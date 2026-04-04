@@ -120,7 +120,7 @@ enum AgentType: String, Codable, Hashable {
   case ai
 }
 
-struct Agent: Identifiable, Codable, Equatable {
+struct Agent: Identifiable, Codable, Equatable, Hashable {
   let id: String
   var name: String
   var avatar: String?

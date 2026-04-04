@@ -1,96 +1,493 @@
 import SwiftUI
 
-// ─── Task List View ────────────────────────────────────────────────────────────
+// Things-style task list. See docs/things-reference/screens.md
 
 struct TaskListView: View {
   @EnvironmentObject var client: ConvexClient
+  @EnvironmentObject var nav: NavigationState
+
   @State private var tasks: [EngageTask] = []
+  @State private var areas: [Area] = []
+  @State private var projects: [Project] = []
   @State private var isLoading = false
   @State private var errorMessage: String?
+
+  // Inline new-task entry
+  @State private var isCreating = false
+  @State private var draftTitle = ""
+  @State private var draftNotes = ""
+
+  // Inline title edit
+  @State private var editingTaskId: String? = nil
+  @State private var editingTitle: String = ""
+  @FocusState private var editFieldFocused: Bool
+
+  // Multi-select
+  @State private var selectMode = false
+  @State private var selection: Set<String> = []
+
+  // Recently-completed visibility
+  @State private var recentlyCompleted: Set<String> = []
+
+  // Sheets for multi-select actions
+  @State private var showingWhenSheet = false
+  @State private var showingMoveSheet = false
 
   let filter: TaskFilter
 
   var body: some View {
-    Group {
-      if isLoading && tasks.isEmpty {
-        ProgressView()
-      } else if let error = errorMessage {
-        ContentUnavailableView("Error", systemImage: "exclamationmark.triangle", description: Text(error))
-      } else if tasks.isEmpty {
-        ContentUnavailableView("No tasks", systemImage: "checkmark.circle", description: Text("Nothing here yet"))
-      } else {
-        List {
-          ForEach(filteredTasks) { task in
-            NavigationLink(value: task) {
-              TaskRowView(task: task)
-            }
-            .swipeActions(edge: .trailing) {
-              Button(role: .destructive) {
-                cancel(task)
-              } label: {
-                Label("Cancel", systemImage: "xmark")
-              }
-              Button {
-                complete(task)
-              } label: {
-                Label("Done", systemImage: "checkmark")
-              }
-              .tint(.green)
-            }
-            .swipeActions(edge: .leading) {
-              assignToAgentAction(task)
-            }
+    ZStack(alignment: .bottom) {
+      ScrollView {
+        VStack(alignment: .leading, spacing: 0) {
+          ScreenTitle(icon: titleIcon, iconTint: titleTint, title: filter.title)
+
+          if filteredTasks.isEmpty && !isLoading {
+            Text("Nothing here yet")
+              .font(.thingsMeta)
+              .foregroundStyle(.secondary)
+              .padding(.horizontal, Theme.hPadding)
+              .padding(.top, 40)
           }
+
+          if shouldGroup {
+            groupedList
+          } else {
+            flatList
+          }
+
+          if isCreating {
+            InlineNewTaskRow(
+              title: $draftTitle, notes: $draftNotes,
+              defaultWhen: whenLabel, defaultWhenIcon: titleIcon, defaultWhenTint: titleTint,
+              onCommit: { commitDraft() }, onCancel: { cancelDraft() }
+            )
+            .padding(.top, 8)
+          }
+
+          Spacer(minLength: 140)
         }
-        .listStyle(.plain)
-        .refreshable {
-          await load()
+      }
+      .background(Color(.systemBackground))
+
+      trailingFloater
+    }
+    .navigationBarTitleDisplayMode(.inline)
+    .toolbar { toolbarContent }
+    .sheet(isPresented: $showingWhenSheet) {
+      WhenPickerSheet(onPick: { date in applyDueToSelected(date) })
+        .presentationDetents([.medium])
+    }
+    .sheet(isPresented: $showingMoveSheet) {
+      MovePickerSheet(areas: areas, projects: projects, onPick: { areaId, projectId in
+        applyMoveToSelected(areaId: areaId, projectId: projectId)
+      })
+      .presentationDetents([.medium, .large])
+    }
+    .task(id: filter) {
+      await load()
+      if nav.autoStartEntry {
+        nav.autoStartEntry = false
+        startDraft()
+      }
+    }
+  }
+
+  // MARK: - Toolbar
+
+  @ToolbarContentBuilder
+  private var toolbarContent: some ToolbarContent {
+    ToolbarItem(placement: .topBarTrailing) {
+      if selectMode {
+        Button("Done") { exitSelectMode() }
+          .font(.system(size: 15, weight: .semibold))
+      } else if editingTaskId != nil {
+        Button("Done") { commitEdit() }
+          .font(.system(size: 15, weight: .semibold))
+      } else {
+        Button {
+          // placeholder for ••• menu
+        } label: {
+          Image(systemName: "ellipsis.circle")
+            .foregroundStyle(.secondary)
         }
       }
     }
-    .navigationTitle(filter.title)
-
-    .task(id: filter.title) { await load() }
   }
+
+  // MARK: - Floating UI
+
+  @ViewBuilder
+  private var trailingFloater: some View {
+    if selectMode {
+      MultiSelectBar(
+        count: selection.count,
+        onWhen: { showingWhenSheet = true },
+        onMove: { showingMoveSheet = true },
+        onDelete: deleteSelected,
+        onMore: { /* TODO */ }
+      )
+      .padding(.horizontal, 24)
+      .padding(.bottom, 20)
+      .transition(.move(edge: .bottom).combined(with: .opacity))
+    } else if isCreating {
+      HStack {
+        Spacer()
+        Button {
+          if draftTitle.trimmingCharacters(in: .whitespaces).isEmpty { cancelDraft() } else { commitDraft() }
+        } label: {
+          Text("Done")
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 10)
+            .background(Theme.magicPlusBlue)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+      }
+      .padding(.trailing, Theme.hPadding)
+      .padding(.bottom, 20)
+    } else {
+      HStack {
+        Spacer()
+        MagicPlusButton { startDraft() }
+      }
+      .padding(.trailing, Theme.hPadding)
+      .padding(.bottom, 20)
+    }
+  }
+
+  // MARK: - List variants
+
+  private var flatList: some View {
+    VStack(spacing: 0) {
+      ForEach(filteredTasks) { task in
+        row(task)
+        Hairline()
+      }
+    }
+  }
+
+  private var groupedList: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      let ungrouped = filteredTasks.filter { $0.project == nil }
+      if !ungrouped.isEmpty {
+        ForEach(ungrouped) { task in
+          row(task)
+          Hairline()
+        }
+      }
+      ForEach(groupedByProject, id: \.0.id) { project, items in
+        ListSectionHeader(
+          icon: "circle", iconTint: .secondary, title: project.name,
+          onTap: selectMode ? nil : { nav.path.append(.project(project)) }
+        )
+        Hairline()
+        ForEach(items) { task in
+          row(task)
+          Hairline()
+        }
+      }
+    }
+  }
+
+  // MARK: - Row
+
+  @ViewBuilder
+  private func row(_ task: EngageTask) -> some View {
+    HStack(spacing: 12) {
+      ThingsCheckbox(isDone: task.status == .completed) {
+        if !selectMode && editingTaskId != task.id { toggle(task) }
+      }
+      .allowsHitTesting(!selectMode && editingTaskId != task.id)
+      .opacity(selectMode ? 0.5 : 1)
+
+      if editingTaskId == task.id {
+        TextField("Title", text: $editingTitle)
+          .font(.thingsTaskTitle)
+          .focused($editFieldFocused)
+          .submitLabel(.done)
+          .onSubmit { commitEdit() }
+        Spacer(minLength: 8)
+      } else {
+        Button {
+          if selectMode {
+            toggleSelection(task.id)
+          } else {
+            startEdit(task)
+          }
+        } label: {
+          HStack(spacing: 6) {
+            Text(task.title)
+              .font(.thingsTaskTitle)
+              .foregroundStyle(task.status == .completed ? .secondary : .primary)
+              .strikethrough(task.status == .completed)
+              .opacity(task.status == .completed ? 0.5 : 1)
+              .lineLimit(2)
+              .multilineTextAlignment(.leading)
+            Spacer(minLength: 8)
+            if selectMode {
+              RadioCircle(isSelected: selection.contains(task.id))
+            } else {
+              trailingMeta(task)
+            }
+          }
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .swipeLeftToSelect {
+          if selectMode {
+            if !selection.contains(task.id) { toggleSelection(task.id) }
+          } else {
+            enterSelectMode(with: task.id)
+          }
+        }
+      }
+    }
+    .padding(.horizontal, Theme.hPadding)
+    .padding(.vertical, 12)
+    .frame(minHeight: Theme.rowHeight)
+    .background(selectMode && selection.contains(task.id) ? Theme.rowSelected : Color.clear)
+  }
+
+  @ViewBuilder
+  private func trailingMeta(_ task: EngageTask) -> some View {
+    HStack(spacing: 6) {
+      if task.isRecurring {
+        Image(systemName: "arrow.triangle.2.circlepath")
+          .font(.system(size: 12))
+          .foregroundStyle(.secondary)
+      }
+      if let due = task.due { deadlineLabel(for: due) }
+    }
+  }
+
+  @ViewBuilder
+  private func deadlineLabel(for date: Date) -> some View {
+    let cal = Calendar.current
+    let today = cal.startOfDay(for: Date())
+    let target = cal.startOfDay(for: date)
+    let days = cal.dateComponents([.day], from: today, to: target).day ?? 0
+    HStack(spacing: 3) {
+      Image(systemName: "flag.fill").font(.system(size: 11))
+      Text(days < 0 ? "\(-days)d over" : days == 0 ? "today" : days == 1 ? "1d left" : "\(days)d left")
+        .font(.thingsMeta)
+    }
+    .foregroundStyle(days == 0 ? Theme.overdueRed : .secondary)
+  }
+
+  // MARK: - Edit mode
+
+  private func startEdit(_ task: EngageTask) {
+    if editingTaskId != nil && editingTaskId != task.id { commitEdit() }
+    editingTaskId = task.id
+    editingTitle = task.title
+    editFieldFocused = true
+  }
+
+  private func commitEdit() {
+    guard let id = editingTaskId else { return }
+    let trimmed = editingTitle.trimmingCharacters(in: .whitespaces)
+    editingTaskId = nil
+    editFieldFocused = false
+    guard !trimmed.isEmpty else { return }
+    if let original = tasks.first(where: { $0.id == id }), original.title == trimmed { return }
+    Task {
+      try? await client.taskUpdate(id: id, patch: ["title": trimmed], actor: "human")
+      await load()
+    }
+  }
+
+  // MARK: - Selection mode
+
+  private func enterSelectMode(with initialId: String) {
+    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    withAnimation(.easeOut(duration: 0.2)) {
+      selectMode = true
+      selection = [initialId]
+    }
+  }
+
+  private func toggleSelection(_ id: String) {
+    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    if selection.contains(id) {
+      selection.remove(id)
+    } else {
+      selection.insert(id)
+    }
+  }
+
+  private func exitSelectMode() {
+    withAnimation(.easeOut(duration: 0.2)) {
+      selectMode = false
+      selection = []
+    }
+  }
+
+  private func applyDueToSelected(_ date: Date?) {
+    let ids = Array(selection)
+    let patch: [String: Any] = ["due": date.map { Int($0.timeIntervalSince1970 * 1000) } ?? NSNull()]
+    Task {
+      for id in ids {
+        try? await client.taskUpdate(id: id, patch: patch, actor: "human")
+      }
+      await load()
+      exitSelectMode()
+    }
+  }
+
+  private func applyMoveToSelected(areaId: String?, projectId: String?) {
+    let ids = Array(selection)
+    var patch: [String: Any] = [:]
+    patch["area"] = areaId ?? NSNull()
+    patch["project"] = projectId ?? NSNull()
+    Task {
+      for id in ids {
+        try? await client.taskUpdate(id: id, patch: patch, actor: "human")
+      }
+      await load()
+      exitSelectMode()
+    }
+  }
+
+  private func deleteSelected() {
+    let ids = Array(selection)
+    Task {
+      for id in ids {
+        try? await client.taskCancel(id: id, actor: "human")
+      }
+      await load()
+      exitSelectMode()
+    }
+  }
+
+  // MARK: - Derived
+
+  private var shouldGroup: Bool {
+    switch filter {
+    case .today, .upcoming, .anytime, .someday: return true
+    default: return false
+    }
+  }
+
+  private var groupedByProject: [(Project, [EngageTask])] {
+    let withProject = filteredTasks.filter { $0.project != nil }
+    let byId = Dictionary(grouping: withProject) { $0.project! }
+    return byId.compactMap { pid, items -> (Project, [EngageTask])? in
+      guard let p = projects.first(where: { $0.id == pid }) else { return nil }
+      return (p, items)
+    }.sorted { $0.0.sortOrder < $1.0.sortOrder }
+  }
+
+  private var titleIcon: String {
+    switch filter {
+    case .inbox: return "tray.fill"
+    case .today: return "star.fill"
+    case .upcoming: return "calendar"
+    case .anytime: return "square.stack.3d.up.fill"
+    case .someday: return "archivebox.fill"
+    case .logbook: return "checkmark.square.fill"
+    case .review: return "exclamationmark.triangle.fill"
+    case .project, .area: return "circle"
+    }
+  }
+
+  private var titleTint: Color {
+    switch filter {
+    case .inbox: return Theme.inboxBlue
+    case .today: return Theme.todayYellow
+    case .upcoming: return Theme.upcomingRed
+    case .anytime: return Theme.anytimeTeal
+    case .someday: return Theme.somedayTan
+    case .logbook: return Theme.logbookGreen
+    default: return .secondary
+    }
+  }
+
+  private var whenLabel: String {
+    switch filter {
+    case .today: return "Today"
+    case .inbox: return "Inbox"
+    case .upcoming: return "Upcoming"
+    case .anytime: return "Anytime"
+    case .someday: return "Someday"
+    default: return "Today"
+    }
+  }
+
+  // MARK: - Inline entry
+
+  private func startDraft() {
+    draftTitle = ""; draftNotes = ""
+    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { isCreating = true }
+  }
+
+  private func cancelDraft() {
+    withAnimation(.easeOut(duration: 0.2)) { isCreating = false }
+    draftTitle = ""; draftNotes = ""
+  }
+
+  private func commitDraft() {
+    let title = draftTitle.trimmingCharacters(in: .whitespaces)
+    guard !title.isEmpty else { cancelDraft(); return }
+    let notes = draftNotes.isEmpty ? nil : draftNotes
+
+    var due: Date? = nil
+    var project: String? = nil
+    var area: String? = nil
+    let today = Calendar.current.startOfDay(for: Date())
+    switch filter {
+    case .today: due = today
+    case .project(let pid): project = pid
+    case .area(let aid): area = aid
+    default: break
+    }
+    if let parsed = EngageDateParser.parse(title) { due = parsed }
+    let repeatRule = EngageDateParser.parseRepeatRule(title)
+
+    Task {
+      do {
+        try await client.taskCreate(
+          title: title, notes: notes, origin: .human, owner: "human",
+          area: area, project: project, due: due, repeatRule: repeatRule
+        )
+        draftTitle = ""; draftNotes = ""
+        await load()
+      } catch {
+        errorMessage = error.localizedDescription
+      }
+    }
+  }
+
+  // MARK: - Filter + load
 
   private var filteredTasks: [EngageTask] {
     let calendar = Calendar.current
     let today = calendar.startOfDay(for: Date())
-    let tomorrow = calendar.date(byAdding: .day, value: 1, to: today)!
-    let weekEnd = calendar.date(byAdding: .day, value: 7, to: today)!
-
     return tasks.filter { task in
+      let isActive = task.status == .open || recentlyCompleted.contains(task.id)
       switch filter {
       case .inbox:
-        return task.status == .open && task.area == nil && task.project == nil && task.due == nil && task.start == nil
+        return isActive && task.area == nil && task.project == nil && task.due == nil && task.start == nil
       case .today:
-        return task.status == .open && (
+        return isActive && (
           (task.due != nil && calendar.isDate(task.due!, inSameDayAs: today)) ||
-          (task.start != nil && calendar.isDate(task.start!, inSameDayAs: today))
+          (task.start != nil && calendar.isDate(task.start!, inSameDayAs: today)) ||
+          (task.due != nil && task.due! < today)
         )
       case .upcoming(let days):
         let end = calendar.date(byAdding: .day, value: days, to: today)!
-        return task.status == .open && (
+        return isActive && (
           (task.due != nil && task.due! >= today && task.due! <= end) ||
           (task.start != nil && task.start! >= today && task.start! <= end)
         )
       case .anytime:
-        return task.status == .open && task.due == nil && task.start == nil
-      case .someday:
-        return task.status == .open && false // someday = cancelled/someday flag
-      case .project(let projectId):
-        return task.status == .open && task.project == projectId
-      case .area(let areaId):
-        return task.status == .open && task.area == areaId
-      case .review:
-        // Stale: no activity in 5+ days
-        let stale = calendar.date(byAdding: .day, value: -5, to: today)!
-        return task.status == .open && (
-          task.agentStatus == .blocked ||
-          (task.completedAt == nil && (task.due == nil || task.due! < today))
-        )
-      case .logbook:
-        return task.status == .completed || task.status == .cancelled
+        return isActive && task.due == nil && task.start == nil && (task.area != nil || task.project != nil)
+      case .someday: return false
+      case .project(let pid): return isActive && task.project == pid
+      case .area(let aid): return isActive && task.area == aid
+      case .review: return task.status == .open && task.agentStatus == .blocked
+      case .logbook: return task.status == .completed || task.status == .cancelled
       }
     }
   }
@@ -99,133 +496,43 @@ struct TaskListView: View {
     isLoading = true
     errorMessage = nil
     do {
-      tasks = try await client.tasksList()
+      async let t = client.tasksList()
+      async let p = client.projectsList()
+      async let a = client.areasList()
+      tasks = try await t
+      projects = try await p
+      areas = try await a
     } catch {
       errorMessage = error.localizedDescription
     }
     isLoading = false
   }
 
-  private func complete(_ task: EngageTask) {
-    Task {
-      do {
-        try await client.taskComplete(id: task.id, completedBy: "human")
-        await load()
-      } catch {
-        errorMessage = error.localizedDescription
-      }
-    }
-  }
-
-  private func cancel(_ task: EngageTask) {
-    Task {
-      do {
-        try await client.taskCancel(id: task.id, actor: "human")
-        await load()
-      } catch {
-        errorMessage = error.localizedDescription
-      }
-    }
-  }
-
-  @ViewBuilder
-  private func assignToAgentAction(_ task: EngageTask) -> some View {
-    Button {
+  private func toggle(_ task: EngageTask) {
+    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    if task.status == .open {
+      recentlyCompleted.insert(task.id)
       Task {
-        try? await client.taskAssign(
+        try? await client.taskComplete(id: task.id, completedBy: "human")
+        await load()
+      }
+    } else if recentlyCompleted.contains(task.id) {
+      recentlyCompleted.remove(task.id)
+      Task {
+        try? await client.taskUpdate(
           id: task.id,
-          owner: "agent",
-          agentAcknowledged: false,
+          patch: ["status": "open", "completedAt": NSNull(), "completedBy": NSNull()],
           actor: "human"
         )
         await load()
       }
-    } label: {
-      Label("Assign to Agent", systemImage: "brain")
     }
-    .tint(.blue)
   }
 }
 
-// ─── Task Row ─────────────────────────────────────────────────────────────────
+// MARK: - Legacy shim
 
 struct TaskRowView: View {
   let task: EngageTask
-  @EnvironmentObject var client: ConvexClient
-  @State private var agents: [Agent] = []
-
-  var body: some View {
-    HStack(spacing: 8) {
-      // Origin badge
-      originBadge
-
-      VStack(alignment: .leading, spacing: 2) {
-        Text(task.title)
-          .font(.body)
-          .strikethrough(task.status == .completed)
-          .foregroundStyle(task.status == .completed ? .secondary : .primary)
-
-        if let notes = task.notes, !notes.isEmpty {
-          Text(notes)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-        }
-
-        HStack(spacing: 6) {
-          if let due = task.due {
-            Label(EngageDateFormatter.relative(due), systemImage: "calendar")
-              .font(.caption2)
-              .foregroundStyle(dueColor(due))
-          }
-          if task.isRecurring {
-            Image(systemName: "repeat")
-              .font(.caption2)
-              .foregroundStyle(.secondary)
-          }
-          if task.agentAssignedMe {
-            Image(systemName: "brain")
-              .font(.caption2)
-              .foregroundStyle(.blue)
-          }
-        }
-      }
-
-      Spacer()
-
-      // Priority indicator
-      if task.priority >= 2 {
-        Circle()
-          .fill(task.priority == 3 ? .red : .orange)
-          .frame(width: 6, height: 6)
-      }
-
-      if task.status == .completed {
-        Image(systemName: "checkmark.circle.fill")
-          .foregroundStyle(.green)
-      }
-    }
-    .padding(.vertical, 2)
-    .task { agents = (try? await client.agentsList()) ?? [] }
-  }
-
-  @ViewBuilder
-  private var originBadge: some View {
-    if task.origin == .agent {
-      Image(systemName: "brain")
-        .font(.caption)
-        .foregroundStyle(.blue)
-    } else {
-      Image(systemName: "person")
-        .font(.caption)
-        .foregroundStyle(.secondary)
-    }
-  }
-
-  private func dueColor(_ date: Date) -> Color {
-    let calendar = Calendar.current
-    if calendar.isDateInToday(date) { return .primary }
-    if date < Date() { return .red }
-    return .secondary
-  }
+  var body: some View { ThingsTaskRow(task: task) }
 }

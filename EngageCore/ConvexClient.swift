@@ -182,6 +182,28 @@ final class ConvexClient: ObservableObject {
     return items.compactMap { dictToProject($0) }
   }
 
+  func areaCreate(name: String, icon: String? = nil, color: String? = nil, sortOrder: Int = 0) async throws {
+    var args: [String: Any] = ["name": name, "sortOrder": sortOrder]
+    if let icon { args["icon"] = icon }
+    if let color { args["color"] = color }
+    try await convexMutation(endpoint: "areas:create", args: args)
+  }
+
+  func projectCreate(name: String, area: String? = nil, notes: String? = nil, sortOrder: Int = 0) async throws {
+    var args: [String: Any] = ["name": name, "sortOrder": sortOrder]
+    if let area { args["area"] = area }
+    if let notes { args["notes"] = notes }
+    try await convexMutation(endpoint: "projects:create", args: args)
+  }
+
+  func areaUpdate(id: String, patch: [String: Any]) async throws {
+    try await convexMutation(endpoint: "areas:update", args: ["id": id, "patch": patch])
+  }
+
+  func projectUpdate(id: String, patch: [String: Any]) async throws {
+    try await convexMutation(endpoint: "projects:update", args: ["id": id, "patch": patch])
+  }
+
   func tagsList() async throws -> [Tag] {
     let items = try await convexRequest(endpoint: "tags:list", args: [:])
     return items.compactMap { dictToTag($0) }
