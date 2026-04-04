@@ -71,9 +71,16 @@ struct SidebarView: View {
   @EnvironmentObject var nav: NavigationState
 
   var body: some View {
-    List(NavigationState.Tab.allCases, selection: $nav.selectedTab) { tab in
-      Label(tab.rawValue.capitalized, systemImage: tab.icon)
-        .tag(tab)
+    List {
+      ForEach(NavigationState.Tab.allCases) { tab in
+        Label(tab.rawValue.capitalized, systemImage: tab.icon)
+          .tag(tab)
+          .listRowBackground(nav.selectedTab == tab ? Color.accentColor.opacity(0.15) : Color.clear)
+          .contentShape(Rectangle())
+          .onTapGesture {
+            nav.selectedTab = tab
+          }
+      }
     }
     .listStyle(.sidebar)
     .toolbar {
