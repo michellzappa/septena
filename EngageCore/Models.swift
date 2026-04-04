@@ -70,7 +70,7 @@ struct ChecklistItem: Identifiable, Codable, Equatable {
 
 // ─── Area ─────────────────────────────────────────────────────────────────────
 
-struct Area: Identifiable, Codable, Equatable {
+struct Area: Identifiable, Codable, Equatable, Hashable {
   let id: String
   var name: String
   var icon: String?
@@ -86,7 +86,7 @@ enum ProjectStatus: String, Codable {
   case dropped
 }
 
-struct Project: Identifiable, Codable, Equatable {
+struct Project: Identifiable, Codable, Equatable, Hashable {
   let id: String
   var name: String
   var area: String?
