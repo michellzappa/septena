@@ -20,7 +20,7 @@ enum TaskAgentStatus: String, Codable {
   case done
 }
 
-struct EngageTask: Identifiable, Codable, Equatable {
+struct EngageTask: Identifiable, Codable, Equatable, Hashable {
   let id: String
   var title: String
   var notes: String?
@@ -62,7 +62,7 @@ struct EngageTask: Identifiable, Codable, Equatable {
   }
 }
 
-struct ChecklistItem: Identifiable, Codable, Equatable {
+struct ChecklistItem: Identifiable, Codable, Equatable, Hashable {
   let id: String
   var title: String
   var done: Bool
@@ -165,7 +165,7 @@ struct CollaborationLogEntry: Identifiable, Codable, Equatable {
 
 // ─── View Filters ─────────────────────────────────────────────────────────────
 
-enum TaskFilter {
+enum TaskFilter: Equatable, Hashable {
   case inbox
   case today
   case upcoming(days: Int)
