@@ -4,7 +4,6 @@ import SwiftUI
 
 struct TaskListView: View {
   @EnvironmentObject var client: ConvexClient
-  @EnvironmentObject var nav: NavigationState
   @State private var tasks: [EngageTask] = []
   @State private var isLoading = false
   @State private var errorMessage: String?
@@ -20,26 +19,27 @@ struct TaskListView: View {
       } else if tasks.isEmpty {
         ContentUnavailableView("No tasks", systemImage: "checkmark.circle", description: Text("Nothing here yet"))
       } else {
-        List(selection: $nav.selectedTask) {
+        List {
           ForEach(filteredTasks) { task in
-            TaskRowView(task: task)
-              .tag(task)
-              .swipeActions(edge: .trailing) {
-                Button(role: .destructive) {
-                  cancel(task)
-                } label: {
-                  Label("Cancel", systemImage: "xmark")
-                }
-                Button {
-                  complete(task)
-                } label: {
-                  Label("Done", systemImage: "checkmark")
-                }
-                .tint(.green)
+            NavigationLink(value: task) {
+              TaskRowView(task: task)
+            }
+            .swipeActions(edge: .trailing) {
+              Button(role: .destructive) {
+                cancel(task)
+              } label: {
+                Label("Cancel", systemImage: "xmark")
               }
-              .swipeActions(edge: .leading) {
-                assignToAgentAction(task)
+              Button {
+                complete(task)
+              } label: {
+                Label("Done", systemImage: "checkmark")
               }
+              .tint(.green)
+            }
+            .swipeActions(edge: .leading) {
+              assignToAgentAction(task)
+            }
           }
         }
         .listStyle(.plain)
@@ -58,8 +58,7 @@ struct TaskListView: View {
         }
       }
     }
-    .task { await load() }
-    .onChange(of: filter) { _, _ in Task { await load() } }
+    .task(id: filter.title) { await load() }
   }
 
   private var filteredTasks: [EngageTask] {

@@ -11,7 +11,6 @@ struct EngageApp: App {
         .environmentObject(client)
         .environmentObject(navigation)
         .onAppear {
-          // Configure appearance
           UITableView.appearance().keyboardDismissMode = .interactive
         }
     }
@@ -27,9 +26,9 @@ final class NavigationState: ObservableObject {
   @Published var showingQuickEntry = false
   @Published var showingAgentPanel = false
 
-  enum Tab: String, CaseIterable, Identifiable {
-    case inbox, today, upcoming, anytime, projects, areas, logbook, review
-    var id: String { rawValue }
+  enum Tab: Int, CaseIterable, Identifiable {
+    case inbox = 0, today, upcoming, anytime, projects, areas, logbook, review
+    var id: Int { rawValue }
   }
 }
 
@@ -40,20 +39,54 @@ struct ContentView: View {
   @EnvironmentObject var nav: NavigationState
 
   var body: some View {
-    NavigationSplitView {
-      SidebarView()
-    } content: {
-      TaskListView(filter: nav.selectedTab.filter)
-    } detail: {
-      if let task = nav.selectedTask {
-        TaskDetailView(task: task)
-      } else {
-        ContentUnavailableView(
-          "Select a task",
-          systemImage: "checkmark.circle",
-          description: Text("Choose a task from the list to see details")
-        )
-      }
+    TabView(selection: $nav.selectedTab) {
+      TaskListView(filter: .inbox)
+        .tabItem {
+          Label("Inbox", systemImage: "tray")
+        }
+        .tag(NavigationState.Tab.inbox)
+
+      TaskListView(filter: .today)
+        .tabItem {
+          Label("Today", systemImage: "sun.max")
+        }
+        .tag(NavigationState.Tab.today)
+
+      TaskListView(filter: .upcoming(days: 7))
+        .tabItem {
+          Label("Upcoming", systemImage: "calendar")
+        }
+        .tag(NavigationState.Tab.upcoming)
+
+      TaskListView(filter: .anytime)
+        .tabItem {
+          Label("Anytime", systemImage: "circle")
+        }
+        .tag(NavigationState.Tab.anytime)
+
+      ProjectsView()
+        .tabItem {
+          Label("Projects", systemImage: "folder")
+        }
+        .tag(NavigationState.Tab.projects)
+
+      AreasView()
+        .tabItem {
+          Label("Areas", systemImage: "square.grid.2x2")
+        }
+        .tag(NavigationState.Tab.areas)
+
+      LogbookView()
+        .tabItem {
+          Label("Logbook", systemImage: "book.closed")
+        }
+        .tag(NavigationState.Tab.logbook)
+
+      ReviewView()
+        .tabItem {
+          Label("Review", systemImage: "exclamationmark.triangle")
+        }
+        .tag(NavigationState.Tab.review)
     }
     .sheet(isPresented: $nav.showingQuickEntry) {
       QuickEntryView()
@@ -61,28 +94,6 @@ struct ContentView: View {
     .sheet(isPresented: $nav.showingAgentPanel) {
       AgentPanelView()
     }
-    .keyboardShortcut("n", modifiers: .command)
-  }
-}
-
-// ─── Sidebar ─────────────────────────────────────────────────────────────────
-
-struct SidebarView: View {
-  @EnvironmentObject var nav: NavigationState
-
-  var body: some View {
-    List {
-      ForEach(NavigationState.Tab.allCases) { tab in
-        Label(tab.rawValue.capitalized, systemImage: tab.icon)
-          .tag(tab)
-          .listRowBackground(nav.selectedTab == tab ? Color.accentColor.opacity(0.15) : Color.clear)
-          .contentShape(Rectangle())
-          .onTapGesture {
-            nav.selectedTab = tab
-          }
-      }
-    }
-    .listStyle(.sidebar)
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         Button {
@@ -100,34 +111,10 @@ struct SidebarView: View {
         }
       }
     }
-    .navigationTitle("Engage")
-  }
-}
-
-extension NavigationState.Tab {
-  var filter: TaskFilter {
-    switch self {
-    case .inbox: return .inbox
-    case .today: return .today
-    case .upcoming: return .upcoming(days: 7)
-    case .anytime: return .anytime
-    case .projects: return .anytime // overridden in ProjectsView
-    case .areas: return .anytime    // overridden in AreasView
-    case .logbook: return .logbook
-    case .review: return .review
-    }
-  }
-
-  var icon: String {
-    switch self {
-    case .inbox: return "tray"
-    case .today: return "sun.max"
-    case .upcoming: return "calendar"
-    case .anytime: return "circle"
-    case .projects: return "folder"
-    case .areas: return "square.grid.2x2"
-    case .logbook: return "book.closed"
-    case .review: return "exclamationmark.triangle"
+    .navigationDestination(for: EngageTask.self) { task in
+      TaskDetailView(task: task)
     }
   }
 }
+
+// ─── Navigation (no longer needed, replaced by TabView) ────────────────────────
