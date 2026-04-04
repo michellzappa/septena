@@ -10,20 +10,17 @@ final class ConvexClient: ObservableObject {
   private let convexKey: String
 
   private init() {
-    self.convexUrl = Bundle.main.object(forInfoDictionaryKey: "ENGAGE_CONVEX_URL") as? String
-      ?? ProcessInfo.processInfo.environment["ENGAGE_CONVEX_URL"]
+    self.convexUrl = ProcessInfo.processInfo.environment["ENGAGE_CONVEX_URL"]
       ?? "https://fiery-oriole-57.eu-west-1.convex.cloud"
 
-    self.convexKey = Bundle.main.object(forInfoDictionaryKey: "ENGAGE_CONVEX_KEY") as? String
-      ?? ProcessInfo.processInfo.environment["ENGAGE_CONVEX_KEY"]
-      ?? ""
+    self.convexKey = ProcessInfo.processInfo.environment["ENGAGE_CONVEX_KEY"] ?? ""
   }
 
   var isConfigured: Bool { !convexKey.isEmpty }
 
   // ─── HTTP Helpers ─────────────────────────────────────────────────────────
 
-  private func query<T: Decodable>(endpoint: String, args: [String: Any] = [:]) async throws -> T {
+  private func convexRequest(endpoint: String, args: [String: Any] = [:]) async throws -> [String: Any] {
     let url = URL(string: "\(convexUrl)/api/query")!
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
@@ -33,7 +30,7 @@ final class ConvexClient: ObservableObject {
     }
     request.setValue("engage-swift/1.0", forHTTPHeaderField: "Convex-Client")
 
-    let body: [String: Any] = ["endpoint": endpoint, "args": Args(args)]
+    let body: [String: Any] = ["endpoint": endpoint, "args": args]
     request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
     let (data, response) = try await URLSession.shared.data(for: request)
@@ -41,14 +38,22 @@ final class ConvexClient: ObservableObject {
       throw ConvexError.requestFailed
     }
 
-    let wrapper = try JSONDecoder().decode(QueryResponse<T>.self, from: data)
-    if let error = wrapper.error {
+    guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      throw ConvexError.invalidResponse
+    }
+
+    if let error = json["error"] as? String {
       throw ConvexError.serverError(error)
     }
-    return wrapper.value
+
+    guard json["value"] != nil else {
+      throw ConvexError.invalidResponse
+    }
+
+    return json
   }
 
-  private func mutation(endpoint: String, args: [String: Any] = [:]) async throws {
+  private func convexMutation(endpoint: String, args: [String: Any] = [:]) async throws {
     let url = URL(string: "\(convexUrl)/api/mutation")!
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
@@ -58,7 +63,7 @@ final class ConvexClient: ObservableObject {
     }
     request.setValue("engage-swift/1.0", forHTTPHeaderField: "Convex-Client")
 
-    let body: [String: Any] = ["endpoint": endpoint, "args": Args(args), "continuation": NSNull()]
+    let body: [String: Any] = ["endpoint": endpoint, "args": args, "continuation": NSNull()]
     request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
     let (data, response) = try await URLSession.shared.data(for: request)
@@ -66,8 +71,11 @@ final class ConvexClient: ObservableObject {
       throw ConvexError.requestFailed
     }
 
-    let wrapper = try JSONDecoder().decode(MutationResponse.self, from: data)
-    if let error = wrapper.error {
+    guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      throw ConvexError.invalidResponse
+    }
+
+    if let error = json["error"] as? String {
       throw ConvexError.serverError(error)
     }
   }
@@ -90,14 +98,16 @@ final class ConvexClient: ObservableObject {
     if let agentAssignedMe { filter["agentAssignedMe"] = agentAssignedMe }
     if let staleDays { filter["staleDays"] = staleDays }
 
-    let args: [String: Any] = filter.isEmpty ? [:] : ["filter": filter]
-    let result: [[String: Any]] = try await query(endpoint: "tasks:list", args: args)
-    return result.compactMap { dictToTask($0) }
+    let requestArgs: [String: Any] = filter.isEmpty ? [:] : ["filter": filter]
+    let json = try await convexRequest(endpoint: "tasks:list", args: requestArgs)
+    let items = json["value"] as? [[String: Any]] ?? []
+    return items.compactMap { dictToTask($0) }
   }
 
   func taskComments(taskId: String) async throws -> [Comment] {
-    let result: [[String: Any]] = try await query(endpoint: "tasks:comments", args: ["taskId": taskId])
-    return result.compactMap { dictToComment($0) }
+    let json = try await convexRequest(endpoint: "tasks:comments", args: ["taskId": taskId])
+    let items = json["value"] as? [[String: Any]] ?? []
+    return items.compactMap { dictToComment($0) }
   }
 
   // ─── Task Mutations ────────────────────────────────────────────────────────
@@ -115,7 +125,7 @@ final class ConvexClient: ObservableObject {
     repeatRule: String? = nil,
     conclusionRule: String? = nil,
     agentAssignedMe: Bool = false
-  ) async throws -> String {
+  ) async throws {
     var args: [String: Any] = [
       "title": title,
       "origin": origin.rawValue,
@@ -131,87 +141,89 @@ final class ConvexClient: ObservableObject {
     if let repeatRule { args["repeatRule"] = repeatRule }
     if let conclusionRule { args["conclusionRule"] = conclusionRule }
 
-    try await mutation(endpoint: "tasks:create", args: args)
-    return "" // Convex returns the inserted ID — simplified here
+    try await convexMutation(endpoint: "tasks:create", args: args)
   }
 
   func taskUpdate(id: String, patch: [String: Any], actor: String) async throws {
-    try await mutation(endpoint: "tasks:update", args: ["id": id, "patch": patch, "actor": actor])
+    try await convexMutation(endpoint: "tasks:update", args: ["id": id, "patch": patch, "actor": actor])
   }
 
   func taskComplete(id: String, completedBy: String) async throws {
-    try await mutation(endpoint: "tasks:complete", args: ["id": id, "completedBy": completedBy])
+    try await convexMutation(endpoint: "tasks:complete", args: ["id": id, "completedBy": completedBy])
   }
 
   func taskCancel(id: String, actor: String) async throws {
-    try await mutation(endpoint: "tasks:cancel", args: ["id": id, "actor": actor])
+    try await convexMutation(endpoint: "tasks:cancel", args: ["id": id, "actor": actor])
   }
 
   func taskAssign(id: String, owner: String, agentAcknowledged: Bool, actor: String) async throws {
-    try await mutation(endpoint: "tasks:assign", args: [
+    try await convexMutation(endpoint: "tasks:assign", args: [
       "id": id, "owner": owner, "agentAcknowledged": agentAcknowledged, "actor": actor
     ])
   }
 
   func taskAddComment(taskId: String, actor: String, body: String) async throws {
-    try await mutation(endpoint: "tasks:addComment", args: ["taskId": taskId, "actor": actor, "body": body])
+    try await convexMutation(endpoint: "tasks:addComment", args: ["taskId": taskId, "actor": actor, "body": body])
   }
 
   // ─── Area / Project / Tag ───────────────────────────────────────────────
 
   func areasList() async throws -> [Area] {
-    let result: [[String: Any]] = try await query(endpoint: "areas:list", args: [:])
-    return result.compactMap { dictToArea($0) }
+    let json = try await convexRequest(endpoint: "areas:list", args: [:])
+    let items = json["value"] as? [[String: Any]] ?? []
+    return items.compactMap { dictToArea($0) }
   }
 
   func projectsList(areaId: String? = nil) async throws -> [Project] {
     let args: [String: Any] = areaId.map { ["areaId": $0] } ?? [:]
-    let result: [[String: Any]] = try await query(endpoint: "projects:list", args: args)
-    return result.compactMap { dictToProject($0) }
+    let json = try await convexRequest(endpoint: "projects:list", args: args)
+    let items = json["value"] as? [[String: Any]] ?? []
+    return items.compactMap { dictToProject($0) }
   }
 
   func tagsList() async throws -> [Tag] {
-    let result: [[String: Any]] = try await query(endpoint: "tags:list", args: [:])
-    return result.compactMap { dictToTag($0) }
+    let json = try await convexRequest(endpoint: "tags:list", args: [:])
+    let items = json["value"] as? [[String: Any]] ?? []
+    return items.compactMap { dictToTag($0) }
   }
 
   // ─── Agent ───────────────────────────────────────────────────────────────
 
   func agentsList() async throws -> [Agent] {
-    let result: [[String: Any]] = try await query(endpoint: "agents:list", args: ["activeOnly": true])
-    return result.compactMap { dictToAgent($0) }
+    let json = try await convexRequest(endpoint: "agents:list", args: ["activeOnly": true])
+    let items = json["value"] as? [[String: Any]] ?? []
+    return items.compactMap { dictToAgent($0) }
   }
 
   func agentMemory(agentId: String) async throws -> [AgentMemoryEntry] {
-    let result: [[String: Any]] = try await query(endpoint: "agentMemory:list", args: ["agentId": agentId])
-    return result.compactMap { dictToAgentMemory($0) }
+    let json = try await convexRequest(endpoint: "agentMemory:list", args: ["agentId": agentId])
+    let items = json["value"] as? [[String: Any]] ?? []
+    return items.compactMap { dictToAgentMemory($0) }
   }
 
   func collaborationLog(taskId: String? = nil, limit: Int = 50) async throws -> [CollaborationLogEntry] {
     var args: [String: Any] = ["limit": limit]
     if let taskId { args["taskId"] = taskId }
-    let result: [[String: Any]] = try await query(endpoint: "collaborationLog:list", args: args)
-    return result.compactMap { dictToLogEntry($0) }
+    let json = try await convexRequest(endpoint: "collaborationLog:list", args: args)
+    let items = json["value"] as? [[String: Any]] ?? []
+    return items.compactMap { dictToLogEntry($0) }
   }
-}
-
-// ─── Response Wrappers ─────────────────────────────────────────────────────────
-
-private struct QueryResponse<T: Decodable>: Decodable {
-  let value: T?
-  let error: String?
-}
-
-private struct MutationResponse: Decodable {
-  let value: String?
-  let error: String?
 }
 
 // ─── Errors ────────────────────────────────────────────────────────────────────
 
-enum ConvexError: Error {
+enum ConvexError: Error, LocalizedError {
   case requestFailed
+  case invalidResponse
   case serverError(String)
+
+  var errorDescription: String? {
+    switch self {
+    case .requestFailed: return "Request failed"
+    case .invalidResponse: return "Invalid response"
+    case .serverError(let msg): return msg
+    }
+  }
 }
 
 // ─── Dict Helpers ──────────────────────────────────────────────────────────────
@@ -228,27 +240,16 @@ private func dictToTask(_ d: [String: Any]) -> EngageTask? {
   else { return nil }
 
   return EngageTask(
-    id: id,
-    title: title,
-    notes: d["notes"] as? String,
-    origin: origin,
-    status: status,
-    priority: (d["priority"] as? Int) ?? 0,
-    area: d["area"] as? String,
-    project: d["project"] as? String,
+    id: id, title: title, notes: d["notes"] as? String,
+    origin: origin, status: status, priority: (d["priority"] as? Int) ?? 0,
+    area: d["area"] as? String, project: d["project"] as? String,
     tags: (d["tags"] as? [String]) ?? [],
-    due: msToDate(d["due"] as? Int),
-    dueDateSetBy: d["dueDateSetBy"] as? String,
-    start: msToDate(d["start"] as? Int),
-    end: msToDate(d["end"] as? Int),
-    createdBy: createdBy,
-    owner: owner,
-    completedAt: msToDate(d["completedAt"] as? Int),
-    completedBy: d["completedBy"] as? String,
-    repeatRule: d["repeatRule"] as? String,
-    conclusionRule: d["conclusionRule"] as? String,
-    nextDue: msToDate(d["nextDue"] as? Int),
-    nextDueSetBy: d["nextDueSetBy"] as? String,
+    due: msToDate(d["due"] as? Int), dueDateSetBy: d["dueDateSetBy"] as? String,
+    start: msToDate(d["start"] as? Int), end: msToDate(d["end"] as? Int),
+    createdBy: createdBy, owner: owner,
+    completedAt: msToDate(d["completedAt"] as? Int), completedBy: d["completedBy"] as? String,
+    repeatRule: d["repeatRule"] as? String, conclusionRule: d["conclusionRule"] as? String,
+    nextDue: msToDate(d["nextDue"] as? Int), nextDueSetBy: d["nextDueSetBy"] as? String,
     agentStatus: (d["agentStatus"] as? String).flatMap { TaskAgentStatus(rawValue: $0) },
     agentAssignedMe: (d["agentAssignedMe"] as? Bool) ?? false,
     agentContext: d["agentContext"] as? String,
@@ -306,5 +307,3 @@ private func msToDate(_ ms: Int?) -> Date? {
   guard let ms else { return nil }
   return Date(timeIntervalSince1970: Double(ms) / 1000)
 }
-
-private typealias Args = [String: Any]
