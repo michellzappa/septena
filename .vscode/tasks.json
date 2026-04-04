@@ -1,0 +1,20 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Generate Xcode project",
+      "type": "shell",
+      "command": "xcodegen generate",
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "Install deps and build iOS",
+      "type": "shell",
+      "command": "xcodegen generate && xcodebuild -scheme Engage -destination 'platform=iOS Simulator,name=iPhone 16' build",
+      "problemMatcher": [],
+      "group": "build",
+      "dependsOn": ["Generate Xcode project"]
+    }
+  ]
+}
