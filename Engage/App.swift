@@ -27,8 +27,9 @@ final class NavigationState: ObservableObject {
   @Published var showingQuickEntry = false
   @Published var showingAgentPanel = false
 
-  enum Tab: String, CaseIterable {
+  enum Tab: String, CaseIterable, Identifiable {
     case inbox, today, upcoming, anytime, projects, areas, logbook, review
+    var id: String { rawValue }
   }
 }
 
@@ -60,9 +61,7 @@ struct ContentView: View {
     .sheet(isPresented: $nav.showingAgentPanel) {
       AgentPanelView()
     }
-    .keyboardShortcut("n", modifiers: .command) {
-      nav.showingQuickEntry = true
-    }
+    .keyboardShortcut("n", modifiers: .command)
   }
 }
 
