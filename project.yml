@@ -24,14 +24,6 @@ settings:
     INFOPLIST_KEY_ENGAGE_CONVEX_KEY: "$(ENGAGE_CONVEX_KEY)"
     GCC_PREPROCESSOR_DEFINITIONS: "ENGAGE_CONVEX_URL=$(ENGAGE_CONVEX_URL)"
 
-packages:
-  Convex:
-    url: https://github.com/get-convex/convex-swift
-    from: "1.8.0"
-  swift-algorithms:
-    url: https://github.com/apple/swift-algorithms
-    from: "1.2.0"
-
 targets:
   Engage:
     type: application
@@ -43,10 +35,6 @@ targets:
       - path: EngageCore
         excludes:
           - "**/.DS_Store"
-    dependencies:
-      - package: Convex
-        product: Convex
-      - package: swift-algorithms
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.engage.app
@@ -66,10 +54,6 @@ targets:
       - path: EngageCore
         excludes:
           - "**/.DS_Store"
-    dependencies:
-      - package: Convex
-        product: Convex
-      - package: swift-algorithms
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.engage.mac

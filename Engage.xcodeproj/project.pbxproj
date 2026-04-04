@@ -9,12 +9,10 @@
 /* Begin PBXBuildFile section */
 		00E9AA93E77BF637A10F309B /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B4B249D148D9C7D84EB1779 /* Models.swift */; };
 		075C5C6781C40965760E039E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F497CEC6A37DDC1D2D74F80C /* Assets.xcassets */; };
-		09D0527CA6D804DAF56977FF /* Convex in Frameworks */ = {isa = PBXBuildFile; productRef = B561DC78263ACE4D9F458692 /* Convex */; };
 		11D5C57096ACC41673BE8637 /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4867FD6F5EB8AD7D641AA4B /* DateParser.swift */; };
 		19D6E120A106CABC9A9C944E /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 013DA8579D8AB360424D2364 /* App.swift */; };
 		2D8766F09F3247831A954293 /* QuickEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EDA430711A0E43505194D23 /* QuickEntryView.swift */; };
 		2DBC84FFB519179B4260C705 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B4B249D148D9C7D84EB1779 /* Models.swift */; };
-		30084EB033820A6582A07F40 /* Convex in Frameworks */ = {isa = PBXBuildFile; productRef = C4AE3515B219095A1F4CEADF /* Convex */; };
 		382D5802D173CEB7D49D1064 /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CF658F967CE8DD8713C1ABA /* TaskDetailView.swift */; };
 		3AB227D519DA079DEB144529 /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39A1A629E49B7C9C806828F3 /* TaskListView.swift */; };
 		49AD393568EF186694DF0069 /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CF658F967CE8DD8713C1ABA /* TaskDetailView.swift */; };
@@ -23,19 +21,17 @@
 		884AB749DEDE66B6BBF9D450 /* ConvexClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE53CDACC4992F1DC1F77630 /* ConvexClient.swift */; };
 		8BC693CA1F8E4B701DAC7F7D /* AreasProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EDA60693B28BE50EDD6893F /* AreasProjectsView.swift */; };
 		A2101A7431CE135313961EDF /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5234679D9D2CD9B511692039 /* TodayView.swift */; };
-		AC364FAB98D522369D6DF5F6 /* swift-algorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 30987FE8F64DA958464BF4FB /* swift-algorithms */; };
 		B46457E2181CB00F99BC6E02 /* QuickEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EDA430711A0E43505194D23 /* QuickEntryView.swift */; };
 		BD314D9DEB757D21A9C5A0F6 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5234679D9D2CD9B511692039 /* TodayView.swift */; };
 		C5475709DF8A7936F734C36E /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4867FD6F5EB8AD7D641AA4B /* DateParser.swift */; };
 		C57C11E572D3EDBD5E573F48 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 013DA8579D8AB360424D2364 /* App.swift */; };
 		E1979CF92BA8FE2069959956 /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39A1A629E49B7C9C806828F3 /* TaskListView.swift */; };
 		E64003148A7364BB1547444A /* ConvexClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE53CDACC4992F1DC1F77630 /* ConvexClient.swift */; };
-		E8D26BB285E09557184368DC /* swift-algorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 0AEB0531E7B6F9623632CB3F /* swift-algorithms */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		013DA8579D8AB360424D2364 /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
-		2BF726C8F4A35FEC00630D07 /* Engage.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Engage.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2BF726C8F4A35FEC00630D07 /* Engage.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Engage.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3034684D21811AA5B6091A0D /* EngageMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EngageMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		39A1A629E49B7C9C806828F3 /* TaskListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskListView.swift; sourceTree = "<group>"; };
 		3CF658F967CE8DD8713C1ABA /* TaskDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
@@ -47,27 +43,6 @@
 		DE53CDACC4992F1DC1F77630 /* ConvexClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvexClient.swift; sourceTree = "<group>"; };
 		F497CEC6A37DDC1D2D74F80C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
-
-/* Begin PBXFrameworksBuildPhase section */
-		4A40E976FB8A8E7465EE500D /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				09D0527CA6D804DAF56977FF /* Convex in Frameworks */,
-				E8D26BB285E09557184368DC /* swift-algorithms in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		F8BEBF5E382D4C6123601B72 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				30084EB033820A6582A07F40 /* Convex in Frameworks */,
-				AC364FAB98D522369D6DF5F6 /* swift-algorithms in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		002ED6BD519513C8F2E8EBB4 /* ViewModels */ = {
@@ -153,7 +128,6 @@
 			buildPhases = (
 				AA76F53FC331AB7784F1A953 /* Sources */,
 				4B57E4AA81994DF9B61194D2 /* Resources */,
-				F8BEBF5E382D4C6123601B72 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -161,8 +135,6 @@
 			);
 			name = EngageMac;
 			packageProductDependencies = (
-				C4AE3515B219095A1F4CEADF /* Convex */,
-				30987FE8F64DA958464BF4FB /* swift-algorithms */,
 			);
 			productName = EngageMac;
 			productReference = 3034684D21811AA5B6091A0D /* EngageMac.app */;
@@ -174,7 +146,6 @@
 			buildPhases = (
 				11A6D5EE7575C6C33D59179D /* Sources */,
 				DEEC0AC8618A7601F2C230F4 /* Resources */,
-				4A40E976FB8A8E7465EE500D /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -182,8 +153,6 @@
 			);
 			name = Engage;
 			packageProductDependencies = (
-				B561DC78263ACE4D9F458692 /* Convex */,
-				0AEB0531E7B6F9623632CB3F /* swift-algorithms */,
 			);
 			productName = Engage;
 			productReference = 2BF726C8F4A35FEC00630D07 /* Engage.app */;
@@ -203,6 +172,7 @@
 						ProvisioningStyle = Automatic;
 					};
 					9CB17204916B93C43163E6BA = {
+						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -216,10 +186,6 @@
 			);
 			mainGroup = 6B305994E81D97798B4CA4CC;
 			minimizedProjectReferenceProxies = 1;
-			packageReferences = (
-				81E6CD5FE74185CF4304B0DE /* XCRemoteSwiftPackageReference "convex-swift" */,
-				5466CBD73431B5E3064C1C78 /* XCRemoteSwiftPackageReference "swift-algorithms" */,
-			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BE613B11D916E16A9B7101D6 /* Products */;
 			projectDirPath = "";
@@ -361,6 +327,7 @@
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = "ENGAGE_CONVEX_URL=$(ENGAGE_CONVEX_URL)";
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
@@ -392,7 +359,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = 992N457T8D;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Engage;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -401,9 +367,6 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.engage.app;
 				SDKROOT = iphoneos;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
-				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -453,10 +416,7 @@
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
-				GCC_PREPROCESSOR_DEFINITIONS = (
-					"$(inherited)",
-					"DEBUG=1",
-				);
+				GCC_PREPROCESSOR_DEFINITIONS = "ENGAGE_CONVEX_URL=$(ENGAGE_CONVEX_URL)";
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
@@ -489,7 +449,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = 992N457T8D;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Engage;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -498,9 +457,6 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.engage.app;
 				SDKROOT = iphoneos;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
-				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
@@ -536,48 +492,6 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		5466CBD73431B5E3064C1C78 /* XCRemoteSwiftPackageReference "swift-algorithms" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/apple/swift-algorithms";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.2.0;
-			};
-		};
-		81E6CD5FE74185CF4304B0DE /* XCRemoteSwiftPackageReference "convex-swift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/get-convex/convex-swift";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.8.0;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		0AEB0531E7B6F9623632CB3F /* swift-algorithms */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 5466CBD73431B5E3064C1C78 /* XCRemoteSwiftPackageReference "swift-algorithms" */;
-			productName = "swift-algorithms";
-		};
-		30987FE8F64DA958464BF4FB /* swift-algorithms */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 5466CBD73431B5E3064C1C78 /* XCRemoteSwiftPackageReference "swift-algorithms" */;
-			productName = "swift-algorithms";
-		};
-		B561DC78263ACE4D9F458692 /* Convex */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 81E6CD5FE74185CF4304B0DE /* XCRemoteSwiftPackageReference "convex-swift" */;
-			productName = Convex;
-		};
-		C4AE3515B219095A1F4CEADF /* Convex */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 81E6CD5FE74185CF4304B0DE /* XCRemoteSwiftPackageReference "convex-swift" */;
-			productName = Convex;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 9558183C6CD3F5A0B302C1CF /* Project object */;
 }

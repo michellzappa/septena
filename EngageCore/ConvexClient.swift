@@ -1,18 +1,15 @@
 import Foundation
-import Convex
 
-// ─── Convex Client ─────────────────────────────────────────────────────────────
+// ─── Convex Client (Pure HTTP, no SDK) ─────────────────────────────────────────
 
 @MainActor
 final class ConvexClient: ObservableObject {
   static let shared = ConvexClient()
 
-  private(set) var convex: Convex?
   private let convexUrl: String
   private let convexKey: String
 
   private init() {
-    // Load from app config — replace with your project values
     self.convexUrl = Bundle.main.object(forInfoDictionaryKey: "ENGAGE_CONVEX_URL") as? String
       ?? ProcessInfo.processInfo.environment["ENGAGE_CONVEX_URL"]
       ?? "https://fiery-oriole-57.eu-west-1.convex.cloud"
@@ -20,16 +17,60 @@ final class ConvexClient: ObservableObject {
     self.convexKey = Bundle.main.object(forInfoDictionaryKey: "ENGAGE_CONVEX_KEY") as? String
       ?? ProcessInfo.processInfo.environment["ENGAGE_CONVEX_KEY"]
       ?? ""
-
-    if !convexKey.isEmpty {
-      self.convex = Convex(
-        deploymentUrl: convexUrl,
-        adminKey: convexKey
-      )
-    }
   }
 
   var isConfigured: Bool { !convexKey.isEmpty }
+
+  // ─── HTTP Helpers ─────────────────────────────────────────────────────────
+
+  private func query<T: Decodable>(endpoint: String, args: [String: Any] = [:]) async throws -> T {
+    let url = URL(string: "\(convexUrl)/api/query")!
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    if !convexKey.isEmpty {
+      request.setValue("Bearer \(convexKey)", forHTTPHeaderField: "Authorization")
+    }
+    request.setValue("engage-swift/1.0", forHTTPHeaderField: "Convex-Client")
+
+    let body: [String: Any] = ["endpoint": endpoint, "args": Args(args)]
+    request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+    let (data, response) = try await URLSession.shared.data(for: request)
+    guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+      throw ConvexError.requestFailed
+    }
+
+    let wrapper = try JSONDecoder().decode(QueryResponse<T>.self, from: data)
+    if let error = wrapper.error {
+      throw ConvexError.serverError(error)
+    }
+    return wrapper.value
+  }
+
+  private func mutation(endpoint: String, args: [String: Any] = [:]) async throws {
+    let url = URL(string: "\(convexUrl)/api/mutation")!
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    if !convexKey.isEmpty {
+      request.setValue("Bearer \(convexKey)", forHTTPHeaderField: "Authorization")
+    }
+    request.setValue("engage-swift/1.0", forHTTPHeaderField: "Convex-Client")
+
+    let body: [String: Any] = ["endpoint": endpoint, "args": Args(args), "continuation": NSNull()]
+    request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+    let (data, response) = try await URLSession.shared.data(for: request)
+    guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+      throw ConvexError.requestFailed
+    }
+
+    let wrapper = try JSONDecoder().decode(MutationResponse.self, from: data)
+    if let error = wrapper.error {
+      throw ConvexError.serverError(error)
+    }
+  }
 
   // ─── Task Queries ─────────────────────────────────────────────────────────
 
@@ -41,8 +82,6 @@ final class ConvexClient: ObservableObject {
     agentAssignedMe: Bool? = nil,
     staleDays: Int? = nil
   ) async throws -> [EngageTask] {
-    guard let convex else { return [] }
-
     var filter: [String: Any] = [:]
     if let status { filter["status"] = status.rawValue }
     if let owner { filter["owner"] = owner }
@@ -52,18 +91,12 @@ final class ConvexClient: ObservableObject {
     if let staleDays { filter["staleDays"] = staleDays }
 
     let args: [String: Any] = filter.isEmpty ? [:] : ["filter": filter]
-    let result: [[String: Any]] = try await convex.query(
-      ConvexFunction(name: "tasks:list", args: Args(args))
-    )
-
+    let result: [[String: Any]] = try await query(endpoint: "tasks:list", args: args)
     return result.compactMap { dictToTask($0) }
   }
 
   func taskComments(taskId: String) async throws -> [Comment] {
-    guard let convex else { return [] }
-    let result: [[String: Any]] = try await convex.query(
-      ConvexFunction(name: "tasks:comments", args: Args(["taskId": taskId]))
-    )
+    let result: [[String: Any]] = try await query(endpoint: "tasks:comments", args: ["taskId": taskId])
     return result.compactMap { dictToComment($0) }
   }
 
@@ -83,8 +116,6 @@ final class ConvexClient: ObservableObject {
     conclusionRule: String? = nil,
     agentAssignedMe: Bool = false
   ) async throws -> String {
-    guard let convex else { throw ConvexError.notConfigured }
-
     var args: [String: Any] = [
       "title": title,
       "origin": origin.rawValue,
@@ -95,137 +126,95 @@ final class ConvexClient: ObservableObject {
     if let notes { args["notes"] = notes }
     if let area { args["area"] = area }
     if let project { args["project"] = project }
-    if let due { args["due"] = due.timeIntervalSince1970 * 1000 }
-    if let start { args["start"] = start.timeIntervalSince1970 * 1000 }
+    if let due { args["due"] = Int(due.timeIntervalSince1970 * 1000) }
+    if let start { args["start"] = Int(start.timeIntervalSince1970 * 1000) }
     if let repeatRule { args["repeatRule"] = repeatRule }
     if let conclusionRule { args["conclusionRule"] = conclusionRule }
 
-    return try await convex.mutation(
-      ConvexFunction(name: "tasks:create", args: Args(args))
-    )
+    try await mutation(endpoint: "tasks:create", args: args)
+    return "" // Convex returns the inserted ID — simplified here
   }
 
-  func taskUpdate(
-    id: String,
-    patch: [String: Any],
-    actor: String
-  ) async throws {
-    guard let convex else { throw ConvexError.notConfigured }
-    var args: [String: Any] = ["id": id, "patch": patch, "actor": actor]
-    try await convex.mutation(ConvexFunction(name: "tasks:update", args: Args(args)))
+  func taskUpdate(id: String, patch: [String: Any], actor: String) async throws {
+    try await mutation(endpoint: "tasks:update", args: ["id": id, "patch": patch, "actor": actor])
   }
 
   func taskComplete(id: String, completedBy: String) async throws {
-    guard let convex else { throw ConvexError.notConfigured }
-    try await convex.mutation(
-      ConvexFunction(
-        name: "tasks:complete",
-        args: Args(["id": id, "completedBy": completedBy])
-      )
-    )
+    try await mutation(endpoint: "tasks:complete", args: ["id": id, "completedBy": completedBy])
   }
 
   func taskCancel(id: String, actor: String) async throws {
-    guard let convex else { throw ConvexError.notConfigured }
-    try await convex.mutation(
-      ConvexFunction(name: "tasks:cancel", args: Args(["id": id, "actor": actor]))
-    )
+    try await mutation(endpoint: "tasks:cancel", args: ["id": id, "actor": actor])
   }
 
-  func taskAssign(
-    id: String,
-    owner: String,
-    agentAcknowledged: Bool,
-    actor: String
-  ) async throws {
-    guard let convex else { throw ConvexError.notConfigured }
-    try await convex.mutation(
-      ConvexFunction(
-        name: "tasks:assign",
-        args: Args([
-          "id": id,
-          "owner": owner,
-          "agentAcknowledged": agentAcknowledged,
-          "actor": actor,
-        ])
-      )
-    )
+  func taskAssign(id: String, owner: String, agentAcknowledged: Bool, actor: String) async throws {
+    try await mutation(endpoint: "tasks:assign", args: [
+      "id": id, "owner": owner, "agentAcknowledged": agentAcknowledged, "actor": actor
+    ])
   }
 
   func taskAddComment(taskId: String, actor: String, body: String) async throws {
-    guard let convex else { throw ConvexError.notConfigured }
-    try await convex.mutation(
-      ConvexFunction(
-        name: "tasks:addComment",
-        args: Args(["taskId": taskId, "actor": actor, "body": body])
-      )
-    )
+    try await mutation(endpoint: "tasks:addComment", args: ["taskId": taskId, "actor": actor, "body": body])
   }
 
   // ─── Area / Project / Tag ───────────────────────────────────────────────
 
   func areasList() async throws -> [Area] {
-    guard let convex else { return [] }
-    let result: [[String: Any]] = try await convex.query(
-      ConvexFunction(name: "areas:list", args: Args([:]))
-    )
+    let result: [[String: Any]] = try await query(endpoint: "areas:list", args: [:])
     return result.compactMap { dictToArea($0) }
   }
 
   func projectsList(areaId: String? = nil) async throws -> [Project] {
-    guard let convex else { return [] }
-    var args: [String: Any] = [:]
-    if let areaId { args["areaId"] = areaId }
-    let result: [[String: Any]] = try await convex.query(
-      ConvexFunction(name: "projects:list", args: Args(args))
-    )
+    let args: [String: Any] = areaId.map { ["areaId": $0] } ?? [:]
+    let result: [[String: Any]] = try await query(endpoint: "projects:list", args: args)
     return result.compactMap { dictToProject($0) }
   }
 
   func tagsList() async throws -> [Tag] {
-    guard let convex else { return [] }
-    let result: [[String: Any]] = try await convex.query(
-      ConvexFunction(name: "tags:list", args: Args([:]))
-    )
+    let result: [[String: Any]] = try await query(endpoint: "tags:list", args: [:])
     return result.compactMap { dictToTag($0) }
   }
 
   // ─── Agent ───────────────────────────────────────────────────────────────
 
   func agentsList() async throws -> [Agent] {
-    guard let convex else { return [] }
-    let result: [[String: Any]] = try await convex.query(
-      ConvexFunction(name: "agents:list", args: Args(["activeOnly": true]))
-    )
+    let result: [[String: Any]] = try await query(endpoint: "agents:list", args: ["activeOnly": true])
     return result.compactMap { dictToAgent($0) }
   }
 
   func agentMemory(agentId: String) async throws -> [AgentMemoryEntry] {
-    guard let convex else { return [] }
-    let result: [[String: Any]] = try await convex.query(
-      ConvexFunction(name: "agentMemory:list", args: Args(["agentId": agentId]))
-    )
+    let result: [[String: Any]] = try await query(endpoint: "agentMemory:list", args: ["agentId": agentId])
     return result.compactMap { dictToAgentMemory($0) }
   }
 
   func collaborationLog(taskId: String? = nil, limit: Int = 50) async throws -> [CollaborationLogEntry] {
-    guard let convex else { return [] }
     var args: [String: Any] = ["limit": limit]
     if let taskId { args["taskId"] = taskId }
-    let result: [[String: Any]] = try await convex.query(
-      ConvexFunction(name: "collaborationLog:list", args: Args(args))
-    )
+    let result: [[String: Any]] = try await query(endpoint: "collaborationLog:list", args: args)
     return result.compactMap { dictToLogEntry($0) }
   }
+}
+
+// ─── Response Wrappers ─────────────────────────────────────────────────────────
+
+private struct QueryResponse<T: Decodable>: Decodable {
+  let value: T?
+  let error: String?
+}
+
+private struct MutationResponse: Decodable {
+  let value: String?
+  let error: String?
 }
 
 // ─── Errors ────────────────────────────────────────────────────────────────────
 
 enum ConvexError: Error {
-  case notConfigured
+  case requestFailed
+  case serverError(String)
 }
 
-// ─── Dict Helpers ─────────────────────────────────────────────────────────────
+// ─── Dict Helpers ──────────────────────────────────────────────────────────────
 
 private func dictToTask(_ d: [String: Any]) -> EngageTask? {
   guard let id = d["_id"] as? String,
@@ -272,24 +261,15 @@ private func dictToTask(_ d: [String: Any]) -> EngageTask? {
 
 private func dictToArea(_ d: [String: Any]) -> Area? {
   guard let id = d["_id"] as? String, let name = d["name"] as? String else { return nil }
-  return Area(
-    id: id,
-    name: name,
-    icon: d["icon"] as? String,
-    sortOrder: (d["sortOrder"] as? Int) ?? 0,
-    color: d["color"] as? String
-  )
+  return Area(id: id, name: name, icon: d["icon"] as? String, sortOrder: (d["sortOrder"] as? Int) ?? 0, color: d["color"] as? String)
 }
 
 private func dictToProject(_ d: [String: Any]) -> Project? {
   guard let id = d["_id"] as? String, let name = d["name"] as? String else { return nil }
   return Project(
-    id: id,
-    name: name,
-    area: d["area"] as? String,
+    id: id, name: name, area: d["area"] as? String,
     status: ProjectStatus(rawValue: (d["status"] as? String) ?? "active") ?? .active,
-    notes: d["notes"] as? String,
-    sortOrder: (d["sortOrder"] as? Int) ?? 0
+    notes: d["notes"] as? String, sortOrder: (d["sortOrder"] as? Int) ?? 0
   )
 }
 
@@ -302,53 +282,24 @@ private func dictToAgent(_ d: [String: Any]) -> Agent? {
   guard let id = d["_id"] as? String, let name = d["name"] as? String,
         let email = d["email"] as? String, let typeStr = d["type"] as? String,
         let type = AgentType(rawValue: typeStr) else { return nil }
-  return Agent(
-    id: id,
-    name: name,
-    avatar: d["avatar"] as? String,
-    email: email,
-    type: type,
-    active: (d["active"] as? Bool) ?? true
-  )
+  return Agent(id: id, name: name, avatar: d["avatar"] as? String, email: email, type: type, active: (d["active"] as? Bool) ?? true)
 }
 
 private func dictToAgentMemory(_ d: [String: Any]) -> AgentMemoryEntry? {
-  guard let id = d["_id"] as? String, let agentId = d["agentId"] as? String,
-        let content = d["content"] as? String else { return nil }
-  return AgentMemoryEntry(
-    id: id,
-    agentId: agentId,
-    taskId: d["taskId"] as? String,
-    content: content,
-    pinned: (d["pinned"] as? Bool) ?? false,
-    updatedAt: msToDate(d["updatedAt"] as? Int) ?? Date()
-  )
+  guard let id = d["_id"] as? String, let agentId = d["agentId"] as? String, let content = d["content"] as? String else { return nil }
+  return AgentMemoryEntry(id: id, agentId: agentId, taskId: d["taskId"] as? String, content: content, pinned: (d["pinned"] as? Bool) ?? false, updatedAt: msToDate(d["updatedAt"] as? Int) ?? Date())
 }
 
 private func dictToComment(_ d: [String: Any]) -> Comment? {
   guard let id = d["_id"] as? String, let taskId = d["taskId"] as? String,
         let actor = d["actor"] as? String, let body = d["body"] as? String else { return nil }
-  return Comment(
-    id: id,
-    taskId: taskId,
-    actor: actor,
-    body: body,
-    createdAt: msToDate(d["createdAt"] as? Int) ?? Date()
-  )
+  return Comment(id: id, taskId: taskId, actor: actor, body: body, createdAt: msToDate(d["createdAt"] as? Int) ?? Date())
 }
 
 private func dictToLogEntry(_ d: [String: Any]) -> CollaborationLogEntry? {
   guard let id = d["_id"] as? String, let actor = d["actor"] as? String,
-        let actionStr = d["action"] as? String,
-        let action = LogAction(rawValue: actionStr) else { return nil }
-  return CollaborationLogEntry(
-    id: id,
-    taskId: d["taskId"] as? String,
-    actor: actor,
-    action: action,
-    content: d["content"] as? String,
-    createdAt: msToDate(d["createdAt"] as? Int) ?? Date()
-  )
+        let actionStr = d["action"] as? String, let action = LogAction(rawValue: actionStr) else { return nil }
+  return CollaborationLogEntry(id: id, taskId: d["taskId"] as? String, actor: actor, action: action, content: d["content"] as? String, createdAt: msToDate(d["createdAt"] as? Int) ?? Date())
 }
 
 private func msToDate(_ ms: Int?) -> Date? {
@@ -356,6 +307,4 @@ private func msToDate(_ ms: Int?) -> Date? {
   return Date(timeIntervalSince1970: Double(ms) / 1000)
 }
 
-// Stub for Convex generated types — filled in after `npx convex codegen`
-typealias Args = [String: Any]
-typealias ConvexFunction = (name: String, args: Args)
+private typealias Args = [String: Any]
