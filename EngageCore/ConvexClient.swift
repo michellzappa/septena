@@ -20,7 +20,7 @@ final class ConvexClient: ObservableObject {
 
   // ─── HTTP Helpers ─────────────────────────────────────────────────────────
 
-  private func convexRequest(endpoint: String, args: [String: Any] = [:]) async throws -> [String: Any] {
+  private func convexRequest(endpoint: String, args: [String: Any] = [:]) async throws -> [[String: Any]] {
     let url = URL(string: "\(convexUrl)/api/query")!
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
@@ -30,7 +30,7 @@ final class ConvexClient: ObservableObject {
     }
     request.setValue("engage-swift/1.0", forHTTPHeaderField: "Convex-Client")
 
-    let body: [String: Any] = ["endpoint": endpoint, "args": args]
+    let body: [String: Any] = ["path": endpoint, "args": args]
     request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
     let (data, response) = try await URLSession.shared.data(for: request)
@@ -46,11 +46,12 @@ final class ConvexClient: ObservableObject {
       throw ConvexError.serverError(error)
     }
 
-    guard json["value"] != nil else {
-      throw ConvexError.invalidResponse
+    guard let value = json["value"] as? [[String: Any]] else {
+      // Value might be null or not an array — return empty
+      return []
     }
 
-    return json
+    return value
   }
 
   private func convexMutation(endpoint: String, args: [String: Any] = [:]) async throws {
@@ -63,7 +64,7 @@ final class ConvexClient: ObservableObject {
     }
     request.setValue("engage-swift/1.0", forHTTPHeaderField: "Convex-Client")
 
-    let body: [String: Any] = ["endpoint": endpoint, "args": args, "continuation": NSNull()]
+    let body: [String: Any] = ["path": endpoint, "args": args, "continuation": NSNull()]
     request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
     let (data, response) = try await URLSession.shared.data(for: request)
@@ -99,14 +100,12 @@ final class ConvexClient: ObservableObject {
     if let staleDays { filter["staleDays"] = staleDays }
 
     let requestArgs: [String: Any] = filter.isEmpty ? [:] : ["filter": filter]
-    let json = try await convexRequest(endpoint: "tasks:list", args: requestArgs)
-    let items = json["value"] as? [[String: Any]] ?? []
+    let items = try await convexRequest(endpoint: "tasks:list", args: requestArgs)
     return items.compactMap { dictToTask($0) }
   }
 
   func taskComments(taskId: String) async throws -> [Comment] {
-    let json = try await convexRequest(endpoint: "tasks:comments", args: ["taskId": taskId])
-    let items = json["value"] as? [[String: Any]] ?? []
+    let items = try await convexRequest(endpoint: "tasks:comments", args: ["taskId": taskId])
     return items.compactMap { dictToComment($0) }
   }
 
@@ -169,43 +168,37 @@ final class ConvexClient: ObservableObject {
   // ─── Area / Project / Tag ───────────────────────────────────────────────
 
   func areasList() async throws -> [Area] {
-    let json = try await convexRequest(endpoint: "areas:list", args: [:])
-    let items = json["value"] as? [[String: Any]] ?? []
+    let items = try await convexRequest(endpoint: "areas:list", args: [:])
     return items.compactMap { dictToArea($0) }
   }
 
   func projectsList(areaId: String? = nil) async throws -> [Project] {
     let args: [String: Any] = areaId.map { ["areaId": $0] } ?? [:]
-    let json = try await convexRequest(endpoint: "projects:list", args: args)
-    let items = json["value"] as? [[String: Any]] ?? []
+    let items = try await convexRequest(endpoint: "projects:list", args: args)
     return items.compactMap { dictToProject($0) }
   }
 
   func tagsList() async throws -> [Tag] {
-    let json = try await convexRequest(endpoint: "tags:list", args: [:])
-    let items = json["value"] as? [[String: Any]] ?? []
+    let items = try await convexRequest(endpoint: "tags:list", args: [:])
     return items.compactMap { dictToTag($0) }
   }
 
   // ─── Agent ───────────────────────────────────────────────────────────────
 
   func agentsList() async throws -> [Agent] {
-    let json = try await convexRequest(endpoint: "agents:list", args: ["activeOnly": true])
-    let items = json["value"] as? [[String: Any]] ?? []
+    let items = try await convexRequest(endpoint: "agents:list", args: ["activeOnly": true])
     return items.compactMap { dictToAgent($0) }
   }
 
   func agentMemory(agentId: String) async throws -> [AgentMemoryEntry] {
-    let json = try await convexRequest(endpoint: "agentMemory:list", args: ["agentId": agentId])
-    let items = json["value"] as? [[String: Any]] ?? []
+    let items = try await convexRequest(endpoint: "agentMemory:list", args: ["agentId": agentId])
     return items.compactMap { dictToAgentMemory($0) }
   }
 
   func collaborationLog(taskId: String? = nil, limit: Int = 50) async throws -> [CollaborationLogEntry] {
     var args: [String: Any] = ["limit": limit]
     if let taskId { args["taskId"] = taskId }
-    let json = try await convexRequest(endpoint: "collaborationLog:list", args: args)
-    let items = json["value"] as? [[String: Any]] ?? []
+    let items = try await convexRequest(endpoint: "collaborationLog:list", args: args)
     return items.compactMap { dictToLogEntry($0) }
   }
 }
