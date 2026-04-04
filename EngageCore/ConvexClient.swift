@@ -105,7 +105,7 @@ final class ConvexClient: ObservableObject {
   }
 
   func taskComments(taskId: String) async throws -> [Comment] {
-    let items = try await convexRequest(endpoint: "tasks:comments", args: ["taskId": taskId])
+    let items = try await convexRequest(endpoint: "comments:list", args: ["taskId": taskId])
     return items.compactMap { dictToComment($0) }
   }
 
@@ -162,7 +162,11 @@ final class ConvexClient: ObservableObject {
   }
 
   func taskAddComment(taskId: String, actor: String, body: String) async throws {
-    try await convexMutation(endpoint: "tasks:addComment", args: ["taskId": taskId, "actor": actor, "body": body])
+    try await convexMutation(endpoint: "comments:addComment", args: ["taskId": taskId, "actor": actor, "body": body])
+  }
+
+  func resolveComment(id: String, resolved: Bool) async throws {
+    try await convexMutation(endpoint: "comments:resolve", args: ["id": id, "resolved": resolved])
   }
 
   // ─── Area / Project / Tag ───────────────────────────────────────────────
@@ -246,6 +250,9 @@ private func dictToTask(_ d: [String: Any]) -> EngageTask? {
     agentStatus: (d["agentStatus"] as? String).flatMap { TaskAgentStatus(rawValue: $0) },
     agentAssignedMe: (d["agentAssignedMe"] as? Bool) ?? false,
     agentContext: d["agentContext"] as? String,
+    agentNote: d["agentNote"] as? String,
+    confidence: (d["confidence"] as? Int) ?? 0,
+    needsHumanReview: (d["needsHumanReview"] as? Bool) ?? false,
     checklist: (d["checklist"] as? [[String: Any]])?.compactMap { item in
       guard let id = item["id"] as? String, let title = item["title"] as? String else { return nil }
       return ChecklistItem(id: id, title: title, done: (item["done"] as? Bool) ?? false)
@@ -287,7 +294,7 @@ private func dictToAgentMemory(_ d: [String: Any]) -> AgentMemoryEntry? {
 private func dictToComment(_ d: [String: Any]) -> Comment? {
   guard let id = d["_id"] as? String, let taskId = d["taskId"] as? String,
         let actor = d["actor"] as? String, let body = d["body"] as? String else { return nil }
-  return Comment(id: id, taskId: taskId, actor: actor, body: body, createdAt: msToDate(d["createdAt"] as? Int) ?? Date())
+  return Comment(id: id, taskId: taskId, actor: actor, body: body, resolved: (d["resolved"] as? Bool) ?? false, createdAt: msToDate(d["createdAt"] as? Int) ?? Date())
 }
 
 private func dictToLogEntry(_ d: [String: Any]) -> CollaborationLogEntry? {

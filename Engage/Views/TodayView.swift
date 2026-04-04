@@ -254,6 +254,45 @@ struct LogbookView: View {
   }
 }
 
+// ─── Review Task Row — agent reasoning inline ────────────────────────────────
+
+struct ReviewTaskRow: View {
+  let task: EngageTask
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      TaskRowView(task: task)
+
+      // Agent reasoning shown inline in Review view
+      if let note = task.agentNote, !note.isEmpty {
+        HStack(alignment: .top, spacing: 4) {
+          Image(systemName: "brain")
+            .font(.caption2)
+            .foregroundStyle(.blue)
+          Text(note)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .italic()
+        }
+        .padding(.leading, 4)
+      }
+
+      // Agent context (blocked reason etc.)
+      if let ctx = task.agentContext, !ctx.isEmpty {
+        HStack(alignment: .top, spacing: 4) {
+          Image(systemName: "exclamationmark.triangle")
+            .font(.caption2)
+            .foregroundStyle(.orange)
+          Text(ctx)
+            .font(.caption)
+            .foregroundStyle(.orange.opacity(0.8))
+        }
+        .padding(.leading, 4)
+      }
+    }
+  }
+}
+
 struct ReviewView: View {
   @EnvironmentObject var client: ConvexClient
   @State private var tasks: [EngageTask] = []
@@ -270,21 +309,21 @@ struct ReviewView: View {
           if !staleTasks.isEmpty {
             Section("Stale (no activity in \(staleDays)+ days)") {
               ForEach(staleTasks) { task in
-                TaskRowView(task: task)
+                ReviewTaskRow(task: task)
               }
             }
           }
           if !overdueTasks.isEmpty {
             Section("Overdue") {
               ForEach(overdueTasks) { task in
-                TaskRowView(task: task)
+                ReviewTaskRow(task: task)
               }
             }
           }
           if !blockedTasks.isEmpty {
             Section("Blocked") {
               ForEach(blockedTasks) { task in
-                TaskRowView(task: task)
+                ReviewTaskRow(task: task)
               }
             }
           }

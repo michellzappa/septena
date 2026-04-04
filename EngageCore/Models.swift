@@ -20,7 +20,7 @@ enum TaskAgentStatus: String, Codable, Hashable {
   case done
 }
 
-struct EngageTask: Identifiable, Codable, Equatable, Hashable {
+struct EngageTask: Identifiable, Codable, Hashable {
   let id: String
   var title: String
   var notes: String?
@@ -51,6 +51,12 @@ struct EngageTask: Identifiable, Codable, Equatable, Hashable {
   var agentStatus: TaskAgentStatus?
   var agentAssignedMe: Bool
   var agentContext: String?
+  /// Agent's internal reasoning visible to human as a thought bubble
+  var agentNote: String?
+  /// 0=none, 1=low, 2=medium, 3=high confidence the agent can do this well
+  var confidence: Int
+  /// Agent completed but waiting for human to confirm before closing
+  var needsHumanReview: Bool
 
   var checklist: [ChecklistItem]
 
@@ -59,6 +65,10 @@ struct EngageTask: Identifiable, Codable, Equatable, Hashable {
 
   static func == (lhs: EngageTask, rhs: EngageTask) -> Bool {
     lhs.id == rhs.id
+  }
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(id)
   }
 }
 
@@ -132,11 +142,12 @@ struct AgentMemoryEntry: Identifiable, Codable, Equatable {
 
 // ─── Comment ─────────────────────────────────────────────────────────────────
 
-struct Comment: Identifiable, Codable, Equatable {
+struct Comment: Identifiable, Codable, Equatable, Hashable {
   let id: String
   var taskId: String
   var actor: String
   var body: String
+  var resolved: Bool
   var createdAt: Date
 }
 
@@ -152,6 +163,7 @@ enum LogAction: String, Codable, Hashable {
   case blocked
   case unblocked
   case staleFlagged = "stale_flagged"
+  case updated
 }
 
 struct CollaborationLogEntry: Identifiable, Codable, Equatable {

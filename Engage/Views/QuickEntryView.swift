@@ -4,7 +4,6 @@ import SwiftUI
 
 struct QuickEntryView: View {
   @EnvironmentObject var client: ConvexClient
-  @EnvironmentObject var nav: NavigationState
   @Environment(\.dismiss) private var dismiss
 
   @State private var title = ""
@@ -32,15 +31,50 @@ struct QuickEntryView: View {
             .lineLimit(2...6)
         }
 
-        Section("When") {
-          WhenPickerRow(dueDate: $dueDate, showingSheet: $showingWhenSheet)
-        }
+        Section {
+          // When — opens WhenSheet
+          Button {
+            showingWhenSheet = true
+          } label: {
+            HStack {
+              Label("When", systemImage: "calendar")
+              Spacer()
+              if let due = dueDate {
+                Text(EngageDateFormatter.relative(due))
+                  .foregroundStyle(.secondary)
+              } else {
+                Text("Add Date")
+                  .foregroundStyle(.secondary)
+              }
+              Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+            }
+          }
+          .buttonStyle(.plain)
 
-        Section("Move") {
-          MoveToRow(
-            selectedProjectId: $selectedProjectId,
-            showingSheet: $showingMoveSheet
-          )
+          Divider()
+
+          // Move — opens MoveToSheet
+          Button {
+            showingMoveSheet = true
+          } label: {
+            HStack {
+              Label("Move to", systemImage: "folder")
+              Spacer()
+              if let projectId = selectedProjectId {
+                Text("Project")
+                  .foregroundStyle(.secondary)
+              } else {
+                Text("Inbox")
+                  .foregroundStyle(.secondary)
+              }
+              Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+            }
+          }
+          .buttonStyle(.plain)
         }
 
         Section("Priority") {
@@ -99,12 +133,10 @@ struct QuickEntryView: View {
 
     Task {
       do {
-        // Parse natural language date from title if not manually set
         var parsedDue = dueDate
         if parsedDue == nil {
           parsedDue = EngageDateParser.parse(title)
         }
-
         let repeatRule = EngageDateParser.parseRepeatRule(title)
 
         try await client.taskCreate(
@@ -131,6 +163,7 @@ struct QuickEntryView: View {
 struct WhenSheet: View {
   @Environment(\.dismiss) private var dismiss
   @Binding var dueDate: Date?
+  @State private var customDate = Date()
 
   private let calendar = Calendar.current
 
@@ -142,15 +175,15 @@ struct WhenSheet: View {
             dueDate = calendar.startOfDay(for: Date())
             dismiss()
           }
-          Button("This Evening") {
-            var components = calendar.dateComponents([.year, .month, .day], from: Date())
-            components.hour = 18
-            components.minute = 0
-            dueDate = calendar.date(from: components)
-            dismiss()
-          }
           Button("Tomorrow") {
             dueDate = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: Date()))
+            dismiss()
+          }
+          Button("This Evening") {
+            var d = Date()
+            d.set(hour: 18, minute: 0, second: 0)
+            if d < Date() { d = calendar.date(byAdding: .day, value: 1, to: d)! }
+            dueDate = d
             dismiss()
           }
           Button("Next Week") {
@@ -160,7 +193,7 @@ struct WhenSheet: View {
         }
 
         Section("Upcoming") {
-          ForEach(nextWeekDates, id: \.self) { date in
+          ForEach(nextWeekdays, id: \.self) { date in
             Button(dateLabel(date)) {
               dueDate = date
               dismiss()
@@ -169,19 +202,15 @@ struct WhenSheet: View {
         }
 
         Section("Custom") {
-          DatePicker(
-            "Pick a date",
-            selection: Binding(
-              get: { dueDate ?? Date() },
-              set: { dueDate = $0; dismiss() }
-            ),
-            displayedComponents: [.date]
-          )
+          DatePicker("Pick a date", selection: $customDate, displayedComponents: [.date])
+            .onChange(of: customDate) { _, newValue in
+              dueDate = newValue
+              dismiss()
+            }
         }
 
         Section {
-          Button("Someday / Someday Maybe", role: .none) {
-            // Someday is represented as no date but a special tag — for now just clear
+          Button("Someday / Maybe", role: .none) {
             dueDate = nil
             dismiss()
           }
@@ -202,23 +231,32 @@ struct WhenSheet: View {
     .presentationDetents([.medium, .large])
   }
 
-  private var nextWeekDates: [Date] {
+  private var nextWeekdays: [Date] {
     let today = calendar.startOfDay(for: Date())
-    let monday = todayWithWeekday(.monday, after: today)
-    return (0..<5).compactMap { calendar.date(byAdding: .weekOfYear, value: 0, to: monday).map { calendar.date(byAdding: .day, value: $0, to: $0)! } }
+    let nextMonday = nextDate(weekday: 2, after: today)
+    return (0..<5).compactMap { calendar.date(byAdding: .day, value: $0, to: nextMonday) }
   }
 
-  private func todayWithWeekday(_ weekday: Int, after date: Date) -> Date {
-    let current = calendar.component(.weekday, from: date)
-    var daysToAdd = weekday - current
-    if daysToAdd <= 0 { daysToAdd += 7 }
-    return calendar.date(byAdding: .day, value: daysToAdd, to: date)!
+  private func nextDate(weekday: Int, after date: Date) -> Date {
+    var days = weekday - calendar.component(.weekday, from: date)
+    if days <= 0 { days += 7 }
+    return calendar.date(byAdding: .day, value: days, to: date)!
   }
 
   private func dateLabel(_ date: Date) -> String {
     let formatter = DateFormatter()
     formatter.dateFormat = "EEEE, MMM d"
     return formatter.string(from: date)
+  }
+}
+
+extension Date {
+  mutating func set(hour: Int, minute: Int, second: Int) {
+    var components = Calendar.current.dateComponents([.year, .month, .day], from: self)
+    components.hour = hour
+    components.minute = minute
+    components.second = second
+    if let d = Calendar.current.date(from: components) { self = d }
   }
 }
 
@@ -229,18 +267,11 @@ struct MoveToSheet: View {
   @Binding var selectedProjectId: String?
   let areas: [Area]
   let projects: [Project]
-
   @State private var searchText = ""
-
-  var filteredProjects: [Project] {
-    if searchText.isEmpty { return projects }
-    return projects.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
-  }
 
   var body: some View {
     NavigationStack {
       List {
-        // Inbox option
         Button {
           selectedProjectId = nil
           dismiss()
@@ -255,10 +286,10 @@ struct MoveToSheet: View {
             }
           }
         }
+        .foregroundStyle(.primary)
 
-        // Projects with no area
-        let topLevelProjects = filteredProjects.filter { $0.area == nil }
-        if !topLevelProjects.isEmpty {
+        let topLevelProjects = projects.filter { $0.area == nil }
+        if !topLevelProjects.isEmpty && matchesSearch(topLevelProjects.first) {
           Section("Projects") {
             ForEach(topLevelProjects) { project in
               projectRow(project)
@@ -266,10 +297,9 @@ struct MoveToSheet: View {
           }
         }
 
-        // Projects grouped by area
         ForEach(areas) { area in
-          let areaProjects = filteredProjects.filter { $0.area == area.id }
-          if !areaProjects.isEmpty {
+          let areaProjects = projects.filter { $0.area == area.id }
+          if !areaProjects.isEmpty && matchesSearch(areaProjects.first) {
             Section(area.name) {
               ForEach(areaProjects) { project in
                 projectRow(project)
@@ -279,7 +309,7 @@ struct MoveToSheet: View {
         }
       }
       .searchable(text: $searchText, prompt: "Search projects")
-      .navigationTitle("Move To")
+      .navigationTitle("Move to")
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
@@ -288,6 +318,10 @@ struct MoveToSheet: View {
       }
     }
     .presentationDetents([.medium, .large])
+  }
+
+  private func matchesSearch(_ project: Project?) -> Bool {
+    searchText.isEmpty || (project?.name.localizedCaseInsensitiveContains(searchText) ?? false)
   }
 
   @ViewBuilder
@@ -305,64 +339,8 @@ struct MoveToSheet: View {
         }
       }
     }
-  }
-}
-
-// ─── When Picker Row ─────────────────────────────────────────────────────────
-
-struct WhenPickerRow: View {
-  @Binding var dueDate: Date?
-  @Binding var showingSheet: Bool
-
-  var body: some View {
-    Button {
-      showingSheet = true
-    } label: {
-      HStack {
-        Image(systemName: "calendar")
-          .foregroundStyle(.blue)
-        if let due = dueDate {
-          Text(EngageDateFormatter.relative(due))
-            .foregroundStyle(.primary)
-        } else {
-          Text("Add Date")
-            .foregroundStyle(.secondary)
-        }
-        Spacer()
-        Image(systemName: "chevron.right")
-          .font(.caption)
-          .foregroundStyle(.tertiary)
-      }
-    }
-  }
-}
-
-// ─── Move To Row ─────────────────────────────────────────────────────────────
-
-struct MoveToRow: View {
-  @Binding var selectedProjectId: String?
-  @Binding var showingSheet: Bool
-
-  var body: some View {
-    Button {
-      showingSheet = true
-    } label: {
-      HStack {
-        Image(systemName: "folder")
-          .foregroundStyle(.orange)
-        if let projectId = selectedProjectId {
-          Text("Project selected")
-            .foregroundStyle(.secondary)
-        } else {
-          Text("Inbox")
-            .foregroundStyle(.secondary)
-        }
-        Spacer()
-        Image(systemName: "chevron.right")
-          .font(.caption)
-          .foregroundStyle(.tertiary)
-      }
-    }
+    .foregroundStyle(.primary)
+    .opacity(matchesSearch(project) ? 1 : 0.5)
   }
 }
 
@@ -374,12 +352,31 @@ struct AgentPanelView: View {
   @State private var memories: [AgentMemoryEntry] = []
   @State private var logEntries: [CollaborationLogEntry] = []
   @State private var isLoading = false
-
+  @State private var agents: [Agent] = []
   private let agentId = "agent"
 
   var body: some View {
     NavigationStack {
       List {
+        Section("Agent Roster") {
+          if agents.isEmpty && !isLoading {
+            Text("No agents found")
+              .foregroundStyle(.secondary)
+              .font(.callout)
+          }
+          ForEach(agents) { agent in
+            HStack {
+              Text(agent.avatar ?? "🤖")
+              Text(agent.name)
+                .fontWeight(.medium)
+              Spacer()
+              Text(agent.type.rawValue)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+          }
+        }
+
         Section("Recent Thinking") {
           if memories.isEmpty && !isLoading {
             Text("No agent activity yet")
@@ -409,7 +406,7 @@ struct AgentPanelView: View {
               Image(systemName: entry.action.icon)
                 .foregroundStyle(entry.action.color)
               VStack(alignment: .leading) {
-                Text(entry.actor == "human" ? "Human" : "Agent")
+                Text(entry.actor == "human" ? "Human" : entry.actor)
                   .font(.caption)
                   .fontWeight(.medium)
                 if let content = entry.content {
@@ -449,6 +446,7 @@ struct AgentPanelView: View {
   private func load() async {
     isLoading = true
     do {
+      agents = try await client.agentsList()
       memories = try await client.agentMemory(agentId: agentId)
       logEntries = try await client.collaborationLog(limit: 30)
     } catch {}
@@ -468,6 +466,7 @@ extension LogAction {
     case .blocked: return "hand.raised"
     case .unblocked: return "hand.raised.fill"
     case .staleFlagged: return "flag"
+    case .updated: return "pencil"
     }
   }
 
@@ -475,7 +474,7 @@ extension LogAction {
     switch self {
     case .completed: return .green
     case .cancelled, .blocked: return .red
-    case .created: return .blue
+    case .created, .updated: return .blue
     default: return .secondary
     }
   }

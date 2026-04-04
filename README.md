@@ -1,62 +1,48 @@
 # Engage — iOS/macOS App
 
-## Setup
+A shared task database where humans and AI agents collaborate in real-time. Built with SwiftUI + Convex.
 
-### 1. Install XcodeGen
+> Named after the Star Trek command — *"Engage!"* — because that's what humans and agents do here: work together.
+
+## Stack
+
+- **SwiftUI** — iOS 17+ / macOS 14+
+- **Convex** — real-time backend (pure URLSession HTTP client, no SDK)
+- **XcodeGen** — project generation
+
+## Quick Start
 
 ```bash
-brew install xcodegen
-```
-
-### 2. Generate the Xcode project
-
-```bash
+git clone https://github.com/envisioning-agent/engage-app.git
+cd engage-app
 xcodegen generate
-```
-
-### 3. Configure Convex credentials
-
-Your Convex deployment is live at:
-```
-https://fiery-oriole-57.eu-west-1.convex.cloud
-```
-
-For development, you can run without a key (public reads). For writes, set your admin key from the dashboard → Settings → API Keys.
-
-Add to Xcode scheme environment variables (Product → Scheme → Edit Scheme → Run → Arguments → Environment Variables):
-```
-ENGAGE_CONVEX_URL=https://fiery-oriole-57.eu-west-1.convex.cloud
-ENGAGE_CONVEX_KEY=your-admin-key
-```
-
-### 4. Open and build
-
-```bash
 open Engage.xcodeproj
 ```
 
-Or via CLI:
+Add your Convex credentials to the Xcode scheme environment:
 
-```bash
-xcodebuild -scheme Engage -destination 'platform=iOS Simulator,name=iPhone 16' build
-```
+| Variable | Value |
+|----------|-------|
+| `ENGAGE_CONVEX_URL` | `https://your-project.convex.cloud` |
+| `ENGAGE_CONVEX_KEY` | Your admin key |
 
-## File Structure
+Build and run (⌘R).
+
+## Architecture
 
 ```
 Engage/
-├── App.swift                     # App entry + navigation
-├── Assets.xcassets/             # Colors, app icon
-└── Views/
-    ├── TaskListView.swift        # Generic task list (used by Today/Upcoming/etc.)
-    ├── TaskDetailView.swift     # Task detail + comments
-    ├── QuickEntryView.swift      # Natural language quick entry
-    ├── TodayView.swift           # Today, Upcoming, Anytime, Someday, Logbook, Review
-    └── AreasProjectsView.swift   # Areas, Projects, AreaDetail, ProjectDetail
-
+├── App.swift                    # TabView entry point
+├── Views/
+│   ├── TaskListView.swift        # Generic filterable task list
+│   ├── TaskRowView.swift         # Task row: thinking preview, badges
+│   ├── TaskDetailView.swift      # Full task: agent bubble, comments, actions
+│   ├── QuickEntryView.swift      # New task: When sheet, Move sheet
+│   ├── TodayView.swift           # Today, Upcoming, Anytime, Someday, Logbook, Review
+│   └── AreasProjectsView.swift   # Areas, Projects, Area/Project detail
 EngageCore/
 ├── Models.swift                 # All data types
-├── ConvexClient.swift           # Convex Swift SDK client
+├── ConvexClient.swift           # Pure URLSession → Convex HTTP API
 └── DateParser.swift             # Natural language date parsing
 ```
 
@@ -64,12 +50,65 @@ EngageCore/
 
 | View | Description |
 |------|-------------|
-| Inbox | Unsorted, undated tasks |
-| Today | Due / started today |
-| Upcoming | 7-day calendar strip |
-| Anytime | Undated open tasks |
-| Someday | Someday/maybe |
-| Projects | All projects |
-| Areas | All areas |
-| Logbook | Completion history |
-| Review | Stale + overdue + blocked |
+| **Today** | Tasks due today |
+| **Upcoming** | Next 7 days |
+| **Anytime** | Open tasks with no date |
+| **Inbox** | Undated, unprojected tasks |
+| **Someday** | Undated, not started |
+| **Projects** | Projects grouped by area |
+| **Areas** | Areas with project counts |
+| **Logbook** | Completion history |
+| **Agent** | Agent roster, recent thinking, activity |
+| **Review** | Stale + overdue + blocked tasks with agent reasoning inline |
+
+## Key UX Features
+
+### 🤖 Agent Thinking Preview
+Task rows with an `agentNote` show a truncated "brain + text" preview — glanceable without opening the task.
+
+### Human Review Banner
+Tasks marked `needsHumanReview` by an agent surface a prominent banner with **Accept / Dismiss / Reply** buttons. The agent is waiting.
+
+### Comment Threading
+Comments support back-and-forth between human and agent. Human can mark threads **Resolved** to declutter.
+
+### Confidence Indicator
+Agents set confidence (0–3) on tasks they own. Low-confidence tasks bubble up in Review. Shown as a colored dot on the row.
+
+### Review with Agent Reasoning
+Stale, overdue, and blocked tasks in Review show the agent's `agentNote` and `agentContext` inline — no need to open each task to understand the status.
+
+## Data Model (Convex)
+
+### Task
+```typescript
+origin: "human" | "agent"
+owner: "human" | agentId
+agentNote: string?        // agent reasoning visible to human
+confidence: 0 | 1 | 2 | 3 // 0=none, 3=high
+needsHumanReview: boolean // agent wants human to confirm
+agentStatus: "pending" | "in_progress" | "blocked" | "done"
+```
+
+### Comment
+```typescript
+actor: "human" | agentId
+body: string
+resolved: boolean        // thread can be marked resolved
+```
+
+## Development
+
+### Modifying Convex schema
+1. Edit `engage-server/engage/convex/schema.ts`
+2. Restart `npx convex dev`
+3. Update `ConvexClient.swift` dict helpers if needed
+
+### Adding a view
+1. Create SwiftUI file in `Engage/Views/`
+2. Add to `TabView` in `App.swift`
+3. Inject `ConvexClient` via `@EnvironmentObject`
+
+## License
+
+Private — Michell Zappa
