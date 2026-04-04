@@ -49,15 +49,7 @@ struct TaskListView: View {
       }
     }
     .navigationTitle(filter.title)
-    .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        Button {
-          nav.showingQuickEntry = true
-        } label: {
-          Image(systemName: "plus")
-        }
-      }
-    }
+
     .task(id: filter.title) { await load() }
   }
 
