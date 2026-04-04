@@ -2,18 +2,18 @@ import Foundation
 
 // ─── Task ─────────────────────────────────────────────────────────────────────
 
-enum TaskOrigin: String, Codable {
+enum TaskOrigin: String, Codable, Hashable {
   case human
   case agent
 }
 
-enum TaskStatus: String, Codable {
+enum TaskStatus: String, Codable, Hashable {
   case open
   case completed
   case cancelled
 }
 
-enum TaskAgentStatus: String, Codable {
+enum TaskAgentStatus: String, Codable, Hashable {
   case pending
   case inProgress = "in_progress"
   case blocked
@@ -80,7 +80,7 @@ struct Area: Identifiable, Codable, Equatable, Hashable {
 
 // ─── Project ─────────────────────────────────────────────────────────────────
 
-enum ProjectStatus: String, Codable {
+enum ProjectStatus: String, Codable, Hashable {
   case active
   case completed
   case dropped
@@ -105,7 +105,7 @@ struct Tag: Identifiable, Codable, Equatable {
 
 // ─── Agent ───────────────────────────────────────────────────────────────────
 
-enum AgentType: String, Codable {
+enum AgentType: String, Codable, Hashable {
   case human
   case ai
 }
@@ -142,7 +142,7 @@ struct Comment: Identifiable, Codable, Equatable {
 
 // ─── CollaborationLog ────────────────────────────────────────────────────────
 
-enum LogAction: String, Codable {
+enum LogAction: String, Codable, Hashable {
   case created
   case commented
   case reassigned
