@@ -15,7 +15,7 @@ final class ConvexClient: ObservableObject {
     // Load from app config — replace with your project values
     self.convexUrl = Bundle.main.object(forInfoDictionaryKey: "ENGAGE_CONVEX_URL") as? String
       ?? ProcessInfo.processInfo.environment["ENGAGE_CONVEX_URL"]
-      ?? "http://localhost:5175"
+      ?? "https://fiery-oriole-57.eu-west-1.convex.cloud"
 
     self.convexKey = Bundle.main.object(forInfoDictionaryKey: "ENGAGE_CONVEX_KEY") as? String
       ?? ProcessInfo.processInfo.environment["ENGAGE_CONVEX_KEY"]

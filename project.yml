@@ -22,6 +22,7 @@ settings:
     INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
     INFOPLIST_KEY_ENGAGE_CONVEX_URL: "$(ENGAGE_CONVEX_URL)"
     INFOPLIST_KEY_ENGAGE_CONVEX_KEY: "$(ENGAGE_CONVEX_KEY)"
+    GCC_PREPROCESSOR_DEFINITIONS: "ENGAGE_CONVEX_URL=$(ENGAGE_CONVEX_URL)"
 
 packages:
   Convex:

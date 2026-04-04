@@ -16,14 +16,18 @@ xcodegen generate
 
 ### 3. Configure Convex credentials
 
-Create `~/.engage.env` (or add to your shell profile):
-
-```bash
-export ENGAGE_CONVEX_URL=https://your-project.convex.cloud
-export ENGAGE_CONVEX_KEY=your-admin-key
+Your Convex deployment is live at:
+```
+https://fiery-oriole-57.eu-west-1.convex.cloud
 ```
 
-Or add to Xcode's scheme environment variables in Xcode's Product → Scheme → Edit Scheme → Run → Arguments → Environment Variables.
+For development, you can run without a key (public reads). For writes, set your admin key from the dashboard → Settings → API Keys.
+
+Add to Xcode scheme environment variables (Product → Scheme → Edit Scheme → Run → Arguments → Environment Variables):
+```
+ENGAGE_CONVEX_URL=https://fiery-oriole-57.eu-west-1.convex.cloud
+ENGAGE_CONVEX_KEY=your-admin-key
+```
 
 ### 4. Open and build
 

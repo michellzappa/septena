@@ -35,7 +35,7 @@
 
 /* Begin PBXFileReference section */
 		013DA8579D8AB360424D2364 /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
-		2BF726C8F4A35FEC00630D07 /* Engage.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Engage.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2BF726C8F4A35FEC00630D07 /* Engage.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Engage.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3034684D21811AA5B6091A0D /* EngageMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EngageMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		39A1A629E49B7C9C806828F3 /* TaskListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskListView.swift; sourceTree = "<group>"; };
 		3CF658F967CE8DD8713C1ABA /* TaskDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
@@ -203,7 +203,6 @@
 						ProvisioningStyle = Automatic;
 					};
 					9CB17204916B93C43163E6BA = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -393,6 +392,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 992N457T8D;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Engage;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -401,6 +401,9 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.engage.app;
 				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -486,6 +489,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 992N457T8D;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Engage;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -494,6 +498,9 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.engage.app;
 				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
