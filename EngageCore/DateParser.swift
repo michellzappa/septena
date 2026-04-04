@@ -109,10 +109,11 @@ struct EngageDateParser {
     guard let regex = try? NSRegularExpression(pattern: pattern),
           let match = regex.firstMatch(in: s, range: NSRange(s.startIndex..., in: s)),
           match.numberOfRanges == 3,
-          let count = Int(s[Range(match.range(at: 1), in: s)!]),
-          let unitStr = s[Range(match.range(at: 2), in: s)...] else { return nil }
+          let countRange = Range(match.range(at: 1), in: s),
+          let count = Int(s[countRange]),
+          let unitRange = Range(match.range(at: 2), in: s) else { return nil }
 
-    let unit = String(unitStr)
+    let unit = String(s[unitRange])
     let calendar = Calendar.current
 
     switch unit {
@@ -165,8 +166,10 @@ struct EngageDateFormatter {
     if calendar.isDateInYesterday(date) { return "Yesterday" }
 
     let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date)).day ?? 0
-    if days > 0 && days <= 7 { return calendar.weekdaySymbol(of: date) }
-    if days < 0 && days >= -7 { return calendar.weekdaySymbol(of: date) }
+    let weekdayFormatter = DateFormatter()
+    weekdayFormatter.dateFormat = "EEEE"
+    if days > 0 && days <= 7 { return weekdayFormatter.string(from: date) }
+    if days < 0 && days >= -7 { return weekdayFormatter.string(from: date) }
 
     let formatter = DateFormatter()
     formatter.dateStyle = .medium
