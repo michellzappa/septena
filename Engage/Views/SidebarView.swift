@@ -129,12 +129,11 @@ struct SidebarView: View {
       // Top-level projects (no area)
       ForEach(topLevelProjects) { project in
         Button { go(.project(project)) } label: {
-          SidebarProjectRow(name: project.name)
+          SidebarProjectRow(name: project.name, progress: progress(for: project))
             .padding(.horizontal, Theme.hPadding)
         }
         .buttonStyle(.plain)
         .background(isTapped(.project(project)) ? Theme.rowSelected : Color.clear)
-        .opacity(draggingId == "project:\(project.id)" ? 0.3 : 1)
         .onDrag {
           draggingId = "project:\(project.id)"
           return NSItemProvider(object: "project:\(project.id)" as NSString)
@@ -146,9 +145,21 @@ struct SidebarView: View {
       }
 
       ForEach(Array(areas.enumerated()), id: \.element.id) { idx, area in
+        if idx > 0 || !topLevelProjects.isEmpty {
+          Hairline()
+            .padding(.top, 12)
+            .padding(.bottom, 8)
+        }
         areaBlock(area: area, index: idx)
       }
     }
+  }
+
+  private func progress(for project: Project) -> Double {
+    let related = tasks.filter { $0.project == project.id }
+    guard !related.isEmpty else { return 0 }
+    let done = related.filter { $0.status == .completed || $0.status == .cancelled }.count
+    return Double(done) / Double(related.count)
   }
 
   private var topLevelProjects: [Project] {
@@ -178,7 +189,6 @@ struct SidebarView: View {
       .buttonStyle(.plain)
       .padding(.horizontal, Theme.hPadding)
       .background(isTapped(.area(area)) ? Theme.rowSelected : Color.clear)
-      .opacity(draggingId == "area:\(area.id)" ? 0.3 : 1)
       .onDrag {
         draggingId = "area:\(area.id)"
         return NSItemProvider(object: "area:\(area.id)" as NSString)
@@ -195,13 +205,11 @@ struct SidebarView: View {
       if expandedAreas.contains(area.id) {
         ForEach(Array(projects(in: area.id).enumerated()), id: \.element.id) { pIdx, project in
           Button { go(.project(project)) } label: {
-            SidebarProjectRow(name: project.name)
-              .padding(.leading, Theme.hPadding + 34)
-              .padding(.trailing, Theme.hPadding)
+            SidebarProjectRow(name: project.name, progress: progress(for: project))
+              .padding(.horizontal, Theme.hPadding)
           }
           .buttonStyle(.plain)
           .background(isTapped(.project(project)) ? Theme.rowSelected : Color.clear)
-          .opacity(draggingId == "project:\(project.id)" ? 0.3 : 1)
           .onDrag {
             draggingId = "project:\(project.id)"
             return NSItemProvider(object: "project:\(project.id)" as NSString)

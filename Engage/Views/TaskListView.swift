@@ -20,6 +20,7 @@ struct TaskListView: View {
   // Inline title edit
   @State private var editingTaskId: String? = nil
   @State private var editingTitle: String = ""
+  @State private var editingNotes: String = ""
   @FocusState private var editFieldFocused: Bool
 
   // Multi-select
@@ -32,6 +33,8 @@ struct TaskListView: View {
   // Sheets for multi-select actions
   @State private var showingWhenSheet = false
   @State private var showingMoveSheet = false
+  @State private var scheduleEditingTask: String? = nil
+  @State private var deadlineEditingTask: String? = nil
 
   let filter: TaskFilter
 
@@ -73,8 +76,26 @@ struct TaskListView: View {
     }
     .navigationBarTitleDisplayMode(.inline)
     .toolbar { toolbarContent }
+    .alert("Error", isPresented: Binding(
+      get: { errorMessage != nil },
+      set: { if !$0 { errorMessage = nil } }
+    )) {
+      Button("OK", role: .cancel) { errorMessage = nil }
+    } message: {
+      Text(errorMessage ?? "")
+    }
     .sheet(isPresented: $showingWhenSheet) {
-      WhenPickerSheet(onPick: { date in applyDueToSelected(date) })
+      WhenPickerSheet(onPick: { date in
+        if let id = scheduleEditingTask {
+          applyStartToTask(id: id, date: date)
+          scheduleEditingTask = nil
+        } else if let id = deadlineEditingTask {
+          applyDueToTask(id: id, date: date)
+          deadlineEditingTask = nil
+        } else {
+          applyDueToSelected(date)
+        }
+      })
         .presentationDetents([.medium])
     }
     .sheet(isPresented: $showingMoveSheet) {
@@ -195,52 +216,61 @@ struct TaskListView: View {
 
   @ViewBuilder
   private func row(_ task: EngageTask) -> some View {
+    if editingTaskId == task.id {
+      InlineEditTaskRow(
+        title: $editingTitle,
+        notes: $editingNotes,
+        isDone: task.status == .completed,
+        onToggleDone: { toggle(task) },
+        onCommit: { commitEdit() },
+        onCancel: { editingTaskId = nil; editFieldFocused = false },
+        onSchedule: { scheduleEditingTask = task.id; showingWhenSheet = true },
+        onDeadline: { deadlineEditingTask = task.id; showingWhenSheet = true }
+      )
+    } else {
+      editableRowBody(task)
+    }
+  }
+
+  @ViewBuilder
+  private func editableRowBody(_ task: EngageTask) -> some View {
     HStack(spacing: 12) {
       ThingsCheckbox(isDone: task.status == .completed) {
-        if !selectMode && editingTaskId != task.id { toggle(task) }
+        if !selectMode { toggle(task) }
       }
-      .allowsHitTesting(!selectMode && editingTaskId != task.id)
+      .allowsHitTesting(!selectMode)
       .opacity(selectMode ? 0.5 : 1)
 
-      if editingTaskId == task.id {
-        TextField("Title", text: $editingTitle)
-          .font(.thingsTaskTitle)
-          .focused($editFieldFocused)
-          .submitLabel(.done)
-          .onSubmit { commitEdit() }
-        Spacer(minLength: 8)
-      } else {
-        Button {
-          if selectMode {
-            toggleSelection(task.id)
-          } else {
-            startEdit(task)
-          }
-        } label: {
-          HStack(spacing: 6) {
-            Text(task.title)
-              .font(.thingsTaskTitle)
-              .foregroundStyle(task.status == .completed ? .secondary : .primary)
-              .strikethrough(task.status == .completed)
-              .opacity(task.status == .completed ? 0.5 : 1)
-              .lineLimit(2)
-              .multilineTextAlignment(.leading)
-            Spacer(minLength: 8)
-            if selectMode {
-              RadioCircle(isSelected: selection.contains(task.id))
-            } else {
-              trailingMeta(task)
-            }
-          }
-          .contentShape(Rectangle())
+      Button {
+        if selectMode {
+          toggleSelection(task.id)
+        } else {
+          startEdit(task)
         }
-        .buttonStyle(.plain)
-        .swipeLeftToSelect {
+      } label: {
+        HStack(spacing: 6) {
+          Text(task.title)
+            .font(.thingsTaskTitle)
+            .foregroundStyle(task.status == .completed ? .secondary : .primary)
+            .strikethrough(task.status == .completed)
+            .opacity(task.status == .completed ? 0.5 : 1)
+            .lineLimit(2)
+            .multilineTextAlignment(.leading)
+          Spacer(minLength: 8)
           if selectMode {
-            if !selection.contains(task.id) { toggleSelection(task.id) }
+            RadioCircle(isSelected: selection.contains(task.id))
           } else {
-            enterSelectMode(with: task.id)
+            trailingMeta(task)
           }
+        }
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .swipeLeftToSelect {
+        if selectMode {
+          if !selection.contains(task.id) { toggleSelection(task.id) }
+        } else {
+          enterSelectMode(with: task.id)
         }
       }
     }
@@ -282,18 +312,26 @@ struct TaskListView: View {
     if editingTaskId != nil && editingTaskId != task.id { commitEdit() }
     editingTaskId = task.id
     editingTitle = task.title
+    editingNotes = task.notes ?? ""
     editFieldFocused = true
   }
 
   private func commitEdit() {
     guard let id = editingTaskId else { return }
-    let trimmed = editingTitle.trimmingCharacters(in: .whitespaces)
+    let trimmedTitle = editingTitle.trimmingCharacters(in: .whitespaces)
+    let newNotes = editingNotes
     editingTaskId = nil
     editFieldFocused = false
-    guard !trimmed.isEmpty else { return }
-    if let original = tasks.first(where: { $0.id == id }), original.title == trimmed { return }
+    guard !trimmedTitle.isEmpty else { return }
+    guard let original = tasks.first(where: { $0.id == id }) else { return }
+    var patch: [String: Any] = [:]
+    if original.title != trimmedTitle { patch["title"] = trimmedTitle }
+    if (original.notes ?? "") != newNotes {
+      patch["notes"] = newNotes.isEmpty ? NSNull() : newNotes
+    }
+    guard !patch.isEmpty else { return }
     Task {
-      try? await client.taskUpdate(id: id, patch: ["title": trimmed], actor: "human")
+      try? await client.taskUpdate(id: id, patch: patch, actor: "human")
       await load()
     }
   }
@@ -324,6 +362,22 @@ struct TaskListView: View {
     }
   }
 
+  private func applyDueToTask(id: String, date: Date?) {
+    let patch: [String: Any] = ["due": date.map { Int($0.timeIntervalSince1970 * 1000) } ?? NSNull()]
+    Task {
+      try? await client.taskUpdate(id: id, patch: patch, actor: "human")
+      await load()
+    }
+  }
+
+  private func applyStartToTask(id: String, date: Date?) {
+    let patch: [String: Any] = ["start": date.map { Int($0.timeIntervalSince1970 * 1000) } ?? NSNull()]
+    Task {
+      try? await client.taskUpdate(id: id, patch: patch, actor: "human")
+      await load()
+    }
+  }
+
   private func applyDueToSelected(_ date: Date?) {
     let ids = Array(selection)
     let patch: [String: Any] = ["due": date.map { Int($0.timeIntervalSince1970 * 1000) } ?? NSNull()]
@@ -342,8 +396,18 @@ struct TaskListView: View {
     patch["area"] = areaId ?? NSNull()
     patch["project"] = projectId ?? NSNull()
     Task {
+      var failures = 0
+      var lastError: String?
       for id in ids {
-        try? await client.taskUpdate(id: id, patch: patch, actor: "human")
+        do {
+          try await client.taskUpdate(id: id, patch: patch, actor: "human")
+        } catch {
+          failures += 1
+          lastError = error.localizedDescription
+        }
+      }
+      if failures > 0 {
+        errorMessage = "Move failed for \(failures) task(s): \(lastError ?? "unknown")"
       }
       await load()
       exitSelectMode()

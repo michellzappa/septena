@@ -93,19 +93,18 @@ struct SidebarAreaRow: View {
 
   var body: some View {
     HStack(spacing: 14) {
-      Image(systemName: "square.stack.3d.up.fill")
-        .font(.system(size: 18))
-        .foregroundStyle(Color.orange)
-        .frame(width: 24, alignment: .center)
-      Text(name.uppercased())
-        .font(.system(size: 12, weight: .bold))
-        .tracking(0.8)
+      Image(systemName: "hexagon")
+        .font(.system(size: 22, weight: .regular))
         .foregroundStyle(.secondary)
+        .frame(width: 24, alignment: .center)
+      Text(name)
+        .font(.thingsSidebarRow)
+        .foregroundStyle(.primary)
       Spacer()
       Button(action: onToggle) {
         Image(systemName: "chevron.down")
-          .font(.system(size: 12, weight: .semibold))
-          .foregroundStyle(.tertiary)
+          .font(.system(size: 13, weight: .semibold))
+          .foregroundStyle(.secondary)
           .rotationEffect(.degrees(isExpanded ? 0 : -90))
       }
       .buttonStyle(.plain)
@@ -119,18 +118,22 @@ struct SidebarAreaRow: View {
 
 struct SidebarProjectRow: View {
   let name: String
+  var progress: Double = 0  // 0..1 — fraction of tasks completed
 
   var body: some View {
     HStack(spacing: 14) {
       ZStack {
         Circle()
-          .stroke(Color.secondary.opacity(0.45), lineWidth: 1.5)
+          .stroke(Color.secondary.opacity(0.5), lineWidth: 1.5)
           .frame(width: 16, height: 16)
-        Circle()
-          .trim(from: 0, to: 0.25)
-          .stroke(Color.secondary.opacity(0.7), lineWidth: 6)
-          .frame(width: 10, height: 10)
-          .rotationEffect(.degrees(-90))
+        if progress > 0 {
+          Circle()
+            .trim(from: 0, to: progress)
+            .stroke(Color.secondary, lineWidth: 8)
+            .frame(width: 8, height: 8)
+            .rotationEffect(.degrees(-90))
+            .clipShape(Circle().inset(by: 1.5))
+        }
       }
       .frame(width: 24, alignment: .center)
       Text(name)
@@ -367,6 +370,93 @@ struct InlineNewTaskRow: View {
         Image(systemName: "flag")
           .font(.system(size: 16))
           .foregroundStyle(.secondary)
+      }
+      .padding(.horizontal, Theme.hPadding)
+      .padding(.bottom, 14)
+    }
+    .background(Color(.systemBackground))
+    .overlay(
+      RoundedRectangle(cornerRadius: 8)
+        .stroke(Theme.divider, lineWidth: 0.5)
+    )
+    .padding(.horizontal, 8)
+    .padding(.vertical, 4)
+    .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2)
+    .onAppear { focused = .title }
+  }
+}
+
+// MARK: - Inline edit task row (existing task)
+
+struct InlineEditTaskRow: View {
+  @Binding var title: String
+  @Binding var notes: String
+  let isDone: Bool
+  var onToggleDone: () -> Void
+  var onCommit: () -> Void
+  var onCancel: () -> Void
+  var onSchedule: (() -> Void)? = nil
+  var onDeadline: (() -> Void)? = nil
+  @FocusState private var focused: Field?
+
+  enum Field { case title, notes }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      HStack(alignment: .top, spacing: 12) {
+        Button(action: onToggleDone) {
+          ZStack {
+            Circle()
+              .stroke(Color.secondary.opacity(0.5), lineWidth: 1.5)
+              .frame(width: 20, height: 20)
+            if isDone {
+              Circle().fill(Theme.magicPlusBlue).frame(width: 20, height: 20)
+              Image(systemName: "checkmark")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
+            }
+          }
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 2)
+
+        VStack(alignment: .leading, spacing: 6) {
+          TextField("Title", text: $title)
+            .font(.thingsTaskTitle)
+            .focused($focused, equals: .title)
+            .submitLabel(.next)
+            .onSubmit { focused = .notes }
+          TextField("Notes", text: $notes, axis: .vertical)
+            .font(.thingsMeta)
+            .foregroundStyle(.secondary)
+            .focused($focused, equals: .notes)
+            .lineLimit(1...6)
+        }
+        Spacer(minLength: 0)
+      }
+      .padding(.horizontal, Theme.hPadding)
+      .padding(.vertical, 14)
+
+      HStack(spacing: 20) {
+        Spacer()
+        Button(action: { onSchedule?() }) {
+          Image(systemName: "calendar")
+            .font(.system(size: 16))
+            .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        Image(systemName: "tag")
+          .font(.system(size: 16))
+          .foregroundStyle(.secondary)
+        Image(systemName: "list.bullet")
+          .font(.system(size: 16))
+          .foregroundStyle(.secondary)
+        Button(action: { onDeadline?() }) {
+          Image(systemName: "flag")
+            .font(.system(size: 16))
+            .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
       }
       .padding(.horizontal, Theme.hPadding)
       .padding(.bottom, 14)

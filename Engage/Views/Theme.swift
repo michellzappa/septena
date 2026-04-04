@@ -30,7 +30,7 @@ enum Theme {
 extension Font {
   static let thingsScreenTitle = Font.system(size: 28, weight: .bold)
   static let thingsSectionHeader = Font.system(size: 17, weight: .semibold)
-  static let thingsSidebarRow = Font.system(size: 17, weight: .regular)
+  static let thingsSidebarRow = Font.system(size: 17, weight: .medium)
   static let thingsTaskTitle = Font.system(size: 16, weight: .regular)
   static let thingsMeta = Font.system(size: 13, weight: .regular)
   static let thingsBadge = Font.system(size: 13, weight: .semibold)

@@ -29,8 +29,8 @@ struct AreaDetailView: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 0) {
         HStack(spacing: 10) {
-          Image(systemName: "hexagon")
-            .font(.system(size: 28))
+          Image(systemName: "hexagon.fill")
+            .font(.system(size: 26))
             .foregroundStyle(.secondary)
           TextField("Area", text: $draftName)
             .font(.thingsScreenTitle)
