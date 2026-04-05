@@ -389,6 +389,8 @@ struct InlineNewTaskRow: View {
 // MARK: - Inline edit task row (existing task)
 
 struct InlineEditTaskRow: View {
+  @EnvironmentObject var client: ConvexClient
+  let task: EngageTask
   @Binding var title: String
   @Binding var notes: String
   let isDone: Bool
@@ -397,12 +399,22 @@ struct InlineEditTaskRow: View {
   var onCancel: () -> Void
   var onSchedule: (() -> Void)? = nil
   var onDeadline: (() -> Void)? = nil
+  var onAccept: (() -> Void)? = nil
+  var onDismiss: (() -> Void)? = nil
+  var onReload: (() -> Void)? = nil
   @FocusState private var focused: Field?
+  @State private var showAgentSheet = false
+  @State private var showCommentsSheet = false
+  @State private var commentCount: Int = 0
 
   enum Field { case title, notes }
 
+  private var hasAgentNote: Bool { !(task.agentNote ?? "").isEmpty }
+
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
+      if task.needsHumanReview { reviewBanner }
+
       HStack(alignment: .top, spacing: 12) {
         Button(action: onToggleDone) {
           ZStack {
@@ -445,16 +457,33 @@ struct InlineEditTaskRow: View {
             .foregroundStyle(.secondary)
         }
         .buttonStyle(.plain)
-        Image(systemName: "tag")
-          .font(.system(size: 16))
-          .foregroundStyle(.secondary)
-        Image(systemName: "list.bullet")
-          .font(.system(size: 16))
-          .foregroundStyle(.secondary)
         Button(action: { onDeadline?() }) {
           Image(systemName: "flag")
             .font(.system(size: 16))
             .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        Button(action: { showAgentSheet = true }) {
+          Image(systemName: "brain")
+            .font(.system(size: 16))
+            .foregroundStyle(hasAgentNote ? Color.blue : Color.secondary)
+        }
+        .buttonStyle(.plain)
+        Button(action: { showCommentsSheet = true }) {
+          ZStack(alignment: .topTrailing) {
+            Image(systemName: "bubble.left")
+              .font(.system(size: 16))
+              .foregroundStyle(.secondary)
+            if commentCount > 0 {
+              Text("\(commentCount)")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(Color.blue, in: Capsule())
+                .offset(x: 8, y: -6)
+            }
+          }
         }
         .buttonStyle(.plain)
       }
@@ -469,7 +498,301 @@ struct InlineEditTaskRow: View {
     .padding(.horizontal, 8)
     .padding(.vertical, 4)
     .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2)
-    .onAppear { focused = .title }
+    .onAppear {
+      focused = .title
+      Task { await loadCommentCount() }
+    }
+    .sheet(isPresented: $showAgentSheet, onDismiss: { onReload?() }) {
+      AgentSheet(task: task)
+        .presentationDetents([.medium, .large])
+    }
+    .sheet(isPresented: $showCommentsSheet, onDismiss: {
+      Task { await loadCommentCount() }
+    }) {
+      CommentsSheet(taskId: task.id, canResolve: task.origin == .human)
+        .presentationDetents([.medium, .large])
+    }
+  }
+
+  private func loadCommentCount() async {
+    commentCount = (try? await client.taskComments(taskId: task.id).count) ?? 0
+  }
+
+  @ViewBuilder
+  private var reviewBanner: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      HStack(alignment: .top, spacing: 8) {
+        Image(systemName: "person.crop.circle.badge.questionmark")
+          .font(.system(size: 16))
+          .foregroundStyle(.orange)
+        VStack(alignment: .leading, spacing: 2) {
+          Text("Awaiting your review")
+            .font(.subheadline).fontWeight(.medium)
+          if let ctx = task.agentContext, !ctx.isEmpty {
+            Text(ctx).font(.caption).foregroundStyle(.secondary)
+          }
+        }
+        Spacer()
+      }
+      HStack(spacing: 8) {
+        Button("Accept") { onAccept?() }
+          .font(.caption).fontWeight(.medium)
+          .padding(.horizontal, 12).padding(.vertical, 6)
+          .background(Color.green.opacity(0.15), in: Capsule())
+          .foregroundStyle(.green)
+        Button("Dismiss") { onDismiss?() }
+          .font(.caption).fontWeight(.medium)
+          .padding(.horizontal, 12).padding(.vertical, 6)
+          .background(Color.secondary.opacity(0.15), in: Capsule())
+          .foregroundStyle(.secondary)
+        Button { showCommentsSheet = true } label: {
+          Label("Reply", systemImage: "bubble.left")
+            .font(.caption).fontWeight(.medium)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 6)
+        .background(Color.secondary.opacity(0.15), in: Capsule())
+        .foregroundStyle(.secondary)
+        .buttonStyle(.plain)
+      }
+    }
+    .padding(.horizontal, Theme.hPadding)
+    .padding(.vertical, 12)
+    .background(Color.orange.opacity(0.08))
+  }
+}
+
+// MARK: - Agent sheet (assign + thinking)
+
+struct AgentSheet: View {
+  let task: EngageTask
+  @EnvironmentObject var client: ConvexClient
+  @Environment(\.dismiss) private var dismiss
+  @State private var agents: [Agent] = []
+  @State private var assigning = false
+  @State private var errorMessage: String?
+
+  var body: some View {
+    NavigationStack {
+      List {
+        Section("Assigned to") {
+          HStack(spacing: 10) {
+            Image(systemName: currentIsAgent ? "cpu" : "person.fill")
+              .foregroundStyle(currentIsAgent ? .purple : .blue)
+            Text(currentOwnerLabel).font(.callout)
+            Spacer()
+          }
+        }
+
+        if let note = task.agentNote, !note.isEmpty {
+          Section("Agent Thinking") {
+            HStack(alignment: .top, spacing: 10) {
+              Image(systemName: "brain").foregroundStyle(.blue)
+              VStack(alignment: .leading, spacing: 6) {
+                Text(note).font(.callout)
+                if task.confidence > 0 {
+                  HStack(spacing: 6) {
+                    Circle().fill(confidenceColor).frame(width: 8, height: 8)
+                    Text(confidenceLabel).font(.caption).foregroundStyle(.secondary)
+                  }
+                }
+              }
+            }
+            if let ctx = task.agentContext, !ctx.isEmpty {
+              VStack(alignment: .leading, spacing: 4) {
+                Text("Context").font(.caption).foregroundStyle(.secondary)
+                Text(ctx).font(.callout)
+              }
+            }
+          }
+        }
+
+        Section("Reassign to") {
+          ForEach(agents) { agent in
+            Button { assign(to: agent) } label: {
+              HStack(spacing: 10) {
+                Image(systemName: agent.type == .ai ? "cpu" : "person.fill")
+                  .foregroundStyle(agent.type == .ai ? .purple : .blue)
+                VStack(alignment: .leading, spacing: 2) {
+                  Text(agent.name).foregroundStyle(.primary)
+                  Text(agent.email).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                if agent.id == task.owner {
+                  Image(systemName: "checkmark").foregroundStyle(.blue)
+                }
+              }
+            }
+            .disabled(assigning || agent.id == task.owner)
+          }
+          if agents.isEmpty {
+            Text("No agents available").font(.caption).foregroundStyle(.secondary)
+          }
+        }
+      }
+      .navigationTitle("Agent")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .confirmationAction) {
+          Button("Done") { dismiss() }
+        }
+      }
+      .task { await loadAgents() }
+      .alert("Error", isPresented: Binding(
+        get: { errorMessage != nil },
+        set: { if !$0 { errorMessage = nil } }
+      )) {
+        Button("OK", role: .cancel) { errorMessage = nil }
+      } message: { Text(errorMessage ?? "") }
+    }
+  }
+
+  private var currentIsAgent: Bool {
+    agents.first(where: { $0.id == task.owner })?.type == .ai
+  }
+
+  private var currentOwnerLabel: String {
+    agents.first(where: { $0.id == task.owner })?.name ?? task.owner
+  }
+
+  private func loadAgents() async {
+    agents = (try? await client.agentsList()) ?? []
+  }
+
+  private func assign(to agent: Agent) {
+    assigning = true
+    Task {
+      do {
+        try await client.taskAssign(id: task.id, owner: agent.id, agentAcknowledged: false, actor: "human")
+        assigning = false
+        dismiss()
+      } catch {
+        assigning = false
+        errorMessage = "Assign failed: \(error.localizedDescription)"
+      }
+    }
+  }
+
+  private var confidenceColor: Color {
+    switch task.confidence {
+    case 3: return .green
+    case 2: return .orange
+    case 1: return .red
+    default: return .clear
+    }
+  }
+
+  private var confidenceLabel: String {
+    switch task.confidence {
+    case 3: return "High confidence"
+    case 2: return "Medium confidence"
+    case 1: return "Low confidence"
+    default: return "No confidence"
+    }
+  }
+}
+
+// MARK: - Comments sheet
+
+struct CommentsSheet: View {
+  let taskId: String
+  let canResolve: Bool
+  @EnvironmentObject var client: ConvexClient
+  @Environment(\.dismiss) private var dismiss
+  @State private var comments: [Comment] = []
+  @State private var newComment = ""
+
+  var body: some View {
+    NavigationStack {
+      VStack(spacing: 0) {
+        ScrollView {
+          LazyVStack(alignment: .leading, spacing: 0) {
+            if comments.isEmpty {
+              Text("No comments yet")
+                .font(.thingsMeta).foregroundStyle(.secondary)
+                .padding()
+            }
+            ForEach(comments) { comment in
+              CommentRow(comment: comment, canResolve: canResolve) { resolved in
+                Task {
+                  try? await client.resolveComment(id: comment.id, resolved: resolved)
+                  await load()
+                }
+              }
+              Divider().padding(.leading, 16)
+            }
+          }
+        }
+        Divider()
+        HStack {
+          TextField("Add a comment…", text: $newComment, axis: .vertical)
+            .textFieldStyle(.roundedBorder)
+            .lineLimit(1...3)
+          Button("Send") { send() }
+            .disabled(newComment.trimmingCharacters(in: .whitespaces).isEmpty)
+        }
+        .padding()
+      }
+      .navigationTitle("Comments")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Close") { dismiss() }
+        }
+      }
+      .task { await load() }
+    }
+  }
+
+  private func load() async {
+    comments = (try? await client.taskComments(taskId: taskId)) ?? []
+  }
+
+  private func send() {
+    let body = newComment.trimmingCharacters(in: .whitespaces)
+    guard !body.isEmpty else { return }
+    newComment = ""
+    Task {
+      try? await client.taskAddComment(taskId: taskId, actor: "human", body: body)
+      await load()
+    }
+  }
+}
+
+struct CommentRow: View {
+  let comment: Comment
+  let canResolve: Bool
+  let onResolve: (Bool) -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      HStack {
+        Image(systemName: comment.actor == "human" ? "person.fill" : "brain")
+          .font(.caption)
+          .foregroundStyle(comment.actor == "human" ? Color.secondary : Color.blue)
+        Text(comment.actor == "human" ? "You" : comment.actor)
+          .font(.caption).fontWeight(.medium)
+        Spacer()
+        if comment.resolved {
+          Image(systemName: "checkmark.circle.fill")
+            .font(.caption2).foregroundStyle(.green)
+        }
+      }
+      Text(comment.body)
+        .font(.body)
+        .strikethrough(comment.resolved)
+        .opacity(comment.resolved ? 0.5 : 1.0)
+      if canResolve {
+        Button(comment.resolved ? "Unresolve" : "Resolve") {
+          onResolve(!comment.resolved)
+        }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .buttonStyle(.plain)
+      }
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 10)
+    .opacity(comment.resolved ? 0.7 : 1.0)
   }
 }
 

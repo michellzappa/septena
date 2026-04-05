@@ -218,6 +218,7 @@ struct TaskListView: View {
   private func row(_ task: EngageTask) -> some View {
     if editingTaskId == task.id {
       InlineEditTaskRow(
+        task: task,
         title: $editingTitle,
         notes: $editingNotes,
         isDone: task.status == .completed,
@@ -225,7 +226,10 @@ struct TaskListView: View {
         onCommit: { commitEdit() },
         onCancel: { editingTaskId = nil; editFieldFocused = false },
         onSchedule: { scheduleEditingTask = task.id; showingWhenSheet = true },
-        onDeadline: { deadlineEditingTask = task.id; showingWhenSheet = true }
+        onDeadline: { deadlineEditingTask = task.id; showingWhenSheet = true },
+        onAccept: { acceptReview(task) },
+        onDismiss: { dismissReview(task) },
+        onReload: { Task { await load() } }
       )
     } else {
       editableRowBody(task)
@@ -314,6 +318,20 @@ struct TaskListView: View {
     editingTitle = task.title
     editingNotes = task.notes ?? ""
     editFieldFocused = true
+  }
+
+  private func acceptReview(_ task: EngageTask) {
+    Task {
+      try? await client.taskUpdate(id: task.id, patch: ["needsHumanReview": false], actor: "human")
+      await load()
+    }
+  }
+
+  private func dismissReview(_ task: EngageTask) {
+    Task {
+      try? await client.taskCancel(id: task.id, actor: "human")
+      await load()
+    }
   }
 
   private func commitEdit() {
@@ -594,9 +612,3 @@ struct TaskListView: View {
   }
 }
 
-// MARK: - Legacy shim
-
-struct TaskRowView: View {
-  let task: EngageTask
-  var body: some View { ThingsTaskRow(task: task) }
-}
