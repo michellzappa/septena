@@ -3,7 +3,7 @@ import SwiftUI
 // Things-style task list. See docs/things-reference/screens.md
 
 struct TaskListView: View {
-  @EnvironmentObject var client: ConvexClient
+  @EnvironmentObject var client: AtaskClient
   @EnvironmentObject var nav: NavigationState
 
   @State private var tasks: [EngageTask] = []
