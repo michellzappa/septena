@@ -620,11 +620,7 @@ struct TaskListView: View {
     } else if recentlyCompleted.contains(task.id) {
       recentlyCompleted.remove(task.id)
       Task {
-        try? await client.taskReopen(
-          id: task.id
-          patch: ["status": "open", "completedAt": NSNull(), "completedBy": NSNull()],
-          actor: "human"
-        )
+        try? await client.taskReopen(id: task.id)
         await load()
       }
     }
