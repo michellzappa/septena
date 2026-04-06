@@ -278,6 +278,7 @@ struct TaskListView: View {
             }
           }
       )
+    }
     .padding(.horizontal, Theme.hPadding)
     .padding(.vertical, 12)
     .frame(minHeight: Theme.rowHeight)
