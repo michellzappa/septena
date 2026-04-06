@@ -868,7 +868,6 @@ struct WhenPickerSheet: View {
     }
     .buttonStyle(.plain)
   }
-}
 
 // MARK: - Move picker sheet
 
@@ -991,4 +990,5 @@ struct Hairline: View {
       .padding(.leading, leadingInset)
   }
 }
-
+}
+}
