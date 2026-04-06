@@ -3,7 +3,7 @@ import SwiftUI
 // ─── Quick Entry View ─────────────────────────────────────────────────────────
 
 struct QuickEntryView: View {
-  @EnvironmentObject var client: ConvexClient
+  @EnvironmentObject var client: AtaskClient
   @Environment(\.dismiss) private var dismiss
 
   @State private var title = ""

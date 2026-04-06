@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 // See docs/things-reference/screens.md §1
 
 struct SidebarView: View {
-  @EnvironmentObject var client: ConvexClient
+  @EnvironmentObject var client: AtaskClient
   @EnvironmentObject var nav: NavigationState
 
   @State private var tasks: [EngageTask] = []
@@ -58,7 +58,7 @@ struct SidebarView: View {
       Button("New Project") { createKind = .project; createName = "" }
       Button("New Area") { createKind = .area; createName = "" }
       Button("New To-Do") {
-        nav.autoStartEntry = true
+        nav.showingQuickEntry = true
         go(.filter(.inbox))
       }
       Button("Cancel", role: .cancel) {}
@@ -73,8 +73,8 @@ struct SidebarView: View {
     }
     .task { await load() }
     .refreshable { await load() }
-    .onChange(of: nav.path) { _, newPath in
-      if newPath.isEmpty { tappedRoute = nil }
+    .onChange(of: nav.selectedTab) { _, _ in
+      tappedRoute = nil
     }
   }
 
@@ -82,7 +82,19 @@ struct SidebarView: View {
 
   private func go(_ route: Route) {
     tappedRoute = route
-    nav.path.append(route)
+    switch route {
+    case .filter(let f):
+      switch f {
+      case .inbox: nav.selectedTab = .inbox
+      case .today: nav.selectedTab = .today
+      case .upcoming: nav.selectedTab = .upcoming
+      case .anytime: nav.selectedTab = .anytime
+      case .logbook: nav.selectedTab = .logbook
+      case .review: nav.selectedTab = .review
+      case .someday, .project, .area: break
+      }
+    case .project, .area, .agents, .agent: break
+    }
   }
 
   private func isTapped(_ route: Route) -> Bool { tappedRoute == route }

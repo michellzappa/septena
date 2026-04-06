@@ -3,7 +3,7 @@ import SwiftUI
 // Agents list + per-agent detail. Not a Things feature — custom for Engage.
 
 struct AgentsView: View {
-  @EnvironmentObject var client: ConvexClient
+  @EnvironmentObject var client: AtaskClient
   @EnvironmentObject var nav: NavigationState
 
   @State private var agents: [Agent] = []
@@ -85,7 +85,7 @@ struct AgentsView: View {
 
 struct AgentDetailView: View {
   let agent: Agent
-  @EnvironmentObject var client: ConvexClient
+  @EnvironmentObject var client: AtaskClient
   @State private var tasks: [EngageTask] = []
   @State private var memory: [AgentMemoryEntry] = []
 

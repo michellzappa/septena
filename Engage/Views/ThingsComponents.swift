@@ -389,7 +389,7 @@ struct InlineNewTaskRow: View {
 // MARK: - Inline edit task row (existing task)
 
 struct InlineEditTaskRow: View {
-  @EnvironmentObject var client: ConvexClient
+  @EnvironmentObject var client: AtaskClient
   let task: EngageTask
   @Binding var title: String
   @Binding var notes: String
@@ -565,7 +565,7 @@ struct InlineEditTaskRow: View {
 
 struct AgentSheet: View {
   let task: EngageTask
-  @EnvironmentObject var client: ConvexClient
+  @EnvironmentObject var client: AtaskClient
   @Environment(\.dismiss) private var dismiss
   @State private var agents: [Agent] = []
   @State private var assigning = false
@@ -696,7 +696,7 @@ struct AgentSheet: View {
 struct CommentsSheet: View {
   let taskId: String
   let canResolve: Bool
-  @EnvironmentObject var client: ConvexClient
+  @EnvironmentObject var client: AtaskClient
   @Environment(\.dismiss) private var dismiss
   @State private var comments: [Comment] = []
   @State private var newComment = ""

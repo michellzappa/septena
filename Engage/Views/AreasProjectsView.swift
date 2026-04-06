@@ -5,7 +5,7 @@ import SwiftUI
 
 struct AreaDetailView: View {
   let area: Area
-  @EnvironmentObject var client: ConvexClient
+  @EnvironmentObject var client: AtaskClient
   @EnvironmentObject var nav: NavigationState
 
   @State private var draftName: String
@@ -191,7 +191,7 @@ struct AreaDetailView: View {
 
 struct ProjectDetailView: View {
   let project: Project
-  @EnvironmentObject var client: ConvexClient
+  @EnvironmentObject var client: AtaskClient
   @EnvironmentObject var nav: NavigationState
 
   @State private var draftName: String
