@@ -285,11 +285,9 @@ struct SidebarView: View {
       do {
         switch kind {
         case .area:
-          let nextOrder = (areas.map { $0.sortOrder }.max() ?? 0) + 10
-          try await client.areaCreate(name: name, sortOrder: nextOrder)
+          try await client.areaCreate(name: name)
         case .project:
-          let nextOrder = (projects.filter { $0.area == nil }.map { $0.sortOrder }.max() ?? 0) + 10
-          try await client.projectCreate(name: name, area: nil, sortOrder: nextOrder)
+          try await client.projectCreate(title: name)
         }
         await load()
       } catch {
