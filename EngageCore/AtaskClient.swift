@@ -130,7 +130,7 @@ final class AtaskClient: ObservableObject {
     func areaCreate(name: String) async throws -> Area {
         let body: [String: Any] = ["name": name]
         let data = try await post("/areas", body: body)
-        return (try? JSONDecoder().decode(Area.self, from: data)) ?? Area(id: "", name: name)
+        return (try? JSONDecoder().decode(Area.self, from: data)) ?? Area(id: UUID().uuidString, name: name, sortOrder: 0)
     }
 
     func areaUpdate(id: String, patch: [String: Any]) async throws {
@@ -140,7 +140,7 @@ final class AtaskClient: ObservableObject {
     func projectCreate(title: String) async throws -> Project {
         let body: [String: Any] = ["title": title]
         let data = try await post("/projects", body: body)
-        return (try? JSONDecoder().decode(Project.self, from: data)) ?? Project(id: "", title: title, status: "active")
+        return (try? JSONDecoder().decode(Project.self, from: data)) ?? Project(id: UUID().uuidString, name: title, area: nil, status: .active, notes: nil, sortOrder: 0)
     }
 
     func projectUpdate(id: String, patch: [String: Any]) async throws {
