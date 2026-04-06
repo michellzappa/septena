@@ -20,8 +20,8 @@ struct AreaDetailView: View {
 
   init(area: Area) {
     self.area = area
-    _draftName = State(initialValue: area.name)
-    _originalName = State(initialValue: area.name)
+    _draftName = State(initialValue: area.title)
+    _originalName = State(initialValue: area.title)
   }
 
   var body: some View {
@@ -139,7 +139,7 @@ struct AreaDetailView: View {
   }
 
   private var areaTasks: [EngageTask] {
-    tasks.filter { $0.areaId == area.id && $0.project == nil && isVisible($0) }
+    tasks.filter { $0.areaId == area.id && $0.projectId == nil && isVisible($0) }
   }
 
   private func isVisible(_ task: EngageTask) -> Bool {
@@ -204,9 +204,9 @@ struct ProjectDetailView: View {
 
   init(project: Project) {
     self.project = project
-    _draftName = State(initialValue: project.name)
+    _draftName = State(initialValue: project.title)
     _draftNotes = State(initialValue: project.notes ?? "")
-    _originalName = State(initialValue: project.name)
+    _originalName = State(initialValue: project.title)
     _originalNotes = State(initialValue: project.notes ?? "")
   }
 
@@ -287,7 +287,7 @@ struct ProjectDetailView: View {
 
   private var visibleTasks: [EngageTask] {
     tasks.filter {
-      $0.project == project.id && ($0.status == .open || recentlyCompleted.contains($0.id))
+      $0.projectId == project.id && ($0.status == .pending || recentlyCompleted.contains($0.id))
     }
   }
 

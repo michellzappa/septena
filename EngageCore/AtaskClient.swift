@@ -170,6 +170,7 @@ final class AtaskClient: ObservableObject {
     func taskCreate(
         title: String,
         id: String? = nil,
+        notes: String? = nil,
         schedule: TaskSchedule? = nil,
         startDate: Date? = nil,
         deadline: Date? = nil,
@@ -183,6 +184,7 @@ final class AtaskClient: ObservableObject {
     ) async throws -> EngageTask {
         var body: [String: Any] = ["title": title]
         if let id = id { body["id"] = id }
+        if let n = notes { body["notes"] = n }
         if let sc = schedule { body["schedule"] = sc.rawValue }
         if let sd = startDate { body["startDate"] = dateFormatter.string(from: sd) }
         if let dl = deadline { body["deadline"] = dateFormatter.string(from: dl) }
