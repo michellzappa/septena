@@ -298,9 +298,9 @@ struct MoveToSheet: View {
         }
 
         ForEach(areas) { area in
-          let areaProjects = projects.filter { $0.area == area.id }
+          let areaProjects = projects.filter { $0.areaId == area.id }
           if !areaProjects.isEmpty && matchesSearch(areaProjects.first) {
-            Section(area.name) {
+            AreaListSection(area.title) {
               ForEach(areaProjects) { project in
                 projectRow(project)
               }
@@ -321,7 +321,7 @@ struct MoveToSheet: View {
   }
 
   private func matchesSearch(_ project: Project?) -> Bool {
-    searchText.isEmpty || (project?.name.localizedCaseInsensitiveContains(searchText) ?? false)
+    searchText.isEmpty || (project?.title.localizedCaseInsensitiveContains(searchText) ?? false)
   }
 
   @ViewBuilder
@@ -331,7 +331,7 @@ struct MoveToSheet: View {
       dismiss()
     } label: {
       HStack {
-        Text(project.name)
+        Text(project.title)
         Spacer()
         if selectedProjectId == project.id {
           Image(systemName: "checkmark")

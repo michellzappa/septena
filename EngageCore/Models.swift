@@ -2,66 +2,63 @@ import Foundation
 
 // ─── Task ─────────────────────────────────────────────────────────────────────
 
-enum TaskOrigin: String, Codable, Hashable {
-  case human
-  case agent
-}
-
+/// TaskStatus mirrors upstream atask domain.Status
 enum TaskStatus: String, Codable, Hashable {
-  case open
+  case pending
   case completed
   case cancelled
 }
 
-enum TaskAgentStatus: String, Codable, Hashable {
-  case pending
-  case inProgress = "in_progress"
-  case blocked
-  case done
+/// TaskSchedule mirrors upstream atask domain.Schedule
+enum TaskSchedule: Int, Codable, Hashable {
+  case inbox = 0
+  case anytime = 1
+  case someday = 2
+
+  var title: String {
+    switch self {
+    case .inbox: return "Inbox"
+    case .anytime: return "Anytime"
+    case .someday: return "Someday"
+    }
+  }
 }
 
+/// Task mirrors upstream atask domain.Task
 struct EngageTask: Identifiable, Codable, Hashable {
   let id: String
   var title: String
   var notes: String?
-  var origin: TaskOrigin
   var status: TaskStatus
-  var priority: Int // 0=none, 1=low, 2=medium, 3=high
+  var schedule: TaskSchedule
 
-  var area: String?
-  var project: String?
-  var tags: [String]
-
-  var due: Date?
-  var dueDateSetBy: String?
-  var start: Date?
-  var end: Date?
-
-  var createdBy: String
-  var owner: String
-
+  /// YYYY-MM-DD format, stored as ISO8601 Date
+  var startDate: Date?
+  var deadline: Date?
   var completedAt: Date?
-  var completedBy: String?
 
-  var repeatRule: String?
-  var conclusionRule: String?
-  var nextDue: Date?
-  var nextDueSetBy: String?
+  /// Sort order within its list
+  var index: Int
+  /// Sort order within Today view
+  var todayIndex: Int?
 
-  var agentStatus: TaskAgentStatus?
-  var agentAssignedMe: Bool
-  var agentContext: String?
-  /// Agent's internal reasoning visible to human as a thought bubble
-  var agentNote: String?
-  /// 0=none, 1=low, 2=medium, 3=high confidence the agent can do this well
-  var confidence: Int
-  /// Agent completed but waiting for human to confirm before closing
-  var needsHumanReview: Bool
+  var projectId: String?
+  var sectionId: String?
+  var areaId: String?
+  var locationId: String?
+
+  var repeatRule: RecurrenceRule?
+  var timeSlot: String?
+
+  var tags: [String]
+  var linkedTaskIds: [String]
 
   var checklist: [ChecklistItem]
 
+  var createdAt: Date
+  var updatedAt: Date
+
   var isRecurring: Bool { repeatRule != nil }
-  var hasConclusionRule: Bool { conclusionRule != nil }
 
   static func == (lhs: EngageTask, rhs: EngageTask) -> Bool {
     lhs.id == rhs.id
@@ -72,133 +69,203 @@ struct EngageTask: Identifiable, Codable, Hashable {
   }
 }
 
+// ─── RecurrenceRule ────────────────────────────────────────────────────────────
+
+/// RecurrenceRule mirrors upstream atask domain.RecurrenceRule
+struct RecurrenceRule: Codable, Hashable {
+  var type: RecurrenceMode  // "fixed" or "afterCompletion"
+  var interval: Int
+  var unit: RecurrenceUnit // "day", "week", "month"
+  var end: RecurrenceEnd?
+}
+
+enum RecurrenceMode: String, Codable, Hashable {
+  case fixed = "fixed"
+  case afterCompletion = "afterCompletion"
+}
+
+enum RecurrenceUnit: String, Codable, Hashable {
+  case day = "day"
+  case week = "week"
+  case month = "month"
+}
+
+struct RecurrenceEnd: Codable, Hashable {
+  var date: String?
+  var count: Int?
+}
+
+// ─── ChecklistItem ────────────────────────────────────────────────────────────
+
+enum ChecklistItemStatus: Int, Codable, Hashable {
+  case pending = 0
+  case completed = 1
+}
+
+/// ChecklistItem mirrors upstream atask domain.ChecklistItem
 struct ChecklistItem: Identifiable, Codable, Equatable, Hashable {
   let id: String
   var title: String
-  var done: Bool
+  var status: ChecklistItemStatus
+  var taskId: String
+  var index: Int
+  var createdAt: Date
+  var updatedAt: Date
 }
 
 // ─── Area ─────────────────────────────────────────────────────────────────────
 
+/// Area mirrors upstream atask domain.Area
 struct Area: Identifiable, Codable, Equatable, Hashable {
   let id: String
-  var name: String
-  var icon: String?
-  var sortOrder: Int
-  var color: String?
-}
-
-// ─── Project ─────────────────────────────────────────────────────────────────
-
-enum ProjectStatus: String, Codable, Hashable {
-  case active
-  case completed
-  case dropped
-}
-
-struct Project: Identifiable, Codable, Equatable, Hashable {
-  let id: String
-  var name: String
-  var area: String?
-  var status: ProjectStatus
-  var notes: String?
-  var sortOrder: Int
-}
-
-// ─── Tag ─────────────────────────────────────────────────────────────────────
-
-struct Tag: Identifiable, Codable, Equatable {
-  let id: String
-  var name: String
-  var color: String
-}
-
-// ─── Agent ───────────────────────────────────────────────────────────────────
-
-enum AgentType: String, Codable, Hashable {
-  case human
-  case ai
-}
-
-struct Agent: Identifiable, Codable, Equatable, Hashable {
-  let id: String
-  var name: String
-  var avatar: String?
-  var email: String
-  var type: AgentType
-  var active: Bool
-}
-
-// ─── AgentMemory ─────────────────────────────────────────────────────────────
-
-struct AgentMemoryEntry: Identifiable, Codable, Equatable {
-  let id: String
-  var agentId: String
-  var taskId: String?
-  var content: String
-  var pinned: Bool
+  var title: String
+  var index: Int
+  var archived: Bool
+  var createdAt: Date
   var updatedAt: Date
 }
 
-// ─── Comment ─────────────────────────────────────────────────────────────────
+// ─── Project ──────────────────────────────────────────────────────────────────
 
-struct Comment: Identifiable, Codable, Equatable, Hashable {
+/// Project mirrors upstream atask domain.Project
+struct Project: Identifiable, Codable, Equatable, Hashable {
   let id: String
-  var taskId: String
-  var actor: String
-  var body: String
-  var resolved: Bool
+  var title: String
+  var notes: String?
+  var status: TaskStatus
+  var schedule: TaskSchedule
+
+  var startDate: Date?
+  var deadline: Date?
+  var completedAt: Date?
+
+  var index: Int
+  var areaId: String?
+  var tags: [String]
+  var autoComplete: Bool
+  var color: String?
+
   var createdAt: Date
+  var updatedAt: Date
 }
 
-// ─── CollaborationLog ────────────────────────────────────────────────────────
+// ─── Section ──────────────────────────────────────────────────────────────────
 
-enum LogAction: String, Codable, Hashable {
-  case created
-  case commented
-  case reassigned
-  case prioritized
-  case completed
-  case cancelled
-  case blocked
-  case unblocked
-  case staleFlagged = "stale_flagged"
-  case updated
-}
-
-struct CollaborationLogEntry: Identifiable, Codable, Equatable {
+/// Section mirrors upstream atask domain.Section
+struct Section: Identifiable, Codable, Equatable, Hashable {
   let id: String
-  var taskId: String?
-  var actor: String
-  var action: LogAction
+  var title: String
+  var projectId: String
+  var index: Int
+  var archived: Bool
+  var collapsed: Bool
+  var createdAt: Date
+  var updatedAt: Date
+}
+
+// ─── Tag ──────────────────────────────────────────────────────────────────────
+
+/// Tag mirrors upstream atask domain.Tag
+struct Tag: Identifiable, Codable, Equatable, Hashable {
+  let id: String
+  var title: String
+  var parentId: String?
+  var shortcut: String?
+  var index: Int
+  var createdAt: Date
+  var updatedAt: Date
+}
+
+// ─── Location ─────────────────────────────────────────────────────────────────
+
+/// Location mirrors upstream atask domain.Location
+struct Location: Identifiable, Codable, Equatable, Hashable {
+  let id: String
+  var name: String
+  var latitude: Double?
+  var longitude: Double?
+  var radius: Int?
+  var address: String?
+  var createdAt: Date
+  var updatedAt: Date
+}
+
+// ─── Activity ─────────────────────────────────────────────────────────────────
+
+/// Activity mirrors upstream atask domain.Activity
+struct Activity: Identifiable, Codable, Equatable {
+  let id: String
+  var type: ActivityType
   var content: String?
+  var taskId: String?
+  var actorType: ActorType
+  var actorId: String
   var createdAt: Date
 }
 
-// ─── View Filters ─────────────────────────────────────────────────────────────
+enum ActivityType: String, Codable {
+  case comment
+  case contextRequest = "context_request"
+  case reply
+  case artifact
+  case statusChange = "status_change"
+  case decomposition
+}
 
-enum TaskFilter: Equatable, Hashable {
-  case inbox
-  case today
-  case upcoming(days: Int)
-  case anytime
-  case someday
-  case project(String)
-  case area(String)
-  case review
-  case logbook
+enum ActorType: String, Codable {
+  case human
+  case agent
+}
 
-  var title: String {
-    switch self {
-    case .inbox: return "Inbox"
-    case .today: return "Today"
-    case .upcoming: return "Upcoming"
-    case .anytime: return "Anytime"
-    case .someday: return "Someday"
-    case .project: return "Project"
-    case .area: return "Area"
-    case .review: return "Review"
-    case .logbook: return "Logbook"
-    }
-  }
+// ─── User ─────────────────────────────────────────────────────────────────────
+
+struct User: Identifiable, Codable {
+  let id: String
+  var email: String
+  var name: String
+}
+
+// ─── APIKey ───────────────────────────────────────────────────────────────────
+
+struct APIKey: Identifiable, Codable {
+  let id: String
+  var name: String
+  var createdAt: Date
+}
+
+// ─── View Responses ────────────────────────────────────────────────────────────
+
+/// InlineTask is the shape returned by /views/* endpoints (flat, no checklist)
+struct InlineTask: Identifiable, Codable, Hashable {
+  let id: String
+  var title: String
+  var notes: String?
+  var status: TaskStatus
+  var schedule: TaskSchedule
+  var startDate: Date?
+  var deadline: Date?
+  var completedAt: Date?
+  var index: Int
+  var todayIndex: Int?
+  var projectId: String?
+  var sectionId: String?
+  var areaId: String?
+  var locationId: String?
+  var repeatRule: RecurrenceRule?
+  var timeSlot: String?
+  var tags: [String]
+  var linkedTaskIds: [String]
+  var createdAt: Date
+  var updatedAt: Date
+}
+
+// ─── Sync ─────────────────────────────────────────────────────────────────────
+
+struct DeltaEvent: Identifiable, Codable {
+  let id: Int64
+  var type: String
+  var entityType: String
+  var entityId: String
+  var payload: String?  // JSON string
+  var createdAt: Date
 }

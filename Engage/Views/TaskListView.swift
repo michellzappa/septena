@@ -187,7 +187,7 @@ struct TaskListView: View {
 
   private var groupedList: some View {
     VStack(alignment: .leading, spacing: 0) {
-      let ungrouped = filteredTasks.filter { $0.project == nil }
+      let ungrouped = filteredTasks.filter { $0.projectId == nil }
       if !ungrouped.isEmpty {
         ForEach(ungrouped) { task in
           row(task)
@@ -196,7 +196,7 @@ struct TaskListView: View {
       }
       ForEach(groupedByProject, id: \.0.id) { project, items in
         ListSectionHeader(
-          icon: "circle", iconTint: .secondary, title: project.name,
+          icon: "circle", iconTint: .secondary, title: project.title,
           onTap: selectMode ? nil : { }
         )
         Hairline()
@@ -318,14 +318,15 @@ struct TaskListView: View {
 
   private func acceptReview(_ task: EngageTask) {
     Task {
-      try? await client.taskUpdate(id: task.id, patch: ["needsHumanReview": false], actor: "human")
+      // review not yet available in upstream atask
+        try? await client.taskPatch(id: task.id)
       await load()
     }
   }
 
   private func dismissReview(_ task: EngageTask) {
     Task {
-      try? await client.taskCancel(id: task.id, actor: "human")
+// cancel available but actor removed
       await load()
     }
   }
@@ -345,7 +346,7 @@ struct TaskListView: View {
     }
     guard !patch.isEmpty else { return }
     Task {
-      try? await client.taskUpdate(id: id, patch: patch, actor: "human")
+      try? await client.taskPatch(id: id, title: titleChanged ? trimmedTitle : nil, notes: notesChanged ? newNotes : nil)
       await load()
     }
   }
@@ -377,27 +378,28 @@ struct TaskListView: View {
   }
 
   private func applyDueToTask(id: String, date: Date?) {
-    let patch: [String: Any] = ["due": date.map { Int($0.timeIntervalSince1970 * 1000) } ?? NSNull()]
+    // apply deadline via taskPatch
+    let deadline = date
     Task {
-      try? await client.taskUpdate(id: id, patch: patch, actor: "human")
+      try? await client.taskPatch(id: id, title: titleChanged ? trimmedTitle : nil, notes: notesChanged ? newNotes : nil)
       await load()
     }
   }
 
   private func applyStartToTask(id: String, date: Date?) {
-    let patch: [String: Any] = ["start": date.map { Int($0.timeIntervalSince1970 * 1000) } ?? NSNull()]
     Task {
-      try? await client.taskUpdate(id: id, patch: patch, actor: "human")
+      try? await client.taskPatch(id: id, startDate: date)
       await load()
     }
   }
 
   private func applyDueToSelected(_ date: Date?) {
     let ids = Array(selection)
-    let patch: [String: Any] = ["due": date.map { Int($0.timeIntervalSince1970 * 1000) } ?? NSNull()]
+    // apply deadline via taskPatch
+    let deadline = date
     Task {
       for id in ids {
-        try? await client.taskUpdate(id: id, patch: patch, actor: "human")
+        try? await client.taskPatch(id: id, deadline: deadline)
       }
       await load()
       exitSelectMode()
@@ -407,14 +409,13 @@ struct TaskListView: View {
   private func applyMoveToSelected(areaId: String?, projectId: String?) {
     let ids = Array(selection)
     var patch: [String: Any] = [:]
-    patch["area"] = areaId ?? NSNull()
-    patch["project"] = projectId ?? NSNull()
+    // apply area/project via taskPatch
     Task {
       var failures = 0
       var lastError: String?
       for id in ids {
         do {
-          try await client.taskUpdate(id: id, patch: patch, actor: "human")
+          try await client.taskMoveToArea(id: id, areaId: areaId); try await client.taskMoveToProject(id: id, projectId: projectId)
         } catch {
           failures += 1
           lastError = error.localizedDescription
@@ -432,7 +433,7 @@ struct TaskListView: View {
     let ids = Array(selection)
     Task {
       for id in ids {
-        try? await client.taskCancel(id: id, actor: "human")
+        try? await client.taskCancel(id: id)
       }
       await load()
       exitSelectMode()
@@ -449,8 +450,8 @@ struct TaskListView: View {
   }
 
   private var groupedByProject: [(Project, [EngageTask])] {
-    let withProject = filteredTasks.filter { $0.project != nil }
-    let byId = Dictionary(grouping: withProject) { $0.project! }
+    let withProject = filteredTasks.filter { $0.projectId != nil }
+    let byId = Dictionary(grouping: withProject) { $0.projectId! }
     return byId.compactMap { pid, items -> (Project, [EngageTask])? in
       guard let p = projects.first(where: { $0.id == pid }) else { return nil }
       return (p, items)
@@ -543,28 +544,28 @@ struct TaskListView: View {
     let calendar = Calendar.current
     let today = calendar.startOfDay(for: Date())
     return tasks.filter { task in
-      let isActive = task.status == .open || recentlyCompleted.contains(task.id)
+      let isActive = task.status == .pending || recentlyCompleted.contains(task.id)
       switch filter {
       case .inbox:
-        return isActive && task.area == nil && task.project == nil && task.due == nil && task.start == nil
+        return isActive && task.areaId == nil && task.projectId == nil && task.deadline == nil && task.startDate == nil
       case .today:
         return isActive && (
-          (task.due != nil && calendar.isDate(task.due!, inSameDayAs: today)) ||
-          (task.start != nil && calendar.isDate(task.start!, inSameDayAs: today)) ||
-          (task.due != nil && task.due! < today)
+          (task.deadline != nil && calendar.isDate(task.due!, inSameDayAs: today)) ||
+          (task.startDate != nil && calendar.isDate(task.start!, inSameDayAs: today)) ||
+          (task.deadline != nil && task.due! < today)
         )
       case .upcoming(let days):
         let end = calendar.date(byAdding: .day, value: days, to: today)!
         return isActive && (
-          (task.due != nil && task.due! >= today && task.due! <= end) ||
-          (task.start != nil && task.start! >= today && task.start! <= end)
+          (task.deadline != nil && task.due! >= today && task.due! <= end) ||
+          (task.startDate != nil && task.start! >= today && task.start! <= end)
         )
       case .anytime:
-        return isActive && task.due == nil && task.start == nil && (task.area != nil || task.project != nil)
+        return isActive && task.deadline == nil && task.startDate == nil && (task.areaId != nil || task.projectId != nil)
       case .someday: return false
-      case .project(let pid): return isActive && task.project == pid
-      case .area(let aid): return isActive && task.area == aid
-      case .review: return task.status == .open && task.agentStatus == .blocked
+      case .project(let pid): return isActive && task.projectId == pid
+      case .area(let aid): return isActive && task.areaId == aid
+      case .review: return task.status == .pending && task.agentStatus == .blocked
       case .logbook: return task.status == .completed || task.status == .cancelled
       }
     }
@@ -588,10 +589,10 @@ struct TaskListView: View {
 
   private func toggle(_ task: EngageTask) {
     UIImpactFeedbackGenerator(style: .light).impactOccurred()
-    if task.status == .open {
+    if task.status == .pending {
       recentlyCompleted.insert(task.id)
       Task {
-        try? await client.taskComplete(id: task.id, completedBy: "human")
+        try? await client.taskComplete(id: task.id)
         await load()
       }
     } else if recentlyCompleted.contains(task.id) {

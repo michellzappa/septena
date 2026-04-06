@@ -53,7 +53,7 @@ struct AreaDetailView: View {
                 Image(systemName: "circle")
                   .font(.system(size: 18))
                   .foregroundStyle(.secondary)
-                Text(project.name)
+                Text(project.title)
                   .font(.thingsSectionHeader)
                   .foregroundStyle(.primary)
                 Spacer()
@@ -125,7 +125,7 @@ struct AreaDetailView: View {
     let n = newNotes.isEmpty ? nil : newNotes
     Task {
       try? await client.taskCreate(
-        title: t, notes: n, origin: .human, owner: "human",
+        title: t, notes: n,
         project: nil
       )
       newTitle = ""; newNotes = ""
@@ -134,16 +134,16 @@ struct AreaDetailView: View {
   }
 
   private var areaProjects: [Project] {
-    projects.filter { $0.area == area.id && $0.status == .active }
-      .sorted { $0.sortOrder < $1.sortOrder }
+    projects.filter { $0.areaId == area.id && $0.status == .pending }
+      .sorted { $0.index < $1.index }
   }
 
   private var areaTasks: [EngageTask] {
-    tasks.filter { $0.area == area.id && $0.project == nil && isVisible($0) }
+    tasks.filter { $0.areaId == area.id && $0.project == nil && isVisible($0) }
   }
 
   private func isVisible(_ task: EngageTask) -> Bool {
-    task.status == .open || recentlyCompleted.contains(task.id)
+    task.status == .pending || recentlyCompleted.contains(task.id)
   }
 
   private func commitName() {
@@ -154,13 +154,13 @@ struct AreaDetailView: View {
     }
     originalName = trimmed
     Task {
-      try? await client.areaUpdate(id: area.id, patch: ["name": trimmed])
+      try? await client.areaPatch(id: area.id, title: trimmed)
     }
   }
 
   private func toggle(_ task: EngageTask) {
     UIImpactFeedbackGenerator(style: .light).impactOccurred()
-    if task.status == .open {
+    if task.status == .pending {
       recentlyCompleted.insert(task.id)
       Task {
         try? await client.taskComplete(id: task.id, completedBy: "human")
@@ -297,7 +297,7 @@ struct ProjectDetailView: View {
 
   private func toggle(_ task: EngageTask) {
     UIImpactFeedbackGenerator(style: .light).impactOccurred()
-    if task.status == .open {
+    if task.status == .pending {
       recentlyCompleted.insert(task.id)
       Task {
         try? await client.taskComplete(id: task.id, completedBy: "human")
@@ -323,13 +323,13 @@ struct ProjectDetailView: View {
       return
     }
     originalName = trimmed
-    Task { try? await client.projectUpdate(id: project.id, patch: ["name": trimmed]) }
+    Task { try? await client.projectPatch(id: project.id, title: trimmed) }
   }
 
   private func commitNotes() {
     guard draftNotes != originalNotes else { return }
     originalNotes = draftNotes
-    Task { try? await client.projectUpdate(id: project.id, patch: ["notes": draftNotes]) }
+    Task { try? await client.projectPatch(id: project.id, notes: draftNotes) }
   }
 
   private func cancelNewTask() {
@@ -344,7 +344,7 @@ struct ProjectDetailView: View {
     let n = newNotes.isEmpty ? nil : newNotes
     Task {
       try? await client.taskCreate(
-        title: t, notes: n, origin: .human, owner: "human",
+        title: t, notes: n,
         project: project.id
       )
       newTitle = ""; newNotes = ""

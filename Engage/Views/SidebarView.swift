@@ -141,7 +141,7 @@ struct SidebarView: View {
       // Top-level projects (no area)
       ForEach(topLevelProjects) { project in
         Button { go(.project(project)) } label: {
-          SidebarProjectRow(name: project.name, progress: progress(for: project))
+          SidebarProjectRow(name: project.title, progress: progress(for: project))
             .padding(.horizontal, Theme.hPadding)
         }
         .buttonStyle(.plain)
@@ -185,7 +185,7 @@ struct SidebarView: View {
     VStack(alignment: .leading, spacing: 0) {
       Button { go(.area(area)) } label: {
         SidebarAreaRow(
-          name: area.name,
+          name: area.title,
           isExpanded: expandedAreas.contains(area.id),
           onToggle: {
             withAnimation(.easeInOut(duration: 0.2)) {
@@ -217,7 +217,7 @@ struct SidebarView: View {
       if expandedAreas.contains(area.id) {
         ForEach(Array(projects(in: area.id).enumerated()), id: \.element.id) { pIdx, project in
           Button { go(.project(project)) } label: {
-            SidebarProjectRow(name: project.name, progress: progress(for: project))
+            SidebarProjectRow(name: project.title, progress: progress(for: project))
               .padding(.horizontal, Theme.hPadding)
           }
           .buttonStyle(.plain)
@@ -249,7 +249,7 @@ struct SidebarView: View {
   }
 
   private func effectiveArea(for project: Project) -> String? {
-    projectAreaOverrides[project.id] ?? project.area
+    projectAreaOverrides[project.id] ?? project.areaId
   }
 
   private var overdueCount: Int {
