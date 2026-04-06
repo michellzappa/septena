@@ -21,9 +21,9 @@ final class AtaskClient: ObservableObject {
         return AtaskClient(baseURL: url, apiKey: key)
     }()
 
+    @MainActor
     func updateConfig(baseURL: URL, apiKey: String) {
-        // Re-create shared singleton with new config
-        ObjectPublisher.shared.client = AtaskClient(baseURL: baseURL, apiKey: apiKey)
+        ClientProvider.shared.client = AtaskClient(baseURL: baseURL, apiKey: apiKey)
     }
 
     // MARK: - Connection test
@@ -572,6 +572,7 @@ final class ClientProvider: ObservableObject {
     @Published var client: AtaskClient = .shared
     private init() {}
 
+    @MainActor
     func update(baseURL: URL, apiKey: String) {
         self.client = AtaskClient(baseURL: baseURL, apiKey: apiKey)
     }
