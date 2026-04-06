@@ -178,7 +178,7 @@ final class AtaskClient: ObservableObject {
 
     private func get(_ url: URL) async throws -> Data {
         var req = URLRequest(url: url)
-        req.addValue(apiKey, forHTTPHeaderField: "X-API-Key")
+        req.addValue("ApiKey \(apiKey)", forHTTPHeaderField: "Authorization")
         let (data, resp) = try await URLSession.shared.data(for: req)
         guard let http = resp as? HTTPURLResponse, http.statusCode < 400 else {
             throw AtaskError.serverError((resp as? HTTPURLResponse)?.statusCode ?? 0)
@@ -204,7 +204,7 @@ final class AtaskClient: ObservableObject {
         var req = URLRequest(url: baseURL.appendingPathComponent(path))
         req.httpMethod = "POST"
         req.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.addValue(apiKey, forHTTPHeaderField: "X-API-Key")
+        req.addValue("ApiKey \(apiKey)", forHTTPHeaderField: "Authorization")
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, resp) = try await URLSession.shared.data(for: req)
         guard let http = resp as? HTTPURLResponse, http.statusCode < 400 else {
@@ -217,7 +217,7 @@ final class AtaskClient: ObservableObject {
         var req = URLRequest(url: baseURL.appendingPathComponent(path))
         req.httpMethod = "PUT"
         req.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.addValue(apiKey, forHTTPHeaderField: "X-API-Key")
+        req.addValue("ApiKey \(apiKey)", forHTTPHeaderField: "Authorization")
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, resp) = try await URLSession.shared.data(for: req)
         guard let http = resp as? HTTPURLResponse, http.statusCode < 400 else {
