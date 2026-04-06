@@ -92,10 +92,13 @@ struct ServerConfigView: View {
     private func testConnection() async {
         isChecking = true
         connectionStatus = "Testing..."
-        // Give a brief delay
-        try? await Task.sleep(nanoseconds: 500_000_000)
+        do {
+            let result = try await client.ping()
+            connectionStatus = result
+        } catch {
+            connectionStatus = "Failed: \(error.localizedDescription)"
+        }
         isChecking = false
-        connectionStatus = "Failed"
     }
 
     private func saveAndClose() {
