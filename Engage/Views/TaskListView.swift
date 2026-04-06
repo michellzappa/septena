@@ -339,13 +339,11 @@ struct TaskListView: View {
   private func commitEdit() {
     guard let id = editingTaskId else { return }
     let trimmedTitle = editingTitle.trimmingCharacters(in: .whitespaces)
-    let newNotes = editingNotes
     editingTaskId = nil
     editFieldFocused = false
     guard !trimmedTitle.isEmpty else { return }
-    let original = tasks.first(where: { $0.id == id })
     Task {
-      try? await client.taskPatch(id: id, title: trimmedTitle, notes: newNotes)
+      try? await client.taskPatch(id: id, title: trimmedTitle, notes: editingNotes)
       await load()
     }
   }
@@ -377,10 +375,8 @@ struct TaskListView: View {
   }
 
   private func applyDueToTask(id: String, date: Date?) {
-    // apply deadline via taskPatch
-    let deadline = date
     Task {
-      try? await client.taskPatch(id: id, title: titleChanged ? trimmedTitle : nil, notes: notesChanged ? newNotes : nil)
+      try? await client.taskPatch(id: id, deadline: date)
       await load()
     }
   }
@@ -394,11 +390,9 @@ struct TaskListView: View {
 
   private func applyDueToSelected(_ date: Date?) {
     let ids = Array(selection)
-    // apply deadline via taskPatch
-    let deadline = date
     Task {
       for id in ids {
-        try? await client.taskPatch(id: id, deadline: deadline)
+        try? await client.taskPatch(id: id, deadline: date)
       }
       await load()
       exitSelectMode()
