@@ -27,7 +27,7 @@ final class NavigationState: ObservableObject {
   @Published var showingAgentPanel = false
 
   enum Tab: Int, CaseIterable, Identifiable {
-    case inbox = 0, today, upcoming, anytime, projects, areas, logbook, review
+    case inbox = 0, today, upcoming, anytime, projects, areas, logbook, review, settings
     var id: Int { rawValue }
   }
 }
@@ -92,7 +92,7 @@ struct ContentView: View {
         .tabItem {
           Label("Settings", systemImage: "gear")
         }
-        .tag(NavigationState.Tab(rawValue: 9)!)
+        .tag(NavigationState.Tab.settings)
     }
     .sheet(isPresented: $nav.showingQuickEntry) {
       QuickEntryView()
