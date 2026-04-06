@@ -547,6 +547,25 @@ final class AtaskClient: ObservableObject {
         throw AtaskError.serverError(501)
     }
 
+
+    func taskAssign(id: String, owner: String, agentAcknowledged: Bool, actor: String) async throws {
+        AtaskLog.info("taskAssign — not yet implemented in upstream atask")
+        // stub: no-op until upstream supports assignment
+    }
+
+    func taskComments(taskId: String) async throws -> [Comment] {
+        AtaskLog.info("taskComments — not yet implemented in upstream atask")
+        return []
+    }
+
+    func taskAddComment(taskId: String, actor: String, body: String) async throws {
+        AtaskLog.info("taskAddComment — not yet implemented in upstream atask")
+    }
+
+    func resolveComment(id: String, resolved: Bool) async throws {
+        AtaskLog.info("resolveComment — not yet implemented in upstream atask")
+    }
+
     // MARK: - HTTP helpers
 
     private func get(_ path: String, queryItems: [URLQueryItem] = []) async throws -> Data {

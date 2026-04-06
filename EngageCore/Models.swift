@@ -334,3 +334,14 @@ struct CollaborationLogEntry: Identifiable, Codable, Equatable {
   var detail: String?
   var timestamp: Date
 }
+
+// MARK: - Comment (Engage-specific — not yet in upstream atask)
+
+struct Comment: Identifiable, Codable, Equatable {
+  let id: String
+  var taskId: String
+  var body: String
+  var actorId: String
+  var resolved: Bool
+  var createdAt: Date
+}
