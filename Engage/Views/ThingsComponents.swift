@@ -237,13 +237,13 @@ struct ThingsTaskRow: View {
   @ViewBuilder
   private var trailingMeta: some View {
     HStack(spacing: 6) {
-      if task.isRecurring {
+      if task.repeatRule != nil {
         Image(systemName: "arrow.triangle.2.circlepath")
           .font(.system(size: 12))
           .foregroundStyle(.secondary)
       }
-      if let due = task.due {
-        deadlineLabel(for: due)
+      if let deadline = task.deadline {
+        deadlineLabel(for: deadline)
       }
     }
   }
@@ -409,13 +409,11 @@ struct InlineEditTaskRow: View {
 
   enum Field { case title, notes }
 
-  private var hasAgentNote: Bool { !(task.agentNote ?? "").isEmpty }
+  private var hasAgentNote: Bool { false }  // agentNote not yet in upstream
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      if task.needsHumanReview { reviewBanner }
-
-      HStack(alignment: .top, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
         Button(action: onToggleDone) {
           ZStack {
             Circle()
@@ -509,7 +507,7 @@ struct InlineEditTaskRow: View {
     .sheet(isPresented: $showCommentsSheet, onDismiss: {
       Task { await loadCommentCount() }
     }) {
-      CommentsSheet(taskId: task.id, canResolve: task.origin == .human)
+      CommentsSheet(taskId: task.id, canResolve: true)
         .presentationDetents([.medium, .large])
     }
   }
@@ -519,47 +517,7 @@ struct InlineEditTaskRow: View {
   }
 
   @ViewBuilder
-  private var reviewBanner: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      HStack(alignment: .top, spacing: 8) {
-        Image(systemName: "person.crop.circle.badge.questionmark")
-          .font(.system(size: 16))
-          .foregroundStyle(.orange)
-        VStack(alignment: .leading, spacing: 2) {
-          Text("Awaiting your review")
-            .font(.subheadline).fontWeight(.medium)
-          if let ctx = task.agentContext, !ctx.isEmpty {
-            Text(ctx).font(.caption).foregroundStyle(.secondary)
-          }
-        }
-        Spacer()
-      }
-      HStack(spacing: 8) {
-        Button("Accept") { onAccept?() }
-          .font(.caption).fontWeight(.medium)
-          .padding(.horizontal, 12).padding(.vertical, 6)
-          .background(Color.green.opacity(0.15), in: Capsule())
-          .foregroundStyle(.green)
-        Button("Dismiss") { onDismiss?() }
-          .font(.caption).fontWeight(.medium)
-          .padding(.horizontal, 12).padding(.vertical, 6)
-          .background(Color.secondary.opacity(0.15), in: Capsule())
-          .foregroundStyle(.secondary)
-        Button { showCommentsSheet = true } label: {
-          Label("Reply", systemImage: "bubble.left")
-            .font(.caption).fontWeight(.medium)
-        }
-        .padding(.horizontal, 12).padding(.vertical, 6)
-        .background(Color.secondary.opacity(0.15), in: Capsule())
-        .foregroundStyle(.secondary)
-        .buttonStyle(.plain)
-      }
-    }
-    .padding(.horizontal, Theme.hPadding)
-    .padding(.vertical, 12)
-    .background(Color.orange.opacity(0.08))
-  }
-}
+  private var reviewBanner: some View { EmptyView() } // review not yet in upstream atask
 
 // MARK: - Agent sheet (assign + thinking)
 
@@ -574,7 +532,7 @@ struct AgentSheet: View {
   var body: some View {
     NavigationStack {
       List {
-        Section("Assigned to") {
+        SwiftUI.Section("Assigned to") {
           HStack(spacing: 10) {
             Image(systemName: currentIsAgent ? "cpu" : "person.fill")
               .foregroundStyle(currentIsAgent ? .purple : .blue)
@@ -583,30 +541,9 @@ struct AgentSheet: View {
           }
         }
 
-        if let note = task.agentNote, !note.isEmpty {
-          Section("Agent Thinking") {
-            HStack(alignment: .top, spacing: 10) {
-              Image(systemName: "brain").foregroundStyle(.blue)
-              VStack(alignment: .leading, spacing: 6) {
-                Text(note).font(.callout)
-                if task.confidence > 0 {
-                  HStack(spacing: 6) {
-                    Circle().fill(confidenceColor).frame(width: 8, height: 8)
-                    Text(confidenceLabel).font(.caption).foregroundStyle(.secondary)
-                  }
-                }
-              }
-            }
-            if let ctx = task.agentContext, !ctx.isEmpty {
-              VStack(alignment: .leading, spacing: 4) {
-                Text("Context").font(.caption).foregroundStyle(.secondary)
-                Text(ctx).font(.callout)
-              }
-            }
-          }
-        }
+        // agentNote / confidence / agentContext not yet available in upstream atask
 
-        Section("Reassign to") {
+        SwiftUI.Section("Reassign to") {
           ForEach(agents) { agent in
             Button { assign(to: agent) } label: {
               HStack(spacing: 10) {
@@ -617,12 +554,12 @@ struct AgentSheet: View {
                   Text(agent.email).font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                if agent.id == task.owner {
+                if false {
                   Image(systemName: "checkmark").foregroundStyle(.blue)
                 }
               }
             }
-            .disabled(assigning || agent.id == task.owner)
+            .disabled(assigning || false)
           }
           if agents.isEmpty {
             Text("No agents available").font(.caption).foregroundStyle(.secondary)
@@ -647,11 +584,11 @@ struct AgentSheet: View {
   }
 
   private var currentIsAgent: Bool {
-    agents.first(where: { $0.id == task.owner })?.type == .ai
+    false
   }
 
   private var currentOwnerLabel: String {
-    agents.first(where: { $0.id == task.owner })?.name ?? task.owner
+    "—"
   }
 
   private func loadAgents() async {
@@ -672,23 +609,9 @@ struct AgentSheet: View {
     }
   }
 
-  private var confidenceColor: Color {
-    switch task.confidence {
-    case 3: return .green
-    case 2: return .orange
-    case 1: return .red
-    default: return .clear
-    }
-  }
-
-  private var confidenceLabel: String {
-    switch task.confidence {
-    case 3: return "High confidence"
-    case 2: return "Medium confidence"
-    case 1: return "Low confidence"
-    default: return "No confidence"
-    }
-  }
+  // confidence not yet available in upstream
+  private var confidenceColor: Color { .clear }
+  private var confidenceLabel: String { "" }
 }
 
 // MARK: - Comments sheet
@@ -766,10 +689,10 @@ struct CommentRow: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
       HStack {
-        Image(systemName: comment.actor == "human" ? "person.fill" : "brain")
+        Image(systemName: comment.actorId == "human" ? "person.fill" : "brain")
           .font(.caption)
-          .foregroundStyle(comment.actor == "human" ? Color.secondary : Color.blue)
-        Text(comment.actor == "human" ? "You" : comment.actor)
+          .foregroundStyle(comment.actorId == "human" ? Color.secondary : Color.blue)
+        Text(comment.actorId == "human" ? "You" : comment.actorId)
           .font(.caption).fontWeight(.medium)
         Spacer()
         if comment.resolved {
@@ -986,7 +909,7 @@ struct MovePickerSheet: View {
           if !filteredTopProjects.isEmpty {
             sectionHeader("Projects")
             ForEach(filteredTopProjects) { p in
-              optionRow(icon: "circle", tint: .secondary, title: p.name) {
+              optionRow(icon: "circle", tint: .secondary, title: p.title) {
                 onPick(nil, p.id); dismiss()
               }
               Hairline()
@@ -994,7 +917,7 @@ struct MovePickerSheet: View {
           }
 
           ForEach(filteredAreas) { area in
-            sectionHeader(area.name.uppercased())
+            sectionHeader(area.title.uppercased())
             optionRow(icon: "square.stack.3d.up.fill", tint: .orange, title: "(area only)") {
               onPick(area.id, nil); dismiss()
             }
@@ -1021,8 +944,8 @@ struct MovePickerSheet: View {
 
   private var filteredAreas: [Area] {
     let q = query.lowercased()
-    return areas.sorted { $0.sortOrder < $1.sortOrder }.filter {
-      q.isEmpty || $0.name.lowercased().contains(q) || projectsIn($0.id).contains(where: { $0.name.lowercased().contains(q) })
+    return areas.sorted { $0.index < $1.index }.filter {
+      q.isEmpty || $0.title.lowercased().contains(q) || projectsIn($0.id).contains(where: { $0.title.lowercased().contains(q) })
     }
   }
 
@@ -1030,16 +953,16 @@ struct MovePickerSheet: View {
     let q = query.lowercased()
     return projects
       .filter { $0.area == nil && $0.status == .active }
-      .filter { q.isEmpty || $0.name.lowercased().contains(q) }
-      .sorted { $0.sortOrder < $1.sortOrder }
+      .filter { q.isEmpty || $0.title.lowercased().contains(q) }
+      .sorted { $0.index < $1.index }
   }
 
   private func projectsIn(_ areaId: String) -> [Project] {
     let q = query.lowercased()
     return projects
       .filter { $0.area == areaId && $0.status == .active }
-      .filter { q.isEmpty || $0.name.lowercased().contains(q) }
-      .sorted { $0.sortOrder < $1.sortOrder }
+      .filter { q.isEmpty || $0.title.lowercased().contains(q) }
+      .sorted { $0.index < $1.index }
   }
 
   @ViewBuilder
