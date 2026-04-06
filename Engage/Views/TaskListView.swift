@@ -6,7 +6,7 @@ struct TaskListView: View {
   @EnvironmentObject var client: AtaskClient
   @EnvironmentObject var nav: NavigationState
 
-  @State private var tasks: [EngageTask] = []
+  @State private var tasks: [InlineTask] = []
   @State private var areas: [Area] = []
   @State private var projects: [Project] = []
   @State private var isLoading = false
@@ -211,7 +211,7 @@ struct TaskListView: View {
   // MARK: - Row
 
   @ViewBuilder
-  private func row(_ task: EngageTask) -> some View {
+  private func row(_ task: InlineTask) -> some View {
     if editingTaskId == task.id {
       InlineEditTaskRow(
         task: task,
@@ -233,7 +233,7 @@ struct TaskListView: View {
   }
 
   @ViewBuilder
-  private func editableRowBody(_ task: EngageTask) -> some View {
+  private func editableRowBody(_ task: InlineTask) -> some View {
     HStack(spacing: 12) {
       ThingsCheckbox(isDone: task.status == .completed) {
         if !selectMode { toggle(task) }
@@ -281,14 +281,14 @@ struct TaskListView: View {
   }
 
   @ViewBuilder
-  private func trailingMeta(_ task: EngageTask) -> some View {
+  private func trailingMeta(_ task: InlineTask) -> some View {
     HStack(spacing: 6) {
-      if task.isRecurring {
+      if task.repeatRule != nil {
         Image(systemName: "arrow.triangle.2.circlepath")
           .font(.system(size: 12))
           .foregroundStyle(.secondary)
       }
-      if let due = task.due { deadlineLabel(for: due) }
+      if let deadline = task.deadline { deadlineLabel(for: deadline) }
     }
   }
 
@@ -308,7 +308,7 @@ struct TaskListView: View {
 
   // MARK: - Edit mode
 
-  private func startEdit(_ task: EngageTask) {
+  private func startEdit(_ task: InlineTask) {
     if editingTaskId != nil && editingTaskId != task.id { commitEdit() }
     editingTaskId = task.id
     editingTitle = task.title
@@ -316,7 +316,7 @@ struct TaskListView: View {
     editFieldFocused = true
   }
 
-  private func acceptReview(_ task: EngageTask) {
+  private func acceptReview(_ task: InlineTask) {
     Task {
       // review not yet available in upstream atask
         try? await client.taskPatch(id: task.id)
@@ -324,7 +324,7 @@ struct TaskListView: View {
     }
   }
 
-  private func dismissReview(_ task: EngageTask) {
+  private func dismissReview(_ task: InlineTask) {
     Task {
 // cancel available but actor removed
       await load()
@@ -338,15 +338,9 @@ struct TaskListView: View {
     editingTaskId = nil
     editFieldFocused = false
     guard !trimmedTitle.isEmpty else { return }
-    guard let original = tasks.first(where: { $0.id == id }) else { return }
-    var patch: [String: Any] = [:]
-    if original.title != trimmedTitle { patch["title"] = trimmedTitle }
-    if (original.notes ?? "") != newNotes {
-      patch["notes"] = newNotes.isEmpty ? NSNull() : newNotes
-    }
-    guard !patch.isEmpty else { return }
+    let original = tasks.first(where: { $0.id == id })
     Task {
-      try? await client.taskPatch(id: id, title: titleChanged ? trimmedTitle : nil, notes: notesChanged ? newNotes : nil)
+      try? await client.taskPatch(id: id, title: trimmedTitle, notes: newNotes)
       await load()
     }
   }
@@ -449,10 +443,10 @@ struct TaskListView: View {
     }
   }
 
-  private var groupedByProject: [(Project, [EngageTask])] {
+  private var groupedByProject: [(Project, [InlineTask])] {
     let withProject = filteredTasks.filter { $0.projectId != nil }
     let byId = Dictionary(grouping: withProject) { $0.projectId! }
-    return byId.compactMap { pid, items -> (Project, [EngageTask])? in
+    return byId.compactMap { pid, items -> (Project, [InlineTask])? in
       guard let p = projects.first(where: { $0.id == pid }) else { return nil }
       return (p, items)
     }.sorted { $0.0.index < $1.0.index }
@@ -540,7 +534,7 @@ struct TaskListView: View {
 
   // MARK: - Filter + load
 
-  private var filteredTasks: [EngageTask] {
+  private var filteredTasks: [InlineTask] {
     let calendar = Calendar.current
     let today = calendar.startOfDay(for: Date())
     return tasks.filter { task in
@@ -550,22 +544,22 @@ struct TaskListView: View {
         return isActive && task.areaId == nil && task.projectId == nil && task.deadline == nil && task.startDate == nil
       case .today:
         return isActive && (
-          (task.deadline != nil && calendar.isDate(task.due!, inSameDayAs: today)) ||
-          (task.startDate != nil && calendar.isDate(task.start!, inSameDayAs: today)) ||
-          (task.deadline != nil && task.due! < today)
+          (task.deadline != nil && calendar.isDate(task.deadline!, inSameDayAs: today)) ||
+          (task.startDate != nil && calendar.isDate(task.startDate!, inSameDayAs: today)) ||
+          (task.deadline != nil && task.deadline! < today)
         )
       case .upcoming(let days):
         let end = calendar.date(byAdding: .day, value: days, to: today)!
         return isActive && (
-          (task.deadline != nil && task.due! >= today && task.due! <= end) ||
-          (task.startDate != nil && task.start! >= today && task.start! <= end)
+          (task.deadline != nil && task.deadline! >= today && task.deadline! <= end) ||
+          (task.startDate != nil && task.startDate! >= today && task.startDate! <= end)
         )
       case .anytime:
         return isActive && task.deadline == nil && task.startDate == nil && (task.areaId != nil || task.projectId != nil)
       case .someday: return false
       case .project(let pid): return isActive && task.projectId == pid
       case .area(let aid): return isActive && task.areaId == aid
-      case .review: return task.status == .pending && task.agentStatus == .blocked
+      case .review: return false  // not yet available in upstream atask
       case .logbook: return task.status == .completed || task.status == .cancelled
       }
     }
@@ -575,19 +569,47 @@ struct TaskListView: View {
     isLoading = true
     errorMessage = nil
     do {
-      async let t = client.tasksList()
+      // Load view-specific tasks based on current filter
+      switch filter {
+      case .inbox:
+        tasks = try await client.viewInbox()
+      case .today:
+        tasks = try await client.viewToday()
+      case .upcoming(let days):
+        // viewUpcoming has no days param — use upcoming view which returns near-future tasks
+        tasks = try await client.viewUpcoming()
+      case .anytime:
+        // anytime = tasks with no deadline that belong to a project/area
+        let all = try await client.tasksList(status: "pending")
+        let calendar = Calendar.current
+        tasks = all.filter { task in
+          task.deadline == nil && task.startDate == nil && (task.areaId != nil || task.projectId != nil)
+        }
+      case .someday:
+        tasks = try await client.viewSomeday()
+      case .logbook:
+        tasks = try await client.viewLogbook()
+      case .project(let pid):
+        let all = try await client.tasksList(projectId: pid)
+        tasks = all.filter { $0.status == .pending }
+      case .area(let aid):
+        let all = try await client.tasksList(areaId: aid)
+        tasks = all.filter { $0.status == .pending }
+      case .review:
+        tasks = []  // not yet available in upstream atask
+      }
       async let p = client.projectsList()
       async let a = client.areasList()
-      tasks = try await t
       projects = try await p
       areas = try await a
     } catch {
+      AtaskLog.error("load() failed", error: error)
       errorMessage = error.localizedDescription
     }
     isLoading = false
   }
 
-  private func toggle(_ task: EngageTask) {
+  private func toggle(_ task: InlineTask) {
     UIImpactFeedbackGenerator(style: .light).impactOccurred()
     if task.status == .pending {
       recentlyCompleted.insert(task.id)
