@@ -776,27 +776,9 @@ struct MultiSelectBar: View {
   }
 }
 
-// MARK: - Swipe-to-select gesture modifier
+// swipeLeftToSelect removed — functionality replaced inline
 
-struct SwipeLeftToSelectModifier: ViewModifier {
-  let onTrigger: () -> Void
-  func body(content: Content) -> some View {
-    content.simultaneousGesture(
-      DragGesture(minimumDistance: 25, coordinateSpace: .local)
-        .onEnded { v in
-          if v.translation.width < -40 && abs(v.translation.width) > abs(v.translation.height) * 1.5 {
-            onTrigger()
-          }
-        }
-    )
-  }
-}
 
-extension View {
-  func swipeLeftToSelect(action: @escaping () -> Void) -> some View {
-    modifier(SwipeLeftToSelectModifier(onTrigger: action))
-  }
-}
 
 // MARK: - When picker sheet (schedule)
 

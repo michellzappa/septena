@@ -266,14 +266,18 @@ struct TaskListView: View {
         .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
-      .swipeLeftToSelect {
-        if selectMode {
-          if !selection.contains(task.id) { toggleSelection(task.id) }
-        } else {
-          enterSelectMode(with: task.id)
-        }
-      }
-    }
+      .simultaneousGesture(
+        DragGesture(minimumDistance: 25, coordinateSpace: .local)
+          .onEnded { v in
+            if v.translation.width < -40 && abs(v.translation.width) > abs(v.translation.height) * 1.5 {
+              if selectMode {
+                if !selection.contains(task.id) { toggleSelection(task.id) }
+              } else {
+                enterSelectMode(with: task.id)
+              }
+            }
+          }
+      )
     .padding(.horizontal, Theme.hPadding)
     .padding(.vertical, 12)
     .frame(minHeight: Theme.rowHeight)
