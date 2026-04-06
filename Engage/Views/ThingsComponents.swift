@@ -917,13 +917,13 @@ struct MovePickerSheet: View {
           }
 
           ForEach(filteredAreas) { area in
-            sectionHeader(area.title.uppercased())
+            sectionHeader(String(area.title.uppercased()))
             optionRow(icon: "square.stack.3d.up.fill", tint: .orange, title: "(area only)") {
               onPick(area.id, nil); dismiss()
             }
             Hairline()
             ForEach(projectsIn(area.id)) { p in
-              optionRow(icon: "circle", tint: .secondary, title: p.name, indent: true) {
+              optionRow(icon: "circle", tint: .secondary, title: p.title, indent: true) {
                 onPick(area.id, p.id); dismiss()
               }
               Hairline()
@@ -952,7 +952,7 @@ struct MovePickerSheet: View {
   private var filteredTopProjects: [Project] {
     let q = query.lowercased()
     return projects
-      .filter { $0.area == nil && $0.status == .active }
+      .filter { $0.areaId == nil && $0.status == .pending }
       .filter { q.isEmpty || $0.title.lowercased().contains(q) }
       .sorted { $0.index < $1.index }
   }
@@ -960,7 +960,7 @@ struct MovePickerSheet: View {
   private func projectsIn(_ areaId: String) -> [Project] {
     let q = query.lowercased()
     return projects
-      .filter { $0.area == areaId && $0.status == .active }
+      .filter { $0.areaId == areaId && $0.status == .pending }
       .filter { q.isEmpty || $0.title.lowercased().contains(q) }
       .sorted { $0.index < $1.index }
   }
