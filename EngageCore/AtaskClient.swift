@@ -5,7 +5,8 @@ import Foundation
 // Set ENGAGE_SERVER_URL and ENGAGE_API_KEY in Xcode scheme, or via Settings screen.
 // No Convex SDK — pure URLSession HTTP.
 
-actor AtaskClient: Sendable {
+@MainActor
+final class AtaskClient: ObservableObject {
     private let baseURL: URL
     private let apiKey: String
 

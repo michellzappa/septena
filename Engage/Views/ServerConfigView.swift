@@ -67,7 +67,7 @@ struct ServerConfigView: View {
                     Button("Save & Close") {
                         saveAndClose()
                     }
-                    .frame(maxWidth: .center)
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
             }
             .navigationTitle("Server Settings")
