@@ -2,7 +2,7 @@ import SwiftUI
 
 @main
 struct EngageApp: App {
-  @StateObject private var client = ConvexClient.shared
+  @StateObject private var client = AtaskClient.shared
   @StateObject private var navigation = NavigationState()
 
   var body: some Scene {
@@ -35,7 +35,7 @@ final class NavigationState: ObservableObject {
 // ─── Content View ─────────────────────────────────────────────────────────────
 
 struct ContentView: View {
-  @EnvironmentObject var client: ConvexClient
+  @EnvironmentObject var client: AtaskClient
   @EnvironmentObject var nav: NavigationState
 
   var body: some View {
@@ -87,6 +87,12 @@ struct ContentView: View {
           Label("Review", systemImage: "exclamationmark.triangle")
         }
         .tag(NavigationState.Tab.review)
+
+      ServerConfigView()
+        .tabItem {
+          Label("Settings", systemImage: "gear")
+        }
+        .tag(NavigationState.Tab(9))
     }
     .sheet(isPresented: $nav.showingQuickEntry) {
       QuickEntryView()

@@ -10,16 +10,21 @@
 		00E9AA93E77BF637A10F309B /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B4B249D148D9C7D84EB1779 /* Models.swift */; };
 		075C5C6781C40965760E039E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F497CEC6A37DDC1D2D74F80C /* Assets.xcassets */; };
 		11D5C57096ACC41673BE8637 /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4867FD6F5EB8AD7D641AA4B /* DateParser.swift */; };
+		134C874D5DAD7432558E10FB /* ServerConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A797FEAC916F4B014DE199D8 /* ServerConfigView.swift */; };
 		19D6E120A106CABC9A9C944E /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 013DA8579D8AB360424D2364 /* App.swift */; };
 		2D8766F09F3247831A954293 /* QuickEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EDA430711A0E43505194D23 /* QuickEntryView.swift */; };
 		2DBC84FFB519179B4260C705 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B4B249D148D9C7D84EB1779 /* Models.swift */; };
 		382D5802D173CEB7D49D1064 /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CF658F967CE8DD8713C1ABA /* TaskDetailView.swift */; };
 		3AB227D519DA079DEB144529 /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39A1A629E49B7C9C806828F3 /* TaskListView.swift */; };
 		49AD393568EF186694DF0069 /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CF658F967CE8DD8713C1ABA /* TaskDetailView.swift */; };
+		541BB63FBC2E3F3EF030A399 /* AtaskClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4E39E6087F429306EF1B7B3 /* AtaskClient.swift */; };
+		5CCDE903F194557DB1CBCA0B /* AtaskClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4E39E6087F429306EF1B7B3 /* AtaskClient.swift */; };
 		73FE2658EAB611FD66ADDC74 /* AreasProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EDA60693B28BE50EDD6893F /* AreasProjectsView.swift */; };
 		85A2DFA3EA2D48198EA8096B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F497CEC6A37DDC1D2D74F80C /* Assets.xcassets */; };
+		85C79FA680F02D90C77D6AC7 /* ServerConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A797FEAC916F4B014DE199D8 /* ServerConfigView.swift */; };
 		884AB749DEDE66B6BBF9D450 /* ConvexClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE53CDACC4992F1DC1F77630 /* ConvexClient.swift */; };
 		8BC693CA1F8E4B701DAC7F7D /* AreasProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EDA60693B28BE50EDD6893F /* AreasProjectsView.swift */; };
+		962C144AFF78CA66667A6D47 /* TaskRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB814E7A7AF58A6B5ACFF749 /* TaskRowView.swift */; };
 		A2101A7431CE135313961EDF /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5234679D9D2CD9B511692039 /* TodayView.swift */; };
 		B46457E2181CB00F99BC6E02 /* QuickEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EDA430711A0E43505194D23 /* QuickEntryView.swift */; };
 		BD314D9DEB757D21A9C5A0F6 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5234679D9D2CD9B511692039 /* TodayView.swift */; };
@@ -27,6 +32,7 @@
 		C57C11E572D3EDBD5E573F48 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 013DA8579D8AB360424D2364 /* App.swift */; };
 		E1979CF92BA8FE2069959956 /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39A1A629E49B7C9C806828F3 /* TaskListView.swift */; };
 		E64003148A7364BB1547444A /* ConvexClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE53CDACC4992F1DC1F77630 /* ConvexClient.swift */; };
+		F3694CAC4258C06E2145B994 /* TaskRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB814E7A7AF58A6B5ACFF749 /* TaskRowView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -39,6 +45,9 @@
 		5234679D9D2CD9B511692039 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
 		6B4B249D148D9C7D84EB1779 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		6EDA430711A0E43505194D23 /* QuickEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickEntryView.swift; sourceTree = "<group>"; };
+		A4E39E6087F429306EF1B7B3 /* AtaskClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtaskClient.swift; sourceTree = "<group>"; };
+		A797FEAC916F4B014DE199D8 /* ServerConfigView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConfigView.swift; sourceTree = "<group>"; };
+		AB814E7A7AF58A6B5ACFF749 /* TaskRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskRowView.swift; sourceTree = "<group>"; };
 		B4867FD6F5EB8AD7D641AA4B /* DateParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateParser.swift; sourceTree = "<group>"; };
 		DE53CDACC4992F1DC1F77630 /* ConvexClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvexClient.swift; sourceTree = "<group>"; };
 		F497CEC6A37DDC1D2D74F80C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -57,8 +66,10 @@
 			children = (
 				3EDA60693B28BE50EDD6893F /* AreasProjectsView.swift */,
 				6EDA430711A0E43505194D23 /* QuickEntryView.swift */,
+				A797FEAC916F4B014DE199D8 /* ServerConfigView.swift */,
 				3CF658F967CE8DD8713C1ABA /* TaskDetailView.swift */,
 				39A1A629E49B7C9C806828F3 /* TaskListView.swift */,
+				AB814E7A7AF58A6B5ACFF749 /* TaskRowView.swift */,
 				5234679D9D2CD9B511692039 /* TodayView.swift */,
 			);
 			path = Views;
@@ -89,6 +100,7 @@
 		90993D6D885DDCE81749B97F /* EngageCore */ = {
 			isa = PBXGroup;
 			children = (
+				A4E39E6087F429306EF1B7B3 /* AtaskClient.swift */,
 				DE53CDACC4992F1DC1F77630 /* ConvexClient.swift */,
 				B4867FD6F5EB8AD7D641AA4B /* DateParser.swift */,
 				6B4B249D148D9C7D84EB1779 /* Models.swift */,
@@ -223,12 +235,15 @@
 			files = (
 				19D6E120A106CABC9A9C944E /* App.swift in Sources */,
 				73FE2658EAB611FD66ADDC74 /* AreasProjectsView.swift in Sources */,
+				541BB63FBC2E3F3EF030A399 /* AtaskClient.swift in Sources */,
 				884AB749DEDE66B6BBF9D450 /* ConvexClient.swift in Sources */,
 				C5475709DF8A7936F734C36E /* DateParser.swift in Sources */,
 				2DBC84FFB519179B4260C705 /* Models.swift in Sources */,
 				B46457E2181CB00F99BC6E02 /* QuickEntryView.swift in Sources */,
+				134C874D5DAD7432558E10FB /* ServerConfigView.swift in Sources */,
 				49AD393568EF186694DF0069 /* TaskDetailView.swift in Sources */,
 				3AB227D519DA079DEB144529 /* TaskListView.swift in Sources */,
+				962C144AFF78CA66667A6D47 /* TaskRowView.swift in Sources */,
 				BD314D9DEB757D21A9C5A0F6 /* TodayView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -239,12 +254,15 @@
 			files = (
 				C57C11E572D3EDBD5E573F48 /* App.swift in Sources */,
 				8BC693CA1F8E4B701DAC7F7D /* AreasProjectsView.swift in Sources */,
+				5CCDE903F194557DB1CBCA0B /* AtaskClient.swift in Sources */,
 				E64003148A7364BB1547444A /* ConvexClient.swift in Sources */,
 				11D5C57096ACC41673BE8637 /* DateParser.swift in Sources */,
 				00E9AA93E77BF637A10F309B /* Models.swift in Sources */,
 				2D8766F09F3247831A954293 /* QuickEntryView.swift in Sources */,
+				85C79FA680F02D90C77D6AC7 /* ServerConfigView.swift in Sources */,
 				382D5802D173CEB7D49D1064 /* TaskDetailView.swift in Sources */,
 				E1979CF92BA8FE2069959956 /* TaskListView.swift in Sources */,
+				F3694CAC4258C06E2145B994 /* TaskRowView.swift in Sources */,
 				A2101A7431CE135313961EDF /* TodayView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
