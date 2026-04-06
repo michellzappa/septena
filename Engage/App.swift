@@ -92,7 +92,7 @@ struct ContentView: View {
         .tabItem {
           Label("Settings", systemImage: "gear")
         }
-        .tag(NavigationState.Tab(9))
+        .tag(NavigationState.Tab(rawValue: 9)!)
     }
     .sheet(isPresented: $nav.showingQuickEntry) {
       QuickEntryView()
