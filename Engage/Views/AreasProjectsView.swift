@@ -163,17 +163,13 @@ struct AreaDetailView: View {
     if task.status == .pending {
       recentlyCompleted.insert(task.id)
       Task {
-        try? await client.taskComplete(id: task.id, completedBy: "human")
+        try? await client.taskComplete(id: task.id)
         await load()
       }
     } else if recentlyCompleted.contains(task.id) {
       recentlyCompleted.remove(task.id)
       Task {
-        try? await client.taskUpdate(
-          id: task.id,
-          patch: ["status": "open", "completedAt": NSNull(), "completedBy": NSNull()],
-          actor: "human"
-        )
+        try? await client.taskReopen(id: task.id)
         await load()
       }
     }
@@ -300,17 +296,13 @@ struct ProjectDetailView: View {
     if task.status == .pending {
       recentlyCompleted.insert(task.id)
       Task {
-        try? await client.taskComplete(id: task.id, completedBy: "human")
+        try? await client.taskComplete(id: task.id)
         await load()
       }
     } else if recentlyCompleted.contains(task.id) {
       recentlyCompleted.remove(task.id)
       Task {
-        try? await client.taskUpdate(
-          id: task.id,
-          patch: ["status": "open", "completedAt": NSNull(), "completedBy": NSNull()],
-          actor: "human"
-        )
+        try? await client.taskReopen(id: task.id)
         await load()
       }
     }

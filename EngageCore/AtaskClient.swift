@@ -534,6 +534,19 @@ final class AtaskClient: ObservableObject {
         return try JSONDecoder.apiDecoder.decode([DeltaEvent].self, from: data)
     }
 
+
+    // MARK: - Agents (Engage-specific — not yet in upstream atask)
+
+    func agentsList() async throws -> [Agent] {
+        AtaskLog.info("agentsList() — not yet implemented in upstream atask")
+        throw AtaskError.serverError(501)
+    }
+
+    func agentMemory(agentId: String) async throws -> [AgentMemoryEntry] {
+        AtaskLog.info("agentMemory(agentId: \(agentId)) — not yet implemented")
+        throw AtaskError.serverError(501)
+    }
+
     // MARK: - HTTP helpers
 
     private func get(_ path: String, queryItems: [URLQueryItem] = []) async throws -> Data {

@@ -345,28 +345,4 @@ struct MoveToSheet: View {
 }
 
 
-extension LogAction {
-  var icon: String {
-    switch self {
-    case .created: return "plus.circle"
-    case .commented: return "bubble.left"
-    case .reassigned: return "arrow.triangle.swap"
-    case .prioritized: return "exclamationmark.circle"
-    case .completed: return "checkmark.circle"
-    case .cancelled: return "xmark.circle"
-    case .blocked: return "hand.raised"
-    case .unblocked: return "hand.raised.fill"
-    case .staleFlagged: return "flag"
-    case .updated: return "pencil"
-    }
-  }
-
-  var color: Color {
-    switch self {
-    case .completed: return .green
-    case .cancelled, .blocked: return .red
-    case .created, .updated: return .blue
-    default: return .secondary
-    }
-  }
-}
+// LogAction types removed — not yet available in upstream atask

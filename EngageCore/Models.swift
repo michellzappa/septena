@@ -269,3 +269,68 @@ struct DeltaEvent: Identifiable, Codable {
   var payload: String?  // JSON string
   var createdAt: Date
 }
+
+// MARK: - TaskFilter ( Engage-specific, maps to atask view queries )
+
+/// TaskFilter mirrors the old Engage UI filter states.
+/// Maps to upstream atask: inbox→schedule=0, anytime→schedule=1, someday→schedule=2
+enum TaskFilter: Equatable, Hashable {
+  case inbox
+  case today
+  case upcoming(days: Int)
+  case anytime
+  case someday
+  case project(String)   // projectId
+  case area(String)      // areaId
+  case review
+  case logbook
+
+  var title: String {
+    switch self {
+    case .inbox: return "Inbox"
+    case .today: return "Today"
+    case .upcoming: return "Upcoming"
+    case .anytime: return "Anytime"
+    case .someday: return "Someday"
+    case .project: return "Project"
+    case .area: return "Area"
+    case .review: return "Review"
+    case .logbook: return "Logbook"
+    }
+  }
+}
+
+// MARK: - Agent ( Engage-specific — not yet in upstream atask )
+
+enum AgentType: String, Codable, Hashable {
+  case human
+  case ai
+}
+
+struct Agent: Identifiable, Codable, Equatable, Hashable {
+  let id: String
+  var name: String
+  var email: String?
+  var type: AgentType
+  var status: String
+  var lastSeen: Date?
+}
+
+// MARK: - AgentMemoryEntry ( Engage-specific )
+
+struct AgentMemoryEntry: Identifiable, Codable, Equatable {
+  let id: String
+  var agentId: String
+  var content: String
+  var createdAt: Date
+}
+
+// MARK: - CollaborationLogEntry ( Engage-specific )
+
+struct CollaborationLogEntry: Identifiable, Codable, Equatable {
+  let id: String
+  var agentId: String
+  var action: String
+  var detail: String?
+  var timestamp: Date
+}

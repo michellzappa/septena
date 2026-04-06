@@ -37,7 +37,7 @@ struct AgentsView: View {
                 Text(agent.name)
                   .font(.thingsTaskTitle)
                   .foregroundStyle(.primary)
-                Text(agent.email)
+                Text(agent.type.rawValue)
                   .font(.thingsMeta)
                   .foregroundStyle(.secondary)
               }
@@ -70,7 +70,7 @@ struct AgentsView: View {
   }
 
   private func taskCount(for agentId: String) -> Int {
-    tasks.filter { $0.status == .open && $0.owner == agentId }.count
+    tasks.filter { $0.status == .pending }.count
   }
 
   private func load() async {
@@ -164,7 +164,7 @@ struct AgentDetailView: View {
   }
 
   private var openTasks: [EngageTask] {
-    tasks.filter { $0.status == .open && $0.owner == agent.id }
+    tasks.filter { $0.status == .pending }
   }
 
   private func load() async {

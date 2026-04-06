@@ -176,8 +176,8 @@ struct SidebarView: View {
 
   private var topLevelProjects: [Project] {
     projects
-      .filter { effectiveArea(for: $0) == nil && $0.status == .active }
-      .sorted { $0.sortOrder < $1.sortOrder }
+      .filter { effectiveArea(for: $0) == nil && $0.status == .pending }
+      .sorted { $0.index < $1.index }
   }
 
   @ViewBuilder
@@ -244,8 +244,8 @@ struct SidebarView: View {
 
   private func projects(in areaId: String) -> [Project] {
     projects
-      .filter { effectiveArea(for: $0) == areaId && $0.status == .active }
-      .sorted { $0.sortOrder < $1.sortOrder }
+      .filter { effectiveArea(for: $0) == areaId && $0.status == .pending }
+      .sorted { $0.index < $1.index }
   }
 
   private func effectiveArea(for project: Project) -> String? {
@@ -255,7 +255,7 @@ struct SidebarView: View {
   private var overdueCount: Int {
     let today = Calendar.current.startOfDay(for: Date())
     return tasks.filter {
-      $0.status == .open && ($0.due.map { $0 < today } ?? false)
+      $0.status == .pending && ($0.deadline.map { $0 < today } ?? false)
     }.count
   }
 
@@ -263,13 +263,13 @@ struct SidebarView: View {
     let cal = Calendar.current
     let today = cal.startOfDay(for: Date())
     return tasks.filter { task in
-      guard task.status == .open else { return filter == .logbook }
+      guard task.status == .pending else { return filter == .logbook }
       switch filter {
       case .inbox:
-        return task.area == nil && task.project == nil && task.due == nil && task.start == nil
+        return task.areaId == nil && task.projectId == nil && task.deadline == nil && task.startDate == nil
       case .today:
-        return (task.due.map { cal.isDate($0, inSameDayAs: today) } ?? false)
-          || (task.start.map { cal.isDate($0, inSameDayAs: today) } ?? false)
+        return (task.deadline.map { cal.isDate($0, inSameDayAs: today) } ?? false)
+          || (task.startDate.map { cal.isDate($0, inSameDayAs: today) } ?? false)
       default: return false
       }
     }.count
@@ -302,7 +302,7 @@ struct SidebarView: View {
     async let p = try? await client.projectsList()
     let (tt, aa, pp) = await (t, a, p)
     tasks = tt ?? []
-    areas = (aa ?? []).sorted { $0.sortOrder < $1.sortOrder }
+    areas = (aa ?? []).sorted { $0.index < $1.index }
     projects = pp ?? []
     if !didInitialize {
       expandedAreas = Set(areas.map { $0.id })
@@ -379,7 +379,7 @@ struct SidebarDropDelegate: DropDelegate {
     p.sortOrder = nextSortOrder(in: toAreaId, before: insertBefore)
     // Reflow sortOrders in target area
     var siblings = projects.filter { ($0.id == p.id ? toAreaId : (projectAreaOverrides[$0.id] ?? $0.area)) == toAreaId }
-      .sorted { $0.sortOrder < $1.sortOrder }
+      .sorted { $0.index < $1.index }
     if let beforeId = insertBefore, let pos = siblings.firstIndex(where: { $0.id == beforeId }) {
       siblings.insert(p, at: pos)
     } else {

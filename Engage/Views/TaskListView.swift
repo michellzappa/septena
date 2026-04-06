@@ -455,7 +455,7 @@ struct TaskListView: View {
     return byId.compactMap { pid, items -> (Project, [EngageTask])? in
       guard let p = projects.first(where: { $0.id == pid }) else { return nil }
       return (p, items)
-    }.sorted { $0.0.sortOrder < $1.0.sortOrder }
+    }.sorted { $0.0.index < $1.0.index }
   }
 
   private var titleIcon: String {

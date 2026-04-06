@@ -74,3 +74,27 @@ Central work file. Update as we go. Reference: `docs/things-reference/`.
 - [x] `ProjectDetailView` Things-styled with inline-editable title + notes, task list, Magic Plus inline entry
 - [x] `areaUpdate` / `projectUpdate` Swift client methods
 - [x] Task completion: haptic + stays crossed-out on page, tap again to undo, clears on navigation away
+
+## What's missing from upstream atask (add to engage later)
+
+### Server extensions needed (engage-server or upstream)
+- [ ] **Priority** — upstream has no priority field; add `priority: Int?` to domain.Task
+- [ ] **Origin tracking** — `origin: ActorType` (human/agent) on tasks, `owner: String`
+- [ ] **Agent fields** — `agentStatus`, `agentAssignedMe`, `agentContext`, `agentNote`, `confidence: Int`, `needsHumanReview: Bool`
+- [ ] **Review flow** — `PUT /tasks/{id}/agent-note`, `PUT /tasks/{id}/confidence`, `POST /tasks/{id}/request-review`, `POST /tasks/{id}/approve-review`, `POST /tasks/{id}/dismiss-review`
+- [ ] **Agents roster** — `GET /agents`, `GET /agents/{id}` — list OpenClaw agents
+- [ ] **Review task list** — `GET /tasks/review` (tasks needing human review)
+- [ ] **Assign/claim/release** — `POST /tasks/{id}/assign`, `POST /tasks/{id}/agent-claim`, `POST /tasks/{id}/agent-release`
+- [ ] **Conclusion rule** — `PUT /tasks/{id}/conclusion-rule`
+- [ ] **SSE events** — `/events/stream` for real-time push to iOS client
+
+### iOS client additions needed
+- [ ] **SSE stream listener** — connect to `/events/stream` with ApiKey auth, update local state on push
+- [ ] **Review screen** — show tasks with `needsHumanReview == true`
+- [ ] **Agent panel** — show agents roster, assign tasks to agents
+- [ ] **Priority UI** — sort/filter by priority
+- [ ] **Connection test** — should hit `/health` first (no auth), then `/tasks?limit=1` (auth) for full verification
+
+### Nice to have
+- [ ] Sync engine (upstream has delta sync — leverage it for offline-first)
+- [ ] Activity feed per task
