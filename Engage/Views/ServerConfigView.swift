@@ -1,91 +1,119 @@
 import SwiftUI
-
-// ─── Server Config View ────────────────────────────────────────────────────────
-// Simple debug settings — set server URL + API key, test connection.
-// Shown as a sheet or accessible from the tab bar in debug builds.
+import Combine
 
 struct ServerConfigView: View {
+    @EnvironmentObject var nav: NavigationState
     @EnvironmentObject var client: AtaskClient
-    @Environment(\.dismiss) private var dismiss
 
-    @AppStorage("engage_server_url") private var serverURL = "http://localhost:8080"
-    @AppStorage("engage_api_key") private var apiKey = ""
-    @State private var connectionStatus: String = "Not tested"
+    @State private var serverURL: String = ""
+    @State private var apiKey: String = ""
     @State private var isChecking = false
+    @State private var connectionStatus: String = ""
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    TextField("Server URL", text: $serverURL)
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.URL)
-                        .autocorrectionDisabled()
-                    TextField("API Key", text: $apiKey)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                } header: {
-                    Text("Server")
-                } footer: {
-                    Text("Use your Tailscale IP when on the same network, e.g. http://100.x.x.x:8080")
+            VStack(spacing: 24) {
+                // Header
+                VStack(spacing: 8) {
+                    Image(systemName: "server.rack")
+                        .font(.system(size: 48))
+                        .foregroundStyle(.secondary)
+                    Text("Configure Server")
+                        .font(.title2).fontWeight(.semibold)
+                    Text("Point the app to your Atask backend")
+                        .font(.subheadline).foregroundStyle(.secondary)
                 }
+                .padding(.top, 32)
 
-                Section {
-                    HStack {
-                        Button {
-                            Task { await testConnection() }
-                        } label: {
+                // Form fields
+                VStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Server URL")
+                            .font(.caption).foregroundStyle(.secondary)
+                        TextField("http://localhost:8080", text: $serverURL)
+                            .textFieldStyle(.roundedBorder)
+                            .autocapitalization(.none)
+                            .keyboardType(.URL)
+                            .textContentType(.URL)
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("API Key")
+                            .font(.caption).foregroundStyle(.secondary)
+                        SecureField("atk_...", text: $apiKey)
+                            .textFieldStyle(.roundedBorder)
+                            .autocapitalization(.none)
+                            .textContentType(.password)
+                    }
+                }
+                .padding(.horizontal, 24)
+
+                // Connection test
+                VStack(spacing: 12) {
+                    Button {
+                        Task { await testConnection() }
+                    } label: {
+                        HStack {
                             if isChecking {
                                 ProgressView()
-                                    .frame(width: 20, height: 20)
+                                    .progressViewStyle(.circular)
+                                    .scaleEffect(0.8)
                             } else {
-                                Text("Test Connection")
+                                Image(systemName: "network")
                             }
+                            Text("Test Connection")
                         }
-                        .disabled(isChecking || serverURL.isEmpty)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.accentColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
+                    }
+                    .disabled(isChecking || serverURL.isEmpty || apiKey.isEmpty)
 
-                        Spacer()
-
-                        Circle()
-                            .fill(connectionColor)
-                            .frame(width: 10, height: 10)
-
+                    if !connectionStatus.isEmpty {
                         Text(connectionStatus)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(connectionStatus.contains("OK") ? .green : .red)
+                            .multilineTextAlignment(.center)
                     }
                 }
+                .padding(.horizontal, 24)
 
-                Section {
-                    LabeledContent("Server", value: serverURL)
-                    LabeledContent("Key set", value: apiKey.isEmpty ? "No" : "Yes")
-                } header: {
-                    Text("Current Config")
+                // Save button
+                Button {
+                    save()
+                } label: {
+                    Text("Save")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 10))
+                        .foregroundStyle(.white)
+                        .fontWeight(.medium)
                 }
+                .disabled(serverURL.isEmpty || apiKey.isEmpty)
+                .padding(.horizontal, 24)
 
-                Section {
-                    Button("Save & Close") {
-                        saveAndClose()
-                    }
-                    .frame(maxWidth: .infinity, alignment: .center)
-                }
+                Spacer()
+
+                // Footer hint
+                Text("The API key is created in the Atask dashboard or via the CLI")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+                    .padding(.bottom, 24)
             }
-            .navigationTitle("Server Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") {
+                        nav.showingServerConfig = false
+                    }
                 }
             }
-        }
-        .presentationDetents([.medium])
-    }
-
-    private var connectionColor: Color {
-        switch connectionStatus {
-        case "Connected": return .green
-        case "Failed": return .red
-        default: return .gray
+            .onAppear {
+                serverURL = nav.serverURL ?? "http://localhost:8080"
+                apiKey = nav.apiKey ?? ""
+            }
         }
     }
 
@@ -93,28 +121,20 @@ struct ServerConfigView: View {
         isChecking = true
         connectionStatus = "Testing..."
         do {
-            let result = try await client.ping()
-            connectionStatus = result
+            let baseURL = URL(string: serverURL)!
+            let testClient = AtaskClient(baseURL: baseURL, apiKey: apiKey)
+            let result = try await testClient.ping()
+            connectionStatus = "✅ \(result)"
         } catch {
-            connectionStatus = "Failed: \(error.localizedDescription)"
+            connectionStatus = "❌ \(error.localizedDescription)"
         }
         isChecking = false
     }
 
-    private func saveAndClose() {
-        // AppStorage persists automatically
-        dismiss()
+    private func save() {
+        nav.serverURL = serverURL
+        nav.apiKey = apiKey
+        ClientProvider.shared.update(baseURL: URL(string: serverURL)!, apiKey: apiKey)
+        nav.showingServerConfig = false
     }
 }
-
-// ─── Tab for Server Config (in App.swift) ─────────────────────────────────────
-// Add this tab in debug builds:
-//
-//   ServerConfigView()
-//       .tabItem { Label("Settings", systemImage: "gear") }
-//       .tag(9)
-//
-// In App.swift, also inject AtaskClient as EnvironmentObject:
-//
-//   @StateObject private var ataskClient = AtaskClient.shared
-//   .environmentObject(ataskClient)
