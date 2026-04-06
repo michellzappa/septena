@@ -23,7 +23,7 @@ struct AgentsView: View {
         }
 
         ForEach(agents) { agent in
-          Button { nav.path.append(Route.agent(agent)) } label: {
+          Button { nav.selectedTab = .inbox } label: {
             HStack(spacing: 12) {
               ZStack {
                 Circle()

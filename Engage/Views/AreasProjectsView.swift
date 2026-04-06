@@ -126,7 +126,7 @@ struct AreaDetailView: View {
     Task {
       try? await client.taskCreate(
         title: t, notes: n, origin: .human, owner: "human",
-        area: area.id, project: nil
+        project: nil
       )
       newTitle = ""; newNotes = ""
       await load()
@@ -345,7 +345,7 @@ struct ProjectDetailView: View {
     Task {
       try? await client.taskCreate(
         title: t, notes: n, origin: .human, owner: "human",
-        area: project.area, project: project.id
+        project: project.id
       )
       newTitle = ""; newNotes = ""
       await load()

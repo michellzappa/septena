@@ -127,6 +127,26 @@ final class AtaskClient: ObservableObject {
         return (try? JSONDecoder().decode([Area].self, from: data)) ?? []
     }
 
+    func areaCreate(name: String) async throws -> Area {
+        let body: [String: Any] = ["name": name]
+        let data = try await post("/areas", body: body)
+        return (try? JSONDecoder().decode(Area.self, from: data)) ?? Area(id: "", name: name)
+    }
+
+    func areaUpdate(id: String, patch: [String: Any]) async throws {
+        try await putVoid("/areas/\(id)", body: patch)
+    }
+
+    func projectCreate(title: String) async throws -> Project {
+        let body: [String: Any] = ["title": title]
+        let data = try await post("/projects", body: body)
+        return (try? JSONDecoder().decode(Project.self, from: data)) ?? Project(id: "", title: title, status: "active")
+    }
+
+    func projectUpdate(id: String, patch: [String: Any]) async throws {
+        try await putVoid("/projects/\(id)", body: patch)
+    }
+
     func tagsList() async throws -> [Tag] {
         let data = try await get("/tags")
         return (try? JSONDecoder().decode([Tag].self, from: data)) ?? []
