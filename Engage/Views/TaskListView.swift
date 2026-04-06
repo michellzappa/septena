@@ -106,10 +106,6 @@ struct TaskListView: View {
     }
     .task(id: filter) {
       await load()
-      if nav.autoStartEntry {
-        nav.autoStartEntry = false
-        startDraft()
-      }
     }
   }
 
@@ -201,7 +197,7 @@ struct TaskListView: View {
       ForEach(groupedByProject, id: \.0.id) { project, items in
         ListSectionHeader(
           icon: "circle", iconTint: .secondary, title: project.name,
-          onTap: selectMode ? nil : { nav.path.append(.project(project)) }
+          onTap: selectMode ? nil : { }
         )
         Hairline()
         ForEach(items) { task in
@@ -531,7 +527,7 @@ struct TaskListView: View {
       do {
         try await client.taskCreate(
           title: title, notes: notes, origin: .human, owner: "human",
-          area: area, project: project, due: due, repeatRule: repeatRule
+          project: project, due: due, repeatRule: repeatRule
         )
         draftTitle = ""; draftNotes = ""
         await load()
