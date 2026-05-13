@@ -74,11 +74,17 @@ struct TaskListView: View {
           // Captures sit above your existing work so the entry point is
           // glanceable from the title.
           if isCreating {
+            // Suppress the "where this lands" pill on Project / Area pages —
+            // the surrounding page header already names the destination.
+            let suppressDest: Bool = {
+              switch filter { case .project, .area: return true; default: return false }
+            }()
             InlineNewTaskRow(
               title: $draftTitle, notes: $draftNotes,
               defaultWhen: filter.title,
               defaultWhenIcon: titleIcon,
               defaultWhenTint: titleTint,
+              showDestination: !suppressDest,
               onCommit: { commitDraft() },
               onCancel: { cancelDraft() }
             )
@@ -94,19 +100,22 @@ struct TaskListView: View {
           }
 
           // ── OPEN block ──────────────────────────────────────────────
-          // Tasks come first (most actionable), then chores / habits / supps.
-          // Unscheduled / Upcoming both group items with inline headers —
-          // by project/area or by date respectively.
-          // "Scheduled Earlier" — render inline at the top so overdue items
-          // are surfaced first, no separate header (they're part of Today).
-          ForEach(review) { task in row(task, reviewable: true); Hairline() }
-
-          if filter == .unscheduled {
+          // Unscheduled / Today both group items with inline project & area
+          // headers; Upcoming groups by date. On Today we also fold "scheduled
+          // earlier" (review) items into the cluster grouping so a due task
+          // shows up under its project/area like any other task — they only
+          // surface as a flat row at the top on other filters.
+          if filter == .today {
+            groupedOpenItems
+          } else if filter == .unscheduled {
+            ForEach(review) { task in row(task, reviewable: true) }
             groupedOpenItems
           } else if filter == .upcoming {
+            ForEach(review) { task in row(task, reviewable: true) }
             groupedUpcomingItems
           } else {
-            ForEach(visibleItems) { task in row(task); Hairline() }
+            ForEach(review) { task in row(task, reviewable: true) }
+            ForEach(visibleItems) { task in row(task) }
           }
           // Done tasks no longer surface on Today / Inbox / etc. — see Logbook
           // for the archive. Per-session optimistic toggles still render in
@@ -171,7 +180,13 @@ struct TaskListView: View {
       }
     }
     .sheet(isPresented: $showingMoveSheet) {
-      MovePickerSheet(areas: areas, projects: projects) { areaId, projectId in
+      let target = currentTask(id: moveTargetId)
+      MovePickerSheet(
+        areas: areas,
+        projects: projects,
+        currentAreaId: target?.area,
+        currentProjectId: target?.project
+      ) { areaId, projectId in
         if let id = moveTargetId {
           applyMove(id: id, areaId: areaId, projectId: projectId)
         }
@@ -208,6 +223,11 @@ struct TaskListView: View {
     guard let id else { return nil }
     let pool = items + review + doneToday
     return pool.first(where: { $0.id == id })?.recurrence
+  }
+
+  private func currentTask(id: String?) -> EngageTask? {
+    guard let id else { return nil }
+    return (items + review + doneToday).first(where: { $0.id == id })
   }
 
   private func applyRecurrence(id: String, rule: Recurrence?) {
@@ -294,23 +314,29 @@ struct TaskListView: View {
       )
     } else {
       taskBody(task, reviewable: reviewable)
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-          Button(role: .destructive) { applyDelete(task.id) } label: {
-            Label("Delete", systemImage: "trash")
-          }
-          Button { applyCancel(task.id) } label: {
-            Label("Cancel", systemImage: "xmark.circle")
-          }
-          .tint(Theme.inkSecondary)
-        }
-        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+        // Long-press menu — temporary stand-in for swipe-to-reveal (which is
+        // List-only in SwiftUI). Each item fires a haptic when selected.
+        .contextMenu {
           Button {
             Haptics.tick()
             Task { try? await client.moveToToday(id: task.id, today: !task.today); await load() }
           } label: {
-            Label(task.today ? "Demote" : "Today", systemImage: "star")
+            Label(task.today ? "Remove from Today" : "Move to Today",
+                  systemImage: task.today ? "star.slash" : "star")
           }
-          .tint(theme.accent)
+          Button {
+            Haptics.tick()
+            applyCancel(task.id)
+          } label: {
+            Label("Cancel", systemImage: "xmark.circle")
+          }
+          Divider()
+          Button(role: .destructive) {
+            Haptics.warning()
+            applyDelete(task.id)
+          } label: {
+            Label("Delete", systemImage: "trash")
+          }
         }
     }
   }
@@ -339,7 +365,8 @@ struct TaskListView: View {
               .foregroundStyle(task.status == .done ? Theme.inkSecondary : Theme.inkPrimary)
               .strikethrough(task.status == .done)
               .opacity(task.status == .done ? 0.5 : 1)
-              .lineLimit(2)
+              .lineLimit(1)
+              .truncationMode(.tail)
               .multilineTextAlignment(.leading)
           }
 
@@ -350,26 +377,58 @@ struct TaskListView: View {
       }
       .buttonStyle(.plain)
 
-      if reviewable {
-        Button {
-          Haptics.tick()
-          Task {
-            try? await client.moveToToday(id: task.id, today: true)
-            await load()
-          }
-        } label: {
-          Image(systemName: "star.fill")
-            .foregroundStyle(theme.accent)
-        }
-        .buttonStyle(.plain)
-        .padding(.top, 2)
+      // Notes glyph on the right when the task has any — kept out of the
+      // meta line so it doesn't crowd the project/area/date chips below.
+      if !(task.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        Image(systemName: "text.alignleft")
+          .font(.system(size: 12))
+          .foregroundStyle(Theme.inkSecondary)
+          .padding(.top, 3)
       }
+      // Trailing date label — Things-style. Always on the right, never a
+      // pill under the title:
+      //   • Due (deadline) wins: flag + label, red when overdue/today.
+      //   • Otherwise scheduled (when present and we're not on Today, where
+      //     the screen itself is "today"): calendar + label, muted.
+      trailingDate(task)
     }
     .padding(.horizontal, Theme.hPadding)
-    .padding(.vertical, 12)
+    .padding(.vertical, 7)
     .frame(minHeight: Theme.rowHeight)
     .background(pulsedTaskId == task.id ? theme.accent.opacity(0.14) : Color.clear)
     .animation(.easeOut(duration: 0.25), value: pulsedTaskId)
+  }
+
+  /// A task with a due date that's today or in the past — surfaces a flag.
+  private func isOverdue(_ task: EngageTask) -> Bool {
+    guard let due = task.due.flatMap(SeptenaDate.parse) else { return false }
+    let today = Calendar.current.startOfDay(for: Date())
+    return Calendar.current.startOfDay(for: due) <= today
+  }
+
+  /// Trailing date indicator: flag for a deadline (due) or calendar for a
+  /// scheduled "when". Lives on the right side of the row so dates never
+  /// crowd the title or meta line.
+  @ViewBuilder
+  private func trailingDate(_ task: EngageTask) -> some View {
+    let cal = Calendar.current
+    let today = cal.startOfDay(for: Date())
+    if let due = task.due.flatMap(SeptenaDate.parse) {
+      let dueSoon = cal.startOfDay(for: due) <= today
+      HStack(spacing: 4) {
+        Image(systemName: "flag.fill").font(.system(size: 12))
+        Text(shortDate(due)).font(.septenaMeta)
+      }
+      .foregroundStyle(dueSoon ? Theme.overdueRed : Theme.inkSecondary)
+      .padding(.top, 3)
+    } else if filter != .today, let scheduled = task.scheduled.flatMap(SeptenaDate.parse) {
+      HStack(spacing: 4) {
+        Image(systemName: "calendar").font(.system(size: 11))
+        Text(shortDate(scheduled)).font(.septenaMeta)
+      }
+      .foregroundStyle(Theme.inkSecondary)
+      .padding(.top, 3)
+    }
   }
 
   /// Briefly flash a row's background so tap registers visually before the
@@ -396,14 +455,14 @@ struct TaskListView: View {
     // group). Upcoming groups by date, so chips stay there.
     let suppressProject: Bool = {
       switch filter {
-      case .project, .unscheduled: return true
-      default:                     return false
+      case .project, .unscheduled, .today: return true
+      default:                             return false
       }
     }()
     let suppressArea: Bool = {
       switch filter {
-      case .project, .area, .unscheduled: return true
-      default:                            return false
+      case .project, .area, .unscheduled, .today: return true
+      default:                                    return false
       }
     }()
     let projectTitle = suppressProject
@@ -412,28 +471,16 @@ struct TaskListView: View {
     let areaTitle = suppressArea
       ? nil
       : task.area.flatMap { aid in areas.first(where: { $0.id == aid })?.title }
-    let due          = task.due.flatMap(SeptenaDate.parse)
-    let scheduled    = task.scheduled.flatMap(SeptenaDate.parse)
-    let hasNotes     = !(task.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
 
-    let hasAny = hasNotes || projectTitle != nil || areaTitle != nil || due != nil || scheduled != nil
+    // Dates live in the trailing region (see trailingDate); only project/area
+    // chips render under the title now.
+    let hasAny = projectTitle != nil || areaTitle != nil
     if hasAny {
       HStack(spacing: 10) {
-        if hasNotes {
-          Image(systemName: "text.alignleft")
-            .font(.system(size: 10))
-            .foregroundStyle(Theme.inkSecondary)
-        }
         if let title = projectTitle {
           metaChip(icon: "number", text: title)
         } else if let title = areaTitle {
           metaChip(icon: "folder", text: title)
-        }
-        if let scheduled {
-          metaChip(icon: "calendar", text: shortDate(scheduled))
-        }
-        if let due {
-          deadlineFlag(for: due, hasScheduled: scheduled != nil)
         }
       }
     }
@@ -457,27 +504,6 @@ struct TaskListView: View {
     .foregroundStyle(Theme.inkSecondary)
   }
 
-  /// Deadline indicator. Red when overdue or due today; secondary otherwise.
-  /// Icon-only when `scheduled` is also present (the calendar chip already
-  /// shows a date — flag just signals "deadline exists"). Includes
-  /// days-left text when due is the only date signal on the row.
-  @ViewBuilder
-  private func deadlineFlag(for date: Date, hasScheduled: Bool) -> some View {
-    let cal = Calendar.current
-    let today = cal.startOfDay(for: Date())
-    let target = cal.startOfDay(for: date)
-    let days = cal.dateComponents([.day], from: today, to: target).day ?? 0
-    let tint: Color = days <= 0 ? Theme.overdueRed : Theme.inkSecondary
-    HStack(spacing: 3) {
-      Image(systemName: "flag.fill").font(.system(size: 10))
-      if !hasScheduled {
-        Text(days < 0 ? "\(-days)d over" : days == 0 ? "today" : days == 1 ? "1d left" : "\(days)d left")
-          .font(.septenaMeta)
-      }
-    }
-    .foregroundStyle(tint)
-  }
-
   @ViewBuilder
   private func sectionHeader(_ text: String) -> some View {
     Text(text)
@@ -494,14 +520,17 @@ struct TaskListView: View {
   /// inline headers that push the corresponding sidebar destination.
   @ViewBuilder
   private var groupedOpenItems: some View {
-    let byProject = Dictionary(grouping: items.filter { $0.project != nil },
+    // Today: fold "scheduled earlier" items into the same cluster grouping so
+    // a due-today task lands under its project/area like any other.
+    let pool = (filter == .today) ? items + review : items
+    let byProject = Dictionary(grouping: pool.filter { $0.project != nil },
                                by: { $0.project! })
-    let byArea = Dictionary(grouping: items.filter { $0.project == nil && $0.area != nil },
+    let byArea = Dictionary(grouping: pool.filter { $0.project == nil && $0.area != nil },
                             by: { $0.area! })
-    let loose = items.filter { $0.project == nil && $0.area == nil }
+    let loose = pool.filter { $0.project == nil && $0.area == nil }
 
     // 1. Loose first (no header) so uncategorized tasks aren't buried.
-    ForEach(loose) { task in row(task); Hairline() }
+    ForEach(loose) { task in row(task) }
 
     // 2. Areas in sidebar order: direct-area tasks, then each project's tasks.
     ForEach(areas) { area in
@@ -510,14 +539,14 @@ struct TaskListView: View {
         groupHeader(icon: "square.stack.3d.up.fill", title: area.title) {
           nav.path.append(.area(area))
         }
-        ForEach(areaTasks) { task in row(task); Hairline() }
+        ForEach(areaTasks) { task in row(task) }
       }
       ForEach(projects.filter { $0.area == area.id }) { project in
         if let tasks = byProject[project.id], !tasks.isEmpty {
           groupHeader(icon: nil, title: project.title) {
             nav.path.append(.project(project))
           }
-          ForEach(tasks) { task in row(task); Hairline() }
+          ForEach(tasks) { task in row(task) }
         }
       }
     }
@@ -528,7 +557,7 @@ struct TaskListView: View {
         groupHeader(icon: nil, title: project.title) {
           nav.path.append(.project(project))
         }
-        ForEach(tasks) { task in row(task); Hairline() }
+        ForEach(tasks) { task in row(task) }
       }
     }
   }
@@ -584,14 +613,19 @@ struct TaskListView: View {
       Spacer()
     }
     .padding(.horizontal, Theme.hPadding)
-    .padding(.top, 18)
+    // Today reads better with extra air above each project/area cluster —
+    // 66% more than the default header inset elsewhere.
+    .padding(.top, filter == .today ? 30 : 18)
     .padding(.bottom, 6)
     .contentShape(Rectangle())
 
-    if let onTap {
-      Button(action: onTap) { body }.buttonStyle(.plain)
-    } else {
-      body
+    VStack(alignment: .leading, spacing: 0) {
+      if let onTap {
+        Button(action: onTap) { body }.buttonStyle(.plain)
+      } else {
+        body
+      }
+      Hairline()
     }
   }
 
@@ -604,7 +638,7 @@ struct TaskListView: View {
     let buckets = upcomingBuckets()
     ForEach(buckets, id: \.key) { bucket in
       groupHeader(icon: "calendar", title: bucket.label)
-      ForEach(bucket.tasks) { task in row(task); Hairline() }
+      ForEach(bucket.tasks) { task in row(task) }
     }
   }
 
@@ -852,7 +886,7 @@ struct TaskListView: View {
 
   private var titleIcon: String {
     switch filter {
-    case .today: return "star"
+    case .today: return "star.fill"
     case .inbox: return "tray"
     case .upcoming: return "calendar"
     case .unscheduled: return "rectangle.stack"

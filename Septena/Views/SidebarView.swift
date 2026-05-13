@@ -13,7 +13,6 @@ struct SidebarRootView: View {
   @State private var counts: TasksCounts? = nil
   @State private var areaOpenCounts: [String: Int] = [:]
   @State private var projectOpenCounts: [String: Int] = [:]
-  @State private var expandedAreas: Set<String> = []
   @State private var errorMessage: String?
 
   /// Briefly tints the tapped row so the user sees the hit register
@@ -211,7 +210,6 @@ struct SidebarRootView: View {
 
   @ViewBuilder
   private func areaBlock(_ area: Area) -> some View {
-    let isExpanded = expandedAreas.contains(area.id)
     let projectsInArea = projects.filter { $0.area == area.id && $0.status == .active }
 
     VStack(alignment: .leading, spacing: 0) {
@@ -220,35 +218,22 @@ struct SidebarRootView: View {
         .padding(.bottom, 6)
 
       Button { pulse(.area(area)) } label: {
-        SidebarAreaRow(
-          name: area.title,
-          count: areaOpenCounts[area.id],
-          isExpanded: isExpanded,
-          hasProjects: !projectsInArea.isEmpty,
-          onToggle: {
-            withAnimation(.easeInOut(duration: 0.2)) {
-              if isExpanded { expandedAreas.remove(area.id) }
-              else          { expandedAreas.insert(area.id) }
-            }
-          }
-        )
-        .padding(.horizontal, Theme.hPadding)
+        SidebarAreaRow(name: area.title, count: areaOpenCounts[area.id])
+          .padding(.horizontal, Theme.hPadding)
       }
       .buttonStyle(.plain)
       .background(pulsedRoute == .area(area) ? theme.accent.opacity(0.14) : Color.clear)
       .animation(.easeOut(duration: 0.25), value: pulsedRoute)
 
-      if isExpanded {
-        ForEach(projectsInArea) { project in
-          Button { pulse(.project(project)) } label: {
-            SidebarProjectRow(name: project.title,
-                              count: projectOpenCounts[project.id])
-              .padding(.horizontal, Theme.hPadding)
-          }
-          .buttonStyle(.plain)
-          .background(pulsedRoute == .project(project) ? theme.accent.opacity(0.14) : Color.clear)
-          .animation(.easeOut(duration: 0.25), value: pulsedRoute)
+      ForEach(projectsInArea) { project in
+        Button { pulse(.project(project)) } label: {
+          SidebarProjectRow(name: project.title,
+                            count: projectOpenCounts[project.id])
+            .padding(.horizontal, Theme.hPadding)
         }
+        .buttonStyle(.plain)
+        .background(pulsedRoute == .project(project) ? theme.accent.opacity(0.14) : Color.clear)
+        .animation(.easeOut(duration: 0.25), value: pulsedRoute)
       }
     }
   }
@@ -261,9 +246,22 @@ struct SidebarRootView: View {
 
   @ViewBuilder
   private var settingsRow: some View {
+    // Discreet on purpose — Settings is rarely needed; the rest of the
+    // sidebar is the main surface.
     Button { pulse(.settings) } label: {
-      SmartListRow(icon: "gearshape.fill", tint: Theme.iconMuted, title: "Settings")
-        .padding(.horizontal, Theme.hPadding)
+      HStack(spacing: 10) {
+        Image(systemName: "gearshape.fill")
+          .font(.system(size: 14))
+          .foregroundStyle(Theme.iconMuted)
+          .frame(width: 24, alignment: .center)
+        Text("Settings")
+          .font(.system(size: 13, weight: .regular))
+          .foregroundStyle(Theme.inkSecondary)
+        Spacer()
+      }
+      .padding(.horizontal, Theme.hPadding)
+      .frame(height: 30)
+      .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
     .background(pulsedRoute == .settings ? theme.accent.opacity(0.14) : Color.clear)
@@ -281,11 +279,13 @@ struct SidebarRootView: View {
       areas = try await a
       projects = try await p
       counts = try await c
-      // Expand every area by default; preserve any existing collapse state.
-      expandedAreas.formUnion(areas.map(\.id))
       let allItems = try await all.items.filter { $0.status == .open }
-      areaOpenCounts = Dictionary(grouping: allItems, by: { $0.area ?? "" })
-        .mapValues { $0.count }
+      // Area count is *direct* tasks only — projects within the area carry
+      // their own counts, double-counting at the area level would be noise.
+      areaOpenCounts = Dictionary(
+        grouping: allItems.filter { $0.project == nil },
+        by: { $0.area ?? "" }
+      ).mapValues { $0.count }
       projectOpenCounts = Dictionary(
         grouping: allItems.filter { $0.project != nil },
         by: { $0.project! }
@@ -330,7 +330,7 @@ struct SmartListRow: View {
         .saturation(0.72)
         .frame(width: 24, alignment: .center)
       Text(title)
-        .font(.septenaSidebarRow)
+        .font(.system(size: 17, weight: .medium))
         .foregroundStyle(Theme.inkPrimary)
       Spacer()
       if let b = overdueBadge, b > 0 {
@@ -356,9 +356,6 @@ struct SmartListRow: View {
 struct SidebarAreaRow: View {
   let name: String
   var count: Int? = nil
-  let isExpanded: Bool
-  let hasProjects: Bool
-  let onToggle: () -> Void
 
   var body: some View {
     HStack(spacing: 14) {
@@ -367,24 +364,13 @@ struct SidebarAreaRow: View {
         .foregroundStyle(Theme.iconMuted)
         .frame(width: 24, alignment: .center)
       Text(name)
-        .font(.system(size: 16, weight: .semibold))
+        .font(.system(size: 17, weight: .semibold))
         .foregroundStyle(Theme.inkPrimary)
       Spacer()
       if let c = count, c > 0 {
         Text("\(c)")
           .font(.septenaMeta)
           .foregroundStyle(Theme.inkSecondary)
-      }
-      if hasProjects {
-        Button(action: onToggle) {
-          Image(systemName: "chevron.down")
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(Theme.inkSecondary.opacity(0.7))
-            .rotationEffect(.degrees(isExpanded ? 0 : -90))
-            .frame(width: 28, height: 28)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
       }
     }
     .frame(height: Theme.sidebarRowHeight)
@@ -410,7 +396,7 @@ struct SidebarProjectRow: View {
       }
       .frame(width: 24, alignment: .center)
       Text(name)
-        .font(.septenaSidebarRow)
+        .font(.system(size: 17, weight: .medium))
         .foregroundStyle(Theme.inkPrimary)
       Spacer()
       if let c = count, c > 0 {

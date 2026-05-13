@@ -137,13 +137,13 @@ private extension Color {
 
 extension Font {
   /// Titles use the system sans (SF Pro on iOS) — neutral and platform-native.
-  static let septenaScreenTitle  = Font.system(size: 30, weight: .bold)
+  static let septenaScreenTitle  = Font.system(size: 28, weight: .bold)
   static let septenaSectionTitle = Font.system(size: 20, weight: .bold)
   static let septenaCardTitle    = Font.system(size: 17, weight: .bold)
 
   /// Sans for UI controls and body.
   static let septenaSidebarRow   = Font.system(size: 16, weight: .medium)
-  static let septenaTaskTitle    = Font.system(size: 16, weight: .regular)
+  static let septenaTaskTitle    = Font.system(size: 17, weight: .regular)
   static let septenaNotes        = Font.system(size: 14, weight: .regular)
   static let septenaButton       = Font.system(size: 15, weight: .semibold)
   static let septenaLabel        = Font.system(size: 13, weight: .medium)

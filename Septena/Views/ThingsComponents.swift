@@ -11,7 +11,7 @@ struct ThingsCheckbox: View {
   let onToggle: () -> Void
 
   /// Square with a small corner radius — matches Things' checkbox shape.
-  private static let size: CGFloat = 18
+  private static let size: CGFloat = 16
   private static let cornerRadius: CGFloat = 4
 
   var body: some View {
@@ -26,7 +26,7 @@ struct ThingsCheckbox: View {
             .fill(fill)
             .frame(width: Self.size, height: Self.size)
           Image(systemName: "checkmark")
-            .font(.system(size: 11, weight: .bold))
+            .font(.system(size: 8, weight: .bold))
             .foregroundStyle(.white)
         }
       }
@@ -102,6 +102,9 @@ struct InlineNewTaskRow: View {
   var defaultWhen: String = "Today"
   var defaultWhenIcon: String = "star.fill"
   var defaultWhenTint: Color = Theme.inkSecondary
+  /// Hide the trailing "where this lands" pill when the surrounding page
+  /// already names the destination (Project / Area detail).
+  var showDestination: Bool = true
   var onCommit: () -> Void
   var onCancel: () -> Void
   @FocusState private var focused: Field?
@@ -141,17 +144,19 @@ struct InlineNewTaskRow: View {
       .padding(.horizontal, Theme.hPadding)
       .padding(.vertical, 12)
 
-      HStack(spacing: 6) {
-        Image(systemName: defaultWhenIcon)
-          .font(.system(size: 14))
-          .foregroundStyle(defaultWhenTint)
-        Text(defaultWhen)
-          .font(.septenaTaskTitle)
-          .foregroundStyle(.primary)
-        Spacer()
+      if showDestination {
+        HStack(spacing: 6) {
+          Image(systemName: defaultWhenIcon)
+            .font(.system(size: 14))
+            .foregroundStyle(defaultWhenTint)
+          Text(defaultWhen)
+            .font(.septenaTaskTitle)
+            .foregroundStyle(.primary)
+          Spacer()
+        }
+        .padding(.horizontal, Theme.hPadding)
+        .padding(.bottom, 14)
       }
-      .padding(.horizontal, Theme.hPadding)
-      .padding(.bottom, 14)
     }
     // Same full-bleed treatment as the open-edit card: matches the closed row
     // position exactly, separated from neighbors by background contrast + a
@@ -162,7 +167,11 @@ struct InlineNewTaskRow: View {
     // doesn't fire when tapping the card's own padding.
     .contentShape(Rectangle())
     .onTapGesture { /* swallow */ }
-    .onAppear { focused = .title }
+    .onAppear {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+        focused = .title
+      }
+    }
   }
 }
 
@@ -234,7 +243,8 @@ struct InlineEditTaskRow: View {
     // gesture doesn't fire when tapping the card's own padding/background.
     .contentShape(Rectangle())
     .onTapGesture { /* swallow */ }
-    .onAppear { focused = .title }
+    // Tapping a task opens the inline card but does NOT auto-focus the
+    // title. The user taps the title (or notes) to start editing.
     // Keyboard dismissed (via scroll-down or tap-outside) → commit. Without
     // this, blur leaves the card open with no field focused.
     .onChange(of: focused) { _, new in
@@ -491,20 +501,18 @@ struct DeadlinePickerSheet: View {
           }
           .buttonStyle(.plain)
 
-          if initialDate != nil {
-            Button {
-              Haptics.warning()
-              onPick(nil)
-              dismiss()
-            } label: {
-              Text("No Deadline")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Theme.overdueRed)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-            }
-            .buttonStyle(.plain)
+          Button {
+            Haptics.warning()
+            onPick(nil)
+            dismiss()
+          } label: {
+            Text("No Deadline")
+              .font(.system(size: 15, weight: .medium))
+              .foregroundStyle(initialDate == nil ? Theme.inkSecondary : Theme.overdueRed)
+              .frame(maxWidth: .infinity)
+              .padding(.vertical, 12)
           }
+          .buttonStyle(.plain)
         }
         .padding(.horizontal, Theme.hPadding)
         .padding(.bottom, 20)
@@ -652,6 +660,8 @@ struct RecurrencePickerSheet: View {
 struct MovePickerSheet: View {
   let areas: [Area]
   let projects: [Project]
+  var currentAreaId: String? = nil
+  var currentProjectId: String? = nil
   let onPick: (_ areaId: String?, _ projectId: String?) -> Void
   @Environment(\.dismiss) private var dismiss
   @State private var query = ""
@@ -659,93 +669,126 @@ struct MovePickerSheet: View {
   var body: some View {
     NavigationStack {
       ScrollView {
-        VStack(alignment: .leading, spacing: 0) {
-          optionRow(icon: "tray.fill", tint: Theme.inkSecondary, title: "Inbox (no area/project)") {
-            onPick(nil, nil); dismiss()
-          }
-          Hairline()
-
-          let topProjects = filteredTopProjects
-          if !topProjects.isEmpty {
-            sectionHeader("Projects")
-            ForEach(topProjects) { p in
-              optionRow(icon: "circle", tint: .secondary, title: p.title) {
-                onPick(nil, p.id); dismiss()
-              }
-              Hairline()
+        LazyVStack(alignment: .leading, spacing: 0) {
+          // Inbox first — drop both area and project.
+          if matches("Inbox") {
+            row(.inbox, title: "Inbox",
+                selected: currentAreaId == nil && currentProjectId == nil) {
+              onPick(nil, nil); dismiss()
             }
           }
 
-          ForEach(areas) { area in
-            sectionHeader(area.title.uppercased())
-            optionRow(icon: "hexagon.fill", tint: .orange, title: "(area only)") {
+          // Top-level projects (no area)
+          ForEach(filteredTopProjects) { p in
+            row(.project, title: p.title,
+                selected: p.id == currentProjectId) {
+              onPick(nil, p.id); dismiss()
+            }
+          }
+
+          // Areas with their projects nested directly underneath, mirroring
+          // the sidebar's hierarchy.
+          ForEach(filteredAreas) { area in
+            row(.area, title: area.title,
+                selected: currentProjectId == nil && area.id == currentAreaId) {
               onPick(area.id, nil); dismiss()
             }
-            Hairline()
             ForEach(projectsIn(area.id)) { p in
-              optionRow(icon: "circle", tint: .secondary, title: p.title, indent: true) {
+              row(.project, title: p.title,
+                  selected: p.id == currentProjectId, indent: true) {
                 onPick(area.id, p.id); dismiss()
               }
-              Hairline()
             }
           }
         }
+        .padding(.vertical, 8)
       }
+      .background(Theme.paperBackground)
       .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always))
-      .navigationTitle("Move To")
+      .navigationTitle("Move")
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
-        ToolbarItem(placement: .topBarLeading) {
-          Button("Cancel") { dismiss() }
+        ToolbarItem(placement: .topBarTrailing) {
+          Button("Done") { dismiss() }
         }
       }
     }
+  }
+
+  // MARK: - Filtering
+
+  private var q: String { query.lowercased() }
+
+  private func matches(_ s: String) -> Bool {
+    q.isEmpty || s.lowercased().contains(q)
   }
 
   private var filteredTopProjects: [Project] {
-    let q = query.lowercased()
-    return projects
-      .filter { $0.area == nil && $0.status == .active }
-      .filter { q.isEmpty || $0.title.lowercased().contains(q) }
+    projects.filter { $0.area == nil && $0.status == .active && matches($0.title) }
+  }
+
+  private var filteredAreas: [Area] {
+    areas.filter { area in
+      matches(area.title) || !projectsIn(area.id).isEmpty
+    }
   }
 
   private func projectsIn(_ areaId: String) -> [Project] {
-    let q = query.lowercased()
-    return projects
-      .filter { $0.area == areaId && $0.status == .active }
-      .filter { q.isEmpty || $0.title.lowercased().contains(q) }
+    projects.filter { $0.area == areaId && $0.status == .active && matches($0.title) }
   }
 
-  @ViewBuilder
-  private func sectionHeader(_ text: String) -> some View {
-    Text(text)
-      .font(.system(size: 12, weight: .bold))
-      .tracking(0.8)
-      .foregroundStyle(.secondary)
-      .padding(.horizontal, Theme.hPadding)
-      .padding(.top, 16)
-      .padding(.bottom, 6)
-  }
+  // MARK: - Row primitive
+
+  private enum RowKind { case inbox, area, project }
 
   @ViewBuilder
-  private func optionRow(icon: String, tint: Color, title: String, indent: Bool = false, action: @escaping () -> Void) -> some View {
+  private func row(_ kind: RowKind, title: String, selected: Bool,
+                   indent: Bool = false, action: @escaping () -> Void) -> some View {
     Button(action: { Haptics.pick(); action() }) {
-      HStack(spacing: 14) {
-        Image(systemName: icon)
-          .font(.system(size: 16))
-          .foregroundStyle(tint)
-          .frame(width: 24)
+      HStack(spacing: 12) {
+        icon(for: kind)
+          .frame(width: 24, alignment: .center)
         Text(title)
-          .font(.septenaSidebarRow)
-          .foregroundStyle(.primary)
+          .font(.system(size: 16, weight: kind == .area ? .semibold : .regular))
+          .foregroundStyle(Theme.inkPrimary)
         Spacer()
+        if selected {
+          Image(systemName: "checkmark")
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(Theme.inkSecondary)
+        }
       }
-      .padding(.leading, indent ? Theme.hPadding + 20 : Theme.hPadding)
+      .padding(.leading, indent ? Theme.hPadding + 24 : Theme.hPadding)
       .padding(.trailing, Theme.hPadding)
-      .frame(height: Theme.rowHeight)
+      .frame(height: 38)
       .contentShape(Rectangle())
+      .background(selected ? Theme.mutedSurface : Color.clear)
     }
     .buttonStyle(.plain)
+  }
+
+  @ViewBuilder
+  private func icon(for kind: RowKind) -> some View {
+    switch kind {
+    case .inbox:
+      Image(systemName: "tray.fill")
+        .font(.system(size: 16))
+        .foregroundStyle(Theme.iconMuted)
+    case .area:
+      Image(systemName: "square.stack.3d.up.fill")
+        .font(.system(size: 16))
+        .foregroundStyle(Theme.iconMuted)
+    case .project:
+      // Pie glyph — mirrors SidebarProjectRow.
+      ZStack {
+        Circle().stroke(Theme.iconMuted, lineWidth: 1.5)
+          .frame(width: 14, height: 14)
+        Circle().trim(from: 0, to: 0.25)
+          .stroke(Theme.iconMuted, lineWidth: 5)
+          .frame(width: 8, height: 8)
+          .rotationEffect(.degrees(-90))
+      }
+    }
   }
 }
 

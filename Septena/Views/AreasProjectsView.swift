@@ -24,9 +24,9 @@ struct AreaDetailView: View {
     VStack(spacing: 0) {
       VStack(alignment: .leading, spacing: 0) {
         HStack(spacing: 12) {
-          Image(systemName: "folder")
+          Image(systemName: "square.stack.3d.up.fill")
             .font(.system(size: 24))
-            .foregroundStyle(Theme.inkSecondary)
+            .foregroundStyle(Theme.iconMuted)
           TextField("Area", text: $draftName)
             .font(.septenaScreenTitle)
             .foregroundStyle(Theme.inkPrimary)
@@ -91,6 +91,10 @@ struct AreaDetailView: View {
       Text(project.title)
         .font(.system(size: 16, weight: .semibold))
         .foregroundStyle(Theme.inkPrimary)
+      Image(systemName: "chevron.right")
+        .font(.system(size: 12, weight: .semibold))
+        .foregroundStyle(Theme.iconMuted)
+        .padding(.top, 4)
       Spacer()
     }
     .padding(.horizontal, Theme.hPadding)
@@ -160,9 +164,18 @@ struct ProjectDetailView: View {
       VStack(alignment: .leading, spacing: 10) {
         // Editable serif title — same shape as ScreenTitle but with a TextField.
         HStack(spacing: 12) {
-          Image(systemName: "circle")
-            .font(.system(size: 22))
-            .foregroundStyle(Theme.inkSecondary)
+          // Pie glyph — matches SidebarProjectRow.
+          ZStack {
+            Circle()
+              .stroke(Theme.iconMuted, lineWidth: 2)
+              .frame(width: 22, height: 22)
+            Circle()
+              .trim(from: 0, to: 0.25)
+              .stroke(Theme.iconMuted, lineWidth: 8)
+              .frame(width: 14, height: 14)
+              .rotationEffect(.degrees(-90))
+          }
+          .frame(width: 28, height: 28)
           TextField("Project", text: $draftName)
             .font(.septenaScreenTitle)
             .foregroundStyle(Theme.inkPrimary)
