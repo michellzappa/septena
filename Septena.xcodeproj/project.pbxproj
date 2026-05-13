@@ -7,303 +7,295 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		00E9AA93E77BF637A10F309B /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B4B249D148D9C7D84EB1779 /* Models.swift */; };
-		075C5C6781C40965760E039E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F497CEC6A37DDC1D2D74F80C /* Assets.xcassets */; };
-		0915DB21E7FC0CA88F895284 /* NextItemsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FC53011C193072623900EA4 /* NextItemsSection.swift */; };
-		0CF4011E0E88AD29ABA2F107 /* NextItemsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FC53011C193072623900EA4 /* NextItemsSection.swift */; };
-		11D5C57096ACC41673BE8637 /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4867FD6F5EB8AD7D641AA4B /* DateParser.swift */; };
-		134C874D5DAD7432558E10FB /* ServerConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A797FEAC916F4B014DE199D8 /* ServerConfigView.swift */; };
-		19D6E120A106CABC9A9C944E /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 013DA8579D8AB360424D2364 /* App.swift */; };
-		1B7E7AC8F777C3969AFFD9AC /* ThingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100DE272C7D209BC00DA64B /* ThingsComponents.swift */; };
-		1C0318F5635B6A71B3A3D658 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60C6F2E3625C24CFC45D439C /* SidebarView.swift */; };
-		23DD765760997AEE244FDB9D /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF5E529F842AB74E19111AB8 /* Theme.swift */; };
-		2D8766F09F3247831A954293 /* QuickEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EDA430711A0E43505194D23 /* QuickEntryView.swift */; };
-		2DBC84FFB519179B4260C705 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B4B249D148D9C7D84EB1779 /* Models.swift */; };
-		382D5802D173CEB7D49D1064 /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CF658F967CE8DD8713C1ABA /* TaskDetailView.swift */; };
-		3A05615A695A99EE33DD52EE /* SeptenaClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EA0D6DBD04D08EB00F32BD5 /* SeptenaClient.swift */; };
-		3AB227D519DA079DEB144529 /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39A1A629E49B7C9C806828F3 /* TaskListView.swift */; };
-		3ED3F0DBF26AA22B922EDF74 /* ThingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100DE272C7D209BC00DA64B /* ThingsComponents.swift */; };
-		49AD393568EF186694DF0069 /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CF658F967CE8DD8713C1ABA /* TaskDetailView.swift */; };
-		5C5DD73A7A566D9D8C8BF3C3 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFD2EA8C86E52F8A7008438C /* Haptics.swift */; };
-		602493DF247ACF788F1C3D44 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFD2EA8C86E52F8A7008438C /* Haptics.swift */; };
-		6072E6F9B646989C778AF95E /* Info-Mac.plist in Resources */ = {isa = PBXBuildFile; fileRef = C7F4D38F38D130147A77C526 /* Info-Mac.plist */; };
-		73FE2658EAB611FD66ADDC74 /* AreasProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EDA60693B28BE50EDD6893F /* AreasProjectsView.swift */; };
-		7C1CEDB22A8FAC74AF654DED /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF5E529F842AB74E19111AB8 /* Theme.swift */; };
-		7EE9A8F340C57F0BB918F8DD /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 0D93BE8FCA8FF2ADBC06E8EA /* Info.plist */; };
-		7FE6B5A8B6B2D6E3FFA5F639 /* SeptenaClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EA0D6DBD04D08EB00F32BD5 /* SeptenaClient.swift */; };
-		85A2DFA3EA2D48198EA8096B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F497CEC6A37DDC1D2D74F80C /* Assets.xcassets */; };
-		85C79FA680F02D90C77D6AC7 /* ServerConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A797FEAC916F4B014DE199D8 /* ServerConfigView.swift */; };
-		8BC693CA1F8E4B701DAC7F7D /* AreasProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EDA60693B28BE50EDD6893F /* AreasProjectsView.swift */; };
-		8FBDE68594C5E4B1468521FD /* SectionTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C0151B6ED9990C50FD2DB48 /* SectionTheme.swift */; };
-		B46457E2181CB00F99BC6E02 /* QuickEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EDA430711A0E43505194D23 /* QuickEntryView.swift */; };
-		C5475709DF8A7936F734C36E /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4867FD6F5EB8AD7D641AA4B /* DateParser.swift */; };
-		C57C11E572D3EDBD5E573F48 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 013DA8579D8AB360424D2364 /* App.swift */; };
-		E00534275E1CD6EFE1B60EBF /* SectionTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C0151B6ED9990C50FD2DB48 /* SectionTheme.swift */; };
-		E1979CF92BA8FE2069959956 /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39A1A629E49B7C9C806828F3 /* TaskListView.swift */; };
-		FDA96AA6AD7B9DC01C538BB0 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60C6F2E3625C24CFC45D439C /* SidebarView.swift */; };
+		02A5629DB466DAEA69A99B2E /* QuickEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B1504276BA0A9BED078DB11 /* QuickEntryView.swift */; };
+		0448F507E1F1600F9933AEED /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5ECFDA9128B73993023CB6 /* Models.swift */; };
+		06F8765D7D9BA1A94FE3984D /* NextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB6D9FD80512D4CD62AEFFFD /* NextView.swift */; };
+		07B127F5FBCE0DE19AFCD387 /* SectionTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03DC46C772E45B60ECB7343 /* SectionTheme.swift */; };
+		09C5366893B7255E08295C88 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBD31B55684A505738EB624C /* App.swift */; };
+		18C336321218C66D6B8DB652 /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D413F054F59B2A90A319154 /* TaskDetailView.swift */; };
+		1D16A641ABEC4D4CCA37145F /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A07E6C15CC294172DF5D20 /* Theme.swift */; };
+		2741B6F5233E5619A7057258 /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B92826563E8E24C2A8F22B9 /* TaskListView.swift */; };
+		28777ACD729D9C78846219C4 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */; };
+		2C16528AA1E96FE947B5BBB3 /* ServerConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A660B22946E4DE2FAFDA8F31 /* ServerConfigView.swift */; };
+		36325B1E6E5A771C01028105 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 31313A0E804B33A3E43FC1F6 /* Info.plist */; };
+		3D19536CFB66987D6D5C7642 /* Info-Mac.plist in Resources */ = {isa = PBXBuildFile; fileRef = 5B49A0D20B2ECD672137900F /* Info-Mac.plist */; };
+		435E5A036D9398686E2F5F8A /* ThingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ED2BBCF38A2078797DD570D /* ThingsComponents.swift */; };
+		513C8B1D41E5BA85B785129C /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E25F81FE5AA4B6BBC056275 /* DateParser.swift */; };
+		5330AF71083A1F3514B862B8 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */; };
+		5ED33F95694C104969333EAD /* AreasProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5C26629FE8A4DF019B9784 /* AreasProjectsView.swift */; };
+		7FB3330B97BCBCB5D87C6F04 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F0AE5985EFE1A9A61F9BC7E /* SidebarView.swift */; };
+		85E7CF1494FFC184EA9CB811 /* NextItemsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B390D43AE1A7533F9AD7198 /* NextItemsSection.swift */; };
+		8AAD68656B31C850F5FA0248 /* ServerConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A660B22946E4DE2FAFDA8F31 /* ServerConfigView.swift */; };
+		9ED913F259DC6E83E4EDB824 /* SeptenaClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 583220978001091137587977 /* SeptenaClient.swift */; };
+		BFCF1AC2BC3C5A12D48B939F /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D413F054F59B2A90A319154 /* TaskDetailView.swift */; };
+		C0BF92A2B687EFEE45D80E25 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A07E6C15CC294172DF5D20 /* Theme.swift */; };
+		D3D801AE0714FA3E8696508A /* SectionTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03DC46C772E45B60ECB7343 /* SectionTheme.swift */; };
+		D4B1495C0BDE3AF22A629505 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */; };
+		D770995846D0B23AC3F77F34 /* SeptenaClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 583220978001091137587977 /* SeptenaClient.swift */; };
+		DD200EF411309E29B543963F /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5ECFDA9128B73993023CB6 /* Models.swift */; };
+		DD215893EE774BA4E826E2B6 /* QuickEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B1504276BA0A9BED078DB11 /* QuickEntryView.swift */; };
+		DF016EF192B7891D2DBE3CB6 /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E25F81FE5AA4B6BBC056275 /* DateParser.swift */; };
+		E31B94DDD122274806A91B5C /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B92826563E8E24C2A8F22B9 /* TaskListView.swift */; };
+		F62DAF6B252E82A6C8CB7167 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F0AE5985EFE1A9A61F9BC7E /* SidebarView.swift */; };
+		F6ED283EEF472FE8DA7B7DFB /* NextItemsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B390D43AE1A7533F9AD7198 /* NextItemsSection.swift */; };
+		F96C5B2A2508D5DE609506E3 /* ThingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ED2BBCF38A2078797DD570D /* ThingsComponents.swift */; };
+		FA564DDD7B30817FB91EC0E5 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBD31B55684A505738EB624C /* App.swift */; };
+		FAA49CC911788D53BAFDBAFD /* NextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB6D9FD80512D4CD62AEFFFD /* NextView.swift */; };
+		FB79CB77D7DB4D47195A606D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */; };
+		FCDDF4248EC04741134329B2 /* AreasProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5C26629FE8A4DF019B9784 /* AreasProjectsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		013DA8579D8AB360424D2364 /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
-		0D93BE8FCA8FF2ADBC06E8EA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		2BF726C8F4A35FEC00630D07 /* Engage.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Engage.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		3034684D21811AA5B6091A0D /* EngageMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EngageMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		39A1A629E49B7C9C806828F3 /* TaskListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskListView.swift; sourceTree = "<group>"; };
-		3CF658F967CE8DD8713C1ABA /* TaskDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
-		3EDA60693B28BE50EDD6893F /* AreasProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreasProjectsView.swift; sourceTree = "<group>"; };
-		4EA0D6DBD04D08EB00F32BD5 /* SeptenaClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptenaClient.swift; sourceTree = "<group>"; };
-		5FC53011C193072623900EA4 /* NextItemsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextItemsSection.swift; sourceTree = "<group>"; };
-		60C6F2E3625C24CFC45D439C /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
-		6B4B249D148D9C7D84EB1779 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
-		6EDA430711A0E43505194D23 /* QuickEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickEntryView.swift; sourceTree = "<group>"; };
-		9C0151B6ED9990C50FD2DB48 /* SectionTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionTheme.swift; sourceTree = "<group>"; };
-		A797FEAC916F4B014DE199D8 /* ServerConfigView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConfigView.swift; sourceTree = "<group>"; };
-		B4867FD6F5EB8AD7D641AA4B /* DateParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateParser.swift; sourceTree = "<group>"; };
-		C7F4D38F38D130147A77C526 /* Info-Mac.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Info-Mac.plist"; sourceTree = "<group>"; };
-		DF5E529F842AB74E19111AB8 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
-		F100DE272C7D209BC00DA64B /* ThingsComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThingsComponents.swift; sourceTree = "<group>"; };
-		F497CEC6A37DDC1D2D74F80C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		FFD2EA8C86E52F8A7008438C /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
+		0B390D43AE1A7533F9AD7198 /* NextItemsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextItemsSection.swift; sourceTree = "<group>"; };
+		1E25F81FE5AA4B6BBC056275 /* DateParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateParser.swift; sourceTree = "<group>"; };
+		2D413F054F59B2A90A319154 /* TaskDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
+		31313A0E804B33A3E43FC1F6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3ED2BBCF38A2078797DD570D /* ThingsComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThingsComponents.swift; sourceTree = "<group>"; };
+		53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
+		583220978001091137587977 /* SeptenaClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptenaClient.swift; sourceTree = "<group>"; };
+		59055370ABA84DB912D64D1E /* SeptenaMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeptenaMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5B49A0D20B2ECD672137900F /* Info-Mac.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Info-Mac.plist"; sourceTree = "<group>"; };
+		6B1504276BA0A9BED078DB11 /* QuickEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickEntryView.swift; sourceTree = "<group>"; };
+		7D5ECFDA9128B73993023CB6 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		9A5C26629FE8A4DF019B9784 /* AreasProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreasProjectsView.swift; sourceTree = "<group>"; };
+		9B92826563E8E24C2A8F22B9 /* TaskListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskListView.swift; sourceTree = "<group>"; };
+		9F0AE5985EFE1A9A61F9BC7E /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
+		A660B22946E4DE2FAFDA8F31 /* ServerConfigView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConfigView.swift; sourceTree = "<group>"; };
+		BBD31B55684A505738EB624C /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
+		C03DC46C772E45B60ECB7343 /* SectionTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionTheme.swift; sourceTree = "<group>"; };
+		C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		D4A07E6C15CC294172DF5D20 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		FB6D9FD80512D4CD62AEFFFD /* NextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
-		56FF6EB5984C3E5CC5A9A2E9 /* Views */ = {
+		28850E874FD7157D02F3C43D /* Septena */ = {
 			isa = PBXGroup;
 			children = (
-				3EDA60693B28BE50EDD6893F /* AreasProjectsView.swift */,
-				5FC53011C193072623900EA4 /* NextItemsSection.swift */,
-				6EDA430711A0E43505194D23 /* QuickEntryView.swift */,
-				A797FEAC916F4B014DE199D8 /* ServerConfigView.swift */,
-				60C6F2E3625C24CFC45D439C /* SidebarView.swift */,
-				3CF658F967CE8DD8713C1ABA /* TaskDetailView.swift */,
-				39A1A629E49B7C9C806828F3 /* TaskListView.swift */,
-				DF5E529F842AB74E19111AB8 /* Theme.swift */,
-				F100DE272C7D209BC00DA64B /* ThingsComponents.swift */,
+				BBD31B55684A505738EB624C /* App.swift */,
+				C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */,
+				5B49A0D20B2ECD672137900F /* Info-Mac.plist */,
+				31313A0E804B33A3E43FC1F6 /* Info.plist */,
+				739A3545F72DF7DDF59D1D30 /* Views */,
+			);
+			path = Septena;
+			sourceTree = "<group>";
+		};
+		739A3545F72DF7DDF59D1D30 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				9A5C26629FE8A4DF019B9784 /* AreasProjectsView.swift */,
+				0B390D43AE1A7533F9AD7198 /* NextItemsSection.swift */,
+				FB6D9FD80512D4CD62AEFFFD /* NextView.swift */,
+				6B1504276BA0A9BED078DB11 /* QuickEntryView.swift */,
+				A660B22946E4DE2FAFDA8F31 /* ServerConfigView.swift */,
+				9F0AE5985EFE1A9A61F9BC7E /* SidebarView.swift */,
+				2D413F054F59B2A90A319154 /* TaskDetailView.swift */,
+				9B92826563E8E24C2A8F22B9 /* TaskListView.swift */,
+				D4A07E6C15CC294172DF5D20 /* Theme.swift */,
+				3ED2BBCF38A2078797DD570D /* ThingsComponents.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
 		};
-		6B305994E81D97798B4CA4CC = {
+		911FA069BE707320A271B250 = {
 			isa = PBXGroup;
 			children = (
-				850FCD0C997698ABEBD6F344 /* Engage */,
-				90993D6D885DDCE81749B97F /* EngageCore */,
-				BE613B11D916E16A9B7101D6 /* Products */,
+				28850E874FD7157D02F3C43D /* Septena */,
+				E129AEFF2C1B93C7B4789164 /* SeptenaCore */,
+				B33B7B657FD728BAA2F26562 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		850FCD0C997698ABEBD6F344 /* Engage */ = {
+		B33B7B657FD728BAA2F26562 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				013DA8579D8AB360424D2364 /* App.swift */,
-				F497CEC6A37DDC1D2D74F80C /* Assets.xcassets */,
-				C7F4D38F38D130147A77C526 /* Info-Mac.plist */,
-				0D93BE8FCA8FF2ADBC06E8EA /* Info.plist */,
-				56FF6EB5984C3E5CC5A9A2E9 /* Views */,
-			);
-			path = Engage;
-			sourceTree = "<group>";
-		};
-		90993D6D885DDCE81749B97F /* EngageCore */ = {
-			isa = PBXGroup;
-			children = (
-				B4867FD6F5EB8AD7D641AA4B /* DateParser.swift */,
-				FFD2EA8C86E52F8A7008438C /* Haptics.swift */,
-				6B4B249D148D9C7D84EB1779 /* Models.swift */,
-				9C0151B6ED9990C50FD2DB48 /* SectionTheme.swift */,
-				4EA0D6DBD04D08EB00F32BD5 /* SeptenaClient.swift */,
-			);
-			path = EngageCore;
-			sourceTree = "<group>";
-		};
-		BE613B11D916E16A9B7101D6 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				2BF726C8F4A35FEC00630D07 /* Engage.app */,
-				3034684D21811AA5B6091A0D /* EngageMac.app */,
+				39E8BE393381A7D49657D3C0 /* Septena.app */,
+				59055370ABA84DB912D64D1E /* SeptenaMac.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		E129AEFF2C1B93C7B4789164 /* SeptenaCore */ = {
+			isa = PBXGroup;
+			children = (
+				1E25F81FE5AA4B6BBC056275 /* DateParser.swift */,
+				53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */,
+				7D5ECFDA9128B73993023CB6 /* Models.swift */,
+				C03DC46C772E45B60ECB7343 /* SectionTheme.swift */,
+				583220978001091137587977 /* SeptenaClient.swift */,
+			);
+			path = SeptenaCore;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		65E25E489CDCD151CAFBCF99 /* EngageMac */ = {
+		1B1FB88A3182F26908EEC837 /* SeptenaMac */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = B0D8F724DFD18E80E009CA3C /* Build configuration list for PBXNativeTarget "EngageMac" */;
+			buildConfigurationList = 431DB537665EFA9DB4BAD4D2 /* Build configuration list for PBXNativeTarget "SeptenaMac" */;
 			buildPhases = (
-				AA76F53FC331AB7784F1A953 /* Sources */,
-				4B57E4AA81994DF9B61194D2 /* Resources */,
+				F0376DA5C03EA92945E59842 /* Sources */,
+				2143C3CFFC66A7E133AC5F90 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = EngageMac;
+			name = SeptenaMac;
 			packageProductDependencies = (
 			);
-			productName = EngageMac;
-			productReference = 3034684D21811AA5B6091A0D /* EngageMac.app */;
+			productName = SeptenaMac;
+			productReference = 59055370ABA84DB912D64D1E /* SeptenaMac.app */;
 			productType = "com.apple.product-type.application";
 		};
-		9CB17204916B93C43163E6BA /* Engage */ = {
+		FD752EC978FED2E2D676DE2D /* Septena */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = AEBC3A40929FE93E33DA03FF /* Build configuration list for PBXNativeTarget "Engage" */;
+			buildConfigurationList = E685B8997C4839865950E138 /* Build configuration list for PBXNativeTarget "Septena" */;
 			buildPhases = (
-				11A6D5EE7575C6C33D59179D /* Sources */,
-				DEEC0AC8618A7601F2C230F4 /* Resources */,
+				BC22601CDD48659F9E35698B /* Sources */,
+				7D928A4B76D5247D721367A3 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = Engage;
+			name = Septena;
 			packageProductDependencies = (
 			);
-			productName = Engage;
-			productReference = 2BF726C8F4A35FEC00630D07 /* Engage.app */;
+			productName = Septena;
+			productReference = 39E8BE393381A7D49657D3C0 /* Septena.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		9558183C6CD3F5A0B302C1CF /* Project object */ = {
+		3A81108521AE358318C77A50 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
-					65E25E489CDCD151CAFBCF99 = {
+					1B1FB88A3182F26908EEC837 = {
 						DevelopmentTeam = "";
-						ProvisioningStyle = Automatic;
-					};
-					9CB17204916B93C43163E6BA = {
 						ProvisioningStyle = Automatic;
 					};
 				};
 			};
-			buildConfigurationList = 67A51D7EA76F693756BD88A9 /* Build configuration list for PBXProject "Engage" */;
+			buildConfigurationList = D5CFABB79F2461F76A2D3ECE /* Build configuration list for PBXProject "Septena" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				Base,
 				en,
 			);
-			mainGroup = 6B305994E81D97798B4CA4CC;
+			mainGroup = 911FA069BE707320A271B250;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = BE613B11D916E16A9B7101D6 /* Products */;
+			productRefGroup = B33B7B657FD728BAA2F26562 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				9CB17204916B93C43163E6BA /* Engage */,
-				65E25E489CDCD151CAFBCF99 /* EngageMac */,
+				FD752EC978FED2E2D676DE2D /* Septena */,
+				1B1FB88A3182F26908EEC837 /* SeptenaMac */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		4B57E4AA81994DF9B61194D2 /* Resources */ = {
+		2143C3CFFC66A7E133AC5F90 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				85A2DFA3EA2D48198EA8096B /* Assets.xcassets in Resources */,
-				7EE9A8F340C57F0BB918F8DD /* Info.plist in Resources */,
+				D4B1495C0BDE3AF22A629505 /* Assets.xcassets in Resources */,
+				36325B1E6E5A771C01028105 /* Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		DEEC0AC8618A7601F2C230F4 /* Resources */ = {
+		7D928A4B76D5247D721367A3 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				075C5C6781C40965760E039E /* Assets.xcassets in Resources */,
-				6072E6F9B646989C778AF95E /* Info-Mac.plist in Resources */,
+				FB79CB77D7DB4D47195A606D /* Assets.xcassets in Resources */,
+				3D19536CFB66987D6D5C7642 /* Info-Mac.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		11A6D5EE7575C6C33D59179D /* Sources */ = {
+		BC22601CDD48659F9E35698B /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				19D6E120A106CABC9A9C944E /* App.swift in Sources */,
-				73FE2658EAB611FD66ADDC74 /* AreasProjectsView.swift in Sources */,
-				C5475709DF8A7936F734C36E /* DateParser.swift in Sources */,
-				602493DF247ACF788F1C3D44 /* Haptics.swift in Sources */,
-				2DBC84FFB519179B4260C705 /* Models.swift in Sources */,
-				0CF4011E0E88AD29ABA2F107 /* NextItemsSection.swift in Sources */,
-				B46457E2181CB00F99BC6E02 /* QuickEntryView.swift in Sources */,
-				8FBDE68594C5E4B1468521FD /* SectionTheme.swift in Sources */,
-				7FE6B5A8B6B2D6E3FFA5F639 /* SeptenaClient.swift in Sources */,
-				134C874D5DAD7432558E10FB /* ServerConfigView.swift in Sources */,
-				1C0318F5635B6A71B3A3D658 /* SidebarView.swift in Sources */,
-				49AD393568EF186694DF0069 /* TaskDetailView.swift in Sources */,
-				3AB227D519DA079DEB144529 /* TaskListView.swift in Sources */,
-				7C1CEDB22A8FAC74AF654DED /* Theme.swift in Sources */,
-				3ED3F0DBF26AA22B922EDF74 /* ThingsComponents.swift in Sources */,
+				FA564DDD7B30817FB91EC0E5 /* App.swift in Sources */,
+				5ED33F95694C104969333EAD /* AreasProjectsView.swift in Sources */,
+				DF016EF192B7891D2DBE3CB6 /* DateParser.swift in Sources */,
+				5330AF71083A1F3514B862B8 /* Haptics.swift in Sources */,
+				0448F507E1F1600F9933AEED /* Models.swift in Sources */,
+				F6ED283EEF472FE8DA7B7DFB /* NextItemsSection.swift in Sources */,
+				FAA49CC911788D53BAFDBAFD /* NextView.swift in Sources */,
+				DD215893EE774BA4E826E2B6 /* QuickEntryView.swift in Sources */,
+				07B127F5FBCE0DE19AFCD387 /* SectionTheme.swift in Sources */,
+				D770995846D0B23AC3F77F34 /* SeptenaClient.swift in Sources */,
+				2C16528AA1E96FE947B5BBB3 /* ServerConfigView.swift in Sources */,
+				F62DAF6B252E82A6C8CB7167 /* SidebarView.swift in Sources */,
+				18C336321218C66D6B8DB652 /* TaskDetailView.swift in Sources */,
+				E31B94DDD122274806A91B5C /* TaskListView.swift in Sources */,
+				C0BF92A2B687EFEE45D80E25 /* Theme.swift in Sources */,
+				435E5A036D9398686E2F5F8A /* ThingsComponents.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		AA76F53FC331AB7784F1A953 /* Sources */ = {
+		F0376DA5C03EA92945E59842 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C57C11E572D3EDBD5E573F48 /* App.swift in Sources */,
-				8BC693CA1F8E4B701DAC7F7D /* AreasProjectsView.swift in Sources */,
-				11D5C57096ACC41673BE8637 /* DateParser.swift in Sources */,
-				5C5DD73A7A566D9D8C8BF3C3 /* Haptics.swift in Sources */,
-				00E9AA93E77BF637A10F309B /* Models.swift in Sources */,
-				0915DB21E7FC0CA88F895284 /* NextItemsSection.swift in Sources */,
-				2D8766F09F3247831A954293 /* QuickEntryView.swift in Sources */,
-				E00534275E1CD6EFE1B60EBF /* SectionTheme.swift in Sources */,
-				3A05615A695A99EE33DD52EE /* SeptenaClient.swift in Sources */,
-				85C79FA680F02D90C77D6AC7 /* ServerConfigView.swift in Sources */,
-				FDA96AA6AD7B9DC01C538BB0 /* SidebarView.swift in Sources */,
-				382D5802D173CEB7D49D1064 /* TaskDetailView.swift in Sources */,
-				E1979CF92BA8FE2069959956 /* TaskListView.swift in Sources */,
-				23DD765760997AEE244FDB9D /* Theme.swift in Sources */,
-				1B7E7AC8F777C3969AFFD9AC /* ThingsComponents.swift in Sources */,
+				09C5366893B7255E08295C88 /* App.swift in Sources */,
+				FCDDF4248EC04741134329B2 /* AreasProjectsView.swift in Sources */,
+				513C8B1D41E5BA85B785129C /* DateParser.swift in Sources */,
+				28777ACD729D9C78846219C4 /* Haptics.swift in Sources */,
+				DD200EF411309E29B543963F /* Models.swift in Sources */,
+				85E7CF1494FFC184EA9CB811 /* NextItemsSection.swift in Sources */,
+				06F8765D7D9BA1A94FE3984D /* NextView.swift in Sources */,
+				02A5629DB466DAEA69A99B2E /* QuickEntryView.swift in Sources */,
+				D3D801AE0714FA3E8696508A /* SectionTheme.swift in Sources */,
+				9ED913F259DC6E83E4EDB824 /* SeptenaClient.swift in Sources */,
+				8AAD68656B31C850F5FA0248 /* ServerConfigView.swift in Sources */,
+				7FB3330B97BCBCB5D87C6F04 /* SidebarView.swift in Sources */,
+				BFCF1AC2BC3C5A12D48B939F /* TaskDetailView.swift in Sources */,
+				2741B6F5233E5619A7057258 /* TaskListView.swift in Sources */,
+				1D16A641ABEC4D4CCA37145F /* Theme.swift in Sources */,
+				F96C5B2A2508D5DE609506E3 /* ThingsComponents.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		12E6DAADA6404734AF8EE3C0 /* Release */ = {
+		4DCBD62CA0FADEA5D8B9E21E /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				COMBINE_HIDPI_IMAGES = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 992N457T8D;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = "Engage/Info-Mac.plist";
+				INFOPLIST_FILE = Septena/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
-					"@executable_path/../Frameworks",
+					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.engage.mac;
-				SDKROOT = macosx;
+				PRODUCT_BUNDLE_IDENTIFIER = com.septena.app;
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
-		1CF085E4BD4D2C8FED23EB12 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				COMBINE_HIDPI_IMAGES = YES;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = "Engage/Info-Mac.plist";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.engage.mac;
-				SDKROOT = macosx;
-			};
-			name = Debug;
-		};
-		A665068992835CC7154729E4 /* Release */ = {
+		4F85311253218416DE2E9045 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -369,26 +361,60 @@
 			};
 			name = Release;
 		};
-		BA62CE082AFB5D23869467ED /* Debug */ = {
+		71FC6DAF7647669E7FCF900F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Septena/Info-Mac.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.septena.mac;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		76EDDC69B856BB8BABDA6C01 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Septena/Info-Mac.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.septena.mac;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		9BE4A3B6E9EAF1CD39BEE937 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 992N457T8D;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Engage/Info.plist;
+				INFOPLIST_FILE = Septena/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.engage.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.septena.app;
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
-		C263BA507CFFBF5C7B4FD47D /* Debug */ = {
+		FA26D50155DD0F9D92E7AD12 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -461,56 +487,37 @@
 			};
 			name = Debug;
 		};
-		CA89573C0A7503A4F7AAAF01 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = 992N457T8D;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Engage/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.engage.app;
-				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		67A51D7EA76F693756BD88A9 /* Build configuration list for PBXProject "Engage" */ = {
+		431DB537665EFA9DB4BAD4D2 /* Build configuration list for PBXNativeTarget "SeptenaMac" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				C263BA507CFFBF5C7B4FD47D /* Debug */,
-				A665068992835CC7154729E4 /* Release */,
+				71FC6DAF7647669E7FCF900F /* Debug */,
+				76EDDC69B856BB8BABDA6C01 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		AEBC3A40929FE93E33DA03FF /* Build configuration list for PBXNativeTarget "Engage" */ = {
+		D5CFABB79F2461F76A2D3ECE /* Build configuration list for PBXProject "Septena" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				BA62CE082AFB5D23869467ED /* Debug */,
-				CA89573C0A7503A4F7AAAF01 /* Release */,
+				FA26D50155DD0F9D92E7AD12 /* Debug */,
+				4F85311253218416DE2E9045 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		B0D8F724DFD18E80E009CA3C /* Build configuration list for PBXNativeTarget "EngageMac" */ = {
+		E685B8997C4839865950E138 /* Build configuration list for PBXNativeTarget "Septena" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				1CF085E4BD4D2C8FED23EB12 /* Debug */,
-				12E6DAADA6404734AF8EE3C0 /* Release */,
+				9BE4A3B6E9EAF1CD39BEE937 /* Debug */,
+				4DCBD62CA0FADEA5D8B9E21E /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = 9558183C6CD3F5A0B302C1CF /* Project object */;
+	rootObject = 3A81108521AE358318C77A50 /* Project object */;
 }
