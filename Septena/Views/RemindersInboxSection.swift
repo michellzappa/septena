@@ -19,8 +19,13 @@ struct RemindersInboxSection: View {
   /// instance's lifecycle, which it doesn't.
   private let bridge = RemindersBridge.shared
 
-  @State private var sourceListID: String?
-  @State private var sourceList: EKCalendar?
+  // Derived from the bridge so the very first render reflects the persisted
+  // source-list selection. Previously these were @State initialised to nil,
+  // which made the section flash the 'Pick a Reminders list' CTA on every
+  // Inbox open until .task ran reload() one frame later.
+  private var sourceListID: String? { bridge.sourceListID }
+  private var sourceList: EKCalendar? { bridge.sourceList() }
+
   @State private var pairs: [(reminder: EKReminder, view: ImportedReminder)] = []
   @State private var importingID: String?
   @State private var bulkImporting = false
@@ -206,8 +211,6 @@ struct RemindersInboxSection: View {
   // MARK: - Load / import
 
   private func reload() async {
-    sourceListID = bridge.sourceListID
-    sourceList = bridge.sourceList()
     SeptenaLog.info("Reminders reload: access=\(bridge.access) sourceID=\(sourceListID ?? "nil") sourceList=\(sourceList?.title ?? "nil")")
     guard bridge.access == .granted, let cal = sourceList else {
       pairs = []
