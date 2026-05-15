@@ -522,12 +522,12 @@ struct TaskListView: View {
     // anchored. For multi-line rows the title still wins the alignment.
     HStack(alignment: .firstTextBaseline, spacing: 12) {
       // Promoted-to-Today tasks wear a sun-in-circle glyph as their
-      // checkbox (instead of a plain circle), so the 'today' signal lives
-      // in the same spot as completion — no extra inline icon next to
-      // the title.
+      // checkbox (instead of a plain circle). Renders on every filter
+      // including Today itself, so the today signal is visible wherever
+      // the task appears.
       TaskCheckbox(
         isDone: task.status == .done,
-        isToday: task.today && filter != .today
+        isToday: task.today
       ) { toggle(task) }
         .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 

@@ -207,6 +207,14 @@ struct InlineEditTaskRow: View {
 
   enum Field { case title, notes }
 
+  /// Tap-target width of the TaskCheckbox, mirrored here so the notes
+  /// field's leading padding lines up with the title text.
+  #if os(macOS)
+  private static let checkboxTap: CGFloat = 22
+  #else
+  private static let checkboxTap: CGFloat = 28
+  #endif
+
   private func handleCancel() {
     cancelling = true
     onCancel()
@@ -243,11 +251,11 @@ struct InlineEditTaskRow: View {
       // baseline lands exactly where the closed Text's baseline was.
       .padding(.vertical, Theme.rowTapHeight >= 44 ? 11 : 5)
 
-      // ── Notes — left-aligned with the title (indent past the checkbox so
-      //    text columns line up). TaskCheckbox renders at 22pt + 12pt
-      //    HStack spacing → notes leading = hPadding + 22 + 12 = +34.
-      //    Return inserts a newline (axis .vertical); grows from 2 lines
-      //    of slack up to ~16 then scrolls internally.
+      // ── Notes — left-aligned with the title. Notes leading must equal
+      //    Theme.hPadding + (TaskCheckbox tap width) + (HStack spacing 12)
+      //    so the notes' left edge sits at the same X as the title.
+      //    TaskCheckbox is 22pt tap on macOS, 28pt on iOS — pick per
+      //    platform so the alignment lines up on both.
       TextField("Notes", text: $notes, axis: .vertical)
         .textFieldStyle(.plain)
         .focusEffectDisabled()
@@ -255,7 +263,7 @@ struct InlineEditTaskRow: View {
         .foregroundStyle(.secondary)
         .focused($focused, equals: .notes)
         .lineLimit(2...16)
-        .padding(.leading, Theme.hPadding + 22 + 12)
+        .padding(.leading, Theme.hPadding + Self.checkboxTap + 12)
         .padding(.trailing, Theme.hPadding)
         .padding(.bottom, 10)
 
