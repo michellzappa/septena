@@ -187,7 +187,7 @@ struct SidebarRootView: View {
           .padding(.vertical, 6)
           .background(
             Theme.cardSurface,
-            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
           )
           .padding(.horizontal, 20)
         settingsRow.padding(.top, 24)
