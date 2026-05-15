@@ -794,16 +794,14 @@ struct SidebarRootView: View {
       async let p = client.projects()
       async let c = client.counts()
       async let all = client.list(view: "all")
-      async let next = client.list(view: "next")
       areas = try await a
       projects = try await p
       counts = try await c
-      do {
-        nextCount = try await next.items.count
-      } catch {
-        print("Septena: next-count fetch failed:", error)
-        nextCount = nil
-      }
+      // 'Next' in this app is the chores / habits / supplements ritual
+      // (see NextView), not a tasks view — the server has no view=next
+      // endpoint, so we don't surface a count here. Tile renders without
+      // a number until / unless we wire a real source.
+      nextCount = nil
 
       // Project progress = done / (done + open). Cancelled/someday don't
       // count toward either side of the ratio (they're not "to-do").
