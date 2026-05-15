@@ -65,101 +65,81 @@ struct TaskListView: View {
   @State private var newTodosDismissed: Bool = false
 
   var body: some View {
-    ZStack(alignment: .bottom) {
-      ScrollView {
-        LazyVStack(alignment: .leading, spacing: 0) {
-
-          // Title is owned by the parent when embedded (Project / Area detail).
-          if !embedded {
-            ScreenTitle(icon: titleIcon, iconTint: titleTint, title: filter.title)
-          }
-
-          // compact "You have N new to-dos" banner on Today. Shows when
-          // review items exist (tasks scheduled for past, rolling into today)
-          // and the banner hasn't been dismissed yet today.
-          if filter == .today && !review.isEmpty && !newTodosDismissed {
-            newTodosBanner(count: review.count)
-          }
-
-          // Apple Reminders mirror — only on Inbox. The section renders nothing
-          // when there is no source list or no pending reminders.
-          if filter == .inbox {
-            RemindersInboxSection(onImported: { Task { await load() } })
-          }
-
-          // New-task entry appears at the TOP of the list — the intended behavior.
-          // Captures sit above your existing work so the entry point is
-          // glanceable from the title.
-          if isCreating {
-            // Suppress the "where this lands" pill on Project / Area pages —
-            // the surrounding page header already names the destination.
-            let suppressDest: Bool = {
-              switch filter { case .project, .area: return true; default: return false }
-            }()
-            InlineNewTaskRow(
-              title: $draftTitle, notes: $draftNotes,
-              defaultWhen: filter.title,
-              defaultWhenIcon: titleIcon,
-              defaultWhenTint: titleTint,
-              showDestination: !suppressDest,
-              onCommit: { commitDraft() },
-              onCancel: { cancelDraft() }
-            )
-            Hairline()
-          }
-
-          if visibleItems.isEmpty && review.isEmpty && doneToday.isEmpty && !isCreating && !isLoading {
-            ContentUnavailableView(
-              "Nothing here yet",
-              systemImage: titleIcon,
-              description: Text("Tap the + button to add a task.")
-            )
-            .frame(maxWidth: .infinity)
-            .padding(.top, 40)
-          }
-
-          // ── OPEN block ──────────────────────────────────────────────
-          // Unscheduled / Today both group items with inline project & area
-          // headers; Upcoming groups by date. On Today we also fold "scheduled
-          // earlier" (review) items into the cluster grouping so a due task
-          // shows up under its project/area like any other task — they only
-          // surface as a flat row at the top on other filters.
-          if filter == .today {
-            groupedOpenItems
-          } else if filter == .unscheduled {
-            ForEach(review) { task in row(task, reviewable: true) }
-            groupedOpenItems
-          } else if filter == .upcoming {
-            ForEach(review) { task in row(task, reviewable: true) }
-            groupedUpcomingItems
-          } else {
-            ForEach(review) { task in row(task, reviewable: true) }
-            ForEach(visibleItems) { task in row(task) }
-          }
-          // Done tasks no longer surface on Today / Inbox / etc. — see Logbook
-          // for the archive. Per-session optimistic toggles still render in
-          // place (strikethrough) until the next reload.
-
-          Spacer(minLength: 40)
-        }
-        // Tap any empty area of the scroll content (title row, gaps between
-        // rows, bottom spacer) to commit the active inline edit. Buttons and
-        // text fields inside rows consume their own taps first.
-        .contentShape(Rectangle())
-        .onTapGesture { dismissInlineEdit() }
+    List {
+      // Title is owned by the parent when embedded (Project / Area detail).
+      if !embedded {
+        ScreenTitle(icon: titleIcon, iconTint: titleTint, title: filter.title)
+          .listRowSeparator(.hidden)
+          .listRowBackground(Color.clear)
+          .listRowInsets(EdgeInsets())
       }
-      .background(Theme.paperBackground)
-      // Dragging the scroll dismisses the keyboard interactively; combined
-      // with the editing card's onChange(focused) commit, this turns a quick
-      // pull into a blur.
-      .scrollDismissesKeyboard(.interactively)
+
+      // compact "You have N new to-dos" banner on Today.
+      if filter == .today && !review.isEmpty && !newTodosDismissed {
+        newTodosBanner(count: review.count)
+          .listRowSeparator(.hidden)
+          .listRowBackground(Color.clear)
+          .listRowInsets(EdgeInsets())
+      }
+
+      // Apple Reminders mirror — only on Inbox.
+      if filter == .inbox {
+        RemindersInboxSection(onImported: { Task { await load() } })
+          .listRowSeparator(.hidden)
+          .listRowBackground(Color.clear)
+          .listRowInsets(EdgeInsets())
+      }
+
+      // New-task entry appears at the TOP of the list.
+      if isCreating {
+        let suppressDest: Bool = {
+          switch filter { case .project, .area: return true; default: return false }
+        }()
+        InlineNewTaskRow(
+          title: $draftTitle, notes: $draftNotes,
+          defaultWhen: filter.title,
+          defaultWhenIcon: titleIcon,
+          defaultWhenTint: titleTint,
+          showDestination: !suppressDest,
+          onCommit: { commitDraft() },
+          onCancel: { cancelDraft() }
+        )
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets())
+      }
+
+      if visibleItems.isEmpty && review.isEmpty && doneToday.isEmpty && !isCreating && !isLoading {
+        ContentUnavailableView(
+          "Nothing here yet",
+          systemImage: titleIcon,
+          description: Text("Tap the + button to add a task.")
+        )
+        .frame(maxWidth: .infinity)
+        .padding(.top, 40)
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets())
+      }
+
+      // ── OPEN block ──────────────────────────────────────────────
+      if filter == .today {
+        groupedOpenItems
+      } else if filter == .unscheduled {
+        ForEach(review) { task in row(task, reviewable: true).asListRow() }
+        groupedOpenItems
+      } else if filter == .upcoming {
+        ForEach(review) { task in row(task, reviewable: true).asListRow() }
+        groupedUpcomingItems
+      } else {
+        ForEach(review) { task in row(task, reviewable: true).asListRow() }
+        ForEach(visibleItems) { task in row(task).asListRow() }
+      }
     }
-    // ZStack-level tap target so the FAB margin, safe-area gaps, and any
-    // surface the inner ScrollView doesn't claim also commit the edit.
-    // Buttons and the editing card consume their taps first, so this only
-    // fires on truly empty space.
-    .contentShape(Rectangle())
-    .onTapGesture { dismissInlineEdit() }
+    .listStyle(.plain)
+    .scrollContentBackground(.hidden)
+    .background(Theme.paperBackground)
+    .scrollDismissesKeyboard(.interactively)
     .modifier(KeyboardNavigationModifier(
       isInputMode: editingTaskId != nil || isCreating,
       hasSelection: selectedTaskId != nil,
@@ -698,6 +678,11 @@ struct TaskListView: View {
       .foregroundStyle(Theme.inkSecondary)
   }
 
+  // MARK: - List row helpers
+
+  /// Strip List's default insets/separator/background so our rows draw the
+  /// way they did inside the old LazyVStack. Applied to every row in the
+  /// body and inside grouped helpers.
   @ViewBuilder
   private func sectionHeader(_ text: String) -> some View {
     Text(text)
@@ -724,7 +709,7 @@ struct TaskListView: View {
     let loose = pool.filter { $0.project == nil && $0.area == nil }
 
     // 1. Loose first (no header) so uncategorized tasks aren't buried.
-    ForEach(loose) { task in row(task) }
+    ForEach(loose) { task in row(task).asListRow() }
 
     // 2. Areas in sidebar order: direct-area tasks, then each project's tasks.
     ForEach(areas) { area in
@@ -733,14 +718,16 @@ struct TaskListView: View {
         groupHeader(icon: "square.stack.3d.up.fill", title: area.title) {
           nav.path.append(.area(area))
         }
-        ForEach(areaTasks) { task in row(task) }
+        .asListRow()
+        ForEach(areaTasks) { task in row(task).asListRow() }
       }
       ForEach(projects.filter { $0.area == area.id }) { project in
         if let tasks = byProject[project.id], !tasks.isEmpty {
           groupHeader(icon: nil, title: project.title) {
             nav.path.append(.project(project))
           }
-          ForEach(tasks) { task in row(task) }
+          .asListRow()
+          ForEach(tasks) { task in row(task).asListRow() }
         }
       }
     }
@@ -751,7 +738,8 @@ struct TaskListView: View {
         groupHeader(icon: nil, title: project.title) {
           nav.path.append(.project(project))
         }
-        ForEach(tasks) { task in row(task) }
+        .asListRow()
+        ForEach(tasks) { task in row(task).asListRow() }
       }
     }
   }
@@ -807,20 +795,18 @@ struct TaskListView: View {
       Spacer()
     }
     .padding(.horizontal, Theme.hPadding)
-    // Headers absorb the visual gap that used to live between rows. Today
-    // gets a touch more air above each cluster, but kept tight enough that
-    // the eye doesn't perceive an unclickable strip.
-    .padding(.top, filter == .today ? 16 : 10)
-    .padding(.bottom, 4)
+    // ~2 lines of whitespace above each project/area cluster header so
+    // groups visually break apart in mixed list views (Unscheduled, Today,
+    // Upcoming). Without this gap, a header reads as the next row of the
+    // previous group instead of the start of a new one.
+    .padding(.top, 32)
+    .padding(.bottom, 6)
     .contentShape(Rectangle())
 
-    VStack(alignment: .leading, spacing: 0) {
-      if let onTap {
-        Button(action: onTap) { body }.buttonStyle(.plain)
-      } else {
-        body
-      }
-      Hairline()
+    if let onTap {
+      Button(action: onTap) { body }.buttonStyle(.plain)
+    } else {
+      body
     }
   }
 
@@ -832,8 +818,8 @@ struct TaskListView: View {
   private var groupedUpcomingItems: some View {
     let buckets = upcomingBuckets()
     ForEach(buckets, id: \.key) { bucket in
-      groupHeader(icon: "calendar", title: bucket.label)
-      ForEach(bucket.tasks) { task in row(task) }
+      groupHeader(icon: "calendar", title: bucket.label).asListRow()
+      ForEach(bucket.tasks) { task in row(task).asListRow() }
     }
   }
 
@@ -1270,5 +1256,22 @@ private struct KeyboardNavigationModifier: ViewModifier {
       .opacity(0)
       .frame(width: 0, height: 0)
       .accessibilityHidden(true)
+  }
+}
+
+// MARK: - List row chrome helper
+//
+// Every row we draw inside the List should opt out of the default
+// separator / row background / row insets so our existing row composition
+// (selection pill, padding, full-bleed action icons) lines up exactly the
+// way it did inside the old LazyVStack. Used in `body` directly and inside
+// the grouping helpers.
+
+extension View {
+  func asListRow() -> some View {
+    self
+      .listRowSeparator(.hidden)
+      .listRowBackground(Color.clear)
+      .listRowInsets(EdgeInsets())
   }
 }
