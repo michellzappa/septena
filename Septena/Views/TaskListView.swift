@@ -36,9 +36,10 @@ struct TaskListView: View {
   @State private var selectedTaskId: String?
 
   // Inline new-task entry
-  @State private var isCreating = false
-  @State private var draftTitle = ""
-  @State private var draftNotes = ""
+  /// Tracks a task created via ⌘N (or the toolbar + button) so that
+  /// committing/cancelling an empty title deletes it — the editor flow
+  /// is the new-task flow, no leftover drafts.
+  @State private var newlyCreatedTaskId: String? = nil
 
   // Inline title edit
   @State private var editingTaskId: String?
@@ -90,26 +91,7 @@ struct TaskListView: View {
           .listRowInsets(EdgeInsets())
       }
 
-      // New-task entry appears at the TOP of the list.
-      if isCreating {
-        let suppressDest: Bool = {
-          switch filter { case .project, .area: return true; default: return false }
-        }()
-        InlineNewTaskRow(
-          title: $draftTitle, notes: $draftNotes,
-          defaultWhen: filter.title,
-          defaultWhenIcon: titleIcon,
-          defaultWhenTint: titleTint,
-          showDestination: !suppressDest,
-          onCommit: { commitDraft() },
-          onCancel: { cancelDraft() }
-        )
-        .listRowSeparator(.hidden)
-        .listRowBackground(Color.clear)
-        .listRowInsets(EdgeInsets())
-      }
-
-      if visibleItems.isEmpty && review.isEmpty && doneToday.isEmpty && !isCreating && !isLoading {
+      if visibleItems.isEmpty && review.isEmpty && doneToday.isEmpty && !isLoading {
         ContentUnavailableView(
           "Nothing here yet",
           systemImage: titleIcon,
@@ -152,7 +134,7 @@ struct TaskListView: View {
     .background(Theme.paperBackground)
     .scrollDismissesKeyboard(.interactively)
     .modifier(KeyboardNavigationModifier(
-      isInputMode: editingTaskId != nil || isCreating,
+      isInputMode: editingTaskId != nil,
       hasSelection: selectedTaskId != nil,
       onArrow: { delta, jump in
         if jump { jumpSelection(toFirst: delta < 0) }
@@ -435,7 +417,19 @@ struct TaskListView: View {
         onToggleDone: { toggle(task) },
         onCommit: { commitEdit() },
         onCancel: {
+          let id = editingTaskId
+          let title = editingTitle.trimmingCharacters(in: .whitespaces)
+          let wasNew = (id != nil && id == newlyCreatedTaskId)
           withAnimation(Self.expandSpring) { editingTaskId = nil }
+          newlyCreatedTaskId = nil
+          // If the user hit Esc on a fresh ⌘N task with an empty title,
+          // delete it so we don't leave a stub in the list.
+          if wasNew && title.isEmpty, let id {
+            Task {
+              _ = try? await client.delete(id: id)
+              await load()
+            }
+          }
         },
         onSchedule: {
           whenTargetId = task.id; whenKind = .scheduled; showingWhenSheet = true
@@ -912,51 +906,43 @@ struct TaskListView: View {
   private func commitEdit() {
     guard let id = editingTaskId else { return }
     let t = editingTitle.trimmingCharacters(in: .whitespaces)
+    let wasNew = (newlyCreatedTaskId == id)
     withAnimation(Self.expandSpring) {
       editingTaskId = nil
     }
-    guard !t.isEmpty else { return }
+    newlyCreatedTaskId = nil
+    if t.isEmpty {
+      // Empty title: delete the task if it was a fresh ⌘N draft;
+      // otherwise leave it alone (existing tasks shouldn't vanish just
+      // because the user blurred while the field was empty).
+      if wasNew {
+        Task {
+          _ = try? await client.delete(id: id)
+          await load()
+        }
+      }
+      return
+    }
     Task {
       _ = try? await client.update(id: id, title: t, notes: editingNotes)
       await load()
     }
   }
 
-  /// Tap-outside dismiss — commits any active inline edit, closes the
-  /// new-task draft, AND clears the keyboard-cursor selection so the
-  /// accent pill goes away when the user clicks empty space.
+  /// Tap-outside dismiss — commits any active inline edit AND clears the
+  /// keyboard-cursor selection so the accent pill goes away when the
+  /// user clicks empty space.
   private func dismissInlineEdit() {
-    if editingTaskId != nil {
-      commitEdit()
-    }
-    if isCreating {
-      if draftTitle.trimmingCharacters(in: .whitespaces).isEmpty {
-        cancelDraft()
-      } else {
-        commitDraft()
-      }
-    }
+    if editingTaskId != nil { commitEdit() }
     selectedTaskId = nil
   }
 
   // MARK: - Create
 
   private func startDraft() {
-    draftTitle = ""; draftNotes = ""
-    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { isCreating = true }
-  }
-
-  private func cancelDraft() {
-    withAnimation(.easeOut(duration: 0.2)) { isCreating = false }
-    draftTitle = ""; draftNotes = ""
-  }
-
-  private func commitDraft() {
-    let title = draftTitle.trimmingCharacters(in: .whitespaces)
-    guard !title.isEmpty else { cancelDraft(); return }
-    let notes = draftNotes.isEmpty ? nil : draftNotes
-
-    var due: Date?
+    // Create the new task server-side immediately, then open it in the
+    // standard inline editor. Empty-title commit/cancel deletes the
+    // task so the user isn't punished for hitting ⌘N speculatively.
     var scheduled: Date?
     var project: String?
     var area: String?
@@ -967,34 +953,25 @@ struct TaskListView: View {
     let tomorrow = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: Date()))
 
     switch filter {
-    case .today:
-      today = true
-    case .upcoming:
-      // Default to tomorrow so the new task actually appears in the list.
-      // Without a future scheduled or due date, the server's upcoming view
-      // would never surface it.
-      scheduled = tomorrow
-    case .project(let pid):
-      project = pid
-    case .area(let aid):
-      area = aid
-    case .unscheduled:
-      status = .someday
-    default:
-      break
+    case .today:            today = true
+    case .upcoming:         scheduled = tomorrow
+    case .project(let pid): project = pid
+    case .area(let aid):    area = aid
+    case .unscheduled:      status = .someday
+    default:                break
     }
-
-    if let parsed = EngageDateParser.parse(title) { due = parsed }
 
     Task {
       do {
-        _ = try await client.create(
-          title: title, area: area, project: project,
-          scheduled: scheduled, due: due, today: today, notes: notes, status: status
+        let created = try await client.create(
+          title: "", area: area, project: project,
+          scheduled: scheduled, due: nil, today: today, notes: nil, status: status
         )
-        draftTitle = ""; draftNotes = ""
-        isCreating = false
         await load()
+        editingTitle = ""
+        editingNotes = ""
+        newlyCreatedTaskId = created.id
+        withAnimation(Self.expandSpring) { editingTaskId = created.id }
       } catch {
         errorMessage = error.localizedDescription
       }
