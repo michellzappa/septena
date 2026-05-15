@@ -793,7 +793,12 @@ struct SidebarRootView: View {
       areas = try await a
       projects = try await p
       counts = try await c
-      nextCount = (try? await next.items.count)
+      do {
+        nextCount = try await next.items.count
+      } catch {
+        print("Septena: next-count fetch failed:", error)
+        nextCount = nil
+      }
 
       // Project progress = done / (done + open). Cancelled/someday don't
       // count toward either side of the ratio (they're not "to-do").
