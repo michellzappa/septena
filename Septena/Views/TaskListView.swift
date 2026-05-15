@@ -23,7 +23,12 @@ struct TaskListView: View {
   @State private var areas: [Area] = []
   @State private var projects: [Project] = []
 
-  @State private var isLoading = false
+  // Start in the loading state so the empty-state ContentUnavailableView
+  // doesn't flash for one frame before .task { load() } fires. Filters
+  // like Today and Inbox almost always have data; without this guard,
+  // navigating to them shows 'Nothing here yet' for a frame on every
+  // mount.
+  @State private var isLoading = true
   @State private var errorMessage: String?
 
   /// IDs of tasks completed during this view's lifetime. On Project / Area
