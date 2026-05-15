@@ -238,7 +238,13 @@ struct InlineEditTaskRow: View {
         Spacer(minLength: 0)
       }
       .padding(.horizontal, Theme.hPadding)
-      .frame(minHeight: Theme.rowTapHeight, alignment: .topLeading)
+      // Default-centered (like closed taskBody) so a row whose closed
+      // state has no metaLine — most common, e.g. Today filter — lands
+      // its title at the same Y on open. Rows that DO have metaLine
+      // chips closed will still see a small downward shift because the
+      // metaLine slot disappears in the editor (~10pt); that's a
+      // tradeoff we accept for matching the common case.
+      .frame(minHeight: Theme.rowTapHeight)
 
       // ── Notes — left-aligned with the title (indent past the checkbox so
       //    text columns line up). TaskCheckbox renders at 22pt + 12pt

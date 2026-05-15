@@ -437,14 +437,12 @@ struct TaskListView: View {
           repeatTargetId = task.id; showingRepeatSheet = true
         }
       )
-      // No vertical padding wrapper here — the editor's title row already
-      // matches the closed row's geometry (same horizontal padding, same
-      // minHeight), so checkbox and title don't shift when the editor
-      // opens. Notes / actions expand strictly downward.
-      .transition(.asymmetric(
-        insertion: .opacity.combined(with: .scale(scale: 0.97, anchor: .top)),
-        removal: .opacity.combined(with: .scale(scale: 0.97, anchor: .top))
-      ))
+      // Pure opacity transitions — scale-from-top was unreliable inside
+      // List on the insertion side (the editor would mount full-size
+      // without fading). Opacity blends predictably both directions;
+      // List handles the row's own height change with its native
+      // animation.
+      .transition(.opacity)
     } else {
       taskBody(task, reviewable: reviewable)
         .transition(.opacity)
@@ -555,10 +553,7 @@ struct TaskListView: View {
       trailingDate(task)
     }
     .padding(.horizontal, Theme.hPadding)
-    // Top-aligned so the title's Y position is independent of whether
-    // metaLine has chips to render. Matching the open editor's frame
-    // alignment means tapping a row never shifts the title vertically.
-    .frame(minHeight: Theme.rowTapHeight, alignment: .topLeading)
+    .frame(minHeight: Theme.rowTapHeight)
     .background(rowBackground(for: task))
     // Hit area covers the FULL padded row (checkbox + title column +
     // padding above/below). Inner controls — TaskCheckbox button, action
@@ -884,9 +879,15 @@ struct TaskListView: View {
 
   private func startEdit(_ task: EngageTask) {
     if editingTaskId != nil && editingTaskId != task.id { commitEdit() }
-    editingTitle = task.title
-    editingNotes = task.notes ?? ""
+    // All three state changes inside the same animation transaction so
+    // the conditional-content swap (taskBody → InlineEditTaskRow) sees
+    // a coherent spring on insertion. Setting title/notes outside the
+    // withAnimation block was triggering an instant re-render before
+    // editingTaskId flipped, which made the open-side transition land
+    // without an active transaction.
     withAnimation(Self.expandSpring) {
+      editingTitle = task.title
+      editingNotes = task.notes ?? ""
       editingTaskId = task.id
     }
   }
