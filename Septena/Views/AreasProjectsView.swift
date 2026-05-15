@@ -97,9 +97,7 @@ struct AreaDetailView: View {
     VStack(spacing: 0) {
       VStack(alignment: .leading, spacing: 10) {
         HStack(spacing: 12) {
-          Image(systemName: "square.stack.3d.up.fill")
-            .font(.system(size: 20))
-            .foregroundStyle(Theme.iconMuted)
+          AreaIcon(diameter: 20, lineWidth: 1.2)
             .frame(width: 24, height: 24)
           ClickToEditTitle(placeholder: "Area", text: $draftName) { newName in
             commitName(newName)
@@ -486,10 +484,15 @@ struct AreaPickerSheet: View {
   @ViewBuilder
   private func row(label: String, icon: String, selected: Bool) -> some View {
     HStack(spacing: 12) {
-      Image(systemName: icon)
-        .font(.system(size: 15))
-        .foregroundStyle(Theme.iconMuted)
-        .frame(width: 22)
+      if icon == "square.stack.3d.up.fill" {
+        AreaIcon(diameter: 15, lineWidth: 1.1)
+          .frame(width: 22)
+      } else {
+        Image(systemName: icon)
+          .font(.system(size: 15))
+          .foregroundStyle(Theme.iconMuted)
+          .frame(width: 22)
+      }
       Text(label).foregroundStyle(Theme.inkPrimary)
       Spacer()
       if selected {

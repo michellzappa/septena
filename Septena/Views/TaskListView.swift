@@ -774,8 +774,13 @@ struct TaskListView: View {
   @ViewBuilder
   private func groupHeader(icon: String?, title: String, onTap: (() -> Void)? = nil) -> some View {
     let body = HStack(spacing: 10) {
-      if let icon {
-        Image(systemName: icon)
+      if icon == "square.stack.3d.up.fill" {
+        // Area glyph — two nested circles, mirrors SidebarAreaRow.
+        AreaIcon(diameter: 14, lineWidth: 1.5)
+          .frame(width: 20, alignment: .center)
+      } else if icon != nil {
+        // Other named system icons (date buckets etc.)
+        Image(systemName: icon!)
           .font(.system(size: 16))
           .foregroundStyle(Theme.iconMuted)
           .frame(width: 20, alignment: .center)

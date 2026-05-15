@@ -791,9 +791,7 @@ struct MovePickerSheet: View {
         .font(.system(size: 16))
         .foregroundStyle(Theme.iconMuted)
     case .area:
-      Image(systemName: "square.stack.3d.up.fill")
-        .font(.system(size: 16))
-        .foregroundStyle(Theme.iconMuted)
+      AreaIcon(diameter: 14, lineWidth: 1.5)
     case .project:
       // Pie glyph — mirrors SidebarProjectRow.
       ZStack {

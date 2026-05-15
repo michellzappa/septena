@@ -949,9 +949,7 @@ struct SidebarAreaRow: View {
 
   var body: some View {
     HStack(spacing: Theme.sidebarRowSpacing) {
-      Image(systemName: "square.stack.3d.up.fill")
-        .font(.system(size: Theme.sidebarIconSize - 4))
-        .foregroundStyle(Theme.iconMuted)
+      AreaIcon()
         .frame(width: Theme.sidebarIconSize + 4, alignment: .center)
       Text(name)
         .font(.system(size: Theme.sidebarAreaTitleSize, weight: .semibold))
@@ -965,6 +963,31 @@ struct SidebarAreaRow: View {
     }
     .frame(height: Theme.sidebarRowHeight)
     .contentShape(Rectangle())
+  }
+}
+
+/// Area glyph — two nested circles (thin outline + small filled dot at
+/// center). Designed to share the visual rhythm of `ProjectProgressIcon`:
+/// same diameter, same stroke weight, so areas and projects read as
+/// related shapes in the sidebar.
+struct AreaIcon: View {
+  var tint: Color = Theme.iconMuted
+  var diameter: CGFloat? = nil
+  var lineWidth: CGFloat? = nil
+
+  private var resolvedDiameter: CGFloat { diameter ?? Theme.sidebarIconSize * 0.95 }
+  private var resolvedLineWidth: CGFloat { lineWidth ?? 0.9 }
+
+  var body: some View {
+    ZStack {
+      Circle()
+        .strokeBorder(tint, lineWidth: resolvedLineWidth)
+      Circle()
+        .fill(tint)
+        .frame(width: resolvedDiameter * 0.34,
+               height: resolvedDiameter * 0.34)
+    }
+    .frame(width: resolvedDiameter, height: resolvedDiameter)
   }
 }
 
