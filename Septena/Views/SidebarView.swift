@@ -181,8 +181,7 @@ struct SidebarRootView: View {
   private var sidebarPhone: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 0) {
-        smartLists.padding(.top, 12).padding(.bottom, 24)
-        myListsHeader
+        smartLists.padding(.top, 12).padding(.bottom, 20)
         areasAndProjects
           .padding(.horizontal, 14)
           .padding(.vertical, 6)
@@ -245,7 +244,6 @@ struct SidebarRootView: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 0) {
         smartLists.padding(.top, 12).padding(.bottom, 16)
-        myListsHeader
         areasAndProjects
           .padding(.horizontal, Theme.hPadding)
         Spacer(minLength: 24)
@@ -342,17 +340,6 @@ struct SidebarRootView: View {
         errorMessage = error.localizedDescription
       }
     }
-  }
-
-  // MARK: - "My Lists" section header
-
-  @ViewBuilder
-  private var myListsHeader: some View {
-    Text("My Lists")
-      .font(.title2.weight(.bold))
-      .foregroundStyle(.primary)
-      .padding(.horizontal, Theme.hPadding)
-      .padding(.bottom, 8)
   }
 
   // MARK: - Smart lists
