@@ -7,21 +7,22 @@ import SwiftUI
 // MARK: - Shared model
 
 @MainActor
-final class NextItemsModel: ObservableObject {
-  @Published var habits: [HabitDayItem] = []
-  @Published var habitBuckets: [String] = []
-  @Published var supplements: [SupplementDayItem] = []
-  @Published var chores: [ChoreItem] = []
+@Observable
+final class NextItemsModel {
+  var habits: [HabitDayItem] = []
+  var habitBuckets: [String] = []
+  var supplements: [SupplementDayItem] = []
+  var chores: [ChoreItem] = []
   /// Chores deferred this session — kept visible (with badge) until reload.
-  @Published var deferredChores: [String: String] = [:]
+  var deferredChores: [String: String] = [:]
   /// Chores marked done this session — same treatment.
-  @Published var completedChores: Set<String> = []
+  var completedChores: Set<String> = []
   /// Habits the user toggled/skipped this session. Keeps them rendered in
   /// the open list (struck through) so the row doesn't hop to the bottom
   /// the moment you check it.
-  @Published var actedHabits: Set<String> = []
+  var actedHabits: Set<String> = []
   /// Same idea for supplements.
-  @Published var actedSupplements: Set<String> = []
+  var actedSupplements: Set<String> = []
 
   private let today: String = SeptenaDate.today
 
@@ -182,9 +183,9 @@ final class NextItemsModel: ObservableObject {
 // MARK: - Open subview (rendered above tasks-done)
 
 struct NextOpenSection: View {
-  @ObservedObject var model: NextItemsModel
-  @EnvironmentObject var client: SeptenaClient
-  @EnvironmentObject var theme: SectionTheme
+  var model: NextItemsModel
+  @Environment(SeptenaClient.self) private var client
+  @Environment(SectionTheme.self) private var theme
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -230,9 +231,9 @@ struct NextOpenSection: View {
 // MARK: - Done subview (rendered after tasks-done)
 
 struct NextDoneSection: View {
-  @ObservedObject var model: NextItemsModel
-  @EnvironmentObject var client: SeptenaClient
-  @EnvironmentObject var theme: SectionTheme
+  var model: NextItemsModel
+  @Environment(SeptenaClient.self) private var client
+  @Environment(SectionTheme.self) private var theme
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -261,7 +262,7 @@ struct NextDoneSection: View {
 
 private struct HabitRow: View {
   let habit: HabitDayItem
-  @ObservedObject var model: NextItemsModel
+  var model: NextItemsModel
   let client: SeptenaClient
   let tint: Color
 
@@ -303,7 +304,7 @@ private struct HabitRow: View {
 
 private struct SupplementRow: View {
   let supplement: SupplementDayItem
-  @ObservedObject var model: NextItemsModel
+  var model: NextItemsModel
   let client: SeptenaClient
   let tint: Color
 
@@ -331,7 +332,7 @@ private struct SupplementRow: View {
 
 private struct ChoreRow: View {
   let chore: ChoreItem
-  @ObservedObject var model: NextItemsModel
+  var model: NextItemsModel
   let client: SeptenaClient
   let tint: Color
 

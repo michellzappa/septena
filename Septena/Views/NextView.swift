@@ -4,10 +4,10 @@ import SwiftUI
 // Pulled out of Today so Today stays focused on tasks (mirrors the web app).
 
 struct NextView: View {
-  @EnvironmentObject var client: SeptenaClient
-  @EnvironmentObject var theme: SectionTheme
+  @Environment(SeptenaClient.self) private var client
+  @Environment(SectionTheme.self) private var theme
 
-  @StateObject private var model = NextItemsModel()
+  @State private var model = NextItemsModel()
 
   var body: some View {
     ScrollView {

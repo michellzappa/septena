@@ -58,7 +58,8 @@ enum SeptenaError: LocalizedError {
 // MARK: - Client
 
 @MainActor
-final class SeptenaClient: ObservableObject {
+@Observable
+final class SeptenaClient {
   private let baseURL: URL
   private let session: URLSession
 
@@ -330,6 +331,28 @@ final class SeptenaClient: ObservableObject {
     try await deleteRaw("/api/tasks/projects/\(id)")
   }
 
+  /// Atomic bulk update — Septena persists the array order, mirroring how
+  /// `replaceAreas` works on the areas endpoint. Used by sidebar drag-to-
+  /// reorder. Backend contract: `PUT /api/tasks/projects` accepts
+  /// `{ "projects": [{id, title, status, area, notes, context}, ...] }`
+  /// and returns the same shape it accepts. The server is responsible for
+  /// preserving the order it received.
+  func replaceProjects(_ projects: [Project]) async throws -> [Project] {
+    struct Wrap: Codable { var projects: [Project] }
+    let body: [String: Any] = ["projects": projects.map { p in
+      var d: [String: Any] = [
+        "id": p.id,
+        "title": p.title,
+        "status": p.status.rawValue,
+      ]
+      if let area = p.area       { d["area"] = area }
+      if let notes = p.notes     { d["notes"] = notes }
+      if let context = p.context { d["context"] = context }
+      return d
+    }]
+    return try await putJSON("/api/tasks/projects", body: body, as: Wrap.self).projects
+  }
+
   // MARK: - HTTP helpers
 
   private func url(_ path: String, query: [URLQueryItem] = []) throws -> URL {
@@ -419,9 +442,10 @@ final class SeptenaClient: ObservableObject {
 // MARK: - Shared provider so views can rebind on settings change
 
 @MainActor
-final class ClientProvider: ObservableObject {
+@Observable
+final class ClientProvider {
   static let shared = ClientProvider()
-  @Published var client: SeptenaClient = .shared
+  var client: SeptenaClient = .shared
   private init() {}
 
   func update(baseURL: URL) {

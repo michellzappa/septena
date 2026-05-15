@@ -108,13 +108,21 @@ enum Theme {
 
   // MARK: - Shape & spacing
 
-  static let cornerRadius: CGFloat = 10
-  static let cornerRadiusSmall: CGFloat = 6
+  /// Major surface radius — cards, sheets, prominent containers.
+  /// Bumped to match iOS 26 Liquid Glass aesthetic.
+  static let cornerRadius: CGFloat = 18
+  /// Minor radius — selection pills, chips, inline highlights.
+  /// Tight enough to read as a tag, not a capsule.
+  static let cornerRadiusSmall: CGFloat = 8
 
   #if os(macOS)
   // Tighter chrome on Mac — compact compact sidebar rows.
   static let hPadding: CGFloat = 12
   static let rowHeight: CGFloat = 24
+  /// Total tap-target height for task rows. Larger than `rowHeight` because
+  /// the row's selection pill fills this full band, making "gaps" between
+  /// rows part of each row's own clickable area.
+  static let rowTapHeight: CGFloat = 40
   static let sidebarRowHeight: CGFloat = 32
   static let sidebarSmartRowHeight: CGFloat = 30
   static let sidebarProjectRowHeight: CGFloat = 28
@@ -138,6 +146,7 @@ enum Theme {
   #else
   static let hPadding: CGFloat = 20
   static let rowHeight: CGFloat = 36
+  static let rowTapHeight: CGFloat = 52
   static let sidebarRowHeight: CGFloat = 48
   static let sidebarSmartRowHeight: CGFloat = 38
   static let sidebarProjectRowHeight: CGFloat = 36
@@ -196,7 +205,7 @@ extension Font {
   static let septenaCardTitle    = Font.system(size: 14, weight: .bold)
   static let septenaSidebarRow   = Font.system(size: 14, weight: .medium)
   static let septenaTaskTitle    = Font.system(size: 14, weight: .regular)
-  static let septenaNotes        = Font.system(size: 12, weight: .regular)
+  static let septenaNotes        = Font.system(size: 14, weight: .regular)
   static let septenaButton       = Font.system(size: 13, weight: .semibold)
   static let septenaLabel        = Font.system(size: 11, weight: .medium)
   static let septenaMeta         = Font.system(size: 11, weight: .regular)
@@ -211,7 +220,7 @@ extension Font {
   /// Sans for UI controls and body.
   static let septenaSidebarRow   = Font.system(size: 16, weight: .medium)
   static let septenaTaskTitle    = Font.system(size: 17, weight: .regular)
-  static let septenaNotes        = Font.system(size: 14, weight: .regular)
+  static let septenaNotes        = Font.system(size: 16, weight: .regular)
   static let septenaButton       = Font.system(size: 15, weight: .semibold)
   static let septenaLabel        = Font.system(size: 13, weight: .medium)
 

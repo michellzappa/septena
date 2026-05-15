@@ -2,16 +2,16 @@ import SwiftUI
 
 @main
 struct EngageApp: App {
-  @StateObject private var clientProvider = ClientProvider.shared
-  @StateObject private var navigation = NavigationState()
-  @StateObject private var theme = SectionTheme()
+  @State private var clientProvider = ClientProvider.shared
+  @State private var navigation = NavigationState()
+  @State private var theme = SectionTheme()
 
   var body: some Scene {
     WindowGroup {
       ContentView()
-        .environmentObject(clientProvider.client)
-        .environmentObject(navigation)
-        .environmentObject(theme)
+        .environment(clientProvider.client)
+        .environment(navigation)
+        .environment(theme)
         .task { await theme.refresh(from: clientProvider.client) }
         .onAppear {
           #if canImport(UIKit)
@@ -41,6 +41,16 @@ struct EngageApp: App {
         Button("Unscheduled") { navigation.path = [.filter(.unscheduled)] }
           .keyboardShortcut("5", modifiers: .command)
       }
+      // ⌘/ toggles the sidebar. Lives in the standard View > Sidebar group
+      // so macOS shows it alongside the built-in column-visibility items.
+      CommandGroup(after: .sidebar) {
+        Button(navigation.sidebarVisibility == .detailOnly
+               ? "Show Sidebar" : "Hide Sidebar") {
+          navigation.sidebarVisibility =
+            navigation.sidebarVisibility == .detailOnly ? .all : .detailOnly
+        }
+        .keyboardShortcut("/", modifiers: .command)
+      }
     }
   }
 }
@@ -59,27 +69,33 @@ enum Route: Hashable {
 // MARK: - Navigation state
 
 @MainActor
-final class NavigationState: ObservableObject {
-  @Published var path: [Route] = []
-  @Published var showingQuickEntry = false
+@Observable
+final class NavigationState {
+  var path: [Route] = []
+  var showingQuickEntry = false
+
+  /// macOS sidebar visibility — toggled by ⌘/. `.all` shows both columns,
+  /// `.detailOnly` collapses the sidebar so detail content runs edge-to-edge.
+  var sidebarVisibility: NavigationSplitViewVisibility = .all
 
   /// Persisted base URL — UserDefaults-backed, mirrored from ClientProvider.
-  @Published var serverURL: String = UserDefaults.standard.string(forKey: "septena.serverURL")
+  var serverURL: String = UserDefaults.standard.string(forKey: "septena.serverURL")
     ?? SeptenaClient.default.absoluteString
 }
 
 // MARK: - Content view
 
 struct ContentView: View {
-  @EnvironmentObject var nav: NavigationState
-  @EnvironmentObject var theme: SectionTheme
+  @Environment(NavigationState.self) private var nav
+  @Environment(SectionTheme.self) private var theme
 
   #if os(iOS)
   @Environment(\.horizontalSizeClass) private var hSize
   #endif
 
   var body: some View {
-    layout
+    @Bindable var nav = nav
+    layout(path: $nav.path)
       .tint(theme.accent)
       .sheet(isPresented: $nav.showingQuickEntry) {
         QuickEntryView()
@@ -87,43 +103,41 @@ struct ContentView: View {
   }
 
   @ViewBuilder
-  private var layout: some View {
+  private func layout(path: Binding<[Route]>) -> some View {
     #if os(macOS)
-    splitLayout
+    splitLayout(path: path)
     #else
     if hSize == .regular {
-      splitLayout
+      splitLayout(path: path)
     } else {
-      stackLayout
+      stackLayout(path: path)
     }
     #endif
   }
 
   // iPhone / compact: sidebar IS the root, routes push onto the stack.
-  private var stackLayout: some View {
-    NavigationStack(path: $nav.path) {
+  private func stackLayout(path: Binding<[Route]>) -> some View {
+    NavigationStack(path: path) {
       SidebarRootView()
         .navigationDestination(for: Route.self) { destination(for: $0) }
     }
   }
 
   // iPad regular / macOS: two-column. Sidebar stays put, detail navigates.
-  private var splitLayout: some View {
-    NavigationSplitView {
+  private func splitLayout(path: Binding<[Route]>) -> some View {
+    @Bindable var nav = nav
+    return NavigationSplitView(columnVisibility: $nav.sidebarVisibility) {
       SidebarRootView()
     } detail: {
-      NavigationStack(path: $nav.path) {
+      NavigationStack(path: path) {
         TaskListView(filter: .today)
-          .padding(.leading, Theme.listLeadingInset)
+          .padding(.horizontal, Theme.listLeadingInset)
           .background(Theme.paperBackground)
-          // macOS chromeless: drop the NavigationStack's back-button row
-          // and the divider underneath it. Content flows to the top of the
-          // detail pane like the reference design does. Sidebar still drives nav by
-          // replacing nav.path, so we don't need a back button — the user
-          // navigates by tapping the sidebar instead.
-          #if os(macOS)
-          .toolbar(.hidden)
-          #endif
+          // macOS 26 paints toolbar items as Liquid Glass pills floating
+          // over the content (Reminders / System Settings look). Letting
+          // the toolbar render — instead of hiding it as before — restores
+          // that look; the root has no back button so there's no chrome to
+          // hide. Push destinations below get the back button automatically.
           .navigationDestination(for: Route.self) { route in
             // `.id(route)` forces a fresh view instance whenever the route
             // changes — critical for going .project(A) → .project(B) on macOS
@@ -131,11 +145,8 @@ struct ContentView: View {
             // and leave its @State bound to the previous project.
             destination(for: route)
               .id(route)
-              .padding(.leading, Theme.listLeadingInset)
+              .padding(.horizontal, Theme.listLeadingInset)
               .background(Theme.paperBackground)
-              #if os(macOS)
-              .toolbar(.hidden)
-              #endif
           }
       }
     }

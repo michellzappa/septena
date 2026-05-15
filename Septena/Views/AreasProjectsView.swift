@@ -1,12 +1,81 @@
 import SwiftUI
 
+// MARK: - Notes field shared by Area / Project detail
+
+/// Multi-line notes editor with inline markdown preview when blurred.
+///
+/// The TextField is ALWAYS in the view tree (controlled via `.opacity`),
+/// not conditionally rendered — that's what fixes the previous "edit only
+/// once" bug, where swapping Text↔TextField on focus change tore down the
+/// freshly-mounted field before `@FocusState` could land on it.
+///
+/// Layout:
+///   • TextField (axis .vertical, lineLimit 1...12) is the source of truth
+///     for height — grows with content, scrolls internally past 12 lines.
+///   • Text(AttributedString(markdown:)) overlays on top when the field
+///     isn't focused and has content; tap forwards focus.
+///   • Hit testing is gated on focus so taps go to the right layer.
+@ViewBuilder
+func notesField(_ text: Binding<String>,
+                focused: FocusState<Bool>.Binding) -> some View {
+  let showRender = !focused.wrappedValue && !text.wrappedValue.isEmpty
+  ZStack(alignment: .topLeading) {
+    TextField("Notes", text: text, axis: .vertical)
+      .textFieldStyle(.plain)
+      .focusEffectDisabled()
+      .font(.septenaNotes)
+      .foregroundStyle(Theme.inkSecondary)
+      .focused(focused)
+      .lineLimit(1...12)
+      .opacity(showRender ? 0 : 1)
+      .allowsHitTesting(!showRender)
+
+    if showRender {
+      Text(markdownAttributed(text.wrappedValue))
+        .font(.septenaNotes)
+        .foregroundStyle(Theme.inkSecondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .textSelection(.enabled)
+        .contentShape(Rectangle())
+        .onTapGesture { focused.wrappedValue = true }
+    }
+  }
+}
+
+/// Render the raw notes string as an `AttributedString` with inline
+/// markdown applied (**bold**, *italic*, `code`, [links], # headings via
+/// `# Heading` rendering as bold + larger text). Falls back to plain text
+/// if the parse fails.
+func markdownAttributed(_ raw: String) -> AttributedString {
+  // `.full` lets us honor `#`/`##` as headers; whitespace is preserved
+  // so the user's line breaks survive the render.
+  var opts = AttributedString.MarkdownParsingOptions()
+  opts.interpretedSyntax = .full
+  opts.allowsExtendedAttributes = true
+  if var attr = try? AttributedString(markdown: raw, options: opts) {
+    // Promote `# Heading` lines so they read as headings even though
+    // AttributedString doesn't auto-style by header level on its own.
+    for run in attr.runs where run.presentationIntent != nil {
+      for component in run.presentationIntent?.components ?? [] {
+        if case .header(let level) = component.kind {
+          let size: CGFloat = level == 1 ? 18 : (level == 2 ? 16 : 15)
+          attr[run.range].font = .system(size: size, weight: .semibold)
+          attr[run.range].foregroundColor = Theme.inkPrimary
+        }
+      }
+    }
+    return attr
+  }
+  return AttributedString(raw)
+}
+
 // MARK: - Area detail (rename + project list + tasks scoped to area)
 
 struct AreaDetailView: View {
   let area: Area
-  @EnvironmentObject var client: SeptenaClient
-  @EnvironmentObject var theme: SectionTheme
-  @EnvironmentObject var nav: NavigationState
+  @Environment(SeptenaClient.self) private var client
+  @Environment(SectionTheme.self) private var theme
+  @Environment(NavigationState.self) private var nav
 
   @State private var draftName: String
   @State private var draftNotes: String
@@ -37,23 +106,13 @@ struct AreaDetailView: View {
           }
         }
 
-        // Notes — backed by the Area.context field (the API's free-text slot).
-        if notesFocused || draftNotes.isEmpty {
-          TextField("Notes", text: $draftNotes, axis: .vertical)
-            .textFieldStyle(.plain)
-            .focusEffectDisabled()
-            .font(.septenaNotes)
-            .foregroundStyle(Theme.inkSecondary)
-            .focused($notesFocused)
-            .lineLimit(1...8)
-        } else {
-          Text(.init(draftNotes))
-            .font(.septenaNotes)
-            .foregroundStyle(Theme.inkSecondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .onTapGesture { notesFocused = true }
-        }
+        // Notes — backed by Area.context. The TextField is ALWAYS in the
+        // tree (overlay pattern with opacity), so @FocusState survives the
+        // display→edit handoff. A markdown-rendered Text overlays on top
+        // when the field isn't focused and has content; tap → start editing.
+        // Pressing Return inserts a newline (axis: .vertical); the field
+        // grows to ~12 lines then scrolls internally.
+        notesField($draftNotes, focused: $notesFocused)
       }
       .padding(.horizontal, Theme.hPadding)
       .padding(.top, 12)
@@ -186,8 +245,8 @@ struct AreaDetailView: View {
 
 struct ProjectDetailView: View {
   let project: Project
-  @EnvironmentObject var client: SeptenaClient
-  @EnvironmentObject var theme: SectionTheme
+  @Environment(SeptenaClient.self) private var client
+  @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
 
   @State private var draftName: String
@@ -227,25 +286,8 @@ struct ProjectDetailView: View {
           }
         }
 
-        // Notes: render basic markdown (bold/italic/code/links) when not
-        // focused; tap to edit raw text. Focus observer lives below on the
-        // VStack — see commitNotes hook there for why.
-        if notesFocused || draftNotes.isEmpty {
-          TextField("Notes", text: $draftNotes, axis: .vertical)
-            .textFieldStyle(.plain)
-            .focusEffectDisabled()
-            .font(.septenaNotes)
-            .foregroundStyle(Theme.inkSecondary)
-            .focused($notesFocused)
-            .lineLimit(1...8)
-        } else {
-          Text(.init(draftNotes))
-            .font(.septenaNotes)
-            .foregroundStyle(Theme.inkSecondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .onTapGesture { notesFocused = true }
-        }
+        // Notes — see AreaDetailView for the overlay-pattern rationale.
+        notesField($draftNotes, focused: $notesFocused)
 
       }
       .padding(.horizontal, Theme.hPadding)
@@ -283,12 +325,14 @@ struct ProjectDetailView: View {
               perform: { showingDeleteConfirm = true }),
       ])
       .presentationDetents([.height(360)])
+      .septenaSheetChrome()
     }
     .sheet(isPresented: $showingMoveToArea) {
       AreaPickerSheet(areas: areas, currentAreaId: project.area) { newAreaId in
         moveToArea(newAreaId)
       }
       .presentationDetents([.medium, .large])
+      .septenaSheetChrome()
     }
     .alert("Delete \(project.title)?", isPresented: $showingDeleteConfirm) {
       Button("Delete", role: .destructive) { deleteProject() }

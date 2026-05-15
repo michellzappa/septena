@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct QuickEntryView: View {
-  @EnvironmentObject var client: SeptenaClient
-  @EnvironmentObject var theme: SectionTheme
+  @Environment(SeptenaClient.self) private var client
+  @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
 
   @State private var title = ""
@@ -96,6 +96,7 @@ struct QuickEntryView: View {
           onSomeday: { scheduledDate = nil; isSomeday = true }
         )
         .presentationDetents([.medium])
+        .septenaSheetChrome()
       }
       .sheet(isPresented: $showingMoveSheet) {
         MovePickerSheet(areas: areas, projects: projects) { areaId, projectId in
@@ -103,6 +104,7 @@ struct QuickEntryView: View {
           selectedProjectId = projectId
         }
         .presentationDetents([.medium, .large])
+        .septenaSheetChrome()
       }
       .task {
         do {
@@ -115,6 +117,7 @@ struct QuickEntryView: View {
       }
     }
     .presentationDetents([.medium, .large])
+    .septenaSheetChrome()
     .interactiveDismissDisabled(isSubmitting)
   }
 

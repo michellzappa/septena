@@ -6,17 +6,18 @@ import SwiftUI
 // `tasks` row — no opinionated default hue baked into code.
 
 @MainActor
-final class SectionTheme: ObservableObject {
+@Observable
+final class SectionTheme {
   /// Neutral fallback — inherits from the asset catalog's AccentColor.
   static let fallback = Color.accentColor
 
   /// Primary accent for the app — equals the user's Septena Tasks-section color.
-  @Published var accent: Color = SectionTheme.fallback
+  var accent: Color = SectionTheme.fallback
   /// Soft / strong derivatives recomputed whenever `accent` changes.
-  @Published private(set) var accentSoft: Color = Color.accentColor.opacity(0.14)
+  private(set) var accentSoft: Color = Color.accentColor.opacity(0.14)
   /// All section accents keyed by Septena section id (`tasks`, `habits`,
   /// `chores`, `supplements`, ...). Populated by `refresh()`.
-  @Published private(set) var accentByKey: [String: Color] = [:]
+  private(set) var accentByKey: [String: Color] = [:]
 
   /// Resolve any section's accent — falls back to `inkSecondary` for
   /// sections we don't know about (or before the first refresh completes).

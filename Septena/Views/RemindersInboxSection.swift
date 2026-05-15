@@ -7,12 +7,17 @@ import EventKit
 // original reminder so dedupe is automatic.
 
 struct RemindersInboxSection: View {
-  @EnvironmentObject var client: SeptenaClient
-  @EnvironmentObject var theme: SectionTheme
+  @Environment(SeptenaClient.self) private var client
+  @Environment(SectionTheme.self) private var theme
+  @Environment(NavigationState.self) private var nav
   /// Parent calls this after a successful import so the inbox below refreshes.
   let onImported: () -> Void
 
-  @StateObject private var bridge = RemindersBridge.shared
+  /// Plain `let` — RemindersBridge is a shared @Observable singleton, and
+  /// SwiftUI's observation macros track property accesses on the instance
+  /// directly. Wrapping in `@State` here would imply the view owns the
+  /// instance's lifecycle, which it doesn't.
+  private let bridge = RemindersBridge.shared
 
   @State private var sourceListID: String?
   @State private var sourceList: EKCalendar?
@@ -22,16 +27,27 @@ struct RemindersInboxSection: View {
 
   var body: some View {
     Group {
-      if bridge.access == .granted, sourceList != nil, !pairs.isEmpty {
-        VStack(alignment: .leading, spacing: 8) {
-          header
-          ForEach(pairs, id: \.view.id) { pair in
-            reminderRow(pair)
+      switch bridge.access {
+      case .granted:
+        if sourceList == nil {
+          pickListCTA
+        } else if !pairs.isEmpty {
+          VStack(alignment: .leading, spacing: 8) {
+            header
+            ForEach(pairs, id: \.view.id) { pair in
+              reminderRow(pair)
+            }
           }
+          .padding(.horizontal, Theme.hPadding)
+          .padding(.top, 8)
+          .padding(.bottom, 16)
         }
-        .padding(.horizontal, Theme.hPadding)
-        .padding(.top, 8)
-        .padding(.bottom, 16)
+        // If sourceList is set but pairs is empty, render nothing — list
+        // is nominated and just has no pending reminders. Don't clutter.
+      case .notDetermined:
+        grantAccessCTA
+      case .denied, .writeOnly:
+        deniedNote
       }
     }
     // `.task(id:)` fires on first appear AND whenever the source list ID
@@ -41,6 +57,64 @@ struct RemindersInboxSection: View {
     .onReceive(NotificationCenter.default.publisher(for: .EKEventStoreChanged)) { _ in
       Task { await reload() }
     }
+  }
+
+  // MARK: - CTAs surfaced when the section can't show anything yet
+
+  @ViewBuilder
+  private var pickListCTA: some View {
+    Button { nav.path.append(.remindersImport) } label: {
+      ctaRow(icon: "checklist",
+             title: "Pick a Reminders list",
+             subtitle: "Mirror items from Apple Reminders into your Inbox.")
+    }
+    .buttonStyle(.plain)
+  }
+
+  @ViewBuilder
+  private var grantAccessCTA: some View {
+    Button { nav.path.append(.remindersImport) } label: {
+      ctaRow(icon: "lock.open",
+             title: "Connect Apple Reminders",
+             subtitle: "Grant access to mirror reminders into your Inbox.")
+    }
+    .buttonStyle(.plain)
+  }
+
+  @ViewBuilder
+  private var deniedNote: some View {
+    ctaRow(icon: "exclamationmark.triangle",
+           title: "Reminders access blocked",
+           subtitle: "Enable Septena in System Settings → Privacy → Reminders.")
+  }
+
+  @ViewBuilder
+  private func ctaRow(icon: String, title: String, subtitle: String) -> some View {
+    HStack(alignment: .top, spacing: 12) {
+      Image(systemName: icon)
+        .font(.system(size: 14, weight: .semibold))
+        .foregroundStyle(theme.accent)
+        .frame(width: 18)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(title)
+          .font(.septenaTaskTitle)
+          .foregroundStyle(Theme.inkPrimary)
+        Text(subtitle)
+          .font(.septenaMeta)
+          .foregroundStyle(Theme.inkSecondary)
+      }
+      Spacer()
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 10)
+    .background(
+      Color.gray.opacity(0.08),
+      in: RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
+    )
+    .padding(.horizontal, Theme.hPadding)
+    .padding(.top, 8)
+    .padding(.bottom, 16)
+    .contentShape(Rectangle())
   }
 
   // MARK: - Header
@@ -106,7 +180,7 @@ struct RemindersInboxSection: View {
       .padding(.vertical, 10)
       .background(
         Color.gray.opacity(0.08),
-        in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+        in: RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
       )
       .contentShape(Rectangle())
       .opacity(isImporting ? 0.5 : 1)

@@ -4,9 +4,9 @@ import SwiftUI
 // Server does the filtering — we just render whatever /api/tasks/list returns.
 
 struct TaskListView: View {
-  @EnvironmentObject var client: SeptenaClient
-  @EnvironmentObject var nav: NavigationState
-  @EnvironmentObject var theme: SectionTheme
+  @Environment(SeptenaClient.self) private var client
+  @Environment(NavigationState.self) private var nav
+  @Environment(SectionTheme.self) private var theme
 
   let filter: TaskFilter
   /// True when this view is laid out *inside* another detail screen
@@ -67,7 +67,7 @@ struct TaskListView: View {
   var body: some View {
     ZStack(alignment: .bottom) {
       ScrollView {
-        VStack(alignment: .leading, spacing: 0) {
+        LazyVStack(alignment: .leading, spacing: 0) {
 
           // Title is owned by the parent when embedded (Project / Area detail).
           if !embedded {
@@ -109,11 +109,13 @@ struct TaskListView: View {
           }
 
           if visibleItems.isEmpty && review.isEmpty && doneToday.isEmpty && !isCreating && !isLoading {
-            Text("Nothing here yet")
-              .font(.septenaMeta)
-              .foregroundStyle(.secondary)
-              .padding(.horizontal, Theme.hPadding)
-              .padding(.top, 40)
+            ContentUnavailableView(
+              "Nothing here yet",
+              systemImage: titleIcon,
+              description: Text("Tap the + button to add a task.")
+            )
+            .frame(maxWidth: .infinity)
+            .padding(.top, 40)
           }
 
           // ── OPEN block ──────────────────────────────────────────────
@@ -138,7 +140,7 @@ struct TaskListView: View {
           // for the archive. Per-session optimistic toggles still render in
           // place (strikethrough) until the next reload.
 
-          Spacer(minLength: 140)
+          Spacer(minLength: 40)
         }
         // Tap any empty area of the scroll content (title row, gaps between
         // rows, bottom spacer) to commit the active inline edit. Buttons and
@@ -151,8 +153,6 @@ struct TaskListView: View {
       // with the editing card's onChange(focused) commit, this turns a quick
       // pull into a blur.
       .scrollDismissesKeyboard(.interactively)
-
-      trailingFloater
     }
     // ZStack-level tap target so the FAB margin, safe-area gaps, and any
     // surface the inner ScrollView doesn't claim also commit the edit.
@@ -199,6 +199,8 @@ struct TaskListView: View {
           }
         )
         .presentationDetents([.medium])
+        .presentationBackground(.thinMaterial)
+        .presentationCornerRadius(Theme.cornerRadius)
       case .due:
         DeadlinePickerSheet(
           initialDate: currentDeadline(for: whenTargetId)
@@ -207,6 +209,8 @@ struct TaskListView: View {
           whenTargetId = nil
         }
         .presentationDetents([.medium, .large])
+        .presentationBackground(.thinMaterial)
+        .presentationCornerRadius(Theme.cornerRadius)
       }
     }
     .sheet(isPresented: $showingMoveSheet) {
@@ -223,6 +227,8 @@ struct TaskListView: View {
         moveTargetId = nil
       }
       .presentationDetents([.medium, .large])
+      .presentationBackground(.thinMaterial)
+      .presentationCornerRadius(Theme.cornerRadius)
     }
     .sheet(isPresented: $showingRepeatSheet) {
       RecurrencePickerSheet(initial: currentRecurrence(for: repeatTargetId)) { rule in
@@ -232,6 +238,8 @@ struct TaskListView: View {
         repeatTargetId = nil
       }
       .presentationDetents([.medium, .large])
+      .presentationBackground(.thinMaterial)
+      .presentationCornerRadius(Theme.cornerRadius)
     }
     // Re-load on every appearance so completed tasks (kept visible in-place
     // while the user is on the screen) drop off when they return.
@@ -436,6 +444,9 @@ struct TaskListView: View {
           repeatTargetId = task.id; showingRepeatSheet = true
         }
       )
+      // Air above & below the expanded card so it visually lifts off the
+      // surrounding list instead of pressing flush against neighboring rows.
+      .padding(.vertical, 8)
     } else {
       taskBody(task, reviewable: reviewable)
         // Right-click should make it visually clear which row the menu
@@ -531,28 +542,6 @@ struct TaskListView: View {
         metaLine(task)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .contentShape(Rectangle())
-      // compact: on macOS one click selects, a second click (or a
-      // double-click) opens the editor. On iOS a single tap opens directly,
-      // matching touch convention.
-      #if os(macOS)
-      .onTapGesture(count: 2) {
-        selectedTaskId = task.id
-        startEdit(task)
-      }
-      .onTapGesture {
-        if selectedTaskId == task.id {
-          startEdit(task)
-        } else {
-          selectedTaskId = task.id
-        }
-      }
-      #else
-      .onTapGesture {
-        selectedTaskId = task.id
-        startEdit(task)
-      }
-      #endif
 
       // Notes glyph on the right when the task has any — kept out of the
       // meta line so it doesn't crowd the project/area/date chips below.
@@ -569,19 +558,48 @@ struct TaskListView: View {
       trailingDate(task)
     }
     .padding(.horizontal, Theme.hPadding)
-    .padding(.vertical, 5)
-    .frame(minHeight: Theme.rowHeight)
+    // Generous vertical padding so the row is comfortably tall and the
+    // entire band between checkbox and date is a single hit target. The
+    // selection pill fills the full padded area, so the "gap" between
+    // rows is actually each row's own clickable padding — clicking
+    // anywhere selects the row whose padding the click landed in.
+    .frame(minHeight: Theme.rowTapHeight)
     .background(rowBackground(for: task))
-    .animation(.easeOut(duration: 0.15), value: selectedTaskId)
+    // Hit area covers the FULL padded row (checkbox + title column +
+    // padding above/below). Inner controls — TaskCheckbox button, action
+    // icons — still consume their own taps via gesture priority, so they
+    // toggle / open without selecting first.
+    .contentShape(Rectangle())
+    #if os(macOS)
+    // macOS: one click selects, a second click on the already-selected row
+    // opens the editor. Single .onTapGesture only — attaching a count:2
+    // sibling forces SwiftUI to wait the system double-click interval
+    // (~300ms) on every single click before firing.
+    .onTapGesture {
+      if selectedTaskId == task.id {
+        startEdit(task)
+      } else {
+        selectedTaskId = task.id
+      }
+    }
+    #else
+    .onTapGesture {
+      selectedTaskId = task.id
+      startEdit(task)
+    }
+    #endif
   }
 
   /// Single highlight rule: light accent-tint pill (matches the sidebar's
   /// selection pill) when the row is the keyboard cursor AND it's not
   /// currently being edited (the editor card has its own chrome).
+  /// Animation is scoped to the fill only — wrapping the whole row body in
+  /// `.animation(value: selectedTaskId)` caused every visible row to re-layout
+  /// for 150ms on each selection change, which was the macOS click-lag source.
   @ViewBuilder
   private func rowBackground(for task: EngageTask) -> some View {
     let isHighlighted = selectedTaskId == task.id && editingTaskId != task.id
-    RoundedRectangle(cornerRadius: 6, style: .continuous)
+    RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
       .fill(isHighlighted ? theme.accent.opacity(0.15) : Color.clear)
       .padding(.horizontal, Theme.hPadding - 6)
   }
@@ -789,10 +807,11 @@ struct TaskListView: View {
       Spacer()
     }
     .padding(.horizontal, Theme.hPadding)
-    // Today reads better with extra air above each project/area cluster —
-    // 66% more than the default header inset elsewhere.
-    .padding(.top, filter == .today ? 30 : 18)
-    .padding(.bottom, 6)
+    // Headers absorb the visual gap that used to live between rows. Today
+    // gets a touch more air above each cluster, but kept tight enough that
+    // the eye doesn't perceive an unclickable strip.
+    .padding(.top, filter == .today ? 16 : 10)
+    .padding(.bottom, 4)
     .contentShape(Rectangle())
 
     VStack(alignment: .leading, spacing: 0) {
@@ -852,20 +871,9 @@ struct TaskListView: View {
     return df.string(from: date)
   }
 
-  // MARK: - Floater
-
-  @ViewBuilder
-  private var trailingFloater: some View {
-    // Hide the FAB while creating — commit is by tap-outside or return key.
-    if !isCreating {
-      HStack {
-        Spacer()
-        MagicPlusButton { startDraft() }
-      }
-      .padding(.trailing, Theme.hPadding)
-      .padding(.bottom, 20)
-    }
-  }
+  // (Floating Magic Plus removed — new-task creation lives in the macOS
+  // toolbar ("+" / ⇧⌘N) and in the global ⌘N shortcut. Reintroduce when
+  // we add user-controlled list ordering / a drag-to-reorder model.)
 
   // MARK: - Edit
 
@@ -1115,7 +1123,7 @@ struct TaskListView: View {
           .padding(.vertical, 6)
           .background(
             Color(red: 0.95, green: 0.83, blue: 0.31),
-            in: RoundedRectangle(cornerRadius: 8)
+            in: RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
           )
       }
       .buttonStyle(.plain)
@@ -1124,9 +1132,11 @@ struct TaskListView: View {
     .padding(.vertical, 10)
     .background(
       Color(red: 0.98, green: 0.91, blue: 0.55),
-      in: RoundedRectangle(cornerRadius: 10)
+      in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
     )
-    .padding(.horizontal, Theme.hPadding)
+    // Match the row selection-pill's effective inset (Theme.hPadding - 6) so
+    // the banner and the highlighted row align edge-to-edge.
+    .padding(.horizontal, Theme.hPadding - 6)
     .padding(.bottom, 12)
     .transition(.opacity.combined(with: .move(edge: .top)))
   }
@@ -1162,7 +1172,22 @@ private struct TopLevelChromeModifier: ViewModifier {
 
   func body(content: Content) -> some View {
     if showChrome {
-      content.septenaInlineTitle()
+      content
+        .septenaInlineTitle()
+        // Toolbar glass pills float over the detail content on macOS 26
+        // (Reminders-style top chrome). `.primaryAction` slot puts them on
+        // the right side; system applies the new Liquid Glass styling.
+        .toolbar {
+          ToolbarItem(placement: .primaryAction) {
+            Button {
+              nav.showingQuickEntry = true
+            } label: {
+              Image(systemName: "plus")
+            }
+            .help("Quick Entry")
+            .keyboardShortcut("n", modifiers: [.command, .shift])
+          }
+        }
     } else {
       content
     }

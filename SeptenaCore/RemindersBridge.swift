@@ -7,7 +7,8 @@ import EventKit
 // always deletes the original reminder so dedupe is implicit.
 
 @MainActor
-final class RemindersBridge: ObservableObject {
+@Observable
+final class RemindersBridge {
   static let shared = RemindersBridge()
 
   let store = EKEventStore()
@@ -62,12 +63,12 @@ final class RemindersBridge: ObservableObject {
 
   private static let sourceKey = "septena.reminders.sourceListID"
 
-  var sourceListID: String? {
-    get { UserDefaults.standard.string(forKey: Self.sourceKey) }
-    set {
-      if let v = newValue { UserDefaults.standard.set(v, forKey: Self.sourceKey) }
-      else                { UserDefaults.standard.removeObject(forKey: Self.sourceKey) }
-      objectWillChange.send()
+  /// Mirrors UserDefaults so @Observable can track changes. Initialized once
+  /// on construction; the setter persists.
+  var sourceListID: String? = UserDefaults.standard.string(forKey: sourceKey) {
+    didSet {
+      if let v = sourceListID { UserDefaults.standard.set(v, forKey: Self.sourceKey) }
+      else                    { UserDefaults.standard.removeObject(forKey: Self.sourceKey) }
     }
   }
 

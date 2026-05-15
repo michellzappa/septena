@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Checkbox
 
 struct TaskCheckbox: View {
-  @EnvironmentObject var theme: SectionTheme
+  @Environment(SectionTheme.self) private var theme
   /// Optional override — used by non-task items (habits/supplements/chores)
   /// to wear their section accent. `nil` means "use the Tasks section accent".
   var tint: Color? = nil
@@ -11,8 +11,8 @@ struct TaskCheckbox: View {
   let onToggle: () -> Void
 
   /// Square with a small corner radius — matches the reference design's checkbox shape.
-  private static let size: CGFloat = 13
-  private static let cornerRadius: CGFloat = 3
+  private static let size: CGFloat = 14
+  private static let cornerRadius: CGFloat = 5
 
   var body: some View {
     let fill = tint ?? theme.accent
@@ -66,7 +66,7 @@ struct ScreenTitle: View {
 // MARK: - Magic Plus floating button
 
 struct MagicPlusButton: View {
-  @EnvironmentObject var theme: SectionTheme
+  @Environment(SectionTheme.self) private var theme
   let action: () -> Void
 
   var body: some View {
@@ -115,9 +115,9 @@ struct InlineNewTaskRow: View {
     VStack(alignment: .leading, spacing: 0) {
       // ── Title row — same geometry as a closed task row.
       HStack(alignment: .firstTextBaseline, spacing: 12) {
-        RoundedRectangle(cornerRadius: 3)
+        RoundedRectangle(cornerRadius: 5, style: .continuous)
           .stroke(Color.secondary.opacity(0.5), lineWidth: 1.2)
-          .frame(width: 13, height: 13)
+          .frame(width: 14, height: 14)
           .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 
         TextField("New To-Do", text: $title)
@@ -205,7 +205,7 @@ struct InlineNewTaskRow: View {
 // MARK: - Inline edit task row
 
 struct InlineEditTaskRow: View {
-  @EnvironmentObject var theme: SectionTheme
+  @Environment(SectionTheme.self) private var theme
   let task: EngageTask
   @Binding var title: String
   @Binding var notes: String
@@ -242,42 +242,55 @@ struct InlineEditTaskRow: View {
         TaskCheckbox(isDone: isDone, onToggle: onToggleDone)
           .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 
-        TextField("Title", text: $title)
+        // Title wraps to multiple visual lines when long (axis .vertical +
+        // lineLimit). Newlines aren't a valid title shape — so onChange
+        // intercepts any Return keystroke (which would normally insert a
+        // newline on a vertical TextField), strips it, and commits.
+        TextField("Title", text: $title, axis: .vertical)
           .textFieldStyle(.plain)
           .focusEffectDisabled()
           .font(.septenaTaskTitle)
           .focused($focused, equals: .title)
+          .lineLimit(1...5)
           .submitLabel(.done)
           .onSubmit { onCommit() }
+          .onChange(of: title) { _, new in
+            if new.contains("\n") {
+              title = new.replacingOccurrences(of: "\n", with: "")
+              onCommit()
+            }
+          }
 
         Spacer(minLength: 0)
       }
       .padding(.horizontal, Theme.hPadding)
-      .padding(.vertical, 5)
-      .frame(minHeight: Theme.rowHeight)
+      .padding(.vertical, 8)
 
       // ── Notes — left-aligned with the title (indent past the checkbox so
-      //    text columns line up). Sits in the expanded space; doesn't push
-      //    the title row.
+      //    text columns line up). TaskCheckbox renders at 22pt + 12pt
+      //    HStack spacing → notes leading = hPadding + 22 + 12 = +34.
+      //    Return inserts a newline (axis .vertical); grows from 2 lines
+      //    of slack up to ~16 then scrolls internally.
       TextField("Notes", text: $notes, axis: .vertical)
         .textFieldStyle(.plain)
         .focusEffectDisabled()
         .font(.septenaNotes)
         .foregroundStyle(.secondary)
         .focused($focused, equals: .notes)
-        .lineLimit(1...6)
-        .padding(.leading, Theme.hPadding + 13 + 12)  // align with title text
+        .lineLimit(2...16)
+        .padding(.leading, Theme.hPadding + 22 + 12)
         .padding(.trailing, Theme.hPadding)
-        .padding(.bottom, 6)
+        .padding(.bottom, 10)
 
-      // ── Bottom row: When pill on the left, action icons on the right.
+      // ── Bottom row: all icons on the right (Things-style). Calendar
+      //    (when), repeat, move target, deadline flag — order matches the
+      //    closed-row trailing chip so the eye doesn't have to jump.
       HStack(spacing: 0) {
-        whenPill
         Spacer()
         actionIcons
       }
       .padding(.horizontal, Theme.hPadding)
-      .padding(.bottom, 10)
+      .padding(.bottom, 12)
     }
     .background(Theme.cardSurface)
     .modifier(InlineCardChrome())
@@ -329,26 +342,7 @@ struct InlineEditTaskRow: View {
       .accessibilityHidden(true)
   }
 
-  // MARK: - Action pills (tappable; sans-serif, slightly larger than meta chips)
-
-  // MARK: - When pill (compact: state-colored icon + text, no capsule bg)
-
-  @ViewBuilder
-  private var whenPill: some View {
-    let parsed = task.scheduled.flatMap(SeptenaDate.parse)
-    Button(action: { Haptics.pick(); onSchedule?() }) {
-      HStack(spacing: 8) {
-        Image(systemName: whenIcon(for: parsed))
-          .font(.system(size: 16))
-          .foregroundStyle(whenIconTint(for: parsed))
-        Text(whenLabel(for: parsed))
-          .font(.system(size: 15, weight: .semibold))
-          .foregroundStyle(whenTextTint(for: parsed))
-      }
-      .contentShape(Rectangle())
-    }
-    .buttonStyle(.plain)
-  }
+  // MARK: - Right-side action icons (icon-only, no capsule background)
 
   private func whenIcon(for d: Date?) -> String {
     guard let d else { return "calendar" }
@@ -363,20 +357,16 @@ struct InlineEditTaskRow: View {
     return Calendar.current.isDateInToday(d) ? .yellow : Theme.inkSecondary
   }
 
-  private func whenTextTint(for d: Date?) -> Color {
-    d == nil ? Theme.inkSecondary.opacity(0.7) : Theme.inkPrimary
-  }
-
-  private func whenLabel(for d: Date?) -> String {
-    guard let d else { return "When" }
-    return dateLabel(d)
-  }
-
-  // MARK: - Right-side action icons (icon-only, no capsule background)
-
   @ViewBuilder
   private var actionIcons: some View {
+    let parsed = task.scheduled.flatMap(SeptenaDate.parse)
     HStack(spacing: 22) {
+      // When — calendar / sun (today) / sunrise (tomorrow); reflects state
+      actionIcon(
+        systemName: whenIcon(for: parsed),
+        tint: whenIconTint(for: parsed),
+        action: { onSchedule?() }
+      )
       // Repeat — colored when set, muted when unset
       actionIcon(
         systemName: "arrow.triangle.2.circlepath",
@@ -423,15 +413,6 @@ struct InlineEditTaskRow: View {
     .buttonStyle(.plain)
   }
 
-  private func dateLabel(_ d: Date) -> String {
-    let cal = Calendar.current
-    if cal.isDateInToday(d) { return "Today" }
-    if cal.isDateInTomorrow(d) { return "Tomorrow" }
-    let f = DateFormatter()
-    f.dateFormat = "MMM d"
-    return f.string(from: d)
-  }
-
   private func dueTint(_ d: Date) -> Color {
     let today = Calendar.current.startOfDay(for: Date())
     return Calendar.current.startOfDay(for: d) <= today ? Theme.overdueRed : Theme.inkSecondary
@@ -445,7 +426,7 @@ struct InlineEditTaskRow: View {
 /// scheduled date. Matches the reference design's When sheet shape. `due` has a separate
 /// picker (DeadlinePickerSheet) because deadlines are concrete dates only.
 struct WhenPickerSheet: View {
-  @EnvironmentObject var theme: SectionTheme
+  @Environment(SectionTheme.self) private var theme
   let onPick: (Date?) -> Void
   let onSomeday: () -> Void
   @Environment(\.dismiss) private var dismiss
@@ -536,7 +517,7 @@ struct WhenPickerSheet: View {
 /// date picker (no Today/Tomorrow shortcuts) because deadlines are
 /// concrete dates, not loose intentions. Matches the reference design's Deadline sheet.
 struct DeadlinePickerSheet: View {
-  @EnvironmentObject var theme: SectionTheme
+  @Environment(SectionTheme.self) private var theme
   let initialDate: Date?
   let onPick: (Date?) -> Void
   @Environment(\.dismiss) private var dismiss
@@ -605,7 +586,7 @@ struct DeadlinePickerSheet: View {
 /// interval stepper, and fixed-vs-after-completion toggle. the reference design's canonical
 /// picker has more (weekday selection, ends-rules) — to be added when needed.
 struct RecurrencePickerSheet: View {
-  @EnvironmentObject var theme: SectionTheme
+  @Environment(SectionTheme.self) private var theme
   let initial: Recurrence?
   let onPick: (Recurrence?) -> Void
   @Environment(\.dismiss) private var dismiss
@@ -881,7 +862,7 @@ struct ActionSheet: View {
 
   let title: String?
   let actions: [Action]
-  @EnvironmentObject var theme: SectionTheme
+  @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
 
   var body: some View {

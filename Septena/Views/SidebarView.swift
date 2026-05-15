@@ -1,12 +1,39 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 // compact homepage on iPhone: the root screen IS the sidebar.
 // QuickFind + smart lists + areas/projects + Settings. See docs/reference/navigation.md.
 
+// MARK: - Sidebar drag identifier
+
+/// Single Transferable type for all sidebar drags. The `kind` discriminator
+/// lets the drop handler reject mismatches (an area dropped on a project
+/// row, a top-level project dropped inside an area, etc.) without relying
+/// on registered UTTypes. `parent` is the area id for projects-in-area, nil
+/// for top-level projects, and ignored for areas — drop handlers use it to
+/// scope reorders to the same group.
+struct SidebarDragID: Codable, Hashable, Transferable {
+  enum Kind: String, Codable, Hashable { case area, project }
+  let kind: Kind
+  let id: String
+  let parent: String?
+
+  static var transferRepresentation: some TransferRepresentation {
+    CodableRepresentation(contentType: .data)
+  }
+
+  static func area(_ id: String) -> SidebarDragID {
+    SidebarDragID(kind: .area, id: id, parent: nil)
+  }
+  static func project(_ id: String, parent: String?) -> SidebarDragID {
+    SidebarDragID(kind: .project, id: id, parent: parent)
+  }
+}
+
 struct SidebarRootView: View {
-  @EnvironmentObject var client: SeptenaClient
-  @EnvironmentObject var nav: NavigationState
-  @EnvironmentObject var theme: SectionTheme
+  @Environment(SeptenaClient.self) private var client
+  @Environment(NavigationState.self) private var nav
+  @Environment(SectionTheme.self) private var theme
 
   @State private var areas: [Area] = []
   @State private var projects: [Project] = []
@@ -32,12 +59,119 @@ struct SidebarRootView: View {
   @State private var showingNewArea = false
   @State private var newAreaName = ""
 
+  /// Right-click → Rename. One pair of state per kind keeps the alert
+  /// presentation simple (alert(isPresented:) reads `target != nil`).
+  @State private var renameProjectTarget: Project?
+  @State private var renameAreaTarget: Area?
+  @State private var renameDraft = ""
+
+  /// Right-click → Delete (confirm before mutating).
+  @State private var deleteProjectTarget: Project?
+  @State private var deleteAreaTarget: Area?
+
+  /// Right-click on an area → "New Project here". Pre-selects the area so the
+  /// existing NewProjectSheet shows it as the target.
+  @State private var newProjectInArea: String?
+
   var body: some View {
     #if os(macOS)
-    sidebarMac
+    sidebarMac.modifier(rightClickAlerts)
     #else
-    sidebarPhone
+    sidebarPhone.modifier(rightClickAlerts)
     #endif
+  }
+
+  // MARK: - Right-click alerts (rename / delete)
+
+  private var rightClickAlerts: some ViewModifier {
+    RightClickAlerts(
+      renameProjectTarget: Binding(
+        get: { renameProjectTarget },
+        set: { renameProjectTarget = $0 }),
+      renameAreaTarget: Binding(
+        get: { renameAreaTarget },
+        set: { renameAreaTarget = $0 }),
+      deleteProjectTarget: Binding(
+        get: { deleteProjectTarget },
+        set: { deleteProjectTarget = $0 }),
+      deleteAreaTarget: Binding(
+        get: { deleteAreaTarget },
+        set: { deleteAreaTarget = $0 }),
+      renameDraft: Binding(
+        get: { renameDraft },
+        set: { renameDraft = $0 }),
+      commitRenameProject: { p, name in renameProject(p, to: name) },
+      commitRenameArea:    { a, name in renameArea(a, to: name) },
+      commitDeleteProject: { p in deleteProject(p) },
+      commitDeleteArea:    { a in deleteArea(a) }
+    )
+  }
+
+  // MARK: - Right-click mutations
+
+  private func renameProject(_ project: Project, to raw: String) {
+    let trimmed = raw.trimmingCharacters(in: .whitespaces)
+    guard !trimmed.isEmpty, trimmed != project.title else { return }
+    Haptics.tick()
+    Task {
+      do {
+        _ = try await client.updateProject(id: project.id, title: trimmed)
+        await load()
+      } catch {
+        errorMessage = error.localizedDescription
+      }
+    }
+  }
+
+  private func renameArea(_ area: Area, to raw: String) {
+    let trimmed = raw.trimmingCharacters(in: .whitespaces)
+    guard !trimmed.isEmpty, trimmed != area.title else { return }
+    Haptics.tick()
+    var next = areas
+    if let idx = next.firstIndex(where: { $0.id == area.id }) {
+      next[idx].title = trimmed
+    }
+    Task {
+      do {
+        areas = try await client.replaceAreas(next)
+        await load()
+      } catch {
+        errorMessage = error.localizedDescription
+      }
+    }
+  }
+
+  private func deleteProject(_ project: Project) {
+    Haptics.warning()
+    // If the user was viewing the project that just got deleted, bounce them
+    // to Today so they aren't stranded on a 404.
+    if case .project(let p) = nav.path.last, p.id == project.id {
+      nav.path = [.filter(.today)]
+    }
+    Task {
+      do {
+        try await client.deleteProject(id: project.id)
+        await load()
+      } catch {
+        errorMessage = error.localizedDescription
+      }
+    }
+  }
+
+  private func deleteArea(_ area: Area) {
+    Haptics.warning()
+    if case .area(let a) = nav.path.last, a.id == area.id {
+      nav.path = [.filter(.today)]
+    }
+    let next = areas.filter { $0.id != area.id }
+    Task {
+      do {
+        areas = try await client.replaceAreas(next)
+        await load()
+      } catch {
+        errorMessage = error.localizedDescription
+      }
+    }
   }
 
   /// iPhone / iPad layout: scrolling list with a floating Magic Plus over it.
@@ -67,6 +201,7 @@ struct SidebarRootView: View {
       showingNewArea: $showingNewArea,
       newAreaName: $newAreaName,
       errorMessage: $errorMessage,
+      newProjectInArea: $newProjectInArea,
       areas: areas,
       onNewTodo: { nav.showingQuickEntry = true },
       onCreateProject: { title, areaId in createProject(title: title, areaId: areaId) },
@@ -83,51 +218,53 @@ struct SidebarRootView: View {
     }
   }
 
-  /// macOS layout: scroll above, fixed bottom bar with "+ New List" and a
-  /// settings glyph — mirrors the reference design's sidebar chrome.
+  /// macOS layout: full-bleed scroll list. Creation actions live in the
+  /// sidebar column's toolbar (Liquid Glass pills on macOS 26 Tahoe);
+  /// Settings is the discreet last item in the toolbar's overflow.
   @ViewBuilder
   private var sidebarMac: some View {
-    VStack(spacing: 0) {
-      ScrollView {
-        VStack(alignment: .leading, spacing: 0) {
-          smartLists.padding(.top, 12).padding(.bottom, 12)
-          areasAndProjects
-          Spacer(minLength: 24)
-        }
+    ScrollView {
+      VStack(alignment: .leading, spacing: 0) {
+        smartLists.padding(.top, 12).padding(.bottom, 12)
+        areasAndProjects
+        Spacer(minLength: 24)
       }
-      .background(Theme.sidebarBackground)
-
-      Divider()
-
-      HStack(spacing: 0) {
-        Button { showingNewProject = true } label: {
-          HStack(spacing: 6) {
-            Image(systemName: "plus")
-              .font(.system(size: 12, weight: .semibold))
-            Text("New List")
-              .font(.system(size: 13, weight: .regular))
+    }
+    // No explicit background — NavigationSplitView renders its sidebar
+    // column with the system Liquid Glass material on macOS 26 (Tahoe).
+    .toolbar {
+      // Primary action on the sidebar column: a Menu offering both list
+      // shapes (Project under an Area, or top-level Project, or Area).
+      // System styles this as a Liquid Glass pill on macOS 26.
+      ToolbarItem(placement: .primaryAction) {
+        Menu {
+          Button {
+            newAreaName = ""
+            showingNewArea = true
+          } label: {
+            Label("New Area", systemImage: "square.stack.3d.up")
           }
-          .foregroundStyle(Theme.inkSecondary)
-          .padding(.vertical, 8)
-          .padding(.horizontal, 4)
-          .contentShape(Rectangle())
+          Button {
+            showingNewProject = true
+          } label: {
+            Label("New Project", systemImage: "number")
+          }
+        } label: {
+          Image(systemName: "plus")
         }
-        .buttonStyle(.plain)
-
-        Spacer()
-
-        Button { nav.path = [.settings] } label: {
-          Image(systemName: "slider.horizontal.3")
-            .font(.system(size: 13, weight: .regular))
-            .foregroundStyle(Theme.inkSecondary)
-            .padding(.vertical, 8)
-            .padding(.horizontal, 4)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
+        .menuStyle(.button)
+        .help("New Area or Project")
       }
-      .padding(.horizontal, Theme.hPadding)
-      .background(Theme.sidebarBackground)
+      // Settings — kept reachable from the sidebar's chrome rather than
+      // tucked at the bottom of the list.
+      ToolbarItem(placement: .automatic) {
+        Button {
+          nav.path = [.settings]
+        } label: {
+          Image(systemName: "slider.horizontal.3")
+        }
+        .help("Settings")
+      }
     }
     .modifier(SidebarSheets(
       showingCreateMenu: $showingCreateMenu,
@@ -135,6 +272,7 @@ struct SidebarRootView: View {
       showingNewArea: $showingNewArea,
       newAreaName: $newAreaName,
       errorMessage: $errorMessage,
+      newProjectInArea: $newProjectInArea,
       areas: areas,
       onNewTodo: { nav.showingQuickEntry = true },
       onCreateProject: { title, areaId in createProject(title: title, areaId: areaId) },
@@ -275,7 +413,7 @@ struct SidebarRootView: View {
   @ViewBuilder
   private func rowBackground(for route: Route) -> some View {
     let fill: Color = isSelected(route) ? theme.accent.opacity(0.15) : .clear
-    RoundedRectangle(cornerRadius: 6, style: .continuous)
+    RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
       .fill(fill)
       .padding(.horizontal, -4)
   }
@@ -285,12 +423,14 @@ struct SidebarRootView: View {
   @ViewBuilder
   private var areasAndProjects: some View {
     VStack(alignment: .leading, spacing: 0) {
+      // Top-level projects (no area). Each row is both draggable and a
+      // drop target — drop on row = position before it. The trailing zone
+      // beneath the last row handles "drop at end" of the top-level group.
       ForEach(topLevelProjects) { project in
-        sidebarButton(.project(project)) {
-          SidebarProjectRow(name: project.title,
-                            progress: projectProgress[project.id] ?? 0,
-                            count: projectOpenCount[project.id] ?? 0)
-        }
+        projectRowDraggable(project, parent: nil)
+      }
+      if !topLevelProjects.isEmpty {
+        endOfGroupDropZone(parent: nil)
       }
 
       if !topLevelProjects.isEmpty && !areas.isEmpty {
@@ -300,8 +440,106 @@ struct SidebarRootView: View {
       ForEach(areas) { area in
         areaBlock(area)
       }
+      // Trailing area drop zone — lets the user drop an area at the very
+      // end of the list (no target row available there otherwise).
+      if !areas.isEmpty {
+        Color.clear
+          .frame(height: 18)
+          .contentShape(Rectangle())
+          .dropDestination(for: SidebarDragID.self) { items, _ in
+            guard let drag = items.first, drag.kind == .area else { return false }
+            reorderArea(drag.id, toEnd: true)
+            return true
+          }
+      }
     }
     .padding(.horizontal, Theme.hPadding)
+  }
+
+  /// Project row in either top-level or within-area context. `parent`
+  /// scopes drag-drop so projects can only be reordered within the same
+  /// group; cross-group drops (top-level ↔ area) are rejected.
+  @ViewBuilder
+  private func projectRowDraggable(_ project: Project, parent: String?) -> some View {
+    sidebarButton(.project(project)) {
+      SidebarProjectRow(name: project.title,
+                        progress: projectProgress[project.id] ?? 0,
+                        count: projectOpenCount[project.id] ?? 0)
+    }
+    .contextMenu { projectMenu(project) }
+    .draggable(SidebarDragID.project(project.id, parent: parent)) {
+      Text(project.title)
+        .font(.system(size: Theme.sidebarTitleSize, weight: Theme.sidebarTitleWeight))
+        .foregroundStyle(Theme.inkPrimary)
+        .padding(.horizontal, 12).padding(.vertical, 6)
+        .background(Theme.cardSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall))
+        .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
+    }
+    .dropDestination(for: SidebarDragID.self) { items, _ in
+      guard let drag = items.first,
+            drag.kind == .project,
+            drag.parent == parent,           // same group only
+            drag.id != project.id else { return false }
+      reorderProject(drag.id, before: project.id, parent: parent)
+      return true
+    }
+  }
+
+  /// Trailing drop zone for "put at the end of this project group". Sized
+  /// generously so the user doesn't have to aim at a hairline.
+  @ViewBuilder
+  private func endOfGroupDropZone(parent: String?) -> some View {
+    Color.clear
+      .frame(height: 18)
+      .contentShape(Rectangle())
+      .dropDestination(for: SidebarDragID.self) { items, _ in
+        guard let drag = items.first,
+              drag.kind == .project,
+              drag.parent == parent else { return false }
+        reorderProject(drag.id, toEnd: true, parent: parent)
+        return true
+      }
+  }
+
+  // MARK: - Context menus
+
+  @ViewBuilder
+  private func projectMenu(_ project: Project) -> some View {
+    Button {
+      renameDraft = project.title
+      renameProjectTarget = project
+    } label: {
+      Label("Rename", systemImage: "pencil")
+    }
+    Divider()
+    Button(role: .destructive) {
+      deleteProjectTarget = project
+    } label: {
+      Label("Delete Project", systemImage: "trash")
+    }
+  }
+
+  @ViewBuilder
+  private func areaMenu(_ area: Area) -> some View {
+    Button {
+      renameDraft = area.title
+      renameAreaTarget = area
+    } label: {
+      Label("Rename", systemImage: "pencil")
+    }
+    Button {
+      newProjectInArea = area.id
+      showingNewProject = true
+    } label: {
+      Label("New Project", systemImage: "plus.square")
+    }
+    Divider()
+    Button(role: .destructive) {
+      deleteAreaTarget = area
+    } label: {
+      Label("Delete Area", systemImage: "trash")
+    }
   }
 
   @ViewBuilder
@@ -323,51 +561,142 @@ struct SidebarRootView: View {
       sidebarButton(.area(area)) {
         SidebarAreaRow(name: area.title, count: areaOpenCount[area.id] ?? 0)
       }
-      // Drag the area header to reorder. The whole block accepts drops so the
-      // user can drop "above this area" without aiming at a 1pt hairline.
-      .draggable(area.id) {
-        // Drag preview — keep it close to the actual row look.
+      .contextMenu { areaMenu(area) }
+      .draggable(SidebarDragID.area(area.id)) {
         Text(area.title)
           .font(.system(size: Theme.sidebarAreaTitleSize, weight: .semibold))
           .foregroundStyle(Theme.inkPrimary)
           .padding(.horizontal, 12).padding(.vertical, 6)
           .background(Theme.cardSurface)
-          .clipShape(RoundedRectangle(cornerRadius: 6))
+          .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall))
           .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
+      }
+      // The area header itself accepts area-drops to position "above this
+      // area". Project drops are rejected — they belong on project rows.
+      .dropDestination(for: SidebarDragID.self) { items, _ in
+        guard let drag = items.first,
+              drag.kind == .area,
+              drag.id != area.id else { return false }
+        reorderArea(drag.id, before: area.id)
+        return true
       }
 
       ForEach(projectsInArea) { project in
-        sidebarButton(.project(project)) {
-          SidebarProjectRow(name: project.title,
-                            progress: projectProgress[project.id] ?? 0,
-                            count: projectOpenCount[project.id] ?? 0)
-        }
+        projectRowDraggable(project, parent: area.id)
       }
-    }
-    .dropDestination(for: String.self) { items, _ in
-      guard let droppedId = items.first, droppedId != area.id else { return false }
-      reorderArea(droppedId, before: area.id)
-      return true
+      // Trailing drop zone for projects in *this* area only.
+      if !projectsInArea.isEmpty {
+        endOfGroupDropZone(parent: area.id)
+      }
     }
   }
 
   /// Move the area with id `movedId` to the position immediately before
-  /// `targetId`, then sync to the server.
+  /// `targetId`, then sync to the server. Optimistic update + rollback on
+  /// failure (any server error reloads server state to restore truth).
   private func reorderArea(_ movedId: String, before targetId: String) {
     guard let from = areas.firstIndex(where: { $0.id == movedId }),
           let to = areas.firstIndex(where: { $0.id == targetId }),
           from != to else { return }
-    Haptics.tick()
     var next = areas
     let item = next.remove(at: from)
-    // After removal the target's index may have shifted by one.
     let insertAt = (from < to) ? to - 1 : to
     next.insert(item, at: insertAt)
+    commitAreaOrder(next)
+  }
+
+  /// Move the area with id `movedId` to the end of the areas list.
+  private func reorderArea(_ movedId: String, toEnd: Bool) {
+    guard toEnd, let from = areas.firstIndex(where: { $0.id == movedId }),
+          from != areas.count - 1 else { return }
+    var next = areas
+    let item = next.remove(at: from)
+    next.append(item)
+    commitAreaOrder(next)
+  }
+
+  private func commitAreaOrder(_ next: [Area]) {
+    let snapshot = areas
+    Haptics.tick()
     areas = next
     Task {
       do {
         areas = try await client.replaceAreas(next)
       } catch {
+        // Roll back to the pre-drop snapshot, then reload to reconcile with
+        // any server state we might have missed during the failed write.
+        areas = snapshot
+        errorMessage = error.localizedDescription
+        await load()
+      }
+    }
+  }
+
+  /// Reorder a project within its parent group (top-level when parent is
+  /// nil, or within a single area). Cross-group drags are caller-rejected
+  /// in the drop handler — this function assumes same-parent invariant.
+  private func reorderProject(_ movedId: String, before targetId: String, parent: String?) {
+    commitProjectOrder(parent: parent) { siblings in
+      guard let from = siblings.firstIndex(where: { $0.id == movedId }),
+            let to   = siblings.firstIndex(where: { $0.id == targetId }),
+            from != to else { return nil }
+      var next = siblings
+      let item = next.remove(at: from)
+      let insertAt = (from < to) ? to - 1 : to
+      next.insert(item, at: insertAt)
+      return next
+    }
+  }
+
+  private func reorderProject(_ movedId: String, toEnd: Bool, parent: String?) {
+    guard toEnd else { return }
+    commitProjectOrder(parent: parent) { siblings in
+      guard let from = siblings.firstIndex(where: { $0.id == movedId }),
+            from != siblings.count - 1 else { return nil }
+      var next = siblings
+      let item = next.remove(at: from)
+      next.append(item)
+      return next
+    }
+  }
+
+  /// Single commit path for project reorder: compute the new sibling-order
+  /// (active projects in the given parent group), splice it back into the
+  /// full `projects` array preserving everything outside that group, push
+  /// optimistic state, and write to the server. Rolls back on failure.
+  ///
+  /// Why splice-back-into-full-array: `replaceProjects` is atomic over the
+  /// entire collection — sending only one group would lose the rest. We
+  /// must reorder within the group while keeping every other row in place.
+  private func commitProjectOrder(parent: String?,
+                                  reorder: ([Project]) -> [Project]?) {
+    let isInGroup: (Project) -> Bool = { p in
+      p.area == parent && p.status == .active
+    }
+    let siblings = projects.filter(isInGroup)
+    guard let nextSiblings = reorder(siblings) else { return }
+
+    // Splice the reordered siblings back into the full projects array,
+    // keeping the relative position of the first sibling slot stable so
+    // non-group projects don't shift.
+    var next: [Project] = []
+    var sibIter = nextSiblings.makeIterator()
+    for p in projects {
+      if isInGroup(p) {
+        if let s = sibIter.next() { next.append(s) }
+      } else {
+        next.append(p)
+      }
+    }
+
+    let snapshot = projects
+    Haptics.tick()
+    projects = next
+    Task {
+      do {
+        projects = try await client.replaceProjects(next)
+      } catch {
+        projects = snapshot
         errorMessage = error.localizedDescription
         await load()
       }
@@ -439,13 +768,11 @@ struct SidebarRootView: View {
         acc[kv.key] = Double(done[kv.key] ?? 0) / Double(kv.value)
       }
       projectOpenCount = projOpen
-      // Area count = loose-in-area + sum of its projects' open counts.
-      var areaCounts: [String: Int] = areaDirectOpen
-      for project in projects {
-        guard let aid = project.area, let n = projOpen[project.id] else { continue }
-        areaCounts[aid, default: 0] += n
-      }
-      areaOpenCount = areaCounts
+      // Area count = direct-in-area tasks ONLY. Projects nested under an
+      // area are shown as their own rows beneath the area header, with
+      // their own counts; rolling those up onto the area double-counts what
+      // the user already sees and made the area number feel inflated.
+      areaOpenCount = areaDirectOpen
     } catch {
       errorMessage = error.localizedDescription
     }
@@ -605,11 +932,20 @@ struct PieSliceShape: Shape {
 
 struct NewProjectSheet: View {
   let areas: [Area]
+  /// Pre-selected area when invoked from an area's right-click menu.
+  var initialAreaId: String? = nil
   let onCreate: (String, String?) -> Void
 
   @Environment(\.dismiss) private var dismiss
   @State private var title = ""
   @State private var selectedAreaId: String?
+
+  init(areas: [Area], initialAreaId: String? = nil, onCreate: @escaping (String, String?) -> Void) {
+    self.areas = areas
+    self.initialAreaId = initialAreaId
+    self.onCreate = onCreate
+    _selectedAreaId = State(initialValue: initialAreaId)
+  }
 
   var body: some View {
     NavigationStack {
@@ -649,12 +985,79 @@ struct NewProjectSheet: View {
 /// Sheet/alert/confirmation-dialog stack shared by both sidebar layouts.
 /// Pulled out so iPhone (floating Magic Plus → action sheet) and macOS
 /// (bottom "+ New List" button) can both trigger the same flows.
+/// Rename / delete alerts driven by the sidebar's right-click context menu.
+/// Lives in its own modifier so the body of SidebarRootView stays small.
+private struct RightClickAlerts: ViewModifier {
+  @Binding var renameProjectTarget: Project?
+  @Binding var renameAreaTarget: Area?
+  @Binding var deleteProjectTarget: Project?
+  @Binding var deleteAreaTarget: Area?
+  @Binding var renameDraft: String
+  let commitRenameProject: (Project, String) -> Void
+  let commitRenameArea:    (Area, String) -> Void
+  let commitDeleteProject: (Project) -> Void
+  let commitDeleteArea:    (Area) -> Void
+
+  func body(content: Content) -> some View {
+    content
+      .alert("Rename Project",
+             isPresented: Binding(
+              get: { renameProjectTarget != nil },
+              set: { if !$0 { renameProjectTarget = nil } })) {
+        TextField("Project name", text: $renameDraft)
+        Button("Save") {
+          if let p = renameProjectTarget { commitRenameProject(p, renameDraft) }
+          renameProjectTarget = nil
+        }
+        Button("Cancel", role: .cancel) { renameProjectTarget = nil }
+      }
+      .alert("Rename Area",
+             isPresented: Binding(
+              get: { renameAreaTarget != nil },
+              set: { if !$0 { renameAreaTarget = nil } })) {
+        TextField("Area name", text: $renameDraft)
+        Button("Save") {
+          if let a = renameAreaTarget { commitRenameArea(a, renameDraft) }
+          renameAreaTarget = nil
+        }
+        Button("Cancel", role: .cancel) { renameAreaTarget = nil }
+      }
+      .alert("Delete \(deleteProjectTarget?.title ?? "Project")?",
+             isPresented: Binding(
+              get: { deleteProjectTarget != nil },
+              set: { if !$0 { deleteProjectTarget = nil } })) {
+        Button("Delete", role: .destructive) {
+          if let p = deleteProjectTarget { commitDeleteProject(p) }
+          deleteProjectTarget = nil
+        }
+        Button("Cancel", role: .cancel) { deleteProjectTarget = nil }
+      } message: {
+        Text("Tasks in this project will be moved to the inbox.")
+      }
+      .alert("Delete \(deleteAreaTarget?.title ?? "Area")?",
+             isPresented: Binding(
+              get: { deleteAreaTarget != nil },
+              set: { if !$0 { deleteAreaTarget = nil } })) {
+        Button("Delete", role: .destructive) {
+          if let a = deleteAreaTarget { commitDeleteArea(a) }
+          deleteAreaTarget = nil
+        }
+        Button("Cancel", role: .cancel) { deleteAreaTarget = nil }
+      } message: {
+        Text("Projects in this area will be detached but not deleted.")
+      }
+  }
+}
+
 private struct SidebarSheets: ViewModifier {
   @Binding var showingCreateMenu: Bool
   @Binding var showingNewProject: Bool
   @Binding var showingNewArea: Bool
   @Binding var newAreaName: String
   @Binding var errorMessage: String?
+  /// Pre-selected area for "New Project" — set when the user invokes it from
+  /// an area's right-click menu. Cleared on sheet dismiss.
+  @Binding var newProjectInArea: String?
   let areas: [Area]
   let onNewTodo: () -> Void
   let onCreateProject: (String, String?) -> Void
@@ -668,9 +1071,12 @@ private struct SidebarSheets: ViewModifier {
         Button("New Area")    { newAreaName = ""; showingNewArea = true }
         Button("Cancel", role: .cancel) {}
       }
-      .sheet(isPresented: $showingNewProject) {
-        NewProjectSheet(areas: areas, onCreate: onCreateProject)
+      .sheet(isPresented: $showingNewProject, onDismiss: { newProjectInArea = nil }) {
+        NewProjectSheet(areas: areas,
+                        initialAreaId: newProjectInArea,
+                        onCreate: onCreateProject)
           .presentationDetents([.medium])
+          .septenaSheetChrome()
       }
       .alert("New Area", isPresented: $showingNewArea) {
         TextField("Area name", text: $newAreaName)

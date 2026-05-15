@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct ServerConfigView: View {
-  @EnvironmentObject var nav: NavigationState
-  @EnvironmentObject var theme: SectionTheme
+  @Environment(NavigationState.self) private var nav
+  @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
 
   @State private var serverURL: String = ""

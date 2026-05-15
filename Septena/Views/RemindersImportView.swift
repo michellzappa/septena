@@ -6,8 +6,8 @@ import EventKit
 // Inbox itself, where reminders render as task-style rows.
 
 struct RemindersImportView: View {
-  @EnvironmentObject var theme: SectionTheme
-  @StateObject private var bridge = RemindersBridge.shared
+  @Environment(SectionTheme.self) private var theme
+  @State private var bridge = RemindersBridge.shared
 
   @State private var access: RemindersBridge.Access = .notDetermined
   @State private var lists: [EKCalendar] = []

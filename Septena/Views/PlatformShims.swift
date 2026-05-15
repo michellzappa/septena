@@ -7,7 +7,7 @@ extension View {
   @ViewBuilder
   func septenaInlineTitle() -> some View {
     #if os(iOS)
-    self.navigationBarTitleDisplayMode(.inline)
+    self.toolbarTitleDisplayMode(.inline)
     #else
     self
     #endif
@@ -16,21 +16,18 @@ extension View {
   @ViewBuilder
   func septenaHideNavBar() -> some View {
     #if os(iOS)
-    self.navigationBarHidden(true)
+    self.toolbar(.hidden, for: .navigationBar)
     #else
     self
     #endif
   }
 
-  /// Always-visible search bar — iOS uses the nav-bar drawer placement,
-  /// macOS uses the default toolbar slot (already always visible).
+  /// Always-visible search bar. On iOS 26 the system places `.searchable`
+  /// in the new bottom field by default, which is what we want — `.automatic`
+  /// lets the platform pick. macOS slots it into the toolbar.
   @ViewBuilder
   func septenaAlwaysVisibleSearch(text: Binding<String>) -> some View {
-    #if os(iOS)
-    self.searchable(text: text, placement: .navigationBarDrawer(displayMode: .always))
-    #else
     self.searchable(text: text)
-    #endif
   }
 
   /// URL-style text field tweaks (no autocap, URL keyboard, URL content type).
@@ -60,14 +57,13 @@ extension View {
 
   /// Run `action` when the user secondary-clicks (right-click / two-finger
   /// click) on this view. macOS only — iOS surfaces the context menu via
-  /// long-press, which already gives visual feedback during the press, so
-  /// the iOS variant is a no-op. The catcher sits behind the SwiftUI
-  /// contextMenu in the responder chain and forwards the event so the menu
-  /// still opens.
+  /// long-press. The catcher sits as an overlay so it sees the right-click
+  /// before SwiftUI's `.contextMenu` consumes it; hit-testing is selective
+  /// so left-clicks, drags, hover all still reach SwiftUI underneath.
   @ViewBuilder
   func septenaOnRightClick(_ action: @escaping () -> Void) -> some View {
     #if os(macOS)
-    self.background(RightClickCatcher(action: action))
+    self.overlay(RightClickCatcher(action: action).allowsHitTesting(true))
     #else
     self
     #endif
@@ -77,9 +73,10 @@ extension View {
 #if os(macOS)
 import AppKit
 
-/// Transparent AppKit view that fires `action` on right-mouse-down and then
-/// forwards the event up the responder chain so SwiftUI's `.contextMenu`
-/// still receives it and opens the menu normally.
+/// Transparent AppKit view that fires `action` on right-mouse-down then
+/// forwards to the next responder so SwiftUI's `.contextMenu` still opens.
+/// `hitTest(_:)` returns self only for secondary-click events; all other
+/// events pass through to the SwiftUI content beneath.
 struct RightClickCatcher: NSViewRepresentable {
   let action: () -> Void
 
@@ -95,9 +92,25 @@ struct RightClickCatcher: NSViewRepresentable {
       super.init(frame: .zero)
     }
     required init?(coder: NSCoder) { fatalError() }
+
+    /// Only claim the hit for secondary-click events. Everything else
+    /// (primary click, hover, drag) falls through to SwiftUI.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+      guard super.hitTest(point) != nil else { return nil }
+      guard let event = NSApp.currentEvent else { return nil }
+      switch event.type {
+      case .rightMouseDown, .rightMouseUp, .rightMouseDragged:
+        return self
+      default:
+        return nil
+      }
+    }
+
     override func rightMouseDown(with event: NSEvent) {
       action()
-      super.rightMouseDown(with: event)
+      // Forward up the responder chain so SwiftUI's contextMenu still
+      // opens — without this, returning self in hitTest would swallow it.
+      nextResponder?.rightMouseDown(with: event)
     }
   }
 }
@@ -166,6 +179,17 @@ struct ClickToEditTitle: View {
   }
 }
 
+extension View {
+  /// Apply the Septena sheet chrome — thin-material glass background plus a
+  /// large continuous corner radius so modals match the iOS 26 Liquid Glass
+  /// aesthetic. Detents must still be set per-sheet.
+  func septenaSheetChrome() -> some View {
+    self
+      .presentationBackground(.thinMaterial)
+      .presentationCornerRadius(Theme.cornerRadius)
+  }
+}
+
 /// Zero-effect button style. Suppresses the brief label tint that SwiftUI's
 /// default `.plain` style applies on click — useful when a row already shows
 /// "I was tapped" via a persistent background pill, so the extra flash adds
@@ -187,7 +211,7 @@ struct InlineCardChrome: ViewModifier {
     // when entering edit mode. Rounded corners + shadow stay so it still
     // reads as a card lifted off the list.
     content
-      .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+      .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
       .shadow(color: .black.opacity(0.07), radius: 5, x: 0, y: 1)
     #else
     content

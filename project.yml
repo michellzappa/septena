@@ -2,14 +2,15 @@ name: Septena
 options:
   bundleIdPrefix: com.septena
   deploymentTarget:
-    iOS: "17.0"
-    macOS: "14.0"
-  xcodeVersion: "15.0"
+    iOS: "26.0"
+    macOS: "26.0"
+  xcodeVersion: "26.0"
   generateEmptyDirectories: true
 
 settings:
   base:
-    SWIFT_VERSION: "5.9"
+    SWIFT_VERSION: "5.10"
+    SWIFT_STRICT_CONCURRENCY: minimal
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
     DEVELOPMENT_TEAM: ""
