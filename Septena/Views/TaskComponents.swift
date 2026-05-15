@@ -8,6 +8,11 @@ struct TaskCheckbox: View {
   /// to wear their section accent. `nil` means inherit list tint.
   var tint: Color? = nil
   let isDone: Bool
+  /// When true (and not done), the checkbox renders as a sun-in-circle
+  /// instead of a plain circle. Used by closed task rows to signal
+  /// 'promoted to Today' — moves the today indicator into the same spot
+  /// as completion so it no longer sits inline with the title.
+  var isToday: Bool = false
   let onToggle: () -> Void
 
   #if os(macOS)
@@ -18,12 +23,22 @@ struct TaskCheckbox: View {
   private static let tap: CGFloat = 28
   #endif
 
+  private var glyphName: String {
+    if isDone { return "largecircle.fill.circle" }
+    if isToday { return "sun.max.circle" }
+    return "circle"
+  }
+
+  private var glyphTint: Color {
+    if !isDone && isToday { return .orange }
+    return tint ?? theme.accent
+  }
+
   var body: some View {
-    let fill = tint ?? theme.accent
     Button(action: onToggle) {
-      Image(systemName: isDone ? "largecircle.fill.circle" : "circle")
+      Image(systemName: glyphName)
         .font(.system(size: Self.glyphSize, weight: .regular))
-        .foregroundStyle(fill)
+        .foregroundStyle(glyphTint)
         .frame(width: Self.tap, height: Self.tap)
         .contentShape(Rectangle())
     }
@@ -199,17 +214,13 @@ struct InlineEditTaskRow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      // ── Title row — same geometry as the closed row so checkbox + title
-      //    sit at the exact same x/y when the editor opens. Notes and
-      //    actions expand *below* this band.
+      // ── Title row — pinned to the top of the rowTapHeight band so the
+      //    title's Y matches the closed taskBody (which is also pinned
+      //    top). Notes + actions grow *below* this band.
       HStack(alignment: .firstTextBaseline, spacing: 12) {
         TaskCheckbox(isDone: isDone, onToggle: onToggleDone)
           .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 
-        // Title wraps to multiple visual lines when long (axis .vertical +
-        // lineLimit). Newlines aren't a valid title shape — so onChange
-        // intercepts any Return keystroke (which would normally insert a
-        // newline on a vertical TextField), strips it, and commits.
         TextField("Title", text: $title, axis: .vertical)
           .textFieldStyle(.plain)
           .focusEffectDisabled()
@@ -224,14 +235,10 @@ struct InlineEditTaskRow: View {
               onCommit()
             }
           }
-
         Spacer(minLength: 0)
       }
       .padding(.horizontal, Theme.hPadding)
-      // Match the closed row's geometry exactly: same horizontal padding,
-      // same minimum row height so the title baseline sits at the same Y
-      // when the editor opens. Notes + action icons grow *below* this band.
-      .frame(minHeight: Theme.rowTapHeight)
+      .frame(minHeight: Theme.rowTapHeight, alignment: .topLeading)
 
       // ── Notes — left-aligned with the title (indent past the checkbox so
       //    text columns line up). TaskCheckbox renders at 22pt + 12pt

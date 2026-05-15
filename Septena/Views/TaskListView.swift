@@ -511,32 +511,30 @@ struct TaskListView: View {
     // so the box reads as centered with the title cap-height, not bottom-
     // anchored. For multi-line rows the title still wins the alignment.
     HStack(alignment: .firstTextBaseline, spacing: 12) {
-      TaskCheckbox(isDone: task.status == .done) { toggle(task) }
+      // Promoted-to-Today tasks wear a sun-in-circle glyph as their
+      // checkbox (instead of a plain circle), so the 'today' signal lives
+      // in the same spot as completion — no extra inline icon next to
+      // the title.
+      TaskCheckbox(
+        isDone: task.status == .done,
+        isToday: task.today && filter != .today
+      ) { toggle(task) }
         .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 
       VStack(alignment: .leading, spacing: 4) {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-          // Promoted to Today: small accent sun inline with the title, sized
-          // ~checkbox so it reads as a flag beside the task, not chrome.
-          if task.today && filter != .today {
-            Image(systemName: "sun.max.fill")
-              .font(.system(size: 14))
-              .foregroundStyle(.orange)
-          }
-          // Cancelled tasks share the visual language of done tasks
-          // (strikethrough + dimmed) so the user gets immediate feedback
-          // when they cancel — even though the server filters cancelled
-          // out of non-logbook views on the next reload.
-          let isInactive = task.status == .done || task.status == .cancelled
-          Text(task.title)
-            .font(.septenaTaskTitle)
-            .foregroundStyle(isInactive ? Theme.inkSecondary : Theme.inkPrimary)
-            .strikethrough(isInactive)
-            .opacity(isInactive ? 0.5 : 1)
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .multilineTextAlignment(.leading)
-        }
+        // Cancelled tasks share the visual language of done tasks
+        // (strikethrough + dimmed) so the user gets immediate feedback
+        // when they cancel — even though the server filters cancelled
+        // out of non-logbook views on the next reload.
+        let isInactive = task.status == .done || task.status == .cancelled
+        Text(task.title)
+          .font(.septenaTaskTitle)
+          .foregroundStyle(isInactive ? Theme.inkSecondary : Theme.inkPrimary)
+          .strikethrough(isInactive)
+          .opacity(isInactive ? 0.5 : 1)
+          .lineLimit(1)
+          .truncationMode(.tail)
+          .multilineTextAlignment(.leading)
 
         metaLine(task)
       }
@@ -557,12 +555,10 @@ struct TaskListView: View {
       trailingDate(task)
     }
     .padding(.horizontal, Theme.hPadding)
-    // Generous vertical padding so the row is comfortably tall and the
-    // entire band between checkbox and date is a single hit target. The
-    // selection pill fills the full padded area, so the "gap" between
-    // rows is actually each row's own clickable padding — clicking
-    // anywhere selects the row whose padding the click landed in.
-    .frame(minHeight: Theme.rowTapHeight)
+    // Top-aligned so the title's Y position is independent of whether
+    // metaLine has chips to render. Matching the open editor's frame
+    // alignment means tapping a row never shifts the title vertically.
+    .frame(minHeight: Theme.rowTapHeight, alignment: .topLeading)
     .background(rowBackground(for: task))
     // Hit area covers the FULL padded row (checkbox + title column +
     // padding above/below). Inner controls — TaskCheckbox button, action
