@@ -189,7 +189,7 @@ struct SidebarRootView: View {
             Theme.cardSurface,
             in: RoundedRectangle(cornerRadius: 12, style: .continuous)
           )
-          .padding(.horizontal, 12)
+          .padding(.horizontal, 20)
         settingsRow.padding(.top, 24)
         Spacer(minLength: 40)
       }
@@ -485,12 +485,12 @@ struct SidebarRootView: View {
         endOfGroupDropZone(parent: nil)
       }
 
-      if !topLevelProjects.isEmpty && !areas.isEmpty {
-        Spacer().frame(height: 12)
-      }
-
-      ForEach(areas) { area in
-        areaBlock(area)
+      ForEach(Array(areas.enumerated()), id: \.element.id) { idx, area in
+        // Skip the divider at the very top of the card — i.e. when this
+        // area is the first child AND there are no top-level projects
+        // above it.
+        let showDivider = idx > 0 || !topLevelProjects.isEmpty
+        areaBlock(area, showDivider: showDivider)
       }
       // Trailing area drop zone — lets the user drop an area at the very
       // end of the list (no target row available there otherwise).
@@ -594,19 +594,24 @@ struct SidebarRootView: View {
   }
 
   @ViewBuilder
-  private func areaBlock(_ area: Area) -> some View {
+  private func areaBlock(_ area: Area, showDivider: Bool = true) -> some View {
     let projectsInArea = projects.filter { $0.area == area.id && $0.status == .active }
 
     VStack(alignment: .leading, spacing: 0) {
-      // macOS sidebar already reads as a single quiet column; the hairline
-      // between areas adds visual noise without grouping value. iOS keeps it
-      // since the wider row spacing there benefits from an explicit divider.
+      // Divider sits at the midpoint between the previous block's last row
+      // and this area's header — equal whitespace top and bottom. Slightly
+      // more contrasty than the default separator so it groups confidently.
       #if os(iOS)
-      Hairline()
-        .padding(.top, 12)
-        .padding(.bottom, 6)
+      if showDivider {
+        Rectangle()
+          .fill(Color(uiColor: .opaqueSeparator).opacity(0.7))
+          .frame(height: 0.5)
+          .padding(.vertical, 10)
+      }
       #else
-      Spacer().frame(height: 12)
+      if showDivider {
+        Spacer().frame(height: 12)
+      }
       #endif
 
       sidebarButton(.area(area)) {
