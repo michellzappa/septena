@@ -429,6 +429,7 @@ struct TaskListView: View {
         title: $editingTitle,
         notes: $editingNotes,
         isDone: task.status == .done,
+        isToday: task.today && filter != .today,
         projectTitle: task.project.flatMap { pid in projects.first(where: { $0.id == pid })?.title },
         areaTitle:    task.area.flatMap    { aid in areas.first(where:    { $0.id == aid })?.title },
         onToggleDone: { toggle(task) },
@@ -522,12 +523,12 @@ struct TaskListView: View {
     // anchored. For multi-line rows the title still wins the alignment.
     HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
       // Promoted-to-Today tasks wear a sun-in-circle glyph as their
-      // checkbox (instead of a plain circle). Renders on every filter
-      // including Today itself, so the today signal is visible wherever
-      // the task appears.
+      // checkbox. Suppressed on the Today filter itself — the page
+      // header already says 'Today', so every checkbox carrying a sun
+      // would be noise.
       TaskCheckbox(
         isDone: task.status == .done,
-        isToday: task.today
+        isToday: task.today && filter != .today
       ) { toggle(task) }
         .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 

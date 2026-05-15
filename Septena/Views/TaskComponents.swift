@@ -188,6 +188,10 @@ struct InlineEditTaskRow: View {
   @Binding var title: String
   @Binding var notes: String
   let isDone: Bool
+  /// Whether to render the sun-in-checkbox glyph. Driven by the caller
+  /// so it can suppress the indicator on the Today filter (where every
+  /// row carries it implicitly).
+  var isToday: Bool = false
   /// Labels resolved from current data (project title or area title) so the
   /// chip reads "Septena" instead of the raw id.
   var projectTitle: String? = nil
@@ -224,7 +228,7 @@ struct InlineEditTaskRow: View {
       //    title's Y matches the closed taskBody (which is also pinned
       //    top). Notes + actions grow *below* this band.
       HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
-        TaskCheckbox(isDone: isDone, isToday: task.today, onToggle: onToggleDone)
+        TaskCheckbox(isDone: isDone, isToday: isToday, onToggle: onToggleDone)
           .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 
         TextField("Title", text: $title, axis: .vertical)
