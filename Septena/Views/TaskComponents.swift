@@ -41,11 +41,11 @@ struct ScreenTitle: View {
   var body: some View {
     HStack(spacing: 12) {
       Image(systemName: icon)
-        .font(.system(size: 20, weight: .regular))
+        .font(.title2)
         .foregroundStyle(iconTint)
       Text(title)
         .font(.septenaScreenTitle)
-        .foregroundStyle(Theme.inkPrimary)
+        .foregroundStyle(iconTint)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.horizontal, Theme.hPadding)
