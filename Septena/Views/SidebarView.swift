@@ -181,7 +181,8 @@ struct SidebarRootView: View {
   private var sidebarPhone: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 0) {
-        smartLists.padding(.top, 12).padding(.bottom, 12)
+        smartLists.padding(.top, 12).padding(.bottom, 16)
+        myListsHeader
         areasAndProjects
         Hairline().padding(.top, 16).padding(.bottom, 4)
         settingsRow
@@ -237,7 +238,8 @@ struct SidebarRootView: View {
   private var sidebarMac: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 0) {
-        smartLists.padding(.top, 12).padding(.bottom, 12)
+        smartLists.padding(.top, 12).padding(.bottom, 16)
+        myListsHeader
         areasAndProjects
         Spacer(minLength: 24)
       }
@@ -335,50 +337,96 @@ struct SidebarRootView: View {
     }
   }
 
+  // MARK: - "My Lists" section header
+
+  @ViewBuilder
+  private var myListsHeader: some View {
+    Text("My Lists")
+      .font(.footnote.weight(.semibold))
+      .textCase(.uppercase)
+      .foregroundStyle(.secondary)
+      .padding(.horizontal, Theme.hPadding)
+      .padding(.bottom, 6)
+  }
+
   // MARK: - Smart lists
+  //
+  // Reminders-style: on iOS a 2-column grid of tiles, on macOS a vertical
+  // list of rows with the same colored filled-icon glyph treatment. The
+  // route + icon + color + title comes from `SmartListSpec` so the tile and
+  // row renderers share one source of truth.
+
+  private struct SmartListSpec {
+    let route: Route
+    let icon: String
+    let color: Color
+    let title: String
+    let count: Int?
+    var overdueBadge: Int? = nil
+  }
+
+  private var smartListSpecs: [SmartListSpec] {
+    [
+      SmartListSpec(route: .filter(.inbox),
+                    icon: "tray.fill", color: .gray,
+                    title: "Inbox",
+                    count: counts?.inboxCount),
+      SmartListSpec(route: .filter(.today),
+                    icon: "sun.max.fill", color: .blue,
+                    title: "Today",
+                    count: counts?.todayCount,
+                    overdueBadge: counts?.reviewCount),
+      SmartListSpec(route: .next,
+                    icon: "arrow.right", color: .green,
+                    title: "Next",
+                    count: nextCount),
+      SmartListSpec(route: .filter(.upcoming),
+                    icon: "calendar", color: .red,
+                    title: "Upcoming",
+                    count: counts?.upcomingCount),
+      SmartListSpec(route: .filter(.unscheduled),
+                    icon: "rectangle.stack.fill", color: .orange,
+                    title: "Unscheduled",
+                    count: counts?.unscheduledCount),
+      SmartListSpec(route: .filter(.logbook),
+                    icon: "checkmark.circle.fill", color: .gray,
+                    title: "Logbook",
+                    count: nil),
+    ]
+  }
 
   @ViewBuilder
   private var smartLists: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      // Icon-tint rule: Today wears the accent because it's the verb of the
-      // app; everything else sits in muted gray so the sidebar feels calm.
-      sidebarButton(.filter(.inbox)) {
-        SmartListRow(icon: "tray.fill", tint: Theme.iconMuted, title: "Inbox",
-                     count: counts?.inboxCount)
+    #if os(macOS)
+    VStack(alignment: .leading, spacing: 2) {
+      ForEach(smartListSpecs, id: \.title) { spec in
+        sidebarButton(spec.route) {
+          SmartListRow(icon: spec.icon,
+                       iconColor: spec.color,
+                       title: spec.title,
+                       overdueBadge: spec.overdueBadge,
+                       count: spec.count)
+        }
       }
-      .padding(.bottom, 10)
-
-      sidebarButton(.filter(.today)) {
-        // Two separate signals, both visible when relevant:
-        //   • red pill = overdue (reviewCount) — surfaces what needs action
-        //   • gray count = pinned-for-today (todayCount) — the "regular" total
-        // Each hides independently when zero. They represent disjoint sets of
-        // tasks server-side, so showing both together isn't double-counting.
-        SmartListRow(icon: "sun.max.fill", tint: theme.accent,
-                     title: "Today",
-                     overdueBadge: counts?.reviewCount,
-                     count: counts?.todayCount)
-      }
-      sidebarButton(.next) {
-        SmartListRow(icon: "arrow.right", tint: Theme.iconMuted, title: "Next",
-                     count: nextCount)
-      }
-      sidebarButton(.filter(.upcoming)) {
-        SmartListRow(icon: "calendar", tint: Theme.iconMuted, title: "Upcoming",
-                     count: counts?.upcomingCount)
-      }
-      sidebarButton(.filter(.unscheduled)) {
-        SmartListRow(icon: "rectangle.stack.fill", tint: Theme.iconMuted,
-                     title: "Unscheduled",
-                     count: counts?.unscheduledCount)
-      }
-      sidebarButton(.filter(.logbook)) {
-        SmartListRow(icon: "checkmark.square.fill", tint: Theme.iconMuted,
-                     title: "Logbook")
-      }
-      .padding(.top, 10)
     }
     .padding(.horizontal, Theme.hPadding)
+    #else
+    LazyVGrid(columns: [GridItem(.flexible(), spacing: 12),
+                        GridItem(.flexible(), spacing: 12)],
+              spacing: 12) {
+      ForEach(smartListSpecs, id: \.title) { spec in
+        Button { selectRoute(spec.route) } label: {
+          SmartListTile(icon: spec.icon,
+                        iconColor: spec.color,
+                        title: spec.title,
+                        overdueBadge: spec.overdueBadge,
+                        count: spec.count)
+        }
+        .buttonStyle(.plain)
+      }
+    }
+    .padding(.horizontal, Theme.hPadding)
+    #endif
   }
 
   @ViewBuilder
@@ -795,23 +843,22 @@ struct SidebarRootView: View {
 
 struct SmartListRow: View {
   let icon: String
-  let tint: Color
+  /// The list's color — fills the rounded-square icon container behind a
+  /// white SF Symbol (Reminders pattern).
+  let iconColor: Color
   let title: String
   /// Red pill — used for "needs attention" (overdue / review).
   var overdueBadge: Int? = nil
-  /// Muted gray count — neutral signal for how much sits behind the row
-  /// (Inbox count, etc). Always rendered to the right of any overdue pill.
+  /// Muted gray count — neutral signal for how much sits behind the row.
   var count: Int? = nil
 
   var body: some View {
-    HStack(spacing: Theme.sidebarRowSpacing) {
-      Image(systemName: icon)
-        .font(.system(size: Theme.sidebarIconSize))
-        .foregroundStyle(tint)
-        .frame(width: Theme.sidebarIconSize + 4, alignment: .center)
+    HStack(spacing: 10) {
+      ColoredGlyph(icon: icon, color: iconColor,
+                   size: Theme.sidebarIconSize + 4)
       Text(title)
-        .font(.system(size: Theme.sidebarTitleSize, weight: Theme.sidebarTitleWeight))
-        .foregroundStyle(Theme.inkPrimary)
+        .font(.body)
+        .foregroundStyle(.primary)
       Spacer()
       if let b = overdueBadge, b > 0 {
         Text("\(b)")
@@ -819,17 +866,76 @@ struct SmartListRow: View {
           .foregroundStyle(.white)
           .frame(minWidth: 18, minHeight: 18)
           .padding(.horizontal, 5)
-          .background(Theme.overdueRed)
+          .background(Color.red)
           .clipShape(Capsule())
       }
       if let n = count, n > 0 {
         Text("\(n)")
-          .font(.system(size: 12, weight: .regular))
-          .foregroundStyle(Theme.inkSecondary.opacity(0.6))
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
       }
     }
     .frame(height: Theme.sidebarSmartRowHeight)
     .contentShape(Rectangle())
+  }
+}
+
+/// iOS "Reminders home screen" smart-list tile — 2-up grid card.
+struct SmartListTile: View {
+  let icon: String
+  let iconColor: Color
+  let title: String
+  var overdueBadge: Int? = nil
+  var count: Int? = nil
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(alignment: .top) {
+        ColoredGlyph(icon: icon, color: iconColor, size: 32)
+        Spacer()
+        Text(count.map(String.init) ?? "")
+          .font(.system(.title, design: .rounded, weight: .bold))
+          .foregroundStyle(.primary)
+          .monospacedDigit()
+      }
+      HStack(spacing: 6) {
+        Text(title)
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+        if let b = overdueBadge, b > 0 {
+          Text("\(b)")
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1)
+            .background(Color.red)
+            .clipShape(Capsule())
+        }
+        Spacer()
+      }
+    }
+    .padding(12)
+    .frame(maxWidth: .infinity, minHeight: 86, alignment: .topLeading)
+    .background(Theme.cardSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+  }
+}
+
+/// Reminders-style colored rounded-square glyph: filled colored container
+/// with a white SF Symbol inside. Used both in smart-list rows and tiles.
+struct ColoredGlyph: View {
+  let icon: String
+  let color: Color
+  let size: CGFloat
+
+  var body: some View {
+    ZStack {
+      RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+        .fill(color)
+      Image(systemName: icon)
+        .font(.system(size: size * 0.58, weight: .semibold))
+        .foregroundStyle(.white)
+    }
+    .frame(width: size, height: size)
   }
 }
 
