@@ -12,6 +12,8 @@
 		06F8765D7D9BA1A94FE3984D /* NextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB6D9FD80512D4CD62AEFFFD /* NextView.swift */; };
 		07B127F5FBCE0DE19AFCD387 /* SectionTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03DC46C772E45B60ECB7343 /* SectionTheme.swift */; };
 		09C5366893B7255E08295C88 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBD31B55684A505738EB624C /* App.swift */; };
+		0FABD76594A04A8968E1A04B /* PlatformShims.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF52BF4594608E7B7D09AA48 /* PlatformShims.swift */; };
+		187093B93D48863B5E1E1E37 /* RemindersBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561130AE996F0E92FE02767D /* RemindersBridge.swift */; };
 		18C336321218C66D6B8DB652 /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D413F054F59B2A90A319154 /* TaskDetailView.swift */; };
 		1D16A641ABEC4D4CCA37145F /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A07E6C15CC294172DF5D20 /* Theme.swift */; };
 		2741B6F5233E5619A7057258 /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B92826563E8E24C2A8F22B9 /* TaskListView.swift */; };
@@ -19,14 +21,22 @@
 		2C16528AA1E96FE947B5BBB3 /* ServerConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A660B22946E4DE2FAFDA8F31 /* ServerConfigView.swift */; };
 		36325B1E6E5A771C01028105 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 31313A0E804B33A3E43FC1F6 /* Info.plist */; };
 		3D19536CFB66987D6D5C7642 /* Info-Mac.plist in Resources */ = {isa = PBXBuildFile; fileRef = 5B49A0D20B2ECD672137900F /* Info-Mac.plist */; };
-		435E5A036D9398686E2F5F8A /* ThingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ED2BBCF38A2078797DD570D /* ThingsComponents.swift */; };
+		3F005BC1D6AB964EA48E05C3 /* PlatformShims.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF52BF4594608E7B7D09AA48 /* PlatformShims.swift */; };
 		513C8B1D41E5BA85B785129C /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E25F81FE5AA4B6BBC056275 /* DateParser.swift */; };
 		5330AF71083A1F3514B862B8 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */; };
+		55C20E76DB4BB1B7C3306925 /* RemindersImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0BB64F31640C03CD64DF855 /* RemindersImportView.swift */; };
+		59D1D3BB3E05AF32C782A9C7 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = E17D3542734AB0B32527C12C /* AppIcon.icns */; };
 		5ED33F95694C104969333EAD /* AreasProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5C26629FE8A4DF019B9784 /* AreasProjectsView.swift */; };
 		7FB3330B97BCBCB5D87C6F04 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F0AE5985EFE1A9A61F9BC7E /* SidebarView.swift */; };
 		85E7CF1494FFC184EA9CB811 /* NextItemsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B390D43AE1A7533F9AD7198 /* NextItemsSection.swift */; };
+		88997E6D2F83CB1CF7B4BA69 /* RemindersInboxSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33B6D5A7801C40656B13C350 /* RemindersInboxSection.swift */; };
 		8AAD68656B31C850F5FA0248 /* ServerConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A660B22946E4DE2FAFDA8F31 /* ServerConfigView.swift */; };
+		8D5C2FF5F66A353AF7905E34 /* RemindersImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0BB64F31640C03CD64DF855 /* RemindersImportView.swift */; };
+		94702073666C4968D36B96C5 /* RemindersBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561130AE996F0E92FE02767D /* RemindersBridge.swift */; };
+		968A90B44B7AA07A52F2103C /* TaskComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB88131B1CFB7EAA692D88E6 /* TaskComponents.swift */; };
 		9ED913F259DC6E83E4EDB824 /* SeptenaClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 583220978001091137587977 /* SeptenaClient.swift */; };
+		A14B8DF03D6FC0799D8AA8C2 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = E17D3542734AB0B32527C12C /* AppIcon.icns */; };
+		BD2AEA299118EC671BAFF32E /* RemindersInboxSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33B6D5A7801C40656B13C350 /* RemindersInboxSection.swift */; };
 		BFCF1AC2BC3C5A12D48B939F /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D413F054F59B2A90A319154 /* TaskDetailView.swift */; };
 		C0BF92A2B687EFEE45D80E25 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A07E6C15CC294172DF5D20 /* Theme.swift */; };
 		D3D801AE0714FA3E8696508A /* SectionTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03DC46C772E45B60ECB7343 /* SectionTheme.swift */; };
@@ -34,11 +44,11 @@
 		D770995846D0B23AC3F77F34 /* SeptenaClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 583220978001091137587977 /* SeptenaClient.swift */; };
 		DD200EF411309E29B543963F /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5ECFDA9128B73993023CB6 /* Models.swift */; };
 		DD215893EE774BA4E826E2B6 /* QuickEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B1504276BA0A9BED078DB11 /* QuickEntryView.swift */; };
+		DE402EEE2DA772AF7300E1C0 /* TaskComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB88131B1CFB7EAA692D88E6 /* TaskComponents.swift */; };
 		DF016EF192B7891D2DBE3CB6 /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E25F81FE5AA4B6BBC056275 /* DateParser.swift */; };
 		E31B94DDD122274806A91B5C /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B92826563E8E24C2A8F22B9 /* TaskListView.swift */; };
 		F62DAF6B252E82A6C8CB7167 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F0AE5985EFE1A9A61F9BC7E /* SidebarView.swift */; };
 		F6ED283EEF472FE8DA7B7DFB /* NextItemsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B390D43AE1A7533F9AD7198 /* NextItemsSection.swift */; };
-		F96C5B2A2508D5DE609506E3 /* ThingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ED2BBCF38A2078797DD570D /* ThingsComponents.swift */; };
 		FA564DDD7B30817FB91EC0E5 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBD31B55684A505738EB624C /* App.swift */; };
 		FAA49CC911788D53BAFDBAFD /* NextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB6D9FD80512D4CD62AEFFFD /* NextView.swift */; };
 		FB79CB77D7DB4D47195A606D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */; };
@@ -50,9 +60,10 @@
 		1E25F81FE5AA4B6BBC056275 /* DateParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateParser.swift; sourceTree = "<group>"; };
 		2D413F054F59B2A90A319154 /* TaskDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
 		31313A0E804B33A3E43FC1F6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		3ED2BBCF38A2078797DD570D /* ThingsComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThingsComponents.swift; sourceTree = "<group>"; };
+		33B6D5A7801C40656B13C350 /* RemindersInboxSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersInboxSection.swift; sourceTree = "<group>"; };
+		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
+		561130AE996F0E92FE02767D /* RemindersBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersBridge.swift; sourceTree = "<group>"; };
 		583220978001091137587977 /* SeptenaClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptenaClient.swift; sourceTree = "<group>"; };
 		59055370ABA84DB912D64D1E /* SeptenaMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeptenaMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5B49A0D20B2ECD672137900F /* Info-Mac.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Info-Mac.plist"; sourceTree = "<group>"; };
@@ -66,6 +77,10 @@
 		C03DC46C772E45B60ECB7343 /* SectionTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionTheme.swift; sourceTree = "<group>"; };
 		C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D4A07E6C15CC294172DF5D20 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		DB88131B1CFB7EAA692D88E6 /* TaskComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskComponents.swift; sourceTree = "<group>"; };
+		E0BB64F31640C03CD64DF855 /* RemindersImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersImportView.swift; sourceTree = "<group>"; };
+		E17D3542734AB0B32527C12C /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
+		EF52BF4594608E7B7D09AA48 /* PlatformShims.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformShims.swift; sourceTree = "<group>"; };
 		FB6D9FD80512D4CD62AEFFFD /* NextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -74,6 +89,7 @@
 			isa = PBXGroup;
 			children = (
 				BBD31B55684A505738EB624C /* App.swift */,
+				E17D3542734AB0B32527C12C /* AppIcon.icns */,
 				C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */,
 				5B49A0D20B2ECD672137900F /* Info-Mac.plist */,
 				31313A0E804B33A3E43FC1F6 /* Info.plist */,
@@ -88,13 +104,16 @@
 				9A5C26629FE8A4DF019B9784 /* AreasProjectsView.swift */,
 				0B390D43AE1A7533F9AD7198 /* NextItemsSection.swift */,
 				FB6D9FD80512D4CD62AEFFFD /* NextView.swift */,
+				EF52BF4594608E7B7D09AA48 /* PlatformShims.swift */,
 				6B1504276BA0A9BED078DB11 /* QuickEntryView.swift */,
+				E0BB64F31640C03CD64DF855 /* RemindersImportView.swift */,
+				33B6D5A7801C40656B13C350 /* RemindersInboxSection.swift */,
 				A660B22946E4DE2FAFDA8F31 /* ServerConfigView.swift */,
 				9F0AE5985EFE1A9A61F9BC7E /* SidebarView.swift */,
+				DB88131B1CFB7EAA692D88E6 /* TaskComponents.swift */,
 				2D413F054F59B2A90A319154 /* TaskDetailView.swift */,
 				9B92826563E8E24C2A8F22B9 /* TaskListView.swift */,
 				D4A07E6C15CC294172DF5D20 /* Theme.swift */,
-				3ED2BBCF38A2078797DD570D /* ThingsComponents.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -123,6 +142,7 @@
 				1E25F81FE5AA4B6BBC056275 /* DateParser.swift */,
 				53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */,
 				7D5ECFDA9128B73993023CB6 /* Models.swift */,
+				561130AE996F0E92FE02767D /* RemindersBridge.swift */,
 				C03DC46C772E45B60ECB7343 /* SectionTheme.swift */,
 				583220978001091137587977 /* SeptenaClient.swift */,
 			);
@@ -181,6 +201,10 @@
 						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
+					FD752EC978FED2E2D676DE2D = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
 				};
 			};
 			buildConfigurationList = D5CFABB79F2461F76A2D3ECE /* Build configuration list for PBXProject "Septena" */;
@@ -208,6 +232,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				59D1D3BB3E05AF32C782A9C7 /* AppIcon.icns in Resources */,
 				D4B1495C0BDE3AF22A629505 /* Assets.xcassets in Resources */,
 				36325B1E6E5A771C01028105 /* Info.plist in Resources */,
 			);
@@ -217,6 +242,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A14B8DF03D6FC0799D8AA8C2 /* AppIcon.icns in Resources */,
 				FB79CB77D7DB4D47195A606D /* Assets.xcassets in Resources */,
 				3D19536CFB66987D6D5C7642 /* Info-Mac.plist in Resources */,
 			);
@@ -236,15 +262,19 @@
 				0448F507E1F1600F9933AEED /* Models.swift in Sources */,
 				F6ED283EEF472FE8DA7B7DFB /* NextItemsSection.swift in Sources */,
 				FAA49CC911788D53BAFDBAFD /* NextView.swift in Sources */,
+				3F005BC1D6AB964EA48E05C3 /* PlatformShims.swift in Sources */,
 				DD215893EE774BA4E826E2B6 /* QuickEntryView.swift in Sources */,
+				187093B93D48863B5E1E1E37 /* RemindersBridge.swift in Sources */,
+				8D5C2FF5F66A353AF7905E34 /* RemindersImportView.swift in Sources */,
+				88997E6D2F83CB1CF7B4BA69 /* RemindersInboxSection.swift in Sources */,
 				07B127F5FBCE0DE19AFCD387 /* SectionTheme.swift in Sources */,
 				D770995846D0B23AC3F77F34 /* SeptenaClient.swift in Sources */,
 				2C16528AA1E96FE947B5BBB3 /* ServerConfigView.swift in Sources */,
 				F62DAF6B252E82A6C8CB7167 /* SidebarView.swift in Sources */,
+				DE402EEE2DA772AF7300E1C0 /* TaskComponents.swift in Sources */,
 				18C336321218C66D6B8DB652 /* TaskDetailView.swift in Sources */,
 				E31B94DDD122274806A91B5C /* TaskListView.swift in Sources */,
 				C0BF92A2B687EFEE45D80E25 /* Theme.swift in Sources */,
-				435E5A036D9398686E2F5F8A /* ThingsComponents.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -259,15 +289,19 @@
 				DD200EF411309E29B543963F /* Models.swift in Sources */,
 				85E7CF1494FFC184EA9CB811 /* NextItemsSection.swift in Sources */,
 				06F8765D7D9BA1A94FE3984D /* NextView.swift in Sources */,
+				0FABD76594A04A8968E1A04B /* PlatformShims.swift in Sources */,
 				02A5629DB466DAEA69A99B2E /* QuickEntryView.swift in Sources */,
+				94702073666C4968D36B96C5 /* RemindersBridge.swift in Sources */,
+				55C20E76DB4BB1B7C3306925 /* RemindersImportView.swift in Sources */,
+				BD2AEA299118EC671BAFF32E /* RemindersInboxSection.swift in Sources */,
 				D3D801AE0714FA3E8696508A /* SectionTheme.swift in Sources */,
 				9ED913F259DC6E83E4EDB824 /* SeptenaClient.swift in Sources */,
 				8AAD68656B31C850F5FA0248 /* ServerConfigView.swift in Sources */,
 				7FB3330B97BCBCB5D87C6F04 /* SidebarView.swift in Sources */,
+				968A90B44B7AA07A52F2103C /* TaskComponents.swift in Sources */,
 				BFCF1AC2BC3C5A12D48B939F /* TaskDetailView.swift in Sources */,
 				2741B6F5233E5619A7057258 /* TaskListView.swift in Sources */,
 				1D16A641ABEC4D4CCA37145F /* Theme.swift in Sources */,
-				F96C5B2A2508D5DE609506E3 /* ThingsComponents.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -279,9 +313,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 992N457T8D;
+				CODE_SIGN_ENTITLEMENTS = Septena/Septena.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Septena/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -289,7 +322,6 @@
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.septena.app;
-				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -365,6 +397,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Septena/SeptenaMac.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Septena/Info-Mac.plist";
@@ -381,6 +415,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Septena/SeptenaMac.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Septena/Info-Mac.plist";
@@ -398,9 +434,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 992N457T8D;
+				CODE_SIGN_ENTITLEMENTS = Septena/Septena.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Septena/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -408,7 +443,6 @@
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.septena.app;
-				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};

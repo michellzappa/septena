@@ -1,7 +1,7 @@
 import SwiftUI
 
-// Things-style homepage on iPhone: the root screen IS the sidebar.
-// QuickFind + smart lists + areas/projects + Settings. See docs/things-reference/navigation.md.
+// compact homepage on iPhone: the root screen IS the sidebar.
+// QuickFind + smart lists + areas/projects + Settings. See docs/reference/navigation.md.
 
 struct SidebarRootView: View {
   @EnvironmentObject var client: SeptenaClient
@@ -11,14 +11,20 @@ struct SidebarRootView: View {
   @State private var areas: [Area] = []
   @State private var projects: [Project] = []
   @State private var counts: TasksCounts? = nil
-  @State private var areaOpenCounts: [String: Int] = [:]
-  @State private var projectOpenCounts: [String: Int] = [:]
+  /// Fraction of each project's tasks that are done (0...1). Drives the
+  /// pie-slice icon in SidebarProjectRow.
+  @State private var projectProgress: [String: Double] = [:]
+  /// Open task count per project — drives the muted gray count on each
+  /// SidebarProjectRow.
+  @State private var projectOpenCount: [String: Int] = [:]
+  /// Open task count per area, rolling up loose-in-area + tasks in that
+  /// area's projects.
+  @State private var areaOpenCount: [String: Int] = [:]
+  /// Open task count for the "Next" smart list. Fetched via view=next since
+  /// `/counts` doesn't expose it directly.
+  @State private var nextCount: Int? = nil
   @State private var errorMessage: String?
 
-  /// Briefly tints the tapped row so the user sees the hit register
-  /// before the push transition begins (Things-style feedback).
-  @State private var pulsedRoute: Route?
-  @State private var pulseToken = 0
 
   /// Magic Plus on the homepage offers task / project / area creation.
   @State private var showingCreateMenu = false
@@ -27,61 +33,121 @@ struct SidebarRootView: View {
   @State private var newAreaName = ""
 
   var body: some View {
+    #if os(macOS)
+    sidebarMac
+    #else
+    sidebarPhone
+    #endif
+  }
+
+  /// iPhone / iPad layout: scrolling list with a floating Magic Plus over it.
+  /// Settings is the discreet last row of the scroll.
+  @ViewBuilder
+  private var sidebarPhone: some View {
     ZStack(alignment: .bottomTrailing) {
       ScrollView {
         VStack(alignment: .leading, spacing: 0) {
-          QuickFindBar()
-            .padding(.horizontal, Theme.hPadding)
-            .padding(.top, 8)
-            .padding(.bottom, 16)
-
-          smartLists
-            .padding(.bottom, 12)
-
+          smartLists.padding(.top, 12).padding(.bottom, 12)
           areasAndProjects
-
-          Hairline()
-            .padding(.top, 16)
-            .padding(.bottom, 4)
-
+          Hairline().padding(.top, 16).padding(.bottom, 4)
           settingsRow
-
           Spacer(minLength: 120)
         }
       }
-      .background(Theme.paperBackground)
-      .navigationBarHidden(true)
+      .background(Theme.sidebarBackground)
+      .septenaHideNavBar()
 
       MagicPlusButton { showingCreateMenu = true }
         .padding(.trailing, Theme.hPadding)
         .padding(.bottom, 20)
     }
+    .modifier(SidebarSheets(
+      showingCreateMenu: $showingCreateMenu,
+      showingNewProject: $showingNewProject,
+      showingNewArea: $showingNewArea,
+      newAreaName: $newAreaName,
+      errorMessage: $errorMessage,
+      areas: areas,
+      onNewTodo: { nav.showingQuickEntry = true },
+      onCreateProject: { title, areaId in createProject(title: title, areaId: areaId) },
+      onCreateArea: { createArea() }
+    ))
     .task { await load() }
     .refreshable { await load() }
-    .confirmationDialog("Create", isPresented: $showingCreateMenu, titleVisibility: .hidden) {
-      Button("New To-Do")    { nav.showingQuickEntry = true }
-      Button("New Project")  { showingNewProject = true }
-      Button("New Area")     { newAreaName = ""; showingNewArea = true }
-      Button("Cancel", role: .cancel) {}
+    // Auto-refresh counts whenever a task / project / area mutation happens
+    // anywhere in the app. SeptenaClient fans this out from postJSON /
+    // putJSON / deleteRaw, so this catches creates, completions, moves,
+    // schedule changes, Reminders imports, area edits, etc.
+    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
+      Task { await load() }
     }
-    .sheet(isPresented: $showingNewProject) {
-      NewProjectSheet(areas: areas) { title, areaId in
-        createProject(title: title, areaId: areaId)
+  }
+
+  /// macOS layout: scroll above, fixed bottom bar with "+ New List" and a
+  /// settings glyph — mirrors the reference design's sidebar chrome.
+  @ViewBuilder
+  private var sidebarMac: some View {
+    VStack(spacing: 0) {
+      ScrollView {
+        VStack(alignment: .leading, spacing: 0) {
+          smartLists.padding(.top, 12).padding(.bottom, 12)
+          areasAndProjects
+          Spacer(minLength: 24)
+        }
       }
-      .presentationDetents([.medium])
+      .background(Theme.sidebarBackground)
+
+      Divider()
+
+      HStack(spacing: 0) {
+        Button { showingNewProject = true } label: {
+          HStack(spacing: 6) {
+            Image(systemName: "plus")
+              .font(.system(size: 12, weight: .semibold))
+            Text("New List")
+              .font(.system(size: 13, weight: .regular))
+          }
+          .foregroundStyle(Theme.inkSecondary)
+          .padding(.vertical, 8)
+          .padding(.horizontal, 4)
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+
+        Spacer()
+
+        Button { nav.path = [.settings] } label: {
+          Image(systemName: "slider.horizontal.3")
+            .font(.system(size: 13, weight: .regular))
+            .foregroundStyle(Theme.inkSecondary)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 4)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+      }
+      .padding(.horizontal, Theme.hPadding)
+      .background(Theme.sidebarBackground)
     }
-    .alert("New Area", isPresented: $showingNewArea) {
-      TextField("Area name", text: $newAreaName)
-      Button("Create") { createArea() }
-      Button("Cancel", role: .cancel) { newAreaName = "" }
-    }
-    .alert("Error", isPresented: Binding(
-      get: { errorMessage != nil },
-      set: { if !$0 { errorMessage = nil } }
-    )) {
-      Button("OK") { errorMessage = nil }
-    } message: {
-      Text(errorMessage ?? "")
+    .modifier(SidebarSheets(
+      showingCreateMenu: $showingCreateMenu,
+      showingNewProject: $showingNewProject,
+      showingNewArea: $showingNewArea,
+      newAreaName: $newAreaName,
+      errorMessage: $errorMessage,
+      areas: areas,
+      onNewTodo: { nav.showingQuickEntry = true },
+      onCreateProject: { title, areaId in createProject(title: title, areaId: areaId) },
+      onCreateArea: { createArea() }
+    ))
+    .task { await load() }
+    .refreshable { await load() }
+    // Auto-refresh counts whenever a task / project / area mutation happens
+    // anywhere in the app. SeptenaClient fans this out from postJSON /
+    // putJSON / deleteRaw, so this catches creates, completions, moves,
+    // schedule changes, Reminders imports, area edits, etc.
+    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
+      Task { await load() }
     }
   }
 
@@ -124,35 +190,40 @@ struct SidebarRootView: View {
   @ViewBuilder
   private var smartLists: some View {
     VStack(alignment: .leading, spacing: 0) {
+      // Icon-tint rule: Today wears the accent because it's the verb of the
+      // app; everything else sits in muted gray so the sidebar feels calm.
       sidebarButton(.filter(.inbox)) {
-        SmartListRow(icon: "tray.fill", tint: Theme.inboxBlue,
-                     title: "Inbox", count: counts?.inboxCount)
+        SmartListRow(icon: "tray.fill", tint: Theme.iconMuted, title: "Inbox",
+                     count: counts?.inboxCount)
       }
       .padding(.bottom, 10)
 
       sidebarButton(.filter(.today)) {
-        SmartListRow(icon: "star.fill", tint: Theme.todayYellow,
+        // Two separate signals, both visible when relevant:
+        //   • red pill = overdue (reviewCount) — surfaces what needs action
+        //   • gray count = pinned-for-today (todayCount) — the "regular" total
+        // Each hides independently when zero. They represent disjoint sets of
+        // tasks server-side, so showing both together isn't double-counting.
+        SmartListRow(icon: "sun.max.fill", tint: theme.accent,
                      title: "Today",
                      overdueBadge: counts?.reviewCount,
                      count: counts?.todayCount)
       }
-      Button { pulse(.next) } label: {
-        SmartListRow(icon: "circle.hexagongrid.fill", tint: Theme.nextPurple,
-                     title: "Next")
+      sidebarButton(.next) {
+        SmartListRow(icon: "arrow.right", tint: Theme.iconMuted, title: "Next",
+                     count: nextCount)
       }
-      .buttonStyle(.plain)
-      .background(pulsedRoute == .next ? theme.accent.opacity(0.14) : Color.clear)
-      .animation(.easeOut(duration: 0.25), value: pulsedRoute)
       sidebarButton(.filter(.upcoming)) {
-        SmartListRow(icon: "calendar", tint: Theme.upcomingRed,
-                     title: "Upcoming", count: counts?.upcomingCount)
+        SmartListRow(icon: "calendar", tint: Theme.iconMuted, title: "Upcoming",
+                     count: counts?.upcomingCount)
       }
       sidebarButton(.filter(.unscheduled)) {
-        SmartListRow(icon: "rectangle.stack.fill", tint: Theme.unscheduledTeal,
-                     title: "Unscheduled", count: counts?.unscheduledCount)
+        SmartListRow(icon: "rectangle.stack.fill", tint: Theme.iconMuted,
+                     title: "Unscheduled",
+                     count: counts?.unscheduledCount)
       }
       sidebarButton(.filter(.logbook)) {
-        SmartListRow(icon: "checkmark.square.fill", tint: Theme.logbookGreen,
+        SmartListRow(icon: "checkmark.square.fill", tint: Theme.iconMuted,
                      title: "Logbook")
       }
       .padding(.top, 10)
@@ -163,23 +234,50 @@ struct SidebarRootView: View {
   @ViewBuilder
   private func sidebarButton<Content: View>(_ route: Route,
                                             @ViewBuilder label: () -> Content) -> some View {
-    Button { pulse(route) } label: { label() }
-      .buttonStyle(.plain)
-      .background(pulsedRoute == route ? theme.accent.opacity(0.14) : Color.clear)
-      .animation(.easeOut(duration: 0.25), value: pulsedRoute)
+    // InertButtonStyle (instead of `.plain`) suppresses the brief label-tint
+    // flash that macOS applies on click. The persistent selection pill is
+    // the only feedback we want.
+    Button { selectRoute(route) } label: { label() }
+      .buttonStyle(InertButtonStyle())
+      .background(rowBackground(for: route))
+      .animation(.easeOut(duration: 0.15), value: nav.path)
   }
 
-  /// Flash a row's background, then push the route. The pulse fades after a
-  /// short delay so re-entry to the same destination re-flashes next time.
-  private func pulse(_ route: Route) {
+  private func selectRoute(_ route: Route) {
     Haptics.tap()
-    pulsedRoute = route
-    pulseToken &+= 1
-    let token = pulseToken
-    nav.path.append(route)
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-      if pulseToken == token { pulsedRoute = nil }
+    // Tapping a sidebar row replaces the current detail rather than deepening
+    // the stack — the sidebar IS the navigation, not a "go back" affordance.
+    nav.path = [route]
+  }
+
+  /// Which route the sidebar should render as "current".
+  private var selectedRoute: Route {
+    nav.path.last ?? .filter(.today)
+  }
+
+  /// Stable-id comparison. Default `Route` equality compares the whole
+  /// associated value (full `Project` / `Area` struct), which breaks the
+  /// highlight as soon as the sidebar reloads a project with any changed
+  /// field. We only care about identity here.
+  private func isSelected(_ route: Route) -> Bool {
+    switch (selectedRoute, route) {
+    case (.filter(let a), .filter(let b)):   return a == b
+    case (.next, .next):                     return true
+    case (.settings, .settings):             return true
+    case (.project(let a), .project(let b)): return a.id == b.id
+    case (.area(let a), .area(let b)):       return a.id == b.id
+    default:                                 return false
     }
+  }
+
+  /// Single highlight rule: selected → light accent tint pill, otherwise
+  /// transparent. Same shape and color logic as the task-row selection pill.
+  @ViewBuilder
+  private func rowBackground(for route: Route) -> some View {
+    let fill: Color = isSelected(route) ? theme.accent.opacity(0.15) : .clear
+    RoundedRectangle(cornerRadius: 6, style: .continuous)
+      .fill(fill)
+      .padding(.horizontal, -4)
   }
 
   // MARK: - Areas and projects
@@ -188,14 +286,11 @@ struct SidebarRootView: View {
   private var areasAndProjects: some View {
     VStack(alignment: .leading, spacing: 0) {
       ForEach(topLevelProjects) { project in
-        Button { pulse(.project(project)) } label: {
+        sidebarButton(.project(project)) {
           SidebarProjectRow(name: project.title,
-                            count: projectOpenCounts[project.id])
-            .padding(.horizontal, Theme.hPadding)
+                            progress: projectProgress[project.id] ?? 0,
+                            count: projectOpenCount[project.id] ?? 0)
         }
-        .buttonStyle(.plain)
-        .background(pulsedRoute == .project(project) ? theme.accent.opacity(0.14) : Color.clear)
-        .animation(.easeOut(duration: 0.25), value: pulsedRoute)
       }
 
       if !topLevelProjects.isEmpty && !areas.isEmpty {
@@ -206,6 +301,7 @@ struct SidebarRootView: View {
         areaBlock(area)
       }
     }
+    .padding(.horizontal, Theme.hPadding)
   }
 
   @ViewBuilder
@@ -213,27 +309,67 @@ struct SidebarRootView: View {
     let projectsInArea = projects.filter { $0.area == area.id && $0.status == .active }
 
     VStack(alignment: .leading, spacing: 0) {
+      // macOS sidebar already reads as a single quiet column; the hairline
+      // between areas adds visual noise without grouping value. iOS keeps it
+      // since the wider row spacing there benefits from an explicit divider.
+      #if os(iOS)
       Hairline()
         .padding(.top, 12)
         .padding(.bottom, 6)
+      #else
+      Spacer().frame(height: 12)
+      #endif
 
-      Button { pulse(.area(area)) } label: {
-        SidebarAreaRow(name: area.title, count: areaOpenCounts[area.id])
-          .padding(.horizontal, Theme.hPadding)
+      sidebarButton(.area(area)) {
+        SidebarAreaRow(name: area.title, count: areaOpenCount[area.id] ?? 0)
       }
-      .buttonStyle(.plain)
-      .background(pulsedRoute == .area(area) ? theme.accent.opacity(0.14) : Color.clear)
-      .animation(.easeOut(duration: 0.25), value: pulsedRoute)
+      // Drag the area header to reorder. The whole block accepts drops so the
+      // user can drop "above this area" without aiming at a 1pt hairline.
+      .draggable(area.id) {
+        // Drag preview — keep it close to the actual row look.
+        Text(area.title)
+          .font(.system(size: Theme.sidebarAreaTitleSize, weight: .semibold))
+          .foregroundStyle(Theme.inkPrimary)
+          .padding(.horizontal, 12).padding(.vertical, 6)
+          .background(Theme.cardSurface)
+          .clipShape(RoundedRectangle(cornerRadius: 6))
+          .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
+      }
 
       ForEach(projectsInArea) { project in
-        Button { pulse(.project(project)) } label: {
+        sidebarButton(.project(project)) {
           SidebarProjectRow(name: project.title,
-                            count: projectOpenCounts[project.id])
-            .padding(.horizontal, Theme.hPadding)
+                            progress: projectProgress[project.id] ?? 0,
+                            count: projectOpenCount[project.id] ?? 0)
         }
-        .buttonStyle(.plain)
-        .background(pulsedRoute == .project(project) ? theme.accent.opacity(0.14) : Color.clear)
-        .animation(.easeOut(duration: 0.25), value: pulsedRoute)
+      }
+    }
+    .dropDestination(for: String.self) { items, _ in
+      guard let droppedId = items.first, droppedId != area.id else { return false }
+      reorderArea(droppedId, before: area.id)
+      return true
+    }
+  }
+
+  /// Move the area with id `movedId` to the position immediately before
+  /// `targetId`, then sync to the server.
+  private func reorderArea(_ movedId: String, before targetId: String) {
+    guard let from = areas.firstIndex(where: { $0.id == movedId }),
+          let to = areas.firstIndex(where: { $0.id == targetId }),
+          from != to else { return }
+    Haptics.tick()
+    var next = areas
+    let item = next.remove(at: from)
+    // After removal the target's index may have shifted by one.
+    let insertAt = (from < to) ? to - 1 : to
+    next.insert(item, at: insertAt)
+    areas = next
+    Task {
+      do {
+        areas = try await client.replaceAreas(next)
+      } catch {
+        errorMessage = error.localizedDescription
+        await load()
       }
     }
   }
@@ -248,7 +384,7 @@ struct SidebarRootView: View {
   private var settingsRow: some View {
     // Discreet on purpose — Settings is rarely needed; the rest of the
     // sidebar is the main surface.
-    Button { pulse(.settings) } label: {
+    sidebarButton(.settings) {
       HStack(spacing: 10) {
         Image(systemName: "gearshape.fill")
           .font(.system(size: 14))
@@ -259,13 +395,10 @@ struct SidebarRootView: View {
           .foregroundStyle(Theme.inkSecondary)
         Spacer()
       }
-      .padding(.horizontal, Theme.hPadding)
       .frame(height: 30)
       .contentShape(Rectangle())
     }
-    .buttonStyle(.plain)
-    .background(pulsedRoute == .settings ? theme.accent.opacity(0.14) : Color.clear)
-    .animation(.easeOut(duration: 0.25), value: pulsedRoute)
+    .padding(.horizontal, Theme.hPadding)
   }
 
   // MARK: - Load
@@ -276,20 +409,43 @@ struct SidebarRootView: View {
       async let p = client.projects()
       async let c = client.counts()
       async let all = client.list(view: "all")
+      async let next = client.list(view: "next")
       areas = try await a
       projects = try await p
       counts = try await c
-      let allItems = try await all.items.filter { $0.status == .open }
-      // Area count is *direct* tasks only — projects within the area carry
-      // their own counts, double-counting at the area level would be noise.
-      areaOpenCounts = Dictionary(
-        grouping: allItems.filter { $0.project == nil },
-        by: { $0.area ?? "" }
-      ).mapValues { $0.count }
-      projectOpenCounts = Dictionary(
-        grouping: allItems.filter { $0.project != nil },
-        by: { $0.project! }
-      ).mapValues { $0.count }
+      nextCount = (try? await next.items.count)
+
+      // Project progress = done / (done + open). Cancelled/someday don't
+      // count toward either side of the ratio (they're not "to-do").
+      let items = try await all.items
+      var done: [String: Int] = [:]
+      var total: [String: Int] = [:]
+      var projOpen: [String: Int] = [:]
+      var areaDirectOpen: [String: Int] = [:]
+      for t in items {
+        if let pid = t.project {
+          switch t.status {
+          case .done:           done[pid, default: 0] += 1; total[pid, default: 0] += 1
+          case .open:           total[pid, default: 0] += 1; projOpen[pid, default: 0] += 1
+          case .cancelled, .someday: break
+          }
+        } else if let aid = t.area, t.status == .open {
+          // Open task assigned directly to an area (no project) — counts
+          // toward that area's roll-up.
+          areaDirectOpen[aid, default: 0] += 1
+        }
+      }
+      projectProgress = total.reduce(into: [:]) { acc, kv in
+        acc[kv.key] = Double(done[kv.key] ?? 0) / Double(kv.value)
+      }
+      projectOpenCount = projOpen
+      // Area count = loose-in-area + sum of its projects' open counts.
+      var areaCounts: [String: Int] = areaDirectOpen
+      for project in projects {
+        guard let aid = project.area, let n = projOpen[project.id] else { continue }
+        areaCounts[aid, default: 0] += n
+      }
+      areaOpenCount = areaCounts
     } catch {
       errorMessage = error.localizedDescription
     }
@@ -298,79 +454,65 @@ struct SidebarRootView: View {
 
 // MARK: - Sidebar primitives
 
-struct QuickFindBar: View {
-  var body: some View {
-    HStack(spacing: 6) {
-      Image(systemName: "magnifyingglass")
-        .font(.system(size: 13))
-        .foregroundStyle(Theme.inkSecondary)
-      Text("Quick Find")
-        .font(.system(size: 15))
-        .foregroundStyle(Theme.inkSecondary)
-    }
-    .frame(maxWidth: .infinity)
-    .frame(height: 36)
-    .background(Theme.mutedSurface)
-    .clipShape(RoundedRectangle(cornerRadius: 10))
-  }
-}
-
 struct SmartListRow: View {
   let icon: String
   let tint: Color
   let title: String
+  /// Red pill — used for "needs attention" (overdue / review).
   var overdueBadge: Int? = nil
+  /// Muted gray count — neutral signal for how much sits behind the row
+  /// (Inbox count, etc). Always rendered to the right of any overdue pill.
   var count: Int? = nil
 
   var body: some View {
-    HStack(spacing: 14) {
+    HStack(spacing: Theme.sidebarRowSpacing) {
       Image(systemName: icon)
-        .font(.system(size: 22))
+        .font(.system(size: Theme.sidebarIconSize))
         .foregroundStyle(tint)
-        .saturation(0.72)
-        .frame(width: 24, alignment: .center)
+        .frame(width: Theme.sidebarIconSize + 4, alignment: .center)
       Text(title)
-        .font(.system(size: 17, weight: .medium))
+        .font(.system(size: Theme.sidebarTitleSize, weight: Theme.sidebarTitleWeight))
         .foregroundStyle(Theme.inkPrimary)
       Spacer()
       if let b = overdueBadge, b > 0 {
         Text("\(b)")
           .font(.septenaBadge)
           .foregroundStyle(.white)
-          .frame(minWidth: 20, minHeight: 20)
-          .padding(.horizontal, 6)
+          .frame(minWidth: 18, minHeight: 18)
+          .padding(.horizontal, 5)
           .background(Theme.overdueRed)
           .clipShape(Capsule())
       }
-      if let c = count, c > 0 {
-        Text("\(c)")
-          .font(.septenaMeta)
-          .foregroundStyle(Theme.inkSecondary)
+      if let n = count, n > 0 {
+        Text("\(n)")
+          .font(.system(size: 12, weight: .regular))
+          .foregroundStyle(Theme.inkSecondary.opacity(0.6))
       }
     }
-    .frame(height: 38)
+    .frame(height: Theme.sidebarSmartRowHeight)
     .contentShape(Rectangle())
   }
 }
 
 struct SidebarAreaRow: View {
   let name: String
-  var count: Int? = nil
+  /// Open task count rolled up across the area (loose + projects in it).
+  var count: Int = 0
 
   var body: some View {
-    HStack(spacing: 14) {
+    HStack(spacing: Theme.sidebarRowSpacing) {
       Image(systemName: "square.stack.3d.up.fill")
-        .font(.system(size: 18))
+        .font(.system(size: Theme.sidebarIconSize - 4))
         .foregroundStyle(Theme.iconMuted)
-        .frame(width: 24, alignment: .center)
+        .frame(width: Theme.sidebarIconSize + 4, alignment: .center)
       Text(name)
-        .font(.system(size: 17, weight: .semibold))
+        .font(.system(size: Theme.sidebarAreaTitleSize, weight: .semibold))
         .foregroundStyle(Theme.inkPrimary)
       Spacer()
-      if let c = count, c > 0 {
-        Text("\(c)")
-          .font(.septenaMeta)
-          .foregroundStyle(Theme.inkSecondary)
+      if count > 0 {
+        Text("\(count)")
+          .font(.system(size: 12, weight: .regular))
+          .foregroundStyle(Theme.inkSecondary.opacity(0.6))
       }
     }
     .frame(height: Theme.sidebarRowHeight)
@@ -380,33 +522,82 @@ struct SidebarAreaRow: View {
 
 struct SidebarProjectRow: View {
   let name: String
-  var count: Int? = nil
+  /// Fraction of tasks done (0...1). 0 → empty ring, 1 → filled disc.
+  var progress: Double = 0
+  var tint: Color = Theme.iconMuted
+  /// Open task count — muted gray, right-aligned alongside the pie.
+  var count: Int = 0
 
   var body: some View {
-    HStack(spacing: 14) {
-      ZStack {
-        Circle()
-          .stroke(Theme.iconMuted, lineWidth: 1.5)
-          .frame(width: 16, height: 16)
-        Circle()
-          .trim(from: 0, to: 0.25)
-          .stroke(Theme.iconMuted, lineWidth: 6)
-          .frame(width: 10, height: 10)
-          .rotationEffect(.degrees(-90))
-      }
-      .frame(width: 24, alignment: .center)
+    HStack(spacing: Theme.sidebarRowSpacing) {
+      ProjectProgressIcon(progress: progress, tint: tint)
+        .frame(width: Theme.sidebarIconSize + 4, alignment: .center)
       Text(name)
-        .font(.system(size: 17, weight: .medium))
+        .font(.system(size: Theme.sidebarTitleSize, weight: Theme.sidebarTitleWeight))
         .foregroundStyle(Theme.inkPrimary)
       Spacer()
-      if let c = count, c > 0 {
-        Text("\(c)")
-          .font(.septenaMeta)
-          .foregroundStyle(Theme.inkSecondary)
+      if count > 0 {
+        Text("\(count)")
+          .font(.system(size: 12, weight: .regular))
+          .foregroundStyle(Theme.inkSecondary.opacity(0.6))
       }
     }
-    .frame(height: 36)
+    .frame(height: Theme.sidebarProjectRowHeight)
     .contentShape(Rectangle())
+  }
+}
+
+/// compact project icon: a thin circle outline with a pie wedge filling
+/// from 12 o'clock clockwise in proportion to completion.
+struct ProjectProgressIcon: View {
+  let progress: Double
+  let tint: Color
+  /// Optional override for sizes that don't match the sidebar default
+  /// (e.g. the larger glyph next to a project's screen title).
+  var diameter: CGFloat? = nil
+  var lineWidth: CGFloat? = nil
+
+  private var resolvedDiameter: CGFloat { diameter ?? Theme.sidebarIconSize * 0.95 }
+  private var resolvedLineWidth: CGFloat { lineWidth ?? 0.9 }
+  /// Gap between the inner pie and the ring. Pie sits inside the ring's
+  /// inner edge (resolvedLineWidth) plus extra breathing room so the two
+  /// read as distinct shapes, not a filled-stroke disc.
+  private var pieInset: CGFloat { resolvedLineWidth + 2.5 }
+
+  var body: some View {
+    let clamped = max(0, min(1, progress))
+    ZStack {
+      Circle()
+        .strokeBorder(tint, lineWidth: resolvedLineWidth)
+      PieSliceShape(progress: clamped)
+        .fill(tint)
+        .padding(pieInset)
+    }
+    .frame(width: resolvedDiameter, height: resolvedDiameter)
+  }
+}
+
+/// Pie slice from -90° (top) sweeping clockwise by `progress` × 360°.
+struct PieSliceShape: Shape {
+  var progress: Double
+
+  func path(in rect: CGRect) -> Path {
+    guard progress > 0 else { return Path() }
+    var path = Path()
+    let center = CGPoint(x: rect.midX, y: rect.midY)
+    let radius = min(rect.width, rect.height) / 2
+    if progress >= 1 {
+      path.addEllipse(in: rect)
+      return path
+    }
+    path.move(to: center)
+    path.addArc(center: center,
+                radius: radius,
+                startAngle: .degrees(-90),
+                endAngle: .degrees(-90 + progress * 360),
+                clockwise: false)
+    path.closeSubpath()
+    return path
   }
 }
 
@@ -438,7 +629,7 @@ struct NewProjectSheet: View {
         }
       }
       .navigationTitle("New Project")
-      .navigationBarTitleDisplayMode(.inline)
+      .septenaInlineTitle()
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button("Cancel") { dismiss() }
@@ -452,5 +643,47 @@ struct NewProjectSheet: View {
         }
       }
     }
+  }
+}
+
+/// Sheet/alert/confirmation-dialog stack shared by both sidebar layouts.
+/// Pulled out so iPhone (floating Magic Plus → action sheet) and macOS
+/// (bottom "+ New List" button) can both trigger the same flows.
+private struct SidebarSheets: ViewModifier {
+  @Binding var showingCreateMenu: Bool
+  @Binding var showingNewProject: Bool
+  @Binding var showingNewArea: Bool
+  @Binding var newAreaName: String
+  @Binding var errorMessage: String?
+  let areas: [Area]
+  let onNewTodo: () -> Void
+  let onCreateProject: (String, String?) -> Void
+  let onCreateArea: () -> Void
+
+  func body(content: Content) -> some View {
+    content
+      .confirmationDialog("Create", isPresented: $showingCreateMenu, titleVisibility: .hidden) {
+        Button("New To-Do")   { onNewTodo() }
+        Button("New Project") { showingNewProject = true }
+        Button("New Area")    { newAreaName = ""; showingNewArea = true }
+        Button("Cancel", role: .cancel) {}
+      }
+      .sheet(isPresented: $showingNewProject) {
+        NewProjectSheet(areas: areas, onCreate: onCreateProject)
+          .presentationDetents([.medium])
+      }
+      .alert("New Area", isPresented: $showingNewArea) {
+        TextField("Area name", text: $newAreaName)
+        Button("Create") { onCreateArea() }
+        Button("Cancel", role: .cancel) { newAreaName = "" }
+      }
+      .alert("Error", isPresented: Binding(
+        get: { errorMessage != nil },
+        set: { if !$0 { errorMessage = nil } }
+      )) {
+        Button("OK") { errorMessage = nil }
+      } message: {
+        Text(errorMessage ?? "")
+      }
   }
 }

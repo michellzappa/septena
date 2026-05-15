@@ -20,6 +20,10 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Septena imports tasks from your Reminders lists into the Inbox.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>Septena imports tasks from your Reminders lists into the Inbox.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

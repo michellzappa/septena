@@ -12,7 +12,7 @@ struct NextView: View {
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 0) {
-        ScreenTitle(icon: "circle.hexagongrid.fill",
+        ScreenTitle(icon: "arrow.right",
                     iconTint: Theme.iconMuted,
                     title: "Next")
 
@@ -40,7 +40,7 @@ struct NextView: View {
       }
     }
     .background(Theme.paperBackground)
-    .navigationBarTitleDisplayMode(.inline)
+    .septenaInlineTitle()
     .task { await model.load(client: client) }
     .refreshable { await model.load(client: client) }
   }

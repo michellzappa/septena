@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Checkbox
 
-struct ThingsCheckbox: View {
+struct TaskCheckbox: View {
   @EnvironmentObject var theme: SectionTheme
   /// Optional override — used by non-task items (habits/supplements/chores)
   /// to wear their section accent. `nil` means "use the Tasks section accent".
@@ -10,26 +10,31 @@ struct ThingsCheckbox: View {
   let isDone: Bool
   let onToggle: () -> Void
 
-  /// Square with a small corner radius — matches Things' checkbox shape.
-  private static let size: CGFloat = 16
-  private static let cornerRadius: CGFloat = 4
+  /// Square with a small corner radius — matches the reference design's checkbox shape.
+  private static let size: CGFloat = 13
+  private static let cornerRadius: CGFloat = 3
 
   var body: some View {
     let fill = tint ?? theme.accent
     Button(action: onToggle) {
       ZStack {
         RoundedRectangle(cornerRadius: Self.cornerRadius)
-          .stroke(fill.opacity(0.5), lineWidth: 1.5)
+          .stroke(fill.opacity(0.5), lineWidth: 1.2)
           .frame(width: Self.size, height: Self.size)
         if isDone {
           RoundedRectangle(cornerRadius: Self.cornerRadius)
             .fill(fill)
             .frame(width: Self.size, height: Self.size)
           Image(systemName: "checkmark")
-            .font(.system(size: 8, weight: .bold))
+            .font(.system(size: 7, weight: .bold))
             .foregroundStyle(.white)
         }
       }
+      // Pad the hit target so mouse clicks land — the visible box is 13pt
+      // but the clickable area is ~22pt square. Critical on macOS where the
+      // stroke-only label otherwise registers clicks only on the thin border.
+      .frame(width: 22, height: 22)
+      .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
   }
@@ -63,34 +68,29 @@ struct ScreenTitle: View {
 struct MagicPlusButton: View {
   @EnvironmentObject var theme: SectionTheme
   let action: () -> Void
-  @State private var pressed = false
 
   var body: some View {
     Button(action: { Haptics.tap(); action() }) {
-      if #available(iOS 26, *) {
-        Image(systemName: "plus")
-          .font(.system(size: 24, weight: .semibold))
-          .foregroundStyle(theme.accent)
-          .frame(width: 56, height: 56)
-          .glassEffect(.regular.interactive(), in: .circle)
-      } else {
-        Image(systemName: "plus")
-          .font(.system(size: 24, weight: .semibold))
-          .foregroundStyle(.white)
-          .frame(width: 56, height: 56)
-          .background(theme.accent)
-          .clipShape(Circle())
-          .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
-      }
+      Image(systemName: "plus")
+        .font(.system(size: 24, weight: .semibold))
+        .foregroundStyle(.white)
+        .frame(width: 56, height: 56)
+        .background(theme.accent)
+        .clipShape(Circle())
+        .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
     }
-    .buttonStyle(.plain)
-    .scaleEffect(pressed ? 0.9 : 1)
-    .animation(.easeOut(duration: 0.15), value: pressed)
-    .simultaneousGesture(
-      DragGesture(minimumDistance: 0)
-        .onChanged { _ in pressed = true }
-        .onEnded { _ in pressed = false }
-    )
+    .buttonStyle(PressEffectButtonStyle())
+  }
+}
+
+/// Plain button + scale-on-press. Uses SwiftUI's native pressed state instead
+/// of a simultaneous DragGesture (the old approach ate taps on iOS when the
+/// drag recognizer kept the touch and the button never fired).
+struct PressEffectButtonStyle: ButtonStyle {
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .scaleEffect(configuration.isPressed ? 0.92 : 1)
+      .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
   }
 }
 
@@ -100,7 +100,7 @@ struct InlineNewTaskRow: View {
   @Binding var title: String
   @Binding var notes: String
   var defaultWhen: String = "Today"
-  var defaultWhenIcon: String = "star.fill"
+  var defaultWhenIcon: String = "sun.max.fill"
   var defaultWhenTint: Color = Theme.inkSecondary
   /// Hide the trailing "where this lands" pill when the surrounding page
   /// already names the destination (Project / Area detail).
@@ -113,36 +113,43 @@ struct InlineNewTaskRow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      HStack(alignment: .top, spacing: 12) {
-        // Square placeholder (non-interactive — the task doesn't exist yet).
-        // Same shape & size as ThingsCheckbox so the row aligns with neighbors.
-        RoundedRectangle(cornerRadius: 4)
-          .stroke(Color.secondary.opacity(0.5), lineWidth: 1.5)
-          .frame(width: 18, height: 18)
-          .padding(.top, 2)
+      // ── Title row — same geometry as a closed task row.
+      HStack(alignment: .firstTextBaseline, spacing: 12) {
+        RoundedRectangle(cornerRadius: 3)
+          .stroke(Color.secondary.opacity(0.5), lineWidth: 1.2)
+          .frame(width: 13, height: 13)
+          .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 
-        VStack(alignment: .leading, spacing: 6) {
-          TextField("New To-Do", text: $title)
-            .font(.septenaTaskTitle)
-            .focused($focused, equals: .title)
-            .submitLabel(.next)
-            .onSubmit {
-              if title.trimmingCharacters(in: .whitespaces).isEmpty {
-                onCancel()
-              } else {
-                onCommit()
-              }
+        TextField("New To-Do", text: $title)
+          .textFieldStyle(.plain)
+          .focusEffectDisabled()
+          .font(.septenaTaskTitle)
+          .focused($focused, equals: .title)
+          .submitLabel(.next)
+          .onSubmit {
+            if title.trimmingCharacters(in: .whitespaces).isEmpty {
+              onCancel()
+            } else {
+              onCommit()
             }
-          TextField("Notes", text: $notes, axis: .vertical)
-            .font(.septenaNotes)
-            .foregroundStyle(.secondary)
-            .focused($focused, equals: .notes)
-            .lineLimit(1...4)
-        }
+          }
         Spacer(minLength: 0)
       }
       .padding(.horizontal, Theme.hPadding)
-      .padding(.vertical, 12)
+      .padding(.vertical, 5)
+      .frame(minHeight: Theme.rowHeight)
+
+      // ── Notes — sits below title in the expanded card.
+      TextField("Notes", text: $notes, axis: .vertical)
+        .textFieldStyle(.plain)
+        .focusEffectDisabled()
+        .font(.septenaNotes)
+        .foregroundStyle(.secondary)
+        .focused($focused, equals: .notes)
+        .lineLimit(1...4)
+        .padding(.leading, Theme.hPadding + 13 + 12)
+        .padding(.trailing, Theme.hPadding)
+        .padding(.bottom, 6)
 
       if showDestination {
         HStack(spacing: 6) {
@@ -155,23 +162,43 @@ struct InlineNewTaskRow: View {
           Spacer()
         }
         .padding(.horizontal, Theme.hPadding)
-        .padding(.bottom, 14)
+        .padding(.bottom, 10)
       }
     }
-    // Same full-bleed treatment as the open-edit card: matches the closed row
-    // position exactly, separated from neighbors by background contrast + a
-    // subtle shadow. No outer inset, no border.
     .background(Theme.cardSurface)
-    .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 0)
+    .modifier(InlineCardChrome())
+    // ⌘K commits — compact "confirm" shortcut, works while either
+    // TextField is focused.
+    .background(commitShortcut)
+    .background(cancelShortcut)
     // Absorb in-card taps so the parent's "tap empty area to dismiss" gesture
     // doesn't fire when tapping the card's own padding.
     .contentShape(Rectangle())
     .onTapGesture { /* swallow */ }
+    .septenaOnEscape { onCancel() }
+    .onKeyPress(.escape) { onCancel(); return .handled }
     .onAppear {
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
         focused = .title
       }
     }
+  }
+
+  private var commitShortcut: some View {
+    Button("Commit") { onCommit() }
+      .keyboardShortcut("k", modifiers: .command)
+      .opacity(0)
+      .frame(width: 0, height: 0)
+      .accessibilityHidden(true)
+  }
+
+  /// Window-wide Esc shortcut — see InlineEditTaskRow.cancelShortcut.
+  private var cancelShortcut: some View {
+    Button("Cancel") { onCancel() }
+      .keyboardShortcut(.cancelAction)
+      .opacity(0)
+      .frame(width: 0, height: 0)
+      .accessibilityHidden(true)
   }
 }
 
@@ -195,72 +222,116 @@ struct InlineEditTaskRow: View {
   var onMove: (() -> Void)? = nil
   var onRepeat: (() -> Void)? = nil
   @FocusState private var focused: Field?
+  /// Set true the moment the user cancels, so the onChange(focused) blur
+  /// handler doesn't race in and auto-commit before the card tears down.
+  @State private var cancelling = false
 
   enum Field { case title, notes }
 
+  private func handleCancel() {
+    cancelling = true
+    onCancel()
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      HStack(alignment: .top, spacing: 12) {
-        // Same component & dimensions as the closed row — keeps the checkbox
-        // and title in the same screen position when the card opens.
-        ThingsCheckbox(isDone: isDone, onToggle: onToggleDone)
-          .padding(.top, 2)
+      // ── Title row — same geometry as the closed row so checkbox + title
+      //    sit at the exact same x/y when the editor opens. Notes and
+      //    actions expand *below* this band.
+      HStack(alignment: .firstTextBaseline, spacing: 12) {
+        TaskCheckbox(isDone: isDone, onToggle: onToggleDone)
+          .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 
-        VStack(alignment: .leading, spacing: 6) {
-          TextField("Title", text: $title)
-            .font(.septenaTaskTitle)
-            .focused($focused, equals: .title)
-            .submitLabel(.next)
-            .onSubmit { focused = .notes }
-          TextField("Notes", text: $notes, axis: .vertical)
-            .font(.septenaNotes)
-            .foregroundStyle(.secondary)
-            .focused($focused, equals: .notes)
-            .lineLimit(1...6)
-        }
+        TextField("Title", text: $title)
+          .textFieldStyle(.plain)
+          .focusEffectDisabled()
+          .font(.septenaTaskTitle)
+          .focused($focused, equals: .title)
+          .submitLabel(.done)
+          .onSubmit { onCommit() }
+
         Spacer(minLength: 0)
       }
       .padding(.horizontal, Theme.hPadding)
-      .padding(.vertical, 12)
+      .padding(.vertical, 5)
+      .frame(minHeight: Theme.rowHeight)
 
-      // Bottom row, Things-style: When pill on the left (with state-colored
-      // icon + text, no capsule background), icon-only action buttons on the
-      // right (repeat / move / deadline). Tap each to open its picker.
+      // ── Notes — left-aligned with the title (indent past the checkbox so
+      //    text columns line up). Sits in the expanded space; doesn't push
+      //    the title row.
+      TextField("Notes", text: $notes, axis: .vertical)
+        .textFieldStyle(.plain)
+        .focusEffectDisabled()
+        .font(.septenaNotes)
+        .foregroundStyle(.secondary)
+        .focused($focused, equals: .notes)
+        .lineLimit(1...6)
+        .padding(.leading, Theme.hPadding + 13 + 12)  // align with title text
+        .padding(.trailing, Theme.hPadding)
+        .padding(.bottom, 6)
+
+      // ── Bottom row: When pill on the left, action icons on the right.
       HStack(spacing: 0) {
         whenPill
         Spacer()
         actionIcons
       }
       .padding(.horizontal, Theme.hPadding)
-      .padding(.bottom, 14)
+      .padding(.bottom, 10)
     }
-    // Full-bleed background so the open card aligns exactly with the closed
-    // row — no horizontal shift on focus. A subtle shadow above/below
-    // separates the card from neighboring rows.
     .background(Theme.cardSurface)
-    .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 0)
+    .modifier(InlineCardChrome())
+    .background(commitShortcut)
+    .background(cancelShortcut)
     // Absorb taps inside the card so the parent's "tap empty area to dismiss"
     // gesture doesn't fire when tapping the card's own padding/background.
     .contentShape(Rectangle())
     .onTapGesture { /* swallow */ }
+    // Belt-and-suspenders for Esc — the hidden cancelShortcut button above is
+    // the reliable path (keyboardShortcut(.cancelAction) is window-wide).
+    // These fire on iOS / iPad where the cancelAction shortcut may not be
+    // routed when no menu bar exists.
+    .septenaOnEscape { handleCancel() }
+    .onKeyPress(.escape) { handleCancel(); return .handled }
     // Tapping a task opens the inline card but does NOT auto-focus the
     // title. The user taps the title (or notes) to start editing.
     // Keyboard dismissed (via scroll-down or tap-outside) → commit. Without
     // this, blur leaves the card open with no field focused.
     .onChange(of: focused) { _, new in
-      if new == nil {
-        if title.trimmingCharacters(in: .whitespaces).isEmpty {
-          onCancel()
-        } else {
-          onCommit()
-        }
+      // Skip the blur-commit when we're already on the cancel path —
+      // otherwise Esc would commit whatever's in the title field as the
+      // editor tears down.
+      guard new == nil, !cancelling else { return }
+      if title.trimmingCharacters(in: .whitespaces).isEmpty {
+        onCancel()
+      } else {
+        onCommit()
       }
     }
   }
 
+  private var commitShortcut: some View {
+    Button("Commit") { onCommit() }
+      .keyboardShortcut("k", modifiers: .command)
+      .opacity(0)
+      .frame(width: 0, height: 0)
+      .accessibilityHidden(true)
+  }
+
+  /// Window-wide Esc shortcut — fires reliably even while an NSTextField
+  /// is first responder (which swallows Esc and stops `.onExitCommand` from
+  /// receiving it).
+  private var cancelShortcut: some View {
+    Button("Cancel") { handleCancel() }
+      .keyboardShortcut(.cancelAction)
+      .opacity(0)
+      .frame(width: 0, height: 0)
+      .accessibilityHidden(true)
+  }
+
   // MARK: - Action pills (tappable; sans-serif, slightly larger than meta chips)
 
-  // MARK: - When pill (Things-style: state-colored icon + text, no capsule bg)
+  // MARK: - When pill (compact: state-colored icon + text, no capsule bg)
 
   @ViewBuilder
   private var whenPill: some View {
@@ -282,7 +353,7 @@ struct InlineEditTaskRow: View {
   private func whenIcon(for d: Date?) -> String {
     guard let d else { return "calendar" }
     let cal = Calendar.current
-    if cal.isDateInToday(d)    { return "star.fill" }
+    if cal.isDateInToday(d)    { return "sun.max.fill" }
     if cal.isDateInTomorrow(d) { return "sunrise.fill" }
     return "calendar"
   }
@@ -344,9 +415,9 @@ struct InlineEditTaskRow: View {
   private func actionIcon(systemName: String, tint: Color, action: @escaping () -> Void) -> some View {
     Button(action: { Haptics.pick(); action() }) {
       Image(systemName: systemName)
-        .font(.system(size: 18, weight: .regular))
+        .font(.system(size: Theme.cardActionIconSize, weight: .regular))
         .foregroundStyle(tint)
-        .frame(width: 24, height: 24)
+        .frame(width: 22, height: 22)
         .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
@@ -371,7 +442,7 @@ struct InlineEditTaskRow: View {
 // MARK: - When picker sheet
 
 /// "When" — schedule a task for a date, defer to Someday, or clear the
-/// scheduled date. Matches Things' When sheet shape. `due` has a separate
+/// scheduled date. Matches the reference design's When sheet shape. `due` has a separate
 /// picker (DeadlinePickerSheet) because deadlines are concrete dates only.
 struct WhenPickerSheet: View {
   @EnvironmentObject var theme: SectionTheme
@@ -405,7 +476,7 @@ struct WhenPickerSheet: View {
           .padding(.horizontal, Theme.hPadding)
           .padding(.bottom, 20)
         } else {
-          option(icon: "star.fill", tint: theme.accent, title: "Today") {
+          option(icon: "sun.max.fill", tint: theme.accent, title: "Today") {
             onPick(Calendar.current.startOfDay(for: Date())); dismiss()
           }
           Hairline()
@@ -429,9 +500,9 @@ struct WhenPickerSheet: View {
         }
       }
       .navigationTitle("When")
-      .navigationBarTitleDisplayMode(.inline)
+      .septenaInlineTitle()
       .toolbar {
-        ToolbarItem(placement: .topBarLeading) {
+        ToolbarItem(placement: .cancellationAction) {
           Button("Cancel") { dismiss() }
         }
       }
@@ -463,7 +534,7 @@ struct WhenPickerSheet: View {
 
 /// "Deadline" — set a hard due date, or clear it. Deliberately *just* a
 /// date picker (no Today/Tomorrow shortcuts) because deadlines are
-/// concrete dates, not loose intentions. Matches Things' Deadline sheet.
+/// concrete dates, not loose intentions. Matches the reference design's Deadline sheet.
 struct DeadlinePickerSheet: View {
   @EnvironmentObject var theme: SectionTheme
   let initialDate: Date?
@@ -518,9 +589,9 @@ struct DeadlinePickerSheet: View {
         .padding(.bottom, 20)
       }
       .navigationTitle("Deadline")
-      .navigationBarTitleDisplayMode(.inline)
+      .septenaInlineTitle()
       .toolbar {
-        ToolbarItem(placement: .topBarLeading) {
+        ToolbarItem(placement: .cancellationAction) {
           Button("Cancel") { dismiss() }
         }
       }
@@ -531,7 +602,7 @@ struct DeadlinePickerSheet: View {
 // MARK: - Recurrence picker sheet
 
 /// "Repeat" — set or clear a recurrence rule. v1: daily / weekly / monthly,
-/// interval stepper, and fixed-vs-after-completion toggle. Things' canonical
+/// interval stepper, and fixed-vs-after-completion toggle. the reference design's canonical
 /// picker has more (weekday selection, ends-rules) — to be added when needed.
 struct RecurrencePickerSheet: View {
   @EnvironmentObject var theme: SectionTheme
@@ -637,9 +708,9 @@ struct RecurrencePickerSheet: View {
         .padding(.bottom, 20)
       }
       .navigationTitle("Repeat")
-      .navigationBarTitleDisplayMode(.inline)
+      .septenaInlineTitle()
       .toolbar {
-        ToolbarItem(placement: .topBarLeading) {
+        ToolbarItem(placement: .cancellationAction) {
           Button("Cancel") { dismiss() }
         }
       }
@@ -704,11 +775,11 @@ struct MovePickerSheet: View {
         .padding(.vertical, 8)
       }
       .background(Theme.paperBackground)
-      .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always))
+      .septenaAlwaysVisibleSearch(text: $query)
       .navigationTitle("Move")
-      .navigationBarTitleDisplayMode(.inline)
+      .septenaInlineTitle()
       .toolbar {
-        ToolbarItem(placement: .topBarTrailing) {
+        ToolbarItem(placement: .confirmationAction) {
           Button("Done") { dismiss() }
         }
       }

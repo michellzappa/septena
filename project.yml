@@ -29,6 +29,7 @@ targets:
       - path: Septena
         excludes:
           - "**/.DS_Store"
+          - "**/*.entitlements"
       - path: SeptenaCore
         excludes:
           - "**/.DS_Store"
@@ -51,12 +52,15 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
+        NSRemindersFullAccessUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
+        NSRemindersUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.app
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: Septena/Septena.entitlements
 
   SeptenaMac:
     type: application
@@ -66,19 +70,31 @@ targets:
         excludes:
           - "**/.DS_Store"
           - Widgets
+          - "**/*.entitlements"
       - path: SeptenaCore
         excludes:
           - "**/.DS_Store"
+      # Standalone icns generated with iconutil — Xcode's asset-catalog
+      # compiler on this SDK silently drops Mac icon slots above 128px when
+      # they share content with other slots. Bundling a pre-built icns
+      # sidesteps that entirely.
+      - path: Septena/AppIcon.icns
+        type: file
     info:
       path: Septena/Info-Mac.plist
       properties:
         CFBundleDisplayName: Septena
+        CFBundleIconFile: AppIcon
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
+        NSRemindersFullAccessUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
+        NSRemindersUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.mac
         GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: Septena/SeptenaMac.entitlements
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
 
 schemes:
   Septena:

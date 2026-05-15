@@ -23,6 +23,28 @@ enum Theme {
     dark:  Color(red: 0.149, green: 0.149, blue: 0.141)    // #262624 ≈ oklch(0.22 0.003 70)
   ))
 
+  /// Sidebar surface. Slightly darker than the canvas on macOS so the column
+  /// reads as a distinct sidebar (compact). Identical to paper on iOS,
+  /// where the sidebar IS the homepage.
+  static let sidebarBackground: Color = {
+    #if os(macOS)
+    return dynamic(
+      light: Color(red: 0.940, green: 0.937, blue: 0.929),  // ≈ #F0EFEC
+      dark:  Color(red: 0.122, green: 0.122, blue: 0.114)   // a touch darker than paper
+    )
+    #else
+    return paperBackground
+    #endif
+  }()
+
+  /// Selection pill background for sidebar rows and keyboard-focused list rows.
+  /// Distinct from both paperBackground and sidebarBackground so it stays
+  /// visible on either surface. Tuned to read as "active" without shouting.
+  static let rowSelection = dynamic(
+    light: Color(red: 0.878, green: 0.874, blue: 0.859),   // ≈ #E0DFDB
+    dark:  Color.white.opacity(0.10)
+  )
+
   /// Primary contained surface (cards, sheets, inline rows).
   /// Pure white in light so cards pop off the canvas; one step lighter than
   /// canvas in dark, carrying the same warm tint.
@@ -58,15 +80,6 @@ enum Theme {
     dark:  Color(red: 0.510, green: 0.510, blue: 0.510)    // ≈ oklch(0.60 0 0)
   )
 
-  // MARK: - Smart-list accents (Things-style per-row icon hues)
-
-  static let inboxBlue       = Color(red: 0.20, green: 0.45, blue: 0.95)   // #3373F2
-  static let todayYellow     = Color(red: 0.96, green: 0.74, blue: 0.18)   // #F4BD2E
-  static let nextPurple      = Color(red: 0.56, green: 0.40, blue: 0.85)   // #8F66D9
-  static let upcomingRed     = Color(red: 0.93, green: 0.30, blue: 0.30)   // #ED4D4D
-  static let unscheduledTeal = Color(red: 0.16, green: 0.66, blue: 0.62)   // #29A89D
-  static let logbookGreen    = Color(red: 0.30, green: 0.70, blue: 0.40)   // #4DB366
-
   // MARK: - Lines & selection
 
   static let border = dynamic(
@@ -97,10 +110,49 @@ enum Theme {
 
   static let cornerRadius: CGFloat = 10
   static let cornerRadiusSmall: CGFloat = 6
+
+  #if os(macOS)
+  // Tighter chrome on Mac — compact compact sidebar rows.
+  static let hPadding: CGFloat = 12
+  static let rowHeight: CGFloat = 24
+  static let sidebarRowHeight: CGFloat = 32
+  static let sidebarSmartRowHeight: CGFloat = 30
+  static let sidebarProjectRowHeight: CGFloat = 28
+  static let sectionSpacing: CGFloat = 16
+  static let sidebarIconSize: CGFloat = 17
+  static let sidebarRowSpacing: CGFloat = 10
+  static let sidebarTitleSize: CGFloat = 14
+  static let sidebarTitleWeight: Font.Weight = .regular
+  static let sidebarAreaTitleSize: CGFloat = 14
+  /// Extra left whitespace on detail-column lists (compact breathing room).
+  static let listLeadingInset: CGFloat = 32
+  /// Inline edit/new-task card — match the closed row's vertical padding
+  /// exactly so the title doesn't jump when entering / leaving edit mode.
+  /// The card's *visual* breathing room comes from the action-row padding
+  /// at the bottom + the rounded chrome, not extra top padding.
+  static let cardVerticalPadding: CGFloat = 7
+  /// Bottom-bar action icons (repeat / move / deadline) inside the inline card.
+  static let cardActionIconSize: CGFloat = 14
+  /// Inline section header (project / area title above a cluster of tasks).
+  static let groupHeaderFontSize: CGFloat = 14
+  #else
   static let hPadding: CGFloat = 20
-  static let rowHeight: CGFloat = 44
+  static let rowHeight: CGFloat = 36
   static let sidebarRowHeight: CGFloat = 48
+  static let sidebarSmartRowHeight: CGFloat = 38
+  static let sidebarProjectRowHeight: CGFloat = 36
   static let sectionSpacing: CGFloat = 24
+  static let sidebarIconSize: CGFloat = 22
+  static let sidebarRowSpacing: CGFloat = 14
+  static let sidebarTitleSize: CGFloat = 17
+  static let sidebarTitleWeight: Font.Weight = .medium
+  static let sidebarAreaTitleSize: CGFloat = 17
+  /// No extra inset on iOS — already in a single-column NavigationStack.
+  static let listLeadingInset: CGFloat = 0
+  static let cardVerticalPadding: CGFloat = 12
+  static let cardActionIconSize: CGFloat = 18
+  static let groupHeaderFontSize: CGFloat = 19
+  #endif
 
   // MARK: - Helpers
 
@@ -136,6 +188,21 @@ private extension Color {
 // MARK: - Typography
 
 extension Font {
+  #if os(macOS)
+  // Mac runs a touch tighter — denser screens, mouse-pointer precision means
+  // we don't need iOS-grade tap targets, and tighter type matches the reference design.
+  static let septenaScreenTitle  = Font.system(size: 22, weight: .bold)
+  static let septenaSectionTitle = Font.system(size: 16, weight: .bold)
+  static let septenaCardTitle    = Font.system(size: 14, weight: .bold)
+  static let septenaSidebarRow   = Font.system(size: 14, weight: .medium)
+  static let septenaTaskTitle    = Font.system(size: 14, weight: .regular)
+  static let septenaNotes        = Font.system(size: 12, weight: .regular)
+  static let septenaButton       = Font.system(size: 13, weight: .semibold)
+  static let septenaLabel        = Font.system(size: 11, weight: .medium)
+  static let septenaMeta         = Font.system(size: 11, weight: .regular)
+  static let septenaMetaStrong   = Font.system(size: 11, weight: .semibold)
+  static let septenaBadge        = Font.system(size: 10, weight: .semibold)
+  #else
   /// Titles use the system sans (SF Pro on iOS) — neutral and platform-native.
   static let septenaScreenTitle  = Font.system(size: 28, weight: .bold)
   static let septenaSectionTitle = Font.system(size: 20, weight: .bold)
@@ -148,8 +215,10 @@ extension Font {
   static let septenaButton       = Font.system(size: 15, weight: .semibold)
   static let septenaLabel        = Font.system(size: 13, weight: .medium)
 
-  /// Mono with tabular figures for numerics, dates, counts, IDs.
-  static let septenaMeta         = Font.system(size: 12, weight: .regular, design: .monospaced)
-  static let septenaMetaStrong   = Font.system(size: 12, weight: .semibold, design: .monospaced)
-  static let septenaBadge        = Font.system(size: 11, weight: .semibold, design: .monospaced)
+  /// Proportional sans for metadata, dates, counts, IDs — no monospace
+  /// anywhere in the app per design preference.
+  static let septenaMeta         = Font.system(size: 12, weight: .regular)
+  static let septenaMetaStrong   = Font.system(size: 12, weight: .semibold)
+  static let septenaBadge        = Font.system(size: 11, weight: .semibold)
+  #endif
 }

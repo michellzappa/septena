@@ -25,9 +25,7 @@ struct ServerConfigView: View {
           TextField("http://100.74.150.55:7000", text: $serverURL)
             .font(.septenaTaskTitle)
             .foregroundStyle(Theme.inkPrimary)
-            .autocapitalization(.none)
-            .keyboardType(.URL)
-            .textContentType(.URL)
+            .septenaURLField()
             .padding(12)
             .background(Theme.cardSurface, in: RoundedRectangle(cornerRadius: Theme.cornerRadius))
             .overlay(
@@ -80,6 +78,33 @@ struct ServerConfigView: View {
 
           Spacer(minLength: 24)
 
+          // Apple Reminders import — compact. Lives in Settings because
+          // it's a periodic one-off action, not a daily-use surface.
+          Button { nav.path.append(.remindersImport) } label: {
+            HStack(spacing: 10) {
+              Image(systemName: "checklist")
+                .font(.system(size: 14))
+                .foregroundStyle(Theme.inkSecondary)
+              Text("Reminders Source")
+                .font(.septenaButton)
+                .foregroundStyle(Theme.inkPrimary)
+              Spacer()
+              Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.inkSecondary.opacity(0.6))
+            }
+            .padding(.vertical, 12)
+            .padding(.horizontal, 12)
+            .background(Theme.cardSurface, in: RoundedRectangle(cornerRadius: Theme.cornerRadius))
+            .overlay(
+              RoundedRectangle(cornerRadius: Theme.cornerRadius)
+                .stroke(Theme.border, lineWidth: 1)
+            )
+          }
+          .buttonStyle(.plain)
+          .padding(.horizontal, Theme.hPadding)
+          .padding(.bottom, 24)
+
           Text("No auth — Septena is reachable on the tailnet.")
             .font(.septenaMeta)
             .foregroundStyle(Theme.inkSecondary.opacity(0.7))
@@ -90,14 +115,14 @@ struct ServerConfigView: View {
         }
       }
     .background(Theme.paperBackground)
-    .navigationBarTitleDisplayMode(.inline)
+    .septenaInlineTitle()
     .onAppear { serverURL = nav.serverURL }
   }
 
   @ViewBuilder
   private func fieldLabel(_ text: String) -> some View {
     Text(text.uppercased())
-      .font(.system(size: 11, weight: .semibold, design: .monospaced))
+      .font(.system(size: 11, weight: .semibold))
       .tracking(0.8)
       .foregroundStyle(Theme.inkSecondary)
       .padding(.horizontal, Theme.hPadding)

@@ -21,6 +21,6 @@ struct TaskDetailView: View {
       }
     }
     .navigationTitle(task.title)
-    .navigationBarTitleDisplayMode(.inline)
+    .septenaInlineTitle()
   }
 }

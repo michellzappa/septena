@@ -16,39 +16,60 @@ final class NextItemsModel: ObservableObject {
   @Published var deferredChores: [String: String] = [:]
   /// Chores marked done this session — same treatment.
   @Published var completedChores: Set<String> = []
+  /// Habits the user toggled/skipped this session. Keeps them rendered in
+  /// the open list (struck through) so the row doesn't hop to the bottom
+  /// the moment you check it.
+  @Published var actedHabits: Set<String> = []
+  /// Same idea for supplements.
+  @Published var actedSupplements: Set<String> = []
 
   private let today: String = SeptenaDate.today
 
   // MARK: - Open / Done splits (the source of truth for both subviews)
 
+  /// Show an item in the open list if it's still pending OR if the user
+  /// just acted on it this session (keeps it from jumping to "done").
   var openHabits: [HabitDayItem] {
-    habits.filter { !$0.done && !$0.skipped }
+    habits.filter { h in
+      actedHabits.contains(h.id) || (!h.done && !h.skipped)
+    }
   }
 
   var doneHabits: [HabitDayItem] {
-    habits.filter { $0.done || $0.skipped }
+    habits.filter { h in
+      !actedHabits.contains(h.id) && (h.done || h.skipped)
+    }
   }
 
   var openSupplements: [SupplementDayItem] {
-    supplements.filter { !$0.done }
+    supplements.filter { s in
+      actedSupplements.contains(s.id) || !s.done
+    }
   }
 
   var doneSupplements: [SupplementDayItem] {
-    supplements.filter { $0.done }
+    supplements.filter { s in
+      !actedSupplements.contains(s.id) && s.done
+    }
   }
 
-  /// Chores due today or overdue, not yet acted on this session.
+  /// Chores due today or overdue. Linger in the open list after completion
+  /// (struck through) so the row doesn't vanish under the user's finger —
+  /// same treatment as habits/supplements. Deferred chores hide because
+  /// "defer" rescheduled them to a future day.
   var openChores: [ChoreItem] {
     chores
       .filter { $0.daysOverdue >= 0 }
-      .filter { !completedChores.contains($0.id) && deferredChores[$0.id] == nil }
+      .filter { c in
+        completedChores.contains(c.id) || deferredChores[c.id] == nil
+      }
       .sorted { ($0.daysOverdue, $0.name) > ($1.daysOverdue, $1.name) }
   }
 
-  /// Chores acted on this session (completed or deferred). Stay visible until
-  /// next full reload removes them from `chores` or shifts their daysOverdue.
+  /// Deferred-this-session chores only. Completed chores stay in the open
+  /// list (lingering) to match the habit / supplement pattern.
   var doneChores: [ChoreItem] {
-    chores.filter { completedChores.contains($0.id) || deferredChores[$0.id] != nil }
+    chores.filter { !completedChores.contains($0.id) && deferredChores[$0.id] != nil }
   }
 
   var hasAnyOpen: Bool {
@@ -76,6 +97,8 @@ final class NextItemsModel: ObservableObject {
     // the source of truth.
     deferredChores = [:]
     completedChores = []
+    actedHabits = []
+    actedSupplements = []
   }
 
   // MARK: - Mutations (optimistic local flips, server-side write)
@@ -87,6 +110,7 @@ final class NextItemsModel: ObservableObject {
       habits[i].done = next
       if next { habits[i].skipped = false }
     }
+    actedHabits.insert(habit.id)
     Task {
       do { try await client.toggleHabit(id: habit.id, date: today, done: next) }
       catch { await load(client: client) }
@@ -99,6 +123,7 @@ final class NextItemsModel: ObservableObject {
       habits[i].skipped = skipped
       if skipped { habits[i].done = false }
     }
+    actedHabits.insert(habit.id)
     Task {
       do { try await client.skipHabit(id: habit.id, date: today, skipped: skipped) }
       catch { await load(client: client) }
@@ -111,6 +136,7 @@ final class NextItemsModel: ObservableObject {
     if let i = supplements.firstIndex(where: { $0.id == supp.id }) {
       supplements[i].done = next
     }
+    actedSupplements.insert(supp.id)
     Task {
       do { try await client.toggleSupplement(id: supp.id, date: today, done: next) }
       catch { await load(client: client) }
@@ -242,7 +268,7 @@ private struct HabitRow: View {
   var body: some View {
     let inactive = habit.done || habit.skipped
     HStack(spacing: 12) {
-      ThingsCheckbox(
+      TaskCheckbox(
         tint: habit.skipped && !habit.done ? Theme.inkSecondary : tint,
         isDone: inactive
       ) { model.toggleHabit(habit, client: client) }
@@ -283,7 +309,7 @@ private struct SupplementRow: View {
 
   var body: some View {
     HStack(spacing: 12) {
-      ThingsCheckbox(tint: tint, isDone: supplement.done) {
+      TaskCheckbox(tint: tint, isDone: supplement.done) {
         model.toggleSupplement(supplement, client: client)
       }
       Text(supplement.emoji ?? "•").font(.system(size: 16))
@@ -315,7 +341,7 @@ private struct ChoreRow: View {
     let inactive = isDone || deferLabel != nil
 
     HStack(spacing: 12) {
-      ThingsCheckbox(
+      TaskCheckbox(
         tint: deferLabel != nil ? Theme.inkSecondary : tint,
         isDone: inactive
       ) {
@@ -399,7 +425,7 @@ private func sectionHeader(_ title: String, icon: String, tint: Color) -> some V
 @ViewBuilder
 private func bucketLabel(_ bucket: String) -> some View {
   Text(bucket.uppercased())
-    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+    .font(.system(size: 11, weight: .semibold))
     .tracking(0.8)
     .foregroundStyle(Theme.inkSecondary)
     .padding(.horizontal, Theme.hPadding)

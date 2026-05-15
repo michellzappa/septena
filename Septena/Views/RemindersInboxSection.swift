@@ -1,0 +1,188 @@
+import SwiftUI
+import EventKit
+
+// Mounted at the top of the Inbox. Mirrors pending items from the user's
+// nominated Reminders list as task-style rows. Tapping a row imports just that
+// item; "Import All" imports the lot. Every successful import deletes the
+// original reminder so dedupe is automatic.
+
+struct RemindersInboxSection: View {
+  @EnvironmentObject var client: SeptenaClient
+  @EnvironmentObject var theme: SectionTheme
+  /// Parent calls this after a successful import so the inbox below refreshes.
+  let onImported: () -> Void
+
+  @StateObject private var bridge = RemindersBridge.shared
+
+  @State private var sourceListID: String?
+  @State private var sourceList: EKCalendar?
+  @State private var pairs: [(reminder: EKReminder, view: ImportedReminder)] = []
+  @State private var importingID: String?
+  @State private var bulkImporting = false
+
+  var body: some View {
+    Group {
+      if bridge.access == .granted, sourceList != nil, !pairs.isEmpty {
+        VStack(alignment: .leading, spacing: 8) {
+          header
+          ForEach(pairs, id: \.view.id) { pair in
+            reminderRow(pair)
+          }
+        }
+        .padding(.horizontal, Theme.hPadding)
+        .padding(.top, 8)
+        .padding(.bottom, 16)
+      }
+    }
+    // `.task(id:)` fires on first appear AND whenever the source list ID
+    // changes, so picking a different list in Settings auto-refreshes the
+    // section without needing a remount.
+    .task(id: bridge.sourceListID) { await reload() }
+    .onReceive(NotificationCenter.default.publisher(for: .EKEventStoreChanged)) { _ in
+      Task { await reload() }
+    }
+  }
+
+  // MARK: - Header
+
+  @ViewBuilder
+  private var header: some View {
+    HStack {
+      Text("From Reminders")
+        .font(.system(size: 15, weight: .semibold))
+        .foregroundStyle(Theme.inkPrimary)
+      Spacer()
+      Button {
+        Task { await importAll() }
+      } label: {
+        HStack(spacing: 4) {
+          if bulkImporting {
+            ProgressView().scaleEffect(0.6)
+          } else {
+            Image(systemName: "arrow.down")
+              .font(.system(size: 11, weight: .semibold))
+          }
+          Text(bulkImporting ? "Importing…" : "Import All")
+            .font(.system(size: 13, weight: .semibold))
+        }
+        .foregroundStyle(Color.accentColor)
+      }
+      .buttonStyle(.plain)
+      .disabled(bulkImporting || importingID != nil)
+    }
+    .padding(.bottom, 2)
+  }
+
+  // MARK: - Row
+
+  @ViewBuilder
+  private func reminderRow(_ pair: (reminder: EKReminder, view: ImportedReminder)) -> some View {
+    let isImporting = importingID == pair.view.id
+    Button {
+      Task { await importOne(pair) }
+    } label: {
+      HStack(spacing: 10) {
+        if isImporting {
+          ProgressView().scaleEffect(0.5).frame(width: 16, height: 16)
+        } else {
+          Image(systemName: "arrow.down")
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(Theme.iconMuted)
+            .frame(width: 16, height: 16)
+        }
+        Text(pair.view.title)
+          .font(.septenaTaskTitle)
+          .foregroundStyle(Theme.inkPrimary)
+          .lineLimit(1)
+          .truncationMode(.tail)
+        Spacer()
+        if let due = pair.view.dueDate {
+          Text(shortDate(due))
+            .font(.septenaMeta)
+            .foregroundStyle(isOverdue(due) ? Theme.overdueRed : Theme.inkSecondary)
+        }
+      }
+      .padding(.horizontal, 12)
+      .padding(.vertical, 10)
+      .background(
+        Color.gray.opacity(0.08),
+        in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+      )
+      .contentShape(Rectangle())
+      .opacity(isImporting ? 0.5 : 1)
+    }
+    .buttonStyle(.plain)
+    .disabled(isImporting || bulkImporting)
+  }
+
+  private func isOverdue(_ d: Date) -> Bool {
+    let today = Calendar.current.startOfDay(for: Date())
+    return Calendar.current.startOfDay(for: d) <= today
+  }
+
+  private func shortDate(_ d: Date) -> String {
+    let cal = Calendar.current
+    if cal.isDateInToday(d) { return "Today" }
+    if cal.isDateInTomorrow(d) { return "Tomorrow" }
+    let f = DateFormatter()
+    f.dateFormat = "MMM d"
+    return f.string(from: d)
+  }
+
+  // MARK: - Load / import
+
+  private func reload() async {
+    sourceListID = bridge.sourceListID
+    sourceList = bridge.sourceList()
+    SeptenaLog.info("Reminders reload: access=\(bridge.access) sourceID=\(sourceListID ?? "nil") sourceList=\(sourceList?.title ?? "nil")")
+    guard bridge.access == .granted, let cal = sourceList else {
+      pairs = []
+      return
+    }
+    let fetched = await bridge.pendingReminders(in: cal)
+    SeptenaLog.info("Reminders reload: fetched \(fetched.count) pending from '\(cal.title)'")
+    pairs = fetched.map { ($0, ImportedReminder($0)) }
+  }
+
+  private func importOne(_ pair: (reminder: EKReminder, view: ImportedReminder)) async {
+    importingID = pair.view.id
+    defer { importingID = nil }
+    do {
+      _ = try await client.create(
+        title: pair.view.title,
+        due: pair.view.dueDate,
+        notes: pair.view.notes
+      )
+      try? bridge.delete([pair.reminder])
+      pairs.removeAll { $0.view.id == pair.view.id }
+      onImported()
+    } catch {
+      SeptenaLog.error("import reminder '\(pair.view.title)'", error)
+    }
+  }
+
+  private func importAll() async {
+    bulkImporting = true
+    defer { bulkImporting = false }
+    var succeeded: [EKReminder] = []
+    var succeededIDs: Set<String> = []
+    for pair in pairs {
+      do {
+        _ = try await client.create(
+          title: pair.view.title,
+          due: pair.view.dueDate,
+          notes: pair.view.notes
+        )
+        succeeded.append(pair.reminder)
+        succeededIDs.insert(pair.view.id)
+      } catch {
+        SeptenaLog.error("import reminder '\(pair.view.title)'", error)
+      }
+    }
+    if !succeeded.isEmpty {
+      try? bridge.delete(succeeded)
+      pairs.removeAll { succeededIDs.contains($0.view.id) }
+      onImported()
+    }
+  }
+}

@@ -78,7 +78,7 @@ struct QuickEntryView: View {
         }
       }
       .background(Theme.paperBackground)
-      .navigationBarTitleDisplayMode(.inline)
+      .septenaInlineTitle()
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button("Cancel") { dismiss() }.tint(theme.accent)
@@ -168,7 +168,7 @@ struct QuickEntryView: View {
     errorMessage = nil
     Task {
       do {
-        // Quick entry's "When" sets `scheduled` (Things rule). Natural-language
+        // Quick entry's "When" sets `scheduled` (reference rule). Natural-language
         // dates parsed from the title go to scheduled too. Deadlines are added
         // later from the task detail. Someday is a status, not a date.
         var scheduled = scheduledDate

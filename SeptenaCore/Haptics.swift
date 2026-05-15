@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import UIKit
 
 // Native UIKit haptics. Lightweight helpers — generators are pre-prepared so
@@ -42,3 +43,17 @@ enum Haptics {
     notification.prepare()
   }
 }
+
+#else
+
+// macOS has no UIKit haptics — Mac trackpads use NSHapticFeedbackManager,
+// but for now we no-op so call sites stay platform-agnostic.
+enum Haptics {
+  static func tap() {}
+  static func tick() {}
+  static func pick() {}
+  static func success() {}
+  static func warning() {}
+}
+
+#endif

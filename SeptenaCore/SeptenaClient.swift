@@ -3,6 +3,15 @@ import Foundation
 // Septena REST client — talks to the FastAPI backend in /api/tasks.
 // No auth; base URL is set via Settings (defaults to http://100.74.150.55:7000).
 
+// MARK: - Change notification
+
+extension Notification.Name {
+  /// Posted by SeptenaClient after any task / project / area mutation
+  /// completes. Sidebar (and any other observer) subscribes to refresh
+  /// counts without having to know about each individual mutation path.
+  static let septenaTasksChanged = Notification.Name("septena.tasksChanged")
+}
+
 // MARK: - Logger
 
 enum SeptenaLog {
@@ -350,7 +359,9 @@ final class SeptenaClient: ObservableObject {
     req.setValue("application/json", forHTTPHeaderField: "Content-Type")
     req.httpBody = try JSONSerialization.data(withJSONObject: body)
     SeptenaLog.info("POST \(u.path) body=\(body)")
-    return try await send(req, as: type)
+    let result: T = try await send(req, as: type)
+    notifyChanged()
+    return result
   }
 
   private func putJSON<T: Decodable>(_ path: String,
@@ -362,7 +373,9 @@ final class SeptenaClient: ObservableObject {
     req.setValue("application/json", forHTTPHeaderField: "Content-Type")
     req.httpBody = try JSONSerialization.data(withJSONObject: body)
     SeptenaLog.info("PUT \(u.path)")
-    return try await send(req, as: type)
+    let result: T = try await send(req, as: type)
+    notifyChanged()
+    return result
   }
 
   private func deleteRaw(_ path: String) async throws {
@@ -375,6 +388,14 @@ final class SeptenaClient: ObservableObject {
     if code >= 400 {
       throw SeptenaError.server(code, String(data: data, encoding: .utf8) ?? "")
     }
+    notifyChanged()
+  }
+
+  /// Single fan-out point: any mutating HTTP call posts this so observers
+  /// (sidebar counts, etc.) can refresh without each call site wiring its
+  /// own reload.
+  private func notifyChanged() {
+    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
   }
 
   private func send<T: Decodable>(_ req: URLRequest, as type: T.Type) async throws -> T {
