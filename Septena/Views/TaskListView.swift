@@ -410,7 +410,9 @@ struct TaskListView: View {
         areaTitle:    task.area.flatMap    { aid in areas.first(where:    { $0.id == aid })?.title },
         onToggleDone: { toggle(task) },
         onCommit: { commitEdit() },
-        onCancel: { editingTaskId = nil },
+        onCancel: {
+          withAnimation(Self.expandSpring) { editingTaskId = nil }
+        },
         onSchedule: {
           whenTargetId = task.id; whenKind = .scheduled; showingWhenSheet = true
         },
@@ -427,8 +429,13 @@ struct TaskListView: View {
       // Air above & below the expanded card so it visually lifts off the
       // surrounding list instead of pressing flush against neighboring rows.
       .padding(.vertical, 8)
+      .transition(.asymmetric(
+        insertion: .opacity.combined(with: .scale(scale: 0.97, anchor: .top)),
+        removal: .opacity.combined(with: .scale(scale: 0.97, anchor: .top))
+      ))
     } else {
       taskBody(task, reviewable: reviewable)
+        .transition(.opacity)
         // Right-click should make it visually clear which row the menu
         // refers to — flip the selection cursor onto this task before the
         // menu opens. iOS gets natural press feedback from long-press, so
@@ -863,17 +870,26 @@ struct TaskListView: View {
 
   // MARK: - Edit
 
+  /// Spring used for the row-expand / row-collapse transition. Snappy enough
+  /// to feel responsive on tap, soft enough to read as an expand rather than
+  /// a snap. Same shape on insert and dismiss for symmetry.
+  private static let expandSpring: Animation = .spring(response: 0.32, dampingFraction: 0.84)
+
   private func startEdit(_ task: EngageTask) {
     if editingTaskId != nil && editingTaskId != task.id { commitEdit() }
-    editingTaskId = task.id
     editingTitle = task.title
     editingNotes = task.notes ?? ""
+    withAnimation(Self.expandSpring) {
+      editingTaskId = task.id
+    }
   }
 
   private func commitEdit() {
     guard let id = editingTaskId else { return }
     let t = editingTitle.trimmingCharacters(in: .whitespaces)
-    editingTaskId = nil
+    withAnimation(Self.expandSpring) {
+      editingTaskId = nil
+    }
     guard !t.isEmpty else { return }
     Task {
       _ = try? await client.update(id: id, title: t, notes: editingNotes)
