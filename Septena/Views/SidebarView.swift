@@ -542,7 +542,7 @@ struct SidebarRootView: View {
   @ViewBuilder
   private func endOfGroupDropZone(parent: String?) -> some View {
     Color.clear
-      .frame(height: 18)
+      .frame(height: 6)
       .contentShape(Rectangle())
       .dropDestination(for: SidebarDragID.self) { items, _ in
         guard let drag = items.first,
