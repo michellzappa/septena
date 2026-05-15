@@ -181,11 +181,17 @@ struct SidebarRootView: View {
   private var sidebarPhone: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 0) {
-        smartLists.padding(.top, 12).padding(.bottom, 16)
+        smartLists.padding(.top, 12).padding(.bottom, 24)
         myListsHeader
         areasAndProjects
-        Hairline().padding(.top, 16).padding(.bottom, 4)
-        settingsRow
+          .padding(.horizontal, 14)
+          .padding(.vertical, 6)
+          .background(
+            Theme.cardSurface,
+            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+          )
+          .padding(.horizontal, 12)
+        settingsRow.padding(.top, 24)
         Spacer(minLength: 40)
       }
     }
@@ -241,6 +247,7 @@ struct SidebarRootView: View {
         smartLists.padding(.top, 12).padding(.bottom, 16)
         myListsHeader
         areasAndProjects
+          .padding(.horizontal, Theme.hPadding)
         Spacer(minLength: 24)
       }
     }
@@ -342,11 +349,10 @@ struct SidebarRootView: View {
   @ViewBuilder
   private var myListsHeader: some View {
     Text("My Lists")
-      .font(.footnote.weight(.semibold))
-      .textCase(.uppercase)
-      .foregroundStyle(.secondary)
+      .font(.title2.weight(.bold))
+      .foregroundStyle(.primary)
       .padding(.horizontal, Theme.hPadding)
-      .padding(.bottom, 6)
+      .padding(.bottom, 8)
   }
 
   // MARK: - Smart lists
@@ -513,7 +519,6 @@ struct SidebarRootView: View {
           }
       }
     }
-    .padding(.horizontal, Theme.hPadding)
   }
 
   /// Project row in either top-level or within-area context. `parent`
@@ -880,7 +885,9 @@ struct SmartListRow: View {
   }
 }
 
-/// iOS "Reminders home screen" smart-list tile — 2-up grid card.
+/// iOS "Reminders home screen" smart-list tile — whole tile fills with the
+/// list color (subtle top-to-bottom gradient), white icon top-left, huge
+/// white count top-right, white label bottom-left.
 struct SmartListTile: View {
   let icon: String
   let iconColor: Color
@@ -889,34 +896,44 @@ struct SmartListTile: View {
   var count: Int? = nil
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: 0) {
       HStack(alignment: .top) {
-        ColoredGlyph(icon: icon, color: iconColor, size: 32)
+        Image(systemName: icon)
+          .font(.system(size: 22, weight: .semibold))
+          .foregroundStyle(.white)
         Spacer()
         Text(count.map(String.init) ?? "")
-          .font(.system(.title, design: .rounded, weight: .bold))
-          .foregroundStyle(.primary)
+          .font(.system(size: 30, weight: .bold))
+          .foregroundStyle(.white)
           .monospacedDigit()
       }
+      Spacer(minLength: 12)
       HStack(spacing: 6) {
         Text(title)
-          .font(.subheadline)
-          .foregroundStyle(.secondary)
+          .font(.subheadline.weight(.semibold))
+          .foregroundStyle(.white)
         if let b = overdueBadge, b > 0 {
           Text("\(b)")
             .font(.caption2.weight(.semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(iconColor)
             .padding(.horizontal, 5)
             .padding(.vertical, 1)
-            .background(Color.red)
+            .background(Color.white)
             .clipShape(Capsule())
         }
         Spacer()
       }
     }
-    .padding(12)
-    .frame(maxWidth: .infinity, minHeight: 86, alignment: .topLeading)
-    .background(Theme.cardSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    .padding(14)
+    .frame(maxWidth: .infinity, minHeight: 100, alignment: .topLeading)
+    .background(
+      LinearGradient(
+        colors: [iconColor, iconColor.opacity(0.78)],
+        startPoint: .top,
+        endPoint: .bottom
+      ),
+      in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+    )
   }
 }
 
