@@ -425,7 +425,7 @@ struct SidebarRootView: View {
           SmartListTile(icon: spec.icon,
                         iconColor: spec.color,
                         title: spec.title,
-                        overdueBadge: spec.overdueBadge)
+                        count: spec.count)
         }
         .buttonStyle(.plain)
       }
@@ -891,30 +891,30 @@ struct SmartListTile: View {
   let icon: String
   let iconColor: Color
   let title: String
-  var overdueBadge: Int? = nil
+  var count: Int? = nil
 
   var body: some View {
-    HStack(spacing: 10) {
-      Image(systemName: icon)
-        .font(.system(size: 18, weight: .semibold))
-        .foregroundStyle(.white)
+    VStack(alignment: .leading, spacing: 0) {
+      HStack(alignment: .top) {
+        Image(systemName: icon)
+          .font(.system(size: 20, weight: .semibold))
+          .foregroundStyle(.white)
+        Spacer()
+        if let n = count {
+          Text("\(n)")
+            .font(.system(size: 28, weight: .bold))
+            .foregroundStyle(.white)
+            .monospacedDigit()
+        }
+      }
+      Spacer(minLength: 4)
       Text(title)
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(.white)
         .lineLimit(1)
-      if let b = overdueBadge, b > 0 {
-        Text("\(b)")
-          .font(.caption2.weight(.semibold))
-          .foregroundStyle(iconColor)
-          .padding(.horizontal, 5)
-          .padding(.vertical, 1)
-          .background(Color.white)
-          .clipShape(Capsule())
-      }
-      Spacer(minLength: 0)
     }
-    .padding(.horizontal, 12)
-    .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+    .padding(12)
+    .frame(maxWidth: .infinity, minHeight: 82, alignment: .topLeading)
     .background(
       LinearGradient(
         colors: [iconColor, iconColor.opacity(0.78)],
