@@ -80,7 +80,7 @@ struct ServerConfigView: View {
 
           // Apple Reminders import — compact. Lives in Settings because
           // it's a periodic one-off action, not a daily-use surface.
-          Button { nav.path.append(.remindersImport) } label: {
+          Button { nav.path = [.remindersImport] } label: {
             HStack(spacing: 10) {
               Image(systemName: "checklist")
                 .font(.system(size: 14))

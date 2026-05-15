@@ -116,10 +116,19 @@ struct ContentView: View {
   }
 
   // iPhone / compact: sidebar IS the root, routes push onto the stack.
+  // Back chevron is hidden in the nav bar — the app is conceptually flat
+  // (path depth is always 1; selectRoute replaces, never appends), so the
+  // visible "back" affordance is just noise. iOS' edge-swipe-back gesture
+  // still works for users who want to return to the sidebar that way; the
+  // toolbar `+` menu and sidebar smart-list buttons are the canonical ways
+  // to switch screens.
   private func stackLayout(path: Binding<[Route]>) -> some View {
     NavigationStack(path: path) {
       SidebarRootView()
-        .navigationDestination(for: Route.self) { destination(for: $0) }
+        .navigationDestination(for: Route.self) { route in
+          destination(for: route)
+            .navigationBarBackButtonHidden(true)
+        }
     }
   }
 

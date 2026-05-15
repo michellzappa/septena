@@ -723,7 +723,7 @@ struct TaskListView: View {
       let areaTasks = byArea[area.id] ?? []
       if !areaTasks.isEmpty {
         groupHeader(icon: "square.stack.3d.up.fill", title: area.title) {
-          nav.path.append(.area(area))
+          nav.path = [.area(area)]
         }
         .asListRow()
         ForEach(areaTasks) { task in row(task).asListRow() }
@@ -731,7 +731,7 @@ struct TaskListView: View {
       ForEach(projects.filter { $0.area == area.id }) { project in
         if let tasks = byProject[project.id], !tasks.isEmpty {
           groupHeader(icon: nil, title: project.title) {
-            nav.path.append(.project(project))
+            nav.path = [.project(project)]
           }
           .asListRow()
           ForEach(tasks) { task in row(task).asListRow() }
@@ -743,7 +743,7 @@ struct TaskListView: View {
     ForEach(projects.filter { $0.area == nil }) { project in
       if let tasks = byProject[project.id], !tasks.isEmpty {
         groupHeader(icon: nil, title: project.title) {
-          nav.path.append(.project(project))
+          nav.path = [.project(project)]
         }
         .asListRow()
         ForEach(tasks) { task in row(task).asListRow() }

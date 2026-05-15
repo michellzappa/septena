@@ -127,7 +127,7 @@ struct AreaDetailView: View {
 
       VStack(alignment: .leading, spacing: 0) {
         ForEach(projectsInArea) { project in
-          Button { nav.path.append(.project(project)) } label: {
+          Button { nav.path = [.project(project)] } label: {
             projectRow(project)
           }
           .buttonStyle(.plain)
