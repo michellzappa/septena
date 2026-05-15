@@ -68,7 +68,13 @@ struct TaskListView: View {
   // "You have N new to-dos" banner — compact start-of-day welcome that
   // surfaces tasks rolling in from scheduled-past or due-today. Dismissed
   // per-day via UserDefaults; reappears the next morning.
-  @State private var newTodosDismissed: Bool = false
+  // Read the persisted dismissed-today flag synchronously so the banner
+  // doesn't flash visible for a frame between load() populating `review`
+  // and the UserDefaults read that runs at the end of load(). The
+  // .onAppear / load() path still refreshes this in case the date
+  // rolled over while the app was running.
+  @State private var newTodosDismissed: Bool =
+    UserDefaults.standard.string(forKey: "septena.newTodos.dismissedDate") == SeptenaDate.today
 
   var body: some View {
     List {
