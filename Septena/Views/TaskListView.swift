@@ -437,6 +437,7 @@ struct TaskListView: View {
         notes: $editingNotes,
         isDone: task.status == .done,
         isToday: task.today && filter != .today,
+        autoFocus: task.id == newlyCreatedTaskId,
         projectTitle: task.project.flatMap { pid in projects.first(where: { $0.id == pid })?.title },
         areaTitle:    task.area.flatMap    { aid in areas.first(where:    { $0.id == aid })?.title },
         onToggleDone: { toggle(task) },

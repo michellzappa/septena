@@ -80,6 +80,11 @@ struct InlineEditTaskRow: View {
   /// so it can suppress the indicator on the Today filter (where every
   /// row carries it implicitly).
   var isToday: Bool = false
+  /// Auto-focus the title field on appear. True when the row was just
+  /// created via ⌘N / + (so the user can start typing immediately);
+  /// false for editing an existing task (user explicitly taps the
+  /// field to start editing).
+  var autoFocus: Bool = false
   /// Labels resolved from current data (project title or area title) so the
   /// chip reads "Septena" instead of the raw id.
   var projectTitle: String? = nil
@@ -177,6 +182,14 @@ struct InlineEditTaskRow: View {
       // insertion inside List).
       withAnimation(.spring(response: 0.32, dampingFraction: 0.84)) {
         entryOpacity = 1
+      }
+      // Auto-focus the title for fresh ⌘N / + drafts so the keyboard
+      // opens and the user can start typing immediately. Small delay
+      // lets the row finish inserting before grabbing focus.
+      if autoFocus {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+          focused = .title
+        }
       }
     }
     .background(commitShortcut)
