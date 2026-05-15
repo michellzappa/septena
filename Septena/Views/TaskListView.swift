@@ -785,16 +785,10 @@ struct TaskListView: View {
           .foregroundStyle(Theme.iconMuted)
           .frame(width: 20, alignment: .center)
       } else {
-        // Project pie glyph, mirrors SidebarProjectRow.
-        ZStack {
-          Circle().stroke(Theme.iconMuted, lineWidth: 1.5)
-            .frame(width: 14, height: 14)
-          Circle().trim(from: 0, to: 0.25)
-            .stroke(Theme.iconMuted, lineWidth: 5)
-            .frame(width: 8, height: 8)
-            .rotationEffect(.degrees(-90))
-        }
-        .frame(width: 20, alignment: .center)
+        // Project pie glyph — same component as the sidebar / detail page
+        // so the look-and-feel is identical.
+        ProjectProgressIcon(progress: 0.25, tint: Theme.iconMuted, diameter: 14)
+          .frame(width: 20, alignment: .center)
       }
       Text(title)
         .font(.system(size: Theme.groupHeaderFontSize, weight: .semibold))

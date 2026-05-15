@@ -158,8 +158,7 @@ struct AreaDetailView: View {
     HStack(alignment: .firstTextBaseline, spacing: 12) {
       ProjectProgressIcon(progress: projectProgress[project.id] ?? 0,
                           tint: theme.accent,
-                          diameter: 14,
-                          lineWidth: 1.2)
+                          diameter: 14)
         .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 
       Text(project.title)

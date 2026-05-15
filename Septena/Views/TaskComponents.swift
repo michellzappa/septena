@@ -793,15 +793,8 @@ struct MovePickerSheet: View {
     case .area:
       AreaIcon(diameter: 14, lineWidth: 1.5)
     case .project:
-      // Pie glyph — mirrors SidebarProjectRow.
-      ZStack {
-        Circle().stroke(Theme.iconMuted, lineWidth: 1.5)
-          .frame(width: 14, height: 14)
-        Circle().trim(from: 0, to: 0.25)
-          .stroke(Theme.iconMuted, lineWidth: 5)
-          .frame(width: 8, height: 8)
-          .rotationEffect(.degrees(-90))
-      }
+      // Pie glyph — same component as sidebar / detail page.
+      ProjectProgressIcon(progress: 0.25, tint: Theme.iconMuted, diameter: 14)
     }
   }
 }

@@ -1026,7 +1026,7 @@ struct ProjectProgressIcon: View {
   var lineWidth: CGFloat? = nil
 
   private var resolvedDiameter: CGFloat { diameter ?? Theme.sidebarIconSize * 0.95 }
-  private var resolvedLineWidth: CGFloat { lineWidth ?? 0.6 }
+  private var resolvedLineWidth: CGFloat { lineWidth ?? 1.2 }
   /// Gap between the inner pie and the ring. Pie sits inside the ring's
   /// inner edge (resolvedLineWidth) plus extra breathing room so the two
   /// read as distinct shapes, not a filled-stroke disc.
