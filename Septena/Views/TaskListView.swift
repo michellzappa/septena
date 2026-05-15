@@ -223,6 +223,20 @@ struct TaskListView: View {
     // while the user is on the screen) drop off when they return.
     .onAppear { Task { await load() } }
     .refreshable { await load() }
+    // Consume the global "start a new task" trigger from the sidebar
+    // Menu or detail toolbar so the new-task flow stays inline (same
+    // as ⌘N) instead of opening a modal sheet.
+    .onChange(of: nav.shouldStartCreating) { _, fire in
+      guard fire else { return }
+      nav.shouldStartCreating = false
+      startDraft()
+    }
+    .onAppear {
+      if nav.shouldStartCreating {
+        nav.shouldStartCreating = false
+        startDraft()
+      }
+    }
   }
 
   /// Existing deadline for a target task, so DeadlinePickerSheet can
@@ -1190,11 +1204,11 @@ private struct TopLevelChromeModifier: ViewModifier {
         .toolbar {
           ToolbarItem(placement: .primaryAction) {
             Button {
-              nav.showingQuickEntry = true
+              nav.shouldStartCreating = true
             } label: {
               Image(systemName: "plus")
             }
-            .help("Quick Entry")
+            .help("New Task")
             .keyboardShortcut("n", modifiers: [.command, .shift])
           }
         }

@@ -72,7 +72,12 @@ enum Route: Hashable {
 @Observable
 final class NavigationState {
   var path: [Route] = []
-  var showingQuickEntry = false
+  /// One-shot trigger: when set to true, the currently-visible
+  /// TaskListView starts a new inline task (same flow as ⌘N) on its
+  /// next render. TaskListView resets it to false after consuming. Used
+  /// by toolbar `+` actions and the sidebar Menu's New To-Do entry, so
+  /// 'new task' never opens a modal sheet — always inline, like Things.
+  var shouldStartCreating = false
 
   /// macOS sidebar visibility — toggled by ⌘/. `.all` shows both columns,
   /// `.detailOnly` collapses the sidebar so detail content runs edge-to-edge.
@@ -97,9 +102,6 @@ struct ContentView: View {
     @Bindable var nav = nav
     layout(path: $nav.path)
       .tint(theme.accent)
-      .sheet(isPresented: $nav.showingQuickEntry) {
-        QuickEntryView()
-      }
   }
 
   @ViewBuilder

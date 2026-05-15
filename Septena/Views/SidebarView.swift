@@ -199,7 +199,13 @@ struct SidebarRootView: View {
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         Menu {
-          Button { nav.showingQuickEntry = true } label: {
+          Button {
+            // Route through .filter(.inbox) so the inline editor mounts
+            // on a known list — Sidebar root has no TaskListView, so
+            // setting the trigger alone wouldn't open the editor.
+            nav.path = [.filter(.inbox)]
+            nav.shouldStartCreating = true
+          } label: {
             Label("New To-Do", systemImage: "plus.circle")
           }
           Button { showingNewProject = true } label: {
@@ -221,7 +227,10 @@ struct SidebarRootView: View {
       errorMessage: $errorMessage,
       newProjectInArea: $newProjectInArea,
       areas: areas,
-      onNewTodo: { nav.showingQuickEntry = true },
+      onNewTodo: {
+        nav.path = [.filter(.inbox)]
+        nav.shouldStartCreating = true
+      },
       onCreateProject: { title, areaId in createProject(title: title, areaId: areaId) },
       onCreateArea: { createArea() }
     ))
@@ -293,7 +302,10 @@ struct SidebarRootView: View {
       errorMessage: $errorMessage,
       newProjectInArea: $newProjectInArea,
       areas: areas,
-      onNewTodo: { nav.showingQuickEntry = true },
+      onNewTodo: {
+        nav.path = [.filter(.inbox)]
+        nav.shouldStartCreating = true
+      },
       onCreateProject: { title, areaId in createProject(title: title, areaId: areaId) },
       onCreateArea: { createArea() }
     ))
