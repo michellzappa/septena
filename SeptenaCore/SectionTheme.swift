@@ -26,6 +26,11 @@ final class SectionTheme {
   }
 
   func refresh(from client: SeptenaClient) async {
+    // Per-section colors are still fetched (other section icons may surface
+    // them), but the *app accent* is deliberately pinned to the system
+    // Color.accentColor — Septena no longer derives its primary hue from
+    // the Tasks-section color. Keeps the app reading as neutral / macOS
+    // standard.
     do {
       let sections = try await client.sections()
       var byKey: [String: Color] = [:]
@@ -33,12 +38,8 @@ final class SectionTheme {
         if let c = parseColor(s.color) { byKey[s.key] = c }
       }
       accentByKey = byKey
-      if let tasks = byKey["tasks"] {
-        accent = tasks
-        accentSoft = tasks.opacity(0.14)
-      }
     } catch {
-      SeptenaLog.error("section accent refresh failed", error)
+      SeptenaLog.error("section color refresh failed", error)
     }
   }
 

@@ -509,7 +509,7 @@ struct TaskListView: View {
           if task.today && filter != .today {
             Image(systemName: "sun.max.fill")
               .font(.system(size: 14))
-              .foregroundStyle(theme.accent)
+              .foregroundStyle(.orange)
           }
           // Cancelled tasks share the visual language of done tasks
           // (strikethrough + dimmed) so the user gets immediate feedback
@@ -1158,10 +1158,7 @@ struct TaskListView: View {
   }
 
   private var titleTint: Color {
-    switch filter {
-    case .today: return theme.accent
-    default: return Theme.inkSecondary
-    }
+    .secondary
   }
 
 }

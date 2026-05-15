@@ -45,7 +45,7 @@ struct ScreenTitle: View {
         .foregroundStyle(iconTint)
       Text(title)
         .font(.septenaScreenTitle)
-        .foregroundStyle(iconTint)
+        .foregroundStyle(.primary)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.horizontal, Theme.hPadding)
