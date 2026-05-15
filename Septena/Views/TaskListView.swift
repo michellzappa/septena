@@ -437,9 +437,10 @@ struct TaskListView: View {
           repeatTargetId = task.id; showingRepeatSheet = true
         }
       )
-      // Air above & below the expanded card so it visually lifts off the
-      // surrounding list instead of pressing flush against neighboring rows.
-      .padding(.vertical, 8)
+      // No vertical padding wrapper here — the editor's title row already
+      // matches the closed row's geometry (same horizontal padding, same
+      // minHeight), so checkbox and title don't shift when the editor
+      // opens. Notes / actions expand strictly downward.
       .transition(.asymmetric(
         insertion: .opacity.combined(with: .scale(scale: 0.97, anchor: .top)),
         removal: .opacity.combined(with: .scale(scale: 0.97, anchor: .top))

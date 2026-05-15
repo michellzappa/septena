@@ -228,7 +228,10 @@ struct InlineEditTaskRow: View {
         Spacer(minLength: 0)
       }
       .padding(.horizontal, Theme.hPadding)
-      .padding(.vertical, 8)
+      // Match the closed row's geometry exactly: same horizontal padding,
+      // same minimum row height so the title baseline sits at the same Y
+      // when the editor opens. Notes + action icons grow *below* this band.
+      .frame(minHeight: Theme.rowTapHeight)
 
       // ── Notes — left-aligned with the title (indent past the checkbox so
       //    text columns line up). TaskCheckbox renders at 22pt + 12pt
