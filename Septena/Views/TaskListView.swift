@@ -411,6 +411,18 @@ struct TaskListView: View {
 
   @ViewBuilder
   private func row(_ task: EngageTask, reviewable: Bool = false) -> some View {
+    rowContent(task, reviewable: reviewable)
+      // Explicit value-driven animation so both directions of the
+      // taskBody ↔ editor swap animate, regardless of whether the
+      // mutating call site wrapped in withAnimation. The transition
+      // modifier on each branch supplies the opacity blend; this drives
+      // the timing curve and ensures List sees the row's height change
+      // as part of the spring.
+      .animation(Self.expandSpring, value: editingTaskId == task.id)
+  }
+
+  @ViewBuilder
+  private func rowContent(_ task: EngageTask, reviewable: Bool = false) -> some View {
     if editingTaskId == task.id {
       InlineEditTaskRow(
         task: task,
@@ -553,7 +565,13 @@ struct TaskListView: View {
       trailingDate(task)
     }
     .padding(.horizontal, Theme.hPadding)
-    .frame(minHeight: Theme.rowTapHeight)
+    // Explicit vertical padding (not frame-min-height centering) so the
+    // title's Y is anchored to a fixed offset from the row top.
+    // TextField's internal metrics differ slightly from Text on iOS,
+    // which made the centered-content approach shift the title on edit
+    // open. Equal padding top + bottom on closed rows; the editor uses
+    // the same top padding.
+    .padding(.vertical, Theme.rowTapHeight >= 44 ? 11 : 5)
     .background(rowBackground(for: task))
     // Hit area covers the FULL padded row (checkbox + title column +
     // padding above/below). Inner controls — TaskCheckbox button, action
@@ -1112,6 +1130,10 @@ struct TaskListView: View {
   /// the day; reappears tomorrow.
   @ViewBuilder
   private func newTodosBanner(count: Int) -> some View {
+    // Colors lean on system + adapt: a soft yellow tint that reads as
+    // attention in light mode and isn't glare-bright in dark mode.
+    // Text and button label use Color.primary so contrast follows the
+    // user's interface style.
     HStack(spacing: 12) {
       HStack(spacing: 0) {
         Text("You have ")
@@ -1119,7 +1141,7 @@ struct TaskListView: View {
         Text(count == 1 ? " new to-do" : " new to-dos")
       }
       .font(.system(size: 14))
-      .foregroundStyle(Color(red: 0.30, green: 0.24, blue: 0.05))
+      .foregroundStyle(.primary)
       Spacer()
       Button {
         Haptics.tick()
@@ -1128,11 +1150,11 @@ struct TaskListView: View {
       } label: {
         Text("OK")
           .font(.system(size: 13, weight: .semibold))
-          .foregroundStyle(Color(red: 0.30, green: 0.24, blue: 0.05))
+          .foregroundStyle(.primary)
           .padding(.horizontal, 14)
           .padding(.vertical, 6)
           .background(
-            Color(red: 0.95, green: 0.83, blue: 0.31),
+            Color.yellow.opacity(0.55),
             in: RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
           )
       }
@@ -1141,7 +1163,7 @@ struct TaskListView: View {
     .padding(.horizontal, 14)
     .padding(.vertical, 10)
     .background(
-      Color(red: 0.98, green: 0.91, blue: 0.55),
+      Color.yellow.opacity(0.20),
       in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
     )
     // Match the row selection-pill's effective inset (Theme.hPadding - 6) so
