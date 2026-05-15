@@ -214,7 +214,10 @@ struct InlineCardChrome: ViewModifier {
       .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
       .shadow(color: .black.opacity(0.07), radius: 5, x: 0, y: 1)
     #else
+    // iOS: clip to rounded rect so the card reads as a contained
+    // surface, not a full-bleed rectangle, and the shadow has shape.
     content
+      .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
       .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 0)
     #endif
   }

@@ -204,6 +204,10 @@ struct InlineEditTaskRow: View {
   /// Set true the moment the user cancels, so the onChange(focused) blur
   /// handler doesn't race in and auto-commit before the card tears down.
   @State private var cancelling = false
+  /// Internal entry-opacity so the open transition animates reliably
+  /// regardless of whether the parent's transition modifier fires. Starts
+  /// at 0 and ramps to 1 on appear with the same spring used elsewhere.
+  @State private var entryOpacity: Double = 0
 
   enum Field { case title, notes }
 
@@ -279,6 +283,16 @@ struct InlineEditTaskRow: View {
     }
     .background(Theme.cardSurface)
     .modifier(InlineCardChrome())
+    .opacity(entryOpacity)
+    .onAppear {
+      // Explicit fade-in keyed to the same spring used by the parent so
+      // the open transition is visible even when SwiftUI skips the
+      // conditional-swap transition (which it does intermittently for
+      // insertion inside List).
+      withAnimation(.spring(response: 0.32, dampingFraction: 0.84)) {
+        entryOpacity = 1
+      }
+    }
     .background(commitShortcut)
     .background(cancelShortcut)
     // Absorb taps inside the card so the parent's "tap empty area to dismiss"
