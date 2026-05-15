@@ -425,8 +425,7 @@ struct SidebarRootView: View {
           SmartListTile(icon: spec.icon,
                         iconColor: spec.color,
                         title: spec.title,
-                        overdueBadge: spec.overdueBadge,
-                        count: spec.count)
+                        overdueBadge: spec.overdueBadge)
         }
         .buttonStyle(.plain)
       }
@@ -893,46 +892,36 @@ struct SmartListTile: View {
   let iconColor: Color
   let title: String
   var overdueBadge: Int? = nil
-  var count: Int? = nil
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      HStack(alignment: .top) {
-        Image(systemName: icon)
-          .font(.system(size: 22, weight: .semibold))
-          .foregroundStyle(.white)
-        Spacer()
-        Text(count.map(String.init) ?? "")
-          .font(.system(size: 30, weight: .bold))
-          .foregroundStyle(.white)
-          .monospacedDigit()
+    HStack(spacing: 10) {
+      Image(systemName: icon)
+        .font(.system(size: 18, weight: .semibold))
+        .foregroundStyle(.white)
+      Text(title)
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(.white)
+        .lineLimit(1)
+      if let b = overdueBadge, b > 0 {
+        Text("\(b)")
+          .font(.caption2.weight(.semibold))
+          .foregroundStyle(iconColor)
+          .padding(.horizontal, 5)
+          .padding(.vertical, 1)
+          .background(Color.white)
+          .clipShape(Capsule())
       }
-      Spacer(minLength: 12)
-      HStack(spacing: 6) {
-        Text(title)
-          .font(.subheadline.weight(.semibold))
-          .foregroundStyle(.white)
-        if let b = overdueBadge, b > 0 {
-          Text("\(b)")
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(iconColor)
-            .padding(.horizontal, 5)
-            .padding(.vertical, 1)
-            .background(Color.white)
-            .clipShape(Capsule())
-        }
-        Spacer()
-      }
+      Spacer(minLength: 0)
     }
-    .padding(14)
-    .frame(maxWidth: .infinity, minHeight: 100, alignment: .topLeading)
+    .padding(.horizontal, 12)
+    .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
     .background(
       LinearGradient(
         colors: [iconColor, iconColor.opacity(0.78)],
         startPoint: .top,
         endPoint: .bottom
       ),
-      in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+      in: RoundedRectangle(cornerRadius: 12, style: .continuous)
     )
   }
 }
