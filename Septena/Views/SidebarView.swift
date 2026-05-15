@@ -966,28 +966,25 @@ struct SidebarAreaRow: View {
   }
 }
 
-/// Area glyph — two nested circles (thin outline + small filled dot at
-/// center). Designed to share the visual rhythm of `ProjectProgressIcon`:
-/// same diameter, same stroke weight, so areas and projects read as
-/// related shapes in the sidebar.
+/// Area glyph — a small filled dot in the muted icon tint. Deliberately
+/// NOT a hollow circle so it doesn't read as a checkable / progress
+/// shape. Same outer dimension as `ProjectProgressIcon` (so the icon
+/// column stays aligned), but only the inner dot is drawn.
 struct AreaIcon: View {
   var tint: Color = Theme.iconMuted
   var diameter: CGFloat? = nil
+  /// Retained for call-site compatibility with the previous two-circle
+  /// glyph — ignored by the new rendering.
   var lineWidth: CGFloat? = nil
 
   private var resolvedDiameter: CGFloat { diameter ?? Theme.sidebarIconSize * 0.95 }
-  private var resolvedLineWidth: CGFloat { lineWidth ?? 0.9 }
 
   var body: some View {
-    ZStack {
-      Circle()
-        .strokeBorder(tint, lineWidth: resolvedLineWidth)
-      Circle()
-        .fill(tint)
-        .frame(width: resolvedDiameter * 0.34,
-               height: resolvedDiameter * 0.34)
-    }
-    .frame(width: resolvedDiameter, height: resolvedDiameter)
+    Circle()
+      .fill(tint)
+      .frame(width: resolvedDiameter * 0.42,
+             height: resolvedDiameter * 0.42)
+      .frame(width: resolvedDiameter, height: resolvedDiameter)
   }
 }
 
@@ -1029,7 +1026,7 @@ struct ProjectProgressIcon: View {
   var lineWidth: CGFloat? = nil
 
   private var resolvedDiameter: CGFloat { diameter ?? Theme.sidebarIconSize * 0.95 }
-  private var resolvedLineWidth: CGFloat { lineWidth ?? 0.9 }
+  private var resolvedLineWidth: CGFloat { lineWidth ?? 0.6 }
   /// Gap between the inner pie and the ring. Pie sits inside the ring's
   /// inner edge (resolvedLineWidth) plus extra breathing room so the two
   /// read as distinct shapes, not a filled-stroke disc.
