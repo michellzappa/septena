@@ -887,6 +887,16 @@ struct SmartListTile: View {
   let iconColor: Color
   let title: String
   var count: Int? = nil
+  @Environment(\.colorScheme) private var colorScheme
+
+  /// Dim the tile gradient in dark mode so fully saturated system colors
+  /// don't glare. Light mode keeps the original Reminders-bright tint.
+  private var gradientTop: Color {
+    iconColor.opacity(colorScheme == .dark ? 0.78 : 1.0)
+  }
+  private var gradientBottom: Color {
+    iconColor.opacity(colorScheme == .dark ? 0.55 : 0.78)
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -912,7 +922,7 @@ struct SmartListTile: View {
     .frame(maxWidth: .infinity, minHeight: 82, alignment: .topLeading)
     .background(
       LinearGradient(
-        colors: [iconColor, iconColor.opacity(0.78)],
+        colors: [gradientTop, gradientBottom],
         startPoint: .top,
         endPoint: .bottom
       ),
@@ -927,11 +937,18 @@ struct ColoredGlyph: View {
   let icon: String
   let color: Color
   let size: CGFloat
+  @Environment(\.colorScheme) private var colorScheme
+
+  /// Slight desaturation in dark mode keeps the small filled square from
+  /// glaring against a dark background; light mode renders full strength.
+  private var adaptedFill: Color {
+    color.opacity(colorScheme == .dark ? 0.78 : 1.0)
+  }
 
   var body: some View {
     ZStack {
       RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-        .fill(color)
+        .fill(adaptedFill)
       Image(systemName: icon)
         .font(.system(size: size * 0.58, weight: .semibold))
         .foregroundStyle(.white)
