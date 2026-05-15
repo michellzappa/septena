@@ -226,7 +226,7 @@ struct InlineEditTaskRow: View {
       //    title's Y matches the closed taskBody (which is also pinned
       //    top). Notes + actions grow *below* this band.
       HStack(alignment: .firstTextBaseline, spacing: 12) {
-        TaskCheckbox(isDone: isDone, onToggle: onToggleDone)
+        TaskCheckbox(isDone: isDone, isToday: task.today, onToggle: onToggleDone)
           .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 
         TextField("Title", text: $title, axis: .vertical)
