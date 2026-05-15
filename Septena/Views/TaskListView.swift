@@ -135,6 +135,17 @@ struct TaskListView: View {
         ForEach(review) { task in row(task, reviewable: true).asListRow() }
         ForEach(visibleItems) { task in row(task).asListRow() }
       }
+
+      // Empty bottom area that catches a tap anywhere below the last row
+      // and dismisses any open inline edit. The List itself swallows
+      // background taps, so we have to opt into this surface as a real
+      // row. InlineEditTaskRow's internal .onTapGesture swallow protects
+      // taps inside the editor from reaching this surface.
+      Color.clear
+        .frame(minHeight: 240)
+        .contentShape(Rectangle())
+        .onTapGesture { dismissInlineEdit() }
+        .asListRow()
     }
     .listStyle(.plain)
     .scrollContentBackground(.hidden)
