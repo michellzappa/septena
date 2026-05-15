@@ -982,8 +982,13 @@ struct TaskListView: View {
 
     Task {
       do {
+        // Server requires a non-empty title; send 'New To-Do' as a
+        // placeholder. Local editingTitle stays empty so the TextField
+        // shows its 'Title' prompt — user types fresh. On commit:
+        //   - empty title → delete (handled in commitEdit / onCancel)
+        //   - non-empty → server's placeholder gets replaced via update
         let created = try await client.create(
-          title: "", area: area, project: project,
+          title: "New To-Do", area: area, project: project,
           scheduled: scheduled, due: nil, today: today, notes: nil, status: status
         )
         await load()
