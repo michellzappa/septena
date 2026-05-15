@@ -17,10 +17,8 @@ struct TaskCheckbox: View {
 
   #if os(macOS)
   private static let glyphSize: CGFloat = 16
-  private static let tap: CGFloat = 22
   #else
   private static let glyphSize: CGFloat = 22
-  private static let tap: CGFloat = 28
   #endif
 
   private var glyphName: String {
@@ -39,7 +37,7 @@ struct TaskCheckbox: View {
       Image(systemName: glyphName)
         .font(.system(size: Self.glyphSize, weight: .regular))
         .foregroundStyle(glyphTint)
-        .frame(width: Self.tap, height: Self.tap)
+        .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
         .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
@@ -89,7 +87,7 @@ struct InlineNewTaskRow: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       // ── Title row — same geometry as a closed task row.
-      HStack(alignment: .firstTextBaseline, spacing: 12) {
+      HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
         Image(systemName: "circle")
           #if os(macOS)
           .font(.system(size: 16, weight: .regular))
@@ -97,6 +95,7 @@ struct InlineNewTaskRow: View {
           .font(.system(size: 22, weight: .regular))
           #endif
           .foregroundStyle(.tint)
+          .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
           .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 
         TextField("New To-Do", text: $title)
@@ -211,13 +210,8 @@ struct InlineEditTaskRow: View {
 
   enum Field { case title, notes }
 
-  /// Tap-target width of the TaskCheckbox, mirrored here so the notes
-  /// field's leading padding lines up with the title text.
-  #if os(macOS)
-  private static let checkboxTap: CGFloat = 22
-  #else
-  private static let checkboxTap: CGFloat = 28
-  #endif
+  // Uses Theme.checkboxTap and Theme.iconTextGap so the notes' left
+  // edge lines up with the title text and matches every other row.
 
   private func handleCancel() {
     cancelling = true
@@ -229,7 +223,7 @@ struct InlineEditTaskRow: View {
       // ── Title row — pinned to the top of the rowTapHeight band so the
       //    title's Y matches the closed taskBody (which is also pinned
       //    top). Notes + actions grow *below* this band.
-      HStack(alignment: .firstTextBaseline, spacing: 12) {
+      HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
         TaskCheckbox(isDone: isDone, isToday: task.today, onToggle: onToggleDone)
           .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 
@@ -267,7 +261,7 @@ struct InlineEditTaskRow: View {
         .foregroundStyle(.secondary)
         .focused($focused, equals: .notes)
         .lineLimit(2...16)
-        .padding(.leading, Theme.hPadding + Self.checkboxTap + 12)
+        .padding(.leading, Theme.hPadding + Theme.checkboxTap + Theme.iconTextGap)
         .padding(.trailing, Theme.hPadding)
         .padding(.bottom, 10)
 

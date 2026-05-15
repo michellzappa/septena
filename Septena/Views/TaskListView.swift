@@ -520,7 +520,7 @@ struct TaskListView: View {
     // baseline; the alignment guide on the box anchors it by visual center
     // so the box reads as centered with the title cap-height, not bottom-
     // anchored. For multi-line rows the title still wins the alignment.
-    HStack(alignment: .firstTextBaseline, spacing: 12) {
+    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
       // Promoted-to-Today tasks wear a sun-in-circle glyph as their
       // checkbox (instead of a plain circle). Renders on every filter
       // including Today itself, so the today signal is visible wherever
@@ -794,22 +794,20 @@ struct TaskListView: View {
 
   @ViewBuilder
   private func groupHeader(icon: String?, title: String, onTap: (() -> Void)? = nil) -> some View {
-    let body = HStack(spacing: 10) {
+    // Same icon column width and same icon→text gap as task rows so
+    // every icon sits at one X and every text starts at one X.
+    let body = HStack(spacing: Theme.iconTextGap) {
       if icon == "square.stack.3d.up.fill" {
-        // Area glyph — two nested circles, mirrors SidebarAreaRow.
         AreaIcon(diameter: 14, lineWidth: 1.5)
-          .frame(width: 20, alignment: .center)
+          .frame(width: Theme.checkboxTap, alignment: .center)
       } else if icon != nil {
-        // Other named system icons (date buckets etc.)
         Image(systemName: icon!)
           .font(.system(size: 16))
           .foregroundStyle(Theme.iconMuted)
-          .frame(width: 20, alignment: .center)
+          .frame(width: Theme.checkboxTap, alignment: .center)
       } else {
-        // Project pie glyph — same component as the sidebar / detail page
-        // so the look-and-feel is identical.
         ProjectProgressIcon(progress: 0.25, tint: Theme.iconMuted, diameter: 14)
-          .frame(width: 20, alignment: .center)
+          .frame(width: Theme.checkboxTap, alignment: .center)
       }
       Text(title)
         .font(.system(size: Theme.groupHeaderFontSize, weight: .semibold))
