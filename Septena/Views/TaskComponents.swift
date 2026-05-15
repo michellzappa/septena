@@ -5,36 +5,27 @@ import SwiftUI
 struct TaskCheckbox: View {
   @Environment(SectionTheme.self) private var theme
   /// Optional override — used by non-task items (habits/supplements/chores)
-  /// to wear their section accent. `nil` means "use the Tasks section accent".
+  /// to wear their section accent. `nil` means inherit list tint.
   var tint: Color? = nil
   let isDone: Bool
   let onToggle: () -> Void
 
-  /// Square with a small corner radius — matches the reference design's checkbox shape.
-  private static let size: CGFloat = 14
-  private static let cornerRadius: CGFloat = 5
+  #if os(macOS)
+  private static let glyphSize: CGFloat = 16
+  private static let tap: CGFloat = 22
+  #else
+  private static let glyphSize: CGFloat = 22
+  private static let tap: CGFloat = 28
+  #endif
 
   var body: some View {
     let fill = tint ?? theme.accent
     Button(action: onToggle) {
-      ZStack {
-        RoundedRectangle(cornerRadius: Self.cornerRadius)
-          .stroke(fill.opacity(0.5), lineWidth: 1.2)
-          .frame(width: Self.size, height: Self.size)
-        if isDone {
-          RoundedRectangle(cornerRadius: Self.cornerRadius)
-            .fill(fill)
-            .frame(width: Self.size, height: Self.size)
-          Image(systemName: "checkmark")
-            .font(.system(size: 7, weight: .bold))
-            .foregroundStyle(.white)
-        }
-      }
-      // Pad the hit target so mouse clicks land — the visible box is 13pt
-      // but the clickable area is ~22pt square. Critical on macOS where the
-      // stroke-only label otherwise registers clicks only on the thin border.
-      .frame(width: 22, height: 22)
-      .contentShape(Rectangle())
+      Image(systemName: isDone ? "largecircle.fill.circle" : "circle")
+        .font(.system(size: Self.glyphSize, weight: .regular))
+        .foregroundStyle(fill)
+        .frame(width: Self.tap, height: Self.tap)
+        .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
   }
@@ -115,9 +106,13 @@ struct InlineNewTaskRow: View {
     VStack(alignment: .leading, spacing: 0) {
       // ── Title row — same geometry as a closed task row.
       HStack(alignment: .firstTextBaseline, spacing: 12) {
-        RoundedRectangle(cornerRadius: 5, style: .continuous)
-          .stroke(Color.secondary.opacity(0.5), lineWidth: 1.2)
-          .frame(width: 14, height: 14)
+        Image(systemName: "circle")
+          #if os(macOS)
+          .font(.system(size: 16, weight: .regular))
+          #else
+          .font(.system(size: 22, weight: .regular))
+          #endif
+          .foregroundStyle(.tint)
           .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 
         TextField("New To-Do", text: $title)
