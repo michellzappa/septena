@@ -174,26 +174,38 @@ struct SidebarRootView: View {
     }
   }
 
-  /// iPhone / iPad layout: scrolling list with a floating Magic Plus over it.
-  /// Settings is the discreet last row of the scroll.
+  /// iPhone / iPad layout: scrolling list with a standard navigation bar and
+  /// toolbar `+` menu (Reminders pattern). Settings remains reachable from
+  /// the discreet last row of the scroll.
   @ViewBuilder
   private var sidebarPhone: some View {
-    ZStack(alignment: .bottomTrailing) {
-      ScrollView {
-        VStack(alignment: .leading, spacing: 0) {
-          smartLists.padding(.top, 12).padding(.bottom, 12)
-          areasAndProjects
-          Hairline().padding(.top, 16).padding(.bottom, 4)
-          settingsRow
-          Spacer(minLength: 120)
+    ScrollView {
+      VStack(alignment: .leading, spacing: 0) {
+        smartLists.padding(.top, 12).padding(.bottom, 12)
+        areasAndProjects
+        Hairline().padding(.top, 16).padding(.bottom, 4)
+        settingsRow
+        Spacer(minLength: 40)
+      }
+    }
+    .background(Theme.sidebarBackground)
+    .navigationTitle("Septena")
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        Menu {
+          Button { nav.showingQuickEntry = true } label: {
+            Label("New To-Do", systemImage: "plus.circle")
+          }
+          Button { showingNewProject = true } label: {
+            Label("New Project", systemImage: "number")
+          }
+          Button { newAreaName = ""; showingNewArea = true } label: {
+            Label("New Area", systemImage: "square.stack.3d.up")
+          }
+        } label: {
+          Image(systemName: "plus")
         }
       }
-      .background(Theme.sidebarBackground)
-      .septenaHideNavBar()
-
-      MagicPlusButton { showingCreateMenu = true }
-        .padding(.trailing, Theme.hPadding)
-        .padding(.bottom, 20)
     }
     .modifier(SidebarSheets(
       showingCreateMenu: $showingCreateMenu,

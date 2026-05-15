@@ -54,37 +54,6 @@ struct ScreenTitle: View {
   }
 }
 
-// MARK: - Magic Plus floating button
-
-struct MagicPlusButton: View {
-  @Environment(SectionTheme.self) private var theme
-  let action: () -> Void
-
-  var body: some View {
-    Button(action: { Haptics.tap(); action() }) {
-      Image(systemName: "plus")
-        .font(.system(size: 24, weight: .semibold))
-        .foregroundStyle(.white)
-        .frame(width: 56, height: 56)
-        .background(theme.accent)
-        .clipShape(Circle())
-        .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
-    }
-    .buttonStyle(PressEffectButtonStyle())
-  }
-}
-
-/// Plain button + scale-on-press. Uses SwiftUI's native pressed state instead
-/// of a simultaneous DragGesture (the old approach ate taps on iOS when the
-/// drag recognizer kept the touch and the button never fired).
-struct PressEffectButtonStyle: ButtonStyle {
-  func makeBody(configuration: Configuration) -> some View {
-    configuration.label
-      .scaleEffect(configuration.isPressed ? 0.92 : 1)
-      .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
-  }
-}
-
 // MARK: - Inline new task row
 
 struct InlineNewTaskRow: View {
