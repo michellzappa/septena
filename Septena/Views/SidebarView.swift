@@ -181,7 +181,7 @@ struct SidebarRootView: View {
   private var sidebarPhone: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 0) {
-        smartLists.padding(.top, 12).padding(.bottom, 12)
+        smartLists.padding(.top, 12).padding(.bottom, 24)
         // areasAndProjects renders its own per-section cards
         // (Mimestream-style), so no outer card wrapping here.
         areasAndProjects
@@ -933,45 +933,40 @@ struct SmartListTile: View {
   let iconColor: Color
   let title: String
   var count: Int? = nil
-  @Environment(\.colorScheme) private var colorScheme
-
-  /// Dim the tile gradient in dark mode so fully saturated system colors
-  /// don't glare. Light mode keeps the original Reminders-bright tint.
-  private var gradientTop: Color {
-    iconColor.opacity(colorScheme == .dark ? 0.78 : 1.0)
-  }
-  private var gradientBottom: Color {
-    iconColor.opacity(colorScheme == .dark ? 0.55 : 0.78)
-  }
 
   var body: some View {
+    // Mimestream-style minimal tile: white card with a small filled
+    // colored circle for the icon, big bold count top-right in primary,
+    // small primary label bottom-left. Lighter than the saturated
+    // gradient version.
     VStack(alignment: .leading, spacing: 0) {
       HStack(alignment: .top) {
-        Image(systemName: icon)
-          .font(.system(size: 20, weight: .semibold))
-          .foregroundStyle(.white)
+        ZStack {
+          Circle().fill(iconColor)
+          Image(systemName: icon)
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(.white)
+        }
+        .frame(width: 26, height: 26)
         Spacer()
         if let n = count {
           Text("\(n)")
-            .font(.system(size: 28, weight: .bold))
-            .foregroundStyle(.white)
+            .font(.system(size: 26, weight: .bold))
+            .foregroundStyle(.primary)
             .monospacedDigit()
         }
       }
-      Spacer(minLength: 4)
+      Spacer(minLength: 6)
       Text(title)
-        .font(.subheadline.weight(.semibold))
-        .foregroundStyle(.white)
+        .font(.system(size: 15, weight: .regular))
+        .foregroundStyle(.primary)
         .lineLimit(1)
     }
-    .padding(12)
-    .frame(maxWidth: .infinity, minHeight: 82, alignment: .topLeading)
+    .padding(.horizontal, 12)
+    .padding(.vertical, 10)
+    .frame(maxWidth: .infinity, minHeight: 78, alignment: .topLeading)
     .background(
-      LinearGradient(
-        colors: [gradientTop, gradientBottom],
-        startPoint: .top,
-        endPoint: .bottom
-      ),
+      Theme.cardSurface,
       in: RoundedRectangle(cornerRadius: 12, style: .continuous)
     )
   }
