@@ -190,10 +190,10 @@ enum Theme {
 
 extension Font {
   /// Large list title — SF Pro Rounded Bold, tinted in list color by caller.
-  static let septenaScreenTitle  = Font.system(.largeTitle, design: .rounded, weight: .bold)
+  static let septenaScreenTitle  = Font.system(.largeTitle, weight: .bold)
   /// Section header inside a list ("Today", "Scheduled") — uppercase footnote
   /// in callers; this is the bare style.
-  static let septenaSectionTitle = Font.system(.title2, design: .rounded, weight: .bold)
+  static let septenaSectionTitle = Font.system(.title2, weight: .bold)
   static let septenaCardTitle    = Font.system(.headline)
   static let septenaSidebarRow   = Font.system(.body)
   static let septenaTaskTitle    = Font.system(.body)
