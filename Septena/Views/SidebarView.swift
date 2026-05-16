@@ -485,7 +485,7 @@ struct SidebarRootView: View {
     // - Top-level projects (no area) → one card, no header
     // - Each area → header above (tappable for area detail) + card
     //   containing that area's projects
-    VStack(alignment: .leading, spacing: 22) {
+    VStack(alignment: .leading, spacing: 12) {
       if !topLevelProjects.isEmpty {
         topLevelProjectsSection
       }
@@ -523,27 +523,14 @@ struct SidebarRootView: View {
   private func areaSection(_ area: Area) -> some View {
     let projectsInArea = projects.filter { $0.area == area.id && $0.status == .active }
 
-    VStack(alignment: .leading, spacing: 8) {
-      // Section header — tappable to navigate to the area's detail page.
-      // Drag/drop targets stay on the header for area-reorder gestures.
-      Button { selectRoute(.area(area)) } label: {
-        HStack(spacing: 8) {
-          AreaIcon(diameter: 14, lineWidth: 1.2)
-          Text(area.title)
-            .font(.headline)
-            .foregroundStyle(.primary)
-          Spacer()
-          let count = areaOpenCount[area.id] ?? 0
-          if count > 0 {
-            Text("\(count)")
-              .font(.subheadline)
-              .foregroundStyle(.secondary)
-          }
-          SidebarRowChevron()
-        }
-        .contentShape(Rectangle())
+    // Each area is its own card (Mimestream-style 'bubble'). The area
+    // row sits at the top of the card, projects underneath. Areas
+    // without projects still get a card so every area visually reads
+    // as the same kind of container.
+    sectionCard {
+      sidebarButton(.area(area)) {
+        SidebarAreaRow(name: area.title, count: areaOpenCount[area.id] ?? 0)
       }
-      .buttonStyle(InertButtonStyle())
       .contextMenu { areaMenu(area) }
       .draggable(SidebarDragID.area(area.id)) {
         Text(area.title)
@@ -561,16 +548,14 @@ struct SidebarRootView: View {
         reorderArea(drag.id, before: area.id)
         return true
       }
-      .padding(.horizontal, sectionHeaderHPad)
 
       if !projectsInArea.isEmpty {
-        sectionCard {
-          ForEach(Array(projectsInArea.enumerated()), id: \.element.id) { idx, project in
-            projectRowDraggable(project, parent: area.id)
-            if idx < projectsInArea.count - 1 { inCardDivider }
-          }
-          endOfGroupDropZone(parent: area.id)
+        inCardDivider
+        ForEach(Array(projectsInArea.enumerated()), id: \.element.id) { idx, project in
+          projectRowDraggable(project, parent: area.id)
+          if idx < projectsInArea.count - 1 { inCardDivider }
         }
+        endOfGroupDropZone(parent: area.id)
       }
     }
   }
@@ -595,14 +580,11 @@ struct SidebarRootView: View {
     #endif
   }
 
-  // Horizontal margins for section headers / cards. iOS uses the
-  // Mimestream-style inset; macOS lines up with the sidebar's standard
-  // hPadding so headers don't read as protruding.
+  // Horizontal margin for section cards. iOS uses a Mimestream-style
+  // inset; macOS lines up with the sidebar's standard hPadding.
   #if os(iOS)
-  private var sectionHeaderHPad: CGFloat { 28 }   // sectionCardHPad + a bit of indent
   private var sectionCardHPad: CGFloat { 20 }
   #else
-  private var sectionHeaderHPad: CGFloat { Theme.hPadding }
   private var sectionCardHPad: CGFloat { Theme.hPadding }
   #endif
 
