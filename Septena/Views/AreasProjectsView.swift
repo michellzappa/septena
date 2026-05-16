@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // MARK: - Notes field shared by Area / Project detail
 
@@ -76,12 +77,13 @@ struct AreaDetailView: View {
   @Environment(SeptenaClient.self) private var client
   @Environment(SectionTheme.self) private var theme
   @Environment(NavigationState.self) private var nav
+  @Environment(\.modelContext) private var modelContext
 
   @State private var draftName: String
   @State private var draftNotes: String
   @State private var originalNotes: String
-  @State private var areas: [Area] = []
-  @State private var projects: [Project] = []
+  @State private var areas: [Area]
+  @State private var projects: [Project]
   @State private var projectProgress: [String: Double] = [:]
   @State private var errorMessage: String?
   @FocusState private var notesFocused: Bool
@@ -91,14 +93,19 @@ struct AreaDetailView: View {
     _draftName = State(initialValue: area.title)
     _draftNotes = State(initialValue: area.context ?? "")
     _originalNotes = State(initialValue: area.context ?? "")
+    // Seed area + project lists from cache before first render so the
+    // project rows are present immediately on navigate-in.
+    let ctx = LocalStore.shared.container.mainContext
+    _areas = State(initialValue: LocalCache.areas(in: ctx))
+    _projects = State(initialValue: LocalCache.projects(in: ctx))
   }
 
   var body: some View {
     VStack(spacing: 0) {
       VStack(alignment: .leading, spacing: 10) {
-        HStack(spacing: 12) {
-          AreaIcon(diameter: 20, lineWidth: 1.2)
-            .frame(width: 24, height: 24)
+        HStack(spacing: Theme.iconTextGap) {
+          AreaIcon(diameter: Theme.checkboxTap)
+            .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
           ClickToEditTitle(placeholder: "Area", text: $draftName) { newName in
             commitName(newName)
           }
@@ -155,14 +162,14 @@ struct AreaDetailView: View {
 
   @ViewBuilder
   private func projectRow(_ project: Project) -> some View {
-    HStack(alignment: .firstTextBaseline, spacing: 12) {
+    HStack(alignment: .center, spacing: Theme.iconTextGap) {
       ProjectProgressIcon(progress: projectProgress[project.id] ?? 0,
                           tint: theme.accent,
-                          diameter: 14)
-        .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+                          diameter: Theme.areaRowRingDiameter)
+        .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
 
       Text(project.title)
-        .font(.system(size: 14, weight: .medium))
+        .font(.septenaTaskTitle.weight(.semibold))
         .foregroundStyle(Theme.inkPrimary)
       Image(systemName: "chevron.right")
         .font(.system(size: 10, weight: .semibold))
@@ -176,11 +183,22 @@ struct AreaDetailView: View {
   }
 
   private func load() async {
+    // Paint from cache first so the area screen isn't blank on cold open.
+    let cachedAreas = LocalCache.areas(in: modelContext)
+    let cachedProjects = LocalCache.projects(in: modelContext)
+    if !cachedAreas.isEmpty { areas = cachedAreas }
+    if !cachedProjects.isEmpty { projects = cachedProjects }
+
     async let a = client.areas()
     async let p = client.projects()
     async let allInArea = client.list(view: "all", area: area.id)
     areas = (try? await a) ?? []
     projects = (try? await p) ?? []
+
+    // Fold server snapshots into the cache for next time.
+    let syncer = Syncer(client: client, context: modelContext)
+    syncer.applyAreas(areas)
+    syncer.applyProjects(projects)
 
     // Rehydrate the notes field from the freshly-loaded area record. The
     // route in nav.path holds the snapshot from when the sidebar last
@@ -204,12 +222,13 @@ struct AreaDetailView: View {
         switch t.status {
         case .done:                done[pid, default: 0] += 1; total[pid, default: 0] += 1
         case .open:                total[pid, default: 0] += 1
-        case .cancelled, .someday: break
+        case .cancelled: break
         }
       }
       projectProgress = total.reduce(into: [:]) { acc, kv in
         acc[kv.key] = Double(done[kv.key] ?? 0) / Double(kv.value)
       }
+      syncer.applyTasks(items, scope: .area(area.id))
     }
   }
 
@@ -245,17 +264,21 @@ struct ProjectDetailView: View {
   @Environment(SeptenaClient.self) private var client
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
+  @Environment(\.modelContext) private var modelContext
 
   @State private var draftName: String
   @State private var draftNotes: String
+  @State private var draftRepo: String
   @State private var originalName: String
   @State private var originalNotes: String
+  @State private var originalRepo: String
   @State private var status: ProjectStatus
   @State private var errorMessage: String?
   @State private var showingDeleteConfirm = false
   @State private var showingMoreActions = false
   @State private var showingMoveToArea = false
   @State private var areas: [Area] = []
+  @FocusState private var repoFocused: Bool
   /// Fraction of this project's tasks that are done (0...1). Drives the pie
   /// icon next to the project title — reloads whenever the page appears so it
   /// reflects completions made elsewhere too.
@@ -266,18 +289,20 @@ struct ProjectDetailView: View {
     self.project = project
     _draftName = State(initialValue: project.title)
     _draftNotes = State(initialValue: project.notes ?? "")
+    _draftRepo = State(initialValue: project.githubRepo ?? "")
     _originalName = State(initialValue: project.title)
     _originalNotes = State(initialValue: project.notes ?? "")
+    _originalRepo = State(initialValue: project.githubRepo ?? "")
     _status = State(initialValue: project.status)
   }
 
   var body: some View {
     VStack(spacing: 0) {
       VStack(alignment: .leading, spacing: 10) {
-        HStack(spacing: 12) {
+        HStack(spacing: Theme.iconTextGap) {
           ProjectProgressIcon(progress: progress, tint: theme.accent,
-                              diameter: 20, lineWidth: 2)
-            .frame(width: 24, height: 24)
+                              diameter: Theme.checkboxTap, lineWidth: 2)
+            .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
           ClickToEditTitle(placeholder: "Project", text: $draftName) { newName in
             commitNameTo(newName)
           }
@@ -286,6 +311,21 @@ struct ProjectDetailView: View {
         // Notes — see AreaDetailView for the overlay-pattern rationale.
         notesField($draftNotes, focused: $notesFocused)
 
+        HStack(spacing: 6) {
+          Image(systemName: "chevron.left.forwardslash.chevron.right")
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(Theme.inkSecondary)
+          TextField("owner/repo", text: $draftRepo)
+            .textFieldStyle(.plain)
+            .focusEffectDisabled()
+            .font(.septenaNotes)
+            .foregroundStyle(Theme.inkSecondary)
+            .focused($repoFocused)
+            #if os(iOS)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            #endif
+        }
       }
       .padding(.horizontal, Theme.hPadding)
       .padding(.top, 12)
@@ -295,6 +335,9 @@ struct ProjectDetailView: View {
       // the observer is torn down before its closure can fire.
       .onChange(of: notesFocused) { _, focused in
         if !focused { commitNotes() }
+      }
+      .onChange(of: repoFocused) { _, focused in
+        if !focused { commitRepo() }
       }
 
       Hairline()
@@ -350,7 +393,6 @@ struct ProjectDetailView: View {
       await loadAreas()
       await rehydrateNotes()
     }
-    .onAppear { Task { await loadProgress() } }
   }
 
   private func loadAreas() async {
@@ -370,6 +412,13 @@ struct ProjectDetailView: View {
       draftNotes = serverNotes
       originalNotes = serverNotes
     }
+    if !repoFocused {
+      let serverRepo = fresh.githubRepo ?? ""
+      if serverRepo != draftRepo {
+        draftRepo = serverRepo
+        originalRepo = serverRepo
+      }
+    }
   }
 
   private func moveToArea(_ newAreaId: String?) {
@@ -386,6 +435,22 @@ struct ProjectDetailView: View {
   }
 
   private func loadProgress() async {
+    // Compute optimistic progress from the cache first, then refresh.
+    let cached = LocalCache.tasks(in: modelContext, filter: .project(project.id))
+      + LocalCache.allTasks(in: modelContext).filter {
+        $0.project == project.id && $0.status == .done
+      }
+    if !cached.isEmpty {
+      var d = 0, t = 0
+      for x in cached {
+        switch x.status {
+        case .done: d += 1; t += 1
+        case .open: t += 1
+        case .cancelled: break
+        }
+      }
+      progress = t > 0 ? Double(d) / Double(t) : 0
+    }
     do {
       let all = try await client.list(view: "all", project: project.id).items
       var done = 0, total = 0
@@ -393,10 +458,12 @@ struct ProjectDetailView: View {
         switch t.status {
         case .done:                done += 1; total += 1
         case .open:                total += 1
-        case .cancelled, .someday: break
+        case .cancelled: break
         }
       }
       progress = total > 0 ? Double(done) / Double(total) : 0
+      Syncer(client: client, context: modelContext)
+        .applyTasks(all, scope: .project(project.id))
     } catch {
       // Non-fatal — progress just stays at its previous value.
     }
@@ -415,6 +482,18 @@ struct ProjectDetailView: View {
     originalNotes = draftNotes
     Task {
       do { _ = try await client.updateProject(id: project.id, notes: draftNotes) }
+      catch { errorMessage = error.localizedDescription }
+    }
+  }
+
+  private func commitRepo() {
+    let trimmed = draftRepo.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed != draftRepo { draftRepo = trimmed }
+    guard trimmed != originalRepo else { return }
+    originalRepo = trimmed
+    let payload: String?? = .some(trimmed.isEmpty ? nil : trimmed)
+    Task {
+      do { _ = try await client.updateProject(id: project.id, githubRepo: payload) }
       catch { errorMessage = error.localizedDescription }
     }
   }

@@ -63,6 +63,12 @@ final class SeptenaClient {
   private let baseURL: URL
   private let session: URLSession
 
+  /// Concurrent identical GETs share one in-flight Task. Different call
+  /// sites (TaskListView.load, sidebar.load, ProjectDetailView.loadProgress
+  /// all asking for `view=all&project=X` on the same navigation) fan into
+  /// one network round-trip instead of N. Keyed by absolute URL string.
+  private var inFlightGETs: [String: Task<Data, Error>] = [:]
+
   init(baseURL: URL) {
     self.baseURL = baseURL
     let cfg = URLSessionConfiguration.default
@@ -114,12 +120,11 @@ final class SeptenaClient {
               scheduled: Date? = nil,
               due: Date? = nil,
               today: Bool = false,
-              notes: String? = nil,
-              status: TaskStatus = .open) async throws -> EngageTask {
+              notes: String? = nil) async throws -> EngageTask {
     var body: [String: Any] = [
       "title": title,
       "today": today,
-      "status": status == .someday ? "someday" : "open",
+      "status": "open",
     ]
     if let area { body["area"] = area }
     if let project { body["project"] = project }
@@ -175,10 +180,6 @@ final class SeptenaClient {
     var body: [String: Any] = ["id": id]
     body["due"] = SeptenaDate.format(date) ?? NSNull()
     _ = try await postJSON("/api/tasks/set-due", body: body, as: EngageTask.self)
-  }
-
-  func someday(id: String) async throws {
-    _ = try await postJSON("/api/tasks/someday", body: ["id": id], as: EngageTask.self)
   }
 
   /// Set or clear a recurrence rule. Pass `nil` to clear. Server spawns the
@@ -303,27 +304,33 @@ final class SeptenaClient {
                      id: String? = nil,
                      area: String? = nil,
                      notes: String? = nil,
-                     context: String? = nil) async throws -> Project {
+                     context: String? = nil,
+                     githubRepo: String? = nil) async throws -> Project {
     var body: [String: Any] = ["title": title]
     if let id { body["id"] = id }
     if let area { body["area"] = area }
     if let notes { body["notes"] = notes }
     if let context { body["context"] = context }
+    if let githubRepo { body["github_repo"] = githubRepo }
     return try await postJSON("/api/tasks/projects", body: body, as: Project.self)
   }
 
+  /// Pass `githubRepo: .some(nil)` to clear, `.some("owner/repo")` to set,
+  /// or omit to leave unchanged — same double-Optional convention as `area`.
   func updateProject(id: String,
                      title: String? = nil,
                      status: String? = nil,
                      area: String?? = nil,
                      notes: String? = nil,
-                     context: String? = nil) async throws -> Project {
+                     context: String? = nil,
+                     githubRepo: String?? = nil) async throws -> Project {
     var body: [String: Any] = [:]
     if let title { body["title"] = title }
     if let status { body["status"] = status }
     if let area { body["area"] = area ?? NSNull() }
     if let notes { body["notes"] = notes }
     if let context { body["context"] = context }
+    if let githubRepo { body["github_repo"] = githubRepo ?? NSNull() }
     return try await putJSON("/api/tasks/projects/\(id)", body: body, as: Project.self)
   }
 
@@ -348,6 +355,7 @@ final class SeptenaClient {
       if let area = p.area       { d["area"] = area }
       if let notes = p.notes     { d["notes"] = notes }
       if let context = p.context { d["context"] = context }
+      if let gh = p.githubRepo   { d["github_repo"] = gh }
       return d
     }]
     return try await putJSON("/api/tasks/projects", body: body, as: Wrap.self).projects
@@ -367,10 +375,38 @@ final class SeptenaClient {
                                      query: [URLQueryItem] = [],
                                      as type: T.Type) async throws -> T {
     let u = try url(path, query: query)
-    var req = URLRequest(url: u)
-    req.httpMethod = "GET"
-    SeptenaLog.info("GET \(u.path)\(query.isEmpty ? "" : "?\(query.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&"))")")
-    return try await send(req, as: type)
+    let key = u.absoluteString
+    let task: Task<Data, Error>
+    let isCreator: Bool
+    if let existing = inFlightGETs[key] {
+      task = existing
+      isCreator = false
+    } else {
+      var req = URLRequest(url: u)
+      req.httpMethod = "GET"
+      SeptenaLog.info("GET \(u.path)\(query.isEmpty ? "" : "?\(query.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&"))")")
+      task = Task { [session] in
+        let (data, resp) = try await session.data(for: req)
+        let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        if code >= 400 {
+          throw SeptenaError.server(code, String(data: data, encoding: .utf8) ?? "")
+        }
+        return data
+      }
+      inFlightGETs[key] = task
+      isCreator = true
+    }
+    // Only the creator clears the slot — followers must not wipe a slot
+    // that's been replaced by a later, distinct request for the same URL.
+    defer { if isCreator { inFlightGETs[key] = nil } }
+    let data = try await task.value
+    do {
+      return try JSONDecoder().decode(type, from: data)
+    } catch {
+      let preview = String(data: data, encoding: .utf8)?.prefix(300) ?? ""
+      SeptenaLog.error("decode \(T.self) failed → \(preview)", error)
+      throw SeptenaError.decoding(String(describing: error))
+    }
   }
 
   private func postJSON<T: Decodable>(_ path: String,

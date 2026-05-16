@@ -100,10 +100,6 @@ struct InlineEditTaskRow: View {
   /// Set true the moment the user cancels, so the onChange(focused) blur
   /// handler doesn't race in and auto-commit before the card tears down.
   @State private var cancelling = false
-  /// Internal entry-opacity so the open transition animates reliably
-  /// regardless of whether the parent's transition modifier fires. Starts
-  /// at 0 and ramps to 1 on appear with the same spring used elsewhere.
-  @State private var entryOpacity: Double = 0
 
   enum Field { case title, notes }
 
@@ -174,15 +170,7 @@ struct InlineEditTaskRow: View {
     }
     .background(Theme.cardSurface)
     .modifier(InlineCardChrome())
-    .opacity(entryOpacity)
     .onAppear {
-      // Explicit fade-in keyed to the same spring used by the parent so
-      // the open transition is visible even when SwiftUI skips the
-      // conditional-swap transition (which it does intermittently for
-      // insertion inside List).
-      withAnimation(.spring(response: 0.32, dampingFraction: 0.84)) {
-        entryOpacity = 1
-      }
       // Auto-focus the title for fresh ⌘N / + drafts so the keyboard
       // opens and the user can start typing immediately. Small delay
       // lets the row finish inserting before grabbing focus.
@@ -318,15 +306,75 @@ struct InlineEditTaskRow: View {
 
 }
 
+// MARK: - Week strip
+
+/// Lean 7-day strip: today + next 6 days as Reminders-style chips
+/// (weekday letter on top, day number below). One tap = one pick.
+/// Used by both the When and Deadline pickers so quick scheduling
+/// within the coming week never opens a full calendar.
+struct WeekStrip: View {
+  @Environment(SectionTheme.self) private var theme
+  /// Currently-selected day (start-of-day), or nil for none.
+  let selected: Date?
+  let onPick: (Date) -> Void
+
+  private static let cal = Calendar.current
+  private static let weekdayFmt: DateFormatter = {
+    let f = DateFormatter(); f.dateFormat = "EEEEE"; return f   // single letter
+  }()
+
+  private var days: [Date] {
+    let start = Self.cal.startOfDay(for: Date())
+    return (0..<7).compactMap { Self.cal.date(byAdding: .day, value: $0, to: start) }
+  }
+
+  var body: some View {
+    HStack(spacing: 6) {
+      ForEach(days, id: \.self) { d in
+        let isSelected = selected.map { Self.cal.isDate($0, inSameDayAs: d) } ?? false
+        let isToday = Self.cal.isDateInToday(d)
+        Button {
+          Haptics.pick()
+          onPick(Self.cal.startOfDay(for: d))
+        } label: {
+          VStack(spacing: 2) {
+            Text(Self.weekdayFmt.string(from: d))
+              .font(.system(size: 11, weight: .medium))
+              .foregroundStyle(isSelected ? Color.white : Theme.inkSecondary)
+            Text("\(Self.cal.component(.day, from: d))")
+              .font(.system(size: 17, weight: .semibold, design: .rounded))
+              .foregroundStyle(isSelected ? Color.white
+                               : (isToday ? theme.accent : Theme.inkPrimary))
+          }
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, 8)
+          .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+              .fill(isSelected ? theme.accent
+                    : (isToday ? theme.accent.opacity(0.12) : Color.clear))
+          )
+          .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+              .strokeBorder(isSelected ? Color.clear : Theme.inkSecondary.opacity(0.18),
+                            lineWidth: 0.5)
+          )
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+      }
+    }
+  }
+}
+
 // MARK: - When picker sheet
 
-/// "When" — schedule a task for a date, defer to Someday, or clear the
-/// scheduled date. Matches the reference design's When sheet shape. `due` has a separate
+/// "When" — schedule a task for a date or clear the scheduled date. Lean:
+/// a 7-day strip up top covers the common case; "Pick a date…" reveals
+/// the graphical calendar for anything further out. `due` has its own
 /// picker (DeadlinePickerSheet) because deadlines are concrete dates only.
 struct WhenPickerSheet: View {
   @Environment(SectionTheme.self) private var theme
   let onPick: (Date?) -> Void
-  let onSomeday: () -> Void
   @Environment(\.dismiss) private var dismiss
   @State private var customDate = Date()
   @State private var showingCustom = false
@@ -334,6 +382,15 @@ struct WhenPickerSheet: View {
   var body: some View {
     NavigationStack {
       VStack(spacing: 0) {
+        WeekStrip(selected: nil) { d in
+          onPick(d); dismiss()
+        }
+        .padding(.horizontal, Theme.hPadding)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
+
+        Hairline()
+
         if showingCustom {
           DatePicker("Date", selection: $customDate, displayedComponents: [.date])
             .datePickerStyle(.graphical)
@@ -355,21 +412,8 @@ struct WhenPickerSheet: View {
           .padding(.horizontal, Theme.hPadding)
           .padding(.bottom, 20)
         } else {
-          option(icon: "sun.max.fill", tint: theme.accent, title: "Today") {
-            onPick(Calendar.current.startOfDay(for: Date())); dismiss()
-          }
-          Hairline()
-          option(icon: "sunrise.fill", tint: Theme.inkSecondary, title: "Tomorrow") {
-            let d = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: Date()))
-            onPick(d); dismiss()
-          }
-          Hairline()
-          option(icon: "calendar", tint: Theme.inkSecondary, title: "Upcoming…") {
+          option(icon: "calendar", tint: Theme.inkSecondary, title: "Pick a Date…") {
             showingCustom = true
-          }
-          Hairline()
-          option(icon: "archivebox.fill", tint: Theme.inkSecondary, title: "Someday") {
-            onSomeday(); dismiss()
           }
           Hairline()
           option(icon: "xmark.circle", tint: .secondary, title: "No Date") {
@@ -421,18 +465,62 @@ struct DeadlinePickerSheet: View {
   @Environment(\.dismiss) private var dismiss
   @State private var date: Date
 
+  @State private var showingCalendar = false
+
   init(initialDate: Date? = nil, onPick: @escaping (Date?) -> Void) {
     self.initialDate = initialDate
     self.onPick = onPick
-    _date = State(initialValue: initialDate ?? Calendar.current.startOfDay(for: Date()))
+    let seed = initialDate ?? Calendar.current.startOfDay(for: Date())
+    _date = State(initialValue: seed)
+    // If the initial deadline is within the next 7 days, the strip
+    // already covers it — keep the calendar collapsed for a lean sheet.
+    let today = Calendar.current.startOfDay(for: Date())
+    let inStripRange: Bool = {
+      guard let initialDate else { return true }
+      let day = Calendar.current.startOfDay(for: initialDate)
+      let days = Calendar.current.dateComponents([.day], from: today, to: day).day ?? 0
+      return days >= 0 && days < 7
+    }()
+    _showingCalendar = State(initialValue: !inStripRange)
   }
 
   var body: some View {
     NavigationStack {
       VStack(spacing: 0) {
-        DatePicker("Deadline", selection: $date, displayedComponents: [.date])
-          .datePickerStyle(.graphical)
-          .padding(.horizontal, Theme.hPadding)
+        WeekStrip(selected: date) { d in
+          date = d
+          onPick(d); dismiss()
+        }
+        .padding(.horizontal, Theme.hPadding)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
+
+        Hairline()
+
+        if showingCalendar {
+          DatePicker("Deadline", selection: $date, displayedComponents: [.date])
+            .datePickerStyle(.graphical)
+            .padding(.horizontal, Theme.hPadding)
+        } else {
+          Button {
+            withAnimation(.easeInOut(duration: 0.18)) { showingCalendar = true }
+          } label: {
+            HStack(spacing: 14) {
+              Image(systemName: "calendar")
+                .font(.system(size: 18))
+                .foregroundStyle(Theme.inkSecondary)
+                .frame(width: 24)
+              Text("Pick a Date…")
+                .font(.septenaSidebarRow)
+                .foregroundStyle(.primary)
+              Spacer()
+            }
+            .padding(.horizontal, Theme.hPadding)
+            .frame(height: Theme.sidebarRowHeight)
+            .contentShape(Rectangle())
+          }
+          .buttonStyle(.plain)
+        }
 
         Spacer()
 
@@ -736,7 +824,7 @@ struct MovePickerSheet: View {
 // MARK: - Paper-themed action sheet
 //
 // iOS Menu pops with system materials (translucent gray) and can't be
-// re-themed. For action lists ("Mark Someday / Cancel / Delete") we want
+// re-themed. For action lists ("Cancel / Delete") we want
 // the same warm-paper surface as the rest of the app, so we present a
 // custom bottom sheet of action rows instead of a Menu.
 

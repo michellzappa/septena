@@ -1,12 +1,15 @@
 import SwiftUI
+import SwiftData
 
 // One screen per filter (Today / Inbox / Upcoming / Anytime / Logbook / Project / Area).
-// Server does the filtering — we just render whatever /api/tasks/list returns.
+// Read-through cache: views render from SwiftData immediately, then refresh
+// from the server in the background and fold the response back in.
 
 struct TaskListView: View {
   @Environment(SeptenaClient.self) private var client
   @Environment(NavigationState.self) private var nav
   @Environment(SectionTheme.self) private var theme
+  @Environment(\.modelContext) private var modelContext
 
   let filter: TaskFilter
   /// True when this view is laid out *inside* another detail screen
@@ -17,18 +20,58 @@ struct TaskListView: View {
   /// area list shows only area-direct work (projects live in the parent view).
   var excludeProjectedTasks: Bool = false
 
-  @State private var items: [EngageTask] = []
-  @State private var review: [EngageTask] = []
-  @State private var doneToday: [EngageTask] = []
-  @State private var areas: [Area] = []
-  @State private var projects: [Project] = []
+  // Items/review/doneToday are filter-scoped. We store them alongside the
+  // filter they correspond to; when the current `filter` doesn't match the
+  // stored filter (a section swap just happened, .onChange hasn't run yet),
+  // the getters fall back to the SwiftData cache for the *current* filter —
+  // so body always reads a value that matches what's on screen. This kills
+  // the one-frame "wrong filter's data" / "Nothing here yet" flash that
+  // happens when @State lags behind a prop change.
+  @State private var itemsStorage: [EngageTask] = []
+  @State private var reviewStorage: [EngageTask] = []
+  @State private var doneTodayStorage: [EngageTask] = []
+  @State private var storageFilter: TaskFilter? = nil
 
-  // Start in the loading state so the empty-state ContentUnavailableView
-  // doesn't flash for one frame before .task { load() } fires. Filters
-  // like Today and Inbox almost always have data; without this guard,
-  // navigating to them shows 'Nothing here yet' for a frame on every
-  // mount.
-  @State private var isLoading = true
+  @State private var areas: [Area]
+  @State private var projects: [Project]
+
+  /// Filters we've successfully loaded from the network at least once.
+  /// Gates the "Nothing here yet" empty state so it never flashes during
+  /// a section swap — only after a real network response confirms emptiness.
+  @State private var loadedFilters: Set<TaskFilter> = []
+
+  init(filter: TaskFilter, embedded: Bool = false, excludeProjectedTasks: Bool = false) {
+    self.filter = filter
+    self.embedded = embedded
+    self.excludeProjectedTasks = excludeProjectedTasks
+    let ctx = LocalStore.shared.container.mainContext
+    _areas = State(initialValue: LocalCache.areas(in: ctx))
+    _projects = State(initialValue: LocalCache.projects(in: ctx))
+  }
+
+  private var items: [EngageTask] {
+    get {
+      storageFilter == filter
+        ? itemsStorage
+        : LocalCache.tasks(in: LocalStore.shared.container.mainContext, filter: filter)
+    }
+    nonmutating set {
+      itemsStorage = newValue
+      storageFilter = filter
+    }
+  }
+
+  private var review: [EngageTask] {
+    get { storageFilter == filter ? reviewStorage : [] }
+    nonmutating set { reviewStorage = newValue; storageFilter = filter }
+  }
+
+  private var doneToday: [EngageTask] {
+    get { storageFilter == filter ? doneTodayStorage : [] }
+    nonmutating set { doneTodayStorage = newValue; storageFilter = filter }
+  }
+
+  @State private var isLoading = false
   @State private var errorMessage: String?
 
   /// IDs of tasks completed during this view's lifetime. On Project / Area
@@ -64,6 +107,26 @@ struct TaskListView: View {
   // Repeat picker
   @State private var showingRepeatSheet = false
   @State private var repeatTargetId: String?
+
+  // "Show N logged items" — recently completed tasks, scoped to the current
+  // view. Loaded lazily on first expand and refreshed alongside the main list.
+  @State private var loggedItemsStorage: [EngageTask] = []
+  @State private var loggedFilter: TaskFilter? = nil
+  @State private var showLogged = false
+
+  private var loggedItems: [EngageTask] {
+    loggedFilter == filter ? loggedItemsStorage : []
+  }
+
+  /// Where the "Show N logged items" footer is shown. Suppressed on the
+  /// Logbook screen itself, and on Today / Inbox where historical completions
+  /// would just be noise.
+  private var showsLoggedSection: Bool {
+    switch filter {
+    case .today, .inbox, .logbook: return false
+    default:                       return true
+    }
+  }
 
   // "You have N new to-dos" banner — compact start-of-day welcome that
   // surfaces tasks rolling in from scheduled-past or due-today. Dismissed
@@ -102,7 +165,7 @@ struct TaskListView: View {
           .listRowInsets(EdgeInsets())
       }
 
-      if visibleItems.isEmpty && review.isEmpty && doneToday.isEmpty && !isLoading {
+      if loadedFilters.contains(filter) && visibleItems.isEmpty && review.isEmpty && doneToday.isEmpty && !isLoading {
         ContentUnavailableView(
           "Nothing here yet",
           systemImage: titleIcon,
@@ -119,14 +182,25 @@ struct TaskListView: View {
       if filter == .today {
         groupedOpenItems
       } else if filter == .unscheduled {
-        ForEach(review) { task in row(task, reviewable: true).asListRow() }
+        ForEach(review) { task in row(task).asListRow() }
         groupedOpenItems
       } else if filter == .upcoming {
-        ForEach(review) { task in row(task, reviewable: true).asListRow() }
+        ForEach(review) { task in row(task).asListRow() }
         groupedUpcomingItems
       } else {
-        ForEach(review) { task in row(task, reviewable: true).asListRow() }
+        ForEach(review) { task in row(task).asListRow() }
         ForEach(visibleItems) { task in row(task).asListRow() }
+      }
+
+      // "Show N logged items" — collapsed by default. Skipped on Logbook
+      // (that screen *is* the log) and on Today / Inbox where it's noise.
+      if showsLoggedSection && !loggedItems.isEmpty {
+        loggedToggleRow.asListRow()
+        if showLogged {
+          ForEach(sortedLoggedItems) { task in
+            loggedRow(task).asListRow()
+          }
+        }
       }
 
       // Empty bottom area that catches a tap anywhere below the last row
@@ -144,6 +218,12 @@ struct TaskListView: View {
     .scrollContentBackground(.hidden)
     .background(Theme.paperBackground)
     .scrollDismissesKeyboard(.interactively)
+    // Floating Liquid Glass "+" — universal task entry. Same trigger path as
+    // the top toolbar "+" and ⌘N, so the new-task flow stays inline. Sits
+    // above the 240pt empty tap-catcher row so it never overlaps a real row.
+    .overlay(alignment: .bottomTrailing) {
+      floatingPlusButton
+    }
     .modifier(KeyboardNavigationModifier(
       isInputMode: editingTaskId != nil,
       hasSelection: selectedTaskId != nil,
@@ -155,12 +235,16 @@ struct TaskListView: View {
       onEscape: { selectedTaskId = nil },
       onSpace: toggleSelected,
       onNewTask: startDraft,
-      onToggleToday: toggleTodayForSelected
+      onToggleToday: toggleTodayForSelected,
+      onOpenWhen: openWhenForSelected,
+      onOpenDeadline: openDeadlineForSelected,
+      onDelete: deleteSelected,
+      onClearSchedule: clearScheduleForSelected
     ))
     // Only attach top-level nav chrome on the standalone tab versions.
     // Embedded uses (Project / Area detail wraps) inherit chrome from parent
     // — adding modifiers here would create duplicate back buttons.
-    .modifier(TopLevelChromeModifier(showChrome: !embedded, nav: nav))
+    .modifier(TopLevelChromeModifier(showChrome: !embedded))
     .alert("Error", isPresented: Binding(
       get: { errorMessage != nil },
       set: { if !$0 { errorMessage = nil } }
@@ -175,10 +259,6 @@ struct TaskListView: View {
         WhenPickerSheet(
           onPick: { date in
             if let id = whenTargetId { applyWhen(id: id, date: date) }
-            whenTargetId = nil
-          },
-          onSomeday: {
-            if let id = whenTargetId { applySomeday(id) }
             whenTargetId = nil
           }
         )
@@ -229,6 +309,17 @@ struct TaskListView: View {
     // while the user is on the screen) drop off when they return.
     .onAppear { Task { await load() } }
     .refreshable { await load() }
+    // Filter swaps reuse this same view (no .id(route) at the App level for
+    // .filter cases). `items` is a computed property that already returns
+    // the right data for `filter` synchronously, so we only need to clear
+    // session-scoped state and re-trigger the network refresh.
+    .onChange(of: filter) { _, _ in
+      sessionDoneIds = []
+      selectedTaskId = nil
+      editingTaskId = nil
+      newlyCreatedTaskId = nil
+      Task { await load() }
+    }
     // Consume the global "start a new task" trigger from the sidebar
     // Menu or detail toolbar so the new-task flow stays inline (same
     // as ⌘N) instead of opening a modal sheet.
@@ -344,6 +435,37 @@ struct TaskListView: View {
     }
   }
 
+  /// ⌘S — open the When (schedule) picker for the focused row.
+  private func openWhenForSelected() {
+    guard let id = selectedTaskId, currentTask(id: id) != nil else { return }
+    whenTargetId = id
+    whenKind = .scheduled
+    showingWhenSheet = true
+  }
+
+  /// ⌘⇧D — open the Deadline picker for the focused row.
+  private func openDeadlineForSelected() {
+    guard let id = selectedTaskId, currentTask(id: id) != nil else { return }
+    whenTargetId = id
+    whenKind = .due
+    showingWhenSheet = true
+  }
+
+  /// ⌘⌫ — delete the focused row.
+  private func deleteSelected() {
+    guard let id = selectedTaskId, currentTask(id: id) != nil else { return }
+    Haptics.warning()
+    selectedTaskId = nil
+    applyDelete(id)
+  }
+
+  /// ⌘. — clear schedule + today, sending the row back to Anytime.
+  private func clearScheduleForSelected() {
+    guard let id = selectedTaskId, currentTask(id: id) != nil else { return }
+    whenKind = .scheduled
+    applyWhen(id: id, date: nil)
+  }
+
   private func applyRecurrence(id: String, rule: Recurrence?) {
     Haptics.tick()
     Task {
@@ -353,14 +475,6 @@ struct TaskListView: View {
       } catch {
         errorMessage = error.localizedDescription
       }
-    }
-  }
-
-  private func applySomeday(_ id: String) {
-    Haptics.tick()
-    Task {
-      do { try await client.someday(id: id); await load() }
-      catch { errorMessage = error.localizedDescription }
     }
   }
 
@@ -417,8 +531,8 @@ struct TaskListView: View {
   // MARK: - Row
 
   @ViewBuilder
-  private func row(_ task: EngageTask, reviewable: Bool = false) -> some View {
-    rowContent(task, reviewable: reviewable)
+  private func row(_ task: EngageTask) -> some View {
+    rowContent(task)
       // Explicit value-driven animation so both directions of the
       // taskBody ↔ editor swap animate, regardless of whether the
       // mutating call site wrapped in withAnimation. The transition
@@ -429,7 +543,7 @@ struct TaskListView: View {
   }
 
   @ViewBuilder
-  private func rowContent(_ task: EngageTask, reviewable: Bool = false) -> some View {
+  private func rowContent(_ task: EngageTask) -> some View {
     if editingTaskId == task.id {
       InlineEditTaskRow(
         task: task,
@@ -470,14 +584,15 @@ struct TaskListView: View {
           repeatTargetId = task.id; showingRepeatSheet = true
         }
       )
-      // Pure opacity transitions — scale-from-top was unreliable inside
-      // List on the insertion side (the editor would mount full-size
-      // without fading). Opacity blends predictably both directions;
-      // List handles the row's own height change with its native
-      // animation.
-      .transition(.opacity)
+      // No cross-fade between display and edit modes — that fade was the
+      // source of the "title + checkmark flicker on open". The checkbox /
+      // title sit at the same position in both branches; an instant swap
+      // is imperceptible. The expand spring on the parent still animates
+      // the row's height as the editor pane unfolds below.
+      .transition(.identity)
     } else {
-      taskBody(task, reviewable: reviewable)
+      taskBody(task)
+        .transition(.identity)
         .transition(.opacity)
         // Right-click should make it visually clear which row the menu
         // refers to — flip the selection cursor onto this task before the
@@ -487,12 +602,25 @@ struct TaskListView: View {
         // Long-press menu — temporary stand-in for swipe-to-reveal (which is
         // List-only in SwiftUI). Each item fires a haptic when selected.
         .contextMenu {
-          Button {
-            Haptics.tick()
-            Task { try? await client.moveToToday(id: task.id, today: !task.today); await load() }
-          } label: {
-            Label(task.today ? "Remove from Today" : "Move to Today",
-                  systemImage: task.today ? "sun.min" : "sun.max.fill")
+          // Hide "Move to Today" whenever the row is already surfacing on
+          // the Today view — either via the today flag or because its
+          // scheduled/due date pulled it in. Only show "Remove from Today"
+          // when the today flag is actually set (that's the only state the
+          // toggle can undo).
+          if task.today {
+            Button {
+              Haptics.tick()
+              Task { try? await client.moveToToday(id: task.id, today: false); await load() }
+            } label: {
+              Label("Remove from Today", systemImage: "sun.min")
+            }
+          } else if filter != .today {
+            Button {
+              Haptics.tick()
+              Task { try? await client.moveToToday(id: task.id, today: true); await load() }
+            } label: {
+              Label("Move to Today", systemImage: "sun.max.fill")
+            }
           }
           Button {
             whenTargetId = task.id; whenKind = .scheduled; showingWhenSheet = true
@@ -536,7 +664,7 @@ struct TaskListView: View {
   }
 
   @ViewBuilder
-  private func taskBody(_ task: EngageTask, reviewable: Bool) -> some View {
+  private func taskBody(_ task: EngageTask) -> some View {
     // `.firstTextBaseline` lines the checkbox up with the title's text
     // baseline; the alignment guide on the box anchors it by visual center
     // so the box reads as centered with the title cap-height, not bottom-
@@ -578,11 +706,8 @@ struct TaskListView: View {
           .font(.system(size: 12))
           .foregroundStyle(Theme.inkSecondary)
       }
-      // Trailing date label — compact. Always on the right, never a
-      // pill under the title:
-      //   • Due (deadline) wins: flag + label, red when overdue/today.
-      //   • Otherwise scheduled (when present and we're not on Today, where
-      //     the screen itself is "today"): calendar + label, muted.
+      // Trailing date / status — one clear signal per row. See
+      // `trailingDate` for the full rule set.
       trailingDate(task)
     }
     .padding(.horizontal, Theme.hPadding)
@@ -605,6 +730,12 @@ struct TaskListView: View {
     // sibling forces SwiftUI to wait the system double-click interval
     // (~300ms) on every single click before firing.
     .onTapGesture {
+      // If a different row is being edited, the first tap just commits
+      // that editor — it does not also select/open this row.
+      if let editing = editingTaskId, editing != task.id {
+        commitEdit()
+        return
+      }
       if selectedTaskId == task.id {
         startEdit(task)
       } else {
@@ -613,6 +744,10 @@ struct TaskListView: View {
     }
     #else
     .onTapGesture {
+      if let editing = editingTaskId, editing != task.id {
+        commitEdit()
+        return
+      }
       selectedTaskId = task.id
       startEdit(task)
     }
@@ -640,21 +775,34 @@ struct TaskListView: View {
     return Calendar.current.startOfDay(for: due) <= today
   }
 
-  /// Trailing date indicator: flag for a deadline (due) or calendar for a
-  /// scheduled "when". Lives on the right side of the row so dates never
-  /// crowd the title or meta line.
+  /// Trailing date / status indicator. Red only ever means **deadline
+  /// missed** — a `scheduled` date in the past is not "overdue", it's just
+  /// the reason the row is on Today. Rules:
+  ///   • `due ≤ today` → red bold date text (`Today` / `Yesterday` / `May 14`).
+  ///   • `due > today` → gray flag + date (marked, not urgent).
+  ///   • No `due`, scheduled future, not on Today → muted calendar + date.
+  ///   • No `due`, scheduled past → nothing. The row's presence on Today
+  ///     *is* the signal; a red label here would conflate "missed deadline"
+  ///     with "showed up because of a planning date."
   @ViewBuilder
   private func trailingDate(_ task: EngageTask) -> some View {
     let cal = Calendar.current
     let today = cal.startOfDay(for: Date())
     if let due = task.due.flatMap(SeptenaDate.parse) {
-      let dueSoon = cal.startOfDay(for: due) <= today
-      HStack(spacing: 4) {
-        Image(systemName: "flag.fill").font(.system(size: 12))
-        Text(shortDate(due)).font(.septenaMeta)
+      let dueDay = cal.startOfDay(for: due)
+      if dueDay <= today {
+        Text(cal.isDateInToday(due) ? "Today" : shortDate(due))
+          .font(.septenaMeta.weight(.semibold))
+          .foregroundStyle(Theme.overdueRed)
+          .padding(.top, 3)
+      } else {
+        HStack(spacing: 4) {
+          Image(systemName: "flag.fill").font(.system(size: 12))
+          Text(shortDate(due)).font(.septenaMeta)
+        }
+        .foregroundStyle(Theme.inkSecondary)
+        .padding(.top, 3)
       }
-      .foregroundStyle(dueSoon ? Theme.overdueRed : Theme.inkSecondary)
-      .padding(.top, 3)
     } else if filter != .today, let scheduled = task.scheduled.flatMap(SeptenaDate.parse) {
       HStack(spacing: 4) {
         Image(systemName: "calendar").font(.system(size: 11))
@@ -817,9 +965,12 @@ struct TaskListView: View {
   private func groupHeader(icon: String?, title: String, onTap: (() -> Void)? = nil) -> some View {
     // Same icon column width and same icon→text gap as task rows so
     // every icon sits at one X and every text starts at one X.
-    let body = HStack(spacing: Theme.iconTextGap) {
+    HStack(spacing: Theme.iconTextGap) {
       if icon == "square.stack.3d.up.fill" {
-        AreaIcon(diameter: 14, lineWidth: 1.5)
+        // Area dot is intentionally bumped past task-row icon size — it's a
+        // section header, not an inline glyph, and the larger circle reads as
+        // a chapter marker.
+        AreaIcon(diameter: 21, lineWidth: 1.5)
           .frame(width: Theme.checkboxTap, alignment: .center)
       } else if icon != nil {
         Image(systemName: icon!)
@@ -830,13 +981,15 @@ struct TaskListView: View {
         ProjectProgressIcon(progress: 0.25, tint: Theme.iconMuted, diameter: 14)
           .frame(width: Theme.checkboxTap, alignment: .center)
       }
-      Text(title)
-        .font(.system(size: Theme.groupHeaderFontSize, weight: .semibold))
-        .foregroundStyle(Theme.inkPrimary)
-      if onTap != nil {
-        Image(systemName: "chevron.right")
-          .font(.system(size: Theme.groupHeaderFontSize - 6, weight: .semibold))
-          .foregroundStyle(Theme.iconMuted)
+      // Tappable target is JUST the title (+ chevron) — not the whole row.
+      // The Spacer keeps the rest of the row visually aligned but inert, so
+      // clicks in empty horizontal space don't navigate.
+      if let onTap {
+        GroupHeaderLabel(title: title, hasChevron: true, action: onTap)
+      } else {
+        Text(title)
+          .font(.system(size: Theme.groupHeaderFontSize, weight: .semibold))
+          .foregroundStyle(Theme.inkPrimary)
       }
       Spacer()
     }
@@ -847,13 +1000,6 @@ struct TaskListView: View {
     // previous group instead of the start of a new one.
     .padding(.top, 32)
     .padding(.bottom, 6)
-    .contentShape(Rectangle())
-
-    if let onTap {
-      Button(action: onTap) { body }.buttonStyle(.plain)
-    } else {
-      body
-    }
   }
 
   // MARK: - Upcoming grouping (by date)
@@ -903,9 +1049,28 @@ struct TaskListView: View {
     return df.string(from: date)
   }
 
-  // (Floating Magic Plus removed — new-task creation lives in the macOS
-  // toolbar ("+" / ⇧⌘N) and in the global ⌘N shortcut. Reintroduce when
-  // we add user-controlled list ordering / a drag-to-reorder model.)
+  /// Bottom-trailing floating "+" — universal entry on both platforms.
+  /// Routes through `nav.shouldStartCreating` so it shares the inline-draft
+  /// flow used by ⌘N and the top toolbar "+".
+  @ViewBuilder
+  private var floatingPlusButton: some View {
+    Button {
+      Haptics.tick()
+      nav.shouldStartCreating = true
+    } label: {
+      Image(systemName: "plus")
+        .font(.system(size: 22, weight: .semibold))
+        .foregroundStyle(Theme.inkPrimary)
+        .frame(width: 56, height: 56)
+        .contentShape(Circle())
+    }
+    .buttonStyle(.plain)
+    .glassEffect(.regular.interactive(), in: .circle)
+    .padding(.trailing, 20)
+    .padding(.bottom, 20)
+    .accessibilityLabel("New Task")
+    .help("New Task")
+  }
 
   // MARK: - Edit
 
@@ -973,7 +1138,6 @@ struct TaskListView: View {
     var project: String?
     var area: String?
     var today = false
-    var status: TaskStatus = .open
 
     let cal = Calendar.current
     let tomorrow = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: Date()))
@@ -983,7 +1147,6 @@ struct TaskListView: View {
     case .upcoming:         scheduled = tomorrow
     case .project(let pid): project = pid
     case .area(let aid):    area = aid
-    case .unscheduled:      status = .someday
     default:                break
     }
 
@@ -996,7 +1159,7 @@ struct TaskListView: View {
         //   - non-empty → server's placeholder gets replaced via update
         let created = try await client.create(
           title: "New To-Do", area: area, project: project,
-          scheduled: scheduled, due: nil, today: today, notes: nil, status: status
+          scheduled: scheduled, due: nil, today: today, notes: nil
         )
         await load()
         editingTitle = ""
@@ -1088,10 +1251,88 @@ struct TaskListView: View {
     apply(&items); apply(&review); apply(&doneToday)
   }
 
+  // MARK: - Logged items section
+
+  /// Scope the logbook (which is always global on the server) to the area /
+  /// project the user is currently looking at. On top-level filters we keep
+  /// everything.
+  private func filterLogged(_ all: [EngageTask]) -> [EngageTask] {
+    switch filter {
+    case .project(let pid):
+      return all.filter { $0.project == pid }
+    case .area(let aid):
+      let projectIdsInArea = Set(projects.filter { $0.area == aid }.map(\.id))
+      return all.filter { task in
+        if task.area == aid { return true }
+        if let pid = task.project, projectIdsInArea.contains(pid) { return true }
+        return false
+      }
+    default:
+      return all
+    }
+  }
+
+  private var sortedLoggedItems: [EngageTask] {
+    loggedItems.sorted { (a, b) in
+      (a.completedAt ?? "") > (b.completedAt ?? "")
+    }
+  }
+
+  @ViewBuilder
+  private var loggedToggleRow: some View {
+    Button {
+      Haptics.tick()
+      withAnimation(.easeInOut(duration: 0.2)) { showLogged.toggle() }
+    } label: {
+      HStack(spacing: 6) {
+        Image(systemName: showLogged ? "chevron.down" : "chevron.right")
+          .font(.system(size: 11, weight: .semibold))
+          .foregroundStyle(Theme.iconMuted)
+        Text(showLogged
+             ? "Hide logged items"
+             : "Show \(loggedItems.count) logged item\(loggedItems.count == 1 ? "" : "s")")
+          .font(.septenaMeta.weight(.semibold))
+          .foregroundStyle(Theme.inkSecondary)
+        Spacer()
+      }
+      .padding(.horizontal, Theme.hPadding)
+      .padding(.top, 24)
+      .padding(.bottom, 6)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+  }
+
+  @ViewBuilder
+  private func loggedRow(_ task: EngageTask) -> some View {
+    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
+      TaskCheckbox(isDone: true, isToday: false) { toggle(task) }
+        .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+
+      if let when = task.completedAt.flatMap(SeptenaDate.parse) {
+        Text(shortDate(when))
+          .font(.septenaMeta)
+          .foregroundStyle(Theme.inkSecondary)
+          .frame(minWidth: 44, alignment: .leading)
+      }
+
+      Text(task.title)
+        .font(.septenaTaskTitle)
+        .foregroundStyle(Theme.inkSecondary)
+        .lineLimit(1)
+        .truncationMode(.tail)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    .padding(.horizontal, Theme.hPadding)
+    .padding(.vertical, Theme.rowTapHeight >= 44 ? 11 : 5)
+  }
+
   // MARK: - Load
 
   private func load() async {
-    isLoading = true
+    // Cache was already painted in init(); only show the loading state when
+    // we have literally nothing to render (first ever launch, cache miss).
+    if items.isEmpty { isLoading = true }
     defer { isLoading = false }
     do {
       let listView = filter.serverView
@@ -1106,11 +1347,37 @@ struct TaskListView: View {
       items = resp.items
       review = resp.review ?? []
       doneToday = resp.done ?? []
+      loadedFilters.insert(filter)
 
       async let p = client.projects()
       async let a = client.areas()
       projects = (try? await p) ?? []
       areas = (try? await a) ?? []
+
+      // 2. Fold the fresh server response back into SwiftData so the next
+      //    cold load renders from cache. Scope tells the syncer how to
+      //    prune deleted rows without nuking out-of-scope tasks.
+      let syncer = Syncer(client: client, context: modelContext)
+      let scope: Syncer.TaskScope = {
+        switch filter {
+        case .area(let aid): return .area(aid)
+        case .project(let pid): return .project(pid)
+        default: return .filter(filter)
+        }
+      }()
+      syncer.applyTasks(resp.items + (resp.review ?? []) + (resp.done ?? []),
+                        scope: scope)
+      syncer.applyAreas(areas)
+      syncer.applyProjects(projects)
+
+      // Recently completed, scoped to the current view. Server's logbook
+      // endpoint ignores area/project, so we filter client-side.
+      if showsLoggedSection {
+        if let logbook = try? await client.list(view: "logbook", days: 30) {
+          loggedItemsStorage = filterLogged(logbook.items)
+          loggedFilter = filter
+        }
+      }
 
       // Refresh dismissed state — banner reappears next day automatically.
       if filter == .today {
@@ -1200,30 +1467,50 @@ struct TaskListView: View {
 
 }
 
+/// Compact tappable target for area / project section headers inside a list.
+/// Wraps just the title (and optional chevron) so the click target matches the
+/// visible text rather than the whole row width. Lights up with a subtle hover
+/// background on macOS / iPadOS pointer; no-op on touch-only devices.
+private struct GroupHeaderLabel: View {
+  let title: String
+  let hasChevron: Bool
+  let action: () -> Void
+  @State private var hovered = false
+
+  var body: some View {
+    Button(action: action) {
+      HStack(spacing: 4) {
+        Text(title)
+          .font(.system(size: Theme.groupHeaderFontSize, weight: .semibold))
+          .foregroundStyle(Theme.inkPrimary)
+        if hasChevron {
+          Image(systemName: "chevron.right")
+            .font(.system(size: Theme.groupHeaderFontSize - 6, weight: .semibold))
+            .foregroundStyle(Theme.iconMuted)
+        }
+      }
+      .padding(.horizontal, 6)
+      .padding(.vertical, 2)
+      .background(
+        RoundedRectangle(cornerRadius: 6, style: .continuous)
+          .fill(hovered ? Color.primary.opacity(0.06) : Color.clear)
+      )
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .onHover { hovered = $0 }
+  }
+}
+
 /// Encapsulates the standalone-tab nav chrome so we can opt out cleanly
 /// when TaskListView is embedded inside a detail page.
 private struct TopLevelChromeModifier: ViewModifier {
   let showChrome: Bool
-  let nav: NavigationState
 
   func body(content: Content) -> some View {
     if showChrome {
       content
         .septenaInlineTitle()
-        // Toolbar glass pills float over the detail content on macOS 26
-        // (Reminders-style top chrome). `.primaryAction` slot puts them on
-        // the right side; system applies the new Liquid Glass styling.
-        .toolbar {
-          ToolbarItem(placement: .primaryAction) {
-            Button {
-              nav.shouldStartCreating = true
-            } label: {
-              Image(systemName: "plus")
-            }
-            .help("New Task")
-            .keyboardShortcut("n", modifiers: [.command, .shift])
-          }
-        }
     } else {
       content
     }
@@ -1246,6 +1533,10 @@ private struct KeyboardNavigationModifier: ViewModifier {
   let onSpace: () -> Void
   let onNewTask: () -> Void
   let onToggleToday: () -> Void
+  let onOpenWhen: () -> Void
+  let onOpenDeadline: () -> Void
+  let onDelete: () -> Void
+  let onClearSchedule: () -> Void
 
   /// Auto-focus the list on appear so the arrow keys / space / enter work
   /// immediately, without the user having to click into the content first.
@@ -1255,6 +1546,10 @@ private struct KeyboardNavigationModifier: ViewModifier {
     content
       .background(newTaskHotkey)
       .background(toggleTodayHotkey)
+      .background(openWhenHotkey)
+      .background(openDeadlineHotkey)
+      .background(deleteHotkey)
+      .background(clearScheduleHotkey)
       .focusable()
       .focused($listFocused)
       // Suppress the macOS blue focus ring around the whole list — the
@@ -1293,6 +1588,42 @@ private struct KeyboardNavigationModifier: ViewModifier {
   private var toggleTodayHotkey: some View {
     Button("Toggle Today") { onToggleToday() }
       .keyboardShortcut("t", modifiers: .command)
+      .opacity(0)
+      .frame(width: 0, height: 0)
+      .accessibilityHidden(true)
+  }
+
+  /// Hidden ⌘S — opens the When (schedule) picker for the focused row.
+  private var openWhenHotkey: some View {
+    Button("When…") { onOpenWhen() }
+      .keyboardShortcut("s", modifiers: .command)
+      .opacity(0)
+      .frame(width: 0, height: 0)
+      .accessibilityHidden(true)
+  }
+
+  /// Hidden ⌘⇧D — opens the Deadline picker for the focused row.
+  private var openDeadlineHotkey: some View {
+    Button("Deadline…") { onOpenDeadline() }
+      .keyboardShortcut("d", modifiers: [.command, .shift])
+      .opacity(0)
+      .frame(width: 0, height: 0)
+      .accessibilityHidden(true)
+  }
+
+  /// Hidden ⌘⌫ — delete the focused row.
+  private var deleteHotkey: some View {
+    Button("Delete") { onDelete() }
+      .keyboardShortcut(.delete, modifiers: .command)
+      .opacity(0)
+      .frame(width: 0, height: 0)
+      .accessibilityHidden(true)
+  }
+
+  /// Hidden ⌘. — clear schedule + today flag, sending the row to Anytime.
+  private var clearScheduleHotkey: some View {
+    Button("Clear Schedule") { onClearSchedule() }
+      .keyboardShortcut(".", modifiers: .command)
       .opacity(0)
       .frame(width: 0, height: 0)
       .accessibilityHidden(true)

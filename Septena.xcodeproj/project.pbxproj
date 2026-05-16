@@ -53,6 +53,8 @@
 		FAA49CC911788D53BAFDBAFD /* NextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB6D9FD80512D4CD62AEFFFD /* NextView.swift */; };
 		FB79CB77D7DB4D47195A606D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */; };
 		FCDDF4248EC04741134329B2 /* AreasProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5C26629FE8A4DF019B9784 /* AreasProjectsView.swift */; };
+		A1A1A1A1A1A1A1A1A1A10001 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A1A1A1A1A1A1A10000 /* Persistence.swift */; };
+		A1A1A1A1A1A1A1A1A1A10002 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A1A1A1A1A1A1A10000 /* Persistence.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -61,7 +63,7 @@
 		2D413F054F59B2A90A319154 /* TaskDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
 		31313A0E804B33A3E43FC1F6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		33B6D5A7801C40656B13C350 /* RemindersInboxSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersInboxSection.swift; sourceTree = "<group>"; };
-		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
 		561130AE996F0E92FE02767D /* RemindersBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersBridge.swift; sourceTree = "<group>"; };
@@ -82,6 +84,7 @@
 		E17D3542734AB0B32527C12C /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
 		EF52BF4594608E7B7D09AA48 /* PlatformShims.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformShims.swift; sourceTree = "<group>"; };
 		FB6D9FD80512D4CD62AEFFFD /* NextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextView.swift; sourceTree = "<group>"; };
+		A1A1A1A1A1A1A1A1A1A10000 /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -142,6 +145,7 @@
 				1E25F81FE5AA4B6BBC056275 /* DateParser.swift */,
 				53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */,
 				7D5ECFDA9128B73993023CB6 /* Models.swift */,
+				A1A1A1A1A1A1A1A1A1A10000 /* Persistence.swift */,
 				561130AE996F0E92FE02767D /* RemindersBridge.swift */,
 				C03DC46C772E45B60ECB7343 /* SectionTheme.swift */,
 				583220978001091137587977 /* SeptenaClient.swift */,
@@ -202,7 +206,6 @@
 						ProvisioningStyle = Automatic;
 					};
 					FD752EC978FED2E2D676DE2D = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -264,6 +267,7 @@
 				0448F507E1F1600F9933AEED /* Models.swift in Sources */,
 				F6ED283EEF472FE8DA7B7DFB /* NextItemsSection.swift in Sources */,
 				FAA49CC911788D53BAFDBAFD /* NextView.swift in Sources */,
+				A1A1A1A1A1A1A1A1A1A10001 /* Persistence.swift in Sources */,
 				3F005BC1D6AB964EA48E05C3 /* PlatformShims.swift in Sources */,
 				187093B93D48863B5E1E1E37 /* RemindersBridge.swift in Sources */,
 				8D5C2FF5F66A353AF7905E34 /* RemindersImportView.swift in Sources */,
@@ -290,6 +294,7 @@
 				DD200EF411309E29B543963F /* Models.swift in Sources */,
 				85E7CF1494FFC184EA9CB811 /* NextItemsSection.swift in Sources */,
 				06F8765D7D9BA1A94FE3984D /* NextView.swift in Sources */,
+				A1A1A1A1A1A1A1A1A1A10002 /* Persistence.swift in Sources */,
 				0FABD76594A04A8968E1A04B /* PlatformShims.swift in Sources */,
 				94702073666C4968D36B96C5 /* RemindersBridge.swift in Sources */,
 				55C20E76DB4BB1B7C3306925 /* RemindersImportView.swift in Sources */,
@@ -315,14 +320,20 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Septena/Septena.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 992N457T8D;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Septena/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Septask;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.septena.app;
 				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
@@ -437,14 +448,20 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Septena/Septena.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 992N457T8D;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Septena/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Septask;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.septena.app;
 				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;

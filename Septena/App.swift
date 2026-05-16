@@ -1,10 +1,12 @@
 import SwiftUI
+import SwiftData
 
 @main
 struct EngageApp: App {
   @State private var clientProvider = ClientProvider.shared
   @State private var navigation = NavigationState()
   @State private var theme = SectionTheme()
+  private let localStore = LocalStore.shared
 
   var body: some Scene {
     WindowGroup {
@@ -12,7 +14,13 @@ struct EngageApp: App {
         .environment(clientProvider.client)
         .environment(navigation)
         .environment(theme)
-        .task { await theme.refresh(from: clientProvider.client) }
+        .modelContainer(localStore.container)
+        .task {
+          await theme.refresh(from: clientProvider.client)
+          let syncer = Syncer(client: clientProvider.client,
+                              context: localStore.container.mainContext)
+          await syncer.pullAll()
+        }
         .onAppear {
           #if canImport(UIKit)
           UITableView.appearance().keyboardDismissMode = .interactive
@@ -128,42 +136,39 @@ struct ContentView: View {
     }
   }
 
-  // iPad regular / macOS: two-column. Sidebar stays put, detail navigates.
+  // iPad regular / macOS: two-column. Sidebar stays put, detail swaps.
+  //
+  // The app is conceptually flat — sidebar selection always sets
+  // `nav.path = [route]` (single element, never pushed onto). So instead of
+  // a NavigationStack(path:) that animates a pop+push on every click, the
+  // detail pane just renders the current route directly. `.id(route)` keeps
+  // each project/area as its own fresh view instance.
   private func splitLayout(path: Binding<[Route]>) -> some View {
     @Bindable var nav = nav
+    let route = nav.path.last ?? .filter(.today)
     return NavigationSplitView(columnVisibility: $nav.sidebarVisibility) {
       SidebarRootView()
     } detail: {
-      NavigationStack(path: path) {
-        TaskListView(filter: .today)
+      NavigationStack {
+        destination(for: route)
           .padding(.horizontal, Theme.listLeadingInset)
           .background(Theme.paperBackground)
-          // macOS 26 paints toolbar items as Liquid Glass pills floating
-          // over the content (Reminders / System Settings look). Letting
-          // the toolbar render — instead of hiding it as before — restores
-          // that look; the root has no back button so there's no chrome to
-          // hide. Push destinations below get the back button automatically.
-          .navigationDestination(for: Route.self) { route in
-            // `.id(route)` forces a fresh view instance whenever the route
-            // changes — critical for going .project(A) → .project(B) on macOS
-            // where NavigationStack would otherwise reuse the same detail view
-            // and leave its @State bound to the previous project.
-            destination(for: route)
-              .id(route)
-              .padding(.horizontal, Theme.listLeadingInset)
-              .background(Theme.paperBackground)
-          }
       }
     }
   }
 
+  // Per-route .id is applied INSIDE destination(for:) — TaskListView is
+  // intentionally reused across filter swaps (sub-second snap; resets its
+  // own session state via .onChange(of: filter)), while Project / Area
+  // detail use their entity ids so navigating between two projects gives
+  // a fresh view with fresh state.
   @ViewBuilder
   private func destination(for route: Route) -> some View {
     switch route {
     case .filter(let f):  TaskListView(filter: f)
     case .next:           NextView()
-    case .project(let p): ProjectDetailView(project: p)
-    case .area(let a):    AreaDetailView(area: a)
+    case .project(let p): ProjectDetailView(project: p).id(p.id)
+    case .area(let a):    AreaDetailView(area: a).id(a.id)
     case .settings:       ServerConfigView()
     case .remindersImport: RemindersImportView()
     }

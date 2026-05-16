@@ -8,7 +8,6 @@ enum TaskStatus: String, Codable, Hashable {
   case open
   case done
   case cancelled
-  case someday
 }
 
 struct EngageTask: Identifiable, Codable, Hashable {
@@ -37,7 +36,9 @@ struct EngageTask: Identifiable, Codable, Hashable {
     let c = try decoder.container(keyedBy: CodingKeys.self)
     id = try c.decode(String.self, forKey: .id)
     title = try c.decode(String.self, forKey: .title)
-    status = try c.decodeIfPresent(TaskStatus.self, forKey: .status) ?? .open
+    // Tolerate unknown status values (e.g. legacy "someday" rows) by
+    // falling back to open rather than failing the whole decode.
+    status = (try? c.decode(TaskStatus.self, forKey: .status)) ?? .open
     created = try c.decodeIfPresent(String.self, forKey: .created)
     scheduled = try c.decodeIfPresent(String.self, forKey: .scheduled)
     due = try c.decodeIfPresent(String.self, forKey: .due)
@@ -110,18 +111,22 @@ struct Project: Identifiable, Codable, Hashable {
   var completedAt: String?
   var notes: String?
   var context: String?
+  /// Optional "owner/repo" pointer. Source of truth for agentic tooling that
+  /// needs to know which GitHub repo a project's tasks live against.
+  var githubRepo: String?
 
   enum CodingKeys: String, CodingKey {
     case id, title, status, area, created, notes, context
     case completedAt = "completed_at"
+    case githubRepo = "github_repo"
   }
 
   init(id: String, title: String, status: ProjectStatus = .active,
        area: String? = nil, created: String? = nil, completedAt: String? = nil,
-       notes: String? = nil, context: String? = nil) {
+       notes: String? = nil, context: String? = nil, githubRepo: String? = nil) {
     self.id = id; self.title = title; self.status = status
     self.area = area; self.created = created; self.completedAt = completedAt
-    self.notes = notes; self.context = context
+    self.notes = notes; self.context = context; self.githubRepo = githubRepo
   }
 
   init(from decoder: Decoder) throws {
@@ -134,6 +139,7 @@ struct Project: Identifiable, Codable, Hashable {
     completedAt = try c.decodeIfPresent(String.self, forKey: .completedAt)
     notes = try c.decodeIfPresent(String.self, forKey: .notes)
     context = try c.decodeIfPresent(String.self, forKey: .context)
+    githubRepo = try c.decodeIfPresent(String.self, forKey: .githubRepo)
   }
 }
 

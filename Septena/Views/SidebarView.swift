@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import UniformTypeIdentifiers
 
 // compact homepage on iPhone: the root screen IS the sidebar.
@@ -34,12 +35,22 @@ struct SidebarRootView: View {
   @Environment(SeptenaClient.self) private var client
   @Environment(NavigationState.self) private var nav
   @Environment(SectionTheme.self) private var theme
+  @Environment(\.modelContext) private var modelContext
 
-  @State private var areas: [Area] = []
-  @State private var projects: [Project] = []
+  @State private var areas: [Area]
+  @State private var projects: [Project]
   @State private var counts: TasksCounts? = nil
+
+  // Seed sidebar lists from cache before first render so the sidebar isn't
+  // ever blank — areas/projects barely change, so this is effectively the
+  // final answer almost every time.
+  init() {
+    let ctx = LocalStore.shared.container.mainContext
+    _areas = State(initialValue: LocalCache.areas(in: ctx))
+    _projects = State(initialValue: LocalCache.projects(in: ctx))
+  }
   /// Fraction of each project's tasks that are done (0...1). Drives the
-  /// pie-slice icon in SidebarProjectRow.
+  /// circular progress icon in SidebarProjectRow.
   @State private var projectProgress: [String: Double] = [:]
   /// Open task count per project — drives the muted gray count on each
   /// SidebarProjectRow.
@@ -50,6 +61,11 @@ struct SidebarRootView: View {
   /// Open task count for the "Next" smart list. Fetched via view=next since
   /// `/counts` doesn't expose it directly.
   @State private var nextCount: Int? = nil
+  /// Count of open tasks with a missed `due` deadline (`due ≤ today`).
+  /// Drives the Today smart-list red badge. Recomputed from the SwiftData
+  /// cache on the same triggers as `counts` so it stays in lockstep with
+  /// what the Today screen renders in red.
+  @State private var overdueCount: Int = 0
   @State private var errorMessage: String?
 
 
@@ -373,8 +389,13 @@ struct SidebarRootView: View {
       SmartListSpec(route: .filter(.today),
                     icon: "sun.max.fill", color: .blue,
                     title: "Today",
-                    count: counts?.todayCount,
-                    overdueBadge: counts?.reviewCount),
+                    // Total = pinned-today + scheduled/due rolling in. Both
+                    // buckets live on Today, so the user-facing count is
+                    // the sum (matches the tile/sidebar Today screen).
+                    count: counts.map { $0.todayCount + $0.reviewCount },
+                    // Red badge = actual overdue deadlines, computed from
+                    // the cache. Same definition as the in-list red date.
+                    overdueBadge: overdueCount > 0 ? overdueCount : nil),
       SmartListSpec(route: .next,
                     icon: "arrow.right", color: .green,
                     title: "Next",
@@ -418,7 +439,8 @@ struct SidebarRootView: View {
           SmartListTile(icon: spec.icon,
                         iconColor: spec.color,
                         title: spec.title,
-                        count: spec.count)
+                        count: spec.count,
+                        overdueBadge: spec.overdueBadge)
         }
         .buttonStyle(.plain)
       }
@@ -436,7 +458,6 @@ struct SidebarRootView: View {
     Button { selectRoute(route) } label: { label() }
       .buttonStyle(InertButtonStyle())
       .background(rowBackground(for: route))
-      .animation(.easeOut(duration: 0.15), value: nav.path)
   }
 
   private func selectRoute(_ route: Route) {
@@ -834,6 +855,12 @@ struct SidebarRootView: View {
   // MARK: - Load
 
   private func load() async {
+    // Paint sidebar from cache immediately — areas / projects rarely change,
+    // so the perceived load is gone after the first run.
+    let cachedAreas = LocalCache.areas(in: modelContext)
+    let cachedProjects = LocalCache.projects(in: modelContext)
+    if !cachedAreas.isEmpty { areas = cachedAreas }
+    if !cachedProjects.isEmpty { projects = cachedProjects }
     do {
       async let a = client.areas()
       async let p = client.projects()
@@ -842,25 +869,33 @@ struct SidebarRootView: View {
       areas = try await a
       projects = try await p
       counts = try await c
+
+      let syncer = Syncer(client: client, context: modelContext)
+      syncer.applyAreas(areas)
+      syncer.applyProjects(projects)
       // 'Next' in this app is the chores / habits / supplements ritual
       // (see NextView), not a tasks view — the server has no view=next
       // endpoint, so we don't surface a count here. Tile renders without
       // a number until / unless we wire a real source.
       nextCount = nil
 
-      // Project progress = done / (done + open). Cancelled/someday don't
+      // Project progress = done / (done + open). Cancelled doesn't
       // count toward either side of the ratio (they're not "to-do").
       let items = try await all.items
+      syncer.applyTasks(items, scope: .all)
       var done: [String: Int] = [:]
       var total: [String: Int] = [:]
       var projOpen: [String: Int] = [:]
       var areaDirectOpen: [String: Int] = [:]
+      var overdue = 0
+      let todayYMD = SeptenaDate.today
       for t in items {
+        if t.status == .open, let d = t.due, d <= todayYMD { overdue += 1 }
         if let pid = t.project {
           switch t.status {
           case .done:           done[pid, default: 0] += 1; total[pid, default: 0] += 1
           case .open:           total[pid, default: 0] += 1; projOpen[pid, default: 0] += 1
-          case .cancelled, .someday: break
+          case .cancelled: break
           }
         } else if let aid = t.area, t.status == .open {
           // Open task assigned directly to an area (no project) — counts
@@ -868,6 +903,7 @@ struct SidebarRootView: View {
           areaDirectOpen[aid, default: 0] += 1
         }
       }
+      overdueCount = overdue
       projectProgress = total.reduce(into: [:]) { acc, kv in
         acc[kv.key] = Double(done[kv.key] ?? 0) / Double(kv.value)
       }
@@ -891,9 +927,12 @@ struct SmartListRow: View {
   /// white SF Symbol (Reminders pattern).
   let iconColor: Color
   let title: String
-  /// Red pill — used for "needs attention" (overdue / review).
+  /// Red pill — count of tasks with a missed `due` deadline (`due ≤ today`).
+  /// Same definition as the in-list red date treatment, so this number
+  /// always matches what the user sees in red on the corresponding screen.
+  /// NOT the same as `reviewCount` — scheduled-past tasks aren't overdue.
   var overdueBadge: Int? = nil
-  /// Muted gray count — neutral signal for how much sits behind the row.
+  /// Muted gray count — neutral signal for total rows on this list.
   var count: Int? = nil
 
   var body: some View {
@@ -931,13 +970,20 @@ struct SmartListTile: View {
   let icon: String
   let iconColor: Color
   let title: String
+  /// Total rows on the list — big bold number top-right.
   var count: Int? = nil
+  /// Red badge — count of tasks with a missed `due` deadline. Matches the
+  /// in-list red date count exactly. Renders as a small red pill on the
+  /// icon corner, Reminders-style. Not the same as `reviewCount`.
+  var overdueBadge: Int? = nil
 
   var body: some View {
     // Mimestream-style minimal tile: white card with a small filled
     // colored circle for the icon, big bold count top-right in primary,
     // small primary label bottom-left. Lighter than the saturated
-    // gradient version.
+    // gradient version. Two counts split overdue from the rest: red on the
+    // left, black on the right, both at the same weight so neither one
+    // dominates as a "badge".
     VStack(alignment: .leading, spacing: 0) {
       HStack(alignment: .top) {
         ZStack {
@@ -948,12 +994,7 @@ struct SmartListTile: View {
         }
         .frame(width: 26, height: 26)
         Spacer()
-        if let n = count {
-          Text("\(n)")
-            .font(.system(size: 26, weight: .bold))
-            .foregroundStyle(.primary)
-            .monospacedDigit()
-        }
+        countCluster
       }
       Spacer(minLength: 6)
       Text(title)
@@ -968,6 +1009,27 @@ struct SmartListTile: View {
       Theme.cardSurface,
       in: RoundedRectangle(cornerRadius: 12, style: .continuous)
     )
+  }
+
+  /// Top-right cluster: single bold total in primary, with a small red
+  /// flag glyph in front when there's at least one overdue task. The flag
+  /// signals "some of these are late" without splitting the number into
+  /// two competing figures.
+  @ViewBuilder
+  private var countCluster: some View {
+    HStack(alignment: .firstTextBaseline, spacing: 4) {
+      if let b = overdueBadge, b > 0 {
+        Image(systemName: "flag.fill")
+          .font(.system(size: 13, weight: .semibold))
+          .foregroundStyle(.red)
+      }
+      if let n = count {
+        Text("\(n)")
+          .font(.system(size: 26, weight: .bold))
+          .foregroundStyle(.primary)
+          .monospacedDigit()
+      }
+    }
   }
 }
 
@@ -1083,8 +1145,9 @@ struct SidebarRowChevron: View {
   }
 }
 
-/// compact project icon: a thin circle outline with a pie wedge filling
-/// from 12 o'clock clockwise in proportion to completion.
+/// Compact project icon: a circular progress bar. A faint track ring sits
+/// underneath an accent-tinted arc that begins at 12 o'clock and sweeps
+/// clockwise in proportion to completion.
 struct ProjectProgressIcon: View {
   let progress: Double
   let tint: Color
@@ -1094,46 +1157,22 @@ struct ProjectProgressIcon: View {
   var lineWidth: CGFloat? = nil
 
   private var resolvedDiameter: CGFloat { diameter ?? Theme.sidebarIconSize * 0.95 }
-  private var resolvedLineWidth: CGFloat { lineWidth ?? 1.2 }
-  /// Gap between the inner pie and the ring. Pie sits inside the ring's
-  /// inner edge (resolvedLineWidth) plus extra breathing room so the two
-  /// read as distinct shapes, not a filled-stroke disc.
-  private var pieInset: CGFloat { resolvedLineWidth + 2.5 }
+  private var resolvedLineWidth: CGFloat { lineWidth ?? 1.6 }
 
   var body: some View {
     let clamped = max(0, min(1, progress))
     ZStack {
       Circle()
-        .strokeBorder(tint, lineWidth: resolvedLineWidth)
-      PieSliceShape(progress: clamped)
-        .fill(tint)
-        .padding(pieInset)
+        .stroke(tint.opacity(0.22), lineWidth: resolvedLineWidth)
+      Circle()
+        .trim(from: 0, to: clamped)
+        .stroke(tint,
+                style: StrokeStyle(lineWidth: resolvedLineWidth,
+                                   lineCap: .round))
+        .rotationEffect(.degrees(-90))
     }
     .frame(width: resolvedDiameter, height: resolvedDiameter)
-  }
-}
-
-/// Pie slice from -90° (top) sweeping clockwise by `progress` × 360°.
-struct PieSliceShape: Shape {
-  var progress: Double
-
-  func path(in rect: CGRect) -> Path {
-    guard progress > 0 else { return Path() }
-    var path = Path()
-    let center = CGPoint(x: rect.midX, y: rect.midY)
-    let radius = min(rect.width, rect.height) / 2
-    if progress >= 1 {
-      path.addEllipse(in: rect)
-      return path
-    }
-    path.move(to: center)
-    path.addArc(center: center,
-                radius: radius,
-                startAngle: .degrees(-90),
-                endAngle: .degrees(-90 + progress * 360),
-                clockwise: false)
-    path.closeSubpath()
-    return path
+    .padding(resolvedLineWidth / 2)
   }
 }
 

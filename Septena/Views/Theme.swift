@@ -108,9 +108,10 @@ enum Theme {
 
   // MARK: - Semantic
 
-  /// Destructive / overdue. System orange matches Reminders' overdue
-  /// timestamp color exactly.
-  static let overdueRed = Color.orange
+  /// Destructive / overdue. System red — matches Apple Reminders' overdue
+  /// date text. The previous orange read as "warning, but soft"; red is the
+  /// platform convention for "this is late".
+  static let overdueRed = Color.red
 
   // MARK: - Filter accents
 
@@ -137,6 +138,14 @@ enum Theme {
   static let checkboxTap: CGFloat = 22
   #else
   static let checkboxTap: CGFloat = 28
+  #endif
+  /// Diameter of the progress ring shown on the area page's project rows.
+  /// Sized to match the `TaskCheckbox` glyph that appears in task rows
+  /// below, so the icon column reads as one consistent dot size.
+  #if os(macOS)
+  static let areaRowRingDiameter: CGFloat = 16
+  #else
+  static let areaRowRingDiameter: CGFloat = 22
   #endif
   /// HStack spacing between the icon column and the text column, shared
   /// across closed task rows, the editor row, the new-task placeholder
