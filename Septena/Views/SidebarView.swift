@@ -677,19 +677,18 @@ struct SidebarRootView: View {
   /// Thin hairline shown between consecutive rows inside the iPhone
   /// areas/projects card. Indented to the left edge of the row text
   /// (past the icon column) so it lines up with the system iOS list
-  /// separator style.
+  /// separator style. macOS sidebar reads cleanly without inter-row
+  /// hairlines (Mimestream macOS doesn't draw them either), so we
+  /// render nothing there.
+  @ViewBuilder
   private var inCardDivider: some View {
+    #if os(iOS)
     Rectangle()
-      .fill(inCardDividerColor)
+      .fill(Color(uiColor: .opaqueSeparator).opacity(0.6))
       .frame(height: 0.5)
       .padding(.leading, Theme.checkboxTap + Theme.iconTextGap)
-  }
-
-  private var inCardDividerColor: Color {
-    #if os(macOS)
-    return Color(nsColor: .separatorColor)
     #else
-    return Color(uiColor: .opaqueSeparator).opacity(0.6)
+    EmptyView()
     #endif
   }
 
