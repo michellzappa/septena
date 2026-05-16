@@ -34,6 +34,27 @@
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<true/>
 	</dict>
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.septena.app.new-todo</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>New To-Do</string>
+			<key>UIApplicationShortcutItemSubtitle</key>
+			<string>Add to Inbox</string>
+			<key>UIApplicationShortcutItemIconType</key>
+			<string>UIApplicationShortcutIconTypeAdd</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.septena.app.show-today</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Show Today</string>
+			<key>UIApplicationShortcutItemIconType</key>
+			<string>UIApplicationShortcutIconTypeDate</string>
+		</dict>
+	</array>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchScreen</key>

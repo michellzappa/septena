@@ -1,4 +1,4 @@
-# Engage — Things 3 Clone TODO
+# Septena — Things 3 Clone TODO
 
 Central work file. Update as we go. Reference: `docs/things-reference/`.
 
@@ -75,7 +75,7 @@ Central work file. Update as we go. Reference: `docs/things-reference/`.
 - [x] `areaUpdate` / `projectUpdate` Swift client methods
 - [x] Task completion: haptic + stays crossed-out on page, tap again to undo, clears on navigation away
 
-## What's missing from upstream atask (add to engage later)
+## What's missing from upstream atask (add to septena later)
 
 ### Server extensions needed (engage-server or upstream)
 - [ ] **Priority** — upstream has no priority field; add `priority: Int?` to domain.Task

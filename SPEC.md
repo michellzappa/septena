@@ -1,4 +1,4 @@
-# Engage — iOS/macOS App
+# Septena — iOS/macOS App
 
 ## Stack
 - SwiftUI (iOS 17+ / macOS 14+)
@@ -25,8 +25,8 @@
 | AreaDetail | `AreaDetail.swift` | Tasks in an area |
 
 ## Architecture
-- `EngageCore/` — shared models, Convex client, date parsing
-- `Engage/` — SwiftUI views + view models
+- `SeptenaCore/` — shared models, Convex client, date parsing
+- `Septena/` — SwiftUI views + view models
 - Real-time: Convex subscriptions update views automatically
 
 ## Build
@@ -34,5 +34,5 @@
 ```bash
 cd engage-app
 xcodegen generate
-xcodebuild -scheme Engage -destination 'platform=iOS Simulator,name=iPhone 16'
+xcodebuild -scheme Septena -destination 'platform=iOS Simulator,name=iPhone 16'
 ```

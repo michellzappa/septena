@@ -1,7 +1,7 @@
 # CHANGELOG
 
-Backend (Septena) changes requested by the iOS Engage client. These can't
-be made from the iOS side — they live in `~/Dev/septena-app/api/` and need
+Backend (Septena) changes requested by the iOS Septena client. These can't
+be made from the iOS side — they live in `~/Dev/engage-app/api/` and need
 to be applied to the Python backend.
 
 Items are listed in priority order. Each one names the file, the symptom,

@@ -10,6 +10,9 @@ extension Notification.Name {
   /// completes. Sidebar (and any other observer) subscribes to refresh
   /// counts without having to know about each individual mutation path.
   static let septenaTasksChanged = Notification.Name("septena.tasksChanged")
+  /// Posted by the macOS menu bar's "New To-Do" item. ContentView
+  /// listens and starts an inline draft on Inbox — same flow as ⌘N.
+  static let septenaOpenQuickAdd = Notification.Name("septena.openQuickAdd")
 }
 
 // MARK: - Logger
@@ -62,6 +65,12 @@ enum SeptenaError: LocalizedError {
 final class SeptenaClient {
   private let baseURL: URL
   private let session: URLSession
+
+  /// True after a transport-level failure (URLError) on the last network
+  /// call; cleared on the next successful round-trip. HTTP status errors
+  /// (4xx/5xx) and decoding failures don't flip this — they mean we did
+  /// reach the server. OfflineBanner observes this for the global indicator.
+  var isOffline: Bool = false
 
   /// Concurrent identical GETs share one in-flight Task. Different call
   /// sites (TaskListView.load, sidebar.load, ProjectDetailView.loadProgress
@@ -120,7 +129,7 @@ final class SeptenaClient {
               scheduled: Date? = nil,
               due: Date? = nil,
               today: Bool = false,
-              notes: String? = nil) async throws -> EngageTask {
+              notes: String? = nil) async throws -> SeptenaTask {
     var body: [String: Any] = [
       "title": title,
       "today": today,
@@ -131,7 +140,7 @@ final class SeptenaClient {
     if let scheduled { body["scheduled"] = SeptenaDate.format(scheduled)! }
     if let due { body["due"] = SeptenaDate.format(due)! }
     if let notes { body["notes"] = notes }
-    return try await postJSON("/api/tasks/create", body: body, as: EngageTask.self)
+    return try await postJSON("/api/tasks/create", body: body, as: SeptenaTask.self)
   }
 
   /// PATCH semantics — only included keys mutate. Use `Optional<Optional<Date>>`
@@ -139,23 +148,23 @@ final class SeptenaClient {
   /// dedicated helper below (`schedule`, `setDue`, `moveToArea`, `moveToProject`).
   func update(id: String,
               title: String? = nil,
-              notes: String? = nil) async throws -> EngageTask {
+              notes: String? = nil) async throws -> SeptenaTask {
     var body: [String: Any] = ["id": id]
     if let title { body["title"] = title }
     if let notes { body["notes"] = notes }
-    return try await postJSON("/api/tasks/update", body: body, as: EngageTask.self)
+    return try await postJSON("/api/tasks/update", body: body, as: SeptenaTask.self)
   }
 
   func complete(id: String) async throws {
-    _ = try await postJSON("/api/tasks/complete", body: ["id": id], as: EngageTask.self)
+    _ = try await postJSON("/api/tasks/complete", body: ["id": id], as: SeptenaTask.self)
   }
 
   func uncomplete(id: String) async throws {
-    _ = try await postJSON("/api/tasks/uncomplete", body: ["id": id], as: EngageTask.self)
+    _ = try await postJSON("/api/tasks/uncomplete", body: ["id": id], as: SeptenaTask.self)
   }
 
   func cancel(id: String) async throws {
-    _ = try await postJSON("/api/tasks/cancel", body: ["id": id], as: EngageTask.self)
+    _ = try await postJSON("/api/tasks/cancel", body: ["id": id], as: SeptenaTask.self)
   }
 
   func delete(id: String) async throws {
@@ -165,26 +174,26 @@ final class SeptenaClient {
   func moveToToday(id: String, today: Bool = true) async throws {
     _ = try await postJSON("/api/tasks/move-to-today",
                            body: ["id": id, "today": today],
-                           as: EngageTask.self)
+                           as: SeptenaTask.self)
   }
 
   /// Pass `nil` to clear the scheduled date.
   func schedule(id: String, date: Date?) async throws {
     var body: [String: Any] = ["id": id]
     body["scheduled"] = SeptenaDate.format(date) ?? NSNull()
-    _ = try await postJSON("/api/tasks/schedule", body: body, as: EngageTask.self)
+    _ = try await postJSON("/api/tasks/schedule", body: body, as: SeptenaTask.self)
   }
 
   /// Pass `nil` to clear the due date.
   func setDue(id: String, date: Date?) async throws {
     var body: [String: Any] = ["id": id]
     body["due"] = SeptenaDate.format(date) ?? NSNull()
-    _ = try await postJSON("/api/tasks/set-due", body: body, as: EngageTask.self)
+    _ = try await postJSON("/api/tasks/set-due", body: body, as: SeptenaTask.self)
   }
 
   /// Set or clear a recurrence rule. Pass `nil` to clear. Server spawns the
   /// next instance automatically on `/complete` when a rule is present.
-  func setRecurrence(id: String, recurrence: Recurrence?) async throws -> EngageTask {
+  func setRecurrence(id: String, recurrence: Recurrence?) async throws -> SeptenaTask {
     var body: [String: Any] = ["id": id]
     if let r = recurrence {
       body["recurrence"] = [
@@ -195,21 +204,21 @@ final class SeptenaClient {
     } else {
       body["recurrence"] = NSNull()
     }
-    return try await postJSON("/api/tasks/update", body: body, as: EngageTask.self)
+    return try await postJSON("/api/tasks/update", body: body, as: SeptenaTask.self)
   }
 
   /// Septena's update endpoint clears area when explicit `null` is sent. Pass
   /// nil here to clear.
-  func moveToArea(id: String, area: String?) async throws -> EngageTask {
+  func moveToArea(id: String, area: String?) async throws -> SeptenaTask {
     var body: [String: Any] = ["id": id]
     body["area"] = area ?? NSNull()
-    return try await postJSON("/api/tasks/update", body: body, as: EngageTask.self)
+    return try await postJSON("/api/tasks/update", body: body, as: SeptenaTask.self)
   }
 
-  func moveToProject(id: String, project: String?) async throws -> EngageTask {
+  func moveToProject(id: String, project: String?) async throws -> SeptenaTask {
     var body: [String: Any] = ["id": id]
     body["project"] = project ?? NSNull()
-    return try await postJSON("/api/tasks/update", body: body, as: EngageTask.self)
+    return try await postJSON("/api/tasks/update", body: body, as: SeptenaTask.self)
   }
 
   // MARK: - Habits / Supplements / Chores (toggleable on Today)
@@ -399,7 +408,14 @@ final class SeptenaClient {
     // Only the creator clears the slot — followers must not wipe a slot
     // that's been replaced by a later, distinct request for the same URL.
     defer { if isCreator { inFlightGETs[key] = nil } }
-    let data = try await task.value
+    let data: Data
+    do {
+      data = try await task.value
+      isOffline = false
+    } catch let urlError as URLError {
+      isOffline = true
+      throw urlError
+    }
     do {
       return try JSONDecoder().decode(type, from: data)
     } catch {
@@ -442,7 +458,14 @@ final class SeptenaClient {
     var req = URLRequest(url: u)
     req.httpMethod = "DELETE"
     SeptenaLog.info("DELETE \(u.path)")
-    let (data, resp) = try await session.data(for: req)
+    let data: Data; let resp: URLResponse
+    do {
+      (data, resp) = try await session.data(for: req)
+      isOffline = false
+    } catch let urlError as URLError {
+      isOffline = true
+      throw urlError
+    }
     let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
     if code >= 400 {
       throw SeptenaError.server(code, String(data: data, encoding: .utf8) ?? "")
@@ -458,7 +481,14 @@ final class SeptenaClient {
   }
 
   private func send<T: Decodable>(_ req: URLRequest, as type: T.Type) async throws -> T {
-    let (data, resp) = try await session.data(for: req)
+    let data: Data; let resp: URLResponse
+    do {
+      (data, resp) = try await session.data(for: req)
+      isOffline = false
+    } catch let urlError as URLError {
+      isOffline = true
+      throw urlError
+    }
     let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
     if code >= 400 {
       let body = String(data: data, encoding: .utf8) ?? ""

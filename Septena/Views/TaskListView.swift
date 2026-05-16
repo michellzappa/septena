@@ -20,6 +20,12 @@ struct TaskListView: View {
   /// area list shows only area-direct work (projects live in the parent view).
   var excludeProjectedTasks: Bool = false
 
+  /// Global sort applied when this list is showing a project or area — name
+  /// or earliest-due first. Other filters (Today, Upcoming, etc.) have their
+  /// own ordering that's part of the screen's meaning, so this is ignored
+  /// outside `.project` / `.area`.
+  @AppStorage(SettingsKey.taskSort) private var taskSortRaw: String = TaskSort.dateAdded.rawValue
+
   // Items/review/doneToday are filter-scoped. We store them alongside the
   // filter they correspond to; when the current `filter` doesn't match the
   // stored filter (a section swap just happened, .onChange hasn't run yet),
@@ -27,9 +33,9 @@ struct TaskListView: View {
   // so body always reads a value that matches what's on screen. This kills
   // the one-frame "wrong filter's data" / "Nothing here yet" flash that
   // happens when @State lags behind a prop change.
-  @State private var itemsStorage: [EngageTask] = []
-  @State private var reviewStorage: [EngageTask] = []
-  @State private var doneTodayStorage: [EngageTask] = []
+  @State private var itemsStorage: [SeptenaTask] = []
+  @State private var reviewStorage: [SeptenaTask] = []
+  @State private var doneTodayStorage: [SeptenaTask] = []
   @State private var storageFilter: TaskFilter? = nil
 
   @State private var areas: [Area]
@@ -49,7 +55,7 @@ struct TaskListView: View {
     _projects = State(initialValue: LocalCache.projects(in: ctx))
   }
 
-  private var items: [EngageTask] {
+  private var items: [SeptenaTask] {
     get {
       storageFilter == filter
         ? itemsStorage
@@ -61,12 +67,12 @@ struct TaskListView: View {
     }
   }
 
-  private var review: [EngageTask] {
+  private var review: [SeptenaTask] {
     get { storageFilter == filter ? reviewStorage : [] }
     nonmutating set { reviewStorage = newValue; storageFilter = filter }
   }
 
-  private var doneToday: [EngageTask] {
+  private var doneToday: [SeptenaTask] {
     get { storageFilter == filter ? doneTodayStorage : [] }
     nonmutating set { doneTodayStorage = newValue; storageFilter = filter }
   }
@@ -110,11 +116,11 @@ struct TaskListView: View {
 
   // "Show N logged items" — recently completed tasks, scoped to the current
   // view. Loaded lazily on first expand and refreshed alongside the main list.
-  @State private var loggedItemsStorage: [EngageTask] = []
+  @State private var loggedItemsStorage: [SeptenaTask] = []
   @State private var loggedFilter: TaskFilter? = nil
   @State private var showLogged = false
 
-  private var loggedItems: [EngageTask] {
+  private var loggedItems: [SeptenaTask] {
     loggedFilter == filter ? loggedItemsStorage : []
   }
 
@@ -352,7 +358,7 @@ struct TaskListView: View {
     return pool.first(where: { $0.id == id })?.recurrence
   }
 
-  private func currentTask(id: String?) -> EngageTask? {
+  private func currentTask(id: String?) -> SeptenaTask? {
     guard let id else { return nil }
     return (items + review + doneToday).first(where: { $0.id == id })
   }
@@ -376,7 +382,7 @@ struct TaskListView: View {
 
   /// Mirrors the rendering order of `groupedOpenItems` so arrow keys traverse
   /// rows in exactly the order the user sees them.
-  private func orderedFromGroupedOpen(pool: [EngageTask]) -> [String] {
+  private func orderedFromGroupedOpen(pool: [SeptenaTask]) -> [String] {
     let byProject = Dictionary(grouping: pool.filter { $0.project != nil },
                                by: { $0.project! })
     let byArea = Dictionary(grouping: pool.filter { $0.project == nil && $0.area != nil },
@@ -423,10 +429,21 @@ struct TaskListView: View {
     toggle(t)
   }
 
+  /// Resolve the row a keyboard shortcut should act on. Falls back to the
+  /// first row in the list when nothing is explicitly selected — otherwise
+  /// the first ⌘T after launch is a silent no-op, which reads as "broken".
+  /// Sets `selectedTaskId` as a side effect so the selection pill follows.
+  private func effectiveSelectionId() -> String? {
+    if let id = selectedTaskId, currentTask(id: id) != nil { return id }
+    guard let first = keyboardOrderedTaskIds.first else { return nil }
+    selectedTaskId = first
+    return first
+  }
+
   /// ⌘T — flip the task's "today" flag. Same action as the context-menu
   /// entry, just keyboard-driven on the currently selected row.
   private func toggleTodayForSelected() {
-    guard let id = selectedTaskId,
+    guard let id = effectiveSelectionId(),
           let t = currentTask(id: id) else { return }
     Haptics.tick()
     Task {
@@ -437,7 +454,7 @@ struct TaskListView: View {
 
   /// ⌘S — open the When (schedule) picker for the focused row.
   private func openWhenForSelected() {
-    guard let id = selectedTaskId, currentTask(id: id) != nil else { return }
+    guard let id = effectiveSelectionId() else { return }
     whenTargetId = id
     whenKind = .scheduled
     showingWhenSheet = true
@@ -445,7 +462,7 @@ struct TaskListView: View {
 
   /// ⌘⇧D — open the Deadline picker for the focused row.
   private func openDeadlineForSelected() {
-    guard let id = selectedTaskId, currentTask(id: id) != nil else { return }
+    guard let id = effectiveSelectionId() else { return }
     whenTargetId = id
     whenKind = .due
     showingWhenSheet = true
@@ -531,7 +548,7 @@ struct TaskListView: View {
   // MARK: - Row
 
   @ViewBuilder
-  private func row(_ task: EngageTask) -> some View {
+  private func row(_ task: SeptenaTask) -> some View {
     rowContent(task)
       // Explicit value-driven animation so both directions of the
       // taskBody ↔ editor swap animate, regardless of whether the
@@ -543,7 +560,7 @@ struct TaskListView: View {
   }
 
   @ViewBuilder
-  private func rowContent(_ task: EngageTask) -> some View {
+  private func rowContent(_ task: SeptenaTask) -> some View {
     if editingTaskId == task.id {
       InlineEditTaskRow(
         task: task,
@@ -664,7 +681,7 @@ struct TaskListView: View {
   }
 
   @ViewBuilder
-  private func taskBody(_ task: EngageTask) -> some View {
+  private func taskBody(_ task: SeptenaTask) -> some View {
     // `.firstTextBaseline` lines the checkbox up with the title's text
     // baseline; the alignment guide on the box anchors it by visual center
     // so the box reads as centered with the title cap-height, not bottom-
@@ -761,7 +778,7 @@ struct TaskListView: View {
   /// `.animation(value: selectedTaskId)` caused every visible row to re-layout
   /// for 150ms on each selection change, which was the macOS click-lag source.
   @ViewBuilder
-  private func rowBackground(for task: EngageTask) -> some View {
+  private func rowBackground(for task: SeptenaTask) -> some View {
     let isHighlighted = selectedTaskId == task.id && editingTaskId != task.id
     RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
       .fill(isHighlighted ? theme.accent.opacity(0.15) : Color.clear)
@@ -769,7 +786,7 @@ struct TaskListView: View {
   }
 
   /// A task with a due date that's today or in the past — surfaces a flag.
-  private func isOverdue(_ task: EngageTask) -> Bool {
+  private func isOverdue(_ task: SeptenaTask) -> Bool {
     guard let due = task.due.flatMap(SeptenaDate.parse) else { return false }
     let today = Calendar.current.startOfDay(for: Date())
     return Calendar.current.startOfDay(for: due) <= today
@@ -785,7 +802,7 @@ struct TaskListView: View {
   ///     *is* the signal; a red label here would conflate "missed deadline"
   ///     with "showed up because of a planning date."
   @ViewBuilder
-  private func trailingDate(_ task: EngageTask) -> some View {
+  private func trailingDate(_ task: SeptenaTask) -> some View {
     let cal = Calendar.current
     let today = cal.startOfDay(for: Date())
     if let due = task.due.flatMap(SeptenaDate.parse) {
@@ -819,7 +836,7 @@ struct TaskListView: View {
   /// flag + days-left when due is the only date signal). Red tint when
   /// due ≤ today, neutral otherwise.
   @ViewBuilder
-  private func metaLine(_ task: EngageTask) -> some View {
+  private func metaLine(_ task: SeptenaTask) -> some View {
     // Suppress project/area chips when the surrounding context already shows
     // them: on a project page (project + area), an area page (area), and on
     // Unscheduled (which renders project/area cluster headers above each
@@ -945,18 +962,67 @@ struct TaskListView: View {
   /// - `excludeProjectedTasks` keeps the Area page focused on loose work.
   /// - On Project / Area pages, completed tasks only appear if the user
   ///   completed them during this view's session.
-  private var visibleItems: [EngageTask] {
+  private var visibleItems: [SeptenaTask] {
     var result = items
     if excludeProjectedTasks { result = result.filter { $0.project == nil } }
     if hideHistoricalDone {
       result = result.filter { $0.status != .done || sessionDoneIds.contains($0.id) }
     }
+    // Apply the global sort only on project/area pages — those are the
+    // surfaces with no inherent ordering of their own.
+    switch filter {
+    case .project, .area:
+      let sort = TaskSort(rawValue: taskSortRaw) ?? .dateAdded
+      result.sort(by: taskSortComparator(sort))
+    default:
+      break
+    }
     return result
+  }
+
+  /// Total ordering for `visibleItems`. For due-date sort, tasks without a
+  /// `due` sink to the bottom; ties (and the no-due bucket) fall back to
+  /// case-insensitive title so the order is stable across reloads.
+  private func taskSortComparator(_ sort: TaskSort) -> (SeptenaTask, SeptenaTask) -> Bool {
+    switch sort {
+    case .alphabetical:
+      return { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+    case .dueDate:
+      return { a, b in
+        switch (a.due, b.due) {
+        case let (la?, lb?) where la != lb: return la < lb
+        case (_?, nil):                     return true
+        case (nil, _?):                     return false
+        default:
+          return a.title.localizedCaseInsensitiveCompare(b.title) == .orderedAscending
+        }
+      }
+    case .dateAdded:
+      // Oldest first → newest sinks to the bottom (matches the "newest at
+      // the end of the list" feel of most task apps). Tasks missing
+      // `created` (legacy rows) fall through to title for stability.
+      return { a, b in
+        switch (a.created, b.created) {
+        case let (la?, lb?) where la != lb: return la < lb
+        case (_?, nil):                     return true
+        case (nil, _?):                     return false
+        default:
+          return a.title.localizedCaseInsensitiveCompare(b.title) == .orderedAscending
+        }
+      }
+    }
   }
 
   private var hideHistoricalDone: Bool {
     switch filter {
     case .project, .area: return true
+    case .today:
+      // Settings → General → "Show completed tasks in Today" governs this.
+      // Default true (matches the long-standing "completions linger" feel);
+      // turning it off drops completed rows on the next reload, keeping only
+      // ones the user just checked off this session.
+      let show = UserDefaults.standard.object(forKey: SettingsKey.todayShowCompleted) as? Bool ?? true
+      return !show
     default:              return false
     }
   }
@@ -970,7 +1036,7 @@ struct TaskListView: View {
         // Area dot is intentionally bumped past task-row icon size — it's a
         // section header, not an inline glyph, and the larger circle reads as
         // a chapter marker.
-        AreaIcon(diameter: 21, lineWidth: 1.5)
+        AreaIcon(tint: Theme.inkSecondary, diameter: 21, lineWidth: 1.5)
           .frame(width: Theme.checkboxTap, alignment: .center)
       } else if icon != nil {
         Image(systemName: icon!)
@@ -978,7 +1044,7 @@ struct TaskListView: View {
           .foregroundStyle(Theme.iconMuted)
           .frame(width: Theme.checkboxTap, alignment: .center)
       } else {
-        ProjectProgressIcon(progress: 0.25, tint: Theme.iconMuted, diameter: 14)
+        ProjectProgressIcon(progress: 0.25, tint: Theme.inkSecondary, diameter: 14)
           .frame(width: Theme.checkboxTap, alignment: .center)
       }
       // Tappable target is JUST the title (+ chevron) — not the whole row.
@@ -986,6 +1052,7 @@ struct TaskListView: View {
       // clicks in empty horizontal space don't navigate.
       if let onTap {
         GroupHeaderLabel(title: title, hasChevron: true, action: onTap)
+          .padding(.leading, -6)
       } else {
         Text(title)
           .font(.system(size: Theme.groupHeaderFontSize, weight: .semibold))
@@ -1018,12 +1085,12 @@ struct TaskListView: View {
   private struct DateBucket {
     let key: String        // YYYY-MM-DD
     let label: String
-    let tasks: [EngageTask]
+    let tasks: [SeptenaTask]
   }
 
   private func upcomingBuckets() -> [DateBucket] {
     var order: [String] = []
-    var grouped: [String: [EngageTask]] = [:]
+    var grouped: [String: [SeptenaTask]] = [:]
     for task in items {
       let key = task.scheduled ?? task.due ?? ""
       guard !key.isEmpty else { continue }
@@ -1079,7 +1146,7 @@ struct TaskListView: View {
   /// a snap. Same shape on insert and dismiss for symmetry.
   private static let expandSpring: Animation = .spring(response: 0.32, dampingFraction: 0.84)
 
-  private func startEdit(_ task: EngageTask) {
+  private func startEdit(_ task: SeptenaTask) {
     if editingTaskId != nil && editingTaskId != task.id { commitEdit() }
     // All three state changes inside the same animation transaction so
     // the conditional-content swap (taskBody → InlineEditTaskRow) sees
@@ -1215,7 +1282,7 @@ struct TaskListView: View {
   /// shows checked without disappearing. Server filters out completed tasks
   /// from inbox/today/upcoming/unscheduled views, so they're gone the next
   /// time the screen reloads (which happens when you leave & return).
-  private func toggle(_ task: EngageTask) {
+  private func toggle(_ task: SeptenaTask) {
     let newStatus: TaskStatus = task.status == .done ? .open : .done
     if newStatus == .done { Haptics.success() } else { Haptics.tap() }
 
@@ -1243,7 +1310,7 @@ struct TaskListView: View {
   /// Mutate the matching task in any of the visible buckets so the row
   /// re-renders with the new status without a server round-trip.
   private func flipStatus(id: String, to newStatus: TaskStatus) {
-    func apply(_ list: inout [EngageTask]) {
+    func apply(_ list: inout [SeptenaTask]) {
       if let i = list.firstIndex(where: { $0.id == id }) {
         list[i].status = newStatus
       }
@@ -1256,7 +1323,7 @@ struct TaskListView: View {
   /// Scope the logbook (which is always global on the server) to the area /
   /// project the user is currently looking at. On top-level filters we keep
   /// everything.
-  private func filterLogged(_ all: [EngageTask]) -> [EngageTask] {
+  private func filterLogged(_ all: [SeptenaTask]) -> [SeptenaTask] {
     switch filter {
     case .project(let pid):
       return all.filter { $0.project == pid }
@@ -1272,7 +1339,7 @@ struct TaskListView: View {
     }
   }
 
-  private var sortedLoggedItems: [EngageTask] {
+  private var sortedLoggedItems: [SeptenaTask] {
     loggedItems.sorted { (a, b) in
       (a.completedAt ?? "") > (b.completedAt ?? "")
     }
@@ -1304,7 +1371,7 @@ struct TaskListView: View {
   }
 
   @ViewBuilder
-  private func loggedRow(_ task: EngageTask) -> some View {
+  private func loggedRow(_ task: SeptenaTask) -> some View {
     HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
       TaskCheckbox(isDone: true, isToday: false) { toggle(task) }
         .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
@@ -1544,12 +1611,18 @@ private struct KeyboardNavigationModifier: ViewModifier {
 
   func body(content: Content) -> some View {
     content
-      .background(newTaskHotkey)
-      .background(toggleTodayHotkey)
-      .background(openWhenHotkey)
-      .background(openDeadlineHotkey)
-      .background(deleteHotkey)
-      .background(clearScheduleHotkey)
+      // Publish row actions to the menu bar via FocusedValues. The
+      // "Task" CommandMenu in App.swift owns the keyboard shortcuts
+      // (⌘N, ⌘T, ⌘S, ⌘⇧D, ⌘⌫, ⌘.) and shows them under a real menu,
+      // which also surfaces them in the iPad keyboard HUD.
+      .focusedSceneValue(\.taskActions, TaskActions(
+        newTask: onNewTask,
+        toggleToday: onToggleToday,
+        openWhen: onOpenWhen,
+        openDeadline: onOpenDeadline,
+        delete: hasSelection ? onDelete : nil,
+        clearSchedule: hasSelection ? onClearSchedule : nil
+      ))
       .focusable()
       .focused($listFocused)
       // Suppress the macOS blue focus ring around the whole list — the
@@ -1583,60 +1656,36 @@ private struct KeyboardNavigationModifier: ViewModifier {
       }
   }
 
-  /// Hidden ⌘T — flips the focused row's "today" flag. No-op without a
-  /// selected row, so it's safe to leave globally bound.
-  private var toggleTodayHotkey: some View {
-    Button("Toggle Today") { onToggleToday() }
-      .keyboardShortcut("t", modifiers: .command)
-      .opacity(0)
-      .frame(width: 0, height: 0)
-      .accessibilityHidden(true)
-  }
+}
 
-  /// Hidden ⌘S — opens the When (schedule) picker for the focused row.
-  private var openWhenHotkey: some View {
-    Button("When…") { onOpenWhen() }
-      .keyboardShortcut("s", modifiers: .command)
-      .opacity(0)
-      .frame(width: 0, height: 0)
-      .accessibilityHidden(true)
-  }
+// MARK: - Focused values for the menu-bar "Task" commands
+//
+// TaskListView publishes a `TaskActions` value while it's the focused
+// scene; the CommandMenu reads it via `@FocusedValue` and exposes each
+// action as a real menu item with its keyboard shortcut. This replaces
+// the older pattern of attaching hidden `Button(...)`s in `.background()`,
+// which gave us shortcuts but no menu visibility.
 
-  /// Hidden ⌘⇧D — opens the Deadline picker for the focused row.
-  private var openDeadlineHotkey: some View {
-    Button("Deadline…") { onOpenDeadline() }
-      .keyboardShortcut("d", modifiers: [.command, .shift])
-      .opacity(0)
-      .frame(width: 0, height: 0)
-      .accessibilityHidden(true)
-  }
+struct TaskActions {
+  var newTask: () -> Void
+  var toggleToday: () -> Void
+  var openWhen: () -> Void
+  var openDeadline: () -> Void
+  /// Nil when nothing is selected — disables the menu item rather than
+  /// letting ⌘⌫ silently grab the first row.
+  var delete: (() -> Void)?
+  /// Same gating as `delete` — ⌘. shouldn't act on an unintended row.
+  var clearSchedule: (() -> Void)?
+}
 
-  /// Hidden ⌘⌫ — delete the focused row.
-  private var deleteHotkey: some View {
-    Button("Delete") { onDelete() }
-      .keyboardShortcut(.delete, modifiers: .command)
-      .opacity(0)
-      .frame(width: 0, height: 0)
-      .accessibilityHidden(true)
-  }
+private struct TaskActionsKey: FocusedValueKey {
+  typealias Value = TaskActions
+}
 
-  /// Hidden ⌘. — clear schedule + today flag, sending the row to Anytime.
-  private var clearScheduleHotkey: some View {
-    Button("Clear Schedule") { onClearSchedule() }
-      .keyboardShortcut(".", modifiers: .command)
-      .opacity(0)
-      .frame(width: 0, height: 0)
-      .accessibilityHidden(true)
-  }
-
-  /// Hidden ⌘N button — surfaces "New Task" without a visible toolbar item.
-  /// iPad picks it up on hardware keyboards too.
-  private var newTaskHotkey: some View {
-    Button("New Task") { onNewTask() }
-      .keyboardShortcut("n", modifiers: .command)
-      .opacity(0)
-      .frame(width: 0, height: 0)
-      .accessibilityHidden(true)
+extension FocusedValues {
+  var taskActions: TaskActions? {
+    get { self[TaskActionsKey.self] }
+    set { self[TaskActionsKey.self] = newValue }
   }
 }
 

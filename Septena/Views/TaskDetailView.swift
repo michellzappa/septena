@@ -4,7 +4,7 @@ import SwiftUI
 // nav links to a task can land somewhere instead of crashing.
 
 struct TaskDetailView: View {
-  let task: EngageTask
+  let task: SeptenaTask
 
   var body: some View {
     Form {

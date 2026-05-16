@@ -68,7 +68,7 @@ struct RemindersInboxSection: View {
 
   @ViewBuilder
   private var pickListCTA: some View {
-    Button { nav.path = [.remindersImport] } label: {
+    Button { nav.showSettings = true } label: {
       ctaRow(icon: "checklist",
              title: "Pick a Reminders list",
              subtitle: "Mirror items from Apple Reminders into your Inbox.")
@@ -78,7 +78,7 @@ struct RemindersInboxSection: View {
 
   @ViewBuilder
   private var grantAccessCTA: some View {
-    Button { nav.path = [.remindersImport] } label: {
+    Button { nav.showSettings = true } label: {
       ctaRow(icon: "lock.open",
              title: "Connect Apple Reminders",
              subtitle: "Grant access to mirror reminders into your Inbox.")

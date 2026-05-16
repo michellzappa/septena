@@ -17,7 +17,6 @@
 		1D16A641ABEC4D4CCA37145F /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A07E6C15CC294172DF5D20 /* Theme.swift */; };
 		2741B6F5233E5619A7057258 /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B92826563E8E24C2A8F22B9 /* TaskListView.swift */; };
 		28777ACD729D9C78846219C4 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */; };
-		2C16528AA1E96FE947B5BBB3 /* ServerConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A660B22946E4DE2FAFDA8F31 /* ServerConfigView.swift */; };
 		36325B1E6E5A771C01028105 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 31313A0E804B33A3E43FC1F6 /* Info.plist */; };
 		3D19536CFB66987D6D5C7642 /* Info-Mac.plist in Resources */ = {isa = PBXBuildFile; fileRef = 5B49A0D20B2ECD672137900F /* Info-Mac.plist */; };
 		3F005BC1D6AB964EA48E05C3 /* PlatformShims.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF52BF4594608E7B7D09AA48 /* PlatformShims.swift */; };
@@ -29,7 +28,6 @@
 		7FB3330B97BCBCB5D87C6F04 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F0AE5985EFE1A9A61F9BC7E /* SidebarView.swift */; };
 		85E7CF1494FFC184EA9CB811 /* NextItemsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B390D43AE1A7533F9AD7198 /* NextItemsSection.swift */; };
 		88997E6D2F83CB1CF7B4BA69 /* RemindersInboxSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33B6D5A7801C40656B13C350 /* RemindersInboxSection.swift */; };
-		8AAD68656B31C850F5FA0248 /* ServerConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A660B22946E4DE2FAFDA8F31 /* ServerConfigView.swift */; };
 		8D5C2FF5F66A353AF7905E34 /* RemindersImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0BB64F31640C03CD64DF855 /* RemindersImportView.swift */; };
 		94702073666C4968D36B96C5 /* RemindersBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561130AE996F0E92FE02767D /* RemindersBridge.swift */; };
 		968A90B44B7AA07A52F2103C /* TaskComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB88131B1CFB7EAA692D88E6 /* TaskComponents.swift */; };
@@ -55,6 +53,14 @@
 		FCDDF4248EC04741134329B2 /* AreasProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5C26629FE8A4DF019B9784 /* AreasProjectsView.swift */; };
 		A1A1A1A1A1A1A1A1A1A10001 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A1A1A1A1A1A1A10000 /* Persistence.swift */; };
 		A1A1A1A1A1A1A1A1A1A10002 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A1A1A1A1A1A1A10000 /* Persistence.swift */; };
+		B1B1B1B1B1B1B1B1B1B10001 /* OfflineBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B1B1B1B1B1B1B1B1B10000 /* OfflineBanner.swift */; };
+		B1B1B1B1B1B1B1B1B1B10002 /* OfflineBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B1B1B1B1B1B1B1B1B10000 /* OfflineBanner.swift */; };
+		C1C1C1C1C1C1C1C1C1C10001 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1C1C1C1C1C1C1C1C1C10000 /* SettingsView.swift */; };
+		C1C1C1C1C1C1C1C1C1C10002 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1C1C1C1C1C1C1C1C1C10000 /* SettingsView.swift */; };
+		D1D1D1D1D1D1D1D1D1D10001 /* BadgeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1D1D1D1D1D1D1D1D1D10000 /* BadgeManager.swift */; };
+		D1D1D1D1D1D1D1D1D1D10002 /* BadgeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1D1D1D1D1D1D1D1D1D10000 /* BadgeManager.swift */; };
+		E1E1E1E1E1E1E1E1E1E10001 /* TaskCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1E1E1E1E1E1E1E1E1E10000 /* TaskCommands.swift */; };
+		E1E1E1E1E1E1E1E1E1E10002 /* TaskCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1E1E1E1E1E1E1E1E1E10000 /* TaskCommands.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -74,7 +80,6 @@
 		9A5C26629FE8A4DF019B9784 /* AreasProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreasProjectsView.swift; sourceTree = "<group>"; };
 		9B92826563E8E24C2A8F22B9 /* TaskListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskListView.swift; sourceTree = "<group>"; };
 		9F0AE5985EFE1A9A61F9BC7E /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
-		A660B22946E4DE2FAFDA8F31 /* ServerConfigView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConfigView.swift; sourceTree = "<group>"; };
 		BBD31B55684A505738EB624C /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
 		C03DC46C772E45B60ECB7343 /* SectionTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionTheme.swift; sourceTree = "<group>"; };
 		C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -85,6 +90,10 @@
 		EF52BF4594608E7B7D09AA48 /* PlatformShims.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformShims.swift; sourceTree = "<group>"; };
 		FB6D9FD80512D4CD62AEFFFD /* NextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextView.swift; sourceTree = "<group>"; };
 		A1A1A1A1A1A1A1A1A1A10000 /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
+		B1B1B1B1B1B1B1B1B1B10000 /* OfflineBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineBanner.swift; sourceTree = "<group>"; };
+		C1C1C1C1C1C1C1C1C1C10000 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		D1D1D1D1D1D1D1D1D1D10000 /* BadgeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BadgeManager.swift; sourceTree = "<group>"; };
+		E1E1E1E1E1E1E1E1E1E10000 /* TaskCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskCommands.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -108,11 +117,13 @@
 				9A5C26629FE8A4DF019B9784 /* AreasProjectsView.swift */,
 				0B390D43AE1A7533F9AD7198 /* NextItemsSection.swift */,
 				FB6D9FD80512D4CD62AEFFFD /* NextView.swift */,
+				B1B1B1B1B1B1B1B1B1B10000 /* OfflineBanner.swift */,
 				EF52BF4594608E7B7D09AA48 /* PlatformShims.swift */,
 				E0BB64F31640C03CD64DF855 /* RemindersImportView.swift */,
 				33B6D5A7801C40656B13C350 /* RemindersInboxSection.swift */,
-				A660B22946E4DE2FAFDA8F31 /* ServerConfigView.swift */,
+				C1C1C1C1C1C1C1C1C1C10000 /* SettingsView.swift */,
 				9F0AE5985EFE1A9A61F9BC7E /* SidebarView.swift */,
+				E1E1E1E1E1E1E1E1E1E10000 /* TaskCommands.swift */,
 				DB88131B1CFB7EAA692D88E6 /* TaskComponents.swift */,
 				2D413F054F59B2A90A319154 /* TaskDetailView.swift */,
 				9B92826563E8E24C2A8F22B9 /* TaskListView.swift */,
@@ -142,6 +153,7 @@
 		E129AEFF2C1B93C7B4789164 /* SeptenaCore */ = {
 			isa = PBXGroup;
 			children = (
+				D1D1D1D1D1D1D1D1D1D10000 /* BadgeManager.swift */,
 				1E25F81FE5AA4B6BBC056275 /* DateParser.swift */,
 				53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */,
 				7D5ECFDA9128B73993023CB6 /* Models.swift */,
@@ -262,11 +274,13 @@
 			files = (
 				FA564DDD7B30817FB91EC0E5 /* App.swift in Sources */,
 				5ED33F95694C104969333EAD /* AreasProjectsView.swift in Sources */,
+				D1D1D1D1D1D1D1D1D1D10002 /* BadgeManager.swift in Sources */,
 				DF016EF192B7891D2DBE3CB6 /* DateParser.swift in Sources */,
 				5330AF71083A1F3514B862B8 /* Haptics.swift in Sources */,
 				0448F507E1F1600F9933AEED /* Models.swift in Sources */,
 				F6ED283EEF472FE8DA7B7DFB /* NextItemsSection.swift in Sources */,
 				FAA49CC911788D53BAFDBAFD /* NextView.swift in Sources */,
+				B1B1B1B1B1B1B1B1B1B10001 /* OfflineBanner.swift in Sources */,
 				A1A1A1A1A1A1A1A1A1A10001 /* Persistence.swift in Sources */,
 				3F005BC1D6AB964EA48E05C3 /* PlatformShims.swift in Sources */,
 				187093B93D48863B5E1E1E37 /* RemindersBridge.swift in Sources */,
@@ -274,8 +288,9 @@
 				88997E6D2F83CB1CF7B4BA69 /* RemindersInboxSection.swift in Sources */,
 				07B127F5FBCE0DE19AFCD387 /* SectionTheme.swift in Sources */,
 				D770995846D0B23AC3F77F34 /* SeptenaClient.swift in Sources */,
-				2C16528AA1E96FE947B5BBB3 /* ServerConfigView.swift in Sources */,
+				C1C1C1C1C1C1C1C1C1C10002 /* SettingsView.swift in Sources */,
 				F62DAF6B252E82A6C8CB7167 /* SidebarView.swift in Sources */,
+				E1E1E1E1E1E1E1E1E1E10001 /* TaskCommands.swift in Sources */,
 				DE402EEE2DA772AF7300E1C0 /* TaskComponents.swift in Sources */,
 				18C336321218C66D6B8DB652 /* TaskDetailView.swift in Sources */,
 				E31B94DDD122274806A91B5C /* TaskListView.swift in Sources */,
@@ -289,11 +304,13 @@
 			files = (
 				09C5366893B7255E08295C88 /* App.swift in Sources */,
 				FCDDF4248EC04741134329B2 /* AreasProjectsView.swift in Sources */,
+				D1D1D1D1D1D1D1D1D1D10001 /* BadgeManager.swift in Sources */,
 				513C8B1D41E5BA85B785129C /* DateParser.swift in Sources */,
 				28777ACD729D9C78846219C4 /* Haptics.swift in Sources */,
 				DD200EF411309E29B543963F /* Models.swift in Sources */,
 				85E7CF1494FFC184EA9CB811 /* NextItemsSection.swift in Sources */,
 				06F8765D7D9BA1A94FE3984D /* NextView.swift in Sources */,
+				B1B1B1B1B1B1B1B1B1B10002 /* OfflineBanner.swift in Sources */,
 				A1A1A1A1A1A1A1A1A1A10002 /* Persistence.swift in Sources */,
 				0FABD76594A04A8968E1A04B /* PlatformShims.swift in Sources */,
 				94702073666C4968D36B96C5 /* RemindersBridge.swift in Sources */,
@@ -301,8 +318,9 @@
 				BD2AEA299118EC671BAFF32E /* RemindersInboxSection.swift in Sources */,
 				D3D801AE0714FA3E8696508A /* SectionTheme.swift in Sources */,
 				9ED913F259DC6E83E4EDB824 /* SeptenaClient.swift in Sources */,
-				8AAD68656B31C850F5FA0248 /* ServerConfigView.swift in Sources */,
+				C1C1C1C1C1C1C1C1C1C10001 /* SettingsView.swift in Sources */,
 				7FB3330B97BCBCB5D87C6F04 /* SidebarView.swift in Sources */,
+				E1E1E1E1E1E1E1E1E1E10002 /* TaskCommands.swift in Sources */,
 				968A90B44B7AA07A52F2103C /* TaskComponents.swift in Sources */,
 				BFCF1AC2BC3C5A12D48B939F /* TaskDetailView.swift in Sources */,
 				2741B6F5233E5619A7057258 /* TaskListView.swift in Sources */,

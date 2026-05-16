@@ -1,6 +1,6 @@
 # Things 3 Reference
 
-Goal: redo the Engage app with the look & feel of Things 3 for iOS. This is a personal app, so we copy closely rather than aiming for originality.
+Goal: redo the Septena app with the look & feel of Things 3 for iOS. This is a personal app, so we copy closely rather than aiming for originality.
 
 ## How to use these docs
 

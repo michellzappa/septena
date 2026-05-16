@@ -293,16 +293,6 @@ struct SidebarRootView: View {
         .menuStyle(.button)
         .help("New Area or Project")
       }
-      // Settings — kept reachable from the sidebar's chrome rather than
-      // tucked at the bottom of the list.
-      ToolbarItem(placement: .automatic) {
-        Button {
-          nav.path = [.settings]
-        } label: {
-          Image(systemName: "slider.horizontal.3")
-        }
-        .help("Settings")
-      }
     }
     .modifier(SidebarSheets(
       showingCreateMenu: $showingCreateMenu,
@@ -480,7 +470,6 @@ struct SidebarRootView: View {
     switch (selectedRoute, route) {
     case (.filter(let a), .filter(let b)):   return a == b
     case (.next, .next):                     return true
-    case (.settings, .settings):             return true
     case (.project(let a), .project(let b)): return a.id == b.id
     case (.area(let a), .area(let b)):       return a.id == b.id
     default:                                 return false
@@ -834,8 +823,11 @@ struct SidebarRootView: View {
   @ViewBuilder
   private var settingsRow: some View {
     // Discreet on purpose — Settings is rarely needed; the rest of the
-    // sidebar is the main surface.
-    sidebarButton(.settings) {
+    // sidebar is the main surface. Opens the Settings sheet (Things 3
+    // pattern) rather than pushing a route, so the user stays in place.
+    Button {
+      nav.showSettings = true
+    } label: {
       HStack(spacing: 10) {
         Image(systemName: "gearshape.fill")
           .font(.system(size: 14))
@@ -849,6 +841,7 @@ struct SidebarRootView: View {
       .frame(height: 30)
       .contentShape(Rectangle())
     }
+    .buttonStyle(InertButtonStyle())
     .padding(.horizontal, Theme.hPadding)
   }
 

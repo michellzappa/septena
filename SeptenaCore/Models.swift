@@ -10,7 +10,7 @@ enum TaskStatus: String, Codable, Hashable {
   case cancelled
 }
 
-struct EngageTask: Identifiable, Codable, Hashable {
+struct SeptenaTask: Identifiable, Codable, Hashable {
   let id: String
   var title: String
   var status: TaskStatus
@@ -169,9 +169,9 @@ struct Area: Identifiable, Codable, Hashable {
 struct TasksListResponse: Codable {
   var view: String
   var today: String
-  var items: [EngageTask]
-  var review: [EngageTask]?    // present only on view=today
-  var done: [EngageTask]?      // present only on view=today
+  var items: [SeptenaTask]
+  var review: [SeptenaTask]?    // present only on view=today
+  var done: [SeptenaTask]?      // present only on view=today
 }
 
 struct TasksCounts: Codable {

@@ -2,7 +2,7 @@ import Foundation
 
 // ─── Natural Language Date Parser ─────────────────────────────────────────────
 
-struct EngageDateParser {
+struct SeptenaDateParser {
   /// Parse a natural language date string into a Date.
   /// Examples:
   ///   "tomorrow", "next monday", "in 3 days", "every monday",

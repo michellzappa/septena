@@ -1,8 +1,6 @@
-# Engage — iOS/macOS App
+# Septena — iOS/macOS App
 
 A shared task database where humans and AI agents collaborate in real-time. Built with SwiftUI + Convex.
-
-> Named after the Star Trek command — *"Engage!"* — because that's what humans and agents do here: work together.
 
 ## Stack
 
@@ -16,22 +14,22 @@ A shared task database where humans and AI agents collaborate in real-time. Buil
 git clone https://github.com/envisioning-agent/engage-app.git
 cd engage-app
 xcodegen generate
-open Engage.xcodeproj
+open Septena.xcodeproj
 ```
 
 Add your Convex credentials to the Xcode scheme environment:
 
 | Variable | Value |
 |----------|-------|
-| `ENGAGE_CONVEX_URL` | `https://your-project.convex.cloud` |
-| `ENGAGE_CONVEX_KEY` | Your admin key |
+| `SEPTENA_CONVEX_URL` | `https://your-project.convex.cloud` |
+| `SEPTENA_CONVEX_KEY` | Your admin key |
 
 Build and run (⌘R).
 
 ## Architecture
 
 ```
-Engage/
+Septena/
 ├── App.swift                    # TabView entry point
 ├── Views/
 │   ├── TaskListView.swift        # Generic filterable task list
@@ -40,7 +38,7 @@ Engage/
 │   ├── QuickEntryView.swift      # New task: When sheet, Move sheet
 │   ├── TodayView.swift           # Today, Upcoming, Anytime, Someday, Logbook, Review
 │   └── AreasProjectsView.swift   # Areas, Projects, Area/Project detail
-EngageCore/
+SeptenaCore/
 ├── Models.swift                 # All data types
 ├── ConvexClient.swift           # Pure URLSession → Convex HTTP API
 └── DateParser.swift             # Natural language date parsing
@@ -105,7 +103,7 @@ resolved: boolean        // thread can be marked resolved
 3. Update `ConvexClient.swift` dict helpers if needed
 
 ### Adding a view
-1. Create SwiftUI file in `Engage/Views/`
+1. Create SwiftUI file in `Septena/Views/`
 2. Add to `TabView` in `App.swift`
 3. Inject `ConvexClient` via `@EnvironmentObject`
 

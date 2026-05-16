@@ -1,6 +1,22 @@
 import SwiftUI
 import SwiftData
 
+// MARK: - Sort actions shared by Area / Project "…" menu
+
+/// The sort rows that prefix the project/area `…` menu — one per
+/// `TaskSort` case. Tapping one writes through to the global `taskSort`
+/// setting; the currently active mode renders a trailing checkmark. Lives
+/// at file scope so both detail views share the exact same list.
+func sortActions(taskSortRaw: Binding<String>) -> [ActionSheet.Action] {
+  let current = TaskSort(rawValue: taskSortRaw.wrappedValue) ?? .dateAdded
+  return TaskSort.allCases.map { mode in
+    ActionSheet.Action(title: mode.label,
+                       icon: mode.icon,
+                       selected: mode == current,
+                       perform: { taskSortRaw.wrappedValue = mode.rawValue })
+  }
+}
+
 // MARK: - Notes field shared by Area / Project detail
 
 /// Multi-line notes editor with inline markdown preview when blurred.
@@ -86,7 +102,11 @@ struct AreaDetailView: View {
   @State private var projects: [Project]
   @State private var projectProgress: [String: Double] = [:]
   @State private var errorMessage: String?
+  @State private var showingMoreActions = false
   @FocusState private var notesFocused: Bool
+  /// Global task sort — read/written here so flipping it from this menu
+  /// re-renders the embedded TaskListView, which reads the same key.
+  @AppStorage(SettingsKey.taskSort) private var taskSortRaw: String = TaskSort.dateAdded.rawValue
 
   init(area: Area) {
     self.area = area
@@ -145,6 +165,19 @@ struct AreaDetailView: View {
     }
     .background(Theme.paperBackground)
     .septenaInlineTitle()
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        Button { showingMoreActions = true } label: {
+          Image(systemName: "ellipsis.circle").foregroundStyle(Theme.inkSecondary)
+        }
+      }
+    }
+    .sheet(isPresented: $showingMoreActions) {
+      ActionSheet(title: area.title,
+                  actions: sortActions(taskSortRaw: $taskSortRaw))
+      .presentationDetents([.height(260)])
+      .septenaSheetChrome()
+    }
     .alert("Error", isPresented: Binding(
       get: { errorMessage != nil },
       set: { if !$0 { errorMessage = nil } }
@@ -277,13 +310,17 @@ struct ProjectDetailView: View {
   @State private var showingDeleteConfirm = false
   @State private var showingMoreActions = false
   @State private var showingMoveToArea = false
+  @State private var showingRepoEditor = false
   @State private var areas: [Area] = []
-  @FocusState private var repoFocused: Bool
   /// Fraction of this project's tasks that are done (0...1). Drives the pie
   /// icon next to the project title — reloads whenever the page appears so it
   /// reflects completions made elsewhere too.
   @State private var progress: Double = 0
   @FocusState private var notesFocused: Bool
+  /// Global task sort — kept in sync via @AppStorage so flipping it from
+  /// this menu instantly re-renders the embedded TaskListView (which reads
+  /// the same key).
+  @AppStorage(SettingsKey.taskSort) private var taskSortRaw: String = TaskSort.dateAdded.rawValue
 
   init(project: Project) {
     self.project = project
@@ -310,22 +347,6 @@ struct ProjectDetailView: View {
 
         // Notes — see AreaDetailView for the overlay-pattern rationale.
         notesField($draftNotes, focused: $notesFocused)
-
-        HStack(spacing: 6) {
-          Image(systemName: "chevron.left.forwardslash.chevron.right")
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(Theme.inkSecondary)
-          TextField("owner/repo", text: $draftRepo)
-            .textFieldStyle(.plain)
-            .focusEffectDisabled()
-            .font(.septenaNotes)
-            .foregroundStyle(Theme.inkSecondary)
-            .focused($repoFocused)
-            #if os(iOS)
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-            #endif
-        }
       }
       .padding(.horizontal, Theme.hPadding)
       .padding(.top, 12)
@@ -335,9 +356,6 @@ struct ProjectDetailView: View {
       // the observer is torn down before its closure can fire.
       .onChange(of: notesFocused) { _, focused in
         if !focused { commitNotes() }
-      }
-      .onChange(of: repoFocused) { _, focused in
-        if !focused { commitRepo() }
       }
 
       Hairline()
@@ -354,7 +372,9 @@ struct ProjectDetailView: View {
       }
     }
     .sheet(isPresented: $showingMoreActions) {
-      ActionSheet(title: project.title, actions: [
+      ActionSheet(title: project.title, actions: sortActions(taskSortRaw: $taskSortRaw) + [
+        .init(title: "Repo…", icon: "chevron.left.forwardslash.chevron.right",
+              perform: { showingRepoEditor = true }),
         .init(title: "Move to Area…", icon: "folder",
               perform: { showingMoveToArea = true }),
         .init(title: "Mark Done", icon: "checkmark.circle",
@@ -364,7 +384,7 @@ struct ProjectDetailView: View {
         .init(title: "Delete Project", icon: "trash", role: .destructive,
               perform: { showingDeleteConfirm = true }),
       ])
-      .presentationDetents([.height(360)])
+      .presentationDetents([.height(520)])
       .septenaSheetChrome()
     }
     .sheet(isPresented: $showingMoveToArea) {
@@ -373,6 +393,11 @@ struct ProjectDetailView: View {
       }
       .presentationDetents([.medium, .large])
       .septenaSheetChrome()
+    }
+    .sheet(isPresented: $showingRepoEditor) {
+      RepoEditorSheet(repo: $draftRepo) { commitRepo() }
+        .presentationDetents([.height(180)])
+        .septenaSheetChrome()
     }
     .alert("Delete \(project.title)?", isPresented: $showingDeleteConfirm) {
       Button("Delete", role: .destructive) { deleteProject() }
@@ -412,7 +437,7 @@ struct ProjectDetailView: View {
       draftNotes = serverNotes
       originalNotes = serverNotes
     }
-    if !repoFocused {
+    if !showingRepoEditor {
       let serverRepo = fresh.githubRepo ?? ""
       if serverRepo != draftRepo {
         draftRepo = serverRepo
@@ -526,6 +551,50 @@ struct ProjectDetailView: View {
 
 
 // MARK: - Area picker (used by Project "Move to Area…")
+
+struct RepoEditorSheet: View {
+  @Binding var repo: String
+  let onCommit: () -> Void
+  @Environment(\.dismiss) private var dismiss
+  @FocusState private var focused: Bool
+
+  var body: some View {
+    NavigationStack {
+      VStack {
+        HStack(spacing: 6) {
+          Image(systemName: "chevron.left.forwardslash.chevron.right")
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(Theme.inkSecondary)
+          TextField("owner/repo", text: $repo)
+            .textFieldStyle(.plain)
+            .focusEffectDisabled()
+            .font(.septenaNotes)
+            .foregroundStyle(Theme.inkSecondary)
+            .focused($focused)
+            #if os(iOS)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            #endif
+            .onSubmit { onCommit(); dismiss() }
+        }
+        .padding(.horizontal, Theme.hPadding)
+        .padding(.top, 12)
+        Spacer()
+      }
+      .navigationTitle("GitHub Repo")
+      .septenaInlineTitle()
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Cancel") { dismiss() }
+        }
+        ToolbarItem(placement: .confirmationAction) {
+          Button("Done") { onCommit(); dismiss() }
+        }
+      }
+      .onAppear { focused = true }
+    }
+  }
+}
 
 struct AreaPickerSheet: View {
   let areas: [Area]

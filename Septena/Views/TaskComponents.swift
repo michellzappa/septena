@@ -72,7 +72,7 @@ struct ScreenTitle: View {
 
 struct InlineEditTaskRow: View {
   @Environment(SectionTheme.self) private var theme
-  let task: EngageTask
+  let task: SeptenaTask
   @Binding var title: String
   @Binding var notes: String
   let isDone: Bool
@@ -834,6 +834,9 @@ struct ActionSheet: View {
     let title: String
     let icon: String
     var role: ButtonRole? = nil          // .destructive renders red
+    /// When true, renders a trailing checkmark in the section accent — used
+    /// for sort-mode rows where one of N is the current selection.
+    var selected: Bool = false
     let perform: () -> Void
   }
 
@@ -869,6 +872,11 @@ struct ActionSheet: View {
               .font(.septenaSidebarRow)
               .foregroundStyle(action.role == .destructive ? Theme.overdueRed : Theme.inkPrimary)
             Spacer()
+            if action.selected {
+              Image(systemName: "checkmark")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(theme.accent)
+            }
           }
           .padding(.horizontal, Theme.hPadding)
           .frame(height: Theme.sidebarRowHeight)

@@ -146,7 +146,7 @@ final class AreaEntity {
 
 // MARK: - DTO ↔ Entity bridging
 
-extension EngageTask {
+extension SeptenaTask {
   init(_ e: TaskEntity) {
     // Decode through the existing decoder so we exercise the same code path
     // as the network layer. Cheaper than maintaining a second initializer.
@@ -170,7 +170,7 @@ extension EngageTask {
       } as Any?
     ]
     let data = try! JSONSerialization.data(withJSONObject: payload.compactMapValues { $0 })
-    self = try! JSONDecoder().decode(EngageTask.self, from: data)
+    self = try! JSONDecoder().decode(SeptenaTask.self, from: data)
   }
 }
 
@@ -235,50 +235,50 @@ final class LocalStore {
 enum LocalCache {
   @MainActor
   static func tasks(in context: ModelContext,
-                    filter: TaskFilter) -> [EngageTask] {
+                    filter: TaskFilter) -> [SeptenaTask] {
     let descriptor = FetchDescriptor<TaskEntity>(
       sortBy: [SortDescriptor(\.sortIndex), SortDescriptor(\.id)]
     )
     guard let rows = try? context.fetch(descriptor) else { return [] }
     let today = SeptenaDate.today
-    return rows.compactMap { e -> EngageTask? in
+    return rows.compactMap { e -> SeptenaTask? in
       switch filter {
       case .today:
         guard e.status == .open else { return nil }
-        if e.today { return EngageTask(e) }
-        if let s = e.scheduled, s <= today { return EngageTask(e) }
-        if let d = e.due, d <= today { return EngageTask(e) }
+        if e.today { return SeptenaTask(e) }
+        if let s = e.scheduled, s <= today { return SeptenaTask(e) }
+        if let d = e.due, d <= today { return SeptenaTask(e) }
         return nil
       case .inbox:
         guard e.status == .open,
               e.project == nil, e.area == nil,
               e.scheduled == nil, e.due == nil, !e.today else { return nil }
-        return EngageTask(e)
+        return SeptenaTask(e)
       case .upcoming:
         guard e.status == .open, !e.today else { return nil }
-        if let s = e.scheduled, s > today { return EngageTask(e) }
-        if let d = e.due, d > today { return EngageTask(e) }
+        if let s = e.scheduled, s > today { return SeptenaTask(e) }
+        if let d = e.due, d > today { return SeptenaTask(e) }
         return nil
       case .unscheduled:
         guard e.status == .open, !e.today,
               e.scheduled == nil, e.due == nil else { return nil }
-        return EngageTask(e)
+        return SeptenaTask(e)
       case .logbook:
         guard e.status == .done else { return nil }
-        return EngageTask(e)
+        return SeptenaTask(e)
       case .project(let pid):
         guard e.project == pid else { return nil }
-        return EngageTask(e)
+        return SeptenaTask(e)
       case .area(let aid):
         guard e.area == aid else { return nil }
-        return EngageTask(e)
+        return SeptenaTask(e)
       }
     }
   }
 
   @MainActor
-  static func allTasks(in context: ModelContext) -> [EngageTask] {
-    (try? context.fetch(FetchDescriptor<TaskEntity>()))?.map(EngageTask.init) ?? []
+  static func allTasks(in context: ModelContext) -> [SeptenaTask] {
+    (try? context.fetch(FetchDescriptor<TaskEntity>()))?.map(SeptenaTask.init) ?? []
   }
 
   /// Count of open tasks whose hard deadline is today or in the past.
@@ -329,6 +329,11 @@ final class Syncer {
     async let areas: () = pullAreas()
     async let projects: () = pullProjects()
     _ = await (tasks, areas, projects)
+    // Surfaced by the Sync pane as "Last sync: 2m ago". Written after each
+    // pull regardless of which leg succeeded — partial syncs still count
+    // as "the cache was reconciled at this time."
+    UserDefaults.standard.set(Date().timeIntervalSince1970,
+                              forKey: "septena.sync.lastSucceededAt")
   }
 
   func pullTasks() async {
@@ -392,7 +397,7 @@ final class Syncer {
     case filter(TaskFilter)
   }
 
-  func applyTasks(_ items: [EngageTask], scope: TaskScope) {
+  func applyTasks(_ items: [SeptenaTask], scope: TaskScope) {
     let now = Date()
     var seen = Set<String>()
     for (index, dto) in items.enumerated() {
@@ -445,7 +450,7 @@ final class Syncer {
 
   // MARK: Upserts
 
-  private func upsert(_ dto: EngageTask, syncedAt: Date, sortIndex: Int) {
+  private func upsert(_ dto: SeptenaTask, syncedAt: Date, sortIndex: Int) {
     let id = dto.id
     let existing = try? context.fetch(
       FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.id == id })
