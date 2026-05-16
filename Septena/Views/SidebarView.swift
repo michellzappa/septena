@@ -181,15 +181,10 @@ struct SidebarRootView: View {
   private var sidebarPhone: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 0) {
-        smartLists.padding(.top, 12).padding(.bottom, 20)
+        smartLists.padding(.top, 12).padding(.bottom, 12)
+        // areasAndProjects renders its own per-section cards
+        // (Mimestream-style), so no outer card wrapping here.
         areasAndProjects
-          .padding(.horizontal, 14)
-          .padding(.vertical, 6)
-          .background(
-            Theme.cardSurface,
-            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-          )
-          .padding(.horizontal, 20)
         settingsRow.padding(.top, 24)
         Spacer(minLength: 40)
       }
@@ -252,9 +247,8 @@ struct SidebarRootView: View {
   private var sidebarMac: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 0) {
-        smartLists.padding(.top, 12).padding(.bottom, 16)
+        smartLists.padding(.top, 12).padding(.bottom, 12)
         areasAndProjects
-          .padding(.horizontal, Theme.hPadding)
         Spacer(minLength: 24)
       }
     }
@@ -486,28 +480,19 @@ struct SidebarRootView: View {
 
   @ViewBuilder
   private var areasAndProjects: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      // Top-level projects (no area). Hairline between each consecutive
-      // pair so the card reads like a standard iOS list.
-      ForEach(Array(topLevelProjects.enumerated()), id: \.element.id) { idx, project in
-        projectRowDraggable(project, parent: nil)
-        if idx < topLevelProjects.count - 1 {
-          inCardDivider
-        }
-      }
+    // Mimestream / iOS Mail pattern: each grouping is a section with a
+    // header above and a card below containing that group's rows.
+    // - Top-level projects (no area) → one card, no header
+    // - Each area → header above (tappable for area detail) + card
+    //   containing that area's projects
+    VStack(alignment: .leading, spacing: 22) {
       if !topLevelProjects.isEmpty {
-        endOfGroupDropZone(parent: nil)
+        topLevelProjectsSection
       }
-
-      ForEach(Array(areas.enumerated()), id: \.element.id) { idx, area in
-        // Skip the divider at the very top of the card — i.e. when this
-        // area is the first child AND there are no top-level projects
-        // above it.
-        let showDivider = idx > 0 || !topLevelProjects.isEmpty
-        areaBlock(area, showDivider: showDivider)
+      ForEach(areas) { area in
+        areaSection(area)
       }
-      // Trailing area drop zone — lets the user drop an area at the very
-      // end of the list (no target row available there otherwise).
+      // Trailing area drop zone for "drop at end of areas".
       if !areas.isEmpty {
         Color.clear
           .frame(height: 18)
@@ -520,6 +505,106 @@ struct SidebarRootView: View {
       }
     }
   }
+
+  // MARK: - Per-section renderers
+
+  @ViewBuilder
+  private var topLevelProjectsSection: some View {
+    sectionCard {
+      ForEach(Array(topLevelProjects.enumerated()), id: \.element.id) { idx, project in
+        projectRowDraggable(project, parent: nil)
+        if idx < topLevelProjects.count - 1 { inCardDivider }
+      }
+      endOfGroupDropZone(parent: nil)
+    }
+  }
+
+  @ViewBuilder
+  private func areaSection(_ area: Area) -> some View {
+    let projectsInArea = projects.filter { $0.area == area.id && $0.status == .active }
+
+    VStack(alignment: .leading, spacing: 8) {
+      // Section header — tappable to navigate to the area's detail page.
+      // Drag/drop targets stay on the header for area-reorder gestures.
+      Button { selectRoute(.area(area)) } label: {
+        HStack(spacing: 8) {
+          AreaIcon(diameter: 14, lineWidth: 1.2)
+          Text(area.title)
+            .font(.headline)
+            .foregroundStyle(.primary)
+          Spacer()
+          let count = areaOpenCount[area.id] ?? 0
+          if count > 0 {
+            Text("\(count)")
+              .font(.subheadline)
+              .foregroundStyle(.secondary)
+          }
+          SidebarRowChevron()
+        }
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(InertButtonStyle())
+      .contextMenu { areaMenu(area) }
+      .draggable(SidebarDragID.area(area.id)) {
+        Text(area.title)
+          .font(.system(size: Theme.sidebarAreaTitleSize, weight: .semibold))
+          .foregroundStyle(Theme.inkPrimary)
+          .padding(.horizontal, 12).padding(.vertical, 6)
+          .background(Theme.cardSurface)
+          .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall))
+          .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
+      }
+      .dropDestination(for: SidebarDragID.self) { items, _ in
+        guard let drag = items.first,
+              drag.kind == .area,
+              drag.id != area.id else { return false }
+        reorderArea(drag.id, before: area.id)
+        return true
+      }
+      .padding(.horizontal, sectionHeaderHPad)
+
+      if !projectsInArea.isEmpty {
+        sectionCard {
+          ForEach(Array(projectsInArea.enumerated()), id: \.element.id) { idx, project in
+            projectRowDraggable(project, parent: area.id)
+            if idx < projectsInArea.count - 1 { inCardDivider }
+          }
+          endOfGroupDropZone(parent: area.id)
+        }
+      }
+    }
+  }
+
+  /// Card wrapper for a section's rows — Mimestream-style: rounded
+  /// surface on iOS, bare rows on macOS (matches the platform's native
+  /// sidebar conventions).
+  @ViewBuilder
+  private func sectionCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    #if os(iOS)
+    VStack(alignment: .leading, spacing: 0) { content() }
+      .padding(.horizontal, 14)
+      .padding(.vertical, 6)
+      .background(
+        Theme.cardSurface,
+        in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+      )
+      .padding(.horizontal, sectionCardHPad)
+    #else
+    VStack(alignment: .leading, spacing: 0) { content() }
+      .padding(.horizontal, Theme.hPadding)
+    #endif
+  }
+
+  // Horizontal margins for section headers / cards. iOS uses the
+  // Mimestream-style inset; macOS lines up with the sidebar's standard
+  // hPadding so headers don't read as protruding.
+  #if os(iOS)
+  private var sectionHeaderHPad: CGFloat { 28 }   // sectionCardHPad + a bit of indent
+  private var sectionCardHPad: CGFloat { 20 }
+  #else
+  private var sectionHeaderHPad: CGFloat { Theme.hPadding }
+  private var sectionCardHPad: CGFloat { Theme.hPadding }
+  #endif
 
   /// Project row in either top-level or within-area context. `parent`
   /// scopes drag-drop so projects can only be reordered within the same
@@ -604,69 +689,6 @@ struct SidebarRootView: View {
       deleteAreaTarget = area
     } label: {
       Label("Delete Area", systemImage: "trash")
-    }
-  }
-
-  @ViewBuilder
-  private func areaBlock(_ area: Area, showDivider: Bool = true) -> some View {
-    let projectsInArea = projects.filter { $0.area == area.id && $0.status == .active }
-
-    VStack(alignment: .leading, spacing: 0) {
-      // Divider sits at the midpoint between the previous block's last row
-      // and this area's header — equal whitespace top and bottom. Slightly
-      // more contrasty than the default separator so it groups confidently.
-      #if os(iOS)
-      if showDivider {
-        Rectangle()
-          .fill(Color(uiColor: .opaqueSeparator).opacity(0.7))
-          .frame(height: 0.5)
-          .padding(.vertical, 10)
-      }
-      #else
-      if showDivider {
-        Spacer().frame(height: 12)
-      }
-      #endif
-
-      sidebarButton(.area(area)) {
-        SidebarAreaRow(name: area.title, count: areaOpenCount[area.id] ?? 0)
-      }
-      .contextMenu { areaMenu(area) }
-      .draggable(SidebarDragID.area(area.id)) {
-        Text(area.title)
-          .font(.system(size: Theme.sidebarAreaTitleSize, weight: .semibold))
-          .foregroundStyle(Theme.inkPrimary)
-          .padding(.horizontal, 12).padding(.vertical, 6)
-          .background(Theme.cardSurface)
-          .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall))
-          .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
-      }
-      // The area header itself accepts area-drops to position "above this
-      // area". Project drops are rejected — they belong on project rows.
-      .dropDestination(for: SidebarDragID.self) { items, _ in
-        guard let drag = items.first,
-              drag.kind == .area,
-              drag.id != area.id else { return false }
-        reorderArea(drag.id, before: area.id)
-        return true
-      }
-
-      // Hairline between the area header and its first project, and
-      // between each pair of projects. Matches the Mail / Reminders
-      // list-card pattern.
-      if !projectsInArea.isEmpty {
-        inCardDivider
-      }
-      ForEach(Array(projectsInArea.enumerated()), id: \.element.id) { idx, project in
-        projectRowDraggable(project, parent: area.id)
-        if idx < projectsInArea.count - 1 {
-          inCardDivider
-        }
-      }
-      // Trailing drop zone for projects in *this* area only.
-      if !projectsInArea.isEmpty {
-        endOfGroupDropZone(parent: area.id)
-      }
     }
   }
 
