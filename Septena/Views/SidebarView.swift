@@ -487,11 +487,13 @@ struct SidebarRootView: View {
   @ViewBuilder
   private var areasAndProjects: some View {
     VStack(alignment: .leading, spacing: 0) {
-      // Top-level projects (no area). Each row is both draggable and a
-      // drop target — drop on row = position before it. The trailing zone
-      // beneath the last row handles "drop at end" of the top-level group.
-      ForEach(topLevelProjects) { project in
+      // Top-level projects (no area). Hairline between each consecutive
+      // pair so the card reads like a standard iOS list.
+      ForEach(Array(topLevelProjects.enumerated()), id: \.element.id) { idx, project in
         projectRowDraggable(project, parent: nil)
+        if idx < topLevelProjects.count - 1 {
+          inCardDivider
+        }
       }
       if !topLevelProjects.isEmpty {
         endOfGroupDropZone(parent: nil)
@@ -649,14 +651,42 @@ struct SidebarRootView: View {
         return true
       }
 
-      ForEach(projectsInArea) { project in
+      // Hairline between the area header and its first project, and
+      // between each pair of projects. Matches the Mail / Reminders
+      // list-card pattern.
+      if !projectsInArea.isEmpty {
+        inCardDivider
+      }
+      ForEach(Array(projectsInArea.enumerated()), id: \.element.id) { idx, project in
         projectRowDraggable(project, parent: area.id)
+        if idx < projectsInArea.count - 1 {
+          inCardDivider
+        }
       }
       // Trailing drop zone for projects in *this* area only.
       if !projectsInArea.isEmpty {
         endOfGroupDropZone(parent: area.id)
       }
     }
+  }
+
+  /// Thin hairline shown between consecutive rows inside the iPhone
+  /// areas/projects card. Indented to the left edge of the row text
+  /// (past the icon column) so it lines up with the system iOS list
+  /// separator style.
+  private var inCardDivider: some View {
+    Rectangle()
+      .fill(inCardDividerColor)
+      .frame(height: 0.5)
+      .padding(.leading, Theme.checkboxTap + Theme.iconTextGap)
+  }
+
+  private var inCardDividerColor: Color {
+    #if os(macOS)
+    return Color(nsColor: .separatorColor)
+    #else
+    return Color(uiColor: .opaqueSeparator).opacity(0.6)
+    #endif
   }
 
   /// Move the area with id `movedId` to the position immediately before
@@ -987,6 +1017,7 @@ struct SidebarAreaRow: View {
           .font(.system(size: 12, weight: .regular))
           .foregroundStyle(Theme.inkSecondary.opacity(0.6))
       }
+      SidebarRowChevron()
     }
     .frame(height: Theme.sidebarRowHeight)
     .contentShape(Rectangle())
@@ -1036,9 +1067,21 @@ struct SidebarProjectRow: View {
           .font(.system(size: 12, weight: .regular))
           .foregroundStyle(Theme.inkSecondary.opacity(0.6))
       }
+      SidebarRowChevron()
     }
     .frame(height: Theme.sidebarProjectRowHeight)
     .contentShape(Rectangle())
+  }
+}
+
+/// Trailing chevron used at the end of sidebar list rows. Matches the
+/// disclosure indicator iOS Mail / Reminders / Settings put at the end
+/// of every navigable row.
+struct SidebarRowChevron: View {
+  var body: some View {
+    Image(systemName: "chevron.right")
+      .font(.system(size: 12, weight: .semibold))
+      .foregroundStyle(.tertiary)
   }
 }
 
