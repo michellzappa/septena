@@ -149,7 +149,7 @@ enum Theme {
   static let rowTapHeight: CGFloat = 32
   static let sidebarRowHeight: CGFloat = 28
   static let sidebarSmartRowHeight: CGFloat = 26
-  static let sidebarProjectRowHeight: CGFloat = 24
+  static let sidebarProjectRowHeight: CGFloat = 30
   static let sectionSpacing: CGFloat = 16
   static let sidebarIconSize: CGFloat = 17
   static let sidebarRowSpacing: CGFloat = 10
@@ -166,7 +166,7 @@ enum Theme {
   static let rowTapHeight: CGFloat = 44
   static let sidebarRowHeight: CGFloat = 44
   static let sidebarSmartRowHeight: CGFloat = 38
-  static let sidebarProjectRowHeight: CGFloat = 36
+  static let sidebarProjectRowHeight: CGFloat = 45
   static let sectionSpacing: CGFloat = 24
   static let sidebarIconSize: CGFloat = 22
   static let sidebarRowSpacing: CGFloat = 14
