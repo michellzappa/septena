@@ -103,7 +103,7 @@ struct DayTimelineView: View {
 
   private var rail: some View {
     RoundedRectangle(cornerRadius: 14, style: .continuous)
-      .fill(Color(.tertiarySystemGroupedBackground))
+      .fill(Theme.mutedSurface)
       .frame(height: 18)
       .frame(maxHeight: .infinity)
   }
@@ -148,7 +148,7 @@ struct DayTimelineView: View {
     let size = min(CGFloat(14), CGFloat(6 + (c.count - 1) * 2))
     return Circle()
       .fill(c.color)
-      .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 1))
+      .overlay(Circle().stroke(Theme.paperBackground, lineWidth: 1))
       .frame(width: size, height: size)
       .position(x: pct(c.hour) * width / 100, y: 14)
   }

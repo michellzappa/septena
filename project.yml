@@ -57,6 +57,7 @@ targets:
         NSRemindersUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
         NSCalendarsFullAccessUsageDescription: Septena shows upcoming events from your calendars on the Week dashboard.
         NSCalendarsUsageDescription: Septena shows upcoming events from your calendars on the Week dashboard.
+        NSHealthShareUsageDescription: Septena reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud
@@ -94,6 +95,7 @@ targets:
         NSRemindersUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
         NSCalendarsFullAccessUsageDescription: Septena shows upcoming events from your calendars on the Week dashboard.
         NSCalendarsUsageDescription: Septena shows upcoming events from your calendars on the Week dashboard.
+        NSHealthShareUsageDescription: Septena reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.mac

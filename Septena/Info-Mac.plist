@@ -31,6 +31,8 @@
 	<string>Septena shows upcoming events from your calendars on the Week dashboard.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>Septena shows upcoming events from your calendars on the Week dashboard.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Septena reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>Septena imports tasks from your Reminders lists into the Inbox.</string>
 	<key>NSRemindersUsageDescription</key>

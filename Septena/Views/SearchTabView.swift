@@ -8,7 +8,9 @@ struct SearchTabView: View {
   var body: some View {
     NavigationStack {
       QuickFindView()
+        #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
+        #endif
     }
   }
 }

@@ -23,6 +23,7 @@ enum WeekDestination: Hashable {
   case body
   case gut
   case settings
+  case activity
 }
 
 struct WeekDashboardView: View {
@@ -114,6 +115,7 @@ struct WeekDashboardView: View {
         case .body:        BodyDestinationView()
         case .gut:         GutDestinationView()
         case .settings:    SettingsDestinationView()
+        case .activity:    ActivityDestinationView()
         }
       }
       .task { await loadAll() }
@@ -183,6 +185,8 @@ struct WeekDashboardView: View {
     gutToday = gT
     gutHistory = gH?.daily ?? []
     settings = cfgRes
+    // HealthKit — on-device, no FastAPI. Mac builds short-circuit.
+    await HealthKitBridge.shared.refresh()
   }
 
   private func sinceDate(daysBack: Int) -> String {
@@ -232,6 +236,7 @@ struct WeekDashboardView: View {
     cannabisTile
     bodyTile
     gutTile
+    activityTile
     settingsTile
   }
 
@@ -584,6 +589,34 @@ struct WeekDashboardView: View {
       )
     }
     .buttonStyle(.plain)
+  }
+
+  // Activity — Apple Health, on-device. Skips entirely when HealthKit
+  // isn't available (Mac). Real per-day step bars from the last 7 days.
+  @ViewBuilder
+  private var activityTile: some View {
+    let bridge = HealthKitBridge.shared
+    if bridge.isAvailable {
+      let accent = theme.color(for: "activity")
+      let stepsTarget = 8000
+      NavigationLink(value: WeekDestination.activity) {
+        ModuleTile(
+          title: "Activity",
+          accent: accent,
+          stats: [
+            .init(label: "Steps",    value: "\(bridge.stepsToday)"),
+            .init(label: "Active",   value: "\(Int(bridge.activeKcalToday))", unit: "kcal"),
+            .init(label: "Exercise", value: "\(bridge.exerciseMinutesToday)", unit: "m")
+          ],
+          progress: .init(label: "Steps target",
+                          current: Double(min(bridge.stepsToday, stepsTarget)),
+                          target: Double(stepsTarget)),
+          history: .init(label: "7-day steps",
+                         values: bridge.stepsHistory)
+        )
+      }
+      .buttonStyle(.plain)
+    }
   }
 
   // Settings — single-stat tile that bears the section accent and
