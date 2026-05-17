@@ -35,8 +35,12 @@ struct CalendarDestinationView: View {
       case .denied, .writeOnly: deniedNotice
       }
     }
+    #if os(macOS)
+    .listStyle(.inset)
+    #else
     .listStyle(.insetGrouped)
-    .background(Color(.systemGroupedBackground))
+    #endif
+    .background(Theme.groupedBackground)
     .navigationTitle("Calendar")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)

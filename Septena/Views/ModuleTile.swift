@@ -59,7 +59,7 @@ struct ModuleTile: View {
     // system token Reminders / Notes use for grouped-list rows.
     .background(
       RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-        .fill(Color(.secondarySystemGroupedBackground))
+        .fill(Theme.secondaryGroupedBackground)
     )
     .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
   }

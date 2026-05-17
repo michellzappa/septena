@@ -58,8 +58,8 @@ struct LogRow: View {
            detail: "BW · 4×6",
            accent: .orange)
   }
-  .background(Color(.secondarySystemGroupedBackground))
+  .background(Theme.secondaryGroupedBackground)
   .clipShape(RoundedRectangle(cornerRadius: 10))
   .padding()
-  .background(Color(.systemGroupedBackground))
+  .background(Theme.groupedBackground)
 }

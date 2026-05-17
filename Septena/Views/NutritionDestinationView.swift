@@ -54,8 +54,12 @@ struct NutritionDestinationView: View {
                                description: Text("Log a meal in the webapp to see it here."))
       }
     }
+    #if os(macOS)
+    .listStyle(.inset)
+    #else
     .listStyle(.insetGrouped)
-    .background(Color(.systemGroupedBackground))
+    #endif
+    .background(Theme.groupedBackground)
     .navigationTitle("Nutrition")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)

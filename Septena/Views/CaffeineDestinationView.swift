@@ -46,8 +46,12 @@ struct CaffeineDestinationView: View {
         }
       }
     }
+    #if os(macOS)
+    .listStyle(.inset)
+    #else
     .listStyle(.insetGrouped)
-    .background(Color(.systemGroupedBackground))
+    #endif
+    .background(Theme.groupedBackground)
     .navigationTitle("Caffeine")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)

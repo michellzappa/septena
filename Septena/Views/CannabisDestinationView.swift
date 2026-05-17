@@ -49,8 +49,12 @@ struct CannabisDestinationView: View {
         }
       }
     }
+    #if os(macOS)
+    .listStyle(.inset)
+    #else
     .listStyle(.insetGrouped)
-    .background(Color(.systemGroupedBackground))
+    #endif
+    .background(Theme.groupedBackground)
     .navigationTitle("Cannabis")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)

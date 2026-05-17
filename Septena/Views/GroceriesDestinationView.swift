@@ -61,8 +61,12 @@ struct GroceriesDestinationView: View {
                                description: Text("Set up your pantry in the webapp."))
       }
     }
+    #if os(macOS)
+    .listStyle(.inset)
+    #else
     .listStyle(.insetGrouped)
-    .background(Color(.systemGroupedBackground))
+    #endif
+    .background(Theme.groupedBackground)
     .navigationTitle("Groceries")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)

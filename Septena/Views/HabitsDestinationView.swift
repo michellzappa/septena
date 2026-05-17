@@ -23,8 +23,12 @@ struct HabitsDestinationView: View {
         bucketSection(bucket)
       }
     }
+    #if os(macOS)
+    .listStyle(.inset)
+    #else
     .listStyle(.insetGrouped)
-    .background(Color(.systemGroupedBackground))
+    #endif
+    .background(Theme.groupedBackground)
     .navigationTitle("Habits")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)

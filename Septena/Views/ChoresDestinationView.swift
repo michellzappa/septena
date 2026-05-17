@@ -60,8 +60,12 @@ struct ChoresDestinationView: View {
         }
       }
     }
+    #if os(macOS)
+    .listStyle(.inset)
+    #else
     .listStyle(.insetGrouped)
-    .background(Color(.systemGroupedBackground))
+    #endif
+    .background(Theme.groupedBackground)
     .navigationTitle("Chores")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)

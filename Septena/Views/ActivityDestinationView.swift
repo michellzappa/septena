@@ -20,8 +20,12 @@ struct ActivityDestinationView: View {
       case .denied:        deniedNotice
       }
     }
+    #if os(macOS)
+    .listStyle(.inset)
+    #else
     .listStyle(.insetGrouped)
-    .background(Color(.systemGroupedBackground))
+    #endif
+    .background(Theme.groupedBackground)
     .navigationTitle("Activity")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)

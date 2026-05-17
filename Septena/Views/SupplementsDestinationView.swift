@@ -30,8 +30,12 @@ struct SupplementsDestinationView: View {
                                description: Text("Add some in the webapp's Supplements settings."))
       }
     }
+    #if os(macOS)
+    .listStyle(.inset)
+    #else
     .listStyle(.insetGrouped)
-    .background(Color(.systemGroupedBackground))
+    #endif
+    .background(Theme.groupedBackground)
     .navigationTitle("Supplements")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)

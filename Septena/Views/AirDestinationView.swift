@@ -45,8 +45,12 @@ struct AirDestinationView: View {
                                description: Text("Check your sensor connection in the webapp."))
       }
     }
+    #if os(macOS)
+    .listStyle(.inset)
+    #else
     .listStyle(.insetGrouped)
-    .background(Color(.systemGroupedBackground))
+    #endif
+    .background(Theme.groupedBackground)
     .navigationTitle("Air")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)

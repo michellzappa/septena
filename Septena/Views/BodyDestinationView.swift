@@ -37,8 +37,12 @@ struct BodyDestinationView: View {
                                description: Text("Check your Withings sync in the webapp."))
       }
     }
+    #if os(macOS)
+    .listStyle(.inset)
+    #else
     .listStyle(.insetGrouped)
-    .background(Color(.systemGroupedBackground))
+    #endif
+    .background(Theme.groupedBackground)
     .navigationTitle("Body")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)

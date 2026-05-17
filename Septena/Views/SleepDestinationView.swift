@@ -36,8 +36,12 @@ struct SleepDestinationView: View {
                                description: Text("Check your Oura sync in the webapp."))
       }
     }
+    #if os(macOS)
+    .listStyle(.inset)
+    #else
     .listStyle(.insetGrouped)
-    .background(Color(.systemGroupedBackground))
+    #endif
+    .background(Theme.groupedBackground)
     .navigationTitle("Sleep")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)

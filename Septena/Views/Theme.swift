@@ -67,6 +67,22 @@ enum Theme {
     #endif
   }()
 
+  /// Cross-platform analogue of `UIColor.systemGroupedBackground` — the soft
+  /// gray under insetGrouped lists / dashboard canvases on iOS.
+  static let groupedBackground: Color = {
+    #if os(macOS)
+    return Color(nsColor: .windowBackgroundColor)
+    #else
+    return Color(.systemGroupedBackground)
+    #endif
+  }()
+
+  /// Cross-platform analogue of `UIColor.secondarySystemGroupedBackground` —
+  /// the elevated surface that sits on top of `groupedBackground` (tiles,
+  /// inset cards). Same swatch as `cardSurface`; kept as a distinct name so
+  /// call sites that migrate from the iOS-only token read clearly.
+  static let secondaryGroupedBackground: Color = cardSurface
+
   /// Muted secondary surface — chips, search fields, inline pills.
   static let mutedSurface: Color = {
     #if os(macOS)
