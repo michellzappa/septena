@@ -55,6 +55,8 @@ targets:
           NSAllowsArbitraryLoads: true
         NSRemindersFullAccessUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
         NSRemindersUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
+        NSCalendarsFullAccessUsageDescription: Septena shows upcoming events from your calendars on the Week dashboard.
+        NSCalendarsUsageDescription: Septena shows upcoming events from your calendars on the Week dashboard.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud
@@ -90,6 +92,8 @@ targets:
           NSAllowsArbitraryLoads: true
         NSRemindersFullAccessUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
         NSRemindersUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
+        NSCalendarsFullAccessUsageDescription: Septena shows upcoming events from your calendars on the Week dashboard.
+        NSCalendarsUsageDescription: Septena shows upcoming events from your calendars on the Week dashboard.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.mac

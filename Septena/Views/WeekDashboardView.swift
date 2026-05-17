@@ -1,4 +1,5 @@
 import SwiftUI
+import EventKit
 
 // Week module — the synthesizing dashboard. Each module gets a tile that
 // (a) renders live stats / histogram for that module and (b) pushes into
@@ -16,6 +17,7 @@ enum WeekDestination: Hashable {
   case nutrition
   case air
   case groceries
+  case calendar
 }
 
 struct WeekDashboardView: View {
@@ -41,6 +43,7 @@ struct WeekDashboardView: View {
   @State private var airSummary: AirSummary? = nil
   @State private var airHistory: [AirHistoryPoint] = []
   @State private var groceries: [GroceryItem] = []
+  @State private var calendarEvents: [EKEvent] = []
 
   /// 1 column on iPhone (compact), 3 on iPad / Mac (regular). LazyVGrid
   /// reflows automatically on rotation; tiles keep their internal layout.
@@ -77,6 +80,7 @@ struct WeekDashboardView: View {
         case .nutrition:   NutritionDestinationView()
         case .air:         AirDestinationView()
         case .groceries:   GroceriesDestinationView()
+        case .calendar:    CalendarDestinationView()
         }
       }
       .task { await loadAll() }
@@ -108,6 +112,9 @@ struct WeekDashboardView: View {
     airSummary = asRes
     airHistory = ahRes?.daily ?? []
     if let g = gRes { groceries = g }
+    // Local-only — CalendarBridge sync; no network. Drains permission +
+    // returns whatever's currently in the user's calendars.
+    calendarEvents = CalendarBridge.shared.upcomingEvents(days: 7)
     if let h { habitHistory = h.daily.map { $0.done } }
     if let c { choreHistory = c.daily.map { $0.completed } }
     cardio = ca
@@ -143,6 +150,7 @@ struct WeekDashboardView: View {
     nutritionTile
     airTile
     groceriesTile
+    calendarTile
   }
 
   // Tasks — live counts from /api/tasks/counts. No history endpoint yet
@@ -322,6 +330,38 @@ struct WeekDashboardView: View {
         ),
         history: .init(label: "Shopping list",
                        values: Array(repeating: max(lowCount, 1), count: 7))
+      )
+    }
+    .buttonStyle(.plain)
+  }
+
+  // Calendar — local EventKit feed; no FastAPI involved. Stats: today's
+  // event count + next event title. Histogram shows events per upcoming
+  // day so the shape of the week is visible at a glance.
+  private var calendarTile: some View {
+    let accent = theme.color(for: "calendar")
+    let cal = Calendar.current
+    let todayCount = calendarEvents.filter { cal.isDateInToday($0.startDate) }.count
+    let next = calendarEvents.first { $0.endDate > Date() }
+    let nextLabel = next.map { e in
+      let f = DateFormatter(); f.dateFormat = "HH:mm"
+      let title = (e.title?.isEmpty == false ? e.title! : "(Untitled)")
+      return "\(title) · \(f.string(from: e.startDate))"
+    } ?? "Nothing scheduled"
+    var bars: [Int] = Array(repeating: 0, count: 7)
+    for e in calendarEvents {
+      let days = cal.dateComponents([.day],
+                                    from: cal.startOfDay(for: Date()),
+                                    to: cal.startOfDay(for: e.startDate)).day ?? 0
+      if (0..<7).contains(days) { bars[days] += 1 }
+    }
+    return NavigationLink(value: WeekDestination.calendar) {
+      ModuleTile(
+        title: "Calendar",
+        accent: accent,
+        stats: [.init(label: "Today", value: "\(todayCount)"),
+                .init(label: "Next",  value: nextLabel)],
+        history: .init(label: "Next 7 days", values: bars)
       )
     }
     .buttonStyle(.plain)

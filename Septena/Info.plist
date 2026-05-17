@@ -25,6 +25,10 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Septena shows upcoming events from your calendars on the Week dashboard.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Septena shows upcoming events from your calendars on the Week dashboard.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>Septena imports tasks from your Reminders lists into the Inbox.</string>
 	<key>NSRemindersUsageDescription</key>
