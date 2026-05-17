@@ -8,7 +8,12 @@ struct NextDashboardView: View {
   var body: some View {
     NavigationStack {
       NextView()
-        .toolbar(.hidden, for: .navigationBar)
+        .navigationTitle("")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarBackground(.regularMaterial, for: .navigationBar)
+        #endif
     }
   }
 }

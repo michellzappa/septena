@@ -89,8 +89,15 @@ struct WeekDashboardView: View {
         .padding(.bottom, 80)
       }
       .background(Color(.systemGroupedBackground))
-      // Tab bar already labels this view; no large title needed.
-      .toolbar(.hidden, for: .navigationBar)
+      // Tab bar already labels this view; keep the nav bar present with
+      // an empty inline title so iOS still renders the scroll-edge blur
+      // (content fades to bg material as it scrolls under the top).
+      .navigationTitle("")
+      #if os(iOS)
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbarBackground(.visible, for: .navigationBar)
+      .toolbarBackground(.regularMaterial, for: .navigationBar)
+      #endif
       .navigationDestination(for: WeekDestination.self) { dest in
         switch dest {
         case .habits:      HabitsDestinationView()
