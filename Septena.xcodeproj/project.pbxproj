@@ -92,11 +92,13 @@
 		D770995846D0B23AC3F77F34 /* SeptenaClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 583220978001091137587977 /* SeptenaClient.swift */; };
 		DD200EF411309E29B543963F /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5ECFDA9128B73993023CB6 /* Models.swift */; };
 		DD317D456C7B6AD457F872B3 /* TaskCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 486793A66A22C3DA7809337B /* TaskCommands.swift */; };
+		DD3CDCDBCD8FD2808774F5A8 /* DayTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD698B19C7814F9ACE075774 /* DayTimelineView.swift */; };
 		DE402EEE2DA772AF7300E1C0 /* TaskComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB88131B1CFB7EAA692D88E6 /* TaskComponents.swift */; };
 		DF016EF192B7891D2DBE3CB6 /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E25F81FE5AA4B6BBC056275 /* DateParser.swift */; };
 		E02065B8AC82D19639A4CFAD /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5213158B9AA9106BBAA03D41 /* SettingsView.swift */; };
 		E1474EC3CDCB9253688ABA00 /* WeekDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA936685A02055A0A5079EB2 /* WeekDashboardView.swift */; };
 		E31B94DDD122274806A91B5C /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B92826563E8E24C2A8F22B9 /* TaskListView.swift */; };
+		ECCD8EBD97007CE19A8A2C71 /* DayTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD698B19C7814F9ACE075774 /* DayTimelineView.swift */; };
 		F21704F2D348D306CBC132AB /* SuggestionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6DD7C05D998EF1301A6410D /* SuggestionEngine.swift */; };
 		F41E7F09812BA328A1E2B328 /* CaffeineDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29D4FAAB1E88C564EF898327 /* CaffeineDestinationView.swift */; };
 		F62DAF6B252E82A6C8CB7167 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F0AE5985EFE1A9A61F9BC7E /* SidebarView.swift */; };
@@ -154,6 +156,7 @@
 		C12E57B6D840EE59123B45F5 /* LogRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogRow.swift; sourceTree = "<group>"; };
 		C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CA936685A02055A0A5079EB2 /* WeekDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekDashboardView.swift; sourceTree = "<group>"; };
+		CD698B19C7814F9ACE075774 /* DayTimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayTimelineView.swift; sourceTree = "<group>"; };
 		CDCA5F7AD926593502A0DDA8 /* AirDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirDestinationView.swift; sourceTree = "<group>"; };
 		D4A07E6C15CC294172DF5D20 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		D852F1B66154D92E60E79CBE /* TrainingDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingDestinationView.swift; sourceTree = "<group>"; };
@@ -190,6 +193,7 @@
 				04B4D06356BC11C849416F5C /* CalendarDestinationView.swift */,
 				1B11A1931AD62F377D8B791A /* CannabisDestinationView.swift */,
 				57CEAA8D15E94157FCE94ED2 /* ChoresDestinationView.swift */,
+				CD698B19C7814F9ACE075774 /* DayTimelineView.swift */,
 				83E5755C28C6B3D53D9031A7 /* GroceriesDestinationView.swift */,
 				3C90473A5415EF805CE827D5 /* GutDestinationView.swift */,
 				6CB6D70452573AF2811BBD08 /* HabitsDestinationView.swift */,
@@ -376,6 +380,7 @@
 				63A5F76E01E1619DA8FA2C4E /* CannabisDestinationView.swift in Sources */,
 				B5D47368B47648A0FC968DFB /* ChoresDestinationView.swift in Sources */,
 				DF016EF192B7891D2DBE3CB6 /* DateParser.swift in Sources */,
+				DD3CDCDBCD8FD2808774F5A8 /* DayTimelineView.swift in Sources */,
 				029C02E7D76246B98F4F6C8B /* GroceriesDestinationView.swift in Sources */,
 				530608759DC8F3A18501430F /* GutDestinationView.swift in Sources */,
 				FD43DBF763D6B72C04A00682 /* HabitsDestinationView.swift in Sources */,
@@ -429,6 +434,7 @@
 				A12F25E5C2F7F54D63633333 /* CannabisDestinationView.swift in Sources */,
 				9EBF276CA0720E417E3EE17E /* ChoresDestinationView.swift in Sources */,
 				513C8B1D41E5BA85B785129C /* DateParser.swift in Sources */,
+				ECCD8EBD97007CE19A8A2C71 /* DayTimelineView.swift in Sources */,
 				350BABC5882550125A41C46D /* GroceriesDestinationView.swift in Sources */,
 				100195F90383D604A61EF4CB /* GutDestinationView.swift in Sources */,
 				69347D27E1CBEFCF3AA87AB2 /* HabitsDestinationView.swift in Sources */,

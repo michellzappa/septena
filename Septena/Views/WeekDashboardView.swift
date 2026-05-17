@@ -41,7 +41,6 @@ struct WeekDashboardView: View {
   @State private var taskCounts: TasksCounts? = nil
   @State private var ouraNights: [OuraNight] = []
   @State private var nutritionStats: NutritionStatsResponse? = nil
-  @State private var todayNutrition: NutritionEntry? = nil
   @State private var todayProteinSum: Double = 0
   @State private var todayKcalSum: Double = 0
   @State private var nutritionTarget: MacrosConfig? = nil
@@ -57,6 +56,12 @@ struct WeekDashboardView: View {
   @State private var gutToday: GutDayResponse? = nil
   @State private var gutHistory: [GutHistoryPoint] = []
   @State private var settings: AppSettings? = nil
+  /// Today-scoped collections kept in state so DayTimelineView can read
+  /// them. NextItemsModel already covers habits/supplements/chores and
+  /// today's caffeine/cannabis/gut live in their respective `*Today`
+  /// state vars; only nutrition + recent training need fresh stash.
+  @State private var todayNutrition: [NutritionEntry] = []
+  @State private var recentTraining: [ExerciseEntry] = []
 
   /// 1 column on iPhone (compact), 3 on iPad / Mac (regular). LazyVGrid
   /// reflows automatically on rotation; tiles keep their internal layout.
@@ -73,8 +78,11 @@ struct WeekDashboardView: View {
   var body: some View {
     NavigationStack {
       ScrollView {
-        LazyVGrid(columns: columns, spacing: 14) {
-          tiles
+        VStack(spacing: 18) {
+          todayTimeline
+          LazyVGrid(columns: columns, spacing: 14) {
+            tiles
+          }
         }
         .padding(.horizontal, Theme.hPadding)
         .padding(.top, 12)
@@ -146,6 +154,8 @@ struct WeekDashboardView: View {
     let todayEntries = (ne ?? []).filter { $0.date == today }
     todayProteinSum = todayEntries.reduce(0) { $0 + $1.proteinG }
     todayKcalSum    = todayEntries.reduce(0) { $0 + $1.kcal }
+    todayNutrition = todayEntries
+    recentTraining = e ?? []
     // Caffeine + Cannabis — second wave so the heavier core fetches above
     // render their tiles first.
     async let cafToday = try? await client.caffeineDay(date: SeptenaDate.today)
@@ -173,6 +183,28 @@ struct WeekDashboardView: View {
     let f = DateFormatter()
     f.dateFormat = "yyyy-MM-dd"
     return f.string(from: d)
+  }
+
+  // MARK: - Today timeline (single row above the tile grid)
+
+  private var todayTimeline: some View {
+    DayTimelineView(
+      date: SeptenaDate.today,
+      oura: ouraNights.first,
+      caffeine: caffeineToday?.entries ?? [],
+      cannabis: cannabisToday?.entries ?? [],
+      nutrition: todayNutrition,
+      gut: gutToday?.entries ?? [],
+      habits: dailies.habits,
+      supplements: dailies.supplements,
+      chores: dailies.chores,
+      training: recentTraining
+    )
+    .padding(14)
+    .background(
+      RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+        .fill(Color(.secondarySystemGroupedBackground))
+    )
   }
 
   // MARK: - Tiles
