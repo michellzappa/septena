@@ -11,11 +11,16 @@ struct SettingsDestinationView: View {
 
   @State private var settings: AppSettings? = nil
   @State private var loading = true
+  // Bridges referenced so .access changes redraw the rows.
+  @State private var calendarBridge = CalendarBridge.shared
+  @State private var remindersBridge = RemindersBridge.shared
+  @State private var healthBridge = HealthKitBridge.shared
 
   private var accent: Color { theme.color(for: "settings") }
 
   var body: some View {
     List {
+      integrationsSection
       if let s = settings {
         appSection(s)
         if let t = s.targets { targetsSection(t) }
@@ -36,6 +41,105 @@ struct SettingsDestinationView: View {
     .tint(accent)
     .task { await load() }
     .refreshable { await load() }
+  }
+
+  // MARK: - Integrations
+  //
+  // Native iOS data sources Septena reaches outside the FastAPI proxy:
+  // Reminders + Calendar (EventKit) and Apple Health (HealthKit). Each
+  // row shows current access state and offers a grant prompt where it
+  // makes sense; denied / not-available cases route to system Settings.
+
+  private var integrationsSection: some View {
+    Section("Integrations") {
+      remindersRow
+      calendarRow
+      healthRow
+    }
+  }
+
+  private var remindersRow: some View {
+    integrationRow(
+      title: "Reminders",
+      systemImage: "checklist",
+      state: remindersAccessLabel,
+      stateColor: remindersBridge.access == .granted ? .green : .secondary
+    ) {
+      if remindersBridge.access == .notDetermined {
+        Task { _ = await remindersBridge.requestAccess() }
+      }
+    }
+  }
+
+  private var calendarRow: some View {
+    integrationRow(
+      title: "Calendar",
+      systemImage: "calendar",
+      state: calendarAccessLabel,
+      stateColor: calendarBridge.access == .granted ? .green : .secondary
+    ) {
+      if calendarBridge.access == .notDetermined {
+        Task { _ = await calendarBridge.requestAccess() }
+      }
+    }
+  }
+
+  private var healthRow: some View {
+    integrationRow(
+      title: "Apple Health",
+      systemImage: "heart.text.square",
+      state: healthAccessLabel,
+      stateColor: healthBridge.access == .granted ? .green : .secondary
+    ) {
+      if healthBridge.access == .notDetermined && healthBridge.isAvailable {
+        Task { _ = await healthBridge.requestAccess() }
+      }
+    }
+  }
+
+  private func integrationRow(title: String,
+                              systemImage: String,
+                              state: String,
+                              stateColor: Color,
+                              onTap: @escaping () -> Void) -> some View {
+    Button(action: onTap) {
+      HStack {
+        Label(title, systemImage: systemImage)
+          .foregroundStyle(Theme.inkPrimary)
+        Spacer()
+        Text(state)
+          .font(.subheadline)
+          .foregroundStyle(stateColor)
+      }
+    }
+    .buttonStyle(.plain)
+  }
+
+  private var remindersAccessLabel: String {
+    switch remindersBridge.access {
+    case .granted:        return "Granted"
+    case .writeOnly:      return "Write-only"
+    case .denied:         return "Denied"
+    case .notDetermined:  return "Grant"
+    }
+  }
+
+  private var calendarAccessLabel: String {
+    switch calendarBridge.access {
+    case .granted:       return "Granted"
+    case .writeOnly:     return "Write-only"
+    case .denied:        return "Denied"
+    case .notDetermined: return "Grant"
+    }
+  }
+
+  private var healthAccessLabel: String {
+    guard healthBridge.isAvailable else { return "Not available" }
+    switch healthBridge.access {
+    case .granted:       return "Granted"
+    case .denied:        return "Denied"
+    case .notDetermined: return "Grant"
+    }
   }
 
   // MARK: - Sections

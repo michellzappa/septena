@@ -8,22 +8,12 @@ import EventKit
 // every accent comes from SectionTheme so colors match the user's
 // server-configured Septena palette today.
 
-enum WeekDestination: Hashable {
-  case habits
-  case chores
-  case training
-  case supplements
-  case sleep
-  case nutrition
-  case air
-  case groceries
-  case calendar
-  case caffeine
-  case cannabis
-  case body
-  case gut
-  case settings
-  case activity
+enum WeekDestination: String, Hashable, Identifiable {
+  case habits, chores, training, supplements, sleep, nutrition
+  case air, groceries, calendar, caffeine, cannabis, body, gut
+  case settings, activity
+
+  var id: String { rawValue }
 }
 
 struct WeekDashboardView: View {
@@ -57,6 +47,7 @@ struct WeekDashboardView: View {
   @State private var gutToday: GutDayResponse? = nil
   @State private var gutHistory: [GutHistoryPoint] = []
   @State private var settings: AppSettings? = nil
+  @State private var sheetDest: WeekDestination? = nil
   /// Today-scoped collections kept in state so DayTimelineView can read
   /// them. NextItemsModel already covers habits/supplements/chores and
   /// today's caffeine/cannabis/gut live in their respective `*Today`
@@ -90,37 +81,62 @@ struct WeekDashboardView: View {
         .padding(.bottom, 80)
       }
       .background(Color(.systemGroupedBackground))
-      // Tab bar already labels this view; keep the nav bar present with
-      // an empty inline title so iOS still renders the scroll-edge blur
-      // (content fades to bg material as it scrolls under the top).
+      // Tab bar already labels this view. Keep the nav bar present so
+      // iOS's default scroll-edge effect kicks in (content fades to bg
+      // material as it scrolls under the top — same shape as the
+      // bottom tab bar). No .toolbarBackground override — the default
+      // transparent-until-scrolled state is exactly what we want.
       .navigationTitle("")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
-      .toolbarBackground(.visible, for: .navigationBar)
-      .toolbarBackground(.regularMaterial, for: .navigationBar)
       #endif
-      .navigationDestination(for: WeekDestination.self) { dest in
-        switch dest {
-        case .habits:      HabitsDestinationView()
-        case .chores:      ChoresDestinationView()
-        case .training:    TrainingDestinationView()
-        case .supplements: SupplementsDestinationView()
-        case .sleep:       SleepDestinationView()
-        case .nutrition:   NutritionDestinationView()
-        case .air:         AirDestinationView()
-        case .groceries:   GroceriesDestinationView()
-        case .calendar:    CalendarDestinationView()
-        case .caffeine:    CaffeineDestinationView()
-        case .cannabis:    CannabisDestinationView()
-        case .body:        BodyDestinationView()
-        case .gut:         GutDestinationView()
-        case .settings:    SettingsDestinationView()
-        case .activity:    ActivityDestinationView()
+      .toolbar {
+        ToolbarItem(placement: .primaryAction) {
+          Button { sheetDest = .settings } label: {
+            Image(systemName: "gearshape")
+          }
         }
+      }
+      // Sheets, not pushes — iPhone navigation into module destinations
+      // is a bottom-sheet slide-over so the dashboard stays visually
+      // present underneath. iPad / Mac render this just as well.
+      .sheet(item: $sheetDest) { dest in
+        sheetContent(for: dest)
       }
       .task { await loadAll() }
       .refreshable { await loadAll() }
     }
+  }
+
+  /// Each module's destination wrapped in its own NavigationStack so
+  /// nav titles render inside the sheet. Medium + large detents on
+  /// iPhone so the user can pull up to full height; iPad / Mac use the
+  /// system default (large).
+  @ViewBuilder
+  private func sheetContent(for dest: WeekDestination) -> some View {
+    NavigationStack {
+      switch dest {
+      case .habits:      HabitsDestinationView()
+      case .chores:      ChoresDestinationView()
+      case .training:    TrainingDestinationView()
+      case .supplements: SupplementsDestinationView()
+      case .sleep:       SleepDestinationView()
+      case .nutrition:   NutritionDestinationView()
+      case .air:         AirDestinationView()
+      case .groceries:   GroceriesDestinationView()
+      case .calendar:    CalendarDestinationView()
+      case .caffeine:    CaffeineDestinationView()
+      case .cannabis:    CannabisDestinationView()
+      case .body:        BodyDestinationView()
+      case .gut:         GutDestinationView()
+      case .settings:    SettingsDestinationView()
+      case .activity:    ActivityDestinationView()
+      }
+    }
+    #if os(iOS)
+    .presentationDetents([.large])
+    .presentationDragIndicator(.visible)
+    #endif
   }
 
   /// Fan out the per-tile fetches in parallel. NextItemsModel covers today's
@@ -237,7 +253,6 @@ struct WeekDashboardView: View {
     bodyTile
     gutTile
     activityTile
-    settingsTile
   }
 
   // Tasks — live counts from /api/tasks/counts. No history endpoint yet
@@ -269,7 +284,7 @@ struct WeekDashboardView: View {
     let done = dailies.habits.filter { $0.done }.count
     let skipped = dailies.habits.filter { $0.skipped }.count
     let accent = theme.color(for: "habits")
-    return NavigationLink(value: WeekDestination.habits) {
+    return Button { sheetDest = .habits } label: {
       ModuleTile(
         title: "Habits",
         accent: accent,
@@ -297,7 +312,7 @@ struct WeekDashboardView: View {
     let minutes = cardio?.daily.reduce(0) { $0 + $1.minutes } ?? 0
     let target = cardio?.targetWeeklyMin ?? 150
     let bars = cardio?.daily.map { $0.minutes } ?? Array(repeating: 0, count: 7)
-    return NavigationLink(value: WeekDestination.training) {
+    return Button { sheetDest = .training } label: {
       ModuleTile(
         title: "Training",
         accent: accent,
@@ -323,7 +338,7 @@ struct WeekDashboardView: View {
     let done = dailies.completedChores.count
     let total = dueToday + overdue + done
     let accent = theme.color(for: "chores")
-    return NavigationLink(value: WeekDestination.chores) {
+    return Button { sheetDest = .chores } label: {
       ModuleTile(
         title: "Chores",
         accent: accent,
@@ -345,7 +360,7 @@ struct WeekDashboardView: View {
     let total = dailies.supplements.count
     let done = dailies.supplements.filter { $0.done }.count
     let accent = theme.color(for: "supplements")
-    return NavigationLink(value: WeekDestination.supplements) {
+    return Button { sheetDest = .supplements } label: {
       ModuleTile(
         title: "Supplements",
         accent: accent,
@@ -370,7 +385,7 @@ struct WeekDashboardView: View {
     let lastH = last?.totalH ?? 0
     let score = last?.sleepScore.map { "\($0)" } ?? "—"
     let bars = ouraNights.reversed().map { Int(($0.totalH ?? 0) * 10) } // tenths-of-hour for resolution
-    return NavigationLink(value: WeekDestination.sleep) {
+    return Button { sheetDest = .sleep } label: {
       ModuleTile(
         title: "Sleep",
         accent: accent,
@@ -396,7 +411,7 @@ struct WeekDashboardView: View {
     // Progress is "air-quality budget" — every minute over 1000 ppm
     // eats into a soft 60-minute daily allowance.
     let budget = 60
-    return NavigationLink(value: WeekDestination.air) {
+    return Button { sheetDest = .air } label: {
       ModuleTile(
         title: "Air",
         accent: accent,
@@ -421,7 +436,7 @@ struct WeekDashboardView: View {
     let accent = theme.color(for: "groceries")
     let lowCount = groceries.filter { $0.low }.count
     let stocked = groceries.count - lowCount
-    return NavigationLink(value: WeekDestination.groceries) {
+    return Button { sheetDest = .groceries } label: {
       ModuleTile(
         title: "Groceries",
         accent: accent,
@@ -462,7 +477,7 @@ struct WeekDashboardView: View {
       if (0..<7).contains(days) { bars[days] += 1 }
     }
     // Soft cap of 8 events/day reads as a "busy day" budget.
-    return NavigationLink(value: WeekDestination.calendar) {
+    return Button { sheetDest = .calendar } label: {
       ModuleTile(
         title: "Calendar",
         accent: accent,
@@ -484,7 +499,7 @@ struct WeekDashboardView: View {
     let grams = caffeineToday?.totalG ?? 0
     let bars = caffeineHistory.map { $0.sessions }
     let dailyLimit = 3   // soft default until Settings.targets is wired
-    return NavigationLink(value: WeekDestination.caffeine) {
+    return Button { sheetDest = .caffeine } label: {
       ModuleTile(
         title: "Caffeine",
         accent: accent,
@@ -510,7 +525,7 @@ struct WeekDashboardView: View {
     let grams = cannabisToday?.totalG ?? 0
     let bars = cannabisHistory.map { $0.sessions }
     let dailyLimit = 2
-    return NavigationLink(value: WeekDestination.cannabis) {
+    return Button { sheetDest = .cannabis } label: {
       ModuleTile(
         title: "Cannabis",
         accent: accent,
@@ -545,7 +560,7 @@ struct WeekDashboardView: View {
     // Body-fat percentage tracked against a soft 18% target (single number,
     // overrideable later via Settings.targets.fat_min_pct).
     let fatTarget: Double = 18
-    return NavigationLink(value: WeekDestination.body) {
+    return Button { sheetDest = .body } label: {
       ModuleTile(
         title: "Body",
         accent: accent,
@@ -572,7 +587,7 @@ struct WeekDashboardView: View {
     let discomfort = gutToday?.totalDiscomfortH ?? 0
     let bars = gutHistory.map { $0.movements }
     let dailyTarget = 2
-    return NavigationLink(value: WeekDestination.gut) {
+    return Button { sheetDest = .gut } label: {
       ModuleTile(
         title: "Gut",
         accent: accent,
@@ -599,7 +614,7 @@ struct WeekDashboardView: View {
     if bridge.isAvailable {
       let accent = theme.color(for: "activity")
       let stepsTarget = 8000
-      NavigationLink(value: WeekDestination.activity) {
+      Button { sheetDest = .activity } label: {
         ModuleTile(
           title: "Activity",
           accent: accent,
@@ -620,30 +635,8 @@ struct WeekDashboardView: View {
   }
 
   // Settings — single-stat tile that bears the section accent and
-  // confirms the iOS app loaded the server config. Histogram is purely
-  // decorative (number of configured targets per category).
-  private var settingsTile: some View {
-    let accent = theme.color(for: "settings")
-    let loaded = settings != nil
-    let count = settings?.sectionOrder?.count ?? 0
-    let theme_ = settings?.theme?.capitalized ?? "—"
-    return NavigationLink(value: WeekDestination.settings) {
-      ModuleTile(
-        title: "Settings",
-        accent: accent,
-        stats: [
-          .init(label: "Sections", value: "\(count)"),
-          .init(label: "Theme",    value: theme_)
-        ],
-        progress: .init(label: "Config loaded",
-                        current: loaded ? 1 : 0,
-                        target: 1),
-        history: .init(label: "Status",
-                       values: Array(repeating: loaded ? 1 : 0, count: 7))
-      )
-    }
-    .buttonStyle(.plain)
-  }
+  // Settings is now reached via the toolbar gear button on Week —
+  // it's an app-level concern, not a module worth a tile.
 
   /// 7.2 → "7:12" — compact h:mm form for the tile.
   private func formatHoursShort(_ h: Double) -> String {
@@ -659,7 +652,7 @@ struct WeekDashboardView: View {
     let proteinTarget = nutritionTarget?.protein.min ?? 150
     let bars = nutritionStats?.daily.map { Int($0.proteinG) }
               ?? Array(repeating: 0, count: 7)
-    return NavigationLink(value: WeekDestination.nutrition) {
+    return Button { sheetDest = .nutrition } label: {
       ModuleTile(
         title: "Nutrition",
         accent: accent,

@@ -11,8 +11,6 @@ struct NextDashboardView: View {
         .navigationTitle("")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .toolbarBackground(.regularMaterial, for: .navigationBar)
         #endif
     }
   }

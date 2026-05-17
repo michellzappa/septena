@@ -209,14 +209,11 @@ struct SidebarRootView: View {
       }
     }
     .background(Theme.sidebarBackground)
-    // Tab bar already labels this view; keep the nav bar present with an
-    // empty inline title so iOS renders the standard scroll-edge blur
-    // when sidebar rows pass behind the top safe area.
+    // Empty nav bar so iOS renders its default scroll-edge fade as
+    // sidebar rows pass behind the top safe area.
     .navigationTitle("")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.inline)
-    .toolbarBackground(.visible, for: .navigationBar)
-    .toolbarBackground(.regularMaterial, for: .navigationBar)
     #endif
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
