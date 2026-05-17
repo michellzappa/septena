@@ -98,6 +98,13 @@ struct WeekDashboardView: View {
       // natural homepage, so it's the natural place to put it.
       .toolbar {
         ToolbarItem(placement: .primaryAction) {
+          Button { nav.showAddInfo = true } label: {
+            Image(systemName: "plus")
+          }
+          .accessibilityLabel("Add Info")
+          .keyboardShortcut("k", modifiers: .command)
+        }
+        ToolbarItem(placement: .primaryAction) {
           Button { nav.showSettings = true } label: {
             Image(systemName: "gearshape")
           }

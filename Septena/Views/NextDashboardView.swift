@@ -5,6 +5,8 @@ import SwiftUI
 // own ScreenTitle ("Next" + arrow icon), so no extra navigationTitle here.
 
 struct NextDashboardView: View {
+  @Environment(NavigationState.self) private var nav
+
   var body: some View {
     NavigationStack {
       NextView()
@@ -12,6 +14,14 @@ struct NextDashboardView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .toolbar {
+          ToolbarItem(placement: .primaryAction) {
+            Button { nav.showAddInfo = true } label: {
+              Image(systemName: "plus")
+            }
+            .accessibilityLabel("Add Info")
+          }
+        }
     }
   }
 }
