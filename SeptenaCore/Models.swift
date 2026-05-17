@@ -465,6 +465,49 @@ struct SupplementHistoryResponse: Codable {
   let total: Int
 }
 
+// MARK: - Health / Sleep (Oura subset)
+//
+// Septena's sleep data flows through `/api/health/*` — Oura is the
+// primary source. We only decode the fields the Sleep mini-app actually
+// renders today; the response includes many more (steps, recovery,
+// activity score, etc) which other modules can opt into later.
+
+struct OuraNight: Codable, Identifiable, Hashable {
+  let date: String           // YYYY-MM-DD
+  var sleepScore: Int?
+  var totalH: Double?
+  var deepH: Double?
+  var remH: Double?
+  var lightH: Double?
+  var awakeH: Double?
+  var efficiency: Int?
+  var hrv: Int?
+  var restingHr: Int?
+  var bedtime: String?
+  var wakeTime: String?
+
+  var id: String { date }
+
+  enum CodingKeys: String, CodingKey {
+    case date
+    case sleepScore  = "sleep_score"
+    case totalH      = "total_h"
+    case deepH       = "deep_h"
+    case remH        = "rem_h"
+    case lightH      = "light_h"
+    case awakeH      = "awake_h"
+    case efficiency
+    case hrv
+    case restingHr   = "resting_hr"
+    case bedtime
+    case wakeTime    = "wake_time"
+  }
+}
+
+struct OuraHistoryResponse: Codable {
+  let oura: [OuraNight]
+}
+
 struct NextItem: Codable, Identifiable, Hashable {
   var id: String
   var kind: String

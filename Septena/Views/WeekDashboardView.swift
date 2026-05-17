@@ -12,6 +12,7 @@ enum WeekDestination: Hashable {
   case chores
   case training
   case supplements
+  case sleep
 }
 
 struct WeekDashboardView: View {
@@ -27,6 +28,8 @@ struct WeekDashboardView: View {
   @State private var cardio: CardioHistoryResponse? = nil
   @State private var trainingSessionDates: Set<String> = []
   @State private var supplementHistory: [Int] = Array(repeating: 0, count: 7)
+  @State private var taskCounts: TasksCounts? = nil
+  @State private var ouraNights: [OuraNight] = []
 
   /// 1 column on iPhone (compact), 3 on iPad / Mac (regular). LazyVGrid
   /// reflows automatically on rotation; tiles keep their internal layout.
@@ -59,6 +62,7 @@ struct WeekDashboardView: View {
         case .chores:      ChoresDestinationView()
         case .training:    TrainingDestinationView()
         case .supplements: SupplementsDestinationView()
+        case .sleep:       SleepDestinationView()
         }
       }
       .task { await loadAll() }
@@ -76,12 +80,16 @@ struct WeekDashboardView: View {
     async let car = try? await client.trainingCardioHistory(days: 7)
     async let ents = try? await client.trainingEntries(since: sinceDate(daysBack: 7))
     async let sh = try? await client.supplementsHistory(days: 7)
-    let (h, c, ca, e, s) = await (hh, ch, car, ents, sh)
+    async let tc = try? await client.counts()
+    async let on = try? await client.ouraHistory(days: 7)
+    let (h, c, ca, e, s, t, o) = await (hh, ch, car, ents, sh, tc, on)
     if let h { habitHistory = h.daily.map { $0.done } }
     if let c { choreHistory = c.daily.map { $0.completed } }
     cardio = ca
     if let e { trainingSessionDates = Set(e.map(\.date)) }
     if let s { supplementHistory = s.daily.map { $0.done } }
+    taskCounts = t
+    if let o { ouraNights = o }
   }
 
   private func sinceDate(daysBack: Int) -> String {
@@ -104,15 +112,20 @@ struct WeekDashboardView: View {
     nutritionTile
   }
 
+  // Tasks — live counts from /api/tasks/counts. No history endpoint yet
+  // (would need /api/tasks/history) so the histogram stays mocked.
   private var tasksTile: some View {
-    ModuleTile(
+    let today = taskCounts.map { $0.todayCount + $0.reviewCount } ?? 0
+    let inbox = taskCounts?.inboxCount ?? 0
+    let upcoming = taskCounts?.upcomingCount ?? 0
+    return ModuleTile(
       title: "Tasks",
       accent: theme.color(for: "tasks"),
-      stats: [.init(label: "Today",   value: "5"),
-              .init(label: "Late",    value: "2"),
-              .init(label: "Inbox",   value: "11")],
-      progress: .init(label: "Week complete", current: 18, target: 28),
-      history: .init(label: "7-day completions", values: [3, 5, 2, 7, 4, 6, 5])
+      stats: [.init(label: "Today",    value: "\(today)"),
+              .init(label: "Inbox",    value: "\(inbox)"),
+              .init(label: "Upcoming", value: "\(upcoming)")],
+      history: .init(label: "7-day completions",
+                     values: Array(repeating: max(today, 1), count: 7))
     )
   }
 
@@ -208,15 +221,36 @@ struct WeekDashboardView: View {
     .buttonStyle(.plain)
   }
 
+  // Sleep — Oura-backed. Last night's total + score; 7-day hours
+  // histogram. Reverse the server order so the bar furthest right is
+  // most-recent.
   private var sleepTile: some View {
-    ModuleTile(
-      title: "Sleep",
-      accent: theme.color(for: "sleep"),
-      stats: [.init(label: "Last night", value: "7:12", unit: "h"),
-              .init(label: "Avg",        value: "7:08", unit: "h")],
-      progress: .init(label: "Target", current: 7.2, target: 8, unit: "h"),
-      history: .init(label: "7-day hours", values: [7, 6, 8, 7, 7, 8, 6])
-    )
+    let accent = theme.color(for: "sleep")
+    let last = ouraNights.first
+    let lastH = last?.totalH ?? 0
+    let score = last?.sleepScore.map { "\($0)" } ?? "—"
+    let bars = ouraNights.reversed().map { Int(($0.totalH ?? 0) * 10) } // tenths-of-hour for resolution
+    return NavigationLink(value: WeekDestination.sleep) {
+      ModuleTile(
+        title: "Sleep",
+        accent: accent,
+        stats: [
+          .init(label: "Last night", value: formatHoursShort(lastH), unit: "h"),
+          .init(label: "Score",      value: score)
+        ],
+        progress: .init(label: "Target", current: lastH, target: 8, unit: "h"),
+        history: .init(label: "7-day hours",
+                       values: bars.isEmpty
+                         ? Array(repeating: 0, count: 7) : bars)
+      )
+    }
+    .buttonStyle(.plain)
+  }
+
+  /// 7.2 → "7:12" — compact h:mm form for the tile.
+  private func formatHoursShort(_ h: Double) -> String {
+    let total = Int((h * 60).rounded())
+    return String(format: "%d:%02d", total / 60, total % 60)
   }
 
   private var nutritionTile: some View {

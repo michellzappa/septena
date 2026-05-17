@@ -294,6 +294,16 @@ final class SeptenaClient {
                       as: CardioHistoryResponse.self)
   }
 
+  // MARK: - Health (Oura)
+
+  /// N nights of Oura sleep data. Server returns newest-first via the
+  /// `oura` array; the Sleep mini-app reverses for chronological charts.
+  func ouraHistory(days: Int = 7) async throws -> [OuraNight] {
+    try await getJSON("/api/health/oura",
+                      query: [URLQueryItem(name: "days", value: String(days))],
+                      as: OuraHistoryResponse.self).oura
+  }
+
   func completeChore(id: String, date: String) async throws {
     let body: [String: Any] = ["chore_id": id, "date": date]
     _ = try await postJSON("/api/chores/complete", body: body, as: EmptyResponse.self)
