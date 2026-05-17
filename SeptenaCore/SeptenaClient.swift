@@ -664,7 +664,7 @@ final class SeptenaClient {
 
   /// Suggested workout type for the next training session.
   func suggestedWorkout() async throws -> SuggestedWorkoutResponse {
-    try await getJSON("/api/training/suggested", as: SuggestedWorkoutResponse.self)
+    try await getJSON("/api/training/suggested-workout", as: SuggestedWorkoutResponse.self)
   }
 
   // MARK: - HTTP helpers
