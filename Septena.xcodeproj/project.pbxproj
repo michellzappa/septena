@@ -40,10 +40,12 @@
 		59D1D3BB3E05AF32C782A9C7 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = E17D3542734AB0B32527C12C /* AppIcon.icns */; };
 		5E4D0521FCB855EC9C825443 /* AirDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDCA5F7AD926593502A0DDA8 /* AirDestinationView.swift */; };
 		5ED33F95694C104969333EAD /* AreasProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5C26629FE8A4DF019B9784 /* AreasProjectsView.swift */; };
+		63A5F76E01E1619DA8FA2C4E /* CannabisDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B11A1931AD62F377D8B791A /* CannabisDestinationView.swift */; };
 		63B5D55FED0B0465C2BBEE96 /* SearchTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA46304BE6907DF5990B15C7 /* SearchTabView.swift */; };
 		67D2267D2F8900C4AE0F234D /* SleepDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8387091CC3EEBBBB0A543D5B /* SleepDestinationView.swift */; };
 		69347D27E1CBEFCF3AA87AB2 /* HabitsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CB6D70452573AF2811BBD08 /* HabitsDestinationView.swift */; };
 		7397EB4533BA4D026F9F7662 /* CalendarBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7027B881D1D8B1B09B105034 /* CalendarBridge.swift */; };
+		762504E801D4C31786E3ED72 /* CaffeineDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29D4FAAB1E88C564EF898327 /* CaffeineDestinationView.swift */; };
 		7BEA23ABC68403A4BD8213FA /* ModuleTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D8E96F4EF0DBE7645A7FAC5 /* ModuleTile.swift */; };
 		7FB3330B97BCBCB5D87C6F04 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F0AE5985EFE1A9A61F9BC7E /* SidebarView.swift */; };
 		7FC13B9F34D2BFBC8BAD9682 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AD6CED1984C5B3D5608F234 /* RootTabView.swift */; };
@@ -58,6 +60,7 @@
 		9D861615DDF132512492C130 /* OfflineBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B065C1A278C890BF5EEBE9C /* OfflineBanner.swift */; };
 		9EBF276CA0720E417E3EE17E /* ChoresDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57CEAA8D15E94157FCE94ED2 /* ChoresDestinationView.swift */; };
 		9ED913F259DC6E83E4EDB824 /* SeptenaClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 583220978001091137587977 /* SeptenaClient.swift */; };
+		A12F25E5C2F7F54D63633333 /* CannabisDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B11A1931AD62F377D8B791A /* CannabisDestinationView.swift */; };
 		A14B8DF03D6FC0799D8AA8C2 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = E17D3542734AB0B32527C12C /* AppIcon.icns */; };
 		A1C7525645EBE54B283DC0D9 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25DC8E705099DB99718A8596 /* Persistence.swift */; };
 		A24EB04802E59F5F3C3489A7 /* ModuleTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D8E96F4EF0DBE7645A7FAC5 /* ModuleTile.swift */; };
@@ -89,6 +92,7 @@
 		E1474EC3CDCB9253688ABA00 /* WeekDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA936685A02055A0A5079EB2 /* WeekDashboardView.swift */; };
 		E31B94DDD122274806A91B5C /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B92826563E8E24C2A8F22B9 /* TaskListView.swift */; };
 		F21704F2D348D306CBC132AB /* SuggestionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6DD7C05D998EF1301A6410D /* SuggestionEngine.swift */; };
+		F41E7F09812BA328A1E2B328 /* CaffeineDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29D4FAAB1E88C564EF898327 /* CaffeineDestinationView.swift */; };
 		F62DAF6B252E82A6C8CB7167 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F0AE5985EFE1A9A61F9BC7E /* SidebarView.swift */; };
 		F6ED283EEF472FE8DA7B7DFB /* NextItemsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B390D43AE1A7533F9AD7198 /* NextItemsSection.swift */; };
 		FA564DDD7B30817FB91EC0E5 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBD31B55684A505738EB624C /* App.swift */; };
@@ -103,8 +107,10 @@
 		04B4D06356BC11C849416F5C /* CalendarDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarDestinationView.swift; sourceTree = "<group>"; };
 		0B390D43AE1A7533F9AD7198 /* NextItemsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextItemsSection.swift; sourceTree = "<group>"; };
 		0D8E96F4EF0DBE7645A7FAC5 /* ModuleTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleTile.swift; sourceTree = "<group>"; };
+		1B11A1931AD62F377D8B791A /* CannabisDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CannabisDestinationView.swift; sourceTree = "<group>"; };
 		1E25F81FE5AA4B6BBC056275 /* DateParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateParser.swift; sourceTree = "<group>"; };
 		25DC8E705099DB99718A8596 /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
+		29D4FAAB1E88C564EF898327 /* CaffeineDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaffeineDestinationView.swift; sourceTree = "<group>"; };
 		2D413F054F59B2A90A319154 /* TaskDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
 		31313A0E804B33A3E43FC1F6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		33B6D5A7801C40656B13C350 /* RemindersInboxSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersInboxSection.swift; sourceTree = "<group>"; };
@@ -170,7 +176,9 @@
 			children = (
 				CDCA5F7AD926593502A0DDA8 /* AirDestinationView.swift */,
 				9A5C26629FE8A4DF019B9784 /* AreasProjectsView.swift */,
+				29D4FAAB1E88C564EF898327 /* CaffeineDestinationView.swift */,
 				04B4D06356BC11C849416F5C /* CalendarDestinationView.swift */,
+				1B11A1931AD62F377D8B791A /* CannabisDestinationView.swift */,
 				57CEAA8D15E94157FCE94ED2 /* ChoresDestinationView.swift */,
 				83E5755C28C6B3D53D9031A7 /* GroceriesDestinationView.swift */,
 				6CB6D70452573AF2811BBD08 /* HabitsDestinationView.swift */,
@@ -349,8 +357,10 @@
 				FA564DDD7B30817FB91EC0E5 /* App.swift in Sources */,
 				5ED33F95694C104969333EAD /* AreasProjectsView.swift in Sources */,
 				0ED59BE06DEBD263BBFA0D91 /* BadgeManager.swift in Sources */,
+				762504E801D4C31786E3ED72 /* CaffeineDestinationView.swift in Sources */,
 				7397EB4533BA4D026F9F7662 /* CalendarBridge.swift in Sources */,
 				2482B2ABDD6A5E86FE3BB3E4 /* CalendarDestinationView.swift in Sources */,
+				63A5F76E01E1619DA8FA2C4E /* CannabisDestinationView.swift in Sources */,
 				B5D47368B47648A0FC968DFB /* ChoresDestinationView.swift in Sources */,
 				DF016EF192B7891D2DBE3CB6 /* DateParser.swift in Sources */,
 				029C02E7D76246B98F4F6C8B /* GroceriesDestinationView.swift in Sources */,
@@ -397,8 +407,10 @@
 				09C5366893B7255E08295C88 /* App.swift in Sources */,
 				FCDDF4248EC04741134329B2 /* AreasProjectsView.swift in Sources */,
 				56E87EA383673A4ACE86F2CD /* BadgeManager.swift in Sources */,
+				F41E7F09812BA328A1E2B328 /* CaffeineDestinationView.swift in Sources */,
 				B09EA3455FBF702224C33616 /* CalendarBridge.swift in Sources */,
 				570E79B3EE3633EBE260AD88 /* CalendarDestinationView.swift in Sources */,
+				A12F25E5C2F7F54D63633333 /* CannabisDestinationView.swift in Sources */,
 				9EBF276CA0720E417E3EE17E /* ChoresDestinationView.swift in Sources */,
 				513C8B1D41E5BA85B785129C /* DateParser.swift in Sources */,
 				350BABC5882550125A41C46D /* GroceriesDestinationView.swift in Sources */,

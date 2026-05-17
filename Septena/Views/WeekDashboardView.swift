@@ -18,6 +18,8 @@ enum WeekDestination: Hashable {
   case air
   case groceries
   case calendar
+  case caffeine
+  case cannabis
 }
 
 struct WeekDashboardView: View {
@@ -44,6 +46,10 @@ struct WeekDashboardView: View {
   @State private var airHistory: [AirHistoryPoint] = []
   @State private var groceries: [GroceryItem] = []
   @State private var calendarEvents: [EKEvent] = []
+  @State private var caffeineToday: CaffeineDayResponse? = nil
+  @State private var caffeineHistory: [CaffeineHistoryPoint] = []
+  @State private var cannabisToday: CannabisDayResponse? = nil
+  @State private var cannabisHistory: [CannabisHistoryPoint] = []
 
   /// 1 column on iPhone (compact), 3 on iPad / Mac (regular). LazyVGrid
   /// reflows automatically on rotation; tiles keep their internal layout.
@@ -81,6 +87,8 @@ struct WeekDashboardView: View {
         case .air:         AirDestinationView()
         case .groceries:   GroceriesDestinationView()
         case .calendar:    CalendarDestinationView()
+        case .caffeine:    CaffeineDestinationView()
+        case .cannabis:    CannabisDestinationView()
         }
       }
       .task { await loadAll() }
@@ -128,6 +136,17 @@ struct WeekDashboardView: View {
     let todayEntries = (ne ?? []).filter { $0.date == today }
     todayProteinSum = todayEntries.reduce(0) { $0 + $1.proteinG }
     todayKcalSum    = todayEntries.reduce(0) { $0 + $1.kcal }
+    // Caffeine + Cannabis — second wave so the heavier core fetches above
+    // render their tiles first.
+    async let cafToday = try? await client.caffeineDay(date: SeptenaDate.today)
+    async let cafHist  = try? await client.caffeineHistory(days: 7)
+    async let cnbToday = try? await client.cannabisDay(date: SeptenaDate.today)
+    async let cnbHist  = try? await client.cannabisHistory(days: 7)
+    let (cafT, cafH, cnbT, cnbH) = await (cafToday, cafHist, cnbToday, cnbHist)
+    caffeineToday = cafT
+    caffeineHistory = cafH?.daily ?? []
+    cannabisToday = cnbT
+    cannabisHistory = cnbH?.daily ?? []
   }
 
   private func sinceDate(daysBack: Int) -> String {
@@ -151,6 +170,8 @@ struct WeekDashboardView: View {
     airTile
     groceriesTile
     calendarTile
+    caffeineTile
+    cannabisTile
   }
 
   // Tasks — live counts from /api/tasks/counts. No history endpoint yet
@@ -362,6 +383,50 @@ struct WeekDashboardView: View {
         stats: [.init(label: "Today", value: "\(todayCount)"),
                 .init(label: "Next",  value: nextLabel)],
         history: .init(label: "Next 7 days", values: bars)
+      )
+    }
+    .buttonStyle(.plain)
+  }
+
+  // Caffeine — today's session count + grams; 7-day session histogram.
+  private var caffeineTile: some View {
+    let accent = theme.color(for: "caffeine")
+    let sessions = caffeineToday?.sessionCount ?? 0
+    let grams = caffeineToday?.totalG ?? 0
+    let bars = caffeineHistory.map { $0.sessions }
+    return NavigationLink(value: WeekDestination.caffeine) {
+      ModuleTile(
+        title: "Caffeine",
+        accent: accent,
+        stats: [
+          .init(label: "Today", value: "\(sessions)"),
+          .init(label: "Grams", value: String(format: "%.1f", grams), unit: "g")
+        ],
+        history: .init(label: "7-day sessions",
+                       values: bars.isEmpty
+                         ? Array(repeating: 0, count: 7) : bars)
+      )
+    }
+    .buttonStyle(.plain)
+  }
+
+  // Cannabis — same shape as caffeine.
+  private var cannabisTile: some View {
+    let accent = theme.color(for: "cannabis")
+    let sessions = cannabisToday?.sessionCount ?? 0
+    let grams = cannabisToday?.totalG ?? 0
+    let bars = cannabisHistory.map { $0.sessions }
+    return NavigationLink(value: WeekDestination.cannabis) {
+      ModuleTile(
+        title: "Cannabis",
+        accent: accent,
+        stats: [
+          .init(label: "Today", value: "\(sessions)"),
+          .init(label: "Grams", value: String(format: "%.2f", grams), unit: "g")
+        ],
+        history: .init(label: "7-day sessions",
+                       values: bars.isEmpty
+                         ? Array(repeating: 0, count: 7) : bars)
       )
     }
     .buttonStyle(.plain)

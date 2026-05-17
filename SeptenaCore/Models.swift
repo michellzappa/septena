@@ -667,6 +667,86 @@ struct GroceriesResponse: Codable {
   let items: [GroceryItem]
 }
 
+// MARK: - Caffeine
+
+struct CaffeineEntry: Codable, Identifiable, Hashable {
+  let id: String
+  let time: String
+  var method: String        // "v60" | "matcha" | "other"
+  var beans: String?
+  var grams: Double?
+  var note: String?
+}
+
+struct CaffeineDayResponse: Codable {
+  let date: String
+  let entries: [CaffeineEntry]
+  let sessionCount: Int
+  var totalG: Double?
+
+  enum CodingKeys: String, CodingKey {
+    case date, entries
+    case sessionCount = "session_count"
+    case totalG       = "total_g"
+  }
+}
+
+struct CaffeineHistoryPoint: Codable, Hashable {
+  let date: String
+  let sessions: Int
+  var totalG: Double?
+
+  enum CodingKeys: String, CodingKey {
+    case date, sessions
+    case totalG = "total_g"
+  }
+}
+
+struct CaffeineHistoryResponse: Codable {
+  let daily: [CaffeineHistoryPoint]
+}
+
+// MARK: - Cannabis
+
+struct CannabisEntry: Codable, Identifiable, Hashable {
+  let id: String
+  let time: String
+  var method: String        // "vape" | "edible"
+  var strain: String?
+  var hit: Int?
+  var grams: Double?
+  var note: String?
+  var effect: String?
+}
+
+struct CannabisDayResponse: Codable {
+  let date: String
+  let entries: [CannabisEntry]
+  let sessionCount: Int
+  var totalG: Double?
+
+  enum CodingKeys: String, CodingKey {
+    case date, entries
+    case sessionCount = "session_count"
+    case totalG       = "total_g"
+  }
+}
+
+struct CannabisHistoryPoint: Codable, Hashable {
+  let date: String
+  let sessions: Int
+  var totalG: Double?
+
+  enum CodingKeys: String, CodingKey {
+    case date, sessions
+    case totalG = "total_g"
+  }
+}
+
+struct CannabisHistoryResponse: Codable {
+  let daily: [CannabisHistoryPoint]
+}
+
 struct NextItem: Codable, Identifiable, Hashable {
   var id: String
   var kind: String

@@ -315,6 +315,30 @@ final class SeptenaClient {
     try await getJSON("/api/nutrition/macros-config", as: MacrosConfig.self)
   }
 
+  // MARK: - Caffeine
+
+  func caffeineDay(date: String) async throws -> CaffeineDayResponse {
+    try await getJSON("/api/caffeine/day/\(date)", as: CaffeineDayResponse.self)
+  }
+
+  func caffeineHistory(days: Int = 7) async throws -> CaffeineHistoryResponse {
+    try await getJSON("/api/caffeine/history",
+                      query: [URLQueryItem(name: "days", value: String(days))],
+                      as: CaffeineHistoryResponse.self)
+  }
+
+  // MARK: - Cannabis
+
+  func cannabisDay(date: String) async throws -> CannabisDayResponse {
+    try await getJSON("/api/cannabis/day/\(date)", as: CannabisDayResponse.self)
+  }
+
+  func cannabisHistory(days: Int = 7) async throws -> CannabisHistoryResponse {
+    try await getJSON("/api/cannabis/history",
+                      query: [URLQueryItem(name: "days", value: String(days))],
+                      as: CannabisHistoryResponse.self)
+  }
+
   // MARK: - Air
 
   /// Snapshot for the Air mini-app — latest reading + today / last-24h
