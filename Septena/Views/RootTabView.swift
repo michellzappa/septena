@@ -12,7 +12,10 @@ struct RootTabView: View {
   @Environment(SectionTheme.self) private var theme
   @State private var selection: Tab = .week
 
-  enum Tab: Hashable { case week, next, tasks, search }
+  // Search was a tab; pulled out because it interfered with QuickFindView's
+  // sheet-style dismissal expectations. SearchTabView.swift stays so the
+  // view is reachable from elsewhere (e.g. a future Settings entry).
+  enum Tab: Hashable { case week, next, tasks }
 
   var body: some View {
     TabView(selection: $selection) {
@@ -35,10 +38,6 @@ struct RootTabView: View {
       ContentView()
         .tabItem { Label("Tasks", systemImage: "checkmark") }
         .tag(Tab.tasks)
-
-      SearchTabView()
-        .tabItem { Label("Search", systemImage: "magnifyingglass") }
-        .tag(Tab.search)
     }
     .tint(theme.accent)
   }

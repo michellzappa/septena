@@ -196,12 +196,19 @@ struct WeekDashboardView: View {
     let today = taskCounts.map { $0.todayCount + $0.reviewCount } ?? 0
     let inbox = taskCounts?.inboxCount ?? 0
     let upcoming = taskCounts?.upcomingCount ?? 0
+    let open = taskCounts?.openCount ?? 0
     return ModuleTile(
       title: "Tasks",
       accent: theme.color(for: "tasks"),
       stats: [.init(label: "Today",    value: "\(today)"),
               .init(label: "Inbox",    value: "\(inbox)"),
               .init(label: "Upcoming", value: "\(upcoming)")],
+      // Today's share of the open backlog — gives a sense of immediate
+      // load against everything still queued. Defaults to a full bar
+      // when open is unknown, so the empty state doesn't read as 0%.
+      progress: .init(label: "Today / open",
+                      current: Double(today),
+                      target: Double(max(open, today, 1))),
       history: .init(label: "7-day completions",
                      values: Array(repeating: max(today, 1), count: 7))
     )
@@ -263,6 +270,8 @@ struct WeekDashboardView: View {
   private var choresTile: some View {
     let dueToday = dailies.chores.filter { $0.daysOverdue == 0 }.count
     let overdue  = dailies.chores.filter { $0.daysOverdue > 0 }.count
+    let done = dailies.completedChores.count
+    let total = dueToday + overdue + done
     let accent = theme.color(for: "chores")
     return NavigationLink(value: WeekDestination.chores) {
       ModuleTile(
@@ -272,6 +281,9 @@ struct WeekDashboardView: View {
           .init(label: "Due today", value: "\(dueToday)"),
           .init(label: "Overdue",   value: "\(overdue)")
         ],
+        progress: .init(label: "Today done",
+                        current: Double(done),
+                        target: Double(max(total, 1))),
         history: .init(label: "7-day done", values: choreHistory)
       )
     }
@@ -331,6 +343,9 @@ struct WeekDashboardView: View {
     let latest = airSummary?.latest?.co2Ppm.map { Int($0) }
     let todayOver = airSummary?.today.minutesOver1000 ?? 0
     let bars = airHistory.map { Int($0.co2Avg ?? 0) }
+    // Progress is "air-quality budget" — every minute over 1000 ppm
+    // eats into a soft 60-minute daily allowance.
+    let budget = 60
     return NavigationLink(value: WeekDestination.air) {
       ModuleTile(
         title: "Air",
@@ -339,6 +354,10 @@ struct WeekDashboardView: View {
           .init(label: "CO2", value: latest.map { "\($0)" } ?? "—", unit: "ppm"),
           .init(label: "Over 1000", value: "\(todayOver)", unit: "m")
         ],
+        progress: .init(label: "Bad-air budget",
+                        current: Double(min(todayOver, budget)),
+                        target: Double(budget),
+                        unit: "m"),
         history: .init(label: "7-day CO2 avg",
                        values: bars.isEmpty
                          ? Array(repeating: 0, count: 7) : bars)
@@ -392,12 +411,16 @@ struct WeekDashboardView: View {
                                     to: cal.startOfDay(for: e.startDate)).day ?? 0
       if (0..<7).contains(days) { bars[days] += 1 }
     }
+    // Soft cap of 8 events/day reads as a "busy day" budget.
     return NavigationLink(value: WeekDestination.calendar) {
       ModuleTile(
         title: "Calendar",
         accent: accent,
         stats: [.init(label: "Today", value: "\(todayCount)"),
                 .init(label: "Next",  value: nextLabel)],
+        progress: .init(label: "Today's load",
+                        current: Double(min(todayCount, 8)),
+                        target: 8),
         history: .init(label: "Next 7 days", values: bars)
       )
     }
@@ -410,6 +433,7 @@ struct WeekDashboardView: View {
     let sessions = caffeineToday?.sessionCount ?? 0
     let grams = caffeineToday?.totalG ?? 0
     let bars = caffeineHistory.map { $0.sessions }
+    let dailyLimit = 3   // soft default until Settings.targets is wired
     return NavigationLink(value: WeekDestination.caffeine) {
       ModuleTile(
         title: "Caffeine",
@@ -418,6 +442,9 @@ struct WeekDashboardView: View {
           .init(label: "Today", value: "\(sessions)"),
           .init(label: "Grams", value: String(format: "%.1f", grams), unit: "g")
         ],
+        progress: .init(label: "Today / limit",
+                        current: Double(min(sessions, dailyLimit)),
+                        target: Double(dailyLimit)),
         history: .init(label: "7-day sessions",
                        values: bars.isEmpty
                          ? Array(repeating: 0, count: 7) : bars)
@@ -432,6 +459,7 @@ struct WeekDashboardView: View {
     let sessions = cannabisToday?.sessionCount ?? 0
     let grams = cannabisToday?.totalG ?? 0
     let bars = cannabisHistory.map { $0.sessions }
+    let dailyLimit = 2
     return NavigationLink(value: WeekDestination.cannabis) {
       ModuleTile(
         title: "Cannabis",
@@ -440,6 +468,9 @@ struct WeekDashboardView: View {
           .init(label: "Today", value: "\(sessions)"),
           .init(label: "Grams", value: String(format: "%.2f", grams), unit: "g")
         ],
+        progress: .init(label: "Today / limit",
+                        current: Double(min(sessions, dailyLimit)),
+                        target: Double(dailyLimit)),
         history: .init(label: "7-day sessions",
                        values: bars.isEmpty
                          ? Array(repeating: 0, count: 7) : bars)
@@ -461,6 +492,9 @@ struct WeekDashboardView: View {
     let reversed = bodyRows.reversed().compactMap { $0.weightKg }
     let floor = reversed.min() ?? 0
     let bars = reversed.map { Int((($0 - floor) * 10).rounded()) }
+    // Body-fat percentage tracked against a soft 18% target (single number,
+    // overrideable later via Settings.targets.fat_min_pct).
+    let fatTarget: Double = 18
     return NavigationLink(value: WeekDestination.body) {
       ModuleTile(
         title: "Body",
@@ -469,6 +503,10 @@ struct WeekDashboardView: View {
           .init(label: "Weight", value: weight.map { String(format: "%.1f", $0) } ?? "—", unit: "kg"),
           .init(label: "Fat",    value: fat.map { String(format: "%.1f", $0) } ?? "—", unit: "%")
         ],
+        progress: .init(label: "Body fat target",
+                        current: fat.map { min($0, fatTarget * 2) } ?? 0,
+                        target: fatTarget,
+                        unit: "%"),
         history: .init(label: "Trend (last \(bars.count))",
                        values: bars.isEmpty
                          ? Array(repeating: 0, count: 7) : bars)
@@ -483,6 +521,7 @@ struct WeekDashboardView: View {
     let count = gutToday?.movementCount ?? 0
     let discomfort = gutToday?.totalDiscomfortH ?? 0
     let bars = gutHistory.map { $0.movements }
+    let dailyTarget = 2
     return NavigationLink(value: WeekDestination.gut) {
       ModuleTile(
         title: "Gut",
@@ -491,6 +530,9 @@ struct WeekDashboardView: View {
           .init(label: "Today",      value: "\(count)"),
           .init(label: "Discomfort", value: String(format: "%.1f", discomfort), unit: "h")
         ],
+        progress: .init(label: "Today / typical",
+                        current: Double(min(count, dailyTarget)),
+                        target: Double(dailyTarget)),
         history: .init(label: "7-day movements",
                        values: bars.isEmpty
                          ? Array(repeating: 0, count: 7) : bars)

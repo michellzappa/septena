@@ -31,6 +31,7 @@ struct ModuleTile: View {
     let label: String          // "7-DAY EFFORT"
     let values: [Int]          // last 7 days, oldest → newest
     var todayIndex: Int? = nil // bar to emphasize (defaults to last)
+    var showDayLabels: Bool = true   // Mon/Tue/Wed/… under each bar
   }
 
   struct ActionButton {
@@ -147,33 +148,65 @@ private struct HistoryView: View {
         .textCase(.uppercase)
       Histogram(values: row.values,
                 accent: accent,
-                emphasizedIndex: row.todayIndex ?? (row.values.count - 1))
-        .frame(height: 56)
+                emphasizedIndex: row.todayIndex ?? (row.values.count - 1),
+                dayLabels: row.showDayLabels ? Self.weekdayLabels(count: row.values.count) : nil)
+        .frame(height: row.showDayLabels ? 72 : 56)
+    }
+  }
+
+  /// Last N weekday initials ending at today — e.g. for 7 values it's
+  /// the last 7 days oldest→newest. Single-letter labels (M T W T F S S)
+  /// keep the tile compact; we accept that the two T's and two S's collide.
+  private static func weekdayLabels(count: Int) -> [String] {
+    let cal = Calendar.current
+    let fmt = DateFormatter()
+    fmt.dateFormat = "EEEEE"     // narrow weekday: single letter
+    return (0..<count).reversed().compactMap { offset in
+      cal.date(byAdding: .day, value: -offset, to: Date()).map(fmt.string(from:))
     }
   }
 }
 
-/// 7-bar histogram. The emphasized bar (defaults to today/newest) renders
+/// N-bar histogram. The emphasized bar (defaults to today/newest) renders
 /// at full accent; others fade. Heights normalize against the max value
 /// (or 1 if all-zero, so the row doesn't divide by zero on empty weeks).
+/// Optional day labels render below each bar (Mon/Tue/Wed/…).
 struct Histogram: View {
   let values: [Int]
   let accent: Color
   var emphasizedIndex: Int? = nil
+  var dayLabels: [String]? = nil
 
   var body: some View {
     GeometryReader { geo in
       let maxV = max(values.max() ?? 0, 1)
       let count = max(values.count, 1)
       let gap: CGFloat = 6
+      let labelH: CGFloat = dayLabels == nil ? 0 : 14
+      let barsH = max(geo.size.height - labelH, 4)
       let barW = (geo.size.width - gap * CGFloat(count - 1)) / CGFloat(count)
-      HStack(alignment: .bottom, spacing: gap) {
-        ForEach(Array(values.enumerated()), id: \.offset) { idx, v in
-          let h = max(CGFloat(v) / CGFloat(maxV) * geo.size.height, 4)
-          let isEmphasized = idx == emphasizedIndex
-          RoundedRectangle(cornerRadius: 3, style: .continuous)
-            .fill(accent.opacity(isEmphasized ? 1.0 : 0.55))
-            .frame(width: barW, height: h)
+      VStack(spacing: 2) {
+        HStack(alignment: .bottom, spacing: gap) {
+          ForEach(Array(values.enumerated()), id: \.offset) { idx, v in
+            let h = max(CGFloat(v) / CGFloat(maxV) * barsH, 4)
+            let isEmphasized = idx == emphasizedIndex
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+              .fill(accent.opacity(isEmphasized ? 1.0 : 0.55))
+              .frame(width: barW, height: h)
+          }
+        }
+        .frame(height: barsH, alignment: .bottom)
+        if let dayLabels {
+          HStack(spacing: gap) {
+            ForEach(Array(dayLabels.enumerated()), id: \.offset) { idx, lbl in
+              Text(lbl)
+                .font(.caption2)
+                .foregroundStyle(idx == emphasizedIndex
+                                 ? Theme.inkPrimary : Theme.inkSecondary)
+                .frame(width: barW)
+            }
+          }
+          .frame(height: labelH)
         }
       }
     }
