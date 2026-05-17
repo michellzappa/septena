@@ -18,7 +18,8 @@ struct RootTabView: View {
   enum Tab: Hashable { case week, next, tasks }
 
   var body: some View {
-    TabView(selection: $selection) {
+    @Bindable var nav = nav
+    return TabView(selection: $selection) {
       WeekDashboardView()
         .tabItem {
           // Custom asset via the standard Label(icon:) initializer.
@@ -40,5 +41,18 @@ struct RootTabView: View {
         .tag(Tab.tasks)
     }
     .tint(theme.accent)
+    // Training session sheet — mounted at the tab root so ⌘K's "Start
+    // training" rows present cleanly from any tab, and so the Start
+    // button inside the Week tab's Training destination can stack a
+    // second sheet on top without dismissing the dashboard.
+    .sheet(isPresented: $nav.showTrainingSession) {
+      TrainingSessionView()
+        #if os(iOS)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        #else
+        .frame(minWidth: 560, minHeight: 600)
+        #endif
+    }
   }
 }

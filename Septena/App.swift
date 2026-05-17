@@ -14,6 +14,7 @@ struct SeptenaApp: App {
   @State private var clientProvider = ClientProvider.shared
   @State private var navigation = NavigationState()
   @State private var theme = SectionTheme()
+  @State private var trainingDraft = TrainingDraftStore()
   private let localStore = LocalStore.shared
   #if os(iOS)
   @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -28,6 +29,7 @@ struct SeptenaApp: App {
         .environment(clientProvider.client)
         .environment(navigation)
         .environment(theme)
+        .environment(trainingDraft)
         .modelContainer(localStore.container)
         .task {
           #if os(iOS)
@@ -106,12 +108,17 @@ struct SeptenaApp: App {
         Button("Settings…") { navigation.showSettings = true }
           .keyboardShortcut(",", modifiers: .command)
       }
-      // ⌘K opens Quick Find — a floating palette that searches across all
-      // tasks, projects, and areas. Lives in its own menu so the shortcut
-      // works from anywhere (sidebar, detail, settings sheet).
+      // ⌘K opens Add Info — the unified quick-add palette (port of the
+      // webapp's ⌘K). Quick Find moves to ⌘⇧F so it stays reachable from
+      // the keyboard but the more frequently used "capture" action gets
+      // the shorter shortcut.
+      CommandMenu("Add") {
+        Button("Add Info…") { navigation.showAddInfo = true }
+          .keyboardShortcut("k", modifiers: .command)
+      }
       CommandMenu("Find") {
         Button("Quick Find…") { navigation.showQuickFind = true }
-          .keyboardShortcut("k", modifiers: .command)
+          .keyboardShortcut("f", modifiers: [.command, .shift])
       }
       // Override the default ⌘N "New Window" with "New To-Do". When a task
       // list is focused, `NewTaskCommand` routes to the in-list inline
@@ -254,9 +261,24 @@ final class NavigationState {
   /// and the macOS toolbar gear; the sheet closes via its own Done button.
   var showSettings = false
 
-  /// Drives the Quick Find palette (⌘K). A floating sheet over the main
+  /// Drives the Quick Find palette (⌘⇧F). A floating sheet over the main
   /// window; selecting a result routes via `path` and dismisses itself.
   var showQuickFind = false
+
+  /// Drives the unified Add Info palette (⌘K, or long-press the FAB on
+  /// touch). Sheet routes capture into any of the ten Septena sections
+  /// using the same rules-based smart behaviour as the web ⌘K palette.
+  var showAddInfo = false
+
+  /// Optional jump-target — when non-nil, AddInfoSheet opens directly to
+  /// that page instead of the root list. Cleared on dismiss.
+  var addInfoRequestedSection: AddInfoSection? = nil
+
+  /// Drives the Training session sheet (logger). Flipped from ⌘K's
+  /// "Start training" rows, the Training destination's Start button, and
+  /// from any future quick-action; the sheet itself reads the live draft
+  /// out of `TrainingDraftStore` so resume-after-dismiss just works.
+  var showTrainingSession = false
 
   /// Persisted base URL — UserDefaults-backed, mirrored from ClientProvider.
   var serverURL: String = UserDefaults.standard.string(forKey: "septena.serverURL")
@@ -288,6 +310,18 @@ struct ContentView: View {
           #if os(macOS)
           .frame(width: 560, height: 420)
           #endif
+      }
+      .sheet(isPresented: $nav.showAddInfo) {
+        AddInfoSheet(initialSection: nav.addInfoRequestedSection)
+          #if os(iOS)
+          .presentationDetents([.medium, .large])
+          .presentationDragIndicator(.visible)
+          #else
+          .frame(width: 560, height: 520)
+          #endif
+      }
+      .onChange(of: nav.showAddInfo) { _, open in
+        if !open { nav.addInfoRequestedSection = nil }
       }
       .onReceive(NotificationCenter.default
         .publisher(for: .septenaOpenQuickAdd)) { _ in

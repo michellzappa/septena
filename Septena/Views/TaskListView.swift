@@ -1375,10 +1375,22 @@ struct TaskListView: View {
     }
     .buttonStyle(.plain)
     .glassEffect(.regular.interactive(), in: .circle)
+    // Long-press opens the unified Add Info palette — same entry point as
+    // ⌘K on a hardware keyboard. Simultaneous gesture rather than
+    // `.onLongPressGesture` so a quick tap still fires the Button's action
+    // with no perceptible delay.
+    .simultaneousGesture(
+      LongPressGesture(minimumDuration: 0.4).onEnded { _ in
+        Haptics.warning()
+        nav.showAddInfo = true
+      }
+    )
     .padding(.trailing, 20)
     .padding(.bottom, 20)
     .accessibilityLabel("New Task")
-    .help("New Task")
+    .accessibilityHint("Long-press for Add Info")
+    .accessibilityAction(named: "Add Info") { nav.showAddInfo = true }
+    .help("New Task — long-press for Add Info")
   }
 
   // MARK: - Keyboard accessory (iOS)

@@ -929,6 +929,89 @@ struct NextItemsResponse: Codable {
   var items: [NextItem]
 }
 
+// MARK: - Add Info: config DTOs (caffeine / cannabis / training)
+
+/// One preset bean from `/api/caffeine/config`.
+struct CaffeineBean: Codable, Identifiable, Hashable {
+  let id: String
+  var name: String
+
+  init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    id = try c.decode(String.self, forKey: .id)
+    name = try c.decodeIfPresent(String.self, forKey: .name) ?? id
+  }
+
+  enum CodingKeys: String, CodingKey { case id, name }
+}
+
+struct CaffeineConfig: Codable, Hashable {
+  var beans: [CaffeineBean]
+  var methods: [String]?
+
+  init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    beans = (try? c.decode([CaffeineBean].self, forKey: .beans)) ?? []
+    methods = try c.decodeIfPresent([String].self, forKey: .methods)
+  }
+
+  enum CodingKeys: String, CodingKey { case beans, methods }
+}
+
+struct CannabisStrain: Codable, Identifiable, Hashable {
+  let id: String
+  var name: String
+
+  init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    id = try c.decode(String.self, forKey: .id)
+    name = try c.decodeIfPresent(String.self, forKey: .name) ?? id
+  }
+
+  enum CodingKeys: String, CodingKey { case id, name }
+}
+
+struct CannabisConfig: Codable, Hashable {
+  var strains: [CannabisStrain]
+  var usesPerCapsule: Int
+
+  init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    strains = (try? c.decode([CannabisStrain].self, forKey: .strains)) ?? []
+    usesPerCapsule = (try? c.decode(Int.self, forKey: .usesPerCapsule)) ?? 3
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case strains
+    case usesPerCapsule = "uses_per_capsule"
+  }
+}
+
+struct SuggestedWorkout: Codable, Hashable {
+  let type: String
+  var reason: String?
+}
+
+struct SuggestedWorkoutResponse: Codable, Hashable {
+  var suggested: SuggestedWorkout?
+  var daysAgo: [String: Int]
+
+  init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    suggested = try c.decodeIfPresent(SuggestedWorkout.self, forKey: .suggested)
+    if let raw = try c.decodeIfPresent([String: Int?].self, forKey: .daysAgo) {
+      daysAgo = raw.compactMapValues { $0 }
+    } else {
+      daysAgo = [:]
+    }
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case suggested
+    case daysAgo = "days_ago"
+  }
+}
+
 // MARK: - Date helpers (Septena uses YYYY-MM-DD strings)
 
 enum SeptenaDate {
@@ -951,4 +1034,141 @@ enum SeptenaDate {
   }
 
   static var today: String { formatter.string(from: Date()) }
+}
+
+// MARK: - Training: session types + draft
+//
+// Mirrors the FastAPI shapes that power the webapp's ⌘K training launcher
+// and active-session logger. Lives at the end of the file so the existing
+// model section above stays untouched.
+
+/// One configured session type from `GET /api/training/session-types`.
+/// The server owns the list so users can rename, reorder, or add custom
+/// splits without an app update. `exercises` is the canonical template;
+/// empty for free-form types where exercises are picked per-session.
+struct SessionTypeConfig: Codable, Hashable, Identifiable {
+  let id: String           // "upper", "lower", "cardio", "yoga", ...
+  let label: String        // "Upper"
+  let emoji: String?       // "💪"
+  let exercises: [String]  // canonical exercise list (may be empty)
+
+  init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    id = try c.decode(String.self, forKey: .id)
+    label = try c.decodeIfPresent(String.self, forKey: .label) ?? id.capitalized
+    emoji = try c.decodeIfPresent(String.self, forKey: .emoji)
+    exercises = (try? c.decodeIfPresent([String].self, forKey: .exercises)) ?? []
+  }
+
+  enum CodingKeys: String, CodingKey { case id, label, emoji, exercises }
+}
+
+struct SessionTypesResponse: Codable {
+  let sessionTypes: [SessionTypeConfig]
+  enum CodingKeys: String, CodingKey { case sessionTypes = "session_types" }
+}
+
+/// Last-entry prefill values for an exercise — drives the logger's default
+/// weight/sets/reps/duration so the user just confirms or tweaks. From
+/// `POST /api/training/last-entries` with `{ exercises: [...] }`.
+struct LastEntryValues: Codable, Hashable {
+  var date: String?
+  var weight: Double?
+  var sets: String?           // server returns int or string ("AMRAP")
+  var reps: String?
+  var difficulty: String?
+  var durationMin: Double?
+  var distanceM: Double?
+  var level: Double?
+
+  init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    date = try c.decodeIfPresent(String.self, forKey: .date)
+    weight = try c.decodeIfPresent(Double.self, forKey: .weight)
+    sets = Self.decodeIntOrString(c, key: .sets)
+    reps = Self.decodeIntOrString(c, key: .reps)
+    difficulty = try c.decodeIfPresent(String.self, forKey: .difficulty)
+    durationMin = try c.decodeIfPresent(Double.self, forKey: .durationMin)
+    distanceM = try c.decodeIfPresent(Double.self, forKey: .distanceM)
+    level = try c.decodeIfPresent(Double.self, forKey: .level)
+  }
+
+  private static func decodeIntOrString(_ c: KeyedDecodingContainer<CodingKeys>,
+                                        key: CodingKeys) -> String? {
+    if let i = try? c.decodeIfPresent(Int.self, forKey: key) { return String(i) }
+    return try? c.decodeIfPresent(String.self, forKey: key)
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case date, weight, sets, reps, difficulty, level
+    case durationMin = "duration_min"
+    case distanceM = "distance_m"
+  }
+
+  /// True when last entry recorded cardio-only fields. Lets the logger
+  /// pick the right input row without needing an exercise taxonomy.
+  var isCardio: Bool {
+    (durationMin ?? 0) > 0 || (distanceM ?? 0) > 0 || (level ?? 0) > 0
+  }
+}
+
+/// Per-exercise entry inside an in-progress draft session. Persisted to
+/// UserDefaults as JSON so a crash or background-kill mid-workout doesn't
+/// lose progress — same role as the webapp's IndexedDB draft.
+struct DraftEntry: Codable, Hashable, Identifiable {
+  enum Status: String, Codable { case pending, saving, done, failed, skipped }
+
+  var id: String { exercise }
+  var exercise: String
+  var weight: Double?
+  var sets: Int?
+  var reps: String?
+  var difficulty: String      // "easy" | "medium" | "hard" | ""
+  var durationMin: Double?
+  var distanceM: Double?
+  var level: Int?
+  var isCardio: Bool
+  var status: Status
+  var savedFile: String?      // backend filename, used on re-edit
+  var note: String
+
+  static func from(exercise: String, last: LastEntryValues?) -> DraftEntry {
+    let cardio = last?.isCardio ?? false
+    return DraftEntry(
+      exercise: exercise,
+      weight: last?.weight,
+      sets: last?.sets.flatMap { Int($0) } ?? (cardio ? nil : 3),
+      reps: last?.reps ?? (cardio ? nil : "12"),
+      difficulty: last?.difficulty ?? "medium",
+      durationMin: last?.durationMin,
+      distanceM: last?.distanceM,
+      level: last?.level.flatMap { Int($0) },
+      isCardio: cardio,
+      status: .pending,
+      savedFile: nil,
+      note: ""
+    )
+  }
+}
+
+/// In-progress training session. One per app; cleared on Finish. Shape
+/// mirrors the webapp's `DraftSession` so behavior — pre-fills, partial
+/// saves, resume after crash — matches across platforms.
+struct DraftSession: Codable, Hashable {
+  var date: String           // YYYY-MM-DD
+  var time: String           // HH:MM (local)
+  var sessionType: String    // "upper" etc.
+  var emoji: String?
+  var label: String          // "Upper"
+  var entries: [DraftEntry]
+  var startedAt: String      // ISO8601
+  var updatedAt: String
+
+  /// Index of the next pending entry, or nil if everything's done/skipped.
+  var nextPendingIndex: Int? {
+    entries.firstIndex { $0.status == .pending }
+  }
+
+  var doneCount: Int { entries.filter { $0.status == .done }.count }
+  var totalCount: Int { entries.filter { $0.status != .skipped }.count }
 }

@@ -10,6 +10,12 @@ extension Notification.Name {
   /// completes. Sidebar (and any other observer) subscribes to refresh
   /// counts without having to know about each individual mutation path.
   static let septenaTasksChanged = Notification.Name("septena.tasksChanged")
+  /// Generic mutation broadcast — fires after any non-task mutation (habits,
+  /// supplements, chores, gut, nutrition, caffeine, cannabis, groceries).
+  /// Destinations that show those sections subscribe to refresh themselves
+  /// without each call site wiring its own reload. Tasks keep their own
+  /// dedicated notification (above) so the overdue-badge path stays narrow.
+  static let septenaDataChanged = Notification.Name("septena.dataChanged")
   /// Posted by the macOS menu bar's "New To-Do" item. ContentView
   /// listens and starts an inline draft on Inbox — same flow as ⌘N.
   static let septenaOpenQuickAdd = Notification.Name("septena.openQuickAdd")
@@ -129,11 +135,12 @@ final class SeptenaClient {
               scheduled: Date? = nil,
               due: Date? = nil,
               today: Bool = false,
-              notes: String? = nil) async throws -> SeptenaTask {
+              notes: String? = nil,
+              status: String? = nil) async throws -> SeptenaTask {
     var body: [String: Any] = [
       "title": title,
       "today": today,
-      "status": "open",
+      "status": status ?? "open",
     ]
     if let area { body["area"] = area }
     if let project { body["project"] = project }
@@ -551,6 +558,108 @@ final class SeptenaClient {
     return try await putJSON("/api/tasks/projects", body: body, as: Wrap.self).projects
   }
 
+  // MARK: - Add Info: create / log mutators
+
+  /// Define a new habit. Bucket is `"morning" | "afternoon" | "evening"`.
+  func createHabit(name: String, bucket: String, emoji: String? = nil) async throws {
+    var body: [String: Any] = ["name": name, "bucket": bucket]
+    if let emoji { body["emoji"] = emoji }
+    _ = try await postJSON("/api/habits/new", body: body, as: EmptyResponse.self)
+  }
+
+  /// Define a new supplement. Bucket is `"morning" | "afternoon" | "evening"`.
+  func createSupplement(name: String, bucket: String, emoji: String? = nil) async throws {
+    var body: [String: Any] = ["name": name, "bucket": bucket]
+    if let emoji { body["emoji"] = emoji }
+    _ = try await postJSON("/api/supplements/new", body: body, as: EmptyResponse.self)
+  }
+
+  /// Define a new recurring chore. Cadence is in days.
+  func createChoreDefinition(name: String, cadenceDays: Int, emoji: String? = nil) async throws {
+    var body: [String: Any] = ["name": name, "cadence_days": cadenceDays]
+    if let emoji { body["emoji"] = emoji }
+    _ = try await postJSON("/api/chores/definitions", body: body, as: EmptyResponse.self)
+  }
+
+  /// Log a Bristol-scale entry. Blood defaults to 0 (none).
+  func addGutEntry(date: String, time: String, bristol: Int, blood: Int = 0) async throws {
+    let body: [String: Any] = [
+      "date": date, "time": time, "bristol": bristol, "blood": blood,
+    ]
+    _ = try await postJSON("/api/gut/entry", body: body, as: EmptyResponse.self)
+  }
+
+  /// Log a meal. `foods` is a non-empty list; macros are optional and
+  /// inherited from the source entry when duplicating a recent meal.
+  func addNutritionEntry(date: String,
+                         time: String,
+                         foods: [String],
+                         proteinG: Double? = nil,
+                         fatG: Double? = nil,
+                         carbsG: Double? = nil,
+                         fiberG: Double? = nil,
+                         kcal: Double? = nil,
+                         emoji: String? = nil) async throws {
+    var body: [String: Any] = ["date": date, "time": time, "foods": foods]
+    if let proteinG { body["protein_g"] = proteinG }
+    if let fatG     { body["fat_g"]     = fatG }
+    if let carbsG   { body["carbs_g"]   = carbsG }
+    if let fiberG   { body["fiber_g"]   = fiberG }
+    if let kcal     { body["kcal"]      = kcal }
+    if let emoji    { body["emoji"]     = emoji }
+    _ = try await postJSON("/api/nutrition/entries", body: body, as: EmptyResponse.self)
+  }
+
+  /// Caffeine config — beans + method list. Optional endpoint; the page
+  /// falls back gracefully when this 404s.
+  func caffeineConfig() async throws -> CaffeineConfig {
+    try await getJSON("/api/caffeine/config", as: CaffeineConfig.self)
+  }
+
+  func addCaffeineEntry(date: String,
+                        time: String,
+                        method: String,
+                        beans: String? = nil,
+                        grams: Double? = nil,
+                        note: String? = nil) async throws {
+    var body: [String: Any] = [
+      "date": date, "time": time, "method": method,
+      "timezone": TimeZone.current.identifier,
+    ]
+    if let beans { body["beans"] = beans }
+    if let grams { body["grams"] = grams }
+    if let note  { body["note"]  = note  }
+    _ = try await postJSON("/api/caffeine/entry", body: body, as: EmptyResponse.self)
+  }
+
+  /// Cannabis config — strain list + uses-per-capsule cap.
+  func cannabisConfig() async throws -> CannabisConfig {
+    try await getJSON("/api/cannabis/config", as: CannabisConfig.self)
+  }
+
+  func addCannabisEntry(date: String,
+                        time: String,
+                        method: String,
+                        strain: String? = nil,
+                        hit: Int? = nil) async throws {
+    var body: [String: Any] = ["date": date, "time": time, "method": method]
+    if let strain { body["strain"] = strain }
+    if let hit    { body["hit"]    = hit    }
+    _ = try await postJSON("/api/cannabis/entry", body: body, as: EmptyResponse.self)
+  }
+
+  /// Append a new grocery item; default category mirrors the webapp ("other").
+  func addGroceryItem(name: String, category: String = "other", emoji: String? = nil) async throws {
+    var body: [String: Any] = ["name": name, "category": category]
+    if let emoji { body["emoji"] = emoji }
+    _ = try await postJSON("/api/groceries/item", body: body, as: EmptyResponse.self)
+  }
+
+  /// Suggested workout type for the next training session.
+  func suggestedWorkout() async throws -> SuggestedWorkoutResponse {
+    try await getJSON("/api/training/suggested", as: SuggestedWorkoutResponse.self)
+  }
+
   // MARK: - HTTP helpers
 
   private func url(_ path: String, query: [URLQueryItem] = []) throws -> URL {
@@ -660,8 +769,11 @@ final class SeptenaClient {
   /// don't affect sidebar counts or the overdue badge, and firing on every
   /// Next-view tap caused the sidebar to flicker.
   private func notifyChanged(for path: String) {
-    guard path.hasPrefix("/api/tasks") else { return }
-    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    if path.hasPrefix("/api/tasks") {
+      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    } else if path.hasPrefix("/api/") {
+      NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+    }
   }
 
   private func send<T: Decodable>(_ req: URLRequest, as type: T.Type) async throws -> T {
@@ -686,6 +798,97 @@ final class SeptenaClient {
       SeptenaLog.error("decode \(T.self) failed → \(preview)", error)
       throw SeptenaError.decoding(String(describing: error))
     }
+  }
+}
+
+// MARK: - Training: session start / save
+//
+// Three endpoints power the iOS logger:
+//   • `session-types` returns the user's configured Upper/Lower/Cardio/Yoga
+//     (plus any custom splits). Server-owned so changes don't need an app
+//     update.
+//   • `last-entries` is a batch prefill — give it the exercise list and it
+//     returns last-logged values per exercise to seed the inputs.
+//   • `sessions` accepts one-or-many entries; the logger POSTs as the user
+//     marks each exercise "Done" so a mid-workout crash never loses work.
+
+extension SeptenaClient {
+  /// User-configurable session-type list. Returned by FastAPI so a user
+  /// can rename "Upper" → "Push", reorder, or add custom splits without
+  /// shipping a new app. Each entry carries its canonical exercise list
+  /// (may be empty for free-form types).
+  func sessionTypes() async throws -> [SessionTypeConfig] {
+    try await getJSON("/api/training/session-types",
+                      as: SessionTypesResponse.self).sessionTypes
+  }
+
+  /// Look up last-logged values for a batch of exercises so the logger
+  /// pre-fills weight/sets/reps (or duration/distance/level for cardio).
+  /// Mirrors the webapp's `getLastEntries` call right before draft start.
+  func lastEntries(exercises: [String]) async throws -> [String: LastEntryValues] {
+    // Hand-rolled — response is a free-form dict (keys = exercise names,
+    // values may be null for exercises never logged before). The generic
+    // postJSON helper can't express that.
+    let body: [String: Any] = ["exercises": exercises]
+    let u = try url("/api/training/last-entries")
+    var req = URLRequest(url: u)
+    req.httpMethod = "POST"
+    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    req.httpBody = try JSONSerialization.data(withJSONObject: body)
+    SeptenaLog.info("POST \(u.path) body=\(body)")
+    let data: Data; let resp: URLResponse
+    do {
+      (data, resp) = try await session.data(for: req)
+      isOffline = false
+    } catch let urlError as URLError {
+      isOffline = true; throw urlError
+    }
+    let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+    if code >= 400 {
+      throw SeptenaError.server(code, String(data: data, encoding: .utf8) ?? "")
+    }
+    let map = try JSONDecoder().decode([String: LastEntryValues?].self, from: data)
+    return map.compactMapValues { $0 }
+  }
+
+  /// Persist one or more entries from an in-progress session. Called
+  /// incrementally as the user marks each exercise "Done" — same shape as
+  /// the webapp's `postSession`. Skipped entries are filtered server-side.
+  /// `savedFile` (when set on an entry) overwrites a previous save for
+  /// the same exercise — used when the user re-edits a done card.
+  @discardableResult
+  func postTrainingSession(date: String,
+                           time: String,
+                           sessionType: String,
+                           entries: [DraftEntry]) async throws -> [String] {
+    struct WriteResponse: Decodable { let written: [String] }
+    let payload: [[String: Any]] = entries.map { e in
+      var d: [String: Any] = [
+        "exercise": e.exercise,
+        "skipped": e.status == .skipped,
+        "note": e.note,
+      ]
+      if e.isCardio {
+        if let dm = e.durationMin { d["duration_min"] = dm }
+        if let m  = e.distanceM   { d["distance_m"]   = m }
+        if let l  = e.level       { d["level"]        = l }
+      } else {
+        if let w = e.weight { d["weight"] = w }
+        if let s = e.sets   { d["sets"]   = s }
+        if let r = e.reps   { d["reps"]   = r }
+        if !e.difficulty.isEmpty { d["difficulty"] = e.difficulty }
+      }
+      if let rf = e.savedFile { d["replace_file"] = rf }
+      return d
+    }
+    let body: [String: Any] = [
+      "date": date,
+      "time": time,
+      "session_type": sessionType,
+      "entries": payload,
+    ]
+    return try await postJSON("/api/training/sessions",
+                              body: body, as: WriteResponse.self).written
   }
 }
 
