@@ -299,12 +299,8 @@ struct ContentView: View {
     @Bindable var nav = nav
     layout(path: $nav.path)
       .tint(theme.accent)
-      .sheet(isPresented: $nav.showSettings) {
-        SettingsView()
-          #if os(macOS)
-          .frame(minWidth: 720, minHeight: 460)
-          #endif
-      }
+      // Settings sheet is mounted at the RootTabView level (so it works
+      // from Week / Next, not just the Tasks tab which hosts ContentView).
       .sheet(isPresented: $nav.showQuickFind) {
         QuickFindView()
           #if os(macOS)

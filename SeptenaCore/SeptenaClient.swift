@@ -113,6 +113,13 @@ final class SeptenaClient {
     try await getJSON("/api/tasks/counts", as: TasksCounts.self)
   }
 
+  /// Per-day task event aggregation (made / done / deferred / cancelled).
+  /// Backed by the FastAPI events log; used for the Tasks tile histogram.
+  func tasksHistory(days: Int = 7) async throws -> TasksHistory {
+    let q = [URLQueryItem(name: "days", value: String(days))]
+    return try await getJSON("/api/tasks/history", query: q, as: TasksHistory.self)
+  }
+
   // MARK: - Tasks: list views
 
   /// Server-derived view. Pass `area` or `project` to scope (ignored for `logbook`).

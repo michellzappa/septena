@@ -7,19 +7,23 @@ import SwiftUI
 // `ContentView` (sidebar + task list) lives inside the Tasks tab unchanged
 // so we can iterate on the new tabs without breaking the daily-driver UX.
 
+enum SeptenaTab: Hashable { case week, next, tasks }
+
+// Shared selection so tiles deep inside the Week dashboard can switch tabs
+// (e.g. Tasks tile → Tasks tab). Injected via .environment on the TabView.
+@Observable final class TabSelection {
+  var current: SeptenaTab = .week
+}
+
 struct RootTabView: View {
   @Environment(NavigationState.self) private var nav
   @Environment(SectionTheme.self) private var theme
-  @State private var selection: Tab = .week
-
-  // Search was a tab; pulled out because it interfered with QuickFindView's
-  // sheet-style dismissal expectations. SearchTabView.swift stays so the
-  // view is reachable from elsewhere (e.g. a future Settings entry).
-  enum Tab: Hashable { case week, next, tasks }
+  @State private var tabSelection = TabSelection()
 
   var body: some View {
     @Bindable var nav = nav
-    return TabView(selection: $selection) {
+    TabView(selection: Binding(get: { tabSelection.current },
+                               set: { tabSelection.current = $0 })) {
       WeekDashboardView()
         .tabItem {
           // Custom asset via the standard Label(icon:) initializer.
@@ -30,17 +34,26 @@ struct RootTabView: View {
             Image("Discs").renderingMode(.template)
           }
         }
-        .tag(Tab.week)
+        .tag(SeptenaTab.week)
 
       NextDashboardView()
         .tabItem { Label("Next", systemImage: "arrow.right") }
-        .tag(Tab.next)
+        .tag(SeptenaTab.next)
 
       ContentView()
         .tabItem { Label("Tasks", systemImage: "checkmark") }
-        .tag(Tab.tasks)
+        .tag(SeptenaTab.tasks)
     }
     .tint(theme.accent)
+    .environment(tabSelection)
+    // App-global Settings sheet. Lives at the TabView level so the gear
+    // on Week / Next opens it just like the sidebar row in Tasks does.
+    .sheet(isPresented: $nav.showSettings) {
+      SettingsView()
+        #if os(macOS)
+        .frame(minWidth: 720, minHeight: 460)
+        #endif
+    }
     // Training session sheet — mounted at the tab root so ⌘K's "Start
     // training" rows present cleanly from any tab, and so the Start
     // button inside the Week tab's Training destination can stack a

@@ -174,6 +174,27 @@ struct TasksListResponse: Codable {
   var done: [SeptenaTask]?      // present only on view=today
 }
 
+// MARK: - Tasks history (per-day event aggregation)
+
+struct TasksHistoryDay: Codable, Hashable {
+  let date: String
+  let made: Int
+  let done: Int
+  let deferred: Int
+  let cancelled: Int
+}
+
+struct TasksHistory: Codable {
+  let daily: [TasksHistoryDay]
+  let today: String
+  let windowDays: Int
+
+  enum CodingKeys: String, CodingKey {
+    case daily, today
+    case windowDays = "window_days"
+  }
+}
+
 struct TasksCounts: Codable {
   var today: String
   var todayCount: Int

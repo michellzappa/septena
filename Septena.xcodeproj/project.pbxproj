@@ -12,7 +12,6 @@
 		0448F507E1F1600F9933AEED /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5ECFDA9128B73993023CB6 /* Models.swift */; };
 		04F3C0CFD85B29B56734DFB0 /* AddChorePage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F970FE642809E3DD2E87C57 /* AddChorePage.swift */; };
 		06F8765D7D9BA1A94FE3984D /* NextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB6D9FD80512D4CD62AEFFFD /* NextView.swift */; };
-		079697FE1E5E22E80326575B /* SettingsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180554C92E6CF6EB995E0212 /* SettingsDestinationView.swift */; };
 		07B127F5FBCE0DE19AFCD387 /* SectionTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03DC46C772E45B60ECB7343 /* SectionTheme.swift */; };
 		09C5366893B7255E08295C88 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBD31B55684A505738EB624C /* App.swift */; };
 		0CD1C4224F209299764240E3 /* AddTaskPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E02202E915B573B152BB3371 /* AddTaskPage.swift */; };
@@ -110,7 +109,6 @@
 		CEE60ED09FC69B57F5FAF50B /* OfflineBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B065C1A278C890BF5EEBE9C /* OfflineBanner.swift */; };
 		CF223B5C7E5F3C851816A9E9 /* AddSupplementPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A23235949EF137B79234073 /* AddSupplementPage.swift */; };
 		CFC6B2FA915632D384BAB194 /* TrainingDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D852F1B66154D92E60E79CBE /* TrainingDestinationView.swift */; };
-		D10AC7600486A78D1F9C5995 /* SettingsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180554C92E6CF6EB995E0212 /* SettingsDestinationView.swift */; };
 		D31B9B82BF6E56894A42F453 /* AddInfoSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41816B2B33A2834500415BF8 /* AddInfoSheet.swift */; };
 		D338D5380CD35BAC0E461088 /* QuickFindView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 758435C6D5207D248170DD12 /* QuickFindView.swift */; };
 		D3D801AE0714FA3E8696508A /* SectionTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03DC46C772E45B60ECB7343 /* SectionTheme.swift */; };
@@ -147,7 +145,6 @@
 		04B4D06356BC11C849416F5C /* CalendarDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarDestinationView.swift; sourceTree = "<group>"; };
 		0B390D43AE1A7533F9AD7198 /* NextItemsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextItemsSection.swift; sourceTree = "<group>"; };
 		0D8E96F4EF0DBE7645A7FAC5 /* ModuleTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleTile.swift; sourceTree = "<group>"; };
-		180554C92E6CF6EB995E0212 /* SettingsDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsDestinationView.swift; sourceTree = "<group>"; };
 		1B11A1931AD62F377D8B791A /* CannabisDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CannabisDestinationView.swift; sourceTree = "<group>"; };
 		1D780CFB5185574B77710C70 /* AddGroceryPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGroceryPage.swift; sourceTree = "<group>"; };
 		1E25F81FE5AA4B6BBC056275 /* DateParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateParser.swift; sourceTree = "<group>"; };
@@ -158,7 +155,7 @@
 		2D413F054F59B2A90A319154 /* TaskDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
 		31313A0E804B33A3E43FC1F6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		33B6D5A7801C40656B13C350 /* RemindersInboxSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersInboxSection.swift; sourceTree = "<group>"; };
-		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		3B065C1A278C890BF5EEBE9C /* OfflineBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineBanner.swift; sourceTree = "<group>"; };
 		3C90473A5415EF805CE827D5 /* GutDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GutDestinationView.swift; sourceTree = "<group>"; };
@@ -288,7 +285,6 @@
 				33B6D5A7801C40656B13C350 /* RemindersInboxSection.swift */,
 				6AD6CED1984C5B3D5608F234 /* RootTabView.swift */,
 				AA46304BE6907DF5990B15C7 /* SearchTabView.swift */,
-				180554C92E6CF6EB995E0212 /* SettingsDestinationView.swift */,
 				5213158B9AA9106BBAA03D41 /* SettingsView.swift */,
 				9F0AE5985EFE1A9A61F9BC7E /* SidebarView.swift */,
 				8387091CC3EEBBBB0A543D5B /* SleepDestinationView.swift */,
@@ -394,7 +390,6 @@
 						ProvisioningStyle = Automatic;
 					};
 					FD752EC978FED2E2D676DE2D = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -499,7 +494,6 @@
 				B6CAA0E5E7DFD2D30F48DF14 /* SearchTabView.swift in Sources */,
 				07B127F5FBCE0DE19AFCD387 /* SectionTheme.swift in Sources */,
 				D770995846D0B23AC3F77F34 /* SeptenaClient.swift in Sources */,
-				D10AC7600486A78D1F9C5995 /* SettingsDestinationView.swift in Sources */,
 				E02065B8AC82D19639A4CFAD /* SettingsView.swift in Sources */,
 				F62DAF6B252E82A6C8CB7167 /* SidebarView.swift in Sources */,
 				67D2267D2F8900C4AE0F234D /* SleepDestinationView.swift in Sources */,
@@ -569,7 +563,6 @@
 				63B5D55FED0B0465C2BBEE96 /* SearchTabView.swift in Sources */,
 				D3D801AE0714FA3E8696508A /* SectionTheme.swift in Sources */,
 				9ED913F259DC6E83E4EDB824 /* SeptenaClient.swift in Sources */,
-				079697FE1E5E22E80326575B /* SettingsDestinationView.swift in Sources */,
 				1C848EE6B229B8FEE079CD97 /* SettingsView.swift in Sources */,
 				7FB3330B97BCBCB5D87C6F04 /* SidebarView.swift in Sources */,
 				1CCEDBAD872A0FA179B960A7 /* SleepDestinationView.swift in Sources */,
@@ -595,6 +588,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Septena/Septena.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 992N457T8D;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Septena/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -717,6 +711,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Septena/Septena.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 992N457T8D;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Septena/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
