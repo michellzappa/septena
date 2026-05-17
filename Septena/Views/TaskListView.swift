@@ -144,11 +144,21 @@ struct TaskListView: View {
   @State private var editingTitle = ""
   @State private var editingNotes = ""
 
-  // When picker
-  @State private var showingWhenSheet = false
-  @State private var whenTargetId: String?
-  @State private var whenKind: WhenKind = .due
+  // When picker. Use a single Identifiable item so the sheet's kind
+  // is intrinsic to the presentation — avoids stale-state races where
+  // tapping "When" could open the prior "Deadline" pane.
+  @State private var whenSheet: WhenSheet?
   enum WhenKind { case due, scheduled }
+  struct WhenSheet: Identifiable {
+    let id: String   // composite of taskId + kind so reopening a kind re-presents cleanly
+    let taskId: String
+    let kind: WhenKind
+    init(taskId: String, kind: WhenKind) {
+      self.taskId = taskId
+      self.kind = kind
+      self.id = "\(taskId)|\(kind == .due ? "due" : "sched")"
+    }
+  }
 
   // Move picker
   @State private var showingMoveSheet = false
@@ -194,10 +204,10 @@ struct TaskListView: View {
           applyTitleNotes(id: target.id, title: newTitle, notes: newNotes)
         },
         onOpenWhen: {
-          whenTargetId = target.id; whenKind = .scheduled; showingWhenSheet = true
+          whenSheet = WhenSheet(taskId: target.id, kind: .scheduled)
         },
         onOpenDeadline: {
-          whenTargetId = target.id; whenKind = .due; showingWhenSheet = true
+          whenSheet = WhenSheet(taskId: target.id, kind: .due)
         },
         onOpenRepeat: {
           repeatTargetId = target.id; showingRepeatSheet = true
@@ -381,24 +391,30 @@ struct TaskListView: View {
     } message: {
       Text(errorMessage ?? "")
     }
-    .sheet(isPresented: $showingWhenSheet) {
-      switch whenKind {
+    .sheet(item: $whenSheet) { sheet in
+      switch sheet.kind {
       case .scheduled:
-        WhenPickerSheet(
-          onPick: { date in
-            if let id = whenTargetId { applyWhen(id: id, date: date) }
-            whenTargetId = nil
-          }
-        )
-        .presentationDetents([.medium])
+        DatePickerSheet(
+          title: "When",
+          initialDate: currentScheduled(for: sheet.taskId),
+          setLabel: "Set Date",
+          updateLabel: "Update Date",
+          clearLabel: "No Date"
+        ) { date in
+          applyWhen(id: sheet.taskId, kind: .scheduled, date: date)
+        }
+        .presentationDetents([.medium, .large])
         .presentationBackground(.thinMaterial)
         .presentationCornerRadius(Theme.cornerRadius)
       case .due:
-        DeadlinePickerSheet(
-          initialDate: currentDeadline(for: whenTargetId)
+        DatePickerSheet(
+          title: "Deadline",
+          initialDate: currentDeadline(for: sheet.taskId),
+          setLabel: "Set Deadline",
+          updateLabel: "Update Deadline",
+          clearLabel: "Remove Deadline"
         ) { date in
-          if let id = whenTargetId { applyWhen(id: id, date: date) }
-          whenTargetId = nil
+          applyWhen(id: sheet.taskId, kind: .due, date: date)
         }
         .presentationDetents([.medium, .large])
         .presentationBackground(.thinMaterial)
@@ -473,12 +489,20 @@ struct TaskListView: View {
     }
   }
 
-  /// Existing deadline for a target task, so DeadlinePickerSheet can
-  /// pre-fill its date picker and show "Update Deadline" / "No Deadline".
+  /// Existing deadline for a target task, so the picker sheet can
+  /// pre-fill its date and show "Update Deadline" / "Remove Deadline".
   private func currentDeadline(for id: String?) -> Date? {
     guard let id else { return nil }
     let pool = items + review + doneToday
     return pool.first(where: { $0.id == id })?.due.flatMap(SeptenaDate.parse)
+  }
+
+  /// Existing scheduled date for a target task, so the picker sheet can
+  /// pre-fill its date and show "Update Date" / "No Date".
+  private func currentScheduled(for id: String?) -> Date? {
+    guard let id else { return nil }
+    let pool = items + review + doneToday
+    return pool.first(where: { $0.id == id })?.scheduled.flatMap(SeptenaDate.parse)
   }
 
   /// Existing recurrence rule for a target task, so RecurrencePickerSheet
@@ -586,17 +610,13 @@ struct TaskListView: View {
   /// ⌘S — open the When (schedule) picker for the focused row.
   private func openWhenForSelected() {
     guard let id = effectiveSelectionId() else { return }
-    whenTargetId = id
-    whenKind = .scheduled
-    showingWhenSheet = true
+    whenSheet = WhenSheet(taskId: id, kind: .scheduled)
   }
 
   /// ⌘⇧D — open the Deadline picker for the focused row.
   private func openDeadlineForSelected() {
     guard let id = effectiveSelectionId() else { return }
-    whenTargetId = id
-    whenKind = .due
-    showingWhenSheet = true
+    whenSheet = WhenSheet(taskId: id, kind: .due)
   }
 
   /// ⌘⌫ — delete the focused row.
@@ -610,8 +630,7 @@ struct TaskListView: View {
   /// ⌘. — clear schedule + today, sending the row back to Anytime.
   private func clearScheduleForSelected() {
     guard let id = selectedTaskId, currentTask(id: id) != nil else { return }
-    whenKind = .scheduled
-    applyWhen(id: id, date: nil)
+    applyWhen(id: id, kind: .scheduled, date: nil)
   }
 
   private func applyRecurrence(id: String, rule: Recurrence?) {
@@ -798,12 +817,12 @@ struct TaskListView: View {
             }
           }
           Button {
-            whenTargetId = task.id; whenKind = .scheduled; showingWhenSheet = true
+            whenSheet = WhenSheet(taskId: task.id, kind: .scheduled)
           } label: {
             Label("When…", systemImage: "calendar")
           }
           Button {
-            whenTargetId = task.id; whenKind = .due; showingWhenSheet = true
+            whenSheet = WhenSheet(taskId: task.id, kind: .due)
           } label: {
             Label("Deadline…", systemImage: "flag")
           }
@@ -1404,7 +1423,7 @@ struct TaskListView: View {
   private func editorKeyboardAccessory(for task: SeptenaTask) -> some View {
     HStack(spacing: 28) {
       accessoryChip(systemName: "calendar") {
-        whenTargetId = task.id; whenKind = .scheduled; showingWhenSheet = true
+        whenSheet = WhenSheet(taskId: task.id, kind: .scheduled)
       }
       accessoryChip(systemName: task.today ? "sun.max.fill" : "sun.max",
                     tint: task.today ? .orange : nil) {
@@ -1418,7 +1437,7 @@ struct TaskListView: View {
         moveTargetId = task.id; showingMoveSheet = true
       }
       accessoryChip(systemName: "flag") {
-        whenTargetId = task.id; whenKind = .due; showingWhenSheet = true
+        whenSheet = WhenSheet(taskId: task.id, kind: .due)
       }
     }
     .padding(.horizontal, 20)
@@ -1550,11 +1569,11 @@ struct TaskListView: View {
 
   // MARK: - When picker apply
 
-  private func applyWhen(id: String, date: Date?) {
+  private func applyWhen(id: String, kind: WhenKind, date: Date?) {
     Haptics.tick()
     Task {
       do {
-        switch whenKind {
+        switch kind {
         case .due:
           try await client.setDue(id: id, date: date)
         case .scheduled:

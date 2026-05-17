@@ -487,114 +487,42 @@ struct WeekStrip: View {
   }
 }
 
-// MARK: - When picker sheet
+// MARK: - Date picker sheet
 
-/// "When" — schedule a task for a date or clear the scheduled date. Lean:
-/// a 7-day strip up top covers the common case; "Pick a date…" reveals
-/// the graphical calendar for anything further out. `due` has its own
-/// picker (DeadlinePickerSheet) because deadlines are concrete dates only.
-struct WhenPickerSheet: View {
+/// Shared picker for both "When" (scheduled) and "Deadline" (due). 7-day
+/// strip up top for the common case; "Pick a Date…" reveals the graphical
+/// calendar for anything further out. Only the title, button labels, and
+/// clear semantics differ between the two — layout is identical.
+struct DatePickerSheet: View {
   @Environment(SectionTheme.self) private var theme
-  let onPick: (Date?) -> Void
-  @Environment(\.dismiss) private var dismiss
-  @State private var customDate = Date()
-  @State private var showingCustom = false
-
-  var body: some View {
-    NavigationStack {
-      VStack(spacing: 0) {
-        WeekStrip(selected: nil) { d in
-          onPick(d); dismiss()
-        }
-        .padding(.horizontal, Theme.hPadding)
-        .padding(.top, 8)
-        .padding(.bottom, 12)
-
-        Hairline()
-
-        if showingCustom {
-          DatePicker("Date", selection: $customDate, displayedComponents: [.date])
-            .datePickerStyle(.graphical)
-            .padding(.horizontal, Theme.hPadding)
-          Spacer()
-          Button {
-            onPick(Calendar.current.startOfDay(for: customDate))
-            dismiss()
-          } label: {
-            Text("Set Date")
-              .font(.system(size: 16, weight: .semibold))
-              .foregroundStyle(.white)
-              .frame(maxWidth: .infinity)
-              .padding(.vertical, 14)
-              .background(theme.accent)
-              .clipShape(Capsule())
-          }
-          .buttonStyle(.plain)
-          .padding(.horizontal, Theme.hPadding)
-          .padding(.bottom, 20)
-        } else {
-          option(icon: "calendar", tint: Theme.inkSecondary, title: "Pick a Date…") {
-            showingCustom = true
-          }
-          Hairline()
-          option(icon: "xmark.circle", tint: .secondary, title: "No Date") {
-            onPick(nil); dismiss()
-          }
-          Spacer()
-        }
-      }
-      .navigationTitle("When")
-      .septenaInlineTitle()
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
-        }
-      }
-    }
-  }
-
-  @ViewBuilder
-  private func option(icon: String, tint: Color, title: String, action: @escaping () -> Void) -> some View {
-    Button(action: { Haptics.pick(); action() }) {
-      HStack(spacing: 14) {
-        Image(systemName: icon)
-          .font(.system(size: 18))
-          .foregroundStyle(tint)
-          .frame(width: 24)
-        Text(title)
-          .font(.septenaSidebarRow)
-          .foregroundStyle(.primary)
-        Spacer()
-      }
-      .padding(.horizontal, Theme.hPadding)
-      .frame(height: Theme.sidebarRowHeight)
-      .contentShape(Rectangle())
-    }
-    .buttonStyle(.plain)
-  }
-}
-
-// MARK: - Deadline picker sheet
-
-/// "Deadline" — set a hard due date, or clear it. Deliberately *just* a
-/// date picker (no Today/Tomorrow shortcuts) because deadlines are
-/// concrete dates, not loose intentions. Matches the reference design's Deadline sheet.
-struct DeadlinePickerSheet: View {
-  @Environment(SectionTheme.self) private var theme
+  let title: String
   let initialDate: Date?
+  let setLabel: String        // e.g. "Set Date" / "Set Deadline"
+  let updateLabel: String     // e.g. "Update Date" / "Update Deadline"
+  let clearLabel: String      // e.g. "No Date" / "Remove Deadline"
   let onPick: (Date?) -> Void
   @Environment(\.dismiss) private var dismiss
   @State private var date: Date
+  @State private var showingCalendar: Bool
 
-  @State private var showingCalendar = false
-
-  init(initialDate: Date? = nil, onPick: @escaping (Date?) -> Void) {
+  init(
+    title: String,
+    initialDate: Date? = nil,
+    setLabel: String,
+    updateLabel: String,
+    clearLabel: String,
+    onPick: @escaping (Date?) -> Void
+  ) {
+    self.title = title
     self.initialDate = initialDate
+    self.setLabel = setLabel
+    self.updateLabel = updateLabel
+    self.clearLabel = clearLabel
     self.onPick = onPick
     let seed = initialDate ?? Calendar.current.startOfDay(for: Date())
     _date = State(initialValue: seed)
-    // If the initial deadline is within the next 7 days, the strip
-    // already covers it — keep the calendar collapsed for a lean sheet.
+    // Open the calendar up-front only when the existing date sits
+    // outside the strip — the strip already covers the next 7 days.
     let today = Calendar.current.startOfDay(for: Date())
     let inStripRange: Bool = {
       guard let initialDate else { return true }
@@ -608,18 +536,17 @@ struct DeadlinePickerSheet: View {
   var body: some View {
     NavigationStack {
       VStack(spacing: 0) {
-        WeekStrip(selected: date) { d in
-          date = d
+        WeekStrip(selected: initialDate.map { Calendar.current.startOfDay(for: $0) }) { d in
           onPick(d); dismiss()
         }
         .padding(.horizontal, Theme.hPadding)
-        .padding(.top, 8)
-        .padding(.bottom, 12)
+        .padding(.top, 6)
+        .padding(.bottom, 8)
 
         Hairline()
 
         if showingCalendar {
-          DatePicker("Deadline", selection: $date, displayedComponents: [.date])
+          DatePicker(title, selection: $date, displayedComponents: [.date])
             .datePickerStyle(.graphical)
             .padding(.horizontal, Theme.hPadding)
         } else {
@@ -643,18 +570,18 @@ struct DeadlinePickerSheet: View {
           .buttonStyle(.plain)
         }
 
-        Spacer()
+        Spacer(minLength: 0)
 
-        VStack(spacing: 10) {
+        VStack(spacing: 6) {
           Button {
             onPick(Calendar.current.startOfDay(for: date))
             dismiss()
           } label: {
-            Text(initialDate == nil ? "Set Deadline" : "Update Deadline")
+            Text(initialDate == nil ? setLabel : updateLabel)
               .font(.system(size: 16, weight: .semibold))
               .foregroundStyle(.white)
               .frame(maxWidth: .infinity)
-              .padding(.vertical, 14)
+              .padding(.vertical, 12)
               .background(theme.accent)
               .clipShape(Capsule())
           }
@@ -665,18 +592,18 @@ struct DeadlinePickerSheet: View {
             onPick(nil)
             dismiss()
           } label: {
-            Text("No Deadline")
+            Text(clearLabel)
               .font(.system(size: 15, weight: .medium))
               .foregroundStyle(initialDate == nil ? Theme.inkSecondary : Theme.overdueRed)
               .frame(maxWidth: .infinity)
-              .padding(.vertical, 12)
+              .padding(.vertical, 8)
           }
           .buttonStyle(.plain)
         }
         .padding(.horizontal, Theme.hPadding)
-        .padding(.bottom, 20)
+        .padding(.bottom, 12)
       }
-      .navigationTitle("Deadline")
+      .navigationTitle(title)
       .septenaInlineTitle()
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
