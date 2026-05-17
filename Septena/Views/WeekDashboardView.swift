@@ -12,13 +12,28 @@ enum WeekDestination: Hashable {
 struct WeekDashboardView: View {
   @Environment(SeptenaClient.self) private var client
   @Environment(SectionTheme.self) private var theme
+  #if os(iOS)
+  @Environment(\.horizontalSizeClass) private var hSize
+  #endif
 
   @State private var habits = NextItemsModel()
+
+  /// 1 column on iPhone (compact), 3 on iPad / Mac (regular). LazyVGrid
+  /// reflows automatically on rotation; tiles keep their internal layout.
+  private var columns: [GridItem] {
+    let count: Int
+    #if os(iOS)
+    count = (hSize == .regular) ? 3 : 1
+    #else
+    count = 3
+    #endif
+    return Array(repeating: GridItem(.flexible(), spacing: 14), count: count)
+  }
 
   var body: some View {
     NavigationStack {
       ScrollView {
-        VStack(spacing: 14) {
+        LazyVGrid(columns: columns, spacing: 14) {
           tiles
         }
         .padding(.horizontal, Theme.hPadding)
