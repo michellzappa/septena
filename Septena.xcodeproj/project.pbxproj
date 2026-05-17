@@ -31,6 +31,7 @@
 		59D1D3BB3E05AF32C782A9C7 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = E17D3542734AB0B32527C12C /* AppIcon.icns */; };
 		5ED33F95694C104969333EAD /* AreasProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5C26629FE8A4DF019B9784 /* AreasProjectsView.swift */; };
 		63B5D55FED0B0465C2BBEE96 /* SearchTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA46304BE6907DF5990B15C7 /* SearchTabView.swift */; };
+		7BEA23ABC68403A4BD8213FA /* ModuleTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D8E96F4EF0DBE7645A7FAC5 /* ModuleTile.swift */; };
 		7FB3330B97BCBCB5D87C6F04 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F0AE5985EFE1A9A61F9BC7E /* SidebarView.swift */; };
 		7FC13B9F34D2BFBC8BAD9682 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AD6CED1984C5B3D5608F234 /* RootTabView.swift */; };
 		830F982B4EF92986B3F4D5C3 /* QuickFindView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 758435C6D5207D248170DD12 /* QuickFindView.swift */; };
@@ -44,6 +45,7 @@
 		9ED913F259DC6E83E4EDB824 /* SeptenaClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 583220978001091137587977 /* SeptenaClient.swift */; };
 		A14B8DF03D6FC0799D8AA8C2 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = E17D3542734AB0B32527C12C /* AppIcon.icns */; };
 		A1C7525645EBE54B283DC0D9 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25DC8E705099DB99718A8596 /* Persistence.swift */; };
+		A24EB04802E59F5F3C3489A7 /* ModuleTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D8E96F4EF0DBE7645A7FAC5 /* ModuleTile.swift */; };
 		A5DBCDF52DE4E8E077C6451E /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */; };
 		AFD39F8C8765E0A36414CEF1 /* NextDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B306432E3182A6992728E0F9 /* NextDashboardView.swift */; };
 		B15EF82A7D9A48BDCDF26BBC /* WeekDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA936685A02055A0A5079EB2 /* WeekDashboardView.swift */; };
@@ -77,6 +79,7 @@
 
 /* Begin PBXFileReference section */
 		0B390D43AE1A7533F9AD7198 /* NextItemsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextItemsSection.swift; sourceTree = "<group>"; };
+		0D8E96F4EF0DBE7645A7FAC5 /* ModuleTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleTile.swift; sourceTree = "<group>"; };
 		1E25F81FE5AA4B6BBC056275 /* DateParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateParser.swift; sourceTree = "<group>"; };
 		25DC8E705099DB99718A8596 /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
 		2D413F054F59B2A90A319154 /* TaskDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
@@ -133,6 +136,7 @@
 			isa = PBXGroup;
 			children = (
 				9A5C26629FE8A4DF019B9784 /* AreasProjectsView.swift */,
+				0D8E96F4EF0DBE7645A7FAC5 /* ModuleTile.swift */,
 				B306432E3182A6992728E0F9 /* NextDashboardView.swift */,
 				0B390D43AE1A7533F9AD7198 /* NextItemsSection.swift */,
 				FB6D9FD80512D4CD62AEFFFD /* NextView.swift */,
@@ -303,6 +307,7 @@
 				DF016EF192B7891D2DBE3CB6 /* DateParser.swift in Sources */,
 				5330AF71083A1F3514B862B8 /* Haptics.swift in Sources */,
 				0448F507E1F1600F9933AEED /* Models.swift in Sources */,
+				7BEA23ABC68403A4BD8213FA /* ModuleTile.swift in Sources */,
 				AFD39F8C8765E0A36414CEF1 /* NextDashboardView.swift in Sources */,
 				F6ED283EEF472FE8DA7B7DFB /* NextItemsSection.swift in Sources */,
 				FAA49CC911788D53BAFDBAFD /* NextView.swift in Sources */,
@@ -339,6 +344,7 @@
 				513C8B1D41E5BA85B785129C /* DateParser.swift in Sources */,
 				28777ACD729D9C78846219C4 /* Haptics.swift in Sources */,
 				DD200EF411309E29B543963F /* Models.swift in Sources */,
+				A24EB04802E59F5F3C3489A7 /* ModuleTile.swift in Sources */,
 				8F6F38ECBF1277701456C8B2 /* NextDashboardView.swift in Sources */,
 				85E7CF1494FFC184EA9CB811 /* NextItemsSection.swift in Sources */,
 				06F8765D7D9BA1A94FE3984D /* NextView.swift in Sources */,

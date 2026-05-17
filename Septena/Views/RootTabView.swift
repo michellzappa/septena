@@ -17,15 +17,19 @@ struct RootTabView: View {
   var body: some View {
     TabView(selection: $selection) {
       WeekDashboardView()
-        .tabItem { Label("Week", systemImage: "square.grid.2x2") }
+        .tabItem {
+          // Brand glyph (7 dots) instead of a system symbol. Discs.png is
+          // template-rendered so it picks up the tab tint.
+          Label { Text("Week") } icon: { Image("Discs").renderingMode(.template) }
+        }
         .tag(Tab.week)
 
       NextDashboardView()
-        .tabItem { Label("Next", systemImage: "checklist") }
+        .tabItem { Label("Next", systemImage: "arrow.right") }
         .tag(Tab.next)
 
       ContentView()
-        .tabItem { Label("Tasks", systemImage: "list.bullet") }
+        .tabItem { Label("Tasks", systemImage: "checkmark") }
         .tag(Tab.tasks)
 
       SearchTabView()
