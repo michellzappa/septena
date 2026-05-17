@@ -47,7 +47,6 @@ struct CalendarDestinationView: View {
     #endif
     .tint(accent)
     .task { load() }
-    .refreshable { load() }
   }
 
   @ViewBuilder

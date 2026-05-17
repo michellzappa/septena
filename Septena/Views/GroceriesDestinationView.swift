@@ -73,7 +73,6 @@ struct GroceriesDestinationView: View {
     #endif
     .tint(accent)
     .task { await load() }
-    .refreshable { await load() }
   }
 
   // MARK: - Actions

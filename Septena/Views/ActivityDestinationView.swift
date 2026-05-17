@@ -32,7 +32,6 @@ struct ActivityDestinationView: View {
     #endif
     .tint(accent)
     .task { await bridge.refresh() }
-    .refreshable { await bridge.refresh() }
   }
 
   // MARK: - States

@@ -72,7 +72,6 @@ struct ChoresDestinationView: View {
     #endif
     .tint(accent)
     .task { await model.load(client: client) }
-    .refreshable { await model.load(client: client) }
   }
 
   private var summary: some View {
