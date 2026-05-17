@@ -31,6 +31,7 @@
 		59D1D3BB3E05AF32C782A9C7 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = E17D3542734AB0B32527C12C /* AppIcon.icns */; };
 		5ED33F95694C104969333EAD /* AreasProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5C26629FE8A4DF019B9784 /* AreasProjectsView.swift */; };
 		63B5D55FED0B0465C2BBEE96 /* SearchTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA46304BE6907DF5990B15C7 /* SearchTabView.swift */; };
+		69347D27E1CBEFCF3AA87AB2 /* HabitsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CB6D70452573AF2811BBD08 /* HabitsDestinationView.swift */; };
 		7BEA23ABC68403A4BD8213FA /* ModuleTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D8E96F4EF0DBE7645A7FAC5 /* ModuleTile.swift */; };
 		7FB3330B97BCBCB5D87C6F04 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F0AE5985EFE1A9A61F9BC7E /* SidebarView.swift */; };
 		7FC13B9F34D2BFBC8BAD9682 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AD6CED1984C5B3D5608F234 /* RootTabView.swift */; };
@@ -74,6 +75,7 @@
 		FAA49CC911788D53BAFDBAFD /* NextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB6D9FD80512D4CD62AEFFFD /* NextView.swift */; };
 		FB79CB77D7DB4D47195A606D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */; };
 		FCDDF4248EC04741134329B2 /* AreasProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5C26629FE8A4DF019B9784 /* AreasProjectsView.swift */; };
+		FD43DBF763D6B72C04A00682 /* HabitsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CB6D70452573AF2811BBD08 /* HabitsDestinationView.swift */; };
 		FF12744271E9DF61BD2F557F /* SuggestionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6DD7C05D998EF1301A6410D /* SuggestionEngine.swift */; };
 /* End PBXBuildFile section */
 
@@ -85,7 +87,7 @@
 		2D413F054F59B2A90A319154 /* TaskDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
 		31313A0E804B33A3E43FC1F6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		33B6D5A7801C40656B13C350 /* RemindersInboxSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersInboxSection.swift; sourceTree = "<group>"; };
-		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		3B065C1A278C890BF5EEBE9C /* OfflineBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineBanner.swift; sourceTree = "<group>"; };
 		486793A66A22C3DA7809337B /* TaskCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskCommands.swift; sourceTree = "<group>"; };
@@ -96,6 +98,7 @@
 		59055370ABA84DB912D64D1E /* SeptenaMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeptenaMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5B49A0D20B2ECD672137900F /* Info-Mac.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Info-Mac.plist"; sourceTree = "<group>"; };
 		6AD6CED1984C5B3D5608F234 /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
+		6CB6D70452573AF2811BBD08 /* HabitsDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitsDestinationView.swift; sourceTree = "<group>"; };
 		758435C6D5207D248170DD12 /* QuickFindView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickFindView.swift; sourceTree = "<group>"; };
 		7D5ECFDA9128B73993023CB6 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		8EC7C9D9CAC52C91AFE79AE7 /* BadgeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BadgeManager.swift; sourceTree = "<group>"; };
@@ -136,6 +139,7 @@
 			isa = PBXGroup;
 			children = (
 				9A5C26629FE8A4DF019B9784 /* AreasProjectsView.swift */,
+				6CB6D70452573AF2811BBD08 /* HabitsDestinationView.swift */,
 				0D8E96F4EF0DBE7645A7FAC5 /* ModuleTile.swift */,
 				B306432E3182A6992728E0F9 /* NextDashboardView.swift */,
 				0B390D43AE1A7533F9AD7198 /* NextItemsSection.swift */,
@@ -245,6 +249,10 @@
 						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
+					FD752EC978FED2E2D676DE2D = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
 				};
 			};
 			buildConfigurationList = D5CFABB79F2461F76A2D3ECE /* Build configuration list for PBXProject "Septena" */;
@@ -301,6 +309,7 @@
 				5ED33F95694C104969333EAD /* AreasProjectsView.swift in Sources */,
 				0ED59BE06DEBD263BBFA0D91 /* BadgeManager.swift in Sources */,
 				DF016EF192B7891D2DBE3CB6 /* DateParser.swift in Sources */,
+				FD43DBF763D6B72C04A00682 /* HabitsDestinationView.swift in Sources */,
 				5330AF71083A1F3514B862B8 /* Haptics.swift in Sources */,
 				0448F507E1F1600F9933AEED /* Models.swift in Sources */,
 				7BEA23ABC68403A4BD8213FA /* ModuleTile.swift in Sources */,
@@ -338,6 +347,7 @@
 				FCDDF4248EC04741134329B2 /* AreasProjectsView.swift in Sources */,
 				56E87EA383673A4ACE86F2CD /* BadgeManager.swift in Sources */,
 				513C8B1D41E5BA85B785129C /* DateParser.swift in Sources */,
+				69347D27E1CBEFCF3AA87AB2 /* HabitsDestinationView.swift in Sources */,
 				28777ACD729D9C78846219C4 /* Haptics.swift in Sources */,
 				DD200EF411309E29B543963F /* Models.swift in Sources */,
 				A24EB04802E59F5F3C3489A7 /* ModuleTile.swift in Sources */,
@@ -376,9 +386,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Septena/Septena.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 992N457T8D;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Septena/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -386,7 +394,6 @@
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.septena.cloud;
-				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -501,9 +508,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Septena/Septena.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 992N457T8D;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Septena/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -511,7 +516,6 @@
 					"@executable_path/Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.septena.cloud;
-				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};

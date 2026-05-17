@@ -290,7 +290,10 @@ struct NextDoneSection: View {
 
 // MARK: - Row primitives
 
-private struct HabitRow: View {
+// Shared by NextOpenSection (current-bucket strip) and HabitsDestinationView
+// (full all-day list). Internal so the Habits mini-app can reuse the same
+// row instead of duplicating the swipe/toggle/skip vocabulary.
+struct HabitRow: View {
   let habit: HabitDayItem
   var model: NextItemsModel
   let client: SeptenaClient
