@@ -253,6 +253,21 @@ final class SeptenaClient {
     try await getJSON("/api/chores/list", as: ChoresListResponse.self).chores
   }
 
+  /// N-day completion/total history for chores; powers the Week tile
+  /// histogram.
+  func choresHistory(days: Int = 7) async throws -> ChoreHistoryResponse {
+    try await getJSON("/api/chores/history",
+                      query: [URLQueryItem(name: "days", value: String(days))],
+                      as: ChoreHistoryResponse.self)
+  }
+
+  /// N-day done/total history for habits; powers the Habits tile histogram.
+  func habitsHistory(days: Int = 7) async throws -> HabitHistoryResponse {
+    try await getJSON("/api/habits/history",
+                      query: [URLQueryItem(name: "days", value: String(days))],
+                      as: HabitHistoryResponse.self)
+  }
+
   func completeChore(id: String, date: String) async throws {
     let body: [String: Any] = ["chore_id": id, "date": date]
     _ = try await postJSON("/api/chores/complete", body: body, as: EmptyResponse.self)

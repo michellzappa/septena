@@ -344,6 +344,33 @@ struct ChoresListResponse: Codable {
   var chores: [ChoreItem]
 }
 
+// MARK: - History (per-day adherence for the Week tile histograms)
+
+/// One day in the habit history series. From `/api/habits/history?days=N`.
+struct HabitHistoryPoint: Codable, Hashable {
+  let date: String   // YYYY-MM-DD
+  let done: Int
+  let total: Int
+  let percent: Int
+}
+
+struct HabitHistoryResponse: Codable {
+  let daily: [HabitHistoryPoint]
+  let total: Int
+}
+
+/// One day in the chore history series. From `/api/chores/history?days=N`.
+struct ChoreHistoryPoint: Codable, Hashable {
+  let date: String
+  let completed: Int
+  let total: Int
+}
+
+struct ChoreHistoryResponse: Codable {
+  let daily: [ChoreHistoryPoint]
+  let total: Int
+}
+
 struct NextItem: Codable, Identifiable, Hashable {
   var id: String
   var kind: String

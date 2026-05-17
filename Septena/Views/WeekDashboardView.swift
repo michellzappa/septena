@@ -3,7 +3,9 @@ import SwiftUI
 // Week module — the synthesizing dashboard. Each module gets a tile that
 // (a) renders live stats / histogram for that module and (b) pushes into
 // the module's full destination on tap. Tiles for modules that don't yet
-// have a Swift mini-app stay mocked + inert until those are built.
+// have a Swift mini-app stay mocked + inert until those are built — but
+// every accent comes from SectionTheme so colors match the user's
+// server-configured Septena palette today.
 
 enum WeekDestination: Hashable {
   case habits
@@ -17,7 +19,9 @@ struct WeekDashboardView: View {
   @Environment(\.horizontalSizeClass) private var hSize
   #endif
 
-  @State private var habits = NextItemsModel()
+  @State private var dailies = NextItemsModel()
+  @State private var habitHistory: [Int] = Array(repeating: 0, count: 7)
+  @State private var choreHistory: [Int] = Array(repeating: 0, count: 7)
 
   /// 1 column on iPhone (compact), 3 on iPad / Mac (regular). LazyVGrid
   /// reflows automatically on rotation; tiles keep their internal layout.
@@ -52,11 +56,21 @@ struct WeekDashboardView: View {
         case .chores: ChoresDestinationView()
         }
       }
-      // Habits and Chores share the same model shape; one fetch hydrates
-      // both tiles. Future tiles can each have their own @State model.
-      .task { await habits.load(client: client) }
-      .refreshable { await habits.load(client: client) }
+      .task { await loadAll() }
+      .refreshable { await loadAll() }
     }
+  }
+
+  /// Fan out the per-tile fetches in parallel. NextItemsModel covers today's
+  /// habits / chores / supplements (used by every "today" stat on the page);
+  /// the two history endpoints provide the 7-day histograms.
+  private func loadAll() async {
+    async let _ = dailies.load(client: client)
+    async let hh = try? await client.habitsHistory(days: 7)
+    async let ch = try? await client.choresHistory(days: 7)
+    let (h, c) = await (hh, ch)
+    if let h { habitHistory = h.daily.map { $0.done } }
+    if let c { choreHistory = c.daily.map { $0.completed } }
   }
 
   // MARK: - Tiles
@@ -71,11 +85,10 @@ struct WeekDashboardView: View {
     nutritionTile
   }
 
-  // Tasks — real backend not wired yet; counts plumbed in next phase.
   private var tasksTile: some View {
     ModuleTile(
       title: "Tasks",
-      accent: .blue,
+      accent: theme.color(for: "tasks"),
       stats: [.init(label: "Today",   value: "5"),
               .init(label: "Late",    value: "2"),
               .init(label: "Inbox",   value: "11")],
@@ -84,12 +97,10 @@ struct WeekDashboardView: View {
     )
   }
 
-  // Habits — real data from NextItemsModel.habits (today only). 7-day
-  // history is a placeholder until the client gains /api/habits/history.
   private var habitsTile: some View {
-    let total = habits.habits.count
-    let done = habits.habits.filter { $0.done }.count
-    let skipped = habits.habits.filter { $0.skipped }.count
+    let total = dailies.habits.count
+    let done = dailies.habits.filter { $0.done }.count
+    let skipped = dailies.habits.filter { $0.skipped }.count
     let accent = theme.color(for: "habits")
     return NavigationLink(value: WeekDestination.habits) {
       ModuleTile(
@@ -104,8 +115,7 @@ struct WeekDashboardView: View {
           current: Double(done),
           target: Double(max(total, 1))
         ),
-        history: .init(label: "7-day adherence",
-                       values: Array(repeating: max(done, 1), count: 7))
+        history: .init(label: "7-day adherence", values: habitHistory)
       )
     }
     .buttonStyle(.plain)
@@ -114,7 +124,7 @@ struct WeekDashboardView: View {
   private var trainingTile: some View {
     ModuleTile(
       title: "Training",
-      accent: .orange,
+      accent: theme.color(for: "training"),
       stats: [.init(label: "Sessions", value: "5/7"),
               .init(label: "Z2 min",   value: "115", unit: "m")],
       progress: .init(label: "Z2 cardio", current: 115, target: 150, unit: "m"),
@@ -122,11 +132,9 @@ struct WeekDashboardView: View {
     )
   }
 
-  // Chores — real data via the shared NextItemsModel (already loaded for
-  // Habits). Tapping pushes into ChoresDestinationView.
   private var choresTile: some View {
-    let dueToday = habits.chores.filter { $0.daysOverdue == 0 }.count
-    let overdue  = habits.chores.filter { $0.daysOverdue > 0 }.count
+    let dueToday = dailies.chores.filter { $0.daysOverdue == 0 }.count
+    let overdue  = dailies.chores.filter { $0.daysOverdue > 0 }.count
     let accent = theme.color(for: "chores")
     return NavigationLink(value: WeekDestination.chores) {
       ModuleTile(
@@ -136,11 +144,7 @@ struct WeekDashboardView: View {
           .init(label: "Due today", value: "\(dueToday)"),
           .init(label: "Overdue",   value: "\(overdue)")
         ],
-        history: .init(
-          label: "7-day done",
-          // Placeholder until /api/chores/history is wired into the client.
-          values: Array(repeating: max(dueToday, 1), count: 7)
-        )
+        history: .init(label: "7-day done", values: choreHistory)
       )
     }
     .buttonStyle(.plain)
@@ -149,7 +153,7 @@ struct WeekDashboardView: View {
   private var sleepTile: some View {
     ModuleTile(
       title: "Sleep",
-      accent: .indigo,
+      accent: theme.color(for: "sleep"),
       stats: [.init(label: "Last night", value: "7:12", unit: "h"),
               .init(label: "Avg",        value: "7:08", unit: "h")],
       progress: .init(label: "Target", current: 7.2, target: 8, unit: "h"),
@@ -160,7 +164,7 @@ struct WeekDashboardView: View {
   private var nutritionTile: some View {
     ModuleTile(
       title: "Nutrition",
-      accent: .pink,
+      accent: theme.color(for: "nutrition"),
       stats: [.init(label: "Protein", value: "50", unit: "g"),
               .init(label: "Kcal",    value: "855")],
       progress: .init(label: "Today's protein", current: 50, target: 150, unit: "g"),
