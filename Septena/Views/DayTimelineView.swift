@@ -27,6 +27,7 @@ struct DayTimelineView: View {
   var supplements: [SupplementDayItem] = []
   var chores: [ChoreItem] = []
   var training: [ExerciseEntry] = []
+  var tasks: [SeptenaTask] = []
 
   @Environment(SectionTheme.self) private var theme
 
@@ -348,6 +349,12 @@ struct DayTimelineView: View {
     }
     for s in supplements where s.done {
       if let t = s.time, let hh = parseHHMM(t) { add(hh, color: cS) }
+    }
+    let cT = theme.color(for: "tasks")
+    for t in tasks where t.status == .done {
+      guard let ts = t.completedAt, ts.hasPrefix(date), ts.count >= 16 else { continue }
+      let hhmm = String(ts.dropFirst(11).prefix(5))
+      if let h = parseHHMM(hhmm) { add(h, color: cT) }
     }
     // Chores don't have a per-completion timestamp on ChoreItem yet;
     // they're skipped here. Calendar pills also TBD.

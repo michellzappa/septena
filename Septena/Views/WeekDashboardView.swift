@@ -11,7 +11,7 @@ import EventKit
 enum WeekDestination: String, Hashable, Identifiable {
   case habits, chores, training, supplements, sleep, nutrition
   case air, groceries, calendar, caffeine, cannabis, body, gut
-  case settings, activity
+  case activity
 
   var id: String { rawValue }
 }
@@ -19,6 +19,8 @@ enum WeekDestination: String, Hashable, Identifiable {
 struct WeekDashboardView: View {
   @Environment(SeptenaClient.self) private var client
   @Environment(SectionTheme.self) private var theme
+  @Environment(TabSelection.self) private var tabSelection
+  @Environment(NavigationState.self) private var nav
   #if os(iOS)
   @Environment(\.horizontalSizeClass) private var hSize
   #endif
@@ -30,6 +32,8 @@ struct WeekDashboardView: View {
   @State private var trainingSessionDates: Set<String> = []
   @State private var supplementHistory: [Int] = Array(repeating: 0, count: 7)
   @State private var taskCounts: TasksCounts? = nil
+  @State private var tasksHistory: TasksHistory? = nil
+  @State private var completedTasks: [SeptenaTask] = []
   @State private var ouraNights: [OuraNight] = []
   @State private var nutritionStats: NutritionStatsResponse? = nil
   @State private var todayProteinSum: Double = 0
@@ -46,7 +50,6 @@ struct WeekDashboardView: View {
   @State private var bodyRows: [WithingsRow] = []
   @State private var gutToday: GutDayResponse? = nil
   @State private var gutHistory: [GutHistoryPoint] = []
-  @State private var settings: AppSettings? = nil
   @State private var sheetDest: WeekDestination? = nil
   /// Today-scoped collections kept in state so DayTimelineView can read
   /// them. NextItemsModel already covers habits/supplements/chores and
@@ -80,7 +83,7 @@ struct WeekDashboardView: View {
         .padding(.top, 12)
         .padding(.bottom, 80)
       }
-      .background(Color(.systemGroupedBackground))
+      .background(Theme.groupedBackground)
       // Tab bar already labels this view. Keep the nav bar present so
       // iOS's default scroll-edge effect kicks in (content fades to bg
       // material as it scrolls under the top — same shape as the
@@ -90,11 +93,15 @@ struct WeekDashboardView: View {
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif
+      // Standard top-right gear opens the unified, app-global Settings
+      // sheet (same one as ⌘, on macOS / the sidebar row). Week is the
+      // natural homepage, so it's the natural place to put it.
       .toolbar {
         ToolbarItem(placement: .primaryAction) {
-          Button { sheetDest = .settings } label: {
+          Button { nav.showSettings = true } label: {
             Image(systemName: "gearshape")
           }
+          .accessibilityLabel("Settings")
         }
       }
       // Sheets, not pushes — iPhone navigation into module destinations
@@ -129,7 +136,6 @@ struct WeekDashboardView: View {
       case .cannabis:    CannabisDestinationView()
       case .body:        BodyDestinationView()
       case .gut:         GutDestinationView()
-      case .settings:    SettingsDestinationView()
       case .activity:    ActivityDestinationView()
       }
     }
@@ -150,6 +156,8 @@ struct WeekDashboardView: View {
     async let ents = try? await client.trainingEntries(since: sinceDate(daysBack: 7))
     async let sh = try? await client.supplementsHistory(days: 7)
     async let tc = try? await client.counts()
+    async let th = try? await client.tasksHistory(days: 7)
+    async let tl = try? await client.list(view: "logbook", days: 1)
     async let on = try? await client.ouraHistory(days: 7)
     async let nstats = try? await client.nutritionStats(days: 7)
     async let nents = try? await client.nutritionEntries(since: SeptenaDate.today)
@@ -172,6 +180,8 @@ struct WeekDashboardView: View {
     if let e { trainingSessionDates = Set(e.map(\.date)) }
     if let s { supplementHistory = s.daily.map { $0.done } }
     taskCounts = t
+    tasksHistory = await th
+    completedTasks = (await tl)?.items ?? []
     if let o { ouraNights = o }
     nutritionStats = ns
     nutritionTarget = nt
@@ -195,12 +205,10 @@ struct WeekDashboardView: View {
     async let wRows = try? await client.withingsHistory(days: 14)
     async let gutT  = try? await client.gutDay(date: SeptenaDate.today)
     async let gutH  = try? await client.gutHistory(days: 7)
-    async let cfg  = try? await client.settings()
-    let (wR, gT, gH, cfgRes) = await (wRows, gutT, gutH, cfg)
+    let (wR, gT, gH) = await (wRows, gutT, gutH)
     bodyRows = wR ?? []
     gutToday = gT
     gutHistory = gH?.daily ?? []
-    settings = cfgRes
     // HealthKit — on-device, no FastAPI. Mac builds short-circuit.
     await HealthKitBridge.shared.refresh()
   }
@@ -225,12 +233,13 @@ struct WeekDashboardView: View {
       habits: dailies.habits,
       supplements: dailies.supplements,
       chores: dailies.chores,
-      training: recentTraining
+      training: recentTraining,
+      tasks: completedTasks
     )
     .padding(14)
     .background(
       RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-        .fill(Color(.secondarySystemGroupedBackground))
+        .fill(Theme.secondaryGroupedBackground)
     )
   }
 
@@ -255,28 +264,35 @@ struct WeekDashboardView: View {
     activityTile
   }
 
-  // Tasks — live counts from /api/tasks/counts. No history endpoint yet
-  // (would need /api/tasks/history) so the histogram stays mocked.
+  // Tasks — live counts from /api/tasks/counts and per-day completion
+  // history from /api/tasks/history. Tapping the tile switches to the
+  // Tasks tab (the full task app); other tiles open a sheet, but Tasks
+  // has its own dedicated tab already.
   private var tasksTile: some View {
     let today = taskCounts.map { $0.todayCount + $0.reviewCount } ?? 0
     let inbox = taskCounts?.inboxCount ?? 0
     let upcoming = taskCounts?.upcomingCount ?? 0
     let open = taskCounts?.openCount ?? 0
-    return ModuleTile(
-      title: "Tasks",
-      accent: theme.color(for: "tasks"),
-      stats: [.init(label: "Today",    value: "\(today)"),
-              .init(label: "Inbox",    value: "\(inbox)"),
-              .init(label: "Upcoming", value: "\(upcoming)")],
-      // Today's share of the open backlog — gives a sense of immediate
-      // load against everything still queued. Defaults to a full bar
-      // when open is unknown, so the empty state doesn't read as 0%.
-      progress: .init(label: "Today / open",
-                      current: Double(today),
-                      target: Double(max(open, today, 1))),
-      history: .init(label: "7-day completions",
-                     values: Array(repeating: max(today, 1), count: 7))
-    )
+    let bars = tasksHistory?.daily.map(\.done) ?? []
+    return Button { tabSelection.current = .tasks } label: {
+      ModuleTile(
+        title: "Tasks",
+        accent: theme.color(for: "tasks"),
+        stats: [.init(label: "Today",    value: "\(today)"),
+                .init(label: "Inbox",    value: "\(inbox)"),
+                .init(label: "Upcoming", value: "\(upcoming)")],
+        // Today's share of the open backlog — gives a sense of immediate
+        // load against everything still queued. Defaults to a full bar
+        // when open is unknown, so the empty state doesn't read as 0%.
+        progress: .init(label: "Today / open",
+                        current: Double(today),
+                        target: Double(max(open, today, 1))),
+        history: bars.isEmpty
+          ? nil
+          : .init(label: "7-day completions", values: bars)
+      )
+    }
+    .buttonStyle(.plain)
   }
 
   private var habitsTile: some View {
@@ -634,9 +650,8 @@ struct WeekDashboardView: View {
     }
   }
 
-  // Settings — single-stat tile that bears the section accent and
-  // Settings is now reached via the toolbar gear button on Week —
-  // it's an app-level concern, not a module worth a tile.
+  // Settings is reached from the sidebar (and ⌘, on macOS) — it's an
+  // app-level surface, not a Week tile, and not on this toolbar.
 
   /// 7.2 → "7:12" — compact h:mm form for the tile.
   private func formatHoursShort(_ h: Double) -> String {
