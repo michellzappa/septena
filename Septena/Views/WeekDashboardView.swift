@@ -14,6 +14,8 @@ enum WeekDestination: Hashable {
   case supplements
   case sleep
   case nutrition
+  case air
+  case groceries
 }
 
 struct WeekDashboardView: View {
@@ -36,6 +38,9 @@ struct WeekDashboardView: View {
   @State private var todayProteinSum: Double = 0
   @State private var todayKcalSum: Double = 0
   @State private var nutritionTarget: MacrosConfig? = nil
+  @State private var airSummary: AirSummary? = nil
+  @State private var airHistory: [AirHistoryPoint] = []
+  @State private var groceries: [GroceryItem] = []
 
   /// 1 column on iPhone (compact), 3 on iPad / Mac (regular). LazyVGrid
   /// reflows automatically on rotation; tiles keep their internal layout.
@@ -70,6 +75,8 @@ struct WeekDashboardView: View {
         case .supplements: SupplementsDestinationView()
         case .sleep:       SleepDestinationView()
         case .nutrition:   NutritionDestinationView()
+        case .air:         AirDestinationView()
+        case .groceries:   GroceriesDestinationView()
         }
       }
       .task { await loadAll() }
@@ -92,8 +99,15 @@ struct WeekDashboardView: View {
     async let nstats = try? await client.nutritionStats(days: 7)
     async let nents = try? await client.nutritionEntries(since: SeptenaDate.today)
     async let ntarget = try? await client.nutritionMacrosConfig()
+    async let asum = try? await client.airSummary()
+    async let ahist = try? await client.airHistory(days: 7)
+    async let groc = try? await client.groceries()
     let (h, c, ca, e, s, t, o) = await (hh, ch, car, ents, sh, tc, on)
     let (ns, ne, nt) = await (nstats, nents, ntarget)
+    let (asRes, ahRes, gRes) = await (asum, ahist, groc)
+    airSummary = asRes
+    airHistory = ahRes?.daily ?? []
+    if let g = gRes { groceries = g }
     if let h { habitHistory = h.daily.map { $0.done } }
     if let c { choreHistory = c.daily.map { $0.completed } }
     cardio = ca
@@ -127,6 +141,8 @@ struct WeekDashboardView: View {
     supplementsTile
     sleepTile
     nutritionTile
+    airTile
+    groceriesTile
   }
 
   // Tasks — live counts from /api/tasks/counts. No history endpoint yet
@@ -259,6 +275,53 @@ struct WeekDashboardView: View {
         history: .init(label: "7-day hours",
                        values: bars.isEmpty
                          ? Array(repeating: 0, count: 7) : bars)
+      )
+    }
+    .buttonStyle(.plain)
+  }
+
+  // Air — latest CO2 with band-derived accent; 7-day CO2 average bars.
+  private var airTile: some View {
+    let accent = theme.color(for: "air")
+    let latest = airSummary?.latest?.co2Ppm.map { Int($0) }
+    let todayOver = airSummary?.today.minutesOver1000 ?? 0
+    let bars = airHistory.map { Int($0.co2Avg ?? 0) }
+    return NavigationLink(value: WeekDestination.air) {
+      ModuleTile(
+        title: "Air",
+        accent: accent,
+        stats: [
+          .init(label: "CO2", value: latest.map { "\($0)" } ?? "—", unit: "ppm"),
+          .init(label: "Over 1000", value: "\(todayOver)", unit: "m")
+        ],
+        history: .init(label: "7-day CO2 avg",
+                       values: bars.isEmpty
+                         ? Array(repeating: 0, count: 7) : bars)
+      )
+    }
+    .buttonStyle(.plain)
+  }
+
+  // Groceries — shopping-list size as the headline stat.
+  private var groceriesTile: some View {
+    let accent = theme.color(for: "groceries")
+    let lowCount = groceries.filter { $0.low }.count
+    let stocked = groceries.count - lowCount
+    return NavigationLink(value: WeekDestination.groceries) {
+      ModuleTile(
+        title: "Groceries",
+        accent: accent,
+        stats: [
+          .init(label: "Low",     value: "\(lowCount)"),
+          .init(label: "Stocked", value: "\(stocked)")
+        ],
+        progress: groceries.isEmpty ? nil : .init(
+          label: "Stocked",
+          current: Double(stocked),
+          target: Double(max(groceries.count, 1))
+        ),
+        history: .init(label: "Shopping list",
+                       values: Array(repeating: max(lowCount, 1), count: 7))
       )
     }
     .buttonStyle(.plain)

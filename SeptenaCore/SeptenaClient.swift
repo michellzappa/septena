@@ -315,6 +315,51 @@ final class SeptenaClient {
     try await getJSON("/api/nutrition/macros-config", as: MacrosConfig.self)
   }
 
+  // MARK: - Air
+
+  /// Snapshot for the Air mini-app — latest reading + today / last-24h
+  /// CO2/temp/humidity averages and CO2 band.
+  func airSummary() async throws -> AirSummary {
+    try await getJSON("/api/air/summary", as: AirSummary.self)
+  }
+
+  /// Per-day air stats; powers the Air tile histogram (CO2 average bars).
+  func airHistory(days: Int = 7) async throws -> AirHistoryResponse {
+    try await getJSON("/api/air/history",
+                      query: [URLQueryItem(name: "days", value: String(days))],
+                      as: AirHistoryResponse.self)
+  }
+
+  // MARK: - Groceries
+
+  /// The current pantry list — both "in stock" and "running low" items.
+  /// Sorted client-side; server returns them in storage order.
+  func groceries() async throws -> [GroceryItem] {
+    try await getJSON("/api/groceries", as: GroceriesResponse.self).items
+  }
+
+  /// Flip an item's `low` flag (the shopping-list state). Body matches
+  /// the webapp's PATCH /api/groceries/item/{id} signature.
+  func patchGroceryItem(id: String, low: Bool) async throws {
+    let path = "/api/groceries/item/\(id)"
+    let body: [String: Any] = ["low": low]
+    guard var comps = URLComponents(url: baseURL.appendingPathComponent(path),
+                                    resolvingAgainstBaseURL: false) else {
+      throw SeptenaError.invalidURL
+    }
+    comps.queryItems = nil
+    guard let u = comps.url else { throw SeptenaError.invalidURL }
+    var req = URLRequest(url: u)
+    req.httpMethod = "PATCH"
+    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    req.httpBody = try JSONSerialization.data(withJSONObject: body)
+    let (data, resp) = try await session.data(for: req)
+    let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+    if code >= 400 {
+      throw SeptenaError.server(code, String(data: data, encoding: .utf8) ?? "")
+    }
+  }
+
   // MARK: - Health (Oura)
 
   /// N nights of Oura sleep data. Server returns newest-first via the

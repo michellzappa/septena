@@ -576,6 +576,97 @@ struct MacrosConfig: Codable, Hashable {
   let kcal: MacroRange
 }
 
+// MARK: - Air
+
+struct AirReading: Codable, Identifiable, Hashable {
+  let date: String
+  let time: String
+  var id_: String?
+  var co2Ppm: Double?
+  var tempC: Double?
+  var humidityPct: Double?
+
+  var id: String { id_ ?? "\(date) \(time)" }
+
+  enum CodingKeys: String, CodingKey {
+    case date, time
+    case id_ = "id"
+    case co2Ppm      = "co2_ppm"
+    case tempC       = "temp_c"
+    case humidityPct = "humidity_pct"
+  }
+}
+
+struct AirDayStats: Codable, Hashable {
+  let readings: Int
+  var co2Avg: Double?
+  var co2Max: Double?
+  var tempAvg: Double?
+  var humidityAvg: Double?
+  var minutesOver1000: Int
+
+  enum CodingKeys: String, CodingKey {
+    case readings
+    case co2Avg          = "co2_avg"
+    case co2Max          = "co2_max"
+    case tempAvg         = "temp_avg"
+    case humidityAvg     = "humidity_avg"
+    case minutesOver1000 = "minutes_over_1000"
+  }
+}
+
+struct AirSummary: Codable, Hashable {
+  let latest: AirReading?
+  let co2Band: String?     // "good" | "ok" | "poor" | "bad"
+  let today: AirDayStats
+  let last24h: AirDayStats
+
+  enum CodingKeys: String, CodingKey {
+    case latest, today
+    case co2Band = "co2_band"
+    case last24h = "last_24h"
+  }
+}
+
+struct AirHistoryPoint: Codable, Hashable {
+  let date: String
+  let readings: Int
+  var co2Avg: Double?
+  var co2Max: Double?
+  var minutesOver1000: Int
+
+  enum CodingKeys: String, CodingKey {
+    case date, readings
+    case co2Avg          = "co2_avg"
+    case co2Max          = "co2_max"
+    case minutesOver1000 = "minutes_over_1000"
+  }
+}
+
+struct AirHistoryResponse: Codable {
+  let daily: [AirHistoryPoint]
+}
+
+// MARK: - Groceries
+
+struct GroceryItem: Codable, Identifiable, Hashable {
+  let id: String
+  var name: String
+  var category: String
+  var emoji: String
+  var low: Bool
+  var lastBought: String?
+
+  enum CodingKeys: String, CodingKey {
+    case id, name, category, emoji, low
+    case lastBought = "last_bought"
+  }
+}
+
+struct GroceriesResponse: Codable {
+  let items: [GroceryItem]
+}
+
 struct NextItem: Codable, Identifiable, Hashable {
   var id: String
   var kind: String
