@@ -508,6 +508,74 @@ struct OuraHistoryResponse: Codable {
   let oura: [OuraNight]
 }
 
+// MARK: - Nutrition
+
+/// One logged meal/snack. From `/api/nutrition/entries`.
+struct NutritionEntry: Codable, Identifiable, Hashable {
+  let date: String
+  let time: String
+  var emoji: String?
+  var proteinG: Double
+  var fatG: Double
+  var carbsG: Double
+  var fiberG: Double?
+  var kcal: Double
+  var foods: [String]
+  let file: String
+
+  var id: String { file }
+
+  enum CodingKeys: String, CodingKey {
+    case date, time, emoji, kcal, foods, file
+    case proteinG = "protein_g"
+    case fatG     = "fat_g"
+    case carbsG   = "carbs_g"
+    case fiberG   = "fiber_g"
+  }
+}
+
+/// One day's macro totals. From `NutritionStats.daily`.
+struct NutritionDailyPoint: Codable, Hashable {
+  let date: String
+  let proteinG: Double
+  let fatG: Double
+  let carbsG: Double
+  let kcal: Double
+
+  enum CodingKeys: String, CodingKey {
+    case date, kcal
+    case proteinG = "protein_g"
+    case fatG     = "fat_g"
+    case carbsG   = "carbs_g"
+  }
+}
+
+struct NutritionStatsResponse: Codable {
+  let daily: [NutritionDailyPoint]
+  let todayMealCount: Int?
+  let todayLatestMeal: String?
+
+  enum CodingKeys: String, CodingKey {
+    case daily
+    case todayMealCount  = "today_meal_count"
+    case todayLatestMeal = "today_latest_meal"
+  }
+}
+
+/// User-configured macro targets. From `/api/nutrition/macros-config`.
+struct MacroRange: Codable, Hashable {
+  let min: Double
+  let max: Double
+  let unit: String
+}
+
+struct MacrosConfig: Codable, Hashable {
+  let protein: MacroRange
+  let fat: MacroRange
+  let carbs: MacroRange
+  let kcal: MacroRange
+}
+
 struct NextItem: Codable, Identifiable, Hashable {
   var id: String
   var kind: String

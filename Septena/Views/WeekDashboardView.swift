@@ -13,6 +13,7 @@ enum WeekDestination: Hashable {
   case training
   case supplements
   case sleep
+  case nutrition
 }
 
 struct WeekDashboardView: View {
@@ -30,6 +31,11 @@ struct WeekDashboardView: View {
   @State private var supplementHistory: [Int] = Array(repeating: 0, count: 7)
   @State private var taskCounts: TasksCounts? = nil
   @State private var ouraNights: [OuraNight] = []
+  @State private var nutritionStats: NutritionStatsResponse? = nil
+  @State private var todayNutrition: NutritionEntry? = nil
+  @State private var todayProteinSum: Double = 0
+  @State private var todayKcalSum: Double = 0
+  @State private var nutritionTarget: MacrosConfig? = nil
 
   /// 1 column on iPhone (compact), 3 on iPad / Mac (regular). LazyVGrid
   /// reflows automatically on rotation; tiles keep their internal layout.
@@ -63,6 +69,7 @@ struct WeekDashboardView: View {
         case .training:    TrainingDestinationView()
         case .supplements: SupplementsDestinationView()
         case .sleep:       SleepDestinationView()
+        case .nutrition:   NutritionDestinationView()
         }
       }
       .task { await loadAll() }
@@ -82,7 +89,11 @@ struct WeekDashboardView: View {
     async let sh = try? await client.supplementsHistory(days: 7)
     async let tc = try? await client.counts()
     async let on = try? await client.ouraHistory(days: 7)
+    async let nstats = try? await client.nutritionStats(days: 7)
+    async let nents = try? await client.nutritionEntries(since: SeptenaDate.today)
+    async let ntarget = try? await client.nutritionMacrosConfig()
     let (h, c, ca, e, s, t, o) = await (hh, ch, car, ents, sh, tc, on)
+    let (ns, ne, nt) = await (nstats, nents, ntarget)
     if let h { habitHistory = h.daily.map { $0.done } }
     if let c { choreHistory = c.daily.map { $0.completed } }
     cardio = ca
@@ -90,6 +101,12 @@ struct WeekDashboardView: View {
     if let s { supplementHistory = s.daily.map { $0.done } }
     taskCounts = t
     if let o { ouraNights = o }
+    nutritionStats = ns
+    nutritionTarget = nt
+    let today = SeptenaDate.today
+    let todayEntries = (ne ?? []).filter { $0.date == today }
+    todayProteinSum = todayEntries.reduce(0) { $0 + $1.proteinG }
+    todayKcalSum    = todayEntries.reduce(0) { $0 + $1.kcal }
   }
 
   private func sinceDate(daysBack: Int) -> String {
@@ -253,14 +270,29 @@ struct WeekDashboardView: View {
     return String(format: "%d:%02d", total / 60, total % 60)
   }
 
+  // Nutrition — today's protein + kcal from today's entries; histogram
+  // is per-day protein from /api/nutrition/stats; progress bar uses the
+  // user's protein target from /api/nutrition/macros-config.
   private var nutritionTile: some View {
-    ModuleTile(
-      title: "Nutrition",
-      accent: theme.color(for: "nutrition"),
-      stats: [.init(label: "Protein", value: "50", unit: "g"),
-              .init(label: "Kcal",    value: "855")],
-      progress: .init(label: "Today's protein", current: 50, target: 150, unit: "g"),
-      history: .init(label: "7-day protein", values: [120, 130, 140, 160, 80, 145, 60])
-    )
+    let accent = theme.color(for: "nutrition")
+    let proteinTarget = nutritionTarget?.protein.min ?? 150
+    let bars = nutritionStats?.daily.map { Int($0.proteinG) }
+              ?? Array(repeating: 0, count: 7)
+    return NavigationLink(value: WeekDestination.nutrition) {
+      ModuleTile(
+        title: "Nutrition",
+        accent: accent,
+        stats: [
+          .init(label: "Protein", value: "\(Int(todayProteinSum))", unit: "g"),
+          .init(label: "Kcal",    value: "\(Int(todayKcalSum))")
+        ],
+        progress: .init(label: "Today's protein",
+                        current: todayProteinSum,
+                        target: max(proteinTarget, 1),
+                        unit: "g"),
+        history: .init(label: "7-day protein", values: bars)
+      )
+    }
+    .buttonStyle(.plain)
   }
 }

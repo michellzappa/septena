@@ -294,6 +294,27 @@ final class SeptenaClient {
                       as: CardioHistoryResponse.self)
   }
 
+  // MARK: - Nutrition
+
+  /// Logged nutrition entries since the given YYYY-MM-DD.
+  func nutritionEntries(since: String? = nil) async throws -> [NutritionEntry] {
+    let q: [URLQueryItem] = since.map { [URLQueryItem(name: "since", value: $0)] } ?? []
+    return try await getJSON("/api/nutrition/entries", query: q, as: [NutritionEntry].self)
+  }
+
+  /// Per-day macro totals + today summary. Powers the Nutrition tile
+  /// histogram and the destination's daily averages.
+  func nutritionStats(days: Int = 7) async throws -> NutritionStatsResponse {
+    try await getJSON("/api/nutrition/stats",
+                      query: [URLQueryItem(name: "days", value: String(days))],
+                      as: NutritionStatsResponse.self)
+  }
+
+  /// User's configured macro targets (protein/fat/carbs/kcal ranges).
+  func nutritionMacrosConfig() async throws -> MacrosConfig {
+    try await getJSON("/api/nutrition/macros-config", as: MacrosConfig.self)
+  }
+
   // MARK: - Health (Oura)
 
   /// N nights of Oura sleep data. Server returns newest-first via the
