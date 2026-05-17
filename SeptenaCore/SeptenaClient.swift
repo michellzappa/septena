@@ -315,6 +315,14 @@ final class SeptenaClient {
     try await getJSON("/api/nutrition/macros-config", as: MacrosConfig.self)
   }
 
+  // MARK: - Settings
+
+  /// User's full Septena configuration (targets, units, theme, time, etc).
+  /// Decoded with our trimmed AppSettings — extra server fields ignored.
+  func settings() async throws -> AppSettings {
+    try await getJSON("/api/settings", as: AppSettings.self)
+  }
+
   // MARK: - Caffeine
 
   func caffeineDay(date: String) async throws -> CaffeineDayResponse {

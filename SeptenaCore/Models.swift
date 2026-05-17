@@ -832,6 +832,82 @@ struct GutHistoryResponse: Codable {
   let daily: [GutHistoryPoint]
 }
 
+// MARK: - Settings
+//
+// Mirror of the webapp's AppSettings shape but trimmed to the fields the
+// iOS client actually reads today. Anything we don't decode just gets
+// ignored — the server stays authoritative; we don't round-trip writes
+// for sections we haven't built UIs for yet.
+
+struct AppTargets: Codable, Hashable {
+  let proteinMinG: Double?
+  let proteinMaxG: Double?
+  let fatMinG: Double?
+  let fatMaxG: Double?
+  let carbsMinG: Double?
+  let carbsMaxG: Double?
+  let kcalMin: Double?
+  let kcalMax: Double?
+  let z2WeeklyMin: Int?
+  let sleepTargetH: Double?
+  let fastingMinH: Double?
+  let fastingMaxH: Double?
+  let weightMinKg: Double?
+  let weightMaxKg: Double?
+  let fatMinPct: Double?
+  let fatMaxPct: Double?
+
+  enum CodingKeys: String, CodingKey {
+    case proteinMinG  = "protein_min_g"
+    case proteinMaxG  = "protein_max_g"
+    case fatMinG      = "fat_min_g"
+    case fatMaxG      = "fat_max_g"
+    case carbsMinG    = "carbs_min_g"
+    case carbsMaxG    = "carbs_max_g"
+    case kcalMin      = "kcal_min"
+    case kcalMax      = "kcal_max"
+    case z2WeeklyMin  = "z2_weekly_min"
+    case sleepTargetH = "sleep_target_h"
+    case fastingMinH  = "fasting_min_h"
+    case fastingMaxH  = "fasting_max_h"
+    case weightMinKg  = "weight_min_kg"
+    case weightMaxKg  = "weight_max_kg"
+    case fatMinPct    = "fat_min_pct"
+    case fatMaxPct    = "fat_max_pct"
+  }
+}
+
+struct AppUnits: Codable, Hashable {
+  let weight: String        // "kg" | "lb"
+  let distance: String      // "km" | "mi"
+}
+
+struct AppTimeSettings: Codable, Hashable {
+  let homeTimezone: String
+  let travelMode: String?
+  let travelTimezone: String?
+
+  enum CodingKeys: String, CodingKey {
+    case homeTimezone   = "home_timezone"
+    case travelMode     = "travel_mode"
+    case travelTimezone = "travel_timezone"
+  }
+}
+
+struct AppSettings: Codable {
+  let sectionOrder: [String]?
+  let targets: AppTargets?
+  let units: AppUnits?
+  let time: AppTimeSettings?
+  let theme: String?        // "system" | "light" | "dark"
+  let eink: Bool?
+
+  enum CodingKeys: String, CodingKey {
+    case sectionOrder = "section_order"
+    case targets, units, time, theme, eink
+  }
+}
+
 struct NextItem: Codable, Identifiable, Hashable {
   var id: String
   var kind: String

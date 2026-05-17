@@ -22,6 +22,7 @@ enum WeekDestination: Hashable {
   case cannabis
   case body
   case gut
+  case settings
 }
 
 struct WeekDashboardView: View {
@@ -55,6 +56,7 @@ struct WeekDashboardView: View {
   @State private var bodyRows: [WithingsRow] = []
   @State private var gutToday: GutDayResponse? = nil
   @State private var gutHistory: [GutHistoryPoint] = []
+  @State private var settings: AppSettings? = nil
 
   /// 1 column on iPhone (compact), 3 on iPad / Mac (regular). LazyVGrid
   /// reflows automatically on rotation; tiles keep their internal layout.
@@ -96,6 +98,7 @@ struct WeekDashboardView: View {
         case .cannabis:    CannabisDestinationView()
         case .body:        BodyDestinationView()
         case .gut:         GutDestinationView()
+        case .settings:    SettingsDestinationView()
         }
       }
       .task { await loadAll() }
@@ -157,10 +160,12 @@ struct WeekDashboardView: View {
     async let wRows = try? await client.withingsHistory(days: 14)
     async let gutT  = try? await client.gutDay(date: SeptenaDate.today)
     async let gutH  = try? await client.gutHistory(days: 7)
-    let (wR, gT, gH) = await (wRows, gutT, gutH)
+    async let cfg  = try? await client.settings()
+    let (wR, gT, gH, cfgRes) = await (wRows, gutT, gutH, cfg)
     bodyRows = wR ?? []
     gutToday = gT
     gutHistory = gH?.daily ?? []
+    settings = cfgRes
   }
 
   private func sinceDate(daysBack: Int) -> String {
@@ -188,6 +193,7 @@ struct WeekDashboardView: View {
     cannabisTile
     bodyTile
     gutTile
+    settingsTile
   }
 
   // Tasks — live counts from /api/tasks/counts. No history endpoint yet
@@ -536,6 +542,32 @@ struct WeekDashboardView: View {
         history: .init(label: "7-day movements",
                        values: bars.isEmpty
                          ? Array(repeating: 0, count: 7) : bars)
+      )
+    }
+    .buttonStyle(.plain)
+  }
+
+  // Settings — single-stat tile that bears the section accent and
+  // confirms the iOS app loaded the server config. Histogram is purely
+  // decorative (number of configured targets per category).
+  private var settingsTile: some View {
+    let accent = theme.color(for: "settings")
+    let loaded = settings != nil
+    let count = settings?.sectionOrder?.count ?? 0
+    let theme_ = settings?.theme?.capitalized ?? "—"
+    return NavigationLink(value: WeekDestination.settings) {
+      ModuleTile(
+        title: "Settings",
+        accent: accent,
+        stats: [
+          .init(label: "Sections", value: "\(count)"),
+          .init(label: "Theme",    value: theme_)
+        ],
+        progress: .init(label: "Config loaded",
+                        current: loaded ? 1 : 0,
+                        target: 1),
+        history: .init(label: "Status",
+                       values: Array(repeating: loaded ? 1 : 0, count: 7))
       )
     }
     .buttonStyle(.plain)
