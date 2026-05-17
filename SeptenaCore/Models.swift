@@ -496,6 +496,7 @@ struct SupplementHistoryResponse: Codable {
 struct OuraNight: Codable, Identifiable, Hashable {
   let date: String           // YYYY-MM-DD
   var sleepScore: Int?
+  var readinessScore: Int?
   var totalH: Double?
   var deepH: Double?
   var remH: Double?
@@ -506,22 +507,29 @@ struct OuraNight: Codable, Identifiable, Hashable {
   var restingHr: Int?
   var bedtime: String?
   var wakeTime: String?
+  var stressHighMin: Int?
+  var recoveryHighMin: Int?
+  var stressSummary: String?   // "stressful" | "normal" | "restored" | "restorative"
 
   var id: String { date }
 
   enum CodingKeys: String, CodingKey {
     case date
-    case sleepScore  = "sleep_score"
-    case totalH      = "total_h"
-    case deepH       = "deep_h"
-    case remH        = "rem_h"
-    case lightH      = "light_h"
-    case awakeH      = "awake_h"
+    case sleepScore       = "sleep_score"
+    case readinessScore   = "readiness_score"
+    case totalH           = "total_h"
+    case deepH            = "deep_h"
+    case remH             = "rem_h"
+    case lightH           = "light_h"
+    case awakeH           = "awake_h"
     case efficiency
     case hrv
-    case restingHr   = "resting_hr"
+    case restingHr        = "resting_hr"
     case bedtime
-    case wakeTime    = "wake_time"
+    case wakeTime         = "wake_time"
+    case stressHighMin    = "stress_high_min"
+    case recoveryHighMin  = "recovery_high_min"
+    case stressSummary    = "stress_summary"
   }
 }
 

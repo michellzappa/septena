@@ -1,8 +1,10 @@
 import SwiftUI
+import Charts
 
-// Sleep mini-app — Oura-backed log of recent nights. Top summary shows
-// last night's score / total / deep / rem / HRV; list below is per-night
-// LogRows for the last ~14 nights so you can scan trends.
+// Sleep mini-app — Oura-backed dashboard mirroring the webapp.
+// Top: score rings + duration/stress stats. Middle: four 7-day charts
+// (score/readiness, stages stacked, total sleep, stress vs recovery).
+// Bottom: per-night LogRows for the last 14 nights.
 
 struct SleepDestinationView: View {
   @Environment(SeptenaClient.self) private var client
@@ -13,12 +15,24 @@ struct SleepDestinationView: View {
 
   private var accent: Color { theme.color(for: "sleep") }
 
-  /// Server returns newest-first; keep that order for the list.
+  // Server returns newest-first; first element = most recent night.
   private var lastNight: OuraNight? { nights.first }
+
+  // 7 most recent nights, chronological (oldest → newest) for charts.
+  private var last7: [OuraNight] {
+    Array(nights.prefix(7).reversed())
+  }
+
+  // Latest non-null helper — Oura sometimes omits fields on a given date.
+  private func latest<T>(_ keyPath: KeyPath<OuraNight, T?>) -> T? {
+    nights.first(where: { $0[keyPath: keyPath] != nil })?[keyPath: keyPath]
+  }
 
   var body: some View {
     List {
-      summary
+      scoresSection
+      durationSection
+      chartsSection
       Section("Recent nights") {
         ForEach(nights) { night in
           LogRow(
@@ -48,59 +62,299 @@ struct SleepDestinationView: View {
     #endif
     .tint(accent)
     .task { await load() }
-    .refreshable { await load() }
   }
 
-  // MARK: - Summary
+  // MARK: - Top stat rows
 
-  private var summary: some View {
+  private var scoresSection: some View {
     Section {
-      if let n = lastNight {
-        HStack(alignment: .top, spacing: 24) {
-          stat(value: n.totalH.map(formatHours) ?? "—", label: "last night", tint: accent)
-          stat(value: n.sleepScore.map { "\($0)" } ?? "—", label: "score", tint: accent)
-          Spacer()
-          if let hrv = n.hrv {
-            stat(value: "\(hrv)", label: "HRV", tint: .secondary, alignment: .trailing)
-          }
+      LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
+        scoreRing(value: latest(\.sleepScore) ?? latest(\.efficiency),
+                  label: "Sleep Score", target: "85+", color: accent)
+        scoreRing(value: latest(\.readinessScore),
+                  label: "Readiness", target: "85+", color: accent.opacity(0.7))
+        scoreRing(value: latest(\.efficiency),
+                  label: "Efficiency", target: "85%+", color: accent.opacity(0.55))
+        bedtimeTile
+      }
+      .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+      .listRowBackground(Color.clear)
+    }
+  }
+
+  private var durationSection: some View {
+    Section {
+      LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
+        statTile(label: "Total Sleep",
+                 value: latest(\.totalH).map(formatHours),
+                 target: "7–9 h",
+                 color: accent)
+        statTile(label: "Deep Sleep",
+                 value: latest(\.deepH).map(formatHours),
+                 target: "1–2 h",
+                 color: accent.opacity(0.85))
+        statTile(label: "REM Sleep",
+                 value: latest(\.remH).map(formatHours),
+                 target: "1.5–2 h",
+                 color: accent.opacity(0.7))
+        stressTile
+      }
+      .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 6, trailing: 12))
+      .listRowBackground(Color.clear)
+    }
+  }
+
+  // MARK: - Tile primitives
+
+  private func scoreRing(value: Int?, label: String, target: String, color: Color) -> some View {
+    let pct = value.map { min(1.0, Double($0) / 100.0) } ?? 0
+    return VStack(spacing: 6) {
+      ZStack {
+        Circle()
+          .stroke(Color.secondary.opacity(0.2), lineWidth: 4)
+        Circle()
+          .trim(from: 0, to: pct)
+          .stroke(color, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+          .rotationEffect(.degrees(-90))
+        Text(value.map(String.init) ?? "—")
+          .font(.system(.title3, design: .rounded).weight(.semibold))
+          .foregroundStyle(color)
+      }
+      .frame(width: 56, height: 56)
+      Text(label)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      Text(target)
+        .font(.caption2)
+        .foregroundStyle(.secondary.opacity(0.7))
+    }
+    .frame(maxWidth: .infinity)
+    .padding(.vertical, 12)
+    .background(Theme.secondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 16))
+  }
+
+  private func statTile(label: String, value: String?, target: String, color: Color) -> some View {
+    VStack(spacing: 4) {
+      Text(value ?? "—")
+        .font(.system(.title2, design: .rounded).weight(.semibold))
+        .foregroundStyle(color)
+      Text(label)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      Text(target)
+        .font(.caption2)
+        .foregroundStyle(.secondary.opacity(0.7))
+    }
+    .frame(maxWidth: .infinity)
+    .padding(.vertical, 14)
+    .background(Theme.secondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 16))
+  }
+
+  private var bedtimeTile: some View {
+    VStack(spacing: 6) {
+      VStack(spacing: 1) {
+        Text("BEDTIME")
+          .font(.caption2.weight(.semibold))
+          .foregroundStyle(.secondary)
+        Text(latest(\.bedtime) ?? "—")
+          .font(.system(.body, design: .rounded).weight(.semibold))
+      }
+      VStack(spacing: 1) {
+        Text("WAKE")
+          .font(.caption2.weight(.semibold))
+          .foregroundStyle(.secondary)
+        Text(latest(\.wakeTime) ?? "—")
+          .font(.system(.body, design: .rounded).weight(.semibold))
+      }
+    }
+    .frame(maxWidth: .infinity)
+    .padding(.vertical, 12)
+    .background(Theme.secondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 16))
+  }
+
+  private var stressTile: some View {
+    let mins = latest(\.stressHighMin)
+    let summary = latest(\.stressSummary)
+    let recovery = latest(\.recoveryHighMin)
+    return VStack(spacing: 4) {
+      Text(mins.map { "\($0)m" } ?? "—")
+        .font(.system(.title2, design: .rounded).weight(.semibold).monospacedDigit())
+        .foregroundStyle(stressColor(summary))
+      Text("Stress")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      Text(summary.map { $0.prefix(1).uppercased() + $0.dropFirst() } ?? "—")
+        .font(.caption2)
+        .foregroundStyle(.secondary.opacity(0.7))
+      if let r = recovery {
+        Text("\(r)m recovery")
+          .font(.caption2)
+          .foregroundStyle(.secondary.opacity(0.6))
+      }
+    }
+    .frame(maxWidth: .infinity)
+    .padding(.vertical, 14)
+    .background(Theme.secondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 16))
+  }
+
+  private func stressColor(_ summary: String?) -> Color {
+    switch summary {
+    case "stressful":            return .red
+    case "restored", "restorative": return .green
+    case "normal":               return .orange
+    default:                     return .secondary
+    }
+  }
+
+  // MARK: - Charts
+
+  @ViewBuilder
+  private var chartsSection: some View {
+    if !last7.isEmpty {
+      Section {
+        scoreReadinessChart
+          .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 6, trailing: 12))
+          .listRowBackground(Color.clear)
+        stagesChart
+          .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 6, trailing: 12))
+          .listRowBackground(Color.clear)
+        totalSleepChart
+          .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 6, trailing: 12))
+          .listRowBackground(Color.clear)
+        if last7.contains(where: { $0.stressHighMin != nil }) {
+          stressRecoveryChart
+            .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 6, trailing: 12))
+            .listRowBackground(Color.clear)
         }
-        if n.deepH != nil || n.remH != nil {
-          HStack(spacing: 18) {
-            phase("Deep", hours: n.deepH)
-            phase("REM",  hours: n.remH)
-            phase("Light", hours: n.lightH)
-            phase("Awake", hours: n.awakeH)
-            Spacer()
-          }
-          .padding(.top, 4)
-        }
-      } else if loading {
-        ProgressView()
-          .frame(maxWidth: .infinity)
       }
     }
   }
 
-  private func stat(value: String, label: String, tint: Color,
-                    alignment: HorizontalAlignment = .leading) -> some View {
-    VStack(alignment: alignment, spacing: 2) {
-      Text(value)
-        .font(.system(.title2, design: .rounded).weight(.semibold))
-        .foregroundStyle(tint)
-      Text(label).font(.caption).foregroundStyle(.secondary)
+  private var scoreReadinessChart: some View {
+    chartCard(title: "Score & Readiness", caption: "↑ 85+") {
+      Chart {
+        ForEach(last7) { n in
+          if let s = n.sleepScore {
+            LineMark(x: .value("Day", weekdayLabel(n.date)),
+                     y: .value("Score", s),
+                     series: .value("Series", "Sleep"))
+              .foregroundStyle(accent)
+              .interpolationMethod(.monotone)
+          }
+          if let r = n.readinessScore {
+            LineMark(x: .value("Day", weekdayLabel(n.date)),
+                     y: .value("Score", r),
+                     series: .value("Series", "Readiness"))
+              .foregroundStyle(accent.opacity(0.55))
+              .interpolationMethod(.monotone)
+          }
+        }
+        RuleMark(y: .value("Target", 85))
+          .foregroundStyle(accent.opacity(0.4))
+          .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
+      }
+      .chartYScale(domain: 0...100)
+      .frame(height: 140)
     }
   }
 
-  private func phase(_ name: String, hours: Double?) -> some View {
-    VStack(alignment: .leading, spacing: 1) {
-      Text(name)
-        .font(.caption2.weight(.semibold))
-        .foregroundStyle(.secondary)
-        .textCase(.uppercase)
-      Text(hours.map(formatHours) ?? "—")
-        .font(.footnote.monospacedDigit())
-        .foregroundStyle(Theme.inkPrimary)
+  private var stagesChart: some View {
+    chartCard(title: "Sleep Stages", caption: "hours") {
+      Chart {
+        ForEach(last7) { n in
+          if let d = n.deepH {
+            BarMark(x: .value("Day", weekdayLabel(n.date)),
+                    y: .value("Deep", d))
+              .foregroundStyle(accent)
+          }
+          if let r = n.remH {
+            BarMark(x: .value("Day", weekdayLabel(n.date)),
+                    y: .value("REM", r))
+              .foregroundStyle(accent.opacity(0.7))
+          }
+          if let l = n.lightH {
+            BarMark(x: .value("Day", weekdayLabel(n.date)),
+                    y: .value("Light", l))
+              .foregroundStyle(accent.opacity(0.4))
+          }
+        }
+      }
+      .chartForegroundStyleScale([
+        "Deep":  accent,
+        "REM":   accent.opacity(0.7),
+        "Light": accent.opacity(0.4)
+      ])
+      .chartLegend(position: .bottom, alignment: .center, spacing: 8)
+      .frame(height: 140)
     }
+  }
+
+  private var totalSleepChart: some View {
+    chartCard(title: "Total Sleep", caption: "↑ 7–9 h") {
+      Chart {
+        ForEach(last7) { n in
+          if let t = n.totalH {
+            LineMark(x: .value("Day", weekdayLabel(n.date)),
+                     y: .value("Hours", t))
+              .foregroundStyle(accent)
+              .interpolationMethod(.monotone)
+            PointMark(x: .value("Day", weekdayLabel(n.date)),
+                      y: .value("Hours", t))
+              .foregroundStyle(accent)
+              .symbolSize(40)
+          }
+        }
+        RuleMark(y: .value("Target", 7))
+          .foregroundStyle(accent.opacity(0.4))
+          .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
+      }
+      .chartYScale(domain: 0...10)
+      .frame(height: 140)
+    }
+  }
+
+  private var stressRecoveryChart: some View {
+    chartCard(title: "Stress & Recovery", caption: "min/day") {
+      Chart {
+        ForEach(last7) { n in
+          if let s = n.stressHighMin {
+            BarMark(x: .value("Day", weekdayLabel(n.date)),
+                    y: .value("Stress", s))
+              .foregroundStyle(stressColor(n.stressSummary))
+          }
+          if let r = n.recoveryHighMin {
+            BarMark(x: .value("Day", weekdayLabel(n.date)),
+                    y: .value("Recovery", r))
+              .foregroundStyle(Color.green)
+          }
+        }
+      }
+      .chartForegroundStyleScale([
+        "Stress":   Color.red,
+        "Recovery": Color.green
+      ])
+      .chartLegend(position: .bottom, alignment: .center, spacing: 8)
+      .frame(height: 140)
+    }
+  }
+
+  @ViewBuilder
+  private func chartCard<C: View>(title: String, caption: String?, @ViewBuilder _ content: () -> C) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(alignment: .firstTextBaseline, spacing: 6) {
+        Text(title)
+          .font(.subheadline.weight(.semibold))
+        if let caption {
+          Text(caption)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        Spacer()
+      }
+      content()
+    }
+    .padding(12)
+    .background(Theme.secondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 16))
   }
 
   // MARK: - Loading
@@ -149,5 +403,15 @@ struct SleepDestinationView: View {
     let pretty = DateFormatter()
     pretty.dateFormat = "MMM d"
     return pretty.string(from: d)
+  }
+
+  private func weekdayLabel(_ iso: String) -> String {
+    let fmt = DateFormatter()
+    fmt.dateFormat = "yyyy-MM-dd"
+    fmt.timeZone = .current
+    guard let d = fmt.date(from: iso) else { return iso }
+    let wd = DateFormatter()
+    wd.dateFormat = "EEE"
+    return wd.string(from: d)
   }
 }
