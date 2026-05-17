@@ -34,9 +34,7 @@ struct WeekDashboardView: View {
   }
 
   private var tiles: some View {
-    LazyVGrid(columns: [GridItem(.flexible(), spacing: 12),
-                        GridItem(.flexible(), spacing: 12)],
-              spacing: 12) {
+    VStack(spacing: 12) {
       ModuleTile(title: "Tasks",    snapshot: "5 today · 2 late",
                  accent: .blue,    history: [3, 5, 2, 7, 4, 6, 5])
       ModuleTile(title: "Habits",   snapshot: "4 of 6 done",

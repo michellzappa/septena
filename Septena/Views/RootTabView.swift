@@ -18,22 +18,50 @@ struct RootTabView: View {
     TabView(selection: $selection) {
       WeekDashboardView()
         .tabItem {
-          // Brand glyph (7 dots) instead of a system symbol. Discs.png is
-          // template-rendered so it picks up the tab tint.
-          Label { Text("Week") } icon: { Image("Discs").renderingMode(.template) }
+          // Brand glyph (7 dots), oversized vs the other tabs to anchor the
+          // bar. .resizable + explicit frame survives the tabItem clamp on
+          // iOS 18+; .imageScale fine-tunes the SF-symbol tabs to feel
+          // visually smaller than the glyph.
+          Label {
+            Text("Week")
+          } icon: {
+            Image("Discs")
+              .renderingMode(.template)
+              .resizable()
+              .scaledToFit()
+              .frame(width: 30, height: 30)
+          }
         }
         .tag(Tab.week)
 
       NextDashboardView()
-        .tabItem { Label("Next", systemImage: "arrow.right") }
+        .tabItem {
+          Label {
+            Text("Next")
+          } icon: {
+            Image(systemName: "arrow.right").imageScale(.small)
+          }
+        }
         .tag(Tab.next)
 
       ContentView()
-        .tabItem { Label("Tasks", systemImage: "checkmark") }
+        .tabItem {
+          Label {
+            Text("Tasks")
+          } icon: {
+            Image(systemName: "checkmark").imageScale(.small)
+          }
+        }
         .tag(Tab.tasks)
 
       SearchTabView()
-        .tabItem { Label("Search", systemImage: "magnifyingglass") }
+        .tabItem {
+          Label {
+            Text("Search")
+          } icon: {
+            Image(systemName: "magnifyingglass").imageScale(.small)
+          }
+        }
         .tag(Tab.search)
     }
     .tint(theme.accent)
