@@ -10,6 +10,7 @@ import SwiftUI
 enum WeekDestination: Hashable {
   case habits
   case chores
+  case training
 }
 
 struct WeekDashboardView: View {
@@ -22,6 +23,8 @@ struct WeekDashboardView: View {
   @State private var dailies = NextItemsModel()
   @State private var habitHistory: [Int] = Array(repeating: 0, count: 7)
   @State private var choreHistory: [Int] = Array(repeating: 0, count: 7)
+  @State private var cardio: CardioHistoryResponse? = nil
+  @State private var trainingSessionDates: Set<String> = []
 
   /// 1 column on iPhone (compact), 3 on iPad / Mac (regular). LazyVGrid
   /// reflows automatically on rotation; tiles keep their internal layout.
@@ -52,8 +55,9 @@ struct WeekDashboardView: View {
       #endif
       .navigationDestination(for: WeekDestination.self) { dest in
         switch dest {
-        case .habits: HabitsDestinationView()
-        case .chores: ChoresDestinationView()
+        case .habits:   HabitsDestinationView()
+        case .chores:   ChoresDestinationView()
+        case .training: TrainingDestinationView()
         }
       }
       .task { await loadAll() }
@@ -68,9 +72,20 @@ struct WeekDashboardView: View {
     async let _ = dailies.load(client: client)
     async let hh = try? await client.habitsHistory(days: 7)
     async let ch = try? await client.choresHistory(days: 7)
-    let (h, c) = await (hh, ch)
+    async let car = try? await client.trainingCardioHistory(days: 7)
+    async let ents = try? await client.trainingEntries(since: sinceDate(daysBack: 7))
+    let (h, c, ca, e) = await (hh, ch, car, ents)
     if let h { habitHistory = h.daily.map { $0.done } }
     if let c { choreHistory = c.daily.map { $0.completed } }
+    cardio = ca
+    if let e { trainingSessionDates = Set(e.map(\.date)) }
+  }
+
+  private func sinceDate(daysBack: Int) -> String {
+    let d = Calendar.current.date(byAdding: .day, value: -daysBack, to: Date()) ?? Date()
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd"
+    return f.string(from: d)
   }
 
   // MARK: - Tiles
@@ -121,15 +136,33 @@ struct WeekDashboardView: View {
     .buttonStyle(.plain)
   }
 
+  // Training — sessions count derived from unique dates in the last 7
+  // days of entries; Z2 minutes and target come from the cardio endpoint;
+  // histogram bars are per-day cardio minutes.
   private var trainingTile: some View {
-    ModuleTile(
-      title: "Training",
-      accent: theme.color(for: "training"),
-      stats: [.init(label: "Sessions", value: "5/7"),
-              .init(label: "Z2 min",   value: "115", unit: "m")],
-      progress: .init(label: "Z2 cardio", current: 115, target: 150, unit: "m"),
-      history: .init(label: "7-day effort", values: [0, 45, 0, 30, 0, 0, 40])
-    )
+    let accent = theme.color(for: "training")
+    let sessionCount = trainingSessionDates.count
+    let minutes = cardio?.daily.reduce(0) { $0 + $1.minutes } ?? 0
+    let target = cardio?.targetWeeklyMin ?? 150
+    let bars = cardio?.daily.map { $0.minutes } ?? Array(repeating: 0, count: 7)
+    return NavigationLink(value: WeekDestination.training) {
+      ModuleTile(
+        title: "Training",
+        accent: accent,
+        stats: [
+          .init(label: "Sessions", value: "\(sessionCount)/7"),
+          .init(label: "Z2 min",   value: "\(minutes)", unit: "m")
+        ],
+        progress: .init(
+          label: "Z2 cardio",
+          current: Double(minutes),
+          target: Double(max(target, 1)),
+          unit: "m"
+        ),
+        history: .init(label: "7-day effort", values: bars)
+      )
+    }
+    .buttonStyle(.plain)
   }
 
   private var choresTile: some View {

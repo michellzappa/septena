@@ -371,6 +371,85 @@ struct ChoreHistoryResponse: Codable {
   let total: Int
 }
 
+// MARK: - Training
+
+/// One logged exercise entry. From `/api/training/entries`. Sessions are
+/// implicit — multiple entries share the same `date` + `session` string.
+struct ExerciseEntry: Codable, Identifiable, Hashable {
+  let date: String           // YYYY-MM-DD
+  let session: String        // e.g. "upper", "cardio"
+  var exercise: String?
+  var weight: Double?
+  var sets: String?          // server returns int OR string ("AMRAP")
+  var reps: String?          // same — int or string
+  var difficulty: String?
+  var durationMin: Double?
+  var distanceM: Double?
+  var level: Double?
+  var file: String?
+  var concludedAt: String?
+  var loggedAt: String?
+
+  /// Identifier: server's `file` is unique per entry; fall back to a
+  /// composite when missing (older logs).
+  var id: String { file ?? "\(date)-\(session)-\(exercise ?? "?")-\(loggedAt ?? "")" }
+
+  init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    date = try c.decode(String.self, forKey: .date)
+    session = try c.decodeIfPresent(String.self, forKey: .session) ?? ""
+    exercise = try c.decodeIfPresent(String.self, forKey: .exercise)
+    weight = try c.decodeIfPresent(Double.self, forKey: .weight)
+    // sets / reps come back as Int or String depending on the row.
+    sets = Self.decodeIntOrString(c, key: .sets)
+    reps = Self.decodeIntOrString(c, key: .reps)
+    difficulty = try c.decodeIfPresent(String.self, forKey: .difficulty)
+    durationMin = try c.decodeIfPresent(Double.self, forKey: .durationMin)
+    distanceM = try c.decodeIfPresent(Double.self, forKey: .distanceM)
+    level = try c.decodeIfPresent(Double.self, forKey: .level)
+    file = try c.decodeIfPresent(String.self, forKey: .file)
+    concludedAt = try c.decodeIfPresent(String.self, forKey: .concludedAt)
+    loggedAt = try c.decodeIfPresent(String.self, forKey: .loggedAt)
+  }
+
+  private static func decodeIntOrString(_ c: KeyedDecodingContainer<CodingKeys>,
+                                        key: CodingKeys) -> String? {
+    if let i = try? c.decodeIfPresent(Int.self, forKey: key) { return String(i) }
+    return try? c.decodeIfPresent(String.self, forKey: key)
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case date, session, exercise, weight, sets, reps, difficulty, level, file
+    case durationMin = "duration_min"
+    case distanceM = "distance_m"
+    case concludedAt = "concluded_at"
+    case loggedAt = "logged_at"
+  }
+}
+
+/// One day of cardio minutes; from `/api/training/cardio-history`. Used by
+/// the Week tile histogram and the destination's weekly Z2 progress.
+struct CardioDay: Codable, Hashable {
+  let date: String
+  let minutes: Int
+  let rolling7d: Double?
+
+  enum CodingKeys: String, CodingKey {
+    case date, minutes
+    case rolling7d = "rolling_7d"
+  }
+}
+
+struct CardioHistoryResponse: Codable {
+  let daily: [CardioDay]
+  let targetWeeklyMin: Int
+
+  enum CodingKeys: String, CodingKey {
+    case daily
+    case targetWeeklyMin = "target_weekly_min"
+  }
+}
+
 struct NextItem: Codable, Identifiable, Hashable {
   var id: String
   var kind: String

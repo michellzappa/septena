@@ -268,6 +268,24 @@ final class SeptenaClient {
                       as: HabitHistoryResponse.self)
   }
 
+  // MARK: - Training
+
+  /// Flat list of logged exercise entries since the given YYYY-MM-DD.
+  /// Server returns most-recent-first by date; group client-side into
+  /// session blocks (same date + session string).
+  func trainingEntries(since: String? = nil) async throws -> [ExerciseEntry] {
+    let q: [URLQueryItem] = since.map { [URLQueryItem(name: "since", value: $0)] } ?? []
+    return try await getJSON("/api/training/entries", query: q, as: [ExerciseEntry].self)
+  }
+
+  /// Per-day cardio minutes + the user's configured weekly Z2 target.
+  /// Drives the Training tile's histogram + Z2 progress bar.
+  func trainingCardioHistory(days: Int = 7) async throws -> CardioHistoryResponse {
+    try await getJSON("/api/training/cardio-history",
+                      query: [URLQueryItem(name: "days", value: String(days))],
+                      as: CardioHistoryResponse.self)
+  }
+
   func completeChore(id: String, date: String) async throws {
     let body: [String: Any] = ["chore_id": id, "date": date]
     _ = try await postJSON("/api/chores/complete", body: body, as: EmptyResponse.self)
