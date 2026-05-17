@@ -7,6 +7,7 @@ import SwiftUI
 
 enum WeekDestination: Hashable {
   case habits
+  case chores
 }
 
 struct WeekDashboardView: View {
@@ -48,8 +49,11 @@ struct WeekDashboardView: View {
       .navigationDestination(for: WeekDestination.self) { dest in
         switch dest {
         case .habits: HabitsDestinationView()
+        case .chores: ChoresDestinationView()
         }
       }
+      // Habits and Chores share the same model shape; one fetch hydrates
+      // both tiles. Future tiles can each have their own @State model.
       .task { await habits.load(client: client) }
       .refreshable { await habits.load(client: client) }
     }
@@ -118,14 +122,28 @@ struct WeekDashboardView: View {
     )
   }
 
+  // Chores — real data via the shared NextItemsModel (already loaded for
+  // Habits). Tapping pushes into ChoresDestinationView.
   private var choresTile: some View {
-    ModuleTile(
-      title: "Chores",
-      accent: .purple,
-      stats: [.init(label: "Due today", value: "2"),
-              .init(label: "Overdue",   value: "0")],
-      history: .init(label: "7-day done", values: [2, 1, 3, 2, 1, 2, 4])
-    )
+    let dueToday = habits.chores.filter { $0.daysOverdue == 0 }.count
+    let overdue  = habits.chores.filter { $0.daysOverdue > 0 }.count
+    let accent = theme.color(for: "chores")
+    return NavigationLink(value: WeekDestination.chores) {
+      ModuleTile(
+        title: "Chores",
+        accent: accent,
+        stats: [
+          .init(label: "Due today", value: "\(dueToday)"),
+          .init(label: "Overdue",   value: "\(overdue)")
+        ],
+        history: .init(
+          label: "7-day done",
+          // Placeholder until /api/chores/history is wired into the client.
+          values: Array(repeating: max(dueToday, 1), count: 7)
+        )
+      )
+    }
+    .buttonStyle(.plain)
   }
 
   private var sleepTile: some View {

@@ -361,7 +361,11 @@ private struct SupplementRow: View {
   }
 }
 
-private struct ChoreRow: View {
+// Shared by NextOpenSection and ChoresDestinationView. Same swipe vocab
+// (Tomorrow / Weekend defer, complete on tap, overdue badge) for both
+// callers; the Chores tab just shows every chore where Next shows only
+// today's actionable subset.
+struct ChoreRow: View {
   let chore: ChoreItem
   var model: NextItemsModel
   let client: SeptenaClient
@@ -430,7 +434,10 @@ private struct ChoreRow: View {
 
 // MARK: - Shared chrome
 
-private struct StatusBadge: View {
+// Reused across HabitRow / SupplementRow / ChoreRow for "Done" / "Skipped"
+// / defer-label pills. Pulled out of private scope so the chores mini-app
+// can render its own status pills inline.
+struct StatusBadge: View {
   let text: String
   var body: some View {
     Text(text)
