@@ -18,53 +18,26 @@ struct RootTabView: View {
     TabView(selection: $selection) {
       WeekDashboardView()
         .tabItem {
-          // Brand glyph (7 dots), oversized vs the other tabs to anchor the
-          // bar. .resizable + explicit frame survives the tabItem clamp on
-          // iOS 18+; .imageScale fine-tunes the SF-symbol tabs to feel
-          // visually smaller than the glyph.
+          // Custom asset via the standard Label(icon:) initializer.
+          // Discs.png is template-rendered so it picks up the tab tint.
           Label {
             Text("Week")
           } icon: {
-            Image("Discs")
-              .renderingMode(.template)
-              .resizable()
-              .scaledToFit()
-              .frame(width: 30, height: 30)
+            Image("Discs").renderingMode(.template)
           }
         }
         .tag(Tab.week)
 
       NextDashboardView()
-        .tabItem {
-          Label {
-            Text("Next")
-          } icon: {
-            Image(systemName: "arrow.right")
-              .resizable().scaledToFit().frame(width: 16, height: 16)
-          }
-        }
+        .tabItem { Label("Next", systemImage: "arrow.right") }
         .tag(Tab.next)
 
       ContentView()
-        .tabItem {
-          Label {
-            Text("Tasks")
-          } icon: {
-            Image(systemName: "checkmark")
-              .resizable().scaledToFit().frame(width: 16, height: 16)
-          }
-        }
+        .tabItem { Label("Tasks", systemImage: "checkmark") }
         .tag(Tab.tasks)
 
       SearchTabView()
-        .tabItem {
-          Label {
-            Text("Search")
-          } icon: {
-            Image(systemName: "magnifyingglass")
-              .resizable().scaledToFit().frame(width: 16, height: 16)
-          }
-        }
+        .tabItem { Label("Search", systemImage: "magnifyingglass") }
         .tag(Tab.search)
     }
     .tint(theme.accent)
