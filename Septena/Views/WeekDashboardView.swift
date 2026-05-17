@@ -10,26 +10,21 @@ struct WeekDashboardView: View {
   var body: some View {
     NavigationStack {
       ScrollView {
-        VStack(alignment: .leading, spacing: 20) {
-          header
+        VStack(spacing: 14) {
           tiles
-          comingSoon
         }
-        .padding(.horizontal)
-        .padding(.top)
+        .padding(.horizontal, Theme.hPadding)
+        .padding(.top, 12)
         .padding(.bottom, 80)
       }
-      .navigationBarHidden(true)
-    }
-  }
-
-  private var header: some View {
-    VStack(alignment: .leading, spacing: 4) {
-      Text("Week")
-        .font(.largeTitle.bold())
-      Text("Last 7 days · your shape across modules")
-        .font(.subheadline)
-        .foregroundStyle(.secondary)
+      // Gray canvas, white tiles — matches the insetGrouped pattern that
+      // Reminders / Settings use, and keeps Week consistent with the
+      // standard iOS section-list look the Tasks tab will adopt.
+      .background(Color(.systemGroupedBackground))
+      .navigationTitle("Week")
+      #if os(iOS)
+      .navigationBarTitleDisplayMode(.large)
+      #endif
     }
   }
 
@@ -88,13 +83,5 @@ struct WeekDashboardView: View {
         history: .init(label: "7-day protein", values: [120, 130, 140, 160, 80, 145, 60])
       )
     }
-  }
-
-  private var comingSoon: some View {
-    Text("Per-day timeline rows land in Phase 2 — for now, tiles are mock data and inert.")
-      .font(.footnote)
-      .foregroundStyle(.secondary)
-      .frame(maxWidth: .infinity, alignment: .center)
-      .padding(.top, 8)
   }
 }

@@ -53,15 +53,14 @@ struct ModuleTile: View {
       .padding(.vertical, 16)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
+    // Match the insetGrouped look: white card on the gray canvas the
+    // Week view supplies. `.secondarySystemGroupedBackground` is the
+    // system token Reminders / Notes use for grouped-list rows.
     .background(
-      RoundedRectangle(cornerRadius: 14, style: .continuous)
-        .fill(Color(.secondarySystemBackground))
+      RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+        .fill(Color(.secondarySystemGroupedBackground))
     )
-    .overlay(
-      RoundedRectangle(cornerRadius: 14, style: .continuous)
-        .stroke(.quaternary, lineWidth: 0.5)
-    )
-    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
   }
 
   private var header: some View {

@@ -209,7 +209,9 @@ struct SidebarRootView: View {
       }
     }
     .background(Theme.sidebarBackground)
-    .navigationTitle("")
+    // Matches the tab label so Tasks reads as a top-level destination,
+    // consistent with Week / Next / Search.
+    .navigationTitle("Tasks")
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         Menu {
@@ -397,10 +399,7 @@ struct SidebarRootView: View {
                     // buckets live on Today, so the user-facing count is
                     // the sum (matches the tile/sidebar Today screen).
                     count: counts.map { $0.todayCount + $0.reviewCount }),
-      SmartListSpec(route: .next,
-                    icon: "arrow.right", color: .green,
-                    title: "Next",
-                    count: nextCount),
+      // Next moved out of the Tasks sidebar — it's a top-level tab now.
       SmartListSpec(route: .filter(.upcoming),
                     icon: "calendar", color: .red,
                     title: "Upcoming",
