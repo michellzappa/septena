@@ -31,6 +31,18 @@ final class TaskEntity {
   /// so the painted-from-cache order matches what the network refresh will
   /// produce — otherwise rows visibly reshuffle on every cold open.
   var sortIndex: Int
+  /// True while one or more `OutboxEntity` rows reference this task. The
+  /// Syncer will not overwrite local fields on a row with `pendingSync ==
+  /// true` — we don't want a server snapshot taken before the user's
+  /// optimistic write to clobber the local state. Cleared by TaskMutator
+  /// once the queue for this id is empty.
+  var pendingSync: Bool = false
+  /// True between the moment `TaskMutator.delete(id:)` is called and the
+  /// drainer confirming the server-side delete. `LocalCache` filters rows
+  /// with `pendingDeletion == true` so the UI hides them immediately. If
+  /// the network call ultimately fails the flag is cleared and the row
+  /// resurrects in the list.
+  var pendingDeletion: Bool = false
 
   init(id: String,
        title: String,
@@ -48,7 +60,9 @@ final class TaskEntity {
        recurrenceInterval: Int = 1,
        recurrenceAfterCompletion: Bool = true,
        lastSyncedAt: Date = .distantPast,
-       sortIndex: Int = 0) {
+       sortIndex: Int = 0,
+       pendingSync: Bool = false,
+       pendingDeletion: Bool = false) {
     self.id = id
     self.title = title
     self.statusRaw = statusRaw
@@ -66,6 +80,8 @@ final class TaskEntity {
     self.recurrenceAfterCompletion = recurrenceAfterCompletion
     self.lastSyncedAt = lastSyncedAt
     self.sortIndex = sortIndex
+    self.pendingSync = pendingSync
+    self.pendingDeletion = pendingDeletion
   }
 
   var status: TaskStatus {
@@ -203,7 +219,7 @@ final class LocalStore {
   let container: ModelContainer
 
   private init() {
-    let schema = Schema([TaskEntity.self, ProjectEntity.self, AreaEntity.self])
+    let schema = Schema([TaskEntity.self, ProjectEntity.self, AreaEntity.self, OutboxEntity.self])
     let config = ModelConfiguration("Septena", schema: schema)
     do {
       container = try ModelContainer(for: schema, configurations: [config])
@@ -242,6 +258,10 @@ enum LocalCache {
     guard let rows = try? context.fetch(descriptor) else { return [] }
     let today = SeptenaDate.today
     return rows.compactMap { e -> SeptenaTask? in
+      // Hide rows the user has deleted locally; the outbox drainer will
+      // either confirm the deletion (row removed) or resurrect them if
+      // the server rejects.
+      if e.pendingDeletion { return nil }
       switch filter {
       case .today:
         guard e.status == .open else { return nil }
@@ -455,6 +475,14 @@ final class Syncer {
     let existing = try? context.fetch(
       FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.id == id })
     ).first
+    // Local outbox in flight: don't overwrite the optimistic state with a
+    // stale server snapshot. Bump lastSyncedAt + sortIndex so the prune
+    // pass doesn't treat the row as orphaned.
+    if let existing, existing.pendingSync {
+      existing.lastSyncedAt = syncedAt
+      existing.sortIndex = sortIndex
+      return
+    }
     let entity = existing ?? TaskEntity(id: id, title: dto.title)
     entity.title = dto.title
     entity.statusRaw = dto.status.rawValue

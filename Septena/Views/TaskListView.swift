@@ -7,6 +7,11 @@ import SwiftData
 
 struct TaskListView: View {
   @Environment(SeptenaClient.self) private var client
+  /// Task write-path: applies optimistic SwiftData changes, enqueues
+  /// outbox ops, and drains to FastAPI with retry. Every mutation in this
+  /// view routes through here instead of `client.*` so the UI never
+  /// blocks on the network and offline edits survive an app restart.
+  @Environment(TaskMutator.self) private var mutator
   @Environment(NavigationState.self) private var nav
   @Environment(SectionTheme.self) private var theme
   @Environment(\.modelContext) private var modelContext
@@ -601,10 +606,8 @@ struct TaskListView: View {
     guard let id = effectiveSelectionId(),
           let t = currentTask(id: id) else { return }
     Haptics.tick()
-    Task {
-      try? await client.moveToToday(id: t.id, today: !t.today)
-      await load()
-    }
+    mutator.moveToToday(id: t.id, today: !t.today)
+    Task { await load() }
   }
 
   /// ⌘S — open the When (schedule) picker for the focused row.
@@ -635,46 +638,28 @@ struct TaskListView: View {
 
   private func applyRecurrence(id: String, rule: Recurrence?) {
     Haptics.tick()
-    Task {
-      do {
-        _ = try await client.setRecurrence(id: id, recurrence: rule)
-        await load()
-      } catch {
-        errorMessage = error.localizedDescription
-      }
-    }
+    mutator.setRecurrence(id: id, recurrence: rule)
+    Task { await load() }
   }
 
   private func applyCancel(_ id: String) {
     Haptics.warning()
     // Optimistic flip so the user sees the row immediately switch to its
-    // cancelled treatment (strikethrough + dim, like a done task). Server
-    // filters cancelled out of every non-logbook view, so without this the
-    // row would just vanish silently on reload — easy to read as "nothing
-    // happened". Linger on screen until the user navigates / reloads, in
-    // line with how completed tasks behave.
-    let prior = currentTask(id: id)?.status
+    // cancelled treatment (strikethrough + dim, like a done task). The
+    // mutator durably enqueues the server-side cancel; if push ultimately
+    // fails the next pull will surface server truth.
     flipStatus(id: id, to: .cancelled)
     sessionDoneIds.insert(id)
-    Task {
-      do {
-        try await client.cancel(id: id)
-      } catch {
-        if let prior {
-          flipStatus(id: id, to: prior)
-          sessionDoneIds.remove(id)
-        }
-        errorMessage = error.localizedDescription
-      }
-    }
+    mutator.cancel(id: id)
   }
 
   private func applyDelete(_ id: String) {
     Haptics.warning()
-    Task {
-      do { try await client.delete(id: id); await load() }
-      catch { errorMessage = error.localizedDescription }
-    }
+    // Remove from the visible buckets immediately — the row is filtered
+    // from LocalCache via `pendingDeletion`, but the in-memory @State
+    // arrays power the current screen and have to be poked separately.
+    removeLocally(id: id)
+    mutator.delete(id: id)
   }
 
   /// Persist title/notes from the Details pane. No-op when both fields
@@ -688,10 +673,8 @@ struct TaskListView: View {
        (current.notes ?? "") == notes {
       return
     }
-    Task {
-      _ = try? await client.update(id: id, title: trimmed, notes: notes)
-      await load()
-    }
+    mutator.update(id: id, title: trimmed, notes: notes)
+    Task { await load() }
   }
 
   /// Open the Details pane for a task. Only the (i) button on the
@@ -713,20 +696,14 @@ struct TaskListView: View {
                                         chosenKind: chosenKind,
                                         chosenId: chosenId)
     }
-    Task {
-      do {
-        // Project takes precedence — Septena derives area from project on save.
-        if projectId != nil {
-          _ = try await client.moveToProject(id: id, project: projectId)
-        } else {
-          _ = try await client.moveToArea(id: id, area: areaId)
-          _ = try await client.moveToProject(id: id, project: nil)
-        }
-        await load()
-      } catch {
-        errorMessage = error.localizedDescription
-      }
+    // Project takes precedence — Septena derives area from project on save.
+    if projectId != nil {
+      mutator.moveToProject(id: id, project: projectId)
+    } else {
+      mutator.moveToArea(id: id, area: areaId)
+      mutator.moveToProject(id: id, project: nil)
     }
+    Task { await load() }
   }
 
   // MARK: - Row
@@ -766,10 +743,8 @@ struct TaskListView: View {
           // If the user hit Esc on a fresh ⌘N task with an empty title,
           // delete it so we don't leave a stub in the list.
           if wasNew && title.isEmpty, let id {
-            Task {
-              _ = try? await client.delete(id: id)
-              await load()
-            }
+            mutator.delete(id: id)
+            removeLocally(id: id)
           }
         },
         onOpenDetails: {
@@ -804,14 +779,16 @@ struct TaskListView: View {
           if task.today {
             Button {
               Haptics.tick()
-              Task { try? await client.moveToToday(id: task.id, today: false); await load() }
+              mutator.moveToToday(id: task.id, today: false)
+              Task { await load() }
             } label: {
               Label("Remove from Today", systemImage: "sun.min")
             }
           } else if filter != .today {
             Button {
               Haptics.tick()
-              Task { try? await client.moveToToday(id: task.id, today: true); await load() }
+              mutator.moveToToday(id: task.id, today: true)
+              Task { await load() }
             } label: {
               Label("Move to Today", systemImage: "sun.max.fill")
             }
@@ -1002,19 +979,13 @@ struct TaskListView: View {
                                       chosenKind: suggestion.kind,
                                       chosenId: suggestion.id)
     suggestionEngine.clearSuggestion(for: task.id)
-    Task {
-      do {
-        switch suggestion.kind {
-        case .area:
-          _ = try await client.moveToArea(id: task.id, area: suggestion.id)
-        case .project:
-          _ = try await client.moveToProject(id: task.id, project: suggestion.id)
-        }
-        await load()
-      } catch {
-        SeptenaLog.error("apply suggestion failed", error)
-      }
+    switch suggestion.kind {
+    case .area:
+      mutator.moveToArea(id: task.id, area: suggestion.id)
+    case .project:
+      mutator.moveToProject(id: task.id, project: suggestion.id)
     }
+    Task { await load() }
   }
 
   /// Implicit "Not this" — fires when the user moves the task somewhere
@@ -1428,10 +1399,8 @@ struct TaskListView: View {
       accessoryChip(systemName: task.today ? "sun.max.fill" : "sun.max",
                     tint: task.today ? .orange : nil) {
         Haptics.tick()
-        Task {
-          try? await client.moveToToday(id: task.id, today: !task.today)
-          await load()
-        }
+        mutator.moveToToday(id: task.id, today: !task.today)
+        Task { await load() }
       }
       accessoryChip(systemName: "number") {
         moveTargetId = task.id; showingMoveSheet = true
@@ -1502,17 +1471,13 @@ struct TaskListView: View {
       // otherwise leave it alone (existing tasks shouldn't vanish just
       // because the user blurred while the field was empty).
       if wasNew {
-        Task {
-          _ = try? await client.delete(id: id)
-          await load()
-        }
+        mutator.delete(id: id)
+        removeLocally(id: id)
       }
       return
     }
-    Task {
-      _ = try? await client.update(id: id, title: t, notes: editingNotes)
-      await load()
-    }
+    mutator.update(id: id, title: t, notes: editingNotes)
+    Task { await load() }
   }
 
   /// Tap-outside dismiss — commits any active inline edit AND clears the
@@ -1571,37 +1536,31 @@ struct TaskListView: View {
 
   private func applyWhen(id: String, kind: WhenKind, date: Date?) {
     Haptics.tick()
-    Task {
-      do {
-        switch kind {
-        case .due:
-          try await client.setDue(id: id, date: date)
-        case .scheduled:
-          // Things-style mapping:
-          //   • "Today" → pin to today (today=true), clear any scheduled date.
-          //     This makes the task appear under Today's pinned items, not
-          //     in the "review/scheduled-past" section.
-          //   • Future date → today=false + scheduled=date. Server auto-
-          //     surfaces the task on Today when that date arrives.
-          //   • Nil ("No Date") → clear both flags.
-          if let d = date {
-            if Calendar.current.isDateInToday(d) {
-              try await client.schedule(id: id, date: nil)
-              try await client.moveToToday(id: id, today: true)
-            } else {
-              try await client.moveToToday(id: id, today: false)
-              try await client.schedule(id: id, date: d)
-            }
-          } else {
-            try await client.schedule(id: id, date: nil)
-            try await client.moveToToday(id: id, today: false)
-          }
+    switch kind {
+    case .due:
+      mutator.setDue(id: id, date: date)
+    case .scheduled:
+      // Things-style mapping:
+      //   • "Today" → pin to today (today=true), clear any scheduled date.
+      //     This makes the task appear under Today's pinned items, not
+      //     in the "review/scheduled-past" section.
+      //   • Future date → today=false + scheduled=date. Server auto-
+      //     surfaces the task on Today when that date arrives.
+      //   • Nil ("No Date") → clear both flags.
+      if let d = date {
+        if Calendar.current.isDateInToday(d) {
+          mutator.schedule(id: id, date: nil)
+          mutator.moveToToday(id: id, today: true)
+        } else {
+          mutator.moveToToday(id: id, today: false)
+          mutator.schedule(id: id, date: d)
         }
-        await load()
-      } catch {
-        errorMessage = error.localizedDescription
+      } else {
+        mutator.schedule(id: id, date: nil)
+        mutator.moveToToday(id: id, today: false)
       }
     }
+    Task { await load() }
   }
 
   // MARK: - Toggle done
@@ -1618,20 +1577,10 @@ struct TaskListView: View {
     if newStatus == .done { sessionDoneIds.insert(task.id) }
     else                  { sessionDoneIds.remove(task.id) }
 
-    Task {
-      do {
-        if newStatus == .done {
-          try await client.complete(id: task.id)
-        } else {
-          try await client.uncomplete(id: task.id)
-        }
-      } catch {
-        // Revert the optimistic flip and surface the error.
-        flipStatus(id: task.id, to: task.status)
-        if task.status == .done { sessionDoneIds.insert(task.id) }
-        else                    { sessionDoneIds.remove(task.id) }
-        errorMessage = error.localizedDescription
-      }
+    if newStatus == .done {
+      mutator.complete(id: task.id)
+    } else {
+      mutator.uncomplete(id: task.id)
     }
   }
 
@@ -1644,6 +1593,17 @@ struct TaskListView: View {
       }
     }
     apply(&items); apply(&review); apply(&doneToday)
+  }
+
+  /// Drop the matching task from every visible bucket. Paired with
+  /// `TaskMutator.delete(...)` — the SwiftData row carries `pendingDeletion`
+  /// so LocalCache hides it, but the in-memory @State arrays power the
+  /// currently rendered screen and have to be poked separately.
+  private func removeLocally(id: String) {
+    func drop(_ list: inout [SeptenaTask]) {
+      list.removeAll { $0.id == id }
+    }
+    drop(&items); drop(&review); drop(&doneToday)
   }
 
   // MARK: - Logged items section

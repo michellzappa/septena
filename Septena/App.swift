@@ -17,6 +17,16 @@ struct SeptenaApp: App {
   @State private var trainingDraft = TrainingDraftStore()
   @State private var settingsStore = SettingsStore()
   private let localStore = LocalStore.shared
+  /// Owns the task write-path: applies optimistic SwiftData changes,
+  /// enqueues OutboxEntity rows, and drains them to FastAPI with retry.
+  /// Views call this instead of `SeptenaClient.*` for any task mutation
+  /// so the UI never blocks on the network.
+  @State private var taskMutator: TaskMutator = TaskMutator(
+    client: ClientProvider.shared.client,
+    context: LocalStore.shared.container.mainContext
+  )
+  /// Drives drainer kicks on foreground / coming-back-online transitions.
+  @Environment(\.scenePhase) private var scenePhase
   #if os(iOS)
   @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
   #endif
@@ -32,7 +42,13 @@ struct SeptenaApp: App {
         .environment(theme)
         .environment(trainingDraft)
         .environment(settingsStore)
+        .environment(taskMutator)
         .modelContainer(localStore.container)
+        .onChange(of: scenePhase) { _, phase in
+          // Foreground transitions are the best moment to flush any
+          // mutations that were queued while offline / suspended.
+          if phase == .active { taskMutator.kickDrain() }
+        }
         .task {
           #if os(iOS)
           // Drain any shortcut captured during cold launch — the
@@ -55,6 +71,11 @@ struct SeptenaApp: App {
           let syncer = Syncer(client: clientProvider.client,
                               context: localStore.container.mainContext)
           await syncer.pullAll()
+          // Flush anything that was queued in a prior session (e.g. the
+          // app was killed mid-drain). Safe to call before/after pullAll
+          // since the mutator's pendingSync flag protects rows during
+          // upsert, and the drainer is idempotent.
+          taskMutator.kickDrain()
           BadgeManager.shared.start(context: localStore.container.mainContext)
           await runRemindersAutoImport()
         }

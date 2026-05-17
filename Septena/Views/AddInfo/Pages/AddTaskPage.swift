@@ -28,6 +28,7 @@ private enum TaskBucket {
 struct AddTaskPage: View {
   @Environment(NavigationState.self) private var nav
   @Environment(SeptenaClient.self) private var client
+  @Environment(TaskMutator.self) private var mutator
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
@@ -140,17 +141,13 @@ struct AddTaskPage: View {
   }
 
   private func pull(_ task: SeptenaTask) {
-    Task {
-      do {
-        if task.today {
-          try await client.complete(id: task.id)
-        } else {
-          try await client.moveToToday(id: task.id)
-        }
-        Haptics.tick()
-        dismiss()
-      } catch { Haptics.warning() }
+    if task.today {
+      mutator.complete(id: task.id)
+    } else {
+      mutator.moveToToday(id: task.id)
     }
+    Haptics.tick()
+    dismiss()
   }
 
   private func loadTodays() async {
