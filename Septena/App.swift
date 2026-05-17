@@ -23,7 +23,7 @@ struct SeptenaApp: App {
     WindowGroup {
       VStack(spacing: 0) {
         OfflineBanner()
-        ContentView()
+        RootTabView()
       }
         .environment(clientProvider.client)
         .environment(navigation)

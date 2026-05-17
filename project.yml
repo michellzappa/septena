@@ -37,7 +37,7 @@ targets:
     info:
       path: Septena/Info.plist
       properties:
-        CFBundleDisplayName: Septena
+        CFBundleDisplayName: Septena Cloud
         UILaunchScreen: {}
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: true
@@ -57,7 +57,7 @@ targets:
         NSRemindersUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.septena.app
+        PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         GENERATE_INFOPLIST_FILE: NO
@@ -84,7 +84,7 @@ targets:
     info:
       path: Septena/Info-Mac.plist
       properties:
-        CFBundleDisplayName: Septena
+        CFBundleDisplayName: Septena Cloud
         CFBundleIconFile: AppIcon
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
@@ -92,7 +92,7 @@ targets:
         NSRemindersUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.septena.mac
+        PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.mac
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_ENTITLEMENTS: Septena/SeptenaMac.entitlements
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
