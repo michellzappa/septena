@@ -394,6 +394,25 @@ final class SeptenaClient {
                       as: OuraHistoryResponse.self).oura
   }
 
+  /// N days of Withings weigh-ins. Same envelope as Oura.
+  func withingsHistory(days: Int = 14) async throws -> [WithingsRow] {
+    try await getJSON("/api/health/withings",
+                      query: [URLQueryItem(name: "days", value: String(days))],
+                      as: WithingsResponse.self).withings
+  }
+
+  // MARK: - Gut
+
+  func gutDay(date: String) async throws -> GutDayResponse {
+    try await getJSON("/api/gut/day/\(date)", as: GutDayResponse.self)
+  }
+
+  func gutHistory(days: Int = 7) async throws -> GutHistoryResponse {
+    try await getJSON("/api/gut/history",
+                      query: [URLQueryItem(name: "days", value: String(days))],
+                      as: GutHistoryResponse.self)
+  }
+
   func completeChore(id: String, date: String) async throws {
     let body: [String: Any] = ["chore_id": id, "date": date]
     _ = try await postJSON("/api/chores/complete", body: body, as: EmptyResponse.self)

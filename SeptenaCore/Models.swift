@@ -747,6 +747,91 @@ struct CannabisHistoryResponse: Codable {
   let daily: [CannabisHistoryPoint]
 }
 
+// MARK: - Body (Withings)
+
+/// One Withings weigh-in. From `/api/health/withings`.
+struct WithingsRow: Codable, Identifiable, Hashable {
+  let date: String           // YYYY-MM-DD
+  var weightKg: Double?
+  var fatPct: Double?
+  var fatMassKg: Double?
+  var fatFreeMassKg: Double?
+  var muscleMassKg: Double?
+  var hydrationKg: Double?
+  var boneMassKg: Double?
+
+  var id: String { date }
+
+  enum CodingKeys: String, CodingKey {
+    case date
+    case weightKg      = "weight_kg"
+    case fatPct        = "fat_pct"
+    case fatMassKg     = "fat_mass_kg"
+    case fatFreeMassKg = "fat_free_mass_kg"
+    case muscleMassKg  = "muscle_mass_kg"
+    case hydrationKg   = "hydration_kg"
+    case boneMassKg    = "bone_mass_kg"
+  }
+}
+
+struct WithingsResponse: Codable {
+  let withings: [WithingsRow]
+}
+
+// MARK: - Gut
+
+struct GutEntry: Codable, Identifiable, Hashable {
+  let id: String
+  let date: String
+  let time: String
+  var bristol: Int           // 1–7
+  var blood: Int             // 0–N severity
+  var volume: String?        // "small" | "medium" | "large"
+  var discomfortLevel: String?     // "low" | "med" | "high"
+  var discomfortHours: Double?
+  var note: String?
+
+  enum CodingKeys: String, CodingKey {
+    case id, date, time, bristol, blood, volume, note
+    case discomfortLevel = "discomfort_level"
+    case discomfortHours = "discomfort_hours"
+  }
+}
+
+struct GutDayResponse: Codable {
+  let date: String
+  let entries: [GutEntry]
+  let movementCount: Int
+  var maxBlood: Int
+  var totalDiscomfortH: Double
+
+  enum CodingKeys: String, CodingKey {
+    case date, entries
+    case movementCount    = "movement_count"
+    case maxBlood         = "max_blood"
+    case totalDiscomfortH = "total_discomfort_h"
+  }
+}
+
+struct GutHistoryPoint: Codable, Hashable {
+  let date: String
+  let movements: Int
+  var avgBristol: Double?
+  var maxBlood: Int
+  var discomfortH: Double
+
+  enum CodingKeys: String, CodingKey {
+    case date, movements
+    case avgBristol  = "avg_bristol"
+    case maxBlood    = "max_blood"
+    case discomfortH = "discomfort_h"
+  }
+}
+
+struct GutHistoryResponse: Codable {
+  let daily: [GutHistoryPoint]
+}
+
 struct NextItem: Codable, Identifiable, Hashable {
   var id: String
   var kind: String

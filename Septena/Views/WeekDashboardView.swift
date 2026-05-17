@@ -20,6 +20,8 @@ enum WeekDestination: Hashable {
   case calendar
   case caffeine
   case cannabis
+  case body
+  case gut
 }
 
 struct WeekDashboardView: View {
@@ -50,6 +52,9 @@ struct WeekDashboardView: View {
   @State private var caffeineHistory: [CaffeineHistoryPoint] = []
   @State private var cannabisToday: CannabisDayResponse? = nil
   @State private var cannabisHistory: [CannabisHistoryPoint] = []
+  @State private var bodyRows: [WithingsRow] = []
+  @State private var gutToday: GutDayResponse? = nil
+  @State private var gutHistory: [GutHistoryPoint] = []
 
   /// 1 column on iPhone (compact), 3 on iPad / Mac (regular). LazyVGrid
   /// reflows automatically on rotation; tiles keep their internal layout.
@@ -89,6 +94,8 @@ struct WeekDashboardView: View {
         case .calendar:    CalendarDestinationView()
         case .caffeine:    CaffeineDestinationView()
         case .cannabis:    CannabisDestinationView()
+        case .body:        BodyDestinationView()
+        case .gut:         GutDestinationView()
         }
       }
       .task { await loadAll() }
@@ -147,6 +154,13 @@ struct WeekDashboardView: View {
     caffeineHistory = cafH?.daily ?? []
     cannabisToday = cnbT
     cannabisHistory = cnbH?.daily ?? []
+    async let wRows = try? await client.withingsHistory(days: 14)
+    async let gutT  = try? await client.gutDay(date: SeptenaDate.today)
+    async let gutH  = try? await client.gutHistory(days: 7)
+    let (wR, gT, gH) = await (wRows, gutT, gutH)
+    bodyRows = wR ?? []
+    gutToday = gT
+    gutHistory = gH?.daily ?? []
   }
 
   private func sinceDate(daysBack: Int) -> String {
@@ -172,6 +186,8 @@ struct WeekDashboardView: View {
     calendarTile
     caffeineTile
     cannabisTile
+    bodyTile
+    gutTile
   }
 
   // Tasks — live counts from /api/tasks/counts. No history endpoint yet
@@ -425,6 +441,57 @@ struct WeekDashboardView: View {
           .init(label: "Grams", value: String(format: "%.2f", grams), unit: "g")
         ],
         history: .init(label: "7-day sessions",
+                       values: bars.isEmpty
+                         ? Array(repeating: 0, count: 7) : bars)
+      )
+    }
+    .buttonStyle(.plain)
+  }
+
+  // Body — latest Withings weigh-in + weight-trend bars. Bars use
+  // tenths-of-kg above a floor so small variation is still visible.
+  private var bodyTile: some View {
+    let accent = theme.color(for: "body")
+    let latest = bodyRows.first
+    let weight = latest?.weightKg
+    let fat    = latest?.fatPct
+    // Server returns newest-first; reverse for chronological bars.
+    // Subtract a floor (min of the series) so the histogram emphasizes
+    // change rather than absolute mass.
+    let reversed = bodyRows.reversed().compactMap { $0.weightKg }
+    let floor = reversed.min() ?? 0
+    let bars = reversed.map { Int((($0 - floor) * 10).rounded()) }
+    return NavigationLink(value: WeekDestination.body) {
+      ModuleTile(
+        title: "Body",
+        accent: accent,
+        stats: [
+          .init(label: "Weight", value: weight.map { String(format: "%.1f", $0) } ?? "—", unit: "kg"),
+          .init(label: "Fat",    value: fat.map { String(format: "%.1f", $0) } ?? "—", unit: "%")
+        ],
+        history: .init(label: "Trend (last \(bars.count))",
+                       values: bars.isEmpty
+                         ? Array(repeating: 0, count: 7) : bars)
+      )
+    }
+    .buttonStyle(.plain)
+  }
+
+  // Gut — today's movement count + last-7-day movement bars.
+  private var gutTile: some View {
+    let accent = theme.color(for: "gut")
+    let count = gutToday?.movementCount ?? 0
+    let discomfort = gutToday?.totalDiscomfortH ?? 0
+    let bars = gutHistory.map { $0.movements }
+    return NavigationLink(value: WeekDestination.gut) {
+      ModuleTile(
+        title: "Gut",
+        accent: accent,
+        stats: [
+          .init(label: "Today",      value: "\(count)"),
+          .init(label: "Discomfort", value: String(format: "%.1f", discomfort), unit: "h")
+        ],
+        history: .init(label: "7-day movements",
                        values: bars.isEmpty
                          ? Array(repeating: 0, count: 7) : bars)
       )

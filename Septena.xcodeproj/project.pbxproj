@@ -16,6 +16,7 @@
 		0EA3AE94FFBC7CC6A2869E36 /* TaskCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 486793A66A22C3DA7809337B /* TaskCommands.swift */; };
 		0ED59BE06DEBD263BBFA0D91 /* BadgeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EC7C9D9CAC52C91AFE79AE7 /* BadgeManager.swift */; };
 		0FABD76594A04A8968E1A04B /* PlatformShims.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF52BF4594608E7B7D09AA48 /* PlatformShims.swift */; };
+		100195F90383D604A61EF4CB /* GutDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C90473A5415EF805CE827D5 /* GutDestinationView.swift */; };
 		12B60ABACC409D80030283D9 /* SupplementsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEF9F7EF4C95C591355F2B0E /* SupplementsDestinationView.swift */; };
 		187093B93D48863B5E1E1E37 /* RemindersBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561130AE996F0E92FE02767D /* RemindersBridge.swift */; };
 		18C336321218C66D6B8DB652 /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D413F054F59B2A90A319154 /* TaskDetailView.swift */; };
@@ -33,6 +34,7 @@
 		49263C8544F1327022162722 /* NutritionDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85180CEA5751AEC394B4F796 /* NutritionDestinationView.swift */; };
 		4A9BF2842C0AC601AF8B7099 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25DC8E705099DB99718A8596 /* Persistence.swift */; };
 		513C8B1D41E5BA85B785129C /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E25F81FE5AA4B6BBC056275 /* DateParser.swift */; };
+		530608759DC8F3A18501430F /* GutDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C90473A5415EF805CE827D5 /* GutDestinationView.swift */; };
 		5330AF71083A1F3514B862B8 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */; };
 		55C20E76DB4BB1B7C3306925 /* RemindersImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0BB64F31640C03CD64DF855 /* RemindersImportView.swift */; };
 		56E87EA383673A4ACE86F2CD /* BadgeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EC7C9D9CAC52C91AFE79AE7 /* BadgeManager.swift */; };
@@ -56,6 +58,7 @@
 		8F6F38ECBF1277701456C8B2 /* NextDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B306432E3182A6992728E0F9 /* NextDashboardView.swift */; };
 		91D2DC6F41DB18CF53F08544 /* TrainingDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D852F1B66154D92E60E79CBE /* TrainingDestinationView.swift */; };
 		94702073666C4968D36B96C5 /* RemindersBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561130AE996F0E92FE02767D /* RemindersBridge.swift */; };
+		9632D65D8B65BA60002117FE /* BodyDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90E96221790D0CEE5974775A /* BodyDestinationView.swift */; };
 		968A90B44B7AA07A52F2103C /* TaskComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB88131B1CFB7EAA692D88E6 /* TaskComponents.swift */; };
 		9D861615DDF132512492C130 /* OfflineBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B065C1A278C890BF5EEBE9C /* OfflineBanner.swift */; };
 		9EBF276CA0720E417E3EE17E /* ChoresDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57CEAA8D15E94157FCE94ED2 /* ChoresDestinationView.swift */; };
@@ -74,6 +77,7 @@
 		BD2AEA299118EC671BAFF32E /* RemindersInboxSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33B6D5A7801C40656B13C350 /* RemindersInboxSection.swift */; };
 		BFCF1AC2BC3C5A12D48B939F /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D413F054F59B2A90A319154 /* TaskDetailView.swift */; };
 		C0BF92A2B687EFEE45D80E25 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A07E6C15CC294172DF5D20 /* Theme.swift */; };
+		C25AB9FF385DB23D9FE71893 /* BodyDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90E96221790D0CEE5974775A /* BodyDestinationView.swift */; };
 		C3A8FD5AF7DDC8CFFB0040DE /* NutritionDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85180CEA5751AEC394B4F796 /* NutritionDestinationView.swift */; };
 		C95C0A72F11063AD3C8DE47F /* LogRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12E57B6D840EE59123B45F5 /* LogRow.swift */; };
 		C9A195F8FF0C63824E0A5BD8 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */; };
@@ -117,6 +121,7 @@
 		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		3B065C1A278C890BF5EEBE9C /* OfflineBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineBanner.swift; sourceTree = "<group>"; };
+		3C90473A5415EF805CE827D5 /* GutDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GutDestinationView.swift; sourceTree = "<group>"; };
 		486793A66A22C3DA7809337B /* TaskCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskCommands.swift; sourceTree = "<group>"; };
 		5213158B9AA9106BBAA03D41 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
@@ -134,6 +139,7 @@
 		83E5755C28C6B3D53D9031A7 /* GroceriesDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceriesDestinationView.swift; sourceTree = "<group>"; };
 		85180CEA5751AEC394B4F796 /* NutritionDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionDestinationView.swift; sourceTree = "<group>"; };
 		8EC7C9D9CAC52C91AFE79AE7 /* BadgeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BadgeManager.swift; sourceTree = "<group>"; };
+		90E96221790D0CEE5974775A /* BodyDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyDestinationView.swift; sourceTree = "<group>"; };
 		9A5C26629FE8A4DF019B9784 /* AreasProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreasProjectsView.swift; sourceTree = "<group>"; };
 		9B92826563E8E24C2A8F22B9 /* TaskListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskListView.swift; sourceTree = "<group>"; };
 		9F0AE5985EFE1A9A61F9BC7E /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
@@ -176,11 +182,13 @@
 			children = (
 				CDCA5F7AD926593502A0DDA8 /* AirDestinationView.swift */,
 				9A5C26629FE8A4DF019B9784 /* AreasProjectsView.swift */,
+				90E96221790D0CEE5974775A /* BodyDestinationView.swift */,
 				29D4FAAB1E88C564EF898327 /* CaffeineDestinationView.swift */,
 				04B4D06356BC11C849416F5C /* CalendarDestinationView.swift */,
 				1B11A1931AD62F377D8B791A /* CannabisDestinationView.swift */,
 				57CEAA8D15E94157FCE94ED2 /* ChoresDestinationView.swift */,
 				83E5755C28C6B3D53D9031A7 /* GroceriesDestinationView.swift */,
+				3C90473A5415EF805CE827D5 /* GutDestinationView.swift */,
 				6CB6D70452573AF2811BBD08 /* HabitsDestinationView.swift */,
 				C12E57B6D840EE59123B45F5 /* LogRow.swift */,
 				0D8E96F4EF0DBE7645A7FAC5 /* ModuleTile.swift */,
@@ -357,6 +365,7 @@
 				FA564DDD7B30817FB91EC0E5 /* App.swift in Sources */,
 				5ED33F95694C104969333EAD /* AreasProjectsView.swift in Sources */,
 				0ED59BE06DEBD263BBFA0D91 /* BadgeManager.swift in Sources */,
+				9632D65D8B65BA60002117FE /* BodyDestinationView.swift in Sources */,
 				762504E801D4C31786E3ED72 /* CaffeineDestinationView.swift in Sources */,
 				7397EB4533BA4D026F9F7662 /* CalendarBridge.swift in Sources */,
 				2482B2ABDD6A5E86FE3BB3E4 /* CalendarDestinationView.swift in Sources */,
@@ -364,6 +373,7 @@
 				B5D47368B47648A0FC968DFB /* ChoresDestinationView.swift in Sources */,
 				DF016EF192B7891D2DBE3CB6 /* DateParser.swift in Sources */,
 				029C02E7D76246B98F4F6C8B /* GroceriesDestinationView.swift in Sources */,
+				530608759DC8F3A18501430F /* GutDestinationView.swift in Sources */,
 				FD43DBF763D6B72C04A00682 /* HabitsDestinationView.swift in Sources */,
 				5330AF71083A1F3514B862B8 /* Haptics.swift in Sources */,
 				C95C0A72F11063AD3C8DE47F /* LogRow.swift in Sources */,
@@ -407,6 +417,7 @@
 				09C5366893B7255E08295C88 /* App.swift in Sources */,
 				FCDDF4248EC04741134329B2 /* AreasProjectsView.swift in Sources */,
 				56E87EA383673A4ACE86F2CD /* BadgeManager.swift in Sources */,
+				C25AB9FF385DB23D9FE71893 /* BodyDestinationView.swift in Sources */,
 				F41E7F09812BA328A1E2B328 /* CaffeineDestinationView.swift in Sources */,
 				B09EA3455FBF702224C33616 /* CalendarBridge.swift in Sources */,
 				570E79B3EE3633EBE260AD88 /* CalendarDestinationView.swift in Sources */,
@@ -414,6 +425,7 @@
 				9EBF276CA0720E417E3EE17E /* ChoresDestinationView.swift in Sources */,
 				513C8B1D41E5BA85B785129C /* DateParser.swift in Sources */,
 				350BABC5882550125A41C46D /* GroceriesDestinationView.swift in Sources */,
+				100195F90383D604A61EF4CB /* GutDestinationView.swift in Sources */,
 				69347D27E1CBEFCF3AA87AB2 /* HabitsDestinationView.swift in Sources */,
 				28777ACD729D9C78846219C4 /* Haptics.swift in Sources */,
 				008EADA54611F2118A61DB42 /* LogRow.swift in Sources */,
