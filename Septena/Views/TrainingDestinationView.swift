@@ -9,6 +9,7 @@ struct TrainingDestinationView: View {
   @Environment(SeptenaClient.self) private var client
   @Environment(SectionTheme.self) private var theme
   @Environment(NavigationState.self) private var nav
+  @Environment(TrainingDraftStore.self) private var draftStore
 
   @State private var entries: [ExerciseEntry] = []
   @State private var cardio: CardioHistoryResponse? = nil
@@ -36,6 +37,9 @@ struct TrainingDestinationView: View {
 
   var body: some View {
     List {
+      if let d = draftStore.draft {
+        activeSessionSection(d)
+      }
       summary
       ForEach(sessions, id: \.key) { block in
         Section {
@@ -63,15 +67,16 @@ struct TrainingDestinationView: View {
                                description: Text("Log a session in the webapp to see it here."))
       }
     }
+    #if os(iOS)
     .listStyle(.insetGrouped)
-    .background(Color(.systemGroupedBackground))
+    #endif
+    .background(Theme.groupedBackground)
     .navigationTitle("Training")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
     .task { await load() }
-    .refreshable { await load() }
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         Button {
@@ -109,6 +114,37 @@ struct TrainingDestinationView: View {
                      total: Double(max(target, 1)))
           .tint(accent)
       }
+    }
+  }
+
+  @ViewBuilder
+  private func activeSessionSection(_ d: DraftSession) -> some View {
+    Section {
+      HStack(spacing: 12) {
+        Text(d.emoji ?? "▶").font(.title3).frame(width: 24)
+        VStack(alignment: .leading, spacing: 2) {
+          Text(d.label).font(.headline)
+          Text("\(d.doneCount)/\(max(d.totalCount, 1)) done · started \(d.time)")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        Spacer()
+        Button {
+          nav.showTrainingSession = true
+        } label: {
+          Text("Open").font(.subheadline.weight(.semibold))
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(accent)
+        Button(role: .destructive) {
+          draftStore.discard()
+        } label: {
+          Image(systemName: "trash")
+        }
+        .buttonStyle(.bordered)
+      }
+    } header: {
+      Text("Active session")
     }
   }
 
@@ -284,8 +320,12 @@ final class TrainingDraftStore {
 
   // MARK: - Catalog
 
-  /// Pull session-type config + suggestion in parallel. Cheap to call on
-  /// palette open; tolerates missing endpoints by leaving lists empty.
+  /// Pull session-type config + days-since-last-session in parallel from
+  /// the server. `/api/training/suggested-workout` already does the
+  /// exercise-taxonomy classification (a day counts as "upper" only with
+  /// ≥3 upper-group exercises, "cardio" needs ≥30 Z2 min and no strength,
+  /// etc.) — far richer than what we'd derive from the flat `session`
+  /// field client-side. So we just read it directly.
   func refreshCatalog(client: SeptenaClient) async {
     async let types = try? await client.sessionTypes()
     async let sw    = try? await client.suggestedWorkout()
@@ -296,6 +336,7 @@ final class TrainingDraftStore {
       suggested = s.suggested?.type
     }
   }
+
 
   // MARK: - Start / discard
 
