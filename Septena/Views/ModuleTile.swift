@@ -32,6 +32,12 @@ struct ModuleTile: View {
     let values: [Int]          // last 7 days, oldest → newest
     var todayIndex: Int? = nil // bar to emphasize (defaults to last)
     var showDayLabels: Bool = true   // Mon/Tue/Wed/… under each bar
+    /// If set, each bar renders at a constant total height representing
+    /// this ceiling, with the `value` portion in full accent and the
+    /// remaining `(ceiling - value)` portion in a lighter accent tone.
+    /// Useful when bars represent a score against a fixed target (e.g.
+    /// sleep score / 100), where seeing the gap to 100 is the point.
+    var ceiling: Int? = nil
   }
 
   struct ActionButton {
@@ -123,9 +129,21 @@ private struct ProgressRow: View {
           .font(.caption.monospacedDigit())
           .foregroundStyle(.secondary)
       }
-      ProgressView(value: min(progress.current, progress.target),
-                   total: max(progress.target, 0.0001))
-        .tint(accent)
+      // Custom capsule progress — SwiftUI's stock ProgressView on macOS
+      // ignores `.tint` and falls back to the system control accent,
+      // so every tile's bar reads as plain blue instead of the section
+      // color. Hand-drawn capsules give consistent accent on both
+      // platforms with no extra style work.
+      GeometryReader { geo in
+        let frac = max(0, min(1, progress.current / max(progress.target, 0.0001)))
+        ZStack(alignment: .leading) {
+          Capsule(style: .continuous).fill(accent.opacity(0.18))
+          Capsule(style: .continuous)
+            .fill(accent)
+            .frame(width: geo.size.width * frac)
+        }
+      }
+      .frame(height: 6)
     }
   }
 
@@ -149,7 +167,8 @@ private struct HistoryView: View {
       Histogram(values: row.values,
                 accent: accent,
                 emphasizedIndex: row.todayIndex ?? (row.values.count - 1),
-                dayLabels: row.showDayLabels ? Self.weekdayLabels(count: row.values.count) : nil)
+                dayLabels: row.showDayLabels ? Self.weekdayLabels(count: row.values.count) : nil,
+                ceiling: row.ceiling)
         .frame(height: row.showDayLabels ? 72 : 56)
     }
   }
@@ -171,11 +190,17 @@ private struct HistoryView: View {
 /// at full accent; others fade. Heights normalize against the max value
 /// (or 1 if all-zero, so the row doesn't divide by zero on empty weeks).
 /// Optional day labels render below each bar (Mon/Tue/Wed/…).
+///
+/// When `ceiling` is set, bars run at a constant total height (the
+/// ceiling) and split into two tones: the `value` portion in full accent,
+/// `(ceiling - value)` on top in a lighter tone. Use for score-style
+/// metrics where the gap-to-target matters as much as the value itself.
 struct Histogram: View {
   let values: [Int]
   let accent: Color
   var emphasizedIndex: Int? = nil
   var dayLabels: [String]? = nil
+  var ceiling: Int? = nil
 
   var body: some View {
     GeometryReader { geo in
@@ -188,11 +213,27 @@ struct Histogram: View {
       VStack(spacing: 2) {
         HStack(alignment: .bottom, spacing: gap) {
           ForEach(Array(values.enumerated()), id: \.offset) { idx, v in
-            let h = max(CGFloat(v) / CGFloat(maxV) * barsH, 4)
             let isEmphasized = idx == emphasizedIndex
-            RoundedRectangle(cornerRadius: 3, style: .continuous)
-              .fill(accent.opacity(isEmphasized ? 1.0 : 0.55))
-              .frame(width: barW, height: h)
+            if let ceiling, ceiling > 0 {
+              let frac = max(0, min(1, CGFloat(v) / CGFloat(ceiling)))
+              let fillH = barsH * frac
+              let restH = barsH - fillH
+              VStack(spacing: 0) {
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                  .fill(accent.opacity(0.18))
+                  .frame(height: restH)
+                Rectangle()
+                  .fill(accent.opacity(isEmphasized ? 1.0 : 0.55))
+                  .frame(height: fillH)
+              }
+              .frame(width: barW, height: barsH)
+              .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+            } else {
+              let h = max(CGFloat(v) / CGFloat(maxV) * barsH, 4)
+              RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .fill(accent.opacity(isEmphasized ? 1.0 : 0.55))
+                .frame(width: barW, height: h)
+            }
           }
         }
         .frame(height: barsH, alignment: .bottom)

@@ -69,9 +69,18 @@ enum Theme {
 
   /// Cross-platform analogue of `UIColor.systemGroupedBackground` — the soft
   /// gray under insetGrouped lists / dashboard canvases on iOS.
+  /// macOS uses a hand-mixed dynamic gray: lighter than
+  /// `.underPageBackgroundColor` (too dark) but distinct from
+  /// `.windowBackgroundColor` (reads as white against tiles). Targets the
+  /// iOS systemGroupedBackground tone (~#F2F2F7) on both appearances.
   static let groupedBackground: Color = {
     #if os(macOS)
-    return Color(nsColor: .windowBackgroundColor)
+    return Color(nsColor: NSColor(name: nil) { appearance in
+      let isDark = appearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil
+      return isDark
+        ? NSColor(white: 0.13, alpha: 1)   // ~iOS dark systemGroupedBackground
+        : NSColor(white: 0.95, alpha: 1)   // ~iOS light systemGroupedBackground
+    })
     #else
     return Color(.systemGroupedBackground)
     #endif
