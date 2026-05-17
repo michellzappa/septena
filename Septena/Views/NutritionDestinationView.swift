@@ -24,10 +24,14 @@ struct NutritionDestinationView: View {
     }
   }
 
-  /// Group entries by date, today first, then descending.
+  /// Group entries by date, today first, then descending. Within a day,
+  /// most-recent time on top — matches the global "newest first" rule.
   private var sections: [(date: String, items: [NutritionEntry])] {
     let grouped = Dictionary(grouping: entries, by: \.date)
-    return grouped.keys.sorted(by: >).map { d in (d, grouped[d] ?? []) }
+    return grouped.keys.sorted(by: >).map { d in
+      let items = (grouped[d] ?? []).sorted { $0.time > $1.time }
+      return (d, items)
+    }
   }
 
   var body: some View {
@@ -66,7 +70,6 @@ struct NutritionDestinationView: View {
     #endif
     .tint(accent)
     .task { await load() }
-    .refreshable { await load() }
   }
 
   // MARK: - Summary

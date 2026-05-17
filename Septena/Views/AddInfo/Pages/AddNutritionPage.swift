@@ -72,11 +72,17 @@ struct AddNutritionPage: View {
   }
 
   private func dedup(_ entries: [NutritionEntry]) -> [MealCandidate] {
+    // Pick the most-recent representative per dedup key so the row's
+    // macros reflect the latest version of that meal (the user may have
+    // re-logged it with updated grams).
     var bucketed: [String: (NutritionEntry, Int)] = [:]
     for e in entries {
       guard let first = e.foods.first?.lowercased() else { continue }
       if let existing = bucketed[first] {
-        bucketed[first] = (existing.0, existing.1 + 1)
+        let prevKey = existing.0.date + existing.0.time
+        let curKey  = e.date + e.time
+        let rep = curKey > prevKey ? e : existing.0
+        bucketed[first] = (rep, existing.1 + 1)
       } else {
         bucketed[first] = (e, 1)
       }
@@ -84,11 +90,13 @@ struct AddNutritionPage: View {
     return bucketed.map { (key, value) in
       MealCandidate(id: key, representative: value.0, count: value.1)
     }
+    // Sort by recency of last occurrence; frequency only as tiebreaker.
+    // Matches the user's expectation that the freshest meal is on top.
     .sorted { lhs, rhs in
-      if lhs.count != rhs.count { return lhs.count > rhs.count }
       let l = lhs.representative.date + lhs.representative.time
       let r = rhs.representative.date + rhs.representative.time
-      return l > r
+      if l != r { return l > r }
+      return lhs.count > rhs.count
     }
     .prefix(30)
     .map { $0 }
