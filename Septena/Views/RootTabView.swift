@@ -39,7 +39,8 @@ struct RootTabView: View {
           Label {
             Text("Next")
           } icon: {
-            Image(systemName: "arrow.right").imageScale(.small)
+            Image(systemName: "arrow.right")
+              .resizable().scaledToFit().frame(width: 16, height: 16)
           }
         }
         .tag(Tab.next)
@@ -49,7 +50,8 @@ struct RootTabView: View {
           Label {
             Text("Tasks")
           } icon: {
-            Image(systemName: "checkmark").imageScale(.small)
+            Image(systemName: "checkmark")
+              .resizable().scaledToFit().frame(width: 16, height: 16)
           }
         }
         .tag(Tab.tasks)
@@ -59,7 +61,8 @@ struct RootTabView: View {
           Label {
             Text("Search")
           } icon: {
-            Image(systemName: "magnifyingglass").imageScale(.small)
+            Image(systemName: "magnifyingglass")
+              .resizable().scaledToFit().frame(width: 16, height: 16)
           }
         }
         .tag(Tab.search)
