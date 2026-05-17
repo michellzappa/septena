@@ -450,6 +450,21 @@ struct CardioHistoryResponse: Codable {
   }
 }
 
+// MARK: - Supplements
+
+/// One day in the supplement history series. From `/api/supplements/history`.
+struct SupplementHistoryPoint: Codable, Hashable {
+  let date: String
+  let done: Int
+  let total: Int
+  let percent: Int
+}
+
+struct SupplementHistoryResponse: Codable {
+  let daily: [SupplementHistoryPoint]
+  let total: Int
+}
+
 struct NextItem: Codable, Identifiable, Hashable {
   var id: String
   var kind: String

@@ -12,9 +12,7 @@ struct NextView: View {
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 0) {
-        ScreenTitle(icon: "arrow.right",
-                    iconTint: Theme.iconMuted,
-                    title: "Next")
+        // Title removed — the tab bar already labels this view.
 
         if model.hasLoaded && !model.hasAnyOpen && !model.hasAnyDone {
           Text("Nothing here yet")

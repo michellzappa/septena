@@ -249,6 +249,14 @@ final class SeptenaClient {
     _ = try await postJSON("/api/supplements/toggle", body: body, as: EmptyResponse.self)
   }
 
+  /// N-day done/total history for supplements; powers the Supplements tile
+  /// histogram.
+  func supplementsHistory(days: Int = 7) async throws -> SupplementHistoryResponse {
+    try await getJSON("/api/supplements/history",
+                      query: [URLQueryItem(name: "days", value: String(days))],
+                      as: SupplementHistoryResponse.self)
+  }
+
   func chores() async throws -> [ChoreItem] {
     try await getJSON("/api/chores/list", as: ChoresListResponse.self).chores
   }

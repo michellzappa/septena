@@ -11,6 +11,7 @@ enum WeekDestination: Hashable {
   case habits
   case chores
   case training
+  case supplements
 }
 
 struct WeekDashboardView: View {
@@ -25,6 +26,7 @@ struct WeekDashboardView: View {
   @State private var choreHistory: [Int] = Array(repeating: 0, count: 7)
   @State private var cardio: CardioHistoryResponse? = nil
   @State private var trainingSessionDates: Set<String> = []
+  @State private var supplementHistory: [Int] = Array(repeating: 0, count: 7)
 
   /// 1 column on iPhone (compact), 3 on iPad / Mac (regular). LazyVGrid
   /// reflows automatically on rotation; tiles keep their internal layout.
@@ -49,15 +51,14 @@ struct WeekDashboardView: View {
         .padding(.bottom, 80)
       }
       .background(Color(.systemGroupedBackground))
-      .navigationTitle("Week")
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.large)
-      #endif
+      // Tab bar already labels this view; no large title needed.
+      .toolbar(.hidden, for: .navigationBar)
       .navigationDestination(for: WeekDestination.self) { dest in
         switch dest {
-        case .habits:   HabitsDestinationView()
-        case .chores:   ChoresDestinationView()
-        case .training: TrainingDestinationView()
+        case .habits:      HabitsDestinationView()
+        case .chores:      ChoresDestinationView()
+        case .training:    TrainingDestinationView()
+        case .supplements: SupplementsDestinationView()
         }
       }
       .task { await loadAll() }
@@ -74,11 +75,13 @@ struct WeekDashboardView: View {
     async let ch = try? await client.choresHistory(days: 7)
     async let car = try? await client.trainingCardioHistory(days: 7)
     async let ents = try? await client.trainingEntries(since: sinceDate(daysBack: 7))
-    let (h, c, ca, e) = await (hh, ch, car, ents)
+    async let sh = try? await client.supplementsHistory(days: 7)
+    let (h, c, ca, e, s) = await (hh, ch, car, ents, sh)
     if let h { habitHistory = h.daily.map { $0.done } }
     if let c { choreHistory = c.daily.map { $0.completed } }
     cardio = ca
     if let e { trainingSessionDates = Set(e.map(\.date)) }
+    if let s { supplementHistory = s.daily.map { $0.done } }
   }
 
   private func sinceDate(daysBack: Int) -> String {
@@ -96,6 +99,7 @@ struct WeekDashboardView: View {
     habitsTile
     trainingTile
     choresTile
+    supplementsTile
     sleepTile
     nutritionTile
   }
@@ -178,6 +182,27 @@ struct WeekDashboardView: View {
           .init(label: "Overdue",   value: "\(overdue)")
         ],
         history: .init(label: "7-day done", values: choreHistory)
+      )
+    }
+    .buttonStyle(.plain)
+  }
+
+  // Supplements — live taken/total today plus 7-day adherence histogram.
+  private var supplementsTile: some View {
+    let total = dailies.supplements.count
+    let done = dailies.supplements.filter { $0.done }.count
+    let accent = theme.color(for: "supplements")
+    return NavigationLink(value: WeekDestination.supplements) {
+      ModuleTile(
+        title: "Supplements",
+        accent: accent,
+        stats: [.init(label: "Today", value: "\(done)/\(max(total, 0))")],
+        progress: .init(
+          label: "Today's stack",
+          current: Double(done),
+          target: Double(max(total, 1))
+        ),
+        history: .init(label: "7-day adherence", values: supplementHistory)
       )
     }
     .buttonStyle(.plain)

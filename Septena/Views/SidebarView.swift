@@ -209,9 +209,8 @@ struct SidebarRootView: View {
       }
     }
     .background(Theme.sidebarBackground)
-    // Matches the tab label so Tasks reads as a top-level destination,
-    // consistent with Week / Next / Search.
-    .navigationTitle("Tasks")
+    // Tab bar already labels this view; suppress the redundant nav title.
+    .toolbar(.hidden, for: .navigationBar)
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         Menu {

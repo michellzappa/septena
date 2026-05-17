@@ -6,6 +6,9 @@ import SwiftUI
 
 struct NextDashboardView: View {
   var body: some View {
-    NavigationStack { NextView() }
+    NavigationStack {
+      NextView()
+        .toolbar(.hidden, for: .navigationBar)
+    }
   }
 }

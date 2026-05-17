@@ -334,7 +334,10 @@ struct HabitRow: View {
   }
 }
 
-private struct SupplementRow: View {
+// Shared by NextOpenSection and SupplementsDestinationView. Same toggle
+// semantics as HabitRow without the skip vocab — supplements are simpler
+// (taken / not taken).
+struct SupplementRow: View {
   let supplement: SupplementDayItem
   var model: NextItemsModel
   let client: SeptenaClient

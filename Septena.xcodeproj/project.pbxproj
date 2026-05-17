@@ -15,6 +15,7 @@
 		0EA3AE94FFBC7CC6A2869E36 /* TaskCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 486793A66A22C3DA7809337B /* TaskCommands.swift */; };
 		0ED59BE06DEBD263BBFA0D91 /* BadgeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EC7C9D9CAC52C91AFE79AE7 /* BadgeManager.swift */; };
 		0FABD76594A04A8968E1A04B /* PlatformShims.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF52BF4594608E7B7D09AA48 /* PlatformShims.swift */; };
+		12B60ABACC409D80030283D9 /* SupplementsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEF9F7EF4C95C591355F2B0E /* SupplementsDestinationView.swift */; };
 		187093B93D48863B5E1E1E37 /* RemindersBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561130AE996F0E92FE02767D /* RemindersBridge.swift */; };
 		18C336321218C66D6B8DB652 /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D413F054F59B2A90A319154 /* TaskDetailView.swift */; };
 		1C848EE6B229B8FEE079CD97 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5213158B9AA9106BBAA03D41 /* SettingsView.swift */; };
@@ -24,6 +25,7 @@
 		36325B1E6E5A771C01028105 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 31313A0E804B33A3E43FC1F6 /* Info.plist */; };
 		3D19536CFB66987D6D5C7642 /* Info-Mac.plist in Resources */ = {isa = PBXBuildFile; fileRef = 5B49A0D20B2ECD672137900F /* Info-Mac.plist */; };
 		3F005BC1D6AB964EA48E05C3 /* PlatformShims.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF52BF4594608E7B7D09AA48 /* PlatformShims.swift */; };
+		486D927C7874CAFC8AEDCCB4 /* SupplementsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEF9F7EF4C95C591355F2B0E /* SupplementsDestinationView.swift */; };
 		4A9BF2842C0AC601AF8B7099 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25DC8E705099DB99718A8596 /* Persistence.swift */; };
 		513C8B1D41E5BA85B785129C /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E25F81FE5AA4B6BBC056275 /* DateParser.swift */; };
 		5330AF71083A1F3514B862B8 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */; };
@@ -127,6 +129,7 @@
 		E17D3542734AB0B32527C12C /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
 		EF52BF4594608E7B7D09AA48 /* PlatformShims.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformShims.swift; sourceTree = "<group>"; };
 		FB6D9FD80512D4CD62AEFFFD /* NextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextView.swift; sourceTree = "<group>"; };
+		FEF9F7EF4C95C591355F2B0E /* SupplementsDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementsDestinationView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -164,6 +167,7 @@
 				AA46304BE6907DF5990B15C7 /* SearchTabView.swift */,
 				5213158B9AA9106BBAA03D41 /* SettingsView.swift */,
 				9F0AE5985EFE1A9A61F9BC7E /* SidebarView.swift */,
+				FEF9F7EF4C95C591355F2B0E /* SupplementsDestinationView.swift */,
 				486793A66A22C3DA7809337B /* TaskCommands.swift */,
 				DB88131B1CFB7EAA692D88E6 /* TaskComponents.swift */,
 				2D413F054F59B2A90A319154 /* TaskDetailView.swift */,
@@ -344,6 +348,7 @@
 				E02065B8AC82D19639A4CFAD /* SettingsView.swift in Sources */,
 				F62DAF6B252E82A6C8CB7167 /* SidebarView.swift in Sources */,
 				FF12744271E9DF61BD2F557F /* SuggestionEngine.swift in Sources */,
+				486D927C7874CAFC8AEDCCB4 /* SupplementsDestinationView.swift in Sources */,
 				0EA3AE94FFBC7CC6A2869E36 /* TaskCommands.swift in Sources */,
 				DE402EEE2DA772AF7300E1C0 /* TaskComponents.swift in Sources */,
 				18C336321218C66D6B8DB652 /* TaskDetailView.swift in Sources */,
@@ -385,6 +390,7 @@
 				1C848EE6B229B8FEE079CD97 /* SettingsView.swift in Sources */,
 				7FB3330B97BCBCB5D87C6F04 /* SidebarView.swift in Sources */,
 				F21704F2D348D306CBC132AB /* SuggestionEngine.swift in Sources */,
+				12B60ABACC409D80030283D9 /* SupplementsDestinationView.swift in Sources */,
 				DD317D456C7B6AD457F872B3 /* TaskCommands.swift in Sources */,
 				968A90B44B7AA07A52F2103C /* TaskComponents.swift in Sources */,
 				BFCF1AC2BC3C5A12D48B939F /* TaskDetailView.swift in Sources */,
