@@ -19,7 +19,7 @@ struct CannabisDestinationView: View {
       summary
       Section("Today") {
         if let today, !today.entries.isEmpty {
-          ForEach(today.entries) { entry in
+          ForEach(Array(today.entries.reversed())) { entry in
             LogRow(
               title: methodLabel(entry.method),
               detail: detailLine(entry),
@@ -35,7 +35,7 @@ struct CannabisDestinationView: View {
       }
       if !history.isEmpty {
         Section("7-day history") {
-          ForEach(history, id: \.date) { p in
+          ForEach(Array(history.reversed()), id: \.date) { p in
             LogRow(
               title: friendlyDate(p.date),
               detail: (p.totalG ?? 0) > 0
@@ -61,7 +61,6 @@ struct CannabisDestinationView: View {
     #endif
     .tint(accent)
     .task { await load() }
-    .refreshable { await load() }
   }
 
   private var summary: some View {

@@ -18,7 +18,7 @@ struct GutDestinationView: View {
       summary
       Section("Today") {
         if let today, !today.entries.isEmpty {
-          ForEach(today.entries) { entry in
+          ForEach(Array(today.entries.reversed())) { entry in
             LogRow(
               title: bristolLabel(entry.bristol),
               detail: detailLine(entry),
@@ -34,7 +34,7 @@ struct GutDestinationView: View {
       }
       if !history.isEmpty {
         Section("7-day history") {
-          ForEach(history, id: \.date) { p in
+          ForEach(Array(history.reversed()), id: \.date) { p in
             LogRow(
               title: friendlyDate(p.date),
               detail: historyDetail(p),
@@ -58,7 +58,6 @@ struct GutDestinationView: View {
     #endif
     .tint(accent)
     .task { await load() }
-    .refreshable { await load() }
   }
 
   private var summary: some View {

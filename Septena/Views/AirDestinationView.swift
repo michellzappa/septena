@@ -29,7 +29,7 @@ struct AirDestinationView: View {
     List {
       summarySection
       Section("7-day average") {
-        ForEach(history, id: \.date) { p in
+        ForEach(Array(history.reversed()), id: \.date) { p in
           LogRow(
             title: friendlyDate(p.date),
             detail: detailLine(p),
@@ -57,7 +57,6 @@ struct AirDestinationView: View {
     #endif
     .tint(accent)
     .task { await load() }
-    .refreshable { await load() }
   }
 
   private var summarySection: some View {
