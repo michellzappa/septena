@@ -1,19 +1,22 @@
 import SwiftUI
 import SwiftData
 
-// MARK: - Sort actions shared by Area / Project "…" menu
+// MARK: - Sort menu items shared by Area / Project "…" menu
 
 /// The sort rows that prefix the project/area `…` menu — one per
 /// `TaskSort` case. Tapping one writes through to the global `taskSort`
-/// setting; the currently active mode renders a trailing checkmark. Lives
-/// at file scope so both detail views share the exact same list.
-func sortActions(taskSortRaw: Binding<String>) -> [ActionSheet.Action] {
+/// setting; the currently active mode renders with a leading checkmark
+/// (system `Menu` styling). Lives at file scope so both detail views share
+/// the same list.
+@ViewBuilder
+func sortMenuItems(taskSortRaw: Binding<String>) -> some View {
   let current = TaskSort(rawValue: taskSortRaw.wrappedValue) ?? .dateAdded
-  return TaskSort.allCases.map { mode in
-    ActionSheet.Action(title: mode.label,
-                       icon: mode.icon,
-                       selected: mode == current,
-                       perform: { taskSortRaw.wrappedValue = mode.rawValue })
+  ForEach(TaskSort.allCases) { mode in
+    Button {
+      taskSortRaw.wrappedValue = mode.rawValue
+    } label: {
+      Label(mode.label, systemImage: mode == current ? "checkmark" : mode.icon)
+    }
   }
 }
 
@@ -102,7 +105,6 @@ struct AreaDetailView: View {
   @State private var projects: [Project]
   @State private var projectProgress: [String: Double] = [:]
   @State private var errorMessage: String?
-  @State private var showingMoreActions = false
   @FocusState private var notesFocused: Bool
   /// Global task sort — read/written here so flipping it from this menu
   /// re-renders the embedded TaskListView, which reads the same key.
@@ -121,62 +123,55 @@ struct AreaDetailView: View {
   }
 
   var body: some View {
-    VStack(spacing: 0) {
-      VStack(alignment: .leading, spacing: 10) {
-        HStack(spacing: Theme.iconTextGap) {
-          AreaIcon(diameter: Theme.checkboxTap)
-            .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
-          ClickToEditTitle(placeholder: "Area", text: $draftName) { newName in
-            commitName(newName)
-          }
-        }
-
-        // Notes — backed by Area.context. The TextField is ALWAYS in the
-        // tree (overlay pattern with opacity), so @FocusState survives the
-        // display→edit handoff. A markdown-rendered Text overlays on top
-        // when the field isn't focused and has content; tap → start editing.
-        // Pressing Return inserts a newline (axis: .vertical); the field
-        // grows to ~12 lines then scrolls internally.
-        notesField($draftNotes, focused: $notesFocused)
-      }
-      .padding(.horizontal, Theme.hPadding)
-      .padding(.top, 12)
-      .padding(.bottom, 16)
-      // Observe focus from a stable parent — if `.onChange` lives on the
-      // TextField, blurring removes the field (the `if` branch flips), and
-      // the observer is torn down before its closure can fire. Attaching it
-      // here means the commit always runs when focus leaves.
-      .onChange(of: notesFocused) { _, focused in
-        if !focused { commitNotes() }
-      }
-
+    // The title + notes + project roll-up are passed *into* TaskListView as
+    // its embedded header, so the whole header scrolls away with the rows
+    // instead of pinning at the top.
+    TaskListView(
+      filter: .area(area.id),
+      embedded: true,
+      excludeProjectedTasks: true
+    ) {
       VStack(alignment: .leading, spacing: 0) {
-        ForEach(projectsInArea) { project in
-          Button { nav.path = [.project(project)] } label: {
-            projectRow(project)
+        VStack(alignment: .leading, spacing: 10) {
+          HStack(spacing: Theme.iconTextGap) {
+            AreaIcon(diameter: Theme.checkboxTap)
+              .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
+            ClickToEditTitle(placeholder: "Area", text: $draftName) { newName in
+              commitName(newName)
+            }
           }
-          .buttonStyle(.plain)
+          notesField($draftNotes, focused: $notesFocused)
+        }
+        .padding(.horizontal, Theme.hPadding)
+        .padding(.top, 12)
+        .padding(.bottom, 16)
+        // Observe focus from a stable parent — if `.onChange` lives on the
+        // TextField, blurring removes the field, the observer is torn down
+        // before its closure can fire.
+        .onChange(of: notesFocused) { _, focused in
+          if !focused { commitNotes() }
+        }
+
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(projectsInArea) { project in
+            Button { nav.path = [.project(project)] } label: {
+              projectRow(project)
+            }
+            .buttonStyle(.plain)
+          }
         }
       }
-
-      // Tasks directly in this area (no project). Projects are listed above
-      // and own their own task lists, so compact.
-      TaskListView(filter: .area(area.id), embedded: true, excludeProjectedTasks: true)
     }
     .background(Theme.paperBackground)
     .septenaInlineTitle()
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
-        Button { showingMoreActions = true } label: {
+        Menu {
+          sortMenuItems(taskSortRaw: $taskSortRaw)
+        } label: {
           Image(systemName: "ellipsis.circle").foregroundStyle(Theme.inkSecondary)
         }
       }
-    }
-    .sheet(isPresented: $showingMoreActions) {
-      ActionSheet(title: area.title,
-                  actions: sortActions(taskSortRaw: $taskSortRaw))
-      .presentationDetents([.height(260)])
-      .septenaSheetChrome()
     }
     .alert("Error", isPresented: Binding(
       get: { errorMessage != nil },
@@ -308,7 +303,6 @@ struct ProjectDetailView: View {
   @State private var status: ProjectStatus
   @State private var errorMessage: String?
   @State private var showingDeleteConfirm = false
-  @State private var showingMoreActions = false
   @State private var showingMoveToArea = false
   @State private var showingRepoEditor = false
   @State private var areas: [Area] = []
@@ -334,58 +328,68 @@ struct ProjectDetailView: View {
   }
 
   var body: some View {
-    VStack(spacing: 0) {
-      VStack(alignment: .leading, spacing: 10) {
-        HStack(spacing: Theme.iconTextGap) {
-          ProjectProgressIcon(progress: progress, tint: theme.accent,
-                              diameter: Theme.checkboxTap, lineWidth: 2)
-            .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
-          ClickToEditTitle(placeholder: "Project", text: $draftName) { newName in
-            commitNameTo(newName)
+    // Title + notes are passed *into* TaskListView as its embedded header so
+    // the whole header scrolls away with the rows instead of pinning above.
+    TaskListView(filter: .project(project.id), embedded: true) {
+      VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 10) {
+          HStack(spacing: Theme.iconTextGap) {
+            ProjectProgressIcon(progress: progress, tint: theme.accent,
+                                diameter: Theme.checkboxTap, lineWidth: 2)
+              .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
+            ClickToEditTitle(placeholder: "Project", text: $draftName) { newName in
+              commitNameTo(newName)
+            }
           }
+          notesField($draftNotes, focused: $notesFocused)
+        }
+        .padding(.horizontal, Theme.hPadding)
+        .padding(.top, 12)
+        .padding(.bottom, 16)
+        .onChange(of: notesFocused) { _, focused in
+          if !focused { commitNotes() }
         }
 
-        // Notes — see AreaDetailView for the overlay-pattern rationale.
-        notesField($draftNotes, focused: $notesFocused)
+        Hairline()
       }
-      .padding(.horizontal, Theme.hPadding)
-      .padding(.top, 12)
-      .padding(.bottom, 16)
-      // Observe focus from a stable parent — if `.onChange` lives on the
-      // TextField, blurring removes the field (the `if` branch flips), and
-      // the observer is torn down before its closure can fire.
-      .onChange(of: notesFocused) { _, focused in
-        if !focused { commitNotes() }
-      }
-
-      Hairline()
-
-      TaskListView(filter: .project(project.id), embedded: true)
     }
     .background(Theme.paperBackground)
     .septenaInlineTitle()
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
-        Button { showingMoreActions = true } label: {
+        Menu {
+          sortMenuItems(taskSortRaw: $taskSortRaw)
+          Divider()
+          Button {
+            showingRepoEditor = true
+          } label: {
+            Label("Repo…", systemImage: "chevron.left.forwardslash.chevron.right")
+          }
+          Button {
+            showingMoveToArea = true
+          } label: {
+            Label("Move to Area…", systemImage: "folder")
+          }
+          Button {
+            setStatus(.done)
+          } label: {
+            Label("Mark Done", systemImage: "checkmark.circle")
+          }
+          Button {
+            setStatus(.cancelled)
+          } label: {
+            Label("Cancel Project", systemImage: "xmark.circle")
+          }
+          Divider()
+          Button(role: .destructive) {
+            showingDeleteConfirm = true
+          } label: {
+            Label("Delete Project", systemImage: "trash")
+          }
+        } label: {
           Image(systemName: "ellipsis.circle").foregroundStyle(Theme.inkSecondary)
         }
       }
-    }
-    .sheet(isPresented: $showingMoreActions) {
-      ActionSheet(title: project.title, actions: sortActions(taskSortRaw: $taskSortRaw) + [
-        .init(title: "Repo…", icon: "chevron.left.forwardslash.chevron.right",
-              perform: { showingRepoEditor = true }),
-        .init(title: "Move to Area…", icon: "folder",
-              perform: { showingMoveToArea = true }),
-        .init(title: "Mark Done", icon: "checkmark.circle",
-              perform: { setStatus(.done) }),
-        .init(title: "Cancel Project", icon: "xmark.circle",
-              perform: { setStatus(.cancelled) }),
-        .init(title: "Delete Project", icon: "trash", role: .destructive,
-              perform: { showingDeleteConfirm = true }),
-      ])
-      .presentationDetents([.height(520)])
-      .septenaSheetChrome()
     }
     .sheet(isPresented: $showingMoveToArea) {
       AreaPickerSheet(areas: areas, currentAreaId: project.area) { newAreaId in

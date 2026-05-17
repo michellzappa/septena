@@ -72,6 +72,8 @@ enum StartupView: String, CaseIterable, Identifiable {
 struct SettingsView: View {
   @Environment(\.dismiss) private var dismiss
   @State private var selection: Section? = .general
+  @State private var columnVisibility: NavigationSplitViewVisibility = .all
+  @State private var preferredCompactColumn: NavigationSplitViewColumn = .detail
 
   enum Section: String, CaseIterable, Identifiable {
     case general, remindersInbox, sync, about
@@ -103,7 +105,8 @@ struct SettingsView: View {
   }
 
   var body: some View {
-    NavigationSplitView {
+    NavigationSplitView(columnVisibility: $columnVisibility,
+                        preferredCompactColumn: $preferredCompactColumn) {
       List(Section.allCases, selection: $selection) { section in
         Label {
           Text(section.title)
@@ -222,10 +225,62 @@ struct RemindersInboxSettingsPane: View {
                       id: cal.calendarIdentifier)
           }
         }
+
+        Section {
+          Toggle("Auto-import new reminders", isOn: Binding(
+            get: { bridge.autoImport },
+            set: { bridge.autoImport = $0 }
+          ))
+          .disabled(bridge.sourceListID == nil)
+        } footer: {
+          Text("When on, pending items in the source list import automatically and are removed from Reminders. Runs on app launch and whenever Reminders changes.")
+        }
+
+        if !bridge.recentImports.isEmpty {
+          Section("Recent auto-imports") {
+            ForEach(bridge.recentImports.prefix(10)) { entry in
+              autoImportRow(entry)
+            }
+            Button("Clear log", role: .destructive) {
+              bridge.recentImports = []
+            }
+          }
+        }
       }
     }
     .formStyle(.grouped)
     .onAppear(perform: refresh)
+  }
+
+  @ViewBuilder
+  private func autoImportRow(_ entry: AutoImportLogEntry) -> some View {
+    HStack(alignment: .top, spacing: 10) {
+      Image(systemName: entry.succeeded ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+        .foregroundStyle(entry.succeeded ? Color.green : Color.orange)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(entry.title)
+          .foregroundStyle(.primary)
+          .lineLimit(2)
+        HStack(spacing: 6) {
+          Text(relativeDate(entry.importedAt))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+          if let err = entry.error {
+            Text("· \(err)")
+              .font(.caption)
+              .foregroundStyle(.orange)
+              .lineLimit(1)
+          }
+        }
+      }
+      Spacer()
+    }
+  }
+
+  private func relativeDate(_ d: Date) -> String {
+    let f = RelativeDateTimeFormatter()
+    f.unitsStyle = .short
+    return f.localizedString(for: d, relativeTo: Date())
   }
 
   @ViewBuilder

@@ -270,6 +270,19 @@ final class SeptenaClient {
     _ = try await postJSON("/api/chores/defer", body: body, as: EmptyResponse.self)
   }
 
+  /// Server-aggregated "Next" list (habits + supplements + chores, with
+  /// defers and bucket filters already applied). Used by the sidebar tile
+  /// count and any client that wants the merged Next slice without doing
+  /// its own four-fetch dance.
+  func nextItems(date: String,
+                 limit: Int? = nil,
+                 bucket: String? = nil) async throws -> NextItemsResponse {
+    var q: [URLQueryItem] = [URLQueryItem(name: "date", value: date)]
+    if let limit { q.append(URLQueryItem(name: "limit", value: String(limit))) }
+    if let bucket { q.append(URLQueryItem(name: "bucket", value: bucket)) }
+    return try await getJSON("/api/next/items", query: q, as: NextItemsResponse.self)
+  }
+
   // MARK: - Sections (for theme accent)
 
   /// Live section config from Septena. We only care about the Tasks entry's
@@ -435,7 +448,7 @@ final class SeptenaClient {
     req.httpBody = try JSONSerialization.data(withJSONObject: body)
     SeptenaLog.info("POST \(u.path) body=\(body)")
     let result: T = try await send(req, as: type)
-    notifyChanged()
+    notifyChanged(for: path)
     return result
   }
 
@@ -449,7 +462,7 @@ final class SeptenaClient {
     req.httpBody = try JSONSerialization.data(withJSONObject: body)
     SeptenaLog.info("PUT \(u.path)")
     let result: T = try await send(req, as: type)
-    notifyChanged()
+    notifyChanged(for: path)
     return result
   }
 
@@ -470,13 +483,16 @@ final class SeptenaClient {
     if code >= 400 {
       throw SeptenaError.server(code, String(data: data, encoding: .utf8) ?? "")
     }
-    notifyChanged()
+    notifyChanged(for: path)
   }
 
   /// Single fan-out point: any mutating HTTP call posts this so observers
   /// (sidebar counts, etc.) can refresh without each call site wiring its
-  /// own reload.
-  private func notifyChanged() {
+  /// own reload. Scoped to /api/tasks/* — habits / supplements / chores
+  /// don't affect sidebar counts or the overdue badge, and firing on every
+  /// Next-view tap caused the sidebar to flicker.
+  private func notifyChanged(for path: String) {
+    guard path.hasPrefix("/api/tasks") else { return }
     NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
   }
 

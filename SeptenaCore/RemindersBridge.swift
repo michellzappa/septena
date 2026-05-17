@@ -77,6 +77,70 @@ final class RemindersBridge {
     return store.calendar(withIdentifier: id)
   }
 
+  // MARK: - Auto-import
+
+  private static let autoImportKey = "septena.reminders.autoImport"
+  private static let logKey        = "septena.reminders.autoImportLog"
+  private static let logCap        = 20
+
+  /// When true, any pending reminder in the source list is imported as a
+  /// Septena task and removed from Reminders, without user action. Triggered
+  /// on app launch and whenever the EventKit store changes.
+  var autoImport: Bool = UserDefaults.standard.bool(forKey: autoImportKey) {
+    didSet { UserDefaults.standard.set(autoImport, forKey: Self.autoImportKey) }
+  }
+
+  /// Most recent auto-imports, newest first, capped at `logCap`. Surfaced in
+  /// Settings so the user can confirm what got pulled in (and removed from
+  /// Reminders) without diving into Console logs.
+  var recentImports: [AutoImportLogEntry] = {
+    guard let data = UserDefaults.standard.data(forKey: logKey),
+          let decoded = try? JSONDecoder().decode([AutoImportLogEntry].self, from: data)
+    else { return [] }
+    return decoded
+  }() {
+    didSet {
+      if let data = try? JSONEncoder().encode(recentImports) {
+        UserDefaults.standard.set(data, forKey: Self.logKey)
+      }
+    }
+  }
+
+  /// Reentrancy guard — EventKit can fire change notifications mid-import.
+  @ObservationIgnored private var autoImporting = false
+
+  /// One pass: fetch pending from the source list, create a Septena task per
+  /// item, delete the original on success, append to the log. No-op unless
+  /// the toggle is on, access is granted, and a source list is nominated.
+  func runAutoImport(using create: (String, Date?, String?) async throws -> Void) async {
+    guard autoImport, access == .granted, let cal = sourceList(), !autoImporting else { return }
+    autoImporting = true
+    defer { autoImporting = false }
+
+    let pending = await pendingReminders(in: cal)
+    guard !pending.isEmpty else { return }
+
+    var imported: [EKReminder] = []
+    var entries: [AutoImportLogEntry] = []
+    for r in pending {
+      let title = r.title ?? "Untitled"
+      do {
+        try await create(title, r.dueDateComponents?.date, r.notes)
+        imported.append(r)
+        entries.append(AutoImportLogEntry(title: title, importedAt: Date(), succeeded: true))
+      } catch {
+        entries.append(AutoImportLogEntry(title: title, importedAt: Date(),
+                                          succeeded: false,
+                                          error: error.localizedDescription))
+      }
+    }
+    if !imported.isEmpty { try? delete(imported) }
+    if !entries.isEmpty {
+      // Newest first; trim to cap.
+      recentImports = Array((entries.reversed() + recentImports).prefix(Self.logCap))
+    }
+  }
+
   // MARK: - Read
 
   func reminderLists() -> [EKCalendar] {
@@ -85,12 +149,14 @@ final class RemindersBridge {
   }
 
   /// Incomplete reminders from `calendar`, in the order Reminders returns them.
+  /// Uses `predicateForReminders(in:)` and filters in-process — the
+  /// `predicateForIncompleteReminders(withDueDateStarting:ending:…)` variant
+  /// inconsistently drops items without a due date across OS versions.
   func pendingReminders(in calendar: EKCalendar) async -> [EKReminder] {
-    let predicate = store.predicateForIncompleteReminders(
-      withDueDateStarting: nil, ending: nil, calendars: [calendar])
+    let predicate = store.predicateForReminders(in: [calendar])
     return await withCheckedContinuation { cont in
       store.fetchReminders(matching: predicate) { results in
-        cont.resume(returning: results ?? [])
+        cont.resume(returning: (results ?? []).filter { !$0.isCompleted })
       }
     }
   }
@@ -122,5 +188,24 @@ struct ImportedReminder: Identifiable, Hashable {
     self.title = r.title ?? "Untitled"
     self.notes = r.notes
     self.dueDate = r.dueDateComponents?.date
+  }
+}
+
+// MARK: - Auto-import log
+
+struct AutoImportLogEntry: Codable, Identifiable, Hashable {
+  let id: UUID
+  let title: String
+  let importedAt: Date
+  let succeeded: Bool
+  let error: String?
+
+  init(id: UUID = UUID(), title: String, importedAt: Date,
+       succeeded: Bool, error: String? = nil) {
+    self.id = id
+    self.title = title
+    self.importedAt = importedAt
+    self.succeeded = succeeded
+    self.error = error
   }
 }

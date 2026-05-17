@@ -10,6 +10,13 @@ struct TaskListView: View {
   @Environment(NavigationState.self) private var nav
   @Environment(SectionTheme.self) private var theme
   @Environment(\.modelContext) private var modelContext
+  #if os(iOS)
+  /// Drives the Details surface choice: `.sheet` on iPhone compact,
+  /// `.inspector` on iPad regular. `.inspector` adapts poorly to iPhone
+  /// (renders as a blank near-fullscreen panel), so we route there
+  /// only when the trailing column actually has room.
+  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+  #endif
 
   let filter: TaskFilter
   /// True when this view is laid out *inside* another detail screen
@@ -19,6 +26,11 @@ struct TaskListView: View {
   /// When set on an Area page, hides tasks that belong to a project so the
   /// area list shows only area-direct work (projects live in the parent view).
   var excludeProjectedTasks: Bool = false
+  /// Optional content rendered as the first row(s) of the underlying List
+  /// when `embedded` is true. Lets Project / Area detail screens place their
+  /// title + notes (and any project roll-up) *inside* the scrolling list, so
+  /// the header scrolls away with the rows instead of pinning at the top.
+  let embeddedHeader: () -> AnyView
 
   /// Global sort applied when this list is showing a project or area — name
   /// or earliest-due first. Other filters (Today, Upcoming, etc.) have their
@@ -46,10 +58,30 @@ struct TaskListView: View {
   /// a section swap — only after a real network response confirms emptiness.
   @State private var loadedFilters: Set<TaskFilter> = []
 
-  init(filter: TaskFilter, embedded: Bool = false, excludeProjectedTasks: Bool = false) {
+  init<H: View>(
+    filter: TaskFilter,
+    embedded: Bool = false,
+    excludeProjectedTasks: Bool = false,
+    @ViewBuilder embeddedHeader: @escaping () -> H
+  ) {
     self.filter = filter
     self.embedded = embedded
     self.excludeProjectedTasks = excludeProjectedTasks
+    self.embeddedHeader = { AnyView(embeddedHeader()) }
+    let ctx = LocalStore.shared.container.mainContext
+    _areas = State(initialValue: LocalCache.areas(in: ctx))
+    _projects = State(initialValue: LocalCache.projects(in: ctx))
+  }
+
+  init(
+    filter: TaskFilter,
+    embedded: Bool = false,
+    excludeProjectedTasks: Bool = false
+  ) {
+    self.filter = filter
+    self.embedded = embedded
+    self.excludeProjectedTasks = excludeProjectedTasks
+    self.embeddedHeader = { AnyView(EmptyView()) }
     let ctx = LocalStore.shared.container.mainContext
     _areas = State(initialValue: LocalCache.areas(in: ctx))
     _projects = State(initialValue: LocalCache.projects(in: ctx))
@@ -70,6 +102,18 @@ struct TaskListView: View {
   private var review: [SeptenaTask] {
     get { storageFilter == filter ? reviewStorage : [] }
     nonmutating set { reviewStorage = newValue; storageFilter = filter }
+  }
+
+  /// Review tasks that genuinely rolled in overnight — i.e. were scheduled
+  /// for a date strictly before today. Items the user scheduled *for* today
+  /// (scheduled == today) or that are merely due today don't count as "new"
+  /// because the user just placed them; the banner shouldn't nag about those.
+  private var rolledInReview: [SeptenaTask] {
+    let today = SeptenaDate.today
+    return review.filter { task in
+      guard let s = task.scheduled, !s.isEmpty else { return false }
+      return String(s.prefix(10)) < today
+    }
   }
 
   private var doneToday: [SeptenaTask] {
@@ -114,6 +158,66 @@ struct TaskListView: View {
   @State private var showingRepeatSheet = false
   @State private var repeatTargetId: String?
 
+  // Details pane is driven by its own state, NOT by `selectedTaskId`.
+  // Selection is a keyboard-cursor highlight; the pane is opened only
+  // by the (i) button on the inline editor. Decoupling them prevents
+  // the pane from popping up as a side effect of tapping / arrowing.
+  @State private var paneTaskId: String?
+  private var detailsPaneIsOpen: Binding<Bool> {
+    Binding(
+      get: { paneTaskId != nil && currentTask(id: paneTaskId) != nil },
+      set: { isOpen in if !isOpen { paneTaskId = nil } }
+    )
+  }
+
+  /// True on iPad regular width and macOS — wide enough for a real
+  /// trailing inspector column. False on iPhone compact, where we
+  /// present Details as a `.sheet` instead.
+  private var useInspectorForDetails: Bool {
+    #if os(macOS)
+    return true
+    #else
+    return horizontalSizeClass == .regular
+    #endif
+  }
+
+  /// Shared content for the Details surface — used by both the
+  /// `.sheet` (iPhone) and `.inspector` (iPad/Mac) presenters.
+  @ViewBuilder
+  private var detailsPaneContent: some View {
+    if let id = paneTaskId, let target = currentTask(id: id) {
+      TaskDetailsSheet(
+        task: target,
+        projectTitle: target.project.flatMap { pid in projects.first(where: { $0.id == pid })?.title },
+        areaTitle:    target.area.flatMap    { aid in areas.first(where:    { $0.id == aid })?.title },
+        onSaveTitleNotes: { newTitle, newNotes in
+          applyTitleNotes(id: target.id, title: newTitle, notes: newNotes)
+        },
+        onOpenWhen: {
+          whenTargetId = target.id; whenKind = .scheduled; showingWhenSheet = true
+        },
+        onOpenDeadline: {
+          whenTargetId = target.id; whenKind = .due; showingWhenSheet = true
+        },
+        onOpenRepeat: {
+          repeatTargetId = target.id; showingRepeatSheet = true
+        },
+        onOpenMove: {
+          moveTargetId = target.id; showingMoveSheet = true
+        },
+        onDelete: {
+          applyDelete(target.id)
+          paneTaskId = nil
+        },
+        onDone: { paneTaskId = nil }
+      )
+      .id(id)
+    }
+  }
+
+  // Local semantic sorter — populates a "→ Suggested" chip on Inbox rows.
+  @State private var suggestionEngine = SuggestionEngine.shared
+
   // "Show N logged items" — recently completed tasks, scoped to the current
   // view. Loaded lazily on first expand and refreshed alongside the main list.
   @State private var loggedItemsStorage: [SeptenaTask] = []
@@ -136,12 +240,8 @@ struct TaskListView: View {
 
   // "You have N new to-dos" banner — compact start-of-day welcome that
   // surfaces tasks rolling in from scheduled-past or due-today. Dismissed
-  // per-day via UserDefaults; reappears the next morning.
-  // Read the persisted dismissed-today flag synchronously so the banner
-  // doesn't flash visible for a frame between load() populating `review`
-  // and the UserDefaults read that runs at the end of load(). The
-  // .onAppear / load() path still refreshes this in case the date
-  // rolled over while the app was running.
+  // per-day via UserDefaults (local only); reappears the next morning.
+  // Cross-device same-day dismissal sync is in the backlog.
   @State private var newTodosDismissed: Bool =
     UserDefaults.standard.string(forKey: "septena.newTodos.dismissedDate") == SeptenaDate.today
 
@@ -153,11 +253,18 @@ struct TaskListView: View {
           .listRowSeparator(.hidden)
           .listRowBackground(Color.clear)
           .listRowInsets(EdgeInsets())
+      } else {
+        // Parent-supplied title + notes (Project / Area detail). Lives inside
+        // the List so it scrolls away with the rows instead of pinning above.
+        embeddedHeader()
+          .listRowSeparator(.hidden)
+          .listRowBackground(Color.clear)
+          .listRowInsets(EdgeInsets())
       }
 
       // compact "You have N new to-dos" banner on Today.
-      if filter == .today && !review.isEmpty && !newTodosDismissed {
-        newTodosBanner(count: review.count)
+      if filter == .today && !rolledInReview.isEmpty && !newTodosDismissed {
+        newTodosBanner(count: rolledInReview.count)
           .listRowSeparator(.hidden)
           .listRowBackground(Color.clear)
           .listRowInsets(EdgeInsets())
@@ -228,8 +335,23 @@ struct TaskListView: View {
     // the top toolbar "+" and ⌘N, so the new-task flow stays inline. Sits
     // above the 240pt empty tap-catcher row so it never overlaps a real row.
     .overlay(alignment: .bottomTrailing) {
-      floatingPlusButton
+      // Hide while the inline editor is open — the keyboard accessory
+      // is the active surface and the floating + would crowd it.
+      if editingTaskId == nil {
+        floatingPlusButton
+      }
     }
+    // Reminders-style floating glass pill above the soft keyboard.
+    // Apple's pattern (WWDC25 session 323) is `.safeAreaInset` + the
+    // iOS 26 `.glassEffect()` — not `ToolbarItemGroup(.keyboard)`,
+    // which renders as a flat strip flush to the keyboard.
+    #if os(iOS)
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      if let id = editingTaskId, let task = currentTask(id: id) {
+        editorKeyboardAccessory(for: task)
+      }
+    }
+    #endif
     .modifier(KeyboardNavigationModifier(
       isInputMode: editingTaskId != nil,
       hasSelection: selectedTaskId != nil,
@@ -311,6 +433,14 @@ struct TaskListView: View {
       .presentationBackground(.thinMaterial)
       .presentationCornerRadius(Theme.cornerRadius)
     }
+    // Details — sheet on iPhone compact (where `.inspector` renders
+    // as a blank near-fullscreen panel), trailing inspector column on
+    // iPad regular / macOS. Same content view either way.
+    .modifier(TaskDetailsPresenter(
+      isOpen: detailsPaneIsOpen,
+      useInspector: useInspectorForDetails,
+      content: { detailsPaneContent }
+    ))
     // Re-load on every appearance so completed tasks (kept visible in-place
     // while the user is on the screen) drop off when they return.
     .onAppear { Task { await load() } }
@@ -323,6 +453,7 @@ struct TaskListView: View {
       sessionDoneIds = []
       selectedTaskId = nil
       editingTaskId = nil
+      paneTaskId = nil
       newlyCreatedTaskId = nil
       Task { await load() }
     }
@@ -527,8 +658,42 @@ struct TaskListView: View {
     }
   }
 
+  /// Persist title/notes from the Details pane. No-op when both fields
+  /// match the current task — avoids a spurious round-trip when the user
+  /// opens Details just to glance.
+  private func applyTitleNotes(id: String, title: String, notes: String) {
+    let trimmed = title.trimmingCharacters(in: .whitespaces)
+    guard !trimmed.isEmpty else { return }
+    if let current = currentTask(id: id),
+       current.title == trimmed,
+       (current.notes ?? "") == notes {
+      return
+    }
+    Task {
+      _ = try? await client.update(id: id, title: trimmed, notes: notes)
+      await load()
+    }
+  }
+
+  /// Open the Details pane for a task. Only the (i) button on the
+  /// inline editor calls this — tapping a row does NOT open the pane.
+  /// Commits any in-flight inline draft first so the pane reads fresh
+  /// state.
+  private func openDetails(for task: SeptenaTask) {
+    if editingTaskId != nil { commitEdit() }
+    paneTaskId = task.id
+  }
+
   private func applyMove(id: String, areaId: String?, projectId: String?) {
     Haptics.tick()
+    if let task = currentTask(id: id) {
+      let chosenKind: SuggestionEngine.Suggestion.Kind? =
+        projectId != nil ? .project : (areaId != nil ? .area : nil)
+      let chosenId = projectId ?? areaId
+      recordImplicitRejectionIfMismatch(task: task,
+                                        chosenKind: chosenKind,
+                                        chosenId: chosenId)
+    }
     Task {
       do {
         // Project takes precedence — Septena derives area from project on save.
@@ -550,12 +715,13 @@ struct TaskListView: View {
   @ViewBuilder
   private func row(_ task: SeptenaTask) -> some View {
     rowContent(task)
-      // Explicit value-driven animation so both directions of the
-      // taskBody ↔ editor swap animate, regardless of whether the
-      // mutating call site wrapped in withAnimation. The transition
-      // modifier on each branch supplies the opacity blend; this drives
-      // the timing curve and ensures List sees the row's height change
-      // as part of the spring.
+      // One shared highlight backplate covers both the closed-row and
+      // inline-editor branches, so the accent tint stays put when the
+      // row swaps state — no cross-fade needed.
+      .background(rowBackground(for: task))
+      // Spring drives the row's height change; we intentionally do
+      // NOT use a transition that fades content in/out, since the
+      // two branches share the same checkbox + title layout.
       .animation(Self.expandSpring, value: editingTaskId == task.id)
   }
 
@@ -563,14 +729,13 @@ struct TaskListView: View {
   private func rowContent(_ task: SeptenaTask) -> some View {
     if editingTaskId == task.id {
       InlineEditTaskRow(
-        task: task,
         title: $editingTitle,
         notes: $editingNotes,
         isDone: task.status == .done,
         isToday: task.today && filter != .today,
-        autoFocus: task.id == newlyCreatedTaskId,
-        projectTitle: task.project.flatMap { pid in projects.first(where: { $0.id == pid })?.title },
-        areaTitle:    task.area.flatMap    { aid in areas.first(where:    { $0.id == aid })?.title },
+        // Tap-to-edit and ⌘N both want the keyboard up immediately —
+        // any time the inline editor mounts, it should claim focus.
+        autoFocus: true,
         onToggleDone: { toggle(task) },
         onCommit: { commitEdit() },
         onCancel: {
@@ -588,17 +753,11 @@ struct TaskListView: View {
             }
           }
         },
-        onSchedule: {
-          whenTargetId = task.id; whenKind = .scheduled; showingWhenSheet = true
-        },
-        onDeadline: {
-          whenTargetId = task.id; whenKind = .due; showingWhenSheet = true
-        },
-        onMove: {
-          moveTargetId = task.id; showingMoveSheet = true
-        },
-        onRepeat: {
-          repeatTargetId = task.id; showingRepeatSheet = true
+        onOpenDetails: {
+          // Commit current draft, then open the Details pane (info
+          // button is the only path to the pane).
+          commitEdit()
+          paneTaskId = task.id
         }
       )
       // No cross-fade between display and edit modes — that fade was the
@@ -610,7 +769,6 @@ struct TaskListView: View {
     } else {
       taskBody(task)
         .transition(.identity)
-        .transition(.opacity)
         // Right-click should make it visually clear which row the menu
         // refers to — flip the selection cursor onto this task before the
         // menu opens. iOS gets natural press feedback from long-press, so
@@ -723,6 +881,10 @@ struct TaskListView: View {
           .font(.system(size: 12))
           .foregroundStyle(Theme.inkSecondary)
       }
+      // Local-embedding "Move to X" chip — only ever appears on Inbox rows
+      // where SuggestionEngine has a confident target. One tap moves the
+      // task and the chip vanishes.
+      suggestionChip(task)
       // Trailing date / status — one clear signal per row. See
       // `trailingDate` for the full rule set.
       trailingDate(task)
@@ -734,55 +896,125 @@ struct TaskListView: View {
     // which made the centered-content approach shift the title on edit
     // open. Equal padding top + bottom on closed rows; the editor uses
     // the same top padding.
-    .padding(.vertical, Theme.rowTapHeight >= 44 ? 11 : 5)
-    .background(rowBackground(for: task))
+    .padding(.vertical, Theme.rowVPadding)
     // Hit area covers the FULL padded row (checkbox + title column +
     // padding above/below). Inner controls — TaskCheckbox button, action
     // icons — still consume their own taps via gesture priority, so they
     // toggle / open without selecting first.
     .contentShape(Rectangle())
-    #if os(macOS)
-    // macOS: one click selects, a second click on the already-selected row
-    // opens the editor. Single .onTapGesture only — attaching a count:2
-    // sibling forces SwiftUI to wait the system double-click interval
-    // (~300ms) on every single click before firing.
-    .onTapGesture {
-      // If a different row is being edited, the first tap just commits
-      // that editor — it does not also select/open this row.
-      if let editing = editingTaskId, editing != task.id {
-        commitEdit()
-        return
-      }
-      if selectedTaskId == task.id {
-        startEdit(task)
-      } else {
-        selectedTaskId = task.id
-      }
-    }
-    #else
-    .onTapGesture {
-      if let editing = editingTaskId, editing != task.id {
-        commitEdit()
-        return
-      }
-      selectedTaskId = task.id
-      startEdit(task)
-    }
-    #endif
+    // Tap = inline edit (Reminders-style). Title focuses, keyboard
+    // accessory chips appear. The (i) button in the editor is the
+    // ONLY path that opens the Details pane — we deliberately do NOT
+    // set `selectedTaskId` here, because that drives the inspector
+    // binding and would render a blank pane behind the editor.
+    .onTapGesture { startEdit(task) }
   }
 
-  /// Single highlight rule: light accent-tint pill (matches the sidebar's
-  /// selection pill) when the row is the keyboard cursor AND it's not
-  /// currently being edited (the editor card has its own chrome).
-  /// Animation is scoped to the fill only — wrapping the whole row body in
-  /// `.animation(value: selectedTaskId)` caused every visible row to re-layout
-  /// for 150ms on each selection change, which was the macOS click-lag source.
+  /// Highlight backplate. Two states:
+  ///   • editing — stronger accent fill so the active row reads as
+  ///     "open" while the inline editor is up and the keyboard accessory
+  ///     is acting on this task.
+  ///   • keyboard cursor — light accent tint (matches the sidebar's
+  ///     selection pill) when arrowed-to but not actively edited.
+  /// Animation is scoped to the fill so we don't re-layout every visible
+  /// row on each selection change (the old macOS click-lag source).
   @ViewBuilder
   private func rowBackground(for task: SeptenaTask) -> some View {
-    let isHighlighted = selectedTaskId == task.id && editingTaskId != task.id
+    let isEditing = editingTaskId == task.id
+    let isCursor  = selectedTaskId == task.id && !isEditing
+    let fill: Color = {
+      if isEditing { return theme.accent.opacity(0.18) }
+      if isCursor  { return theme.accent.opacity(0.10) }
+      return .clear
+    }()
     RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
-      .fill(isHighlighted ? theme.accent.opacity(0.15) : Color.clear)
+      .fill(fill)
       .padding(.horizontal, Theme.hPadding - 6)
+  }
+
+  /// Inbox-only round "sort" button. Click opens a ranked dropdown of
+  /// candidate projects/areas — picking one moves the task immediately. No
+  /// label on the button itself; the icon alone is the affordance, the menu
+  /// is where the choices live. "Not this" trains a per-target rejection.
+  @ViewBuilder
+  private func suggestionChip(_ task: SeptenaTask) -> some View {
+    if filter == .inbox,
+       task.status == .open,
+       let top = suggestionEngine.topSuggestion(for: task.id) {
+      let ranked = suggestionEngine.suggestions[task.id] ?? [top]
+      Menu {
+        ForEach(Array(ranked.enumerated()), id: \.element) { _, s in
+          Button {
+            applySuggestion(task: task, suggestion: s)
+          } label: {
+            Label("Move to \(s.title)",
+                  systemImage: s.kind == .area ? "tray" : "folder")
+          }
+        }
+        Divider()
+        Button {
+          moveTargetId = task.id
+          showingMoveSheet = true
+        } label: {
+          Label("Other…", systemImage: "ellipsis")
+        }
+      } label: {
+        Image(systemName: "arrow.right")
+          .font(.system(size: 12, weight: .semibold))
+          .foregroundStyle(theme.accent)
+          .frame(width: 26, height: 26)
+          .background(
+            Circle().fill(theme.accent.opacity(0.15))
+          )
+          .contentShape(Circle())
+      }
+      .menuStyle(.button)
+      .menuIndicator(.hidden)
+      .buttonStyle(.plain)
+      .fixedSize()
+      .help("Suggest a project or area for this task")
+    }
+  }
+
+  private func applySuggestion(task: SeptenaTask,
+                               suggestion: SuggestionEngine.Suggestion) {
+    Haptics.tick()
+    recordImplicitRejectionIfMismatch(task: task,
+                                      chosenKind: suggestion.kind,
+                                      chosenId: suggestion.id)
+    suggestionEngine.clearSuggestion(for: task.id)
+    Task {
+      do {
+        switch suggestion.kind {
+        case .area:
+          _ = try await client.moveToArea(id: task.id, area: suggestion.id)
+        case .project:
+          _ = try await client.moveToProject(id: task.id, project: suggestion.id)
+        }
+        await load()
+      } catch {
+        SeptenaLog.error("apply suggestion failed", error)
+      }
+    }
+  }
+
+  /// Implicit "Not this" — fires when the user moves the task somewhere
+  /// other than the engine's top pick (via the menu's alternates, "Other…",
+  /// the context menu's Move, or any other path that calls applyMove).
+  /// Records the top suggestion as a rejection for this target so similar
+  /// future tasks won't pick it.
+  private func recordImplicitRejectionIfMismatch(task: SeptenaTask,
+                                                 chosenKind: SuggestionEngine.Suggestion.Kind?,
+                                                 chosenId: String?) {
+    guard let top = suggestionEngine.topSuggestion(for: task.id) else { return }
+    if let chosenId, top.kind == chosenKind, top.id == chosenId { return }
+    let text = [task.title,
+                task.notes?.trimmingCharacters(in: .whitespacesAndNewlines)]
+      .compactMap { $0?.isEmpty == false ? $0 : nil }
+      .joined(separator: ". ")
+    suggestionEngine.recordRejection(taskText: text,
+                                     targetKind: top.kind,
+                                     targetId: top.id)
   }
 
   /// A task with a due date that's today or in the past — surfaces a flag.
@@ -1031,42 +1263,52 @@ struct TaskListView: View {
   private func groupHeader(icon: String?, title: String, onTap: (() -> Void)? = nil) -> some View {
     // Same icon column width and same icon→text gap as task rows so
     // every icon sits at one X and every text starts at one X.
-    HStack(spacing: Theme.iconTextGap) {
-      if icon == "square.stack.3d.up.fill" {
-        // Area dot is intentionally bumped past task-row icon size — it's a
-        // section header, not an inline glyph, and the larger circle reads as
-        // a chapter marker.
-        AreaIcon(tint: Theme.inkSecondary, diameter: 21, lineWidth: 1.5)
-          .frame(width: Theme.checkboxTap, alignment: .center)
-      } else if icon != nil {
-        Image(systemName: icon!)
-          .font(.system(size: 16))
-          .foregroundStyle(Theme.iconMuted)
-          .frame(width: Theme.checkboxTap, alignment: .center)
-      } else {
-        ProjectProgressIcon(progress: 0.25, tint: Theme.inkSecondary, diameter: 14)
-          .frame(width: Theme.checkboxTap, alignment: .center)
+    VStack(alignment: .leading, spacing: 0) {
+      HStack(spacing: Theme.iconTextGap) {
+        if icon == "square.stack.3d.up.fill" {
+          // Area dot is intentionally bumped past task-row icon size — it's a
+          // section header, not an inline glyph, and the larger circle reads as
+          // a chapter marker.
+          AreaIcon(tint: Theme.inkSecondary, diameter: 21, lineWidth: 1.5)
+            .frame(width: Theme.checkboxTap, alignment: .center)
+        } else if icon != nil {
+          Image(systemName: icon!)
+            .font(.system(size: 16))
+            .foregroundStyle(Theme.iconMuted)
+            .frame(width: Theme.checkboxTap, alignment: .center)
+        } else {
+          ProjectProgressIcon(progress: 0.25, tint: Theme.inkSecondary, diameter: 14)
+            .frame(width: Theme.checkboxTap, alignment: .center)
+        }
+        // Tappable target is JUST the title (+ chevron) — not the whole row.
+        // The Spacer keeps the rest of the row visually aligned but inert, so
+        // clicks in empty horizontal space don't navigate.
+        if let onTap {
+          GroupHeaderLabel(title: title, hasChevron: true, action: onTap)
+            .padding(.leading, -6)
+        } else {
+          Text(title)
+            .font(.system(size: Theme.groupHeaderFontSize, weight: .semibold))
+            .foregroundStyle(Theme.inkPrimary)
+        }
+        Spacer()
       }
-      // Tappable target is JUST the title (+ chevron) — not the whole row.
-      // The Spacer keeps the rest of the row visually aligned but inert, so
-      // clicks in empty horizontal space don't navigate.
-      if let onTap {
-        GroupHeaderLabel(title: title, hasChevron: true, action: onTap)
-          .padding(.leading, -6)
-      } else {
-        Text(title)
-          .font(.system(size: Theme.groupHeaderFontSize, weight: .semibold))
-          .foregroundStyle(Theme.inkPrimary)
+      .padding(.horizontal, Theme.hPadding)
+      // ~2 lines of whitespace above each project/area cluster header so
+      // groups visually break apart in mixed list views (Unscheduled, Today,
+      // Upcoming). Without this gap, a header reads as the next row of the
+      // previous group instead of the start of a new one.
+      .padding(.top, 32)
+      .padding(.bottom, 6)
+
+      // Hairline beneath project/area cluster headers — separates the title
+      // from the tasks underneath in mixed-list views (Today, Unscheduled).
+      // Date buckets (Upcoming) are non-tappable and skip the rule.
+      if onTap != nil {
+        Hairline()
+          .padding(.bottom, 4)
       }
-      Spacer()
     }
-    .padding(.horizontal, Theme.hPadding)
-    // ~2 lines of whitespace above each project/area cluster header so
-    // groups visually break apart in mixed list views (Unscheduled, Today,
-    // Upcoming). Without this gap, a header reads as the next row of the
-    // previous group instead of the start of a new one.
-    .padding(.top, 32)
-    .padding(.bottom, 6)
   }
 
   // MARK: - Upcoming grouping (by date)
@@ -1138,6 +1380,61 @@ struct TaskListView: View {
     .accessibilityLabel("New Task")
     .help("New Task")
   }
+
+  // MARK: - Keyboard accessory (iOS)
+
+  #if os(iOS)
+  /// Reminders-style floating glass pill that appears above the soft
+  /// keyboard while the inline editor is open. Built with the iOS 26
+  /// `.glassEffect()` + `.safeAreaInset` pattern — not
+  /// `ToolbarItemGroup(.keyboard)`, which renders as a flat strip.
+  @ViewBuilder
+  private func editorKeyboardAccessory(for task: SeptenaTask) -> some View {
+    HStack(spacing: 28) {
+      accessoryChip(systemName: "calendar") {
+        whenTargetId = task.id; whenKind = .scheduled; showingWhenSheet = true
+      }
+      accessoryChip(systemName: task.today ? "sun.max.fill" : "sun.max",
+                    tint: task.today ? .orange : nil) {
+        Haptics.tick()
+        Task {
+          try? await client.moveToToday(id: task.id, today: !task.today)
+          await load()
+        }
+      }
+      accessoryChip(systemName: "number") {
+        moveTargetId = task.id; showingMoveSheet = true
+      }
+      accessoryChip(systemName: "flag") {
+        whenTargetId = task.id; whenKind = .due; showingWhenSheet = true
+      }
+    }
+    .padding(.horizontal, 20)
+    .padding(.vertical, 10)
+    .glassEffect(.regular.interactive(), in: .capsule)
+    .padding(.horizontal, 14)
+    .padding(.bottom, 8)
+  }
+
+  @ViewBuilder
+  private func accessoryChip(systemName: String, tint: Color? = nil,
+                             action: @escaping () -> Void) -> some View {
+    Button {
+      Haptics.pick()
+      // Commit any in-flight title/notes draft so the picker reads
+      // fresh state.
+      if editingTaskId != nil { commitEdit() }
+      action()
+    } label: {
+      Image(systemName: systemName)
+        .font(.system(size: 20, weight: .regular))
+        .foregroundStyle(tint ?? Theme.inkPrimary)
+        .frame(width: 36, height: 36)
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+  }
+  #endif
 
   // MARK: - Edit
 
@@ -1391,7 +1688,7 @@ struct TaskListView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
     .padding(.horizontal, Theme.hPadding)
-    .padding(.vertical, Theme.rowTapHeight >= 44 ? 11 : 5)
+    .padding(.vertical, Theme.rowVPadding)
   }
 
   // MARK: - Load
@@ -1420,6 +1717,24 @@ struct TaskListView: View {
       async let a = client.areas()
       projects = (try? await p) ?? []
       areas = (try? await a) ?? []
+
+      // Refresh the embedding-backed suggestion chips for Inbox rows. The
+      // engine needs every assigned task — each project / area's semantic
+      // identity is the centroid of its assigned tasks. Open tasks come
+      // from the local mirror; done tasks need an explicit logbook pull
+      // (the server's "all" view returns open-only, so weeks of completed
+      // work would otherwise be invisible to the model).
+      if filter == .inbox {
+        var allTasks = LocalCache.allTasks(in: modelContext)
+        if let logbook = try? await client.list(view: "logbook", days: 365) {
+          let known = Set(allTasks.map(\.id))
+          allTasks.append(contentsOf: logbook.items.filter { !known.contains($0.id) })
+        }
+        suggestionEngine.refresh(inbox: resp.items,
+                                 allTasks: allTasks,
+                                 projects: projects,
+                                 areas: areas)
+      }
 
       // 2. Fold the fresh server response back into SwiftData so the next
       //    cold load renders from cache. Scope tells the syncer how to
@@ -1584,6 +1899,32 @@ private struct TopLevelChromeModifier: ViewModifier {
   }
 }
 
+/// Routes the Details surface to `.inspector` (iPad regular / macOS)
+/// or `.sheet` (iPhone compact). `.inspector` adapts poorly to compact
+/// width — renders as a near-fullscreen blank panel — so we present
+/// a real bottom sheet there instead.
+private struct TaskDetailsPresenter<C: View>: ViewModifier {
+  let isOpen: Binding<Bool>
+  let useInspector: Bool
+  @ViewBuilder let content: () -> C
+
+  func body(content base: Content) -> some View {
+    if useInspector {
+      base.inspector(isPresented: isOpen) {
+        content()
+          .inspectorColumnWidth(min: 320, ideal: 380, max: 560)
+      }
+    } else {
+      base.sheet(isPresented: isOpen) {
+        content()
+          .presentationDetents([.medium, .large])
+          .presentationBackground(.thinMaterial)
+          .presentationCornerRadius(Theme.cornerRadius)
+      }
+    }
+  }
+}
+
 /// Bundles ⌘N, ⌘T, ↑/↓, ⌘↑/⌘↓, Enter, Esc, Space into one modifier so the
 /// TaskListView body stays small enough for the SwiftUI type-checker.
 /// While a row is being edited, arrow/return/space/escape are forwarded to
@@ -1620,6 +1961,7 @@ private struct KeyboardNavigationModifier: ViewModifier {
         toggleToday: onToggleToday,
         openWhen: onOpenWhen,
         openDeadline: onOpenDeadline,
+        toggleComplete: hasSelection ? onSpace : nil,
         delete: hasSelection ? onDelete : nil,
         clearSchedule: hasSelection ? onClearSchedule : nil
       ))
@@ -1671,6 +2013,9 @@ struct TaskActions {
   var toggleToday: () -> Void
   var openWhen: () -> Void
   var openDeadline: () -> Void
+  /// Toggles done/open on the selected row — same handler as Space.
+  /// Nil-gated by selection so ⌘K can't fire on an empty list.
+  var toggleComplete: (() -> Void)?
   /// Nil when nothing is selected — disables the menu item rather than
   /// letting ⌘⌫ silently grab the first row.
   var delete: (() -> Void)?

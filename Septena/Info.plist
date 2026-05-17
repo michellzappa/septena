@@ -20,15 +20,15 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
-	<key>NSRemindersFullAccessUsageDescription</key>
-	<string>Septena imports tasks from your Reminders lists into the Inbox.</string>
-	<key>NSRemindersUsageDescription</key>
-	<string>Septena imports tasks from your Reminders lists into the Inbox.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Septena imports tasks from your Reminders lists into the Inbox.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>Septena imports tasks from your Reminders lists into the Inbox.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -37,40 +37,38 @@
 	<key>UIApplicationShortcutItems</key>
 	<array>
 		<dict>
-			<key>UIApplicationShortcutItemType</key>
-			<string>com.septena.app.new-todo</string>
-			<key>UIApplicationShortcutItemTitle</key>
-			<string>New To-Do</string>
-			<key>UIApplicationShortcutItemSubtitle</key>
-			<string>Add to Inbox</string>
 			<key>UIApplicationShortcutItemIconType</key>
 			<string>UIApplicationShortcutIconTypeAdd</string>
+			<key>UIApplicationShortcutItemSubtitle</key>
+			<string>Add to Inbox</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>New To-Do</string>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.septena.app.new-todo</string>
 		</dict>
 		<dict>
-			<key>UIApplicationShortcutItemType</key>
-			<string>com.septena.app.show-today</string>
-			<key>UIApplicationShortcutItemTitle</key>
-			<string>Show Today</string>
 			<key>UIApplicationShortcutItemIconType</key>
 			<string>UIApplicationShortcutIconTypeDate</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Show Today</string>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.septena.app.show-today</string>
 		</dict>
 	</array>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchScreen</key>
 	<dict/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
 		<string>UIInterfaceOrientationPortrait</string>
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-	<key>UISupportedInterfaceOrientations~iphone</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 </dict>
 </plist>

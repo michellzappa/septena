@@ -53,6 +53,7 @@ Central work file. Update as we go. Reference: `docs/things-reference/`.
 - [ ] Quick Find search implementation
 - [ ] Empty states for each list (per Things conventions)
 - [ ] Pull-down on list to reveal Quick Find (not refresh)
+- [ ] Cross-device sync for "You have N new to-dos" daily dismissal (currently local UserDefaults — dismissing on Mac doesn't dismiss on iPhone). Probably NSUbiquitousKeyValueStore; feels like overkill for one banner so parked.
 
 ### Cleanup
 - [ ] Delete unused `QuickEntryView` struct (no longer used; keep file for AgentPanelView)

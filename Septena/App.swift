@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import AppIntents
+import EventKit
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -50,6 +51,11 @@ struct SeptenaApp: App {
                               context: localStore.container.mainContext)
           await syncer.pullAll()
           BadgeManager.shared.start(context: localStore.container.mainContext)
+          await runRemindersAutoImport()
+        }
+        .onReceive(NotificationCenter.default
+          .publisher(for: .EKEventStoreChanged)) { _ in
+          Task { await runRemindersAutoImport() }
         }
         .onAppear {
           #if canImport(UIKit)
@@ -100,6 +106,19 @@ struct SeptenaApp: App {
         Button("Settings…") { navigation.showSettings = true }
           .keyboardShortcut(",", modifiers: .command)
       }
+      // ⌘K opens Quick Find — a floating palette that searches across all
+      // tasks, projects, and areas. Lives in its own menu so the shortcut
+      // works from anywhere (sidebar, detail, settings sheet).
+      CommandMenu("Find") {
+        Button("Quick Find…") { navigation.showQuickFind = true }
+          .keyboardShortcut("k", modifiers: .command)
+      }
+      // Override the default ⌘N "New Window" with "New To-Do". When a task
+      // list is focused, `NewTaskCommand` routes to the in-list inline
+      // creator so the new row inherits the list's project/area context;
+      // otherwise it falls back to the menu-bar Quick Add path (jump to
+      // Inbox + draft a row), the same flow as the iOS Quick Action.
+      CommandGroup(replacing: .newItem) { NewTaskCommand() }
     }
 
     // macOS menu bar quick-entry. Click the checklist glyph in the status
@@ -120,6 +139,22 @@ struct SeptenaApp: App {
     }
     .menuBarExtraStyle(.menu)
     #endif
+  }
+
+  /// Drains the Reminders source list into Septena when the user has opted
+  /// in. Posts `.septenaTasksChanged` after a successful run so any open
+  /// task list refreshes without manual reload.
+  @MainActor
+  private func runRemindersAutoImport() async {
+    let client = clientProvider.client
+    let bridge = RemindersBridge.shared
+    let before = bridge.recentImports.count
+    await bridge.runAutoImport { title, due, notes in
+      _ = try await client.create(title: title, due: due, notes: notes)
+    }
+    if bridge.recentImports.count != before {
+      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    }
   }
 }
 
@@ -219,6 +254,10 @@ final class NavigationState {
   /// and the macOS toolbar gear; the sheet closes via its own Done button.
   var showSettings = false
 
+  /// Drives the Quick Find palette (⌘K). A floating sheet over the main
+  /// window; selecting a result routes via `path` and dismisses itself.
+  var showQuickFind = false
+
   /// Persisted base URL — UserDefaults-backed, mirrored from ClientProvider.
   var serverURL: String = UserDefaults.standard.string(forKey: "septena.serverURL")
     ?? SeptenaClient.default.absoluteString
@@ -242,6 +281,12 @@ struct ContentView: View {
         SettingsView()
           #if os(macOS)
           .frame(minWidth: 720, minHeight: 460)
+          #endif
+      }
+      .sheet(isPresented: $nav.showQuickFind) {
+        QuickFindView()
+          #if os(macOS)
+          .frame(width: 560, height: 420)
           #endif
       }
       .onReceive(NotificationCenter.default
@@ -358,8 +403,10 @@ private final class MenuBarTodayLoader {
   func refresh() async {
     do {
       let resp = try await ClientProvider.shared.client.list(view: "today")
-      // Open only — completed-today rows are returned separately in `done`.
-      items = resp.items.filter { $0.status == .open }
+      // Mirror the Today screen: pinned-today (`items`) plus scheduled/due
+      // rolling in (`review`). Completed-today rows live in `done` and stay
+      // out of the menu bar.
+      items = (resp.items + (resp.review ?? [])).filter { $0.status == .open }
     } catch {
       // Silent: stale items remain visible until the next refresh.
     }

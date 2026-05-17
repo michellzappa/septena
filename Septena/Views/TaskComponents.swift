@@ -15,30 +15,48 @@ struct TaskCheckbox: View {
   var isToday: Bool = false
   let onToggle: () -> Void
 
+  // Smaller rounded square than the old circle glyph — reads as a checkbox,
+  // not a progress dot. Sizes are the visible box, not the tap area.
   #if os(macOS)
-  private static let glyphSize: CGFloat = 16
+  private static let boxSize: CGFloat = 14
+  private static let boxCorner: CGFloat = 3.5
+  private static let boxStroke: CGFloat = 1.2
+  private static let checkSize: CGFloat = 9
   #else
-  private static let glyphSize: CGFloat = 22
+  private static let boxSize: CGFloat = 18
+  private static let boxCorner: CGFloat = 4.5
+  private static let boxStroke: CGFloat = 1.4
+  private static let checkSize: CGFloat = 12
   #endif
 
-  private var glyphName: String {
-    if isDone { return "largecircle.fill.circle" }
-    if isToday { return "sun.max.circle" }
-    return "circle"
+  /// Checkbox chrome is neutral gray by default; Today rows swap stroke
+  /// and fill to `Theme.todayAccent` so the checkbox itself signals the
+  /// promotion (no inset sun glyph).
+  private var boxStrokeColor: Color {
+    isToday ? Theme.todayAccent : Theme.inkSecondary.opacity(0.55)
   }
-
-  private var glyphTint: Color {
-    if !isDone && isToday { return .orange }
-    return tint ?? theme.accent
+  private var boxFillColor: Color {
+    isToday ? Theme.todayAccent : Theme.inkSecondary.opacity(0.85)
   }
 
   var body: some View {
     Button(action: onToggle) {
-      Image(systemName: glyphName)
-        .font(.system(size: Self.glyphSize, weight: .regular))
-        .foregroundStyle(glyphTint)
-        .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
-        .contentShape(Rectangle())
+      ZStack {
+        if isDone {
+          RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
+            .fill(boxFillColor)
+            .frame(width: Self.boxSize, height: Self.boxSize)
+          Image(systemName: "checkmark")
+            .font(.system(size: Self.checkSize, weight: .bold))
+            .foregroundStyle(.white)
+        } else {
+          RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
+            .strokeBorder(boxStrokeColor, lineWidth: Self.boxStroke)
+            .frame(width: Self.boxSize, height: Self.boxSize)
+        }
+      }
+      .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
+      .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
   }
@@ -69,10 +87,15 @@ struct ScreenTitle: View {
 
 
 // MARK: - Inline edit task row
+//
+// Reminders-style inline editor. No card chrome, no embedded action icons
+// — the row stays a row. The user edits title (and optionally notes)
+// in place; everything else (dates, repeat, list, delete) lives behind
+// the `info.circle` button on the trailing edge, which opens the
+// TaskDetailsSheet. This replaces the prior Things-style expanding card.
 
 struct InlineEditTaskRow: View {
   @Environment(SectionTheme.self) private var theme
-  let task: SeptenaTask
   @Binding var title: String
   @Binding var notes: String
   let isDone: Bool
@@ -85,26 +108,17 @@ struct InlineEditTaskRow: View {
   /// false for editing an existing task (user explicitly taps the
   /// field to start editing).
   var autoFocus: Bool = false
-  /// Labels resolved from current data (project title or area title) so the
-  /// chip reads "Septena" instead of the raw id.
-  var projectTitle: String? = nil
-  var areaTitle: String? = nil
   var onToggleDone: () -> Void
   var onCommit: () -> Void
   var onCancel: () -> Void
-  var onSchedule: (() -> Void)? = nil
-  var onDeadline: (() -> Void)? = nil
-  var onMove: (() -> Void)? = nil
-  var onRepeat: (() -> Void)? = nil
+  var onOpenDetails: () -> Void
+
   @FocusState private var focused: Field?
   /// Set true the moment the user cancels, so the onChange(focused) blur
-  /// handler doesn't race in and auto-commit before the card tears down.
+  /// handler doesn't race in and auto-commit before the editor tears down.
   @State private var cancelling = false
 
   enum Field { case title, notes }
-
-  // Uses Theme.checkboxTap and Theme.iconTextGap so the notes' left
-  // edge lines up with the title text and matches every other row.
 
   private func handleCancel() {
     cancelling = true
@@ -112,64 +126,57 @@ struct InlineEditTaskRow: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      // ── Title row — pinned to the top of the rowTapHeight band so the
-      //    title's Y matches the closed taskBody (which is also pinned
-      //    top). Notes + actions grow *below* this band.
-      HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
-        TaskCheckbox(isDone: isDone, isToday: isToday, onToggle: onToggleDone)
-          .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
+      TaskCheckbox(isDone: isDone, isToday: isToday, onToggle: onToggleDone)
+        .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 
-        TextField("Title", text: $title, axis: .vertical)
+      VStack(alignment: .leading, spacing: 4) {
+        // Single-line on purpose: a multi-line (`axis: .vertical`)
+        // TextField makes iOS inject a system Done bar above the
+        // keyboard, which fights our floating glass accessory. Long
+        // titles still truncate cleanly in the closed row.
+        //
+        // `.fixedSize(vertical: true)` clamps the TextField to its
+        // intrinsic text height — without it, plain-style TextField
+        // adds a few pixels of internal padding that shifts the
+        // baseline up vs the closed-row `Text`. The result: title
+        // stays put on tap; notes grows the row downward.
+        TextField("Title", text: $title)
           .textFieldStyle(.plain)
           .focusEffectDisabled()
           .font(.septenaTaskTitle)
           .focused($focused, equals: .title)
-          .lineLimit(1...5)
-          .submitLabel(.done)
+          .submitLabel(.return)
           .onSubmit { onCommit() }
-          .onChange(of: title) { _, new in
-            if new.contains("\n") {
-              title = new.replacingOccurrences(of: "\n", with: "")
-              onCommit()
-            }
-          }
-        Spacer(minLength: 0)
+          .fixedSize(horizontal: false, vertical: true)
+        // Notes line, Reminders-style — single-line truncated when not
+        // focused, expands to multi-line when the user taps it.
+        TextField("Add Note", text: $notes, axis: .vertical)
+          .textFieldStyle(.plain)
+          .focusEffectDisabled()
+          .font(.septenaNotes)
+          .foregroundStyle(.secondary)
+          .focused($focused, equals: .notes)
+          .lineLimit(1...8)
+          .fixedSize(horizontal: false, vertical: true)
       }
-      .padding(.horizontal, Theme.hPadding)
-      // Match the closed taskBody's explicit vertical padding — anchors
-      // the title's Y to a fixed offset from row top so the TextField's
-      // baseline lands exactly where the closed Text's baseline was.
-      .padding(.vertical, Theme.rowTapHeight >= 44 ? 11 : 5)
 
-      // ── Notes — left-aligned with the title. Notes leading must equal
-      //    Theme.hPadding + (TaskCheckbox tap width) + (HStack spacing 12)
-      //    so the notes' left edge sits at the same X as the title.
-      //    TaskCheckbox is 22pt tap on macOS, 28pt on iOS — pick per
-      //    platform so the alignment lines up on both.
-      TextField("Notes", text: $notes, axis: .vertical)
-        .textFieldStyle(.plain)
-        .focusEffectDisabled()
-        .font(.septenaNotes)
-        .foregroundStyle(.secondary)
-        .focused($focused, equals: .notes)
-        .lineLimit(2...16)
-        .padding(.leading, Theme.hPadding + Theme.checkboxTap + Theme.iconTextGap)
-        .padding(.trailing, Theme.hPadding)
-        .padding(.bottom, 10)
-
-      // ── Bottom row: all icons on the right (Things-style). Calendar
-      //    (when), repeat, move target, deadline flag — order matches the
-      //    closed-row trailing chip so the eye doesn't have to jump.
-      HStack(spacing: 0) {
-        Spacer()
-        actionIcons
+      // Info button — Reminders' "i" affordance, always visible while
+      // editing. Opens the consolidated details pane for every other
+      // field (when, deadline, repeat, list, delete).
+      Button(action: { Haptics.pick(); onOpenDetails() }) {
+        Image(systemName: "info.circle")
+          .font(.system(size: 22))
+          .foregroundStyle(theme.accent)
+          .frame(width: 28, height: 28)
+          .contentShape(Rectangle())
       }
-      .padding(.horizontal, Theme.hPadding)
-      .padding(.bottom, 12)
+      .buttonStyle(.plain)
+      .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+      .accessibilityLabel("Task details")
     }
-    .background(Theme.cardSurface)
-    .modifier(InlineCardChrome())
+    .padding(.horizontal, Theme.hPadding)
+    .padding(.vertical, Theme.rowVPadding)
     .onAppear {
       // Auto-focus the title for fresh ⌘N / + drafts so the keyboard
       // opens and the user can start typing immediately. Small delay
@@ -182,24 +189,13 @@ struct InlineEditTaskRow: View {
     }
     .background(commitShortcut)
     .background(cancelShortcut)
-    // Absorb taps inside the card so the parent's "tap empty area to dismiss"
-    // gesture doesn't fire when tapping the card's own padding/background.
+    // Absorb taps inside the editor so the parent's "tap empty area to
+    // dismiss" gesture doesn't fire when tapping our own padding.
     .contentShape(Rectangle())
     .onTapGesture { /* swallow */ }
-    // Belt-and-suspenders for Esc — the hidden cancelShortcut button above is
-    // the reliable path (keyboardShortcut(.cancelAction) is window-wide).
-    // These fire on iOS / iPad where the cancelAction shortcut may not be
-    // routed when no menu bar exists.
     .septenaOnEscape { handleCancel() }
     .onKeyPress(.escape) { handleCancel(); return .handled }
-    // Tapping a task opens the inline card but does NOT auto-focus the
-    // title. The user taps the title (or notes) to start editing.
-    // Keyboard dismissed (via scroll-down or tap-outside) → commit. Without
-    // this, blur leaves the card open with no field focused.
     .onChange(of: focused) { _, new in
-      // Skip the blur-commit when we're already on the cancel path —
-      // otherwise Esc would commit whatever's in the title field as the
-      // editor tears down.
       guard new == nil, !cancelling else { return }
       if title.trimmingCharacters(in: .whitespaces).isEmpty {
         onCancel()
@@ -228,82 +224,207 @@ struct InlineEditTaskRow: View {
       .accessibilityHidden(true)
   }
 
-  // MARK: - Right-side action icons (icon-only, no capsule background)
+}
 
-  private func whenIcon(for d: Date?) -> String {
-    guard let d else { return "calendar" }
+// MARK: - Task details sheet
+//
+// One sheet, every secondary attribute. Each row shows the current value
+// and opens the relevant existing picker (When / Deadline / Repeat /
+// Move) on tap. Mirrors Reminders' Details sheet — a single jumping-off
+// point instead of four separate icon affordances inside the row.
+
+struct TaskDetailsSheet: View {
+  @Environment(SectionTheme.self) private var theme
+  @Environment(\.dismiss) private var dismiss
+
+  let task: SeptenaTask
+  let projectTitle: String?
+  let areaTitle: String?
+  /// Saves edited title + notes back to the parent. Called on dismiss and
+  /// when the sheet hands off to a sub-picker, so in-flight edits aren't
+  /// lost when the user opens (say) the When picker from inside Details.
+  let onSaveTitleNotes: (_ title: String, _ notes: String) -> Void
+  let onOpenWhen: () -> Void
+  let onOpenDeadline: () -> Void
+  let onOpenRepeat: () -> Void
+  let onOpenMove: () -> Void
+  let onDelete: () -> Void
+  /// Closes the pane from inside (Done button). Parent clears
+  /// `selectedTaskId`, which retracts the inspector binding.
+  let onDone: () -> Void
+
+  @State private var titleDraft: String = ""
+  @State private var notesDraft: String = ""
+  @FocusState private var focused: Field?
+  enum Field { case title, notes }
+
+  private func save() {
+    onSaveTitleNotes(titleDraft, notesDraft)
+  }
+
+  var body: some View {
+    NavigationStack {
+      List {
+        // Title + notes live at the top of the pane so the sheet feels
+        // like the task itself, not just a metadata picker.
+        Section {
+          TextField("Title", text: $titleDraft, axis: .vertical)
+            .textFieldStyle(.plain)
+            .focusEffectDisabled()
+            .font(.septenaTaskTitle)
+            .focused($focused, equals: .title)
+            .lineLimit(1...5)
+
+          TextField("Notes", text: $notesDraft, axis: .vertical)
+            .textFieldStyle(.plain)
+            .focusEffectDisabled()
+            .font(.septenaNotes)
+            .foregroundStyle(.secondary)
+            .focused($focused, equals: .notes)
+            .lineLimit(1...12)
+        }
+
+        Section {
+          detailRow(
+            icon: whenIcon, tint: whenTint,
+            title: "When", value: whenLabel
+          ) { save(); onOpenWhen() }
+
+          detailRow(
+            icon: "flag", tint: deadlineTint,
+            title: "Deadline", value: deadlineLabel
+          ) { save(); onOpenDeadline() }
+
+          detailRow(
+            icon: "arrow.triangle.2.circlepath",
+            tint: task.recurrence == nil ? Theme.inkSecondary : Theme.inkPrimary,
+            title: "Repeat", value: repeatLabel
+          ) { save(); onOpenRepeat() }
+        }
+
+        Section {
+          detailRow(
+            icon: moveIcon,
+            tint: (projectTitle != nil || areaTitle != nil) ? Theme.inkPrimary : Theme.inkSecondary,
+            title: "List", value: moveLabel
+          ) { save(); onOpenMove() }
+        }
+
+        Section {
+          Button(role: .destructive) {
+            Haptics.warning()
+            onDelete()
+          } label: {
+            Label("Delete Task", systemImage: "trash")
+              .foregroundStyle(Theme.overdueRed)
+          }
+        }
+      }
+      #if os(macOS)
+      .listStyle(.inset)
+      #else
+      .listStyle(.insetGrouped)
+      #endif
+      .scrollContentBackground(.hidden)
+      .background(Theme.paperBackground)
+      .navigationTitle("Details")
+      .septenaInlineTitle()
+      .toolbar {
+        ToolbarItem(placement: .confirmationAction) {
+          Button("Done") { save(); onDone() }
+        }
+      }
+      .onAppear {
+        titleDraft = task.title
+        notesDraft = task.notes ?? ""
+      }
+      .onDisappear { save() }
+    }
+  }
+
+  // MARK: - Row primitive
+
+  @ViewBuilder
+  private func detailRow(icon: String, tint: Color, title: String,
+                         value: String, action: @escaping () -> Void) -> some View {
+    Button(action: { Haptics.pick(); action() }) {
+      HStack(spacing: 14) {
+        Image(systemName: icon)
+          .font(.system(size: 17))
+          .foregroundStyle(tint)
+          .frame(width: 24)
+        Text(title)
+          .font(.septenaSidebarRow)
+          .foregroundStyle(Theme.inkPrimary)
+        Spacer()
+        Text(value)
+          .font(.septenaMeta)
+          .foregroundStyle(Theme.inkSecondary)
+        Image(systemName: "chevron.right")
+          .font(.system(size: 12, weight: .semibold))
+          .foregroundStyle(Theme.inkSecondary.opacity(0.5))
+      }
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+  }
+
+  // MARK: - Labels
+
+  private var whenIcon: String {
+    guard let d = task.scheduled.flatMap(SeptenaDate.parse) else { return "calendar" }
     let cal = Calendar.current
     if cal.isDateInToday(d)    { return "sun.max.fill" }
     if cal.isDateInTomorrow(d) { return "sunrise.fill" }
     return "calendar"
   }
-
-  private func whenIconTint(for d: Date?) -> Color {
-    guard let d else { return Theme.inkSecondary.opacity(0.6) }
-    return Calendar.current.isDateInToday(d) ? .yellow : Theme.inkSecondary
+  private var whenTint: Color {
+    guard let d = task.scheduled.flatMap(SeptenaDate.parse) else { return Theme.inkSecondary }
+    return Calendar.current.isDateInToday(d) ? .yellow : Theme.inkPrimary
+  }
+  private var whenLabel: String {
+    guard let d = task.scheduled.flatMap(SeptenaDate.parse) else { return "None" }
+    return shortDate(d)
   }
 
-  @ViewBuilder
-  private var actionIcons: some View {
-    let parsed = task.scheduled.flatMap(SeptenaDate.parse)
-    HStack(spacing: 22) {
-      // When — calendar / sun (today) / sunrise (tomorrow); reflects state
-      actionIcon(
-        systemName: whenIcon(for: parsed),
-        tint: whenIconTint(for: parsed),
-        action: { onSchedule?() }
-      )
-      // Repeat — colored when set, muted when unset
-      actionIcon(
-        systemName: "arrow.triangle.2.circlepath",
-        tint: task.recurrence == nil ? Theme.inkSecondary.opacity(0.6) : Theme.inkPrimary,
-        action: { onRepeat?() }
-      )
-      // Move — icon reflects target (project / area / inbox)
-      actionIcon(
-        systemName: moveIcon,
-        tint: (projectTitle != nil || areaTitle != nil) ? Theme.inkPrimary : Theme.inkSecondary.opacity(0.6),
-        action: { onMove?() }
-      )
-      // Deadline — red when overdue/today, muted otherwise
-      actionIcon(
-        systemName: "flag",
-        tint: deadlineIconTint,
-        action: { onDeadline?() }
-      )
-    }
+  private var deadlineTint: Color {
+    guard let d = task.due.flatMap(SeptenaDate.parse) else { return Theme.inkSecondary }
+    let today = Calendar.current.startOfDay(for: Date())
+    return Calendar.current.startOfDay(for: d) <= today ? Theme.overdueRed : Theme.inkPrimary
+  }
+  private var deadlineLabel: String {
+    guard let d = task.due.flatMap(SeptenaDate.parse) else { return "None" }
+    return shortDate(d)
+  }
+
+  private var repeatLabel: String {
+    guard let r = task.recurrence else { return "Never" }
+    let unit: String = {
+      switch r.unit {
+      case .day:   return r.interval == 1 ? "day"   : "\(r.interval) days"
+      case .week:  return r.interval == 1 ? "week"  : "\(r.interval) weeks"
+      case .month: return r.interval == 1 ? "month" : "\(r.interval) months"
+      }
+    }()
+    return "Every \(unit)"
   }
 
   private var moveIcon: String {
     if projectTitle != nil { return "number" }
-    if areaTitle != nil    { return "folder" }
+    if areaTitle    != nil { return "folder" }
     return "tray"
   }
-
-  private var deadlineIconTint: Color {
-    guard let d = task.due.flatMap(SeptenaDate.parse) else {
-      return Theme.inkSecondary.opacity(0.6)
-    }
-    return dueTint(d)
+  private var moveLabel: String {
+    projectTitle ?? areaTitle ?? "Inbox"
   }
 
-  @ViewBuilder
-  private func actionIcon(systemName: String, tint: Color, action: @escaping () -> Void) -> some View {
-    Button(action: { Haptics.pick(); action() }) {
-      Image(systemName: systemName)
-        .font(.system(size: Theme.cardActionIconSize, weight: .regular))
-        .foregroundStyle(tint)
-        .frame(width: 22, height: 22)
-        .contentShape(Rectangle())
-    }
-    .buttonStyle(.plain)
+  private func shortDate(_ d: Date) -> String {
+    let cal = Calendar.current
+    if cal.isDateInToday(d)    { return "Today" }
+    if cal.isDateInTomorrow(d) { return "Tomorrow" }
+    let f = DateFormatter(); f.dateFormat = "MMM d"
+    return f.string(from: d)
   }
-
-  private func dueTint(_ d: Date) -> Color {
-    let today = Calendar.current.startOfDay(for: Date())
-    return Calendar.current.startOfDay(for: d) <= today ? Theme.overdueRed : Theme.inkSecondary
-  }
-
 }
 
 // MARK: - Week strip

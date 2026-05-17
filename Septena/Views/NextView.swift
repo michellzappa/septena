@@ -16,7 +16,7 @@ struct NextView: View {
                     iconTint: Theme.iconMuted,
                     title: "Next")
 
-        if !model.hasAnyOpen && !model.hasAnyDone {
+        if model.hasLoaded && !model.hasAnyOpen && !model.hasAnyDone {
           Text("Nothing here yet")
             .font(.septenaMeta)
             .foregroundStyle(.secondary)

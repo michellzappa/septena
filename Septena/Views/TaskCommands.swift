@@ -10,11 +10,12 @@ struct TaskCommandsMenu: View {
   @FocusedValue(\.taskActions) private var actions
 
   var body: some View {
-    Button("New Task") { actions?.newTask() }
-      .keyboardShortcut("n", modifiers: .command)
-      .disabled(actions == nil)
-
-    Divider()
+    // ⌘N lives in the File menu via `NewTaskCommand` so it works even when
+    // no task list is focused (otherwise the system falls back to "New
+    // Window").
+    Button("Mark as Complete") { actions?.toggleComplete?() }
+      .keyboardShortcut("k", modifiers: .command)
+      .disabled(actions?.toggleComplete == nil)
 
     Button("Toggle Today") { actions?.toggleToday() }
       .keyboardShortcut("t", modifiers: .command)
@@ -37,5 +38,24 @@ struct TaskCommandsMenu: View {
     Button("Delete") { actions?.delete?() }
       .keyboardShortcut(.delete, modifiers: .command)
       .disabled(actions?.delete == nil)
+  }
+}
+
+/// Replaces the system "New Window" ⌘N. When a task list is focused, fires
+/// its inline-create action so the new row inherits the list's
+/// project/area; otherwise posts the Quick Add notification (Inbox + draft
+/// row), matching the menu-bar entry and iOS Home Screen Quick Action.
+struct NewTaskCommand: View {
+  @FocusedValue(\.taskActions) private var actions
+
+  var body: some View {
+    Button("New To-Do") {
+      if let actions {
+        actions.newTask()
+      } else {
+        NotificationCenter.default.post(name: .septenaOpenQuickAdd, object: nil)
+      }
+    }
+    .keyboardShortcut("n", modifiers: .command)
   }
 }

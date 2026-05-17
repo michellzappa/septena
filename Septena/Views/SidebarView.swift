@@ -48,6 +48,13 @@ struct SidebarRootView: View {
     let ctx = LocalStore.shared.container.mainContext
     _areas = State(initialValue: LocalCache.areas(in: ctx))
     _projects = State(initialValue: LocalCache.projects(in: ctx))
+    let cachedTasks = LocalCache.allTasks(in: ctx)
+    let agg = Self.aggregate(tasks: cachedTasks)
+    _counts = State(initialValue: agg.counts)
+    _nextCount = State(initialValue: nil)
+    _projectProgress = State(initialValue: agg.projectProgress)
+    _projectOpenCount = State(initialValue: agg.projectOpenCount)
+    _areaOpenCount = State(initialValue: agg.areaOpenCount)
   }
   /// Fraction of each project's tasks that are done (0...1). Drives the
   /// circular progress icon in SidebarProjectRow.
@@ -58,14 +65,10 @@ struct SidebarRootView: View {
   /// Open task count per area, rolling up loose-in-area + tasks in that
   /// area's projects.
   @State private var areaOpenCount: [String: Int] = [:]
-  /// Open task count for the "Next" smart list. Fetched via view=next since
-  /// `/counts` doesn't expose it directly.
+  /// Open task count for the "Next" smart list — habits + supplements +
+  /// chores merged server-side via `/api/next/items`.
   @State private var nextCount: Int? = nil
   /// Count of open tasks with a missed `due` deadline (`due ≤ today`).
-  /// Drives the Today smart-list red badge. Recomputed from the SwiftData
-  /// cache on the same triggers as `counts` so it stays in lockstep with
-  /// what the Today screen renders in red.
-  @State private var overdueCount: Int = 0
   @State private var errorMessage: String?
 
 
@@ -206,7 +209,7 @@ struct SidebarRootView: View {
       }
     }
     .background(Theme.sidebarBackground)
-    .navigationTitle("Septena")
+    .navigationTitle("")
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         Menu {
@@ -228,6 +231,12 @@ struct SidebarRootView: View {
         } label: {
           Image(systemName: "plus")
         }
+      }
+      ToolbarItem(placement: .primaryAction) {
+        Button { nav.showQuickFind = true } label: {
+          Image(systemName: "magnifyingglass")
+        }
+        .accessibilityLabel("Search")
       }
     }
     .modifier(SidebarSheets(
@@ -292,6 +301,12 @@ struct SidebarRootView: View {
         }
         .menuStyle(.button)
         .help("New Area or Project")
+      }
+      ToolbarItem(placement: .primaryAction) {
+        Button { nav.showQuickFind = true } label: {
+          Image(systemName: "magnifyingglass")
+        }
+        .help("Quick Find (⌘K)")
       }
     }
     .modifier(SidebarSheets(
@@ -367,7 +382,6 @@ struct SidebarRootView: View {
     let color: Color
     let title: String
     let count: Int?
-    var overdueBadge: Int? = nil
   }
 
   private var smartListSpecs: [SmartListSpec] {
@@ -377,15 +391,12 @@ struct SidebarRootView: View {
                     title: "Inbox",
                     count: counts?.inboxCount),
       SmartListSpec(route: .filter(.today),
-                    icon: "sun.max.fill", color: .blue,
+                    icon: "sun.max.fill", color: Theme.todayAccent,
                     title: "Today",
                     // Total = pinned-today + scheduled/due rolling in. Both
                     // buckets live on Today, so the user-facing count is
                     // the sum (matches the tile/sidebar Today screen).
-                    count: counts.map { $0.todayCount + $0.reviewCount },
-                    // Red badge = actual overdue deadlines, computed from
-                    // the cache. Same definition as the in-list red date.
-                    overdueBadge: overdueCount > 0 ? overdueCount : nil),
+                    count: counts.map { $0.todayCount + $0.reviewCount }),
       SmartListSpec(route: .next,
                     icon: "arrow.right", color: .green,
                     title: "Next",
@@ -399,7 +410,7 @@ struct SidebarRootView: View {
                     title: "Unscheduled",
                     count: counts?.unscheduledCount),
       SmartListSpec(route: .filter(.logbook),
-                    icon: "checkmark.circle.fill", color: .gray,
+                    icon: "checkmark", color: .gray,
                     title: "Logbook",
                     count: nil),
     ]
@@ -414,7 +425,6 @@ struct SidebarRootView: View {
           SmartListRow(icon: spec.icon,
                        iconColor: spec.color,
                        title: spec.title,
-                       overdueBadge: spec.overdueBadge,
                        count: spec.count)
         }
       }
@@ -430,9 +440,12 @@ struct SidebarRootView: View {
                         iconColor: spec.color,
                         title: spec.title,
                         count: spec.count,
-                        overdueBadge: spec.overdueBadge)
+                        isSelected: isSelected(spec.route))
         }
-        .buttonStyle(.plain)
+        // .plain on iOS animates a brief scale + tint on the whole label,
+        // which read as "the sidebar lifts" on tap. The selected fill is
+        // the only feedback we want — InertButtonStyle strips the rest.
+        .buttonStyle(InertButtonStyle())
       }
     }
     .padding(.horizontal, Theme.hPadding)
@@ -457,9 +470,18 @@ struct SidebarRootView: View {
     nav.path = [route]
   }
 
-  /// Which route the sidebar should render as "current".
-  private var selectedRoute: Route {
-    nav.path.last ?? .filter(.today)
+  /// Which route the sidebar should render as "current". On iPhone the
+  /// sidebar IS the home screen, so an empty nav stack means "no row is
+  /// current" — returning a Today fallback there would falsely highlight
+  /// the Today tile while the user is looking at the overview. iPad/macOS
+  /// always have a detail pane showing, so Today is a sensible default.
+  private var selectedRoute: Route? {
+    #if os(iOS)
+    if UIDevice.current.userInterfaceIdiom == .phone {
+      return nav.path.last
+    }
+    #endif
+    return nav.path.last ?? .filter(.today)
   }
 
   /// Stable-id comparison. Default `Route` equality compares the whole
@@ -467,6 +489,7 @@ struct SidebarRootView: View {
   /// highlight as soon as the sidebar reloads a project with any changed
   /// field. We only care about identity here.
   private func isSelected(_ route: Route) -> Bool {
+    guard let selectedRoute else { return false }
     switch (selectedRoute, route) {
     case (.filter(let a), .filter(let b)):   return a == b
     case (.next, .next):                     return true
@@ -478,12 +501,26 @@ struct SidebarRootView: View {
 
   /// Single highlight rule: selected → light accent tint pill, otherwise
   /// transparent. Same shape and color logic as the task-row selection pill.
+  /// iOS / iPadOS sidebar rows sit inside Mimestream-style cards on the
+  /// `Theme.cardSurface` background, so the highlight needs a stronger fill
+  /// to read as "this is the current screen". macOS keeps the lighter
+  /// accent on its bare sidebar column.
   @ViewBuilder
   private func rowBackground(for route: Route) -> some View {
+    #if os(iOS)
+    // Highlight sits inside the section card's inner padding — no negative
+    // bleed, and a larger corner so it reads as a nested pill rather than a
+    // separate rectangle clashing with the card's 18pt rounding.
+    let fill: Color = isSelected(route) ? theme.accent.opacity(0.18) : .clear
+    RoundedRectangle(cornerRadius: 10, style: .continuous)
+      .fill(fill)
+      .padding(.horizontal, -6)
+    #else
     let fill: Color = isSelected(route) ? theme.accent.opacity(0.15) : .clear
     RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
       .fill(fill)
       .padding(.horizontal, -4)
+    #endif
   }
 
   // MARK: - Areas and projects
@@ -502,6 +539,7 @@ struct SidebarRootView: View {
       ForEach(areas) { area in
         areaSection(area)
       }
+      #if os(macOS)
       // Trailing area drop zone for "drop at end of areas".
       if !areas.isEmpty {
         Color.clear
@@ -513,6 +551,7 @@ struct SidebarRootView: View {
             return true
           }
       }
+      #endif
     }
   }
 
@@ -542,6 +581,10 @@ struct SidebarRootView: View {
         SidebarAreaRow(name: area.title, count: areaOpenCount[area.id] ?? 0)
       }
       .contextMenu { areaMenu(area) }
+      #if os(macOS)
+      // Drag-to-reorder is macOS-only. On iPadOS, attaching `.draggable`
+      // to a tappable row plays a "lift" preview on every tap that reads
+      // as the whole sidebar briefly shifting.
       .draggable(SidebarDragID.area(area.id)) {
         Text(area.title)
           .font(.system(size: Theme.sidebarAreaTitleSize, weight: .semibold))
@@ -558,6 +601,7 @@ struct SidebarRootView: View {
         reorderArea(drag.id, before: area.id)
         return true
       }
+      #endif
 
       if !projectsInArea.isEmpty {
         inCardDivider
@@ -609,6 +653,7 @@ struct SidebarRootView: View {
                         count: projectOpenCount[project.id] ?? 0)
     }
     .contextMenu { projectMenu(project) }
+    #if os(macOS)
     .draggable(SidebarDragID.project(project.id, parent: parent)) {
       Text(project.title)
         .font(.system(size: Theme.sidebarTitleSize, weight: Theme.sidebarTitleWeight))
@@ -626,12 +671,14 @@ struct SidebarRootView: View {
       reorderProject(drag.id, before: project.id, parent: parent)
       return true
     }
+    #endif
   }
 
   /// Trailing drop zone for "put at the end of this project group". Sized
   /// generously so the user doesn't have to aim at a hairline.
   @ViewBuilder
   private func endOfGroupDropZone(parent: String?) -> some View {
+    #if os(macOS)
     Color.clear
       .frame(height: 6)
       .contentShape(Rectangle())
@@ -642,6 +689,9 @@ struct SidebarRootView: View {
         reorderProject(drag.id, toEnd: true, parent: parent)
         return true
       }
+    #else
+    EmptyView()
+    #endif
   }
 
   // MARK: - Context menus
@@ -849,11 +899,14 @@ struct SidebarRootView: View {
 
   private func load() async {
     // Paint sidebar from cache immediately — areas / projects rarely change,
-    // so the perceived load is gone after the first run.
+    // and tile counts can be rebuilt from the SwiftData task cache without a
+    // round-trip. The server response overwrites both below.
     let cachedAreas = LocalCache.areas(in: modelContext)
     let cachedProjects = LocalCache.projects(in: modelContext)
     if !cachedAreas.isEmpty { areas = cachedAreas }
     if !cachedProjects.isEmpty { projects = cachedProjects }
+    let cachedTasks = LocalCache.allTasks(in: modelContext)
+    if !cachedTasks.isEmpty { apply(aggregate: Self.aggregate(tasks: cachedTasks)) }
     do {
       async let a = client.areas()
       async let p = client.projects()
@@ -861,54 +914,99 @@ struct SidebarRootView: View {
       async let all = client.list(view: "all")
       areas = try await a
       projects = try await p
-      counts = try await c
+      let serverCounts = try await c
 
       let syncer = Syncer(client: client, context: modelContext)
       syncer.applyAreas(areas)
       syncer.applyProjects(projects)
-      // 'Next' in this app is the chores / habits / supplements ritual
-      // (see NextView), not a tasks view — the server has no view=next
-      // endpoint, so we don't surface a count here. Tile renders without
-      // a number until / unless we wire a real source.
-      nextCount = nil
+      // 'Next' is the chores / habits / supplements ritual. The server
+      // does the merge + filter via /api/next/items; we just count.
+      if let next = try? await client.nextItems(date: SeptenaDate.today) {
+        nextCount = next.items.count
+      } else {
+        nextCount = nil
+      }
 
-      // Project progress = done / (done + open). Cancelled doesn't
-      // count toward either side of the ratio (they're not "to-do").
       let items = try await all.items
       syncer.applyTasks(items, scope: .all)
-      var done: [String: Int] = [:]
-      var total: [String: Int] = [:]
-      var projOpen: [String: Int] = [:]
-      var areaDirectOpen: [String: Int] = [:]
-      var overdue = 0
-      let todayYMD = SeptenaDate.today
-      for t in items {
-        if t.status == .open, let d = t.due, d <= todayYMD { overdue += 1 }
-        if let pid = t.project {
-          switch t.status {
-          case .done:           done[pid, default: 0] += 1; total[pid, default: 0] += 1
-          case .open:           total[pid, default: 0] += 1; projOpen[pid, default: 0] += 1
-          case .cancelled: break
-          }
-        } else if let aid = t.area, t.status == .open {
-          // Open task assigned directly to an area (no project) — counts
-          // toward that area's roll-up.
-          areaDirectOpen[aid, default: 0] += 1
-        }
-      }
-      overdueCount = overdue
-      projectProgress = total.reduce(into: [:]) { acc, kv in
-        acc[kv.key] = Double(done[kv.key] ?? 0) / Double(kv.value)
-      }
-      projectOpenCount = projOpen
-      // Area count = direct-in-area tasks ONLY. Projects nested under an
-      // area are shown as their own rows beneath the area header, with
-      // their own counts; rolling those up onto the area double-counts what
-      // the user already sees and made the area number feel inflated.
-      areaOpenCount = areaDirectOpen
+      var agg = Self.aggregate(tasks: items)
+      // /api/tasks/counts is authoritative for smart-list buckets; keep the
+      // local aggregate's per-project / per-area roll-ups (not exposed by
+      // the counts endpoint).
+      agg.counts = serverCounts
+      apply(aggregate: agg)
     } catch {
       errorMessage = error.localizedDescription
     }
+  }
+
+  private struct Aggregate {
+    var counts: TasksCounts
+    var projectProgress: [String: Double]
+    var projectOpenCount: [String: Int]
+    var areaOpenCount: [String: Int]
+  }
+
+  /// Single-pass roll-up over a task list. Called twice per load: once over
+  /// the local cache for instant paint, once over the server response.
+  private static func aggregate(tasks: [SeptenaTask]) -> Aggregate {
+    // Project progress = done / (done + open). Cancelled doesn't count
+    // toward either side of the ratio.
+    var done: [String: Int] = [:]
+    var total: [String: Int] = [:]
+    var projOpen: [String: Int] = [:]
+    // Area count = direct-in-area tasks ONLY. Nested projects render as
+    // their own rows, so rolling them up would double-count.
+    var areaDirectOpen: [String: Int] = [:]
+    var inbox = 0, todayN = 0, upcoming = 0, unscheduled = 0, open = 0
+    let today = SeptenaDate.today
+    for t in tasks {
+      if t.status == .open { open += 1 }
+      if let pid = t.project {
+        switch t.status {
+        case .done:      done[pid, default: 0] += 1; total[pid, default: 0] += 1
+        case .open:      total[pid, default: 0] += 1; projOpen[pid, default: 0] += 1
+        case .cancelled: break
+        }
+      } else if let aid = t.area, t.status == .open {
+        areaDirectOpen[aid, default: 0] += 1
+      }
+      guard t.status == .open else { continue }
+      // Smart-list buckets — mirror LocalCache.tasks(in:filter:) semantics.
+      if t.project == nil, t.area == nil,
+         t.scheduled == nil, t.due == nil, !t.today {
+        inbox += 1
+      }
+      if t.today { todayN += 1 }
+      else if let s = t.scheduled, s <= today { todayN += 1 }
+      else if let d = t.due, d <= today { todayN += 1 }
+      if !t.today {
+        if let s = t.scheduled, s > today { upcoming += 1 }
+        else if let d = t.due, d > today { upcoming += 1 }
+      }
+      if !t.today, t.scheduled == nil, t.due == nil { unscheduled += 1 }
+    }
+    // Lump the today-screen sum into `todayCount` and leave `reviewCount`
+    // at 0 — the sidebar shows the sum, so the tile looks identical
+    // whether the server splits 5/2 or we send 7/0.
+    let progress = total.reduce(into: [String: Double]()) { acc, kv in
+      acc[kv.key] = Double(done[kv.key] ?? 0) / Double(kv.value)
+    }
+    return Aggregate(
+      counts: TasksCounts(today: today,
+                          todayCount: todayN, reviewCount: 0,
+                          inboxCount: inbox, upcomingCount: upcoming,
+                          unscheduledCount: unscheduled, openCount: open),
+      projectProgress: progress,
+      projectOpenCount: projOpen,
+      areaOpenCount: areaDirectOpen)
+  }
+
+  private func apply(aggregate agg: Aggregate) {
+    counts = agg.counts
+    projectProgress = agg.projectProgress
+    projectOpenCount = agg.projectOpenCount
+    areaOpenCount = agg.areaOpenCount
   }
 }
 
@@ -920,11 +1018,6 @@ struct SmartListRow: View {
   /// white SF Symbol (Reminders pattern).
   let iconColor: Color
   let title: String
-  /// Red pill — count of tasks with a missed `due` deadline (`due ≤ today`).
-  /// Same definition as the in-list red date treatment, so this number
-  /// always matches what the user sees in red on the corresponding screen.
-  /// NOT the same as `reviewCount` — scheduled-past tasks aren't overdue.
-  var overdueBadge: Int? = nil
   /// Muted gray count — neutral signal for total rows on this list.
   var count: Int? = nil
 
@@ -936,15 +1029,6 @@ struct SmartListRow: View {
         .font(.body)
         .foregroundStyle(.primary)
       Spacer()
-      if let b = overdueBadge, b > 0 {
-        Text("\(b)")
-          .font(.septenaBadge)
-          .foregroundStyle(.white)
-          .frame(minWidth: 18, minHeight: 18)
-          .padding(.horizontal, 5)
-          .background(Color.red)
-          .clipShape(Capsule())
-      }
       if let n = count, n > 0 {
         Text("\(n)")
           .font(.subheadline)
@@ -965,10 +1049,11 @@ struct SmartListTile: View {
   let title: String
   /// Total rows on the list — big bold number top-right.
   var count: Int? = nil
-  /// Red badge — count of tasks with a missed `due` deadline. Matches the
-  /// in-list red date count exactly. Renders as a small red pill on the
-  /// icon corner, Reminders-style. Not the same as `reviewCount`.
-  var overdueBadge: Int? = nil
+  /// When true, the tile renders with a tinted outline + slight fill so the
+  /// iPad sidebar shows which smart list the detail pane is currently on.
+  /// iPhone never sees a selected tile (tapping pushes onto the stack), but
+  /// it costs nothing to honor here.
+  var isSelected: Bool = false
 
   var body: some View {
     // Mimestream-style minimal tile: white card with a small filled
@@ -999,29 +1084,21 @@ struct SmartListTile: View {
     .padding(.vertical, 10)
     .frame(maxWidth: .infinity, minHeight: 78, alignment: .topLeading)
     .background(
-      Theme.cardSurface,
-      in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+      RoundedRectangle(cornerRadius: 12, style: .continuous)
+        .fill(isSelected ? iconColor.opacity(0.18) : Theme.cardSurface)
     )
   }
 
-  /// Top-right cluster: single bold total in primary, with a small red
-  /// flag glyph in front when there's at least one overdue task. The flag
-  /// signals "some of these are late" without splitting the number into
-  /// two competing figures.
+  /// Top-right cluster: single bold total in primary. Overdue is signalled
+  /// in the sidebar row's red pill and in-list red dates — repeating it on
+  /// the tile read as noise.
   @ViewBuilder
   private var countCluster: some View {
-    HStack(alignment: .firstTextBaseline, spacing: 4) {
-      if let b = overdueBadge, b > 0 {
-        Image(systemName: "flag.fill")
-          .font(.system(size: 13, weight: .semibold))
-          .foregroundStyle(.red)
-      }
-      if let n = count {
-        Text("\(n)")
-          .font(.system(size: 26, weight: .bold))
-          .foregroundStyle(.primary)
-          .monospacedDigit()
-      }
+    if let n = count {
+      Text("\(n)")
+        .font(.system(size: 26, weight: .bold))
+        .foregroundStyle(.primary)
+        .monospacedDigit()
     }
   }
 }
@@ -1127,14 +1204,21 @@ struct SidebarProjectRow: View {
   }
 }
 
-/// Trailing chevron used at the end of sidebar list rows. Matches the
-/// disclosure indicator iOS Mail / Reminders / Settings put at the end
-/// of every navigable row.
+/// Trailing chevron used at the end of sidebar list rows. iOS Mail /
+/// Reminders / Settings put a disclosure indicator at the end of every
+/// navigable row, and the iPhone sidebar matches that. macOS sidebars
+/// (Mail.app, Reminders.app) don't draw chevrons — the persistent
+/// selection pill is the only "this row is the current screen" cue
+/// needed — so we render nothing there.
 struct SidebarRowChevron: View {
   var body: some View {
+    #if os(iOS)
     Image(systemName: "chevron.right")
       .font(.system(size: 12, weight: .semibold))
       .foregroundStyle(.tertiary)
+    #else
+    EmptyView()
+    #endif
   }
 }
 

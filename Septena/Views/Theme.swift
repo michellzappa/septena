@@ -24,13 +24,14 @@ enum Theme {
   // MARK: - Surfaces
 
   /// App canvas. System grouped background on iOS gives the soft gray that
-  /// Reminders uses behind insetGrouped lists; on macOS we use the plain
-  /// window background so the sidebar's `.regularMaterial` can sit on top.
+  /// Reminders uses behind insetGrouped lists; on macOS we use the text
+  /// background (white in light, near-black in dark) so the content pane
+  /// reads as paper next to the translucent sidebar — matching Reminders.
   static let paperBackground: Color = {
     #if os(macOS)
-    return Color(nsColor: .windowBackgroundColor)
+    return Color(nsColor: .textBackgroundColor)
     #else
-    return Color(.systemGroupedBackground)
+    return Color(.systemBackground)
     #endif
   }()
 
@@ -116,7 +117,11 @@ enum Theme {
   // MARK: - Filter accents
 
   static let inboxAccent    = Color.secondary
-  static let todayAccent    = Color.blue
+  /// Slightly darker than `Color.yellow` so the white sun glyph keeps
+  /// contrast against it in light mode (system yellow is so bright the
+  /// icon almost disappears). Same swatch in both modes — dark mode reads
+  /// it as a warm gold, light mode as a saturated amber.
+  static let todayAccent    = Color(red: 0.96, green: 0.78, blue: 0.13)
   static let upcomingAccent = Color.red
   static let anytimeAccent  = Color.secondary
   static let logbookAccent  = Color.secondary
@@ -187,6 +192,12 @@ enum Theme {
   static let cardActionIconSize: CGFloat = 18
   static let groupHeaderFontSize: CGFloat = 17
   #endif
+
+  /// Vertical padding inside a task row. Single source of truth so row
+  /// density stays coherent across platforms — Reminders-tight everywhere
+  /// rather than expanding on iOS to hit the 44pt tap target (the checkbox
+  /// has its own tap region; we don't need the row to do double duty).
+  static let rowVPadding: CGFloat = 3
 }
 
 // MARK: - Typography

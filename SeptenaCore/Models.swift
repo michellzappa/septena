@@ -203,6 +203,18 @@ struct TasksCounts: Codable {
     unscheduledCount = (try? c.decode(Int.self, forKey: .unscheduledCount)) ?? 0
     openCount = (try? c.decode(Int.self, forKey: .openCount)) ?? 0
   }
+
+  init(today: String, todayCount: Int, reviewCount: Int,
+       inboxCount: Int, upcomingCount: Int, unscheduledCount: Int,
+       openCount: Int) {
+    self.today = today
+    self.todayCount = todayCount
+    self.reviewCount = reviewCount
+    self.inboxCount = inboxCount
+    self.upcomingCount = upcomingCount
+    self.unscheduledCount = unscheduledCount
+    self.openCount = openCount
+  }
 }
 
 // MARK: - UI filter (maps to server `view` param + optional area/project scope)
@@ -330,6 +342,27 @@ struct ChoreItem: Codable, Identifiable, Hashable {
 
 struct ChoresListResponse: Codable {
   var chores: [ChoreItem]
+}
+
+struct NextItem: Codable, Identifiable, Hashable {
+  var id: String
+  var kind: String
+  var title: String
+  var subtitle: String?
+  var trailing: String?
+  var overdue: Bool
+  var sortKey: Int
+
+  enum CodingKeys: String, CodingKey {
+    case id, kind, title, subtitle, trailing, overdue
+    case sortKey = "sortKey"
+  }
+}
+
+struct NextItemsResponse: Codable {
+  var date: String
+  var bucket: String
+  var items: [NextItem]
 }
 
 // MARK: - Date helpers (Septena uses YYYY-MM-DD strings)

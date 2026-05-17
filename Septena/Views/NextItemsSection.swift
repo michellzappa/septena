@@ -24,6 +24,10 @@ final class NextItemsModel {
   /// Same idea for supplements.
   var actedSupplements: Set<String> = []
 
+  /// Flips true after the first network response (success or failure) so the
+  /// empty state never flashes during the initial load.
+  var hasLoaded: Bool = false
+
   private let today: String = SeptenaDate.today
 
   // MARK: - Open / Done splits (the source of truth for both subviews)
@@ -100,6 +104,7 @@ final class NextItemsModel {
     completedChores = []
     actedHabits = []
     actedSupplements = []
+    hasLoaded = true
   }
 
   // MARK: - Mutations (optimistic local flips, server-side write)
@@ -187,41 +192,56 @@ struct NextOpenSection: View {
   @Environment(SeptenaClient.self) private var client
   @Environment(SectionTheme.self) private var theme
 
+  /// Habits are bucketed by time-of-day on the server ("morning" / "afternoon"
+  /// / "evening"). The Next screen only shows the habits for *now* — earlier
+  /// buckets shouldn't linger as catch-up debt, and later buckets shouldn't
+  /// surface ahead of time. One-bucket-at-a-time keeps the screen focused.
+  private var currentHabitBucket: String {
+    let hour = Calendar.current.component(.hour, from: Date())
+    switch hour {
+    case ..<12:  return "morning"
+    case 12..<17: return "afternoon"
+    default:      return "evening"
+    }
+  }
+
+  private var habitsNow: [HabitDayItem] {
+    let bucket = currentHabitBucket
+    return model.openHabits.filter { $0.bucket == bucket }
+  }
+
   var body: some View {
+    let chores = model.openChores
+    let habits = habitsNow
+    let supplements = model.openSupplements
+
     VStack(alignment: .leading, spacing: 0) {
-      if !model.openChores.isEmpty {
+      if !chores.isEmpty {
         sectionHeader("Chores", icon: "list.bullet.clipboard",
                       tint: theme.color(for: "chores"))
-        ForEach(model.openChores) { chore in
+        ForEach(chores) { chore in
           ChoreRow(chore: chore, model: model, client: client,
                    tint: theme.color(for: "chores"))
-          Hairline()
         }
       }
 
-      if !model.openHabits.isEmpty {
-        sectionHeader("Habits", icon: "repeat",
-                      tint: theme.color(for: "habits"))
-        ForEach(model.habitBuckets, id: \.self) { bucket in
-          let inBucket = model.openHabits.filter { $0.bucket == bucket }
-          if !inBucket.isEmpty {
-            bucketLabel(bucket)
-            ForEach(inBucket) { habit in
-              HabitRow(habit: habit, model: model, client: client,
-                       tint: theme.color(for: "habits"))
-              Hairline()
-            }
-          }
+      if !habits.isEmpty {
+        if !chores.isEmpty { Hairline().padding(.top, 8) }
+        habitBucketHeader(bucket: currentHabitBucket,
+                          tint: theme.color(for: "habits"))
+        ForEach(habits) { habit in
+          HabitRow(habit: habit, model: model, client: client,
+                   tint: theme.color(for: "habits"))
         }
       }
 
-      if !model.openSupplements.isEmpty {
+      if !supplements.isEmpty {
+        if !chores.isEmpty || !habits.isEmpty { Hairline().padding(.top, 8) }
         sectionHeader("Supplements", icon: "pills",
                       tint: theme.color(for: "supplements"))
-        ForEach(model.openSupplements) { supp in
+        ForEach(supplements) { supp in
           SupplementRow(supplement: supp, model: model, client: client,
                         tint: theme.color(for: "supplements"))
-          Hairline()
         }
       }
     }
@@ -236,23 +256,33 @@ struct NextDoneSection: View {
   @Environment(SectionTheme.self) private var theme
 
   var body: some View {
+    let chores = model.doneChores
+    let habits = model.doneHabits
+    let supplements = model.doneSupplements
+
     VStack(alignment: .leading, spacing: 0) {
       // No section headers in the done strip — keep it visually quiet.
-      // Items still wear their section accent on the (filled) check.
-      ForEach(model.doneChores) { chore in
-        ChoreRow(chore: chore, model: model, client: client,
-                 tint: theme.color(for: "chores"))
-        Hairline()
+      // Items still wear their section accent on the (filled) check. One
+      // hairline between adjacent kinds rather than between every row.
+      if !chores.isEmpty {
+        ForEach(chores) { chore in
+          ChoreRow(chore: chore, model: model, client: client,
+                   tint: theme.color(for: "chores"))
+        }
       }
-      ForEach(model.doneHabits) { habit in
-        HabitRow(habit: habit, model: model, client: client,
-                 tint: theme.color(for: "habits"))
-        Hairline()
+      if !habits.isEmpty {
+        if !chores.isEmpty { Hairline().padding(.top, 8) }
+        ForEach(habits) { habit in
+          HabitRow(habit: habit, model: model, client: client,
+                   tint: theme.color(for: "habits"))
+        }
       }
-      ForEach(model.doneSupplements) { supp in
-        SupplementRow(supplement: supp, model: model, client: client,
-                      tint: theme.color(for: "supplements"))
-        Hairline()
+      if !supplements.isEmpty {
+        if !chores.isEmpty || !habits.isEmpty { Hairline().padding(.top, 8) }
+        ForEach(supplements) { supp in
+          SupplementRow(supplement: supp, model: model, client: client,
+                        tint: theme.color(for: "supplements"))
+        }
       }
     }
   }
@@ -288,8 +318,7 @@ private struct HabitRow: View {
       }
     }
     .padding(.horizontal, Theme.hPadding)
-    .padding(.vertical, 12)
-    .frame(minHeight: Theme.rowHeight)
+    .padding(.vertical, Theme.rowVPadding)
     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
       Button {
         model.skipHabit(habit, skipped: !habit.skipped, client: client)
@@ -325,8 +354,7 @@ private struct SupplementRow: View {
       }
     }
     .padding(.horizontal, Theme.hPadding)
-    .padding(.vertical, 12)
-    .frame(minHeight: Theme.rowHeight)
+    .padding(.vertical, Theme.rowVPadding)
   }
 }
 
@@ -368,8 +396,7 @@ private struct ChoreRow: View {
       }
     }
     .padding(.horizontal, Theme.hPadding)
-    .padding(.vertical, 12)
-    .frame(minHeight: Theme.rowHeight)
+    .padding(.vertical, Theme.rowVPadding)
     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
       Button {
         model.deferChore(chore, mode: "day", label: "Tomorrow", client: client)
@@ -423,13 +450,86 @@ private func sectionHeader(_ title: String, icon: String, tint: Color) -> some V
   .padding(.bottom, 6)
 }
 
+// MARK: - Habit bucket header
+//
+// Same chrome as `sectionHeader`, plus a trailing "time left in this bucket"
+// chip that rounds coarsely when there's plenty of slack and tightens up
+// (minutes, then warm color, then red) as the cutoff approaches.
+
 @ViewBuilder
-private func bucketLabel(_ bucket: String) -> some View {
-  Text(bucket.uppercased())
-    .font(.system(size: 11, weight: .semibold))
-    .tracking(0.8)
-    .foregroundStyle(Theme.inkSecondary)
-    .padding(.horizontal, Theme.hPadding)
-    .padding(.top, 12)
-    .padding(.bottom, 4)
+private func habitBucketHeader(bucket: String, tint: Color) -> some View {
+  HStack(spacing: 8) {
+    Image(systemName: "repeat").font(.system(size: 14)).foregroundStyle(tint)
+    Text("\(bucket.capitalized) Habits")
+      .font(.septenaSectionTitle).foregroundStyle(Theme.inkPrimary)
+    Spacer()
+    BucketTimeLeft(bucket: bucket)
+  }
+  .padding(.horizontal, Theme.hPadding)
+  .padding(.top, Theme.sectionSpacing)
+  .padding(.bottom, 6)
 }
+
+/// Tiny "Xh / Xm left" chip that ticks once a minute. Same font as the
+/// section title so it sits in the row's metrics; only the color changes
+/// (secondary → orange → red) as we approach the bucket cutoff.
+private struct BucketTimeLeft: View {
+  let bucket: String
+
+  var body: some View {
+    TimelineView(.periodic(from: .now, by: 60)) { ctx in
+      let parts = formatted(remaining: cutoff().timeIntervalSince(ctx.date))
+      Text(parts.text)
+        .font(.septenaSectionTitle)
+        .foregroundStyle(parts.color)
+        .monospacedDigit()
+    }
+  }
+
+  /// End of the current habit window. Bucket boundaries mirror
+  /// `NextOpenSection.currentHabitBucket`: noon, 5pm, midnight.
+  private func cutoff() -> Date {
+    let cal = Calendar.current
+    let now = Date()
+    let hour: Int
+    switch bucket {
+    case "morning":   hour = 12
+    case "afternoon": hour = 17
+    default:          hour = 24  // end of day → tomorrow 00:00
+    }
+    if hour == 24 {
+      let startOfTomorrow = cal.date(byAdding: .day, value: 1,
+                                     to: cal.startOfDay(for: now))!
+      return startOfTomorrow
+    }
+    return cal.date(bySettingHour: hour, minute: 0, second: 0, of: now) ?? now
+  }
+
+  private func formatted(remaining seconds: TimeInterval) -> (text: String, color: Color) {
+    let s = max(0, Int(seconds))
+    let totalMin = s / 60
+    let h = totalMin / 60
+    let m = totalMin % 60
+
+    let text: String
+    if totalMin >= 120 {
+      // Plenty of runway — coarse hours only.
+      text = "\(h)h"
+    } else if totalMin >= 60 {
+      // Last hour-and-a-bit — show "1h 25m", rounded to 5m.
+      let rounded = (m / 5) * 5
+      text = rounded == 0 ? "\(h)h" : "\(h)h \(rounded)m"
+    } else {
+      // Under an hour — minutes, exact (this is the "more detail" zone).
+      text = "\(totalMin)m"
+    }
+
+    let color: Color
+    if totalMin < 15      { color = Theme.overdueRed }
+    else if totalMin < 60 { color = .orange }
+    else                  { color = Theme.inkSecondary }
+
+    return (text, color)
+  }
+}
+
