@@ -15,6 +15,7 @@ struct SeptenaApp: App {
   @State private var navigation = NavigationState()
   @State private var theme = SectionTheme()
   @State private var trainingDraft = TrainingDraftStore()
+  @State private var settingsStore = SettingsStore()
   private let localStore = LocalStore.shared
   #if os(iOS)
   @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -30,6 +31,7 @@ struct SeptenaApp: App {
         .environment(navigation)
         .environment(theme)
         .environment(trainingDraft)
+        .environment(settingsStore)
         .modelContainer(localStore.container)
         .task {
           #if os(iOS)
@@ -49,6 +51,7 @@ struct SeptenaApp: App {
             navigation.path = [startup.route]
           }
           await theme.refresh(from: clientProvider.client)
+          await settingsStore.refresh(from: clientProvider.client)
           let syncer = Syncer(client: clientProvider.client,
                               context: localStore.container.mainContext)
           await syncer.pullAll()

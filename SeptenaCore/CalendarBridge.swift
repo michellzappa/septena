@@ -64,4 +64,16 @@ final class CalendarBridge {
     return store.events(matching: predicate)
       .sorted { $0.startDate < $1.startDate }
   }
+
+  /// Every event on today's date, including ones that have already ended.
+  /// Used by the Next screen to surface earlier-today meetings as "Done Today".
+  func todayEvents() -> [EKEvent] {
+    guard access == .granted else { return [] }
+    let cal = Calendar.current
+    let start = cal.startOfDay(for: Date())
+    guard let end = cal.date(byAdding: .day, value: 1, to: start) else { return [] }
+    let predicate = store.predicateForEvents(withStart: start, end: end, calendars: nil)
+    return store.events(matching: predicate)
+      .sorted { $0.startDate < $1.startDate }
+  }
 }

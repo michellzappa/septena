@@ -90,20 +90,30 @@ final class SettingsStore {
   var sections: [SeptenaClient.SectionConfig] = []
   var caffeine: CaffeineConfig? = nil
   var cannabis: CannabisConfig? = nil
+  var macros: MacrosConfig? = nil
+  var sessionTypes: [SessionTypeConfig] = []
+  var chores: [ChoreItem] = []
   var serverLoading: Bool = false
 
   func refresh(from client: SeptenaClient) async {
     serverLoading = true
     defer { serverLoading = false }
-    async let s = try? await client.settings()
-    async let secs = try? await client.sections()
-    async let caf = try? await client.caffeineConfig()
-    async let cnb = try? await client.cannabisConfig()
+    async let s     = try? await client.settings()
+    async let secs  = try? await client.sections()
+    async let caf   = try? await client.caffeineConfig()
+    async let cnb   = try? await client.cannabisConfig()
+    async let macs  = try? await client.nutritionMacrosConfig()
+    async let sess  = try? await client.sessionTypes()
+    async let chrs  = try? await client.chores()
     let (sv, sc, cf, cn) = await (s, secs, caf, cnb)
+    let (mc, st, ch) = await (macs, sess, chrs)
     serverSettings = sv
     sections = sc ?? []
     caffeine = cf
     cannabis = cn
+    macros = mc
+    sessionTypes = st ?? []
+    chores = ch ?? []
   }
 }
 
@@ -332,55 +342,21 @@ struct ServerSettingsPane: View {
         unavailable
       }
 
-      // Sub-panes — list-shaped configs that get pushed deeper rather
-      // than crowding the Server overview. Each row hides itself when
-      // its endpoint is empty so the surface only shows configured data.
-      Section("Catalogs") {
-        if !store.sections.isEmpty {
-          NavigationLink {
-            SectionsPalettePane()
-              .navigationTitle("Sections")
-              #if os(iOS)
-              .navigationBarTitleDisplayMode(.inline)
-              #endif
-          } label: {
-            HStack {
-              Label("Sections palette", systemImage: "paintpalette")
-              Spacer()
-              Text("\(store.sections.count)")
-                .foregroundStyle(.secondary)
-            }
-          }
-        }
-        if let caf = store.caffeine, !(caf.beans.isEmpty && (caf.methods ?? []).isEmpty) {
-          NavigationLink {
-            CaffeinePresetsPane()
-              .navigationTitle("Caffeine")
-              #if os(iOS)
-              .navigationBarTitleDisplayMode(.inline)
-              #endif
-          } label: {
-            HStack {
-              Label("Caffeine presets", systemImage: "cup.and.saucer")
-              Spacer()
-              Text("\(caf.beans.count) beans")
-                .foregroundStyle(.secondary)
-            }
-          }
-        }
-        if let cnb = store.cannabis, !cnb.strains.isEmpty {
-          NavigationLink {
-            CannabisPresetsPane()
-              .navigationTitle("Cannabis")
-              #if os(iOS)
-              .navigationBarTitleDisplayMode(.inline)
-              #endif
-          } label: {
-            HStack {
-              Label("Cannabis presets", systemImage: "leaf")
-              Spacer()
-              Text("\(cnb.strains.count) strains")
-                .foregroundStyle(.secondary)
+      // Single Sections entry — one row per /api/sections entry, each
+      // pushing to a per-section detail. Mirrors the webapp's structure:
+      // every mini-app is configurable from one place, even if some
+      // sections only expose their accent today.
+      if !store.sections.isEmpty {
+        Section("Sections") {
+          ForEach(store.sections, id: \.key) { sec in
+            NavigationLink {
+              SectionDetailPane(section: sec)
+                .navigationTitle(sec.label)
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
+            } label: {
+              SectionRow(section: sec)
             }
           }
         }
@@ -392,101 +368,110 @@ struct ServerSettingsPane: View {
   }
 }
 
-// MARK: - Sections palette (read-only)
+// MARK: - Section row + detail
+//
+// One sub-pane per section, picked from `store.sections` (the same list
+// the webapp uses to drive its homepage). Detail content is per-section:
+// caffeine/cannabis/training/chores have catalog data; others show just
+// the accent + key + an empty-state footer. Adding a new section to the
+// server appears here for free.
 
-private struct SectionsPalettePane: View {
+private struct SectionRow: View {
+  let section: SeptenaClient.SectionConfig
+  var body: some View {
+    HStack(spacing: 12) {
+      RoundedRectangle(cornerRadius: 5, style: .continuous)
+        .fill(parseHexColor(section.color))
+        .frame(width: 22, height: 22)
+      Text(section.label).foregroundStyle(.primary)
+      Spacer()
+      Text(section.key)
+        .font(.caption.monospaced())
+        .foregroundStyle(.secondary)
+    }
+  }
+}
+
+private struct SectionDetailPane: View {
   @Environment(SettingsStore.self) private var store
+  let section: SeptenaClient.SectionConfig
 
   var body: some View {
     Form {
-      Section {
-        ForEach(store.sections, id: \.key) { sec in
-          HStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 5, style: .continuous)
-              .fill(parseColor(sec.color))
-              .frame(width: 22, height: 22)
-            VStack(alignment: .leading, spacing: 1) {
-              Text(sec.label).foregroundStyle(.primary)
-              Text(sec.key)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-            Spacer()
-            Text(sec.color)
+      Section("Identity") {
+        HStack(spacing: 12) {
+          RoundedRectangle(cornerRadius: 6, style: .continuous)
+            .fill(parseHexColor(section.color))
+            .frame(width: 28, height: 28)
+          VStack(alignment: .leading, spacing: 1) {
+            Text(section.label).foregroundStyle(.primary)
+            Text(section.key)
               .font(.caption.monospaced())
               .foregroundStyle(.secondary)
           }
+          Spacer()
+          Text(section.color)
+            .font(.caption.monospaced())
+            .foregroundStyle(.secondary)
         }
-      } footer: {
-        Text("The accent palette for every mini-app. Configured server-side.")
       }
-    }
-    .formStyle(.grouped)
-  }
 
-  /// Tolerant parse of "#rrggbb" hex strings. Falls back to gray for
-  /// hsl(...) or other formats — the server returns either, but only the
-  /// hex form decodes natively. A future pass can add hsl() support.
-  private func parseColor(_ s: String) -> Color {
-    var hex = s.trimmingCharacters(in: .whitespacesAndNewlines)
-    if hex.hasPrefix("#") { hex.removeFirst() }
-    guard hex.count == 6, let v = UInt32(hex, radix: 16) else { return .gray }
-    let r = Double((v >> 16) & 0xFF) / 255
-    let g = Double((v >>  8) & 0xFF) / 255
-    let b = Double( v        & 0xFF) / 255
-    return Color(red: r, green: g, blue: b)
-  }
-}
-
-// MARK: - Caffeine presets (read-only)
-
-private struct CaffeinePresetsPane: View {
-  @Environment(SettingsStore.self) private var store
-
-  var body: some View {
-    Form {
-      if let caf = store.caffeine {
-        if !caf.beans.isEmpty {
-          Section("Beans") {
-            ForEach(caf.beans) { bean in
-              HStack {
-                Text(bean.name).foregroundStyle(.primary)
-                Spacer()
-                Text(bean.id)
-                  .font(.caption.monospaced())
-                  .foregroundStyle(.secondary)
-              }
-            }
-          }
-        }
-        if let methods = caf.methods, !methods.isEmpty {
-          Section("Methods") {
-            ForEach(methods, id: \.self) { m in
-              Text(m)
-            }
-          }
-        }
-      } else {
-        unavailable
-      }
+      sectionSpecific
       readOnlyFooter
     }
     .formStyle(.grouped)
   }
-}
 
-// MARK: - Cannabis presets (read-only)
+  /// Per-key catalog content. Keys must match what the server emits in
+  /// `/api/sections`. Unknown / un-cataloged sections fall through to
+  /// the "no additional configuration" empty state — accent + key only.
+  @ViewBuilder
+  private var sectionSpecific: some View {
+    switch section.key {
+    case "caffeine":    caffeineConfig
+    case "cannabis":    cannabisConfig
+    case "training":    trainingConfig
+    case "chores":      choresConfig
+    case "nutrition":   nutritionConfig
+    case "tasks":       tasksConfig
+    default:            emptyConfig
+    }
+  }
 
-private struct CannabisPresetsPane: View {
-  @Environment(SettingsStore.self) private var store
+  @ViewBuilder
+  private var caffeineConfig: some View {
+    if let caf = store.caffeine {
+      if !caf.beans.isEmpty {
+        Section("Beans") {
+          ForEach(caf.beans) { bean in
+            HStack {
+              Text(bean.name)
+              Spacer()
+              Text(bean.id)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+            }
+          }
+        }
+      }
+      if let methods = caf.methods, !methods.isEmpty {
+        Section("Methods") {
+          ForEach(methods, id: \.self) { Text($0) }
+        }
+      }
+    } else {
+      emptyConfig
+    }
+  }
 
-  var body: some View {
-    Form {
-      if let cnb = store.cannabis {
+  @ViewBuilder
+  private var cannabisConfig: some View {
+    if let cnb = store.cannabis {
+      if !cnb.strains.isEmpty {
         Section("Strains") {
           ForEach(cnb.strains) { st in
             HStack {
-              Text(st.name).foregroundStyle(.primary)
+              Text(st.name)
               Spacer()
               Text(st.id)
                 .font(.caption.monospaced())
@@ -494,16 +479,109 @@ private struct CannabisPresetsPane: View {
             }
           }
         }
-        Section("Dosing") {
-          row("Uses per capsule", "\(cnb.usesPerCapsule)")
-        }
-      } else {
-        unavailable
       }
-      readOnlyFooter
+      Section("Dosing") {
+        row("Uses per capsule", "\(cnb.usesPerCapsule)")
+      }
+    } else {
+      emptyConfig
     }
-    .formStyle(.grouped)
   }
+
+  @ViewBuilder
+  private var trainingConfig: some View {
+    if !store.sessionTypes.isEmpty {
+      Section("Session types") {
+        ForEach(store.sessionTypes) { t in
+          VStack(alignment: .leading, spacing: 4) {
+            HStack {
+              if let e = t.emoji { Text(e) }
+              Text(t.label).foregroundStyle(.primary)
+              Spacer()
+              Text(t.id)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+            }
+            if !t.exercises.isEmpty {
+              Text(t.exercises.joined(separator: " · "))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+          }
+          .padding(.vertical, 2)
+        }
+      }
+    } else {
+      emptyConfig
+    }
+  }
+
+  @ViewBuilder
+  private var choresConfig: some View {
+    if !store.chores.isEmpty {
+      Section("Definitions") {
+        ForEach(store.chores) { c in
+          HStack {
+            if let e = c.emoji { Text(e) }
+            Text(c.name).foregroundStyle(.primary)
+            Spacer()
+            if let due = c.dueDate {
+              Text(due)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+            }
+          }
+        }
+      }
+    } else {
+      emptyConfig
+    }
+  }
+
+  @ViewBuilder
+  private var nutritionConfig: some View {
+    if let m = store.macros {
+      Section("Macro ranges") {
+        row("Protein", "\(Int(m.protein.min))–\(Int(m.protein.max)) g")
+        row("Fat",     "\(Int(m.fat.min))–\(Int(m.fat.max)) g")
+        row("Carbs",   "\(Int(m.carbs.min))–\(Int(m.carbs.max)) g")
+        row("Calories","\(Int(m.kcal.min))–\(Int(m.kcal.max)) kcal")
+      }
+    } else {
+      emptyConfig
+    }
+  }
+
+  @ViewBuilder
+  private var tasksConfig: some View {
+    Section {
+      Text("Areas and projects are managed in the Tasks tab.")
+        .font(.callout)
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  @ViewBuilder
+  private var emptyConfig: some View {
+    Section {
+      Text("No additional configuration for this section.")
+        .font(.callout)
+        .foregroundStyle(.secondary)
+    }
+  }
+}
+
+/// Tolerant parse of "#rrggbb" hex strings. Falls back to gray for
+/// hsl(...) or other formats — the server returns either, but only the
+/// hex form decodes natively. A future pass can add hsl() support.
+private func parseHexColor(_ s: String) -> Color {
+  var hex = s.trimmingCharacters(in: .whitespacesAndNewlines)
+  if hex.hasPrefix("#") { hex.removeFirst() }
+  guard hex.count == 6, let v = UInt32(hex, radix: 16) else { return .gray }
+  let r = Double((v >> 16) & 0xFF) / 255
+  let g = Double((v >>  8) & 0xFF) / 255
+  let b = Double( v        & 0xFF) / 255
+  return Color(red: r, green: g, blue: b)
 }
 
 // MARK: - Integrations

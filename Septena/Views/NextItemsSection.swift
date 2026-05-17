@@ -1,4 +1,5 @@
 import SwiftUI
+import EventKit
 
 // Today-screen "everything else" rendering: chores, habits, supplements.
 // Split into two views (open / done) so the parent can place all open items
@@ -23,6 +24,10 @@ final class NextItemsModel {
   var actedHabits: Set<String> = []
   /// Same idea for supplements.
   var actedSupplements: Set<String> = []
+  /// Today's calendar events — surfaced inline in Next instead of as a
+  /// separate dashboard tile (matches the webapp's `/api/calendar/day`
+  /// integration into the Next list).
+  var calendarEvents: [EKEvent] = []
 
   /// Flips true after the first network response (success or failure) so the
   /// empty state never flashes during the initial load.
@@ -77,12 +82,24 @@ final class NextItemsModel {
     chores.filter { !completedChores.contains($0.id) && deferredChores[$0.id] != nil }
   }
 
+  /// Calendar events still ahead today (or currently happening). Past
+  /// events drop into `doneCalendarEvents`.
+  var openCalendarEvents: [EKEvent] {
+    calendarEvents.filter { $0.endDate > Date() }
+  }
+
+  var doneCalendarEvents: [EKEvent] {
+    calendarEvents.filter { $0.endDate <= Date() }
+  }
+
   var hasAnyOpen: Bool {
     !openHabits.isEmpty || !openSupplements.isEmpty || !openChores.isEmpty
+      || !openCalendarEvents.isEmpty
   }
 
   var hasAnyDone: Bool {
     !doneHabits.isEmpty || !doneSupplements.isEmpty || !doneChores.isEmpty
+      || !doneCalendarEvents.isEmpty
   }
 
   // MARK: - Loading
@@ -98,6 +115,9 @@ final class NextItemsModel {
     }
     if let sRes { supplements = sRes.items }
     if let cRes { chores = cRes }
+    // Local EventKit fetch — no network. Returns [] when access isn't
+    // granted yet; the user grants in Calendar destination view / Settings.
+    calendarEvents = CalendarBridge.shared.todayEvents()
     // Reload clears the per-session "kept visible" buckets — server is now
     // the source of truth.
     deferredChores = [:]
@@ -214,9 +234,20 @@ struct NextOpenSection: View {
     let chores = model.openChores
     let habits = habitsNow
     let supplements = model.openSupplements
+    let events = model.openCalendarEvents
 
     VStack(alignment: .leading, spacing: 0) {
+      if !events.isEmpty {
+        sectionHeader("Calendar", icon: "calendar",
+                      tint: theme.color(for: "calendar"))
+        ForEach(events, id: \.eventIdentifier) { event in
+          CalendarEventRow(event: event,
+                           tint: theme.color(for: "calendar"))
+        }
+      }
+
       if !chores.isEmpty {
+        if !events.isEmpty { Hairline().padding(.top, 8) }
         sectionHeader("Chores", icon: "list.bullet.clipboard",
                       tint: theme.color(for: "chores"))
         ForEach(chores) { chore in
@@ -226,7 +257,7 @@ struct NextOpenSection: View {
       }
 
       if !habits.isEmpty {
-        if !chores.isEmpty { Hairline().padding(.top, 8) }
+        if !events.isEmpty || !chores.isEmpty { Hairline().padding(.top, 8) }
         habitBucketHeader(bucket: currentHabitBucket,
                           tint: theme.color(for: "habits"))
         ForEach(habits) { habit in
@@ -236,7 +267,9 @@ struct NextOpenSection: View {
       }
 
       if !supplements.isEmpty {
-        if !chores.isEmpty || !habits.isEmpty { Hairline().padding(.top, 8) }
+        if !events.isEmpty || !chores.isEmpty || !habits.isEmpty {
+          Hairline().padding(.top, 8)
+        }
         sectionHeader("Supplements", icon: "pills",
                       tint: theme.color(for: "supplements"))
         ForEach(supplements) { supp in
@@ -259,26 +292,37 @@ struct NextDoneSection: View {
     let chores = model.doneChores
     let habits = model.doneHabits
     let supplements = model.doneSupplements
+    let events = model.doneCalendarEvents
 
     VStack(alignment: .leading, spacing: 0) {
       // No section headers in the done strip — keep it visually quiet.
       // Items still wear their section accent on the (filled) check. One
       // hairline between adjacent kinds rather than between every row.
+      if !events.isEmpty {
+        ForEach(events, id: \.eventIdentifier) { event in
+          CalendarEventRow(event: event,
+                           tint: theme.color(for: "calendar"),
+                           inactive: true)
+        }
+      }
       if !chores.isEmpty {
+        if !events.isEmpty { Hairline().padding(.top, 8) }
         ForEach(chores) { chore in
           ChoreRow(chore: chore, model: model, client: client,
                    tint: theme.color(for: "chores"))
         }
       }
       if !habits.isEmpty {
-        if !chores.isEmpty { Hairline().padding(.top, 8) }
+        if !events.isEmpty || !chores.isEmpty { Hairline().padding(.top, 8) }
         ForEach(habits) { habit in
           HabitRow(habit: habit, model: model, client: client,
                    tint: theme.color(for: "habits"))
         }
       }
       if !supplements.isEmpty {
-        if !chores.isEmpty || !habits.isEmpty { Hairline().padding(.top, 8) }
+        if !events.isEmpty || !chores.isEmpty || !habits.isEmpty {
+          Hairline().padding(.top, 8)
+        }
         ForEach(supplements) { supp in
           SupplementRow(supplement: supp, model: model, client: client,
                         tint: theme.color(for: "supplements"))
@@ -432,6 +476,50 @@ struct ChoreRow: View {
     } else {
       Text("\(-days)d").font(.septenaMeta).foregroundStyle(Theme.inkSecondary)
     }
+  }
+}
+
+// Read-only row for a calendar event in the Next list. Mirrors the webapp,
+// which folds /api/calendar/day events into the Next feed instead of
+// surfacing them as a separate widget. No checkbox — events come from the
+// system calendar and aren't actionable from here.
+struct CalendarEventRow: View {
+  let event: EKEvent
+  let tint: Color
+  var inactive: Bool = false
+
+  var body: some View {
+    HStack(spacing: 12) {
+      // Source-calendar color dot so multi-calendar users can still tell
+      // events apart; falls back to the section tint when EventKit gives
+      // us no color (rare).
+      Circle()
+        .fill(eventColor)
+        .frame(width: 10, height: 10)
+        .padding(.leading, 2)
+      Text(event.title?.isEmpty == false ? event.title! : "(Untitled)")
+        .font(.septenaTaskTitle)
+        .foregroundStyle(inactive ? Theme.inkSecondary : Theme.inkPrimary)
+        .strikethrough(inactive)
+        .opacity(inactive ? 0.5 : 1)
+      Spacer()
+      if let trailing = timeRange {
+        Text(trailing).font(.septenaMeta).foregroundStyle(Theme.inkSecondary)
+      }
+    }
+    .padding(.horizontal, Theme.hPadding)
+    .padding(.vertical, Theme.rowVPadding)
+  }
+
+  private var eventColor: Color {
+    if let cg = event.calendar?.cgColor { return Color(cgColor: cg) }
+    return tint
+  }
+
+  private var timeRange: String? {
+    if event.isAllDay { return "all-day" }
+    let f = DateFormatter(); f.dateFormat = "HH:mm"
+    return "\(f.string(from: event.startDate))–\(f.string(from: event.endDate))"
   }
 }
 

@@ -1,5 +1,4 @@
 import SwiftUI
-import EventKit
 
 // Week module — the synthesizing dashboard. Each module gets a tile that
 // (a) renders live stats / histogram for that module and (b) pushes into
@@ -21,6 +20,7 @@ struct WeekDashboardView: View {
   @Environment(SectionTheme.self) private var theme
   @Environment(TabSelection.self) private var tabSelection
   @Environment(NavigationState.self) private var nav
+  @Environment(SettingsStore.self) private var settingsStore
   #if os(iOS)
   @Environment(\.horizontalSizeClass) private var hSize
   #endif
@@ -42,7 +42,6 @@ struct WeekDashboardView: View {
   @State private var airSummary: AirSummary? = nil
   @State private var airHistory: [AirHistoryPoint] = []
   @State private var groceries: [GroceryItem] = []
-  @State private var calendarEvents: [EKEvent] = []
   @State private var caffeineToday: CaffeineDayResponse? = nil
   @State private var caffeineHistory: [CaffeineHistoryPoint] = []
   @State private var cannabisToday: CannabisDayResponse? = nil
@@ -58,16 +57,16 @@ struct WeekDashboardView: View {
   @State private var todayNutrition: [NutritionEntry] = []
   @State private var recentTraining: [ExerciseEntry] = []
 
-  /// 1 column on iPhone (compact), 3 on iPad / Mac (regular). LazyVGrid
-  /// reflows automatically on rotation; tiles keep their internal layout.
+  /// iPhone compact: 1 column. iPad regular: 3 columns.
+  /// macOS: adaptive — packs as many ~280pt tiles as fit, so wider windows
+  /// get 4 or 5 columns automatically. LazyVGrid reflows on resize.
   private var columns: [GridItem] {
-    let count: Int
     #if os(iOS)
-    count = (hSize == .regular) ? 3 : 1
-    #else
-    count = 3
-    #endif
+    let count = (hSize == .regular) ? 3 : 1
     return Array(repeating: GridItem(.flexible(), spacing: 14), count: count)
+    #else
+    return [GridItem(.adaptive(minimum: 280), spacing: 14)]
+    #endif
   }
 
   var body: some View {
@@ -178,9 +177,6 @@ struct WeekDashboardView: View {
     airSummary = asRes
     airHistory = ahRes?.daily ?? []
     if let g = gRes { groceries = g }
-    // Local-only — CalendarBridge sync; no network. Drains permission +
-    // returns whatever's currently in the user's calendars.
-    calendarEvents = CalendarBridge.shared.upcomingEvents(days: 7)
     if let h { habitHistory = h.daily.map { $0.done } }
     if let c { choreHistory = c.daily.map { $0.completed } }
     cardio = ca
@@ -213,7 +209,7 @@ struct WeekDashboardView: View {
     async let gutT  = try? await client.gutDay(date: SeptenaDate.today)
     async let gutH  = try? await client.gutHistory(days: 7)
     let (wR, gT, gH) = await (wRows, gutT, gutH)
-    bodyRows = wR ?? []
+    bodyRows = (wR ?? []).sorted { $0.date > $1.date }
     gutToday = gT
     gutHistory = gH?.daily ?? []
     // HealthKit — on-device, no FastAPI. Mac builds short-circuit.
@@ -251,9 +247,50 @@ struct WeekDashboardView: View {
   }
 
   // MARK: - Tiles
+  //
+  // Order is driven by `/api/sections` (the same list Settings shows) so
+  // the homepage and Settings always agree. Each section key dispatches
+  // to its tile; unknown keys are skipped. If the sections list hasn't
+  // loaded yet, fall back to the legacy static order so the dashboard
+  // never renders empty.
 
   @ViewBuilder
   private var tiles: some View {
+    if settingsStore.sections.isEmpty {
+      legacyTileOrder
+    } else {
+      ForEach(settingsStore.sections, id: \.key) { sec in
+        tile(for: sec.key)
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func tile(for key: String) -> some View {
+    switch key {
+    case "tasks":       tasksTile
+    case "habits":      habitsTile
+    case "training":    trainingTile
+    case "chores":      choresTile
+    case "supplements": supplementsTile
+    case "sleep":       sleepTile
+    case "nutrition":   nutritionTile
+    case "air":         airTile
+    case "groceries":   groceriesTile
+    // Calendar is surfaced inline in the Next tab (mirroring the webapp's
+    // /api/calendar/day integration), not as a standalone tile.
+    case "calendar":    EmptyView()
+    case "caffeine":    caffeineTile
+    case "cannabis":    cannabisTile
+    case "body":        bodyTile
+    case "gut":         gutTile
+    case "activity":    activityTile
+    default:            EmptyView()
+    }
+  }
+
+  @ViewBuilder
+  private var legacyTileOrder: some View {
     tasksTile
     habitsTile
     trainingTile
@@ -263,7 +300,6 @@ struct WeekDashboardView: View {
     nutritionTile
     airTile
     groceriesTile
-    calendarTile
     caffeineTile
     cannabisTile
     bodyTile
@@ -356,9 +392,22 @@ struct WeekDashboardView: View {
   }
 
   private var choresTile: some View {
-    let dueToday = dailies.chores.filter { $0.daysOverdue == 0 }.count
-    let overdue  = dailies.chores.filter { $0.daysOverdue > 0 }.count
-    let done = dailies.completedChores.count
+    // "Done today" needs to count chores already completed earlier in the
+    // day (server has them with `last_completed == today`) plus anything
+    // toggled in this session (`completedChores`). Without the server
+    // half, the count is always 0 on a fresh launch.
+    let todayISO = SeptenaDate.today
+    let serverDoneIDs = Set(dailies.chores
+                              .filter { $0.lastCompleted == todayISO }
+                              .map(\.id))
+    let doneIDs = serverDoneIDs.union(dailies.completedChores)
+    let dueToday = dailies.chores.filter {
+      $0.daysOverdue == 0 && !doneIDs.contains($0.id)
+    }.count
+    let overdue  = dailies.chores.filter {
+      $0.daysOverdue > 0 && !doneIDs.contains($0.id)
+    }.count
+    let done = doneIDs.count
     let total = dueToday + overdue + done
     let accent = theme.color(for: "chores")
     return Button { sheetDest = .chores } label: {
@@ -407,7 +456,10 @@ struct WeekDashboardView: View {
     let last = ouraNights.first
     let lastH = last?.totalH ?? 0
     let score = last?.sleepScore.map { "\($0)" } ?? "—"
-    let bars = ouraNights.reversed().map { Int(($0.totalH ?? 0) * 10) } // tenths-of-hour for resolution
+    // Score-out-of-100 bars matched to the webapp: each bar runs to a
+    // constant ceiling of 100, with the score in full accent and the
+    // gap-to-100 in a lighter tone so the actual score reads at a glance.
+    let bars = ouraNights.reversed().map { $0.sleepScore ?? 0 }
     return Button { sheetDest = .sleep } label: {
       ModuleTile(
         title: "Sleep",
@@ -417,9 +469,10 @@ struct WeekDashboardView: View {
           .init(label: "Score",      value: score)
         ],
         progress: .init(label: "Target", current: lastH, target: 8, unit: "h"),
-        history: .init(label: "7-day hours",
+        history: .init(label: "7-day score",
                        values: bars.isEmpty
-                         ? Array(repeating: 0, count: 7) : bars)
+                         ? Array(repeating: 0, count: 7) : bars,
+                       ceiling: 100)
       )
     }
     .buttonStyle(.plain)
@@ -479,42 +532,6 @@ struct WeekDashboardView: View {
     .buttonStyle(.plain)
   }
 
-  // Calendar — local EventKit feed; no FastAPI involved. Stats: today's
-  // event count + next event title. Histogram shows events per upcoming
-  // day so the shape of the week is visible at a glance.
-  private var calendarTile: some View {
-    let accent = theme.color(for: "calendar")
-    let cal = Calendar.current
-    let todayCount = calendarEvents.filter { cal.isDateInToday($0.startDate) }.count
-    let next = calendarEvents.first { $0.endDate > Date() }
-    let nextLabel = next.map { e in
-      let f = DateFormatter(); f.dateFormat = "HH:mm"
-      let title = (e.title?.isEmpty == false ? e.title! : "(Untitled)")
-      return "\(title) · \(f.string(from: e.startDate))"
-    } ?? "Nothing scheduled"
-    var bars: [Int] = Array(repeating: 0, count: 7)
-    for e in calendarEvents {
-      let days = cal.dateComponents([.day],
-                                    from: cal.startOfDay(for: Date()),
-                                    to: cal.startOfDay(for: e.startDate)).day ?? 0
-      if (0..<7).contains(days) { bars[days] += 1 }
-    }
-    // Soft cap of 8 events/day reads as a "busy day" budget.
-    return Button { sheetDest = .calendar } label: {
-      ModuleTile(
-        title: "Calendar",
-        accent: accent,
-        stats: [.init(label: "Today", value: "\(todayCount)"),
-                .init(label: "Next",  value: nextLabel)],
-        progress: .init(label: "Today's load",
-                        current: Double(min(todayCount, 8)),
-                        target: 8),
-        history: .init(label: "Next 7 days", values: bars)
-      )
-    }
-    .buttonStyle(.plain)
-  }
-
   // Caffeine — today's session count + grams; 7-day session histogram.
   private var caffeineTile: some View {
     let accent = theme.color(for: "caffeine")
@@ -569,17 +586,20 @@ struct WeekDashboardView: View {
 
   // Body — latest Withings weigh-in + weight-trend bars. Bars use
   // tenths-of-kg above a floor so small variation is still visible.
+  // Always 7 bars, today rightmost; gaps carry-forward the last weigh-in
+  // so the trend line stays continuous on days without a measurement.
   private var bodyTile: some View {
     let accent = theme.color(for: "body")
     let latest = bodyRows.first
     let weight = latest?.weightKg
     let fat    = latest?.fatPct
-    // Server returns newest-first; reverse for chronological bars.
-    // Subtract a floor (min of the series) so the histogram emphasizes
-    // change rather than absolute mass.
-    let reversed = bodyRows.reversed().compactMap { $0.weightKg }
-    let floor = reversed.min() ?? 0
-    let bars = reversed.map { Int((($0 - floor) * 10).rounded()) }
+    let series = weeklyWeightSeries()
+    let nonZero = series.compactMap { $0 }
+    let floor = nonZero.min() ?? 0
+    let bars = series.map { w -> Int in
+      guard let w else { return 0 }
+      return Int(((w - floor) * 10).rounded())
+    }
     // Body-fat percentage tracked against a soft 18% target (single number,
     // overrideable later via Settings.targets.fat_min_pct).
     let fatTarget: Double = 18
@@ -595,9 +615,7 @@ struct WeekDashboardView: View {
                         current: fat.map { min($0, fatTarget * 2) } ?? 0,
                         target: fatTarget,
                         unit: "%"),
-        history: .init(label: "Trend (last \(bars.count))",
-                       values: bars.isEmpty
-                         ? Array(repeating: 0, count: 7) : bars)
+        history: .init(label: "7-day trend", values: bars)
       )
     }
     .buttonStyle(.plain)
@@ -659,6 +677,34 @@ struct WeekDashboardView: View {
 
   // Settings is reached from the sidebar (and ⌘, on macOS) — it's an
   // app-level surface, not a Week tile, and not on this toolbar.
+
+  /// Last 7 calendar days oldest→newest (today rightmost) of carry-forward
+  /// weights from `bodyRows`. A day with no weigh-in inherits the most
+  /// recent prior weight; days before the first ever weigh-in are nil.
+  private func weeklyWeightSeries() -> [Double?] {
+    let cal = Calendar.current
+    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+    // Map date → weight for fast lookup. bodyRows is newest-first; weights
+    // may be nil on partial rows so filter those out.
+    var byDate: [String: Double] = [:]
+    for r in bodyRows { if let w = r.weightKg { byDate[r.date] = w } }
+    // Sorted ascending dates of known weights, for carry-forward search.
+    let knownDates = byDate.keys.sorted()
+    var out: [Double?] = []
+    let today = cal.startOfDay(for: Date())
+    for offset in (0..<7).reversed() {
+      let d = cal.date(byAdding: .day, value: -offset, to: today) ?? today
+      let key = fmt.string(from: d)
+      if let exact = byDate[key] {
+        out.append(exact)
+      } else if let prior = knownDates.last(where: { $0 <= key }) {
+        out.append(byDate[prior])
+      } else {
+        out.append(nil)
+      }
+    }
+    return out
+  }
 
   /// 7.2 → "7:12" — compact h:mm form for the tile.
   private func formatHoursShort(_ h: Double) -> String {
