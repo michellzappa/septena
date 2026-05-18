@@ -1,19 +1,25 @@
 import SwiftUI
 
-// Edit sheet for a grocery item — name, emoji, category. Standard
-// SwiftUI `Form` in a `NavigationStack` presented via `.sheet(item:)`.
-// Save enqueues `PATCH /api/groceries/item/{id}` through HTTPOutbox.
+// Edit sheet for a grocery item — name, emoji, category. Category is a
+// picker bound to the user's configured groceries categories (fetched
+// from the server and passed in by the dashboard). Save enqueues
+// `PATCH /api/groceries/item/{id}` through HTTPOutbox.
 
 struct EditGroceryItemSheet: View {
   @Environment(HTTPOutbox.self) private var outbox
   @Environment(\.dismiss) private var dismiss
 
   let original: GroceryItem
+  let categories: [GroceryCategory]
   let onSave: (GroceryItem) -> Void
 
   @State private var name: String = ""
   @State private var emoji: String = ""
   @State private var category: String = ""
+
+  private var fallbackID: String {
+    categories.first(where: { $0.id == "other" })?.id ?? categories.first?.id ?? "other"
+  }
 
   var body: some View {
     NavigationStack {
@@ -21,7 +27,12 @@ struct EditGroceryItemSheet: View {
         Section("Item") {
           TextField("Name", text: $name)
           TextField("Emoji", text: $emoji)
-          TextField("Category", text: $category)
+          Picker("Category", selection: $category) {
+            ForEach(categories) { cat in
+              Text(cat.emoji.isEmpty ? cat.name : "\(cat.emoji) \(cat.name)")
+                .tag(cat.id)
+            }
+          }
         }
       }
       .navigationTitle("Edit grocery item")
@@ -44,17 +55,18 @@ struct EditGroceryItemSheet: View {
   private func seed() {
     name = original.name
     emoji = original.emoji
-    category = original.category
+    let knownIDs = Set(categories.map { $0.id })
+    category = knownIDs.contains(original.category) ? original.category : fallbackID
   }
 
   private func save() {
     let n = name.trimmingCharacters(in: .whitespaces)
     let e = emoji.trimmingCharacters(in: .whitespaces)
-    let c = category.trimmingCharacters(in: .whitespaces)
+    let c = category.isEmpty ? fallbackID : category
     let body: [String: Any] = [
       "name": n,
       "emoji": e,
-      "category": c.isEmpty ? "other" : c,
+      "category": c,
     ]
     outbox.enqueue(
       method: "PATCH",
@@ -66,7 +78,7 @@ struct EditGroceryItemSheet: View {
     var rebuilt = original
     rebuilt.name = n
     rebuilt.emoji = e
-    rebuilt.category = c.isEmpty ? "other" : c
+    rebuilt.category = c
     onSave(rebuilt)
     dismiss()
   }

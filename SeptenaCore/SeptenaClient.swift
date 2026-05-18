@@ -402,6 +402,15 @@ final class SeptenaClient {
     try await getJSON("/api/groceries", as: GroceriesResponse.self).items
   }
 
+  /// Full groceries payload: items + user-defined categories (in display order).
+  /// Older servers may omit `categories`; callers should fall back to
+  /// `DEFAULT_GROCERY_CATEGORIES` in that case.
+  func groceriesFull() async throws -> (items: [GroceryItem], categories: [GroceryCategory]) {
+    let res = try await getJSON("/api/groceries", as: GroceriesResponse.self)
+    let cats = res.categories?.isEmpty == false ? res.categories! : DEFAULT_GROCERY_CATEGORIES
+    return (res.items, cats)
+  }
+
   /// Flip an item's `low` flag (the shopping-list state). Body matches
   /// the webapp's PATCH /api/groceries/item/{id} signature.
   func patchGroceryItem(id: String, low: Bool) async throws {

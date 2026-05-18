@@ -771,9 +771,41 @@ struct GroceryItem: Codable, Identifiable, Hashable {
   }
 }
 
+struct GroceryCategory: Codable, Identifiable, Hashable {
+  let id: String
+  var name: String
+  var emoji: String
+
+  init(id: String, name: String, emoji: String = "") {
+    self.id = id
+    self.name = name
+    self.emoji = emoji
+  }
+
+  init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    self.id = try c.decode(String.self, forKey: .id)
+    self.name = try c.decode(String.self, forKey: .name)
+    self.emoji = (try? c.decode(String.self, forKey: .emoji)) ?? ""
+  }
+}
+
 struct GroceriesResponse: Codable {
   let items: [GroceryItem]
+  let categories: [GroceryCategory]?
 }
+
+/// Default fallback used when the backend response omits `categories` (older
+/// server) or returns an empty list. Matches the server-side defaults.
+public let DEFAULT_GROCERY_CATEGORIES: [GroceryCategory] = [
+  GroceryCategory(id: "produce",   name: "Produce",   emoji: "🥬"),
+  GroceryCategory(id: "dairy",     name: "Dairy",     emoji: "🥛"),
+  GroceryCategory(id: "grains",    name: "Grains",    emoji: "🍞"),
+  GroceryCategory(id: "meat",      name: "Meat",      emoji: "🍗"),
+  GroceryCategory(id: "frozen",    name: "Frozen",    emoji: "🧊"),
+  GroceryCategory(id: "household", name: "Household", emoji: "🧼"),
+  GroceryCategory(id: "other",     name: "Other",     emoji: "🗂️"),
+]
 
 // MARK: - Caffeine
 
