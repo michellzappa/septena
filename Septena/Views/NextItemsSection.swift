@@ -158,7 +158,7 @@ final class NextItemsModel {
 
   // MARK: - Mutations (optimistic local flips, server-side write)
 
-  func toggleHabit(_ habit: HabitDayItem, client: SeptenaClient) {
+  func toggleHabit(_ habit: HabitDayItem, outbox: HTTPOutbox) {
     let next = !habit.done
     if next { Haptics.success() } else { Haptics.tap() }
     if let i = habits.firstIndex(where: { $0.id == habit.id }) {
@@ -166,71 +166,59 @@ final class NextItemsModel {
       if next { habits[i].skipped = false }
     }
     actedHabits.insert(habit.id)
-    Task {
-      do { try await client.toggleHabit(id: habit.id, date: today, done: next) }
-      catch { await load(client: client) }
-    }
+    outbox.enqueue(method: "POST", path: "/api/habits/toggle",
+                   body: ["habit_id": habit.id, "date": today, "done": next],
+                   kind: "habits.toggle")
   }
 
-  func skipHabit(_ habit: HabitDayItem, skipped: Bool, client: SeptenaClient) {
+  func skipHabit(_ habit: HabitDayItem, skipped: Bool, outbox: HTTPOutbox) {
     Haptics.tick()
     if let i = habits.firstIndex(where: { $0.id == habit.id }) {
       habits[i].skipped = skipped
       if skipped { habits[i].done = false }
     }
     actedHabits.insert(habit.id)
-    Task {
-      do { try await client.skipHabit(id: habit.id, date: today, skipped: skipped) }
-      catch { await load(client: client) }
-    }
+    outbox.enqueue(method: "POST", path: "/api/habits/skip",
+                   body: ["habit_id": habit.id, "date": today, "skipped": skipped],
+                   kind: "habits.skip")
   }
 
-  func toggleSupplement(_ supp: SupplementDayItem, client: SeptenaClient) {
+  func toggleSupplement(_ supp: SupplementDayItem, outbox: HTTPOutbox) {
     let next = !supp.done
     if next { Haptics.success() } else { Haptics.tap() }
     if let i = supplements.firstIndex(where: { $0.id == supp.id }) {
       supplements[i].done = next
     }
     actedSupplements.insert(supp.id)
-    Task {
-      do { try await client.toggleSupplement(id: supp.id, date: today, done: next) }
-      catch { await load(client: client) }
-    }
+    outbox.enqueue(method: "POST", path: "/api/supplements/toggle",
+                   body: ["supplement_id": supp.id, "date": today, "done": next],
+                   kind: "supplements.toggle")
   }
 
-  func completeChore(_ chore: ChoreItem, client: SeptenaClient) {
+  func completeChore(_ chore: ChoreItem, outbox: HTTPOutbox) {
     Haptics.success()
     completedChores.insert(chore.id)
     deferredChores.removeValue(forKey: chore.id)
-    Task {
-      do { try await client.completeChore(id: chore.id, date: today) }
-      catch {
-        completedChores.remove(chore.id)
-        await load(client: client)
-      }
-    }
+    outbox.enqueue(method: "POST", path: "/api/chores/complete",
+                   body: ["chore_id": chore.id, "date": today],
+                   kind: "chores.complete")
   }
 
-  func deferChore(_ chore: ChoreItem, mode: String, label: String, client: SeptenaClient) {
+  func deferChore(_ chore: ChoreItem, mode: String, label: String, outbox: HTTPOutbox) {
     Haptics.tick()
     deferredChores[chore.id] = label
     completedChores.remove(chore.id)
-    Task {
-      do { try await client.deferChore(id: chore.id, mode: mode) }
-      catch {
-        deferredChores.removeValue(forKey: chore.id)
-        await load(client: client)
-      }
-    }
+    outbox.enqueue(method: "POST", path: "/api/chores/defer",
+                   body: ["chore_id": chore.id, "mode": mode],
+                   kind: "chores.defer")
   }
 
-  func uncompleteChore(_ chore: ChoreItem, client: SeptenaClient) {
+  func uncompleteChore(_ chore: ChoreItem, outbox: HTTPOutbox) {
     Haptics.tap()
     completedChores.remove(chore.id)
-    Task {
-      do { try await client.uncompleteChore(id: chore.id, date: today) }
-      catch { await load(client: client) }
-    }
+    outbox.enqueue(method: "POST", path: "/api/chores/uncomplete",
+                   body: ["chore_id": chore.id, "date": today],
+                   kind: "chores.uncomplete")
   }
 }
 
@@ -238,7 +226,7 @@ final class NextItemsModel {
 
 struct NextOpenSection: View {
   var model: NextItemsModel
-  @Environment(SeptenaClient.self) private var client
+  @Environment(HTTPOutbox.self) private var outbox
   @Environment(SectionTheme.self) private var theme
 
   /// Habits are bucketed by time-of-day on the server ("morning" / "afternoon"
@@ -280,7 +268,7 @@ struct NextOpenSection: View {
         sectionHeader("Chores", icon: "list.bullet.clipboard",
                       tint: theme.color(for: "chores"))
         ForEach(chores) { chore in
-          ChoreRow(chore: chore, model: model, client: client,
+          ChoreRow(chore: chore, model: model, outbox: outbox,
                    tint: theme.color(for: "chores"))
         }
       }
@@ -290,7 +278,7 @@ struct NextOpenSection: View {
         habitBucketHeader(bucket: currentHabitBucket,
                           tint: theme.color(for: "habits"))
         ForEach(habits) { habit in
-          HabitRow(habit: habit, model: model, client: client,
+          HabitRow(habit: habit, model: model, outbox: outbox,
                    tint: theme.color(for: "habits"))
         }
       }
@@ -302,7 +290,7 @@ struct NextOpenSection: View {
         sectionHeader("Supplements", icon: "pills",
                       tint: theme.color(for: "supplements"))
         ForEach(supplements) { supp in
-          SupplementRow(supplement: supp, model: model, client: client,
+          SupplementRow(supplement: supp, model: model, outbox: outbox,
                         tint: theme.color(for: "supplements"))
         }
       }
@@ -314,7 +302,7 @@ struct NextOpenSection: View {
 
 struct NextDoneSection: View {
   var model: NextItemsModel
-  @Environment(SeptenaClient.self) private var client
+  @Environment(HTTPOutbox.self) private var outbox
   @Environment(SectionTheme.self) private var theme
 
   var body: some View {
@@ -337,14 +325,14 @@ struct NextDoneSection: View {
       if !chores.isEmpty {
         if !events.isEmpty { Hairline().padding(.top, 8) }
         ForEach(chores) { chore in
-          ChoreRow(chore: chore, model: model, client: client,
+          ChoreRow(chore: chore, model: model, outbox: outbox,
                    tint: theme.color(for: "chores"))
         }
       }
       if !habits.isEmpty {
         if !events.isEmpty || !chores.isEmpty { Hairline().padding(.top, 8) }
         ForEach(habits) { habit in
-          HabitRow(habit: habit, model: model, client: client,
+          HabitRow(habit: habit, model: model, outbox: outbox,
                    tint: theme.color(for: "habits"))
         }
       }
@@ -353,7 +341,7 @@ struct NextDoneSection: View {
           Hairline().padding(.top, 8)
         }
         ForEach(supplements) { supp in
-          SupplementRow(supplement: supp, model: model, client: client,
+          SupplementRow(supplement: supp, model: model, outbox: outbox,
                         tint: theme.color(for: "supplements"))
         }
       }
@@ -369,7 +357,7 @@ struct NextDoneSection: View {
 struct HabitRow: View {
   let habit: HabitDayItem
   var model: NextItemsModel
-  let client: SeptenaClient
+  let outbox: HTTPOutbox
   let tint: Color
 
   var body: some View {
@@ -378,7 +366,7 @@ struct HabitRow: View {
       TaskCheckbox(
         tint: habit.skipped && !habit.done ? Theme.inkSecondary : tint,
         isDone: inactive
-      ) { model.toggleHabit(habit, client: client) }
+      ) { model.toggleHabit(habit, outbox: outbox) }
 
       Text(habit.emoji ?? "•").font(.system(size: 16))
       Text(habit.name)
@@ -397,7 +385,7 @@ struct HabitRow: View {
     .padding(.vertical, Theme.rowVPadding)
     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
       Button {
-        model.skipHabit(habit, skipped: !habit.skipped, client: client)
+        model.skipHabit(habit, skipped: !habit.skipped, outbox: outbox)
       } label: {
         Label(habit.skipped ? "Unskip" : "Skip",
               systemImage: habit.skipped ? "arrow.uturn.left" : "forward.end")
@@ -413,13 +401,13 @@ struct HabitRow: View {
 struct SupplementRow: View {
   let supplement: SupplementDayItem
   var model: NextItemsModel
-  let client: SeptenaClient
+  let outbox: HTTPOutbox
   let tint: Color
 
   var body: some View {
     HStack(spacing: 12) {
       TaskCheckbox(tint: tint, isDone: supplement.done) {
-        model.toggleSupplement(supplement, client: client)
+        model.toggleSupplement(supplement, outbox: outbox)
       }
       Text(supplement.emoji ?? "•").font(.system(size: 16))
       Text(supplement.name)
@@ -444,7 +432,7 @@ struct SupplementRow: View {
 struct ChoreRow: View {
   let chore: ChoreItem
   var model: NextItemsModel
-  let client: SeptenaClient
+  let outbox: HTTPOutbox
   let tint: Color
 
   var body: some View {
@@ -458,9 +446,9 @@ struct ChoreRow: View {
         isDone: inactive
       ) {
         if isDone {
-          model.uncompleteChore(chore, client: client)
+          model.uncompleteChore(chore, outbox: outbox)
         } else {
-          model.completeChore(chore, client: client)
+          model.completeChore(chore, outbox: outbox)
         }
       }
       Text(chore.emoji ?? "•").font(.system(size: 16))
@@ -482,13 +470,13 @@ struct ChoreRow: View {
     .padding(.vertical, Theme.rowVPadding)
     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
       Button {
-        model.deferChore(chore, mode: "day", label: "Tomorrow", client: client)
+        model.deferChore(chore, mode: "day", label: "Tomorrow", outbox: outbox)
       } label: {
         Label("Tomorrow", systemImage: "calendar.badge.plus")
       }
       .tint(Theme.inkSecondary)
       Button {
-        model.deferChore(chore, mode: "weekend", label: "Weekend", client: client)
+        model.deferChore(chore, mode: "weekend", label: "Weekend", outbox: outbox)
       } label: {
         Label("Weekend", systemImage: "calendar.badge.clock")
       }

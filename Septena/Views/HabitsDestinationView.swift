@@ -8,6 +8,7 @@ import SwiftUI
 
 struct HabitsDestinationView: View {
   @Environment(SeptenaClient.self) private var client
+  @Environment(HTTPOutbox.self) private var outbox
   @Environment(SectionTheme.self) private var theme
 
   @State private var model = NextItemsModel()
@@ -78,7 +79,7 @@ struct HabitsDestinationView: View {
     if !items.isEmpty {
       Section {
         ForEach(items) { habit in
-          HabitRow(habit: habit, model: model, client: client, tint: accent)
+          HabitRow(habit: habit, model: model, outbox: outbox, tint: accent)
             .listRowInsets(EdgeInsets())
         }
       } header: {

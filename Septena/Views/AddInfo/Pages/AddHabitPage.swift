@@ -30,6 +30,7 @@ private func visibleBuckets(_ all: [String]) -> [String] {
 
 struct AddHabitPage: View {
   @Environment(SeptenaClient.self) private var client
+  @Environment(HTTPOutbox.self) private var outbox
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
@@ -101,13 +102,13 @@ struct AddHabitPage: View {
   }
 
   private func toggle(_ item: HabitDayItem) {
-    Task {
-      do {
-        try await client.toggleHabit(id: item.id, date: SeptenaDate.today, done: true)
-        Haptics.tick()
-        dismiss()
-      } catch { Haptics.warning() }
-    }
+    outbox.enqueue(method: "POST", path: "/api/habits/toggle",
+                   body: ["habit_id": item.id,
+                          "date": SeptenaDate.today,
+                          "done": true],
+                   kind: "habits.toggle")
+    Haptics.tick()
+    dismiss()
   }
 
   private func create(name: String) {

@@ -25,6 +25,14 @@ struct SeptenaApp: App {
     client: ClientProvider.shared.client,
     context: LocalStore.shared.container.mainContext
   )
+  /// Generic queue for non-task mutations (habit toggles, intake logs,
+  /// chore complete/defer, grocery patches, training session posts).
+  /// View layer keeps its in-memory optimistic flips; this just delivers
+  /// the server-side write reliably, surviving offline + app restart.
+  @State private var httpOutbox: HTTPOutbox = HTTPOutbox(
+    client: ClientProvider.shared.client,
+    context: LocalStore.shared.container.mainContext
+  )
   /// Drives drainer kicks on foreground / coming-back-online transitions.
   @Environment(\.scenePhase) private var scenePhase
   #if os(iOS)
@@ -43,11 +51,15 @@ struct SeptenaApp: App {
         .environment(trainingDraft)
         .environment(settingsStore)
         .environment(taskMutator)
+        .environment(httpOutbox)
         .modelContainer(localStore.container)
         .onChange(of: scenePhase) { _, phase in
           // Foreground transitions are the best moment to flush any
           // mutations that were queued while offline / suspended.
-          if phase == .active { taskMutator.kickDrain() }
+          if phase == .active {
+            taskMutator.kickDrain()
+            httpOutbox.kickDrain()
+          }
         }
         .task {
           #if os(iOS)
@@ -82,6 +94,7 @@ struct SeptenaApp: App {
           // since the mutator's pendingSync flag protects rows during
           // upsert, and the drainer is idempotent.
           taskMutator.kickDrain()
+          httpOutbox.kickDrain()
           BadgeManager.shared.start(context: localStore.container.mainContext)
           await runRemindersAutoImport()
         }

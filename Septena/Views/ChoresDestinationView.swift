@@ -8,6 +8,7 @@ import SwiftUI
 
 struct ChoresDestinationView: View {
   @Environment(SeptenaClient.self) private var client
+  @Environment(HTTPOutbox.self) private var outbox
   @Environment(SectionTheme.self) private var theme
 
   @State private var model = NextItemsModel()
@@ -38,7 +39,7 @@ struct ChoresDestinationView: View {
       if !today.isEmpty {
         Section("Today") {
           ForEach(today) { chore in
-            ChoreRow(chore: chore, model: model, client: client, tint: accent)
+            ChoreRow(chore: chore, model: model, outbox: outbox, tint: accent)
               .listRowInsets(EdgeInsets())
           }
         }
@@ -46,7 +47,7 @@ struct ChoresDestinationView: View {
       if !doneToday.isEmpty {
         Section("Done today") {
           ForEach(doneToday) { chore in
-            ChoreRow(chore: chore, model: model, client: client, tint: accent)
+            ChoreRow(chore: chore, model: model, outbox: outbox, tint: accent)
               .listRowInsets(EdgeInsets())
           }
         }
@@ -54,7 +55,7 @@ struct ChoresDestinationView: View {
       if !later.isEmpty {
         Section("Later") {
           ForEach(later) { chore in
-            ChoreRow(chore: chore, model: model, client: client, tint: accent)
+            ChoreRow(chore: chore, model: model, outbox: outbox, tint: accent)
               .listRowInsets(EdgeInsets())
           }
         }

@@ -7,6 +7,7 @@ import SwiftUI
 
 struct GroceriesDestinationView: View {
   @Environment(SeptenaClient.self) private var client
+  @Environment(HTTPOutbox.self) private var outbox
   @Environment(SectionTheme.self) private var theme
 
   @State private var items: [GroceryItem] = []
@@ -85,18 +86,11 @@ struct GroceriesDestinationView: View {
     if let i = items.firstIndex(where: { $0.id == item.id }) {
       items[i].low = next   // optimistic flip
     }
-    pending.insert(item.id)
     Haptics.tap()
-    Task {
-      do {
-        try await client.patchGroceryItem(id: item.id, low: next)
-      } catch {
-        if let i = items.firstIndex(where: { $0.id == item.id }) {
-          items[i].low = !next   // revert on failure
-        }
-      }
-      pending.remove(item.id)
-    }
+    outbox.enqueue(method: "PATCH",
+                   path: "/api/groceries/item/\(item.id)",
+                   body: ["low": next],
+                   kind: "groceries.patch")
   }
 
   private static let cacheKey = "groceries.items"

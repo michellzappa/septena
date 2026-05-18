@@ -6,6 +6,7 @@ import SwiftUI
 
 struct AddCannabisPage: View {
   @Environment(SeptenaClient.self) private var client
+  @Environment(HTTPOutbox.self) private var outbox
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
@@ -92,22 +93,17 @@ struct AddCannabisPage: View {
   }
 
   private func commit(method: String, strain: String?, hit: Int?) {
-    guard !working else { return }
-    working = true
-    Task {
-      defer { working = false }
-      do {
-        try await client.addCannabisEntry(
-          date: SeptenaDate.today,
-          time: nowHHMM(),
-          method: method,
-          strain: strain,
-          hit: hit
-        )
-        Haptics.tick()
-        dismiss()
-      } catch { Haptics.warning() }
-    }
+    var body: [String: Any] = [
+      "date": SeptenaDate.today,
+      "time": nowHHMM(),
+      "method": method,
+    ]
+    if let strain { body["strain"] = strain }
+    if let hit { body["hit"] = hit }
+    outbox.enqueue(method: "POST", path: "/api/cannabis/entry",
+                   body: body, kind: "cannabis.add")
+    Haptics.tick()
+    dismiss()
   }
 
   private func load() async {

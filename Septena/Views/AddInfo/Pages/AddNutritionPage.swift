@@ -12,6 +12,7 @@ private struct MealCandidate: Identifiable {
 
 struct AddNutritionPage: View {
   @Environment(SeptenaClient.self) private var client
+  @Environment(HTTPOutbox.self) private var outbox
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
@@ -103,27 +104,21 @@ struct AddNutritionPage: View {
   }
 
   private func duplicate(_ entry: NutritionEntry) {
-    guard !working else { return }
-    working = true
-    Task {
-      defer { working = false }
-      do {
-        let now = nowHHMM()
-        try await client.addNutritionEntry(
-          date: SeptenaDate.today,
-          time: now,
-          foods: entry.foods,
-          proteinG: entry.proteinG,
-          fatG: entry.fatG,
-          carbsG: entry.carbsG,
-          fiberG: entry.fiberG,
-          kcal: entry.kcal,
-          emoji: entry.emoji
-        )
-        Haptics.tick()
-        dismiss()
-      } catch { Haptics.warning() }
-    }
+    var body: [String: Any] = [
+      "date": SeptenaDate.today,
+      "time": nowHHMM(),
+      "foods": entry.foods,
+      "protein_g": entry.proteinG,
+      "fat_g": entry.fatG,
+      "carbs_g": entry.carbsG,
+      "kcal": entry.kcal,
+    ]
+    if let fiberG = entry.fiberG { body["fiber_g"] = fiberG }
+    if let emoji = entry.emoji { body["emoji"] = emoji }
+    outbox.enqueue(method: "POST", path: "/api/nutrition/entries",
+                   body: body, kind: "nutrition.add")
+    Haptics.tick()
+    dismiss()
   }
 
   private func load() async {

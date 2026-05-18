@@ -768,6 +768,34 @@ final class SeptenaClient {
     return result
   }
 
+  /// Execute an arbitrary HTTP request without decoding the response.
+  /// Used by `HTTPOutbox` to drain queued non-task mutations through the
+  /// same transport (offline detection, header conventions, error codes)
+  /// as everything else.
+  func executeRaw(method: String, path: String, bodyData: Data? = nil) async throws {
+    let u = try url(path)
+    var req = URLRequest(url: u)
+    req.httpMethod = method
+    if let bodyData {
+      req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+      req.httpBody = bodyData
+    }
+    SeptenaLog.info("\(method) \(u.path)")
+    let data: Data; let resp: URLResponse
+    do {
+      (data, resp) = try await session.data(for: req)
+      isOffline = false
+    } catch let urlError as URLError {
+      isOffline = true
+      throw urlError
+    }
+    let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+    if code >= 400 {
+      throw SeptenaError.server(code, String(data: data, encoding: .utf8) ?? "")
+    }
+    notifyChanged(for: path)
+  }
+
   private func deleteRaw(_ path: String) async throws {
     let u = try url(path)
     var req = URLRequest(url: u)

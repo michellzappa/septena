@@ -5,6 +5,7 @@ import SwiftUI
 
 struct AddChorePage: View {
   @Environment(SeptenaClient.self) private var client
+  @Environment(HTTPOutbox.self) private var outbox
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
@@ -67,13 +68,11 @@ struct AddChorePage: View {
   }
 
   private func complete(_ chore: ChoreItem) {
-    Task {
-      do {
-        try await client.completeChore(id: chore.id, date: SeptenaDate.today)
-        Haptics.tick()
-        dismiss()
-      } catch { Haptics.warning() }
-    }
+    outbox.enqueue(method: "POST", path: "/api/chores/complete",
+                   body: ["chore_id": chore.id, "date": SeptenaDate.today],
+                   kind: "chores.complete")
+    Haptics.tick()
+    dismiss()
   }
 
   private func create(name: String) {

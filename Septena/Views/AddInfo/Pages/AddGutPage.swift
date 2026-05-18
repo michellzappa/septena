@@ -22,6 +22,7 @@ private let bristolScale: [BristolEntry] = [
 
 struct AddGutPage: View {
   @Environment(SeptenaClient.self) private var client
+  @Environment(HTTPOutbox.self) private var outbox
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
@@ -56,17 +57,13 @@ struct AddGutPage: View {
   }
 
   private func log(_ item: BristolEntry) {
-    guard !working else { return }
-    working = true
-    Task {
-      defer { working = false }
-      do {
-        try await client.addGutEntry(date: SeptenaDate.today,
-                                     time: nowHHMM(),
-                                     bristol: item.id)
-        Haptics.tick()
-        dismiss()
-      } catch { Haptics.warning() }
-    }
+    outbox.enqueue(method: "POST", path: "/api/gut/entry",
+                   body: ["date": SeptenaDate.today,
+                          "time": nowHHMM(),
+                          "bristol": item.id,
+                          "blood": 0],
+                   kind: "gut.add")
+    Haptics.tick()
+    dismiss()
   }
 }

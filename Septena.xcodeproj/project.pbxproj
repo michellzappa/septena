@@ -37,6 +37,7 @@
 		31907B76B454482FC198B6DB /* AddTaskPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E02202E915B573B152BB3371 /* AddTaskPage.swift */; };
 		350BABC5882550125A41C46D /* GroceriesDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83E5755C28C6B3D53D9031A7 /* GroceriesDestinationView.swift */; };
 		36325B1E6E5A771C01028105 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 31313A0E804B33A3E43FC1F6 /* Info.plist */; };
+		39CD08C5DEE045DA2046A98C /* HTTPOutbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BE54D41FA8376A929C7D29 /* HTTPOutbox.swift */; };
 		3B66AE20B0697A3F84F5F762 /* AddGroceryPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D780CFB5185574B77710C70 /* AddGroceryPage.swift */; };
 		3D19536CFB66987D6D5C7642 /* Info-Mac.plist in Resources */ = {isa = PBXBuildFile; fileRef = 5B49A0D20B2ECD672137900F /* Info-Mac.plist */; };
 		3D2C6F1E4621C0CCB9E26003 /* AddCannabisPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 246D22B8CA77332FF2CC7A6C /* AddCannabisPage.swift */; };
@@ -92,6 +93,7 @@
 		A37CA09A2BA7FD3DA134D41F /* AddInfoRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4F39429D9683F549DE4999F /* AddInfoRouter.swift */; };
 		A5DBCDF52DE4E8E077C6451E /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */; };
 		AB9C2DB321F8FDAD38FA9F4A /* AddHabitPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFBFDD4F53D7D667C8B204D9 /* AddHabitPage.swift */; };
+		ACD44B47A763255CA20575BE /* HTTPOutbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BE54D41FA8376A929C7D29 /* HTTPOutbox.swift */; };
 		AF5A77B5B730923A825F7C89 /* Outbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD295FAB7B881CAC43EE8C34 /* Outbox.swift */; };
 		AFD39F8C8765E0A36414CEF1 /* NextDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B306432E3182A6992728E0F9 /* NextDashboardView.swift */; };
 		B09EA3455FBF702224C33616 /* CalendarBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7027B881D1D8B1B09B105034 /* CalendarBridge.swift */; };
@@ -163,6 +165,7 @@
 		3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		3B065C1A278C890BF5EEBE9C /* OfflineBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineBanner.swift; sourceTree = "<group>"; };
 		3C90473A5415EF805CE827D5 /* GutDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GutDestinationView.swift; sourceTree = "<group>"; };
+		40BE54D41FA8376A929C7D29 /* HTTPOutbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPOutbox.swift; sourceTree = "<group>"; };
 		41816B2B33A2834500415BF8 /* AddInfoSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddInfoSheet.swift; sourceTree = "<group>"; };
 		486793A66A22C3DA7809337B /* TaskCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskCommands.swift; sourceTree = "<group>"; };
 		4A23235949EF137B79234073 /* AddSupplementPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddSupplementPage.swift; sourceTree = "<group>"; };
@@ -333,6 +336,7 @@
 				1E25F81FE5AA4B6BBC056275 /* DateParser.swift */,
 				53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */,
 				F61B77A80F53A6EEEBBC90EA /* HealthKitBridge.swift */,
+				40BE54D41FA8376A929C7D29 /* HTTPOutbox.swift */,
 				7D5ECFDA9128B73993023CB6 /* Models.swift */,
 				AD295FAB7B881CAC43EE8C34 /* Outbox.swift */,
 				25DC8E705099DB99718A8596 /* Persistence.swift */,
@@ -482,6 +486,7 @@
 				DD3CDCDBCD8FD2808774F5A8 /* DayTimelineView.swift in Sources */,
 				029C02E7D76246B98F4F6C8B /* GroceriesDestinationView.swift in Sources */,
 				530608759DC8F3A18501430F /* GutDestinationView.swift in Sources */,
+				ACD44B47A763255CA20575BE /* HTTPOutbox.swift in Sources */,
 				FD43DBF763D6B72C04A00682 /* HabitsDestinationView.swift in Sources */,
 				5330AF71083A1F3514B862B8 /* Haptics.swift in Sources */,
 				EF6F6DC70A2A20577E2BDCBD /* HealthKitBridge.swift in Sources */,
@@ -553,6 +558,7 @@
 				ECCD8EBD97007CE19A8A2C71 /* DayTimelineView.swift in Sources */,
 				350BABC5882550125A41C46D /* GroceriesDestinationView.swift in Sources */,
 				100195F90383D604A61EF4CB /* GutDestinationView.swift in Sources */,
+				39CD08C5DEE045DA2046A98C /* HTTPOutbox.swift in Sources */,
 				69347D27E1CBEFCF3AA87AB2 /* HabitsDestinationView.swift in Sources */,
 				28777ACD729D9C78846219C4 /* Haptics.swift in Sources */,
 				1DFCCAA759E4B23AC3D03C10 /* HealthKitBridge.swift in Sources */,

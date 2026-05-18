@@ -5,6 +5,7 @@ import SwiftUI
 
 struct AddGroceryPage: View {
   @Environment(SeptenaClient.self) private var client
+  @Environment(HTTPOutbox.self) private var outbox
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
@@ -59,26 +60,19 @@ struct AddGroceryPage: View {
   }
 
   private func create(name: String) {
-    guard !working else { return }
-    working = true
-    Task {
-      defer { working = false }
-      do {
-        try await client.addGroceryItem(name: name)
-        Haptics.tick()
-        dismiss()
-      } catch { Haptics.warning() }
-    }
+    outbox.enqueue(method: "POST", path: "/api/groceries/item",
+                   body: ["name": name, "category": "other"],
+                   kind: "groceries.add")
+    Haptics.tick()
+    dismiss()
   }
 
   private func markLow(_ item: GroceryItem) {
-    Task {
-      do {
-        try await client.patchGroceryItem(id: item.id, low: true)
-        Haptics.tick()
-        dismiss()
-      } catch { Haptics.warning() }
-    }
+    outbox.enqueue(method: "PATCH", path: "/api/groceries/item/\(item.id)",
+                   body: ["low": true],
+                   kind: "groceries.patch")
+    Haptics.tick()
+    dismiss()
   }
 
   private func load() async {

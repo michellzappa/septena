@@ -7,6 +7,7 @@ import SwiftUI
 
 struct SupplementsDestinationView: View {
   @Environment(SeptenaClient.self) private var client
+  @Environment(HTTPOutbox.self) private var outbox
   @Environment(SectionTheme.self) private var theme
 
   @State private var model = NextItemsModel()
@@ -18,7 +19,7 @@ struct SupplementsDestinationView: View {
       summary
       Section {
         ForEach(model.supplements) { supp in
-          SupplementRow(supplement: supp, model: model, client: client, tint: accent)
+          SupplementRow(supplement: supp, model: model, outbox: outbox, tint: accent)
             .listRowInsets(EdgeInsets())
         }
       } header: {

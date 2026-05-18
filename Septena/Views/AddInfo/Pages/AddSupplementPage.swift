@@ -6,6 +6,7 @@ import SwiftUI
 
 struct AddSupplementPage: View {
   @Environment(SeptenaClient.self) private var client
+  @Environment(HTTPOutbox.self) private var outbox
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
@@ -48,13 +49,13 @@ struct AddSupplementPage: View {
   }
 
   private func toggle(_ item: SupplementDayItem) {
-    Task {
-      do {
-        try await client.toggleSupplement(id: item.id, date: SeptenaDate.today, done: true)
-        Haptics.tick()
-        dismiss()
-      } catch { Haptics.warning() }
-    }
+    outbox.enqueue(method: "POST", path: "/api/supplements/toggle",
+                   body: ["supplement_id": item.id,
+                          "date": SeptenaDate.today,
+                          "done": true],
+                   kind: "supplements.toggle")
+    Haptics.tick()
+    dismiss()
   }
 
   private func load() async {

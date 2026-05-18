@@ -243,7 +243,8 @@ final class LocalStore {
   let container: ModelContainer
 
   private init() {
-    let schema = Schema([TaskEntity.self, ProjectEntity.self, AreaEntity.self, OutboxEntity.self])
+    let schema = Schema([TaskEntity.self, ProjectEntity.self, AreaEntity.self,
+                         OutboxEntity.self, HTTPOutboxEntity.self])
     let config = ModelConfiguration("Septena", schema: schema)
     do {
       container = try ModelContainer(for: schema, configurations: [config])

@@ -8,6 +8,7 @@ import SwiftUI
 
 struct AddCaffeinePage: View {
   @Environment(SeptenaClient.self) private var client
+  @Environment(HTTPOutbox.self) private var outbox
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
@@ -83,22 +84,18 @@ struct AddCaffeinePage: View {
   }
 
   private func commit(method: String, beans: String?, grams: Double?) {
-    guard !working else { return }
-    working = true
-    Task {
-      defer { working = false }
-      do {
-        try await client.addCaffeineEntry(
-          date: SeptenaDate.today,
-          time: nowHHMM(),
-          method: method,
-          beans: beans,
-          grams: grams
-        )
-        Haptics.tick()
-        dismiss()
-      } catch { Haptics.warning() }
-    }
+    var body: [String: Any] = [
+      "date": SeptenaDate.today,
+      "time": nowHHMM(),
+      "method": method,
+      "timezone": TimeZone.current.identifier,
+    ]
+    if let beans { body["beans"] = beans }
+    if let grams { body["grams"] = grams }
+    outbox.enqueue(method: "POST", path: "/api/caffeine/entry",
+                   body: body, kind: "caffeine.add")
+    Haptics.tick()
+    dismiss()
   }
 
   private func load() async {
