@@ -25,7 +25,7 @@ struct GroceriesDestinationView: View {
 
   private func displayName(forCategory id: String) -> String {
     if let cat = categoryByID[id] {
-      return cat.emoji.isEmpty ? cat.name : "\(cat.emoji) \(cat.name)"
+      return cat.name
     }
     return id.isEmpty ? "In stock" : id.capitalized
   }
