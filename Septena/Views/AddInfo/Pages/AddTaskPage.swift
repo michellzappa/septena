@@ -110,34 +110,26 @@ struct AddTaskPage: View {
 
   private func commit(title: String) {
     guard !working else { return }
-    working = true
-    Task {
-      defer { working = false }
-      do {
-        let scheduled: Date? = {
-          if case .upcoming = bucket {
-            return Calendar.current.date(byAdding: .day, value: 1, to: .now)
-          }
-          return nil
-        }()
-        let today: Bool = { if case .today = bucket { return true }; return false }()
-        let status: String? = { if case .someday = bucket { return "someday" }; return nil }()
-        let area: String? = { if case .area(let a) = bucket { return a.id }; return nil }()
-        let project: String? = { if case .project(let p) = bucket { return p.id }; return nil }()
-        _ = try await client.create(
-          title: title,
-          area: area,
-          project: project,
-          scheduled: scheduled,
-          today: today,
-          status: status
-        )
-        Haptics.tick()
-        dismiss()
-      } catch {
-        Haptics.warning()
+    let scheduled: Date? = {
+      if case .upcoming = bucket {
+        return Calendar.current.date(byAdding: .day, value: 1, to: .now)
       }
-    }
+      return nil
+    }()
+    let today: Bool = { if case .today = bucket { return true }; return false }()
+    let status: String? = { if case .someday = bucket { return "someday" }; return nil }()
+    let area: String? = { if case .area(let a) = bucket { return a.id }; return nil }()
+    let project: String? = { if case .project(let p) = bucket { return p.id }; return nil }()
+    mutator.create(
+      title: title,
+      area: area,
+      project: project,
+      scheduled: scheduled,
+      today: today,
+      status: status
+    )
+    Haptics.tick()
+    dismiss()
   }
 
   private func pull(_ task: SeptenaTask) {

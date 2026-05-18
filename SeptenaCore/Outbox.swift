@@ -48,6 +48,7 @@ final class OutboxEntity {
 }
 
 enum OutboxKind: String {
+  case create
   case update
   case complete, uncomplete, cancel
   case delete
@@ -63,6 +64,17 @@ enum OutboxKind: String {
 /// corresponding SeptenaClient method consumes, encoded as plain Codable.
 /// The server is reached through SeptenaClient.* so we don't duplicate
 /// JSON-body construction here.
+private struct CreatePayload: Codable {
+  var id: String
+  var title: String
+  var area: String?
+  var project: String?
+  var scheduled: String?
+  var due: String?
+  var today: Bool
+  var notes: String?
+  var status: String?
+}
 private struct UpdatePayload: Codable {
   var title: String?
   var notes: String?
@@ -124,6 +136,52 @@ final class TaskMutator {
   }
 
   // MARK: - Mutations (optimistic + enqueue)
+
+  /// Optimistic create. Mints a client UUID, inserts a fully-formed
+  /// `TaskEntity` into SwiftData synchronously, and enqueues the server
+  /// push. Returns the new task immediately so the caller can wire up
+  /// inline-edit / selection without awaiting the network. The drainer
+  /// pushes to FastAPI with the same id; the server honors it.
+  @discardableResult
+  func create(title: String,
+              area: String? = nil,
+              project: String? = nil,
+              scheduled: Date? = nil,
+              due: Date? = nil,
+              today: Bool = false,
+              notes: String? = nil,
+              status: String? = nil) -> SeptenaTask {
+    let id = UUID().uuidString.lowercased()
+    let todayIso = SeptenaDate.today
+    let scheduledIso = SeptenaDate.format(scheduled)
+    let dueIso = SeptenaDate.format(due)
+    // Server derives area from project on save — mirror that here so the
+    // optimistic row matches what the server will return.
+    let effectiveArea = project != nil ? nil : area
+    let entity = TaskEntity(
+      id: id,
+      title: title,
+      statusRaw: status ?? TaskStatus.open.rawValue,
+      created: todayIso,
+      scheduled: scheduledIso,
+      due: dueIso,
+      today: today,
+      todaySetOn: today ? todayIso : nil,
+      area: effectiveArea,
+      project: project,
+      notes: (notes?.isEmpty == false) ? notes : nil,
+      pendingSync: true
+    )
+    context.insert(entity)
+    let payload = CreatePayload(
+      id: id, title: title, area: area, project: project,
+      scheduled: scheduledIso, due: dueIso,
+      today: today, notes: notes, status: status
+    )
+    let data = (try? outboxEncoder.encode(payload)) ?? Data()
+    enqueue(kind: .create, taskId: id, payload: data)
+    return SeptenaTask(entity)
+  }
 
   func complete(id: String) {
     guard let entity = fetch(id: id) else { return }
@@ -280,6 +338,23 @@ final class TaskMutator {
     }
     let id = entry.taskId
     switch kind {
+    case .create:
+      let p = (try? outboxDecoder.decode(CreatePayload.self, from: entry.payloadData))
+      guard let p else {
+        SeptenaLog.error("outbox: create payload missing for \(id)")
+        return
+      }
+      do {
+        _ = try await client.create(
+          title: p.title, id: p.id, area: p.area, project: p.project,
+          scheduled: SeptenaDate.parse(p.scheduled),
+          due: SeptenaDate.parse(p.due),
+          today: p.today, notes: p.notes, status: p.status
+        )
+      } catch SeptenaError.server(let code, _) where code == 409 {
+        // Server already has this id — most likely a retry of a request
+        // whose response we lost. Treat as success and drop the entry.
+      }
     case .complete:
       try await client.complete(id: id)
     case .uncomplete:

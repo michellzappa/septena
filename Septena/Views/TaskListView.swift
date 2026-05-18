@@ -1510,26 +1510,20 @@ struct TaskListView: View {
     default:                break
     }
 
-    Task {
-      do {
-        // Server requires a non-empty title; send 'New To-Do' as a
-        // placeholder. Local editingTitle stays empty so the TextField
-        // shows its 'Title' prompt — user types fresh. On commit:
-        //   - empty title → delete (handled in commitEdit / onCancel)
-        //   - non-empty → server's placeholder gets replaced via update
-        let created = try await client.create(
-          title: "New To-Do", area: area, project: project,
-          scheduled: scheduled, due: nil, today: today, notes: nil
-        )
-        await load()
-        editingTitle = ""
-        editingNotes = ""
-        newlyCreatedTaskId = created.id
-        withAnimation(Self.expandSpring) { editingTaskId = created.id }
-      } catch {
-        errorMessage = error.localizedDescription
-      }
-    }
+    // Optimistic: TaskMutator inserts a SwiftData row with a client UUID
+    // and queues the server push. Returns the new task immediately so
+    // the inline editor opens without a network round-trip.
+    //   - empty title → delete (handled in commitEdit / onCancel)
+    //   - non-empty → server's placeholder gets replaced via update
+    let created = mutator.create(
+      title: "New To-Do", area: area, project: project,
+      scheduled: scheduled, due: nil, today: today, notes: nil
+    )
+    insertLocally(created)
+    editingTitle = ""
+    editingNotes = ""
+    newlyCreatedTaskId = created.id
+    withAnimation(Self.expandSpring) { editingTaskId = created.id }
   }
 
   // MARK: - When picker apply
@@ -1604,6 +1598,13 @@ struct TaskListView: View {
       list.removeAll { $0.id == id }
     }
     drop(&items); drop(&review); drop(&doneToday)
+  }
+
+  /// Inverse of `removeLocally` — paired with `TaskMutator.create(...)`.
+  /// Inserts the freshly-minted task at the top of `items` so the inline
+  /// editor mounts on a visible row.
+  private func insertLocally(_ task: SeptenaTask) {
+    items.insert(task, at: 0)
   }
 
   // MARK: - Logged items section

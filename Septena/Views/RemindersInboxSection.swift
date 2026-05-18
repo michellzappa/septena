@@ -8,6 +8,7 @@ import EventKit
 
 struct RemindersInboxSection: View {
   @Environment(SeptenaClient.self) private var client
+  @Environment(TaskMutator.self) private var mutator
   @Environment(SectionTheme.self) private var theme
   @Environment(NavigationState.self) private var nav
   /// Parent calls this after a successful import so the inbox below refreshes.
@@ -224,18 +225,14 @@ struct RemindersInboxSection: View {
   private func importOne(_ pair: (reminder: EKReminder, view: ImportedReminder)) async {
     importingID = pair.view.id
     defer { importingID = nil }
-    do {
-      _ = try await client.create(
-        title: pair.view.title,
-        due: pair.view.dueDate,
-        notes: pair.view.notes
-      )
-      try? bridge.delete([pair.reminder])
-      pairs.removeAll { $0.view.id == pair.view.id }
-      onImported()
-    } catch {
-      SeptenaLog.error("import reminder '\(pair.view.title)'", error)
-    }
+    mutator.create(
+      title: pair.view.title,
+      due: pair.view.dueDate,
+      notes: pair.view.notes
+    )
+    try? bridge.delete([pair.reminder])
+    pairs.removeAll { $0.view.id == pair.view.id }
+    onImported()
   }
 
   private func importAll() async {
@@ -244,17 +241,13 @@ struct RemindersInboxSection: View {
     var succeeded: [EKReminder] = []
     var succeededIDs: Set<String> = []
     for pair in pairs {
-      do {
-        _ = try await client.create(
-          title: pair.view.title,
-          due: pair.view.dueDate,
-          notes: pair.view.notes
-        )
-        succeeded.append(pair.reminder)
-        succeededIDs.insert(pair.view.id)
-      } catch {
-        SeptenaLog.error("import reminder '\(pair.view.title)'", error)
-      }
+      mutator.create(
+        title: pair.view.title,
+        due: pair.view.dueDate,
+        notes: pair.view.notes
+      )
+      succeeded.append(pair.reminder)
+      succeededIDs.insert(pair.view.id)
     }
     if !succeeded.isEmpty {
       try? bridge.delete(succeeded)
