@@ -116,7 +116,14 @@ struct WeekDashboardView: View {
       .sheet(item: $sheetDest) { dest in
         sheetContent(for: dest)
       }
-      .task { await loadAll() }
+      // Two-phase load: paint cached blobs synchronously so tiles +
+      // histograms appear immediately on cold launch, then kick off the
+      // network refresh in the background. Pull-to-refresh skips the
+      // cache step since it's a manual "I want fresh data now" gesture.
+      .task {
+        paintFromCache()
+        await loadAll()
+      }
       .refreshable { await loadAll() }
     }
   }
@@ -151,9 +158,78 @@ struct WeekDashboardView: View {
     #endif
   }
 
+  // MARK: - Cache keys
+  //
+  // Each tile's data is cached under a stable key so cold launch paints
+  // from disk before the network round-trip completes. Keys are scoped
+  // `week.<state-var-name>` so different views don't collide.
+  private enum CacheKey {
+    static let habitHistory       = "week.habitHistory"
+    static let choreHistory       = "week.choreHistory"
+    static let cardio             = "week.cardio"
+    static let trainingDates      = "week.trainingSessionDates"
+    static let supplementHistory  = "week.supplementHistory"
+    static let taskCounts         = "week.taskCounts"
+    static let tasksHistory       = "week.tasksHistory"
+    static let completedTasks     = "week.completedTasks"
+    static let ouraNights         = "week.ouraNights"
+    static let nutritionStats     = "week.nutritionStats"
+    static let nutritionTarget    = "week.nutritionTarget"
+    static let todayNutrition     = "week.todayNutrition"
+    static let airSummary         = "week.airSummary"
+    static let airHistory         = "week.airHistory"
+    static let groceries          = "week.groceries"
+    static let caffeineToday      = "week.caffeineToday"
+    static let caffeineHistory    = "week.caffeineHistory"
+    static let cannabisToday      = "week.cannabisToday"
+    static let cannabisHistory    = "week.cannabisHistory"
+    static let bodyRows           = "week.bodyRows"
+    static let gutToday           = "week.gutToday"
+    static let gutHistory         = "week.gutHistory"
+    static let recentTraining     = "week.recentTraining"
+  }
+
+  /// Read every tile's last-known data out of disk-cached blobs and
+  /// assign to @State. Runs synchronously at the top of `.task` so the
+  /// dashboard renders with real numbers on cold launch — no flash of
+  /// empty histograms while the network catches up.
+  private func paintFromCache() {
+    if let v = ResponseCache.load([Int].self, forKey: CacheKey.habitHistory) { habitHistory = v }
+    if let v = ResponseCache.load([Int].self, forKey: CacheKey.choreHistory) { choreHistory = v }
+    if let v = ResponseCache.load(CardioHistoryResponse.self, forKey: CacheKey.cardio) { cardio = v }
+    if let v = ResponseCache.load(Set<String>.self, forKey: CacheKey.trainingDates) { trainingSessionDates = v }
+    if let v = ResponseCache.load([Int].self, forKey: CacheKey.supplementHistory) { supplementHistory = v }
+    if let v = ResponseCache.load(TasksCounts.self, forKey: CacheKey.taskCounts) { taskCounts = v }
+    if let v = ResponseCache.load(TasksHistory.self, forKey: CacheKey.tasksHistory) { tasksHistory = v }
+    if let v = ResponseCache.load([SeptenaTask].self, forKey: CacheKey.completedTasks) { completedTasks = v }
+    if let v = ResponseCache.load([OuraNight].self, forKey: CacheKey.ouraNights) { ouraNights = v }
+    if let v = ResponseCache.load(NutritionStatsResponse.self, forKey: CacheKey.nutritionStats) { nutritionStats = v }
+    if let v = ResponseCache.load(MacrosConfig.self, forKey: CacheKey.nutritionTarget) { nutritionTarget = v }
+    if let v = ResponseCache.load([NutritionEntry].self, forKey: CacheKey.todayNutrition) {
+      todayNutrition = v
+      todayProteinSum = v.reduce(0) { $0 + $1.proteinG }
+      todayKcalSum    = v.reduce(0) { $0 + $1.kcal }
+    }
+    if let v = ResponseCache.load(AirSummary.self, forKey: CacheKey.airSummary) { airSummary = v }
+    if let v = ResponseCache.load([AirHistoryPoint].self, forKey: CacheKey.airHistory) { airHistory = v }
+    if let v = ResponseCache.load([GroceryItem].self, forKey: CacheKey.groceries) { groceries = v }
+    if let v = ResponseCache.load(CaffeineDayResponse.self, forKey: CacheKey.caffeineToday) { caffeineToday = v }
+    if let v = ResponseCache.load([CaffeineHistoryPoint].self, forKey: CacheKey.caffeineHistory) { caffeineHistory = v }
+    if let v = ResponseCache.load(CannabisDayResponse.self, forKey: CacheKey.cannabisToday) { cannabisToday = v }
+    if let v = ResponseCache.load([CannabisHistoryPoint].self, forKey: CacheKey.cannabisHistory) { cannabisHistory = v }
+    if let v = ResponseCache.load([WithingsRow].self, forKey: CacheKey.bodyRows) { bodyRows = v }
+    if let v = ResponseCache.load(GutDayResponse.self, forKey: CacheKey.gutToday) { gutToday = v }
+    if let v = ResponseCache.load([GutHistoryPoint].self, forKey: CacheKey.gutHistory) { gutHistory = v }
+    if let v = ResponseCache.load([ExerciseEntry].self, forKey: CacheKey.recentTraining) { recentTraining = v }
+  }
+
   /// Fan out the per-tile fetches in parallel. NextItemsModel covers today's
   /// habits / chores / supplements (used by every "today" stat on the page);
   /// the two history endpoints provide the 7-day histograms.
+  ///
+  /// Every successful response is mirrored to ResponseCache so the next
+  /// cold launch repaints from disk. Failures leave both the @State and
+  /// the cached blob alone — last-known-good wins until the next refresh.
   private func loadAll() async {
     async let _ = dailies.load(client: client)
     async let hh = try? await client.habitsHistory(days: 7)
@@ -174,26 +250,74 @@ struct WeekDashboardView: View {
     let (h, c, ca, e, s, t, o) = await (hh, ch, car, ents, sh, tc, on)
     let (ns, ne, nt) = await (nstats, nents, ntarget)
     let (asRes, ahRes, gRes) = await (asum, ahist, groc)
-    airSummary = asRes
-    airHistory = ahRes?.daily ?? []
-    if let g = gRes { groceries = g }
-    if let h { habitHistory = h.daily.map { $0.done } }
-    if let c { choreHistory = c.daily.map { $0.completed } }
-    cardio = ca
-    if let e { trainingSessionDates = Set(e.map(\.date)) }
-    if let s { supplementHistory = s.daily.map { $0.done } }
-    taskCounts = t
-    tasksHistory = await th
-    completedTasks = (await tl)?.items ?? []
-    if let o { ouraNights = o }
-    nutritionStats = ns
-    nutritionTarget = nt
-    let today = SeptenaDate.today
-    let todayEntries = (ne ?? []).filter { $0.date == today }
-    todayProteinSum = todayEntries.reduce(0) { $0 + $1.proteinG }
-    todayKcalSum    = todayEntries.reduce(0) { $0 + $1.kcal }
-    todayNutrition = todayEntries
-    recentTraining = e ?? []
+    if let asRes {
+      airSummary = asRes
+      ResponseCache.save(asRes, forKey: CacheKey.airSummary)
+    }
+    if let ah = ahRes?.daily {
+      airHistory = ah
+      ResponseCache.save(ah, forKey: CacheKey.airHistory)
+    }
+    if let g = gRes {
+      groceries = g
+      ResponseCache.save(g, forKey: CacheKey.groceries)
+    }
+    if let h {
+      habitHistory = h.daily.map { $0.done }
+      ResponseCache.save(habitHistory, forKey: CacheKey.habitHistory)
+    }
+    if let c {
+      choreHistory = c.daily.map { $0.completed }
+      ResponseCache.save(choreHistory, forKey: CacheKey.choreHistory)
+    }
+    if let ca {
+      cardio = ca
+      ResponseCache.save(ca, forKey: CacheKey.cardio)
+    }
+    if let e {
+      trainingSessionDates = Set(e.map(\.date))
+      ResponseCache.save(trainingSessionDates, forKey: CacheKey.trainingDates)
+    }
+    if let s {
+      supplementHistory = s.daily.map { $0.done }
+      ResponseCache.save(supplementHistory, forKey: CacheKey.supplementHistory)
+    }
+    if let t {
+      taskCounts = t
+      ResponseCache.save(t, forKey: CacheKey.taskCounts)
+    }
+    if let thRes = await th {
+      tasksHistory = thRes
+      ResponseCache.save(thRes, forKey: CacheKey.tasksHistory)
+    }
+    if let items = (await tl)?.items {
+      completedTasks = items
+      ResponseCache.save(items, forKey: CacheKey.completedTasks)
+    }
+    if let o {
+      ouraNights = o
+      ResponseCache.save(o, forKey: CacheKey.ouraNights)
+    }
+    if let ns {
+      nutritionStats = ns
+      ResponseCache.save(ns, forKey: CacheKey.nutritionStats)
+    }
+    if let nt {
+      nutritionTarget = nt
+      ResponseCache.save(nt, forKey: CacheKey.nutritionTarget)
+    }
+    if let ne {
+      let today = SeptenaDate.today
+      let todayEntries = ne.filter { $0.date == today }
+      todayProteinSum = todayEntries.reduce(0) { $0 + $1.proteinG }
+      todayKcalSum    = todayEntries.reduce(0) { $0 + $1.kcal }
+      todayNutrition = todayEntries
+      ResponseCache.save(todayEntries, forKey: CacheKey.todayNutrition)
+    }
+    if let e {
+      recentTraining = e
+      ResponseCache.save(e, forKey: CacheKey.recentTraining)
+    }
     // Caffeine + Cannabis — second wave so the heavier core fetches above
     // render their tiles first.
     async let cafToday = try? await client.caffeineDay(date: SeptenaDate.today)
@@ -201,17 +325,39 @@ struct WeekDashboardView: View {
     async let cnbToday = try? await client.cannabisDay(date: SeptenaDate.today)
     async let cnbHist  = try? await client.cannabisHistory(days: 7)
     let (cafT, cafH, cnbT, cnbH) = await (cafToday, cafHist, cnbToday, cnbHist)
-    caffeineToday = cafT
-    caffeineHistory = cafH?.daily ?? []
-    cannabisToday = cnbT
-    cannabisHistory = cnbH?.daily ?? []
+    if let cafT {
+      caffeineToday = cafT
+      ResponseCache.save(cafT, forKey: CacheKey.caffeineToday)
+    }
+    if let ch = cafH?.daily {
+      caffeineHistory = ch
+      ResponseCache.save(ch, forKey: CacheKey.caffeineHistory)
+    }
+    if let cnbT {
+      cannabisToday = cnbT
+      ResponseCache.save(cnbT, forKey: CacheKey.cannabisToday)
+    }
+    if let cnh = cnbH?.daily {
+      cannabisHistory = cnh
+      ResponseCache.save(cnh, forKey: CacheKey.cannabisHistory)
+    }
     async let wRows = try? await client.withingsHistory(days: 14)
     async let gutT  = try? await client.gutDay(date: SeptenaDate.today)
     async let gutH  = try? await client.gutHistory(days: 7)
     let (wR, gT, gH) = await (wRows, gutT, gutH)
-    bodyRows = (wR ?? []).sorted { $0.date > $1.date }
-    gutToday = gT
-    gutHistory = gH?.daily ?? []
+    if let wR {
+      let sorted = wR.sorted { $0.date > $1.date }
+      bodyRows = sorted
+      ResponseCache.save(sorted, forKey: CacheKey.bodyRows)
+    }
+    if let gT {
+      gutToday = gT
+      ResponseCache.save(gT, forKey: CacheKey.gutToday)
+    }
+    if let gh = gH?.daily {
+      gutHistory = gh
+      ResponseCache.save(gh, forKey: CacheKey.gutHistory)
+    }
     // HealthKit — on-device, no FastAPI. Mac builds short-circuit.
     await HealthKitBridge.shared.refresh()
   }
