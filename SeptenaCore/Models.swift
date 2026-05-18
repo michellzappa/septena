@@ -24,12 +24,23 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   var project: String?
   var notes: String?
   var recurrence: Recurrence?
+  /// Stamped server-side on every write. Used as a watermark by the
+  /// delta-sync path (`/api/tasks/changes?since=…`). Nil only on legacy
+  /// records that haven't been touched since the server was upgraded.
+  var updatedAt: String?
+  /// Tombstone marker. When set, the row is logically deleted; the local
+  /// store keeps it briefly so other clients (or this client on next
+  /// pull) can purge accordingly. The Septena views filter rows where
+  /// `deletedAt != nil` out of every read.
+  var deletedAt: String?
 
   enum CodingKeys: String, CodingKey {
     case id, title, status, created, scheduled, due, today
     case todaySetOn = "today_set_on"
     case completedAt = "completed_at"
     case area, project, notes, recurrence
+    case updatedAt = "updated_at"
+    case deletedAt = "deleted_at"
   }
 
   init(from decoder: Decoder) throws {
@@ -49,6 +60,8 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     project = try c.decodeIfPresent(String.self, forKey: .project)
     notes = try c.decodeIfPresent(String.self, forKey: .notes)
     recurrence = try c.decodeIfPresent(Recurrence.self, forKey: .recurrence)
+    updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
+    deletedAt = try c.decodeIfPresent(String.self, forKey: .deletedAt)
   }
 }
 
@@ -114,19 +127,25 @@ struct Project: Identifiable, Codable, Hashable {
   /// Optional "owner/repo" pointer. Source of truth for agentic tooling that
   /// needs to know which GitHub repo a project's tasks live against.
   var githubRepo: String?
+  var updatedAt: String?
+  var deletedAt: String?
 
   enum CodingKeys: String, CodingKey {
     case id, title, status, area, created, notes, context
     case completedAt = "completed_at"
     case githubRepo = "github_repo"
+    case updatedAt = "updated_at"
+    case deletedAt = "deleted_at"
   }
 
   init(id: String, title: String, status: ProjectStatus = .active,
        area: String? = nil, created: String? = nil, completedAt: String? = nil,
-       notes: String? = nil, context: String? = nil, githubRepo: String? = nil) {
+       notes: String? = nil, context: String? = nil, githubRepo: String? = nil,
+       updatedAt: String? = nil, deletedAt: String? = nil) {
     self.id = id; self.title = title; self.status = status
     self.area = area; self.created = created; self.completedAt = completedAt
     self.notes = notes; self.context = context; self.githubRepo = githubRepo
+    self.updatedAt = updatedAt; self.deletedAt = deletedAt
   }
 
   init(from decoder: Decoder) throws {
@@ -140,6 +159,8 @@ struct Project: Identifiable, Codable, Hashable {
     notes = try c.decodeIfPresent(String.self, forKey: .notes)
     context = try c.decodeIfPresent(String.self, forKey: .context)
     githubRepo = try c.decodeIfPresent(String.self, forKey: .githubRepo)
+    updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
+    deletedAt = try c.decodeIfPresent(String.self, forKey: .deletedAt)
   }
 }
 
@@ -149,9 +170,15 @@ struct Area: Identifiable, Codable, Hashable {
   let id: String
   var title: String
   var context: String?
+  var updatedAt: String?
+  // Areas are stored on the server as a single wholesale-replace array,
+  // so there's no per-row tombstone. Removed areas just stop appearing
+  // in /changes — we delete-by-omission for areas, tombstone for tasks
+  // and projects. No `deletedAt` field by design.
 
-  init(id: String, title: String, context: String? = nil) {
+  init(id: String, title: String, context: String? = nil, updatedAt: String? = nil) {
     self.id = id; self.title = title; self.context = context
+    self.updatedAt = updatedAt
   }
 
   init(from decoder: Decoder) throws {
@@ -159,9 +186,13 @@ struct Area: Identifiable, Codable, Hashable {
     id = try c.decode(String.self, forKey: .id)
     title = try c.decodeIfPresent(String.self, forKey: .title) ?? id
     context = try c.decodeIfPresent(String.self, forKey: .context)
+    updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
   }
 
-  enum CodingKeys: String, CodingKey { case id, title, context }
+  enum CodingKeys: String, CodingKey {
+    case id, title, context
+    case updatedAt = "updated_at"
+  }
 }
 
 // MARK: - List response shapes
@@ -172,6 +203,24 @@ struct TasksListResponse: Codable {
   var items: [SeptenaTask]
   var review: [SeptenaTask]?    // present only on view=today
   var done: [SeptenaTask]?      // present only on view=today
+}
+
+/// Response from `GET /api/tasks/changes?since=<iso8601>` — the delta-sync
+/// endpoint. `tasks` and `projects` include tombstones (deletedAt set);
+/// `areas` are wholesale (deletion is by-omission since the server stores
+/// them as a single replace-on-write array). Persist `serverTime` as the
+/// next `since` value.
+struct ChangesResponse: Codable {
+  var serverTime: String
+  var since: String?
+  var tasks: [SeptenaTask]
+  var projects: [Project]
+  var areas: [Area]
+
+  enum CodingKeys: String, CodingKey {
+    case serverTime = "server_time"
+    case since, tasks, projects, areas
+  }
 }
 
 // MARK: - Tasks history (per-day event aggregation)

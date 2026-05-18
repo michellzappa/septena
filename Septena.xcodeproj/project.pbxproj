@@ -157,7 +157,7 @@
 		2D413F054F59B2A90A319154 /* TaskDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
 		31313A0E804B33A3E43FC1F6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		33B6D5A7801C40656B13C350 /* RemindersInboxSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersInboxSection.swift; sourceTree = "<group>"; };
-		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		3B065C1A278C890BF5EEBE9C /* OfflineBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineBanner.swift; sourceTree = "<group>"; };
 		3C90473A5415EF805CE827D5 /* GutDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GutDestinationView.swift; sourceTree = "<group>"; };
@@ -394,7 +394,6 @@
 						ProvisioningStyle = Automatic;
 					};
 					FD752EC978FED2E2D676DE2D = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -595,6 +594,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Septena/Septena.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 992N457T8D;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Septena/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -717,6 +717,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Septena/Septena.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 992N457T8D;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Septena/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

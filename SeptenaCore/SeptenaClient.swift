@@ -137,6 +137,7 @@ final class SeptenaClient {
   // MARK: - Tasks: mutate
 
   func create(title: String,
+              id: String? = nil,
               area: String? = nil,
               project: String? = nil,
               scheduled: Date? = nil,
@@ -144,7 +145,14 @@ final class SeptenaClient {
               today: Bool = false,
               notes: String? = nil,
               status: String? = nil) async throws -> SeptenaTask {
+    // CloudKit prep: the client owns the id. Mint a lowercase UUID by
+    // default so the row has a stable identifier from the moment we
+    // hand it off, even before the server acknowledges. Server accepts
+    // any string matching its ID_RE (lowercased UUIDs fit) and returns
+    // 409 on collision — caller can retry with a fresh UUID.
+    let taskId = id ?? UUID().uuidString.lowercased()
     var body: [String: Any] = [
+      "id": taskId,
       "title": title,
       "today": today,
       "status": status ?? "open",
@@ -155,6 +163,16 @@ final class SeptenaClient {
     if let due { body["due"] = SeptenaDate.format(due)! }
     if let notes { body["notes"] = notes }
     return try await postJSON("/api/tasks/create", body: body, as: SeptenaTask.self)
+  }
+
+  /// Delta-sync endpoint. Pass the `serverTime` returned from the previous
+  /// call as `since` to get only records changed (or tombstoned) since
+  /// that watermark. Pass nil on first sync to fetch a full snapshot.
+  /// Mirrors CKSyncEngine.fetchChanges in shape.
+  func changes(since: String? = nil) async throws -> ChangesResponse {
+    var query: [URLQueryItem] = []
+    if let since { query.append(URLQueryItem(name: "since", value: since)) }
+    return try await getJSON("/api/tasks/changes", query: query, as: ChangesResponse.self)
   }
 
   /// PATCH semantics — only included keys mutate. Use `Optional<Optional<Date>>`

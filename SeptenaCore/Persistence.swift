@@ -43,6 +43,13 @@ final class TaskEntity {
   /// the network call ultimately fails the flag is cleared and the row
   /// resurrects in the list.
   var pendingDeletion: Bool = false
+  /// Server-stamped `updated_at` (mirrored from the DTO). Used by the
+  /// delta-sync watermark — `Syncer.pullChanges()` sends the max
+  /// updatedAt back as `since` on the next call.
+  var updatedAt: String?
+  /// Server-stamped tombstone. When set, the row is logically deleted
+  /// — Syncer purges it locally during the next apply.
+  var deletedAt: String?
 
   init(id: String,
        title: String,
@@ -62,7 +69,9 @@ final class TaskEntity {
        lastSyncedAt: Date = .distantPast,
        sortIndex: Int = 0,
        pendingSync: Bool = false,
-       pendingDeletion: Bool = false) {
+       pendingDeletion: Bool = false,
+       updatedAt: String? = nil,
+       deletedAt: String? = nil) {
     self.id = id
     self.title = title
     self.statusRaw = statusRaw
@@ -82,6 +91,8 @@ final class TaskEntity {
     self.sortIndex = sortIndex
     self.pendingSync = pendingSync
     self.pendingDeletion = pendingDeletion
+    self.updatedAt = updatedAt
+    self.deletedAt = deletedAt
   }
 
   var status: TaskStatus {
@@ -116,6 +127,8 @@ final class ProjectEntity {
   var context: String?
   var githubRepo: String?
   var lastSyncedAt: Date
+  var updatedAt: String?
+  var deletedAt: String?
 
   init(id: String,
        title: String,
@@ -126,7 +139,9 @@ final class ProjectEntity {
        notes: String? = nil,
        context: String? = nil,
        githubRepo: String? = nil,
-       lastSyncedAt: Date = .distantPast) {
+       lastSyncedAt: Date = .distantPast,
+       updatedAt: String? = nil,
+       deletedAt: String? = nil) {
     self.id = id
     self.title = title
     self.statusRaw = statusRaw
@@ -137,6 +152,8 @@ final class ProjectEntity {
     self.context = context
     self.githubRepo = githubRepo
     self.lastSyncedAt = lastSyncedAt
+    self.updatedAt = updatedAt
+    self.deletedAt = deletedAt
   }
 
   var status: ProjectStatus {
@@ -151,12 +168,15 @@ final class AreaEntity {
   var title: String
   var context: String?
   var lastSyncedAt: Date
+  var updatedAt: String?
 
-  init(id: String, title: String, context: String? = nil, lastSyncedAt: Date = .distantPast) {
+  init(id: String, title: String, context: String? = nil,
+       lastSyncedAt: Date = .distantPast, updatedAt: String? = nil) {
     self.id = id
     self.title = title
     self.context = context
     self.lastSyncedAt = lastSyncedAt
+    self.updatedAt = updatedAt
   }
 }
 
@@ -183,7 +203,9 @@ extension SeptenaTask {
         ["unit": unit,
          "interval": e.recurrenceInterval,
          "after_completion": e.recurrenceAfterCompletion]
-      } as Any?
+      } as Any?,
+      "updated_at": e.updatedAt,
+      "deleted_at": e.deletedAt,
     ]
     let data = try! JSONSerialization.data(withJSONObject: payload.compactMapValues { $0 })
     self = try! JSONDecoder().decode(SeptenaTask.self, from: data)
@@ -200,13 +222,15 @@ extension Project {
               completedAt: e.completedAt,
               notes: e.notes,
               context: e.context,
-              githubRepo: e.githubRepo)
+              githubRepo: e.githubRepo,
+              updatedAt: e.updatedAt,
+              deletedAt: e.deletedAt)
   }
 }
 
 extension Area {
   init(_ e: AreaEntity) {
-    self.init(id: e.id, title: e.title, context: e.context)
+    self.init(id: e.id, title: e.title, context: e.context, updatedAt: e.updatedAt)
   }
 }
 
@@ -332,12 +356,22 @@ enum LocalCache {
 
 /// Pulls the authoritative state from the server and folds it into SwiftData.
 /// Call `pullAll()` on app foreground and after mutations. The mutation
-/// outbox (write path) is a separate slice — for now writes still hit the
-/// API directly and the next pull reconciles.
+/// outbox (write path) is a separate slice — TaskMutator handles those.
+///
+/// Implementation: a single `GET /api/tasks/changes?since=<watermark>` call
+/// returns everything (tasks, projects, areas) that changed since the last
+/// successful sync, including tombstones. The watermark is the server's
+/// `server_time` from the previous response, persisted in UserDefaults so
+/// it survives relaunches. Shape mirrors `CKSyncEngine.fetchChanges`.
 @MainActor
 final class Syncer {
   private let client: SeptenaClient
   private let context: ModelContext
+
+  /// Watermark key — the server-returned `serverTime` from the previous
+  /// `/changes` call. Nil on first launch (or after a deliberate reset),
+  /// which triggers a full snapshot from the server.
+  private static let watermarkKey = "septena.sync.serverTime"
 
   init(client: SeptenaClient, context: ModelContext) {
     self.client = client
@@ -345,63 +379,72 @@ final class Syncer {
   }
 
   func pullAll() async {
-    async let tasks: () = pullTasks()
-    async let areas: () = pullAreas()
-    async let projects: () = pullProjects()
-    _ = await (tasks, areas, projects)
-    // Surfaced by the Sync pane as "Last sync: 2m ago". Written after each
-    // pull regardless of which leg succeeded — partial syncs still count
-    // as "the cache was reconciled at this time."
-    UserDefaults.standard.set(Date().timeIntervalSince1970,
-                              forKey: "septena.sync.lastSucceededAt")
-  }
-
-  func pullTasks() async {
     do {
-      let response = try await client.list(view: "all")
-      let now = Date()
-      var seen = Set<String>()
-      for (index, dto) in response.items.enumerated() {
-        seen.insert(dto.id)
-        upsert(dto, syncedAt: now, sortIndex: index)
-      }
-      // Server didn't return these — treat as deleted.
-      try context.delete(model: TaskEntity.self,
-                         where: #Predicate { $0.lastSyncedAt < now })
+      let since = UserDefaults.standard.string(forKey: Self.watermarkKey)
+      let response = try await client.changes(since: since)
+      apply(response)
       try context.save()
+      // Persist the server's clock — next call sends this back as `since`.
+      UserDefaults.standard.set(response.serverTime, forKey: Self.watermarkKey)
+      // Surfaced by the Sync pane as "Last sync: 2m ago".
+      UserDefaults.standard.set(Date().timeIntervalSince1970,
+                                forKey: "septena.sync.lastSucceededAt")
     } catch is CancellationError {
       // Foreground re-trigger; silent.
     } catch {
-      SeptenaLog.error("Syncer.pullTasks failed", error)
+      SeptenaLog.error("Syncer.pullAll failed", error)
     }
   }
 
-  func pullAreas() async {
-    do {
-      let dtos = try await client.areas()
-      let now = Date()
-      for dto in dtos { upsert(dto, syncedAt: now) }
-      try context.delete(model: AreaEntity.self,
-                         where: #Predicate { $0.lastSyncedAt < now })
-      try context.save()
-    } catch is CancellationError {
-    } catch {
-      SeptenaLog.error("Syncer.pullAreas failed", error)
+  /// Fold a `/changes` response into the local store. Tombstones (rows
+  /// with `deletedAt` set) purge the local entity unless the outbox has
+  /// pending writes for that id — those rows wait for the drainer to
+  /// reconcile rather than getting yanked out from under it.
+  private func apply(_ response: ChangesResponse) {
+    let now = Date()
+    for (index, dto) in response.tasks.enumerated() {
+      if dto.deletedAt != nil {
+        applyTombstoneTask(id: dto.id)
+      } else {
+        upsert(dto, syncedAt: now, sortIndex: index)
+      }
+    }
+    for dto in response.projects {
+      if dto.deletedAt != nil {
+        applyTombstoneProject(id: dto.id)
+      } else {
+        upsert(dto, syncedAt: now)
+      }
+    }
+    // Areas use delete-by-omission on the server (wholesale-replace via
+    // PUT, no per-row tombstone), so delta sync can't detect removals.
+    // A removed area would only purge after a full resync (clear the
+    // watermark). Acceptable: areas rarely change and the next cold
+    // launch will trigger a fresh `/changes` with stale-but-non-nil
+    // `since`, missing the deletion. To force reconciliation, clear
+    // `septena.sync.serverTime` in Settings.
+    for dto in response.areas {
+      upsert(dto, syncedAt: now)
     }
   }
 
-  func pullProjects() async {
-    do {
-      let dtos = try await client.projects()
-      let now = Date()
-      for dto in dtos { upsert(dto, syncedAt: now) }
-      try context.delete(model: ProjectEntity.self,
-                         where: #Predicate { $0.lastSyncedAt < now })
-      try context.save()
-    } catch is CancellationError {
-    } catch {
-      SeptenaLog.error("Syncer.pullProjects failed", error)
-    }
+  private func applyTombstoneTask(id: String) {
+    let descriptor = FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { $0.id == id }
+    )
+    guard let entity = try? context.fetch(descriptor).first else { return }
+    // Don't yank a row the outbox is still pushing for — let the drainer
+    // finish (or fail with 404, which it treats as success and drops).
+    if entity.pendingSync { return }
+    context.delete(entity)
+  }
+
+  private func applyTombstoneProject(id: String) {
+    let descriptor = FetchDescriptor<ProjectEntity>(
+      predicate: #Predicate { $0.id == id }
+    )
+    guard let entity = try? context.fetch(descriptor).first else { return }
+    context.delete(entity)
   }
 
   // MARK: Apply (fold an already-fetched response back into the cache)
@@ -496,6 +539,8 @@ final class Syncer {
     entity.project = dto.project
     entity.notes = dto.notes
     entity.recurrence = dto.recurrence
+    entity.updatedAt = dto.updatedAt
+    entity.deletedAt = dto.deletedAt
     entity.lastSyncedAt = syncedAt
     entity.sortIndex = sortIndex
     if existing == nil { context.insert(entity) }
@@ -515,6 +560,8 @@ final class Syncer {
     entity.notes = dto.notes
     entity.context = dto.context
     entity.githubRepo = dto.githubRepo
+    entity.updatedAt = dto.updatedAt
+    entity.deletedAt = dto.deletedAt
     entity.lastSyncedAt = syncedAt
     if existing == nil { context.insert(entity) }
   }
@@ -527,6 +574,7 @@ final class Syncer {
     let entity = existing ?? AreaEntity(id: id, title: dto.title)
     entity.title = dto.title
     entity.context = dto.context
+    entity.updatedAt = dto.updatedAt
     entity.lastSyncedAt = syncedAt
     if existing == nil { context.insert(entity) }
   }
