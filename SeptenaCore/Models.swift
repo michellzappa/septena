@@ -391,6 +391,7 @@ struct ChoreItem: Codable, Identifiable, Hashable {
   var dueDate: String?           // YYYY-MM-DD
   var lastCompleted: String?     // YYYY-MM-DD
   var daysOverdue: Int           // negative = future, 0 = today, positive = late
+  var cadenceDays: Int?          // recurrence in days (from chore definition)
 
   init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -400,6 +401,7 @@ struct ChoreItem: Codable, Identifiable, Hashable {
     dueDate = try c.decodeIfPresent(String.self, forKey: .dueDate)
     lastCompleted = try c.decodeIfPresent(String.self, forKey: .lastCompleted)
     daysOverdue = (try? c.decode(Int.self, forKey: .daysOverdue)) ?? 0
+    cadenceDays = try? c.decodeIfPresent(Int.self, forKey: .cadenceDays)
   }
 
   enum CodingKeys: String, CodingKey {
@@ -407,6 +409,7 @@ struct ChoreItem: Codable, Identifiable, Hashable {
     case dueDate = "due_date"
     case lastCompleted = "last_completed"
     case daysOverdue = "days_overdue"
+    case cadenceDays = "cadence_days"
   }
 }
 
@@ -599,12 +602,13 @@ struct NutritionEntry: Codable, Identifiable, Hashable {
   var fiberG: Double?
   var kcal: Double
   var foods: [String]
+  var ingredients: [String]?
   let file: String
 
   var id: String { file }
 
   enum CodingKeys: String, CodingKey {
-    case date, time, emoji, kcal, foods, file
+    case date, time, emoji, kcal, foods, ingredients, file
     case proteinG = "protein_g"
     case fatG     = "fat_g"
     case carbsG   = "carbs_g"
@@ -618,6 +622,7 @@ struct NutritionDailyPoint: Codable, Hashable {
   let proteinG: Double
   let fatG: Double
   let carbsG: Double
+  var fiberG: Double?
   let kcal: Double
 
   enum CodingKeys: String, CodingKey {
@@ -625,18 +630,41 @@ struct NutritionDailyPoint: Codable, Hashable {
     case proteinG = "protein_g"
     case fatG     = "fat_g"
     case carbsG   = "carbs_g"
+    case fiberG   = "fiber_g"
+  }
+}
+
+/// One day's fasting window — from prior day's last meal to today's first.
+/// `hours` is nil when logs were too sparse to anchor the window honestly.
+struct FastingWindow: Codable, Hashable, Identifiable {
+  let date: String
+  var hours: Double?
+  var lastMeal: String?
+  var firstMeal: String?
+  var note: String?   // "gap" when value suppressed
+  var id: String { date }
+
+  enum CodingKeys: String, CodingKey {
+    case date, hours, note
+    case lastMeal  = "last_meal"
+    case firstMeal = "first_meal"
   }
 }
 
 struct NutritionStatsResponse: Codable {
   let daily: [NutritionDailyPoint]
+  var fasting: [FastingWindow]?
   let todayMealCount: Int?
   let todayLatestMeal: String?
+  var yesterdayLastMeal: String?
+  var avgFastH: Double?
 
   enum CodingKeys: String, CodingKey {
-    case daily
-    case todayMealCount  = "today_meal_count"
-    case todayLatestMeal = "today_latest_meal"
+    case daily, fasting
+    case todayMealCount    = "today_meal_count"
+    case todayLatestMeal   = "today_latest_meal"
+    case yesterdayLastMeal = "yesterday_last_meal"
+    case avgFastH          = "avg_fast_h"
   }
 }
 
@@ -644,7 +672,7 @@ struct NutritionStatsResponse: Codable {
 struct MacroRange: Codable, Hashable {
   let min: Double
   let max: Double
-  let unit: String
+  var unit: String?
 }
 
 struct MacrosConfig: Codable, Hashable {
@@ -652,6 +680,8 @@ struct MacrosConfig: Codable, Hashable {
   let fat: MacroRange
   let carbs: MacroRange
   let kcal: MacroRange
+  var fiber: MacroRange?
+  var fasting: MacroRange?
 }
 
 // MARK: - Air
