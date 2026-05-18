@@ -783,7 +783,7 @@ struct GroceriesResponse: Codable {
 
 /// Default fallback used when the backend response omits `categories` (older
 /// server) or returns an empty list. Matches the server-side defaults.
-public let DEFAULT_GROCERY_CATEGORIES: [GroceryCategory] = [
+let DEFAULT_GROCERY_CATEGORIES: [GroceryCategory] = [
   GroceryCategory(id: "produce",   name: "Produce"),
   GroceryCategory(id: "dairy",     name: "Dairy"),
   GroceryCategory(id: "grains",    name: "Grains"),
