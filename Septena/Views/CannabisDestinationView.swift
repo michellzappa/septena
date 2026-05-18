@@ -1,8 +1,8 @@
 import SwiftUI
 
-// Cannabis mini-app — same shape as Caffeine: today's sessions log +
-// a 7-day history list. Entries note method (vape/edible), strain,
-// optional effect.
+// Cannabis mini-app — today's sessions log. Entries note method
+// (vape/edible), strain, optional effect. Weekly trends will be
+// shown via graphs (not a list) in a later pass.
 
 struct CannabisDestinationView: View {
   @Environment(SeptenaClient.self) private var client
@@ -10,7 +10,6 @@ struct CannabisDestinationView: View {
   @Environment(SectionTheme.self) private var theme
 
   @State private var today: CannabisDayResponse? = nil
-  @State private var history: [CannabisHistoryPoint] = []
   @State private var loading = true
   @State private var editing: CannabisEntry? = nil
 
@@ -34,7 +33,7 @@ struct CannabisDestinationView: View {
             }
             .buttonStyle(.plain)
             .listRowInsets(EdgeInsets())
-            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            .contextMenu {
               Button(role: .destructive) {
                 delete(entry)
               } label: {
@@ -45,21 +44,6 @@ struct CannabisDestinationView: View {
         } else if !loading {
           Text("Nothing logged yet.")
             .foregroundStyle(.secondary)
-        }
-      }
-      if !history.isEmpty {
-        Section("7-day history") {
-          ForEach(Array(history.reversed()), id: \.date) { p in
-            LogRow(
-              title: friendlyDate(p.date),
-              detail: (p.totalG ?? 0) > 0
-                ? String(format: "%.2f g", p.totalG ?? 0)
-                : nil,
-              trailing: "\(p.sessions) session\(p.sessions == 1 ? "" : "s")",
-              accent: accent
-            )
-            .listRowInsets(EdgeInsets())
-          }
         }
       }
     }
@@ -164,39 +148,20 @@ struct CannabisDestinationView: View {
     return parts.isEmpty ? nil : parts.joined(separator: " · ")
   }
 
-  private func friendlyDate(_ iso: String) -> String {
-    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
-    guard let d = fmt.date(from: iso) else { return iso }
-    let cal = Calendar.current
-    if cal.isDateInToday(d)     { return "Today" }
-    if cal.isDateInYesterday(d) { return "Yesterday" }
-    let w = DateFormatter(); w.dateFormat = "EEEE"
-    return w.string(from: d)
-  }
-
   private enum CacheKey {
-    static let today   = "cannabis.today"
-    static let history = "cannabis.history"
+    static let today = "cannabis.today"
   }
 
   private func paintFromCache() {
     if let v = ResponseCache.load(CannabisDayResponse.self, forKey: CacheKey.today) { today = v }
-    if let v = ResponseCache.load([CannabisHistoryPoint].self, forKey: CacheKey.history) { history = v }
     loading = false
   }
 
   private func load() async {
     loading = true
-    async let t = try? await client.cannabisDay(date: SeptenaDate.today)
-    async let h = try? await client.cannabisHistory(days: 7)
-    let (tRes, hRes) = await (t, h)
-    if let tRes {
+    if let tRes = try? await client.cannabisDay(date: SeptenaDate.today) {
       today = tRes
       ResponseCache.save(tRes, forKey: CacheKey.today)
-    }
-    if let daily = hRes?.daily {
-      history = daily
-      ResponseCache.save(daily, forKey: CacheKey.history)
     }
     loading = false
   }

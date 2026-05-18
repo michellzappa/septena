@@ -21,24 +21,18 @@ struct SupplementsDestinationView: View {
       Section {
         ForEach(model.supplements) { supp in
           Button { editing = supp } label: {
-            SupplementRow(supplement: supp, model: model, outbox: outbox, tint: accent)
+            SupplementRow(supplement: supp, model: model, outbox: outbox, tint: accent,
+                          onDelete: { delete(supp) })
           }
           .buttonStyle(.plain)
           .listRowInsets(EdgeInsets())
-          .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button(role: .destructive) {
-              delete(supp)
-            } label: {
-              Label("Delete", systemImage: "trash")
-            }
-          }
         }
       } header: {
         Text("Today")
       }
       if model.hasLoaded && model.supplements.isEmpty {
         ContentUnavailableView("No supplements configured",
-                               systemImage: "pills",
+                               systemImage: theme.icon(for: "supplements"),
                                description: Text("Add some in the webapp's Supplements settings."))
       }
     }

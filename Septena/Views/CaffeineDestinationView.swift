@@ -1,7 +1,8 @@
 import SwiftUI
 
-// Caffeine mini-app — today's sessions log + weekly grams histogram in
-// the summary. Each entry is a LogRow (method · beans · grams + time).
+// Caffeine mini-app — today's sessions log. Each entry is a LogRow
+// (method · beans · grams + time). Weekly trends will be shown via
+// graphs (not a list) in a later pass.
 
 struct CaffeineDestinationView: View {
   @Environment(SeptenaClient.self) private var client
@@ -9,7 +10,6 @@ struct CaffeineDestinationView: View {
   @Environment(SectionTheme.self) private var theme
 
   @State private var today: CaffeineDayResponse? = nil
-  @State private var history: [CaffeineHistoryPoint] = []
   @State private var loading = true
   @State private var editing: CaffeineEntry? = nil
 
@@ -22,9 +22,9 @@ struct CaffeineDestinationView: View {
         if let today, !today.entries.isEmpty {
           ForEach(Array(today.entries.reversed())) { entry in
             // Standard List "tap row → edit" pattern: Button with
-            // `.plain` style preserves the row chrome, swipe action
-            // provides destructive delete. Apple uses this exact shape
-            // in Reminders / Notes for editable list entries.
+            // `.plain` style preserves the row chrome; destructive
+            // delete lives in the long-press context menu, matching the
+            // rest of the app.
             Button {
               editing = entry
             } label: {
@@ -37,7 +37,7 @@ struct CaffeineDestinationView: View {
             }
             .buttonStyle(.plain)
             .listRowInsets(EdgeInsets())
-            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            .contextMenu {
               Button(role: .destructive) {
                 delete(entry)
               } label: {
@@ -48,19 +48,6 @@ struct CaffeineDestinationView: View {
         } else if !loading {
           Text("Nothing logged yet.")
             .foregroundStyle(.secondary)
-        }
-      }
-      if !history.isEmpty {
-        Section("7-day history") {
-          ForEach(Array(history.reversed()), id: \.date) { p in
-            LogRow(
-              title: friendlyDate(p.date),
-              detail: p.totalG.map { String(format: "%.1f g", $0) },
-              trailing: "\(p.sessions) session\(p.sessions == 1 ? "" : "s")",
-              accent: accent
-            )
-            .listRowInsets(EdgeInsets())
-          }
         }
       }
     }
@@ -129,13 +116,11 @@ struct CaffeineDestinationView: View {
   }
 
   private enum CacheKey {
-    static let today   = "caffeine.today"
-    static let history = "caffeine.history"
+    static let today = "caffeine.today"
   }
 
   private func paintFromCache() {
     if let v = ResponseCache.load(CaffeineDayResponse.self, forKey: CacheKey.today) { today = v }
-    if let v = ResponseCache.load([CaffeineHistoryPoint].self, forKey: CacheKey.history) { history = v }
     loading = false
   }
 
@@ -183,28 +168,11 @@ struct CaffeineDestinationView: View {
     return parts.isEmpty ? nil : parts.joined(separator: " · ")
   }
 
-  private func friendlyDate(_ iso: String) -> String {
-    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
-    guard let d = fmt.date(from: iso) else { return iso }
-    let cal = Calendar.current
-    if cal.isDateInToday(d)     { return "Today" }
-    if cal.isDateInYesterday(d) { return "Yesterday" }
-    let w = DateFormatter(); w.dateFormat = "EEEE"
-    return w.string(from: d)
-  }
-
   private func load() async {
     loading = true
-    async let t = try? await client.caffeineDay(date: SeptenaDate.today)
-    async let h = try? await client.caffeineHistory(days: 7)
-    let (tRes, hRes) = await (t, h)
-    if let tRes {
+    if let tRes = try? await client.caffeineDay(date: SeptenaDate.today) {
       today = tRes
       ResponseCache.save(tRes, forKey: CacheKey.today)
-    }
-    if let daily = hRes?.daily {
-      history = daily
-      ResponseCache.save(daily, forKey: CacheKey.history)
     }
     loading = false
   }

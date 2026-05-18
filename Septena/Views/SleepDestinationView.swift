@@ -46,7 +46,7 @@ struct SleepDestinationView: View {
       }
       if !loading && nights.isEmpty {
         ContentUnavailableView("No Oura data",
-                               systemImage: "moon.zzz",
+                               systemImage: theme.icon(for: "sleep"),
                                description: Text("Check your Oura sync in the webapp."))
       }
     }

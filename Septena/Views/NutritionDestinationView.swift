@@ -17,42 +17,60 @@ import Charts
 //      the per-macro counts. Fasting gap row sits between days; a live
 //      "currently fasting" row sits at the top of today when applicable.
 //
-// All colors come from the same palette the webapp uses (lib/palette.ts)
-// so the two clients read as the same product.
+// Macro colors come from `settings.nutrition.macro_colors` (same source
+// as the webapp's `useMacroColors`), with per-key fallbacks matching
+// lib/macro-targets.ts:FALLBACK_MACRO_COLORS so the two clients read as
+// the same product.
 
 struct NutritionDestinationView: View {
   @Environment(SeptenaClient.self) private var client
   @Environment(HTTPOutbox.self) private var outbox
-  @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var clock
 
   @State private var entries: [NutritionEntry] = []
   @State private var stats: NutritionStatsResponse? = nil
   @State private var macros: MacrosConfig? = nil
+  @State private var macroColors: MacroColors? = nil
   @State private var loading = true
-  @State private var now = Date()
   @State private var editing: NutritionEntry? = nil
 
-  /// Drives the live fasting timer at the top of the entry list.
-  private let liveTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
+  /// Live "now" for the fasting row + relative time labels. Sourced from
+  /// the shared DayClock (single 60s tick app-wide) instead of a per-view
+  /// Timer.publish — same value the DayTimeline cursor reads.
+  private var now: Date { clock.now }
 
   // MARK: - Colors
   //
-  // Hard-coded to match `lib/palette.ts` in the webapp. Keeping them
-  // local — the iOS settings endpoint doesn't ship macro colors today.
+  // Resolved from `settings.nutrition.macro_colors` (mirrors the webapp's
+  // `useMacroColors`). Per-key fallbacks match the webapp defaults in
+  // `lib/macro-targets.ts:FALLBACK_MACRO_COLORS` so partial server patches
+  // never leave a macro uncolored, and first paint isn't monochrome while
+  // settings are loading.
 
-  private static let proteinColor = Color(hex: 0xef4444)
-  private static let fatColor     = Color(hex: 0xf59e0b)
-  private static let carbsColor   = Color(hex: 0x3b82f6)
-  private static let fiberColor   = Color(hex: 0x10b981)
-  private static let fastingColor = Color(hex: 0x8b5cf6)
-  private var kcalColor: Color    { theme.color(for: "nutrition") }
+  private static let proteinFallback = Color(hex: 0xef4444)
+  private static let fatFallback     = Color(hex: 0xf59e0b)
+  private static let carbsFallback   = Color(hex: 0x3b82f6)
+  private static let fiberFallback   = Color(hex: 0x10b981)
+  private static let kcalFallback    = Color(hex: 0xeab308)
+  private static let fastingFallback = Color(hex: 0x8b5cf6)
+
+  private var proteinColor: Color { resolve(macroColors?.protein, fallback: Self.proteinFallback) }
+  private var fatColor: Color     { resolve(macroColors?.fat,     fallback: Self.fatFallback) }
+  private var carbsColor: Color   { resolve(macroColors?.carbs,   fallback: Self.carbsFallback) }
+  private var fiberColor: Color   { resolve(macroColors?.fiber,   fallback: Self.fiberFallback) }
+  private var kcalColor: Color    { resolve(macroColors?.kcal,    fallback: Self.kcalFallback) }
+  private var fastingColor: Color { resolve(macroColors?.fasting, fallback: Self.fastingFallback) }
+
+  private func resolve(_ hex: String?, fallback: Color) -> Color {
+    Color(hexString: hex) ?? fallback
+  }
 
   private var today: String { SeptenaDate.today }
 
   // MARK: - Derived
 
   private var todayEntries: [NutritionEntry] {
-    entries.filter { $0.date == today }.sorted { $0.time < $1.time }
+    entries.filter { $0.date == today }.sorted { $0.time > $1.time }
   }
 
   private struct DayTotals { var protein = 0.0; var fat = 0.0; var carbs = 0.0; var fiber = 0.0; var kcal = 0.0 }
@@ -109,10 +127,14 @@ struct NutritionDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(kcalColor)
-    .onReceive(liveTimer) { now = $0 }
     .task {
       paintFromCache()
       await load()
+    }
+    // Day rollover: reload so the fasting row, today's totals, and the
+    // "earlier days" grouping all reflect the new day's data.
+    .onChange(of: clock.today) { _, _ in
+      Task { await load() }
     }
     .sheet(item: $editing) { entry in
       EditNutritionEntrySheet(
@@ -179,14 +201,14 @@ struct NutritionDestinationView: View {
     let m = macros
     return LazyVGrid(columns: tileColumns, spacing: 8) {
       statTile(label: "Protein", value: t.protein, unit: "g",
-               target: m?.protein, color: Self.proteinColor)
+               target: m?.protein, color: proteinColor)
       statTile(label: "Fat", value: t.fat, unit: "g",
-               target: m?.fat, color: Self.fatColor)
+               target: m?.fat, color: fatColor)
       statTile(label: "Carbs", value: t.carbs, unit: "g",
-               target: m?.carbs, color: Self.carbsColor)
+               target: m?.carbs, color: carbsColor)
       statTile(label: "Fiber", value: t.fiber, unit: "g",
                target: m?.fiber ?? MacroRange(min: 25, max: 35, unit: "g"),
-               color: Self.fiberColor)
+               color: fiberColor)
       statTile(label: "Kcal", value: t.kcal, unit: "",
                target: m?.kcal, color: kcalColor)
       fastingTile
@@ -234,13 +256,13 @@ struct NutritionDestinationView: View {
       HStack(alignment: .firstTextBaseline, spacing: 2) {
         Text(displayHours.map { String(format: "%.1f", $0) } ?? "—")
           .font(.system(.title2, design: .rounded).weight(.semibold).monospacedDigit())
-          .foregroundStyle(displayHours != nil ? Self.fastingColor : Color.secondary)
+          .foregroundStyle(displayHours != nil ? fastingColor : Color.secondary)
         Text("h").font(.caption2).foregroundStyle(.secondary)
       }
       Text("FASTING")
         .font(.caption2.weight(.semibold))
         .foregroundStyle(.secondary)
-      progressBar(value: progress, color: Self.fastingColor)
+      progressBar(value: progress, color: fastingColor)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.horizontal, 10)
@@ -263,19 +285,19 @@ struct NutritionDestinationView: View {
   private var chartsGrid: some View {
     LazyVGrid(columns: tileColumns, spacing: 8) {
       if let m = macros {
-        macroChart(label: "Protein", unit: "g", color: Self.proteinColor,
+        macroChart(label: "Protein", unit: "g", color: proteinColor,
                    target: m.protein,
                    series: dailySeries { $0.proteinG },
                    todayValue: todayTotals.protein)
-        macroChart(label: "Fat", unit: "g", color: Self.fatColor,
+        macroChart(label: "Fat", unit: "g", color: fatColor,
                    target: m.fat,
                    series: dailySeries { $0.fatG },
                    todayValue: todayTotals.fat)
-        macroChart(label: "Carbs", unit: "g", color: Self.carbsColor,
+        macroChart(label: "Carbs", unit: "g", color: carbsColor,
                    target: m.carbs,
                    series: dailySeries { $0.carbsG },
                    todayValue: todayTotals.carbs)
-        macroChart(label: "Fiber", unit: "g", color: Self.fiberColor,
+        macroChart(label: "Fiber", unit: "g", color: fiberColor,
                    target: m.fiber ?? MacroRange(min: 25, max: 35, unit: "g"),
                    series: dailySeries { $0.fiberG ?? 0 },
                    todayValue: todayTotals.fiber)
@@ -398,21 +420,21 @@ struct NutritionDestinationView: View {
       Text("Fasting").font(.subheadline.weight(.semibold))
       Text(deltaCaption ?? " ")
         .font(.caption.monospacedDigit())
-        .foregroundStyle(Self.fastingColor)
+        .foregroundStyle(fastingColor)
       Chart {
         RectangleMark(xStart: nil, xEnd: nil,
                       yStart: .value("Min", target.min),
                       yEnd: .value("Max", target.max))
-          .foregroundStyle(Self.fastingColor.opacity(0.12))
+          .foregroundStyle(fastingColor.opacity(0.12))
         RuleMark(y: .value("Min", target.min))
-          .foregroundStyle(Self.fastingColor.opacity(0.6))
+          .foregroundStyle(fastingColor.opacity(0.6))
           .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
         RuleMark(y: .value("Max", target.max))
-          .foregroundStyle(Self.fastingColor.opacity(0.6))
+          .foregroundStyle(fastingColor.opacity(0.6))
           .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
         if avg > 0 {
           RuleMark(y: .value("Avg", avg))
-            .foregroundStyle(Self.fastingColor.opacity(0.85))
+            .foregroundStyle(fastingColor.opacity(0.85))
             .lineStyle(StrokeStyle(lineWidth: 2))
         }
         ForEach(data, id: \.date) { p in
@@ -423,7 +445,7 @@ struct NutritionDestinationView: View {
           )
           .foregroundStyle(p.value <= 0
                            ? Color.secondary.opacity(0.2)
-                           : Self.fastingColor.opacity(p.value >= target.min ? 1 : 0.55))
+                           : fastingColor.opacity(p.value >= target.min ? 1 : 0.55))
           .cornerRadius(2)
         }
       }
@@ -529,16 +551,16 @@ struct NutritionDestinationView: View {
           MiniMacroBar(
             protein: e.proteinG, fat: e.fatG, carbs: e.carbsG,
             fiber: e.fiberG ?? 0, kcal: e.kcal, maxKcal: maxMealKcal,
-            colors: (Self.proteinColor, Self.fatColor, Self.carbsColor, Self.fiberColor)
+            colors: (proteinColor, fatColor, carbsColor, fiberColor)
           )
           Group {
-            Text("\(Int(e.proteinG.rounded()))P").foregroundStyle(Self.proteinColor)
+            Text("\(Int(e.proteinG.rounded()))P").foregroundStyle(proteinColor)
             Text("·").foregroundStyle(.secondary.opacity(0.5))
-            Text("\(Int(e.fatG.rounded()))F").foregroundStyle(Self.fatColor)
+            Text("\(Int(e.fatG.rounded()))F").foregroundStyle(fatColor)
             Text("·").foregroundStyle(.secondary.opacity(0.5))
-            Text("\(Int(e.carbsG.rounded()))C").foregroundStyle(Self.carbsColor)
+            Text("\(Int(e.carbsG.rounded()))C").foregroundStyle(carbsColor)
             Text("·").foregroundStyle(.secondary.opacity(0.5))
-            Text("\(Int((e.fiberG ?? 0).rounded()))Fb").foregroundStyle(Self.fiberColor)
+            Text("\(Int((e.fiberG ?? 0).rounded()))Fb").foregroundStyle(fiberColor)
             Text("·").foregroundStyle(.secondary.opacity(0.5))
             Text("\(Int(e.kcal.rounded()))kcal").foregroundStyle(kcalColor)
           }
@@ -574,12 +596,12 @@ struct NutritionDestinationView: View {
       let mins = Int((live - Double(hours)) * 60)
       let label = mins == 0 ? "\(hours)h fasting" : "\(hours)h \(mins)m fasting"
       HStack(alignment: .top, spacing: 10) {
-        Circle().fill(Self.fastingColor).frame(width: 6, height: 6).padding(.top, 7)
+        Circle().fill(fastingColor).frame(width: 6, height: 6).padding(.top, 7)
         VStack(alignment: .leading, spacing: 2) {
           HStack {
             Text("⏳ \(label)")
               .font(.subheadline.weight(.semibold).monospacedDigit())
-              .foregroundStyle(Self.fastingColor)
+              .foregroundStyle(fastingColor)
             Spacer()
           }
           Text("Since \(since) · target \(Int(target.min))–\(Int(target.max))h")
@@ -599,16 +621,16 @@ struct NutritionDestinationView: View {
         let mm = totalMin % 60
         let label = mm == 0 ? "\(hh)h fasted" : "\(hh)h \(mm)m fasted"
         HStack(spacing: 10) {
-          Circle().fill(Self.fastingColor).frame(width: 6, height: 6)
+          Circle().fill(fastingColor).frame(width: 6, height: 6)
           Text(label)
             .font(.caption.monospacedDigit().weight(.semibold))
-            .foregroundStyle(Self.fastingColor)
+            .foregroundStyle(fastingColor)
           Spacer()
         }
         .padding(.horizontal, 10).padding(.vertical, 6)
       } else if f.note == "gap" {
         HStack(spacing: 10) {
-          Circle().fill(Self.fastingColor.opacity(0.4)).frame(width: 6, height: 6)
+          Circle().fill(fastingColor.opacity(0.4)).frame(width: 6, height: 6)
           Text("Incomplete logs")
             .font(.caption).foregroundStyle(.secondary)
           Spacer()
@@ -691,12 +713,14 @@ struct NutritionDestinationView: View {
     static let entries = "nutrition.entries14"
     static let stats   = "nutrition.stats"
     static let macros  = "nutrition.macros"
+    static let colors  = "nutrition.macroColors"
   }
 
   private func paintFromCache() {
     if let v = ResponseCache.load([NutritionEntry].self, forKey: CacheKey.entries) { entries = v }
     if let v = ResponseCache.load(NutritionStatsResponse.self, forKey: CacheKey.stats) { stats = v }
     if let v = ResponseCache.load(MacrosConfig.self, forKey: CacheKey.macros) { macros = v }
+    if let v = ResponseCache.load(MacroColors.self, forKey: CacheKey.colors) { macroColors = v }
     loading = false
   }
 
@@ -706,7 +730,8 @@ struct NutritionDestinationView: View {
     async let e: [NutritionEntry]? = try? await client.nutritionEntries(since: since)
     async let s: NutritionStatsResponse? = try? await client.nutritionStats(days: 30)
     async let m: MacrosConfig? = try? await client.nutritionMacrosConfig()
-    let (entriesRes, statsRes, macrosRes) = await (e, s, m)
+    async let settings: AppSettings? = try? await client.settings()
+    let (entriesRes, statsRes, macrosRes, settingsRes) = await (e, s, m, settings)
     if let entriesRes {
       entries = entriesRes
       ResponseCache.save(entriesRes, forKey: CacheKey.entries)
@@ -718,6 +743,10 @@ struct NutritionDestinationView: View {
     if let macrosRes {
       macros = macrosRes
       ResponseCache.save(macrosRes, forKey: CacheKey.macros)
+    }
+    if let colors = settingsRes?.nutrition?.macroColors {
+      macroColors = colors
+      ResponseCache.save(colors, forKey: CacheKey.colors)
     }
     loading = false
   }
@@ -779,12 +808,21 @@ private struct MiniMacroBar: View {
 
 // MARK: - Color hex helper
 
-private extension Color {
+extension Color {
   init(hex: UInt32) {
     self.init(
       red:   Double((hex >> 16) & 0xff) / 255,
       green: Double((hex >> 8)  & 0xff) / 255,
       blue:  Double( hex        & 0xff) / 255
     )
+  }
+
+  /// Parses "#rrggbb" or "rrggbb". Returns nil on bad input so callers can
+  /// fall through to a typed default rather than silently rendering black.
+  init?(hexString: String?) {
+    guard let s = hexString else { return nil }
+    let trimmed = s.hasPrefix("#") ? String(s.dropFirst()) : s
+    guard trimmed.count == 6, let v = UInt32(trimmed, radix: 16) else { return nil }
+    self.init(hex: v)
   }
 }

@@ -390,6 +390,10 @@ struct ChoreItem: Codable, Identifiable, Hashable {
   var emoji: String?
   var dueDate: String?           // YYYY-MM-DD
   var lastCompleted: String?     // YYYY-MM-DD
+  var lastCompletedTime: String? // HH:MM — time-of-day, when the
+                                 // server logged a per-event timestamp.
+                                 // Used by DayTimelineView to place a dot
+                                 // at the moment the chore was checked off.
   var daysOverdue: Int           // negative = future, 0 = today, positive = late
   var cadenceDays: Int?          // recurrence in days (from chore definition)
 
@@ -400,6 +404,7 @@ struct ChoreItem: Codable, Identifiable, Hashable {
     emoji = try c.decodeIfPresent(String.self, forKey: .emoji)
     dueDate = try c.decodeIfPresent(String.self, forKey: .dueDate)
     lastCompleted = try c.decodeIfPresent(String.self, forKey: .lastCompleted)
+    lastCompletedTime = try c.decodeIfPresent(String.self, forKey: .lastCompletedTime)
     daysOverdue = (try? c.decode(Int.self, forKey: .daysOverdue)) ?? 0
     cadenceDays = try? c.decodeIfPresent(Int.self, forKey: .cadenceDays)
   }
@@ -408,6 +413,7 @@ struct ChoreItem: Codable, Identifiable, Hashable {
     case id, name, emoji
     case dueDate = "due_date"
     case lastCompleted = "last_completed"
+    case lastCompletedTime = "last_completed_time"
     case daysOverdue = "days_overdue"
     case cadenceDays = "cadence_days"
   }
@@ -520,6 +526,59 @@ struct CardioHistoryResponse: Codable {
   enum CodingKeys: String, CodingKey {
     case daily
     case targetWeeklyMin = "target_weekly_min"
+  }
+}
+
+/// One point on the per-exercise progression series. Numeric fields may be
+/// absent depending on the exercise type (strength vs cardio vs mobility).
+struct ProgressionPoint: Codable, Hashable {
+  let date: String
+  var weight: Double?
+  var sets: String?
+  var reps: String?
+  var durationMin: Double?
+  var distanceM: Double?
+  var level: Double?
+  var difficulty: String?
+
+  init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    date = try c.decode(String.self, forKey: .date)
+    weight = try c.decodeIfPresent(Double.self, forKey: .weight)
+    if let i = try? c.decodeIfPresent(Int.self, forKey: .sets) { sets = String(i) }
+    else { sets = try c.decodeIfPresent(String.self, forKey: .sets) }
+    if let i = try? c.decodeIfPresent(Int.self, forKey: .reps) { reps = String(i) }
+    else { reps = try c.decodeIfPresent(String.self, forKey: .reps) }
+    durationMin = try c.decodeIfPresent(Double.self, forKey: .durationMin)
+    distanceM = try c.decodeIfPresent(Double.self, forKey: .distanceM)
+    level = try c.decodeIfPresent(Double.self, forKey: .level)
+    difficulty = try c.decodeIfPresent(String.self, forKey: .difficulty)
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case date, weight, sets, reps, level, difficulty
+    case durationMin = "duration_min"
+    case distanceM = "distance_m"
+  }
+}
+
+struct ProgressionResponse: Codable {
+  let exercise: String
+  let data: [ProgressionPoint]
+}
+
+/// One row from `/api/training/summary` — per-exercise rollup.
+struct ExerciseSummary: Codable, Hashable {
+  let name: String
+  let count: Int
+  let latestWeight: Double?
+  let latestDate: String?
+  let trend: String?
+
+  enum CodingKeys: String, CodingKey {
+    case name, count, trend
+    case latestWeight = "latest_weight"
+    case latestDate = "latest_date"
   }
 }
 
@@ -771,9 +830,41 @@ struct GroceryItem: Codable, Identifiable, Hashable {
   }
 }
 
+struct GroceryCategory: Codable, Identifiable, Hashable {
+  let id: String
+  var name: String
+  var emoji: String
+
+  init(id: String, name: String, emoji: String = "") {
+    self.id = id
+    self.name = name
+    self.emoji = emoji
+  }
+
+  init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    self.id = try c.decode(String.self, forKey: .id)
+    self.name = try c.decode(String.self, forKey: .name)
+    self.emoji = (try? c.decode(String.self, forKey: .emoji)) ?? ""
+  }
+}
+
 struct GroceriesResponse: Codable {
   let items: [GroceryItem]
+  let categories: [GroceryCategory]?
 }
+
+/// Default fallback used when the backend response omits `categories` (older
+/// server) or returns an empty list. Matches the server-side defaults.
+let DEFAULT_GROCERY_CATEGORIES: [GroceryCategory] = [
+  GroceryCategory(id: "produce",   name: "Produce",   emoji: "🥬"),
+  GroceryCategory(id: "dairy",     name: "Dairy",     emoji: "🥛"),
+  GroceryCategory(id: "grains",    name: "Grains",    emoji: "🍞"),
+  GroceryCategory(id: "meat",      name: "Meat",      emoji: "🍗"),
+  GroceryCategory(id: "frozen",    name: "Frozen",    emoji: "🧊"),
+  GroceryCategory(id: "household", name: "Household", emoji: "🧼"),
+  GroceryCategory(id: "other",     name: "Other",     emoji: "🗂️"),
+]
 
 // MARK: - Caffeine
 
@@ -1002,6 +1093,23 @@ struct AppTimeSettings: Codable, Hashable {
   }
 }
 
+struct MacroColors: Codable, Hashable {
+  let protein: String?
+  let fat: String?
+  let carbs: String?
+  let fiber: String?
+  let kcal: String?
+  let fasting: String?
+}
+
+struct NutritionSettings: Codable, Hashable {
+  let macroColors: MacroColors?
+
+  enum CodingKeys: String, CodingKey {
+    case macroColors = "macro_colors"
+  }
+}
+
 struct AppSettings: Codable {
   let sectionOrder: [String]?
   let targets: AppTargets?
@@ -1009,10 +1117,11 @@ struct AppSettings: Codable {
   let time: AppTimeSettings?
   let theme: String?        // "system" | "light" | "dark"
   let eink: Bool?
+  let nutrition: NutritionSettings?
 
   enum CodingKeys: String, CodingKey {
     case sectionOrder = "section_order"
-    case targets, units, time, theme, eink
+    case targets, units, time, theme, eink, nutrition
   }
 }
 

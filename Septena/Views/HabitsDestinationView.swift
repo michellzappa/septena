@@ -13,6 +13,7 @@ struct HabitsDestinationView: View {
 
   @State private var model = NextItemsModel()
   @State private var editing: HabitDayItem? = nil
+  @State private var history: [HabitHistoryPoint] = []
 
   /// Server section key; accent comes from the user's Septena config so the
   /// hue matches the webapp / sidebar / Next tab without hard-coding.
@@ -23,6 +24,17 @@ struct HabitsDestinationView: View {
       summary
       ForEach(model.habitBuckets, id: \.self) { bucket in
         bucketSection(bucket)
+      }
+      if !history.isEmpty {
+        ChecklistHeatmapSection(
+          title: "Habit consistency",
+          noun: "habit",
+          accent: accent,
+          daily: history,
+          date: { $0.date },
+          done: { $0.done },
+          total: { $0.total }
+        )
       }
     }
     #if os(macOS)
@@ -39,6 +51,9 @@ struct HabitsDestinationView: View {
     .task {
       model.paintFromCache()
       await model.load(client: client)
+      if let resp = try? await client.habitsHistory(days: 112) {
+        history = resp.daily
+      }
     }
     .sheet(item: $editing) { habit in
       EditHabitSheet(
@@ -103,24 +118,11 @@ struct HabitsDestinationView: View {
       Section {
         ForEach(items) { habit in
           Button { editing = habit } label: {
-            HabitRow(habit: habit, model: model, outbox: outbox, tint: accent)
+            HabitRow(habit: habit, model: model, outbox: outbox, tint: accent,
+                     onDelete: { delete(habit) })
           }
           .buttonStyle(.plain)
           .listRowInsets(EdgeInsets())
-          .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            Button(role: .destructive) {
-              delete(habit)
-            } label: {
-              Label("Delete", systemImage: "trash")
-            }
-            Button {
-              model.skipHabit(habit, skipped: !habit.skipped, outbox: outbox)
-            } label: {
-              Label(habit.skipped ? "Unskip" : "Skip",
-                    systemImage: habit.skipped ? "arrow.uturn.left" : "forward.end")
-            }
-            .tint(Theme.inkSecondary)
-          }
         }
       } header: {
         HStack {

@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 
 // Training mini-app — historical log of exercise entries grouped by
 // session (date + session-type pair). Uses the new LogRow since entries
@@ -16,6 +17,14 @@ struct TrainingDestinationView: View {
   @State private var cardio: CardioHistoryResponse? = nil
   @State private var loading = true
   @State private var editing: ExerciseEntry? = nil
+
+  // Chart state — mirrors the webapp's training dashboard. `selectedExercise`
+  // is either a real exercise name or one of the two meta tokens below;
+  // `progression` is the per-exercise series fetched on demand.
+  @State private var selectedExercise: String = MetaExercise.strength
+  @State private var progression: [ProgressionPoint] = []
+  @State private var progressionLoading = false
+  @State private var windowDays: Int = 30
 
   private var accent: Color { theme.color(for: "training") }
 
@@ -43,6 +52,9 @@ struct TrainingDestinationView: View {
         activeSessionSection(d)
       }
       summary
+      z2CardioSection
+      consistencySection
+      progressionSection
       ForEach(sessions, id: \.key) { block in
         Section {
           ForEach(block.entries) { entry in
@@ -59,7 +71,7 @@ struct TrainingDestinationView: View {
             }
             .buttonStyle(.plain)
             .listRowInsets(EdgeInsets())
-            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            .contextMenu {
               if entry.file != nil {
                 Button(role: .destructive) {
                   delete(entry)
@@ -80,7 +92,7 @@ struct TrainingDestinationView: View {
       }
       if !loading && entries.isEmpty {
         ContentUnavailableView("No entries yet",
-                               systemImage: "figure.strengthtraining.traditional",
+                               systemImage: theme.icon(for: "training"),
                                description: Text("Log a session in the webapp to see it here."))
       }
     }
@@ -210,8 +222,11 @@ struct TrainingDestinationView: View {
   // MARK: - Loading
 
   private enum CacheKey {
-    static let entries = "training.entries14"
-    static let cardio  = "training.cardio7"
+    // Bumped to 90d so the progression chart's widest window (90 days) is
+    // always populated from cache. Old "training.entries14" cache lingers
+    // harmlessly until the user opens the screen and we overwrite it.
+    static let entries = "training.entries90"
+    static let cardio  = "training.cardio30"
   }
 
   private func paintFromCache() {
@@ -222,9 +237,9 @@ struct TrainingDestinationView: View {
 
   private func load() async {
     loading = true
-    let since = sinceDate(daysBack: 14)
+    let since = sinceDate(daysBack: 90)
     async let e: [ExerciseEntry]? = try? await client.trainingEntries(since: since)
-    async let c: CardioHistoryResponse? = try? await client.trainingCardioHistory(days: 7)
+    async let c: CardioHistoryResponse? = try? await client.trainingCardioHistory(days: 30)
     let (entriesRes, cardioRes) = await (e, c)
     if let entriesRes {
       entries = entriesRes
@@ -235,6 +250,416 @@ struct TrainingDestinationView: View {
       ResponseCache.save(cardioRes, forKey: CacheKey.cardio)
     }
     loading = false
+  }
+
+  // MARK: - Charts
+
+  /// Last 7 days of Z2 cardio minutes as a bar chart with a per-day fair
+  /// share of the weekly target drawn as a dashed rule. Mirrors the
+  /// webapp's Zone 2 card.
+  @ViewBuilder
+  private var z2CardioSection: some View {
+    if let c = cardio, !c.daily.isEmpty {
+      let series = Array(c.daily.suffix(7))
+      let target = c.targetWeeklyMin
+      let perDay = Double(target) / 7.0
+      let weekly = series.reduce(0) { $0 + $1.minutes }
+      let maxBar = series.map { Double($0.minutes) }.max() ?? 0
+      let yMax = max(perDay, maxBar) * 1.2
+      Section {
+        VStack(alignment: .leading, spacing: 6) {
+          HStack {
+            Text("Zone 2 cardio").font(.subheadline.weight(.semibold))
+            Spacer()
+            Text("\(weekly)/\(target)m")
+              .font(.caption.monospacedDigit())
+              .foregroundStyle(.secondary)
+          }
+          Chart {
+            ForEach(series, id: \.date) { d in
+              BarMark(
+                x: .value("Day", weekdayInitial(d.date)),
+                y: .value("Min", d.minutes),
+                width: .ratio(0.6)
+              )
+              .foregroundStyle(d.minutes == 0
+                               ? Color.secondary.opacity(0.2)
+                               : accent.opacity(0.9))
+              .cornerRadius(2)
+            }
+            RuleMark(y: .value("Target", perDay))
+              .foregroundStyle(accent.opacity(0.7))
+              .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+              .annotation(position: .top, alignment: .trailing) {
+                Text("\(Int(perDay))m/day").font(.caption2).foregroundStyle(.secondary)
+              }
+          }
+          .chartYScale(domain: 0...yMax)
+          .chartYAxis {
+            AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { v in
+              AxisValueLabel { if let d = v.as(Double.self) { Text("\(Int(d))m").font(.caption2) } }
+              AxisGridLine().foregroundStyle(Color.secondary.opacity(0.1))
+            }
+          }
+          .chartXAxis {
+            AxisMarks(values: .automatic) { _ in AxisValueLabel().font(.caption2) }
+          }
+          .frame(height: 140)
+        }
+      } header: {
+        Text("Cardio")
+      }
+    }
+  }
+
+  /// 6-week (42-day) consistency grid — one square per day, filled when at
+  /// least one entry exists for that date. Today gets a stroke ring.
+  private var consistencySection: some View {
+    let days = consistencyDays
+    let counts = Set(entries.map(\.date))
+    let active = days.filter { counts.contains($0) }.count
+    return Section {
+      VStack(alignment: .leading, spacing: 8) {
+        HStack {
+          Text("Consistency").font(.subheadline.weight(.semibold))
+          Spacer()
+          Text("\(active)/\(days.count) days")
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(.secondary)
+        }
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7),
+                  spacing: 4) {
+          ForEach(days, id: \.self) { iso in
+            let isActive = counts.contains(iso)
+            let isToday = iso == today
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+              .fill(isActive
+                    ? accent.opacity(isToday ? 1.0 : 0.85)
+                    : Color.secondary.opacity(0.12))
+              .frame(height: 18)
+              .overlay(
+                isToday
+                ? RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .stroke(accent, lineWidth: 1.5)
+                : nil
+              )
+          }
+        }
+      }
+    } header: {
+      Text("Last 6 weeks")
+    }
+  }
+
+  /// Per-exercise progression line chart. Pills above the chart switch
+  /// the selected exercise (or one of the two meta aggregates).
+  private var progressionSection: some View {
+    let pills = pillOptions
+    let line = lineData
+    let yMax: Double = {
+      let vals = line.compactMap(\.value)
+      guard let m = vals.max(), m > 0 else { return 1 }
+      return m * 1.15
+    }()
+
+    return Section {
+      VStack(alignment: .leading, spacing: 10) {
+        HStack {
+          Text(MetaExercise.label(for: selectedExercise))
+            .font(.subheadline.weight(.semibold))
+            .lineLimit(1)
+          Spacer()
+          Picker("Window", selection: $windowDays) {
+            Text("30d").tag(30)
+            Text("60d").tag(60)
+            Text("90d").tag(90)
+          }
+          .pickerStyle(.segmented)
+          .frame(width: 170)
+        }
+        Text(chartSubtitle)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+
+        if line.isEmpty || line.allSatisfy({ $0.value == nil }) {
+          Text(progressionLoading ? "Loading…" : "No data for this exercise yet.")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, minHeight: 160)
+        } else {
+          Chart {
+            ForEach(line) { p in
+              if let v = p.value {
+                LineMark(
+                  x: .value("Date", p.day),
+                  y: .value("Metric", v)
+                )
+                .interpolationMethod(.linear)
+                .foregroundStyle(accent)
+                PointMark(
+                  x: .value("Date", p.day),
+                  y: .value("Metric", v)
+                )
+                .symbolSize(28)
+                .foregroundStyle(accent)
+              }
+            }
+          }
+          .chartYScale(domain: 0...yMax)
+          .chartYAxis {
+            AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { v in
+              AxisValueLabel {
+                if let d = v.as(Double.self) { Text(yLabel(d)).font(.caption2) }
+              }
+              AxisGridLine().foregroundStyle(Color.secondary.opacity(0.1))
+            }
+          }
+          .chartXAxis {
+            AxisMarks(values: .automatic(desiredCount: 5)) { value in
+              if let d = value.as(Date.self) {
+                AxisValueLabel { Text(shortMonthDay(d)).font(.caption2) }
+              }
+              AxisGridLine().foregroundStyle(Color.secondary.opacity(0.08))
+            }
+          }
+          .frame(height: 180)
+        }
+
+        VStack(alignment: .leading, spacing: 6) {
+          if !pills.strength.isEmpty {
+            pillRow(title: "Strength", items: pills.strength)
+          }
+          if !pills.cardio.isEmpty {
+            pillRow(title: "Cardio & mobility", items: pills.cardio)
+          }
+        }
+      }
+    } header: {
+      Text("Progression")
+    }
+    .onChange(of: selectedExercise, initial: false) { _, _ in
+      Task { await loadProgression() }
+    }
+  }
+
+  private func pillRow(title: String, items: [PillItem]) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Text(title.uppercased())
+        .font(.caption2.weight(.semibold))
+        .foregroundStyle(.secondary)
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 6) {
+          ForEach(items) { item in
+            let isSelected = item.name == selectedExercise
+            Button {
+              selectedExercise = item.name
+            } label: {
+              HStack(spacing: 4) {
+                Text(item.label).font(.caption.weight(.medium))
+                Text("\(item.count)")
+                  .font(.caption2.monospacedDigit())
+                  .foregroundStyle(isSelected ? Color.white.opacity(0.85) : .secondary)
+              }
+              .padding(.horizontal, 10)
+              .padding(.vertical, 5)
+              .background(
+                isSelected ? accent : accent.opacity(0.10),
+                in: Capsule()
+              )
+              .foregroundStyle(isSelected ? Color.white : accent)
+            }
+            .buttonStyle(.plain)
+          }
+        }
+      }
+    }
+  }
+
+  // MARK: - Chart data
+
+  private struct LinePoint: Identifiable {
+    let id: String
+    let day: Date
+    let value: Double?
+  }
+
+  private struct PillItem: Identifiable {
+    let name: String
+    let label: String
+    let count: Int
+    var id: String { name }
+  }
+
+  /// One value per calendar day in `[today - windowDays, today]`. Meta
+  /// charts sum across all matching entries; per-exercise charts average.
+  private var lineData: [LinePoint] {
+    let cutoff = sinceDate(daysBack: windowDays)
+    let cal = Calendar.current
+    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+
+    var byDate: [String: [Double]] = [:]
+    let meta = MetaExercise.isMeta(selectedExercise)
+    let kind = metricKind(for: selectedExercise)
+
+    if meta {
+      for e in entries where e.date >= cutoff {
+        if selectedExercise == MetaExercise.strength {
+          guard isStrengthEntry(e), let v = volumeValue(e) else { continue }
+          byDate[e.date, default: []].append(v)
+        } else {
+          guard isCardioEntry(e), let d = e.durationMin else { continue }
+          byDate[e.date, default: []].append(d)
+        }
+      }
+    } else {
+      for p in progression where p.date >= cutoff {
+        guard let v = pointValue(p, kind: kind) else { continue }
+        byDate[p.date, default: []].append(v)
+      }
+    }
+
+    guard let start = fmt.date(from: cutoff),
+          let end = fmt.date(from: today) else { return [] }
+    var out: [LinePoint] = []
+    var day = start
+    while day <= end {
+      let iso = fmt.string(from: day)
+      let bucket = byDate[iso] ?? []
+      let reduced: Double? = bucket.isEmpty
+        ? nil
+        : (meta
+           ? bucket.reduce(0, +)
+           : bucket.reduce(0, +) / Double(bucket.count))
+      out.append(LinePoint(id: iso, day: day, value: reduced))
+      guard let next = cal.date(byAdding: .day, value: 1, to: day) else { break }
+      day = next
+    }
+    return out
+  }
+
+  private var pillOptions: (strength: [PillItem], cardio: [PillItem]) {
+    var counts: [String: Int] = [:]
+    var hasCardio: [String: Bool] = [:]
+    for e in entries {
+      guard let name = e.exercise, !name.isEmpty else { continue }
+      counts[name, default: 0] += 1
+      if isCardioEntry(e) { hasCardio[name] = true }
+    }
+    let names = counts.keys.sorted { (a, b) in
+      let ca = counts[a] ?? 0; let cb = counts[b] ?? 0
+      if ca != cb { return ca > cb }
+      return a < b
+    }
+    var strength: [PillItem] = []
+    var cardio: [PillItem] = []
+    for n in names {
+      let item = PillItem(name: n, label: n.capitalized, count: counts[n] ?? 0)
+      if hasCardio[n] == true { cardio.append(item) } else { strength.append(item) }
+    }
+    let metaS = PillItem(name: MetaExercise.strength, label: "All strength", count: strength.count)
+    let metaC = PillItem(name: MetaExercise.cardio,   label: "All cardio",   count: cardio.count)
+    return (strength: [metaS] + strength, cardio: [metaC] + cardio)
+  }
+
+  private var consistencyDays: [String] {
+    let cal = Calendar.current
+    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+    let now = Date()
+    var out: [String] = []
+    for offset in stride(from: 41, through: 0, by: -1) {
+      if let d = cal.date(byAdding: .day, value: -offset, to: now) {
+        out.append(fmt.string(from: d))
+      }
+    }
+    return out
+  }
+
+  private var today: String { SeptenaDate.today }
+
+  private enum MetricKind { case weight, duration, pace, volume, cardioTotal }
+
+  /// Pick a metric kind from the entry shape — same idea as the webapp's
+  /// `metricKind()` but driven entirely off the data we've already loaded.
+  private func metricKind(for exercise: String) -> MetricKind {
+    if exercise == MetaExercise.strength { return .volume }
+    if exercise == MetaExercise.cardio { return .cardioTotal }
+    let rel = entries.filter { $0.exercise == exercise }
+    if rel.contains(where: { ($0.distanceM ?? 0) > 0 && ($0.durationMin ?? 0) > 0 }) {
+      return .pace
+    }
+    if rel.contains(where: { ($0.durationMin ?? 0) > 0 && $0.weight == nil }) {
+      return .duration
+    }
+    return .weight
+  }
+
+  private func pointValue(_ p: ProgressionPoint, kind: MetricKind) -> Double? {
+    switch kind {
+    case .pace:
+      guard let m = p.distanceM, let d = p.durationMin, d > 0 else { return nil }
+      return (m / d * 10).rounded() / 10
+    case .duration: return p.durationMin
+    case .weight: return p.weight
+    case .volume, .cardioTotal: return nil
+    }
+  }
+
+  private func volumeValue(_ e: ExerciseEntry) -> Double? {
+    guard let w = e.weight, w > 0,
+          let s = e.sets.flatMap(Int.init), s > 0,
+          let r = e.reps.flatMap(Int.init), r > 0 else { return nil }
+    return Double(s * r) * w
+  }
+
+  private func isCardioEntry(_ e: ExerciseEntry) -> Bool {
+    (e.distanceM ?? 0) > 0 || ((e.durationMin ?? 0) > 0 && e.weight == nil)
+  }
+
+  private func isStrengthEntry(_ e: ExerciseEntry) -> Bool {
+    e.weight != nil && !isCardioEntry(e)
+  }
+
+  private var chartSubtitle: String {
+    switch metricKind(for: selectedExercise) {
+    case .volume: return "Total volume per session (kg)"
+    case .cardioTotal: return "Total cardio minutes per session"
+    case .pace: return "Pace (m/min) per session"
+    case .duration: return "Duration (min) per session"
+    case .weight: return "Weight (kg) over time"
+    }
+  }
+
+  private func yLabel(_ v: Double) -> String {
+    switch metricKind(for: selectedExercise) {
+    case .volume, .cardioTotal: return "\(Int(v))"
+    case .pace: return String(format: "%.0f", v)
+    case .duration: return "\(Int(v))m"
+    case .weight: return "\(Int(v))kg"
+    }
+  }
+
+  private func shortMonthDay(_ d: Date) -> String {
+    let f = DateFormatter(); f.dateFormat = "MMM d"
+    return f.string(from: d)
+  }
+
+  private func weekdayInitial(_ iso: String) -> String {
+    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+    guard let d = fmt.date(from: iso) else { return "" }
+    let w = DateFormatter(); w.dateFormat = "EEEEE"
+    return w.string(from: d)
+  }
+
+  private func loadProgression() async {
+    if MetaExercise.isMeta(selectedExercise) {
+      progression = []
+      return
+    }
+    progressionLoading = true
+    if let data = try? await client.trainingProgression(exercise: selectedExercise) {
+      progression = data
+    }
+    progressionLoading = false
   }
 
   // MARK: - Helpers
@@ -334,6 +759,28 @@ struct TrainingDestinationView: View {
     fmt.dateFormat = "yyyy-MM-dd"
     let cutoff = fmt.string(from: weekStart)
     return Set(entries.map(\.date).filter { $0 >= cutoff })
+  }
+}
+
+// MARK: - Meta exercise tokens
+//
+// Sentinel "exercise" ids for the two aggregate charts. Chosen so they can't
+// collide with a real exercise name. Mirrors the webapp's META_STRENGTH /
+// META_CARDIO constants.
+enum MetaExercise {
+  static let strength = "__all_strength__"
+  static let cardio   = "__all_cardio__"
+
+  static func isMeta(_ name: String) -> Bool {
+    name == strength || name == cardio
+  }
+
+  static func label(for name: String) -> String {
+    switch name {
+    case strength: return "All strength"
+    case cardio:   return "All cardio"
+    default:       return name.capitalized
+    }
   }
 }
 

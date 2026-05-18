@@ -21,6 +21,7 @@ struct WeekDashboardView: View {
   @Environment(TabSelection.self) private var tabSelection
   @Environment(NavigationState.self) private var nav
   @Environment(SettingsStore.self) private var settingsStore
+  @Environment(DayClock.self) private var clock
   #if os(iOS)
   @Environment(\.horizontalSizeClass) private var hSize
   #endif
@@ -56,6 +57,10 @@ struct WeekDashboardView: View {
   /// state vars; only nutrition + recent training need fresh stash.
   @State private var todayNutrition: [NutritionEntry] = []
   @State private var recentTraining: [ExerciseEntry] = []
+  /// Fasting band color for DayTimelineView — sourced from
+  /// `settings.nutrition.macro_colors`, same accent the Nutrition mini-app
+  /// renders the fasting tile in.
+  @State private var macroColors: MacroColors? = nil
 
   /// iPhone compact: 1 column. iPad regular: 3 columns.
   /// macOS: adaptive — packs as many ~280pt tiles as fit, so wider windows
@@ -95,21 +100,7 @@ struct WeekDashboardView: View {
       // Standard top-right gear opens the unified, app-global Settings
       // sheet (same one as ⌘, on macOS / the sidebar row). Week is the
       // natural homepage, so it's the natural place to put it.
-      .toolbar {
-        ToolbarItem(placement: .primaryAction) {
-          Button { nav.showAddInfo = true } label: {
-            Image(systemName: "plus")
-          }
-          .accessibilityLabel("Add Info")
-          .keyboardShortcut("k", modifiers: .command)
-        }
-        ToolbarItem(placement: .primaryAction) {
-          Button { nav.showSettings = true } label: {
-            Image(systemName: "gearshape")
-          }
-          .accessibilityLabel("Settings")
-        }
-      }
+      .toolbar { settingsToolbar }
       // Sheets, not pushes — iPhone navigation into module destinations
       // is a bottom-sheet slide-over so the dashboard stays visually
       // present underneath. iPad / Mac render this just as well.
@@ -125,6 +116,25 @@ struct WeekDashboardView: View {
         await loadAll()
       }
       .refreshable { await loadAll() }
+      // Day rollover: the dashboard is the most date-sensitive surface
+      // (today's timeline, today's totals, 7-day windows ending today).
+      // Refetch everything when `clock.today` flips.
+      .onChange(of: clock.today) { _, _ in
+        Task { await loadAll() }
+      }
+    }
+    .overlay(alignment: .bottomTrailing) {
+      AddInfoFAB { nav.showAddInfo = true }
+    }
+  }
+
+  @ToolbarContentBuilder
+  private var settingsToolbar: some ToolbarContent {
+    ToolbarItem(placement: .primaryAction) {
+      Button { nav.showSettings = true } label: {
+        Image(systemName: "gearshape")
+      }
+      .accessibilityLabel("Settings")
     }
   }
 
@@ -187,6 +197,7 @@ struct WeekDashboardView: View {
     static let gutToday           = "week.gutToday"
     static let gutHistory         = "week.gutHistory"
     static let recentTraining     = "week.recentTraining"
+    static let macroColors        = "week.macroColors"
   }
 
   /// Read every tile's last-known data out of disk-cached blobs and
@@ -221,6 +232,7 @@ struct WeekDashboardView: View {
     if let v = ResponseCache.load(GutDayResponse.self, forKey: CacheKey.gutToday) { gutToday = v }
     if let v = ResponseCache.load([GutHistoryPoint].self, forKey: CacheKey.gutHistory) { gutHistory = v }
     if let v = ResponseCache.load([ExerciseEntry].self, forKey: CacheKey.recentTraining) { recentTraining = v }
+    if let v = ResponseCache.load(MacroColors.self, forKey: CacheKey.macroColors) { macroColors = v }
   }
 
   /// Fan out the per-tile fetches in parallel. NextItemsModel covers today's
@@ -247,9 +259,14 @@ struct WeekDashboardView: View {
     async let asum = try? await client.airSummary()
     async let ahist = try? await client.airHistory(days: 7)
     async let groc = try? await client.groceries()
+    async let appSettings = try? await client.settings()
     let (h, c, ca, e, s, t, o) = await (hh, ch, car, ents, sh, tc, on)
     let (ns, ne, nt) = await (nstats, nents, ntarget)
     let (asRes, ahRes, gRes) = await (asum, ahist, groc)
+    if let colors = (await appSettings)?.nutrition?.macroColors {
+      macroColors = colors
+      ResponseCache.save(colors, forKey: CacheKey.macroColors)
+    }
     if let asRes {
       airSummary = asRes
       ResponseCache.save(asRes, forKey: CacheKey.airSummary)
@@ -373,7 +390,7 @@ struct WeekDashboardView: View {
 
   private var todayTimeline: some View {
     DayTimelineView(
-      date: SeptenaDate.today,
+      date: clock.today,
       oura: ouraNights.first,
       caffeine: caffeineToday?.entries ?? [],
       cannabis: cannabisToday?.entries ?? [],
@@ -383,7 +400,9 @@ struct WeekDashboardView: View {
       supplements: dailies.supplements,
       chores: dailies.chores,
       training: recentTraining,
-      tasks: completedTasks
+      tasks: completedTasks,
+      calendar: dailies.calendarEvents,
+      macroColors: macroColors
     )
     .padding(14)
     .background(
@@ -512,13 +531,37 @@ struct WeekDashboardView: View {
 
   // Training — sessions count derived from unique dates in the last 7
   // days of entries; Z2 minutes and target come from the cardio endpoint;
-  // histogram bars are per-day cardio minutes.
+  // histogram bars stack strength volume (full accent) and cardio minutes
+  // (lighter shade) per day, mirroring the webapp's training overview.
+  // Each series is normalized to its own 7-day max ×50 so a peak day fills
+  // the chart and a half-sized bar reads as ~half that week's effort.
   private var trainingTile: some View {
     let accent = theme.color(for: "training")
     let sessionCount = trainingSessionDates.count
     let minutes = cardio?.daily.reduce(0) { $0 + $1.minutes } ?? 0
     let target = cardio?.targetWeeklyMin ?? 150
-    let bars = cardio?.daily.map { $0.minutes } ?? Array(repeating: 0, count: 7)
+
+    let days = lastSevenDays
+    var strengthByDate: [String: Double] = [:]
+    var cardioByDate: [String: Double] = [:]
+    for e in recentTraining {
+      let isCardio = (e.distanceM ?? 0) > 0
+        || ((e.durationMin ?? 0) > 0 && e.weight == nil)
+      if isCardio {
+        if let d = e.durationMin, d > 0 {
+          cardioByDate[e.date, default: 0] += d
+        }
+      } else if let w = e.weight, w > 0,
+                let s = e.sets.flatMap(Int.init), s > 0,
+                let r = e.reps.flatMap(Int.init), r > 0 {
+        strengthByDate[e.date, default: 0] += w * Double(s * r)
+      }
+    }
+    let maxS = max(1, days.map { strengthByDate[$0] ?? 0 }.max() ?? 0)
+    let maxC = max(1, days.map { cardioByDate[$0] ?? 0 }.max() ?? 0)
+    let strengthBars = days.map { Int(((strengthByDate[$0] ?? 0) / maxS) * 50) }
+    let cardioBars   = days.map { Int(((cardioByDate[$0]   ?? 0) / maxC) * 50) }
+
     return Button { sheetDest = .training } label: {
       ModuleTile(
         title: "Training",
@@ -533,10 +576,23 @@ struct WeekDashboardView: View {
           target: Double(max(target, 1)),
           unit: "m"
         ),
-        history: .init(label: "7-day effort", values: bars)
+        history: .init(label: "7-day effort",
+                       values: strengthBars,
+                       secondaryValues: cardioBars)
       )
     }
     .buttonStyle(.plain)
+  }
+
+  /// Last 7 ISO yyyy-MM-dd dates, oldest → newest. Used to align the
+  /// training tile's two-series histogram so absent days still render as
+  /// zero-height bars instead of being collapsed out of the chart.
+  private var lastSevenDays: [String] {
+    let cal = Calendar.current
+    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+    return (0..<7).reversed().compactMap { offset in
+      cal.date(byAdding: .day, value: -offset, to: Date()).map(fmt.string(from:))
+    }
   }
 
   private var choresTile: some View {

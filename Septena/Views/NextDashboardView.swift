@@ -14,14 +14,9 @@ struct NextDashboardView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-        .toolbar {
-          ToolbarItem(placement: .primaryAction) {
-            Button { nav.showAddInfo = true } label: {
-              Image(systemName: "plus")
-            }
-            .accessibilityLabel("Add Info")
-          }
-        }
+    }
+    .overlay(alignment: .bottomTrailing) {
+      AddInfoFAB { nav.showAddInfo = true }
     }
   }
 }

@@ -5,6 +5,106 @@ import EventKit
 // Split into two views (open / done) so the parent can place all open items
 // above tasks-done. Shared state lives in NextItemsModel.
 
+// MARK: - Today tasks (inline on Next)
+//
+// Mirrors NextItemsModel for the Tasks slice — Next renders today's open
+// tasks as the first list above chores / habits / supplements. Full task
+// editing still lives in the Tasks tab; this surface is a read-through
+// checklist (tap to complete, tap again to uncomplete).
+
+@MainActor
+@Observable
+final class TodayTasksModel {
+  var tasks: [SeptenaTask] = []
+  /// Tasks the user toggled this session — keeps them rendered in place
+  /// (struck through) so the row doesn't hop the moment you check it.
+  var actedTasks: Set<String> = []
+  var hasLoaded: Bool = false
+
+  func paintFromCache() {
+    refreshFromCache()
+    hasLoaded = true
+  }
+
+  func refreshFromCache() {
+    tasks = LocalCache.tasks(in: LocalStore.shared.container.mainContext,
+                             filter: .today)
+  }
+
+  func load(client: SeptenaClient) async {
+    if let resp = try? await client.list(view: "today") {
+      let syncer = Syncer(client: client,
+                          context: LocalStore.shared.container.mainContext)
+      syncer.applyTasks(resp.items + (resp.review ?? []) + (resp.done ?? []),
+                        scope: .filter(.today))
+    }
+    refreshFromCache()
+    actedTasks = []
+    hasLoaded = true
+  }
+
+  /// Open today tasks, plus any toggled this session (so a just-completed
+  /// row lingers struck through instead of vanishing under the finger).
+  var openTasks: [SeptenaTask] {
+    tasks.filter { actedTasks.contains($0.id) || $0.status == .open }
+  }
+
+  func toggle(_ task: SeptenaTask, mutator: TaskMutator) {
+    if task.status == .done {
+      Haptics.tap()
+      mutator.uncomplete(id: task.id)
+    } else {
+      Haptics.success()
+      mutator.complete(id: task.id)
+    }
+    actedTasks.insert(task.id)
+    refreshFromCache()
+  }
+}
+
+struct TodayTasksSection: View {
+  var model: TodayTasksModel
+  @Environment(TaskMutator.self) private var mutator
+  @Environment(SectionTheme.self) private var theme
+
+  var body: some View {
+    let tasks = model.openTasks
+    if !tasks.isEmpty {
+      VStack(alignment: .leading, spacing: 0) {
+        sectionHeader("Tasks", tint: theme.color(for: "tasks"))
+        ForEach(tasks) { task in
+          TodayTaskRow(task: task, model: model, mutator: mutator,
+                       tint: theme.color(for: "tasks"))
+        }
+      }
+    }
+  }
+}
+
+struct TodayTaskRow: View {
+  let task: SeptenaTask
+  var model: TodayTasksModel
+  let mutator: TaskMutator
+  let tint: Color
+
+  var body: some View {
+    let isDone = task.status == .done
+    HStack(spacing: 12) {
+      TaskCheckbox(tint: tint, isDone: isDone) {
+        model.toggle(task, mutator: mutator)
+      }
+      Text(task.title)
+        .font(.septenaTaskTitle)
+        .foregroundStyle(isDone ? Theme.inkSecondary : Theme.inkPrimary)
+        .strikethrough(isDone)
+        .opacity(isDone ? 0.5 : 1)
+      Spacer()
+    }
+    .padding(.horizontal, Theme.hPadding)
+    .padding(.vertical, Theme.rowVPadding)
+  }
+}
+
 // MARK: - Shared model
 
 @MainActor
@@ -33,7 +133,10 @@ final class NextItemsModel {
   /// empty state never flashes during the initial load.
   var hasLoaded: Bool = false
 
-  private let today: String = SeptenaDate.today
+  // Computed (not captured at init) so mutation bodies always tag the
+  // current day. The owning view also calls `load()` from
+  // `.onChange(of: clock.today)` to refetch day-scoped data on rollover.
+  private var today: String { SeptenaDate.today }
 
   // MARK: - Open / Done splits (the source of truth for both subviews)
 
@@ -255,8 +358,7 @@ struct NextOpenSection: View {
 
     VStack(alignment: .leading, spacing: 0) {
       if !events.isEmpty {
-        sectionHeader("Calendar", icon: "calendar",
-                      tint: theme.color(for: "calendar"))
+        sectionHeader("Calendar", tint: theme.color(for: "calendar"))
         ForEach(events, id: \.eventIdentifier) { event in
           CalendarEventRow(event: event,
                            tint: theme.color(for: "calendar"))
@@ -265,8 +367,7 @@ struct NextOpenSection: View {
 
       if !chores.isEmpty {
         if !events.isEmpty { Hairline().padding(.top, 8) }
-        sectionHeader("Chores", icon: "list.bullet.clipboard",
-                      tint: theme.color(for: "chores"))
+        sectionHeader("Chores", tint: theme.color(for: "chores"))
         ForEach(chores) { chore in
           ChoreRow(chore: chore, model: model, outbox: outbox,
                    tint: theme.color(for: "chores"))
@@ -287,8 +388,7 @@ struct NextOpenSection: View {
         if !events.isEmpty || !chores.isEmpty || !habits.isEmpty {
           Hairline().padding(.top, 8)
         }
-        sectionHeader("Supplements", icon: "pills",
-                      tint: theme.color(for: "supplements"))
+        sectionHeader("Supplements", tint: theme.color(for: "supplements"))
         ForEach(supplements) { supp in
           SupplementRow(supplement: supp, model: model, outbox: outbox,
                         tint: theme.color(for: "supplements"))
@@ -352,13 +452,15 @@ struct NextDoneSection: View {
 // MARK: - Row primitives
 
 // Shared by NextOpenSection (current-bucket strip) and HabitsDestinationView
-// (full all-day list). Internal so the Habits mini-app can reuse the same
-// row instead of duplicating the swipe/toggle/skip vocabulary.
+// (full all-day list). `onDelete` is supplied by destinations that own the
+// underlying record (e.g. the Habits mini-app); Next leaves it nil since
+// it never deletes inline.
 struct HabitRow: View {
   let habit: HabitDayItem
   var model: NextItemsModel
   let outbox: HTTPOutbox
   let tint: Color
+  var onDelete: (() -> Void)? = nil
 
   var body: some View {
     let inactive = habit.done || habit.skipped
@@ -383,14 +485,19 @@ struct HabitRow: View {
     }
     .padding(.horizontal, Theme.hPadding)
     .padding(.vertical, Theme.rowVPadding)
-    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+    .contextMenu {
       Button {
         model.skipHabit(habit, skipped: !habit.skipped, outbox: outbox)
       } label: {
-        Label(habit.skipped ? "Unskip" : "Skip",
+        Label(habit.skipped ? "Unskip" : "Skip today",
               systemImage: habit.skipped ? "arrow.uturn.left" : "forward.end")
       }
-      .tint(Theme.inkSecondary)
+      if let onDelete {
+        Divider()
+        Button(role: .destructive) { onDelete() } label: {
+          Label("Delete", systemImage: "trash")
+        }
+      }
     }
   }
 }
@@ -403,6 +510,7 @@ struct SupplementRow: View {
   var model: NextItemsModel
   let outbox: HTTPOutbox
   let tint: Color
+  var onDelete: (() -> Void)? = nil
 
   var body: some View {
     HStack(spacing: 12) {
@@ -422,18 +530,25 @@ struct SupplementRow: View {
     }
     .padding(.horizontal, Theme.hPadding)
     .padding(.vertical, Theme.rowVPadding)
+    .contextMenu {
+      if let onDelete {
+        Button(role: .destructive) { onDelete() } label: {
+          Label("Delete", systemImage: "trash")
+        }
+      }
+    }
   }
 }
 
-// Shared by NextOpenSection and ChoresDestinationView. Same swipe vocab
-// (Tomorrow / Weekend defer, complete on tap, overdue badge) for both
-// callers; the Chores tab just shows every chore where Next shows only
-// today's actionable subset.
+// Shared by NextOpenSection and ChoresDestinationView. Tap completes,
+// long-press exposes defer + (when supplied) delete. Defer is hidden
+// once the chore is done or has been deferred this session.
 struct ChoreRow: View {
   let chore: ChoreItem
   var model: NextItemsModel
   let outbox: HTTPOutbox
   let tint: Color
+  var onDelete: (() -> Void)? = nil
 
   var body: some View {
     let isDone = model.completedChores.contains(chore.id)
@@ -468,19 +583,25 @@ struct ChoreRow: View {
     }
     .padding(.horizontal, Theme.hPadding)
     .padding(.vertical, Theme.rowVPadding)
-    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-      Button {
-        model.deferChore(chore, mode: "day", label: "Tomorrow", outbox: outbox)
-      } label: {
-        Label("Tomorrow", systemImage: "calendar.badge.plus")
+    .contextMenu {
+      if !isDone && deferLabel == nil {
+        Button {
+          model.deferChore(chore, mode: "day", label: "Tomorrow", outbox: outbox)
+        } label: {
+          Label("Defer to tomorrow", systemImage: "calendar.badge.plus")
+        }
+        Button {
+          model.deferChore(chore, mode: "weekend", label: "Weekend", outbox: outbox)
+        } label: {
+          Label("Defer to weekend", systemImage: "calendar.badge.clock")
+        }
       }
-      .tint(Theme.inkSecondary)
-      Button {
-        model.deferChore(chore, mode: "weekend", label: "Weekend", outbox: outbox)
-      } label: {
-        Label("Weekend", systemImage: "calendar.badge.clock")
+      if let onDelete {
+        Divider()
+        Button(role: .destructive) { onDelete() } label: {
+          Label("Delete", systemImage: "trash")
+        }
       }
-      .tint(Theme.inkSecondary.opacity(0.7))
     }
   }
 
@@ -558,14 +679,15 @@ struct StatusBadge: View {
 }
 
 @ViewBuilder
-private func sectionHeader(_ title: String, icon: String, tint: Color) -> some View {
-  HStack(spacing: 8) {
-    Image(systemName: icon).font(.system(size: 14)).foregroundStyle(tint)
-    Text(title).font(.septenaSectionTitle).foregroundStyle(Theme.inkPrimary)
-  }
-  .padding(.horizontal, Theme.hPadding)
-  .padding(.top, Theme.sectionSpacing)
-  .padding(.bottom, 6)
+private func sectionHeader(_ title: String, tint: Color) -> some View {
+  // Title-only — no leading SF Symbol. The section accent already lives on
+  // each row's checkbox, so an extra glyph in the header was redundant.
+  Text(title)
+    .font(.septenaSectionTitle)
+    .foregroundStyle(tint)
+    .padding(.horizontal, Theme.hPadding)
+    .padding(.top, Theme.sectionSpacing)
+    .padding(.bottom, 6)
 }
 
 // MARK: - Habit bucket header
@@ -577,9 +699,8 @@ private func sectionHeader(_ title: String, icon: String, tint: Color) -> some V
 @ViewBuilder
 private func habitBucketHeader(bucket: String, tint: Color) -> some View {
   HStack(spacing: 8) {
-    Image(systemName: "repeat").font(.system(size: 14)).foregroundStyle(tint)
     Text("\(bucket.capitalized) Habits")
-      .font(.septenaSectionTitle).foregroundStyle(Theme.inkPrimary)
+      .font(.septenaSectionTitle).foregroundStyle(tint)
     Spacer()
     BucketTimeLeft(bucket: bucket)
   }

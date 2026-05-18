@@ -326,6 +326,21 @@ final class SeptenaClient {
                       as: CardioHistoryResponse.self)
   }
 
+  /// Per-exercise progression series (one point per logged date).
+  func trainingProgression(exercise: String) async throws -> [ProgressionPoint] {
+    let encoded = exercise.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? exercise
+    let response = try await getJSON("/api/training/progression/\(encoded)",
+                                     as: ProgressionResponse.self)
+    return response.data
+  }
+
+  /// Exercises summary since a YYYY-MM-DD cutoff (or all-time if nil),
+  /// with per-exercise counts. Drives the exercise pills.
+  func trainingSummary(since: String? = nil) async throws -> [ExerciseSummary] {
+    let q: [URLQueryItem] = since.map { [URLQueryItem(name: "since", value: $0)] } ?? []
+    return try await getJSON("/api/training/summary", query: q, as: [ExerciseSummary].self)
+  }
+
   // MARK: - Nutrition
 
   /// Logged nutrition entries since the given YYYY-MM-DD.
@@ -400,6 +415,15 @@ final class SeptenaClient {
   /// Sorted client-side; server returns them in storage order.
   func groceries() async throws -> [GroceryItem] {
     try await getJSON("/api/groceries", as: GroceriesResponse.self).items
+  }
+
+  /// Full groceries payload: items + user-defined categories (in display order).
+  /// Older servers may omit `categories`; callers should fall back to
+  /// `DEFAULT_GROCERY_CATEGORIES` in that case.
+  func groceriesFull() async throws -> (items: [GroceryItem], categories: [GroceryCategory]) {
+    let res = try await getJSON("/api/groceries", as: GroceriesResponse.self)
+    let cats = res.categories?.isEmpty == false ? res.categories! : DEFAULT_GROCERY_CATEGORIES
+    return (res.items, cats)
   }
 
   /// Flip an item's `low` flag (the shopping-list state). Body matches

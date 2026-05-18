@@ -16,6 +16,10 @@ struct SeptenaApp: App {
   @State private var theme = SectionTheme()
   @State private var trainingDraft = TrainingDraftStore()
   @State private var settingsStore = SettingsStore()
+  /// App-wide "what day / what time is it" clock. Views read `today`/`now`
+  /// from this instead of calling `SeptenaDate.today` or `Date()` so they
+  /// re-render on midnight rollover and on each minute tick uniformly.
+  @State private var dayClock = DayClock()
   private let localStore = LocalStore.shared
   /// Owns the task write-path: applies optimistic SwiftData changes,
   /// enqueues OutboxEntity rows, and drains them to FastAPI with retry.
@@ -52,11 +56,15 @@ struct SeptenaApp: App {
         .environment(settingsStore)
         .environment(taskMutator)
         .environment(httpOutbox)
+        .environment(dayClock)
         .modelContainer(localStore.container)
         .onChange(of: scenePhase) { _, phase in
           // Foreground transitions are the best moment to flush any
-          // mutations that were queued while offline / suspended.
+          // mutations that were queued while offline / suspended, and
+          // to re-check the clock so a backgrounded-across-midnight
+          // session flips `today` before any view renders.
           if phase == .active {
+            dayClock.refreshIfNeeded()
             taskMutator.kickDrain()
             httpOutbox.kickDrain()
           }

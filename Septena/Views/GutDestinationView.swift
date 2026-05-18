@@ -1,7 +1,7 @@
 import SwiftUI
 
-// Gut mini-app — today's movements (and any open discomfort window),
-// then a 7-day history with movement counts + average Bristol score.
+// Gut mini-app — today's movements (and any open discomfort window).
+// Weekly trends will be shown via graphs (not a list) in a later pass.
 
 struct GutDestinationView: View {
   @Environment(SeptenaClient.self) private var client
@@ -9,7 +9,6 @@ struct GutDestinationView: View {
   @Environment(SectionTheme.self) private var theme
 
   @State private var today: GutDayResponse? = nil
-  @State private var history: [GutHistoryPoint] = []
   @State private var loading = true
   @State private var editing: GutEntry? = nil
 
@@ -33,7 +32,7 @@ struct GutDestinationView: View {
             }
             .buttonStyle(.plain)
             .listRowInsets(EdgeInsets())
-            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            .contextMenu {
               Button(role: .destructive) {
                 delete(entry)
               } label: {
@@ -44,19 +43,6 @@ struct GutDestinationView: View {
         } else if !loading {
           Text("Nothing logged yet.")
             .foregroundStyle(.secondary)
-        }
-      }
-      if !history.isEmpty {
-        Section("7-day history") {
-          ForEach(Array(history.reversed()), id: \.date) { p in
-            LogRow(
-              title: friendlyDate(p.date),
-              detail: historyDetail(p),
-              trailing: "\(p.movements)",
-              accent: accent
-            )
-            .listRowInsets(EdgeInsets())
-          }
         }
       }
     }
@@ -186,47 +172,20 @@ struct GutDestinationView: View {
     return parts.isEmpty ? nil : parts.joined(separator: " · ")
   }
 
-  private func historyDetail(_ p: GutHistoryPoint) -> String? {
-    var parts: [String] = []
-    if let a = p.avgBristol { parts.append(String(format: "avg %.1f", a)) }
-    if p.maxBlood > 0 { parts.append("blood max \(p.maxBlood)") }
-    if p.discomfortH > 0 { parts.append(String(format: "%.1fh discomfort", p.discomfortH)) }
-    return parts.isEmpty ? nil : parts.joined(separator: " · ")
-  }
-
-  private func friendlyDate(_ iso: String) -> String {
-    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
-    guard let d = fmt.date(from: iso) else { return iso }
-    let cal = Calendar.current
-    if cal.isDateInToday(d)     { return "Today" }
-    if cal.isDateInYesterday(d) { return "Yesterday" }
-    let w = DateFormatter(); w.dateFormat = "EEEE"
-    return w.string(from: d)
-  }
-
   private enum CacheKey {
-    static let today   = "gut.today"
-    static let history = "gut.history"
+    static let today = "gut.today"
   }
 
   private func paintFromCache() {
     if let v = ResponseCache.load(GutDayResponse.self, forKey: CacheKey.today) { today = v }
-    if let v = ResponseCache.load([GutHistoryPoint].self, forKey: CacheKey.history) { history = v }
     loading = false
   }
 
   private func load() async {
     loading = true
-    async let t = try? await client.gutDay(date: SeptenaDate.today)
-    async let h = try? await client.gutHistory(days: 7)
-    let (tRes, hRes) = await (t, h)
-    if let tRes {
+    if let tRes = try? await client.gutDay(date: SeptenaDate.today) {
       today = tRes
       ResponseCache.save(tRes, forKey: CacheKey.today)
-    }
-    if let daily = hRes?.daily {
-      history = daily
-      ResponseCache.save(daily, forKey: CacheKey.history)
     }
     loading = false
   }

@@ -53,7 +53,7 @@ struct CalendarDestinationView: View {
   private var grantedBody: some View {
     if sections.isEmpty {
       ContentUnavailableView("Nothing scheduled",
-                             systemImage: "calendar",
+                             systemImage: theme.icon(for: "calendar"),
                              description: Text("Next 7 days are clear."))
     } else {
       ForEach(sections, id: \.date) { sec in

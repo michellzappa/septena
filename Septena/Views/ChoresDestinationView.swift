@@ -3,8 +3,8 @@ import SwiftUI
 // Chores mini-app — full chore list split into Today (due or overdue),
 // Done today, and Later (future-dated). Reached from the Week dashboard's
 // Chores tile. Reuses NextItemsModel for loading + optimistic mutations
-// and ChoreRow for row UI, so swipe vocab (Tomorrow / Weekend defer) and
-// completion behavior match the Next tab exactly.
+// and ChoreRow for row UI; tap edits, long-press exposes defer / delete
+// (the app-wide list-row menu pattern — no swipe actions anywhere).
 
 struct ChoresDestinationView: View {
   @Environment(SeptenaClient.self) private var client
@@ -28,68 +28,28 @@ struct ChoresDestinationView: View {
     model.chores.filter { model.completedChores.contains($0.id) }
   }
 
+  /// Soonest first (least-negative `daysOverdue`) → furthest away last, so
+  /// the user sees what's coming up next at the top of the Later section.
   private var later: [ChoreItem] {
     model.chores
       .filter { $0.daysOverdue < 0 && !model.completedChores.contains($0.id) }
-      .sorted { ($0.daysOverdue, $0.name) < ($1.daysOverdue, $1.name) }
+      .sorted {
+        if $0.daysOverdue != $1.daysOverdue { return $0.daysOverdue > $1.daysOverdue }
+        return $0.name < $1.name
+      }
   }
 
   var body: some View {
     List {
       summary
       if !today.isEmpty {
-        Section("Today") {
-          ForEach(today) { chore in
-            Button { editing = chore } label: {
-              ChoreRow(chore: chore, model: model, outbox: outbox, tint: accent)
-            }
-            .buttonStyle(.plain)
-            .listRowInsets(EdgeInsets())
-            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-              Button(role: .destructive) {
-                delete(chore)
-              } label: {
-                Label("Delete", systemImage: "trash")
-              }
-            }
-          }
-        }
+        Section("Today") { ForEach(today) { row(for: $0) } }
       }
       if !doneToday.isEmpty {
-        Section("Done today") {
-          ForEach(doneToday) { chore in
-            Button { editing = chore } label: {
-              ChoreRow(chore: chore, model: model, outbox: outbox, tint: accent)
-            }
-            .buttonStyle(.plain)
-            .listRowInsets(EdgeInsets())
-            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-              Button(role: .destructive) {
-                delete(chore)
-              } label: {
-                Label("Delete", systemImage: "trash")
-              }
-            }
-          }
-        }
+        Section("Done today") { ForEach(doneToday) { row(for: $0) } }
       }
       if !later.isEmpty {
-        Section("Later") {
-          ForEach(later) { chore in
-            Button { editing = chore } label: {
-              ChoreRow(chore: chore, model: model, outbox: outbox, tint: accent)
-            }
-            .buttonStyle(.plain)
-            .listRowInsets(EdgeInsets())
-            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-              Button(role: .destructive) {
-                delete(chore)
-              } label: {
-                Label("Delete", systemImage: "trash")
-              }
-            }
-          }
-        }
+        Section("Later") { ForEach(later) { row(for: $0) } }
       }
     }
     #if os(macOS)
@@ -117,6 +77,19 @@ struct ChoresDestinationView: View {
         }
       )
     }
+  }
+
+  /// Single source of truth for chore rows in all three sections. Tap
+  /// opens the editor; the row's own long-press context menu (provided
+  /// by `ChoreRow`) covers defer + delete.
+  @ViewBuilder
+  private func row(for chore: ChoreItem) -> some View {
+    Button { editing = chore } label: {
+      ChoreRow(chore: chore, model: model, outbox: outbox, tint: accent,
+               onDelete: { delete(chore) })
+    }
+    .buttonStyle(.plain)
+    .listRowInsets(EdgeInsets())
   }
 
   private func delete(_ chore: ChoreItem) {

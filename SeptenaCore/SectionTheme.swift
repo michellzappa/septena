@@ -25,6 +25,13 @@ final class SectionTheme {
     accentByKey[sectionKey] ?? Color(red: 0.541, green: 0.514, blue: 0.471)
   }
 
+  /// Placeholder glyph for any "this is the X section" chrome that still
+  /// needs an icon slot filled (e.g. SwiftUI's `ContentUnavailableView`).
+  /// Deliberately section-agnostic — Septena doesn't lean on per-section
+  /// SF Symbols, and "when in doubt, a dot" beats picking a glyph that
+  /// ends up feeling arbitrary.
+  func icon(for sectionKey: String) -> String { "circle.fill" }
+
   /// Synchronous cache prime — reads the last-known `/api/sections`
   /// response out of disk and populates `accentByKey`. Called before
   /// `refresh()` on app launch so tiles render with the right color on

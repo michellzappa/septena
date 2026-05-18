@@ -1,4 +1,5 @@
 import SwiftUI
+import EventKit
 
 // Day timeline — single-row visualization of one date's events. Adapted
 // from septena-app's TodayTimeline:
@@ -28,10 +29,14 @@ struct DayTimelineView: View {
   var chores: [ChoreItem] = []
   var training: [ExerciseEntry] = []
   var tasks: [SeptenaTask] = []
+  var calendar: [EKEvent] = []
+  /// Used to source the fasting band color (`macro_colors.fasting`).
+  var macroColors: MacroColors? = nil
 
   @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var clock
 
-  private var isToday: Bool { date == SeptenaDate.today }
+  private var isToday: Bool { date == clock.today }
 
   // MARK: - Body
 
@@ -44,6 +49,7 @@ struct DayTimelineView: View {
           rail
           sleepShade(width: w)
           ticks(width: w)
+          fastingBands(width: w)
           ForEach(Array(bars.enumerated()), id: \.offset) { _, b in
             barPill(b, width: w)
           }
@@ -51,7 +57,7 @@ struct DayTimelineView: View {
             dot(c, width: w)
           }
           if let wake = wakeHour { marker("☀️", at: wake, width: w) }
-          if let moon = moonHour, moon < 24 { marker("🌙", at: moon, width: w, opacity: 0.7) }
+          if shouldShowMoon, let moon = moonHour { marker("🌙", at: moon, width: w, opacity: moonOpacity) }
           if isToday {
             nowIndicator(width: w)
           }
@@ -117,7 +123,7 @@ struct DayTimelineView: View {
         .frame(width: max(0, pct(wake) * width / 100), height: 18)
         .frame(maxHeight: .infinity)
     }
-    if let moon = moonHour, moon < 24, !(isToday && nowHour >= moon) {
+    if shouldShowMoon, let moon = moonHour {
       RoundedRectangle(cornerRadius: 9, style: .continuous)
         .fill(Color.primary.opacity(0.06))
         .frame(width: max(0, (100 - pct(moon)) * width / 100), height: 18)
@@ -135,23 +141,112 @@ struct DayTimelineView: View {
     }
   }
 
+  // MARK: - Fasting bands
+  //
+  // Two thin horizontal stripes painted on top of the rail in the
+  // user-configured fasting color:
+  //   • Overnight tail — from wake (or 00:00 fallback) → today's first
+  //     meal. The visible end of yesterday's overnight fast.
+  //   • Post-dinner   — from today's last meal → now (or bedtime),
+  //     gated on hour ≥ evening_hour + post-meal-grace, matching the
+  //     web's `computeFastingState`.
+  //
+  // Stripes are drawn at h=2 so they read as a marker, not a wash, and
+  // never intrude on bars/dots above them.
+
+  private static let fastingFallbackColor = Color(hex: 0x8b5cf6)
+
+  private var fastingColor: Color {
+    Color(hexString: macroColors?.fasting) ?? Self.fastingFallbackColor
+  }
+
+  /// Today's nutrition entries, sorted by time-of-day.
+  private var todayMealHours: [Double] {
+    nutrition.filter { $0.date == date }
+      .compactMap { parseHHMM($0.time) }
+      .sorted()
+  }
+
+  /// Hardcoded to match `DEFAULT_EVENING_HOUR_24H` / `DEFAULT_POST_MEAL_GRACE_MIN`
+  /// in lib/fasting.ts. Settings doesn't surface these to iOS yet — when it
+  /// does, plumb them through `AppTargets` instead of these constants.
+  private static let eveningHour: Double = 19
+  private static let postMealGraceMin: Double = 30
+
+  /// Right band start: only set when the day's last meal happened, we're
+  /// past `eveningHour`, and grace has elapsed. Mirrors `computeFastingState`
+  /// case B — for non-today dates we anchor "now" to end-of-day so completed
+  /// days still surface their post-dinner fast.
+  private var fastingFromHour: Double? {
+    guard let last = todayMealHours.last else { return nil }
+    let anchorHour = isToday ? nowHour : 24
+    guard anchorHour >= Self.eveningHour else { return nil }
+    let elapsedMin = (anchorHour - last) * 60
+    guard elapsedMin >= Self.postMealGraceMin else { return nil }
+    return last
+  }
+
+  @ViewBuilder
+  private func fastingBands(width: CGFloat) -> some View {
+    // Left (overnight) — wake → first meal.
+    if let first = todayMealHours.first {
+      let start = wakeHour ?? 0
+      if first > start {
+        Capsule(style: .continuous)
+          .fill(fastingColor)
+          .frame(width: max(0, (pct(first) - pct(start)) * width / 100), height: 2)
+          .position(x: ((pct(start) + pct(first)) / 2) * width / 100, y: 14)
+      }
+    }
+    // Right (post-dinner) — last meal → now (or bedtime, whichever first).
+    if let from = fastingFromHour {
+      let cap = isToday ? nowHour : 24
+      let end = min(cap, moonHour ?? 24)
+      if end > from {
+        Capsule(style: .continuous)
+          .fill(fastingColor)
+          .frame(width: max(0, (pct(end) - pct(from)) * width / 100), height: 2)
+          .position(x: ((pct(from) + pct(end)) / 2) * width / 100, y: 14)
+      }
+    }
+  }
+
+  /// Moon visibility — for non-today dates, always show. For today, only
+  /// show once bedtime is "approaching" (within 4h) so the homepage stays
+  /// clean in the morning and only flags bed time as evening sets in.
+  private var shouldShowMoon: Bool {
+    guard let moon = moonHour, moon < 24 else { return false }
+    if !isToday { return true }
+    if nowHour >= moon { return false }       // past bedtime → hide
+    return moon - nowHour <= 4
+  }
+
+  /// Fades the moon from 0.4 (4h out) → 1.0 (at bedtime) so it gets more
+  /// prominent the closer the user gets.
+  private var moonOpacity: Double {
+    guard isToday, let moon = moonHour else { return 0.7 }
+    let hoursUntil = max(0, min(4, moon - nowHour))
+    return 0.4 + (1.0 - hoursUntil / 4) * 0.6
+  }
+
   private func barPill(_ b: Bar, width: CGFloat) -> some View {
     let x = pct(b.startHour) * width / 100
     let w = max(8, pct(b.endHour - b.startHour + windowStart) * width / 100)
     return RoundedRectangle(cornerRadius: 3, style: .continuous)
       .fill(b.color)
-      .frame(width: w, height: b.thin ? 4 : 8)
+      .frame(width: w, height: b.thin ? 3 : 8)
       .frame(maxHeight: .infinity)
       .position(x: x + w / 2, y: 14)
   }
 
   private func dot(_ c: Cluster, width: CGFloat) -> some View {
-    let h: CGFloat = 8
-    let w = min(CGFloat(20), CGFloat(10 + (c.count - 1) * 3))
-    return Capsule(style: .continuous)
+    // Circle (not capsule) — width == height so multi-event clusters grow
+    // in both dimensions instead of stretching horizontally into a pill.
+    let size = min(CGFloat(14), CGFloat(8 + (c.count - 1) * 2))
+    return Circle()
       .fill(c.color)
-      .overlay(Capsule(style: .continuous).stroke(Theme.paperBackground, lineWidth: 1))
-      .frame(width: w, height: h)
+      .overlay(Circle().stroke(Theme.paperBackground, lineWidth: 1))
+      .frame(width: size, height: size)
       .position(x: pct(c.hour) * width / 100, y: 14)
   }
 
@@ -221,7 +316,7 @@ struct DayTimelineView: View {
 
   private var nowHour: Double {
     let cal = Calendar.current
-    let comps = cal.dateComponents([.hour, .minute], from: Date())
+    let comps = cal.dateComponents([.hour, .minute], from: clock.now)
     return Double(comps.hour ?? 0) + Double(comps.minute ?? 0) / 60
   }
 
@@ -270,7 +365,11 @@ struct DayTimelineView: View {
     for e in supplements where e.done {
       if let t = e.time, let h = parseHHMM(t) { values.append(h) }
     }
+    for c in chores where c.lastCompleted == date {
+      if let t = c.lastCompletedTime, let h = parseHHMM(t) { values.append(h) }
+    }
     for s in trainingSessions { values.append(s.endHour) }
+    for b in calendarBars { values.append(b.endHour) }
     return values.max() ?? 0
   }
 
@@ -308,8 +407,37 @@ struct DayTimelineView: View {
     }
   }
 
-  /// Duration bars (training only for now — calendar pills could join later).
-  private var bars: [Bar] { trainingSessions }
+  /// Calendar events that overlap `date`, rendered as thin pills from
+  /// start → end. All-day events (no real time-of-day) are skipped — they
+  /// would span the entire rail and drown out everything else.
+  private var calendarBars: [Bar] {
+    let cal = Foundation.Calendar.current
+    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+    guard let dayStart = fmt.date(from: date),
+          let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart) else { return [] }
+    let calColor = theme.color(for: "calendar")
+    var out: [Bar] = []
+    for e in calendar {
+      if e.isAllDay { continue }
+      // Clamp the event to today's bounds so a meeting that crosses
+      // midnight still renders correctly on each day it touches.
+      let s = max(e.startDate, dayStart)
+      let f = min(e.endDate, dayEnd)
+      guard f > s else { continue }
+      let startH = hourOfDay(s, in: cal, dayStart: dayStart)
+      let endH = hourOfDay(f, in: cal, dayStart: dayStart)
+      guard endH > startH else { continue }
+      out.append(Bar(startHour: startH, endHour: endH, color: calColor, thin: true))
+    }
+    return out
+  }
+
+  private func hourOfDay(_ d: Date, in cal: Foundation.Calendar, dayStart: Date) -> Double {
+    let secs = d.timeIntervalSince(dayStart)
+    return max(0, min(24, secs / 3600))
+  }
+
+  private var bars: [Bar] { trainingSessions + calendarBars }
 
   private var clusters: [Cluster] {
     // (color, ~10-min bucket) keys collapse adjacent same-section events.
@@ -357,10 +485,11 @@ struct DayTimelineView: View {
       let hhmm = String(ts.dropFirst(11).prefix(5))
       if let h = parseHHMM(hhmm) { add(h, color: cT) }
     }
-    // Chores don't have a per-completion timestamp on ChoreItem yet;
-    // they're skipped here. Calendar pills also TBD.
-    _ = chores
-    _ = cR
+    // Chores — dot at last_completed_time for each chore checked off
+    // today. Matches web's today-timeline keying on `last_completed_time`.
+    for c in chores where c.lastCompleted == date {
+      if let t = c.lastCompletedTime, let h = parseHHMM(t) { add(h, color: cR) }
+    }
     return Array(byKey.values).sorted { $0.hour < $1.hour }
   }
 

@@ -41,7 +41,7 @@ struct AirDestinationView: View {
       }
       if !loading && history.isEmpty && summary == nil {
         ContentUnavailableView("No air data",
-                               systemImage: "wind",
+                               systemImage: theme.icon(for: "air"),
                                description: Text("Check your sensor connection in the webapp."))
       }
     }

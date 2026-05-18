@@ -38,6 +38,12 @@ struct ModuleTile: View {
     /// Useful when bars represent a score against a fixed target (e.g.
     /// sleep score / 100), where seeing the gap to 100 is the point.
     var ceiling: Int? = nil
+    /// When set, each bar becomes a two-tone stack: `values[i]` in full
+    /// accent on the bottom, `secondaryValues[i]` in a lighter shade on
+    /// top. Both arrays are pre-normalized into a 0…100 total range
+    /// (each series independently scaled, mirroring the webapp's
+    /// training overview where strength + cardio are charted together).
+    var secondaryValues: [Int]? = nil
   }
 
   struct ActionButton {
@@ -168,7 +174,8 @@ private struct HistoryView: View {
                 accent: accent,
                 emphasizedIndex: row.todayIndex ?? (row.values.count - 1),
                 dayLabels: row.showDayLabels ? Self.weekdayLabels(count: row.values.count) : nil,
-                ceiling: row.ceiling)
+                ceiling: row.ceiling,
+                secondaryValues: row.secondaryValues)
         .frame(height: row.showDayLabels ? 72 : 56)
     }
   }
@@ -201,6 +208,12 @@ struct Histogram: View {
   var emphasizedIndex: Int? = nil
   var dayLabels: [String]? = nil
   var ceiling: Int? = nil
+  /// Companion series stacked on top of `values` in a lighter accent
+  /// shade. Both series share a fixed 0…100 ceiling and the caller is
+  /// responsible for pre-normalizing them so `values[i] + secondaryValues[i]`
+  /// never exceeds 100. Mirrors the two-series stacked bar in the
+  /// webapp's training overview (strength + cardio).
+  var secondaryValues: [Int]? = nil
 
   var body: some View {
     GeometryReader { geo in
@@ -213,7 +226,21 @@ struct Histogram: View {
       VStack(spacing: 2) {
         HStack(alignment: .bottom, spacing: gap) {
           ForEach(Array(values.enumerated()), id: \.offset) { idx, v in
-            if let ceiling, ceiling > 0 {
+            if let secondaryValues, idx < secondaryValues.count {
+              let primaryH = barsH * max(0, min(1, CGFloat(v) / 100))
+              let secH = barsH * max(0, min(1, CGFloat(secondaryValues[idx]) / 100))
+              VStack(spacing: 0) {
+                Spacer(minLength: 0)
+                Rectangle()
+                  .fill(accent.opacity(0.35))
+                  .frame(height: secH)
+                Rectangle()
+                  .fill(accent)
+                  .frame(height: primaryH)
+              }
+              .frame(width: barW, height: barsH)
+              .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+            } else if let ceiling, ceiling > 0 {
               let frac = max(0, min(1, CGFloat(v) / CGFloat(ceiling)))
               let fillH = barsH * frac
               let restH = barsH - fillH

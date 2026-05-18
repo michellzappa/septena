@@ -48,7 +48,7 @@ struct BodyDestinationView: View {
       }
       if !loading && rows.isEmpty {
         ContentUnavailableView("No Withings data",
-                               systemImage: "scalemass",
+                               systemImage: theme.icon(for: "body"),
                                description: Text("Check your Withings sync in the webapp."))
       }
     }
@@ -228,6 +228,17 @@ struct BodyDestinationView: View {
     if !points.isEmpty {
       let trend = showTrend ? linearTrend(points.map { $0.value }) : nil
       let projection = trend.map { projectedValue($0, count: points.count, days: 7) }
+      let yDomain: ClosedRange<Double> = {
+        var values = points.map { $0.value }
+        if let t = trend {
+          values.append(t.intercept)
+          values.append(t.slope * Double(points.count + 6) + t.intercept)
+        }
+        let lo = values.min() ?? 0
+        let hi = values.max() ?? 1
+        let pad = max((hi - lo) * 0.1, 0.5)
+        return (lo - pad)...(hi + pad)
+      }()
       VStack(alignment: .leading, spacing: 8) {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
           Text(title)
@@ -267,6 +278,7 @@ struct BodyDestinationView: View {
           }
         }
         .chartXAxis(.hidden)
+        .chartYScale(domain: yDomain)
         .frame(height: 160)
       }
       .padding(12)
