@@ -6,11 +6,13 @@ import SwiftUI
 
 struct CannabisDestinationView: View {
   @Environment(SeptenaClient.self) private var client
+  @Environment(HTTPOutbox.self) private var outbox
   @Environment(SectionTheme.self) private var theme
 
   @State private var today: CannabisDayResponse? = nil
   @State private var history: [CannabisHistoryPoint] = []
   @State private var loading = true
+  @State private var editing: CannabisEntry? = nil
 
   private var accent: Color { theme.color(for: "cannabis") }
 
@@ -20,13 +22,25 @@ struct CannabisDestinationView: View {
       Section("Today") {
         if let today, !today.entries.isEmpty {
           ForEach(Array(today.entries.reversed())) { entry in
-            LogRow(
-              title: methodLabel(entry.method),
-              detail: detailLine(entry),
-              trailing: entry.time,
-              accent: accent
-            )
+            Button {
+              editing = entry
+            } label: {
+              LogRow(
+                title: methodLabel(entry.method),
+                detail: detailLine(entry),
+                trailing: entry.time,
+                accent: accent
+              )
+            }
+            .buttonStyle(.plain)
             .listRowInsets(EdgeInsets())
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+              Button(role: .destructive) {
+                delete(entry)
+              } label: {
+                Label("Delete", systemImage: "trash")
+              }
+            }
           }
         } else if !loading {
           Text("Nothing logged yet.")
@@ -64,6 +78,47 @@ struct CannabisDestinationView: View {
       paintFromCache()
       await load()
     }
+    .sheet(item: $editing) { entry in
+      EditCannabisEntrySheet(
+        date: today?.date ?? SeptenaDate.today,
+        original: entry,
+        onSave: { updated in applyLocalUpdate(updated) }
+      )
+    }
+  }
+
+  private func applyLocalUpdate(_ updated: CannabisEntry) {
+    guard let t = today else { return }
+    var entries = t.entries
+    guard let idx = entries.firstIndex(where: { $0.id == updated.id }) else { return }
+    entries[idx] = updated
+    today = CannabisDayResponse(
+      date: t.date,
+      entries: entries,
+      sessionCount: t.sessionCount,
+      totalG: entries.compactMap(\.grams).reduce(0, +)
+    )
+    if let today { ResponseCache.save(today, forKey: CacheKey.today) }
+  }
+
+  private func delete(_ entry: CannabisEntry) {
+    guard let t = today else { return }
+    let day = t.date
+    outbox.enqueue(
+      method: "DELETE",
+      path: "/api/cannabis/entry/\(entry.id)?date=\(day)",
+      body: nil,
+      kind: "cannabis.delete"
+    )
+    let entries = t.entries.filter { $0.id != entry.id }
+    today = CannabisDayResponse(
+      date: t.date,
+      entries: entries,
+      sessionCount: max(0, t.sessionCount - 1),
+      totalG: entries.compactMap(\.grams).reduce(0, +)
+    )
+    if let today { ResponseCache.save(today, forKey: CacheKey.today) }
+    Haptics.warning()
   }
 
   private var summary: some View {

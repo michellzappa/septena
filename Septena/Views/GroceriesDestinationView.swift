@@ -13,6 +13,7 @@ struct GroceriesDestinationView: View {
   @State private var items: [GroceryItem] = []
   @State private var pending: Set<String> = []
   @State private var loading = true
+  @State private var editing: GroceryItem? = nil
 
   private var accent: Color { theme.color(for: "groceries") }
 
@@ -33,11 +34,21 @@ struct GroceriesDestinationView: View {
       if !low.isEmpty {
         Section {
           ForEach(low) { item in
-            GroceryRow(item: item,
-                       pending: pending.contains(item.id),
-                       accent: accent,
-                       onToggle: { toggle(item) })
-              .listRowInsets(EdgeInsets())
+            Button { editing = item } label: {
+              GroceryRow(item: item,
+                         pending: pending.contains(item.id),
+                         accent: accent,
+                         onToggle: { toggle(item) })
+            }
+            .buttonStyle(.plain)
+            .listRowInsets(EdgeInsets())
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+              Button(role: .destructive) {
+                delete(item)
+              } label: {
+                Label("Delete", systemImage: "trash")
+              }
+            }
           }
         } header: {
           HStack { Text("Shopping list"); Spacer(); Text("\(low.count)").monospacedDigit() }
@@ -46,11 +57,21 @@ struct GroceriesDestinationView: View {
       if !stocked.isEmpty {
         Section {
           ForEach(stocked) { item in
-            GroceryRow(item: item,
-                       pending: pending.contains(item.id),
-                       accent: accent,
-                       onToggle: { toggle(item) })
-              .listRowInsets(EdgeInsets())
+            Button { editing = item } label: {
+              GroceryRow(item: item,
+                         pending: pending.contains(item.id),
+                         accent: accent,
+                         onToggle: { toggle(item) })
+            }
+            .buttonStyle(.plain)
+            .listRowInsets(EdgeInsets())
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+              Button(role: .destructive) {
+                delete(item)
+              } label: {
+                Label("Delete", systemImage: "trash")
+              }
+            }
           }
         } header: {
           Text("In stock")
@@ -77,6 +98,30 @@ struct GroceriesDestinationView: View {
       paintFromCache()
       await load()
     }
+    .sheet(item: $editing) { item in
+      EditGroceryItemSheet(
+        original: item,
+        onSave: { updated in applyLocalUpdate(updated) }
+      )
+    }
+  }
+
+  private func applyLocalUpdate(_ updated: GroceryItem) {
+    guard let idx = items.firstIndex(where: { $0.id == updated.id }) else { return }
+    items[idx] = updated
+    ResponseCache.save(items, forKey: Self.cacheKey)
+  }
+
+  private func delete(_ item: GroceryItem) {
+    outbox.enqueue(
+      method: "DELETE",
+      path: "/api/groceries/item/\(item.id)",
+      body: nil,
+      kind: "groceries.delete"
+    )
+    items.removeAll { $0.id == item.id }
+    ResponseCache.save(items, forKey: Self.cacheKey)
+    Haptics.warning()
   }
 
   // MARK: - Actions

@@ -5,11 +5,13 @@ import SwiftUI
 
 struct CaffeineDestinationView: View {
   @Environment(SeptenaClient.self) private var client
+  @Environment(HTTPOutbox.self) private var outbox
   @Environment(SectionTheme.self) private var theme
 
   @State private var today: CaffeineDayResponse? = nil
   @State private var history: [CaffeineHistoryPoint] = []
   @State private var loading = true
+  @State private var editing: CaffeineEntry? = nil
 
   private var accent: Color { theme.color(for: "caffeine") }
 
@@ -19,13 +21,29 @@ struct CaffeineDestinationView: View {
       Section("Today") {
         if let today, !today.entries.isEmpty {
           ForEach(Array(today.entries.reversed())) { entry in
-            LogRow(
-              title: methodLabel(entry.method),
-              detail: detailLine(entry),
-              trailing: entry.time,
-              accent: accent
-            )
+            // Standard List "tap row → edit" pattern: Button with
+            // `.plain` style preserves the row chrome, swipe action
+            // provides destructive delete. Apple uses this exact shape
+            // in Reminders / Notes for editable list entries.
+            Button {
+              editing = entry
+            } label: {
+              LogRow(
+                title: methodLabel(entry.method),
+                detail: detailLine(entry),
+                trailing: entry.time,
+                accent: accent
+              )
+            }
+            .buttonStyle(.plain)
             .listRowInsets(EdgeInsets())
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+              Button(role: .destructive) {
+                delete(entry)
+              } label: {
+                Label("Delete", systemImage: "trash")
+              }
+            }
           }
         } else if !loading {
           Text("Nothing logged yet.")
@@ -61,6 +79,53 @@ struct CaffeineDestinationView: View {
       paintFromCache()
       await load()
     }
+    .sheet(item: $editing) { entry in
+      EditCaffeineEntrySheet(
+        date: today?.date ?? SeptenaDate.today,
+        original: entry,
+        onSave: { updated in applyLocalUpdate(updated) }
+      )
+    }
+  }
+
+  /// Swap an edited entry into the in-memory `today.entries` so the UI
+  /// reflects the change immediately. The outbox carries the PUT to the
+  /// server; the next `load()` will reconcile.
+  private func applyLocalUpdate(_ updated: CaffeineEntry) {
+    guard var t = today else { return }
+    if let idx = t.entries.firstIndex(where: { $0.id == updated.id }) {
+      var entries = t.entries
+      entries[idx] = updated
+      t = CaffeineDayResponse(
+        date: t.date,
+        entries: entries,
+        sessionCount: t.sessionCount,
+        totalG: entries.reduce(0.0) { $0 + ($1.grams ?? 0) }
+      )
+      today = t
+      ResponseCache.save(t, forKey: CacheKey.today)
+    }
+  }
+
+  private func delete(_ entry: CaffeineEntry) {
+    guard var t = today else { return }
+    let day = t.date
+    outbox.enqueue(
+      method: "DELETE",
+      path: "/api/caffeine/entry/\(entry.id)?date=\(day)",
+      body: nil,
+      kind: "caffeine.delete"
+    )
+    let entries = t.entries.filter { $0.id != entry.id }
+    t = CaffeineDayResponse(
+      date: t.date,
+      entries: entries,
+      sessionCount: max(0, t.sessionCount - 1),
+      totalG: entries.reduce(0.0) { $0 + ($1.grams ?? 0) }
+    )
+    today = t
+    ResponseCache.save(t, forKey: CacheKey.today)
+    Haptics.warning()
   }
 
   private enum CacheKey {

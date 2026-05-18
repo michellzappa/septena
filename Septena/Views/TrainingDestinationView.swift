@@ -7,6 +7,7 @@ import SwiftUI
 
 struct TrainingDestinationView: View {
   @Environment(SeptenaClient.self) private var client
+  @Environment(HTTPOutbox.self) private var outbox
   @Environment(SectionTheme.self) private var theme
   @Environment(NavigationState.self) private var nav
   @Environment(TrainingDraftStore.self) private var draftStore
@@ -14,6 +15,7 @@ struct TrainingDestinationView: View {
   @State private var entries: [ExerciseEntry] = []
   @State private var cardio: CardioHistoryResponse? = nil
   @State private var loading = true
+  @State private var editing: ExerciseEntry? = nil
 
   private var accent: Color { theme.color(for: "training") }
 
@@ -44,13 +46,28 @@ struct TrainingDestinationView: View {
       ForEach(sessions, id: \.key) { block in
         Section {
           ForEach(block.entries) { entry in
-            LogRow(
-              title: entry.exercise ?? "—",
-              detail: detailLine(entry),
-              trailing: entry.loggedAt.map(timeOnly),
-              accent: accent
-            )
+            Button {
+              guard entry.file != nil else { return }
+              editing = entry
+            } label: {
+              LogRow(
+                title: entry.exercise ?? "—",
+                detail: detailLine(entry),
+                trailing: entry.loggedAt.map(timeOnly),
+                accent: accent
+              )
+            }
+            .buttonStyle(.plain)
             .listRowInsets(EdgeInsets())
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+              if entry.file != nil {
+                Button(role: .destructive) {
+                  delete(entry)
+                } label: {
+                  Label("Delete", systemImage: "trash")
+                }
+              }
+            }
           }
         } header: {
           HStack {
@@ -90,6 +107,31 @@ struct TrainingDestinationView: View {
         .tint(accent)
       }
     }
+    .sheet(item: $editing) { entry in
+      EditExerciseEntrySheet(
+        original: entry,
+        onSave: { updated in applyLocalUpdate(updated) }
+      )
+    }
+  }
+
+  private func applyLocalUpdate(_ updated: ExerciseEntry) {
+    guard let idx = entries.firstIndex(where: { $0.id == updated.id }) else { return }
+    entries[idx] = updated
+    ResponseCache.save(entries, forKey: CacheKey.entries)
+  }
+
+  private func delete(_ entry: ExerciseEntry) {
+    guard let file = entry.file else { return }
+    outbox.enqueue(
+      method: "DELETE",
+      path: "/api/training/entries",
+      body: ["file": file],
+      kind: "training.delete"
+    )
+    entries.removeAll { $0.file == file }
+    ResponseCache.save(entries, forKey: CacheKey.entries)
+    Haptics.warning()
   }
 
   // MARK: - Summary

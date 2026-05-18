@@ -5,11 +5,13 @@ import SwiftUI
 
 struct GutDestinationView: View {
   @Environment(SeptenaClient.self) private var client
+  @Environment(HTTPOutbox.self) private var outbox
   @Environment(SectionTheme.self) private var theme
 
   @State private var today: GutDayResponse? = nil
   @State private var history: [GutHistoryPoint] = []
   @State private var loading = true
+  @State private var editing: GutEntry? = nil
 
   private var accent: Color { theme.color(for: "gut") }
 
@@ -19,13 +21,25 @@ struct GutDestinationView: View {
       Section("Today") {
         if let today, !today.entries.isEmpty {
           ForEach(Array(today.entries.reversed())) { entry in
-            LogRow(
-              title: bristolLabel(entry.bristol),
-              detail: detailLine(entry),
-              trailing: entry.time,
-              accent: accent
-            )
+            Button {
+              editing = entry
+            } label: {
+              LogRow(
+                title: bristolLabel(entry.bristol),
+                detail: detailLine(entry),
+                trailing: entry.time,
+                accent: accent
+              )
+            }
+            .buttonStyle(.plain)
             .listRowInsets(EdgeInsets())
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+              Button(role: .destructive) {
+                delete(entry)
+              } label: {
+                Label("Delete", systemImage: "trash")
+              }
+            }
           }
         } else if !loading {
           Text("Nothing logged yet.")
@@ -61,6 +75,49 @@ struct GutDestinationView: View {
       paintFromCache()
       await load()
     }
+    .sheet(item: $editing) { entry in
+      EditGutEntrySheet(
+        date: today?.date ?? SeptenaDate.today,
+        original: entry,
+        onSave: { updated in applyLocalUpdate(updated) }
+      )
+    }
+  }
+
+  private func applyLocalUpdate(_ updated: GutEntry) {
+    guard let t = today else { return }
+    var entries = t.entries
+    guard let idx = entries.firstIndex(where: { $0.id == updated.id }) else { return }
+    entries[idx] = updated
+    today = GutDayResponse(
+      date: t.date,
+      entries: entries,
+      movementCount: t.movementCount,
+      maxBlood: entries.map(\.blood).max() ?? 0,
+      totalDiscomfortH: entries.compactMap(\.discomfortHours).reduce(0, +)
+    )
+    if let today { ResponseCache.save(today, forKey: CacheKey.today) }
+  }
+
+  private func delete(_ entry: GutEntry) {
+    guard let t = today else { return }
+    let day = t.date
+    outbox.enqueue(
+      method: "DELETE",
+      path: "/api/gut/entry/\(entry.id)?date=\(day)",
+      body: nil,
+      kind: "gut.delete"
+    )
+    let entries = t.entries.filter { $0.id != entry.id }
+    today = GutDayResponse(
+      date: t.date,
+      entries: entries,
+      movementCount: max(0, t.movementCount - 1),
+      maxBlood: entries.map(\.blood).max() ?? 0,
+      totalDiscomfortH: entries.compactMap(\.discomfortHours).reduce(0, +)
+    )
+    if let today { ResponseCache.save(today, forKey: CacheKey.today) }
+    Haptics.warning()
   }
 
   private var summary: some View {
