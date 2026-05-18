@@ -768,69 +768,96 @@ struct TaskListView: View {
         // menu opens. iOS gets natural press feedback from long-press, so
         // the shim is a no-op there.
         .septenaOnRightClick { selectedTaskId = task.id }
-        // Long-press menu — temporary stand-in for swipe-to-reveal (which is
-        // List-only in SwiftUI). Each item fires a haptic when selected.
-        .contextMenu {
-          // Hide "Move to Today" whenever the row is already surfacing on
-          // the Today view — either via the today flag or because its
-          // scheduled/due date pulled it in. Only show "Remove from Today"
-          // when the today flag is actually set (that's the only state the
-          // toggle can undo).
-          if task.today {
-            Button {
-              Haptics.tick()
-              mutator.moveToToday(id: task.id, today: false)
-              Task { await load() }
-            } label: {
-              Label("Remove from Today", systemImage: "sun.min")
-            }
-          } else if filter != .today {
-            Button {
-              Haptics.tick()
-              mutator.moveToToday(id: task.id, today: true)
-              Task { await load() }
-            } label: {
-              Label("Move to Today", systemImage: "sun.max.fill")
-            }
-          }
+        // Long-press (iOS) / right-click (macOS) context menu. Shares the
+        // exact same Buttons as the trailing ellipsis Menu on the row so
+        // both entry points stay in lockstep.
+        .contextMenu { rowActionsMenu(for: task) }
+    }
+  }
+
+  /// Single source of truth for per-row actions. Used by both the trailing
+  /// ellipsis `Menu` on the row and the long-press / right-click
+  /// `.contextMenu` — keeping one builder means the two entry points can
+  /// never drift apart.
+  @ViewBuilder
+  private func rowActionsMenu(for task: SeptenaTask) -> some View {
+    // Smart-sort suggestions — used to render as a separate trailing chip
+    // on Inbox rows, but folded in here so all per-row actions live in one
+    // place. SwiftUI `Section` inside a `Menu` is the standard way to group
+    // related items with a header.
+    if filter == .inbox,
+       task.status == .open,
+       let top = suggestionEngine.topSuggestion(for: task.id) {
+      let ranked = suggestionEngine.suggestions[task.id] ?? [top]
+      Section("Suggested") {
+        ForEach(Array(ranked.enumerated()), id: \.element) { _, s in
           Button {
-            whenSheet = WhenSheet(taskId: task.id, kind: .scheduled)
+            applySuggestion(task: task, suggestion: s)
           } label: {
-            Label("When…", systemImage: "calendar")
-          }
-          Button {
-            whenSheet = WhenSheet(taskId: task.id, kind: .due)
-          } label: {
-            Label("Deadline…", systemImage: "flag")
-          }
-          Button {
-            moveTargetId = task.id
-            showingMoveSheet = true
-          } label: {
-            Label("Move…", systemImage: "folder")
-          }
-          Button {
-            repeatTargetId = task.id; showingRepeatSheet = true
-          } label: {
-            Label("Repeat…", systemImage: "repeat")
-          }
-          Divider()
-          Button {
-            applyCancel(task.id)
-          } label: {
-            // Labelled "Cancel Task" (not "Cancel") so iOS doesn't treat
-            // this as a dismiss button — a bare "Cancel" inside a menu has
-            // shown up as no-op in past iOS builds.
-            Label("Cancel Task", systemImage: "xmark.circle")
-          }
-          Divider()
-          Button(role: .destructive) {
-            Haptics.warning()
-            applyDelete(task.id)
-          } label: {
-            Label("Delete", systemImage: "trash")
+            Label("Move to \(s.title)",
+                  systemImage: s.kind == .area ? "tray" : "folder")
           }
         }
+      }
+      Divider()
+    }
+    // Hide "Move to Today" whenever the row is already surfacing on the
+    // Today view — either via the today flag or because its scheduled/due
+    // date pulled it in. Only show "Remove from Today" when the today flag
+    // is actually set (that's the only state the toggle can undo).
+    if task.today {
+      Button {
+        Haptics.tick()
+        mutator.moveToToday(id: task.id, today: false)
+        Task { await load() }
+      } label: {
+        Label("Remove from Today", systemImage: "sun.min")
+      }
+    } else if filter != .today {
+      Button {
+        Haptics.tick()
+        mutator.moveToToday(id: task.id, today: true)
+        Task { await load() }
+      } label: {
+        Label("Move to Today", systemImage: "sun.max.fill")
+      }
+    }
+    Button {
+      whenSheet = WhenSheet(taskId: task.id, kind: .scheduled)
+    } label: {
+      Label("When…", systemImage: "calendar")
+    }
+    Button {
+      whenSheet = WhenSheet(taskId: task.id, kind: .due)
+    } label: {
+      Label("Deadline…", systemImage: "flag")
+    }
+    Button {
+      moveTargetId = task.id
+      showingMoveSheet = true
+    } label: {
+      Label("Move…", systemImage: "folder")
+    }
+    Button {
+      repeatTargetId = task.id; showingRepeatSheet = true
+    } label: {
+      Label("Repeat…", systemImage: "repeat")
+    }
+    Divider()
+    Button {
+      applyCancel(task.id)
+    } label: {
+      // Labelled "Cancel Task" (not "Cancel") so iOS doesn't treat this as
+      // a dismiss button — a bare "Cancel" inside a menu has shown up as
+      // no-op in past iOS builds.
+      Label("Cancel Task", systemImage: "xmark.circle")
+    }
+    Divider()
+    Button(role: .destructive) {
+      Haptics.warning()
+      applyDelete(task.id)
+    } label: {
+      Label("Delete", systemImage: "trash")
     }
   }
 
@@ -877,10 +904,6 @@ struct TaskListView: View {
           .font(.system(size: 12))
           .foregroundStyle(Theme.inkSecondary)
       }
-      // Local-embedding "Move to X" chip — only ever appears on Inbox rows
-      // where SuggestionEngine has a confident target. One tap moves the
-      // task and the chip vanishes.
-      suggestionChip(task)
       // Trailing date / status — one clear signal per row. See
       // `trailingDate` for the full rule set.
       trailingDate(task)
@@ -926,50 +949,6 @@ struct TaskListView: View {
     RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
       .fill(fill)
       .padding(.horizontal, Theme.hPadding - 6)
-  }
-
-  /// Inbox-only round "sort" button. Click opens a ranked dropdown of
-  /// candidate projects/areas — picking one moves the task immediately. No
-  /// label on the button itself; the icon alone is the affordance, the menu
-  /// is where the choices live. "Not this" trains a per-target rejection.
-  @ViewBuilder
-  private func suggestionChip(_ task: SeptenaTask) -> some View {
-    if filter == .inbox,
-       task.status == .open,
-       let top = suggestionEngine.topSuggestion(for: task.id) {
-      let ranked = suggestionEngine.suggestions[task.id] ?? [top]
-      Menu {
-        ForEach(Array(ranked.enumerated()), id: \.element) { _, s in
-          Button {
-            applySuggestion(task: task, suggestion: s)
-          } label: {
-            Label("Move to \(s.title)",
-                  systemImage: s.kind == .area ? "tray" : "folder")
-          }
-        }
-        Divider()
-        Button {
-          moveTargetId = task.id
-          showingMoveSheet = true
-        } label: {
-          Label("Other…", systemImage: "ellipsis")
-        }
-      } label: {
-        Image(systemName: "arrow.right")
-          .font(.system(size: 12, weight: .semibold))
-          .foregroundStyle(theme.accent)
-          .frame(width: 26, height: 26)
-          .background(
-            Circle().fill(theme.accent.opacity(0.15))
-          )
-          .contentShape(Circle())
-      }
-      .menuStyle(.button)
-      .menuIndicator(.hidden)
-      .buttonStyle(.plain)
-      .fixedSize()
-      .help("Suggest a project or area for this task")
-    }
   }
 
   private func applySuggestion(task: SeptenaTask,
