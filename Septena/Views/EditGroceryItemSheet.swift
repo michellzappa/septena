@@ -29,8 +29,7 @@ struct EditGroceryItemSheet: View {
           TextField("Emoji", text: $emoji)
           Picker("Category", selection: $category) {
             ForEach(categories) { cat in
-              Text(cat.emoji.isEmpty ? cat.name : "\(cat.emoji) \(cat.name)")
-                .tag(cat.id)
+              Text(cat.name).tag(cat.id)
             }
           }
         }

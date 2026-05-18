@@ -25,7 +25,7 @@ struct GroceriesDestinationView: View {
 
   private func displayName(forCategory id: String) -> String {
     if let cat = categoryByID[id] {
-      return cat.emoji.isEmpty ? cat.name : "\(cat.emoji) \(cat.name)"
+      return cat.name
     }
     return id.isEmpty ? "In stock" : id.capitalized
   }
@@ -73,7 +73,7 @@ struct GroceriesDestinationView: View {
             }
             .buttonStyle(.plain)
             .listRowInsets(EdgeInsets())
-            .contextMenu {
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
               Button(role: .destructive) {
                 delete(item)
               } label: {
@@ -98,7 +98,7 @@ struct GroceriesDestinationView: View {
             }
             .buttonStyle(.plain)
             .listRowInsets(EdgeInsets())
-            .contextMenu {
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
               Button(role: .destructive) {
                 delete(item)
               } label: {
@@ -112,7 +112,7 @@ struct GroceriesDestinationView: View {
       }
       if !loading && items.isEmpty {
         ContentUnavailableView("No groceries yet",
-                               systemImage: theme.icon(for: "groceries"),
+                               systemImage: "basket",
                                description: Text("Set up your pantry in the webapp."))
       }
     }
