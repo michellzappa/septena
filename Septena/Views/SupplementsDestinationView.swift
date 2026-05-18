@@ -11,6 +11,7 @@ struct SupplementsDestinationView: View {
   @Environment(SectionTheme.self) private var theme
 
   @State private var model = NextItemsModel()
+  @State private var editing: SupplementDayItem? = nil
 
   private var accent: Color { theme.color(for: "supplements") }
 
@@ -19,8 +20,18 @@ struct SupplementsDestinationView: View {
       summary
       Section {
         ForEach(model.supplements) { supp in
-          SupplementRow(supplement: supp, model: model, outbox: outbox, tint: accent)
-            .listRowInsets(EdgeInsets())
+          Button { editing = supp } label: {
+            SupplementRow(supplement: supp, model: model, outbox: outbox, tint: accent)
+          }
+          .buttonStyle(.plain)
+          .listRowInsets(EdgeInsets())
+          .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+              delete(supp)
+            } label: {
+              Label("Delete", systemImage: "trash")
+            }
+          }
         }
       } header: {
         Text("Today")
@@ -46,6 +57,27 @@ struct SupplementsDestinationView: View {
       model.paintFromCache()
       await model.load(client: client)
     }
+    .sheet(item: $editing) { supp in
+      EditSupplementSheet(
+        original: supp,
+        onSave: { updated in
+          if let idx = model.supplements.firstIndex(where: { $0.id == updated.id }) {
+            model.supplements[idx] = updated
+          }
+        }
+      )
+    }
+  }
+
+  private func delete(_ supp: SupplementDayItem) {
+    outbox.enqueue(
+      method: "DELETE",
+      path: "/api/supplements/delete/\(supp.id)",
+      body: nil,
+      kind: "supplements.delete"
+    )
+    model.supplements.removeAll { $0.id == supp.id }
+    Haptics.warning()
   }
 
   private var summary: some View {

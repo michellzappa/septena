@@ -12,6 +12,7 @@ struct HabitsDestinationView: View {
   @Environment(SectionTheme.self) private var theme
 
   @State private var model = NextItemsModel()
+  @State private var editing: HabitDayItem? = nil
 
   /// Server section key; accent comes from the user's Septena config so the
   /// hue matches the webapp / sidebar / Next tab without hard-coding.
@@ -39,6 +40,28 @@ struct HabitsDestinationView: View {
       model.paintFromCache()
       await model.load(client: client)
     }
+    .sheet(item: $editing) { habit in
+      EditHabitSheet(
+        original: habit,
+        buckets: model.habitBuckets,
+        onSave: { updated in
+          if let idx = model.habits.firstIndex(where: { $0.id == updated.id }) {
+            model.habits[idx] = updated
+          }
+        }
+      )
+    }
+  }
+
+  private func delete(_ habit: HabitDayItem) {
+    outbox.enqueue(
+      method: "DELETE",
+      path: "/api/habits/delete/\(habit.id)",
+      body: nil,
+      kind: "habits.delete"
+    )
+    model.habits.removeAll { $0.id == habit.id }
+    Haptics.warning()
   }
 
   // MARK: - Sections
@@ -79,8 +102,25 @@ struct HabitsDestinationView: View {
     if !items.isEmpty {
       Section {
         ForEach(items) { habit in
-          HabitRow(habit: habit, model: model, outbox: outbox, tint: accent)
-            .listRowInsets(EdgeInsets())
+          Button { editing = habit } label: {
+            HabitRow(habit: habit, model: model, outbox: outbox, tint: accent)
+          }
+          .buttonStyle(.plain)
+          .listRowInsets(EdgeInsets())
+          .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive) {
+              delete(habit)
+            } label: {
+              Label("Delete", systemImage: "trash")
+            }
+            Button {
+              model.skipHabit(habit, skipped: !habit.skipped, outbox: outbox)
+            } label: {
+              Label(habit.skipped ? "Unskip" : "Skip",
+                    systemImage: habit.skipped ? "arrow.uturn.left" : "forward.end")
+            }
+            .tint(Theme.inkSecondary)
+          }
         }
       } header: {
         HStack {

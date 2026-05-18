@@ -12,6 +12,7 @@ struct ChoresDestinationView: View {
   @Environment(SectionTheme.self) private var theme
 
   @State private var model = NextItemsModel()
+  @State private var editing: ChoreItem? = nil
 
   private var accent: Color { theme.color(for: "chores") }
 
@@ -39,24 +40,54 @@ struct ChoresDestinationView: View {
       if !today.isEmpty {
         Section("Today") {
           ForEach(today) { chore in
-            ChoreRow(chore: chore, model: model, outbox: outbox, tint: accent)
-              .listRowInsets(EdgeInsets())
+            Button { editing = chore } label: {
+              ChoreRow(chore: chore, model: model, outbox: outbox, tint: accent)
+            }
+            .buttonStyle(.plain)
+            .listRowInsets(EdgeInsets())
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+              Button(role: .destructive) {
+                delete(chore)
+              } label: {
+                Label("Delete", systemImage: "trash")
+              }
+            }
           }
         }
       }
       if !doneToday.isEmpty {
         Section("Done today") {
           ForEach(doneToday) { chore in
-            ChoreRow(chore: chore, model: model, outbox: outbox, tint: accent)
-              .listRowInsets(EdgeInsets())
+            Button { editing = chore } label: {
+              ChoreRow(chore: chore, model: model, outbox: outbox, tint: accent)
+            }
+            .buttonStyle(.plain)
+            .listRowInsets(EdgeInsets())
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+              Button(role: .destructive) {
+                delete(chore)
+              } label: {
+                Label("Delete", systemImage: "trash")
+              }
+            }
           }
         }
       }
       if !later.isEmpty {
         Section("Later") {
           ForEach(later) { chore in
-            ChoreRow(chore: chore, model: model, outbox: outbox, tint: accent)
-              .listRowInsets(EdgeInsets())
+            Button { editing = chore } label: {
+              ChoreRow(chore: chore, model: model, outbox: outbox, tint: accent)
+            }
+            .buttonStyle(.plain)
+            .listRowInsets(EdgeInsets())
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+              Button(role: .destructive) {
+                delete(chore)
+              } label: {
+                Label("Delete", systemImage: "trash")
+              }
+            }
           }
         }
       }
@@ -76,6 +107,27 @@ struct ChoresDestinationView: View {
       model.paintFromCache()
       await model.load(client: client)
     }
+    .sheet(item: $editing) { chore in
+      EditChoreSheet(
+        original: chore,
+        onSave: { updated in
+          if let idx = model.chores.firstIndex(where: { $0.id == updated.id }) {
+            model.chores[idx] = updated
+          }
+        }
+      )
+    }
+  }
+
+  private func delete(_ chore: ChoreItem) {
+    outbox.enqueue(
+      method: "DELETE",
+      path: "/api/chores/definitions/\(chore.id)",
+      body: nil,
+      kind: "chores.delete"
+    )
+    model.chores.removeAll { $0.id == chore.id }
+    Haptics.warning()
   }
 
   private var summary: some View {
