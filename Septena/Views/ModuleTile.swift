@@ -213,7 +213,6 @@ struct Histogram: View {
       VStack(spacing: 2) {
         HStack(alignment: .bottom, spacing: gap) {
           ForEach(Array(values.enumerated()), id: \.offset) { idx, v in
-            let isEmphasized = idx == emphasizedIndex
             if let ceiling, ceiling > 0 {
               let frac = max(0, min(1, CGFloat(v) / CGFloat(ceiling)))
               let fillH = barsH * frac
@@ -223,7 +222,7 @@ struct Histogram: View {
                   .fill(accent.opacity(0.18))
                   .frame(height: restH)
                 Rectangle()
-                  .fill(accent.opacity(isEmphasized ? 1.0 : 0.55))
+                  .fill(accent)
                   .frame(height: fillH)
               }
               .frame(width: barW, height: barsH)
@@ -231,7 +230,7 @@ struct Histogram: View {
             } else {
               let h = max(CGFloat(v) / CGFloat(maxV) * barsH, 4)
               RoundedRectangle(cornerRadius: 3, style: .continuous)
-                .fill(accent.opacity(isEmphasized ? 1.0 : 0.55))
+                .fill(accent)
                 .frame(width: barW, height: h)
             }
           }

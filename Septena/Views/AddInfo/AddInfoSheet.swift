@@ -86,7 +86,7 @@ private struct RootView: View {
           } label: {
             AddInfoRow(
               title: section.title,
-              systemImage: section.systemImage,
+              systemImage: section.verbSystemImage,
               tint: section.accent(theme: theme),
               accessory: .chevron
             )

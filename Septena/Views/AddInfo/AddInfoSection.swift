@@ -42,24 +42,10 @@ enum AddInfoSection: String, CaseIterable, Identifiable, Hashable {
     }
   }
 
-  /// SF Symbol for the row's leading glyph. Picked to read clearly even
-  /// when the section accent isn't loaded yet (offline / first launch).
-  var systemImage: String {
-    switch self {
-    case .training:    return "figure.strengthtraining.traditional"
-    case .nutrition:   return "fork.knife"
-    case .caffeine:    return "cup.and.saucer.fill"
-    case .cannabis:    return "leaf.fill"
-    case .habits:      return "checkmark.circle"
-    case .supplements: return "pills.fill"
-    case .chores:      return "house.fill"
-    case .gut:         return "drop.fill"
-    case .tasks:       return "checklist"
-    case .groceries:   return "cart.fill"
-    }
-  }
-
-  /// Verb glyph shown trailing the verb in the root list.
+  /// Verb glyph shown as the row's leading icon. Three verbs, three
+  /// icons, 1:1 — mirrors the webapp's quick-log registry. We deliberately
+  /// don't carry per-section SF Symbols: picking a glyph per section is an
+  /// Android/web pattern and made the iOS port feel off.
   var verbSystemImage: String {
     switch verb {
     case .start: return "play.fill"

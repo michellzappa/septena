@@ -458,24 +458,26 @@ struct WeekDashboardView: View {
   // Tasks tab (the full task app); other tiles open a sheet, but Tasks
   // has its own dedicated tab already.
   private var tasksTile: some View {
-    let today = taskCounts.map { $0.todayCount + $0.reviewCount } ?? 0
+    let openToday = taskCounts.map { $0.todayCount + $0.reviewCount } ?? 0
     let inbox = taskCounts?.inboxCount ?? 0
     let upcoming = taskCounts?.upcomingCount ?? 0
-    let open = taskCounts?.openCount ?? 0
+    let doneToday = tasksHistory?.daily.last?.done ?? 0
+    let totalToday = doneToday + openToday
     let bars = tasksHistory?.daily.map(\.done) ?? []
     return Button { tabSelection.current = .tasks } label: {
       ModuleTile(
         title: "Tasks",
         accent: theme.color(for: "tasks"),
-        stats: [.init(label: "Today",    value: "\(today)"),
+        stats: [.init(label: "Today",    value: "\(openToday)"),
                 .init(label: "Inbox",    value: "\(inbox)"),
                 .init(label: "Upcoming", value: "\(upcoming)")],
-        // Today's share of the open backlog — gives a sense of immediate
-        // load against everything still queued. Defaults to a full bar
-        // when open is unknown, so the empty state doesn't read as 0%.
-        progress: .init(label: "Today / open",
-                        current: Double(today),
-                        target: Double(max(open, today, 1))),
+        // Today's completion progress: done so far vs. everything
+        // scheduled for today (done + still open). Defaults to a full
+        // bar when there's nothing today, so the empty state doesn't
+        // read as 0%.
+        progress: .init(label: "Done / today",
+                        current: Double(doneToday),
+                        target: Double(max(totalToday, 1))),
         history: bars.isEmpty
           ? nil
           : .init(label: "7-day completions", values: bars)
@@ -494,7 +496,7 @@ struct WeekDashboardView: View {
         title: "Habits",
         accent: accent,
         stats: [
-          .init(label: "Today",   value: "\(done)/\(max(total, 0))"),
+          .init(label: "Today",   value: "\(done)"),
           .init(label: "Skipped", value: "\(skipped)")
         ],
         progress: .init(
@@ -582,7 +584,7 @@ struct WeekDashboardView: View {
       ModuleTile(
         title: "Supplements",
         accent: accent,
-        stats: [.init(label: "Today", value: "\(done)/\(max(total, 0))")],
+        stats: [.init(label: "Today", value: "\(done)")],
         progress: .init(
           label: "Today's stack",
           current: Double(done),

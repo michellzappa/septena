@@ -146,11 +146,12 @@ struct DayTimelineView: View {
   }
 
   private func dot(_ c: Cluster, width: CGFloat) -> some View {
-    let size = min(CGFloat(14), CGFloat(6 + (c.count - 1) * 2))
-    return Circle()
+    let h: CGFloat = 8
+    let w = min(CGFloat(20), CGFloat(10 + (c.count - 1) * 3))
+    return Capsule(style: .continuous)
       .fill(c.color)
-      .overlay(Circle().stroke(Theme.paperBackground, lineWidth: 1))
-      .frame(width: size, height: size)
+      .overlay(Capsule(style: .continuous).stroke(Theme.paperBackground, lineWidth: 1))
+      .frame(width: w, height: h)
       .position(x: pct(c.hour) * width / 100, y: 14)
   }
 
