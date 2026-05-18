@@ -57,7 +57,21 @@ struct CaffeineDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
-    .task { await load() }
+    .task {
+      paintFromCache()
+      await load()
+    }
+  }
+
+  private enum CacheKey {
+    static let today   = "caffeine.today"
+    static let history = "caffeine.history"
+  }
+
+  private func paintFromCache() {
+    if let v = ResponseCache.load(CaffeineDayResponse.self, forKey: CacheKey.today) { today = v }
+    if let v = ResponseCache.load([CaffeineHistoryPoint].self, forKey: CacheKey.history) { history = v }
+    loading = false
   }
 
   private var summary: some View {
@@ -119,8 +133,14 @@ struct CaffeineDestinationView: View {
     async let t = try? await client.caffeineDay(date: SeptenaDate.today)
     async let h = try? await client.caffeineHistory(days: 7)
     let (tRes, hRes) = await (t, h)
-    today = tRes
-    history = hRes?.daily ?? []
+    if let tRes {
+      today = tRes
+      ResponseCache.save(tRes, forKey: CacheKey.today)
+    }
+    if let daily = hRes?.daily {
+      history = daily
+      ResponseCache.save(daily, forKey: CacheKey.history)
+    }
     loading = false
   }
 }

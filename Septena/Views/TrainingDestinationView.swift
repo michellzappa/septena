@@ -76,7 +76,10 @@ struct TrainingDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
-    .task { await load() }
+    .task {
+      paintFromCache()
+      await load()
+    }
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         Button {
@@ -164,14 +167,31 @@ struct TrainingDestinationView: View {
 
   // MARK: - Loading
 
+  private enum CacheKey {
+    static let entries = "training.entries14"
+    static let cardio  = "training.cardio7"
+  }
+
+  private func paintFromCache() {
+    if let v = ResponseCache.load([ExerciseEntry].self, forKey: CacheKey.entries) { entries = v }
+    if let v = ResponseCache.load(CardioHistoryResponse.self, forKey: CacheKey.cardio) { cardio = v }
+    loading = false
+  }
+
   private func load() async {
     loading = true
     let since = sinceDate(daysBack: 14)
     async let e: [ExerciseEntry]? = try? await client.trainingEntries(since: since)
     async let c: CardioHistoryResponse? = try? await client.trainingCardioHistory(days: 7)
     let (entriesRes, cardioRes) = await (e, c)
-    entries = entriesRes ?? []
-    cardio = cardioRes
+    if let entriesRes {
+      entries = entriesRes
+      ResponseCache.save(entriesRes, forKey: CacheKey.entries)
+    }
+    if let cardioRes {
+      cardio = cardioRes
+      ResponseCache.save(cardioRes, forKey: CacheKey.cardio)
+    }
     loading = false
   }
 

@@ -34,7 +34,10 @@ struct HabitsDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
-    .task { await model.load(client: client) }
+    .task {
+      model.paintFromCache()
+      await model.load(client: client)
+    }
   }
 
   // MARK: - Sections

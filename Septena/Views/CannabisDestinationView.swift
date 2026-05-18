@@ -60,7 +60,10 @@ struct CannabisDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
-    .task { await load() }
+    .task {
+      paintFromCache()
+      await load()
+    }
   }
 
   private var summary: some View {
@@ -116,13 +119,30 @@ struct CannabisDestinationView: View {
     return w.string(from: d)
   }
 
+  private enum CacheKey {
+    static let today   = "cannabis.today"
+    static let history = "cannabis.history"
+  }
+
+  private func paintFromCache() {
+    if let v = ResponseCache.load(CannabisDayResponse.self, forKey: CacheKey.today) { today = v }
+    if let v = ResponseCache.load([CannabisHistoryPoint].self, forKey: CacheKey.history) { history = v }
+    loading = false
+  }
+
   private func load() async {
     loading = true
     async let t = try? await client.cannabisDay(date: SeptenaDate.today)
     async let h = try? await client.cannabisHistory(days: 7)
     let (tRes, hRes) = await (t, h)
-    today = tRes
-    history = hRes?.daily ?? []
+    if let tRes {
+      today = tRes
+      ResponseCache.save(tRes, forKey: CacheKey.today)
+    }
+    if let daily = hRes?.daily {
+      history = daily
+      ResponseCache.save(daily, forKey: CacheKey.history)
+    }
     loading = false
   }
 }

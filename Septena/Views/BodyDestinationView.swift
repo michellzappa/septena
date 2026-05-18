@@ -63,7 +63,10 @@ struct BodyDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
-    .task { await load() }
+    .task {
+      paintFromCache()
+      await load()
+    }
   }
 
   // MARK: - Stats
@@ -298,13 +301,31 @@ struct BodyDestinationView: View {
 
   // MARK: - Loading
 
+  private enum CacheKey {
+    static let rows    = "body.rows"
+    static let targets = "body.targets"
+  }
+
+  private func paintFromCache() {
+    if let v = ResponseCache.load([WithingsRow].self, forKey: CacheKey.rows) { rows = v }
+    if let v = ResponseCache.load(AppTargets.self, forKey: CacheKey.targets) { targets = v }
+    loading = false
+  }
+
   private func load() async {
     loading = true
     async let rs = try? client.withingsHistory(days: 21)
     async let st = try? client.settings()
     let (loadedRows, loadedSettings) = await (rs, st)
-    if let loadedRows { rows = loadedRows.sorted { $0.date > $1.date } }
-    targets = loadedSettings?.targets
+    if let loadedRows {
+      let sorted = loadedRows.sorted { $0.date > $1.date }
+      rows = sorted
+      ResponseCache.save(sorted, forKey: CacheKey.rows)
+    }
+    if let t = loadedSettings?.targets {
+      targets = t
+      ResponseCache.save(t, forKey: CacheKey.targets)
+    }
     loading = false
   }
 

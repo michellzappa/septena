@@ -56,7 +56,10 @@ struct AirDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
-    .task { await load() }
+    .task {
+      paintFromCache()
+      await load()
+    }
   }
 
   private var summarySection: some View {
@@ -137,13 +140,30 @@ struct AirDestinationView: View {
     return p.string(from: d)
   }
 
+  private enum CacheKey {
+    static let summary = "air.summary"
+    static let history = "air.history"
+  }
+
+  private func paintFromCache() {
+    if let v = ResponseCache.load(AirSummary.self, forKey: CacheKey.summary) { summary = v }
+    if let v = ResponseCache.load([AirHistoryPoint].self, forKey: CacheKey.history) { history = v }
+    loading = false
+  }
+
   private func load() async {
     loading = true
     async let s = try? await client.airSummary()
     async let h = try? await client.airHistory(days: 7)
     let (sRes, hRes) = await (s, h)
-    summary = sRes
-    history = hRes?.daily ?? []
+    if let sRes {
+      summary = sRes
+      ResponseCache.save(sRes, forKey: CacheKey.summary)
+    }
+    if let daily = hRes?.daily {
+      history = daily
+      ResponseCache.save(daily, forKey: CacheKey.history)
+    }
     loading = false
   }
 }

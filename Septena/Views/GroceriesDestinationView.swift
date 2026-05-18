@@ -72,7 +72,10 @@ struct GroceriesDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
-    .task { await load() }
+    .task {
+      paintFromCache()
+      await load()
+    }
   }
 
   // MARK: - Actions
@@ -96,10 +99,18 @@ struct GroceriesDestinationView: View {
     }
   }
 
+  private static let cacheKey = "groceries.items"
+
+  private func paintFromCache() {
+    if let v = ResponseCache.load([GroceryItem].self, forKey: Self.cacheKey) { items = v }
+    loading = false
+  }
+
   private func load() async {
     loading = true
     if let res = try? await client.groceries() {
       items = res
+      ResponseCache.save(res, forKey: Self.cacheKey)
     }
     loading = false
   }

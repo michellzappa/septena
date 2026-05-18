@@ -104,6 +104,27 @@ final class NextItemsModel {
 
   // MARK: - Loading
 
+  private enum CacheKey {
+    static let habits        = "next.habits"
+    static let habitBuckets  = "next.habitBuckets"
+    static let supplements   = "next.supplements"
+    static let chores        = "next.chores"
+  }
+
+  /// Synchronous cache prime — paints the last-known habits / supplements
+  /// / chores snapshot on view appear, so screens that consume this model
+  /// (Habits / Supplements / Chores destinations + Next) render real data
+  /// on the first frame instead of empty sections while the network
+  /// catches up.
+  func paintFromCache() {
+    if let v = ResponseCache.load([HabitDayItem].self, forKey: CacheKey.habits) { habits = v }
+    if let v = ResponseCache.load([String].self, forKey: CacheKey.habitBuckets) { habitBuckets = v }
+    if let v = ResponseCache.load([SupplementDayItem].self, forKey: CacheKey.supplements) { supplements = v }
+    if let v = ResponseCache.load([ChoreItem].self, forKey: CacheKey.chores) { chores = v }
+    calendarEvents = CalendarBridge.shared.todayEvents()
+    hasLoaded = true
+  }
+
   func load(client: SeptenaClient) async {
     async let h = try? await client.habitsDay(date: today)
     async let s = try? await client.supplementsDay(date: today)
@@ -112,9 +133,17 @@ final class NextItemsModel {
     if let hRes {
       habits = hRes.buckets.flatMap { hRes.grouped[$0] ?? [] }
       habitBuckets = hRes.buckets
+      ResponseCache.save(habits, forKey: CacheKey.habits)
+      ResponseCache.save(habitBuckets, forKey: CacheKey.habitBuckets)
     }
-    if let sRes { supplements = sRes.items }
-    if let cRes { chores = cRes }
+    if let sRes {
+      supplements = sRes.items
+      ResponseCache.save(supplements, forKey: CacheKey.supplements)
+    }
+    if let cRes {
+      chores = cRes
+      ResponseCache.save(cRes, forKey: CacheKey.chores)
+    }
     // Local EventKit fetch — no network. Returns [] when access isn't
     // granted yet; the user grants in Calendar destination view / Settings.
     calendarEvents = CalendarBridge.shared.todayEvents()

@@ -69,7 +69,10 @@ struct NutritionDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
-    .task { await load() }
+    .task {
+      paintFromCache()
+      await load()
+    }
   }
 
   // MARK: - Summary
@@ -162,14 +165,31 @@ struct NutritionDestinationView: View {
 
   // MARK: - Loading
 
+  private enum CacheKey {
+    static let entries = "nutrition.entries14"
+    static let macros  = "nutrition.macros"
+  }
+
+  private func paintFromCache() {
+    if let v = ResponseCache.load([NutritionEntry].self, forKey: CacheKey.entries) { entries = v }
+    if let v = ResponseCache.load(MacrosConfig.self, forKey: CacheKey.macros) { macros = v }
+    loading = false
+  }
+
   private func load() async {
     loading = true
     let since = sinceDate(daysBack: 14)
     async let e: [NutritionEntry]? = try? await client.nutritionEntries(since: since)
     async let m: MacrosConfig? = try? await client.nutritionMacrosConfig()
     let (entriesRes, macrosRes) = await (e, m)
-    entries = entriesRes ?? []
-    macros = macrosRes
+    if let entriesRes {
+      entries = entriesRes
+      ResponseCache.save(entriesRes, forKey: CacheKey.entries)
+    }
+    if let macrosRes {
+      macros = macrosRes
+      ResponseCache.save(macrosRes, forKey: CacheKey.macros)
+    }
     loading = false
   }
 

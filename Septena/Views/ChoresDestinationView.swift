@@ -71,7 +71,10 @@ struct ChoresDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
-    .task { await model.load(client: client) }
+    .task {
+      model.paintFromCache()
+      await model.load(client: client)
+    }
   }
 
   private var summary: some View {

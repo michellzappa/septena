@@ -39,7 +39,10 @@ struct NextView: View {
     }
     .background(Theme.paperBackground)
     .septenaInlineTitle()
-    .task { await model.load(client: client) }
+    .task {
+      model.paintFromCache()
+      await model.load(client: client)
+    }
     .refreshable { await model.load(client: client) }
   }
 }

@@ -61,7 +61,10 @@ struct SleepDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
-    .task { await load() }
+    .task {
+      paintFromCache()
+      await load()
+    }
   }
 
   // MARK: - Top stat rows
@@ -359,10 +362,18 @@ struct SleepDestinationView: View {
 
   // MARK: - Loading
 
+  private static let cacheKey = "sleep.nights"
+
+  private func paintFromCache() {
+    if let v = ResponseCache.load([OuraNight].self, forKey: Self.cacheKey) { nights = v }
+    loading = false
+  }
+
   private func load() async {
     loading = true
     if let n = try? await client.ouraHistory(days: 14) {
       nights = n
+      ResponseCache.save(n, forKey: Self.cacheKey)
     }
     loading = false
   }
