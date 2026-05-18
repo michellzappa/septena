@@ -25,6 +25,19 @@ final class SectionTheme {
     accentByKey[sectionKey] ?? Color(red: 0.541, green: 0.514, blue: 0.471)
   }
 
+  /// Synchronous cache prime — reads the last-known `/api/sections`
+  /// response out of disk and populates `accentByKey`. Called before
+  /// `refresh()` on app launch so tiles render with the right color on
+  /// cold launch instead of the fallback gray.
+  func paintFromCache() {
+    if let sections = ResponseCache.load([SeptenaClient.SectionConfig].self,
+                                         forKey: Self.cacheKey) {
+      applySections(sections)
+    }
+  }
+
+  static let cacheKey = "theme.sections"
+
   func refresh(from client: SeptenaClient) async {
     // Per-section colors are still fetched (other section icons may surface
     // them), but the *app accent* is deliberately pinned to the system
@@ -33,14 +46,19 @@ final class SectionTheme {
     // standard.
     do {
       let sections = try await client.sections()
-      var byKey: [String: Color] = [:]
-      for s in sections {
-        if let c = parseColor(s.color) { byKey[s.key] = c }
-      }
-      accentByKey = byKey
+      applySections(sections)
+      ResponseCache.save(sections, forKey: Self.cacheKey)
     } catch {
       SeptenaLog.error("section color refresh failed", error)
     }
+  }
+
+  private func applySections(_ sections: [SeptenaClient.SectionConfig]) {
+    var byKey: [String: Color] = [:]
+    for s in sections {
+      if let c = parseColor(s.color) { byKey[s.key] = c }
+    }
+    accentByKey = byKey
   }
 
   // MARK: - Color string parsing

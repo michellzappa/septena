@@ -95,6 +95,30 @@ final class SettingsStore {
   var chores: [ChoreItem] = []
   var serverLoading: Bool = false
 
+  private enum CacheKey {
+    static let serverSettings = "settings.serverSettings"
+    static let sections       = "settings.sections"
+    static let caffeine       = "settings.caffeine"
+    static let cannabis       = "settings.cannabis"
+    static let macros         = "settings.macros"
+    static let sessionTypes   = "settings.sessionTypes"
+    static let chores         = "settings.chores"
+  }
+
+  /// Synchronous read from disk-cached responses. Run at app launch
+  /// before `refresh()` so the dashboard's tile order (driven by
+  /// `sections`) and the section-config sub-panes render with last-known
+  /// data instead of empty / default state during the network round-trip.
+  func paintFromCache() {
+    if let v = ResponseCache.load(AppSettings.self, forKey: CacheKey.serverSettings) { serverSettings = v }
+    if let v = ResponseCache.load([SeptenaClient.SectionConfig].self, forKey: CacheKey.sections) { sections = v }
+    if let v = ResponseCache.load(CaffeineConfig.self, forKey: CacheKey.caffeine) { caffeine = v }
+    if let v = ResponseCache.load(CannabisConfig.self, forKey: CacheKey.cannabis) { cannabis = v }
+    if let v = ResponseCache.load(MacrosConfig.self, forKey: CacheKey.macros) { macros = v }
+    if let v = ResponseCache.load([SessionTypeConfig].self, forKey: CacheKey.sessionTypes) { sessionTypes = v }
+    if let v = ResponseCache.load([ChoreItem].self, forKey: CacheKey.chores) { chores = v }
+  }
+
   func refresh(from client: SeptenaClient) async {
     serverLoading = true
     defer { serverLoading = false }
@@ -107,13 +131,16 @@ final class SettingsStore {
     async let chrs  = try? await client.chores()
     let (sv, sc, cf, cn) = await (s, secs, caf, cnb)
     let (mc, st, ch) = await (macs, sess, chrs)
-    serverSettings = sv
-    sections = sc ?? []
-    caffeine = cf
-    cannabis = cn
-    macros = mc
-    sessionTypes = st ?? []
-    chores = ch ?? []
+    // Only overwrite + cache the values where the network actually
+    // returned something — failed fetches leave the (cache-primed)
+    // values alone instead of wiping them to nil / empty.
+    if let sv { serverSettings = sv; ResponseCache.save(sv, forKey: CacheKey.serverSettings) }
+    if let sc { sections = sc; ResponseCache.save(sc, forKey: CacheKey.sections) }
+    if let cf { caffeine = cf; ResponseCache.save(cf, forKey: CacheKey.caffeine) }
+    if let cn { cannabis = cn; ResponseCache.save(cn, forKey: CacheKey.cannabis) }
+    if let mc { macros = mc; ResponseCache.save(mc, forKey: CacheKey.macros) }
+    if let st { sessionTypes = st; ResponseCache.save(st, forKey: CacheKey.sessionTypes) }
+    if let ch { chores = ch; ResponseCache.save(ch, forKey: CacheKey.chores) }
   }
 }
 

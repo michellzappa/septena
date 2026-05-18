@@ -66,6 +66,12 @@ struct SeptenaApp: App {
              let startup = StartupView(rawValue: raw) {
             navigation.path = [startup.route]
           }
+          // Two-phase load for tile order + section colors. Disk reads
+          // are synchronous so the dashboard renders with the user's
+          // ordering and palette on the first frame; the network refresh
+          // overwrites them when it lands.
+          theme.paintFromCache()
+          settingsStore.paintFromCache()
           await theme.refresh(from: clientProvider.client)
           await settingsStore.refresh(from: clientProvider.client)
           let syncer = Syncer(client: clientProvider.client,
