@@ -78,6 +78,7 @@ struct GutDestinationView: View {
     #endif
     .background(Theme.groupedBackground)
     .navigationTitle("Gut")
+    .trackScreen("gut")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)
     #endif

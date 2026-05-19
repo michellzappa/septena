@@ -123,6 +123,7 @@ struct NutritionDestinationView: View {
     }
     .background(Theme.groupedBackground)
     .navigationTitle("Nutrition")
+    .trackScreen("nutrition")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)
     #endif

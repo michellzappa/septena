@@ -27,6 +27,7 @@ struct ActivityDestinationView: View {
     #endif
     .background(Theme.groupedBackground)
     .navigationTitle("Activity")
+    .trackScreen("activity")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)
     #endif

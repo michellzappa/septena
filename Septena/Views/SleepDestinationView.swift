@@ -78,6 +78,7 @@ struct SleepDestinationView: View {
     #endif
     .background(Theme.groupedBackground)
     .navigationTitle("Sleep")
+    .trackScreen("sleep")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)
     #endif

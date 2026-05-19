@@ -83,6 +83,7 @@ struct CaffeineDestinationView: View {
     #endif
     .background(Theme.groupedBackground)
     .navigationTitle("Caffeine")
+    .trackScreen("caffeine")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)
     #endif

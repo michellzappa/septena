@@ -52,6 +52,7 @@ struct AirDestinationView: View {
     #endif
     .background(Theme.groupedBackground)
     .navigationTitle("Air")
+    .trackScreen("air")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)
     #endif

@@ -80,6 +80,7 @@ struct CannabisDestinationView: View {
     #endif
     .background(Theme.groupedBackground)
     .navigationTitle("Cannabis")
+    .trackScreen("cannabis")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)
     #endif

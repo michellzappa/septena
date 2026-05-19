@@ -42,6 +42,7 @@ struct CalendarDestinationView: View {
     #endif
     .background(Theme.groupedBackground)
     .navigationTitle("Calendar")
+    .trackScreen("calendar")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)
     #endif

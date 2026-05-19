@@ -55,6 +55,7 @@ struct SupplementsDestinationView: View {
     #endif
     .background(Theme.groupedBackground)
     .navigationTitle("Supplements")
+    .trackScreen("supplements")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)
     #endif

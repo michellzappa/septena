@@ -71,6 +71,7 @@ struct ChoresDestinationView: View {
     #endif
     .background(Theme.groupedBackground)
     .navigationTitle("Chores")
+    .trackScreen("chores")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)
     #endif

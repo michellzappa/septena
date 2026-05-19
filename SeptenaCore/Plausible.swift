@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // Anonymous aggregate screen-view analytics via Plausible
 // (https://plausible.io). Sends one HTTP POST per screen view; nothing
@@ -127,5 +128,18 @@ public actor PlausibleClient {
       #endif
     }()
     return "Septena/\(version) (\(os))"
+  }
+}
+
+// MARK: - SwiftUI
+
+public extension View {
+  /// Reports a screen view to Plausible when this view first appears with
+  /// the given name, and again only if the name changes. Backed by
+  /// `.task(id:)` so it's cancelled on disappear and never blocks UI;
+  /// pair with the per-screen debounce inside `PlausibleClient` to absorb
+  /// rapid re-appearances from nav-stack pops.
+  func trackScreen(_ name: String) -> some View {
+    task(id: name) { await PlausibleClient.shared.track(screen: name) }
   }
 }

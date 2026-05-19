@@ -44,6 +44,7 @@ struct HabitsDestinationView: View {
     #endif
     .background(Theme.groupedBackground)
     .navigationTitle("Habits")
+    .trackScreen("habits")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)
     #endif

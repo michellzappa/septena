@@ -59,6 +59,7 @@ struct BodyDestinationView: View {
     #endif
     .background(Theme.groupedBackground)
     .navigationTitle("Body")
+    .trackScreen("body")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)
     #endif
