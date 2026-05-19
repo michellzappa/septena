@@ -415,6 +415,28 @@ final class SeptenaClient {
                       as: AirHistoryResponse.self)
   }
 
+  // MARK: - Goals
+
+  func goals() async throws -> [Goal] {
+    try await getJSON("/api/goals", as: GoalsList.self).goals
+  }
+
+  func createGoal(text: String, sections: [String] = []) async throws -> Goal {
+    let body: [String: Any] = ["text": text, "sections": sections]
+    return try await postJSON("/api/goals", body: body, as: GoalMutation.self).goal
+  }
+
+  func updateGoal(id: String, text: String? = nil, sections: [String]? = nil) async throws -> Goal {
+    var body: [String: Any] = [:]
+    if let text { body["text"] = text }
+    if let sections { body["sections"] = sections }
+    return try await putJSON("/api/goals/\(id)", body: body, as: GoalMutation.self).goal
+  }
+
+  func deleteGoal(id: String) async throws {
+    try await deleteRaw("/api/goals/\(id)")
+  }
+
   // MARK: - Groceries
 
   /// The current pantry list — both "in stock" and "running low" items.

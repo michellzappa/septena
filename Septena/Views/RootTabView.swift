@@ -8,7 +8,7 @@ import SwiftUI
 // daily-driver UX.
 
 enum SeptenaTab: Hashable {
-  case week, next, tasks
+  case week, next, tasks, goals
 
   /// Stable, low-cardinality screen name for Plausible. Kept here so the
   /// dashboard's labels match the enum even if the tab's display title
@@ -18,6 +18,7 @@ enum SeptenaTab: Hashable {
     case .week:  return "week"
     case .next:  return "next"
     case .tasks: return "tasks"
+    case .goals: return "goals"
     }
   }
 }
@@ -59,7 +60,7 @@ struct RootTabView: View {
       .sheet(isPresented: $nav.showQuickFind) {
         QuickFindView()
           #if os(iOS)
-          .presentationDetents([.large])
+          .presentationDetents([.medium, .large])
           .presentationDragIndicator(.visible)
           #else
           .frame(width: 560, height: 420)
@@ -119,6 +120,13 @@ struct RootTabView: View {
       ContentView()
         .tabItem { Label("Tasks", systemImage: "checkmark") }
         .tag(SeptenaTab.tasks)
+
+      GoalsView()
+        .tabItem {
+          Label("Goals", systemImage: "smallcircle.filled.circle")
+            .imageScale(.small)
+        }
+        .tag(SeptenaTab.goals)
     }
     #if os(iOS)
     tv.tabBarMinimizeBehavior(.onScrollDown)

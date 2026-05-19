@@ -1233,6 +1233,19 @@ struct SuggestedWorkoutResponse: Codable, Hashable {
   }
 }
 
+// MARK: - Goals
+
+struct Goal: Identifiable, Codable, Hashable {
+  let id: String
+  var text: String
+  var sections: [String]
+  let created: String
+  var updated: String
+}
+
+struct GoalsList: Decodable { let goals: [Goal] }
+struct GoalMutation: Decodable { let ok: Bool; let goal: Goal }
+
 // MARK: - Date helpers (Septena uses YYYY-MM-DD strings)
 
 enum SeptenaDate {
