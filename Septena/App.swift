@@ -350,26 +350,9 @@ struct ContentView: View {
     @Bindable var nav = nav
     layout(path: $nav.path)
       .tint(theme.accent)
-      // Settings sheet is mounted at the RootTabView level (so it works
-      // from Week / Next, not just the Tasks tab which hosts ContentView).
-      .sheet(isPresented: $nav.showQuickFind) {
-        QuickFindView()
-          #if os(macOS)
-          .frame(width: 560, height: 420)
-          #endif
-      }
-      .sheet(isPresented: $nav.showAddInfo) {
-        AddInfoSheet(initialSection: nav.addInfoRequestedSection)
-          #if os(iOS)
-          .presentationDetents([.medium, .large])
-          .presentationDragIndicator(.visible)
-          #else
-          .frame(width: 560, height: 520)
-          #endif
-      }
-      .onChange(of: nav.showAddInfo) { _, open in
-        if !open { nav.addInfoRequestedSection = nil }
-      }
+      // Settings / QuickFind / AddInfo sheets are mounted at the
+      // RootTabView level (so they work from Week / Next, not just the
+      // Tasks tab which hosts ContentView).
       .onReceive(NotificationCenter.default
         .publisher(for: .septenaOpenQuickAdd)) { _ in
         // macOS menu bar "New To-Do" routes through here — same effect as

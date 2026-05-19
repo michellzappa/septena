@@ -215,29 +215,27 @@ struct SidebarRootView: View {
     #if os(iOS)
     .navigationBarTitleDisplayMode(.inline)
     #endif
+    // Consistent home-page chrome across Week / Next / Tasks:
+    //   • top-left "…" menu (Settings today; room to grow)
+    //   • top-right magnifyingglass → Quick Find sheet (also reachable
+    //     via the discreet Settings row at the bottom of the sidebar)
+    // The floating + bubble that used to sit beside the tab bar has
+    // been removed; New Project / New Area remain reachable from the
+    // Areas/Projects sheets.
     .toolbar {
-      ToolbarItem(placement: .primaryAction) {
+      ToolbarItem(placement: .topBarLeading) {
         Menu {
           Button {
-            // Route through .filter(.inbox) so the inline editor mounts
-            // on a known list — Sidebar root has no TaskListView, so
-            // setting the trigger alone wouldn't open the editor.
-            nav.path = [.filter(.inbox)]
-            nav.shouldStartCreating = true
+            nav.showSettings = true
           } label: {
-            Label("New To-Do", systemImage: "plus.circle")
-          }
-          Button { showingNewProject = true } label: {
-            Label("New Project", systemImage: "number")
-          }
-          Button { newAreaName = ""; showingNewArea = true } label: {
-            Label("New Area", systemImage: "square.stack.3d.up")
+            Label("Settings", systemImage: "gearshape")
           }
         } label: {
-          Image(systemName: "plus")
+          Image(systemName: "ellipsis.circle")
         }
+        .accessibilityLabel("More")
       }
-      ToolbarItem(placement: .primaryAction) {
+      ToolbarItem(placement: .topBarTrailing) {
         Button { nav.showQuickFind = true } label: {
           Image(systemName: "magnifyingglass")
         }

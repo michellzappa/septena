@@ -97,16 +97,10 @@ struct WeekDashboardView: View {
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif
-      // Standard top-right gear opens the unified, app-global Settings
-      // sheet (same one as ⌘, on macOS / the sidebar row). Week is the
-      // natural homepage, so it's the natural place to put it.
-      .toolbar { settingsToolbar }
-      // Sheets, not pushes — iPhone navigation into module destinations
-      // is a bottom-sheet slide-over so the dashboard stays visually
-      // present underneath. iPad / Mac render this just as well.
-      .sheet(item: $sheetDest) { dest in
-        sheetContent(for: dest)
-      }
+      // Consistent home-page chrome across Week / Next / Tasks:
+      //   • top-left "…" menu (Settings today; room to grow)
+      //   • top-right magnifyingglass → universal Quick Find sheet
+      .toolbar { homeToolbar }
       // Two-phase load: paint cached blobs synchronously so tiles +
       // histograms appear immediately on cold launch, then kick off the
       // network refresh in the background. Pull-to-refresh skips the
@@ -122,20 +116,62 @@ struct WeekDashboardView: View {
       .onChange(of: clock.today) { _, _ in
         Task { await loadAll() }
       }
+      // Quick-add finished — repaint just that tile from cache (instant,
+      // for sections that wrote optimistic state) and refetch its
+      // endpoints in the background to reconcile with the server. Scoped
+      // to the touched section so the rest of the dashboard stays put.
+      .onReceive(NotificationCenter.default.publisher(for: .tilesDidChange)) { note in
+        guard let key = note.userInfo?[TileChangeKey.section] as? String,
+              let section = AddInfoSection(rawValue: key) else { return }
+        repaint(section: section)
+        Task { await refresh(section: section) }
+      }
     }
-    .overlay(alignment: .bottomTrailing) {
-      AddInfoFAB { nav.showAddInfo = true }
+    // Sheets, not pushes — iPhone navigation into module destinations
+    // is a bottom-sheet slide-over so the dashboard stays visually
+    // present underneath. iPad / Mac render this just as well.
+    //
+    // Attached OUTSIDE the NavigationStack on purpose: `.refreshable`
+    // inside publishes `\.refresh` into the env, and SwiftUI sheet
+    // contents inherit env from the view they're attached to. Hosting
+    // `.sheet` on the NavigationStack itself (not on the ScrollView
+    // beside `.refreshable`) keeps the sheet's attachment point outside
+    // the refreshable's scope, so drawers don't inherit a pull-to-
+    // refresh gesture that re-runs Week's loader.
+    .sheet(item: $sheetDest) { dest in
+      sheetContent(for: dest)
     }
   }
 
   @ToolbarContentBuilder
-  private var settingsToolbar: some ToolbarContent {
-    ToolbarItem(placement: .primaryAction) {
-      Button { nav.showSettings = true } label: {
-        Image(systemName: "gearshape")
+  private var homeToolbar: some ToolbarContent {
+    #if os(iOS)
+    ToolbarItem(placement: .topBarLeading) { homeMenu }
+    ToolbarItem(placement: .topBarTrailing) { homeSearch }
+    #else
+    ToolbarItem(placement: .primaryAction) { homeMenu }
+    ToolbarItem(placement: .primaryAction) { homeSearch }
+    #endif
+  }
+
+  private var homeMenu: some View {
+    Menu {
+      Button {
+        nav.showSettings = true
+      } label: {
+        Label("Settings", systemImage: "gearshape")
       }
-      .accessibilityLabel("Settings")
+    } label: {
+      Image(systemName: "ellipsis.circle")
     }
+    .accessibilityLabel("More")
+  }
+
+  private var homeSearch: some View {
+    Button { nav.showQuickFind = true } label: {
+      Image(systemName: "magnifyingglass")
+    }
+    .accessibilityLabel("Search")
   }
 
   /// Each module's destination wrapped in its own NavigationStack so
@@ -163,7 +199,7 @@ struct WeekDashboardView: View {
       }
     }
     #if os(iOS)
-    .presentationDetents([.large])
+    .presentationDetents([.medium, .large])
     .presentationDragIndicator(.visible)
     #endif
   }
@@ -377,6 +413,178 @@ struct WeekDashboardView: View {
     }
     // HealthKit — on-device, no FastAPI. Mac builds short-circuit.
     await HealthKitBridge.shared.refresh()
+  }
+
+  // MARK: - Per-section refresh (quick-add fast path)
+  //
+  // Triggered by `Notification.Name.tilesDidChange` posted from any
+  // Add*Page after a successful commit. We do two things, scoped to the
+  // touched section so the rest of the dashboard stays put:
+  //
+  //   1. `repaint(section:)`  — synchronous read from ResponseCache.
+  //      Picks up any optimistic blob the Add page wrote (e.g. cannabis
+  //      bumps `sessionCount` locally before the outbox drains).
+  //   2. `refresh(section:)`  — async refetch of just that section's
+  //      endpoints. Reconciles with the server once the outbox drains.
+  //
+  // Animation lives on the tile components (`.animation(.snappy, value:)`
+  // inside `ModuleTile`), so any @State assignment here tweens for free.
+
+  private func repaint(section: AddInfoSection) {
+    switch section {
+    case .cannabis:
+      if let v = ResponseCache.load(CannabisDayResponse.self, forKey: CacheKey.cannabisToday) {
+        cannabisToday = v
+      }
+      if let v = ResponseCache.load([CannabisHistoryPoint].self, forKey: CacheKey.cannabisHistory) {
+        cannabisHistory = v
+      }
+    case .caffeine:
+      if let v = ResponseCache.load(CaffeineDayResponse.self, forKey: CacheKey.caffeineToday) {
+        caffeineToday = v
+      }
+      if let v = ResponseCache.load([CaffeineHistoryPoint].self, forKey: CacheKey.caffeineHistory) {
+        caffeineHistory = v
+      }
+    case .gut:
+      if let v = ResponseCache.load(GutDayResponse.self, forKey: CacheKey.gutToday) {
+        gutToday = v
+      }
+      if let v = ResponseCache.load([GutHistoryPoint].self, forKey: CacheKey.gutHistory) {
+        gutHistory = v
+      }
+    case .nutrition:
+      if let v = ResponseCache.load([NutritionEntry].self, forKey: CacheKey.todayNutrition) {
+        todayNutrition = v
+        todayProteinSum = v.reduce(0) { $0 + $1.proteinG }
+        todayKcalSum    = v.reduce(0) { $0 + $1.kcal }
+      }
+      if let v = ResponseCache.load(NutritionStatsResponse.self, forKey: CacheKey.nutritionStats) {
+        nutritionStats = v
+      }
+    case .habits:
+      if let v = ResponseCache.load([Int].self, forKey: CacheKey.habitHistory) { habitHistory = v }
+    case .chores:
+      if let v = ResponseCache.load([Int].self, forKey: CacheKey.choreHistory) { choreHistory = v }
+    case .supplements:
+      if let v = ResponseCache.load([Int].self, forKey: CacheKey.supplementHistory) { supplementHistory = v }
+    case .groceries:
+      if let v = ResponseCache.load([GroceryItem].self, forKey: CacheKey.groceries) { groceries = v }
+    case .tasks:
+      if let v = ResponseCache.load(TasksCounts.self, forKey: CacheKey.taskCounts) { taskCounts = v }
+      if let v = ResponseCache.load(TasksHistory.self, forKey: CacheKey.tasksHistory) { tasksHistory = v }
+      if let v = ResponseCache.load([SeptenaTask].self, forKey: CacheKey.completedTasks) { completedTasks = v }
+    case .training:
+      // Training has no in-place optimistic cache write today — the Add
+      // page is a navigation shim. Repaint is a no-op; `refresh` will
+      // pull fresh server state when (eventually) the session lands.
+      break
+    }
+  }
+
+  private func refresh(section: AddInfoSection) async {
+    switch section {
+    case .cannabis:
+      async let day  = try? await client.cannabisDay(date: SeptenaDate.today)
+      async let hist = try? await client.cannabisHistory(days: 7)
+      if let d = await day {
+        cannabisToday = d
+        ResponseCache.save(d, forKey: CacheKey.cannabisToday)
+      }
+      if let h = (await hist)?.daily {
+        cannabisHistory = h
+        ResponseCache.save(h, forKey: CacheKey.cannabisHistory)
+      }
+    case .caffeine:
+      async let day  = try? await client.caffeineDay(date: SeptenaDate.today)
+      async let hist = try? await client.caffeineHistory(days: 7)
+      if let d = await day {
+        caffeineToday = d
+        ResponseCache.save(d, forKey: CacheKey.caffeineToday)
+      }
+      if let h = (await hist)?.daily {
+        caffeineHistory = h
+        ResponseCache.save(h, forKey: CacheKey.caffeineHistory)
+      }
+    case .gut:
+      async let day  = try? await client.gutDay(date: SeptenaDate.today)
+      async let hist = try? await client.gutHistory(days: 7)
+      if let d = await day {
+        gutToday = d
+        ResponseCache.save(d, forKey: CacheKey.gutToday)
+      }
+      if let h = (await hist)?.daily {
+        gutHistory = h
+        ResponseCache.save(h, forKey: CacheKey.gutHistory)
+      }
+    case .nutrition:
+      async let ents  = try? await client.nutritionEntries(since: SeptenaDate.today)
+      async let stats = try? await client.nutritionStats(days: 7)
+      if let e = await ents {
+        let today = SeptenaDate.today
+        let todays = e.filter { $0.date == today }
+        todayNutrition = todays
+        todayProteinSum = todays.reduce(0) { $0 + $1.proteinG }
+        todayKcalSum    = todays.reduce(0) { $0 + $1.kcal }
+        ResponseCache.save(todays, forKey: CacheKey.todayNutrition)
+      }
+      if let s = await stats {
+        nutritionStats = s
+        ResponseCache.save(s, forKey: CacheKey.nutritionStats)
+      }
+    case .habits:
+      async let _ = dailies.load(client: client)
+      if let h = try? await client.habitsHistory(days: 7) {
+        habitHistory = h.daily.map { $0.done }
+        ResponseCache.save(habitHistory, forKey: CacheKey.habitHistory)
+      }
+    case .chores:
+      async let _ = dailies.load(client: client)
+      if let c = try? await client.choresHistory(days: 7) {
+        choreHistory = c.daily.map { $0.completed }
+        ResponseCache.save(choreHistory, forKey: CacheKey.choreHistory)
+      }
+    case .supplements:
+      async let _ = dailies.load(client: client)
+      if let s = try? await client.supplementsHistory(days: 7) {
+        supplementHistory = s.daily.map { $0.done }
+        ResponseCache.save(supplementHistory, forKey: CacheKey.supplementHistory)
+      }
+    case .groceries:
+      if let g = try? await client.groceries() {
+        groceries = g
+        ResponseCache.save(g, forKey: CacheKey.groceries)
+      }
+    case .tasks:
+      async let tc = try? await client.counts()
+      async let th = try? await client.tasksHistory(days: 7)
+      async let tl = try? await client.list(view: "logbook", days: 1)
+      if let t = await tc {
+        taskCounts = t
+        ResponseCache.save(t, forKey: CacheKey.taskCounts)
+      }
+      if let t = await th {
+        tasksHistory = t
+        ResponseCache.save(t, forKey: CacheKey.tasksHistory)
+      }
+      if let items = (await tl)?.items {
+        completedTasks = items
+        ResponseCache.save(items, forKey: CacheKey.completedTasks)
+      }
+    case .training:
+      async let car  = try? await client.trainingCardioHistory(days: 7)
+      async let ents = try? await client.trainingEntries(since: sinceDate(daysBack: 7))
+      if let c = await car {
+        cardio = c
+        ResponseCache.save(c, forKey: CacheKey.cardio)
+      }
+      if let e = await ents {
+        trainingSessionDates = Set(e.map(\.date))
+        recentTraining = e
+        ResponseCache.save(trainingSessionDates, forKey: CacheKey.trainingDates)
+        ResponseCache.save(e, forKey: CacheKey.recentTraining)
+      }
+    }
   }
 
   private func sinceDate(daysBack: Int) -> String {
