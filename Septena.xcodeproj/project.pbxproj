@@ -154,11 +154,13 @@
 		E02065B8AC82D19639A4CFAD /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5213158B9AA9106BBAA03D41 /* SettingsView.swift */; };
 		E093BA3F5235262C527C0132 /* ConsistencyHeatmap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0251BE0D8623B9A1ADE7798E /* ConsistencyHeatmap.swift */; };
 		E1474EC3CDCB9253688ABA00 /* WeekDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA936685A02055A0A5079EB2 /* WeekDashboardView.swift */; };
+		E1AABD694A327D25EA73C02F /* IntensityGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = C01B5C68B8A212509DF09EBB /* IntensityGlyph.swift */; };
 		E1B5AA92A5B3FE12E1F8B0BD /* EditExerciseEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AE607CA6B994CD28B193CEB /* EditExerciseEntrySheet.swift */; };
 		E2596519BF088C332394AEA3 /* QuickAddToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAAA521F588811EDFAEC5D7D /* QuickAddToolbar.swift */; };
 		E31B94DDD122274806A91B5C /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B92826563E8E24C2A8F22B9 /* TaskListView.swift */; };
 		E40F659426611380CBD88767 /* AddInfoRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C686C6F5ACB55133382CF4 /* AddInfoRow.swift */; };
 		E54A0F1EA6FA2B39A221E491 /* AddGutPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FB72BF40178A9E5A2888E6E /* AddGutPage.swift */; };
+		E5EF26BD9077FB31E82E3FCC /* IntensityGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = C01B5C68B8A212509DF09EBB /* IntensityGlyph.swift */; };
 		E6EB68149686E499DC25DC23 /* SectionManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474065C5EA4B37AC35AAC07C /* SectionManifest.swift */; };
 		E874E988CAB7C13A4570BB00 /* ConsistencyHeatmap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0251BE0D8623B9A1ADE7798E /* ConsistencyHeatmap.swift */; };
 		ECCD8EBD97007CE19A8A2C71 /* DayTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD698B19C7814F9ACE075774 /* DayTimelineView.swift */; };
@@ -245,6 +247,7 @@
 		B82465F93192F30FD53F2EDB /* Accessibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Accessibility.swift; sourceTree = "<group>"; };
 		BBD31B55684A505738EB624C /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
 		BFBFDD4F53D7D667C8B204D9 /* AddHabitPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddHabitPage.swift; sourceTree = "<group>"; };
+		C01B5C68B8A212509DF09EBB /* IntensityGlyph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntensityGlyph.swift; sourceTree = "<group>"; };
 		C03DC46C772E45B60ECB7343 /* SectionTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionTheme.swift; sourceTree = "<group>"; };
 		C12E57B6D840EE59123B45F5 /* LogRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogRow.swift; sourceTree = "<group>"; };
 		C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -341,6 +344,7 @@
 				83E5755C28C6B3D53D9031A7 /* GroceriesDestinationView.swift */,
 				3C90473A5415EF805CE827D5 /* GutDestinationView.swift */,
 				6CB6D70452573AF2811BBD08 /* HabitsDestinationView.swift */,
+				C01B5C68B8A212509DF09EBB /* IntensityGlyph.swift */,
 				C12E57B6D840EE59123B45F5 /* LogRow.swift */,
 				0D8E96F4EF0DBE7645A7FAC5 /* ModuleTile.swift */,
 				B306432E3182A6992728E0F9 /* NextDashboardView.swift */,
@@ -566,6 +570,7 @@
 				FD43DBF763D6B72C04A00682 /* HabitsDestinationView.swift in Sources */,
 				5330AF71083A1F3514B862B8 /* Haptics.swift in Sources */,
 				EF6F6DC70A2A20577E2BDCBD /* HealthKitBridge.swift in Sources */,
+				E5EF26BD9077FB31E82E3FCC /* IntensityGlyph.swift in Sources */,
 				C95C0A72F11063AD3C8DE47F /* LogRow.swift in Sources */,
 				0448F507E1F1600F9933AEED /* Models.swift in Sources */,
 				7BEA23ABC68403A4BD8213FA /* ModuleTile.swift in Sources */,
@@ -654,6 +659,7 @@
 				69347D27E1CBEFCF3AA87AB2 /* HabitsDestinationView.swift in Sources */,
 				28777ACD729D9C78846219C4 /* Haptics.swift in Sources */,
 				1DFCCAA759E4B23AC3D03C10 /* HealthKitBridge.swift in Sources */,
+				E1AABD694A327D25EA73C02F /* IntensityGlyph.swift in Sources */,
 				008EADA54611F2118A61DB42 /* LogRow.swift in Sources */,
 				DD200EF411309E29B543963F /* Models.swift in Sources */,
 				A24EB04802E59F5F3C3489A7 /* ModuleTile.swift in Sources */,

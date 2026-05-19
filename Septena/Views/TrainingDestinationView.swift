@@ -59,6 +59,7 @@ struct TrainingDestinationView: View {
       }
       summary
       z2CardioSection
+      strengthVolumeSection
       consistencySection
       progressionSection
       ForEach(sessions, id: \.key) { block in
@@ -72,7 +73,7 @@ struct TrainingDestinationView: View {
                 title: entry.exercise ?? "—",
                 detail: detailLine(entry),
                 trailing: entry.loggedAt.map(timeOnly),
-                accent: accent
+                accessory: glyphAccessory(for: entry)
               )
             }
             .buttonStyle(.plain)
@@ -161,7 +162,7 @@ struct TrainingDestinationView: View {
 
   private var summary: some View {
     let sessionsThisWeek = uniqueSessionDates(thisWeek: true).count
-    let z2 = Int(cardio?.daily.reduce(0) { $0 + $1.minutes } ?? 0)
+    let z2 = Int(cardio?.daily.last?.rolling7d ?? 0)
     let target = cardio?.targetWeeklyMin ?? 150
     return Section {
       HStack(alignment: .top, spacing: 24) {
@@ -363,6 +364,67 @@ struct TrainingDestinationView: View {
         .a11yCombineKeepingChildren(summary)
       } header: {
         Text("Cardio")
+      }
+    }
+  }
+
+  /// Trailing-7-day "effective hard sets" — the headline strength-volume
+  /// number. Counts each strength entry's `sets` × difficulty weight:
+  /// hard/max = 1.0, moderate = 0.5, easy/unset = 0. Floor 10, target 12,
+  /// soft ceiling 20 reflect the hypertrophy meta-analysis consensus
+  /// (Schoenfeld et al.) on sets-to-failure per week as the primary
+  /// stimulus driver. Single number, no per-muscle split — that's the MVP.
+  private static let hardSetsTarget: Double = 12
+  private static let hardSetsCeiling: Double = 20
+
+  private func effectiveHardSets(in days: Int) -> Double {
+    let cutoff = sinceDate(daysBack: days)
+    var total: Double = 0
+    for e in entries where isStrengthEntry(e) && e.date >= cutoff {
+      guard let s = e.sets.flatMap(Int.init), s > 0 else { continue }
+      let weight: Double
+      switch (e.difficulty ?? "").lowercased() {
+      case "hard", "max":   weight = 1.0
+      case "moderate":      weight = 0.5
+      default:              weight = 0
+      }
+      total += Double(s) * weight
+    }
+    return total
+  }
+
+  /// Strength-volume card — trailing 7-day effective hard sets vs target.
+  /// Sibling to `z2CardioSection`; both answer "am I doing enough to drive
+  /// adaptation this week." See `effectiveHardSets(in:)` for the math.
+  @ViewBuilder
+  private var strengthVolumeSection: some View {
+    let raw = effectiveHardSets(in: 7)
+    let value = Int(raw.rounded())
+    let target = Self.hardSetsTarget
+    let ceiling = Self.hardSetsCeiling
+    // Progress fills toward the target; once past target, color shifts to
+    // signal "in the productive band" until the ceiling.
+    let progress = min(raw, target) / target
+    let overTarget = raw > target
+    let overCeiling = raw > ceiling
+    Section {
+      VStack(alignment: .leading, spacing: 6) {
+        HStack {
+          Text("Strength volume").font(.subheadline.weight(.semibold))
+          Spacer()
+          Text("\(value)/\(Int(target)) hard sets")
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(.secondary)
+        }
+        ProgressView(value: progress)
+          .tint(overCeiling ? .orange : (overTarget ? .green : accent))
+        Text(overCeiling
+             ? "Past the 20-set ceiling — consider a deload."
+             : overTarget
+               ? "In the productive 12–20 hard-set band."
+               : "Target \(Int(target)) hard sets/week to drive hypertrophy.")
+          .font(.caption2)
+          .foregroundStyle(.secondary)
       }
     }
   }
@@ -762,13 +824,27 @@ struct TrainingDestinationView: View {
     if let m = e.distanceM, m > 0 {
       parts.append(formatDistance(m))
     }
-    if let lvl = e.level, lvl > 0 {
-      parts.append("L\(Int(lvl))")
-    }
-    if let diff = e.difficulty, !diff.isEmpty {
-      parts.append(diff)
-    }
     return parts.isEmpty ? nil : parts.joined(separator: " · ")
+  }
+
+  /// Difficulty pips + cardio level bars rendered inline next to the
+  /// numeric stats. Mirrors the webapp's `DifficultyGlyph` / `LevelGlyph`
+  /// row in `training-dashboard.tsx`. Returns nil when neither glyph would
+  /// render so the detail line collapses cleanly.
+  private func glyphAccessory(for e: ExerciseEntry) -> AnyView? {
+    let hasDifficulty = (e.difficulty ?? "").isEmpty == false
+    let hasLevel = (e.level ?? 0) > 0
+    guard hasDifficulty || hasLevel else { return nil }
+    return AnyView(
+      HStack(spacing: 6) {
+        if hasDifficulty {
+          DifficultyGlyph(difficulty: e.difficulty)
+        }
+        if hasLevel, let lvl = e.level {
+          LevelGlyph(level: Int(lvl), accent: accent)
+        }
+      }
+    )
   }
 
   private func formatWeight(_ w: Double) -> String {
