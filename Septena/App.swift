@@ -78,14 +78,6 @@ struct SeptenaApp: App {
           }
           AppDelegate.navigation = navigation
           #endif
-          // Apply the user's "Open on launch" preference once, before any
-          // sync runs. Only seeds when the path is still empty so a Quick
-          // Action that already populated it isn't overwritten.
-          if navigation.path.isEmpty,
-             let raw = UserDefaults.standard.string(forKey: SettingsKey.startupView),
-             let startup = StartupView(rawValue: raw) {
-            navigation.path = [startup.route]
-          }
           // Two-phase load for tile order + section colors. Disk reads
           // are synchronous so the dashboard renders with the user's
           // ordering and palette on the first frame; the network refresh

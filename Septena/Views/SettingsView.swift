@@ -4,25 +4,27 @@ import EventKit
 // Settings — the single unified surface for everything user-configurable.
 // One sheet, one store, one entry point (sidebar row + ⌘,).
 //
-// Sections:
-//   • General         — startup view, badge, today toggle, task sort (local)
-//   • Appearance      — theme + eInk         (read-only, /api/settings)
-//   • Units & Time    — units + timezones    (read-only, /api/settings)
-//   • Targets         — macros + health      (read-only, /api/settings)
+// Layout (Apple-style: app-wide rows on top, per-section rows below):
+//   • General         — app-wide settings (currently empty, for future use)
 //   • Integrations    — Reminders / Calendar / HealthKit permissions
-//   • Reminders Inbox — source list picker + auto-import log
 //   • Sync            — server URL + manual sync
+//   • Privacy         — analytics consent
 //   • About           — version / links
+//   ── Sections ────────────────────────────
+//   • Tasks           — badge, today toggle, task sort + identity
+//   • Training, Nutrition, Sleep, Habits, Cannabis, Caffeine, …
+//                     — identity + (where applicable) catalog data
 //
-// Server-side fields are read-only for now (editing is a separate concern).
-// The Week toolbar gear and SettingsDestinationView no longer exist —
-// Settings is an app-level surface, not a Week tile.
+// Per-section rows are driven by `SectionManifest.all` filtered against
+// the server's `/api/sections` response (an "enabled" set today; will be
+// a CloudKit-backed per-account set in the future). Each row pushes to
+// `SectionDetailPane(key:)` which composes identity + section-specific
+// content.
 
 // MARK: - Default keys
 
 enum SettingsKey {
   static let badgeShowOverdue = "septena.badge.showOverdue"
-  static let startupView      = "septena.startup.view"
   static let todayShowCompleted = "septena.today.showCompleted"
   static let syncLastSucceeded = "septena.sync.lastSucceededAt"
   /// Consent toggle for anonymous aggregate usage analytics (Plausible).
@@ -56,27 +58,6 @@ enum TaskSort: String, CaseIterable, Identifiable {
     case .dateAdded:    return "clock"
     case .alphabetical: return "textformat"
     case .dueDate:      return "calendar"
-    }
-  }
-}
-
-enum StartupView: String, CaseIterable, Identifiable {
-  case today, inbox, upcoming, next
-  var id: String { rawValue }
-  var label: String {
-    switch self {
-    case .today: return "Today"
-    case .inbox: return "Inbox"
-    case .upcoming: return "Upcoming"
-    case .next: return "Next"
-    }
-  }
-  var route: Route {
-    switch self {
-    case .today: return .filter(.today)
-    case .inbox: return .filter(.inbox)
-    case .upcoming: return .filter(.upcoming)
-    case .next: return .next
     }
   }
 }
@@ -152,90 +133,45 @@ final class SettingsStore {
 
 struct SettingsView: View {
   @Environment(\.dismiss) private var dismiss
-  @State private var selection: Section? = .general
+  @Environment(SettingsStore.self) private var store
+  @State private var selection: SettingsDestination? = .general
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @State private var preferredCompactColumn: NavigationSplitViewColumn = .detail
 
-  enum Section: String, CaseIterable, Identifiable {
-    case general, integrations, server, sync, privacy, about
-    var id: String { rawValue }
-    var title: String {
-      switch self {
-      case .general:      return "General"
-      case .integrations: return "Integrations"
-      case .server:       return "Server"
-      case .sync:         return "Sync"
-      case .privacy:      return "Privacy"
-      case .about:        return "About"
-      }
-    }
-    var icon: String {
-      switch self {
-      case .general:      return "gearshape"
-      case .integrations: return "app.connected.to.app.below.fill"
-      case .server:       return "server.rack"
-      case .sync:         return "arrow.triangle.2.circlepath"
-      case .privacy:      return "hand.raised"
-      case .about:        return "info.circle"
-      }
-    }
-    var tint: Color {
-      switch self {
-      case .general:      return .gray
-      case .integrations: return .indigo
-      case .server:       return .green
-      case .sync:         return .blue
-      case .privacy:      return .teal
-      case .about:        return .purple
-      }
-    }
+  /// Sidebar entries. Static cases for app-wide settings; `section(key)`
+  /// for per-section rows resolved against `SectionManifest` + the live
+  /// `store.sections` list.
+  enum SettingsDestination: Hashable {
+    case general, integrations, sync, privacy, about
+    case section(String)
   }
 
   var body: some View {
     #if os(iOS)
-    // NavigationStack + NavigationLink(value:) — selection-based push in a
-    // sheet-hosted NavigationSplitView is unreliable on iPhone compact
-    // (rows highlight but don't navigate). A plain stack with explicit
-    // links is the canonical iOS Settings pattern and pushes every time.
     NavigationStack {
-      List(Section.allCases) { section in
-        NavigationLink(value: section) {
-          Label {
-            Text(section.title)
-          } icon: {
-            ColoredGlyph(icon: section.icon, color: section.tint, size: 22)
+      sidebarList
+        .navigationTitle("Settings")
+        .navigationDestination(for: SettingsDestination.self) { dest in
+          pane(for: dest)
+            .navigationTitle(title(for: dest))
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .toolbar {
+          ToolbarItem(placement: .confirmationAction) {
+            Button("Done") { dismiss() }
           }
         }
-      }
-      .navigationTitle("Settings")
-      .navigationDestination(for: Section.self) { section in
-        pane(for: section)
-          .navigationTitle(section.title)
-          .navigationBarTitleDisplayMode(.inline)
-      }
-      .toolbar {
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Done") { dismiss() }
-        }
-      }
     }
     #else
     NavigationSplitView(columnVisibility: $columnVisibility,
                         preferredCompactColumn: $preferredCompactColumn) {
-      List(Section.allCases, selection: $selection) { section in
-        Label {
-          Text(section.title)
-        } icon: {
-          ColoredGlyph(icon: section.icon, color: section.tint, size: 22)
-        }
-        .tag(section)
-      }
-      .navigationTitle("Settings")
+      sidebarList(selection: $selection)
+        .navigationTitle("Settings")
     } detail: {
       NavigationStack {
-        let section = selection ?? .general
-        pane(for: section)
-          .navigationTitle(section.title)
+        let dest = selection ?? .general
+        pane(for: dest)
+          .navigationTitle(title(for: dest))
       }
     }
     .frame(minWidth: 720, minHeight: 460)
@@ -247,17 +183,155 @@ struct SettingsView: View {
     #endif
   }
 
+  #if os(iOS)
   @ViewBuilder
-  private func pane(for section: Section) -> some View {
-    switch section {
-    case .general:      GeneralSettingsPane()
-    case .integrations: IntegrationsSettingsPane()
-    case .server:       ServerSettingsPane()
-    case .sync:         SyncSettingsPane()
-    case .privacy:      PrivacySettingsPane()
-    case .about:        AboutSettingsPane()
+  private var sidebarList: some View {
+    List {
+      SwiftUI.Section {
+        ForEach(staticDestinations, id: \.self) { dest in
+          NavigationLink(value: dest) { staticRow(dest) }
+        }
+      }
+      if !sectionEntries.isEmpty {
+        SwiftUI.Section("Sections") {
+          ForEach(sectionEntries) { entry in
+            NavigationLink(value: SettingsDestination.section(entry.key)) {
+              sectionRow(entry)
+            }
+          }
+        }
+      }
     }
   }
+  #else
+  @ViewBuilder
+  private func sidebarList(selection: Binding<SettingsDestination?>) -> some View {
+    List(selection: selection) {
+      SwiftUI.Section {
+        ForEach(staticDestinations, id: \.self) { dest in
+          staticRow(dest).tag(dest)
+        }
+      }
+      if !sectionEntries.isEmpty {
+        SwiftUI.Section("Sections") {
+          ForEach(sectionEntries) { entry in
+            sectionRow(entry).tag(SettingsDestination.section(entry.key))
+          }
+        }
+      }
+    }
+  }
+  #endif
+
+  private var staticDestinations: [SettingsDestination] {
+    [.general, .integrations, .sync, .privacy, .about]
+  }
+
+  /// Per-section sidebar rows, in server order (`section_order` from
+  /// `/api/settings`), filtered to sections present in both the local
+  /// manifest and the live `store.sections` list. Server-only or
+  /// manifest-only keys are dropped — visible only when both agree the
+  /// section exists for this user.
+  private var sectionEntries: [SectionEntry] {
+    let serverByKey = Dictionary(uniqueKeysWithValues: store.sections.map { ($0.key, $0) })
+    let order = store.serverSettings?.sectionOrder ?? store.sections.map(\.key)
+    return order.compactMap { key in
+      guard let manifest = SectionManifest.byKey[key],
+            let server = serverByKey[key] else { return nil }
+      return SectionEntry(manifest: manifest, server: server)
+    }
+  }
+
+  private func staticRow(_ dest: SettingsDestination) -> some View {
+    Label {
+      Text(title(for: dest))
+    } icon: {
+      ColoredGlyph(icon: icon(for: dest), color: tint(for: dest), size: 22)
+    }
+  }
+
+  private func sectionRow(_ entry: SectionEntry) -> some View {
+    // No per-section icon vocabulary in the app yet — match the webapp
+    // and use a plain color dot. Sized to align with the 22pt
+    // ColoredGlyph slot used by the static rows above.
+    Label {
+      Text(entry.label)
+    } icon: {
+      Circle()
+        .fill(entry.accent)
+        .frame(width: 14, height: 14)
+        .frame(width: 22, height: 22, alignment: .center)
+    }
+  }
+
+  private func title(for dest: SettingsDestination) -> String {
+    switch dest {
+    case .general:      return "General"
+    case .integrations: return "Integrations"
+    case .sync:         return "Sync"
+    case .privacy:      return "Privacy"
+    case .about:        return "About"
+    case .section(let key):
+      return store.sections.first(where: { $0.key == key })?.label
+        ?? SectionManifest.byKey[key]?.defaultLabel
+        ?? key.capitalized
+    }
+  }
+
+  // Icon + tint helpers are only used for the static rows on top —
+  // section rows render their own color-dot label via `sectionRow`.
+  private func icon(for dest: SettingsDestination) -> String {
+    switch dest {
+    case .general:      return "gearshape"
+    case .integrations: return "app.connected.to.app.below.fill"
+    case .sync:         return "arrow.triangle.2.circlepath"
+    case .privacy:      return "hand.raised"
+    case .about:        return "info.circle"
+    case .section:      return ""  // unreachable; sectionRow handles section dests
+    }
+  }
+
+  private func tint(for dest: SettingsDestination) -> Color {
+    switch dest {
+    case .general:      return .gray
+    case .integrations: return .indigo
+    case .sync:         return .blue
+    case .privacy:      return .teal
+    case .about:        return .purple
+    case .section:      return .gray  // unreachable; see above
+    }
+  }
+
+  @ViewBuilder
+  private func pane(for dest: SettingsDestination) -> some View {
+    switch dest {
+    case .general:           GeneralSettingsPane()
+    case .integrations:      IntegrationsSettingsPane()
+    case .sync:              SyncSettingsPane()
+    case .privacy:           PrivacySettingsPane()
+    case .about:             AboutSettingsPane()
+    case .section(let key):  SectionDetailPane(sectionKey: key)
+    }
+  }
+}
+
+/// Resolved sidebar row for a section — combines the static manifest
+/// (icon, defaults) with the live server overrides (label, accent).
+struct SectionEntry: Identifiable, Hashable {
+  let manifest: SectionManifest
+  let server: SeptenaClient.SectionConfig
+  var id: String { manifest.key }
+  var key: String { manifest.key }
+  /// Server label wins; manifest default is the fallback when the server
+  /// hasn't returned a label yet (cold launch before refresh).
+  var label: String {
+    server.label.isEmpty ? manifest.defaultLabel : server.label
+  }
+  /// Accent comes from the server (today) / CloudKit account (tomorrow).
+  /// No catalog default — `parseHexColor` already returns neutral gray
+  /// for empty / unparseable strings, which is the right fallback when
+  /// the user hasn't picked a color yet.
+  var accent: Color { parseHexColor(server.color) }
 }
 
 // MARK: - Privacy
@@ -314,213 +388,98 @@ struct PrivacySettingsPane: View {
 // MARK: - General
 
 struct GeneralSettingsPane: View {
-  @AppStorage(SettingsKey.badgeShowOverdue) private var badge: Bool = false
-  @AppStorage(SettingsKey.startupView) private var startup: String = StartupView.today.rawValue
-  @AppStorage(SettingsKey.todayShowCompleted) private var showCompleted: Bool = true
-  @AppStorage(SettingsKey.taskSort) private var taskSortRaw: String = TaskSort.dateAdded.rawValue
-
   var body: some View {
     Form {
-      Section("Badge") {
-        Toggle("Show overdue count on app icon", isOn: $badge)
-      }
-      Section("Open on launch") {
-        Picker("Open on launch", selection: $startup) {
-          ForEach(StartupView.allCases) { v in
-            Text(v.label).tag(v.rawValue)
-          }
-        }
-        .pickerStyle(.inline)
-        .labelsHidden()
-      }
-      Section("Today") {
-        Toggle("Show completed tasks in Today", isOn: $showCompleted)
-      }
-      Section("Task sort") {
-        Picker("Sort tasks by", selection: $taskSortRaw) {
-          ForEach(TaskSort.allCases) { s in
-            Label(s.label, systemImage: s.icon).tag(s.rawValue)
-          }
-        }
-        .pickerStyle(.inline)
-        .labelsHidden()
+      Section {
+        Text("App-wide settings will appear here.")
+          .font(.callout)
+          .foregroundStyle(.secondary)
       }
     }
     .formStyle(.grouped)
   }
 }
 
-// MARK: - Server (all read-only /api/settings: appearance, units, time, targets)
+// MARK: - Section detail
 //
-// One pane showing everything the FastAPI server reports. Edited
-// elsewhere for now — the iOS app is purely a display surface for
-// these. Keeping it in one place mirrors how the data is fetched
-// (one endpoint, one cached payload).
+// One pane per section, addressed by stable key. Identity (icon, label,
+// color, description) comes from the local `SectionManifest`; the server
+// label/color override the defaults when present. Per-key content below
+// uses cached catalog data from `SettingsStore` — caffeine beans,
+// cannabis strains, etc. Sections without catalog data show identity
+// only. Tasks is special-cased to host the local task prefs (badge,
+// today, sort) that used to live in a top-level Tasks pane.
 
-struct ServerSettingsPane: View {
+struct SectionDetailPane: View {
   @Environment(SettingsStore.self) private var store
+  let sectionKey: String
+
+  /// Local task prefs — only read for `sectionKey == "tasks"`, but
+  /// SwiftUI requires the property be declared at view-init so the
+  /// `@AppStorage` binding wires up; the Tasks-specific section in
+  /// `body` is the only place these are consumed.
+  @AppStorage(SettingsKey.badgeShowOverdue)    private var taskBadge: Bool = false
+  @AppStorage(SettingsKey.todayShowCompleted)  private var todayShowCompleted: Bool = true
+  @AppStorage(SettingsKey.taskSort)            private var taskSortRaw: String = TaskSort.dateAdded.rawValue
+
+  private var manifest: SectionManifest? { SectionManifest.byKey[sectionKey] }
+  private var server: SeptenaClient.SectionConfig? {
+    store.sections.first(where: { $0.key == sectionKey })
+  }
+  private var label: String {
+    let serverLabel = server?.label ?? ""
+    if !serverLabel.isEmpty { return serverLabel }
+    return manifest?.defaultLabel ?? sectionKey.capitalized
+  }
+  private var accent: Color {
+    parseHexColor(server?.color ?? "")
+  }
 
   var body: some View {
     Form {
-      if let s = store.serverSettings {
-        Section("Appearance") {
-          row("Theme", s.theme?.capitalized ?? "—")
-          row("eInk mode", (s.eink ?? false) ? "On" : "Off")
-        }
-        if let u = s.units {
-          Section("Units") {
-            row("Weight", u.weight)
-            row("Distance", u.distance)
-          }
-        }
-        if let t = s.time {
-          Section("Time") {
-            row("Home timezone", t.homeTimezone)
-            if let m = t.travelMode, m != "off" {
-              row("Travel mode", m)
-              if let tz = t.travelTimezone { row("Travel timezone", tz) }
-            }
-          }
-        }
-        if let t = s.targets {
-          Section("Macro targets") {
-            if let lo = t.proteinMinG, let hi = t.proteinMaxG {
-              row("Protein", "\(Int(lo))–\(Int(hi)) g")
-            }
-            if let lo = t.fatMinG, let hi = t.fatMaxG {
-              row("Fat", "\(Int(lo))–\(Int(hi)) g")
-            }
-            if let lo = t.carbsMinG, let hi = t.carbsMaxG {
-              row("Carbs", "\(Int(lo))–\(Int(hi)) g")
-            }
-            if let lo = t.kcalMin, let hi = t.kcalMax {
-              row("Calories", "\(Int(lo))–\(Int(hi)) kcal")
-            }
-          }
-          Section("Health targets") {
-            if let z2 = t.z2WeeklyMin {
-              row("Z2 weekly", "\(z2) min")
-            }
-            if let sl = t.sleepTargetH {
-              row("Sleep", String(format: "%.1f h", sl))
-            }
-            if let lo = t.fastingMinH, let hi = t.fastingMaxH {
-              row("Fasting", String(format: "%.0f–%.0f h", lo, hi))
-            }
-            if let lo = t.weightMinKg, let hi = t.weightMaxKg {
-              row("Weight", String(format: "%.1f–%.1f kg", lo, hi))
-            }
-            if let lo = t.fatMinPct, let hi = t.fatMaxPct {
-              row("Body fat", String(format: "%.0f–%.0f %%", lo, hi))
-            }
-          }
-        }
-        if let order = s.sectionOrder, !order.isEmpty {
-          Section("Section order") {
-            Text(order.joined(separator: " · "))
-              .font(.callout)
-              .foregroundStyle(.secondary)
-          }
-        }
-      } else if store.serverLoading {
-        Section { ProgressView().frame(maxWidth: .infinity) }
-      } else {
-        unavailable
-      }
-
-      // Single Sections entry — one row per /api/sections entry, each
-      // pushing to a per-section detail. Mirrors the webapp's structure:
-      // every mini-app is configurable from one place, even if some
-      // sections only expose their accent today.
-      if !store.sections.isEmpty {
-        Section("Sections") {
-          ForEach(store.sections, id: \.key) { sec in
-            NavigationLink {
-              SectionDetailPane(section: sec)
-                .navigationTitle(sec.label)
-                #if os(iOS)
-                .navigationBarTitleDisplayMode(.inline)
-                #endif
-            } label: {
-              SectionRow(section: sec)
-            }
-          }
-        }
-      }
-
-      readOnlyFooter
+      identitySection
+      sectionSpecific
+      // No read-only footer here: per-section pages are mostly identity
+      // today; the footer made sense when this pane lived inside Server.
     }
     .formStyle(.grouped)
   }
-}
 
-// MARK: - Section row + detail
-//
-// One sub-pane per section, picked from `store.sections` (the same list
-// the webapp uses to drive its homepage). Detail content is per-section:
-// caffeine/cannabis/training/chores have catalog data; others show just
-// the accent + key + an empty-state footer. Adding a new section to the
-// server appears here for free.
-
-private struct SectionRow: View {
-  let section: SeptenaClient.SectionConfig
-  var body: some View {
-    HStack(spacing: 12) {
-      RoundedRectangle(cornerRadius: 5, style: .continuous)
-        .fill(parseHexColor(section.color))
-        .frame(width: 22, height: 22)
-      Text(section.label).foregroundStyle(.primary)
-      Spacer()
-      Text(section.key)
-        .font(.caption.monospaced())
-        .foregroundStyle(.secondary)
-    }
-  }
-}
-
-private struct SectionDetailPane: View {
-  @Environment(SettingsStore.self) private var store
-  let section: SeptenaClient.SectionConfig
-
-  var body: some View {
-    Form {
-      Section("Identity") {
-        HStack(spacing: 12) {
-          RoundedRectangle(cornerRadius: 6, style: .continuous)
-            .fill(parseHexColor(section.color))
-            .frame(width: 28, height: 28)
-          VStack(alignment: .leading, spacing: 1) {
-            Text(section.label).foregroundStyle(.primary)
-            Text(section.key)
-              .font(.caption.monospaced())
-              .foregroundStyle(.secondary)
-          }
-          Spacer()
-          Text(section.color)
+  @ViewBuilder
+  private var identitySection: some View {
+    Section {
+      HStack(spacing: 12) {
+        RoundedRectangle(cornerRadius: 6, style: .continuous)
+          .fill(accent)
+          .frame(width: 28, height: 28)
+        VStack(alignment: .leading, spacing: 1) {
+          Text(label).foregroundStyle(.primary)
+          Text(sectionKey)
             .font(.caption.monospaced())
             .foregroundStyle(.secondary)
         }
+        Spacer()
       }
-
-      sectionSpecific
-      readOnlyFooter
+    } footer: {
+      if let m = manifest, !m.shortDescription.isEmpty {
+        Text(m.shortDescription)
+      }
     }
-    .formStyle(.grouped)
   }
 
-  /// Per-key catalog content. Keys must match what the server emits in
-  /// `/api/sections`. Unknown / un-cataloged sections fall through to
-  /// the "no additional configuration" empty state — accent + key only.
+  /// Per-key content. Tasks gets local prefs; the rest pull cached
+  /// catalog data from `SettingsStore`. Unknown / un-cataloged keys
+  /// fall through to identity-only.
   @ViewBuilder
   private var sectionSpecific: some View {
-    switch section.key {
+    switch sectionKey {
+    case "tasks":       tasksConfig
     case "caffeine":    caffeineConfig
     case "cannabis":    cannabisConfig
     case "training":    trainingConfig
     case "chores":      choresConfig
     case "nutrition":   nutritionConfig
-    case "tasks":       tasksConfig
-    default:            emptyConfig
+    default:            EmptyView()
     }
   }
 
@@ -546,7 +505,7 @@ private struct SectionDetailPane: View {
         }
       }
     } else {
-      emptyConfig
+      EmptyView()
     }
   }
 
@@ -570,7 +529,7 @@ private struct SectionDetailPane: View {
         row("Uses per capsule", "\(cnb.usesPerCapsule)")
       }
     } else {
-      emptyConfig
+      EmptyView()
     }
   }
 
@@ -598,7 +557,7 @@ private struct SectionDetailPane: View {
         }
       }
     } else {
-      emptyConfig
+      EmptyView()
     }
   }
 
@@ -620,7 +579,7 @@ private struct SectionDetailPane: View {
         }
       }
     } else {
-      emptyConfig
+      EmptyView()
     }
   }
 
@@ -634,23 +593,29 @@ private struct SectionDetailPane: View {
         row("Calories","\(Int(m.kcal.min))–\(Int(m.kcal.max)) kcal")
       }
     } else {
-      emptyConfig
+      EmptyView()
     }
   }
 
   @ViewBuilder
   private var tasksConfig: some View {
+    Section("Badge") {
+      Toggle("Show overdue count on app icon", isOn: $taskBadge)
+    }
+    Section("Today") {
+      Toggle("Show completed tasks in Today", isOn: $todayShowCompleted)
+    }
+    Section("Task sort") {
+      Picker("Sort tasks by", selection: $taskSortRaw) {
+        ForEach(TaskSort.allCases) { s in
+          Label(s.label, systemImage: s.icon).tag(s.rawValue)
+        }
+      }
+      .pickerStyle(.inline)
+      .labelsHidden()
+    }
     Section {
       Text("Areas and projects are managed in the Tasks tab.")
-        .font(.callout)
-        .foregroundStyle(.secondary)
-    }
-  }
-
-  @ViewBuilder
-  private var emptyConfig: some View {
-    Section {
-      Text("No additional configuration for this section.")
         .font(.callout)
         .foregroundStyle(.secondary)
     }
@@ -1173,23 +1138,5 @@ private func row(_ label: String, _ value: String) -> some View {
     Text(value)
       .foregroundStyle(.secondary)
       .multilineTextAlignment(.trailing)
-  }
-}
-
-@ViewBuilder
-private var unavailable: some View {
-  Section {
-    ContentUnavailableView("Couldn't load settings",
-                           systemImage: "gear",
-                           description: Text("Check the backend connection."))
-  }
-}
-
-@ViewBuilder
-private var readOnlyFooter: some View {
-  Section {
-    EmptyView()
-  } footer: {
-    Text("These values are configured server-side. Editing is not available in the app yet.")
   }
 }
