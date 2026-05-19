@@ -51,6 +51,7 @@ struct WeekDashboardView: View {
   @State private var gutToday: GutDayResponse? = nil
   @State private var gutHistory: [GutHistoryPoint] = []
   @State private var sheetDest: WeekDestination? = nil
+  @State private var quickAddSection: AddInfoSection? = nil
   /// Today-scoped collections kept in state so DayTimelineView can read
   /// them. NextItemsModel already covers habits/supplements/chores and
   /// today's caffeine/cannabis/gut live in their respective `*Today`
@@ -140,6 +141,15 @@ struct WeekDashboardView: View {
     // refresh gesture that re-runs Week's loader.
     .sheet(item: $sheetDest) { dest in
       sheetContent(for: dest)
+    }
+    .sheet(item: $quickAddSection) { section in
+      AddInfoSheet(initialSection: section)
+        #if os(iOS)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        #else
+        .frame(width: 560, height: 520)
+        #endif
     }
   }
 
@@ -707,7 +717,8 @@ struct WeekDashboardView: View {
                         target: Double(max(totalToday, 1))),
         history: bars.isEmpty
           ? nil
-          : .init(label: "7-day completions", values: bars)
+          : .init(label: "7-day completions", values: bars),
+        action: .init(systemImage: AddInfoSection.tasks.verbSystemImage) { quickAddSection = .tasks }
       )
     }
     .buttonStyle(.plain)
@@ -731,7 +742,8 @@ struct WeekDashboardView: View {
           current: Double(done),
           target: Double(max(total, 1))
         ),
-        history: .init(label: "7-day adherence", values: habitHistory)
+        history: .init(label: "7-day adherence", values: habitHistory),
+        action: .init(systemImage: AddInfoSection.habits.verbSystemImage) { quickAddSection = .habits }
       )
     }
     .buttonStyle(.plain)
@@ -786,7 +798,8 @@ struct WeekDashboardView: View {
         ),
         history: .init(label: "7-day effort",
                        values: strengthBars,
-                       secondaryValues: cardioBars)
+                       secondaryValues: cardioBars),
+        action: .init(systemImage: AddInfoSection.training.verbSystemImage) { quickAddSection = .training }
       )
     }
     .buttonStyle(.plain)
@@ -833,7 +846,8 @@ struct WeekDashboardView: View {
         progress: .init(label: "Today done",
                         current: Double(done),
                         target: Double(max(total, 1))),
-        history: .init(label: "7-day done", values: choreHistory)
+        history: .init(label: "7-day done", values: choreHistory),
+        action: .init(systemImage: AddInfoSection.chores.verbSystemImage) { quickAddSection = .chores }
       )
     }
     .buttonStyle(.plain)
@@ -854,7 +868,8 @@ struct WeekDashboardView: View {
           current: Double(done),
           target: Double(max(total, 1))
         ),
-        history: .init(label: "7-day adherence", values: supplementHistory)
+        history: .init(label: "7-day adherence", values: supplementHistory),
+        action: .init(systemImage: AddInfoSection.supplements.verbSystemImage) { quickAddSection = .supplements }
       )
     }
     .buttonStyle(.plain)
@@ -924,24 +939,41 @@ struct WeekDashboardView: View {
     let accent = theme.color(for: "groceries")
     let lowCount = groceries.filter { $0.low }.count
     let stocked = groceries.count - lowCount
+    let boughtPerDay = groceriesBoughtPerDay()
+    let totalBought7d = boughtPerDay.reduce(0, +)
     return Button { sheetDest = .groceries } label: {
       ModuleTile(
         title: "Groceries",
         accent: accent,
         stats: [
-          .init(label: "Low",     value: "\(lowCount)"),
-          .init(label: "Stocked", value: "\(stocked)")
+          .init(label: "Need",       value: "\(lowCount)"),
+          .init(label: "7-day buys", value: "\(totalBought7d)")
         ],
         progress: groceries.isEmpty ? nil : .init(
           label: "Stocked",
           current: Double(stocked),
           target: Double(max(groceries.count, 1))
         ),
-        history: .init(label: "Shopping list",
-                       values: Array(repeating: max(lowCount, 1), count: 7))
+        history: .init(label: "Bought (7d)", values: boughtPerDay),
+        action: .init(systemImage: AddInfoSection.groceries.verbSystemImage) { quickAddSection = .groceries }
       )
     }
     .buttonStyle(.plain)
+  }
+
+  /// Items bought per day for the last 7 days (oldest → newest, today last),
+  /// derived from each item's `lastBought` date.
+  private func groceriesBoughtPerDay() -> [Int] {
+    let cal = Calendar.current
+    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+    let today = cal.startOfDay(for: Date())
+    var counts = Array(repeating: 0, count: 7)
+    for item in groceries {
+      guard let lb = item.lastBought, let d = fmt.date(from: lb) else { continue }
+      let diff = cal.dateComponents([.day], from: cal.startOfDay(for: d), to: today).day ?? Int.max
+      if diff >= 0 && diff < 7 { counts[6 - diff] += 1 }
+    }
+    return counts
   }
 
   // Caffeine — today's session count + grams; 7-day session histogram.
@@ -964,7 +996,8 @@ struct WeekDashboardView: View {
                         target: Double(dailyLimit)),
         history: .init(label: "7-day sessions",
                        values: bars.isEmpty
-                         ? Array(repeating: 0, count: 7) : bars)
+                         ? Array(repeating: 0, count: 7) : bars),
+        action: .init(systemImage: AddInfoSection.caffeine.verbSystemImage) { quickAddSection = .caffeine }
       )
     }
     .buttonStyle(.plain)
@@ -990,28 +1023,25 @@ struct WeekDashboardView: View {
                         target: Double(dailyLimit)),
         history: .init(label: "7-day sessions",
                        values: bars.isEmpty
-                         ? Array(repeating: 0, count: 7) : bars)
+                         ? Array(repeating: 0, count: 7) : bars),
+        action: .init(systemImage: AddInfoSection.cannabis.verbSystemImage) { quickAddSection = .cannabis }
       )
     }
     .buttonStyle(.plain)
   }
 
-  // Body — latest Withings weigh-in + weight-trend bars. Bars use
-  // tenths-of-kg above a floor so small variation is still visible.
-  // Always 7 bars, today rightmost; gaps carry-forward the last weigh-in
-  // so the trend line stays continuous on days without a measurement.
+  // Body — latest Withings weigh-in + bidirectional weight chart.
+  // Only actual weigh-in days produce bars; gaps stay nil so carry-forward
+  // values don't collapse everything to zero deviation.
   private var bodyTile: some View {
     let accent = theme.color(for: "body")
     let latest = bodyRows.first
     let weight = latest?.weightKg
     let fat    = latest?.fatPct
-    let series = weeklyWeightSeries()
-    let nonZero = series.compactMap { $0 }
-    let floor = nonZero.min() ?? 0
-    let bars = series.map { w -> Int in
-      guard let w else { return 0 }
-      return Int(((w - floor) * 10).rounded())
-    }
+    let actualSeries = weeklyWeightActual()
+    let present = actualSeries.compactMap { $0 }
+    let avg = present.isEmpty ? 0.0 : present.reduce(0, +) / Double(present.count)
+    let centeredValues: [Double?] = actualSeries.map { $0.map { $0 - avg } }
     // Body-fat percentage tracked against a soft 18% target (single number,
     // overrideable later via Settings.targets.fat_min_pct).
     let fatTarget: Double = 18
@@ -1027,7 +1057,7 @@ struct WeekDashboardView: View {
                         current: fat.map { min($0, fatTarget * 2) } ?? 0,
                         target: fatTarget,
                         unit: "%"),
-        history: .init(label: "7-day trend", values: bars)
+        centeredHistory: .init(label: "Weight vs avg (7d)", values: centeredValues)
       )
     }
     .buttonStyle(.plain)
@@ -1053,7 +1083,8 @@ struct WeekDashboardView: View {
                         target: Double(dailyTarget)),
         history: .init(label: "7-day movements",
                        values: bars.isEmpty
-                         ? Array(repeating: 0, count: 7) : bars)
+                         ? Array(repeating: 0, count: 7) : bars),
+        action: .init(systemImage: AddInfoSection.gut.verbSystemImage) { quickAddSection = .gut }
       )
     }
     .buttonStyle(.plain)
@@ -1118,6 +1149,21 @@ struct WeekDashboardView: View {
     return out
   }
 
+  /// Last 7 calendar days with actual weigh-ins only — no carry-forward.
+  /// Days without a measurement are nil so the centered chart shows stubs
+  /// rather than collapsing to zero deviation.
+  private func weeklyWeightActual() -> [Double?] {
+    let cal = Calendar.current
+    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+    var byDate: [String: Double] = [:]
+    for r in bodyRows { if let w = r.weightKg { byDate[r.date] = w } }
+    let today = cal.startOfDay(for: Date())
+    return (0..<7).reversed().map { offset -> Double? in
+      guard let d = cal.date(byAdding: .day, value: -offset, to: today) else { return nil }
+      return byDate[fmt.string(from: d)]
+    }
+  }
+
   /// 7.2 → "7:12" — compact h:mm form for the tile.
   private func formatHoursShort(_ h: Double) -> String {
     let total = Int((h * 60).rounded())
@@ -1144,7 +1190,8 @@ struct WeekDashboardView: View {
                         current: todayProteinSum,
                         target: max(proteinTarget, 1),
                         unit: "g"),
-        history: .init(label: "7-day protein", values: bars)
+        history: .init(label: "7-day protein", values: bars),
+        action: .init(systemImage: AddInfoSection.nutrition.verbSystemImage) { quickAddSection = .nutrition }
       )
     }
     .buttonStyle(.plain)

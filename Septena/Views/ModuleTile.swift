@@ -12,6 +12,7 @@ struct ModuleTile: View {
   var stats: [Stat] = []
   var progress: ProgressBar? = nil
   var history: HistoryRow? = nil
+  var centeredHistory: CenteredHistoryRow? = nil
   var action: ActionButton? = nil
 
   struct Stat: Hashable {
@@ -46,6 +47,14 @@ struct ModuleTile: View {
     var secondaryValues: [Int]? = nil
   }
 
+  /// Bidirectional bar chart centered on y=0. Positive values go up,
+  /// negative go down. nil entries render as a small neutral stub so gaps
+  /// don't collapse the bar area on days with no measurement.
+  struct CenteredHistoryRow: Hashable {
+    let label: String
+    let values: [Double?]
+  }
+
   struct ActionButton {
     let systemImage: String    // "play.fill" / "checkmark"
     let onTap: () -> Void
@@ -61,6 +70,7 @@ struct ModuleTile: View {
         if !stats.isEmpty { statsGrid }
         if let progress { ProgressRow(progress: progress, accent: accent) }
         if let history { HistoryView(row: history, accent: accent) }
+        if let centeredHistory { CenteredHistoryView(row: centeredHistory, accent: accent) }
       }
       .padding(.horizontal, 16)
       .padding(.vertical, 16)
@@ -109,7 +119,7 @@ struct ModuleTile: View {
               // Quick-add updates the value; .numericText() tween the
               // digit transition (5 → 6, 14 → 15) instead of a hard cut.
               .contentTransition(.numericText())
-              .animation(.snappy, value: stat.value)
+              .a11yAnimation(.snappy, value: stat.value)
             if let unit = stat.unit {
               Text(unit)
                 .font(.subheadline)
@@ -153,7 +163,7 @@ private struct ProgressRow: View {
             .frame(width: geo.size.width * frac)
             // Tween the bar width when current/target change — quick-add
             // commits a new value, the bar slides instead of snapping.
-            .animation(.snappy, value: frac)
+            .a11yAnimation(.snappy, value: frac)
         }
       }
       .frame(height: 6)
@@ -196,6 +206,95 @@ private struct HistoryView: View {
     fmt.dateFormat = "EEEEE"     // narrow weekday: single letter
     return (0..<count).reversed().compactMap { offset in
       cal.date(byAdding: .day, value: -offset, to: Date()).map(fmt.string(from:))
+    }
+  }
+}
+
+private struct CenteredHistoryView: View {
+  let row: ModuleTile.CenteredHistoryRow
+  let accent: Color
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text(row.label)
+        .font(.caption2.weight(.semibold))
+        .foregroundStyle(.secondary)
+        .textCase(.uppercase)
+      CenteredBarChart(values: row.values, accent: accent,
+                       dayLabels: weekdayLabels(count: row.values.count))
+        .frame(height: 72)
+    }
+  }
+
+  private func weekdayLabels(count: Int) -> [String] {
+    let cal = Calendar.current
+    let fmt = DateFormatter(); fmt.dateFormat = "EEEEE"
+    return (0..<count).reversed().compactMap { offset in
+      cal.date(byAdding: .day, value: -offset, to: Date()).map(fmt.string(from:))
+    }
+  }
+}
+
+/// Bidirectional bar chart drawn manually with GeometryReader — no SwiftUI
+/// Charts dependency. A horizontal reference line sits at the midpoint (avg).
+/// Bars above the line = above-average weight (gain, full accent).
+/// Bars below the line = below-average weight (loss, dimmer accent).
+/// Missing days get a small neutral stub at the midline.
+private struct CenteredBarChart: View {
+  let values: [Double?]
+  let accent: Color
+  var dayLabels: [String]? = nil
+
+  var body: some View {
+    GeometryReader { geo in
+      let present   = values.compactMap { $0 }
+      let maxAbs    = max(0.01, present.map { abs($0) }.max() ?? 0.01)
+      let count     = max(values.count, 1)
+      let gap: CGFloat    = 4
+      let labelH: CGFloat = dayLabels == nil ? 0 : 14
+      let barsH: CGFloat  = geo.size.height - labelH - 2
+      let barW: CGFloat   = (geo.size.width - gap * CGFloat(count - 1)) / CGFloat(count)
+      let midY: CGFloat   = barsH / 2
+      let minH: CGFloat   = 3
+
+      VStack(spacing: 2) {
+        ZStack(alignment: .topLeading) {
+          Rectangle()
+            .fill(accent.opacity(0.2))
+            .frame(width: geo.size.width, height: 1)
+            .offset(y: midY)
+
+          ForEach(Array(values.enumerated()), id: \.offset) { idx, v in
+            let missing       = v == nil
+            let dev           = v ?? 0.0
+            let barH: CGFloat = max(CGFloat(abs(dev) / maxAbs) * midY, minH)
+            let xPos: CGFloat = (barW + gap) * CGFloat(idx)
+            let yPos: CGFloat = dev >= 0 ? midY - barH : midY
+            let color: Color  = missing ? accent.opacity(0.15)
+                              : dev > 0 ? accent
+                              :           accent.opacity(0.45)
+
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+              .fill(color)
+              .frame(width: barW, height: barH)
+              .offset(x: xPos, y: yPos)
+          }
+        }
+        .frame(width: geo.size.width, height: barsH)
+
+        if let dayLabels {
+          HStack(spacing: gap) {
+            ForEach(Array(dayLabels.enumerated()), id: \.offset) { idx, lbl in
+              Text(lbl)
+                .font(.caption2)
+                .foregroundStyle(idx == values.count - 1
+                                 ? Theme.inkPrimary : Theme.inkSecondary)
+                .frame(width: barW)
+            }
+          }
+          .frame(height: labelH)
+        }
+      }
     }
   }
 }
@@ -274,8 +373,8 @@ struct Histogram: View {
         // quick-add bumps today's bar (the last one), which slides up
         // smoothly instead of jumping. Stacked modifiers because SwiftUI's
         // `.animation(_:value:)` watches one value each.
-        .animation(.snappy, value: values)
-        .animation(.snappy, value: secondaryValues)
+        .a11yAnimation(.snappy, value: values)
+        .a11yAnimation(.snappy, value: secondaryValues)
         if let dayLabels {
           HStack(spacing: gap) {
             ForEach(Array(dayLabels.enumerated()), id: \.offset) { idx, lbl in
