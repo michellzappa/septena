@@ -12,6 +12,8 @@ struct CannabisDestinationView: View {
   @State private var today: CannabisDayResponse? = nil
   @State private var loading = true
   @State private var editing: CannabisEntry? = nil
+  @State private var usesPerCapsule: Int = 3
+  @State private var history: [CannabisHistoryPoint] = []
 
   private var accent: Color { theme.color(for: "cannabis") }
 
@@ -46,6 +48,30 @@ struct CannabisDestinationView: View {
             .foregroundStyle(.secondary)
         }
       }
+      if !history.isEmpty {
+        ActivityHeatmapSection(
+          title: "Cannabis days",
+          accent: accent,
+          daily: history,
+          date: { $0.date },
+          value: { Double($0.sessions) },
+          levelFor: { v in
+            let n = Int(v)
+            if n <= 0 { return 0 }
+            if n == 1 { return 1 }
+            if n == 2 { return 2 }
+            if n == 3 { return 3 }
+            return 4
+          },
+          labelFor: { v in
+            let n = Int(v)
+            return "\(n) \(n == 1 ? "session" : "sessions")"
+          },
+          subtitleFor: { active, total, sum in
+            "\(active) of \(total) days · \(Int(sum)) sessions"
+          }
+        )
+      }
     }
     #if os(macOS)
     .listStyle(.inset)
@@ -58,6 +84,7 @@ struct CannabisDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
+    .quickAddToolbar(.cannabis)
     .task {
       paintFromCache()
       await load()
@@ -142,10 +169,19 @@ struct CannabisDestinationView: View {
   private func detailLine(_ e: CannabisEntry) -> String? {
     var parts: [String] = []
     if let s = e.strain, !s.isEmpty { parts.append(s) }
-    if let hit = e.hit { parts.append("hit \(hit)") }
+    if let hit = e.hit { parts.append(hitDots(hit: hit)) }
     if let g = e.grams, g > 0 { parts.append(String(format: "%.2fg", g)) }
     if let eff = e.effect, !eff.isEmpty { parts.append(eff) }
     return parts.isEmpty ? nil : parts.joined(separator: " · ")
+  }
+
+  // Mirrors the webapp's HitDots (cannabis-dashboard.tsx): filled circles for
+  // hits taken, hollow for remaining slots in the capsule.
+  private func hitDots(hit: Int) -> String {
+    let total = max(usesPerCapsule, hit)
+    let clamped = max(0, min(hit, total))
+    return String(repeating: "●", count: clamped)
+      + String(repeating: "○", count: total - clamped)
   }
 
   private enum CacheKey {
@@ -159,9 +195,15 @@ struct CannabisDestinationView: View {
 
   private func load() async {
     loading = true
+    if let cfg = try? await client.cannabisConfig() {
+      usesPerCapsule = max(1, cfg.usesPerCapsule)
+    }
     if let tRes = try? await client.cannabisDay(date: SeptenaDate.today) {
       today = tRes
       ResponseCache.save(tRes, forKey: CacheKey.today)
+    }
+    if let h = try? await client.cannabisHistory(days: 365) {
+      history = h.daily
     }
     loading = false
   }

@@ -1,10 +1,16 @@
 import SwiftUI
 
-// Caffeine palette — "Repeat last" pinned at top, then one row per
-// configured bean preset. Each bean row swaps the bean but inherits the
-// last (method, grams) so the most common path (same brew, swap bean) is
-// one tap. Config endpoint may not exist on every backend; we degrade
-// gracefully if it 404s.
+// Caffeine palette — mirrors the webapp command palette (components/
+// command-palette.tsx :: page === "caffeine"). Rows, in order:
+//
+//   1. Repeat: {beans or METHOD}  → commit last (method, beans, grams).
+//      Sub: METHOD[ · Ng] · last {date}. Drawn from a 7-day lookback so
+//      "repeat" still works if you haven't logged anything today.
+//   2. {bean}  (one per configured bean preset, all shown — search
+//      filters this group only). Sub: LAST_METHOD[ · Ng]. Commit with
+//      last method + last grams but swap the bean. The most common path
+//      (same brew, swap bean) is one tap.
+//   3. Empty-state hint when no beans *and* no prior entry exists.
 
 struct AddCaffeinePage: View {
   @Environment(SeptenaClient.self) private var client
@@ -13,12 +19,15 @@ struct AddCaffeinePage: View {
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
   @State private var beans: [CaffeineBean] = []
-  @State private var lastEntry: CaffeineEntry? = nil
+  @State private var lastEntry: CaffeineTimePoint? = nil
   @State private var working = false
 
   private var trimmed: String {
     router.query.trimmingCharacters(in: .whitespacesAndNewlines)
   }
+
+  private var lastMethod: String { lastEntry?.method ?? "v60" }
+  private var lastGrams: Double? { lastEntry?.grams }
 
   var body: some View {
     let tint = AddInfoSection.caffeine.accent(theme: theme)
@@ -29,8 +38,8 @@ struct AddCaffeinePage: View {
         Section {
           Button { repeatLast(last) } label: {
             AddInfoRow(
-              title: "Repeat last",
-              subtitle: subtitle(for: last),
+              title: "Repeat: \(last.beans ?? last.method.uppercased())",
+              subtitle: repeatSubtitle(for: last),
               systemImage: "arrow.clockwise",
               tint: tint
             )
@@ -39,13 +48,14 @@ struct AddCaffeinePage: View {
           .disabled(working)
         }
       }
+
       if !filtered.isEmpty {
         Section("Beans") {
           ForEach(filtered) { bean in
             Button { logBean(bean) } label: {
               AddInfoRow(
                 title: bean.name,
-                subtitle: lastEntry.map { "\($0.method) · \(grams($0.grams))g" },
+                subtitle: beanSubtitle,
                 systemImage: "cup.and.saucer",
                 tint: tint
               )
@@ -55,6 +65,14 @@ struct AddCaffeinePage: View {
           }
         }
       }
+
+      if beans.isEmpty && lastEntry == nil {
+        Section {
+          Text("No bean presets yet — add some in Caffeine settings.")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+      }
     }
     .task { await load() }
     #if os(iOS)
@@ -62,25 +80,29 @@ struct AddCaffeinePage: View {
     #endif
   }
 
-  private func subtitle(for entry: CaffeineEntry) -> String {
-    var parts: [String] = [entry.method]
-    if let b = entry.beans { parts.append(b) }
-    if let g = entry.grams { parts.append("\(grams(g))g") }
-    return parts.joined(separator: " · ")
+  private func repeatSubtitle(for entry: CaffeineTimePoint) -> String {
+    var s = entry.method.uppercased()
+    if let g = entry.grams { s += " · \(grams(g))g" }
+    s += " · last \(entry.date)"
+    return s
   }
 
-  private func grams(_ g: Double?) -> String {
-    guard let g else { return "?" }
-    return g == g.rounded() ? String(Int(g)) : String(format: "%.1f", g)
+  private var beanSubtitle: String {
+    var s = lastMethod.uppercased()
+    if let g = lastGrams { s += " · \(grams(g))g" }
+    return s
   }
 
-  private func repeatLast(_ entry: CaffeineEntry) {
+  private func grams(_ g: Double) -> String {
+    g == g.rounded() ? String(Int(g)) : String(format: "%.1f", g)
+  }
+
+  private func repeatLast(_ entry: CaffeineTimePoint) {
     commit(method: entry.method, beans: entry.beans, grams: entry.grams)
   }
 
   private func logBean(_ bean: CaffeineBean) {
-    let method = lastEntry?.method ?? "v60"
-    commit(method: method, beans: bean.name, grams: lastEntry?.grams)
+    commit(method: lastMethod, beans: bean.name, grams: lastGrams)
   }
 
   private func commit(method: String, beans: String?, grams: Double?) {
@@ -94,6 +116,7 @@ struct AddCaffeinePage: View {
     if let grams { body["grams"] = grams }
     outbox.enqueue(method: "POST", path: "/api/caffeine/entry",
                    body: body, kind: "caffeine.add")
+    AddInfoSection.caffeine.notifyTilesChanged()
     Haptics.tick()
     dismiss()
   }
@@ -102,8 +125,10 @@ struct AddCaffeinePage: View {
     if let cfg = try? await client.caffeineConfig() {
       beans = cfg.beans
     }
-    if let day = try? await client.caffeineDay(date: SeptenaDate.today) {
-      lastEntry = day.entries.last
+    // Pull a 7-day window so "Repeat" still works the morning after a gap,
+    // matching getCaffeineEntries(7) in the webapp's command palette.
+    if let res = try? await client.caffeineEntries(days: 7) {
+      lastEntry = res.entries.last
     }
   }
 }

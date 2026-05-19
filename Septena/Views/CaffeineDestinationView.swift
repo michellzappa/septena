@@ -12,6 +12,7 @@ struct CaffeineDestinationView: View {
   @State private var today: CaffeineDayResponse? = nil
   @State private var loading = true
   @State private var editing: CaffeineEntry? = nil
+  @State private var history: [CaffeineHistoryPoint] = []
 
   private var accent: Color { theme.color(for: "caffeine") }
 
@@ -50,6 +51,30 @@ struct CaffeineDestinationView: View {
             .foregroundStyle(.secondary)
         }
       }
+      if !history.isEmpty {
+        ActivityHeatmapSection(
+          title: "Caffeine days",
+          accent: accent,
+          daily: history,
+          date: { $0.date },
+          value: { Double($0.sessions) },
+          levelFor: { v in
+            let n = Int(v)
+            if n <= 0 { return 0 }
+            if n == 1 { return 1 }
+            if n == 2 { return 2 }
+            if n == 3 { return 3 }
+            return 4
+          },
+          labelFor: { v in
+            let n = Int(v)
+            return "\(n) \(n == 1 ? "session" : "sessions")"
+          },
+          subtitleFor: { active, total, sum in
+            "\(active) of \(total) days · \(Int(sum)) sessions"
+          }
+        )
+      }
     }
     #if os(macOS)
     .listStyle(.inset)
@@ -62,6 +87,7 @@ struct CaffeineDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
+    .quickAddToolbar(.caffeine)
     .task {
       paintFromCache()
       await load()
@@ -173,6 +199,9 @@ struct CaffeineDestinationView: View {
     if let tRes = try? await client.caffeineDay(date: SeptenaDate.today) {
       today = tRes
       ResponseCache.save(tRes, forKey: CacheKey.today)
+    }
+    if let h = try? await client.caffeineHistory(days: 365) {
+      history = h.daily
     }
     loading = false
   }

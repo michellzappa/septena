@@ -382,6 +382,12 @@ final class SeptenaClient {
                       as: CaffeineHistoryResponse.self)
   }
 
+  func caffeineEntries(days: Int = 7) async throws -> CaffeineEntriesResponse {
+    try await getJSON("/api/caffeine/entries",
+                      query: [URLQueryItem(name: "days", value: String(days))],
+                      as: CaffeineEntriesResponse.self)
+  }
+
   // MARK: - Cannabis
 
   func cannabisDay(date: String) async throws -> CannabisDayResponse {

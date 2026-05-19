@@ -891,6 +891,19 @@ struct CaffeineHistoryResponse: Codable {
   let daily: [CaffeineHistoryPoint]
 }
 
+struct CaffeineTimePoint: Codable, Hashable {
+  let date: String
+  let time: String
+  let hour: Double
+  let method: String
+  var beans: String?
+  var grams: Double?
+}
+
+struct CaffeineEntriesResponse: Codable {
+  let entries: [CaffeineTimePoint]
+}
+
 // MARK: - Cannabis
 
 struct CannabisEntry: Codable, Identifiable, Hashable {
@@ -1164,6 +1177,11 @@ struct CaffeineConfig: Codable, Hashable {
 struct CannabisStrain: Codable, Identifiable, Hashable {
   let id: String
   var name: String
+
+  init(id: String, name: String) {
+    self.id = id
+    self.name = name
+  }
 
   init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
