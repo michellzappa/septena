@@ -215,6 +215,16 @@ final class TaskMutator {
 
   func delete(id: String) {
     guard let entity = fetch(id: id) else { return }
+    // If the CREATE for this task hasn't drained yet, the server never
+    // knew the task existed — drop the CREATE entry and the local row
+    // outright instead of round-tripping a DELETE that would 404.
+    if let pending = pendingCreate(taskId: id) {
+      context.delete(pending)
+      context.delete(entity)
+      try? context.save()
+      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+      return
+    }
     // Soft-hide locally — the row stays in SwiftData so we can resurrect
     // it if the network call fails. LocalCache filters pendingDeletion.
     entity.pendingDeletion = true
@@ -284,6 +294,23 @@ final class TaskMutator {
     if let title { entity.title = title }
     if let notes { entity.notes = notes.isEmpty ? nil : notes }
     entity.pendingSync = true
+    // Merge into a not-yet-drained CREATE so the single POST /api/tasks/create
+    // carries the user's real title — otherwise the optimistic CREATE drains
+    // with the "New To-Do" placeholder and the separate UPDATE behind it can
+    // race (e.g., dropped on transport failure, or never enqueued because of
+    // a keyboard-focus race on Enter). One round-trip, right title, no race.
+    if let pending = pendingCreate(taskId: id),
+       var payload = try? outboxDecoder.decode(CreatePayload.self, from: pending.payloadData) {
+      if let title { payload.title = title }
+      if let notes { payload.notes = notes.isEmpty ? nil : notes }
+      if let data = try? outboxEncoder.encode(payload) {
+        pending.payloadData = data
+        try? context.save()
+        NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+        kickDrain()
+        return
+      }
+    }
     let payload = try? outboxEncoder.encode(UpdatePayload(title: title, notes: notes))
     enqueue(kind: .update, taskId: id, payload: payload ?? Data())
   }
@@ -405,6 +432,17 @@ final class TaskMutator {
   private func fetch(id: String) -> TaskEntity? {
     let descriptor = FetchDescriptor<TaskEntity>(
       predicate: #Predicate { $0.id == id }
+    )
+    return try? context.fetch(descriptor).first
+  }
+
+  /// Returns the still-queued CREATE outbox row for `taskId`, if any. Used
+  /// by `update` / `delete` to merge into a pending create instead of
+  /// enqueueing a follow-up op that would race against the create's POST.
+  private func pendingCreate(taskId: String) -> OutboxEntity? {
+    let createKind = OutboxKind.create.rawValue
+    let descriptor = FetchDescriptor<OutboxEntity>(
+      predicate: #Predicate { $0.taskId == taskId && $0.kind == createKind }
     )
     return try? context.fetch(descriptor).first
   }
