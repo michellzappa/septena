@@ -41,6 +41,7 @@ struct SeptenaApp: App {
   @Environment(\.scenePhase) private var scenePhase
   #if os(iOS)
   @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+  private let watchBridge = WatchBridge.shared
   #endif
 
   var body: some Scene {
@@ -184,7 +185,9 @@ struct SeptenaApp: App {
       // `Discs` is the brand glyph as a monochrome PNG (1x/2x/3x) flagged
       // template-rendering-intent in the asset catalog, so it picks up
       // the menu bar tint automatically. PNG > SVG here because the
-      // vector+template combo proved unreliable.
+      // vector+template combo proved unreliable. The raster is sized at
+      // 18pt (36/54 for 2x/3x) — MenuBarExtra uses the image's intrinsic
+      // size and ignores SwiftUI .frame() on the label.
       Image("Discs")
     }
     .menuBarExtraStyle(.menu)

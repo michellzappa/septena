@@ -103,6 +103,27 @@ targets:
         CODE_SIGN_ENTITLEMENTS: Septena/SeptenaMac.entitlements
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
 
+  SeptenaWatch:
+    type: application
+    platform: watchOS
+    deploymentTarget: "11.0"
+    sources:
+      - path: SeptenaWatch
+        excludes:
+          - "**/.DS_Store"
+    info:
+      path: SeptenaWatch/Info.plist
+      properties:
+        CFBundleDisplayName: Septena
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: com.septena.cloud
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.watchkitapp
+        GENERATE_INFOPLIST_FILE: NO
+
 schemes:
   Septena:
     build:
@@ -111,6 +132,19 @@ schemes:
     run:
       config: Debug
     test:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
+
+  SeptenaWatch:
+    build:
+      targets:
+        SeptenaWatch: all
+    run:
       config: Debug
     profile:
       config: Release
