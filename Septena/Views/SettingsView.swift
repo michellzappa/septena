@@ -25,6 +25,10 @@ enum SettingsKey {
   static let startupView      = "septena.startup.view"
   static let todayShowCompleted = "septena.today.showCompleted"
   static let syncLastSucceeded = "septena.sync.lastSucceededAt"
+  /// Consent toggle for anonymous aggregate usage analytics (Plausible).
+  /// Same key string is referenced by `PlausibleClient.consentKey` so the
+  /// guard inside the actor and the @AppStorage binding stay in sync.
+  static let shareUsageData   = "septena.privacy.shareUsageData"
   /// Global sort applied to task lists inside a project or area. Stored as
   /// the raw value of `TaskSort`. Lives in UserDefaults rather than per-list
   /// state — there's no per-project manual order in this app, so one global
@@ -153,7 +157,7 @@ struct SettingsView: View {
   @State private var preferredCompactColumn: NavigationSplitViewColumn = .detail
 
   enum Section: String, CaseIterable, Identifiable {
-    case general, integrations, server, sync, about
+    case general, integrations, server, sync, privacy, about
     var id: String { rawValue }
     var title: String {
       switch self {
@@ -161,6 +165,7 @@ struct SettingsView: View {
       case .integrations: return "Integrations"
       case .server:       return "Server"
       case .sync:         return "Sync"
+      case .privacy:      return "Privacy"
       case .about:        return "About"
       }
     }
@@ -170,6 +175,7 @@ struct SettingsView: View {
       case .integrations: return "app.connected.to.app.below.fill"
       case .server:       return "server.rack"
       case .sync:         return "arrow.triangle.2.circlepath"
+      case .privacy:      return "hand.raised"
       case .about:        return "info.circle"
       }
     }
@@ -179,6 +185,7 @@ struct SettingsView: View {
       case .integrations: return .indigo
       case .server:       return .green
       case .sync:         return .blue
+      case .privacy:      return .teal
       case .about:        return .purple
       }
     }
@@ -247,7 +254,59 @@ struct SettingsView: View {
     case .integrations: IntegrationsSettingsPane()
     case .server:       ServerSettingsPane()
     case .sync:         SyncSettingsPane()
+    case .privacy:      PrivacySettingsPane()
     case .about:        AboutSettingsPane()
+    }
+  }
+}
+
+// MARK: - Privacy
+//
+// One toggle (anonymous Plausible screen-view analytics) plus a plain-
+// language disclosure of exactly what is and isn't sent. The toggle is
+// the same UserDefault key the actor reads, so flipping it takes effect
+// on the next screen view — no app restart needed.
+
+struct PrivacySettingsPane: View {
+  @AppStorage(SettingsKey.shareUsageData) private var share: Bool = true
+
+  var body: some View {
+    Form {
+      Section {
+        Toggle("Share anonymous usage data", isOn: $share)
+      } footer: {
+        Text("Helps us understand which features people use, so we improve the right things.")
+      }
+
+      Section("What is sent") {
+        bullet("Which screens you open (e.g. \"Nutrition\", \"Sleep\")")
+        bullet("App version, build, and platform (iOS or macOS)")
+      }
+
+      Section("What is never sent") {
+        bullet("Anything you log — food, caffeine, cannabis, supplements, sleep, mood, notes. None of it leaves your device through analytics.")
+        bullet("Any identifier that links events to you, or links today's session to yesterday's.")
+        bullet("Your IP address. The analytics provider uses it briefly to derive your country, then discards it.")
+      }
+
+      Section {
+        EmptyView()
+      } footer: {
+        VStack(alignment: .leading, spacing: 8) {
+          Text("Analytics is provided by Plausible Analytics (EU-hosted, cookie-free).")
+          Link("plausible.io/privacy",
+               destination: URL(string: "https://plausible.io/privacy")!)
+            .font(.callout)
+        }
+      }
+    }
+    .formStyle(.grouped)
+  }
+
+  private func bullet(_ text: String) -> some View {
+    HStack(alignment: .firstTextBaseline, spacing: 8) {
+      Text("•").foregroundStyle(.secondary)
+      Text(text).foregroundStyle(.primary)
     }
   }
 }
@@ -640,14 +699,17 @@ struct IntegrationsSettingsPane: View {
                    isGranted: remindersBridge.access == .granted)
         }
 
-        grantButton(
-          title: "Calendar",
-          systemImage: "calendar",
-          state: calendarAccessLabel,
-          isGranted: calendarBridge.access == .granted,
-          canRequest: calendarBridge.access == .notDetermined
-        ) {
-          Task { _ = await calendarBridge.requestAccess() }
+        NavigationLink {
+          CalendarDetail()
+            .navigationTitle("Calendar")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+        } label: {
+          stateRow(title: "Calendar",
+                   systemImage: "calendar",
+                   state: calendarAccessLabel,
+                   isGranted: calendarBridge.access == .granted)
         }
 
         grantButton(
@@ -859,6 +921,92 @@ private struct RemindersInboxDetail: View {
     if access == .granted {
       lists = bridge.reminderLists()
       selectedID = bridge.sourceListID
+    }
+  }
+}
+
+// MARK: - Calendar detail
+//
+// Reached from Integrations → Calendar. Lists every event calendar EventKit
+// exposes and lets the user toggle visibility per source. Hidden calendars
+// drop out of CalendarBridge's fetch helpers, so both the day timeline and
+// the Next page stop showing those events.
+
+private struct CalendarDetail: View {
+  @State private var bridge = CalendarBridge.shared
+  @State private var access: CalendarBridge.Access = .notDetermined
+  @State private var calendars: [EKCalendar] = []
+
+  var body: some View {
+    Form {
+      Section {
+        Text("Pick which calendars contribute events to your day timeline and Next page. Hidden calendars stay untouched in iOS Calendar.")
+          .font(.callout)
+          .foregroundStyle(.secondary)
+      }
+
+      switch access {
+      case .notDetermined:
+        Section {
+          Button("Grant Access to Calendar") {
+            Task {
+              _ = await bridge.requestAccess()
+              refresh()
+            }
+          }
+        }
+      case .denied, .writeOnly:
+        Section {
+          Text(access == .writeOnly
+               ? "Septena has write-only access. Enable Full Access in Settings → Privacy → Calendars."
+               : "Calendar access is denied. Enable it in Settings → Privacy → Calendars.")
+            .font(.callout)
+        }
+      case .granted:
+        if calendars.isEmpty {
+          Section {
+            Text("No calendars found.")
+              .foregroundStyle(.secondary)
+          }
+        } else {
+          Section("Calendars") {
+            ForEach(calendars, id: \.calendarIdentifier) { cal in
+              calendarRow(cal)
+            }
+          }
+        }
+      }
+    }
+    .formStyle(.grouped)
+    .onAppear(perform: refresh)
+  }
+
+  private func calendarRow(_ cal: EKCalendar) -> some View {
+    Toggle(isOn: Binding(
+      get: { !bridge.isHidden(cal) },
+      set: { bridge.setHidden(!$0, for: cal) }
+    )) {
+      HStack(spacing: 10) {
+        Circle()
+          .fill(Color(cgColor: cal.cgColor))
+          .frame(width: 10, height: 10)
+        VStack(alignment: .leading, spacing: 2) {
+          Text(cal.title)
+            .foregroundStyle(.primary)
+          if let source = cal.source?.title, !source.isEmpty {
+            Text(source)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+        }
+      }
+    }
+  }
+
+  private func refresh() {
+    access = bridge.access
+    if access == .granted {
+      calendars = bridge.allCalendars()
     }
   }
 }
