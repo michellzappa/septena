@@ -63,6 +63,7 @@ struct AddGutPage: View {
                           "bristol": item.id,
                           "blood": 0],
                    kind: "gut.add")
+    AddInfoSection.gut.notifyTilesChanged()
     Haptics.tick()
     dismiss()
   }

@@ -92,4 +92,28 @@ enum AddInfoSection: String, CaseIterable, Identifiable, Hashable {
     .habits, .supplements, .chores, .gut,
     .tasks, .groceries,
   ]
+
+  /// Broadcast that this section's tile state has changed (quick-add
+  /// committed, item toggled, etc.). The Week dashboard listens and
+  /// repaints just that tile from cache + kicks off a background refetch,
+  /// so the user sees the new number/progress/bar without waiting for the
+  /// next pull-to-refresh.
+  func notifyTilesChanged() {
+    NotificationCenter.default.post(
+      name: .tilesDidChange,
+      object: nil,
+      userInfo: [TileChangeKey.section: rawValue]
+    )
+  }
+}
+
+extension Notification.Name {
+  /// Posted by quick-add pages after a successful commit. UserInfo carries
+  /// the `AddInfoSection.rawValue` under `TileChangeKey.section` so the
+  /// receiver can scope its refresh to one tile.
+  static let tilesDidChange = Notification.Name("septena.tilesDidChange")
+}
+
+enum TileChangeKey {
+  static let section = "section"
 }

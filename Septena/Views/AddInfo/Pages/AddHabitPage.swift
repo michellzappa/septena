@@ -107,6 +107,7 @@ struct AddHabitPage: View {
                           "date": SeptenaDate.today,
                           "done": true],
                    kind: "habits.toggle")
+    AddInfoSection.habits.notifyTilesChanged()
     Haptics.tick()
     dismiss()
   }
@@ -118,6 +119,7 @@ struct AddHabitPage: View {
       defer { working = false }
       do {
         try await client.createHabit(name: name, bucket: createBucket)
+        AddInfoSection.habits.notifyTilesChanged()
         Haptics.tick()
         dismiss()
       } catch { Haptics.warning() }

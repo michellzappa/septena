@@ -54,6 +54,7 @@ struct AddSupplementPage: View {
                           "date": SeptenaDate.today,
                           "done": true],
                    kind: "supplements.toggle")
+    AddInfoSection.supplements.notifyTilesChanged()
     Haptics.tick()
     dismiss()
   }

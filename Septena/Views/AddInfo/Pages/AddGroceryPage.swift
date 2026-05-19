@@ -63,6 +63,7 @@ struct AddGroceryPage: View {
     outbox.enqueue(method: "POST", path: "/api/groceries/item",
                    body: ["name": name, "category": "other"],
                    kind: "groceries.add")
+    AddInfoSection.groceries.notifyTilesChanged()
     Haptics.tick()
     dismiss()
   }
@@ -71,6 +72,7 @@ struct AddGroceryPage: View {
     outbox.enqueue(method: "PATCH", path: "/api/groceries/item/\(item.id)",
                    body: ["low": true],
                    kind: "groceries.patch")
+    AddInfoSection.groceries.notifyTilesChanged()
     Haptics.tick()
     dismiss()
   }

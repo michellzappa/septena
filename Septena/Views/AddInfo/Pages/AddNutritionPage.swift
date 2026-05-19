@@ -117,6 +117,7 @@ struct AddNutritionPage: View {
     if let emoji = entry.emoji { body["emoji"] = emoji }
     outbox.enqueue(method: "POST", path: "/api/nutrition/entries",
                    body: body, kind: "nutrition.add")
+    AddInfoSection.nutrition.notifyTilesChanged()
     Haptics.tick()
     dismiss()
   }

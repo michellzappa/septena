@@ -128,6 +128,7 @@ struct AddTaskPage: View {
       today: today,
       status: status
     )
+    AddInfoSection.tasks.notifyTilesChanged()
     Haptics.tick()
     dismiss()
   }
@@ -138,6 +139,7 @@ struct AddTaskPage: View {
     } else {
       mutator.moveToToday(id: task.id)
     }
+    AddInfoSection.tasks.notifyTilesChanged()
     Haptics.tick()
     dismiss()
   }

@@ -71,6 +71,7 @@ struct AddChorePage: View {
     outbox.enqueue(method: "POST", path: "/api/chores/complete",
                    body: ["chore_id": chore.id, "date": SeptenaDate.today],
                    kind: "chores.complete")
+    AddInfoSection.chores.notifyTilesChanged()
     Haptics.tick()
     dismiss()
   }
@@ -82,6 +83,7 @@ struct AddChorePage: View {
       defer { working = false }
       do {
         try await client.createChoreDefinition(name: name, cadenceDays: 7)
+        AddInfoSection.chores.notifyTilesChanged()
         Haptics.tick()
         dismiss()
       } catch { Haptics.warning() }
