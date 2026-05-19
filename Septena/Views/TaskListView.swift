@@ -348,10 +348,21 @@ struct TaskListView: View {
     .scrollContentBackground(.hidden)
     .background(Theme.paperBackground)
     .scrollDismissesKeyboard(.interactively)
-    // Per-list floating `+` removed — the app-global Liquid Glass bubble in
-    // RootTabView is the single creation entry point. When the Tasks tab is
-    // active that bubble flips `shouldStartCreating`, so this list still
-    // gets its inline draft via the existing `.onChange` handler below.
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        Button {
+          nav.shouldStartCreating = true
+        } label: {
+          Image(systemName: "plus")
+        }
+        .accessibilityLabel("New Task")
+      }
+    }
+    // Primary-action `+` flips `shouldStartCreating`, identical to ⌘N and
+    // the sidebar Menu's "New To-Do" — opens the inline draft row instead of
+    // a modal sheet (Things-style). Attached on the inner List so it also
+    // merges into the parent toolbar when embedded inside Project / Area
+    // detail, alongside their existing ellipsis menu.
     // Reminders-style floating glass pill above the soft keyboard.
     // Apple's pattern (WWDC25 session 323) is `.safeAreaInset` + the
     // iOS 26 `.glassEffect()` — not `ToolbarItemGroup(.keyboard)`,
@@ -1447,6 +1458,7 @@ struct TaskListView: View {
     var project: String?
     var area: String?
     var today = false
+    var status: String? = nil
 
     let cal = Calendar.current
     let tomorrow = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: Date()))
@@ -1454,6 +1466,7 @@ struct TaskListView: View {
     switch filter {
     case .today:            today = true
     case .upcoming:         scheduled = tomorrow
+    case .someday:          status = "someday"
     case .project(let pid): project = pid
     case .area(let aid):    area = aid
     default:                break
@@ -1466,7 +1479,7 @@ struct TaskListView: View {
     //   - non-empty → server's placeholder gets replaced via update
     let created = mutator.create(
       title: "New To-Do", area: area, project: project,
-      scheduled: scheduled, due: nil, today: today, notes: nil
+      scheduled: scheduled, due: nil, today: today, notes: nil, status: status
     )
     insertLocally(created)
     editingTitle = ""
@@ -1778,6 +1791,7 @@ struct TaskListView: View {
     case .inbox: return "tray"
     case .upcoming: return "calendar"
     case .unscheduled: return "rectangle.stack"
+    case .someday: return "moon.stars.fill"
     case .logbook: return "checkmark.circle"
     case .project: return "number"
     case .area: return "folder"

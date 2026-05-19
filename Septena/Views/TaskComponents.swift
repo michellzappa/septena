@@ -210,11 +210,17 @@ struct InlineEditTaskRow: View {
       // affordance is only for the empty-notes case.
       if !notes.isEmpty { showNotes = true }
     }
-    // .task runs after the view is in the hierarchy and bound, so
-    // FocusState lands on the field cleanly — replaces the previous
-    // DispatchQueue.asyncAfter(0.05) workaround.
+    // The row mounts mid-expand-animation; assigning FocusState immediately
+    // races UIKit's input-session setup and the field silently fails to
+    // become first responder (logs "performInputOperation requires a valid
+    // sessionID"). Sleeping one tick lets the row settle before we claim
+    // focus — the difference between "Enter saves the title" and "Enter
+    // saves an empty draft."
     .task {
-      if autoFocus { focused = .title }
+      if autoFocus {
+        try? await Task.sleep(for: .milliseconds(50))
+        focused = .title
+      }
     }
     // Save-on-blur safety net: if the row vanishes for any reason (parent
     // tore it down, navigation, sheet presented over it, list reload)
@@ -452,7 +458,13 @@ struct TaskDetailsSheet: View {
       case .month: return r.interval == 1 ? "month" : "\(r.interval) months"
       }
     }()
-    return "Every \(unit)"
+    let base = "Every \(unit)"
+    // Server stamps `next_occurrence` on open recurring tasks — show it so the
+    // user sees when the next instance will land without doing the math.
+    if let next = task.nextOccurrence.flatMap(SeptenaDate.parse) {
+      return "\(base) · next \(shortDate(next))"
+    }
+    return base
   }
 
   private var moveIcon: String {

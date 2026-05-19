@@ -308,6 +308,9 @@ enum LocalCache {
         guard e.status == .open, !e.today,
               e.scheduled == nil, e.due == nil else { return nil }
         return SeptenaTask(e)
+      case .someday:
+        guard e.status == .someday else { return nil }
+        return SeptenaTask(e)
       case .logbook:
         guard e.status == .done else { return nil }
         return SeptenaTask(e)

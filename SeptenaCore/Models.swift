@@ -8,6 +8,7 @@ enum TaskStatus: String, Codable, Hashable {
   case open
   case done
   case cancelled
+  case someday
 }
 
 struct SeptenaTask: Identifiable, Codable, Hashable {
@@ -24,6 +25,11 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   var project: String?
   var notes: String?
   var recurrence: Recurrence?
+  /// For open recurring tasks: the date the next instance would land if
+  /// completed today. Computed server-side per request; absent on non-
+  /// recurring or already-completed tasks. Used to render
+  /// "Repeats weekly · next May 26" in the row meta.
+  var nextOccurrence: String?
   /// Stamped server-side on every write. Used as a watermark by the
   /// delta-sync path (`/api/tasks/changes?since=…`). Nil only on legacy
   /// records that haven't been touched since the server was upgraded.
@@ -39,6 +45,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     case todaySetOn = "today_set_on"
     case completedAt = "completed_at"
     case area, project, notes, recurrence
+    case nextOccurrence = "next_occurrence"
     case updatedAt = "updated_at"
     case deletedAt = "deleted_at"
   }
@@ -60,6 +67,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     project = try c.decodeIfPresent(String.self, forKey: .project)
     notes = try c.decodeIfPresent(String.self, forKey: .notes)
     recurrence = try c.decodeIfPresent(Recurrence.self, forKey: .recurrence)
+    nextOccurrence = try c.decodeIfPresent(String.self, forKey: .nextOccurrence)
     updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     deletedAt = try c.decodeIfPresent(String.self, forKey: .deletedAt)
   }
@@ -251,6 +259,7 @@ struct TasksCounts: Codable {
   var inboxCount: Int
   var upcomingCount: Int
   var unscheduledCount: Int
+  var somedayCount: Int
   var openCount: Int
 
   enum CodingKeys: String, CodingKey {
@@ -260,6 +269,7 @@ struct TasksCounts: Codable {
     case inboxCount = "inbox_count"
     case upcomingCount = "upcoming_count"
     case unscheduledCount = "unscheduled_count"
+    case somedayCount = "someday_count"
     case openCount = "open_count"
   }
 
@@ -271,18 +281,20 @@ struct TasksCounts: Codable {
     inboxCount = (try? c.decode(Int.self, forKey: .inboxCount)) ?? 0
     upcomingCount = (try? c.decode(Int.self, forKey: .upcomingCount)) ?? 0
     unscheduledCount = (try? c.decode(Int.self, forKey: .unscheduledCount)) ?? 0
+    somedayCount = (try? c.decode(Int.self, forKey: .somedayCount)) ?? 0
     openCount = (try? c.decode(Int.self, forKey: .openCount)) ?? 0
   }
 
   init(today: String, todayCount: Int, reviewCount: Int,
        inboxCount: Int, upcomingCount: Int, unscheduledCount: Int,
-       openCount: Int) {
+       somedayCount: Int = 0, openCount: Int) {
     self.today = today
     self.todayCount = todayCount
     self.reviewCount = reviewCount
     self.inboxCount = inboxCount
     self.upcomingCount = upcomingCount
     self.unscheduledCount = unscheduledCount
+    self.somedayCount = somedayCount
     self.openCount = openCount
   }
 }
@@ -294,6 +306,7 @@ enum TaskFilter: Equatable, Hashable {
   case inbox
   case upcoming
   case unscheduled
+  case someday
   case logbook
   case project(String)
   case area(String)
@@ -304,17 +317,22 @@ enum TaskFilter: Equatable, Hashable {
     case .inbox: return "inbox"
     case .upcoming: return "upcoming"
     case .unscheduled: return "unscheduled"
+    case .someday: return "someday"
     case .logbook: return "logbook"
     case .project, .area: return "all"
     }
   }
 
+  // User-facing label. We follow Things 3 vocabulary: "Anytime" for the
+  // unscheduled-open pile and "Someday" for the deliberately-deferred one.
+  // The serverView key stays `unscheduled` so the API contract is unchanged.
   var title: String {
     switch self {
     case .today: return "Today"
     case .inbox: return "Inbox"
     case .upcoming: return "Upcoming"
-    case .unscheduled: return "Unscheduled"
+    case .unscheduled: return "Anytime"
+    case .someday: return "Someday"
     case .logbook: return "Logbook"
     case .project: return "Project"
     case .area: return "Area"
@@ -943,6 +961,19 @@ struct CannabisHistoryPoint: Codable, Hashable {
 
 struct CannabisHistoryResponse: Codable {
   let daily: [CannabisHistoryPoint]
+}
+
+struct CannabisTimePoint: Codable, Hashable {
+  let date: String
+  let time: String
+  let hour: Double
+  let method: String
+  var strain: String?
+  var hit: Int?
+}
+
+struct CannabisEntriesResponse: Codable {
+  let entries: [CannabisTimePoint]
 }
 
 // MARK: - Body (Withings)
