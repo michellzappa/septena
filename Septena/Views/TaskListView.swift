@@ -15,6 +15,7 @@ struct TaskListView: View {
   @Environment(NavigationState.self) private var nav
   @Environment(SectionTheme.self) private var theme
   @Environment(\.modelContext) private var modelContext
+  @Environment(\.a11yMotion) private var motion
   #if os(iOS)
   /// Drives the Details surface choice: `.sheet` on iPhone compact,
   /// `.inspector` on iPad regular. `.inspector` adapts poorly to iPhone
@@ -42,6 +43,7 @@ struct TaskListView: View {
   /// own ordering that's part of the screen's meaning, so this is ignored
   /// outside `.project` / `.area`.
   @AppStorage(SettingsKey.taskSort) private var taskSortRaw: String = TaskSort.dateAdded.rawValue
+  @AppStorage(SettingsKey.todayShowCompleted) private var todayShowCompleted: Bool = true
 
   // Items/review/doneToday are filter-scoped. We store them alongside the
   // filter they correspond to; when the current `filter` doesn't match the
@@ -712,7 +714,7 @@ struct TaskListView: View {
       // Spring drives the row's height change; we intentionally do
       // NOT use a transition that fades content in/out, since the
       // two branches share the same checkbox + title layout.
-      .animation(Self.expandSpring, value: editingTaskId == task.id)
+      .a11yAnimation(Self.expandSpring, value: editingTaskId == task.id)
   }
 
   @ViewBuilder
@@ -732,7 +734,7 @@ struct TaskListView: View {
           let id = editingTaskId
           let title = editingTitle.trimmingCharacters(in: .whitespaces)
           let wasNew = (id != nil && id == newlyCreatedTaskId)
-          withAnimation(Self.expandSpring) { editingTaskId = nil }
+          motion.run(Self.expandSpring) { editingTaskId = nil }
           newlyCreatedTaskId = nil
           // If the user hit Esc on a fresh ⌘N task with an empty title,
           // delete it so we don't leave a stub in the list.
@@ -1212,12 +1214,7 @@ struct TaskListView: View {
     switch filter {
     case .project, .area: return true
     case .today:
-      // Settings → General → "Show completed tasks in Today" governs this.
-      // Default true (matches the long-standing "completions linger" feel);
-      // turning it off drops completed rows on the next reload, keeping only
-      // ones the user just checked off this session.
-      let show = UserDefaults.standard.object(forKey: SettingsKey.todayShowCompleted) as? Bool ?? true
-      return !show
+      return !todayShowCompleted
     default:              return false
     }
   }
@@ -1403,7 +1400,7 @@ struct TaskListView: View {
       }
       newlyCreatedTaskId = nil
     }
-    withAnimation(Self.expandSpring) {
+    motion.run(Self.expandSpring) {
       editingTitle = task.title
       editingNotes = task.notes ?? ""
       editingTaskId = task.id
@@ -1414,7 +1411,7 @@ struct TaskListView: View {
     guard let id = editingTaskId else { return }
     let t = editingTitle.trimmingCharacters(in: .whitespaces)
     let wasNew = (newlyCreatedTaskId == id)
-    withAnimation(Self.expandSpring) {
+    motion.run(Self.expandSpring) {
       editingTaskId = nil
     }
     newlyCreatedTaskId = nil
@@ -1475,7 +1472,7 @@ struct TaskListView: View {
     editingTitle = ""
     editingNotes = ""
     newlyCreatedTaskId = created.id
-    withAnimation(Self.expandSpring) { editingTaskId = created.id }
+    motion.run(Self.expandSpring) { editingTaskId = created.id }
   }
 
   // MARK: - When picker apply
@@ -1590,7 +1587,7 @@ struct TaskListView: View {
   private var loggedToggleRow: some View {
     Button {
       Haptics.tick()
-      withAnimation(.easeInOut(duration: 0.2)) { showLogged.toggle() }
+      motion.run(.easeInOut(duration: 0.2)) { showLogged.toggle() }
     } label: {
       HStack(spacing: 6) {
         Image(systemName: showLogged ? "chevron.down" : "chevron.right")
@@ -1746,7 +1743,7 @@ struct TaskListView: View {
       Button {
         Haptics.tick()
         UserDefaults.standard.set(SeptenaDate.today, forKey: "septena.newTodos.dismissedDate")
-        withAnimation(.easeOut(duration: 0.2)) { newTodosDismissed = true }
+        motion.run(.easeOut(duration: 0.2)) { newTodosDismissed = true }
       } label: {
         Text("OK")
           .font(.system(size: 13, weight: .semibold))

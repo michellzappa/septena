@@ -21,9 +21,9 @@ struct AddInfoRow: View {
   var body: some View {
     HStack(spacing: 12) {
       Image(systemName: systemImage)
-        .font(.system(size: 16, weight: .medium))
+        .font(.body.weight(.medium))
         .foregroundStyle(tint)
-        .frame(width: 24, height: 24)
+        .a11yScaledFrame(24)
       VStack(alignment: .leading, spacing: 1) {
         Text(title)
           .font(.body)

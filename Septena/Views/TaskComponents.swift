@@ -176,7 +176,8 @@ struct InlineEditTaskRow: View {
           } label: {
             HStack(spacing: 4) {
               Image(systemName: "plus")
-                .font(.system(size: 10, weight: .semibold))
+                .font(.septenaNotes.weight(.semibold))
+                .imageScale(.small)
               Text("Notes")
                 .font(.septenaNotes)
             }
@@ -193,7 +194,7 @@ struct InlineEditTaskRow: View {
       // field (when, deadline, repeat, list, delete).
       Button(action: { Haptics.pick(); onOpenDetails() }) {
         Image(systemName: "info.circle")
-          .font(.system(size: 22))
+          .font(.title3)
           .foregroundStyle(theme.accent)
           .frame(width: 28, height: 28)
           .contentShape(Rectangle())
@@ -547,6 +548,7 @@ struct DatePickerSheet: View {
   let clearLabel: String      // e.g. "No Date" / "Remove Deadline"
   let onPick: (Date?) -> Void
   @Environment(\.dismiss) private var dismiss
+  @Environment(\.a11yMotion) private var motion
   @State private var date: Date
   @State private var showingCalendar: Bool
 
@@ -596,7 +598,7 @@ struct DatePickerSheet: View {
             .padding(.horizontal, Theme.hPadding)
         } else {
           Button {
-            withAnimation(.easeInOut(duration: 0.18)) { showingCalendar = true }
+            motion.run(.easeInOut(duration: 0.18)) { showingCalendar = true }
           } label: {
             HStack(spacing: 14) {
               Image(systemName: "calendar")

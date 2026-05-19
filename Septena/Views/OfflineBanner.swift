@@ -28,6 +28,6 @@ struct OfflineBanner: View {
         .transition(.opacity.combined(with: .move(edge: .top)))
       }
     }
-    .animation(.easeInOut(duration: 0.2), value: client.isOffline)
+    .a11yAnimation(.easeInOut(duration: 0.2), value: client.isOffline)
   }
 }

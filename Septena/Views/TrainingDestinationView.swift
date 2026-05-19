@@ -107,6 +107,7 @@ struct TrainingDestinationView: View {
     #endif
     .background(Theme.groupedBackground)
     .navigationTitle("Training")
+    .trackScreen("training")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.large)
     #endif
@@ -1209,6 +1210,7 @@ struct TrainingSessionView: View {
 struct TrainingExerciseCard: View {
   @Environment(SeptenaClient.self) private var client
   @Environment(TrainingDraftStore.self) private var store
+  @Environment(\.a11yMotion) private var motion
 
   let index: Int
   let entry: DraftEntry
@@ -1229,7 +1231,7 @@ struct TrainingExerciseCard: View {
     .opacity(opacityFor(entry.status))
     .contentShape(Rectangle())
     .onTapGesture {
-      withAnimation(.easeInOut(duration: 0.18)) { expanded.toggle() }
+      motion.run(.easeInOut(duration: 0.18)) { expanded.toggle() }
     }
   }
 

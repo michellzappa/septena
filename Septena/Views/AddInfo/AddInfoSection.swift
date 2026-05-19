@@ -36,9 +36,9 @@ enum AddInfoSection: String, CaseIterable, Identifiable, Hashable {
   var verb: AddInfoVerb {
     switch self {
     case .training:                                                       return .start
-    case .nutrition, .caffeine, .cannabis,
-         .habits, .supplements, .chores, .gut:                            return .log
-    case .tasks, .groceries:                                              return .add
+    case .caffeine, .cannabis,
+         .habits, .supplements, .chores, .gut:                           return .log
+    case .nutrition, .tasks, .groceries:                                  return .add
     }
   }
 
@@ -49,7 +49,7 @@ enum AddInfoSection: String, CaseIterable, Identifiable, Hashable {
   var verbSystemImage: String {
     switch verb {
     case .start: return "play.fill"
-    case .log:   return "checkmark.circle"
+    case .log:   return "checkmark"
     case .add:   return "plus"
     }
   }

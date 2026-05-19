@@ -11,25 +11,45 @@ struct QuickFindView: View {
   @Environment(SeptenaClient.self) private var client
   @Environment(SectionTheme.self) private var theme
   @Environment(TrainingDraftStore.self) private var trainingDraft
+  @Environment(\.a11yMotion) private var motion
   @Query private var tasks: [TaskEntity]
   @Query private var projects: [ProjectEntity]
   @Query private var areas: [AreaEntity]
 
   @State private var query: String = ""
   @State private var selection: Int = 0
-  @FocusState private var queryFocused: Bool
 
   private static let resultLimit = 12
 
   var body: some View {
-    VStack(spacing: 0) {
-      searchField
-      Divider()
-      results
+    NavigationStack {
+      content
+        .background(Theme.paperBackground)
+        .navigationTitle("Search")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .toolbar {
+          ToolbarItem(placement: .cancellationAction) {
+            Button("Cancel") { dismiss() }
+          }
+        }
+        .searchable(
+          text: $query,
+          placement: .navigationBarDrawer(displayMode: .always),
+          prompt: "Search tasks, projects, areas…"
+        )
+        .onSubmit(of: .search, activateSelected)
+        .onKeyPress(.upArrow) {
+          selection = max(0, selection - 1)
+          return .handled
+        }
+        .onKeyPress(.downArrow) {
+          selection = min(max(0, hits.count - 1), selection + 1)
+          return .handled
+        }
     }
-    .background(Theme.paperBackground)
     .onAppear {
-      queryFocused = true
       // Pre-warm the session-type list so the training launcher reads
       // populated on first ⌘K. Cheap; the store keeps a cached copy.
       Task { await trainingDraft.refreshCatalog(client: client) }
@@ -37,55 +57,14 @@ struct QuickFindView: View {
     .onChange(of: query) { selection = 0 }
   }
 
-  private var searchField: some View {
-    HStack(spacing: 10) {
-      Image(systemName: "magnifyingglass")
-        .foregroundStyle(Theme.inkSecondary)
-        .font(.system(size: 16, weight: .medium))
-      TextField("Search tasks, projects, areas…", text: $query)
-        .textFieldStyle(.plain)
-        .font(.system(.title3))
-        .focused($queryFocused)
-        .onSubmit(activateSelected)
-      if !query.isEmpty {
-        Button { query = "" } label: {
-          Image(systemName: "xmark.circle.fill")
-            .foregroundStyle(Theme.inkSecondary)
-        }
-        .buttonStyle(.plain)
-      }
-    }
-    .padding(.horizontal, 16)
-    .padding(.vertical, 14)
-    .onKeyPress(.upArrow) {
-      selection = max(0, selection - 1)
-      return .handled
-    }
-    .onKeyPress(.downArrow) {
-      selection = min(max(0, hits.count - 1), selection + 1)
-      return .handled
-    }
-    .onKeyPress(.escape) {
-      dismiss()
-      return .handled
-    }
-  }
-
   @ViewBuilder
-  private var results: some View {
+  private var content: some View {
     let rows = hits
     if rows.isEmpty {
       if query.isEmpty {
         trainingLauncher
       } else {
-        VStack {
-          Spacer()
-          Text("No matches")
-            .foregroundStyle(Theme.inkSecondary)
-            .font(.system(.callout))
-          Spacer()
-        }
-        .frame(maxWidth: .infinity)
+        ContentUnavailableView.search(text: query)
       }
     } else {
       ScrollViewReader { proxy in
@@ -101,7 +80,7 @@ struct QuickFindView: View {
           .padding(.vertical, 4)
         }
         .onChange(of: selection) { _, new in
-          withAnimation(.easeOut(duration: 0.08)) {
+          motion.run(.easeOut(duration: 0.08)) {
             proxy.scrollTo(new, anchor: .center)
           }
         }

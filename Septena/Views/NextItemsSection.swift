@@ -505,7 +505,7 @@ struct HabitRow: View {
         isDone: inactive
       ) { model.toggleHabit(habit, outbox: outbox) }
 
-      Text(habit.emoji ?? "•").font(.system(size: 16))
+      Text(habit.emoji ?? "•").font(.body)
       Text(habit.name)
         .font(.septenaTaskTitle)
         .foregroundStyle(inactive ? Theme.inkSecondary : Theme.inkPrimary)
@@ -552,7 +552,7 @@ struct SupplementRow: View {
       TaskCheckbox(tint: tint, isDone: supplement.done) {
         model.toggleSupplement(supplement, outbox: outbox)
       }
-      Text(supplement.emoji ?? "•").font(.system(size: 16))
+      Text(supplement.emoji ?? "•").font(.body)
       Text(supplement.name)
         .font(.septenaTaskTitle)
         .foregroundStyle(supplement.done ? Theme.inkSecondary : Theme.inkPrimary)
@@ -616,7 +616,7 @@ struct ChoreRow: View {
           model.completeChore(chore, outbox: outbox)
         }
       }
-      Text(chore.emoji ?? "•").font(.system(size: 16))
+      Text(chore.emoji ?? "•").font(.body)
       Text(chore.name)
         .font(.septenaTaskTitle)
         .foregroundStyle(inactive ? Theme.inkSecondary : Theme.inkPrimary)

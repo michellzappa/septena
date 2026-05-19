@@ -194,8 +194,8 @@ struct SidebarRootView: View {
   }
 
   /// iPhone / iPad layout: scrolling list with a standard navigation bar and
-  /// toolbar `+` menu (Reminders pattern). Settings remains reachable from
-  /// the discreet last row of the scroll.
+  /// toolbar `+` menu (Reminders pattern). Settings is reachable from the
+  /// top-left "…" overflow menu (and ⌘, on macOS).
   @ViewBuilder
   private var sidebarPhone: some View {
     ScrollView {
@@ -204,7 +204,6 @@ struct SidebarRootView: View {
         // areasAndProjects renders its own per-section cards
         // (Mimestream-style), so no outer card wrapping here.
         areasAndProjects
-        settingsRow.padding(.top, 24)
         Spacer(minLength: 40)
       }
     }
@@ -866,33 +865,6 @@ struct SidebarRootView: View {
 
   private var topLevelProjects: [Project] {
     projects.filter { $0.area == nil && $0.status == .active }
-  }
-
-  // MARK: - Settings
-
-  @ViewBuilder
-  private var settingsRow: some View {
-    // Discreet on purpose — Settings is rarely needed; the rest of the
-    // sidebar is the main surface. Opens the Settings sheet (Things 3
-    // pattern) rather than pushing a route, so the user stays in place.
-    Button {
-      nav.showSettings = true
-    } label: {
-      HStack(spacing: 10) {
-        Image(systemName: "gearshape.fill")
-          .font(.system(size: 14))
-          .foregroundStyle(Theme.iconMuted)
-          .frame(width: 24, alignment: .center)
-        Text("Settings")
-          .font(.system(size: 13, weight: .regular))
-          .foregroundStyle(Theme.inkSecondary)
-        Spacer()
-      }
-      .frame(height: 30)
-      .contentShape(Rectangle())
-    }
-    .buttonStyle(InertButtonStyle())
-    .padding(.horizontal, Theme.hPadding)
   }
 
   // MARK: - Load
