@@ -10,6 +10,7 @@ struct NextView: View {
 
   @State private var model = NextItemsModel()
   @State private var tasksModel = TodayTasksModel()
+  @State private var suggestionsModel = NextSuggestionsModel()
 
   var body: some View {
     ScrollView {
@@ -17,13 +18,16 @@ struct NextView: View {
         // Title removed — the tab bar already labels this view.
 
         if model.hasLoaded && !model.hasAnyOpen && !model.hasAnyDone
-            && tasksModel.openTasks.isEmpty {
+            && tasksModel.openTasks.isEmpty
+            && suggestionsModel.suggestions.isEmpty {
           Text("Nothing here yet")
             .font(.septenaMeta)
             .foregroundStyle(.secondary)
             .padding(.horizontal, Theme.hPadding)
             .padding(.top, 40)
         }
+
+        NextSuggestionsSection(model: suggestionsModel)
 
         TodayTasksSection(model: tasksModel)
 
@@ -47,14 +51,17 @@ struct NextView: View {
     .task {
       model.paintFromCache()
       tasksModel.paintFromCache()
+      suggestionsModel.paintFromCache()
       async let a: () = model.load(client: client)
       async let b: () = tasksModel.load(client: client)
-      _ = await (a, b)
+      async let c: () = suggestionsModel.load(client: client)
+      _ = await (a, b, c)
     }
     .refreshable {
       async let a: () = model.load(client: client)
       async let b: () = tasksModel.load(client: client)
-      _ = await (a, b)
+      async let c: () = suggestionsModel.load(client: client)
+      _ = await (a, b, c)
     }
     // Repaint when other surfaces (Tasks tab, menu bar, outbox drain)
     // mutate tasks so the Next checklist stays in sync.
@@ -68,7 +75,8 @@ struct NextView: View {
       Task {
         async let a: () = model.load(client: client)
         async let b: () = tasksModel.load(client: client)
-        _ = await (a, b)
+        async let c: () = suggestionsModel.load(client: client)
+        _ = await (a, b, c)
       }
     }
   }

@@ -400,6 +400,12 @@ final class SeptenaClient {
                       as: CannabisHistoryResponse.self)
   }
 
+  func cannabisEntries(days: Int = 7) async throws -> CannabisEntriesResponse {
+    try await getJSON("/api/cannabis/entries",
+                      query: [URLQueryItem(name: "days", value: String(days))],
+                      as: CannabisEntriesResponse.self)
+  }
+
   // MARK: - Air
 
   /// Snapshot for the Air mini-app — latest reading + today / last-24h
