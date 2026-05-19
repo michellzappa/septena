@@ -31,7 +31,6 @@ struct AddSupplementPage: View {
               Button { toggle(item) } label: {
                 AddInfoRow(
                   title: "\(item.emoji ?? "") \(item.name)".trimmingCharacters(in: .whitespaces),
-                  systemImage: "pills",
                   tint: tint,
                   accessory: .check(false)
                 )

@@ -45,7 +45,6 @@ struct AddChorePage: View {
               AddInfoRow(
                 title: "\(chore.emoji ?? "") \(chore.name)".trimmingCharacters(in: .whitespaces),
                 subtitle: subtitle(for: chore),
-                systemImage: "house",
                 tint: tint
               )
             }

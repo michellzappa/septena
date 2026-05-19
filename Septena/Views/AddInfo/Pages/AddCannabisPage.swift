@@ -96,7 +96,6 @@ struct AddCannabisPage: View {
                 subtitle: strain.name == lastStrain
                   ? "New capsule · reset to hit 1"
                   : "New capsule · hit 1",
-                systemImage: "leaf",
                 tint: tint
               )
             }

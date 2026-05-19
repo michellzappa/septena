@@ -40,8 +40,7 @@ struct BodyDestinationView: View {
           LogRow(
             title: friendlyDate(row.date),
             detail: detailLine(row),
-            trailing: row.weightKg.map { String(format: "%.1f kg", $0) },
-            accent: accent
+            trailing: row.weightKg.map { String(format: "%.1f kg", $0) }
           )
           .listRowInsets(EdgeInsets())
         }

@@ -14,16 +14,18 @@ enum AddInfoRowAccessory {
 struct AddInfoRow: View {
   let title: String
   var subtitle: String? = nil
-  var systemImage: String = "circle.fill"
+  var systemImage: String? = nil
   var tint: Color = .secondary
   var accessory: AddInfoRowAccessory = .none
 
   var body: some View {
     HStack(spacing: 12) {
-      Image(systemName: systemImage)
-        .font(.body.weight(.medium))
-        .foregroundStyle(tint)
-        .a11yScaledFrame(24)
+      if let systemImage {
+        Image(systemName: systemImage)
+          .font(.body.weight(.medium))
+          .foregroundStyle(tint)
+          .a11yScaledFrame(24)
+      }
       VStack(alignment: .leading, spacing: 1) {
         Text(title)
           .font(.body)

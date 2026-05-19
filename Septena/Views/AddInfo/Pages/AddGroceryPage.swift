@@ -44,7 +44,6 @@ struct AddGroceryPage: View {
               AddInfoRow(
                 title: "\(item.emoji.isEmpty ? "" : item.emoji + " ")\(item.name)",
                 subtitle: item.category,
-                systemImage: "cart",
                 tint: tint
               )
             }

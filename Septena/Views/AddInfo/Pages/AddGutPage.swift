@@ -42,7 +42,6 @@ struct AddGutPage: View {
           Button { log(item) } label: {
             AddInfoRow(
               title: "\(item.emoji)  Type \(item.id) — \(item.label)",
-              systemImage: "drop",
               tint: tint
             )
           }

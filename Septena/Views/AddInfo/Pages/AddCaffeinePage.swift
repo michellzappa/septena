@@ -56,7 +56,6 @@ struct AddCaffeinePage: View {
               AddInfoRow(
                 title: bean.name,
                 subtitle: beanSubtitle,
-                systemImage: "cup.and.saucer",
                 tint: tint
               )
             }

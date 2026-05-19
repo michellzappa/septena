@@ -33,8 +33,7 @@ struct AirDestinationView: View {
           LogRow(
             title: friendlyDate(p.date),
             detail: detailLine(p),
-            trailing: p.co2Avg.map { "\(Int($0)) ppm" },
-            accent: accent
+            trailing: p.co2Avg.map { "\(Int($0)) ppm" }
           )
           .listRowInsets(EdgeInsets())
         }

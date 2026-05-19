@@ -32,8 +32,7 @@ struct CaffeineDestinationView: View {
               LogRow(
                 title: methodLabel(entry.method),
                 detail: detailLine(entry),
-                trailing: entry.time,
-                accent: accent
+                trailing: entry.time
               )
             }
             .buttonStyle(.plain)

@@ -38,8 +38,7 @@ struct SleepDestinationView: View {
           LogRow(
             title: friendlyDate(night.date),
             detail: detailLine(night),
-            trailing: night.totalH.map(formatHours),
-            accent: accent
+            trailing: night.totalH.map(formatHours)
           )
           .listRowInsets(EdgeInsets())
         }

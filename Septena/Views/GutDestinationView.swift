@@ -27,8 +27,7 @@ struct GutDestinationView: View {
               LogRow(
                 title: bristolLabel(entry.bristol),
                 detail: detailLine(entry),
-                trailing: entry.time,
-                accent: accent
+                trailing: entry.time
               )
             }
             .buttonStyle(.plain)

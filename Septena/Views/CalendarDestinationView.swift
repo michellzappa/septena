@@ -63,8 +63,7 @@ struct CalendarDestinationView: View {
             LogRow(
               title: event.title ?? "(Untitled)",
               detail: subtitleFor(event),
-              trailing: timeRangeFor(event),
-              accent: calendarColor(event) ?? accent
+              trailing: timeRangeFor(event)
             )
             .listRowInsets(EdgeInsets())
           }
@@ -115,11 +114,6 @@ struct CalendarDestinationView: View {
   }
 
   // MARK: - Helpers
-
-  private func calendarColor(_ event: EKEvent) -> Color? {
-    guard let cgColor = event.calendar?.cgColor else { return nil }
-    return Color(cgColor: cgColor)
-  }
 
   private func subtitleFor(_ event: EKEvent) -> String? {
     var parts: [String] = []

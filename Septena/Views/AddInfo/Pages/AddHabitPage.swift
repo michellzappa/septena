@@ -70,7 +70,6 @@ struct AddHabitPage: View {
                   AddInfoRow(
                     title: "\(item.emoji ?? "") \(item.name)".trimmingCharacters(in: .whitespaces),
                     subtitle: nil,
-                    systemImage: "circle",
                     tint: tint,
                     accessory: .check(false)
                   )

@@ -45,8 +45,7 @@ struct ActivityDestinationView: View {
       ForEach(Array(zip(weekdayLabels, bridge.stepsHistory).enumerated()), id: \.offset) { _, pair in
         LogRow(title: pair.0,
                detail: nil,
-               trailing: pair.1 > 0 ? "\(pair.1)" : "—",
-               accent: accent)
+               trailing: pair.1 > 0 ? "\(pair.1)" : "—")
           .listRowInsets(EdgeInsets())
       }
     }

@@ -38,7 +38,6 @@ struct AddNutritionPage: View {
               AddInfoRow(
                 title: title(for: meal.representative),
                 subtitle: macros(for: meal),
-                systemImage: "fork.knife",
                 tint: tint
               )
             }

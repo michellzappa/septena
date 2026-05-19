@@ -45,7 +45,6 @@ struct AddTrainingPage: View {
             AddInfoRow(
               title: type,
               subtitle: subtitle(for: type),
-              systemImage: "figure.strengthtraining.traditional",
               tint: tint
             )
           }
