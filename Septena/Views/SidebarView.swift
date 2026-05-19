@@ -222,7 +222,7 @@ struct SidebarRootView: View {
     // been removed; New Project / New Area remain reachable from the
     // Areas/Projects sheets.
     .toolbar {
-      ToolbarItem(placement: .topBarLeading) {
+      ToolbarItem(placement: .navigation) {
         Menu {
           Button {
             nav.showSettings = true
@@ -234,7 +234,7 @@ struct SidebarRootView: View {
         }
         .accessibilityLabel("More")
       }
-      ToolbarItem(placement: .topBarTrailing) {
+      ToolbarItem(placement: .primaryAction) {
         Button { nav.showQuickFind = true } label: {
           Image(systemName: "magnifyingglass")
         }

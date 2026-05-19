@@ -109,7 +109,7 @@ struct RootTabView: View {
         .tabItem {
           // `DiscsMark` is a custom SF Symbol (Septena's seven-disc mark);
           // the system tab bar sizes it like any built-in SF Symbol.
-          Label("Septena", image: "DiscsMark")
+          Label("Week", image: "DiscsMark")
         }
         .tag(SeptenaTab.week)
 

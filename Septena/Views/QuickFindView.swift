@@ -34,11 +34,18 @@ struct QuickFindView: View {
             Button("Cancel") { dismiss() }
           }
         }
+        #if os(iOS)
         .searchable(
           text: $query,
           placement: .navigationBarDrawer(displayMode: .always),
           prompt: "Search tasks, projects, areas…"
         )
+        #else
+        .searchable(
+          text: $query,
+          prompt: "Search tasks, projects, areas…"
+        )
+        #endif
         .onSubmit(of: .search, activateSelected)
         .onKeyPress(.upArrow) {
           selection = max(0, selection - 1)

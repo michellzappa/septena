@@ -84,7 +84,9 @@ struct GoalsView: View {
           }
         }
       }
+      #if os(iOS)
       .listStyle(.insetGrouped)
+      #endif
     }
   }
 
