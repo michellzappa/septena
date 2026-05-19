@@ -12,6 +12,7 @@ struct SupplementsDestinationView: View {
 
   @State private var model = NextItemsModel()
   @State private var editing: SupplementDayItem? = nil
+  @State private var history: [SupplementHistoryPoint] = []
 
   private var accent: Color { theme.color(for: "supplements") }
 
@@ -35,6 +36,17 @@ struct SupplementsDestinationView: View {
                                systemImage: theme.icon(for: "supplements"),
                                description: Text("Add some in the webapp's Supplements settings."))
       }
+      if !history.isEmpty {
+        ChecklistHeatmapSection(
+          title: "Supplement consistency",
+          noun: "supplement",
+          accent: accent,
+          daily: history,
+          date: { $0.date },
+          done: { $0.done },
+          total: { $0.total }
+        )
+      }
     }
     #if os(macOS)
     .listStyle(.inset)
@@ -47,9 +59,13 @@ struct SupplementsDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
+    .quickAddToolbar(.supplements)
     .task {
       model.paintFromCache()
       await model.load(client: client)
+      if let resp = try? await client.supplementsHistory(days: 365) {
+        history = resp.daily
+      }
     }
     .sheet(item: $editing) { supp in
       EditSupplementSheet(

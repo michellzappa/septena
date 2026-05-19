@@ -48,10 +48,11 @@ struct HabitsDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
+    .quickAddToolbar(.habits)
     .task {
       model.paintFromCache()
       await model.load(client: client)
-      if let resp = try? await client.habitsHistory(days: 112) {
+      if let resp = try? await client.habitsHistory(days: 365) {
         history = resp.daily
       }
     }

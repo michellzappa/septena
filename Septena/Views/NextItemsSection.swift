@@ -102,6 +102,41 @@ struct TodayTaskRow: View {
     }
     .padding(.horizontal, Theme.hPadding)
     .padding(.vertical, Theme.rowVPadding)
+    // Same app-wide pattern as the other rows: long-press → menu. The
+    // richer task menu (When… / Move… / Repeat… / Suggested) lives in
+    // TaskListView because those actions need sheet state that doesn't
+    // exist on the Next surface; here we surface the subset that works
+    // standalone (Today toggle, Cancel, Delete).
+    .contextMenu {
+      if task.today {
+        Button {
+          Haptics.tick()
+          mutator.moveToToday(id: task.id, today: false)
+        } label: {
+          Label("Remove from Today", systemImage: "sun.min")
+        }
+      } else {
+        Button {
+          Haptics.tick()
+          mutator.moveToToday(id: task.id, today: true)
+        } label: {
+          Label("Move to Today", systemImage: "sun.max.fill")
+        }
+      }
+      Button {
+        Haptics.tick()
+        mutator.cancel(id: task.id)
+      } label: {
+        Label("Cancel Task", systemImage: "xmark.circle")
+      }
+      Divider()
+      Button(role: .destructive) {
+        Haptics.warning()
+        mutator.delete(id: task.id)
+      } label: {
+        Label("Delete", systemImage: "trash")
+      }
+    }
   }
 }
 
@@ -530,12 +565,27 @@ struct SupplementRow: View {
     }
     .padding(.horizontal, Theme.hPadding)
     .padding(.vertical, Theme.rowVPadding)
-    .contextMenu {
-      if let onDelete {
+    // Only attach a context menu when there's actually an action to
+    // show — Next view passes no `onDelete`, and SwiftUI's long-press
+    // preview still triggers for an empty menu, which feels broken.
+    .modifier(SupplementRowContextMenu(onDelete: onDelete))
+  }
+}
+
+/// Conditional `.contextMenu` for `SupplementRow`. Lifted out so the
+/// row's body stays a single expression and we don't apply the modifier
+/// when there are no items to show.
+private struct SupplementRowContextMenu: ViewModifier {
+  let onDelete: (() -> Void)?
+  func body(content: Content) -> some View {
+    if let onDelete {
+      content.contextMenu {
         Button(role: .destructive) { onDelete() } label: {
           Label("Delete", systemImage: "trash")
         }
       }
+    } else {
+      content
     }
   }
 }

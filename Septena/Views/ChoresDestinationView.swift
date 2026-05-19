@@ -13,6 +13,7 @@ struct ChoresDestinationView: View {
 
   @State private var model = NextItemsModel()
   @State private var editing: ChoreItem? = nil
+  @State private var history: [ChoreHistoryPoint] = []
 
   private var accent: Color { theme.color(for: "chores") }
 
@@ -51,6 +52,17 @@ struct ChoresDestinationView: View {
       if !later.isEmpty {
         Section("Later") { ForEach(later) { row(for: $0) } }
       }
+      if !history.isEmpty {
+        ChecklistHeatmapSection(
+          title: "Chore consistency",
+          noun: "chore",
+          accent: accent,
+          daily: history,
+          date: { $0.date },
+          done: { $0.completed },
+          total: { $0.total }
+        )
+      }
     }
     #if os(macOS)
     .listStyle(.inset)
@@ -63,9 +75,13 @@ struct ChoresDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
+    .quickAddToolbar(.chores)
     .task {
       model.paintFromCache()
       await model.load(client: client)
+      if let resp = try? await client.choresHistory(days: 365) {
+        history = resp.daily
+      }
     }
     .sheet(item: $editing) { chore in
       EditChoreSheet(

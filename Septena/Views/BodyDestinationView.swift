@@ -239,6 +239,12 @@ struct BodyDestinationView: View {
         let pad = max((hi - lo) * 0.1, 0.5)
         return (lo - pad)...(hi + pad)
       }()
+      let valSum = points.map(\.value).reduce(0, +)
+      let avg = points.isEmpty ? 0 : valSum / Double(points.count)
+      let projText = projection.map { "Projection in 7 days \(String(format: "%.1f", $0)) \(unit)." } ?? ""
+      let summary = "\(title) trend chart. "
+                  + "Window average \(String(format: "%.1f", avg)) \(unit). "
+                  + projText
       VStack(alignment: .leading, spacing: 8) {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
           Text(title)
@@ -262,10 +268,13 @@ struct BodyDestinationView: View {
                      series: .value("Series", "actual"))
               .foregroundStyle(accent)
               .interpolationMethod(.monotone)
+              .accessibilityHidden(true)
             PointMark(x: .value("Day", idx),
                       y: .value(title, p.value))
               .foregroundStyle(accent)
               .symbolSize(28)
+              .accessibilityLabel(weekdayFull(p.date))
+              .accessibilityValue("\(String(format: "%.1f", p.value)) \(unit)")
           }
           if let t = trend {
             ForEach(0..<(points.count + 7), id: \.self) { idx in
@@ -274,6 +283,7 @@ struct BodyDestinationView: View {
                        series: .value("Series", "trend"))
                 .foregroundStyle(accent.opacity(0.5))
                 .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
+                .accessibilityHidden(true)
             }
           }
         }
@@ -285,6 +295,7 @@ struct BodyDestinationView: View {
       .background(Theme.secondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 16))
       .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 6, trailing: 12))
       .listRowBackground(Color.clear)
+      .a11yCombineKeepingChildren(summary)
     }
   }
 
@@ -363,6 +374,18 @@ struct BodyDestinationView: View {
     }
     let p = DateFormatter(); p.dateFormat = "MMM d"
     return p.string(from: d)
+  }
+
+  // Full weekday name for VoiceOver point labels — visual axis is hidden.
+  private func weekdayFull(_ iso: String) -> String {
+    let fmt = DateFormatter()
+    fmt.dateFormat = "yyyy-MM-dd"
+    guard let d = fmt.date(from: iso) else { return iso }
+    let cal = Calendar.current
+    if cal.isDateInToday(d)     { return "Today" }
+    if cal.isDateInYesterday(d) { return "Yesterday" }
+    let w = DateFormatter(); w.dateFormat = "EEEE"
+    return w.string(from: d)
   }
 }
 

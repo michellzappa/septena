@@ -34,7 +34,7 @@ struct SleepDestinationView: View {
       durationSection
       chartsSection
       Section("Recent nights") {
-        ForEach(nights) { night in
+        ForEach(nights.prefix(14)) { night in
           LogRow(
             title: friendlyDate(night.date),
             detail: detailLine(night),
@@ -43,6 +43,27 @@ struct SleepDestinationView: View {
           )
           .listRowInsets(EdgeInsets())
         }
+      }
+      if nights.count > 14 {
+        ActivityHeatmapSection(
+          title: "Sleep score",
+          accent: accent,
+          daily: nights,
+          date: { $0.date },
+          value: { Double($0.sleepScore ?? 0) },
+          levelFor: { v in
+            let s = Int(v)
+            if s <= 0 { return 0 }
+            if s >= 85 { return 4 }
+            if s >= 75 { return 3 }
+            if s >= 65 { return 2 }
+            return 1
+          },
+          labelFor: { v in "score \(Int(v))" },
+          subtitleFor: { active, total, _ in
+            "\(active) of \(total) nights logged"
+          }
+        )
       }
       if !loading && nights.isEmpty {
         ContentUnavailableView("No Oura data",
@@ -234,7 +255,16 @@ struct SleepDestinationView: View {
   }
 
   private var scoreReadinessChart: some View {
-    chartCard(title: "Score & Readiness", caption: "↑ 85+") {
+    let sleepScores = last7.compactMap { $0.sleepScore }
+    let readyScores = last7.compactMap { $0.readinessScore }
+    let avgSleep = sleepScores.isEmpty ? 0 : sleepScores.reduce(0, +) / sleepScores.count
+    let avgReady = readyScores.isEmpty ? 0 : readyScores.reduce(0, +) / readyScores.count
+    let parts: [String] = [
+      avgSleep > 0 ? "Seven-day sleep score average \(avgSleep)." : "",
+      avgReady > 0 ? "Readiness average \(avgReady)." : ""
+    ].filter { !$0.isEmpty }
+    let summary = "Score and readiness chart. Target 85 or higher. " + parts.joined(separator: " ")
+    return chartCard(title: "Score & Readiness", caption: "↑ 85+") {
       Chart {
         ForEach(last7) { n in
           if let s = n.sleepScore {
@@ -243,6 +273,8 @@ struct SleepDestinationView: View {
                      series: .value("Series", "Sleep"))
               .foregroundStyle(accent)
               .interpolationMethod(.monotone)
+              .accessibilityLabel(weekdayFull(n.date))
+              .accessibilityValue("Sleep score \(s)")
           }
           if let r = n.readinessScore {
             LineMark(x: .value("Day", weekdayLabel(n.date)),
@@ -250,35 +282,53 @@ struct SleepDestinationView: View {
                      series: .value("Series", "Readiness"))
               .foregroundStyle(accent.opacity(0.55))
               .interpolationMethod(.monotone)
+              .accessibilityLabel(weekdayFull(n.date))
+              .accessibilityValue("Readiness \(r)")
           }
         }
         RuleMark(y: .value("Target", 85))
           .foregroundStyle(accent.opacity(0.4))
           .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
+          .accessibilityHidden(true)
       }
       .chartYScale(domain: 0...100)
       .frame(height: 140)
     }
+    .a11yCombineKeepingChildren(summary)
   }
 
   private var stagesChart: some View {
-    chartCard(title: "Sleep Stages", caption: "hours") {
+    let deeps = last7.compactMap { $0.deepH }
+    let rems  = last7.compactMap { $0.remH }
+    let avgDeep = deeps.isEmpty ? 0 : deeps.reduce(0, +) / Double(deeps.count)
+    let avgRem  = rems.isEmpty  ? 0 : rems.reduce(0, +) / Double(rems.count)
+    let avgText = (avgDeep > 0 || avgRem > 0)
+      ? "Seven-night averages: deep \(String(format: "%.1f", avgDeep)) hours, REM \(String(format: "%.1f", avgRem)) hours."
+      : ""
+    let summary = "Sleep stages chart. Deep, REM, and light hours per night. \(avgText)"
+    return chartCard(title: "Sleep Stages", caption: "hours") {
       Chart {
         ForEach(last7) { n in
           if let d = n.deepH {
             BarMark(x: .value("Day", weekdayLabel(n.date)),
                     y: .value("Deep", d))
               .foregroundStyle(accent)
+              .accessibilityLabel(weekdayFull(n.date))
+              .accessibilityValue("Deep \(String(format: "%.1f", d)) hours")
           }
           if let r = n.remH {
             BarMark(x: .value("Day", weekdayLabel(n.date)),
                     y: .value("REM", r))
               .foregroundStyle(accent.opacity(0.7))
+              .accessibilityLabel(weekdayFull(n.date))
+              .accessibilityValue("REM \(String(format: "%.1f", r)) hours")
           }
           if let l = n.lightH {
             BarMark(x: .value("Day", weekdayLabel(n.date)),
                     y: .value("Light", l))
               .foregroundStyle(accent.opacity(0.4))
+              .accessibilityLabel(weekdayFull(n.date))
+              .accessibilityValue("Light \(String(format: "%.1f", l)) hours")
           }
         }
       }
@@ -290,10 +340,17 @@ struct SleepDestinationView: View {
       .chartLegend(position: .bottom, alignment: .center, spacing: 8)
       .frame(height: 140)
     }
+    .a11yCombineKeepingChildren(summary)
   }
 
   private var totalSleepChart: some View {
-    chartCard(title: "Total Sleep", caption: "↑ 7–9 h") {
+    let totals = last7.compactMap { $0.totalH }
+    let avg = totals.isEmpty ? 0 : totals.reduce(0, +) / Double(totals.count)
+    let avgText = avg > 0
+      ? "Seven-night average \(String(format: "%.1f", avg)) hours."
+      : ""
+    let summary = "Total sleep chart. Target 7 to 9 hours. \(avgText)"
+    return chartCard(title: "Total Sleep", caption: "↑ 7–9 h") {
       Chart {
         ForEach(last7) { n in
           if let t = n.totalH {
@@ -301,34 +358,52 @@ struct SleepDestinationView: View {
                      y: .value("Hours", t))
               .foregroundStyle(accent)
               .interpolationMethod(.monotone)
+              .accessibilityHidden(true)
             PointMark(x: .value("Day", weekdayLabel(n.date)),
                       y: .value("Hours", t))
               .foregroundStyle(accent)
               .symbolSize(40)
+              .accessibilityLabel(weekdayFull(n.date))
+              .accessibilityValue("\(String(format: "%.1f", t)) hours")
           }
         }
         RuleMark(y: .value("Target", 7))
           .foregroundStyle(accent.opacity(0.4))
           .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
+          .accessibilityHidden(true)
       }
       .chartYScale(domain: 0...10)
       .frame(height: 140)
     }
+    .a11yCombineKeepingChildren(summary)
   }
 
   private var stressRecoveryChart: some View {
-    chartCard(title: "Stress & Recovery", caption: "min/day") {
+    let stresses = last7.compactMap { $0.stressHighMin }
+    let recoveries = last7.compactMap { $0.recoveryHighMin }
+    let avgStress = stresses.isEmpty ? 0 : stresses.reduce(0, +) / stresses.count
+    let avgRecovery = recoveries.isEmpty ? 0 : recoveries.reduce(0, +) / recoveries.count
+    let parts: [String] = [
+      avgStress > 0   ? "Stress \(avgStress) minutes."     : "",
+      avgRecovery > 0 ? "Recovery \(avgRecovery) minutes." : ""
+    ].filter { !$0.isEmpty }
+    let summary = "Stress and recovery chart. Minutes per day. Seven-day averages: " + parts.joined(separator: " ")
+    return chartCard(title: "Stress & Recovery", caption: "min/day") {
       Chart {
         ForEach(last7) { n in
           if let s = n.stressHighMin {
             BarMark(x: .value("Day", weekdayLabel(n.date)),
                     y: .value("Stress", s))
               .foregroundStyle(stressColor(n.stressSummary))
+              .accessibilityLabel(weekdayFull(n.date))
+              .accessibilityValue("Stress \(s) minutes")
           }
           if let r = n.recoveryHighMin {
             BarMark(x: .value("Day", weekdayLabel(n.date)),
                     y: .value("Recovery", r))
               .foregroundStyle(Color.green)
+              .accessibilityLabel(weekdayFull(n.date))
+              .accessibilityValue("Recovery \(r) minutes")
           }
         }
       }
@@ -339,6 +414,7 @@ struct SleepDestinationView: View {
       .chartLegend(position: .bottom, alignment: .center, spacing: 8)
       .frame(height: 140)
     }
+    .a11yCombineKeepingChildren(summary)
   }
 
   @ViewBuilder
@@ -371,7 +447,7 @@ struct SleepDestinationView: View {
 
   private func load() async {
     loading = true
-    if let n = try? await client.ouraHistory(days: 14) {
+    if let n = try? await client.ouraHistory(days: 365) {
       nights = n
       ResponseCache.save(n, forKey: Self.cacheKey)
     }
@@ -424,5 +500,17 @@ struct SleepDestinationView: View {
     let wd = DateFormatter()
     wd.dateFormat = "EEE"
     return wd.string(from: d)
+  }
+
+  // Full weekday name for VoiceOver — visual axis uses abbreviated form.
+  private func weekdayFull(_ iso: String) -> String {
+    let fmt = DateFormatter()
+    fmt.dateFormat = "yyyy-MM-dd"
+    guard let d = fmt.date(from: iso) else { return iso }
+    let cal = Calendar.current
+    if cal.isDateInToday(d)     { return "Today" }
+    if cal.isDateInYesterday(d) { return "Yesterday" }
+    let w = DateFormatter(); w.dateFormat = "EEEE"
+    return w.string(from: d)
   }
 }

@@ -127,6 +127,7 @@ struct NutritionDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(kcalColor)
+    .quickAddToolbar(.nutrition)
     .task {
       paintFromCache()
       await load()
@@ -282,8 +283,13 @@ struct NutritionDestinationView: View {
 
   // MARK: - Charts grid
 
+  private var chartColumns: [GridItem] {
+    [GridItem(.flexible(), spacing: 8),
+     GridItem(.flexible(), spacing: 8)]
+  }
+
   private var chartsGrid: some View {
-    LazyVGrid(columns: tileColumns, spacing: 8) {
+    LazyVGrid(columns: chartColumns, spacing: 8) {
       if let m = macros {
         macroChart(label: "Protein", unit: "g", color: proteinColor,
                    target: m.protein,
@@ -320,8 +326,24 @@ struct NutritionDestinationView: View {
 
   private struct DailyPoint: Hashable { let date: String; let value: Double }
 
+  /// The seven ISO dates ending today (oldest → newest). Used to render an
+  /// exact 7-bar window — `stats.daily` omits days with no entries, so a
+  /// naive `.suffix(7)` would silently render fewer (or stale) bars.
+  private var last7Dates: [String] {
+    let fmt = DateFormatter()
+    fmt.dateFormat = "yyyy-MM-dd"
+    let cal = Calendar.current
+    return (0..<7).reversed().compactMap { off in
+      cal.date(byAdding: .day, value: -off, to: Date()).map(fmt.string(from:))
+    }
+  }
+
   private func dailySeries(_ pick: (NutritionDailyPoint) -> Double) -> [DailyPoint] {
-    (stats?.daily ?? []).suffix(7).map { DailyPoint(date: $0.date, value: pick($0)) }
+    let byDate = Dictionary(uniqueKeysWithValues:
+      (stats?.daily ?? []).map { ($0.date, $0) })
+    return last7Dates.map { d in
+      DailyPoint(date: d, value: byDate[d].map(pick) ?? 0)
+    }
   }
 
   private func macroChart(label: String, unit: String, color: Color,
@@ -341,6 +363,17 @@ struct NutritionDestinationView: View {
       ? "\(consumed)\(unit) · \(over)\(unit) over"
       : "\(consumed)\(unit) · \(left)\(unit) left"
 
+    let lo = Int(target.min.rounded())
+    let hi = Int(target.max.rounded())
+    let statusText = over > 0
+      ? "\(over)\(unit) over target"
+      : (consumed >= lo && consumed <= hi
+         ? "in target"
+         : "\(left)\(unit) left to target")
+    let avgText = avg > 0 ? "Seven-day average \(Int(avg))\(unit)." : ""
+    let summary = "\(label) chart. Today \(consumed)\(unit), \(statusText). "
+                + "Target \(lo) to \(hi)\(unit). \(avgText)"
+
     return VStack(alignment: .leading, spacing: 4) {
       Text(label).font(.subheadline.weight(.semibold))
       Text(caption)
@@ -351,20 +384,29 @@ struct NutritionDestinationView: View {
                       yStart: .value("Min", target.min),
                       yEnd: .value("Max", target.max))
           .foregroundStyle(color.opacity(0.12))
+          .accessibilityHidden(true)
         RuleMark(y: .value("Min", target.min))
           .foregroundStyle(color.opacity(0.6))
           .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+          .accessibilityHidden(true)
         RuleMark(y: .value("Max", target.max))
           .foregroundStyle(color.opacity(0.6))
           .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+          .accessibilityHidden(true)
         if avg > 0 {
           RuleMark(y: .value("Avg", avg))
             .foregroundStyle(color.opacity(0.85))
             .lineStyle(StrokeStyle(lineWidth: 2))
+            .accessibilityHidden(true)
         }
         ForEach(series, id: \.date) { p in
           BarMark(
-            x: .value("Day", weekdayInitial(p.date)),
+            // x is the full ISO date so each day is its own category.
+            // Using the weekday letter here would collide same-letter
+            // days (Sat/Sun → "S", Tue/Thu → "T") into a single column
+            // and silently render <7 bars. The axis formats the label
+            // back to a narrow weekday for display.
+            x: .value("Day", p.date),
             y: .value(label, p.value),
             width: .ratio(0.6)
           )
@@ -372,18 +414,27 @@ struct NutritionDestinationView: View {
                            ? Color.secondary.opacity(0.2)
                            : color.opacity(p.value < target.min ? 0.55 : 1))
           .cornerRadius(2)
+          .accessibilityLabel(weekdayFull(p.date))
+          .accessibilityValue(p.value == 0
+                              ? "no entries"
+                              : "\(Int(p.value.rounded()))\(unit)")
         }
       }
+      .chartXScale(domain: series.map(\.date))
       .chartYScale(domain: 0...yMax)
       .chartYAxis {
         AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { v in
-          AxisValueLabel { if let d = v.as(Double.self) { Text("\(Int(d))\(unit)").font(.caption2) } }
+          AxisValueLabel { if let d = v.as(Double.self) { Text(verbatim: "\(Int(d))\(unit)").font(.caption2) } }
           AxisGridLine().foregroundStyle(Color.secondary.opacity(0.1))
         }
       }
       .chartXAxis {
-        AxisMarks(values: .automatic) { _ in
-          AxisValueLabel().font(.caption2)
+        AxisMarks(values: series.map(\.date)) { v in
+          AxisValueLabel {
+            if let iso = v.as(String.self) {
+              Text(verbatim: weekdayInitial(iso)).font(.caption2)
+            }
+          }
         }
       }
       .frame(height: 110)
@@ -391,22 +442,22 @@ struct NutritionDestinationView: View {
     .padding(10)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(Theme.secondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 14))
+    .a11yCombineKeepingChildren(summary)
   }
 
   private var fastingChart: some View {
     let target = macros?.fasting ?? MacroRange(min: 14, max: 16, unit: "h")
     let yMax = ceil(target.max / 0.85)
 
-    var data: [DailyPoint] = (stats?.fasting ?? []).suffix(7).map {
-      DailyPoint(date: $0.date, value: $0.hours ?? 0)
+    let fastByDate = Dictionary(uniqueKeysWithValues:
+      (stats?.fasting ?? []).map { ($0.date, $0) })
+    var data: [DailyPoint] = last7Dates.map { d in
+      DailyPoint(date: d, value: fastByDate[d]?.hours ?? 0)
     }
     // Inject the live creeping bar for today when actively fasting.
-    if let live = liveFastingHours() {
-      if let idx = data.firstIndex(where: { $0.date == today }) {
-        data[idx] = DailyPoint(date: today, value: live)
-      } else {
-        data.append(DailyPoint(date: today, value: live))
-      }
+    if let live = liveFastingHours(),
+       let idx = data.firstIndex(where: { $0.date == today }) {
+      data[idx] = DailyPoint(date: today, value: live)
     }
 
     let past = data.filter { $0.date != today && $0.value > 0 }
@@ -415,6 +466,11 @@ struct NutritionDestinationView: View {
     let deltaCaption: String? = avg > 0
       ? String(format: "%+.1fh vs target", avg - mid)
       : nil
+
+    let avgText = avg > 0
+      ? "Seven-day average \(String(format: "%.1f", avg)) hours."
+      : ""
+    let summary = "Fasting chart. Target \(Int(target.min)) to \(Int(target.max)) hours. \(avgText)"
 
     return VStack(alignment: .leading, spacing: 4) {
       Text("Fasting").font(.subheadline.weight(.semibold))
@@ -426,20 +482,26 @@ struct NutritionDestinationView: View {
                       yStart: .value("Min", target.min),
                       yEnd: .value("Max", target.max))
           .foregroundStyle(fastingColor.opacity(0.12))
+          .accessibilityHidden(true)
         RuleMark(y: .value("Min", target.min))
           .foregroundStyle(fastingColor.opacity(0.6))
           .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+          .accessibilityHidden(true)
         RuleMark(y: .value("Max", target.max))
           .foregroundStyle(fastingColor.opacity(0.6))
           .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+          .accessibilityHidden(true)
         if avg > 0 {
           RuleMark(y: .value("Avg", avg))
             .foregroundStyle(fastingColor.opacity(0.85))
             .lineStyle(StrokeStyle(lineWidth: 2))
+            .accessibilityHidden(true)
         }
         ForEach(data, id: \.date) { p in
           BarMark(
-            x: .value("Day", weekdayInitial(p.date)),
+            // See macroChart for why x is the ISO date, not the weekday
+            // letter — same-letter days would otherwise collapse.
+            x: .value("Day", p.date),
             y: .value("Hours", p.value),
             width: .ratio(0.6)
           )
@@ -447,18 +509,27 @@ struct NutritionDestinationView: View {
                            ? Color.secondary.opacity(0.2)
                            : fastingColor.opacity(p.value >= target.min ? 1 : 0.55))
           .cornerRadius(2)
+          .accessibilityLabel(weekdayFull(p.date))
+          .accessibilityValue(p.value <= 0
+                              ? "no data"
+                              : "\(String(format: "%.1f", p.value)) hours")
         }
       }
+      .chartXScale(domain: data.map(\.date))
       .chartYScale(domain: 0...yMax)
       .chartYAxis {
         AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { v in
-          AxisValueLabel { if let d = v.as(Double.self) { Text("\(Int(d))h").font(.caption2) } }
+          AxisValueLabel { if let d = v.as(Double.self) { Text(verbatim: "\(Int(d))h").font(.caption2) } }
           AxisGridLine().foregroundStyle(Color.secondary.opacity(0.1))
         }
       }
       .chartXAxis {
-        AxisMarks(values: .automatic) { _ in
-          AxisValueLabel().font(.caption2)
+        AxisMarks(values: data.map(\.date)) { v in
+          AxisValueLabel {
+            if let iso = v.as(String.self) {
+              Text(verbatim: weekdayInitial(iso)).font(.caption2)
+            }
+          }
         }
       }
       .frame(height: 110)
@@ -466,6 +537,7 @@ struct NutritionDestinationView: View {
     .padding(10)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(Theme.secondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 14))
+    .a11yCombineKeepingChildren(summary)
   }
 
   // MARK: - Entries list
@@ -483,6 +555,7 @@ struct NutritionDestinationView: View {
     } else {
       VStack(alignment: .leading, spacing: 12) {
         VStack(spacing: 6) {
+          dayHeader(date: today, totals: todayTotals)
           fastingNowRow()
           ForEach(todayEntries) { e in mealRow(e) }
           if let f = fastingByDate[today], todayEntries.isEmpty == false {
@@ -503,22 +576,27 @@ struct NutritionDestinationView: View {
   }
 
   private func dayGroup(date: String, items: [NutritionEntry]) -> some View {
-    let totals = totalsByDate[date]
     let fast = fastingByDate[date]
     return VStack(alignment: .leading, spacing: 6) {
-      HStack {
-        Text(friendlyDate(date))
-          .font(.subheadline.weight(.semibold))
-        Spacer()
-        if let totals { Text("\(Int(totals.kcal.rounded())) kcal")
-            .font(.caption.monospacedDigit())
-            .foregroundStyle(kcalColor)
-        }
-      }
-      .padding(.horizontal, 4)
+      dayHeader(date: date, totals: totalsByDate[date])
       ForEach(items) { e in mealRow(e) }
       if let fast { fastingGapRow(fast) }
     }
+  }
+
+  @ViewBuilder
+  private func dayHeader(date: String, totals: DayTotals?) -> some View {
+    HStack {
+      Text(friendlyDate(date))
+        .font(.subheadline.weight(.semibold))
+      Spacer()
+      if let totals {
+        Text("\(Int(totals.kcal.rounded())) kcal")
+          .font(.caption.monospacedDigit())
+          .foregroundStyle(kcalColor)
+      }
+    }
+    .padding(.horizontal, 4)
   }
 
   private func mealRow(_ e: NutritionEntry) -> some View {
@@ -704,6 +782,20 @@ struct NutritionDestinationView: View {
     fmt.dateFormat = "yyyy-MM-dd"
     guard let d = fmt.date(from: iso) else { return "" }
     let w = DateFormatter(); w.dateFormat = "EEEEE"  // narrow weekday
+    return w.string(from: d)
+  }
+
+  /// Full weekday name for VoiceOver. The visual axis uses narrow initials
+  /// ("M") which read as a single letter and lose meaning — screen readers
+  /// hear the per-bar label, which uses the full form ("Monday").
+  private func weekdayFull(_ iso: String) -> String {
+    let fmt = DateFormatter()
+    fmt.dateFormat = "yyyy-MM-dd"
+    guard let d = fmt.date(from: iso) else { return iso }
+    let cal = Calendar.current
+    if cal.isDateInToday(d)     { return "Today" }
+    if cal.isDateInYesterday(d) { return "Yesterday" }
+    let w = DateFormatter(); w.dateFormat = "EEEE"
     return w.string(from: d)
   }
 

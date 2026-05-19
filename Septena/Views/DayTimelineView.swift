@@ -47,10 +47,13 @@ struct DayTimelineView: View {
         let w = geo.size.width
         ZStack(alignment: .leading) {
           rail
+          ForEach(Array(calendarBars.enumerated()), id: \.offset) { _, b in
+            barPill(b, width: w)
+          }
           sleepShade(width: w)
           ticks(width: w)
           fastingBands(width: w)
-          ForEach(Array(bars.enumerated()), id: \.offset) { _, b in
+          ForEach(Array(trainingSessions.enumerated()), id: \.offset) { _, b in
             barPill(b, width: w)
           }
           ForEach(Array(clusters.enumerated()), id: \.offset) { _, c in
@@ -415,7 +418,7 @@ struct DayTimelineView: View {
     let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
     guard let dayStart = fmt.date(from: date),
           let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart) else { return [] }
-    let calColor = theme.color(for: "calendar")
+    let fallbackColor = theme.color(for: "calendar")
     var out: [Bar] = []
     for e in calendar {
       if e.isAllDay { continue }
@@ -427,7 +430,8 @@ struct DayTimelineView: View {
       let startH = hourOfDay(s, in: cal, dayStart: dayStart)
       let endH = hourOfDay(f, in: cal, dayStart: dayStart)
       guard endH > startH else { continue }
-      out.append(Bar(startHour: startH, endHour: endH, color: calColor, thin: true))
+      let eventColor = e.calendar?.cgColor.map { Color($0) } ?? fallbackColor
+      out.append(Bar(startHour: startH, endHour: endH, color: eventColor, thin: true))
     }
     return out
   }

@@ -127,6 +127,7 @@ struct GroceriesDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
+    .quickAddToolbar(.groceries)
     .task {
       paintFromCache()
       await load()

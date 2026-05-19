@@ -346,16 +346,10 @@ struct TaskListView: View {
     .scrollContentBackground(.hidden)
     .background(Theme.paperBackground)
     .scrollDismissesKeyboard(.interactively)
-    // Floating Liquid Glass "+" — universal task entry. Same trigger path as
-    // the top toolbar "+" and ⌘N, so the new-task flow stays inline. Sits
-    // above the 240pt empty tap-catcher row so it never overlaps a real row.
-    .overlay(alignment: .bottomTrailing) {
-      // Hide while the inline editor is open — the keyboard accessory
-      // is the active surface and the floating + would crowd it.
-      if editingTaskId == nil {
-        floatingPlusButton
-      }
-    }
+    // Per-list floating `+` removed — the app-global Liquid Glass bubble in
+    // RootTabView is the single creation entry point. When the Tasks tab is
+    // active that bubble flips `shouldStartCreating`, so this list still
+    // gets its inline draft via the existing `.onChange` handler below.
     // Reminders-style floating glass pill above the soft keyboard.
     // Apple's pattern (WWDC25 session 323) is `.safeAreaInset` + the
     // iOS 26 `.glassEffect()` — not `ToolbarItemGroup(.keyboard)`,
@@ -1327,41 +1321,6 @@ struct TaskListView: View {
     return df.string(from: date)
   }
 
-  /// Bottom-trailing floating "+" — universal entry on both platforms.
-  /// Routes through `nav.shouldStartCreating` so it shares the inline-draft
-  /// flow used by ⌘N and the top toolbar "+".
-  @ViewBuilder
-  private var floatingPlusButton: some View {
-    Button {
-      Haptics.tick()
-      nav.shouldStartCreating = true
-    } label: {
-      Image(systemName: "plus")
-        .font(.system(size: 22, weight: .semibold))
-        .foregroundStyle(Theme.inkPrimary)
-        .frame(width: 56, height: 56)
-        .contentShape(Circle())
-    }
-    .buttonStyle(.plain)
-    .glassEffect(.regular.interactive(), in: .circle)
-    // Long-press opens the unified Add Info palette — same entry point as
-    // ⌘K on a hardware keyboard. Simultaneous gesture rather than
-    // `.onLongPressGesture` so a quick tap still fires the Button's action
-    // with no perceptible delay.
-    .simultaneousGesture(
-      LongPressGesture(minimumDuration: 0.4).onEnded { _ in
-        Haptics.warning()
-        nav.showAddInfo = true
-      }
-    )
-    .padding(.trailing, 20)
-    .padding(.bottom, 20)
-    .accessibilityLabel("New Task")
-    .accessibilityHint("Long-press for Add Info")
-    .accessibilityAction(named: "Add Info") { nav.showAddInfo = true }
-    .help("New Task — long-press for Add Info")
-  }
-
   // MARK: - Keyboard accessory (iOS)
 
   #if os(iOS)
@@ -1423,13 +1382,27 @@ struct TaskListView: View {
   private static let expandSpring: Animation = .spring(response: 0.32, dampingFraction: 0.84)
 
   private func startEdit(_ task: SeptenaTask) {
-    if editingTaskId != nil && editingTaskId != task.id { commitEdit() }
-    // All three state changes inside the same animation transaction so
-    // the conditional-content swap (taskBody → InlineEditTaskRow) sees
-    // a coherent spring on insertion. Setting title/notes outside the
-    // withAnimation block was triggering an instant re-render before
-    // editingTaskId flipped, which made the open-side transition land
-    // without an active transaction.
+    // If switching from another task, persist the prior draft inline
+    // (no nested withAnimation) so the swap is ONE animation transaction:
+    // editingTaskId stays on the prior id until our withAnimation block
+    // atomically flips title + notes + id together. The previous version
+    // called commitEdit() — which has its own withAnimation setting
+    // editingTaskId = nil — and that intermediate frame let the prior
+    // row's view mode flash into existence between the two transactions.
+    if let priorId = editingTaskId, priorId != task.id {
+      let priorTitle = editingTitle.trimmingCharacters(in: .whitespaces)
+      let wasNew = (newlyCreatedTaskId == priorId)
+      if priorTitle.isEmpty {
+        if wasNew {
+          mutator.delete(id: priorId)
+          removeLocally(id: priorId)
+        }
+      } else {
+        mutator.update(id: priorId, title: priorTitle, notes: editingNotes)
+        Task { await load() }
+      }
+      newlyCreatedTaskId = nil
+    }
     withAnimation(Self.expandSpring) {
       editingTitle = task.title
       editingNotes = task.notes ?? ""

@@ -28,22 +28,28 @@ struct TrainingDestinationView: View {
 
   private var accent: Color { theme.color(for: "training") }
 
-  /// Group entries by (date, session). Server returns most-recent first
-  /// already, so just preserve first-appearance order per session key.
+  /// Group entries by (date, session), newest first. Sessions sort by
+  /// `date` desc; entries within a session sort by `loggedAt` desc (or
+  /// id desc as a fallback when the server hasn't stamped a timestamp).
+  /// The server's own ordering isn't trusted here — explicit sorts keep
+  /// the list stable regardless of which endpoint variant we hit.
   private var sessions: [SessionBlock] {
-    var order: [String] = []
     var byKey: [String: [ExerciseEntry]] = [:]
     for e in entries {
       let key = "\(e.date)|\(e.session)"
-      if byKey[key] == nil { order.append(key) }
       byKey[key, default: []].append(e)
     }
-    return order.map { key in
-      let parts = key.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
-      return SessionBlock(date: String(parts[0]),
-                          session: parts.count > 1 ? String(parts[1]) : "",
-                          entries: byKey[key] ?? [])
-    }
+    return byKey.keys
+      .sorted(by: >)  // "YYYY-MM-DD|session" — date dominates
+      .map { key in
+        let parts = key.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
+        let items = (byKey[key] ?? []).sorted { lhs, rhs in
+          (lhs.loggedAt ?? lhs.id) > (rhs.loggedAt ?? rhs.id)
+        }
+        return SessionBlock(date: String(parts[0]),
+                            session: parts.count > 1 ? String(parts[1]) : "",
+                            entries: items)
+      }
   }
 
   var body: some View {
@@ -109,6 +115,10 @@ struct TrainingDestinationView: View {
       paintFromCache()
       await load()
     }
+    // Training's quick-add is the Start session sheet itself, so we
+    // don't route through `AddInfoSheet` (its training page is a v1
+    // no-op that just dismisses). Top-right icon stays the verb glyph
+    // — Training's verb is `.start`, not `.add`.
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         Button {
@@ -254,18 +264,31 @@ struct TrainingDestinationView: View {
 
   // MARK: - Charts
 
-  /// Last 7 days of Z2 cardio minutes as a bar chart with a per-day fair
-  /// share of the weekly target drawn as a dashed rule. Mirrors the
-  /// webapp's Zone 2 card.
+  /// Last 7 days of Z2 cardio minutes with the rolling 7-day sum stacked
+  /// on top of each day's bar as a faded accent. Mirrors the webapp's
+  /// Zone 2 card (`training-dashboard.tsx`): solid bar = today's minutes
+  /// (accent at 0.9 opacity), faded bar above = `rolling_7d` (accent at
+  /// 0.3 opacity). Weekly target sits as a dashed rule. Stacks visually
+  /// communicate "today's contribution → ceiling toward the weekly goal."
   @ViewBuilder
   private var z2CardioSection: some View {
     if let c = cardio, !c.daily.isEmpty {
-      let series = Array(c.daily.suffix(7))
+      // Gap-fill to the last 7 dates ending today so the chart always
+      // shows 7 columns even if the server skipped empty days.
+      let byDate = Dictionary(uniqueKeysWithValues: c.daily.map { ($0.date, $0) })
+      let series: [CardioDay] = last7Dates.map { d in
+        byDate[d] ?? CardioDay(date: d, minutes: 0, rolling7d: nil)
+      }
       let target = c.targetWeeklyMin
-      let perDay = Double(target) / 7.0
       let weekly = series.reduce(0) { $0 + $1.minutes }
-      let maxBar = series.map { Double($0.minutes) }.max() ?? 0
-      let yMax = max(perDay, maxBar) * 1.2
+      // Stack ceiling = max(daily + rolling_7d). Webapp pads to
+      // ceil(target/0.9); match that so the dashed target line sits at
+      // ~90% of the y-domain when no day has yet exceeded the weekly goal.
+      let stackedMax = series.map { Double($0.minutes) + ($0.rolling7d ?? 0) }.max() ?? 0
+      let yMax = max(stackedMax, ceil(Double(target) / 0.9))
+      let avg = series.isEmpty ? 0 : weekly / series.count
+      let avgText = avg > 0 ? "Seven-day average \(avg) minutes." : ""
+      let summary = "Zone 2 cardio chart. Weekly total \(weekly) minutes, target \(target). \(avgText)"
       Section {
         VStack(alignment: .leading, spacing: 6) {
           HStack {
@@ -276,9 +299,14 @@ struct TrainingDestinationView: View {
               .foregroundStyle(.secondary)
           }
           Chart {
+            // x value is the ISO date (unique per day) — using the
+            // weekday letter would collide same-letter days (Sat/Sun,
+            // Tue/Thu) into a single column. The axis formats the label
+            // back to a narrow weekday for display.
             ForEach(series, id: \.date) { d in
+              // Today's contribution — solid.
               BarMark(
-                x: .value("Day", weekdayInitial(d.date)),
+                x: .value("Day", d.date),
                 y: .value("Min", d.minutes),
                 width: .ratio(0.6)
               )
@@ -286,68 +314,103 @@ struct TrainingDestinationView: View {
                                ? Color.secondary.opacity(0.2)
                                : accent.opacity(0.9))
               .cornerRadius(2)
+              .accessibilityLabel(weekdayFull(d.date))
+              .accessibilityValue(d.minutes == 0
+                                  ? "no Z2 minutes"
+                                  : "\(d.minutes) Z2 minutes")
+              // Rolling 7-day sum — faded, stacked on top. Implicit
+              // stacking via shared x category.
+              if let r = d.rolling7d, r > 0 {
+                BarMark(
+                  x: .value("Day", d.date),
+                  y: .value("7d sum", r),
+                  width: .ratio(0.6)
+                )
+                .foregroundStyle(accent.opacity(0.3))
+                .cornerRadius(2)
+                .accessibilityLabel(weekdayFull(d.date))
+                .accessibilityValue("7-day rolling sum \(Int(r.rounded())) minutes")
+              }
             }
-            RuleMark(y: .value("Target", perDay))
+            RuleMark(y: .value("Target", target))
               .foregroundStyle(accent.opacity(0.7))
               .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
               .annotation(position: .top, alignment: .trailing) {
-                Text("\(Int(perDay))m/day").font(.caption2).foregroundStyle(.secondary)
+                Text(verbatim: "\(target)m target").font(.caption2).foregroundStyle(.secondary)
               }
+              .accessibilityHidden(true)
           }
+          .chartXScale(domain: series.map(\.date))
           .chartYScale(domain: 0...yMax)
           .chartYAxis {
             AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { v in
-              AxisValueLabel { if let d = v.as(Double.self) { Text("\(Int(d))m").font(.caption2) } }
+              AxisValueLabel { if let d = v.as(Double.self) { Text(verbatim: "\(Int(d))m").font(.caption2) } }
               AxisGridLine().foregroundStyle(Color.secondary.opacity(0.1))
             }
           }
           .chartXAxis {
-            AxisMarks(values: .automatic) { _ in AxisValueLabel().font(.caption2) }
+            AxisMarks(values: series.map(\.date)) { v in
+              AxisValueLabel {
+                if let iso = v.as(String.self) {
+                  Text(verbatim: weekdayInitial(iso)).font(.caption2)
+                }
+              }
+            }
           }
           .frame(height: 140)
         }
+        .a11yCombineKeepingChildren(summary)
       } header: {
         Text("Cardio")
       }
     }
   }
 
-  /// 6-week (42-day) consistency grid — one square per day, filled when at
-  /// least one entry exists for that date. Today gets a stroke ring.
+  /// Seven ISO dates ending today, oldest → newest. Used by `z2CardioSection`
+  /// to gap-fill the bar chart so empty days appear as zero columns rather
+  /// than silently disappearing from the series.
+  private var last7Dates: [String] {
+    let fmt = DateFormatter()
+    fmt.dateFormat = "yyyy-MM-dd"
+    let cal = Calendar.current
+    return (0..<7).reversed().compactMap { off in
+      cal.date(byAdding: .day, value: -off, to: Date()).map(fmt.string(from:))
+    }
+  }
+
+  /// Consistency heatmap — one cell per day, intensity from entry count.
+  /// Anchors to today's week on the right and fills as many week columns
+  /// as the row width allows, clamped to the earliest logged entry so we
+  /// don't render dead history. Uses the shared `ConsistencyHeatmap`.
   private var consistencySection: some View {
-    let days = consistencyDays
-    let counts = Set(entries.map(\.date))
-    let active = days.filter { counts.contains($0) }.count
+    // Tally entries per date.
+    var counts: [String: Int] = [:]
+    for e in entries { counts[e.date, default: 0] += 1 }
+    let firstDate = entries.map(\.date).min().flatMap(ConsistencyHeatmap.date(fromISO:))
+    let end = Date()
+    let activeDays = counts.values.filter { $0 > 0 }.count
     return Section {
-      VStack(alignment: .leading, spacing: 8) {
+      VStack(alignment: .leading, spacing: 10) {
         HStack {
           Text("Consistency").font(.subheadline.weight(.semibold))
           Spacer()
-          Text("\(active)/\(days.count) days")
+          Text("\(activeDays) active days")
             .font(.caption.monospacedDigit())
             .foregroundStyle(.secondary)
         }
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7),
-                  spacing: 4) {
-          ForEach(days, id: \.self) { iso in
-            let isActive = counts.contains(iso)
-            let isToday = iso == today
-            RoundedRectangle(cornerRadius: 3, style: .continuous)
-              .fill(isActive
-                    ? accent.opacity(isToday ? 1.0 : 0.85)
-                    : Color.secondary.opacity(0.12))
-              .frame(height: 18)
-              .overlay(
-                isToday
-                ? RoundedRectangle(cornerRadius: 3, style: .continuous)
-                    .stroke(accent, lineWidth: 1.5)
-                : nil
-              )
-          }
+        ConsistencyHeatmap(endDate: end, firstDataDate: firstDate, accent: accent) { iso in
+          let c = counts[iso] ?? 0
+          let level: Int = {
+            if c <= 0 { return 0 }
+            if c == 1 { return 1 }
+            if c == 2 { return 2 }
+            if c == 3 { return 3 }
+            return 4
+          }()
+          let label = c > 0 ? "\(iso) · \(c) \(c == 1 ? "entry" : "entries")" : "\(iso) · rest"
+          return HeatmapDay(level: level, label: label)
         }
       }
-    } header: {
-      Text("Last 6 weeks")
     }
   }
 
@@ -361,6 +424,12 @@ struct TrainingDestinationView: View {
       guard let m = vals.max(), m > 0 else { return 1 }
       return m * 1.15
     }()
+    let vals = line.compactMap(\.value)
+    let avg = vals.isEmpty ? 0 : vals.reduce(0, +) / Double(vals.count)
+    let avgText = avg > 0
+      ? "Window average \(yLabel(avg))."
+      : ""
+    let summary = "\(MetaExercise.label(for: selectedExercise)) progression chart. \(chartSubtitle). \(avgText)"
 
     return Section {
       VStack(alignment: .leading, spacing: 10) {
@@ -396,12 +465,15 @@ struct TrainingDestinationView: View {
                 )
                 .interpolationMethod(.linear)
                 .foregroundStyle(accent)
+                .accessibilityHidden(true)
                 PointMark(
                   x: .value("Date", p.day),
                   y: .value("Metric", v)
                 )
                 .symbolSize(28)
                 .foregroundStyle(accent)
+                .accessibilityLabel(weekdayFull(p.id))
+                .accessibilityValue(yLabel(v))
               }
             }
           }
@@ -434,6 +506,7 @@ struct TrainingDestinationView: View {
           }
         }
       }
+      .a11yCombineKeepingChildren(summary)
     } header: {
       Text("Progression")
     }
@@ -561,19 +634,6 @@ struct TrainingDestinationView: View {
     return (strength: [metaS] + strength, cardio: [metaC] + cardio)
   }
 
-  private var consistencyDays: [String] {
-    let cal = Calendar.current
-    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
-    let now = Date()
-    var out: [String] = []
-    for offset in stride(from: 41, through: 0, by: -1) {
-      if let d = cal.date(byAdding: .day, value: -offset, to: now) {
-        out.append(fmt.string(from: d))
-      }
-    }
-    return out
-  }
-
   private var today: String { SeptenaDate.today }
 
   private enum MetricKind { case weight, duration, pace, volume, cardioTotal }
@@ -641,6 +701,18 @@ struct TrainingDestinationView: View {
   private func shortMonthDay(_ d: Date) -> String {
     let f = DateFormatter(); f.dateFormat = "MMM d"
     return f.string(from: d)
+  }
+
+  // Full weekday name for VoiceOver — visual axis uses narrow initials.
+  private func weekdayFull(_ iso: String) -> String {
+    let fmt = DateFormatter()
+    fmt.dateFormat = "yyyy-MM-dd"
+    guard let d = fmt.date(from: iso) else { return iso }
+    let cal = Calendar.current
+    if cal.isDateInToday(d)     { return "Today" }
+    if cal.isDateInYesterday(d) { return "Yesterday" }
+    let w = DateFormatter(); w.dateFormat = "EEEE"
+    return w.string(from: d)
   }
 
   private func weekdayInitial(_ iso: String) -> String {

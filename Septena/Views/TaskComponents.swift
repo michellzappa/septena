@@ -96,6 +96,7 @@ struct ScreenTitle: View {
 
 struct InlineEditTaskRow: View {
   @Environment(SectionTheme.self) private var theme
+  @Environment(\.scenePhase) private var scenePhase
   @Binding var title: String
   @Binding var notes: String
   let isDone: Bool
@@ -117,6 +118,11 @@ struct InlineEditTaskRow: View {
   /// Set true the moment the user cancels, so the onChange(focused) blur
   /// handler doesn't race in and auto-commit before the editor tears down.
   @State private var cancelling = false
+  /// Notes affordance state — Reminders-style. Hidden by default for
+  /// tasks without notes (no placeholder line on open); the user taps
+  /// "＋ Notes" to reveal the field. If the task arrives with notes
+  /// already set, the field shows automatically on appear.
+  @State private var showNotes = false
 
   enum Field { case title, notes }
 
@@ -149,16 +155,37 @@ struct InlineEditTaskRow: View {
           .submitLabel(.return)
           .onSubmit { onCommit() }
           .fixedSize(horizontal: false, vertical: true)
-        // Notes line, Reminders-style — single-line truncated when not
-        // focused, expands to multi-line when the user taps it.
-        TextField("Add Note", text: $notes, axis: .vertical)
-          .textFieldStyle(.plain)
-          .focusEffectDisabled()
-          .font(.septenaNotes)
-          .foregroundStyle(.secondary)
-          .focused($focused, equals: .notes)
-          .lineLimit(1...8)
-          .fixedSize(horizontal: false, vertical: true)
+        // Notes — hidden until the user taps "＋ Notes" (or until the
+        // task arrives with notes already set). Multi-line on edit,
+        // single-line truncated when unfocused. Reminders-style: an
+        // empty 'Add Note' placeholder shouldn't shout on a fresh row.
+        if showNotes || !notes.isEmpty {
+          TextField("Note", text: $notes, axis: .vertical)
+            .textFieldStyle(.plain)
+            .focusEffectDisabled()
+            .font(.septenaNotes)
+            .foregroundStyle(.secondary)
+            .focused($focused, equals: .notes)
+            .lineLimit(1...8)
+            .fixedSize(horizontal: false, vertical: true)
+        } else {
+          Button {
+            Haptics.pick()
+            showNotes = true
+            focused = .notes
+          } label: {
+            HStack(spacing: 4) {
+              Image(systemName: "plus")
+                .font(.system(size: 10, weight: .semibold))
+              Text("Notes")
+                .font(.septenaNotes)
+            }
+            .foregroundStyle(Theme.inkSecondary.opacity(0.7))
+            .contentShape(Rectangle())
+          }
+          .buttonStyle(.plain)
+          .accessibilityLabel("Add notes")
+        }
       }
 
       // Info button — Reminders' "i" affordance, always visible while
@@ -178,14 +205,23 @@ struct InlineEditTaskRow: View {
     .padding(.horizontal, Theme.hPadding)
     .padding(.vertical, Theme.rowVPadding)
     .onAppear {
-      // Auto-focus the title for fresh ⌘N / + drafts so the keyboard
-      // opens and the user can start typing immediately. Small delay
-      // lets the row finish inserting before grabbing focus.
-      if autoFocus {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-          focused = .title
-        }
-      }
+      // Reveal notes inline if the task already has them — the "+ Notes"
+      // affordance is only for the empty-notes case.
+      if !notes.isEmpty { showNotes = true }
+    }
+    // .task runs after the view is in the hierarchy and bound, so
+    // FocusState lands on the field cleanly — replaces the previous
+    // DispatchQueue.asyncAfter(0.05) workaround.
+    .task {
+      if autoFocus { focused = .title }
+    }
+    // Save-on-blur safety net: if the row vanishes for any reason (parent
+    // tore it down, navigation, sheet presented over it, list reload)
+    // and the user *didn't* explicitly cancel, commit the draft.
+    // onCommit is idempotent — its guard returns immediately if the
+    // parent has already cleared editingTaskId.
+    .onDisappear {
+      if !cancelling { onCommit() }
     }
     .background(commitShortcut)
     .background(cancelShortcut)
@@ -195,6 +231,10 @@ struct InlineEditTaskRow: View {
     .onTapGesture { /* swallow */ }
     .septenaOnEscape { handleCancel() }
     .onKeyPress(.escape) { handleCancel(); return .handled }
+    // Save-on-blur — fires when focus moves out of *both* fields
+    // (intra-row focus shifts go field → field without hitting nil,
+    // so the editor stays open while the user moves between
+    // title/notes; the commit only triggers when keyboard goes away).
     .onChange(of: focused) { _, new in
       guard new == nil, !cancelling else { return }
       if title.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -202,6 +242,11 @@ struct InlineEditTaskRow: View {
       } else {
         onCommit()
       }
+    }
+    // App backgrounded mid-edit — iOS may yank the keyboard without
+    // routing focus through nil first, so cover this path explicitly.
+    .onChange(of: scenePhase) { _, new in
+      if new != .active && !cancelling { onCommit() }
     }
   }
 

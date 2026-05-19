@@ -11,6 +11,7 @@ struct GutDestinationView: View {
   @State private var today: GutDayResponse? = nil
   @State private var loading = true
   @State private var editing: GutEntry? = nil
+  @State private var history: [GutHistoryPoint] = []
 
   private var accent: Color { theme.color(for: "gut") }
 
@@ -45,6 +46,30 @@ struct GutDestinationView: View {
             .foregroundStyle(.secondary)
         }
       }
+      if !history.isEmpty {
+        ActivityHeatmapSection(
+          title: "Movement days",
+          accent: accent,
+          daily: history,
+          date: { $0.date },
+          value: { Double($0.movements) },
+          levelFor: { v in
+            let n = Int(v)
+            if n <= 0 { return 0 }
+            if n == 1 { return 1 }
+            if n == 2 { return 2 }
+            if n == 3 { return 3 }
+            return 4
+          },
+          labelFor: { v in
+            let n = Int(v)
+            return "\(n) \(n == 1 ? "movement" : "movements")"
+          },
+          subtitleFor: { active, total, sum in
+            "\(active) of \(total) days · \(Int(sum)) movements"
+          }
+        )
+      }
     }
     #if os(macOS)
     .listStyle(.inset)
@@ -57,6 +82,7 @@ struct GutDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
+    .quickAddToolbar(.gut)
     .task {
       paintFromCache()
       await load()
@@ -186,6 +212,9 @@ struct GutDestinationView: View {
     if let tRes = try? await client.gutDay(date: SeptenaDate.today) {
       today = tRes
       ResponseCache.save(tRes, forKey: CacheKey.today)
+    }
+    if let h = try? await client.gutHistory(days: 365) {
+      history = h.daily
     }
     loading = false
   }
