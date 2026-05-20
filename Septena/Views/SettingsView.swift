@@ -993,9 +993,6 @@ struct SyncSettingsPane: View {
   @State private var isSyncing = false
 
   @AppStorage(SettingsKey.syncLastSucceeded) private var lastSyncedAt: Double = 0
-  /// Backing storage for the DEBUG-only tasks-backend picker. The
-  /// `TasksBackendDefaults` enum exposes the same key for non-UI reads.
-  @AppStorage(TasksBackendDefaults.key) private var tasksBackendRaw: String = TasksBackendKind.fastAPI.rawValue
   /// CloudKit engine, injected via environment from App.swift. Used
   /// only by the DEBUG migration buttons below.
   @Environment(CKEngine.self) private var ckEngine
@@ -1063,11 +1060,9 @@ struct SyncSettingsPane: View {
       }
 
       #if DEBUG
-      // Phase 1 dev toggle: route task mutations through CloudKit
-      // (CKSyncEngine) instead of the FastAPI/Outbox path. Requires a
-      // signed-in iCloud account and a relaunch — the engine binds
-      // its closures once at App.task and only `start()`s on launch
-      // when the flag is already `.cloudKit`.
+      // iCloud account status + recovery tools. Tasks/areas/projects
+      // are CloudKit-only as of the cutover — these controls help
+      // recover when the local mirror or the CK zone gets out of sync.
       Section {
         HStack {
           Image(systemName: accountStatusIcon)
@@ -1080,20 +1075,15 @@ struct SyncSettingsPane: View {
           .buttonStyle(.borderless)
           .controlSize(.small)
         }
-        Picker("Tasks backend", selection: $tasksBackendRaw) {
-          Text("FastAPI server").tag(TasksBackendKind.fastAPI.rawValue)
-          Text("iCloud (CloudKit)").tag(TasksBackendKind.cloudKit.rawValue)
-        }
       } header: {
-        Text("CloudKit (dev)")
+        Text("iCloud")
       } footer: {
-        Text("Relaunch after switching. CloudKit writes go to the Development environment; the schema auto-creates from your first save.")
+        Text("CloudKit writes go to the Development environment in debug builds; the schema auto-creates from your first save.")
       }
 
-      // Phase 2 migration tooling. Export is non-destructive — safe to
-      // run any time. Migrate writes a snapshot first, then pushes every
-      // local task into CloudKit and verifies the round-trip. On success
-      // the flag flips and the next launch routes writes to CKSyncEngine.
+      // Recovery tooling. Export is non-destructive — safe to run any
+      // time. Re-sync re-pushes every local task/area/project into
+      // CloudKit and verifies the round-trip; useful after a zone reset.
       Section {
         Button {
           runExport()
@@ -1106,21 +1096,13 @@ struct SyncSettingsPane: View {
         } label: {
           HStack {
             if isMigrating { ProgressView().controlSize(.small) }
-            Label("Migrate to iCloud", systemImage: "icloud.and.arrow.up")
+            Label("Re-sync to iCloud", systemImage: "icloud.and.arrow.up")
           }
         }
-        // Block the migration when iCloud isn't ready — pushing into
-        // CloudKit without an account would either silently fail or
-        // create records under a stale identity. Same gate the engine
-        // would hit anyway; we just surface it as disabled UI instead
-        // of a confusing error after the fact.
+        // Block when iCloud isn't ready — pushing into CloudKit without
+        // an account would either silently fail or create records under
+        // a stale identity. Same gate the engine would hit anyway.
         .disabled(isMigrating || ckEngine.accountStatus != .available)
-        Button {
-          runRestoreSnapshot()
-        } label: {
-          Label("Restore Latest Snapshot", systemImage: "arrow.uturn.backward")
-        }
-        .disabled(isMigrating)
         Button {
           Task { await runInboxDiagnostic() }
         } label: {
@@ -1149,9 +1131,9 @@ struct SyncSettingsPane: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
       } header: {
-        Text("Migration (dev)")
+        Text("Recovery (dev)")
       } footer: {
-        Text("Export writes a JSON snapshot (tasks + areas + projects) to Application Support. Migrate exports first, then uploads everything to CloudKit, verifies the count, and flips the backend flag. On any failure the flag is NOT flipped — your data stays as it was.")
+        Text("Export writes a JSON snapshot (tasks + areas + projects) to Application Support. Re-sync exports first, then re-uploads everything to CloudKit and verifies the count.")
       }
       #endif
     }
@@ -1266,45 +1248,11 @@ struct SyncSettingsPane: View {
     }
   }
 
-  /// Find the most recent snapshot file and re-import. Used to recover
-  /// the SwiftData state if a migration round-trip corrupts local
-  /// entities. Also flips the backend back to FastAPI — the snapshot
-  /// is FastAPI-shape data and CK now has a separate (possibly bad)
-  /// copy that the next CK fetch would overwrite the restore with.
-  private func runRestoreSnapshot() {
-    do {
-      let dir = try TasksMigrator.snapshotsDirectory()
-      let files = (try? FileManager.default
-        .contentsOfDirectory(at: dir, includingPropertiesForKeys: [.fileSizeKey])) ?? []
-      // Pick the snapshot with the most data, not the most recent. The
-      // most recent file may be a tiny post-mishap snapshot; the safest
-      // recovery target is whichever JSON has the largest task array,
-      // and file size is a clean proxy for that.
-      let candidates = files
-        .filter { $0.lastPathComponent.hasSuffix(".json") }
-        .sorted { (a, b) -> Bool in
-          let aSize = (try? a.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-          let bSize = (try? b.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-          return aSize > bSize
-        }
-      guard let url = candidates.first else {
-        migrationStatus = "❌ No snapshot files found"
-        return
-      }
-      let migrator = TasksMigrator(context: modelContext, engine: ckEngine)
-      let n = try migrator.importFromJSON(url: url)
-      tasksBackendRaw = TasksBackendKind.fastAPI.rawValue
-      migrationStatus = "✅ Restored \(n) records from \(url.lastPathComponent). Backend flipped to FastAPI; relaunch to take effect."
-    } catch {
-      migrationStatus = "❌ Restore failed: \(error.localizedDescription)"
-    }
-  }
-
   @MainActor
   private func runMigration() async {
     isMigrating = true
     defer { isMigrating = false }
-    migrationStatus = "Migrating…"
+    migrationStatus = "Re-syncing…"
     // Pass the client so the migrator can hydrate FastAPI areas/projects
     // into the local mirror before pushing — without this, a fresh
     // install with no Syncer pull yet would push zero areas/projects to
@@ -1313,13 +1261,7 @@ struct SyncSettingsPane: View {
     let migrator = TasksMigrator(context: modelContext, engine: ckEngine, client: client)
     do {
       let result = try await migrator.migrateToCloudKit()
-      // Flip the flag only after verification succeeds. Caller must
-      // relaunch for App.swift's `.task` block to call `engine.start()`
-      // on the new flag setting — the picker's @AppStorage triggers
-      // an immediate write, the engine itself is already running from
-      // this migration.
-      tasksBackendRaw = TasksBackendKind.cloudKit.rawValue
-      migrationStatus = "✅ Migrated \(result.tasksCount) tasks, \(result.areasCount) areas, \(result.projectsCount) projects. Snapshot: \(result.snapshotURL.lastPathComponent). Relaunch to finish the cutover."
+      migrationStatus = "✅ Re-sync complete: \(result.tasksCount) tasks, \(result.areasCount) areas, \(result.projectsCount) projects. Snapshot: \(result.snapshotURL.lastPathComponent)."
     } catch {
       migrationStatus = "❌ \(error.localizedDescription)"
     }
@@ -1407,7 +1349,7 @@ struct SyncSettingsPane: View {
     lines.append("== Inbox Diagnostic ==")
     lines.append("device: \(deviceLabel())")
     lines.append("iCloudUser: \(userID)")
-    lines.append("backend: \(tasksBackendRaw)")
+    lines.append("backend: cloudKit")
     lines.append("fetch: \(fetchNote)")
     lines.append("pending: record=\(pendingRecord) db=\(pendingDatabase)")
     lines.append("totals: tasks=\(rows.count) inbox=\(inboxRows.count) ghosts=\(ghostRows.count) missingCKFields=\(missingCK)")

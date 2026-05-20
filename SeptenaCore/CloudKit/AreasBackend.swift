@@ -90,9 +90,7 @@ final class AreasMutator: AreasBackend {
   }
 
   private var current: AreasBackend {
-    if TasksBackendDefaults.current == .cloudKit, let ck = ckBackend {
-      return ck
-    }
+    if let ck = ckBackend { return ck }
     return fastBackend
   }
 

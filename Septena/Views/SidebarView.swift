@@ -787,25 +787,12 @@ struct SidebarRootView: View {
   }
 
   private func commitAreaOrder(_ next: [Area]) {
-    let snapshot = areas
     Haptics.tick()
     areas = next
     // CloudKit mode: no server-side ordering yet — each AreaRecord is
     // standalone. The visual reorder sticks until the next load() reads
     // back alphabetical order from LocalCache. Phase 6+: add a sortIndex
     // field to AreaRecord if persistent ordering becomes a requirement.
-    guard TasksBackendDefaults.current == .fastAPI else { return }
-    Task {
-      do {
-        areas = try await client.replaceAreas(next)
-      } catch {
-        // Roll back to the pre-drop snapshot, then reload to reconcile with
-        // any server state we might have missed during the failed write.
-        areas = snapshot
-        errorMessage = error.localizedDescription
-        await load()
-      }
-    }
   }
 
   /// Reorder a project within its parent group (top-level when parent is
@@ -865,20 +852,9 @@ struct SidebarRootView: View {
       }
     }
 
-    let snapshot = projects
     Haptics.tick()
     projects = next
     // CloudKit mode: ordering isn't persisted — same note as commitAreaOrder.
-    guard TasksBackendDefaults.current == .fastAPI else { return }
-    Task {
-      do {
-        projects = try await client.replaceProjects(next)
-      } catch {
-        projects = snapshot
-        errorMessage = error.localizedDescription
-        await load()
-      }
-    }
   }
 
   private var topLevelProjects: [Project] {
@@ -898,24 +874,12 @@ struct SidebarRootView: View {
     let cachedTasks = LocalCache.allTasks(in: modelContext)
     if !cachedTasks.isEmpty { apply(aggregate: Self.aggregate(tasks: cachedTasks)) }
     do {
-      // In CloudKit mode the local cache is authoritative — CKSyncEngine
-      // keeps SwiftData fresh. In FastAPI mode we pull from the server
-      // and fold the response into SwiftData via Syncer.
-      let isCK = TasksBackendDefaults.current == .cloudKit
+      // CloudKit is the only backend. LocalCache is authoritative —
+      // CKSyncEngine keeps SwiftData fresh.
       async let c = TaskReads.counts(client: client, context: modelContext)
       async let all = TaskReads.list(view: "all", client: client, context: modelContext)
-      if isCK {
-        areas = LocalCache.areas(in: modelContext)
-        projects = LocalCache.projects(in: modelContext)
-      } else {
-        async let a = client.areas()
-        async let p = client.projects()
-        areas = try await a
-        projects = try await p
-        let syncer = Syncer(client: client, context: modelContext)
-        syncer.applyAreas(areas)
-        syncer.applyProjects(projects)
-      }
+      areas = LocalCache.areas(in: modelContext)
+      projects = LocalCache.projects(in: modelContext)
       let serverCounts = try await c
       // 'Next' is the chores / habits / supplements ritual. The server
       // does the merge + filter via /api/next/items; we just count.
@@ -926,21 +890,9 @@ struct SidebarRootView: View {
       }
 
       let items = try await all.items
-      // In FastAPI mode, fold the server's view=all into SwiftData so
-      // the next cold paint renders from cache. In CloudKit mode the
-      // items already came from LocalCache, so the fold-back is a
-      // no-op — skip it.
-      if !isCK {
-        // `.filter` scope upserts but never prunes (the server's
-        // view=all is open-only and would mass-delete done/cancelled).
-        Syncer(client: client, context: modelContext)
-          .applyTasks(items, scope: .filter(.upcoming))
-      }
       var agg = Self.aggregate(tasks: items)
-      // Per-smart-list counts come from the authoritative source: the
-      // server in FastAPI mode, LocalCache in CK mode (TaskReads.counts
-      // handles the routing). Per-project / per-area roll-ups stay from
-      // the local aggregate (not exposed by the counts endpoint).
+      // Per-smart-list counts come from LocalCache via TaskReads.counts.
+      // Per-project / per-area roll-ups stay from the local aggregate.
       agg.counts = serverCounts
       apply(aggregate: agg)
     } catch {

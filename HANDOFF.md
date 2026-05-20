@@ -24,9 +24,10 @@ via CKSyncEngine. This document is the brief for the next agent.
   uniformly.
 - **Other server data (habits, chores, nutrition, etc): unchanged.** When
   they move, follow the IDENTIFIERS.md checklist.
-- **Backend flag**: `TasksBackendDefaults.current` in UserDefaults
-  (`tasks.backend` key), values `.fastAPI | .cloudKit`. Set via
-  Settings → Sync → CloudKit (dev) picker (DEBUG-only).
+- **Backend selection**: Tasks, areas, and projects are CloudKit-only
+  as of the cutover. The `TasksBackendDefaults` flag and the DEBUG
+  Settings picker have been removed. FastAPI remains the backend for
+  habits, nutrition, training, chores, and supplements.
 
 ## Architecture
 
@@ -135,12 +136,14 @@ anyway).
 - [x] `DEVELOPMENT_TEAM` lifted to project.yml base settings
 - [x] `SeptenaCore/CloudKit/` directory with `CKEngine`, `TaskRecord`,
       `TasksBackend`, `TaskReads`, `Migration`
-- [x] `TaskMutator` per-method router gated on backend flag
+- [x] `TaskMutator` thin shim forwarding to `CloudKitTasksBackend`
 - [x] `CloudKitTasksBackend` — full create/update/complete/uncomplete/
       cancel/delete/moveToToday/schedule/setDue/setRecurrence/
       moveToArea/moveToProject implementation
-- [x] CKSyncEngine wired in App.swift; closures bound; engine starts
-      when flag == .cloudKit; account status monitored
+- [x] CKSyncEngine wired in App.swift; closures bound; engine starts on
+      launch; account status monitored
+- [x] FastAPI task-backend toggle removed (cutover complete) — CloudKit
+      is now the only path for tasks/areas/projects
 - [x] Migration tooling — Export Snapshot, Migrate to iCloud, Restore
       Latest Snapshot (size-based), Reset CloudKit Zone (cascade-safe)
 - [x] Silent push registration (`registerForRemoteNotifications`) +
@@ -247,26 +250,19 @@ auto-create on first write the same way `Task` did. After the
 migration cutover lands and ships, promote schema Development →
 Production via Dashboard's "Deploy Schema to Production" button.
 
-## Phase 6 — Cleanup (~30 days post Phase 5b stability)
+## Phase 6 — Cleanup (~30 days post-cutover stability)
 
-When you're confident no users still have `tasks.backend = .fastAPI`:
+The runtime toggle is gone. Remaining cleanup is dead-code removal:
 
-- Delete `OutboxEntity`, `OutboxKind`, payload structs, `drain()`,
-  `executingEntryId`, `pendingCreate`, `enqueue` from
-  [Outbox.swift](SeptenaCore/Outbox.swift)
-- Delete the FastAPI branch in every `TaskMutator` method; collapse
-  the router to a thin shim forwarding to `cloudBackend`
-- Delete `Syncer` task-related code (it's only for FastAPI pull) —
-  keep the areas/projects bits until Phase 5b lands
+- Delete `OutboxEntity`, `OutboxKind`, task payload structs, `drain()`
+  task paths, `executingEntryId`, `pendingCreate`, `enqueue` from
+  [Outbox.swift](SeptenaCore/Outbox.swift) — keep habit/nutrition/etc
+  outbox functionality intact
+- Delete `Syncer` task-related code (FastAPI pull); keep area/project
+  pull until those move too (which they have, but the Syncer code is
+  still referenced by the migration path)
 - Delete `client.list / counts / changes / nextItems / list(view:)`
   client-side
-- Delete the `TasksBackendKind.fastAPI` case and remove the picker
-  from Settings (CK is the only backend)
-- Delete `cloudBackend` indirection — `TaskMutator` becomes the CK
-  backend directly
-- Delete the safety-snapshot code path and the Reset / Restore
-  buttons (move to a debug-only setting if you still want them
-  available for support)
 - Server-side: tasks endpoints (`/api/tasks/*`) become read-only or
   go away entirely. Inbox suggestion engine still needs task content
   via some path — either keep tasks endpoints read-only for that, or
@@ -359,7 +355,7 @@ If something corrupts local SwiftData:
 
 - [SeptenaCore/CloudKit/CKEngine.swift](SeptenaCore/CloudKit/CKEngine.swift) — engine wrapper, account status, push, reset, batching
 - [SeptenaCore/CloudKit/TaskRecord.swift](SeptenaCore/CloudKit/TaskRecord.swift) — TaskEntity ↔ CKRecord mapping + system fields capture
-- [SeptenaCore/CloudKit/TasksBackend.swift](SeptenaCore/CloudKit/TasksBackend.swift) — backend protocol + `TasksBackendDefaults` flag + `CloudKitTasksBackend`
+- [SeptenaCore/CloudKit/TasksBackend.swift](SeptenaCore/CloudKit/TasksBackend.swift) — `TasksBackend` protocol + `CloudKitTasksBackend` (sole implementation)
 - [SeptenaCore/CloudKit/TaskReads.swift](SeptenaCore/CloudKit/TaskReads.swift) — read-side routing (list/counts → LocalCache in CK mode)
 - [SeptenaCore/CloudKit/Migration.swift](SeptenaCore/CloudKit/Migration.swift) — `TasksMigrator` + snapshot file shapes
 - [SeptenaCore/Persistence.swift](SeptenaCore/Persistence.swift) — SwiftData entities + `cloudKitDatabase: .none` + `LocalCache.logTaskStateSummary`

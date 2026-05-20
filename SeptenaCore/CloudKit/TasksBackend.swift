@@ -1,46 +1,18 @@
 import Foundation
 import SwiftData
 
-// TasksBackend — the seam that lets a task mutation run against either
-// the FastAPI/Outbox path or CloudKit. Phase 1 wires `CloudKitTasksBackend`
-// up against `CKEngine`; `TaskMutator` chooses which to forward to per
-// `TasksBackendDefaults.current`.
+// TasksBackend — CloudKit is the only path for task mutations. The
+// protocol survives as a seam for tests and future re-routing, but the
+// runtime backend toggle has been removed.
 //
-// The CloudKit path is intentionally smaller than the FastAPI/Outbox path:
-// CKSyncEngine *is* the outbox — we don't need OutboxEntity rows, a
-// drain loop, retry, or merge-into-pending-create races. Local mutation
-// + `engine.noteTaskChange(id:)` is the whole story; the engine batches,
-// retries, and resolves conflicts on its own.
-
-// MARK: - Selection flag
-
-enum TasksBackendKind: String {
-  case fastAPI
-  case cloudKit
-}
-
-enum TasksBackendDefaults {
-  /// UserDefaults key. Reads default to `.fastAPI` until Phase 3 flips
-  /// the default for new installs.
-  static let key = "tasks.backend"
-
-  static var current: TasksBackendKind {
-    get {
-      let raw = UserDefaults.standard.string(forKey: key) ?? TasksBackendKind.fastAPI.rawValue
-      return TasksBackendKind(rawValue: raw) ?? .fastAPI
-    }
-    set {
-      UserDefaults.standard.set(newValue.rawValue, forKey: key)
-    }
-  }
-}
+// CKSyncEngine *is* the outbox — local mutation + `engine.noteTaskChange(id:)`
+// is the whole story; the engine batches, retries, and resolves
+// conflicts on its own.
 
 // MARK: - Protocol
 
-/// Mutation surface that mirrors the existing `TaskMutator` API one-for-
-/// one. `TaskMutator` itself conforms (its body is the FastAPI impl) and
-/// `CloudKitTasksBackend` conforms (the CK impl below). A future Phase 6
-/// can delete the FastAPI impl and the protocol disappears with it.
+/// Mutation surface. `CloudKitTasksBackend` is the only conforming type
+/// in production; `TaskMutator` is now a thin shim that forwards to it.
 @MainActor
 protocol TasksBackend: AnyObject {
   @discardableResult

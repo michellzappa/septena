@@ -38,9 +38,7 @@ final class ProjectsMutator: ProjectsBackend {
   }
 
   private var current: ProjectsBackend {
-    if TasksBackendDefaults.current == .cloudKit, let ck = ckBackend {
-      return ck
-    }
+    if let ck = ckBackend { return ck }
     return fastBackend
   }
 

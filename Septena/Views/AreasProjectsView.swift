@@ -218,21 +218,10 @@ struct AreaDetailView: View {
     if !cachedAreas.isEmpty { areas = cachedAreas }
     if !cachedProjects.isEmpty { projects = cachedProjects }
 
-    let isCK = TasksBackendDefaults.current == .cloudKit
     async let allInArea = TaskReads.list(view: "all", area: area.id,
                                          client: client, context: modelContext)
-    if isCK {
-      areas = LocalCache.areas(in: modelContext)
-      projects = LocalCache.projects(in: modelContext)
-    } else {
-      async let a = client.areas()
-      async let p = client.projects()
-      areas = (try? await a) ?? []
-      projects = (try? await p) ?? []
-      let syncer = Syncer(client: client, context: modelContext)
-      syncer.applyAreas(areas)
-      syncer.applyProjects(projects)
-    }
+    areas = LocalCache.areas(in: modelContext)
+    projects = LocalCache.projects(in: modelContext)
 
     // Rehydrate the notes field from the freshly-loaded area record. The
     // route in nav.path holds the snapshot from when the sidebar last
@@ -261,10 +250,6 @@ struct AreaDetailView: View {
       }
       projectProgress = total.reduce(into: [:]) { acc, kv in
         acc[kv.key] = Double(done[kv.key] ?? 0) / Double(kv.value)
-      }
-      if !isCK {
-        Syncer(client: client, context: modelContext)
-          .applyTasks(items, scope: .area(area.id))
       }
     }
   }
@@ -431,11 +416,7 @@ struct ProjectDetailView: View {
   }
 
   private func loadAreas() async {
-    if TasksBackendDefaults.current == .cloudKit {
-      areas = LocalCache.areas(in: modelContext)
-    } else {
-      areas = (try? await client.areas()) ?? []
-    }
+    areas = LocalCache.areas(in: modelContext)
   }
 
   /// The project struct in nav.path is the snapshot from when the sidebar
@@ -443,13 +424,8 @@ struct ProjectDetailView: View {
   /// Pull the latest record and update the draft — but only when the user
   /// isn't actively typing, so we never clobber an unsaved edit.
   private func rehydrateNotes() async {
-    let fresh: Project?
-    if TasksBackendDefaults.current == .cloudKit {
-      fresh = LocalCache.projects(in: modelContext)
-        .first(where: { $0.id == project.id })
-    } else {
-      fresh = (try? await client.projects())?.first(where: { $0.id == project.id })
-    }
+    let fresh: Project? = LocalCache.projects(in: modelContext)
+      .first(where: { $0.id == project.id })
     guard !notesFocused, let fresh else { return }
     let serverNotes = fresh.notes ?? ""
     if serverNotes != draftNotes {

@@ -579,39 +579,12 @@ final class Syncer {
   }
 
   func applyTasks(_ items: [SeptenaTask], scope: TaskScope) {
-    // In CloudKit mode the local mirror is authoritative — CKSyncEngine
-    // keeps it fresh. Running a FastAPI-shaped prune here would wipe
-    // CK-only tasks the server doesn't know about. Hard skip.
-    if TasksBackendDefaults.current == .cloudKit { return }
-    let now = Date()
-    var seen = Set<String>()
-    for (index, dto) in items.enumerated() {
-      seen.insert(dto.id)
-      upsert(dto, syncedAt: now, sortIndex: index)
-    }
-    do {
-      // Flush upserts BEFORE the predicate-based batch delete. SwiftData
-      // evaluates the predicate against the persistent store, not unsaved
-      // context state — so freshly-inserted rows still look stale to the
-      // delete and would get wiped. Save first; then prune is safe.
-      try context.save()
-      switch scope {
-      case .all:
-        try context.delete(model: TaskEntity.self,
-                           where: #Predicate { $0.lastSyncedAt < now })
-      case .area(let aid):
-        try context.delete(model: TaskEntity.self,
-                           where: #Predicate { $0.area == aid && $0.lastSyncedAt < now })
-      case .project(let pid):
-        try context.delete(model: TaskEntity.self,
-                           where: #Predicate { $0.project == pid && $0.lastSyncedAt < now })
-      case .filter:
-        break
-      }
-      try context.save()
-    } catch {
-      SeptenaLog.error("applyTasks save failed", error)
-    }
+    // CloudKit is the only backend — CKSyncEngine keeps the local
+    // mirror authoritative. Running a FastAPI-shaped prune here would
+    // wipe CK-only tasks the server doesn't know about. No-op kept so
+    // existing call sites keep compiling; Phase B will delete them.
+    _ = items
+    _ = scope
   }
 
   func applyAreas(_ dtos: [Area]) {

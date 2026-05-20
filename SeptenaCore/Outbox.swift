@@ -119,24 +119,18 @@ final class TaskMutator {
   private let client: SeptenaClient
   private let context: ModelContext
 
-  /// CloudKit dependency. Held weakly-typed (optional) so the FastAPI
-  /// path stays runnable on devices that haven't been migrated yet
-  /// (CKEngine refuses to start without a signed-in iCloud account,
-  /// so we don't force one until the user flips the backend flag).
-  /// Settable post-init via `bind(ckEngine:)` because App.swift can't
+  /// CloudKit dependency. Held as optional because App.swift can't
   /// reference its own `@State var ckEngine` from another `@State`
-  /// initializer — wiring happens once in `.task` at launch.
+  /// initializer — wiring happens once in `.task` at launch via
+  /// `bind(ckEngine:)`. Once bound the backend is always available.
   private var ckEngine: CKEngine?
   private var _cloudBackend: CloudKitTasksBackend?
 
-  /// The CloudKit backend, lazily constructed when the flag is on.
-  /// Returns nil when the backend is FastAPI — that's how every mutation
-  /// method below decides which path to take. Single point of truth for
-  /// "are we on CloudKit?", avoids each method re-checking the flag.
+  /// The CloudKit backend, lazily constructed once the engine is bound.
+  /// Every mutation method below routes through this — there is no
+  /// FastAPI fallback for tasks anymore.
   private var cloudBackend: CloudKitTasksBackend? {
-    guard TasksBackendDefaults.current == .cloudKit, let engine = ckEngine else {
-      return nil
-    }
+    guard let engine = ckEngine else { return nil }
     if _cloudBackend == nil {
       _cloudBackend = CloudKitTasksBackend(engine: engine, context: context)
     }

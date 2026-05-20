@@ -27,10 +27,9 @@ struct SeptenaApp: App {
   /// after a flag flip. Phase 1: dev-environment only.
   @State private var ckEngine: CKEngine = CKEngine()
   /// Owns the task write-path: applies optimistic SwiftData changes,
-  /// then either enqueues OutboxEntity rows (FastAPI) or hands off to
-  /// CKSyncEngine (CloudKit), chosen per `TasksBackendDefaults.current`.
-  /// Views call this instead of `SeptenaClient.*` for any task mutation
-  /// so the UI never blocks on the network.
+  /// then hands off to CKSyncEngine. Views call this instead of
+  /// `SeptenaClient.*` for any task mutation so the UI never blocks on
+  /// the network.
   @State private var taskMutator: TaskMutator = TaskMutator(
     client: ClientProvider.shared.client,
     context: LocalStore.shared.container.mainContext,
@@ -111,9 +110,7 @@ struct SeptenaApp: App {
           // console immediately — no Inspector required.
           LocalCache.logTaskStateSummary(in: localStore.container.mainContext)
           // Bind the CloudKit engine to the task mutator and install its
-          // SwiftData seams. The engine itself isn't started until the
-          // user flips `TasksBackendDefaults.current == .cloudKit` — until
-          // then it's a parked object holding closures, doing nothing.
+          // SwiftData seams.
           let context = localStore.container.mainContext
           // Single dispatcher for outbound records: try Task, then Project,
           // then Area. Within a CK zone recordNames are unique, so at most
@@ -212,9 +209,7 @@ struct SeptenaApp: App {
           #if os(macOS)
           MacAppDelegate.ckEngine = ckEngine
           #endif
-          if TasksBackendDefaults.current == .cloudKit {
-            ckEngine.start()
-          }
+          ckEngine.start()
           // Two-phase load for tile order + section colors. Disk reads
           // are synchronous so the dashboard renders with the user's
           // ordering and palette on the first frame; the network refresh
@@ -223,45 +218,29 @@ struct SeptenaApp: App {
           settingsStore.paintFromCache()
           await theme.refresh(from: clientProvider.client)
           await settingsStore.refresh(from: clientProvider.client)
-          // FastAPI pull-everything is only safe on the FastAPI backend.
-          // In CloudKit mode the server snapshot is older than what
-          // CKSyncEngine is mirroring locally; running pullAll() would
-          // overwrite live CK state with whatever was on FastAPI at the
-          // last migration. Instead, ask the engine to pull from CK.
-          if TasksBackendDefaults.current == .cloudKit {
-            try? await ckEngine.fetchChanges()
-            // Backstop for users who flipped to CloudKit before Phase 5b
-            // (areas/projects were FastAPI-only at the time, so the local
-            // SwiftData mirror has none). If both tables are empty AND
-            // FastAPI is reachable, pull once and fold in. After they
-            // re-run Migrate to iCloud, the engine's applyFetchedRecord
-            // keeps the mirror in sync from CK and this branch sleeps.
-            let context = localStore.container.mainContext
-            let areaCount = (try? context.fetchCount(FetchDescriptor<AreaEntity>())) ?? 0
-            let projectCount = (try? context.fetchCount(FetchDescriptor<ProjectEntity>())) ?? 0
-            SeptenaLog.info("[Hydrate] CK mode launch: areas=\(areaCount) projects=\(projectCount)")
-            // Backstop for users who flipped to CloudKit before Phase 5b
-            // pushed areas/projects to CK. If either table is empty,
-            // pull from FastAPI once and fold in. After they re-run
-            // Migrate to iCloud, the engine's applyFetchedRecord keeps
-            // the mirror in sync from CK and this branch is a no-op.
-            if areaCount == 0 || projectCount == 0 {
-              SeptenaLog.info("[Hydrate] mirror gap — pulling from FastAPI as one-shot")
-              if let areas = try? await clientProvider.client.areas(),
-                 let projects = try? await clientProvider.client.projects() {
-                let syncer = Syncer(client: clientProvider.client, context: context)
-                syncer.applyAreas(areas)
-                syncer.applyProjects(projects)
-                NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
-                SeptenaLog.info("[Hydrate] seeded \(areas.count) areas, \(projects.count) projects from FastAPI — run Migrate to push to CloudKit")
-              } else {
-                SeptenaLog.info("[Hydrate] FastAPI pull failed — sidebar will be empty for areas/projects until reachable")
-              }
+          // CKSyncEngine owns the read path. Ask it to pull from CK.
+          try? await ckEngine.fetchChanges()
+          // Backstop for users whose local mirror is missing areas/projects
+          // (e.g. installed before Phase 5b pushed them to CK). If either
+          // table is empty AND FastAPI is reachable, pull once and fold
+          // in. After they re-run Re-sync to iCloud, the engine's
+          // applyFetchedRecord keeps the mirror in sync from CK and this
+          // branch is a no-op.
+          let areaCount = (try? context.fetchCount(FetchDescriptor<AreaEntity>())) ?? 0
+          let projectCount = (try? context.fetchCount(FetchDescriptor<ProjectEntity>())) ?? 0
+          SeptenaLog.info("[Hydrate] CK mode launch: areas=\(areaCount) projects=\(projectCount)")
+          if areaCount == 0 || projectCount == 0 {
+            SeptenaLog.info("[Hydrate] mirror gap — pulling from FastAPI as one-shot")
+            if let areas = try? await clientProvider.client.areas(),
+               let projects = try? await clientProvider.client.projects() {
+              let syncer = Syncer(client: clientProvider.client, context: context)
+              syncer.applyAreas(areas)
+              syncer.applyProjects(projects)
+              NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+              SeptenaLog.info("[Hydrate] seeded \(areas.count) areas, \(projects.count) projects from FastAPI — run Re-sync to iCloud to push to CloudKit")
+            } else {
+              SeptenaLog.info("[Hydrate] FastAPI pull failed — sidebar will be empty for areas/projects until reachable")
             }
-          } else {
-            let syncer = Syncer(client: clientProvider.client,
-                                context: localStore.container.mainContext)
-            await syncer.pullAll()
           }
           // Flush anything that was queued in a prior session (e.g. the
           // app was killed mid-drain). Safe to call before/after pullAll

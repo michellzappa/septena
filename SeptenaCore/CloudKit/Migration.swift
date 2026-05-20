@@ -10,12 +10,10 @@ import OSLog
 //   1. Migration ALWAYS writes a JSON snapshot to Application Support
 //      BEFORE touching CloudKit. If anything later goes wrong, the
 //      snapshot path is the recovery seed.
-//   2. The `tasks.backend` flag is NOT flipped here — caller flips it
-//      only after `migrateToCloudKit()` returns success. Failure leaves
-//      the user on FastAPI with their data intact.
-//   3. Identity is preserved: each TaskEntity's `id` becomes the CKRecord
-//      `recordName`. Re-running the migration is idempotent (same ids,
-//      CKSyncEngine merges via change tag).
+//   2. Identity is preserved: each TaskEntity's `id` becomes the CKRecord
+//      `recordName`. Re-running is idempotent (same ids, CKSyncEngine
+//      merges via change tag). This is now mostly a recovery/re-sync tool;
+//      the original FastAPI→CK migration has already shipped.
 
 // MARK: - Snapshot codable
 
@@ -184,7 +182,7 @@ final class TasksMigrator {
     let snapshot = TasksSnapshotFile(
       schemaVersion: 2,
       createdAt: Date(),
-      sourceBackend: TasksBackendDefaults.current.rawValue,
+      sourceBackend: "cloudKit",
       tasks: tasks.map(TaskSnapshot.init),
       areas: areas.map(AreaSnapshot.init),
       projects: projects.map(ProjectSnapshot.init)

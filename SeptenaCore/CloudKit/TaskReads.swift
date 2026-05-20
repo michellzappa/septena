@@ -36,10 +36,8 @@ enum TaskReads {
                    days: Int = 90,
                    client: SeptenaClient,
                    context: ModelContext) async throws -> TasksListResponse {
-    if TasksBackendDefaults.current == .cloudKit {
-      return localList(view: view, area: area, project: project, days: days, context: context)
-    }
-    return try await client.list(view: view, area: area, project: project, days: days)
+    _ = client
+    return localList(view: view, area: area, project: project, days: days, context: context)
   }
 
   /// Synthesize a `TasksListResponse` from SwiftData. Matches the
@@ -126,10 +124,8 @@ enum TaskReads {
 
   static func counts(client: SeptenaClient,
                      context: ModelContext) async throws -> TasksCounts {
-    if TasksBackendDefaults.current == .cloudKit {
-      return localCounts(context: context)
-    }
-    return try await client.counts()
+    _ = client
+    return localCounts(context: context)
   }
 
   static func localCounts(context: ModelContext) -> TasksCounts {

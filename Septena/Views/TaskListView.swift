@@ -1749,126 +1749,40 @@ struct TaskListView: View {
     if items.isEmpty { isLoading = true }
     defer { isLoading = false }
 
-    // CloudKit mode: skip the FastAPI list/Syncer path entirely. The
-    // server doesn't know about CK-side writes, so its response would
-    // wipe the just-created row out of `items`. Pull fresh from CK via
-    // the engine (its callbacks fold incoming records into SwiftData and
-    // post .septenaTasksChanged), then read from the local mirror.
-    if TasksBackendDefaults.current == .cloudKit {
-      SeptenaLog.info("[TaskList] load filter=\(String(describing: filter)) route=cloudKit")
-      try? await ckEngine.fetchChanges()
-      let local = LocalCache.tasks(in: modelContext, filter: filter)
-      items = local
-      review = []
-      doneToday = []
-      loadedFilters.insert(filter)
-      // Projects + areas: in CK mode they live in SwiftData (mirrored by
-      // CKSyncEngine), so the local cache is authoritative — no network
-      // round-trip needed.
-      projects = LocalCache.projects(in: modelContext)
-      areas = LocalCache.areas(in: modelContext)
-      if showsLoggedSection {
-        loggedItemsStorage = filterLogged(LocalCache.tasks(in: modelContext, filter: .logbook))
-        loggedFilter = filter
-      }
-      // Refresh the inbox suggestion engine from local data alone —
-      // the FastAPI logbook pull is unavailable here. LocalCache returns
-      // every status, so the engine sees the full corpus for ranking.
-      if filter == .inbox {
-        let allTasks = LocalCache.allTasks(in: modelContext)
-        suggestionEngine.refresh(inbox: local,
-                                 allTasks: allTasks,
-                                 projects: projects,
-                                 areas: areas)
-      }
-      SeptenaLog.info("[TaskList] load done count=\(items.count)")
-      return
+    // CloudKit is the only backend. Pull fresh from CK via the engine
+    // (its callbacks fold incoming records into SwiftData and post
+    // .septenaTasksChanged), then read from the local mirror.
+    SeptenaLog.info("[TaskList] load filter=\(String(describing: filter)) route=cloudKit")
+    try? await ckEngine.fetchChanges()
+    let local = LocalCache.tasks(in: modelContext, filter: filter)
+    items = local
+    review = []
+    doneToday = []
+    loadedFilters.insert(filter)
+    // Projects + areas live in SwiftData (mirrored by CKSyncEngine), so
+    // the local cache is authoritative — no network round-trip needed.
+    projects = LocalCache.projects(in: modelContext)
+    areas = LocalCache.areas(in: modelContext)
+    if showsLoggedSection {
+      loggedItemsStorage = filterLogged(LocalCache.tasks(in: modelContext, filter: .logbook))
+      loggedFilter = filter
     }
-    do {
-      let listView = filter.serverView
-      var area: String?
-      var project: String?
-      switch filter {
-      case .area(let aid): area = aid
-      case .project(let pid): project = pid
-      default: break
-      }
-      SeptenaLog.info("[TaskList] load filter=\(String(describing: filter)) route=fastAPI")
-      let resp = try await client.list(view: listView, area: area, project: project)
-      items = resp.items
-      review = resp.review ?? []
-      doneToday = resp.done ?? []
-      loadedFilters.insert(filter)
-
-      async let p = client.projects()
-      async let a = client.areas()
-      projects = (try? await p) ?? []
-      areas = (try? await a) ?? []
-
-      // Refresh the embedding-backed suggestion chips for Inbox rows. The
-      // engine needs every assigned task — each project / area's semantic
-      // identity is the centroid of its assigned tasks. Open tasks come
-      // from the local mirror; done tasks need an explicit logbook pull
-      // (the server's "all" view returns open-only, so weeks of completed
-      // work would otherwise be invisible to the model).
-      if filter == .inbox {
-        var allTasks = LocalCache.allTasks(in: modelContext)
-        if let logbook = try? await TaskReads.list(
-          view: "logbook", days: 365,
-          client: client, context: modelContext
-        ) {
-          let known = Set(allTasks.map(\.id))
-          allTasks.append(contentsOf: logbook.items.filter { !known.contains($0.id) })
-        }
-        suggestionEngine.refresh(inbox: resp.items,
-                                 allTasks: allTasks,
-                                 projects: projects,
-                                 areas: areas)
-      }
-
-      // 2. Fold the fresh server response back into SwiftData so the next
-      //    cold load renders from cache. Scope tells the syncer how to
-      //    prune deleted rows without nuking out-of-scope tasks.
-      let syncer = Syncer(client: client, context: modelContext)
-      let scope: Syncer.TaskScope = {
-        switch filter {
-        case .area(let aid): return .area(aid)
-        case .project(let pid): return .project(pid)
-        default: return .filter(filter)
-        }
-      }()
-      syncer.applyTasks(resp.items + (resp.review ?? []) + (resp.done ?? []),
-                        scope: scope)
-      syncer.applyAreas(areas)
-      syncer.applyProjects(projects)
-
-      // Recently completed, scoped to the current view. Server's logbook
-      // endpoint ignores area/project, so we filter client-side.
-      if showsLoggedSection {
-        if let logbook = try? await TaskReads.list(
-          view: "logbook", days: 30,
-          client: client, context: modelContext
-        ) {
-          loggedItemsStorage = filterLogged(logbook.items)
-          loggedFilter = filter
-        }
-      }
-
-      // Refresh dismissed state — banner reappears next day automatically.
-      if filter == .today {
-        let last = UserDefaults.standard.string(forKey: "septena.newTodos.dismissedDate")
-        newTodosDismissed = (last == SeptenaDate.today)
-      }
-    } catch is CancellationError {
-      // Pull-to-refresh interruption or task cancellation — no user error.
-      return
-    } catch let urlError as URLError where urlError.code == .cancelled {
-      // URLSession cancelled mid-request (refresh re-triggered). Silent.
-      return
-    } catch {
-      SeptenaLog.error("load failed", error)
-      errorMessage = error.localizedDescription
+    // Refresh the inbox suggestion engine from local data. LocalCache
+    // returns every status, so the engine sees the full corpus for
+    // ranking.
+    if filter == .inbox {
+      let allTasks = LocalCache.allTasks(in: modelContext)
+      suggestionEngine.refresh(inbox: local,
+                               allTasks: allTasks,
+                               projects: projects,
+                               areas: areas)
     }
+    // Refresh dismissed state — banner reappears next day automatically.
+    if filter == .today {
+      let last = UserDefaults.standard.string(forKey: "septena.newTodos.dismissedDate")
+      newTodosDismissed = (last == SeptenaDate.today)
+    }
+    SeptenaLog.info("[TaskList] load done count=\(items.count)")
   }
 
   // MARK: - New-to-dos banner
