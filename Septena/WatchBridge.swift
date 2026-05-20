@@ -7,8 +7,6 @@ import WatchConnectivity
 final class WatchBridge: NSObject, WCSessionDelegate {
   static let shared = WatchBridge()
 
-  private var client: SeptenaClient { ClientProvider.shared.client }
-
   private override init() {
     super.init()
     guard WCSession.isSupported() else { return }
@@ -52,15 +50,18 @@ final class WatchBridge: NSObject, WCSessionDelegate {
       replyHandler(["error": "missing action"])
       return
     }
-    let date = msg["date"] as? String ?? SeptenaDate.today
-    let id   = msg["id"]   as? String ?? ""
+    let client = await MainActor.run { ClientProvider.shared.client }
+    let date   = msg["date"] as? String ?? SeptenaDate.today
+    let id     = msg["id"]   as? String ?? ""
 
     do {
       switch action {
       case "fetchNext":
-        let response = try await client.nextItems(date: date)
-        let data     = try JSONEncoder().encode(response)
-        replyHandler(["items": data])
+        let response  = try await client.nextItems(date: date)
+        let data      = try JSONEncoder().encode(response)
+        let serverURL = UserDefaults.standard.string(forKey: "septena.serverURL")
+                        ?? SeptenaClient.default.absoluteString
+        replyHandler(["items": data, "serverURL": serverURL])
 
       case "toggleHabit":
         let done = msg["done"] as? Bool ?? true
