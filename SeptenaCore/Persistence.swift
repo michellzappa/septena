@@ -4,6 +4,13 @@ import SwiftData
 // Local SwiftData mirror of the Septena server. Server stays authoritative;
 // this is a cache so the UI can render and accept input without a round-trip.
 // Wire DTOs in Models.swift remain unchanged — we convert at the boundary.
+//
+// ⚠️  When adding a new label-style entity (anything users will rename and
+//     reference by name, like areas/projects/chores/habits/sections), use
+//     the uniform `id + slug + previousSlugs` model documented in
+//     [IDENTIFIERS.md](IDENTIFIERS.md). Tasks-style content entities are
+//     exempt (id-only). The Areas/Projects entities below are the
+//     reference implementation.
 
 // MARK: - Entities
 
@@ -50,6 +57,14 @@ final class TaskEntity {
   /// Server-stamped tombstone. When set, the row is logically deleted
   /// — Syncer purges it locally during the next apply.
   var deletedAt: String?
+  /// CKRecord system-fields blob (NSKeyedArchiver-encoded). Captured the
+  /// first time we see a record from CloudKit (or after our own save is
+  /// acked) so subsequent uploads preserve the recordChangeTag and avoid
+  /// 409s. Nil for rows that haven't round-tripped through CloudKit yet
+  /// (pre-migration FastAPI rows, or rows authored offline before the
+  /// engine drained). The CloudKit path on `TaskRecord` reads / writes
+  /// this transparently — call sites don't need to think about it.
+  var cloudKitSystemFields: Data?
 
   init(id: String,
        title: String,
@@ -71,7 +86,8 @@ final class TaskEntity {
        pendingSync: Bool = false,
        pendingDeletion: Bool = false,
        updatedAt: String? = nil,
-       deletedAt: String? = nil) {
+       deletedAt: String? = nil,
+       cloudKitSystemFields: Data? = nil) {
     self.id = id
     self.title = title
     self.statusRaw = statusRaw
@@ -93,6 +109,7 @@ final class TaskEntity {
     self.pendingDeletion = pendingDeletion
     self.updatedAt = updatedAt
     self.deletedAt = deletedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
   }
 
   var status: TaskStatus {
@@ -129,6 +146,18 @@ final class ProjectEntity {
   var lastSyncedAt: Date
   var updatedAt: String?
   var deletedAt: String?
+  /// CKRecord system-fields blob. See `TaskEntity.cloudKitSystemFields` for
+  /// the same contract — captured on round-trip through CloudKit so the
+  /// next save preserves recordChangeTag.
+  var cloudKitSystemFields: Data?
+  /// Human-friendly, mutable identifier derived from `title`. Updates on
+  /// every rename, deduped across live projects. Nil on legacy records
+  /// that haven't been backfilled yet — resolver falls back to id-as-slug
+  /// for those. See [IDENTIFIERS.md].
+  var slug: String?
+  /// Last ~3 slugs, FIFO. Lets a lookup for a recently-renamed entity
+  /// still resolve. Empty by default.
+  var previousSlugs: [String] = []
 
   init(id: String,
        title: String,
@@ -141,7 +170,10 @@ final class ProjectEntity {
        githubRepo: String? = nil,
        lastSyncedAt: Date = .distantPast,
        updatedAt: String? = nil,
-       deletedAt: String? = nil) {
+       deletedAt: String? = nil,
+       cloudKitSystemFields: Data? = nil,
+       slug: String? = nil,
+       previousSlugs: [String] = []) {
     self.id = id
     self.title = title
     self.statusRaw = statusRaw
@@ -154,6 +186,9 @@ final class ProjectEntity {
     self.lastSyncedAt = lastSyncedAt
     self.updatedAt = updatedAt
     self.deletedAt = deletedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+    self.slug = slug
+    self.previousSlugs = previousSlugs
   }
 
   var status: ProjectStatus {
@@ -169,14 +204,26 @@ final class AreaEntity {
   var context: String?
   var lastSyncedAt: Date
   var updatedAt: String?
+  /// CKRecord system-fields blob. See `TaskEntity.cloudKitSystemFields`.
+  var cloudKitSystemFields: Data?
+  /// Mutable natural-name identifier — see ProjectEntity.slug.
+  var slug: String?
+  /// FIFO of the last 3 slugs — see ProjectEntity.previousSlugs.
+  var previousSlugs: [String] = []
 
   init(id: String, title: String, context: String? = nil,
-       lastSyncedAt: Date = .distantPast, updatedAt: String? = nil) {
+       lastSyncedAt: Date = .distantPast, updatedAt: String? = nil,
+       cloudKitSystemFields: Data? = nil,
+       slug: String? = nil,
+       previousSlugs: [String] = []) {
     self.id = id
     self.title = title
     self.context = context
     self.lastSyncedAt = lastSyncedAt
     self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+    self.slug = slug
+    self.previousSlugs = previousSlugs
   }
 }
 
@@ -245,7 +292,13 @@ final class LocalStore {
   private init() {
     let schema = Schema([TaskEntity.self, ProjectEntity.self, AreaEntity.self,
                          OutboxEntity.self, HTTPOutboxEntity.self])
-    let config = ModelConfiguration("Septena", schema: schema)
+    // Explicitly opt OUT of NSPersistentCloudKitContainer mirroring. Having
+    // CloudKit in the target entitlements would otherwise switch SwiftData
+    // into auto-mirror mode, which requires all-optional attributes and
+    // disallows @Attribute(.unique) — neither of which our model honors.
+    // We sync via CKSyncEngine instead (see CKEngine.swift); SwiftData is
+    // strictly a local cache. `.none` is the disable switch.
+    let config = ModelConfiguration("Septena", schema: schema, cloudKitDatabase: .none)
     do {
       container = try ModelContainer(for: schema, configurations: [config])
     } catch {
@@ -329,6 +382,65 @@ enum LocalCache {
     (try? context.fetch(FetchDescriptor<TaskEntity>()))?.map(SeptenaTask.init) ?? []
   }
 
+  /// One-line diagnostic of what the local task store currently looks
+  /// like — counts by status, today flag, and date-relative buckets.
+  /// Logged on app launch so a partial-migration / data-corruption
+  /// situation surfaces in the console without needing a database
+  /// inspector. Cheap; iterates entities once.
+  @MainActor
+  static func logTaskStateSummary(in context: ModelContext) {
+    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
+    let today = SeptenaDate.today
+    var open = 0, done = 0, cancelled = 0, someday = 0
+    var todayFlag = 0, scheduledLE = 0, dueLE = 0
+    var withArea = 0, withProject = 0, pendingDel = 0
+    var withSystemFields = 0
+    for e in rows {
+      switch e.status {
+      case .open: open += 1
+      case .done: done += 1
+      case .cancelled: cancelled += 1
+      case .someday: someday += 1
+      }
+      if e.today { todayFlag += 1 }
+      if let s = e.scheduled, s <= today { scheduledLE += 1 }
+      if let d = e.due, d <= today { dueLE += 1 }
+      if e.area != nil { withArea += 1 }
+      if e.project != nil { withProject += 1 }
+      if e.pendingDeletion { pendingDel += 1 }
+      if e.cloudKitSystemFields != nil { withSystemFields += 1 }
+    }
+    SeptenaLog.info("[TaskState] total=\(rows.count) open=\(open) done=\(done) cancelled=\(cancelled) someday=\(someday)")
+    SeptenaLog.info("[TaskState] today=\(todayFlag) scheduled<=today=\(scheduledLE) due<=today=\(dueLE) inArea=\(withArea) inProject=\(withProject) pendingDeletion=\(pendingDel) withCKSystemFields=\(withSystemFields)")
+
+    let areas = (try? context.fetch(FetchDescriptor<AreaEntity>())) ?? []
+    let projects = (try? context.fetch(FetchDescriptor<ProjectEntity>())) ?? []
+    let areasWithCK = areas.filter { $0.cloudKitSystemFields != nil }.count
+    let projectsWithCK = projects.filter { $0.cloudKitSystemFields != nil }.count
+    SeptenaLog.info("[AreaState] total=\(areas.count) withCKSystemFields=\(areasWithCK)")
+    SeptenaLog.info("[ProjectState] total=\(projects.count) withCKSystemFields=\(projectsWithCK)")
+
+    // One-shot crosswalk: are the project ids on tasks actually the same
+    // strings as the ids on ProjectEntity? If task.project="signals" but
+    // ProjectEntity.id="proj-abc", `filter: .project("proj-abc")` returns
+    // nothing. Sample top 20 of each.
+    let taskProjectIds = Set(rows.compactMap { $0.project })
+    let projectIds = Set(projects.map { $0.id })
+    let orphanedTaskProjectIds = taskProjectIds.subtracting(projectIds)
+    let projectsWithNoTasks = projectIds.subtracting(taskProjectIds)
+    SeptenaLog.info("[Crosswalk] taskProjectIds=\(taskProjectIds.sorted().prefix(20))")
+    SeptenaLog.info("[Crosswalk] projectIds=\(projectIds.sorted().prefix(20))")
+    SeptenaLog.info("[Crosswalk] orphaned (task references id not in ProjectEntity)=\(orphanedTaskProjectIds.sorted().prefix(20))")
+    SeptenaLog.info("[Crosswalk] projects with no tasks=\(projectsWithNoTasks.sorted().prefix(20))")
+
+    let taskAreaIds = Set(rows.compactMap { $0.area })
+    let areaIds = Set(areas.map { $0.id })
+    let orphanedTaskAreaIds = taskAreaIds.subtracting(areaIds)
+    SeptenaLog.info("[Crosswalk] taskAreaIds=\(taskAreaIds.sorted().prefix(20))")
+    SeptenaLog.info("[Crosswalk] areaIds=\(areaIds.sorted().prefix(20))")
+    SeptenaLog.info("[Crosswalk] orphaned (task references area not in AreaEntity)=\(orphanedTaskAreaIds.sorted().prefix(20))")
+  }
+
   /// Count of open tasks whose hard deadline is today or in the past.
   /// Drives the Today sidebar's red badge — matches the in-list red date
   /// treatment exactly (only `due ≤ today` counts as overdue; scheduled-past
@@ -346,13 +458,15 @@ enum LocalCache {
   @MainActor
   static func areas(in context: ModelContext) -> [Area] {
     let descriptor = FetchDescriptor<AreaEntity>(sortBy: [SortDescriptor(\.title)])
-    return (try? context.fetch(descriptor))?.map(Area.init) ?? []
+    let rows = (try? context.fetch(descriptor)) ?? []
+    return rows.map(Area.init)
   }
 
   @MainActor
   static func projects(in context: ModelContext) -> [Project] {
     let descriptor = FetchDescriptor<ProjectEntity>(sortBy: [SortDescriptor(\.title)])
-    return (try? context.fetch(descriptor))?.map(Project.init) ?? []
+    let rows = (try? context.fetch(descriptor)) ?? []
+    return rows.map(Project.init)
   }
 }
 
@@ -465,6 +579,10 @@ final class Syncer {
   }
 
   func applyTasks(_ items: [SeptenaTask], scope: TaskScope) {
+    // In CloudKit mode the local mirror is authoritative — CKSyncEngine
+    // keeps it fresh. Running a FastAPI-shaped prune here would wipe
+    // CK-only tasks the server doesn't know about. Hard skip.
+    if TasksBackendDefaults.current == .cloudKit { return }
     let now = Date()
     var seen = Set<String>()
     for (index, dto) in items.enumerated() {
@@ -472,6 +590,11 @@ final class Syncer {
       upsert(dto, syncedAt: now, sortIndex: index)
     }
     do {
+      // Flush upserts BEFORE the predicate-based batch delete. SwiftData
+      // evaluates the predicate against the persistent store, not unsaved
+      // context state — so freshly-inserted rows still look stale to the
+      // delete and would get wiped. Save first; then prune is safe.
+      try context.save()
       switch scope {
       case .all:
         try context.delete(model: TaskEntity.self,
@@ -495,6 +618,12 @@ final class Syncer {
     let now = Date()
     for dto in dtos { upsert(dto, syncedAt: now) }
     do {
+      // Flush inserts BEFORE the predicate-based batch delete. SwiftData's
+      // `context.delete(model:where:)` evaluates against the persistent
+      // store, not unsaved context state — so freshly-inserted rows still
+      // have lastSyncedAt at the @Model default (.distantPast) from the
+      // delete's POV and would get wiped. Save first; then prune is safe.
+      try context.save()
       try context.delete(model: AreaEntity.self,
                          where: #Predicate { $0.lastSyncedAt < now })
       try context.save()
@@ -507,6 +636,7 @@ final class Syncer {
     let now = Date()
     for dto in dtos { upsert(dto, syncedAt: now) }
     do {
+      try context.save()
       try context.delete(model: ProjectEntity.self,
                          where: #Predicate { $0.lastSyncedAt < now })
       try context.save()

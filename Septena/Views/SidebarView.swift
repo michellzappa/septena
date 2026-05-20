@@ -35,6 +35,8 @@ struct SidebarRootView: View {
   @Environment(SeptenaClient.self) private var client
   @Environment(NavigationState.self) private var nav
   @Environment(SectionTheme.self) private var theme
+  @Environment(AreasMutator.self) private var areasMutator
+  @Environment(ProjectsMutator.self) private var projectsMutator
   @Environment(\.modelContext) private var modelContext
 
   @State private var areas: [Area]
@@ -134,7 +136,7 @@ struct SidebarRootView: View {
     Haptics.tick()
     Task {
       do {
-        _ = try await client.updateProject(id: project.id, title: trimmed)
+        try await projectsMutator.rename(id: project.id, to: trimmed)
         await load()
       } catch {
         errorMessage = error.localizedDescription
@@ -146,13 +148,9 @@ struct SidebarRootView: View {
     let trimmed = raw.trimmingCharacters(in: .whitespaces)
     guard !trimmed.isEmpty, trimmed != area.title else { return }
     Haptics.tick()
-    var next = areas
-    if let idx = next.firstIndex(where: { $0.id == area.id }) {
-      next[idx].title = trimmed
-    }
     Task {
       do {
-        areas = try await client.replaceAreas(next)
+        try await areasMutator.rename(id: area.id, to: trimmed)
         await load()
       } catch {
         errorMessage = error.localizedDescription
@@ -169,7 +167,7 @@ struct SidebarRootView: View {
     }
     Task {
       do {
-        try await client.deleteProject(id: project.id)
+        try await projectsMutator.delete(id: project.id)
         await load()
       } catch {
         errorMessage = error.localizedDescription
@@ -182,10 +180,9 @@ struct SidebarRootView: View {
     if case .area(let a) = nav.path.last, a.id == area.id {
       nav.path = [.filter(.today)]
     }
-    let next = areas.filter { $0.id != area.id }
     Task {
       do {
-        areas = try await client.replaceAreas(next)
+        try await areasMutator.delete(id: area.id)
         await load()
       } catch {
         errorMessage = error.localizedDescription
@@ -224,6 +221,21 @@ struct SidebarRootView: View {
     .toolbar {
       ToolbarItem(placement: .navigation) {
         Menu {
+          // Capture actions live alongside Settings in the "…" menu so
+          // the iOS sidebar matches what macOS gets in its dedicated `+`
+          // toolbar button. Sheets are mounted by `SidebarSheets`.
+          Button {
+            showingNewArea = true
+            newAreaName = ""
+          } label: {
+            Label("New Area", systemImage: "square.stack.3d.up")
+          }
+          Button {
+            showingNewProject = true
+          } label: {
+            Label("New Project", systemImage: "number")
+          }
+          Divider()
           Button {
             nav.showSettings = true
           } label: {
@@ -344,7 +356,7 @@ struct SidebarRootView: View {
     guard !t.isEmpty else { return }
     Task {
       do {
-        _ = try await client.createProject(title: t, area: areaId)
+        _ = try await projectsMutator.create(title: t, area: areaId)
         await load()
       } catch {
         errorMessage = error.localizedDescription
@@ -356,14 +368,9 @@ struct SidebarRootView: View {
     let name = newAreaName.trimmingCharacters(in: .whitespaces)
     newAreaName = ""
     guard !name.isEmpty else { return }
-    let id = name.lowercased()
-      .components(separatedBy: CharacterSet.alphanumerics.inverted)
-      .joined(separator: "-")
-      .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
-    let next = areas + [Area(id: id, title: name, context: nil)]
     Task {
       do {
-        areas = try await client.replaceAreas(next)
+        _ = try await areasMutator.create(title: name)
         await load()
       } catch {
         errorMessage = error.localizedDescription
@@ -783,6 +790,11 @@ struct SidebarRootView: View {
     let snapshot = areas
     Haptics.tick()
     areas = next
+    // CloudKit mode: no server-side ordering yet — each AreaRecord is
+    // standalone. The visual reorder sticks until the next load() reads
+    // back alphabetical order from LocalCache. Phase 6+: add a sortIndex
+    // field to AreaRecord if persistent ordering becomes a requirement.
+    guard TasksBackendDefaults.current == .fastAPI else { return }
     Task {
       do {
         areas = try await client.replaceAreas(next)
@@ -856,6 +868,8 @@ struct SidebarRootView: View {
     let snapshot = projects
     Haptics.tick()
     projects = next
+    // CloudKit mode: ordering isn't persisted — same note as commitAreaOrder.
+    guard TasksBackendDefaults.current == .fastAPI else { return }
     Task {
       do {
         projects = try await client.replaceProjects(next)
@@ -884,17 +898,25 @@ struct SidebarRootView: View {
     let cachedTasks = LocalCache.allTasks(in: modelContext)
     if !cachedTasks.isEmpty { apply(aggregate: Self.aggregate(tasks: cachedTasks)) }
     do {
-      async let a = client.areas()
-      async let p = client.projects()
-      async let c = client.counts()
-      async let all = client.list(view: "all")
-      areas = try await a
-      projects = try await p
+      // In CloudKit mode the local cache is authoritative — CKSyncEngine
+      // keeps SwiftData fresh. In FastAPI mode we pull from the server
+      // and fold the response into SwiftData via Syncer.
+      let isCK = TasksBackendDefaults.current == .cloudKit
+      async let c = TaskReads.counts(client: client, context: modelContext)
+      async let all = TaskReads.list(view: "all", client: client, context: modelContext)
+      if isCK {
+        areas = LocalCache.areas(in: modelContext)
+        projects = LocalCache.projects(in: modelContext)
+      } else {
+        async let a = client.areas()
+        async let p = client.projects()
+        areas = try await a
+        projects = try await p
+        let syncer = Syncer(client: client, context: modelContext)
+        syncer.applyAreas(areas)
+        syncer.applyProjects(projects)
+      }
       let serverCounts = try await c
-
-      let syncer = Syncer(client: client, context: modelContext)
-      syncer.applyAreas(areas)
-      syncer.applyProjects(projects)
       // 'Next' is the chores / habits / supplements ritual. The server
       // does the merge + filter via /api/next/items; we just count.
       if let next = try? await client.nextItems(date: SeptenaDate.today) {
@@ -904,11 +926,21 @@ struct SidebarRootView: View {
       }
 
       let items = try await all.items
-      syncer.applyTasks(items, scope: .all)
+      // In FastAPI mode, fold the server's view=all into SwiftData so
+      // the next cold paint renders from cache. In CloudKit mode the
+      // items already came from LocalCache, so the fold-back is a
+      // no-op — skip it.
+      if !isCK {
+        // `.filter` scope upserts but never prunes (the server's
+        // view=all is open-only and would mass-delete done/cancelled).
+        Syncer(client: client, context: modelContext)
+          .applyTasks(items, scope: .filter(.upcoming))
+      }
       var agg = Self.aggregate(tasks: items)
-      // /api/tasks/counts is authoritative for smart-list buckets; keep the
-      // local aggregate's per-project / per-area roll-ups (not exposed by
-      // the counts endpoint).
+      // Per-smart-list counts come from the authoritative source: the
+      // server in FastAPI mode, LocalCache in CK mode (TaskReads.counts
+      // handles the routing). Per-project / per-area roll-ups stay from
+      // the local aggregate (not exposed by the counts endpoint).
       agg.counts = serverCounts
       apply(aggregate: agg)
     } catch {
@@ -940,9 +972,9 @@ struct SidebarRootView: View {
       if t.status == .open { open += 1 }
       if let pid = t.project {
         switch t.status {
-        case .done:      done[pid, default: 0] += 1; total[pid, default: 0] += 1
-        case .open:      total[pid, default: 0] += 1; projOpen[pid, default: 0] += 1
-        case .cancelled: break
+        case .done:                 done[pid, default: 0] += 1; total[pid, default: 0] += 1
+        case .open:                 total[pid, default: 0] += 1; projOpen[pid, default: 0] += 1
+        case .cancelled, .someday:  break
         }
       } else if let aid = t.area, t.status == .open {
         areaDirectOpen[aid, default: 0] += 1

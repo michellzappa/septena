@@ -1,0 +1,369 @@
+import Foundation
+import CloudKit
+import OSLog
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+
+// CKEngine — Phase 0 scaffolding.
+//
+// Owns the `CKSyncEngine` for the Septena CloudKit container. Nothing in
+// the app instantiates this yet; the FastAPI/Outbox path remains live.
+// Phase 1 will:
+//   1. Construct one of these from `App.swift` on launch.
+//   2. Have `TaskMutator` call `noteTaskChange(id:)` after each write.
+//   3. Fill in the `recordProvider` and `applyFetched(...)` paths so
+//      incoming records fold into the SwiftData mirror.
+//
+// The shape mirrors the Apple sample (CloudKitSyncEngine, WWDC23) so the
+// gap between "Phase 0 skeleton" and "Phase 1 production" stays narrow.
+
+// MARK: - Constants
+
+/// Single source of truth for container / zone identifiers. Both are
+/// effectively immutable post-Production deploy — re-publishing schema
+/// to a new zone or container forces a migration we don't want.
+enum SeptenaCloudKit {
+static let containerIdentifier = "iCloud.com.septena.cloud"
+
+  /// Custom zone name. CKSyncEngine requires a custom zone — the default
+  /// zone has no per-zone change-tracking. The `-v1` suffix lets us cut
+  /// over to a fresh zone if a schema-incompatible pivot is ever needed
+  /// rather than mutate this one.
+static let zoneName = "septena-v1"
+
+static var zoneID: CKRecordZone.ID {
+    CKRecordZone.ID(zoneName: zoneName, ownerName: CKCurrentUserDefaultName)
+  }
+}
+
+// MARK: - CKEngine
+
+@MainActor
+@Observable
+final class CKEngine {
+  private let logger = Logger(subsystem: "com.septena.cloud", category: "CKEngine")
+  /// Exposed read-only so DEBUG diagnostics can query userRecordID — both
+  /// devices must report the same one or they're hitting different
+  /// private databases entirely.
+  let container: CKContainer
+  private let database: CKDatabase
+
+  /// Set on `start()`. Nil until Phase 1 wires the boot call in App.swift.
+  private var engine: CKSyncEngine?
+
+  /// Plug-in points. The engine calls these to (a) materialize a CKRecord
+  /// for upload from the local mirror, (b) fold a downloaded record into
+  /// the mirror, (c) erase a deleted record locally. Held as closures
+  /// rather than a delegate protocol so the engine stays agnostic of
+  /// SwiftData / TaskEntity, keeping this file in SeptenaCore without a
+  /// forward import on the higher layer.
+  ///
+  /// The single-closure shape covers all three record types (Task, Area,
+  /// Project): App.swift dispatches by `record.recordType` for fetched
+  /// events and tries each entity type in order in the provider. The
+  /// deleted closure gets the recordType as a second argument because
+  /// the local mirror no longer holds the row by the time we'd need to
+  /// look it up.
+var recordProvider: ((CKRecord.ID) -> CKRecord?)?
+var applyFetchedRecord: ((CKRecord) -> Void)?
+var applyDeletedRecord: ((CKRecord.ID, CKRecord.RecordType) -> Void)?
+  /// Called once after every batch of fetched/sent record events is
+  /// drained, so the host can perform a single `context.save()` and
+  /// post one repaint notification instead of N. During a 553-row
+  /// migrate the per-record save-and-notify path was taking 60+ sec
+  /// of main-actor work; the batched version is sub-second.
+var applyDidFinishBatch: (() -> Void)?
+
+  /// Current iCloud account status. Refreshed on init, when the system
+  /// posts `.CKAccountChanged`, and any time `refreshAccountStatus()` is
+  /// called explicitly (e.g. on scenePhase active). Observable so views
+  /// can disable migration / show a banner without polling.
+var accountStatus: CKAccountStatus = .couldNotDetermine
+
+init() {
+    self.container = CKContainer(identifier: SeptenaCloudKit.containerIdentifier)
+    self.database = container.privateCloudDatabase
+    // The CKAccountChanged notification fires on an arbitrary thread, so
+    // bounce back to MainActor before touching `self`.
+    NotificationCenter.default.addObserver(
+      forName: .CKAccountChanged, object: nil, queue: nil
+    ) { [weak self] _ in
+      Task { @MainActor in await self?.refreshAccountStatus() }
+    }
+    Task { await refreshAccountStatus() }
+  }
+
+  /// Re-query the container for the user's iCloud status. Cheap; safe
+  /// to call on every foreground transition.
+  func refreshAccountStatus() async {
+    do {
+      let status = try await container.accountStatus()
+      if status != accountStatus {
+        logger.info("CKEngine account status: \(String(describing: status), privacy: .public)")
+      }
+      accountStatus = status
+    } catch {
+      logger.error("accountStatus query failed: \(error.localizedDescription, privacy: .public)")
+      accountStatus = .couldNotDetermine
+    }
+  }
+
+  /// Boots the sync engine. Idempotent — safe to call repeatedly. No-op
+  /// when called pre-Phase-1 (CKSyncEngine creation hits the network for
+  /// account status; we don't want to pay that cost until we're ready
+  /// to actually sync).
+func start() {
+    guard engine == nil else { return }
+    let configuration = CKSyncEngine.Configuration(
+      database: database,
+      stateSerialization: loadStateSerialization(),
+      delegate: self
+    )
+    let engine = CKSyncEngine(configuration)
+    self.engine = engine
+    // Ensure the custom zone exists before any record-save fires.
+    // CKSyncEngine doesn't auto-create zones from referenced recordIDs
+    // — without this every saveRecord returns "Zone Not Found" (CKError
+    // 2036). Idempotent: if the zone is already on the server, the
+    // engine treats the pending change as a no-op and drops it.
+    let zone = CKRecordZone(zoneID: SeptenaCloudKit.zoneID)
+    engine.state.add(pendingDatabaseChanges: [.saveZone(zone)])
+    logger.info("CKEngine started: container=\(SeptenaCloudKit.containerIdentifier, privacy: .public) zone=\(SeptenaCloudKit.zoneName, privacy: .public)")
+    // Register for silent CK pushes so cross-device updates land in
+    // sub-second rather than waiting for the engine's periodic refresh.
+    // CKSyncEngine auto-creates its database subscription on first
+    // sync; all we need here is the OS-level push token registration.
+    registerForRemoteNotifications()
+  }
+
+  private func registerForRemoteNotifications() {
+    #if canImport(UIKit)
+    UIApplication.shared.registerForRemoteNotifications()
+    #elseif canImport(AppKit)
+    NSApplication.shared.registerForRemoteNotifications()
+    #endif
+  }
+
+  /// Forward a silent push payload from the app delegate. CKSyncEngine
+  /// translates the CKNotification into a fetch operation. Returns
+  /// `true` if the payload was a CK notification we handled.
+  @discardableResult
+  func handleRemoteNotification(_ userInfo: [AnyHashable: Any]) async -> Bool {
+    guard let engine else { return false }
+    guard let notification = CKNotification(fromRemoteNotificationDictionary: userInfo) else {
+      return false
+    }
+    // The notification just tells us "something changed for this
+    // subscription" — the engine knows what's new from its tokens.
+    _ = notification
+    try? await engine.fetchChanges()
+    return true
+  }
+
+  /// Tells the engine "this task changed locally"; the engine batches and
+  /// uploads on the next drain. Safe before `start()` — calls are dropped.
+func noteTaskChange(id: String) { noteChange(recordName: id, kind: "task") }
+func noteTaskDeletion(id: String) { noteDeletion(recordName: id, kind: "task") }
+
+  // Area / Project pendants. CK doesn't distinguish by record type at the
+  // engine layer — a pending save is a pending save — but logging the
+  // kind helps when reading [CKEngine] traces post-mortem.
+func noteAreaChange(id: String) { noteChange(recordName: id, kind: "area") }
+func noteAreaDeletion(id: String) { noteDeletion(recordName: id, kind: "area") }
+func noteProjectChange(id: String) { noteChange(recordName: id, kind: "project") }
+func noteProjectDeletion(id: String) { noteDeletion(recordName: id, kind: "project") }
+
+  private func noteChange(recordName: String, kind: String) {
+    guard let engine else {
+      SeptenaLog.info("[CKEngine] note\(kind.capitalized)Change id=\(recordName) DROPPED (engine not started)")
+      return
+    }
+    let recordID = CKRecord.ID(recordName: recordName, zoneID: SeptenaCloudKit.zoneID)
+    engine.state.add(pendingRecordZoneChanges: [.saveRecord(recordID)])
+    SeptenaLog.info("[CKEngine] note\(kind.capitalized)Change id=\(recordName) pending=\(engine.state.pendingRecordZoneChanges.count)")
+  }
+
+  private func noteDeletion(recordName: String, kind: String) {
+    guard let engine else {
+      SeptenaLog.info("[CKEngine] note\(kind.capitalized)Deletion id=\(recordName) DROPPED (engine not started)")
+      return
+    }
+    let recordID = CKRecord.ID(recordName: recordName, zoneID: SeptenaCloudKit.zoneID)
+    engine.state.add(pendingRecordZoneChanges: [.deleteRecord(recordID)])
+    SeptenaLog.info("[CKEngine] note\(kind.capitalized)Deletion id=\(recordName) pending=\(engine.state.pendingRecordZoneChanges.count)")
+  }
+
+  /// Count of writes the engine has accepted but not yet sent to CloudKit.
+  /// Non-zero before sendChanges drains; useful in diagnostics to see if a
+  /// device has un-pushed local mutations.
+  var pendingRecordZoneChangesCount: Int {
+    engine?.state.pendingRecordZoneChanges.count ?? 0
+  }
+
+  /// Count of pending database-level operations (zone saves / deletes).
+  /// Usually 0 in steady state.
+  var pendingDatabaseChangesCount: Int {
+    engine?.state.pendingDatabaseChanges.count ?? 0
+  }
+
+  /// Force-flush all pending record-zone changes to CloudKit. Awaits
+  /// completion. Used by `TasksMigrator` so the migration step blocks
+  /// on actual server delivery rather than firing-and-hoping.
+  func sendChanges() async throws {
+    guard let engine else { return }
+    try await engine.sendChanges()
+  }
+
+  /// Pull any server-side changes the engine hasn't seen yet. Awaits
+  /// completion. Migration uses this to verify the push round-tripped.
+  func fetchChanges() async throws {
+    guard let engine else { return }
+    try await engine.fetchChanges()
+  }
+
+  /// Nuclear option for dev: delete the custom zone on the server,
+  /// then recreate it. Use when local SwiftData has been wiped /
+  /// rebuilt and `cloudKitSystemFields` is missing across the board —
+  /// without those tags every save into the existing CK records gets
+  /// rejected with `serverRecordChanged`. After the reset, run Migrate
+  /// to push local state fresh; new records will be stamped with tags
+  /// the next applyFetchedRecord captures.
+  ///
+  /// Important: this bypasses CKSyncEngine for the delete. Routing
+  /// `.deleteZone` through the engine causes it to emit a
+  /// `fetchedRecordZoneChanges` deletion event for every record that
+  /// was in the zone, which our `applyDeletedRecord` closure interprets
+  /// as a user deletion and wipes from SwiftData — a 500-row cascade
+  /// the user definitely didn't ask for. Direct `CKDatabase` API +
+  /// engine-state file reset gives us a clean server slate without
+  /// touching local state.
+  func resetZone() async throws {
+    let zoneID = SeptenaCloudKit.zoneID
+    SeptenaLog.info("[CKEngine] resetZone: deleting \(zoneID.zoneName) via CKDatabase")
+    applyingResetCascade = true
+    defer { applyingResetCascade = false }
+    do {
+      _ = try await database.deleteRecordZone(withID: zoneID)
+    } catch let error as CKError where error.code == .zoneNotFound {
+      // Already gone — treat as success and move on to recreation.
+      SeptenaLog.info("[CKEngine] resetZone: zone already absent")
+    }
+    // Throw away the engine and its persisted state. The state file
+    // remembers tokens and pending changes for the old zone; with the
+    // zone gone, none of it is meaningful anymore. A fresh engine
+    // starts with no preconceptions and rebuilds from scratch.
+    engine = nil
+    try? FileManager.default.removeItem(at: stateURL)
+    SeptenaLog.info("[CKEngine] resetZone: engine state cleared, restarting")
+    start()
+    let zone = CKRecordZone(zoneID: zoneID)
+    engine?.state.add(pendingDatabaseChanges: [.saveZone(zone)])
+    try await engine?.sendChanges()
+    SeptenaLog.info("[CKEngine] resetZone: zone recreated")
+  }
+
+  /// True while `resetZone` is in flight. Belt-and-suspenders: even if
+  /// the engine somehow emits deletion events during a reset, the
+  /// delegate handler can check this flag and skip the cascade.
+  private var applyingResetCascade = false
+
+  // MARK: - State persistence
+
+  /// CKSyncEngine expects us to persist `State.Serialization` between
+  /// launches — it includes pending operations and zone change tokens
+  /// so the next launch resumes instead of re-fetching the world.
+  private var stateURL: URL {
+    let base = (try? FileManager.default.url(
+      for: .applicationSupportDirectory, in: .userDomainMask,
+      appropriateFor: nil, create: true
+    )) ?? URL(fileURLWithPath: NSTemporaryDirectory())
+    return base.appendingPathComponent("CKEngineState.json")
+  }
+
+  private func loadStateSerialization() -> CKSyncEngine.State.Serialization? {
+    guard let data = try? Data(contentsOf: stateURL) else { return nil }
+    return try? JSONDecoder().decode(CKSyncEngine.State.Serialization.self, from: data)
+  }
+
+  private func persistStateSerialization(_ state: CKSyncEngine.State.Serialization) {
+    guard let data = try? JSONEncoder().encode(state) else { return }
+    try? data.write(to: stateURL, options: .atomic)
+  }
+}
+
+// MARK: - CKSyncEngineDelegate
+
+extension CKEngine: CKSyncEngineDelegate {
+func handleEvent(
+    _ event: CKSyncEngine.Event,
+    syncEngine: CKSyncEngine
+  ) async {
+    switch event {
+    case .stateUpdate(let update):
+      persistStateSerialization(update.stateSerialization)
+
+    case .accountChange(let change):
+      // Phase 1: react to sign-in / sign-out / switched-account. On
+      // signOut we wipe the local mirror; on signIn we re-upload.
+      logger.info("CKEngine accountChange: \(String(describing: change), privacy: .public)")
+
+    case .fetchedRecordZoneChanges(let changes):
+      SeptenaLog.info("[CKEngine] fetched: +\(changes.modifications.count) ~ -\(changes.deletions.count) reset=\(applyingResetCascade)")
+      for mod in changes.modifications {
+        applyFetchedRecord?(mod.record)
+      }
+      for del in changes.deletions {
+        if applyingResetCascade {
+          SeptenaLog.info("[CKEngine] fetched.delete IGNORED (reset) id=\(del.recordID.recordName)")
+          continue
+        }
+        applyDeletedRecord?(del.recordID, del.recordType)
+      }
+      applyDidFinishBatch?()
+
+    case .sentRecordZoneChanges(let sent):
+      // `savedRecords` are the records the server accepted and stamped
+      // with a fresh recordChangeTag. We MUST fold them back into local
+      // state to capture system fields — otherwise the next edit has
+      // no tag to send and the server returns serverRecordChanged.
+      // CKSyncEngine's `fetchChanges` won't redeliver them (the engine
+      // already knows about them), so this is the only path that
+      // updates `cloudKitSystemFields` post-send.
+      SeptenaLog.info("[CKEngine] sent: saves=\(sent.savedRecords.count) deletes=\(sent.deletedRecordIDs.count) failedSaves=\(sent.failedRecordSaves.count) failedDeletes=\(sent.failedRecordDeletes.count)")
+      for save in sent.savedRecords {
+        applyFetchedRecord?(save)
+      }
+      for fail in sent.failedRecordSaves {
+        SeptenaLog.error("[CKEngine] sent.save FAIL id=\(fail.record.recordID.recordName) error=\(fail.error.localizedDescription)")
+      }
+      for (recordID, error) in sent.failedRecordDeletes {
+        SeptenaLog.error("[CKEngine] sent.delete FAIL id=\(recordID.recordName) error=\(error.localizedDescription)")
+      }
+      applyDidFinishBatch?()
+
+    case .fetchedDatabaseChanges, .sentDatabaseChanges,
+         .willFetchChanges, .didFetchChanges,
+         .willFetchRecordZoneChanges, .didFetchRecordZoneChanges,
+         .willSendChanges, .didSendChanges:
+      break
+
+    @unknown default:
+      break
+    }
+  }
+
+func nextRecordZoneChangeBatch(
+    _ context: CKSyncEngine.SendChangesContext,
+    syncEngine: CKSyncEngine
+  ) async -> CKSyncEngine.RecordZoneChangeBatch? {
+    let pending = syncEngine.state.pendingRecordZoneChanges
+      .filter { context.options.scope.contains($0) }
+    guard !pending.isEmpty else { return nil }
+    return await CKSyncEngine.RecordZoneChangeBatch(pendingChanges: pending) { [recordProvider] recordID in
+      recordProvider?(recordID)
+    }
+  }
+}

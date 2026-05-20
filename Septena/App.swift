@@ -21,11 +21,31 @@ struct SeptenaApp: App {
   /// re-render on midnight rollover and on each minute tick uniformly.
   @State private var dayClock = DayClock()
   private let localStore = LocalStore.shared
+  /// CloudKit sync engine. Held even when the backend flag is FastAPI
+  /// — `start()` is the gate, not construction; building one is cheap
+  /// and lets the SwiftData closures bind once at launch instead of
+  /// after a flag flip. Phase 1: dev-environment only.
+  @State private var ckEngine: CKEngine = CKEngine()
   /// Owns the task write-path: applies optimistic SwiftData changes,
-  /// enqueues OutboxEntity rows, and drains them to FastAPI with retry.
+  /// then either enqueues OutboxEntity rows (FastAPI) or hands off to
+  /// CKSyncEngine (CloudKit), chosen per `TasksBackendDefaults.current`.
   /// Views call this instead of `SeptenaClient.*` for any task mutation
   /// so the UI never blocks on the network.
   @State private var taskMutator: TaskMutator = TaskMutator(
+    client: ClientProvider.shared.client,
+    context: LocalStore.shared.container.mainContext,
+    ckEngine: nil   // bound below in .task — needs the @State to be live first
+  )
+  /// Same router pattern as `taskMutator`, scoped to area mutations
+  /// (create / rename / delete / set-context). Views call this instead
+  /// of `SeptenaClient.replaceAreas(...)` so the CloudKit path can fire
+  /// without round-tripping FastAPI.
+  @State private var areasMutator: AreasMutator = AreasMutator(
+    client: ClientProvider.shared.client,
+    context: LocalStore.shared.container.mainContext
+  )
+  /// Same router pattern as `taskMutator`, scoped to project mutations.
+  @State private var projectsMutator: ProjectsMutator = ProjectsMutator(
     client: ClientProvider.shared.client,
     context: LocalStore.shared.container.mainContext
   )
@@ -43,6 +63,9 @@ struct SeptenaApp: App {
   @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
   private let watchBridge = WatchBridge.shared
   #endif
+  #if os(macOS)
+  @NSApplicationDelegateAdaptor(MacAppDelegate.self) private var macAppDelegate
+  #endif
 
   var body: some Scene {
     WindowGroup {
@@ -56,8 +79,11 @@ struct SeptenaApp: App {
         .environment(trainingDraft)
         .environment(settingsStore)
         .environment(taskMutator)
+        .environment(areasMutator)
+        .environment(projectsMutator)
         .environment(httpOutbox)
         .environment(dayClock)
+        .environment(ckEngine)
         .modelContainer(localStore.container)
         .onChange(of: scenePhase) { _, phase in
           // Foreground transitions are the best moment to flush any
@@ -68,6 +94,7 @@ struct SeptenaApp: App {
             dayClock.refreshIfNeeded()
             taskMutator.kickDrain()
             httpOutbox.kickDrain()
+            Task { await ckEngine.refreshAccountStatus() }
           }
         }
         .task {
@@ -79,6 +106,115 @@ struct SeptenaApp: App {
           }
           AppDelegate.navigation = navigation
           #endif
+          // Diagnostic snapshot of the local store at launch. Surfaces
+          // migration corruption / partial-state situations in the
+          // console immediately — no Inspector required.
+          LocalCache.logTaskStateSummary(in: localStore.container.mainContext)
+          // Bind the CloudKit engine to the task mutator and install its
+          // SwiftData seams. The engine itself isn't started until the
+          // user flips `TasksBackendDefaults.current == .cloudKit` — until
+          // then it's a parked object holding closures, doing nothing.
+          let context = localStore.container.mainContext
+          // Single dispatcher for outbound records: try Task, then Project,
+          // then Area. Within a CK zone recordNames are unique, so at most
+          // one entity type holds each id.
+          ckEngine.recordProvider = { recordID in
+            let id = recordID.recordName
+            if let entity = try? context.fetch(FetchDescriptor<TaskEntity>(
+              predicate: #Predicate { $0.id == id }
+            )).first {
+              return entity.toCloudKitRecord()
+            }
+            if let entity = try? context.fetch(FetchDescriptor<ProjectEntity>(
+              predicate: #Predicate { $0.id == id }
+            )).first {
+              return entity.toCloudKitRecord()
+            }
+            if let entity = try? context.fetch(FetchDescriptor<AreaEntity>(
+              predicate: #Predicate { $0.id == id }
+            )).first {
+              return entity.toCloudKitRecord()
+            }
+            return nil
+          }
+          ckEngine.applyFetchedRecord = { record in
+            let id = record.recordID.recordName
+            switch record.recordType {
+            case TaskCloudKitSchema.recordType:
+              if let entity = try? context.fetch(FetchDescriptor<TaskEntity>(
+                predicate: #Predicate { $0.id == id }
+              )).first {
+                entity.apply(record)
+              } else {
+                context.insert(TaskEntity(cloudKit: record))
+              }
+            case ProjectCloudKitSchema.recordType:
+              if let entity = try? context.fetch(FetchDescriptor<ProjectEntity>(
+                predicate: #Predicate { $0.id == id }
+              )).first {
+                entity.apply(record)
+              } else {
+                context.insert(ProjectEntity(cloudKit: record))
+              }
+            case AreaCloudKitSchema.recordType:
+              if let entity = try? context.fetch(FetchDescriptor<AreaEntity>(
+                predicate: #Predicate { $0.id == id }
+              )).first {
+                entity.apply(record)
+              } else {
+                context.insert(AreaEntity(cloudKit: record))
+              }
+            default:
+              SeptenaLog.info("[CKEngine] applyFetched: unknown recordType \(record.recordType) id=\(id)")
+            }
+            // No save / notification here — `applyDidFinishBatch` does
+            // both once per batch.
+          }
+          ckEngine.applyDeletedRecord = { recordID, recordType in
+            let id = recordID.recordName
+            switch recordType {
+            case TaskCloudKitSchema.recordType:
+              if let entity = try? context.fetch(FetchDescriptor<TaskEntity>(
+                predicate: #Predicate { $0.id == id }
+              )).first {
+                context.delete(entity)
+              }
+            case ProjectCloudKitSchema.recordType:
+              if let entity = try? context.fetch(FetchDescriptor<ProjectEntity>(
+                predicate: #Predicate { $0.id == id }
+              )).first {
+                context.delete(entity)
+              }
+            case AreaCloudKitSchema.recordType:
+              if let entity = try? context.fetch(FetchDescriptor<AreaEntity>(
+                predicate: #Predicate { $0.id == id }
+              )).first {
+                context.delete(entity)
+              }
+            default:
+              SeptenaLog.info("[CKEngine] applyDeleted: unknown recordType \(recordType) id=\(id)")
+            }
+          }
+          ckEngine.applyDidFinishBatch = {
+            try? context.save()
+            NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+          }
+          taskMutator.bind(ckEngine: ckEngine)
+          areasMutator.bind(ckEngine: ckEngine)
+          projectsMutator.bind(ckEngine: ckEngine)
+          // Stash the engine on the platform's app delegate so silent
+          // remote-notification callbacks (which aren't part of any
+          // SwiftUI view hierarchy) can hand the push payload back to
+          // the engine for a fetch.
+          #if os(iOS)
+          AppDelegate.ckEngine = ckEngine
+          #endif
+          #if os(macOS)
+          MacAppDelegate.ckEngine = ckEngine
+          #endif
+          if TasksBackendDefaults.current == .cloudKit {
+            ckEngine.start()
+          }
           // Two-phase load for tile order + section colors. Disk reads
           // are synchronous so the dashboard renders with the user's
           // ordering and palette on the first frame; the network refresh
@@ -87,13 +223,51 @@ struct SeptenaApp: App {
           settingsStore.paintFromCache()
           await theme.refresh(from: clientProvider.client)
           await settingsStore.refresh(from: clientProvider.client)
-          let syncer = Syncer(client: clientProvider.client,
-                              context: localStore.container.mainContext)
-          await syncer.pullAll()
+          // FastAPI pull-everything is only safe on the FastAPI backend.
+          // In CloudKit mode the server snapshot is older than what
+          // CKSyncEngine is mirroring locally; running pullAll() would
+          // overwrite live CK state with whatever was on FastAPI at the
+          // last migration. Instead, ask the engine to pull from CK.
+          if TasksBackendDefaults.current == .cloudKit {
+            try? await ckEngine.fetchChanges()
+            // Backstop for users who flipped to CloudKit before Phase 5b
+            // (areas/projects were FastAPI-only at the time, so the local
+            // SwiftData mirror has none). If both tables are empty AND
+            // FastAPI is reachable, pull once and fold in. After they
+            // re-run Migrate to iCloud, the engine's applyFetchedRecord
+            // keeps the mirror in sync from CK and this branch sleeps.
+            let context = localStore.container.mainContext
+            let areaCount = (try? context.fetchCount(FetchDescriptor<AreaEntity>())) ?? 0
+            let projectCount = (try? context.fetchCount(FetchDescriptor<ProjectEntity>())) ?? 0
+            SeptenaLog.info("[Hydrate] CK mode launch: areas=\(areaCount) projects=\(projectCount)")
+            // Backstop for users who flipped to CloudKit before Phase 5b
+            // pushed areas/projects to CK. If either table is empty,
+            // pull from FastAPI once and fold in. After they re-run
+            // Migrate to iCloud, the engine's applyFetchedRecord keeps
+            // the mirror in sync from CK and this branch is a no-op.
+            if areaCount == 0 || projectCount == 0 {
+              SeptenaLog.info("[Hydrate] mirror gap — pulling from FastAPI as one-shot")
+              if let areas = try? await clientProvider.client.areas(),
+                 let projects = try? await clientProvider.client.projects() {
+                let syncer = Syncer(client: clientProvider.client, context: context)
+                syncer.applyAreas(areas)
+                syncer.applyProjects(projects)
+                NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+                SeptenaLog.info("[Hydrate] seeded \(areas.count) areas, \(projects.count) projects from FastAPI — run Migrate to push to CloudKit")
+              } else {
+                SeptenaLog.info("[Hydrate] FastAPI pull failed — sidebar will be empty for areas/projects until reachable")
+              }
+            }
+          } else {
+            let syncer = Syncer(client: clientProvider.client,
+                                context: localStore.container.mainContext)
+            await syncer.pullAll()
+          }
           // Flush anything that was queued in a prior session (e.g. the
           // app was killed mid-drain). Safe to call before/after pullAll
           // since the mutator's pendingSync flag protects rows during
-          // upsert, and the drainer is idempotent.
+          // upsert, and the drainer is idempotent. In CK mode kickDrain
+          // is a no-op (the outbox is empty), so we skip the route check.
           taskMutator.kickDrain()
           httpOutbox.kickDrain()
           BadgeManager.shared.start(context: localStore.container.mainContext)
@@ -233,6 +407,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
   /// Set by SeptenaApp once NavigationState is alive — lets warm-launch
   /// shortcut events publish directly without a stash.
   static weak var navigation: NavigationState?
+  /// Set by SeptenaApp once the CloudKit engine exists. Silent CK pushes
+  /// route through here to `engine.handleRemoteNotification`. Weak so
+  /// app teardown doesn't leak.
+  static weak var ckEngine: CKEngine?
 
   static func consumePendingShortcut() -> ShortcutAction? {
     defer { pending = nil }
@@ -268,6 +446,33 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
       Self.pending = action
     }
     completionHandler(true)
+  }
+
+  /// Silent CK pushes arrive here. CKSyncEngine's database subscription
+  /// triggers a content-available push when another device writes; we
+  /// hand the payload to the engine which translates it into a fetch.
+  func application(
+    _ application: UIApplication,
+    didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+    fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+  ) {
+    Task { @MainActor in
+      let handled = await Self.ckEngine?.handleRemoteNotification(userInfo) ?? false
+      completionHandler(handled ? .newData : .noData)
+    }
+  }
+}
+#endif
+
+#if os(macOS)
+final class MacAppDelegate: NSObject, NSApplicationDelegate {
+  static weak var ckEngine: CKEngine?
+
+  func application(_ application: NSApplication,
+                   didReceiveRemoteNotification userInfo: [String: Any]) {
+    Task { @MainActor in
+      await Self.ckEngine?.handleRemoteNotification(userInfo)
+    }
   }
 }
 #endif
@@ -461,7 +666,11 @@ private final class MenuBarTodayLoader {
 
   func refresh() async {
     do {
-      let resp = try await ClientProvider.shared.client.list(view: "today")
+      let resp = try await TaskReads.list(
+        view: "today",
+        client: ClientProvider.shared.client,
+        context: LocalStore.shared.container.mainContext
+      )
       // Mirror the Today screen: pinned-today (`items`) plus scheduled/due
       // rolling in (`review`). Completed-today rows live in `done` and stay
       // out of the menu bar.

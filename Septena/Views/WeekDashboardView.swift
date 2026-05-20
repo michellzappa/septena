@@ -295,9 +295,12 @@ struct WeekDashboardView: View {
     async let car = try? await client.trainingCardioHistory(days: 7)
     async let ents = try? await client.trainingEntries(since: sinceDate(daysBack: 7))
     async let sh = try? await client.supplementsHistory(days: 7)
-    async let tc = try? await client.counts()
+    async let tc = try? await TaskReads.counts(
+      client: client, context: LocalStore.shared.container.mainContext)
     async let th = try? await client.tasksHistory(days: 7)
-    async let tl = try? await client.list(view: "logbook", days: 1)
+    async let tl = try? await TaskReads.list(
+      view: "logbook", days: 1,
+      client: client, context: LocalStore.shared.container.mainContext)
     async let on = try? await client.ouraHistory(days: 7)
     async let nstats = try? await client.nutritionStats(days: 7)
     async let nents = try? await client.nutritionEntries(since: SeptenaDate.today)
@@ -566,9 +569,12 @@ struct WeekDashboardView: View {
         ResponseCache.save(g, forKey: CacheKey.groceries)
       }
     case .tasks:
-      async let tc = try? await client.counts()
+      async let tc = try? await TaskReads.counts(
+        client: client, context: LocalStore.shared.container.mainContext)
       async let th = try? await client.tasksHistory(days: 7)
-      async let tl = try? await client.list(view: "logbook", days: 1)
+      async let tl = try? await TaskReads.list(
+        view: "logbook", days: 1,
+        client: client, context: LocalStore.shared.container.mainContext)
       if let t = await tc {
         taskCounts = t
         ResponseCache.save(t, forKey: CacheKey.taskCounts)

@@ -1,5 +1,7 @@
 import SwiftUI
+import SwiftData
 import EventKit
+import CloudKit
 
 // Settings — the single unified surface for everything user-configurable.
 // One sheet, one store, one entry point (sidebar row + ⌘,).
@@ -600,7 +602,7 @@ struct SectionDetailPane: View {
   @ViewBuilder
   private var tasksConfig: some View {
     Section("Badge") {
-      Toggle("Show overdue count on app icon", isOn: $taskBadge)
+      Toggle("Show overdue indicator on app icon", isOn: $taskBadge)
     }
     Section("Today") {
       Toggle("Show completed tasks in Today", isOn: $todayShowCompleted)
@@ -991,6 +993,18 @@ struct SyncSettingsPane: View {
   @State private var isSyncing = false
 
   @AppStorage(SettingsKey.syncLastSucceeded) private var lastSyncedAt: Double = 0
+  /// Backing storage for the DEBUG-only tasks-backend picker. The
+  /// `TasksBackendDefaults` enum exposes the same key for non-UI reads.
+  @AppStorage(TasksBackendDefaults.key) private var tasksBackendRaw: String = TasksBackendKind.fastAPI.rawValue
+  /// CloudKit engine, injected via environment from App.swift. Used
+  /// only by the DEBUG migration buttons below.
+  @Environment(CKEngine.self) private var ckEngine
+  @State private var migrationStatus: String = ""
+  @State private var isMigrating = false
+  /// Multi-line report from "Diagnose Inbox" — pasted between devices to
+  /// pinpoint where the two SwiftData mirrors disagree.
+  @State private var inboxDiag: String = ""
+  @State private var isDiagnosing = false
 
   var body: some View {
     Form {
@@ -1047,6 +1061,99 @@ struct SyncSettingsPane: View {
       } footer: {
         Text("No auth — Septena is reachable on the tailnet.")
       }
+
+      #if DEBUG
+      // Phase 1 dev toggle: route task mutations through CloudKit
+      // (CKSyncEngine) instead of the FastAPI/Outbox path. Requires a
+      // signed-in iCloud account and a relaunch — the engine binds
+      // its closures once at App.task and only `start()`s on launch
+      // when the flag is already `.cloudKit`.
+      Section {
+        HStack {
+          Image(systemName: accountStatusIcon)
+            .foregroundStyle(accountStatusColor)
+          Text("iCloud: \(accountStatusLabel)")
+          Spacer()
+          Button("Refresh") {
+            Task { await ckEngine.refreshAccountStatus() }
+          }
+          .buttonStyle(.borderless)
+          .controlSize(.small)
+        }
+        Picker("Tasks backend", selection: $tasksBackendRaw) {
+          Text("FastAPI server").tag(TasksBackendKind.fastAPI.rawValue)
+          Text("iCloud (CloudKit)").tag(TasksBackendKind.cloudKit.rawValue)
+        }
+      } header: {
+        Text("CloudKit (dev)")
+      } footer: {
+        Text("Relaunch after switching. CloudKit writes go to the Development environment; the schema auto-creates from your first save.")
+      }
+
+      // Phase 2 migration tooling. Export is non-destructive — safe to
+      // run any time. Migrate writes a snapshot first, then pushes every
+      // local task into CloudKit and verifies the round-trip. On success
+      // the flag flips and the next launch routes writes to CKSyncEngine.
+      Section {
+        Button {
+          runExport()
+        } label: {
+          Label("Export Snapshot…", systemImage: "square.and.arrow.up")
+        }
+        .disabled(isMigrating)
+        Button {
+          Task { await runMigration() }
+        } label: {
+          HStack {
+            if isMigrating { ProgressView().controlSize(.small) }
+            Label("Migrate to iCloud", systemImage: "icloud.and.arrow.up")
+          }
+        }
+        // Block the migration when iCloud isn't ready — pushing into
+        // CloudKit without an account would either silently fail or
+        // create records under a stale identity. Same gate the engine
+        // would hit anyway; we just surface it as disabled UI instead
+        // of a confusing error after the fact.
+        .disabled(isMigrating || ckEngine.accountStatus != .available)
+        Button {
+          runRestoreSnapshot()
+        } label: {
+          Label("Restore Latest Snapshot", systemImage: "arrow.uturn.backward")
+        }
+        .disabled(isMigrating)
+        Button {
+          Task { await runInboxDiagnostic() }
+        } label: {
+          HStack {
+            if isDiagnosing { ProgressView().controlSize(.small) }
+            Label("Diagnose Inbox", systemImage: "stethoscope")
+          }
+        }
+        .disabled(isDiagnosing)
+        Button(role: .destructive) {
+          Task { await runResetZone() }
+        } label: {
+          Label("Reset CloudKit Zone", systemImage: "trash")
+        }
+        .disabled(isMigrating || ckEngine.accountStatus != .available)
+        if !migrationStatus.isEmpty {
+          Text(migrationStatus)
+            .font(.callout)
+            .foregroundStyle(migrationStatus.hasPrefix("✅") ? .green : .red)
+            .textSelection(.enabled)
+        }
+        if !inboxDiag.isEmpty {
+          Text(inboxDiag)
+            .font(.system(.caption, design: .monospaced))
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+      } header: {
+        Text("Migration (dev)")
+      } footer: {
+        Text("Export writes a JSON snapshot (tasks + areas + projects) to Application Support. Migrate exports first, then uploads everything to CloudKit, verifies the count, and flips the backend flag. On any failure the flag is NOT flipped — your data stays as it was.")
+      }
+      #endif
     }
     .formStyle(.grouped)
     .onAppear { serverURL = nav.serverURL }
@@ -1091,6 +1198,257 @@ struct SyncSettingsPane: View {
     let syncer = Syncer(client: client, context: modelContext)
     await syncer.pullAll()
   }
+
+  #if DEBUG
+  private var accountStatusLabel: String {
+    switch ckEngine.accountStatus {
+    case .available:             return "Signed in"
+    case .noAccount:             return "Not signed in"
+    case .restricted:            return "Restricted (parental / MDM)"
+    case .temporarilyUnavailable: return "Temporarily unavailable"
+    case .couldNotDetermine:     return "Status unknown"
+    @unknown default:            return "Unknown"
+    }
+  }
+  private var accountStatusIcon: String {
+    switch ckEngine.accountStatus {
+    case .available: return "checkmark.icloud.fill"
+    case .noAccount, .restricted: return "xmark.icloud.fill"
+    default: return "exclamationmark.icloud.fill"
+    }
+  }
+  private var accountStatusColor: Color {
+    switch ckEngine.accountStatus {
+    case .available: return .green
+    case .noAccount, .restricted: return .red
+    default: return .orange
+    }
+  }
+
+  private func runExport() {
+    let migrator = TasksMigrator(context: modelContext, engine: ckEngine)
+    do {
+      let url = try migrator.exportToJSON(reason: "manual")
+      migrationStatus = "✅ Exported to \(url.path)"
+    } catch {
+      migrationStatus = "❌ Export failed: \(error.localizedDescription)"
+    }
+  }
+
+  /// Delete the entire `septena-v1` zone on CloudKit, then recreate it
+  /// empty. Used when local entities lost their captured system fields
+  /// (e.g. SwiftData was wiped after a migration) — without a clean
+  /// slate every save into the existing records would 409. Also clears
+  /// any stale system fields on local entities so the next migrate
+  /// writes fresh.
+  @MainActor
+  private func runResetZone() async {
+    isMigrating = true
+    defer { isMigrating = false }
+    migrationStatus = "Resetting CloudKit zone…"
+    do {
+      try await ckEngine.resetZone()
+      // Wipe any system-fields blobs on local entities — they referred
+      // to records in the zone we just deleted. Next migrate will
+      // recapture fresh tags via applyFetchedRecord. Covers tasks,
+      // areas, and projects (all three now live in CloudKit).
+      let tasks = (try? modelContext.fetch(FetchDescriptor<TaskEntity>())) ?? []
+      let areas = (try? modelContext.fetch(FetchDescriptor<AreaEntity>())) ?? []
+      let projects = (try? modelContext.fetch(FetchDescriptor<ProjectEntity>())) ?? []
+      for row in tasks { row.cloudKitSystemFields = nil }
+      for row in areas { row.cloudKitSystemFields = nil }
+      for row in projects { row.cloudKitSystemFields = nil }
+      try? modelContext.save()
+      let total = tasks.count + areas.count + projects.count
+      migrationStatus = "✅ Zone reset (\(total) entities cleared). Now run Migrate to push local state fresh."
+    } catch {
+      migrationStatus = "❌ Zone reset failed: \(error.localizedDescription)"
+    }
+  }
+
+  /// Find the most recent snapshot file and re-import. Used to recover
+  /// the SwiftData state if a migration round-trip corrupts local
+  /// entities. Also flips the backend back to FastAPI — the snapshot
+  /// is FastAPI-shape data and CK now has a separate (possibly bad)
+  /// copy that the next CK fetch would overwrite the restore with.
+  private func runRestoreSnapshot() {
+    do {
+      let dir = try TasksMigrator.snapshotsDirectory()
+      let files = (try? FileManager.default
+        .contentsOfDirectory(at: dir, includingPropertiesForKeys: [.fileSizeKey])) ?? []
+      // Pick the snapshot with the most data, not the most recent. The
+      // most recent file may be a tiny post-mishap snapshot; the safest
+      // recovery target is whichever JSON has the largest task array,
+      // and file size is a clean proxy for that.
+      let candidates = files
+        .filter { $0.lastPathComponent.hasSuffix(".json") }
+        .sorted { (a, b) -> Bool in
+          let aSize = (try? a.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+          let bSize = (try? b.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+          return aSize > bSize
+        }
+      guard let url = candidates.first else {
+        migrationStatus = "❌ No snapshot files found"
+        return
+      }
+      let migrator = TasksMigrator(context: modelContext, engine: ckEngine)
+      let n = try migrator.importFromJSON(url: url)
+      tasksBackendRaw = TasksBackendKind.fastAPI.rawValue
+      migrationStatus = "✅ Restored \(n) records from \(url.lastPathComponent). Backend flipped to FastAPI; relaunch to take effect."
+    } catch {
+      migrationStatus = "❌ Restore failed: \(error.localizedDescription)"
+    }
+  }
+
+  @MainActor
+  private func runMigration() async {
+    isMigrating = true
+    defer { isMigrating = false }
+    migrationStatus = "Migrating…"
+    // Pass the client so the migrator can hydrate FastAPI areas/projects
+    // into the local mirror before pushing — without this, a fresh
+    // install with no Syncer pull yet would push zero areas/projects to
+    // CloudKit, then have task.area / task.project links pointing at
+    // records that don't exist.
+    let migrator = TasksMigrator(context: modelContext, engine: ckEngine, client: client)
+    do {
+      let result = try await migrator.migrateToCloudKit()
+      // Flip the flag only after verification succeeds. Caller must
+      // relaunch for App.swift's `.task` block to call `engine.start()`
+      // on the new flag setting — the picker's @AppStorage triggers
+      // an immediate write, the engine itself is already running from
+      // this migration.
+      tasksBackendRaw = TasksBackendKind.cloudKit.rawValue
+      migrationStatus = "✅ Migrated \(result.tasksCount) tasks, \(result.areasCount) areas, \(result.projectsCount) projects. Snapshot: \(result.snapshotURL.lastPathComponent). Relaunch to finish the cutover."
+    } catch {
+      migrationStatus = "❌ \(error.localizedDescription)"
+    }
+  }
+
+  /// Forces a CK fetch, then prints a per-row report of why each task
+  /// is or isn't inbox-eligible. Run on both devices and diff the
+  /// outputs to find the 2 rows that disagree.
+  @MainActor
+  private func runInboxDiagnostic() async {
+    isDiagnosing = true
+    defer { isDiagnosing = false }
+    inboxDiag = "Diagnosing…"
+
+    // 1. Pull the latest from CK first so the local mirror is as
+    //    fresh as possible before we count. If CK is unreachable
+    //    we still continue with whatever the mirror has.
+    var fetchNote = ""
+    do {
+      try await ckEngine.fetchChanges()
+      fetchNote = "fetchChanges OK"
+    } catch {
+      fetchNote = "fetchChanges FAILED: \(error.localizedDescription)"
+    }
+
+    // 2. Walk every TaskEntity once. Inbox criteria mirror
+    //    LocalCache.tasks(filter: .inbox) exactly — keep them in lockstep.
+    let rows = (try? modelContext.fetch(FetchDescriptor<TaskEntity>())) ?? []
+    var inboxRows: [TaskEntity] = []
+    var ghostRows: [TaskEntity] = []
+    var missingCK = 0
+    var excluded: [String: Int] = [:]
+    for e in rows {
+      if e.cloudKitSystemFields == nil { missingCK += 1 }
+      if e.pendingDeletion {
+        ghostRows.append(e)
+        excluded["pendingDeletion", default: 0] += 1
+        continue
+      }
+      if e.status != .open {
+        excluded["status=\(e.statusRaw)", default: 0] += 1
+        continue
+      }
+      if e.today {
+        excluded["today=true", default: 0] += 1
+        continue
+      }
+      if e.project != nil {
+        excluded["hasProject", default: 0] += 1
+        continue
+      }
+      if e.area != nil {
+        excluded["hasArea", default: 0] += 1
+        continue
+      }
+      if e.scheduled != nil {
+        excluded["hasScheduled", default: 0] += 1
+        continue
+      }
+      if e.due != nil {
+        excluded["hasDue", default: 0] += 1
+        continue
+      }
+      inboxRows.append(e)
+    }
+
+    // 3. iCloud identity — both devices must report the same userRecordID
+    //    or they're hitting different private databases entirely.
+    var userID = "unknown"
+    if let id = try? await ckEngine.container.userRecordID() {
+      userID = id.recordName
+    }
+
+    // 4. Pending engine state — non-zero means the engine has writes
+    //    queued that haven't been sent yet (or fetches it hasn't applied).
+    let pendingRecord = ckEngine.pendingRecordZoneChangesCount
+    let pendingDatabase = ckEngine.pendingDatabaseChangesCount
+
+    // 5. Build the report. Sort inbox rows by id for a stable diff
+    //    between devices — sortIndex is local-only and may differ.
+    let sortedInbox = inboxRows.sorted { $0.id < $1.id }
+    let sortedGhosts = ghostRows.sorted { $0.id < $1.id }
+
+    var lines: [String] = []
+    lines.append("== Inbox Diagnostic ==")
+    lines.append("device: \(deviceLabel())")
+    lines.append("iCloudUser: \(userID)")
+    lines.append("backend: \(tasksBackendRaw)")
+    lines.append("fetch: \(fetchNote)")
+    lines.append("pending: record=\(pendingRecord) db=\(pendingDatabase)")
+    lines.append("totals: tasks=\(rows.count) inbox=\(inboxRows.count) ghosts=\(ghostRows.count) missingCKFields=\(missingCK)")
+    if !excluded.isEmpty {
+      let pairs = excluded.sorted { $0.key < $1.key }
+        .map { "\($0.key)=\($0.value)" }
+        .joined(separator: " ")
+      lines.append("excluded: \(pairs)")
+    }
+    lines.append("-- inbox ids --")
+    for e in sortedInbox {
+      let title = e.title.isEmpty ? "(untitled)" : e.title
+      let ck = e.cloudKitSystemFields == nil ? " !noCK" : ""
+      lines.append("• \(e.id)  \(title)\(ck)")
+    }
+    if !sortedGhosts.isEmpty {
+      lines.append("-- pendingDeletion ghosts --")
+      for e in sortedGhosts {
+        let title = e.title.isEmpty ? "(untitled)" : e.title
+        lines.append("• \(e.id)  \(title)")
+      }
+    }
+    let report = lines.joined(separator: "\n")
+    inboxDiag = report
+
+    // Console echo so the user can grep across both devices.
+    for line in lines {
+      SeptenaLog.info("[InboxDiag] \(line)")
+    }
+  }
+
+  private func deviceLabel() -> String {
+    #if os(macOS)
+    return "macOS"
+    #elseif os(iOS)
+    return "iOS"
+    #else
+    return "unknown"
+    #endif
+  }
+  #endif
 }
 
 // MARK: - About

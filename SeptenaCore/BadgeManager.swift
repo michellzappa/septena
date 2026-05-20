@@ -57,15 +57,12 @@ final class BadgeManager {
 
   private func apply(count: Int, enabled: Bool) {
     #if canImport(AppKit)
-    NSApp.dockTile.badgeLabel = count > 0 ? String(count) : nil
+    NSApp.dockTile.badgeLabel = count > 0 ? "•" : nil
     #endif
+    // iOS app-icon badges are numeric only; we'd rather show nothing than a
+    // running count, so the badge stays cleared on UIKit platforms.
     #if canImport(UIKit)
-    if enabled {
-      // Request once; subsequent setBadgeCount calls succeed silently if
-      // the user previously denied (the badge just won't show).
-      UNUserNotificationCenter.current().requestAuthorization(options: [.badge]) { _, _ in }
-    }
-    UNUserNotificationCenter.current().setBadgeCount(count) { _ in }
+    UNUserNotificationCenter.current().setBadgeCount(0) { _ in }
     #endif
   }
 }

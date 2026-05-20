@@ -153,7 +153,10 @@ struct InlineEditTaskRow: View {
           .font(.septenaTaskTitle)
           .focused($focused, equals: .title)
           .submitLabel(.return)
-          .onSubmit { onCommit() }
+          .onSubmit {
+            SeptenaLog.info("[Edit] TextField onSubmit (Enter) title=\"\(title)\"")
+            onCommit()
+          }
           .fixedSize(horizontal: false, vertical: true)
         // Notes — hidden until the user taps "＋ Notes" (or until the
         // task arrives with notes already set). Multi-line on edit,
@@ -220,6 +223,7 @@ struct InlineEditTaskRow: View {
       if autoFocus {
         try? await Task.sleep(for: .milliseconds(50))
         focused = .title
+        SeptenaLog.info("[Edit] InlineEditTaskRow autoFocus claimed title field (title=\"\(title)\")")
       }
     }
     // Save-on-blur safety net: if the row vanishes for any reason (parent
@@ -228,7 +232,12 @@ struct InlineEditTaskRow: View {
     // onCommit is idempotent — its guard returns immediately if the
     // parent has already cleared editingTaskId.
     .onDisappear {
-      if !cancelling { onCommit() }
+      if !cancelling {
+        SeptenaLog.info("[Edit] InlineEditTaskRow onDisappear → onCommit (title=\"\(title)\")")
+        onCommit()
+      } else {
+        SeptenaLog.info("[Edit] InlineEditTaskRow onDisappear (cancelling) — skipping commit")
+      }
     }
     .background(commitShortcut)
     .background(cancelShortcut)
@@ -242,11 +251,14 @@ struct InlineEditTaskRow: View {
     // (intra-row focus shifts go field → field without hitting nil,
     // so the editor stays open while the user moves between
     // title/notes; the commit only triggers when keyboard goes away).
-    .onChange(of: focused) { _, new in
+    .onChange(of: focused) { old, new in
+      SeptenaLog.info("[Edit] focus change \(String(describing: old)) → \(String(describing: new)) title=\"\(title)\"")
       guard new == nil, !cancelling else { return }
       if title.trimmingCharacters(in: .whitespaces).isEmpty {
+        SeptenaLog.info("[Edit] blur with empty title → onCancel")
         onCancel()
       } else {
+        SeptenaLog.info("[Edit] blur with title → onCommit")
         onCommit()
       }
     }

@@ -12,6 +12,10 @@ struct TaskListView: View {
   /// view routes through here instead of `client.*` so the UI never
   /// blocks on the network and offline edits survive an app restart.
   @Environment(TaskMutator.self) private var mutator
+  /// CloudKit engine. Consulted by `load()` when the backend flag is on
+  /// so reads pull from CK + local mirror instead of the (stale) FastAPI
+  /// list endpoint.
+  @Environment(CKEngine.self) private var ckEngine
   @Environment(NavigationState.self) private var nav
   @Environment(SectionTheme.self) private var theme
   @Environment(\.modelContext) private var modelContext
@@ -351,6 +355,7 @@ struct TaskListView: View {
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         Button {
+          SeptenaLog.info("[Create] + button tapped filter=\(String(describing: filter))")
           nav.shouldStartCreating = true
         } label: {
           Image(systemName: "plus")
@@ -490,11 +495,13 @@ struct TaskListView: View {
     // as ⌘N) instead of opening a modal sheet.
     .onChange(of: nav.shouldStartCreating) { _, fire in
       guard fire else { return }
+      SeptenaLog.info("[Create] shouldStartCreating observed → startDraft (via onChange)")
       nav.shouldStartCreating = false
       startDraft()
     }
     .onAppear {
       if nav.shouldStartCreating {
+        SeptenaLog.info("[Create] shouldStartCreating consumed on appear → startDraft")
         nav.shouldStartCreating = false
         startDraft()
       }
@@ -658,6 +665,18 @@ struct TaskListView: View {
     flipStatus(id: id, to: .cancelled)
     sessionDoneIds.insert(id)
     mutator.cancel(id: id)
+  }
+
+  /// Demote to Someday. Optimistically removes the row from the current
+  /// list (it no longer matches any filter except `.someday`) and routes
+  /// the mutation through the mutator. The CK backend persists status +
+  /// clears today/scheduled/due in one round-trip.
+  private func applySomeday(_ id: String) {
+    Haptics.tap()
+    flipStatus(id: id, to: .someday)
+    removeLocally(id: id)
+    mutator.moveToSomeday(id: id)
+    Task { await load() }
   }
 
   private func applyDelete(_ id: String) {
@@ -851,6 +870,15 @@ struct TaskListView: View {
       Label("Repeat…", systemImage: "repeat")
     }
     Divider()
+    // Demote to the Someday holding bay. Hidden when the task is already
+    // there so the menu doesn't show a no-op for the user.
+    if task.status != .someday {
+      Button {
+        applySomeday(task.id)
+      } label: {
+        Label("Move to Someday", systemImage: "moon.stars.fill")
+      }
+    }
     Button {
       applyCancel(task.id)
     } label: {
@@ -1168,13 +1196,15 @@ struct TaskListView: View {
 
   /// Filters applied client-side before rendering:
   /// - `excludeProjectedTasks` keeps the Area page focused on loose work.
-  /// - On Project / Area pages, completed tasks only appear if the user
-  ///   completed them during this view's session.
+  /// - On every bucket that owns a "Show logged" footer, completed tasks
+  ///   are hidden from the main list and surfaced under that footer
+  ///   instead — including just-completed rows, which the optimistic
+  ///   `toggle()` mirrors directly into `loggedItemsStorage`.
   private var visibleItems: [SeptenaTask] {
     var result = items
     if excludeProjectedTasks { result = result.filter { $0.project == nil } }
     if hideHistoricalDone {
-      result = result.filter { $0.status != .done || sessionDoneIds.contains($0.id) }
+      result = result.filter { $0.status != .done }
     }
     // Apply the global sort only on project/area pages — those are the
     // surfaces with no inherent ordering of their own.
@@ -1223,10 +1253,10 @@ struct TaskListView: View {
 
   private var hideHistoricalDone: Bool {
     switch filter {
-    case .project, .area: return true
+    case .project, .area, .unscheduled, .upcoming: return true
     case .today:
       return !todayShowCompleted
-    default:              return false
+    default:                                        return false
     }
   }
 
@@ -1419,9 +1449,13 @@ struct TaskListView: View {
   }
 
   private func commitEdit() {
-    guard let id = editingTaskId else { return }
+    guard let id = editingTaskId else {
+      SeptenaLog.info("[Edit] commitEdit called but editingTaskId=nil — no-op")
+      return
+    }
     let t = editingTitle.trimmingCharacters(in: .whitespaces)
     let wasNew = (newlyCreatedTaskId == id)
+    SeptenaLog.info("[Edit] commitEdit id=\(id) wasNew=\(wasNew) title=\"\(t)\" (raw editingTitle=\"\(editingTitle)\")")
     motion.run(Self.expandSpring) {
       editingTaskId = nil
     }
@@ -1431,11 +1465,21 @@ struct TaskListView: View {
       // otherwise leave it alone (existing tasks shouldn't vanish just
       // because the user blurred while the field was empty).
       if wasNew {
+        SeptenaLog.info("[Edit] commitEdit empty+new → deleting placeholder id=\(id)")
         mutator.delete(id: id)
         removeLocally(id: id)
+      } else {
+        SeptenaLog.info("[Edit] commitEdit empty+existing → leaving alone id=\(id)")
       }
       return
     }
+    SeptenaLog.info("[Edit] commitEdit → mutator.update id=\(id) title=\"\(t)\"")
+    // Patch the in-memory bucket synchronously so the static row re-renders
+    // with the new title in the same frame as editingTaskId clears.
+    // `mutator.update` mutates SwiftData asynchronously and `await load()`
+    // re-pulls into `items` — without this poke the row briefly paints the
+    // placeholder ("New To-Do") between commit and load completion.
+    updateLocally(id: id, title: t, notes: editingNotes)
     mutator.update(id: id, title: t, notes: editingNotes)
     Task { await load() }
   }
@@ -1477,15 +1521,18 @@ struct TaskListView: View {
     // the inline editor opens without a network round-trip.
     //   - empty title → delete (handled in commitEdit / onCancel)
     //   - non-empty → server's placeholder gets replaced via update
+    SeptenaLog.info("[Create] startDraft filter=\(String(describing: filter)) area=\(area ?? "nil") project=\(project ?? "nil") today=\(today)")
     let created = mutator.create(
       title: "New To-Do", area: area, project: project,
       scheduled: scheduled, due: nil, today: today, notes: nil, status: status
     )
+    SeptenaLog.info("[Create] mutator.create returned id=\(created.id)")
     insertLocally(created)
     editingTitle = ""
     editingNotes = ""
     newlyCreatedTaskId = created.id
     motion.run(Self.expandSpring) { editingTaskId = created.id }
+    SeptenaLog.info("[Create] editingTaskId set id=\(created.id) — inline editor opens")
   }
 
   // MARK: - When picker apply
@@ -1533,6 +1580,31 @@ struct TaskListView: View {
     if newStatus == .done { sessionDoneIds.insert(task.id) }
     else                  { sessionDoneIds.remove(task.id) }
 
+    // Keep the "Show logged" footer in sync with the optimistic flip so a
+    // just-completed task drops out of the main list and reappears under
+    // the footer without waiting for the next reload. The reverse path
+    // (uncomplete from the footer) needs to re-seed `items` for any task
+    // that wasn't in the open list to begin with.
+    if showsLoggedSection && loggedFilter == filter {
+      if newStatus == .done {
+        var completed = task
+        completed.status = .done
+        completed.completedAt = ISO8601DateFormatter().string(from: Date())
+        if filterLogged([completed]).first != nil,
+           !loggedItemsStorage.contains(where: { $0.id == completed.id }) {
+          loggedItemsStorage.append(completed)
+        }
+      } else {
+        loggedItemsStorage.removeAll { $0.id == task.id }
+        if !items.contains(where: { $0.id == task.id }) {
+          var reopened = task
+          reopened.status = .open
+          reopened.completedAt = nil
+          items.append(reopened)
+        }
+      }
+    }
+
     if newStatus == .done {
       mutator.complete(id: task.id)
     } else {
@@ -1569,11 +1641,27 @@ struct TaskListView: View {
     items.insert(task, at: 0)
   }
 
+  /// Patch the title/notes of a task in the in-memory buckets so the
+  /// static row re-renders with the new content immediately after commit
+  /// — without waiting for the async `await load()` to repaint from
+  /// LocalCache. Paired with `TaskMutator.update(...)`.
+  private func updateLocally(id: String, title: String, notes: String) {
+    func apply(_ list: inout [SeptenaTask]) {
+      if let i = list.firstIndex(where: { $0.id == id }) {
+        list[i].title = title
+        list[i].notes = notes.isEmpty ? nil : notes
+      }
+    }
+    apply(&items); apply(&review); apply(&doneToday)
+  }
+
   // MARK: - Logged items section
 
-  /// Scope the logbook (which is always global on the server) to the area /
-  /// project the user is currently looking at. On top-level filters we keep
-  /// everything.
+  /// Scope the logbook (which is always global on the server) to the bucket
+  /// the user is currently looking at — project, area, or one of the
+  /// Anytime / Upcoming / Someday piles. Bucket detection for completed
+  /// tasks uses the same field signals the open-task filters use, since the
+  /// scheduled/deadline/today/area/project values survive completion.
   private func filterLogged(_ all: [SeptenaTask]) -> [SeptenaTask] {
     switch filter {
     case .project(let pid):
@@ -1585,6 +1673,14 @@ struct TaskListView: View {
         if let pid = task.project, projectIdsInArea.contains(pid) { return true }
         return false
       }
+    case .unscheduled:
+      return all.filter { $0.scheduled == nil && $0.deadline == nil && !$0.today }
+    case .upcoming:
+      return all.filter { $0.scheduled != nil || $0.deadline != nil }
+    case .someday:
+      // Once completed the .someday status flips to .done, so we can't
+      // tell which logged tasks were Someday-bucketed. Drop the section.
+      return []
     default:
       return all
     }
@@ -1652,6 +1748,42 @@ struct TaskListView: View {
     // we have literally nothing to render (first ever launch, cache miss).
     if items.isEmpty { isLoading = true }
     defer { isLoading = false }
+
+    // CloudKit mode: skip the FastAPI list/Syncer path entirely. The
+    // server doesn't know about CK-side writes, so its response would
+    // wipe the just-created row out of `items`. Pull fresh from CK via
+    // the engine (its callbacks fold incoming records into SwiftData and
+    // post .septenaTasksChanged), then read from the local mirror.
+    if TasksBackendDefaults.current == .cloudKit {
+      SeptenaLog.info("[TaskList] load filter=\(String(describing: filter)) route=cloudKit")
+      try? await ckEngine.fetchChanges()
+      let local = LocalCache.tasks(in: modelContext, filter: filter)
+      items = local
+      review = []
+      doneToday = []
+      loadedFilters.insert(filter)
+      // Projects + areas: in CK mode they live in SwiftData (mirrored by
+      // CKSyncEngine), so the local cache is authoritative — no network
+      // round-trip needed.
+      projects = LocalCache.projects(in: modelContext)
+      areas = LocalCache.areas(in: modelContext)
+      if showsLoggedSection {
+        loggedItemsStorage = filterLogged(LocalCache.tasks(in: modelContext, filter: .logbook))
+        loggedFilter = filter
+      }
+      // Refresh the inbox suggestion engine from local data alone —
+      // the FastAPI logbook pull is unavailable here. LocalCache returns
+      // every status, so the engine sees the full corpus for ranking.
+      if filter == .inbox {
+        let allTasks = LocalCache.allTasks(in: modelContext)
+        suggestionEngine.refresh(inbox: local,
+                                 allTasks: allTasks,
+                                 projects: projects,
+                                 areas: areas)
+      }
+      SeptenaLog.info("[TaskList] load done count=\(items.count)")
+      return
+    }
     do {
       let listView = filter.serverView
       var area: String?
@@ -1661,6 +1793,7 @@ struct TaskListView: View {
       case .project(let pid): project = pid
       default: break
       }
+      SeptenaLog.info("[TaskList] load filter=\(String(describing: filter)) route=fastAPI")
       let resp = try await client.list(view: listView, area: area, project: project)
       items = resp.items
       review = resp.review ?? []
@@ -1680,7 +1813,10 @@ struct TaskListView: View {
       // work would otherwise be invisible to the model).
       if filter == .inbox {
         var allTasks = LocalCache.allTasks(in: modelContext)
-        if let logbook = try? await client.list(view: "logbook", days: 365) {
+        if let logbook = try? await TaskReads.list(
+          view: "logbook", days: 365,
+          client: client, context: modelContext
+        ) {
           let known = Set(allTasks.map(\.id))
           allTasks.append(contentsOf: logbook.items.filter { !known.contains($0.id) })
         }
@@ -1709,7 +1845,10 @@ struct TaskListView: View {
       // Recently completed, scoped to the current view. Server's logbook
       // endpoint ignores area/project, so we filter client-side.
       if showsLoggedSection {
-        if let logbook = try? await client.list(view: "logbook", days: 30) {
+        if let logbook = try? await TaskReads.list(
+          view: "logbook", days: 30,
+          client: client, context: modelContext
+        ) {
           loggedItemsStorage = filterLogged(logbook.items)
           loggedFilter = filter
         }

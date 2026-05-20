@@ -96,6 +96,7 @@ struct AreaDetailView: View {
   @Environment(SeptenaClient.self) private var client
   @Environment(SectionTheme.self) private var theme
   @Environment(NavigationState.self) private var nav
+  @Environment(AreasMutator.self) private var areasMutator
   @Environment(\.modelContext) private var modelContext
 
   @State private var draftName: String
@@ -217,16 +218,21 @@ struct AreaDetailView: View {
     if !cachedAreas.isEmpty { areas = cachedAreas }
     if !cachedProjects.isEmpty { projects = cachedProjects }
 
-    async let a = client.areas()
-    async let p = client.projects()
-    async let allInArea = client.list(view: "all", area: area.id)
-    areas = (try? await a) ?? []
-    projects = (try? await p) ?? []
-
-    // Fold server snapshots into the cache for next time.
-    let syncer = Syncer(client: client, context: modelContext)
-    syncer.applyAreas(areas)
-    syncer.applyProjects(projects)
+    let isCK = TasksBackendDefaults.current == .cloudKit
+    async let allInArea = TaskReads.list(view: "all", area: area.id,
+                                         client: client, context: modelContext)
+    if isCK {
+      areas = LocalCache.areas(in: modelContext)
+      projects = LocalCache.projects(in: modelContext)
+    } else {
+      async let a = client.areas()
+      async let p = client.projects()
+      areas = (try? await a) ?? []
+      projects = (try? await p) ?? []
+      let syncer = Syncer(client: client, context: modelContext)
+      syncer.applyAreas(areas)
+      syncer.applyProjects(projects)
+    }
 
     // Rehydrate the notes field from the freshly-loaded area record. The
     // route in nav.path holds the snapshot from when the sidebar last
@@ -248,25 +254,24 @@ struct AreaDetailView: View {
       for t in items {
         guard let pid = t.project else { continue }
         switch t.status {
-        case .done:                done[pid, default: 0] += 1; total[pid, default: 0] += 1
-        case .open:                total[pid, default: 0] += 1
-        case .cancelled: break
+        case .done:                 done[pid, default: 0] += 1; total[pid, default: 0] += 1
+        case .open:                 total[pid, default: 0] += 1
+        case .cancelled, .someday:  break
         }
       }
       projectProgress = total.reduce(into: [:]) { acc, kv in
         acc[kv.key] = Double(done[kv.key] ?? 0) / Double(kv.value)
       }
-      syncer.applyTasks(items, scope: .area(area.id))
+      if !isCK {
+        Syncer(client: client, context: modelContext)
+          .applyTasks(items, scope: .area(area.id))
+      }
     }
   }
 
   private func commitName(_ trimmed: String) {
-    var next = areas
-    if let idx = next.firstIndex(where: { $0.id == area.id }) {
-      next[idx].title = trimmed
-    }
     Task {
-      do { areas = try await client.replaceAreas(next) }
+      do { try await areasMutator.rename(id: area.id, to: trimmed) }
       catch { errorMessage = error.localizedDescription }
     }
   }
@@ -274,13 +279,13 @@ struct AreaDetailView: View {
   private func commitNotes() {
     guard draftNotes != originalNotes else { return }
     originalNotes = draftNotes
-    var next = areas
-    if let idx = next.firstIndex(where: { $0.id == area.id }) {
-      next[idx].context = draftNotes.isEmpty ? nil : draftNotes
-    }
     Task {
-      do { areas = try await client.replaceAreas(next) }
-      catch { errorMessage = error.localizedDescription }
+      do {
+        try await areasMutator.setContext(id: area.id,
+                                          context: draftNotes.isEmpty ? nil : draftNotes)
+      } catch {
+        errorMessage = error.localizedDescription
+      }
     }
   }
 }
@@ -291,6 +296,7 @@ struct ProjectDetailView: View {
   let project: Project
   @Environment(SeptenaClient.self) private var client
   @Environment(SectionTheme.self) private var theme
+  @Environment(ProjectsMutator.self) private var projectsMutator
   @Environment(\.dismiss) private var dismiss
   @Environment(\.modelContext) private var modelContext
 
@@ -425,7 +431,11 @@ struct ProjectDetailView: View {
   }
 
   private func loadAreas() async {
-    areas = (try? await client.areas()) ?? []
+    if TasksBackendDefaults.current == .cloudKit {
+      areas = LocalCache.areas(in: modelContext)
+    } else {
+      areas = (try? await client.areas()) ?? []
+    }
   }
 
   /// The project struct in nav.path is the snapshot from when the sidebar
@@ -433,9 +443,14 @@ struct ProjectDetailView: View {
   /// Pull the latest record and update the draft — but only when the user
   /// isn't actively typing, so we never clobber an unsaved edit.
   private func rehydrateNotes() async {
-    guard !notesFocused,
-          let fresh = (try? await client.projects())?.first(where: { $0.id == project.id })
-    else { return }
+    let fresh: Project?
+    if TasksBackendDefaults.current == .cloudKit {
+      fresh = LocalCache.projects(in: modelContext)
+        .first(where: { $0.id == project.id })
+    } else {
+      fresh = (try? await client.projects())?.first(where: { $0.id == project.id })
+    }
+    guard !notesFocused, let fresh else { return }
     let serverNotes = fresh.notes ?? ""
     if serverNotes != draftNotes {
       draftNotes = serverNotes
@@ -454,7 +469,7 @@ struct ProjectDetailView: View {
     Haptics.tick()
     Task {
       do {
-        _ = try await client.updateProject(id: project.id, area: .some(newAreaId))
+        try await projectsMutator.setArea(id: project.id, area: newAreaId)
         // Project's `area` value is captured in `let project`; the route
         // identity changes on the next sidebar refresh.
       } catch {
@@ -473,21 +488,22 @@ struct ProjectDetailView: View {
       var d = 0, t = 0
       for x in cached {
         switch x.status {
-        case .done: d += 1; t += 1
-        case .open: t += 1
-        case .cancelled: break
+        case .done:                 d += 1; t += 1
+        case .open:                 t += 1
+        case .cancelled, .someday:  break
         }
       }
       progress = t > 0 ? Double(d) / Double(t) : 0
     }
     do {
-      let all = try await client.list(view: "all", project: project.id).items
+      let all = try await TaskReads.list(view: "all", project: project.id,
+                                         client: client, context: modelContext).items
       var done = 0, total = 0
       for t in all {
         switch t.status {
-        case .done:                done += 1; total += 1
-        case .open:                total += 1
-        case .cancelled: break
+        case .done:                 done += 1; total += 1
+        case .open:                 total += 1
+        case .cancelled, .someday:  break
         }
       }
       progress = total > 0 ? Double(done) / Double(total) : 0
@@ -501,7 +517,7 @@ struct ProjectDetailView: View {
   private func commitNameTo(_ trimmed: String) {
     originalName = trimmed
     Task {
-      do { _ = try await client.updateProject(id: project.id, title: trimmed) }
+      do { try await projectsMutator.rename(id: project.id, to: trimmed) }
       catch { errorMessage = error.localizedDescription }
     }
   }
@@ -510,7 +526,7 @@ struct ProjectDetailView: View {
     guard draftNotes != originalNotes else { return }
     originalNotes = draftNotes
     Task {
-      do { _ = try await client.updateProject(id: project.id, notes: draftNotes) }
+      do { try await projectsMutator.setNotes(id: project.id, notes: draftNotes) }
       catch { errorMessage = error.localizedDescription }
     }
   }
@@ -520,9 +536,8 @@ struct ProjectDetailView: View {
     if trimmed != draftRepo { draftRepo = trimmed }
     guard trimmed != originalRepo else { return }
     originalRepo = trimmed
-    let payload: String?? = .some(trimmed.isEmpty ? nil : trimmed)
     Task {
-      do { _ = try await client.updateProject(id: project.id, githubRepo: payload) }
+      do { try await projectsMutator.setGithubRepo(id: project.id, repo: trimmed) }
       catch { errorMessage = error.localizedDescription }
     }
   }
@@ -535,7 +550,7 @@ struct ProjectDetailView: View {
     }
     status = newStatus
     Task {
-      do { _ = try await client.updateProject(id: project.id, status: newStatus.rawValue) }
+      do { try await projectsMutator.setStatus(id: project.id, status: newStatus) }
       catch { errorMessage = error.localizedDescription }
     }
   }
@@ -544,7 +559,7 @@ struct ProjectDetailView: View {
     Haptics.warning()
     Task {
       do {
-        try await client.deleteProject(id: project.id)
+        try await projectsMutator.delete(id: project.id)
         dismiss()
       } catch {
         errorMessage = error.localizedDescription

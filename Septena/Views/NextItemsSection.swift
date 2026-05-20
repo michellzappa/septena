@@ -32,11 +32,16 @@ final class TodayTasksModel {
   }
 
   func load(client: SeptenaClient) async {
-    if let resp = try? await client.list(view: "today") {
-      let syncer = Syncer(client: client,
-                          context: LocalStore.shared.container.mainContext)
-      syncer.applyTasks(resp.items + (resp.review ?? []) + (resp.done ?? []),
-                        scope: .filter(.today))
+    let context = LocalStore.shared.container.mainContext
+    if let resp = try? await TaskReads.list(view: "today", client: client, context: context) {
+      // CloudKit-mode response comes directly from LocalCache, so the
+      // Syncer fold-back is a no-op in that branch. In FastAPI mode the
+      // syncer keeps the local mirror fresh for the next paint.
+      if TasksBackendDefaults.current == .fastAPI {
+        let syncer = Syncer(client: client, context: context)
+        syncer.applyTasks(resp.items + (resp.review ?? []) + (resp.done ?? []),
+                          scope: .filter(.today))
+      }
     }
     refreshFromCache()
     actedTasks = []

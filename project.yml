@@ -4,6 +4,7 @@ options:
   deploymentTarget:
     iOS: "26.0"
     macOS: "26.0"
+    watchOS: "26.0"
   xcodeVersion: "26.0"
   generateEmptyDirectories: true
 
@@ -13,8 +14,7 @@ settings:
     SWIFT_STRICT_CONCURRENCY: minimal
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
-    DEVELOPMENT_TEAM: ""
-    CODE_SIGN_IDENTITY: ""
+    DEVELOPMENT_TEAM: 992N457T8D
     CODE_SIGN_STYLE: Automatic
     INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
     INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
@@ -34,6 +34,10 @@ targets:
       - path: SeptenaCore
         excludes:
           - "**/.DS_Store"
+    dependencies:
+      - target: SeptenaWatch
+        embed: true
+        codeSign: true
     info:
       path: Septena/Info.plist
       properties:
@@ -42,6 +46,8 @@ targets:
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: true
         UIApplicationSupportsIndirectInputEvents: true
+        UIBackgroundModes:
+          - remote-notification
         UISupportedInterfaceOrientations~ipad:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationPortraitUpsideDown
@@ -106,11 +112,15 @@ targets:
   SeptenaWatch:
     type: application
     platform: watchOS
-    deploymentTarget: "11.0"
     sources:
       - path: SeptenaWatch
         excludes:
           - "**/.DS_Store"
+          - "**/*.entitlements"
+    dependencies:
+      - target: SeptenaWatchComplication
+        embed: true
+        codeSign: true
     info:
       path: SeptenaWatch/Info.plist
       properties:
@@ -122,7 +132,31 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.watchkitapp
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: SeptenaWatch/SeptenaWatch.entitlements
+
+  SeptenaWatchComplication:
+    type: app-extension
+    platform: watchOS
+    sources:
+      - path: SeptenaWatchComplication
+        excludes:
+          - "**/.DS_Store"
+          - "**/*.entitlements"
+      - path: SeptenaWatch/SharedComplicationData.swift
+    info:
+      path: SeptenaWatchComplication/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.watchkitapp.next
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: SeptenaWatchComplication/SeptenaWatchComplication.entitlements
 
 schemes:
   Septena:

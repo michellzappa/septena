@@ -17,7 +17,13 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   var status: TaskStatus
   var created: String?         // YYYY-MM-DD
   var scheduled: String?       // YYYY-MM-DD
-  var due: String?             // YYYY-MM-DD
+  /// Hard date the task is owed by. Things-style: rendering only — the
+  /// server unions deadline-today rows into Today.items at view time, no
+  /// mutation. Reschedule the deadline forward and the task drops out of
+  /// Today on the next view load. The previous `due` field was the same
+  /// data but with auto-pinning behavior baked in; the server still emits
+  /// `due` as a mirror for the transition window, so we read either.
+  var deadline: String?
   var today: Bool
   var todaySetOn: String?      // YYYY-MM-DD
   var completedAt: String?     // YYYY-MM-DDTHH:MM:SS
@@ -40,8 +46,16 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// `deletedAt != nil` out of every read.
   var deletedAt: String?
 
+  /// Transitional read-only alias so older call sites compile during the
+  /// rename. Prefer `deadline` for new code; remove the alias once nothing
+  /// else references it.
+  var due: String? {
+    get { deadline }
+    set { deadline = newValue }
+  }
+
   enum CodingKeys: String, CodingKey {
-    case id, title, status, created, scheduled, due, today
+    case id, title, status, created, scheduled, deadline, today
     case todaySetOn = "today_set_on"
     case completedAt = "completed_at"
     case area, project, notes, recurrence
@@ -49,6 +63,11 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     case updatedAt = "updated_at"
     case deletedAt = "deleted_at"
   }
+
+  /// Legacy decode-only key — server still emits `due` as a mirror of
+  /// `deadline` for the transition window. Kept separate from CodingKeys
+  /// so the synthesized encoder doesn't try to round-trip it.
+  private enum LegacyKeys: String, CodingKey { case due }
 
   init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -59,7 +78,14 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     status = (try? c.decode(TaskStatus.self, forKey: .status)) ?? .open
     created = try c.decodeIfPresent(String.self, forKey: .created)
     scheduled = try c.decodeIfPresent(String.self, forKey: .scheduled)
-    due = try c.decodeIfPresent(String.self, forKey: .due)
+    // Prefer the canonical `deadline`; fall back to legacy `due` for old
+    // payloads (cached responses, old server builds).
+    if let dl = try c.decodeIfPresent(String.self, forKey: .deadline) {
+      deadline = dl
+    } else {
+      let legacy = try decoder.container(keyedBy: LegacyKeys.self)
+      deadline = try legacy.decodeIfPresent(String.self, forKey: .due)
+    }
     today = (try? c.decode(Bool.self, forKey: .today)) ?? false
     todaySetOn = try c.decodeIfPresent(String.self, forKey: .todaySetOn)
     completedAt = try c.decodeIfPresent(String.self, forKey: .completedAt)

@@ -119,10 +119,42 @@ final class TaskMutator {
   private let client: SeptenaClient
   private let context: ModelContext
 
+  /// CloudKit dependency. Held weakly-typed (optional) so the FastAPI
+  /// path stays runnable on devices that haven't been migrated yet
+  /// (CKEngine refuses to start without a signed-in iCloud account,
+  /// so we don't force one until the user flips the backend flag).
+  /// Settable post-init via `bind(ckEngine:)` because App.swift can't
+  /// reference its own `@State var ckEngine` from another `@State`
+  /// initializer — wiring happens once in `.task` at launch.
+  private var ckEngine: CKEngine?
+  private var _cloudBackend: CloudKitTasksBackend?
+
+  /// The CloudKit backend, lazily constructed when the flag is on.
+  /// Returns nil when the backend is FastAPI — that's how every mutation
+  /// method below decides which path to take. Single point of truth for
+  /// "are we on CloudKit?", avoids each method re-checking the flag.
+  private var cloudBackend: CloudKitTasksBackend? {
+    guard TasksBackendDefaults.current == .cloudKit, let engine = ckEngine else {
+      return nil
+    }
+    if _cloudBackend == nil {
+      _cloudBackend = CloudKitTasksBackend(engine: engine, context: context)
+    }
+    return _cloudBackend
+  }
+
   /// Tracks the currently-running drain so multiple kicks coalesce into
   /// a single in-flight loop instead of fanning out into parallel pushers
   /// that would step on each other's ordering.
   private var drainTask: Task<Void, Never>?
+
+  /// ID of the OutboxEntity the drain has started executing (payload already
+  /// decoded, network call in flight). Set before `await execute(entry)`,
+  /// cleared after the entry is finalized (deleted on success, persisted on
+  /// failure). Used by `update` / `delete` to know whether a `pendingCreate`
+  /// row can still be mutated in place, or whether the drain has already
+  /// snapshotted its payload and a follow-up op must be enqueued.
+  private var executingEntryId: String?
 
   /// Surfaced by the Sync pane: "N pending mutations." Useful while
   /// offline to confirm work is queued rather than silently dropped.
@@ -130,9 +162,18 @@ final class TaskMutator {
     (try? context.fetchCount(FetchDescriptor<OutboxEntity>())) ?? 0
   }
 
-  init(client: SeptenaClient, context: ModelContext) {
+  init(client: SeptenaClient, context: ModelContext, ckEngine: CKEngine? = nil) {
     self.client = client
     self.context = context
+    self.ckEngine = ckEngine
+  }
+
+  /// One-shot binding hook for App.swift. Subsequent calls replace the
+  /// engine (and drop any lazy-built `_cloudBackend` so the next mutation
+  /// rebuilds against the new engine).
+  func bind(ckEngine: CKEngine) {
+    self.ckEngine = ckEngine
+    self._cloudBackend = nil
   }
 
   // MARK: - Mutations (optimistic + enqueue)
@@ -151,6 +192,13 @@ final class TaskMutator {
               today: Bool = false,
               notes: String? = nil,
               status: String? = nil) -> SeptenaTask {
+    if let cloudBackend {
+      SeptenaLog.info("[TaskMutator] route=cloudKit op=create title=\"\(title)\"")
+      return cloudBackend.create(title: title, area: area, project: project,
+                                 scheduled: scheduled, due: due, today: today,
+                                 notes: notes, status: status)
+    }
+    SeptenaLog.info("[TaskMutator] route=fastAPI op=create title=\"\(title)\"")
     let id = UUID().uuidString.lowercased()
     let todayIso = SeptenaDate.today
     let scheduledIso = SeptenaDate.format(scheduled)
@@ -184,6 +232,7 @@ final class TaskMutator {
   }
 
   func complete(id: String) {
+    if let cloudBackend { cloudBackend.complete(id: id); return }
     guard let entity = fetch(id: id) else { return }
     entity.statusRaw = TaskStatus.done.rawValue
     entity.completedAt = serverNow()
@@ -193,6 +242,7 @@ final class TaskMutator {
   }
 
   func uncomplete(id: String) {
+    if let cloudBackend { cloudBackend.uncomplete(id: id); return }
     guard let entity = fetch(id: id) else { return }
     entity.statusRaw = TaskStatus.open.rawValue
     entity.completedAt = nil
@@ -204,6 +254,7 @@ final class TaskMutator {
   }
 
   func cancel(id: String) {
+    if let cloudBackend { cloudBackend.cancel(id: id); return }
     guard let entity = fetch(id: id) else { return }
     entity.statusRaw = TaskStatus.cancelled.rawValue
     entity.completedAt = serverNow()
@@ -214,11 +265,16 @@ final class TaskMutator {
   }
 
   func delete(id: String) {
+    if let cloudBackend { cloudBackend.delete(id: id); return }
     guard let entity = fetch(id: id) else { return }
     // If the CREATE for this task hasn't drained yet, the server never
     // knew the task existed — drop the CREATE entry and the local row
-    // outright instead of round-tripping a DELETE that would 404.
-    if let pending = pendingCreate(taskId: id) {
+    // outright instead of round-tripping a DELETE that would 404. Skipped
+    // when the drain is mid-flight on this CREATE: deleting the entry now
+    // would pull the rug from under `execute`, and the server is about to
+    // know about the task anyway. Fall through to enqueue a real DELETE.
+    if let pending = pendingCreate(taskId: id),
+       pending.id != executingEntryId {
       context.delete(pending)
       context.delete(entity)
       try? context.save()
@@ -233,6 +289,7 @@ final class TaskMutator {
   }
 
   func moveToToday(id: String, today: Bool = true) {
+    if let cloudBackend { cloudBackend.moveToToday(id: id, today: today); return }
     guard let entity = fetch(id: id) else { return }
     entity.today = today
     entity.todaySetOn = today ? SeptenaDate.today : nil
@@ -241,7 +298,28 @@ final class TaskMutator {
     enqueue(kind: .moveToToday, taskId: id, payload: payload ?? Data())
   }
 
+  /// Demote a task to the Someday bucket. The server has no per-task
+  /// status endpoint (only complete/cancel/uncomplete) so on FastAPI we
+  /// can only update local state — the row stays "someday" until the
+  /// next pull from the server overwrites it. Acceptable transitional
+  /// behaviour: FastAPI is deprecated; CloudKit is the production path
+  /// where this works end-to-end.
+  func moveToSomeday(id: String) {
+    if let cloudBackend { cloudBackend.moveToSomeday(id: id); return }
+    guard let entity = fetch(id: id) else { return }
+    entity.statusRaw = TaskStatus.someday.rawValue
+    entity.today = false
+    entity.todaySetOn = nil
+    entity.scheduled = nil
+    entity.due = nil
+    entity.completedAt = nil
+    try? context.save()
+    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    SeptenaLog.info("[TaskMutator] moveToSomeday id=\(id) — local-only on FastAPI (no server endpoint)")
+  }
+
   func schedule(id: String, date: Date?) {
+    if let cloudBackend { cloudBackend.schedule(id: id, date: date); return }
     guard let entity = fetch(id: id) else { return }
     entity.scheduled = SeptenaDate.format(date)
     entity.pendingSync = true
@@ -250,7 +328,9 @@ final class TaskMutator {
   }
 
   func setDue(id: String, date: Date?) {
+    if let cloudBackend { cloudBackend.setDue(id: id, date: date); return }
     guard let entity = fetch(id: id) else { return }
+    let previousDue = entity.due
     entity.due = SeptenaDate.format(date)
     // Server auto-promotes a due-today task into Today. Mirror that so the
     // optimistic UI reflects the same state the server will return.
@@ -258,12 +338,27 @@ final class TaskMutator {
       entity.today = true
       entity.todaySetOn = SeptenaDate.today
     }
+    // Things-style: clearing a deadline must not drop a task out of Today.
+    // If the row was surfacing only via due<=today, pin it now so it stays.
+    // The server has no such rule, so enqueue moveToToday explicitly.
+    var pinAfterClear = false
+    if entity.due == nil, !entity.today,
+       let prev = previousDue, prev <= SeptenaDate.today {
+      entity.today = true
+      entity.todaySetOn = SeptenaDate.today
+      pinAfterClear = true
+    }
     entity.pendingSync = true
     let payload = try? outboxEncoder.encode(DatePayload(date: entity.due))
     enqueue(kind: .setDue, taskId: id, payload: payload ?? Data())
+    if pinAfterClear {
+      let movePayload = try? outboxEncoder.encode(MoveToTodayPayload(today: true))
+      enqueue(kind: .moveToToday, taskId: id, payload: movePayload ?? Data())
+    }
   }
 
   func setRecurrence(id: String, recurrence: Recurrence?) {
+    if let cloudBackend { cloudBackend.setRecurrence(id: id, recurrence: recurrence); return }
     guard let entity = fetch(id: id) else { return }
     entity.recurrence = recurrence
     entity.pendingSync = true
@@ -272,6 +367,7 @@ final class TaskMutator {
   }
 
   func moveToArea(id: String, area: String?) {
+    if let cloudBackend { cloudBackend.moveToArea(id: id, area: area); return }
     guard let entity = fetch(id: id) else { return }
     entity.area = area
     if area != nil { entity.project = nil }   // server enforces; mirror it
@@ -281,6 +377,7 @@ final class TaskMutator {
   }
 
   func moveToProject(id: String, project: String?) {
+    if let cloudBackend { cloudBackend.moveToProject(id: id, project: project); return }
     guard let entity = fetch(id: id) else { return }
     entity.project = project
     if project != nil { entity.area = nil }   // server derives area from project
@@ -290,16 +387,20 @@ final class TaskMutator {
   }
 
   func update(id: String, title: String? = nil, notes: String? = nil) {
+    if let cloudBackend { cloudBackend.update(id: id, title: title, notes: notes); return }
     guard let entity = fetch(id: id) else { return }
     if let title { entity.title = title }
     if let notes { entity.notes = notes.isEmpty ? nil : notes }
     entity.pendingSync = true
     // Merge into a not-yet-drained CREATE so the single POST /api/tasks/create
-    // carries the user's real title — otherwise the optimistic CREATE drains
-    // with the "New To-Do" placeholder and the separate UPDATE behind it can
-    // race (e.g., dropped on transport failure, or never enqueued because of
-    // a keyboard-focus race on Enter). One round-trip, right title, no race.
+    // carries the user's real title. Only safe if the drain hasn't already
+    // decoded the payload — once `execute` is mid-await, mutating payloadData
+    // is wasted (the in-flight POST still carries the placeholder, and on
+    // success the outbox row is deleted, so no UPDATE follows). When the
+    // CREATE is in flight we fall through and enqueue a real UPDATE op; the
+    // outbox is FIFO-ordered, so it drains right after the CREATE settles.
     if let pending = pendingCreate(taskId: id),
+       pending.id != executingEntryId,
        var payload = try? outboxDecoder.decode(CreatePayload.self, from: pending.payloadData) {
       if let title { payload.title = title }
       if let notes { payload.notes = notes.isEmpty ? nil : notes }
@@ -330,14 +431,21 @@ final class TaskMutator {
   private func drain() async {
     while true {
       guard let entry = nextReadyEntry() else { break }
+      // Mark this entry as in-flight BEFORE awaiting. `execute` decodes the
+      // payload upfront, so any payloadData mutation that lands while we're
+      // suspended on the network is wasted. `update` / `delete` consult this
+      // to decide whether merging into a pending CREATE is still safe.
+      executingEntryId = entry.id
       do {
         try await execute(entry)
+        executingEntryId = nil
         // Success: drop the outbox row and refresh the task's pending flag.
         context.delete(entry)
         recomputePendingSync(taskId: entry.taskId, afterDeletingEntryId: entry.id)
         try context.save()
         NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
       } catch {
+        executingEntryId = nil
         let isTransport = (error as? URLError) != nil
         entry.attempts += 1
         entry.lastError = error.localizedDescription
