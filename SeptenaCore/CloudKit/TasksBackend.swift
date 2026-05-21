@@ -23,7 +23,8 @@ protocol TasksBackend: AnyObject {
               due: Date?,
               today: Bool,
               notes: String?,
-              status: String?) -> SeptenaTask
+              status: String?,
+              deferPush: Bool) -> SeptenaTask
 
   func update(id: String, title: String?, notes: String?)
   func complete(id: String)
@@ -99,7 +100,8 @@ final class CloudKitTasksBackend: TasksBackend {
   @discardableResult
   func create(title: String, area: String?, project: String?,
               scheduled: Date?, due: Date?, today: Bool,
-              notes: String?, status: String?) -> SeptenaTask {
+              notes: String?, status: String?,
+              deferPush: Bool = false) -> SeptenaTask {
     let id = UUID().uuidString.lowercased()
     let todayIso = SeptenaDate.today
     let effectiveArea = project != nil ? nil : area
@@ -118,7 +120,17 @@ final class CloudKitTasksBackend: TasksBackend {
       pendingSync: true
     )
     context.insert(entity)
-    commitAndPush(entity, op: "create")
+    // deferPush is used for inline-editor drafts: skip the engine push
+    // here so other devices don't briefly see "New To-Do" before the
+    // user commits the real title. The first push happens via the
+    // update() path when the user commits.
+    if deferPush {
+      do { try context.save() } catch { SeptenaLog.error("CK backend: context.save failed", error) }
+      SeptenaLog.info("[CK] create(deferred) id=\(id) title=\"\(title)\" — engine push held until first update")
+      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    } else {
+      commitAndPush(entity, op: "create")
+    }
     return SeptenaTask(entity)
   }
 
@@ -164,9 +176,19 @@ final class CloudKitTasksBackend: TasksBackend {
     // CKSyncEngine deletes are durable and retried until success, so we
     // hard-delete locally. If the user is offline the deletion sits in
     // the engine's pendingRecordZoneChanges and drains on reconnect.
+    // If this entity never made it to CloudKit (deferred-push draft
+    // that the user cancelled), skip the engine call — there's no
+    // server-side record to delete.
+    let neverPushed = entity.cloudKitSystemFields == nil
     let staged = entity     // capture before we tell SwiftData to remove
     context.delete(entity)
-    commitAndPush(staged, op: "delete", deletion: true)
+    if neverPushed {
+      do { try context.save() } catch { SeptenaLog.error("CK backend: context.save failed", error) }
+      SeptenaLog.info("[CK] delete(local-only) id=\(id) — was never pushed, skipping engine")
+      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    } else {
+      commitAndPush(staged, op: "delete", deletion: true)
+    }
   }
 
   func moveToToday(id: String, today: Bool) {

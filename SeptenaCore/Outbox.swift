@@ -185,12 +185,14 @@ final class TaskMutator {
               due: Date? = nil,
               today: Bool = false,
               notes: String? = nil,
-              status: String? = nil) -> SeptenaTask {
+              status: String? = nil,
+              deferPush: Bool = false) -> SeptenaTask {
     if let cloudBackend {
-      SeptenaLog.info("[TaskMutator] route=cloudKit op=create title=\"\(title)\"")
+      SeptenaLog.info("[TaskMutator] route=cloudKit op=create title=\"\(title)\" deferPush=\(deferPush)")
       return cloudBackend.create(title: title, area: area, project: project,
                                  scheduled: scheduled, due: due, today: today,
-                                 notes: notes, status: status)
+                                 notes: notes, status: status,
+                                 deferPush: deferPush)
     }
     SeptenaLog.info("[TaskMutator] route=fastAPI op=create title=\"\(title)\"")
     let id = UUID().uuidString.lowercased()

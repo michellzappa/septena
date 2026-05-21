@@ -352,13 +352,6 @@ struct TaskListView: View {
     .scrollContentBackground(.hidden)
     .background(Theme.paperBackground)
     .scrollDismissesKeyboard(.interactively)
-    // Drive the .transition(.opacity) on row from the visible-id set.
-    // withAnimation inside an async load() loses its transaction across
-    // the actor hop; binding the animation to a value the list already
-    // computes works reliably for both local creates and CK-fetched
-    // inserts arriving via .septenaTasksChanged.
-    .animation(.easeOut(duration: 0.25), value: visibleItems.map(\.id))
-    .animation(.easeOut(duration: 0.25), value: review.map(\.id))
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         Button {
@@ -759,12 +752,6 @@ struct TaskListView: View {
       // NOT use a transition that fades content in/out, since the
       // two branches share the same checkbox + title layout.
       .a11yAnimation(Self.expandSpring, value: editingTaskId == task.id)
-      // Row-level insert/remove transition. Combined with the
-      // withAnimation { items = ... } wrapper in load(), new rows
-      // (whether from a local create, a CK fetch, or a filter swap)
-      // fade in instead of popping. Also softens completed-task
-      // removal at end-of-session.
-      .transition(.opacity)
   }
 
   @ViewBuilder
@@ -1540,11 +1527,14 @@ struct TaskListView: View {
     // and queues the server push. Returns the new task immediately so
     // the inline editor opens without a network round-trip.
     //   - empty title → delete (handled in commitEdit / onCancel)
-    //   - non-empty → server's placeholder gets replaced via update
+    //   - non-empty → first CK push happens via commitEdit's update,
+    //     so other devices see one event with the real title rather
+    //     than a "New To-Do" placeholder followed by a rename.
     SeptenaLog.info("[Create] startDraft filter=\(String(describing: filter)) area=\(area ?? "nil") project=\(project ?? "nil") today=\(today)")
     let created = mutator.create(
       title: "New To-Do", area: area, project: project,
-      scheduled: scheduled, due: nil, today: today, notes: nil, status: status
+      scheduled: scheduled, due: nil, today: today, notes: nil, status: status,
+      deferPush: true
     )
     SeptenaLog.info("[Create] mutator.create returned id=\(created.id)")
     insertLocally(created)
