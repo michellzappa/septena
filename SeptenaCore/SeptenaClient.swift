@@ -105,152 +105,20 @@ final class SeptenaClient {
   // MARK: - Connection test
 
   func ping() async throws -> String {
-    _ = try await getJSON("/api/tasks/counts", as: TasksCounts.self)
+    // Cheap reachability check via the sections endpoint (still on FastAPI).
+    _ = try await sections()
     return "OK — Septena reachable"
-  }
-
-  func counts() async throws -> TasksCounts {
-    try await getJSON("/api/tasks/counts", as: TasksCounts.self)
-  }
-
-  /// Per-day task event aggregation (made / done / deferred / cancelled).
-  /// Backed by the FastAPI events log; used for the Tasks tile histogram.
-  func tasksHistory(days: Int = 7) async throws -> TasksHistory {
-    let q = [URLQueryItem(name: "days", value: String(days))]
-    return try await getJSON("/api/tasks/history", query: q, as: TasksHistory.self)
-  }
-
-  // MARK: - Tasks: list views
-
-  /// Server-derived view. Pass `area` or `project` to scope (ignored for `logbook`).
-  func list(view: String = "today",
-            area: String? = nil,
-            project: String? = nil,
-            days: Int = 90) async throws -> TasksListResponse {
-    var q: [URLQueryItem] = [URLQueryItem(name: "view", value: view)]
-    if let area { q.append(URLQueryItem(name: "area", value: area)) }
-    if let project { q.append(URLQueryItem(name: "project", value: project)) }
-    if view == "logbook" { q.append(URLQueryItem(name: "days", value: String(days))) }
-    return try await getJSON("/api/tasks/list", query: q, as: TasksListResponse.self)
-  }
-
-  // MARK: - Tasks: mutate
-
-  func create(title: String,
-              id: String? = nil,
-              area: String? = nil,
-              project: String? = nil,
-              scheduled: Date? = nil,
-              due: Date? = nil,
-              today: Bool = false,
-              notes: String? = nil,
-              status: String? = nil) async throws -> SeptenaTask {
-    // CloudKit prep: the client owns the id. Mint a lowercase UUID by
-    // default so the row has a stable identifier from the moment we
-    // hand it off, even before the server acknowledges. Server accepts
-    // any string matching its ID_RE (lowercased UUIDs fit) and returns
-    // 409 on collision — caller can retry with a fresh UUID.
-    let taskId = id ?? UUID().uuidString.lowercased()
-    var body: [String: Any] = [
-      "id": taskId,
-      "title": title,
-      "today": today,
-      "status": status ?? "open",
-    ]
-    if let area { body["area"] = area }
-    if let project { body["project"] = project }
-    if let scheduled { body["scheduled"] = SeptenaDate.format(scheduled)! }
-    if let due { body["due"] = SeptenaDate.format(due)! }
-    if let notes { body["notes"] = notes }
-    return try await postJSON("/api/tasks/create", body: body, as: SeptenaTask.self)
   }
 
   /// Delta-sync endpoint. Pass the `serverTime` returned from the previous
   /// call as `since` to get only records changed (or tombstoned) since
   /// that watermark. Pass nil on first sync to fetch a full snapshot.
-  /// Mirrors CKSyncEngine.fetchChanges in shape.
+  /// Tasks are no longer pulled through this path (CloudKit owns them);
+  /// the projects + areas slices are still consumed by `Syncer.apply`.
   func changes(since: String? = nil) async throws -> ChangesResponse {
     var query: [URLQueryItem] = []
     if let since { query.append(URLQueryItem(name: "since", value: since)) }
     return try await getJSON("/api/tasks/changes", query: query, as: ChangesResponse.self)
-  }
-
-  /// PATCH semantics — only included keys mutate. Use `Optional<Optional<Date>>`
-  /// at call sites isn't ergonomic in Swift, so each clear-able field gets a
-  /// dedicated helper below (`schedule`, `setDue`, `moveToArea`, `moveToProject`).
-  func update(id: String,
-              title: String? = nil,
-              notes: String? = nil) async throws -> SeptenaTask {
-    var body: [String: Any] = ["id": id]
-    if let title { body["title"] = title }
-    if let notes { body["notes"] = notes }
-    return try await postJSON("/api/tasks/update", body: body, as: SeptenaTask.self)
-  }
-
-  func complete(id: String) async throws {
-    _ = try await postJSON("/api/tasks/complete", body: ["id": id], as: SeptenaTask.self)
-  }
-
-  func uncomplete(id: String) async throws {
-    _ = try await postJSON("/api/tasks/uncomplete", body: ["id": id], as: SeptenaTask.self)
-  }
-
-  func cancel(id: String) async throws {
-    _ = try await postJSON("/api/tasks/cancel", body: ["id": id], as: SeptenaTask.self)
-  }
-
-  func delete(id: String) async throws {
-    try await deleteRaw("/api/tasks/\(id)")
-  }
-
-  func moveToToday(id: String, today: Bool = true) async throws {
-    _ = try await postJSON("/api/tasks/move-to-today",
-                           body: ["id": id, "today": today],
-                           as: SeptenaTask.self)
-  }
-
-  /// Pass `nil` to clear the scheduled date.
-  func schedule(id: String, date: Date?) async throws {
-    var body: [String: Any] = ["id": id]
-    body["scheduled"] = SeptenaDate.format(date) ?? NSNull()
-    _ = try await postJSON("/api/tasks/schedule", body: body, as: SeptenaTask.self)
-  }
-
-  /// Pass `nil` to clear the due date.
-  func setDue(id: String, date: Date?) async throws {
-    var body: [String: Any] = ["id": id]
-    body["due"] = SeptenaDate.format(date) ?? NSNull()
-    _ = try await postJSON("/api/tasks/set-due", body: body, as: SeptenaTask.self)
-  }
-
-  /// Set or clear a recurrence rule. Pass `nil` to clear. Server spawns the
-  /// next instance automatically on `/complete` when a rule is present.
-  func setRecurrence(id: String, recurrence: Recurrence?) async throws -> SeptenaTask {
-    var body: [String: Any] = ["id": id]
-    if let r = recurrence {
-      body["recurrence"] = [
-        "unit": r.unit.rawValue,
-        "interval": r.interval,
-        "after_completion": r.afterCompletion,
-      ]
-    } else {
-      body["recurrence"] = NSNull()
-    }
-    return try await postJSON("/api/tasks/update", body: body, as: SeptenaTask.self)
-  }
-
-  /// Septena's update endpoint clears area when explicit `null` is sent. Pass
-  /// nil here to clear.
-  func moveToArea(id: String, area: String?) async throws -> SeptenaTask {
-    var body: [String: Any] = ["id": id]
-    body["area"] = area ?? NSNull()
-    return try await postJSON("/api/tasks/update", body: body, as: SeptenaTask.self)
-  }
-
-  func moveToProject(id: String, project: String?) async throws -> SeptenaTask {
-    var body: [String: Any] = ["id": id]
-    body["project"] = project ?? NSNull()
-    return try await postJSON("/api/tasks/update", body: body, as: SeptenaTask.self)
   }
 
   // MARK: - Habits / Supplements / Chores (toggleable on Today)

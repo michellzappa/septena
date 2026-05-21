@@ -71,7 +71,6 @@ struct SeptenaApp: App {
           // refresh path independent of push delivery.
           if phase == .active {
             dayClock.refreshIfNeeded()
-            taskMutator.kickDrain()
             httpOutbox.kickDrain()
             Task {
               await ckEngine.refreshAccountStatus()
@@ -141,11 +140,8 @@ struct SeptenaApp: App {
             }
           }
           // Flush anything that was queued in a prior session (e.g. the
-          // app was killed mid-drain). Safe to call before/after pullAll
-          // since the mutator's pendingSync flag protects rows during
-          // upsert, and the drainer is idempotent. In CK mode kickDrain
-          // is a no-op (the outbox is empty), so we skip the route check.
-          taskMutator.kickDrain()
+          // app was killed mid-drain). Tasks are CloudKit-only now; only
+          // the non-task HTTP outbox needs kicking.
           httpOutbox.kickDrain()
           BadgeManager.shared.start(context: localStore.container.mainContext)
           await runRemindersAutoImport()
@@ -246,15 +242,22 @@ struct SeptenaApp: App {
   }
 
   /// Drains the Reminders source list into Septena when the user has opted
-  /// in. Posts `.septenaTasksChanged` after a successful run so any open
-  /// task list refreshes without manual reload.
+  /// in. Routes through `taskMutator` so imports land in CloudKit like every
+  /// other task creation path — historically this called `client.create`
+  /// directly, which bypassed the CK migration and silently wrote to
+  /// FastAPI. Posts `.septenaTasksChanged` after a successful run so any
+  /// open task list refreshes without manual reload.
   @MainActor
   private func runRemindersAutoImport() async {
-    let client = clientProvider.client
     let bridge = RemindersBridge.shared
     let before = bridge.recentImports.count
+    // Belt-and-suspenders: scene `.task` has already awaited this, but
+    // `.EKEventStoreChanged` can fire before `start()` returns on the
+    // very first launch — awaiting the cached task here is a no-op once
+    // ready, and the guarantee that `taskMutator` routes to CloudKit.
+    await services.start()
     await bridge.runAutoImport { title, due, notes in
-      _ = try await client.create(title: title, due: due, notes: notes)
+      _ = taskMutator.create(title: title, due: due, notes: notes)
     }
     if bridge.recentImports.count != before {
       NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)

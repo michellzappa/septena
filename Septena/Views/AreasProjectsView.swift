@@ -492,8 +492,6 @@ struct ProjectDetailView: View {
         }
       }
       progress = total > 0 ? Double(done) / Double(total) : 0
-      Syncer(client: client, context: modelContext)
-        .applyTasks(all, scope: .project(project.id))
     } catch {
       // Non-fatal — progress just stays at its previous value.
     }

@@ -515,18 +515,11 @@ final class Syncer {
   }
 
   /// Fold a `/changes` response into the local store. Tombstones (rows
-  /// with `deletedAt` set) purge the local entity unless the outbox has
-  /// pending writes for that id — those rows wait for the drainer to
-  /// reconcile rather than getting yanked out from under it.
+  /// with `deletedAt` set) purge the local entity. Tasks are no longer
+  /// pulled through this path — CloudKit owns them. Only the projects
+  /// and areas slices of the response are consumed here.
   private func apply(_ response: ChangesResponse) {
     let now = Date()
-    for (index, dto) in response.tasks.enumerated() {
-      if dto.deletedAt != nil {
-        applyTombstoneTask(id: dto.id)
-      } else {
-        upsert(dto, syncedAt: now, sortIndex: index)
-      }
-    }
     for dto in response.projects {
       if dto.deletedAt != nil {
         applyTombstoneProject(id: dto.id)
@@ -546,17 +539,6 @@ final class Syncer {
     }
   }
 
-  private func applyTombstoneTask(id: String) {
-    let descriptor = FetchDescriptor<TaskEntity>(
-      predicate: #Predicate { $0.id == id }
-    )
-    guard let entity = try? context.fetch(descriptor).first else { return }
-    // Don't yank a row the outbox is still pushing for — let the drainer
-    // finish (or fail with 404, which it treats as success and drops).
-    if entity.pendingSync { return }
-    context.delete(entity)
-  }
-
   private func applyTombstoneProject(id: String) {
     let descriptor = FetchDescriptor<ProjectEntity>(
       predicate: #Predicate { $0.id == id }
@@ -566,26 +548,6 @@ final class Syncer {
   }
 
   // MARK: Apply (fold an already-fetched response back into the cache)
-
-  /// Fold a list response into the cache. `scope` controls how deletions
-  /// are detected: `.all` removes any task not in the payload; `.area` /
-  /// `.project` only prune within that scope; `.filter` doesn't prune at
-  /// all (the server's view filter excludes tasks that still exist).
-  enum TaskScope {
-    case all
-    case area(String)
-    case project(String)
-    case filter(TaskFilter)
-  }
-
-  func applyTasks(_ items: [SeptenaTask], scope: TaskScope) {
-    // CloudKit is the only backend — CKSyncEngine keeps the local
-    // mirror authoritative. Running a FastAPI-shaped prune here would
-    // wipe CK-only tasks the server doesn't know about. No-op kept so
-    // existing call sites keep compiling; Phase B will delete them.
-    _ = items
-    _ = scope
-  }
 
   func applyAreas(_ dtos: [Area]) {
     let now = Date()
@@ -619,39 +581,6 @@ final class Syncer {
   }
 
   // MARK: Upserts
-
-  private func upsert(_ dto: SeptenaTask, syncedAt: Date, sortIndex: Int) {
-    let id = dto.id
-    let existing = try? context.fetch(
-      FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.id == id })
-    ).first
-    // Local outbox in flight: don't overwrite the optimistic state with a
-    // stale server snapshot. Bump lastSyncedAt + sortIndex so the prune
-    // pass doesn't treat the row as orphaned.
-    if let existing, existing.pendingSync {
-      existing.lastSyncedAt = syncedAt
-      existing.sortIndex = sortIndex
-      return
-    }
-    let entity = existing ?? TaskEntity(id: id, title: dto.title)
-    entity.title = dto.title
-    entity.statusRaw = dto.status.rawValue
-    entity.created = dto.created
-    entity.scheduled = dto.scheduled
-    entity.due = dto.due
-    entity.today = dto.today
-    entity.todaySetOn = dto.todaySetOn
-    entity.completedAt = dto.completedAt
-    entity.area = dto.area
-    entity.project = dto.project
-    entity.notes = dto.notes
-    entity.recurrence = dto.recurrence
-    entity.updatedAt = dto.updatedAt
-    entity.deletedAt = dto.deletedAt
-    entity.lastSyncedAt = syncedAt
-    entity.sortIndex = sortIndex
-    if existing == nil { context.insert(entity) }
-  }
 
   private func upsert(_ dto: Project, syncedAt: Date) {
     let id = dto.id
