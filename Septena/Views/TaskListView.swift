@@ -478,6 +478,13 @@ struct TaskListView: View {
     // while the user is on the screen) drop off when they return.
     .onAppear { Task { await load() } }
     .refreshable { await load() }
+    // CKSyncEngine fires .septenaTasksChanged at the end of every fetch
+    // batch — including pushes from other devices and the foreground
+    // bootstrap fetch. Without this, the list only refreshes when the
+    // view re-appears (i.e. you have to navigate away and back).
+    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
+      Task { await load() }
+    }
     // Filter swaps reuse this same view (no .id(route) at the App level for
     // .filter cases). `items` is a computed property that already returns
     // the right data for `filter` synchronously, so we only need to clear

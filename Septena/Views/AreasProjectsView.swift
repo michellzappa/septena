@@ -183,6 +183,9 @@ struct AreaDetailView: View {
       Text(errorMessage ?? "")
     }
     .task(id: area.id) { await load() }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
+      Task { await load() }
+    }
   }
 
   private var projectsInArea: [Project] {
@@ -412,6 +415,12 @@ struct ProjectDetailView: View {
       await loadProgress()
       await loadAreas()
       await rehydrateNotes()
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
+      Task {
+        await loadProgress()
+        await loadAreas()
+      }
     }
   }
 

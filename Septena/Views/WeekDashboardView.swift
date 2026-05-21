@@ -111,6 +111,12 @@ struct WeekDashboardView: View {
         await loadAll()
       }
       .refreshable { await loadAll() }
+      // CK fetch landed (push, foreground refresh, or pull-to-refresh on
+      // any other surface) — repaint so today's task counts reflect
+      // mutations from other devices.
+      .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
+        Task { await loadAll() }
+      }
       // Day rollover: the dashboard is the most date-sensitive surface
       // (today's timeline, today's totals, 7-day windows ending today).
       // Refetch everything when `clock.today` flips.
