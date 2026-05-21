@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		008EADA54611F2118A61DB42 /* LogRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12E57B6D840EE59123B45F5 /* LogRow.swift */; };
+		026791A2DF6D93BEA1F659BE /* Resolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27CC3D4517460C542A710842 /* Resolver.swift */; };
 		029C02E7D76246B98F4F6C8B /* GroceriesDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83E5755C28C6B3D53D9031A7 /* GroceriesDestinationView.swift */; };
 		0448F507E1F1600F9933AEED /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5ECFDA9128B73993023CB6 /* Models.swift */; };
 		04F3C0CFD85B29B56734DFB0 /* AddChorePage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F970FE642809E3DD2E87C57 /* AddChorePage.swift */; };
@@ -15,6 +16,7 @@
 		06F8765D7D9BA1A94FE3984D /* NextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB6D9FD80512D4CD62AEFFFD /* NextView.swift */; };
 		07B127F5FBCE0DE19AFCD387 /* SectionTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03DC46C772E45B60ECB7343 /* SectionTheme.swift */; };
 		07F54D0DB13468114771FD91 /* Outbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD295FAB7B881CAC43EE8C34 /* Outbox.swift */; };
+		09B59A0D732B44E95964E19A /* Resolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27CC3D4517460C542A710842 /* Resolver.swift */; };
 		09C5366893B7255E08295C88 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBD31B55684A505738EB624C /* App.swift */; };
 		0CD1C4224F209299764240E3 /* AddTaskPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E02202E915B573B152BB3371 /* AddTaskPage.swift */; };
 		0EA3AE94FFBC7CC6A2869E36 /* TaskCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 486793A66A22C3DA7809337B /* TaskCommands.swift */; };
@@ -42,6 +44,7 @@
 		280ED2DB6BAD6301789C3A60 /* SectionManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474065C5EA4B37AC35AAC07C /* SectionManifest.swift */; };
 		2865329AE795A838CD3896E8 /* AddNutritionPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = DED03C8F5175C3FC2CD492ED /* AddNutritionPage.swift */; };
 		28777ACD729D9C78846219C4 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */; };
+		288822C1F37C59515A97A967 /* SeptenaServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D227602C1039FA2206A539A /* SeptenaServices.swift */; };
 		31907B76B454482FC198B6DB /* AddTaskPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E02202E915B573B152BB3371 /* AddTaskPage.swift */; };
 		350BABC5882550125A41C46D /* GroceriesDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83E5755C28C6B3D53D9031A7 /* GroceriesDestinationView.swift */; };
 		36325B1E6E5A771C01028105 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 31313A0E804B33A3E43FC1F6 /* Info.plist */; };
@@ -173,6 +176,7 @@
 		D4B1495C0BDE3AF22A629505 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */; };
 		D5765B4A1D684A7C420D5DE7 /* EditNutritionEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5C63CFFF3503ADC0B356ED8 /* EditNutritionEntrySheet.swift */; };
 		D6D209D590B58B2F43FC371D /* WatchBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B42D0FF98AD1F790A4F1F975 /* WatchBridge.swift */; };
+		D70A3B473E3ACD222FD15870 /* SeptenaServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D227602C1039FA2206A539A /* SeptenaServices.swift */; };
 		D770995846D0B23AC3F77F34 /* SeptenaClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 583220978001091137587977 /* SeptenaClient.swift */; };
 		D84CE356C37CEBDDCCDF1B74 /* SeptenaWatchComplication.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B456DE05339EB2A12EB2A9BE /* SeptenaWatchComplication.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		DB24B77414572DFAA30F6537 /* EditExerciseEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AE607CA6B994CD28B193CEB /* EditExerciseEntrySheet.swift */; };
@@ -277,6 +281,7 @@
 		23D4FD6096AAAF4FF35B1824 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		246D22B8CA77332FF2CC7A6C /* AddCannabisPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddCannabisPage.swift; sourceTree = "<group>"; };
 		25DC8E705099DB99718A8596 /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
+		27CC3D4517460C542A710842 /* Resolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Resolver.swift; sourceTree = "<group>"; };
 		29D4FAAB1E88C564EF898327 /* CaffeineDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaffeineDestinationView.swift; sourceTree = "<group>"; };
 		2D413F054F59B2A90A319154 /* TaskDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
 		31313A0E804B33A3E43FC1F6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -306,6 +311,7 @@
 		583220978001091137587977 /* SeptenaClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptenaClient.swift; sourceTree = "<group>"; };
 		59055370ABA84DB912D64D1E /* SeptenaMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeptenaMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5B49A0D20B2ECD672137900F /* Info-Mac.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Info-Mac.plist"; sourceTree = "<group>"; };
+		5D227602C1039FA2206A539A /* SeptenaServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptenaServices.swift; sourceTree = "<group>"; };
 		5FBFFB14069FB717EF02173A /* NextComplicationBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextComplicationBundle.swift; sourceTree = "<group>"; };
 		62BF9F7C16DF9595A999267D /* TaskRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskRecord.swift; sourceTree = "<group>"; };
 		64EB95DB6A86885B3FA483C1 /* Migration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Migration.swift; sourceTree = "<group>"; };
@@ -528,6 +534,7 @@
 				64EB95DB6A86885B3FA483C1 /* Migration.swift */,
 				1A7C4DF4E90BB39F4A0D23DE /* ProjectRecord.swift */,
 				7FD1B7B2BAE523F2E4D3F99C /* ProjectsBackend.swift */,
+				27CC3D4517460C542A710842 /* Resolver.swift */,
 				1CBF0DAD74F9392D507229CE /* TaskReads.swift */,
 				62BF9F7C16DF9595A999267D /* TaskRecord.swift */,
 				3882D64DF6517B0447F5F65C /* TasksBackend.swift */,
@@ -565,6 +572,7 @@
 				474065C5EA4B37AC35AAC07C /* SectionManifest.swift */,
 				C03DC46C772E45B60ECB7343 /* SectionTheme.swift */,
 				583220978001091137587977 /* SeptenaClient.swift */,
+				5D227602C1039FA2206A539A /* SeptenaServices.swift */,
 				B6DD7C05D998EF1301A6410D /* SuggestionEngine.swift */,
 				9C1C012D9D64C42D35820701 /* CloudKit */,
 			);
@@ -816,12 +824,14 @@
 				187093B93D48863B5E1E1E37 /* RemindersBridge.swift in Sources */,
 				8D5C2FF5F66A353AF7905E34 /* RemindersImportView.swift in Sources */,
 				88997E6D2F83CB1CF7B4BA69 /* RemindersInboxSection.swift in Sources */,
+				09B59A0D732B44E95964E19A /* Resolver.swift in Sources */,
 				6DB169E3C4B6BC5BA8855D66 /* ResponseCache.swift in Sources */,
 				7FC13B9F34D2BFBC8BAD9682 /* RootTabView.swift in Sources */,
 				B6CAA0E5E7DFD2D30F48DF14 /* SearchTabView.swift in Sources */,
 				280ED2DB6BAD6301789C3A60 /* SectionManifest.swift in Sources */,
 				07B127F5FBCE0DE19AFCD387 /* SectionTheme.swift in Sources */,
 				D770995846D0B23AC3F77F34 /* SeptenaClient.swift in Sources */,
+				288822C1F37C59515A97A967 /* SeptenaServices.swift in Sources */,
 				E02065B8AC82D19639A4CFAD /* SettingsView.swift in Sources */,
 				F62DAF6B252E82A6C8CB7167 /* SidebarView.swift in Sources */,
 				67D2267D2F8900C4AE0F234D /* SleepDestinationView.swift in Sources */,
@@ -940,12 +950,14 @@
 				94702073666C4968D36B96C5 /* RemindersBridge.swift in Sources */,
 				55C20E76DB4BB1B7C3306925 /* RemindersImportView.swift in Sources */,
 				BD2AEA299118EC671BAFF32E /* RemindersInboxSection.swift in Sources */,
+				026791A2DF6D93BEA1F659BE /* Resolver.swift in Sources */,
 				B211B2678BDDD3B30FD9307D /* ResponseCache.swift in Sources */,
 				CB921D3A1C0F91F0B1A767AB /* RootTabView.swift in Sources */,
 				63B5D55FED0B0465C2BBEE96 /* SearchTabView.swift in Sources */,
 				E6EB68149686E499DC25DC23 /* SectionManifest.swift in Sources */,
 				D3D801AE0714FA3E8696508A /* SectionTheme.swift in Sources */,
 				9ED913F259DC6E83E4EDB824 /* SeptenaClient.swift in Sources */,
+				D70A3B473E3ACD222FD15870 /* SeptenaServices.swift in Sources */,
 				1C848EE6B229B8FEE079CD97 /* SettingsView.swift in Sources */,
 				7FB3330B97BCBCB5D87C6F04 /* SidebarView.swift in Sources */,
 				1CCEDBAD872A0FA179B960A7 /* SleepDestinationView.swift in Sources */,

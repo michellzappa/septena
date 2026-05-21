@@ -21,41 +21,18 @@ struct SeptenaApp: App {
   /// re-render on midnight rollover and on each minute tick uniformly.
   @State private var dayClock = DayClock()
   private let localStore = LocalStore.shared
-  /// CloudKit sync engine. Held even when the backend flag is FastAPI
-  /// — `start()` is the gate, not construction; building one is cheap
-  /// and lets the SwiftData closures bind once at launch instead of
-  /// after a flag flip. Phase 1: dev-environment only.
-  @State private var ckEngine: CKEngine = CKEngine()
-  /// Owns the task write-path: applies optimistic SwiftData changes,
-  /// then hands off to CKSyncEngine. Views call this instead of
-  /// `SeptenaClient.*` for any task mutation so the UI never blocks on
-  /// the network.
-  @State private var taskMutator: TaskMutator = TaskMutator(
-    client: ClientProvider.shared.client,
-    context: LocalStore.shared.container.mainContext,
-    ckEngine: nil   // bound below in .task — needs the @State to be live first
-  )
-  /// Same router pattern as `taskMutator`, scoped to area mutations
-  /// (create / rename / delete / set-context). Views call this instead
-  /// of `SeptenaClient.replaceAreas(...)` so the CloudKit path can fire
-  /// without round-tripping FastAPI.
-  @State private var areasMutator: AreasMutator = AreasMutator(
-    client: ClientProvider.shared.client,
-    context: LocalStore.shared.container.mainContext
-  )
-  /// Same router pattern as `taskMutator`, scoped to project mutations.
-  @State private var projectsMutator: ProjectsMutator = ProjectsMutator(
-    client: ClientProvider.shared.client,
-    context: LocalStore.shared.container.mainContext
-  )
-  /// Generic queue for non-task mutations (habit toggles, intake logs,
-  /// chore complete/defer, grocery patches, training session posts).
-  /// View layer keeps its in-memory optimistic flips; this just delivers
-  /// the server-side write reliably, surviving offline + app restart.
-  @State private var httpOutbox: HTTPOutbox = HTTPOutbox(
-    client: ClientProvider.shared.client,
-    context: LocalStore.shared.container.mainContext
-  )
+  /// Process-wide accessor for the CloudKit-backed mutation stack.
+  /// Owns `ckEngine`, `taskMutator`, `areasMutator`, `projectsMutator`,
+  /// and `httpOutbox` so AppIntents (Siri / Shortcuts) can reach the
+  /// same instances the SwiftUI scene uses — see SeptenaServices.swift
+  /// for the rationale. The properties below are convenience aliases
+  /// so the view body / environment-injection sites read like before.
+  private let services = SeptenaServices.shared
+  private var ckEngine: CKEngine { services.ckEngine }
+  private var taskMutator: TaskMutator { services.taskMutator }
+  private var areasMutator: AreasMutator { services.areasMutator }
+  private var projectsMutator: ProjectsMutator { services.projectsMutator }
+  private var httpOutbox: HTTPOutbox { services.httpOutbox }
   /// Drives drainer kicks on foreground / coming-back-online transitions.
   @Environment(\.scenePhase) private var scenePhase
   #if os(iOS)
@@ -115,96 +92,11 @@ struct SeptenaApp: App {
           // migration corruption / partial-state situations in the
           // console immediately — no Inspector required.
           LocalCache.logTaskStateSummary(in: localStore.container.mainContext)
-          // Bind the CloudKit engine to the task mutator and install its
-          // SwiftData seams.
-          let context = localStore.container.mainContext
-          // Single dispatcher for outbound records: try Task, then Project,
-          // then Area. Within a CK zone recordNames are unique, so at most
-          // one entity type holds each id.
-          ckEngine.recordProvider = { recordID in
-            let id = recordID.recordName
-            if let entity = try? context.fetch(FetchDescriptor<TaskEntity>(
-              predicate: #Predicate { $0.id == id }
-            )).first {
-              return entity.toCloudKitRecord()
-            }
-            if let entity = try? context.fetch(FetchDescriptor<ProjectEntity>(
-              predicate: #Predicate { $0.id == id }
-            )).first {
-              return entity.toCloudKitRecord()
-            }
-            if let entity = try? context.fetch(FetchDescriptor<AreaEntity>(
-              predicate: #Predicate { $0.id == id }
-            )).first {
-              return entity.toCloudKitRecord()
-            }
-            return nil
-          }
-          ckEngine.applyFetchedRecord = { record in
-            let id = record.recordID.recordName
-            switch record.recordType {
-            case TaskCloudKitSchema.recordType:
-              if let entity = try? context.fetch(FetchDescriptor<TaskEntity>(
-                predicate: #Predicate { $0.id == id }
-              )).first {
-                entity.apply(record)
-              } else {
-                context.insert(TaskEntity(cloudKit: record))
-              }
-            case ProjectCloudKitSchema.recordType:
-              if let entity = try? context.fetch(FetchDescriptor<ProjectEntity>(
-                predicate: #Predicate { $0.id == id }
-              )).first {
-                entity.apply(record)
-              } else {
-                context.insert(ProjectEntity(cloudKit: record))
-              }
-            case AreaCloudKitSchema.recordType:
-              if let entity = try? context.fetch(FetchDescriptor<AreaEntity>(
-                predicate: #Predicate { $0.id == id }
-              )).first {
-                entity.apply(record)
-              } else {
-                context.insert(AreaEntity(cloudKit: record))
-              }
-            default:
-              SeptenaLog.info("[CKEngine] applyFetched: unknown recordType \(record.recordType) id=\(id)")
-            }
-            // No save / notification here — `applyDidFinishBatch` does
-            // both once per batch.
-          }
-          ckEngine.applyDeletedRecord = { recordID, recordType in
-            let id = recordID.recordName
-            switch recordType {
-            case TaskCloudKitSchema.recordType:
-              if let entity = try? context.fetch(FetchDescriptor<TaskEntity>(
-                predicate: #Predicate { $0.id == id }
-              )).first {
-                context.delete(entity)
-              }
-            case ProjectCloudKitSchema.recordType:
-              if let entity = try? context.fetch(FetchDescriptor<ProjectEntity>(
-                predicate: #Predicate { $0.id == id }
-              )).first {
-                context.delete(entity)
-              }
-            case AreaCloudKitSchema.recordType:
-              if let entity = try? context.fetch(FetchDescriptor<AreaEntity>(
-                predicate: #Predicate { $0.id == id }
-              )).first {
-                context.delete(entity)
-              }
-            default:
-              SeptenaLog.info("[CKEngine] applyDeleted: unknown recordType \(recordType) id=\(id)")
-            }
-          }
-          ckEngine.applyDidFinishBatch = {
-            try? context.save()
-            NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
-          }
-          taskMutator.bind(ckEngine: ckEngine)
-          areasMutator.bind(ckEngine: ckEngine)
-          projectsMutator.bind(ckEngine: ckEngine)
+          // Wire CKEngine's SwiftData seams, bind the mutators, start
+          // the engine. Idempotent — AppIntents call the same entry
+          // point, so a Siri-triggered cold launch and the scene's
+          // `.task` race safely.
+          await services.start()
           // Stash the engine on the platform's app delegate so silent
           // remote-notification callbacks (which aren't part of any
           // SwiftUI view hierarchy) can hand the push payload back to
@@ -215,7 +107,6 @@ struct SeptenaApp: App {
           #if os(macOS)
           MacAppDelegate.ckEngine = ckEngine
           #endif
-          ckEngine.start()
           // Two-phase load for tile order + section colors. Disk reads
           // are synchronous so the dashboard renders with the user's
           // ordering and palette on the first frame; the network refresh
@@ -232,6 +123,7 @@ struct SeptenaApp: App {
           // in. After they re-run Re-sync to iCloud, the engine's
           // applyFetchedRecord keeps the mirror in sync from CK and this
           // branch is a no-op.
+          let context = localStore.container.mainContext
           let areaCount = (try? context.fetchCount(FetchDescriptor<AreaEntity>())) ?? 0
           let projectCount = (try? context.fetchCount(FetchDescriptor<ProjectEntity>())) ?? 0
           SeptenaLog.info("[Hydrate] CK mode launch: areas=\(areaCount) projects=\(projectCount)")
@@ -715,13 +607,16 @@ private struct MenuBarMenu: View {
 
 // MARK: - App Intent: "Add to Septena"
 //
-// Powers Siri ("Hey Siri, add buy milk to Septena"), Spotlight actions, and
-// Shortcuts.app. Runs in-process when invoked from inside the app, in the
-// AppIntents extension otherwise — `ClientProvider.shared` is process-local
-// either way, so it reads the server URL from this process's UserDefaults.
-// Default server URL is used when running outside the app process; to
-// support a custom URL there, an App Group + shared UserDefaults suite
-// would need to be added.
+// Powers Siri ("Hey Siri, add buy milk to Septena"), Spotlight actions,
+// and Shortcuts.app. Runs in the app's own process — when the system
+// triggers an intent with the app cold-killed, iOS launches it in the
+// background just to run `perform()`. That cold-launch path may execute
+// before the SwiftUI scene's `.task` mounts, so we can't assume the
+// CKEngine has been bound. `SeptenaServices.shared.start()` is the
+// shared, idempotent entry point: both the scene and this intent call
+// it, the first one wires the stack, the second awaits the same task.
+// Once it returns, `taskMutator.create(...)` routes to CloudKit instead
+// of falling back to FastAPI.
 
 struct AddTaskIntent: AppIntent {
   static let title: LocalizedStringResource = "Add Task"
@@ -732,7 +627,8 @@ struct AddTaskIntent: AppIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult & ProvidesDialog {
-    _ = try await ClientProvider.shared.client.create(title: taskTitle)
+    await SeptenaServices.shared.start()
+    _ = SeptenaServices.shared.taskMutator.create(title: taskTitle)
     return .result(dialog: "Added “\(taskTitle)” to Septena.")
   }
 }
