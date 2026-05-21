@@ -1,36 +1,15 @@
 import Foundation
 import SwiftData
 
-// MARK: - Shared id + slug helpers
+// MARK: - Shared id helpers
 //
 // ⚠️  IDENTIFIER MODEL — applies to ALL label-style entities project-wide.
-//     Read [IDENTIFIERS.md](IDENTIFIERS.md) before adding a new entity type
-//     (chore, habit, section, etc) to CK or to the MCP surface. Do not
-//     invent a per-type id scheme.
+//     Read [IDENTIFIERS.md](IDENTIFIERS.md) before adding a new entity type.
+//     Do not invent a per-type id scheme.
 //
 //   • `id`   — frozen at creation, base32 shortid. Internal stable key,
-//              CKRecord.recordName, FK target.
-//   • `slug` — derived from title, auto-updates on rename, deduped.
-//              Natural-name lookup for MCP / UI / deeplinks.
-//   • `title`— freely editable display string.
-//
-// `IDShortcode` and `IDSlug` below are the shared primitives — reuse them
-// from any new backend; do not duplicate.
-
-/// Generate URL-safe slugs from human titles. The slug field on each
-/// label-style entity is recomputed via this on every rename; collisions
-/// resolve to `home-2`, `home-3`, … via dedup at the backend layer.
-enum IDSlug {
-  static func from(_ name: String) -> String {
-    let s = name.lowercased()
-      .components(separatedBy: CharacterSet.alphanumerics.inverted)
-      .joined(separator: "-")
-      .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
-    // Empty input (purely-non-alphanumeric title) falls back to a
-    // timestamp-based hint so two empty-name records don't collide.
-    return s.isEmpty ? "item-\(Int(Date().timeIntervalSince1970))" : s
-  }
-}
+//              CKRecord.recordName, FK target. Invisible to users.
+//   • `title`— freely editable display string. The only user-facing name.
 
 /// Generate opaque, immutable identifiers for new records. base32-style
 /// alphabet (no `0/o/1/l/i` — characters that are easy to misread in
@@ -106,6 +85,15 @@ final class AreasMutator: AreasBackend {
   func delete(id: String) async throws {
     try await current.delete(id: id)
   }
+
+  /// Forensic — create a record with a specific id. CK-mode only.
+  @discardableResult
+  func createWithExplicitID(id: String, title: String, context ctx: String? = nil) async throws -> Area {
+    guard let ck = ckBackend else {
+      throw NSError(domain: "AreasMutator", code: -1, userInfo: [NSLocalizedDescriptionKey: "createWithExplicitID requires CloudKit backend"])
+    }
+    return try await ck.createWithExplicitID(id: id, title: title, context: ctx)
+  }
 }
 
 // MARK: - FastAPI impl
@@ -116,15 +104,13 @@ private final class FastAPIAreasBackend: AreasBackend {
   init(client: SeptenaClient) { self.client = client }
 
   func create(title: String, context ctx: String?) async throws -> Area {
+    // FastAPI fallback is a dead-coded bootstrap path; CloudKit is the
+    // canonical write path. If reached, use a random shortcode for id —
+    // no slug derivation since the slug concept is gone.
     let current = try await client.areas()
-    // Dedup against the server's existing list so two "Home" entries
-    // don't collide. Same slug pattern as the CloudKit backend.
-    let base = IDSlug.from(title)
-    var id = base
-    if current.contains(where: { $0.id == id }) {
-      var i = 2
-      while current.contains(where: { $0.id == "\(base)-\(i)" }) { i += 1 }
-      id = "\(base)-\(i)"
+    var id = IDShortcode.generate(length: 4)
+    while current.contains(where: { $0.id == id }) {
+      id = IDShortcode.generate(length: 6)
     }
     let next = current + [Area(id: id, title: title, context: ctx)]
     let updated = try await client.replaceAreas(next)
@@ -184,20 +170,6 @@ final class CloudKitAreasBackend: AreasBackend {
     return String(UUID().uuidString.prefix(8)).lowercased()
   }
 
-  /// Dedup a candidate slug against every other live area (excluding the
-  /// caller's own id, so renaming to the same title doesn't add a `-2`).
-  /// Returns the base slug if free, else `base-2`, `base-3`, …
-  private func uniqueSlug(for name: String, excluding ownId: String?) -> String {
-    let base = IDSlug.from(name)
-    let descriptor = FetchDescriptor<AreaEntity>()
-    let all = (try? context.fetch(descriptor)) ?? []
-    let taken = Set(all.compactMap { $0.id == ownId ? nil : $0.slug })
-    if !taken.contains(base) { return base }
-    var i = 2
-    while taken.contains("\(base)-\(i)") { i += 1 }
-    return "\(base)-\(i)"
-  }
-
   private func commitAndPush(_ entity: AreaEntity, op: String, deletion: Bool = false) {
     let id = entity.id
     let title = entity.title
@@ -216,28 +188,32 @@ final class CloudKitAreasBackend: AreasBackend {
 
   func create(title: String, context ctx: String?) async throws -> Area {
     let newId = uniqueShortcode()
-    let newSlug = uniqueSlug(for: title, excluding: nil)
-    let entity = AreaEntity(id: newId, title: title, context: ctx,
-                            slug: newSlug)
+    let entity = AreaEntity(id: newId, title: title, context: ctx)
     context.insert(entity)
-    commitAndPush(entity, op: "create slug=\(newSlug)")
+    commitAndPush(entity, op: "create")
+    return Area(entity)
+  }
+
+  /// Forensic create: caller supplies the entity id (becomes CKRecord
+  /// recordName `area:<id>`). Used to rebuild a missing record so that
+  /// existing dangling task/project references (which match on entity id)
+  /// resolve. Skips uniqueShortcode because the caller is asserting a
+  /// specific identity.
+  @discardableResult
+  func createWithExplicitID(id: String, title: String, context ctx: String? = nil) async throws -> Area {
+    if let existing = fetch(id: id) {
+      return Area(existing)
+    }
+    let entity = AreaEntity(id: id, title: title, context: ctx)
+    context.insert(entity)
+    commitAndPush(entity, op: "create(explicit-id)")
     return Area(entity)
   }
 
   func rename(id: String, to title: String) async throws {
     guard let entity = fetch(id: id) else { return }
-    let oldSlug = entity.slug ?? entity.id
-    let newSlug = uniqueSlug(for: title, excluding: id)
     entity.title = title
-    if newSlug != oldSlug {
-      // Capture the old slug so a recently-renamed area still resolves
-      // by its previous name for ~3 renames worth of grace. FIFO, cap 3.
-      var history = [oldSlug] + entity.previousSlugs.filter { $0 != oldSlug }
-      if history.count > 3 { history = Array(history.prefix(3)) }
-      entity.previousSlugs = history
-      entity.slug = newSlug
-    }
-    commitAndPush(entity, op: "rename slug=\(newSlug)")
+    commitAndPush(entity, op: "rename")
   }
 
   func setContext(id: String, context ctx: String?) async throws {

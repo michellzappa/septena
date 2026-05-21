@@ -27,8 +27,11 @@ static let todaySetOn = "todaySetOn"
 static let completedAt = "completedAt"
 static let area = "area"
 static let project = "project"
-    /// Plain field (was encrypted; switched for MCP-gateway access).
-static let notes = "notes"
+    /// Legacy CloudKit schema field. Already typed as ENCRYPTED_STRING.
+static let encryptedNotes = "notes"
+    /// Plaintext replacement for cross-surface access. CloudKit field
+    /// types are immutable, so this cannot reuse the legacy `notes` name.
+static let notesText = "notesText"
 static let recurrenceUnit = "recurrenceUnit"
 static let recurrenceInterval = "recurrenceInterval"
 static let recurrenceAfterCompletion = "recurrenceAfterCompletion"
@@ -92,15 +95,10 @@ extension TaskEntity {
     record[TaskCloudKitSchema.Field.recurrenceInterval] = recurrenceInterval
     record[TaskCloudKitSchema.Field.recurrenceAfterCompletion] = recurrenceAfterCompletion ? 1 : 0
 
-    // Stored as a plain field so the MCP gateway (CKWS REST, no access
-    // to the per-user iCloud Keychain) can read and write notes too.
-    // Server-side at-rest encryption still applies; we trade E2E
-    // encryption for cross-surface access. Don't touch encryptedValues
-    // here — CloudKit raises NSInvalidArgumentException if the same
-    // field name appears on both `record` and `record.encryptedValues`
-    // in the same save. Legacy encrypted notes (if any) are handled by
-    // the read-fallback in apply(_:).
-    record[TaskCloudKitSchema.Field.notes] = notes
+    // Write plaintext under a new field name. The old `notes` field is
+    // permanently ENCRYPTED_STRING in the CK schema, so attempting to
+    // write a STRING there fails even after a zone reset.
+    record[TaskCloudKitSchema.Field.notesText] = notes
 
     return record
   }
@@ -131,8 +129,8 @@ func apply(_ record: CKRecord) {
     }
     // Read plain first, fall back to the legacy encrypted bag for records
     // that haven't been re-saved since the plaintext switch.
-    notes = (record[TaskCloudKitSchema.Field.notes] as? String)
-      ?? (record.encryptedValues[TaskCloudKitSchema.Field.notes] as? String)
+    notes = (record[TaskCloudKitSchema.Field.notesText] as? String)
+      ?? (record.encryptedValues[TaskCloudKitSchema.Field.encryptedNotes] as? String)
     captureCloudKitSystemFields(from: record)
   }
 

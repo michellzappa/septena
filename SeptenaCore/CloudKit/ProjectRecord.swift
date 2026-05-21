@@ -7,6 +7,10 @@ import SwiftData
 
 enum ProjectCloudKitSchema {
   static let recordType = "Project"
+  static func recordName(for id: String) -> String { "project:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    recordName.hasPrefix("project:") ? String(recordName.dropFirst(8)) : recordName
+  }
 
   enum Field {
     static let title = "title"
@@ -14,14 +18,13 @@ enum ProjectCloudKitSchema {
     static let area = "area"
     static let created = "created"
     static let completedAt = "completedAt"
-    /// Plain field (was encrypted; switched for MCP-gateway access).
-    static let notes = "notes"
+    /// Legacy CloudKit schema field. Already typed as ENCRYPTED_STRING.
+    static let encryptedNotes = "notes"
+    /// Plaintext replacement for cross-surface access. CloudKit field
+    /// types are immutable, so this cannot reuse the legacy `notes` name.
+    static let notesText = "notesText"
     static let context = "context"
     static let githubRepo = "githubRepo"
-    /// Natural-name identifier. Mutable, deduped — see [IDENTIFIERS.md].
-    static let slug = "slug"
-    /// FIFO history of the last 3 slugs (STRING_LIST on the CK side).
-    static let previousSlugs = "previousSlugs"
 
     // Reserved.
     static let reservedString1 = "reservedString1"
@@ -51,7 +54,7 @@ extension ProjectEntity {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: ProjectCloudKitSchema.recordType,
-      recordID: CKRecord.ID(recordName: id, zoneID: SeptenaCloudKit.zoneID)
+      recordID: CKRecord.ID(recordName: ProjectCloudKitSchema.recordName(for: id), zoneID: SeptenaCloudKit.zoneID)
     )
     record[ProjectCloudKitSchema.Field.title] = title
     record[ProjectCloudKitSchema.Field.status] = statusRaw
@@ -60,14 +63,10 @@ extension ProjectEntity {
     record[ProjectCloudKitSchema.Field.completedAt] = completedAt
     record[ProjectCloudKitSchema.Field.context] = context
     record[ProjectCloudKitSchema.Field.githubRepo] = githubRepo
-    record[ProjectCloudKitSchema.Field.slug] = slug
-    // Skip empty arrays — see AreaRecord for the same workaround.
-    if !previousSlugs.isEmpty {
-      record[ProjectCloudKitSchema.Field.previousSlugs] = previousSlugs
-    }
-    // Plaintext for MCP-gateway compatibility — see TaskRecord for
-    // rationale, including why we don't touch encryptedValues here.
-    record[ProjectCloudKitSchema.Field.notes] = notes
+    // Write plaintext under a new field name. The old `notes` field is
+    // permanently ENCRYPTED_STRING in the CK schema, so attempting to
+    // write a STRING there fails even after a zone reset.
+    record[ProjectCloudKitSchema.Field.notesText] = notes
     return record
   }
 }
@@ -83,16 +82,13 @@ extension ProjectEntity {
     completedAt = record[ProjectCloudKitSchema.Field.completedAt] as? String
     context = record[ProjectCloudKitSchema.Field.context] as? String
     githubRepo = record[ProjectCloudKitSchema.Field.githubRepo] as? String
-    slug = record[ProjectCloudKitSchema.Field.slug] as? String
-    previousSlugs = (record[ProjectCloudKitSchema.Field.previousSlugs] as? [String]) ?? []
-    if slug == nil, !id.isEmpty { slug = id }
-    notes = (record[ProjectCloudKitSchema.Field.notes] as? String)
-      ?? (record.encryptedValues[ProjectCloudKitSchema.Field.notes] as? String)
+    notes = (record[ProjectCloudKitSchema.Field.notesText] as? String)
+      ?? (record.encryptedValues[ProjectCloudKitSchema.Field.encryptedNotes] as? String)
     captureCloudKitSystemFields(from: record)
   }
 
   convenience init(cloudKit record: CKRecord) {
-    self.init(id: record.recordID.recordName, title: "")
+    self.init(id: ProjectCloudKitSchema.entityID(from: record.recordID.recordName), title: "")
     apply(record)
   }
 }

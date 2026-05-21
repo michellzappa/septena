@@ -68,22 +68,32 @@ final class SeptenaServices {
     let task = Task { @MainActor [self] in
       let context = LocalStore.shared.container.mainContext
 
-      // Single dispatcher for outbound records: try Task, then Project,
-      // then Area. Within a CK zone recordNames are unique, so at most
-      // one entity type holds each id.
+      // Single dispatcher for outbound records. CK record IDs are
+      // zone-wide, so Area/Project record names are type-prefixed to
+      // avoid natural-id collisions like area "septena" and project
+      // "septena".
       ckEngine.recordProvider = { recordID in
-        let id = recordID.recordName
+        let recordName = recordID.recordName
+        if recordName.hasPrefix("area:") {
+          let id = AreaCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<AreaEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
+        if recordName.hasPrefix("project:") {
+          let id = ProjectCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<ProjectEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
+        let id = recordName
         if let entity = try? context.fetch(FetchDescriptor<TaskEntity>(
-          predicate: #Predicate { $0.id == id }
-        )).first {
-          return entity.toCloudKitRecord()
-        }
-        if let entity = try? context.fetch(FetchDescriptor<ProjectEntity>(
-          predicate: #Predicate { $0.id == id }
-        )).first {
-          return entity.toCloudKitRecord()
-        }
-        if let entity = try? context.fetch(FetchDescriptor<AreaEntity>(
           predicate: #Predicate { $0.id == id }
         )).first {
           return entity.toCloudKitRecord()
@@ -91,9 +101,9 @@ final class SeptenaServices {
         return nil
       }
       ckEngine.applyFetchedRecord = { record in
-        let id = record.recordID.recordName
         switch record.recordType {
         case TaskCloudKitSchema.recordType:
+          let id = record.recordID.recordName
           if let entity = try? context.fetch(FetchDescriptor<TaskEntity>(
             predicate: #Predicate { $0.id == id }
           )).first {
@@ -102,6 +112,7 @@ final class SeptenaServices {
             context.insert(TaskEntity(cloudKit: record))
           }
         case ProjectCloudKitSchema.recordType:
+          let id = ProjectCloudKitSchema.entityID(from: record.recordID.recordName)
           if let entity = try? context.fetch(FetchDescriptor<ProjectEntity>(
             predicate: #Predicate { $0.id == id }
           )).first {
@@ -110,6 +121,7 @@ final class SeptenaServices {
             context.insert(ProjectEntity(cloudKit: record))
           }
         case AreaCloudKitSchema.recordType:
+          let id = AreaCloudKitSchema.entityID(from: record.recordID.recordName)
           if let entity = try? context.fetch(FetchDescriptor<AreaEntity>(
             predicate: #Predicate { $0.id == id }
           )).first {
@@ -118,34 +130,36 @@ final class SeptenaServices {
             context.insert(AreaEntity(cloudKit: record))
           }
         default:
-          SeptenaLog.info("[CKEngine] applyFetched: unknown recordType \(record.recordType) id=\(id)")
+          SeptenaLog.info("[CKEngine] applyFetched: unknown recordType \(record.recordType) id=\(record.recordID.recordName)")
         }
         // No save / notification here — `applyDidFinishBatch` does
         // both once per batch.
       }
       ckEngine.applyDeletedRecord = { recordID, recordType in
-        let id = recordID.recordName
         switch recordType {
         case TaskCloudKitSchema.recordType:
+          let id = recordID.recordName
           if let entity = try? context.fetch(FetchDescriptor<TaskEntity>(
             predicate: #Predicate { $0.id == id }
           )).first {
             context.delete(entity)
           }
         case ProjectCloudKitSchema.recordType:
+          let id = ProjectCloudKitSchema.entityID(from: recordID.recordName)
           if let entity = try? context.fetch(FetchDescriptor<ProjectEntity>(
             predicate: #Predicate { $0.id == id }
           )).first {
             context.delete(entity)
           }
         case AreaCloudKitSchema.recordType:
+          let id = AreaCloudKitSchema.entityID(from: recordID.recordName)
           if let entity = try? context.fetch(FetchDescriptor<AreaEntity>(
             predicate: #Predicate { $0.id == id }
           )).first {
             context.delete(entity)
           }
         default:
-          SeptenaLog.info("[CKEngine] applyDeleted: unknown recordType \(recordType) id=\(id)")
+          SeptenaLog.info("[CKEngine] applyDeleted: unknown recordType \(recordType) id=\(recordID.recordName)")
         }
       }
       ckEngine.applyDidFinishBatch = {

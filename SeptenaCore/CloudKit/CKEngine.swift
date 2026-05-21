@@ -82,6 +82,7 @@ var applyDidFinishBatch: (() -> Void)?
   /// called explicitly (e.g. on scenePhase active). Observable so views
   /// can disable migration / show a banner without polling.
 var accountStatus: CKAccountStatus = .couldNotDetermine
+  private var lastSendFailureSummary: String?
 
 init() {
     self.container = CKContainer(identifier: SeptenaCloudKit.containerIdentifier)
@@ -179,10 +180,10 @@ func noteTaskDeletion(id: String) { noteDeletion(recordName: id, kind: "task") }
   // Area / Project pendants. CK doesn't distinguish by record type at the
   // engine layer — a pending save is a pending save — but logging the
   // kind helps when reading [CKEngine] traces post-mortem.
-func noteAreaChange(id: String) { noteChange(recordName: id, kind: "area") }
-func noteAreaDeletion(id: String) { noteDeletion(recordName: id, kind: "area") }
-func noteProjectChange(id: String) { noteChange(recordName: id, kind: "project") }
-func noteProjectDeletion(id: String) { noteDeletion(recordName: id, kind: "project") }
+func noteAreaChange(id: String) { noteChange(recordName: AreaCloudKitSchema.recordName(for: id), kind: "area") }
+func noteAreaDeletion(id: String) { noteDeletion(recordName: AreaCloudKitSchema.recordName(for: id), kind: "area") }
+func noteProjectChange(id: String) { noteChange(recordName: ProjectCloudKitSchema.recordName(for: id), kind: "project") }
+func noteProjectDeletion(id: String) { noteDeletion(recordName: ProjectCloudKitSchema.recordName(for: id), kind: "project") }
 
   private func noteChange(recordName: String, kind: String) {
     guard let engine else {
@@ -222,7 +223,13 @@ func noteProjectDeletion(id: String) { noteDeletion(recordName: id, kind: "proje
   /// on actual server delivery rather than firing-and-hoping.
   func sendChanges() async throws {
     guard let engine else { return }
+    lastSendFailureSummary = nil
     try await engine.sendChanges()
+  }
+
+  func consumeLastSendFailureSummary() -> String? {
+    defer { lastSendFailureSummary = nil }
+    return lastSendFailureSummary
   }
 
   /// Pull any server-side changes the engine hasn't seen yet. Awaits
@@ -230,6 +237,62 @@ func noteProjectDeletion(id: String) { noteDeletion(recordName: id, kind: "proje
   func fetchChanges() async throws {
     guard let engine else { return }
     try await engine.fetchChanges()
+  }
+
+  /// Drop this install's persisted CKSyncEngine state without touching
+  /// CloudKit records. Use before replacing the local mirror from a
+  /// full-zone CloudKit query so stale pending saves/deletes from this
+  /// device cannot replay after the mirror has been rebuilt.
+  func discardLocalSyncState() {
+    engine = nil
+    lastSendFailureSummary = nil
+    try? FileManager.default.removeItem(at: stateURL)
+    SeptenaLog.info("[CKEngine] local sync state discarded")
+  }
+
+  /// Full-zone repair read. `CKSyncEngine.fetchChanges()` is token-based;
+  /// if a local mirror was seeded from a different historical state, the
+  /// token stream may not be enough for a human-visible "show me the whole
+  /// cloud truth" repair.
+  ///
+  /// Use zone changes from a nil token instead of CKQuery. Querying all
+  /// records requires queryable schema indexes, and Development schema
+  /// may reject even broad queries when `recordName` is not marked
+  /// queryable. Zone-change fetches are the native custom-zone replay API
+  /// and return all current live records without those indexes.
+  func fetchAllRecords(recordTypes: [CKRecord.RecordType]) async throws -> [CKRecord] {
+    let acceptedTypes = Set(recordTypes)
+    var token: CKServerChangeToken?
+    var moreComing = true
+    var recordsByID: [CKRecord.ID: CKRecord] = [:]
+
+    while moreComing {
+      let page = try await database.recordZoneChanges(
+        inZoneWith: SeptenaCloudKit.zoneID,
+        since: token,
+        desiredKeys: nil,
+        resultsLimit: nil
+      )
+      for (recordID, result) in page.modificationResultsByID {
+        switch result {
+        case .success(let modification):
+          let record = modification.record
+          if acceptedTypes.contains(record.recordType) {
+            recordsByID[recordID] = record
+          }
+        case .failure(let error):
+          SeptenaLog.error("[CKEngine] zone replay record FAIL id=\(recordID.recordName) error=\(error.localizedDescription)")
+        }
+      }
+      token = page.changeToken
+      moreComing = page.moreComing
+    }
+
+    let records = Array(recordsByID.values)
+    let counts = Dictionary(grouping: records, by: \.recordType)
+      .mapValues(\.count)
+    SeptenaLog.info("[CKEngine] zone replay records=\(records.count) counts=\(String(describing: counts))")
+    return records
   }
 
   /// Nuclear option for dev: delete the custom zone on the server,
@@ -264,6 +327,7 @@ func noteProjectDeletion(id: String) { noteDeletion(recordName: id, kind: "proje
     // zone gone, none of it is meaningful anymore. A fresh engine
     // starts with no preconceptions and rebuilds from scratch.
     engine = nil
+    lastSendFailureSummary = nil
     try? FileManager.default.removeItem(at: stateURL)
     SeptenaLog.info("[CKEngine] resetZone: engine state cleared, restarting")
     start()
@@ -320,17 +384,23 @@ func handleEvent(
 
     case .fetchedRecordZoneChanges(let changes):
       SeptenaLog.info("[CKEngine] fetched: +\(changes.modifications.count) ~ -\(changes.deletions.count) reset=\(applyingResetCascade)")
-      for mod in changes.modifications {
-        applyFetchedRecord?(mod.record)
-      }
-      for del in changes.deletions {
-        if applyingResetCascade {
-          SeptenaLog.info("[CKEngine] fetched.delete IGNORED (reset) id=\(del.recordID.recordName)")
-          continue
+      // Force every closure invocation onto MainActor. The closures
+      // touch SwiftData's mainContext, which isn't thread-safe — and
+      // @MainActor on the enclosing class isn't sufficient because
+      // CKSyncEngine calls our handlers from its own executor.
+      await MainActor.run {
+        for mod in changes.modifications {
+          applyFetchedRecord?(mod.record)
         }
-        applyDeletedRecord?(del.recordID, del.recordType)
+        for del in changes.deletions {
+          if applyingResetCascade {
+            SeptenaLog.info("[CKEngine] fetched.delete IGNORED (reset) id=\(del.recordID.recordName)")
+            continue
+          }
+          applyDeletedRecord?(del.recordID, del.recordType)
+        }
+        applyDidFinishBatch?()
       }
-      applyDidFinishBatch?()
 
     case .sentRecordZoneChanges(let sent):
       // `savedRecords` are the records the server accepted and stamped
@@ -341,16 +411,24 @@ func handleEvent(
       // already knows about them), so this is the only path that
       // updates `cloudKitSystemFields` post-send.
       SeptenaLog.info("[CKEngine] sent: saves=\(sent.savedRecords.count) deletes=\(sent.deletedRecordIDs.count) failedSaves=\(sent.failedRecordSaves.count) failedDeletes=\(sent.failedRecordDeletes.count)")
-      for save in sent.savedRecords {
-        applyFetchedRecord?(save)
+      await MainActor.run {
+        for save in sent.savedRecords {
+          applyFetchedRecord?(save)
+        }
+        for fail in sent.failedRecordSaves {
+          SeptenaLog.error("[CKEngine] sent.save FAIL id=\(fail.record.recordID.recordName) error=\(fail.error.localizedDescription)")
+        }
+        for (recordID, error) in sent.failedRecordDeletes {
+          SeptenaLog.error("[CKEngine] sent.delete FAIL id=\(recordID.recordName) error=\(error.localizedDescription)")
+        }
+        if !sent.failedRecordSaves.isEmpty || !sent.failedRecordDeletes.isEmpty {
+          lastSendFailureSummary = Self.sendFailureSummary(
+            failedSaves: sent.failedRecordSaves,
+            failedDeletes: Array(sent.failedRecordDeletes)
+          )
+        }
+        applyDidFinishBatch?()
       }
-      for fail in sent.failedRecordSaves {
-        SeptenaLog.error("[CKEngine] sent.save FAIL id=\(fail.record.recordID.recordName) error=\(fail.error.localizedDescription)")
-      }
-      for (recordID, error) in sent.failedRecordDeletes {
-        SeptenaLog.error("[CKEngine] sent.delete FAIL id=\(recordID.recordName) error=\(error.localizedDescription)")
-      }
-      applyDidFinishBatch?()
 
     case .fetchedDatabaseChanges, .sentDatabaseChanges,
          .willFetchChanges, .didFetchChanges,
@@ -370,8 +448,68 @@ func nextRecordZoneChangeBatch(
     let pending = syncEngine.state.pendingRecordZoneChanges
       .filter { context.options.scope.contains($0) }
     guard !pending.isEmpty else { return nil }
-    return await CKSyncEngine.RecordZoneChangeBatch(pendingChanges: pending) { [recordProvider] recordID in
-      recordProvider?(recordID)
+    // Pre-resolve every record on MainActor before handing the batch
+    // builder a pure dictionary-lookup closure. CKSyncEngine's batch
+    // builder may invoke the resolver on a background queue; if it
+    // touched SwiftData there we'd corrupt the main context.
+    let resolved: [CKRecord.ID: CKRecord] = await MainActor.run {
+      var out: [CKRecord.ID: CKRecord] = [:]
+      for change in pending {
+        // PendingRecordZoneChange is an enum (.saveRecord(id) / .deleteRecord(id)).
+        // We only need the save case here — deletes don't ask the
+        // resolver for a CKRecord.
+        guard case .saveRecord(let id) = change else { continue }
+        if out[id] == nil, let rec = recordProvider?(id) {
+          out[id] = rec
+        }
+      }
+      return out
     }
+    return await CKSyncEngine.RecordZoneChangeBatch(pendingChanges: pending) { recordID in
+      resolved[recordID]
+    }
+  }
+
+  private static func sendFailureSummary(
+    failedSaves: [CKSyncEngine.Event.SentRecordZoneChanges.FailedRecordSave],
+    failedDeletes: [(CKRecord.ID, any Error)]
+  ) -> String {
+    var lines: [String] = []
+    for failure in failedSaves.prefix(5) {
+      lines.append(describeSaveFailure(failure))
+    }
+    for (recordID, error) in failedDeletes.prefix(5) {
+      lines.append("delete \(recordID.recordName): \(describeError(error))")
+    }
+    let overflow = failedSaves.count + failedDeletes.count - lines.count
+    if overflow > 0 {
+      lines.append("+\(overflow) more CloudKit failures")
+    }
+    return lines.joined(separator: "\n")
+  }
+
+  private static func describeSaveFailure(
+    _ failure: CKSyncEngine.Event.SentRecordZoneChanges.FailedRecordSave
+  ) -> String {
+    let record = failure.record
+    return "save \(record.recordType)/\(record.recordID.recordName): \(describeError(failure.error))"
+  }
+
+  private static func describeError(_ error: any Error) -> String {
+    guard let ckError = error as? CKError else {
+      return error.localizedDescription
+    }
+    var parts = ["\(ckError.code)"]
+    let message = ckError.localizedDescription
+    if !message.isEmpty {
+      parts.append(message)
+    }
+    if let server = ckError.serverRecord {
+      parts.append("server=\(server.recordType)/\(server.recordID.recordName)")
+    }
+    if let ancestor = ckError.ancestorRecord {
+      parts.append("ancestor=\(ancestor.recordType)/\(ancestor.recordID.recordName)")
+    }
+    return parts.joined(separator: " | ")
   }
 }

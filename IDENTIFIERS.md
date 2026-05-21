@@ -1,113 +1,118 @@
 # Identifiers — design note
 
 How Septena identifies user-named entities (areas, projects, chores, habits,
-supplements, sections, …) so renames don't lose data, agents speak natural
-names, and deeplinks survive.
+supplements, sections, …) so renames don't break references, agents speak
+natural names, and the data model stays trivial.
 
 Tasks are excluded — they're content with a title, not labels with a name.
 Tasks keep id-only.
 
 ## The model
 
-Three fields on every label-style entity:
+Two fields on every label-style entity:
 
-| Field | Mutable? | Purpose |
-|-------|----------|---------|
-| `id` | **No** — frozen at creation | Stable identity. CK `recordName`. Foreign-key target. Tool-arg "exact match." |
-| `slug` | Yes — auto-updates on rename | Natural-name lookup. Deeplink path. Tool-arg "fuzzy match." Always deduped. |
-| `title` | Yes — freely editable | Display. May collide freely. |
+| Field | Mutable? | Visible? | Purpose |
+|-------|----------|----------|---------|
+| `id` | **No** — frozen at creation | No | Stable identity. CK `recordName`. Foreign-key target. |
+| `title` | Yes — freely editable | Yes | The user-facing name. Also what agents see. |
+
+That's it. No slug, no previousSlugs, no derived URL form. Renaming a title
+is just a title write — no derived fields to update, no FK breakage because
+references store the immutable `id`.
 
 ### `id` (shortid)
 
-- **Format**: base36 lowercase, no ambiguous chars (no `0`/`o`, `1`/`l`).
-  - Areas/projects: 4 chars (~1.6M combos — enough for personal scale).
-  - Chores/habits/sections etc: 4 chars.
+- **Format**: base32 lowercase, no ambiguous chars (no `0`/`o`, `1`/`l`/`i`).
+  - All label-style entities: 4 chars (~1M combos — plenty for personal scale).
 - **Lifetime**: immutable. Generated once at create. Stays the same across
   every rename, every device, forever.
-- **Collision**: try once, retry once with an extra char if the rare birthday
-  collision hits. After two retries, fall through to UUID (panic mode, never
-  fires in practice).
-- **Existing records keep their current ids unchanged.** `septena`,
-  `obsidian`, etc. are now treated as opaque ids that happen to look readable.
-
-### `slug`
-
-- **Format**: lowercase, alphanumeric+dash, derived from `title`.
-- **Updates**: on every rename, recompute from new title. Dedup against
-  other live entities of the same type — collisions become `home-2`, `home-3`.
-- **History**: last 3 previous slugs kept in `previousSlugs: [String]` field
-  so a lookup for the old name still resolves for a couple of weeks of
-  conversation/deeplink lifetime. Capped at 3 entries, FIFO.
-- **Nullable** in storage. Old records lazy-backfill: on first `apply()` from
-  CK (or first read), populate slug from title if nil. No big-bang migration.
+- **Collision**: try once, retry once with an extra char if the rare
+  birthday collision hits. After two retries, fall through to UUID prefix
+  (panic mode — never fires in practice).
+- **Existing records keep their current ids unchanged.** Some are slug-shaped
+  legacy strings (`septena`, `obsidian`, `home`, `home1`) because the old
+  code used the slug as the id. Those are now opaque ids that happen to be
+  human-readable. Harmless.
+- **Never shown to users.** Ids are plumbing. The user sees titles.
 
 ### `title`
 
-Display string. Whatever the user typed. Unicode, emoji, length up to you.
+Display string. Whatever the user typed. Unicode, emoji, length unrestricted.
+May collide freely with other titles — disambiguation is the resolver's job.
 
 ## Resolution rule
 
 When MCP / UI / any code accepts a string referring to one of these entities:
 
-1. **Exact `id` match** wins. Lowest ambiguity.
-2. Else **exact `slug` match** on a live record.
-3. Else **exact `slug` match** in any record's `previousSlugs`.
-4. Else **case-insensitive `title` substring** match — return ambiguous-match
+1. **Exact `id` match** wins. Lowest ambiguity, fastest path.
+2. Else **exact `title` match** (case-insensitive). Returns ambiguous-match
+   error if more than one hits.
+3. Else **case-insensitive `title` substring** match — returns ambiguous-match
    error if more than one hits.
 
 This rule is identical across types so the resolver helper is one function
-per entity (`resolveAreaId(_:)`, `resolveProjectId(_:)`, etc.) all built
-on the same primitive.
+per entity, all built on the same primitive.
 
 ## Rename flow
 
 ```
 user renames "Obsidian" → "Notes":
-  title       := "Notes"
-  oldSlug     := slug                    // "obsidian"
-  newSlug     := dedup(IDSlug.from("Notes"))   // "notes"
-  if newSlug != oldSlug:
-    previousSlugs.insert(oldSlug, at: 0)
-    previousSlugs = Array(previousSlugs.prefix(3))
-    slug := newSlug
-  id stays "b2ck" forever.
+  entity.title := "Notes"
+  // no derived fields to update
+  // id stays the same forever
 ```
 
-## CK schema impact
+That's the whole operation. Tasks/projects pointing at this area's id keep
+working. No URL handles to migrate. No history to maintain.
 
-Each label-type CKRecord gets two new fields:
+## CK schema
+
+Each label-type CKRecord has these fields (plus type-specific extras):
 
 ```
-slug             STRING
-previousSlugs    STRING_LIST
+title            STRING
+context          STRING   (areas/projects only)
+…type-specific…
 ```
 
-Additive change. Add both to the schema in Development, verify, then promote
-to Production. Use real names — don't burn reserved slots, those are for
-unforeseen needs.
+**No `slug` or `previousSlugs` fields are written.** Existing CloudKit
+records may still have those fields populated on the server (from before
+the slug removal); the decoder ignores them and they're harmless storage.
 
-## SwiftData impact
+## SwiftData
 
-Add to each `@Model` class (AreaEntity, ProjectEntity, and later
-ChoreEntity etc):
+Each `@Model` class has:
 
 ```swift
-var slug: String?              // nil = legacy record awaiting backfill
-var previousSlugs: [String] = []
+@Attribute(.unique) var id: String   // immutable shortid
+var title: String                    // the display name
+// no slug, no previousSlugs
 ```
 
-`String?` not `String` so the schema migration is trivially additive — no
-default-value gymnastics on legacy rows. Tighten to non-optional later if
-you want, after backfill is universal.
+(There may be vestigial `slug: String?` and `previousSlugs: [String]`
+fields on the existing schema during the transition — see the slug-removal
+Stage 2 task for cleanup. They're set to nil/empty by current code and read
+by nothing.)
 
 ## Tasks
 
-Tasks are content, not labels. Keep `id` only. Lookup by id or by title
-fuzzy search. No slug, no `previousSlugs`.
+Tasks are content, not labels. Keep `id` only.
 
-- Existing tasks keep their ids (FastAPI date-prefix slugs or CK-mode
+- Existing tasks keep their ids (FastAPI date-prefix strings or CK-mode
   UUIDs — both are opaque from now on).
-- New tasks get base36-6 shortids for compactness.
+- New tasks get base32-6 shortids for compactness.
+
+## Foreign keys
+
+Cross-type references store the **target id**, never the title. So
+`task.area = "k7m2"`, not `task.area = "Obsidian"`. The resolver runs
+once at write time (turning a natural-name input into an id), then the
+stored value is immune to renames.
+
+The only exception is **migrated FastAPI records** whose `task.area`
+field currently holds a legacy slug-as-id (`"septena"`, `"obsidian"`).
+Those continue to work because the resolver matches id-first — and for
+those records, the id IS the legacy slug.
 
 ## Extending to a new entity type — checklist
 
@@ -119,78 +124,59 @@ deeplink handlers rely on the rule being uniform.
 For each new type `Foo`:
 
 - [ ] **SwiftData entity** ([Persistence.swift](SeptenaCore/Persistence.swift))
-  - Add `var slug: String?` (optional so additive migration is trivial)
-  - Add `var previousSlugs: [String] = []`
-  - Update `init` with both new params, defaulted to nil / `[]`
+  - `@Attribute(.unique) var id: String`
+  - `var title: String`
+  - No slug fields.
 - [ ] **CKRecord schema** (new `FooRecord.swift` under
   `SeptenaCore/CloudKit/`, mirroring `AreaRecord.swift`)
-  - Add `slug` (STRING) and `previousSlugs` (STRING_LIST) to
-    `FooCloudKitSchema.Field`
-  - Wire both in `toCloudKitRecord()` and `apply(_:)`
-  - In `apply(_:)`, lazy-backfill `slug = id` when nil for legacy records
+  - Add `title` (and any type-specific fields) to `FooCloudKitSchema.Field`
+  - Wire in `toCloudKitRecord()` and `apply(_:)`
 - [ ] **Backend** (`FoosBackend.swift`, mirroring `AreasBackend.swift`)
   - `uniqueShortcode()` — try-4-then-6-then-UUID-prefix
-  - `uniqueSlug(for:excluding:)` — dedup against other live records of
-    the same type, excluding the caller's own id
-  - `create(...)` uses `uniqueShortcode()` for `id`, `uniqueSlug` for `slug`
-  - `rename(id:, to:)` recomputes slug, pushes old onto `previousSlugs`
-    (FIFO cap 3) when the slug actually changed
-- [ ] **Resolver helper** ([Resolver.swift](SeptenaCore/CloudKit/Resolver.swift))
-  - Copy `resolveAreaId(_:)` body, swap `AreaEntity` → `FooEntity`,
-    "area" → "foo" in error strings
+  - `create(title:...)` uses `uniqueShortcode()` for `id`
+  - `rename(id:to:)` just sets `title`. No slug bookkeeping.
 - [ ] **MCP tool layer** (when wired)
-  - Accept either id or natural name in tool args
-  - Resolve internally via `EntityResolver.resolveFooId(_:in:)`
-  - Return both `id` and `slug` in tool responses so the agent learns
-    the canonical form
+  - Accept either id or title in tool args
+  - Resolve internally via the id-or-title resolver
+  - Return both `id` and `title` in tool responses so the agent learns
+    the canonical id
 
-For an entity that **stays on FastAPI** (no CK move yet) but still needs
-MCP access:
+## MCP gateway contract
 
-- [ ] Add `slug` + `previousSlugs` to the wire DTO and to the local SwiftData
-  mirror
-- [ ] Server stores both, updates slug on rename, manages `previousSlugs`
-  history server-side
-- [ ] Local `EntityResolver` works against the cached SwiftData rows the
-  same way
+When the hosted MCP gateway (`mcp.septena.app`) is built out, its
+resolution contract for area/project/etc references in tool args:
 
-## Foreign keys
+1. If the arg looks like a valid id (4-char base32), exact-match by id.
+2. Else case-insensitive title match. If multiple hit, return an
+   ambiguous-match error listing the candidates so the agent can ask
+   the user to disambiguate.
 
-Cross-type references store the **target id**, never the slug. So
-`task.area = "k7m2"`, not `task.area = "obsidian"`. The resolver runs
-once at write time (turning a natural-name input into an id), then the
-stored value is immune to renames.
-
-The only exception is **migrated FastAPI records** whose `task.area`
-field currently holds the legacy slug-as-id (`"septena"`, `"obsidian"`).
-Those continue to work because the resolver matches id-first — and for
-those records, the id IS the legacy slug. New records use real shortids
-and the foreign keys hold those shortids.
-
-## Migration plan, summarized
-
-1. Add `slug: String?` + `previousSlugs: [String]` to `AreaEntity` and
-   `ProjectEntity`.
-2. Add `slug` + `previousSlugs` fields to `AreaRecord` + `ProjectRecord`
-   schemas (CK Development environment auto-creates on first write).
-3. Switch new area/project creates to shortid + auto-slug.
-4. On `apply(_:)` from CK or on read, lazy-backfill `slug` from `title`
-   if nil and the record's id ≠ its slug (otherwise leave `slug` nil and
-   treat id-as-slug for legacy lookup compatibility).
-5. Wire `rename` paths to update `slug` + push old onto `previousSlugs`.
-6. Add `resolveAreaId(_:)` and `resolveProjectId(_:)` helpers.
-7. Use the same code shape later when chores/habits/etc need it.
+Tool responses always return both `id` and `title`. The agent learns to
+use the id for subsequent calls (faster, unambiguous) but can present
+the title to the user.
 
 ## What this design doesn't try to do
 
-- **Server-side index on `slug`**. Lookups happen in the local SwiftData
-  mirror; CK queries by field aren't needed. If we later add server-side
-  search, mark `slug` queryable in CK Dashboard.
-- **Cross-type id collision protection**. Slugs are scoped per type
-  (`obsidian` can be both an area and a project; the resolver always knows
-  which type it's looking in). If you ever want a global "find anything
-  named X" search, that's a separate union-search helper on top.
-- **Renaming with concurrent CK writes from two devices**. CK's last-writer-
-  wins applies; we may end up with both devices having different `slug`
-  values for a brief window. Self-corrects on next sync. Single-user, single-
-  device scenario this doesn't matter.
+- **URL-safe handles for deeplinks**. If you later need them, derive
+  them at read time from the title (lowercased, hyphenated) — but tasks
+  reference by id, so the derived form is purely for URLs, not storage.
+- **Server-side title index in CK**. Lookups happen in the local
+  SwiftData mirror; CK queries by field aren't needed.
+- **Cross-type id collision protection**. Ids are scoped per type
+  (`k7m2` can be both an area and a project; the resolver always knows
+  which type it's looking in).
+- **Renaming with concurrent CK writes from two devices**. CK's
+  last-writer-wins applies; brief window of disagreement on title.
+  Self-corrects on next sync.
+
+## Removed in 2026: the slug concept
+
+Earlier versions of this doc described a three-field model with
+`slug` (mutable derived URL handle) and `previousSlugs` (FIFO history
+for old-name lookups). That added complexity for a problem we don't
+have — we never built URL-based access, the agent surface doesn't need
+URL-safe handles, and the slug fields were a source of drift between
+title and slug (e.g., area with id="home" titled "Admin" but slug="home").
+
+The slug fields still exist on legacy CloudKit records as harmless
+storage. New code doesn't read or write them.

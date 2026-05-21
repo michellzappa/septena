@@ -63,6 +63,15 @@ final class ProjectsMutator: ProjectsBackend {
   func delete(id: String) async throws {
     try await current.delete(id: id)
   }
+
+  /// Forensic — create a record with a specific id. CK-mode only.
+  @discardableResult
+  func createWithExplicitID(id: String, title: String, area: String? = nil) async throws -> Project {
+    guard let ck = ckBackend else {
+      throw NSError(domain: "ProjectsMutator", code: -1, userInfo: [NSLocalizedDescriptionKey: "createWithExplicitID requires CloudKit backend"])
+    }
+    return try await ck.createWithExplicitID(id: id, title: title, area: area)
+  }
 }
 
 // MARK: - FastAPI impl
@@ -123,18 +132,6 @@ final class CloudKitProjectsBackend: ProjectsBackend {
     return String(UUID().uuidString.prefix(8)).lowercased()
   }
 
-  /// Dedup a candidate slug against other live projects. See AreasBackend.
-  private func uniqueSlug(for name: String, excluding ownId: String?) -> String {
-    let base = IDSlug.from(name)
-    let descriptor = FetchDescriptor<ProjectEntity>()
-    let all = (try? context.fetch(descriptor)) ?? []
-    let taken = Set(all.compactMap { $0.id == ownId ? nil : $0.slug })
-    if !taken.contains(base) { return base }
-    var i = 2
-    while taken.contains("\(base)-\(i)") { i += 1 }
-    return "\(base)-\(i)"
-  }
-
   private func commitAndPush(_ entity: ProjectEntity, op: String, deletion: Bool = false) {
     let id = entity.id
     let title = entity.title
@@ -152,29 +149,30 @@ final class CloudKitProjectsBackend: ProjectsBackend {
   }
 
   func create(title: String, area: String?) async throws -> Project {
-    // Opaque shortid for stable identity; slug derived from title for
-    // natural-name lookup. See IDENTIFIERS.md.
     let newId = uniqueShortcode()
-    let newSlug = uniqueSlug(for: title, excluding: nil)
-    let entity = ProjectEntity(id: newId, title: title, area: area,
-                               slug: newSlug)
+    let entity = ProjectEntity(id: newId, title: title, area: area)
     context.insert(entity)
-    commitAndPush(entity, op: "create slug=\(newSlug)")
+    commitAndPush(entity, op: "create")
+    return Project(entity)
+  }
+
+  /// Forensic create: caller supplies the entity id. Used to rebuild a
+  /// missing record so dangling task references resolve.
+  @discardableResult
+  func createWithExplicitID(id: String, title: String, area: String? = nil) async throws -> Project {
+    if let existing = fetch(id: id) {
+      return Project(existing)
+    }
+    let entity = ProjectEntity(id: id, title: title, area: area)
+    context.insert(entity)
+    commitAndPush(entity, op: "create(explicit-id)")
     return Project(entity)
   }
 
   func rename(id: String, to title: String) async throws {
     guard let entity = fetch(id: id) else { return }
-    let oldSlug = entity.slug ?? entity.id
-    let newSlug = uniqueSlug(for: title, excluding: id)
     entity.title = title
-    if newSlug != oldSlug {
-      var history = [oldSlug] + entity.previousSlugs.filter { $0 != oldSlug }
-      if history.count > 3 { history = Array(history.prefix(3)) }
-      entity.previousSlugs = history
-      entity.slug = newSlug
-    }
-    commitAndPush(entity, op: "rename slug=\(newSlug)")
+    commitAndPush(entity, op: "rename")
   }
 
   func setNotes(id: String, notes: String?) async throws {

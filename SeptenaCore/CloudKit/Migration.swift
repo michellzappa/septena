@@ -117,20 +117,27 @@ struct TasksSnapshotFile: Codable {
 
 enum MigrationError: LocalizedError {
   case noEntities
-  case engineSendFailed(underlying: Error)
+  case engineSendFailed(underlying: Error, details: String?)
   case engineFetchFailed(underlying: Error)
   case countMismatch(local: Int, afterPull: Int)
+  case repairFetchFailed(underlying: Error)
 
   var errorDescription: String? {
     switch self {
     case .noEntities:
       return "Nothing to migrate — local task store is empty."
-    case .engineSendFailed(let e):
-      return "Failed to send local tasks to CloudKit: \(e.localizedDescription)"
+    case .engineSendFailed(let e, let details):
+      let base = "Failed to send local tasks to CloudKit: \(e.localizedDescription)"
+      if let details, !details.isEmpty {
+        return "\(base)\n\(details)"
+      }
+      return base
     case .engineFetchFailed(let e):
       return "Failed to read CloudKit state back for verification: \(e.localizedDescription)"
     case .countMismatch(let local, let after):
       return "Verification failed: had \(local) local tasks, only \(after) after sync. CloudKit flag NOT flipped — your data is unchanged."
+    case .repairFetchFailed(let e):
+      return "Failed to query all CloudKit records for repair: \(e.localizedDescription)"
     }
   }
 }
@@ -279,6 +286,215 @@ final class TasksMigrator {
     return file.tasks.count + areaCount + projectCount
   }
 
+  // MARK: Repair merge
+
+  /// Merge the full CloudKit zone into the local SwiftData mirror, then
+  /// push the resulting local union back to CloudKit.
+  ///
+  /// This is intentionally non-destructive: it does not delete local-only
+  /// rows that are absent from CloudKit, because during the cutover those
+  /// rows may be the user's only copy. If two devices contain the same
+  /// human task under different ids, this can preserve both and create
+  /// duplicates. That is preferable for emergency repair because duplicate
+  /// cleanup is recoverable; data loss is not.
+  func repairMergeWithCloudKit() async throws -> RepairSyncResult {
+    let snapshotURL = try exportToJSON(reason: "pre-repair")
+
+    engine.start()
+
+    do {
+      try await engine.sendChanges()
+      try await engine.fetchChanges()
+    } catch {
+      logger.error("pre-repair engine drain failed: \(error.localizedDescription, privacy: .public)")
+      throw MigrationError.engineFetchFailed(underlying: error)
+    }
+
+    let cloudRecords: [CKRecord]
+    do {
+      cloudRecords = try await engine.fetchAllRecords(recordTypes: [
+        TaskCloudKitSchema.recordType,
+        AreaCloudKitSchema.recordType,
+        ProjectCloudKitSchema.recordType,
+      ])
+    } catch {
+      logger.error("repair full-zone query failed: \(error.localizedDescription, privacy: .public)")
+      throw MigrationError.repairFetchFailed(underlying: error)
+    }
+
+    var cloudTasks = 0
+    var cloudAreas = 0
+    var cloudProjects = 0
+    for record in cloudRecords {
+      switch record.recordType {
+      case TaskCloudKitSchema.recordType:
+        cloudTasks += 1
+        applyTask(record)
+      case AreaCloudKitSchema.recordType:
+        cloudAreas += 1
+        applyArea(record)
+      case ProjectCloudKitSchema.recordType:
+        cloudProjects += 1
+        applyProject(record)
+      default:
+        logger.info("Repair ignored unknown CK record type \(record.recordType, privacy: .public)")
+      }
+    }
+    try context.save()
+
+    let taskDescriptor = FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { $0.pendingDeletion == false && $0.deletedAt == nil }
+    )
+    let tasks = try context.fetch(taskDescriptor)
+    let areas = try context.fetch(FetchDescriptor<AreaEntity>())
+    let projectDescriptor = FetchDescriptor<ProjectEntity>(
+      predicate: #Predicate { $0.deletedAt == nil }
+    )
+    let projects = try context.fetch(projectDescriptor)
+
+    for entity in tasks { engine.noteTaskChange(id: entity.id) }
+    for entity in areas { engine.noteAreaChange(id: entity.id) }
+    for entity in projects { engine.noteProjectChange(id: entity.id) }
+
+    do {
+      try await engine.sendChanges()
+      try await engine.fetchChanges()
+    } catch {
+      logger.error("repair send/fetch failed: \(error.localizedDescription, privacy: .public)")
+      throw MigrationError.engineSendFailed(
+        underlying: error,
+        details: engine.consumeLastSendFailureSummary()
+      )
+    }
+
+    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    let localTotal = tasks.count + areas.count + projects.count
+    logger.info("Repair merged cloud Task/Area/Project \(cloudTasks, privacy: .public)/\(cloudAreas, privacy: .public)/\(cloudProjects, privacy: .public); pushed local total \(localTotal, privacy: .public)")
+
+    return RepairSyncResult(
+      snapshotURL: snapshotURL,
+      cloudTasksCount: cloudTasks,
+      cloudAreasCount: cloudAreas,
+      cloudProjectsCount: cloudProjects,
+      localTasksCount: tasks.count,
+      localAreasCount: areas.count,
+      localProjectsCount: projects.count
+    )
+  }
+
+  /// Replace this device's local SwiftData mirror with the current live
+  /// records in CloudKit. This is the "one device is canonical" repair:
+  /// it snapshots first, discards local CKSyncEngine state so stale
+  /// pending changes cannot replay, deletes local Task/Area/Project rows,
+  /// then applies the full CloudKit zone.
+  func replaceLocalMirrorFromCloudKit() async throws -> ReplaceLocalMirrorResult {
+    let snapshotURL = try exportToJSON(reason: "pre-replace-local")
+
+    engine.discardLocalSyncState()
+
+    let cloudRecords: [CKRecord]
+    do {
+      cloudRecords = try await engine.fetchAllRecords(recordTypes: [
+        TaskCloudKitSchema.recordType,
+        AreaCloudKitSchema.recordType,
+        ProjectCloudKitSchema.recordType,
+      ])
+    } catch {
+      logger.error("replace-local full-zone query failed: \(error.localizedDescription, privacy: .public)")
+      throw MigrationError.repairFetchFailed(underlying: error)
+    }
+
+    let existingTasks = try context.fetch(FetchDescriptor<TaskEntity>())
+    let existingAreas = try context.fetch(FetchDescriptor<AreaEntity>())
+    let existingProjects = try context.fetch(FetchDescriptor<ProjectEntity>())
+    let deletedTasks = existingTasks.count
+    let deletedAreas = existingAreas.count
+    let deletedProjects = existingProjects.count
+
+    for entity in existingTasks { context.delete(entity) }
+    for entity in existingAreas { context.delete(entity) }
+    for entity in existingProjects { context.delete(entity) }
+    try context.save()
+
+    var cloudTasks = 0
+    var cloudAreas = 0
+    var cloudProjects = 0
+    for record in cloudRecords {
+      switch record.recordType {
+      case AreaCloudKitSchema.recordType:
+        cloudAreas += 1
+        applyArea(record)
+      case ProjectCloudKitSchema.recordType:
+        cloudProjects += 1
+        applyProject(record)
+      case TaskCloudKitSchema.recordType:
+        cloudTasks += 1
+        applyTask(record)
+      default:
+        logger.info("Replace-local ignored unknown CK record type \(record.recordType, privacy: .public)")
+      }
+    }
+    try context.save()
+
+    engine.start()
+    do {
+      try await engine.sendChanges()
+      try await engine.fetchChanges()
+    } catch {
+      logger.error("replace-local post-fetch failed: \(error.localizedDescription, privacy: .public)")
+      throw MigrationError.engineFetchFailed(underlying: error)
+    }
+
+    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    logger.info("Replaced local mirror from CloudKit. Deleted Task/Area/Project \(deletedTasks, privacy: .public)/\(deletedAreas, privacy: .public)/\(deletedProjects, privacy: .public); loaded \(cloudTasks, privacy: .public)/\(cloudAreas, privacy: .public)/\(cloudProjects, privacy: .public)")
+
+    return ReplaceLocalMirrorResult(
+      snapshotURL: snapshotURL,
+      deletedTasksCount: deletedTasks,
+      deletedAreasCount: deletedAreas,
+      deletedProjectsCount: deletedProjects,
+      cloudTasksCount: cloudTasks,
+      cloudAreasCount: cloudAreas,
+      cloudProjectsCount: cloudProjects
+    )
+  }
+
+  private func applyTask(_ record: CKRecord) {
+    let id = record.recordID.recordName
+    let descriptor = FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { $0.id == id }
+    )
+    if let entity = try? context.fetch(descriptor).first {
+      entity.apply(record)
+    } else {
+      context.insert(TaskEntity(cloudKit: record))
+    }
+  }
+
+  private func applyArea(_ record: CKRecord) {
+    let id = AreaCloudKitSchema.entityID(from: record.recordID.recordName)
+    let descriptor = FetchDescriptor<AreaEntity>(
+      predicate: #Predicate { $0.id == id }
+    )
+    if let entity = try? context.fetch(descriptor).first {
+      entity.apply(record)
+    } else {
+      context.insert(AreaEntity(cloudKit: record))
+    }
+  }
+
+  private func applyProject(_ record: CKRecord) {
+    let id = ProjectCloudKitSchema.entityID(from: record.recordID.recordName)
+    let descriptor = FetchDescriptor<ProjectEntity>(
+      predicate: #Predicate { $0.id == id }
+    )
+    if let entity = try? context.fetch(descriptor).first {
+      entity.apply(record)
+    } else {
+      context.insert(ProjectEntity(cloudKit: record))
+    }
+  }
+
   // MARK: Migrate to CloudKit
 
   /// Push every local task, area, and project into CloudKit, wait for the
@@ -335,7 +551,10 @@ final class TasksMigrator {
       try await engine.sendChanges()
     } catch {
       logger.error("sendChanges failed: \(error.localizedDescription, privacy: .public)")
-      throw MigrationError.engineSendFailed(underlying: error)
+      throw MigrationError.engineSendFailed(
+        underlying: error,
+        details: engine.consumeLastSendFailureSummary()
+      )
     }
 
     // 5. Pull back to confirm. The fetched-record closures fold incoming
@@ -420,4 +639,24 @@ struct MigrationResult {
   let tasksCount: Int
   let areasCount: Int
   let projectsCount: Int
+}
+
+struct RepairSyncResult {
+  let snapshotURL: URL
+  let cloudTasksCount: Int
+  let cloudAreasCount: Int
+  let cloudProjectsCount: Int
+  let localTasksCount: Int
+  let localAreasCount: Int
+  let localProjectsCount: Int
+}
+
+struct ReplaceLocalMirrorResult {
+  let snapshotURL: URL
+  let deletedTasksCount: Int
+  let deletedAreasCount: Int
+  let deletedProjectsCount: Int
+  let cloudTasksCount: Int
+  let cloudAreasCount: Int
+  let cloudProjectsCount: Int
 }

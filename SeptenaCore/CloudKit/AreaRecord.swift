@@ -11,15 +11,14 @@ import SwiftData
 
 enum AreaCloudKitSchema {
   static let recordType = "Area"
+  static func recordName(for id: String) -> String { "area:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    recordName.hasPrefix("area:") ? String(recordName.dropFirst(5)) : recordName
+  }
 
   enum Field {
     static let title = "title"
     static let context = "context"
-    /// Natural-name identifier. Mutable, deduped — see [IDENTIFIERS.md].
-    static let slug = "slug"
-    /// FIFO history of recent slugs (max 3). Lets a lookup for a recently
-    /// renamed area still resolve. STRING_LIST on the CK side.
-    static let previousSlugs = "previousSlugs"
 
     // Reserved for foreseeable additions without bumping the record type.
     static let reservedString1 = "reservedString1"
@@ -49,19 +48,10 @@ extension AreaEntity {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: AreaCloudKitSchema.recordType,
-      recordID: CKRecord.ID(recordName: id, zoneID: SeptenaCloudKit.zoneID)
+      recordID: CKRecord.ID(recordName: AreaCloudKitSchema.recordName(for: id), zoneID: SeptenaCloudKit.zoneID)
     )
     record[AreaCloudKitSchema.Field.title] = title
     record[AreaCloudKitSchema.Field.context] = context
-    record[AreaCloudKitSchema.Field.slug] = slug
-    // Don't write an empty list on first save — CloudKit can't infer the
-    // element type from `[]` and rejects with INVALID_ARGUMENTS until the
-    // field has been seeded with at least one non-empty value via the
-    // schema editor. Skipping the assignment leaves the field absent
-    // (effectively nil); decode tolerates that.
-    if !previousSlugs.isEmpty {
-      record[AreaCloudKitSchema.Field.previousSlugs] = previousSlugs
-    }
     return record
   }
 }
@@ -72,18 +62,11 @@ extension AreaEntity {
   func apply(_ record: CKRecord) {
     if let v = record[AreaCloudKitSchema.Field.title] as? String { title = v }
     context = record[AreaCloudKitSchema.Field.context] as? String
-    slug = record[AreaCloudKitSchema.Field.slug] as? String
-    previousSlugs = (record[AreaCloudKitSchema.Field.previousSlugs] as? [String]) ?? []
-    // Lazy backfill: legacy records (pre-IDENTIFIERS.md) have nil slug.
-    // Default to the id, which for those records is the historical slug
-    // anyway ("septena", "obsidian", etc). The first rename will compute
-    // a fresh slug and push it back to CK normally.
-    if slug == nil, !id.isEmpty { slug = id }
     captureCloudKitSystemFields(from: record)
   }
 
   convenience init(cloudKit record: CKRecord) {
-    self.init(id: record.recordID.recordName, title: "")
+    self.init(id: AreaCloudKitSchema.entityID(from: record.recordID.recordName), title: "")
     apply(record)
   }
 }

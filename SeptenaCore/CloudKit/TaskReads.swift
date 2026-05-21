@@ -37,7 +37,12 @@ enum TaskReads {
                    client: SeptenaClient,
                    context: ModelContext) async throws -> TasksListResponse {
     _ = client
-    return localList(view: view, area: area, project: project, days: days, context: context)
+    // See note on `counts(...)` — same off-main race applies. Force
+    // MainActor execution so SwiftData reads never hit the cooperative
+    // executor.
+    return await MainActor.run {
+      localList(view: view, area: area, project: project, days: days, context: context)
+    }
   }
 
   /// Synthesize a `TasksListResponse` from SwiftData. Matches the
@@ -125,7 +130,13 @@ enum TaskReads {
   static func counts(client: SeptenaClient,
                      context: ModelContext) async throws -> TasksCounts {
     _ = client
-    return localCounts(context: context)
+    // Force the SwiftData reads onto the main thread regardless of
+    // caller's executor. The enum-level @MainActor annotation isn't
+    // enough because ModelContext isn't Sendable — when passed across
+    // an `async let` boundary, the runtime can run this body off-main,
+    // which crashes SwiftData (mainContext is not thread-safe). See
+    // malloc double-free repro 2026-05-21 (TaskReads.localCount path).
+    return await MainActor.run { localCounts(context: context) }
   }
 
   static func localCounts(context: ModelContext) -> TasksCounts {
