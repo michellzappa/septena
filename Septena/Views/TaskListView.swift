@@ -1766,7 +1766,16 @@ struct TaskListView: View {
     // (its callbacks fold incoming records into SwiftData and post
     // .septenaTasksChanged), then read from the local mirror.
     SeptenaLog.info("[TaskList] load filter=\(String(describing: filter)) route=cloudKit")
-    try? await ckEngine.fetchChanges()
+    // Do NOT call ckEngine.fetchChanges() here. Fetches are owned by:
+    //   • CKEngine.start()              — cold-launch bootstrap
+    //   • App.swift scenePhase=active   — foreground refresh
+    //   • CKEngine.handleRemoteNotification — silent push
+    //   • Settings → "Re-sync to iCloud" — manual recovery
+    // Calling fetchChanges() from inside a load() invoked by
+    // .onReceive(.septenaTasksChanged) re-enters the delegate while
+    // we're still inside applyDidFinishBatch — CKSyncEngine asserts.
+    // The mirror is already up to date by the time the notification
+    // fires, so a plain re-read is correct.
     let local = LocalCache.tasks(in: modelContext, filter: filter)
     // Animate the diff: ForEach matches by id, so rows that are new
     // fade in via .transition(.opacity) and rows that disappeared fade
