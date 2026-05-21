@@ -975,14 +975,16 @@ struct TaskListView: View {
   ///   • editing — stronger accent fill so the active row reads as
   ///     "open" while the inline editor is up and the keyboard accessory
   ///     is acting on this task.
-  ///   • keyboard cursor — light accent tint (matches the sidebar's
-  ///     selection pill) when arrowed-to but not actively edited.
+  ///   • keyboard cursor — light accent tint when arrowed-to but not
+  ///     actively edited. Suppressed on iPhone compact width: touch users
+  ///     never see a "selected but not editing" third state — tap goes
+  ///     straight to edit, matching Reminders / Mail.
   /// Animation is scoped to the fill so we don't re-layout every visible
   /// row on each selection change (the old macOS click-lag source).
   @ViewBuilder
   private func rowBackground(for task: SeptenaTask) -> some View {
     let isEditing = editingTaskId == task.id
-    let isCursor  = selectedTaskId == task.id && !isEditing
+    let isCursor  = selectedTaskId == task.id && !isEditing && showsCursorPill
     let fill: Color = {
       if isEditing { return theme.accent.opacity(0.18) }
       if isCursor  { return theme.accent.opacity(0.10) }
@@ -991,6 +993,19 @@ struct TaskListView: View {
     RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
       .fill(fill)
       .padding(.horizontal, Theme.hPadding - 6)
+  }
+
+  /// Whether the keyboard-cursor accent pill should render. On macOS and
+  /// iPad regular width a hardware keyboard typically drives arrow-key
+  /// navigation, so the pill is a useful focus indicator. On iPhone
+  /// (compact) it's just a non-standard third state with no way to enter
+  /// or exit it via touch.
+  private var showsCursorPill: Bool {
+    #if os(macOS)
+    return true
+    #else
+    return horizontalSizeClass == .regular
+    #endif
   }
 
   private func applySuggestion(task: SeptenaTask,

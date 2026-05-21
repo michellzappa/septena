@@ -118,11 +118,6 @@ struct InlineEditTaskRow: View {
   /// Set true the moment the user cancels, so the onChange(focused) blur
   /// handler doesn't race in and auto-commit before the editor tears down.
   @State private var cancelling = false
-  /// Notes affordance state — Reminders-style. Hidden by default for
-  /// tasks without notes (no placeholder line on open); the user taps
-  /// "＋ Notes" to reveal the field. If the task arrives with notes
-  /// already set, the field shows automatically on appear.
-  @State private var showNotes = false
 
   enum Field { case title, notes }
 
@@ -158,38 +153,18 @@ struct InlineEditTaskRow: View {
             onCommit()
           }
           .fixedSize(horizontal: false, vertical: true)
-        // Notes — hidden until the user taps "＋ Notes" (or until the
-        // task arrives with notes already set). Multi-line on edit,
-        // single-line truncated when unfocused. Reminders-style: an
-        // empty 'Add Note' placeholder shouldn't shout on a fresh row.
-        if showNotes || !notes.isEmpty {
-          TextField("Note", text: $notes, axis: .vertical)
-            .textFieldStyle(.plain)
-            .focusEffectDisabled()
-            .font(.septenaNotes)
-            .foregroundStyle(.secondary)
-            .focused($focused, equals: .notes)
-            .lineLimit(1...8)
-            .fixedSize(horizontal: false, vertical: true)
-        } else {
-          Button {
-            Haptics.pick()
-            showNotes = true
-            focused = .notes
-          } label: {
-            HStack(spacing: 4) {
-              Image(systemName: "plus")
-                .font(.septenaNotes.weight(.semibold))
-                .imageScale(.small)
-              Text("Notes")
-                .font(.septenaNotes)
-            }
-            .foregroundStyle(Theme.inkSecondary.opacity(0.7))
-            .contentShape(Rectangle())
-          }
-          .buttonStyle(.plain)
-          .accessibilityLabel("Add notes")
-        }
+        // Notes — always rendered with a "Notes" placeholder so the row's
+        // expanded height is fixed the instant edit mode opens. Reminders-
+        // style: one stable layout, no toggle button that shifts the row
+        // when the user reaches for notes.
+        TextField("Notes", text: $notes, axis: .vertical)
+          .textFieldStyle(.plain)
+          .focusEffectDisabled()
+          .font(.septenaNotes)
+          .foregroundStyle(.secondary)
+          .focused($focused, equals: .notes)
+          .lineLimit(1...8)
+          .fixedSize(horizontal: false, vertical: true)
       }
 
       // Info button — Reminders' "i" affordance, always visible while
@@ -208,11 +183,6 @@ struct InlineEditTaskRow: View {
     }
     .padding(.horizontal, Theme.hPadding)
     .padding(.vertical, Theme.rowVPadding)
-    .onAppear {
-      // Reveal notes inline if the task already has them — the "+ Notes"
-      // affordance is only for the empty-notes case.
-      if !notes.isEmpty { showNotes = true }
-    }
     // The row mounts mid-expand-animation; assigning FocusState immediately
     // races UIKit's input-session setup and the field silently fails to
     // become first responder (logs "performInputOperation requires a valid
