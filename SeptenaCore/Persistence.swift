@@ -301,21 +301,52 @@ final class LocalStore {
     let config = ModelConfiguration("Septena", schema: schema, cloudKitDatabase: .none)
     do {
       container = try ModelContainer(for: schema, configurations: [config])
-    } catch {
+    } catch let firstError {
       // Schema drift between releases: wipe and re-pull from the server.
-      // Server is the source of truth so local data is safe to drop.
-      SeptenaLog.error("ModelContainer init failed — wiping local store", error)
-      try? Self.deleteStore(name: "Septena")
-      container = try! ModelContainer(for: schema, configurations: [config])
+      // Server is the source of truth so local data is safe to drop. We
+      // print() unconditionally so the underlying error survives release
+      // builds and shows up in Console.app / device logs — `try!` on the
+      // recovery path would otherwise trap before any diagnostic emerges.
+      Swift.print("[Septena] ❌ ModelContainer init failed (1/2): \(firstError)")
+      Self.wipeAllKnownStores()
+      do {
+        container = try ModelContainer(for: schema, configurations: [config])
+      } catch let secondError {
+        Swift.print("[Septena] ❌ ModelContainer init failed (2/2) after wipe: \(secondError)")
+        fatalError("LocalStore unrecoverable: \(secondError)")
+      }
     }
   }
 
-  private static func deleteStore(name: String) throws {
-    let url = URL.applicationSupportDirectory.appending(path: "\(name).store")
+  /// Best-effort scrub of every location SwiftData might have left a store.
+  /// SwiftData's actual on-disk path varies by OS version and configuration;
+  /// brute-forcing every plausible location is cheaper than misdiagnosing a
+  /// stale-store launch crash.
+  private static func wipeAllKnownStores() {
     let fm = FileManager.default
-    for suffix in ["", "-shm", "-wal"] {
-      let f = URL(fileURLWithPath: url.path + suffix)
-      if fm.fileExists(atPath: f.path) { try fm.removeItem(at: f) }
+    var dirs: [URL] = []
+    if let appSupport = try? fm.url(for: .applicationSupportDirectory,
+                                    in: .userDomainMask,
+                                    appropriateFor: nil, create: false) {
+      dirs.append(appSupport)
+    }
+    if let docs = try? fm.url(for: .documentDirectory,
+                              in: .userDomainMask,
+                              appropriateFor: nil, create: false) {
+      dirs.append(docs)
+    }
+    let bases = ["Septena", "default"]   // named + SwiftData default
+    for dir in dirs {
+      for base in bases {
+        for suffix in ["store", "store-shm", "store-wal", "sqlite",
+                       "sqlite-shm", "sqlite-wal"] {
+          let f = dir.appendingPathComponent("\(base).\(suffix)")
+          if fm.fileExists(atPath: f.path) {
+            try? fm.removeItem(at: f)
+            Swift.print("[Septena] wiped \(f.lastPathComponent)")
+          }
+        }
+      }
     }
   }
 }

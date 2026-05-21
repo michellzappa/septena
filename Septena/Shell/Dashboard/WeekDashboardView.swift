@@ -400,19 +400,31 @@ struct WeekDashboardView: View {
     // render their tiles first.
     async let cafToday = try? await client.caffeineDay(date: SeptenaDate.today)
     async let cafHist  = try? await client.caffeineHistory(days: 7)
-    async let cafCfg   = try? await client.caffeineConfig()
-    async let cafRecent = try? await client.caffeineEntries(days: 7)
     async let cnbToday = try? await client.cannabisDay(date: SeptenaDate.today)
     async let cnbHist  = try? await client.cannabisHistory(days: 7)
-    async let cnbCfg   = try? await client.cannabisConfig()
-    let (cafT, cafH, cafC, cafR, cnbT, cnbH, cnbC) =
-      await (cafToday, cafHist, cafCfg, cafRecent, cnbToday, cnbHist, cnbCfg)
-    if let cnbC {
-      cannabisStrains = cnbC.strains
-      cannabisUsesPerCapsule = max(1, cnbC.usesPerCapsule)
+    let (cafT, cafH, cnbT, cnbH) = await (cafToday, cafHist, cnbToday, cnbHist)
+
+    // QuickAdd menu preset data — fire-and-forget on a separate Task so it
+    // doesn't block the rest of `loadAll()`. Adding these to the second
+    // wave's parallel `async let` group triggered "freed pointer was not
+    // the last allocation" heap corruption mid-launch (a SeptenaClient /
+    // URLSession concurrency edge past ~4 simultaneous calls); doing them
+    // inline-but-sequential here would block tile rendering if any one
+    // request stalls. The dashboard tiles don't need this data for first
+    // paint, only when the user opens a context menu.
+    Task { @MainActor [client] in
+      if let cfg = try? await client.caffeineConfig() {
+        caffeineBeans = cfg.beans
+      }
+      if let entries = try? await client.caffeineEntries(days: 7),
+         let last = entries.entries.last {
+        caffeineLastEntry = last
+      }
+      if let cnbCfg = try? await client.cannabisConfig() {
+        cannabisStrains = cnbCfg.strains
+        cannabisUsesPerCapsule = max(1, cnbCfg.usesPerCapsule)
+      }
     }
-    if let cafC { caffeineBeans = cafC.beans }
-    if let last = cafR?.entries.last { caffeineLastEntry = last }
     if let cafT {
       caffeineToday = cafT
       ResponseCache.save(cafT, forKey: CacheKey.caffeineToday)
