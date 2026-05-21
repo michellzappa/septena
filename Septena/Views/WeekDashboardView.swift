@@ -303,7 +303,8 @@ struct WeekDashboardView: View {
     async let sh = try? await client.supplementsHistory(days: 7)
     async let tc = try? await TaskReads.counts(
       client: client, context: LocalStore.shared.container.mainContext)
-    async let th = try? await client.tasksHistory(days: 7)
+    let th: TasksHistory? = TaskReads.tasksHistory(
+      days: 7, context: LocalStore.shared.container.mainContext)
     async let tl = try? await TaskReads.list(
       view: "logbook", days: 1,
       client: client, context: LocalStore.shared.container.mainContext)
@@ -358,7 +359,7 @@ struct WeekDashboardView: View {
       taskCounts = t
       ResponseCache.save(t, forKey: CacheKey.taskCounts)
     }
-    if let thRes = await th {
+    if let thRes = th {
       tasksHistory = thRes
       ResponseCache.save(thRes, forKey: CacheKey.tasksHistory)
     }
@@ -577,7 +578,8 @@ struct WeekDashboardView: View {
     case .tasks:
       async let tc = try? await TaskReads.counts(
         client: client, context: LocalStore.shared.container.mainContext)
-      async let th = try? await client.tasksHistory(days: 7)
+      let th: TasksHistory? = TaskReads.tasksHistory(
+        days: 7, context: LocalStore.shared.container.mainContext)
       async let tl = try? await TaskReads.list(
         view: "logbook", days: 1,
         client: client, context: LocalStore.shared.container.mainContext)
@@ -585,7 +587,7 @@ struct WeekDashboardView: View {
         taskCounts = t
         ResponseCache.save(t, forKey: CacheKey.taskCounts)
       }
-      if let t = await th {
+      if let t = th {
         tasksHistory = t
         ResponseCache.save(t, forKey: CacheKey.tasksHistory)
       }

@@ -147,6 +147,58 @@ enum TaskReads {
                        openCount: allOpen)
   }
 
+  // MARK: - tasksHistory
+
+  /// Local replacement for the (removed) FastAPI `/api/tasks/history`.
+  /// Counts done-today, deferred (status open with todaySetOn matching the
+  /// day), and cancelled tasks per day for the last `days` days ending
+  /// today. The Tasks tile histogram only consumes `daily[*].done` —
+  /// `made` and `deferred` are best-effort and `cancelled` is exact.
+  static func tasksHistory(days: Int = 7, context: ModelContext) -> TasksHistory {
+    let todayIso = SeptenaDate.today
+    let cal = Calendar.current
+    let now = Date()
+
+    // Build the day buckets in chronological order ending today.
+    var dayKeys: [String] = []
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd"
+    f.locale = Locale(identifier: "en_US_POSIX")
+    for offset in stride(from: days - 1, through: 0, by: -1) {
+      guard let d = cal.date(byAdding: .day, value: -offset, to: now) else { continue }
+      dayKeys.append(f.string(from: d))
+    }
+
+    var doneByDay: [String: Int] = [:]
+    var cancelledByDay: [String: Int] = [:]
+    var madeByDay: [String: Int] = [:]
+    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
+    for e in rows {
+      // Bucket completions / cancellations by the date prefix of completedAt
+      // ("yyyy-MM-dd" — the same shape the server stamps).
+      if let stamp = e.completedAt, stamp.count >= 10 {
+        let day = String(stamp.prefix(10))
+        switch e.status {
+        case .done: doneByDay[day, default: 0] += 1
+        case .cancelled: cancelledByDay[day, default: 0] += 1
+        default: break
+        }
+      }
+      if let c = e.created, c.count >= 10 {
+        madeByDay[String(c.prefix(10)), default: 0] += 1
+      }
+    }
+
+    let daily = dayKeys.map { day in
+      TasksHistoryDay(date: day,
+                      made: madeByDay[day] ?? 0,
+                      done: doneByDay[day] ?? 0,
+                      deferred: 0,
+                      cancelled: cancelledByDay[day] ?? 0)
+    }
+    return TasksHistory(daily: daily, today: todayIso, windowDays: days)
+  }
+
   // MARK: - helpers
 
   /// Logbook cutoff stamp at YYYY-MM-DDTHH:MM:SS — matches what the
