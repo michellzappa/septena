@@ -752,6 +752,12 @@ struct TaskListView: View {
       // NOT use a transition that fades content in/out, since the
       // two branches share the same checkbox + title layout.
       .a11yAnimation(Self.expandSpring, value: editingTaskId == task.id)
+      // Row-level insert/remove transition. Combined with the
+      // withAnimation { items = ... } wrapper in load(), new rows
+      // (whether from a local create, a CK fetch, or a filter swap)
+      // fade in instead of popping. Also softens completed-task
+      // removal at end-of-session.
+      .transition(.opacity)
   }
 
   @ViewBuilder
@@ -1762,9 +1768,14 @@ struct TaskListView: View {
     SeptenaLog.info("[TaskList] load filter=\(String(describing: filter)) route=cloudKit")
     try? await ckEngine.fetchChanges()
     let local = LocalCache.tasks(in: modelContext, filter: filter)
-    items = local
-    review = []
-    doneToday = []
+    // Animate the diff: ForEach matches by id, so rows that are new
+    // fade in via .transition(.opacity) and rows that disappeared fade
+    // out. No-op when nothing changed.
+    withAnimation(.easeOut(duration: 0.25)) {
+      items = local
+      review = []
+      doneToday = []
+    }
     loadedFilters.insert(filter)
     // Projects + areas live in SwiftData (mirrored by CKSyncEngine), so
     // the local cache is authoritative — no network round-trip needed.
