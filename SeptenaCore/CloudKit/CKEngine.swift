@@ -137,6 +137,14 @@ func start() {
     // CKSyncEngine auto-creates its database subscription on first
     // sync; all we need here is the OS-level push token registration.
     registerForRemoteNotifications()
+    // Bootstrap pull: without this, a cold launch sees only whatever
+    // was already in SwiftData. Any record other devices wrote while
+    // we were closed would have to wait for an opportunistic push to
+    // arrive — APNs coalesces silent pushes aggressively, so don't
+    // rely on that as the only refresh path.
+    Task { [weak self] in
+      try? await self?.engine?.fetchChanges()
+    }
   }
 
   private func registerForRemoteNotifications() {

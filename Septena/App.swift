@@ -88,12 +88,18 @@ struct SeptenaApp: App {
           // Foreground transitions are the best moment to flush any
           // mutations that were queued while offline / suspended, and
           // to re-check the clock so a backgrounded-across-midnight
-          // session flips `today` before any view renders.
+          // session flips `today` before any view renders. We also pull
+          // from CloudKit here — silent pushes can be coalesced or
+          // dropped by APNs, so foregrounding must be a reliable
+          // refresh path independent of push delivery.
           if phase == .active {
             dayClock.refreshIfNeeded()
             taskMutator.kickDrain()
             httpOutbox.kickDrain()
-            Task { await ckEngine.refreshAccountStatus() }
+            Task {
+              await ckEngine.refreshAccountStatus()
+              try? await ckEngine.fetchChanges()
+            }
           }
         }
         .task {
