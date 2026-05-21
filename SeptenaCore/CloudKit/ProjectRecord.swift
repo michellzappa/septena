@@ -65,9 +65,9 @@ extension ProjectEntity {
     if !previousSlugs.isEmpty {
       record[ProjectCloudKitSchema.Field.previousSlugs] = previousSlugs
     }
-    // Plaintext for MCP-gateway compatibility — see TaskRecord for rationale.
+    // Plaintext for MCP-gateway compatibility — see TaskRecord for
+    // rationale, including why we don't touch encryptedValues here.
     record[ProjectCloudKitSchema.Field.notes] = notes
-    record.encryptedValues[ProjectCloudKitSchema.Field.notes] = nil
     return record
   }
 }

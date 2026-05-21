@@ -95,10 +95,12 @@ extension TaskEntity {
     // Stored as a plain field so the MCP gateway (CKWS REST, no access
     // to the per-user iCloud Keychain) can read and write notes too.
     // Server-side at-rest encryption still applies; we trade E2E
-    // encryption for cross-surface access. The old encryptedValues entry
-    // (if any) is cleared on save so the record converges to one source.
+    // encryption for cross-surface access. Don't touch encryptedValues
+    // here — CloudKit raises NSInvalidArgumentException if the same
+    // field name appears on both `record` and `record.encryptedValues`
+    // in the same save. Legacy encrypted notes (if any) are handled by
+    // the read-fallback in apply(_:).
     record[TaskCloudKitSchema.Field.notes] = notes
-    record.encryptedValues[TaskCloudKitSchema.Field.notes] = nil
 
     return record
   }
