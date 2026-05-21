@@ -24,17 +24,21 @@ extension Notification.Name {
 // MARK: - Logger
 
 enum SeptenaLog {
+  #if DEBUG
   static var enabled = true
+  #else
+  static var enabled = false
+  #endif
 
-  static func info(_ msg: String) {
+  static func info(_ msg: @autoclosure () -> String) {
     guard enabled else { return }
-    print("[Septena] \(msg)")
+    print("[Septena] \(msg())")
   }
 
-  static func error(_ msg: String, _ error: Error? = nil) {
+  static func error(_ msg: @autoclosure () -> String, _ error: Error? = nil) {
     guard enabled else { return }
-    if let error { print("[Septena] ❌ \(msg) → \(error.localizedDescription)") }
-    else { print("[Septena] ❌ \(msg)") }
+    if let error { print("[Septena] ❌ \(msg()) → \(error.localizedDescription)") }
+    else { print("[Septena] ❌ \(msg())") }
   }
 }
 
@@ -660,8 +664,7 @@ final class SeptenaClient {
     do {
       return try JSONDecoder().decode(type, from: data)
     } catch {
-      let preview = String(data: data, encoding: .utf8)?.prefix(300) ?? ""
-      SeptenaLog.error("decode \(T.self) failed → \(preview)", error)
+      SeptenaLog.error("decode \(T.self) failed", error)
       throw SeptenaError.decoding(String(describing: error))
     }
   }
@@ -674,7 +677,7 @@ final class SeptenaClient {
     req.httpMethod = "POST"
     req.setValue("application/json", forHTTPHeaderField: "Content-Type")
     req.httpBody = try JSONSerialization.data(withJSONObject: body)
-    SeptenaLog.info("POST \(u.path) body=\(body)")
+    SeptenaLog.info("POST \(u.path)")
     let result: T = try await send(req, as: type)
     notifyChanged(for: path)
     return result
@@ -767,14 +770,13 @@ final class SeptenaClient {
     let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
     if code >= 400 {
       let body = String(data: data, encoding: .utf8) ?? ""
-      SeptenaLog.error("HTTP \(code) — \(body.prefix(200))")
+      SeptenaLog.error("HTTP \(code)")
       throw SeptenaError.server(code, body)
     }
     do {
       return try JSONDecoder().decode(type, from: data)
     } catch {
-      let preview = String(data: data, encoding: .utf8)?.prefix(300) ?? ""
-      SeptenaLog.error("decode \(T.self) failed → \(preview)", error)
+      SeptenaLog.error("decode \(T.self) failed", error)
       throw SeptenaError.decoding(String(describing: error))
     }
   }
@@ -814,7 +816,7 @@ extension SeptenaClient {
     req.httpMethod = "POST"
     req.setValue("application/json", forHTTPHeaderField: "Content-Type")
     req.httpBody = try JSONSerialization.data(withJSONObject: body)
-    SeptenaLog.info("POST \(u.path) body=\(body)")
+    SeptenaLog.info("POST \(u.path)")
     let data: Data; let resp: URLResponse
     do {
       (data, resp) = try await session.data(for: req)
