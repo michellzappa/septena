@@ -352,6 +352,13 @@ struct TaskListView: View {
     .scrollContentBackground(.hidden)
     .background(Theme.paperBackground)
     .scrollDismissesKeyboard(.interactively)
+    // Drive the .transition(.opacity) on row from the visible-id set.
+    // withAnimation inside an async load() loses its transaction across
+    // the actor hop; binding the animation to a value the list already
+    // computes works reliably for both local creates and CK-fetched
+    // inserts arriving via .septenaTasksChanged.
+    .animation(.easeOut(duration: 0.25), value: visibleItems.map(\.id))
+    .animation(.easeOut(duration: 0.25), value: review.map(\.id))
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         Button {
@@ -1777,14 +1784,12 @@ struct TaskListView: View {
     // The mirror is already up to date by the time the notification
     // fires, so a plain re-read is correct.
     let local = LocalCache.tasks(in: modelContext, filter: filter)
-    // Animate the diff: ForEach matches by id, so rows that are new
-    // fade in via .transition(.opacity) and rows that disappeared fade
-    // out. No-op when nothing changed.
-    withAnimation(.easeOut(duration: 0.25)) {
-      items = local
-      review = []
-      doneToday = []
-    }
+    // Plain assignments — the fade is driven by .animation(_:value:)
+    // attached to the List, which observes the visible id set. That
+    // approach survives the async/await context that load() runs in.
+    items = local
+    review = []
+    doneToday = []
     loadedFilters.insert(filter)
     // Projects + areas live in SwiftData (mirrored by CKSyncEngine), so
     // the local cache is authoritative — no network round-trip needed.
