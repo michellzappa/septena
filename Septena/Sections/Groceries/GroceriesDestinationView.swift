@@ -16,6 +16,7 @@ struct GroceriesDestinationView: View {
   @State private var pending: Set<String> = []
   @State private var loading = true
   @State private var editing: GroceryItem? = nil
+  @State private var creating = false
 
   private var accent: Color { theme.color(for: "groceries") }
 
@@ -128,7 +129,12 @@ struct GroceriesDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
-    .quickAddToolbar(.groceries)
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        Button { creating = true } label: { Image(systemName: "plus") }
+          .tint(accent)
+      }
+    }
     .task {
       paintFromCache()
       await load()
@@ -137,8 +143,19 @@ struct GroceriesDestinationView: View {
       EditGroceryItemSheet(
         original: item,
         categories: categories,
-        onSave: { updated in applyLocalUpdate(updated) }
+        onDone: { updated in if let updated { applyLocalUpdate(updated) } }
       )
+    }
+    .sheet(isPresented: $creating) {
+      EditGroceryItemSheet(
+        original: nil,
+        categories: categories,
+        onDone: { _ in Task { await load() } }
+      )
+      #if os(iOS)
+      .presentationDetents([.medium, .large])
+      .presentationDragIndicator(.visible)
+      #endif
     }
   }
 
@@ -215,8 +232,6 @@ private struct GroceryRow: View {
       }
       .buttonStyle(.plain)
 
-      Text(item.emoji.isEmpty ? "•" : item.emoji)
-        .font(.system(size: 16))
       VStack(alignment: .leading, spacing: 2) {
         Text(item.name)
           .font(.septenaTaskTitle)

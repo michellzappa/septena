@@ -87,7 +87,6 @@ struct CaffeineDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
-    .quickAddToolbar(.caffeine)
     .task {
       paintFromCache()
       await load()

@@ -12,6 +12,7 @@ struct SupplementsDestinationView: View {
 
   @State private var model = NextItemsModel()
   @State private var editing: SupplementDayItem? = nil
+  @State private var creating = false
   @State private var history: [SupplementHistoryPoint] = []
 
   private var accent: Color { theme.color(for: "supplements") }
@@ -60,7 +61,12 @@ struct SupplementsDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
-    .quickAddToolbar(.supplements)
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        Button { creating = true } label: { Image(systemName: "plus") }
+          .tint(accent)
+      }
+    }
     .task {
       model.paintFromCache()
       await model.load(client: client)
@@ -71,12 +77,22 @@ struct SupplementsDestinationView: View {
     .sheet(item: $editing) { supp in
       EditSupplementSheet(
         original: supp,
-        onSave: { updated in
-          if let idx = model.supplements.firstIndex(where: { $0.id == updated.id }) {
+        onDone: { updated in
+          if let updated, let idx = model.supplements.firstIndex(where: { $0.id == updated.id }) {
             model.supplements[idx] = updated
           }
         }
       )
+    }
+    .sheet(isPresented: $creating) {
+      EditSupplementSheet(
+        original: nil,
+        onDone: { _ in Task { await model.load(client: client) } }
+      )
+      #if os(iOS)
+      .presentationDetents([.medium, .large])
+      .presentationDragIndicator(.visible)
+      #endif
     }
   }
 

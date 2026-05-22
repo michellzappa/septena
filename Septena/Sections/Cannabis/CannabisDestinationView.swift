@@ -84,7 +84,6 @@ struct CannabisDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
-    .quickAddToolbar(.cannabis)
     .task {
       paintFromCache()
       await load()

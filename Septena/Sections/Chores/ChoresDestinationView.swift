@@ -13,6 +13,7 @@ struct ChoresDestinationView: View {
 
   @State private var model = NextItemsModel()
   @State private var editing: ChoreItem? = nil
+  @State private var creating = false
   @State private var history: [ChoreHistoryPoint] = []
 
   private var accent: Color { theme.color(for: "chores") }
@@ -76,7 +77,12 @@ struct ChoresDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
-    .quickAddToolbar(.chores)
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        Button { creating = true } label: { Image(systemName: "plus") }
+          .tint(accent)
+      }
+    }
     .task {
       model.paintFromCache()
       await model.load(client: client)
@@ -87,12 +93,22 @@ struct ChoresDestinationView: View {
     .sheet(item: $editing) { chore in
       EditChoreSheet(
         original: chore,
-        onSave: { updated in
-          if let idx = model.chores.firstIndex(where: { $0.id == updated.id }) {
+        onDone: { updated in
+          if let updated, let idx = model.chores.firstIndex(where: { $0.id == updated.id }) {
             model.chores[idx] = updated
           }
         }
       )
+    }
+    .sheet(isPresented: $creating) {
+      EditChoreSheet(
+        original: nil,
+        onDone: { _ in Task { await model.load(client: client) } }
+      )
+      #if os(iOS)
+      .presentationDetents([.medium, .large])
+      .presentationDragIndicator(.visible)
+      #endif
     }
   }
 

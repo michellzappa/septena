@@ -82,7 +82,6 @@ struct GutDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
-    .quickAddToolbar(.gut)
     .task {
       paintFromCache()
       await load()

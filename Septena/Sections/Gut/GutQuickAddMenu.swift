@@ -27,7 +27,6 @@ struct GutQuickAddMenu: View {
   let onCommit: (_ bristol: Int) -> Void
   let hasLastEntry: Bool
   let onEditLast: (() -> Void)?
-  let onMore: () -> Void
 
   var body: some View {
     ForEach(bristolScale) { item in
@@ -42,8 +41,5 @@ struct GutQuickAddMenu: View {
         Label("Edit last entry", systemImage: "pencil")
       }
     }
-
-    Divider()
-    Button { onMore() } label: { Label("Gut…", systemImage: "ellipsis") }
   }
 }

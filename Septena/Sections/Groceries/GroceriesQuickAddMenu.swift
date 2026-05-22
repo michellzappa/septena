@@ -16,7 +16,6 @@ import SwiftUI
 struct GroceriesQuickAddMenu: View {
   let items: [GroceryItem]
   let onMarkLow: (GroceryItem) -> Void
-  let onMore: () -> Void
 
   /// Top 3 stocked items ranked by `lastBought` descending. Items with no
   /// `lastBought` sort last so freshly-added groceries don't crowd out
@@ -51,14 +50,9 @@ struct GroceriesQuickAddMenu: View {
       }
     }
 
-    Divider()
-    Button { onMore() } label: {
-      Label("Groceries…", systemImage: "ellipsis")
-    }
   }
 
   private func displayName(_ item: GroceryItem) -> String {
-    let head = item.emoji.isEmpty ? item.name : "\(item.emoji) \(item.name)"
-    return head
+    return item.name
   }
 }

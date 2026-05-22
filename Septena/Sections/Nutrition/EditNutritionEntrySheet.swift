@@ -1,16 +1,17 @@
 import SwiftUI
 
-// Edit sheet for a logged nutrition entry. Standard SwiftUI `Form` in a
-// `NavigationStack` presented via `.sheet(item:)`. Save enqueues
-// `PUT /api/nutrition/entries` through HTTPOutbox. The server identifies
-// the entry by its filename (`file` field in the JSON body).
+// Edit/create sheet for a logged nutrition entry. Standard SwiftUI `Form` in a
+// `NavigationStack` presented via `.sheet(item:)` (edit) or
+// `.sheet(isPresented:)` (create). Edit enqueues `PUT /api/nutrition/entries`
+// through HTTPOutbox; create enqueues `POST /api/nutrition/entries`. The server
+// identifies an existing entry by its filename (`file` field in the JSON body).
 
 struct EditNutritionEntrySheet: View {
   @Environment(HTTPOutbox.self) private var outbox
   @Environment(\.dismiss) private var dismiss
 
-  let original: NutritionEntry
-  let onSave: (NutritionEntry) -> Void
+  let original: NutritionEntry?
+  let onDone: (NutritionEntry?) -> Void
 
   @State private var time: Date = Date()
   @State private var emoji: String = ""
@@ -49,7 +50,7 @@ struct EditNutritionEntrySheet: View {
           macroField("kcal", text: $kcal)
         }
       }
-      .navigationTitle("Edit meal")
+      .navigationTitle(original == nil ? "New Meal" : "Edit Meal")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif
@@ -79,16 +80,28 @@ struct EditNutritionEntrySheet: View {
   }
 
   private func seed() {
-    emoji = original.emoji ?? ""
-    foodsText = original.foods.joined(separator: "\n")
-    ingredientsText = (original.ingredients ?? []).joined(separator: "\n")
-    proteinG = numString(original.proteinG)
-    fatG     = numString(original.fatG)
-    carbsG   = numString(original.carbsG)
-    fiberG   = numString(original.fiberG ?? 0)
-    kcal     = numString(original.kcal)
-    let fmt = DateFormatter(); fmt.dateFormat = "HH:mm"
-    time = fmt.date(from: original.time) ?? Date()
+    if let original {
+      emoji = original.emoji ?? ""
+      foodsText = original.foods.joined(separator: "\n")
+      ingredientsText = (original.ingredients ?? []).joined(separator: "\n")
+      proteinG = numString(original.proteinG)
+      fatG     = numString(original.fatG)
+      carbsG   = numString(original.carbsG)
+      fiberG   = numString(original.fiberG ?? 0)
+      kcal     = numString(original.kcal)
+      let fmt = DateFormatter(); fmt.dateFormat = "HH:mm"
+      time = fmt.date(from: original.time) ?? Date()
+    } else {
+      emoji = ""
+      foodsText = ""
+      ingredientsText = ""
+      proteinG = ""
+      fatG = ""
+      carbsG = ""
+      fiberG = ""
+      kcal = ""
+      time = Date()
+    }
   }
 
   private func numString(_ d: Double) -> String {
@@ -118,44 +131,67 @@ struct EditNutritionEntrySheet: View {
     let k = parseDouble(kcal)
     let emojiValue = emoji.trimmingCharacters(in: .whitespacesAndNewlines)
 
-    var body: [String: Any] = [
-      "file": original.file,
-      "date": original.date,
-      "time": hhmm,
-      "emoji": emojiValue,
-      "protein_g": p,
-      "fat_g": f,
-      "carbs_g": c,
-      "fiber_g": fb,
-      "kcal": k,
-      "foods": foods,
-    ]
-    if !ingredients.isEmpty {
-      body["ingredients"] = ingredients
+    if let original {
+      var body: [String: Any] = [
+        "file": original.file,
+        "date": original.date,
+        "time": hhmm,
+        "emoji": emojiValue,
+        "protein_g": p,
+        "fat_g": f,
+        "carbs_g": c,
+        "fiber_g": fb,
+        "kcal": k,
+        "foods": foods,
+      ]
+      if !ingredients.isEmpty {
+        body["ingredients"] = ingredients
+      }
+      outbox.enqueue(
+        method: "PUT",
+        path: "/api/nutrition/entries",
+        body: body,
+        kind: "nutrition.update"
+      )
+      Haptics.tick()
+      let rebuilt = NutritionEntry(
+        date: original.date,
+        time: hhmm,
+        emoji: emojiValue.isEmpty ? nil : emojiValue,
+        proteinG: p,
+        fatG: f,
+        carbsG: c,
+        fiberG: fb == 0 ? nil : fb,
+        kcal: k,
+        foods: foods,
+        ingredients: ingredients.isEmpty ? nil : ingredients,
+        file: original.file
+      )
+      onDone(rebuilt)
+    } else {
+      var body: [String: Any] = [
+        "date": SeptenaDate.today,
+        "time": hhmm,
+        "emoji": emojiValue,
+        "protein_g": p,
+        "fat_g": f,
+        "carbs_g": c,
+        "fiber_g": fb,
+        "kcal": k,
+        "foods": foods,
+      ]
+      if !ingredients.isEmpty {
+        body["ingredients"] = ingredients
+      }
+      outbox.enqueue(
+        method: "POST",
+        path: "/api/nutrition/entries",
+        body: body,
+        kind: "nutrition.create"
+      )
+      Haptics.tick()
+      onDone(nil)
     }
-
-    outbox.enqueue(
-      method: "PUT",
-      path: "/api/nutrition/entries",
-      body: body,
-      kind: "nutrition.update"
-    )
-    Haptics.tick()
-
-    let rebuilt = NutritionEntry(
-      date: original.date,
-      time: hhmm,
-      emoji: emojiValue.isEmpty ? nil : emojiValue,
-      proteinG: p,
-      fatG: f,
-      carbsG: c,
-      fiberG: fb == 0 ? nil : fb,
-      kcal: k,
-      foods: foods,
-      ingredients: ingredients.isEmpty ? nil : ingredients,
-      file: original.file
-    )
-    onSave(rebuilt)
     dismiss()
   }
 }

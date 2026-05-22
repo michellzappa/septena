@@ -1,5 +1,9 @@
 import SwiftUI
 
+// TODO(backlog): QuickAddToolbar is no longer used by destination views — each
+// view now owns its own "+" button pointing directly at the relevant Edit sheet.
+// Keep the modifier for now in case it is needed by RootTabView or future surfaces.
+
 // Standard top-right "+" toolbar button for every destination panel
 // openable from the homepage tile grid. Mirrors the webapp's contextual
 // quick-log surface — tap "+" inside a section and you land directly on

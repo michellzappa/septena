@@ -23,7 +23,6 @@ struct TasksQuickAddMenu: View {
   let onGoToInbox: () -> Void
   let onGoToToday: () -> Void
   let onCheckOff: (SeptenaTask) -> Void
-  let onMore: () -> Void
 
   /// Top 3 open tasks for today; finished ones drop out so the menu
   /// doesn't surface stale rows once they're complete.
@@ -52,9 +51,5 @@ struct TasksQuickAddMenu: View {
       }
     }
 
-    Divider()
-    Button { onMore() } label: {
-      Label("Tasks…", systemImage: "ellipsis")
-    }
   }
 }

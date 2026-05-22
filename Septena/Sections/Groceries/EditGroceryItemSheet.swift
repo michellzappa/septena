@@ -1,17 +1,18 @@
 import SwiftUI
 
-// Edit sheet for a grocery item — name, emoji, category. Category is a
+// Edit/create sheet for a grocery item — name, emoji, category. Category is a
 // picker bound to the user's configured groceries categories (fetched
-// from the server and passed in by the dashboard). Save enqueues
-// `PATCH /api/groceries/item/{id}` through HTTPOutbox.
+// from the server and passed in by the dashboard). Edit enqueues
+// `PATCH /api/groceries/item/{id}` through HTTPOutbox; create enqueues
+// `POST /api/groceries/item`.
 
 struct EditGroceryItemSheet: View {
   @Environment(HTTPOutbox.self) private var outbox
   @Environment(\.dismiss) private var dismiss
 
-  let original: GroceryItem
+  let original: GroceryItem?
   let categories: [GroceryCategory]
-  let onSave: (GroceryItem) -> Void
+  let onDone: (GroceryItem?) -> Void
 
   @State private var name: String = ""
   @State private var emoji: String = ""
@@ -26,7 +27,6 @@ struct EditGroceryItemSheet: View {
       Form {
         Section("Item") {
           TextField("Name", text: $name)
-          TextField("Emoji", text: $emoji)
           Picker("Category", selection: $category) {
             ForEach(categories) { cat in
               Text(cat.name).tag(cat.id)
@@ -34,7 +34,7 @@ struct EditGroceryItemSheet: View {
           }
         }
       }
-      .navigationTitle("Edit grocery item")
+      .navigationTitle(original == nil ? "New Item" : "Edit Item")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif
@@ -52,10 +52,14 @@ struct EditGroceryItemSheet: View {
   }
 
   private func seed() {
-    name = original.name
-    emoji = original.emoji
-    let knownIDs = Set(categories.map { $0.id })
-    category = knownIDs.contains(original.category) ? original.category : fallbackID
+    name = original?.name ?? ""
+    emoji = original?.emoji ?? ""
+    if let original {
+      let knownIDs = Set(categories.map { $0.id })
+      category = knownIDs.contains(original.category) ? original.category : fallbackID
+    } else {
+      category = fallbackID
+    }
   }
 
   private func save() {
@@ -67,18 +71,29 @@ struct EditGroceryItemSheet: View {
       "emoji": e,
       "category": c,
     ]
-    outbox.enqueue(
-      method: "PATCH",
-      path: "/api/groceries/item/\(original.id)",
-      body: body,
-      kind: "groceries.update"
-    )
-    Haptics.tick()
-    var rebuilt = original
-    rebuilt.name = n
-    rebuilt.emoji = e
-    rebuilt.category = c
-    onSave(rebuilt)
+    if let original {
+      outbox.enqueue(
+        method: "PATCH",
+        path: "/api/groceries/item/\(original.id)",
+        body: body,
+        kind: "groceries.update"
+      )
+      Haptics.tick()
+      var rebuilt = original
+      rebuilt.name = n
+      rebuilt.emoji = e
+      rebuilt.category = c
+      onDone(rebuilt)
+    } else {
+      outbox.enqueue(
+        method: "POST",
+        path: "/api/groceries/item",
+        body: body,
+        kind: "groceries.create"
+      )
+      Haptics.tick()
+      onDone(nil)
+    }
     dismiss()
   }
 }

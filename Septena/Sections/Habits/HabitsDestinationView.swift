@@ -13,6 +13,7 @@ struct HabitsDestinationView: View {
 
   @State private var model = NextItemsModel()
   @State private var editing: HabitDayItem? = nil
+  @State private var creating = false
   @State private var history: [HabitHistoryPoint] = []
 
   /// Server section key; accent comes from the user's Septena config so the
@@ -49,7 +50,12 @@ struct HabitsDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
-    .quickAddToolbar(.habits)
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        Button { creating = true } label: { Image(systemName: "plus") }
+          .tint(accent)
+      }
+    }
     .task {
       model.paintFromCache()
       await model.load(client: client)
@@ -61,12 +67,23 @@ struct HabitsDestinationView: View {
       EditHabitSheet(
         original: habit,
         buckets: model.habitBuckets,
-        onSave: { updated in
-          if let idx = model.habits.firstIndex(where: { $0.id == updated.id }) {
+        onDone: { updated in
+          if let updated, let idx = model.habits.firstIndex(where: { $0.id == updated.id }) {
             model.habits[idx] = updated
           }
         }
       )
+    }
+    .sheet(isPresented: $creating) {
+      EditHabitSheet(
+        original: nil,
+        buckets: model.habitBuckets,
+        onDone: { _ in Task { await model.load(client: client) } }
+      )
+      #if os(iOS)
+      .presentationDetents([.medium, .large])
+      .presentationDragIndicator(.visible)
+      #endif
     }
   }
 

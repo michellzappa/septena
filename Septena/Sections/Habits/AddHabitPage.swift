@@ -68,7 +68,7 @@ struct AddHabitPage: View {
               ForEach(items) { item in
                 Button { toggle(item) } label: {
                   AddInfoRow(
-                    title: "\(item.emoji ?? "") \(item.name)".trimmingCharacters(in: .whitespaces),
+                    title: item.name,
                     subtitle: nil,
                     tint: tint,
                     accessory: .check(false)

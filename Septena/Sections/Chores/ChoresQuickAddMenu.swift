@@ -18,7 +18,7 @@ private func actionable(_ chores: [ChoreItem], limit: Int) -> [ChoreItem] {
 }
 
 private func displayName(_ chore: ChoreItem) -> String {
-  let core = "\(chore.emoji ?? "") \(chore.name)".trimmingCharacters(in: .whitespaces)
+  let core = chore.name
   let n = chore.daysOverdue
   return n <= 0 ? core : "\(core) · \(n)d late"
 }
@@ -26,7 +26,6 @@ private func displayName(_ chore: ChoreItem) -> String {
 struct ChoresQuickAddMenu: View {
   let chores: [ChoreItem]
   let onComplete: (ChoreItem) -> Void
-  let onMore: () -> Void
 
   var body: some View {
     let items = actionable(chores, limit: 2)
@@ -40,7 +39,5 @@ struct ChoresQuickAddMenu: View {
         }
       }
     }
-    Divider()
-    Button { onMore() } label: { Label("Chores…", systemImage: "ellipsis") }
   }
 }

@@ -15,7 +15,6 @@ struct CannabisQuickAddMenu: View {
   let usesPerCapsule: Int
   let onCommit: (_ method: String, _ strain: String?, _ hit: Int?) -> Void
   let onEditLast: (() -> Void)?
-  let onMore: () -> Void
 
   private var lastStrain: String? {
     guard let s = lastVape?.strain, !s.isEmpty else { return nil }
@@ -67,9 +66,5 @@ struct CannabisQuickAddMenu: View {
       }
     }
 
-    Divider()
-    Button { onMore() } label: {
-      Label("Cannabis…", systemImage: "ellipsis")
-    }
   }
 }

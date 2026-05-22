@@ -42,7 +42,7 @@ struct AddGroceryPage: View {
           ForEach(filtered) { item in
             Button { markLow(item) } label: {
               AddInfoRow(
-                title: "\(item.emoji.isEmpty ? "" : item.emoji + " ")\(item.name)",
+                title: item.name,
                 subtitle: item.category,
                 tint: tint
               )

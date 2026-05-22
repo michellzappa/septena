@@ -14,13 +14,12 @@ private func remaining(_ supplements: [SupplementDayItem], limit: Int) -> [Suppl
 }
 
 private func displayName(_ item: SupplementDayItem) -> String {
-  "\(item.emoji ?? "") \(item.name)".trimmingCharacters(in: .whitespaces)
+  item.name
 }
 
 struct SupplementsQuickAddMenu: View {
   let supplements: [SupplementDayItem]
   let onToggle: (SupplementDayItem) -> Void
-  let onMore: () -> Void
 
   var body: some View {
     let items = remaining(supplements, limit: 2)
@@ -34,7 +33,5 @@ struct SupplementsQuickAddMenu: View {
         }
       }
     }
-    Divider()
-    Button { onMore() } label: { Label("Supplements…", systemImage: "ellipsis") }
   }
 }

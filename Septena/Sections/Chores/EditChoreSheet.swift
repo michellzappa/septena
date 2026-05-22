@@ -1,21 +1,22 @@
 import SwiftUI
 
-// Edit sheet for a chore definition — name, emoji, cadence. Save enqueues
-// `PUT /api/chores/definitions/{id}` through HTTPOutbox.
+// Edit/create sheet for a chore definition — name, emoji, cadence. Edit
+// enqueues `PUT /api/chores/definitions/{id}` through HTTPOutbox; create
+// enqueues `POST /api/chores/definitions`.
 
 struct EditChoreSheet: View {
   @Environment(HTTPOutbox.self) private var outbox
   @Environment(\.dismiss) private var dismiss
 
-  let original: ChoreItem
-  let onSave: (ChoreItem) -> Void
+  let original: ChoreItem?
+  let onDone: (ChoreItem?) -> Void
 
   @State private var name: String = ""
   @State private var emoji: String = ""
   @State private var cadenceDays: Int = 7
   /// Recognised cadence presets — picking one drives `cadenceDays`. Same
   /// shape the webapp's chore editor uses.
-  @State private var cadencePreset: String = "custom"
+  @State private var cadencePreset: String = "Weekly"
 
   private static let presets: [(label: String, days: Int)] = [
     ("Daily", 1),
@@ -31,7 +32,6 @@ struct EditChoreSheet: View {
       Form {
         Section("Chore") {
           TextField("Name", text: $name)
-          TextField("Emoji", text: $emoji)
         }
         Section("Cadence") {
           Picker("Preset", selection: $cadencePreset) {
@@ -56,7 +56,7 @@ struct EditChoreSheet: View {
           }
         }
       }
-      .navigationTitle("Edit chore")
+      .navigationTitle(original == nil ? "New Chore" : "Edit Chore")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif
@@ -74,10 +74,10 @@ struct EditChoreSheet: View {
   }
 
   private func seed() {
-    name = original.name
-    emoji = original.emoji ?? ""
-    cadenceDays = original.cadenceDays ?? 7
-    cadencePreset = Self.presets.first(where: { $0.days == cadenceDays })?.label ?? "custom"
+    name = original?.name ?? ""
+    emoji = original?.emoji ?? ""
+    cadenceDays = original?.cadenceDays ?? 7
+    cadencePreset = Self.presets.first(where: { $0.days == cadenceDays })?.label ?? "Weekly"
   }
 
   private func save() {
@@ -88,18 +88,29 @@ struct EditChoreSheet: View {
       "emoji": e,
       "cadence_days": cadenceDays,
     ]
-    outbox.enqueue(
-      method: "PUT",
-      path: "/api/chores/definitions/\(original.id)",
-      body: body,
-      kind: "chores.update"
-    )
-    Haptics.tick()
-    var rebuilt = original
-    rebuilt.name = n
-    rebuilt.emoji = e.isEmpty ? nil : e
-    rebuilt.cadenceDays = cadenceDays
-    onSave(rebuilt)
+    if let original {
+      outbox.enqueue(
+        method: "PUT",
+        path: "/api/chores/definitions/\(original.id)",
+        body: body,
+        kind: "chores.update"
+      )
+      Haptics.tick()
+      var rebuilt = original
+      rebuilt.name = n
+      rebuilt.emoji = e.isEmpty ? nil : e
+      rebuilt.cadenceDays = cadenceDays
+      onDone(rebuilt)
+    } else {
+      outbox.enqueue(
+        method: "POST",
+        path: "/api/chores/definitions",
+        body: body,
+        kind: "chores.create"
+      )
+      Haptics.tick()
+      onDone(nil)
+    }
     dismiss()
   }
 }

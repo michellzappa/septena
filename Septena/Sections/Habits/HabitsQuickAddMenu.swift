@@ -36,14 +36,13 @@ private func actionable(_ habits: [HabitDayItem], buckets: [String], limit: Int)
 }
 
 private func displayName(_ item: HabitDayItem) -> String {
-  "\(item.emoji ?? "") \(item.name)".trimmingCharacters(in: .whitespaces)
+  item.name
 }
 
 struct HabitsQuickAddMenu: View {
   let habits: [HabitDayItem]
   let buckets: [String]
   let onComplete: (HabitDayItem) -> Void
-  let onMore: () -> Void
 
   var body: some View {
     let items = actionable(habits, buckets: buckets, limit: 2)
@@ -57,7 +56,5 @@ struct HabitsQuickAddMenu: View {
         }
       }
     }
-    Divider()
-    Button { onMore() } label: { Label("Habits…", systemImage: "ellipsis") }
   }
 }

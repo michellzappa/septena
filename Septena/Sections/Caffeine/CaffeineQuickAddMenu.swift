@@ -12,7 +12,6 @@ struct CaffeineQuickAddMenu: View {
   let lastEntry: CaffeineTimePoint?
   let onCommit: (_ method: String, _ beans: String?, _ grams: Double?) -> Void
   let onEditLast: (() -> Void)?
-  let onMore: () -> Void
 
   /// Prefer the bean name; fall back to the brew method (e.g. "V60") for
   /// entries logged without a bean.
@@ -36,9 +35,5 @@ struct CaffeineQuickAddMenu: View {
       }
     }
 
-    Divider()
-    Button { onMore() } label: {
-      Label("Caffeine…", systemImage: "ellipsis")
-    }
   }
 }

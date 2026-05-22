@@ -13,7 +13,6 @@ struct ModuleTile: View {
   var progress: ProgressBar? = nil
   var history: HistoryRow? = nil
   var centeredHistory: CenteredHistoryRow? = nil
-  var action: ActionButton? = nil
 
   struct Stat: Hashable {
     let label: String          // "SESSIONS"
@@ -55,27 +54,6 @@ struct ModuleTile: View {
     let values: [Double?]
   }
 
-  struct ActionButton {
-    let systemImage: String    // "play.fill" / "checkmark"
-    let onTap: (() -> Void)?
-    let menuContent: AnyView?
-
-    init(systemImage: String, onTap: @escaping () -> Void) {
-      self.systemImage = systemImage
-      self.onTap = onTap
-      self.menuContent = nil
-    }
-
-    /// Menu-style action: tapping the trailing circle opens a SwiftUI Menu.
-    /// Pair with `.contextMenu { sameContent }` on the tile to give users a
-    /// long-press / right-click affordance with the same options.
-    init<Content: View>(systemImage: String, @ViewBuilder menu: () -> Content) {
-      self.systemImage = systemImage
-      self.onTap = nil
-      self.menuContent = AnyView(menu())
-    }
-  }
-
   var body: some View {
     HStack(spacing: 0) {
       Rectangle()
@@ -103,30 +81,9 @@ struct ModuleTile: View {
   }
 
   private var header: some View {
-    HStack {
-      Text(title)
-        .font(.title3.weight(.semibold))
-      Spacer()
-      if let action {
-        let icon = Image(systemName: action.systemImage)
-          .font(.subheadline.weight(.semibold))
-          .foregroundStyle(.white)
-          .frame(width: 32, height: 32)
-          .background(Circle().fill(accent))
-        if let menuContent = action.menuContent {
-          // No `.menuStyle(.button)` or `.buttonStyle(.plain)` here. The
-          // combination registered the label as the menu's anchor view,
-          // and after the first menu open the anchor frame decoupled
-          // from the tile during scroll — the icon visibly drifted off
-          // the tile. Default Menu styling tracks layout correctly; the
-          // inner Image+frame+background already supplies the visual.
-          Menu { menuContent } label: { icon }
-        } else if let onTap = action.onTap {
-          Button(action: onTap) { icon }
-            .buttonStyle(.plain)
-        }
-      }
-    }
+    Text(title)
+      .font(.title3.weight(.semibold))
+      .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   private var statsGrid: some View {
@@ -426,8 +383,7 @@ struct Histogram: View {
         stats: [.init(label: "Sessions", value: "5/7"),
                 .init(label: "Z2 min",   value: "115", unit: "m")],
         progress: .init(label: "Z2 cardio", current: 115, target: 150, unit: "m"),
-        history: .init(label: "7-day effort", values: [0, 1, 2, 1, 1, 0, 1], todayIndex: 1),
-        action: .init(systemImage: "play.fill") {}
+        history: .init(label: "7-day effort", values: [0, 1, 2, 1, 1, 0, 1], todayIndex: 1)
       )
       ModuleTile(
         title: "Nutrition",
@@ -435,8 +391,7 @@ struct Histogram: View {
         stats: [.init(label: "Protein", value: "50", unit: "g"),
                 .init(label: "Kcal",    value: "855")],
         progress: .init(label: "Today's protein", current: 50, target: 150, unit: "g"),
-        history: .init(label: "7-day protein", values: [120, 130, 140, 160, 80, 145, 60]),
-        action: .init(systemImage: "checkmark") {}
+        history: .init(label: "7-day protein", values: [120, 130, 140, 160, 80, 145, 60])
       )
     }
     .padding()

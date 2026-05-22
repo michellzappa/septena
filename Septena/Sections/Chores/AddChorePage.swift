@@ -43,7 +43,7 @@ struct AddChorePage: View {
           ForEach(actionable) { chore in
             Button { complete(chore) } label: {
               AddInfoRow(
-                title: "\(chore.emoji ?? "") \(chore.name)".trimmingCharacters(in: .whitespaces),
+                title: chore.name,
                 subtitle: subtitle(for: chore),
                 tint: tint
               )

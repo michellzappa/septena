@@ -27,14 +27,11 @@ struct AddInfoSheet: View {
       .navigationBarTitleDisplayMode(.inline)
       #endif
       .toolbar {
+        // TODO(backlog): restore root navigation when AddInfoSheet is repurposed as a
+        // universal creation palette — for now it is always launched directly on a
+        // section page and has no root to pop back to.
         ToolbarItem(placement: .cancellationAction) {
-          if router.page != nil {
-            Button { router.pop() } label: {
-              Label("Back", systemImage: "chevron.left")
-            }
-          } else {
-            Button("Cancel") { dismiss() }
-          }
+          Button("Cancel") { dismiss() }
         }
       }
       #if os(iOS)

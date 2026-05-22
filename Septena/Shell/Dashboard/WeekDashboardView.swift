@@ -16,8 +16,7 @@ enum WeekDestination: String, Hashable, Identifiable {
 }
 
 /// Sub-sheets presented from the Nutrition QuickAdd menu. Separate state
-/// from `sheetDest` (destination views) and `quickAddSection` (AddInfo
-/// palettes) so each affordance is self-contained.
+/// from `sheetDest` (destination views) so each affordance is self-contained.
 enum NutritionSheet: Hashable, Identifiable {
   case search        // history search modal
   case newEntry      // blank meal-form sheet
@@ -76,7 +75,6 @@ struct WeekDashboardView: View {
   @State private var gutToday: GutDayResponse? = nil
   @State private var gutHistory: [GutHistoryPoint] = []
   @State private var sheetDest: WeekDestination? = nil
-  @State private var quickAddSection: AddInfoSection? = nil
   /// Today-scoped collections kept in state so DayTimelineView can read
   /// them. NextItemsModel already covers habits/supplements/chores and
   /// today's caffeine/cannabis/gut live in their respective `*Today`
@@ -172,15 +170,6 @@ struct WeekDashboardView: View {
     // refresh gesture that re-runs Week's loader.
     .sheet(item: $sheetDest) { dest in
       sheetContent(for: dest)
-    }
-    .sheet(item: $quickAddSection) { section in
-      AddInfoSheet(initialSection: section)
-        #if os(iOS)
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-        #else
-        .frame(width: 560, height: 520)
-        #endif
     }
     .sheet(item: $nutritionSheet) { sheet in
       switch sheet {
@@ -816,10 +805,7 @@ struct WeekDashboardView: View {
                       target: Double(max(totalToday, 1))),
       history: bars.isEmpty
         ? nil
-        : .init(label: "7-day completions", values: bars),
-      action: .init(systemImage: AddInfoSection.tasks.verbSystemImage) {
-        tasksQuickAddMenu
-      }
+        : .init(label: "7-day completions", values: bars)
     )
     .contentShape(Rectangle())
     .onTapGesture { tabSelection.current = .tasks }
@@ -859,8 +845,7 @@ struct WeekDashboardView: View {
       onCheckOff: { task in
         Haptics.success()
         taskMutator.complete(id: task.id)
-      },
-      onMore: { quickAddSection = .tasks }
+      }
     )
   }
 
@@ -881,10 +866,7 @@ struct WeekDashboardView: View {
         current: Double(done),
         target: Double(max(total, 1))
       ),
-      history: .init(label: "7-day adherence", values: habitHistory),
-      action: .init(systemImage: AddInfoSection.habits.verbSystemImage) {
-        habitsQuickAddMenu
-      }
+      history: .init(label: "7-day adherence", values: habitHistory)
     )
     .contentShape(Rectangle())
     .onTapGesture { sheetDest = .habits }
@@ -895,8 +877,7 @@ struct WeekDashboardView: View {
     HabitsQuickAddMenu(
       habits: dailies.habits,
       buckets: dailies.habitBuckets,
-      onComplete: { item in commitHabitToggle(item) },
-      onMore: { quickAddSection = .habits }
+      onComplete: { item in commitHabitToggle(item) }
     )
   }
 
@@ -965,10 +946,7 @@ struct WeekDashboardView: View {
       ),
       history: .init(label: "7-day effort",
                      values: strengthBars,
-                     secondaryValues: cardioBars),
-      action: .init(systemImage: AddInfoSection.training.verbSystemImage) {
-        trainingQuickAddMenu
-      }
+                     secondaryValues: cardioBars)
     )
     .contentShape(Rectangle())
     .onTapGesture { sheetDest = .training }
@@ -988,8 +966,7 @@ struct WeekDashboardView: View {
           nav.pendingTrainingType = typeId
         }
         nav.showTrainingSession = true
-      },
-      onMore: { quickAddSection = .training }
+      }
     )
   }
 
@@ -1033,10 +1010,7 @@ struct WeekDashboardView: View {
       progress: .init(label: "Today done",
                       current: Double(done),
                       target: Double(max(total, 1))),
-      history: .init(label: "7-day done", values: choreHistory),
-      action: .init(systemImage: AddInfoSection.chores.verbSystemImage) {
-        choresQuickAddMenu
-      }
+      history: .init(label: "7-day done", values: choreHistory)
     )
     .contentShape(Rectangle())
     .onTapGesture { sheetDest = .chores }
@@ -1053,8 +1027,7 @@ struct WeekDashboardView: View {
   @ViewBuilder private var choresQuickAddMenu: some View {
     ChoresQuickAddMenu(
       chores: pendingChores,
-      onComplete: { chore in commitChoreComplete(chore) },
-      onMore: { quickAddSection = .chores }
+      onComplete: { chore in commitChoreComplete(chore) }
     )
   }
 
@@ -1081,10 +1054,7 @@ struct WeekDashboardView: View {
         current: Double(done),
         target: Double(max(total, 1))
       ),
-      history: .init(label: "7-day adherence", values: supplementHistory),
-      action: .init(systemImage: AddInfoSection.supplements.verbSystemImage) {
-        supplementsQuickAddMenu
-      }
+      history: .init(label: "7-day adherence", values: supplementHistory)
     )
     .contentShape(Rectangle())
     .onTapGesture { sheetDest = .supplements }
@@ -1094,8 +1064,7 @@ struct WeekDashboardView: View {
   @ViewBuilder private var supplementsQuickAddMenu: some View {
     SupplementsQuickAddMenu(
       supplements: dailies.supplements,
-      onToggle: { item in commitSupplementToggle(item) },
-      onMore: { quickAddSection = .supplements }
+      onToggle: { item in commitSupplementToggle(item) }
     )
   }
 
@@ -1188,10 +1157,7 @@ struct WeekDashboardView: View {
         current: Double(stocked),
         target: Double(max(groceries.count, 1))
       ),
-      history: .init(label: "Bought (7d)", values: boughtPerDay),
-      action: .init(systemImage: AddInfoSection.groceries.verbSystemImage) {
-        groceriesQuickAddMenu
-      }
+      history: .init(label: "Bought (7d)", values: boughtPerDay)
     )
     .contentShape(Rectangle())
     .onTapGesture { sheetDest = .groceries }
@@ -1201,8 +1167,7 @@ struct WeekDashboardView: View {
   @ViewBuilder private var groceriesQuickAddMenu: some View {
     GroceriesQuickAddMenu(
       items: groceries,
-      onMarkLow: { item in commitGroceryMarkLow(item) },
-      onMore: { quickAddSection = .groceries }
+      onMarkLow: { item in commitGroceryMarkLow(item) }
     )
   }
 
@@ -1253,27 +1218,20 @@ struct WeekDashboardView: View {
                       target: Double(dailyLimit)),
       history: .init(label: "7-day sessions",
                      values: bars.isEmpty
-                       ? Array(repeating: 0, count: 7) : bars),
-      action: .init(systemImage: AddInfoSection.caffeine.verbSystemImage) {
-        caffeineQuickAddMenu
-      }
+                       ? Array(repeating: 0, count: 7) : bars)
     )
     .contentShape(Rectangle())
     .onTapGesture { sheetDest = .caffeine }
     .contextMenu { caffeineQuickAddMenu }
   }
 
-  // Single source of truth for the caffeine tile's quick-add affordances —
-  // mirrored by both the trailing-circle Menu and the tile-level
-  // `.contextMenu` (long-press on iOS, right-click on macOS).
   @ViewBuilder private var caffeineQuickAddMenu: some View {
     CaffeineQuickAddMenu(
       lastEntry: caffeineLastEntry,
       onCommit: { method, beans, grams in
         commitCaffeine(method: method, beans: beans, grams: grams)
       },
-      onEditLast: caffeineLastEntry == nil ? nil : { sheetDest = .caffeine },
-      onMore: { quickAddSection = .caffeine }
+      onEditLast: caffeineLastEntry == nil ? nil : { sheetDest = .caffeine }
     )
   }
 
@@ -1311,10 +1269,7 @@ struct WeekDashboardView: View {
                       target: Double(dailyLimit)),
       history: .init(label: "7-day sessions",
                      values: bars.isEmpty
-                       ? Array(repeating: 0, count: 7) : bars),
-      action: .init(systemImage: AddInfoSection.cannabis.verbSystemImage) {
-        cannabisQuickAddMenu
-      }
+                       ? Array(repeating: 0, count: 7) : bars)
     )
     .contentShape(Rectangle())
     .onTapGesture { sheetDest = .cannabis }
@@ -1331,8 +1286,7 @@ struct WeekDashboardView: View {
     cannabisToday?.entries.reversed().first { $0.method == "vape" }
   }
 
-  /// Canonical menu — bound to both the trailing-circle button and the
-  /// tile's `.contextMenu`. Edit-last opens the destination view (rather
+  /// Edit-last opens the destination view (rather
   /// than threading an EditCannabisEntrySheet through the dashboard)
   /// since the destination already has that affordance.
   @ViewBuilder private var cannabisQuickAddMenu: some View {
@@ -1342,8 +1296,7 @@ struct WeekDashboardView: View {
       onCommit: { method, strain, hit in
         commitCannabis(method: method, strain: strain, hit: hit)
       },
-      onEditLast: lastCannabisVape == nil ? nil : { sheetDest = .cannabis },
-      onMore: { quickAddSection = .cannabis }
+      onEditLast: lastCannabisVape == nil ? nil : { sheetDest = .cannabis }
     )
   }
 
@@ -1441,10 +1394,7 @@ struct WeekDashboardView: View {
                       target: Double(dailyTarget)),
       history: .init(label: "7-day movements",
                      values: bars.isEmpty
-                       ? Array(repeating: 0, count: 7) : bars),
-      action: .init(systemImage: AddInfoSection.gut.verbSystemImage) {
-        gutQuickAddMenu
-      }
+                       ? Array(repeating: 0, count: 7) : bars)
     )
     .contentShape(Rectangle())
     .onTapGesture { sheetDest = .gut }
@@ -1459,8 +1409,7 @@ struct WeekDashboardView: View {
     GutQuickAddMenu(
       onCommit: { bristol in commitGut(bristol: bristol) },
       hasLastEntry: hasLast,
-      onEditLast: hasLast ? { sheetDest = .gut } : nil,
-      onMore: { quickAddSection = .gut }
+      onEditLast: hasLast ? { sheetDest = .gut } : nil
     )
   }
 
@@ -1574,10 +1523,7 @@ struct WeekDashboardView: View {
                       current: todayProteinSum,
                       target: max(proteinTarget, 1),
                       unit: "g"),
-      history: .init(label: "7-day protein", values: bars),
-      action: .init(systemImage: AddInfoSection.nutrition.verbSystemImage) {
-        nutritionQuickAddMenu
-      }
+      history: .init(label: "7-day protein", values: bars)
     )
     .contentShape(Rectangle())
     .onTapGesture { sheetDest = .nutrition }
@@ -1590,8 +1536,7 @@ struct WeekDashboardView: View {
         from: nutritionHistory, limit: 3),
       onSearch: { nutritionSheet = .search },
       onInput: { nutritionSheet = .newEntry },
-      onCommit: { meal in commitNutritionDuplicate(meal) },
-      onMore: { quickAddSection = .nutrition }
+      onCommit: { meal in commitNutritionDuplicate(meal) }
     )
   }
 

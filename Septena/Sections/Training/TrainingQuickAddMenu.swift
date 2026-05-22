@@ -30,7 +30,6 @@ struct TrainingQuickAddMenu: View {
   /// stuffs it into `nav.pendingTrainingType` and presents the session
   /// sheet, which auto-starts the draft on appear.
   let onStart: (String) -> Void
-  let onMore: () -> Void
 
   private var suggested: SessionTypeConfig? {
     guard let id = suggestedId else { return nil }
@@ -78,9 +77,5 @@ struct TrainingQuickAddMenu: View {
       }
     }
 
-    Divider()
-    Button { onMore() } label: {
-      Label("Training…", systemImage: "ellipsis")
-    }
   }
 }

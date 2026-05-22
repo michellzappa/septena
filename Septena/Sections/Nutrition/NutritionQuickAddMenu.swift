@@ -28,7 +28,6 @@ struct NutritionQuickAddMenu: View {
   let onSearch: () -> Void
   let onInput: () -> Void
   let onCommit: (NutritionEntry) -> Void
-  let onMore: () -> Void
 
   private func displayName(_ entry: NutritionEntry) -> String {
     let head = entry.foods.first ?? "Meal"
@@ -54,9 +53,5 @@ struct NutritionQuickAddMenu: View {
       }
     }
 
-    Divider()
-    Button { onMore() } label: {
-      Label("Nutrition…", systemImage: "ellipsis")
-    }
   }
 }

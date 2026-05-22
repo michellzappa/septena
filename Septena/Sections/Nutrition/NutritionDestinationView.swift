@@ -33,6 +33,7 @@ struct NutritionDestinationView: View {
   @State private var macroColors: MacroColors? = nil
   @State private var loading = true
   @State private var editing: NutritionEntry? = nil
+  @State private var creating = false
 
   /// Live "now" for the fasting row + relative time labels. Sourced from
   /// the shared DayClock (single 60s tick app-wide) instead of a per-view
@@ -128,7 +129,12 @@ struct NutritionDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(kcalColor)
-    .quickAddToolbar(.nutrition)
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        Button { creating = true } label: { Image(systemName: "plus") }
+          .tint(kcalColor)
+      }
+    }
     .task {
       paintFromCache()
       await load()
@@ -141,8 +147,18 @@ struct NutritionDestinationView: View {
     .sheet(item: $editing) { entry in
       EditNutritionEntrySheet(
         original: entry,
-        onSave: { updated in applyLocalUpdate(updated) }
+        onDone: { updated in if let updated { applyLocalUpdate(updated) } }
       )
+    }
+    .sheet(isPresented: $creating) {
+      EditNutritionEntrySheet(
+        original: nil,
+        onDone: { _ in Task { await load() } }
+      )
+      #if os(iOS)
+      .presentationDetents([.medium, .large])
+      .presentationDragIndicator(.visible)
+      #endif
     }
   }
 
