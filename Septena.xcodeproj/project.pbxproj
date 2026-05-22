@@ -99,6 +99,7 @@
 		5C2CAF18F7F1BB26F040A597 /* CKEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3A43D786998D198C9BCA480 /* CKEngine.swift */; };
 		5FC8B85066ABC219A5C9EC86 /* NextWatchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 851BE2CCE51793135E27E354 /* NextWatchView.swift */; };
 		616C90B23EBD22005C6BBBAB /* AddGutPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 804ACCAA2E1FE43802EA25AB /* AddGutPage.swift */; };
+		63C0C4DF131A491BAB9F8DB2 /* GutBristolRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BD81EAADE544C509D548C02 /* GutBristolRecorder.swift */; };
 		64BB65F0683A560F5055BA6A /* NextItemsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A26475D9A9D19DC0840960D /* NextItemsSection.swift */; };
 		65246BE2E94DD5324730533D /* Plausible.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CA646178F906B39ADA6689F /* Plausible.swift */; };
 		6599659F45F9B6EF50FC2C1B /* ServerInspectorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53E343B15A4B6F29FBF956B8 /* ServerInspectorSheet.swift */; };
@@ -133,6 +134,7 @@
 		8C4B8E2EEE2504ED9E24D5EA /* NavigationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C59B083F7F5C67ABE440868 /* NavigationState.swift */; };
 		8C64426276695251AE35D327 /* ChoresQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = F531676F7BCEFA46F3A7D827 /* ChoresQuickAddMenu.swift */; };
 		8D494DC3944E6DF820478280 /* AddGutPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 804ACCAA2E1FE43802EA25AB /* AddGutPage.swift */; };
+		4AC96267389746D89855EE54 /* GutBristolRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BD81EAADE544C509D548C02 /* GutBristolRecorder.swift */; };
 		8F36E77E81D7EAC78F51D64A /* NewNutritionEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C180106D47D0477F75695A /* NewNutritionEntrySheet.swift */; };
 		91693AEE32D3825C811733E8 /* AddTrainingPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F955392D23BB02F27DD39CD9 /* AddTrainingPage.swift */; };
 		91CF39EC64CE090D8FDB9C65 /* EditHabitSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4E0ADF5987E9D7E112126AB /* EditHabitSheet.swift */; };
@@ -383,6 +385,7 @@
 		7F911216C13CBFC7E330714A /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		7FD1B7B2BAE523F2E4D3F99C /* ProjectsBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectsBackend.swift; sourceTree = "<group>"; };
 		804ACCAA2E1FE43802EA25AB /* AddGutPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGutPage.swift; sourceTree = "<group>"; };
+		5BD81EAADE544C509D548C02 /* GutBristolRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GutBristolRecorder.swift; sourceTree = "<group>"; };
 		80D7DFAC856BBE635EBBC6E4 /* ActivityDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityDestinationView.swift; sourceTree = "<group>"; };
 		8416FB0AD38638BF7038BF2A /* NextDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextDashboardView.swift; sourceTree = "<group>"; };
 		841912A106FECA1706069D4A /* AirDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirDestinationView.swift; sourceTree = "<group>"; };
@@ -512,6 +515,7 @@
 			children = (
 				804ACCAA2E1FE43802EA25AB /* AddGutPage.swift */,
 				0BCB8601AE73D7F70536C902 /* EditGutEntrySheet.swift */,
+				5BD81EAADE544C509D548C02 /* GutBristolRecorder.swift */,
 				D2AF70B89A0D3FC41DAFAFE9 /* GutDestinationView.swift */,
 				6326F985506DA489D2B176A7 /* GutQuickAddMenu.swift */,
 			);
@@ -1042,6 +1046,7 @@
 				0ED02C4262546D720DCBE5DE /* AddChorePage.swift in Sources */,
 				ED0AA58CABA5CF7F1EEA51BC /* AddGroceryPage.swift in Sources */,
 				616C90B23EBD22005C6BBBAB /* AddGutPage.swift in Sources */,
+				63C0C4DF131A491BAB9F8DB2 /* GutBristolRecorder.swift in Sources */,
 				F97689E39AD64A5101DB4296 /* AddHabitPage.swift in Sources */,
 				0A871A3A42EE54FEC6B17A0A /* AddInfoRouter.swift in Sources */,
 				1B693725E48BCC5939FE1196 /* AddInfoRow.swift in Sources */,
@@ -1187,6 +1192,7 @@
 				AD8E6D6E9DFA518DBC2B50CA /* AddChorePage.swift in Sources */,
 				933FEAF27E7304E27A956B84 /* AddGroceryPage.swift in Sources */,
 				8D494DC3944E6DF820478280 /* AddGutPage.swift in Sources */,
+				4AC96267389746D89855EE54 /* GutBristolRecorder.swift in Sources */,
 				F85E889C41CE2E31C1502315 /* AddHabitPage.swift in Sources */,
 				490A398C3B11F900B233B2F3 /* AddInfoRouter.swift in Sources */,
 				D2ED87D701557BCC94446AC6 /* AddInfoRow.swift in Sources */,

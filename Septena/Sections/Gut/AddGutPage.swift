@@ -62,6 +62,7 @@ struct AddGutPage: View {
                           "bristol": item.id,
                           "blood": 0],
                    kind: "gut.add")
+    GutBristolRecorder.record(item.id)
     AddInfoSection.gut.notifyTilesChanged()
     Haptics.tick()
     dismiss()

@@ -149,6 +149,7 @@ struct EditGutEntrySheet: View {
       body: body,
       kind: "gut.update"
     )
+    GutBristolRecorder.record(bristol)
     Haptics.tick()
 
     let rebuilt = GutEntry(

@@ -1405,11 +1405,9 @@ struct WeekDashboardView: View {
   // no "More…" sheet fallback. Matches AddGutPage's commit semantics:
   // `blood: 0` by default; full editor lives in GutDestinationView.
   @ViewBuilder private var gutQuickAddMenu: some View {
-    let entries = gutToday?.entries ?? []
-    let hasLast = !entries.isEmpty
-    let recentTypes = Array(Set(entries.map { $0.bristol }))
+    let hasLast = !(gutToday?.entries.isEmpty ?? true)
     GutQuickAddMenu(
-      recentBristolTypes: recentTypes,
+      recentBristolTypes: GutBristolRecorder.recentTypes,
       onCommit: { bristol in commitGut(bristol: bristol) },
       hasLastEntry: hasLast,
       onEditLast: hasLast ? { sheetDest = .gut } : nil
@@ -1423,6 +1421,7 @@ struct WeekDashboardView: View {
                           "bristol": bristol,
                           "blood": 0],
                    kind: "gut.add")
+    GutBristolRecorder.record(bristol)
     AddInfoSection.gut.notifyTilesChanged()
     Haptics.tick()
   }
