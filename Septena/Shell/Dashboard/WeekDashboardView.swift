@@ -15,9 +15,20 @@ enum WeekDestination: String, Hashable, Identifiable {
   var id: String { rawValue }
 }
 
+/// Sub-sheets presented from the Nutrition QuickAdd menu. Separate state
+/// from `sheetDest` (destination views) and `quickAddSection` (AddInfo
+/// palettes) so each affordance is self-contained.
+enum NutritionSheet: Hashable, Identifiable {
+  case search        // history search modal
+  case newEntry      // blank meal-form sheet
+
+  var id: Self { self }
+}
+
 struct WeekDashboardView: View {
   @Environment(SeptenaClient.self) private var client
   @Environment(HTTPOutbox.self) private var outbox
+  @Environment(TaskMutator.self) private var taskMutator
   @Environment(SectionTheme.self) private var theme
   @Environment(TabSelection.self) private var tabSelection
   @Environment(NavigationState.self) private var nav
@@ -32,6 +43,11 @@ struct WeekDashboardView: View {
   @State private var choreHistory: [Int] = Array(repeating: 0, count: 7)
   @State private var cardio: CardioHistoryResponse? = nil
   @State private var trainingSessionDates: Set<String> = []
+  /// Session-type catalog + recency for the Training QuickAdd menu.
+  /// Loaded in the background Task alongside other menu-only fetches.
+  @State private var trainingSessionTypes: [SessionTypeConfig] = []
+  @State private var trainingSuggestedId: String? = nil
+  @State private var trainingDaysAgo: [String: Int] = [:]
   @State private var supplementHistory: [Int] = Array(repeating: 0, count: 7)
   @State private var taskCounts: TasksCounts? = nil
   @State private var tasksHistory: TasksHistory? = nil
@@ -41,16 +57,20 @@ struct WeekDashboardView: View {
   @State private var todayProteinSum: Double = 0
   @State private var todayKcalSum: Double = 0
   @State private var nutritionTarget: MacrosConfig? = nil
+  /// 30-day meal history — feeds both the QuickAdd menu's recommendations
+  /// and the NutritionSearchSheet's full searchable list. Loaded in the
+  /// background Task after the second-wave dashboard fetches settle.
+  @State private var nutritionHistory: [NutritionEntry] = []
+  /// Which Nutrition sub-sheet is currently presented from the menu.
+  @State private var nutritionSheet: NutritionSheet? = nil
   @State private var airSummary: AirSummary? = nil
   @State private var airHistory: [AirHistoryPoint] = []
   @State private var groceries: [GroceryItem] = []
   @State private var caffeineToday: CaffeineDayResponse? = nil
   @State private var caffeineHistory: [CaffeineHistoryPoint] = []
-  @State private var caffeineBeans: [CaffeineBean] = []
   @State private var caffeineLastEntry: CaffeineTimePoint? = nil
   @State private var cannabisToday: CannabisDayResponse? = nil
   @State private var cannabisHistory: [CannabisHistoryPoint] = []
-  @State private var cannabisStrains: [CannabisStrain] = []
   @State private var cannabisUsesPerCapsule: Int = 3
   @State private var bodyRows: [WithingsRow] = []
   @State private var gutToday: GutDayResponse? = nil
@@ -161,6 +181,26 @@ struct WeekDashboardView: View {
         #else
         .frame(width: 560, height: 520)
         #endif
+    }
+    .sheet(item: $nutritionSheet) { sheet in
+      switch sheet {
+      case .search:
+        NutritionSearchSheet(entries: nutritionHistory)
+          #if os(iOS)
+          .presentationDetents([.large])
+          .presentationDragIndicator(.visible)
+          #else
+          .frame(width: 560, height: 600)
+          #endif
+      case .newEntry:
+        NewNutritionEntrySheet()
+          #if os(iOS)
+          .presentationDetents([.large])
+          .presentationDragIndicator(.visible)
+          #else
+          .frame(width: 560, height: 600)
+          #endif
+      }
     }
   }
 
@@ -413,16 +453,35 @@ struct WeekDashboardView: View {
     // request stalls. The dashboard tiles don't need this data for first
     // paint, only when the user opens a context menu.
     Task { @MainActor [client] in
-      if let cfg = try? await client.caffeineConfig() {
-        caffeineBeans = cfg.beans
-      }
+      // Caffeine: only the last entry is needed (Repeat is the menu's
+      // only contextual action — bean-picking lives in the sheet).
       if let entries = try? await client.caffeineEntries(days: 7),
          let last = entries.entries.last {
         caffeineLastEntry = last
       }
+      // Cannabis: usesPerCapsule is the only field the smart menu reads
+      // (to know when the current capsule is exhausted). Strain list is
+      // not consumed by the menu anymore.
       if let cnbCfg = try? await client.cannabisConfig() {
-        cannabisStrains = cnbCfg.strains
         cannabisUsesPerCapsule = max(1, cnbCfg.usesPerCapsule)
+      }
+      // Nutrition: 30-day meal history feeds the menu's "Recommended"
+      // scoring and the NutritionSearchSheet's full searchable list.
+      let since = SeptenaDate.format(
+        Calendar.current.date(byAdding: .day, value: -30, to: .now)
+      ) ?? SeptenaDate.today
+      if let entries = try? await client.nutritionEntries(since: since) {
+        nutritionHistory = entries
+      }
+      // Training: session-type catalog + suggested + daysAgo. Feeds the
+      // menu's "Start: {suggested}" row and the "Recent" section. All
+      // three come from existing endpoints — no new server work needed.
+      if let types = try? await client.sessionTypes() {
+        trainingSessionTypes = types
+      }
+      if let resp = try? await client.suggestedWorkout() {
+        trainingSuggestedId = resp.suggested?.type
+        trainingDaysAgo = resp.daysAgo
       }
     }
     if let cafT {
@@ -742,27 +801,67 @@ struct WeekDashboardView: View {
     let doneToday = tasksHistory?.daily.last?.done ?? 0
     let totalToday = doneToday + openToday
     let bars = tasksHistory?.daily.map(\.done) ?? []
-    return Button { tabSelection.current = .tasks } label: {
-      ModuleTile(
-        title: "Tasks",
-        accent: theme.color(for: "tasks"),
-        stats: [.init(label: "Today",    value: "\(openToday)"),
-                .init(label: "Inbox",    value: "\(inbox)"),
-                .init(label: "Upcoming", value: "\(upcoming)")],
-        // Today's completion progress: done so far vs. everything
-        // scheduled for today (done + still open). Defaults to a full
-        // bar when there's nothing today, so the empty state doesn't
-        // read as 0%.
-        progress: .init(label: "Done / today",
-                        current: Double(doneToday),
-                        target: Double(max(totalToday, 1))),
-        history: bars.isEmpty
-          ? nil
-          : .init(label: "7-day completions", values: bars),
-        action: .init(systemImage: AddInfoSection.tasks.verbSystemImage) { quickAddSection = .tasks }
-      )
-    }
-    .buttonStyle(.plain)
+    return ModuleTile(
+      title: "Tasks",
+      accent: theme.color(for: "tasks"),
+      stats: [.init(label: "Today",    value: "\(openToday)"),
+              .init(label: "Inbox",    value: "\(inbox)"),
+              .init(label: "Upcoming", value: "\(upcoming)")],
+      // Today's completion progress: done so far vs. everything
+      // scheduled for today (done + still open). Defaults to a full
+      // bar when there's nothing today, so the empty state doesn't
+      // read as 0%.
+      progress: .init(label: "Done / today",
+                      current: Double(doneToday),
+                      target: Double(max(totalToday, 1))),
+      history: bars.isEmpty
+        ? nil
+        : .init(label: "7-day completions", values: bars),
+      action: .init(systemImage: AddInfoSection.tasks.verbSystemImage) {
+        tasksQuickAddMenu
+      }
+    )
+    .contentShape(Rectangle())
+    .onTapGesture { tabSelection.current = .tasks }
+    .contextMenu { tasksQuickAddMenu }
+  }
+
+  /// Today's open tasks read straight from SwiftData (no network hop) —
+  /// LocalCache mirrors the server's view=today filter, so this matches
+  /// what the Tasks tab shows when you navigate in.
+  private var todayOpenTasks: [SeptenaTask] {
+    let resp = TaskReads.localList(
+      view: "today", area: nil, project: nil, days: 1,
+      context: LocalStore.shared.container.mainContext
+    )
+    return resp.items.filter { $0.status != .done }
+  }
+
+  @ViewBuilder private var tasksQuickAddMenu: some View {
+    TasksQuickAddMenu(
+      todayTasks: todayOpenTasks,
+      onCreateInInbox: {
+        tabSelection.current = .tasks
+        nav.path = [.filter(.inbox)]
+        // Trip the "start inline create" flag — TaskListView consumes
+        // and clears it on its next render. Mirrors the sidebar's
+        // "New To-Do" path so create flows always look the same.
+        nav.shouldStartCreating = true
+      },
+      onGoToInbox: {
+        tabSelection.current = .tasks
+        nav.path = [.filter(.inbox)]
+      },
+      onGoToToday: {
+        tabSelection.current = .tasks
+        nav.path = [.filter(.today)]
+      },
+      onCheckOff: { task in
+        Haptics.success()
+        taskMutator.complete(id: task.id)
+      },
+      onMore: { quickAddSection = .tasks }
+    )
   }
 
   private var habitsTile: some View {
@@ -851,27 +950,47 @@ struct WeekDashboardView: View {
     let strengthBars = days.map { Int(((strengthByDate[$0] ?? 0) / maxS) * 50) }
     let cardioBars   = days.map { Int(((cardioByDate[$0]   ?? 0) / maxC) * 50) }
 
-    return Button { sheetDest = .training } label: {
-      ModuleTile(
-        title: "Training",
-        accent: accent,
-        stats: [
-          .init(label: "Sessions", value: "\(sessionCount)/7"),
-          .init(label: "Z2 min",   value: "\(minutes)", unit: "m")
-        ],
-        progress: .init(
-          label: "Z2 cardio",
-          current: Double(minutes),
-          target: Double(max(target, 1)),
-          unit: "m"
-        ),
-        history: .init(label: "7-day effort",
-                       values: strengthBars,
-                       secondaryValues: cardioBars),
-        action: .init(systemImage: AddInfoSection.training.verbSystemImage) { quickAddSection = .training }
-      )
-    }
-    .buttonStyle(.plain)
+    return ModuleTile(
+      title: "Training",
+      accent: accent,
+      stats: [
+        .init(label: "Sessions", value: "\(sessionCount)/7"),
+        .init(label: "Z2 min",   value: "\(minutes)", unit: "m")
+      ],
+      progress: .init(
+        label: "Z2 cardio",
+        current: Double(minutes),
+        target: Double(max(target, 1)),
+        unit: "m"
+      ),
+      history: .init(label: "7-day effort",
+                     values: strengthBars,
+                     secondaryValues: cardioBars),
+      action: .init(systemImage: AddInfoSection.training.verbSystemImage) {
+        trainingQuickAddMenu
+      }
+    )
+    .contentShape(Rectangle())
+    .onTapGesture { sheetDest = .training }
+    .contextMenu { trainingQuickAddMenu }
+  }
+
+  @ViewBuilder private var trainingQuickAddMenu: some View {
+    TrainingQuickAddMenu(
+      sessionTypes: trainingSessionTypes,
+      suggestedId: trainingSuggestedId,
+      daysAgo: trainingDaysAgo,
+      onStart: { typeId in
+        // Empty id = "no suggestion, open the picker" — leave pendingType
+        // nil so TrainingSessionView shows its picker. Otherwise pass the
+        // chosen id through nav so the sheet auto-starts the draft.
+        if !typeId.isEmpty {
+          nav.pendingTrainingType = typeId
+        }
+        nav.showTrainingSession = true
+      },
+      onMore: { quickAddSection = .training }
+    )
   }
 
   /// Last 7 ISO yyyy-MM-dd dates, oldest → newest. Used to align the
@@ -1057,24 +1176,47 @@ struct WeekDashboardView: View {
     let stocked = groceries.count - lowCount
     let boughtPerDay = groceriesBoughtPerDay()
     let totalBought7d = boughtPerDay.reduce(0, +)
-    return Button { sheetDest = .groceries } label: {
-      ModuleTile(
-        title: "Groceries",
-        accent: accent,
-        stats: [
-          .init(label: "Need",       value: "\(lowCount)"),
-          .init(label: "7-day buys", value: "\(totalBought7d)")
-        ],
-        progress: groceries.isEmpty ? nil : .init(
-          label: "Stocked",
-          current: Double(stocked),
-          target: Double(max(groceries.count, 1))
-        ),
-        history: .init(label: "Bought (7d)", values: boughtPerDay),
-        action: .init(systemImage: AddInfoSection.groceries.verbSystemImage) { quickAddSection = .groceries }
-      )
+    return ModuleTile(
+      title: "Groceries",
+      accent: accent,
+      stats: [
+        .init(label: "Need",       value: "\(lowCount)"),
+        .init(label: "7-day buys", value: "\(totalBought7d)")
+      ],
+      progress: groceries.isEmpty ? nil : .init(
+        label: "Stocked",
+        current: Double(stocked),
+        target: Double(max(groceries.count, 1))
+      ),
+      history: .init(label: "Bought (7d)", values: boughtPerDay),
+      action: .init(systemImage: AddInfoSection.groceries.verbSystemImage) {
+        groceriesQuickAddMenu
+      }
+    )
+    .contentShape(Rectangle())
+    .onTapGesture { sheetDest = .groceries }
+    .contextMenu { groceriesQuickAddMenu }
+  }
+
+  @ViewBuilder private var groceriesQuickAddMenu: some View {
+    GroceriesQuickAddMenu(
+      items: groceries,
+      onMarkLow: { item in commitGroceryMarkLow(item) },
+      onMore: { quickAddSection = .groceries }
+    )
+  }
+
+  private func commitGroceryMarkLow(_ item: GroceryItem) {
+    outbox.enqueue(method: "PATCH", path: "/api/groceries/item/\(item.id)",
+                   body: ["low": true], kind: "groceries.patch")
+    // Optimistic local flip so the same menu re-opened a moment later
+    // doesn't re-list the item under "stocked." Matches the optimistic
+    // patterns in other tile menus (acted sets in NextItemsModel).
+    if let idx = groceries.firstIndex(where: { $0.id == item.id }) {
+      groceries[idx].low = true
     }
-    .buttonStyle(.plain)
+    AddInfoSection.groceries.notifyTilesChanged()
+    Haptics.tick()
   }
 
   /// Items bought per day for the last 7 days (oldest → newest, today last),
@@ -1126,7 +1268,6 @@ struct WeekDashboardView: View {
   // `.contextMenu` (long-press on iOS, right-click on macOS).
   @ViewBuilder private var caffeineQuickAddMenu: some View {
     CaffeineQuickAddMenu(
-      beans: caffeineBeans,
       lastEntry: caffeineLastEntry,
       onCommit: { method, beans, grams in
         commitCaffeine(method: method, beans: beans, grams: grams)
@@ -1196,7 +1337,6 @@ struct WeekDashboardView: View {
   /// since the destination already has that affordance.
   @ViewBuilder private var cannabisQuickAddMenu: some View {
     CannabisQuickAddMenu(
-      strains: cannabisStrains,
       lastVape: lastCannabisVape,
       usesPerCapsule: cannabisUsesPerCapsule,
       onCommit: { method, strain, hit in
@@ -1423,22 +1563,56 @@ struct WeekDashboardView: View {
     let proteinTarget = nutritionTarget?.protein.min ?? 150
     let bars = nutritionStats?.daily.map { Int($0.proteinG) }
               ?? Array(repeating: 0, count: 7)
-    return Button { sheetDest = .nutrition } label: {
-      ModuleTile(
-        title: "Nutrition",
-        accent: accent,
-        stats: [
-          .init(label: "Protein", value: "\(Int(todayProteinSum))", unit: "g"),
-          .init(label: "Kcal",    value: "\(Int(todayKcalSum))")
-        ],
-        progress: .init(label: "Today's protein",
-                        current: todayProteinSum,
-                        target: max(proteinTarget, 1),
-                        unit: "g"),
-        history: .init(label: "7-day protein", values: bars),
-        action: .init(systemImage: AddInfoSection.nutrition.verbSystemImage) { quickAddSection = .nutrition }
-      )
-    }
-    .buttonStyle(.plain)
+    return ModuleTile(
+      title: "Nutrition",
+      accent: accent,
+      stats: [
+        .init(label: "Protein", value: "\(Int(todayProteinSum))", unit: "g"),
+        .init(label: "Kcal",    value: "\(Int(todayKcalSum))")
+      ],
+      progress: .init(label: "Today's protein",
+                      current: todayProteinSum,
+                      target: max(proteinTarget, 1),
+                      unit: "g"),
+      history: .init(label: "7-day protein", values: bars),
+      action: .init(systemImage: AddInfoSection.nutrition.verbSystemImage) {
+        nutritionQuickAddMenu
+      }
+    )
+    .contentShape(Rectangle())
+    .onTapGesture { sheetDest = .nutrition }
+    .contextMenu { nutritionQuickAddMenu }
+  }
+
+  @ViewBuilder private var nutritionQuickAddMenu: some View {
+    NutritionQuickAddMenu(
+      recommendations: NutritionRecommendations.topRecommended(
+        from: nutritionHistory, limit: 3),
+      onSearch: { nutritionSheet = .search },
+      onInput: { nutritionSheet = .newEntry },
+      onCommit: { meal in commitNutritionDuplicate(meal) },
+      onMore: { quickAddSection = .nutrition }
+    )
+  }
+
+  /// POST a fresh nutrition entry mirroring the meal's macros + emoji at
+  /// the current time. Same payload as AddNutritionPage.duplicate so the
+  /// server treats this menu commit identically to the palette one.
+  private func commitNutritionDuplicate(_ entry: NutritionEntry) {
+    var body: [String: Any] = [
+      "date": SeptenaDate.today,
+      "time": nowHHMM(),
+      "foods": entry.foods,
+      "protein_g": entry.proteinG,
+      "fat_g": entry.fatG,
+      "carbs_g": entry.carbsG,
+      "kcal": entry.kcal,
+    ]
+    if let fiberG = entry.fiberG { body["fiber_g"] = fiberG }
+    if let emoji = entry.emoji { body["emoji"] = emoji }
+    outbox.enqueue(method: "POST", path: "/api/nutrition/entries",
+                   body: body, kind: "nutrition.add")
+    AddInfoSection.nutrition.notifyTilesChanged()
+    Haptics.tick()
   }
 }

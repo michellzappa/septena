@@ -1,9 +1,10 @@
 import SwiftUI
 
-// Single canonical menu for the Habits tile — top 5 undone habits + More,
-// bound to both the trailing-circle button and the tile's `.contextMenu`.
-// Filtered to time-of-day buckets up to and including "now" — so evening
-// habits don't surface at 10am.
+// Single canonical menu for the Habits tile — top 2 undone habits from
+// time-of-day buckets up to and including "now" + Habits…, bound to
+// both the trailing-circle button and the tile's `.contextMenu`. Evening
+// habits don't surface at 10am. Answers "what's the next habit to tick
+// off right now" — the full list lives in the sheet.
 
 private func visibleBucketSet(_ buckets: [String]) -> Set<String> {
   let canonical = ["morning", "afternoon", "evening"]
@@ -45,7 +46,7 @@ struct HabitsQuickAddMenu: View {
   let onMore: () -> Void
 
   var body: some View {
-    let items = actionable(habits, buckets: buckets, limit: 5)
+    let items = actionable(habits, buckets: buckets, limit: 2)
     if items.isEmpty {
       Button {} label: { Label("Nothing left right now", systemImage: "checkmark.circle") }
         .disabled(true)

@@ -1,8 +1,8 @@
 import SwiftUI
 
-// Single canonical menu for the Supplements tile — top 5 undone +
-// "Supplements…" (opens the AddInfo sheet for search / type-to-create),
-// bound to both the trailing-circle button and the tile's `.contextMenu`.
+// Single canonical menu for the Supplements tile — top 2 undone +
+// Supplements…, bound to both the trailing-circle button and the tile's
+// `.contextMenu`. Answers "what should I take next."
 //
 // Server-given order is already median-time-of-day sorted per the
 // webapp's `api/services/_time_of_day.py :: median_time_by_item()`, so
@@ -23,7 +23,7 @@ struct SupplementsQuickAddMenu: View {
   let onMore: () -> Void
 
   var body: some View {
-    let items = remaining(supplements, limit: 5)
+    let items = remaining(supplements, limit: 2)
     if items.isEmpty {
       Button {} label: { Label("Nothing left today", systemImage: "checkmark.circle") }
         .disabled(true)

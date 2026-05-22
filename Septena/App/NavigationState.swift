@@ -50,6 +50,12 @@ final class NavigationState {
   /// out of `TrainingDraftStore` so resume-after-dismiss just works.
   var showTrainingSession = false
 
+  /// Optional pre-selected session type. When non-nil, the Training
+  /// session sheet auto-starts a draft of this type on appear and skips
+  /// the picker step — used by the dashboard QuickAdd menu's smart
+  /// shortcuts ("Start: Upper", etc.). Cleared after consumption.
+  var pendingTrainingType: String? = nil
+
   /// Persisted base URL — UserDefaults-backed, mirrored from ClientProvider.
   var serverURL: String = UserDefaults.standard.string(forKey: "septena.serverURL")
     ?? SeptenaClient.default.absoluteString

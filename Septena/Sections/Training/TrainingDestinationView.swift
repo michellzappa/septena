@@ -1086,6 +1086,7 @@ struct TrainingSessionView: View {
   @Environment(SeptenaClient.self) private var client
   @Environment(SectionTheme.self) private var theme
   @Environment(TrainingDraftStore.self) private var store
+  @Environment(NavigationState.self) private var nav
   @Environment(\.dismiss) private var dismiss
 
   /// Re-render the elapsed counter once per minute. Cheap and avoids a
@@ -1125,6 +1126,19 @@ struct TrainingSessionView: View {
     .task {
       if store.sessionTypes.isEmpty {
         await store.refreshCatalog(client: client)
+      }
+      // Skip the picker when the dashboard's QuickAdd menu pre-selected
+      // a type. We wait until after `refreshCatalog` so the lookup can
+      // resolve labels → SessionTypeConfig. Cleared immediately so a
+      // dismiss-and-reopen doesn't loop.
+      if let pending = nav.pendingTrainingType,
+         store.draft == nil,
+         let match = store.sessionTypes.first(where: {
+           $0.id.caseInsensitiveCompare(pending) == .orderedSame ||
+           $0.label.caseInsensitiveCompare(pending) == .orderedSame
+         }) {
+        nav.pendingTrainingType = nil
+        await store.start(type: match, client: client)
       }
     }
   }
