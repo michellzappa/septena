@@ -801,6 +801,7 @@ struct WeekDashboardView: View {
     )
   }
 
+
   private func commitHabitToggle(_ item: HabitDayItem) {
     outbox.enqueue(method: "POST", path: "/api/habits/toggle",
                    body: ["habit_id": item.id,
@@ -923,13 +924,16 @@ struct WeekDashboardView: View {
     .contextMenu { choresQuickAddMenu }
   }
 
+  /// Chores already toggled this session — hidden from both menus so we
+  /// don't re-show them mid-flick. `completedChores` is the same session
+  /// set NextItemsSection uses; matching it keeps the two surfaces aligned.
+  private var pendingChores: [ChoreItem] {
+    dailies.chores.filter { !dailies.completedChores.contains($0.id) }
+  }
+
   @ViewBuilder private var choresQuickAddMenu: some View {
-    // Filter out chores already toggled this session so the menu doesn't
-    // re-show them. `completedChores` is the same session set NextItemsSection
-    // uses; matching it keeps the two surfaces consistent.
-    let pending = dailies.chores.filter { !dailies.completedChores.contains($0.id) }
     ChoresQuickAddMenu(
-      chores: pending,
+      chores: pendingChores,
       onComplete: { chore in commitChoreComplete(chore) },
       onMore: { quickAddSection = .chores }
     )
@@ -1127,6 +1131,7 @@ struct WeekDashboardView: View {
       onCommit: { method, beans, grams in
         commitCaffeine(method: method, beans: beans, grams: grams)
       },
+      onEditLast: caffeineLastEntry == nil ? nil : { sheetDest = .caffeine },
       onMore: { quickAddSection = .caffeine }
     )
   }
@@ -1185,6 +1190,10 @@ struct WeekDashboardView: View {
     cannabisToday?.entries.reversed().first { $0.method == "vape" }
   }
 
+  /// Canonical menu — bound to both the trailing-circle button and the
+  /// tile's `.contextMenu`. Edit-last opens the destination view (rather
+  /// than threading an EditCannabisEntrySheet through the dashboard)
+  /// since the destination already has that affordance.
   @ViewBuilder private var cannabisQuickAddMenu: some View {
     CannabisQuickAddMenu(
       strains: cannabisStrains,
@@ -1193,6 +1202,7 @@ struct WeekDashboardView: View {
       onCommit: { method, strain, hit in
         commitCannabis(method: method, strain: strain, hit: hit)
       },
+      onEditLast: lastCannabisVape == nil ? nil : { sheetDest = .cannabis },
       onMore: { quickAddSection = .cannabis }
     )
   }
@@ -1305,7 +1315,13 @@ struct WeekDashboardView: View {
   // no "More…" sheet fallback. Matches AddGutPage's commit semantics:
   // `blood: 0` by default; full editor lives in GutDestinationView.
   @ViewBuilder private var gutQuickAddMenu: some View {
-    GutQuickAddMenu(onCommit: { bristol in commitGut(bristol: bristol) })
+    let hasLast = !(gutToday?.entries.isEmpty ?? true)
+    GutQuickAddMenu(
+      onCommit: { bristol in commitGut(bristol: bristol) },
+      hasLastEntry: hasLast,
+      onEditLast: hasLast ? { sheetDest = .gut } : nil,
+      onMore: { quickAddSection = .gut }
+    )
   }
 
   private func commitGut(bristol: Int) {

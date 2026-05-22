@@ -114,9 +114,13 @@ struct ModuleTile: View {
           .frame(width: 32, height: 32)
           .background(Circle().fill(accent))
         if let menuContent = action.menuContent {
+          // No `.menuStyle(.button)` or `.buttonStyle(.plain)` here. The
+          // combination registered the label as the menu's anchor view,
+          // and after the first menu open the anchor frame decoupled
+          // from the tile during scroll — the icon visibly drifted off
+          // the tile. Default Menu styling tracks layout correctly; the
+          // inner Image+frame+background already supplies the visual.
           Menu { menuContent } label: { icon }
-            .menuStyle(.button)
-            .buttonStyle(.plain)
         } else if let onTap = action.onTap {
           Button(action: onTap) { icon }
             .buttonStyle(.plain)

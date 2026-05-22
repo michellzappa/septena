@@ -1,32 +1,42 @@
 import SwiftUI
 
-// Menu items shared by the tile's trailing-button Menu and the tile-level
-// `.contextMenu` (long-press / right-click). One source of truth so both
-// affordances open exactly the same list of presets.
-//
-// Items, in order:
-//   1. Repeat last — commits last (method, beans, grams). Only shown when
-//      a 7-day lookback found a prior entry.
-//   2. One row per configured bean preset, using last method + grams so
-//      the most common path (same brew, swap bean) is one tap.
-//   3. "Custom…" — falls through to the full AddInfo sheet for fields the
-//      menu can't express (different method, custom grams, time edit).
+// Single canonical menu for the Caffeine tile — same content from both
+// the trailing-circle button (Menu) and the tile's `.contextMenu`. The
+// bean list is small enough (<8 typically) to show in full; Edit-last
+// surfaces when there's a prior entry. Matches the iOS pattern of one
+// menu per surface, accessible from both tap-button and long-press.
+
+private struct CaffeineQuickAddContext {
+  let beans: [CaffeineBean]
+  let lastEntry: CaffeineTimePoint?
+
+  var lastMethod: String { lastEntry?.method ?? "v60" }
+  var lastGrams: Double? { lastEntry?.grams }
+
+  /// Label for the "repeat" row — prefers the bean name, falls back to
+  /// the method (e.g. "V60") if no bean was attached to the last entry.
+  func repeatLabel(_ entry: CaffeineTimePoint) -> String {
+    "Repeat: \(entry.beans ?? entry.method.uppercased())"
+  }
+}
+
 struct CaffeineQuickAddMenu: View {
   let beans: [CaffeineBean]
   let lastEntry: CaffeineTimePoint?
   let onCommit: (_ method: String, _ beans: String?, _ grams: Double?) -> Void
+  let onEditLast: (() -> Void)?
   let onMore: () -> Void
 
-  private var lastMethod: String { lastEntry?.method ?? "v60" }
-  private var lastGrams: Double? { lastEntry?.grams }
+  private var ctx: CaffeineQuickAddContext {
+    .init(beans: beans, lastEntry: lastEntry)
+  }
 
   var body: some View {
     if let last = lastEntry {
       Button {
         onCommit(last.method, last.beans, last.grams)
       } label: {
-        Label("Repeat: \(last.beans ?? last.method.uppercased())",
-              systemImage: "arrow.clockwise")
+        Label(ctx.repeatLabel(last), systemImage: "arrow.clockwise")
       }
     }
 
@@ -34,7 +44,7 @@ struct CaffeineQuickAddMenu: View {
       Section("Beans") {
         ForEach(beans) { bean in
           Button {
-            onCommit(lastMethod, bean.name, lastGrams)
+            onCommit(ctx.lastMethod, bean.name, ctx.lastGrams)
           } label: {
             Label(bean.name, systemImage: "leaf")
           }
@@ -42,11 +52,20 @@ struct CaffeineQuickAddMenu: View {
       }
     }
 
+    if let onEditLast, lastEntry != nil {
+      Divider()
+      Button {
+        onEditLast()
+      } label: {
+        Label("Edit last entry", systemImage: "pencil")
+      }
+    }
+
     Divider()
     Button {
       onMore()
     } label: {
-      Label("Custom…", systemImage: "ellipsis")
+      Label("Caffeine…", systemImage: "ellipsis")
     }
   }
 }
