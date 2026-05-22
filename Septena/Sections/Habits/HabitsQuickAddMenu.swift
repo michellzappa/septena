@@ -1,12 +1,11 @@
 import SwiftUI
 
 // Single canonical menu for the Habits tile — top 2 undone habits from
-// time-of-day buckets up to and including "now" + Habits…, bound to
-// both the trailing-circle button and the tile's `.contextMenu`. Evening
-// habits don't surface at 10am. Answers "what's the next habit to tick
-// off right now" — the full list lives in the sheet.
+// the current time-of-day bucket only, bound to the tile's `.contextMenu`.
+// At 10am only morning habits surface; at 3pm only afternoon; at 8pm only
+// evening. Answers "what's next right now" — the full list lives in the sheet.
 
-private func visibleBucketSet(_ buckets: [String]) -> Set<String> {
+private func currentBucketSet(_ buckets: [String]) -> Set<String> {
   let canonical = ["morning", "afternoon", "evening"]
   let nowIdx: Int = {
     let h = Calendar.current.component(.hour, from: .now)
@@ -18,7 +17,7 @@ private func visibleBucketSet(_ buckets: [String]) -> Set<String> {
   for name in buckets {
     let lower = name.lowercased()
     if let i = canonical.firstIndex(of: lower) {
-      if i <= nowIdx { allowed.insert(name) }
+      if i == nowIdx { allowed.insert(name) }
     } else {
       allowed.insert(name) // unknown bucket → fail open
     }
@@ -27,7 +26,7 @@ private func visibleBucketSet(_ buckets: [String]) -> Set<String> {
 }
 
 private func actionable(_ habits: [HabitDayItem], buckets: [String], limit: Int) -> [HabitDayItem] {
-  let allowed = visibleBucketSet(buckets)
+  let allowed = currentBucketSet(buckets)
   return habits
     .filter { !$0.done && !$0.skipped }
     .filter { allowed.contains($0.bucket) }
