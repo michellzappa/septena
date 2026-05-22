@@ -6,15 +6,13 @@ import SwiftUI
 // most-overdue first → alphabetical tiebreak. Answers "what's screaming
 // at me hardest right now" — the broader list lives in the sheet.
 
-private func actionable(_ chores: [ChoreItem], limit: Int) -> [ChoreItem] {
+private func actionable(_ chores: [ChoreItem]) -> [ChoreItem] {
   chores
     .filter { $0.daysOverdue >= 0 }
     .sorted { lhs, rhs in
       if lhs.daysOverdue != rhs.daysOverdue { return lhs.daysOverdue > rhs.daysOverdue }
       return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
     }
-    .prefix(limit)
-    .map { $0 }
 }
 
 private func displayName(_ chore: ChoreItem) -> String {
@@ -28,7 +26,7 @@ struct ChoresQuickAddMenu: View {
   let onComplete: (ChoreItem) -> Void
 
   var body: some View {
-    let items = actionable(chores, limit: 2)
+    let items = actionable(chores)
     if items.isEmpty {
       Button {} label: { Label("Nothing due today", systemImage: "checkmark.circle") }
         .disabled(true)

@@ -9,8 +9,8 @@ import SwiftUI
 // Vitamin D surfaces before Magnesium in the morning, etc. No client-
 // side sorting.
 
-private func remaining(_ supplements: [SupplementDayItem], limit: Int) -> [SupplementDayItem] {
-  supplements.filter { !$0.done }.prefix(limit).map { $0 }
+private func remaining(_ supplements: [SupplementDayItem]) -> [SupplementDayItem] {
+  supplements.filter { !$0.done }
 }
 
 private func displayName(_ item: SupplementDayItem) -> String {
@@ -22,7 +22,7 @@ struct SupplementsQuickAddMenu: View {
   let onToggle: (SupplementDayItem) -> Void
 
   var body: some View {
-    let items = remaining(supplements, limit: 2)
+    let items = remaining(supplements)
     if items.isEmpty {
       Button {} label: { Label("Nothing left today", systemImage: "checkmark.circle") }
         .disabled(true)

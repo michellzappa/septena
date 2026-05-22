@@ -25,13 +25,11 @@ private func currentBucketSet(_ buckets: [String]) -> Set<String> {
   return allowed
 }
 
-private func actionable(_ habits: [HabitDayItem], buckets: [String], limit: Int) -> [HabitDayItem] {
+private func actionable(_ habits: [HabitDayItem], buckets: [String]) -> [HabitDayItem] {
   let allowed = currentBucketSet(buckets)
   return habits
     .filter { !$0.done && !$0.skipped }
     .filter { allowed.contains($0.bucket) }
-    .prefix(limit)
-    .map { $0 }
 }
 
 private func displayName(_ item: HabitDayItem) -> String {
@@ -44,7 +42,7 @@ struct HabitsQuickAddMenu: View {
   let onComplete: (HabitDayItem) -> Void
 
   var body: some View {
-    let items = actionable(habits, buckets: buckets, limit: 2)
+    let items = actionable(habits, buckets: buckets)
     if items.isEmpty {
       Button {} label: { Label("Nothing left right now", systemImage: "checkmark.circle") }
         .disabled(true)

@@ -32,8 +32,6 @@ struct GroceriesQuickAddMenu: View {
           return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
         }
       }
-      .prefix(3)
-      .map { $0 }
   }
 
   var body: some View {
