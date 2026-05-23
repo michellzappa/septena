@@ -70,9 +70,6 @@ struct RoutineCatalogView: View {
   @ViewBuilder
   private func routineRow(_ entity: SessionTypeEntity) -> some View {
     HStack(spacing: 10) {
-      if let emoji = entity.emoji {
-        Text(emoji).font(.title3)
-      }
       VStack(alignment: .leading, spacing: 2) {
         Text(entity.label)
           .foregroundStyle(entity.archived ? .secondary : .primary)

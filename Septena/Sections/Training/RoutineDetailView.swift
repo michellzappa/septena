@@ -12,7 +12,6 @@ struct RoutineDetailView: View {
   private var allExercises: [ExerciseDefinitionEntity]
 
   @State private var label = ""
-  @State private var emoji = ""
   @State private var exercises: [String] = []  // ordered list of exercise IDs
   @State private var archived = false
   @State private var showPicker = false
@@ -27,14 +26,16 @@ struct RoutineDetailView: View {
     Form {
       Section("Name") {
         TextField("Routine label", text: $label)
-        TextField("Emoji (optional)", text: $emoji)
-          .frame(maxWidth: 120)
       }
 
       Section {
         ForEach(exercises, id: \.self) { id in
           if let def = exerciseByID[id] {
-            Text(def.name)
+            NavigationLink {
+              ExerciseDetailView(entity: def)
+            } label: {
+              Text(def.name)
+            }
           } else {
             Text(id)
               .foregroundStyle(.secondary)
@@ -95,7 +96,6 @@ struct RoutineDetailView: View {
   private func load() {
     guard let e = entity else { return }
     label = e.label
-    emoji = e.emoji ?? ""
     exercises = e.exercises
     archived = e.archived
   }
@@ -107,10 +107,13 @@ struct RoutineDetailView: View {
     } else {
       id = TrainingConfigStore.slug(from: label)
     }
+    // Preserve any existing emoji on the entity — the UI no longer
+    // exposes it, but we don't want to silently null out historical
+    // values on save.
     TrainingConfigStore.upsertSessionType(
       id: id,
       label: label.trimmingCharacters(in: .whitespaces),
-      emoji: emoji.trimmingCharacters(in: .whitespaces).isEmpty ? nil : emoji.trimmingCharacters(in: .whitespaces),
+      emoji: entity?.emoji,
       exercises: exercises,
       archived: archived,
       context: context
