@@ -1523,7 +1523,7 @@ struct SyncSettingsPane: View {
         } label: {
           HStack {
             if isMigrating { ProgressView().controlSize(.small) }
-            Label("Re-import Habits/Supps/Chores/Goals from FastAPI", systemImage: "arrow.down.doc")
+            Label("Re-import All Sections from FastAPI", systemImage: "arrow.down.doc")
           }
         }
         .disabled(isMigrating || ckEngine.accountStatus != .available)
@@ -1659,7 +1659,7 @@ struct SyncSettingsPane: View {
   private func runReimportChecklistHistory() async {
     isMigrating = true
     defer { isMigrating = false }
-    migrationStatus = "Re-importing habits/supplements/chores/goals from FastAPI…"
+    migrationStatus = "Re-importing all sections from FastAPI…"
     let bootstrapper = ChecklistCloudKitBootstrapper(
       context: modelContext,
       engine: ckEngine,
@@ -1667,7 +1667,7 @@ struct SyncSettingsPane: View {
     )
     do {
       try await bootstrapper.forceBootstrap()
-      migrationStatus = "✅ Re-imported habits/supplements/chores/goals. The CloudKit push continues in the background — refresh a tile to see the data."
+      migrationStatus = "✅ Re-imported all sections. The CloudKit push continues in the background — refresh a tile to see the data."
     } catch {
       migrationStatus = "❌ Re-import failed: \(error.localizedDescription)"
     }
