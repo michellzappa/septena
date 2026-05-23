@@ -1233,8 +1233,12 @@ enum ChecklistMirror {
 
     // All name-keyed dictionaries below are lowercased so the join survives
     // casing drift between entry.exercise (the logged name) and def.name
-    // (the catalog display label).
-    let defByName = Dictionary(uniqueKeysWithValues: defs.map { ($0.name.lowercased(), $0) })
+    // (the catalog display label). Duplicates can exist (e.g. a library-
+    // imported "Chest Press" alongside a RoutineSlugRepair stub with the
+    // same humanized name) — keep the first encountered so the dictionary
+    // builder doesn't trap.
+    let defByName = Dictionary(defs.map { ($0.name.lowercased(), $0) },
+                                uniquingKeysWith: { first, _ in first })
     let cardioNames = Set(defs
       .filter { $0.type == "cardio" || $0.type == "mobility" }
       .map { $0.name.lowercased() })
