@@ -1073,3 +1073,82 @@ final class ChecklistCloudKitBootstrapper {
     for t in types { engine.noteSessionTypeChange(id: t.id) }
   }
 }
+
+// MARK: - Training muscle backfill
+
+/// One-shot migration: assign `primaryMuscle` to every ExerciseDefinitionEntity
+/// that currently has nil, using keyword rules against the exercise name and
+/// subgroup. Conservative — skips if no rule matches rather than guessing.
+@MainActor
+enum TrainingMuscleBackfill {
+  static let userDefaultsKey = "training.muscleBackfill.v1"
+
+  static func runIfNeeded(context: ModelContext) {
+    guard !UserDefaults.standard.bool(forKey: userDefaultsKey) else { return }
+    let defs = (try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>())) ?? []
+    let needsBackfill = defs.filter { $0.primaryMuscle == nil }
+    guard !needsBackfill.isEmpty else {
+      UserDefaults.standard.set(true, forKey: userDefaultsKey)
+      return
+    }
+    var updated = 0
+    for entity in needsBackfill {
+      // Concatenate name + subgroup (lowercased) for matching
+      let text = ((entity.name) + " " + (entity.subgroup ?? "")).lowercased()
+      if let muscle = classify(text) {
+        entity.primaryMuscle = muscle.rawValue
+        entity.updatedAt = .now
+        SeptenaServices.shared.ckEngine.noteExerciseDefinitionChange(id: entity.id)
+        updated += 1
+      }
+    }
+    try? context.save()
+    UserDefaults.standard.set(true, forKey: userDefaultsKey)
+    SeptenaLog.info("[TrainingMuscleBackfill] updated \(updated)/\(needsBackfill.count) exercises")
+  }
+
+  /// Returns the first matching muscle for the combined text string.
+  /// Order matters: specific overrides (leg press, leg curl) come first.
+  private static func classify(_ text: String) -> Muscle? {
+    // Override: leg press → quads (beats generic "press" → chest)
+    if text.contains("leg press") { return .quads }
+    // Override: leg curl → hamstrings (beats generic "curl" → biceps)
+    if text.contains("leg curl") { return .hamstrings }
+
+    if text.contains("deadlift") || text.contains("romanian") ||
+       text.contains("rdl") || text.contains("hinge") ||
+       text.contains("hamstring") { return .hamstrings }
+
+    if text.contains("glute") || text.contains("hip thrust") ||
+       text.contains("bridge") { return .glutes }
+
+    if text.contains("squat") || text.contains("lunge") ||
+       text.contains("quad") { return .quads }
+
+    if text.contains("shoulder") || text.contains("overhead") ||
+       text.contains("lateral raise") || text.contains("lateral ") ||
+       text.contains("raise") || text.contains("delt") { return .shoulders }
+
+    if text.contains("tricep") || text.contains("skull") ||
+       text.contains("pushdown") { return .triceps }
+
+    if text.contains("row") || text.contains("pull") ||
+       text.contains("lat") || text.contains("pulldown") ||
+       text.contains("chinup") || text.contains("chin-up") { return .back }
+
+    // "press"/"bench"/"push"/"dip"/"fly" → chest
+    if text.contains("press") || text.contains("bench") ||
+       text.contains("push") || text.contains("dip") ||
+       text.contains("fly") { return .chest }
+
+    if text.contains("curl") { return .biceps }
+
+    if text.contains("calf") || text.contains("calves") { return .calves }
+
+    if text.contains("plank") || text.contains("crunch") ||
+       text.contains("ab ") || text.contains("sit-up") ||
+       text.contains("hollow") || text.contains("core") { return .core }
+
+    return nil
+  }
+}
