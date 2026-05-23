@@ -22,8 +22,8 @@ struct ExerciseCatalogView: View {
     case muscle(Muscle)
   }
 
-  private var unassignedCount: Int {
-    allExercises.filter { !$0.archived && $0.primaryMuscle == nil }.count
+  private var hasUnassigned: Bool {
+    allExercises.contains { !$0.archived && $0.primaryMuscle == nil }
   }
 
   private var filtered: [ExerciseDefinitionEntity] {
@@ -109,16 +109,19 @@ struct ExerciseCatalogView: View {
         filterChip(label: "All", isSelected: muscleFilter == .all) {
           muscleFilter = .all
         }
-        if unassignedCount > 0 {
-          filterChip(label: "Unassigned (\(unassignedCount))",
-                     isSelected: muscleFilter == .unassigned) {
-            muscleFilter = muscleFilter == .unassigned ? .all : .unassigned
-          }
-        }
         ForEach(Muscle.allCases) { muscle in
           filterChip(label: muscle.label,
                      isSelected: muscleFilter == .muscle(muscle)) {
             muscleFilter = muscleFilter == .muscle(muscle) ? .all : .muscle(muscle)
+          }
+        }
+        // "Other" lives at the end as a low-pressure escape hatch for
+        // exercises without a primary muscle (mobility, conditioning,
+        // adductors/abductors, complexes). Only shown when there's at
+        // least one such row so it doesn't appear on tidy catalogs.
+        if hasUnassigned {
+          filterChip(label: "Other", isSelected: muscleFilter == .unassigned) {
+            muscleFilter = muscleFilter == .unassigned ? .all : .unassigned
           }
         }
       }
