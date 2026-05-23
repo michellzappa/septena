@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 
 // Air mini-app — sensor snapshot above a per-day stats list. CO2 is the
 // headline number (the band drives the accent overlay); temp / humidity
@@ -19,6 +20,10 @@ struct AirDestinationView: View {
 
   @State private var summary: AirSummary? = nil
   @State private var history: [AirHistoryPoint] = []
+  /// Hour-resolution series powering the CO2/temp/humidity 24h charts.
+  /// Refreshed on appear + on every `.septenaAirChanged` post — same
+  /// trigger as `summary`/`history` so all three stay in sync.
+  @State private var series24h: [AirReadingEntity] = []
 
   private var accent: Color { theme.color(for: "air") }
 
@@ -37,18 +42,11 @@ struct AirDestinationView: View {
     List {
       summarySection
       pollenSection
-      if !history.isEmpty {
-        Section("7-day average") {
-          ForEach(Array(history.reversed()), id: \.date) { p in
-            LogRow(
-              title: friendlyDate(p.date),
-              detail: detailLine(p),
-              trailing: p.co2Avg.map { "\(Int($0)) ppm" }
-            )
-            .listRowInsets(EdgeInsets())
-          }
-        }
-      }
+      co2Last24hChart
+      tempLast24hChart
+      humidityLast24hChart
+      co2SevenDayMaxChart
+      pollenHistoryChart
       if history.isEmpty && summary?.latest == nil {
         Section {
           ContentUnavailableView {
@@ -94,7 +92,12 @@ struct AirDestinationView: View {
       // most appearances are a no-op. First load asks for location
       // permission inline; the user can dismiss the prompt and the
       // section gracefully shows the "denied" CTA instead.
-      Task { await pollen.refresh() }
+      // History fans out on the same auth/permission gate so it
+      // populates the bar chart without a second prompt.
+      Task {
+        await pollen.refresh()
+        await pollen.refreshHistory()
+      }
     }
     .onDisappear {
       // Don't `stop()` — the user may flip to Settings to inspect the
@@ -348,10 +351,187 @@ struct AirDestinationView: View {
     return p.string(from: d)
   }
 
+  // MARK: - Charts
+  //
+  // Five charts mirroring septena-app/components/air-dashboard.tsx:
+  //   1. CO2 last 24h     — line + reference bands (1000-1400 warn, 1400+ bad)
+  //   2. Temperature 24h  — line, auto y-domain
+  //   3. Humidity 24h     — line + 40/60 comfort band lines
+  //   4. CO2 7-day max    — line with dots, 1000 ref line
+  //   5. Grass pollen 7d  — bar chart, max grains/m³ per day
+  //
+  // Each section gates on data availability so a fresh-install state
+  // doesn't render empty cards. Reference bands/lines duplicate the
+  // webapp's thresholds (1000 ok→poor, 1400 poor→bad, 40-60% humidity
+  // comfort) so the visual language stays consistent.
+
+  @ViewBuilder
+  private var co2Last24hChart: some View {
+    let pts = series24h.filter { $0.co2Ppm != nil }
+    if pts.count >= 2 {
+      Section {
+        Chart {
+          // Health threshold rules — webapp uses these as ReferenceLines.
+          // The colored band rectangles the webapp shows behind the
+          // line are harder to do cleanly in Swift Charts (RectangleMark
+          // requires explicit x bounds); the rules carry the same info.
+          RuleMark(y: .value("1000", 1000))
+            .foregroundStyle(.orange.opacity(0.6))
+            .lineStyle(StrokeStyle(lineWidth: 1, dash: [6, 3]))
+          RuleMark(y: .value("1400", 1400))
+            .foregroundStyle(.red.opacity(0.6))
+            .lineStyle(StrokeStyle(lineWidth: 1, dash: [6, 3]))
+          // Reading line.
+          ForEach(pts) { p in
+            LineMark(x: .value("Time", p.capturedAt),
+                     y: .value("ppm", p.co2Ppm ?? 0))
+              .foregroundStyle(accent)
+              .interpolationMethod(.monotone)
+          }
+        }
+        .chartYScale(domain: .automatic(includesZero: false))
+        .frame(height: 200)
+      } header: { chartHeader("CO₂ last 24h", detail: co2Last24hDetail) }
+    }
+  }
+
+  /// "avg N · max N ppm" summary string for the last-24h section
+  /// header. Extracted so the section body stays clean of optional
+  /// chaining ladders.
+  private var co2Last24hDetail: String? {
+    guard let s = summary?.last24h,
+          let avg = s.co2Avg, let mx = s.co2Max else { return nil }
+    return "avg \(Int(avg)) · max \(Int(mx)) ppm"
+  }
+
+  @ViewBuilder
+  private var tempLast24hChart: some View {
+    let pts = series24h.filter { $0.tempC != nil }
+    if pts.count >= 2 {
+      Section {
+        Chart(pts) { p in
+          LineMark(x: .value("Time", p.capturedAt),
+                   y: .value("°C", p.tempC ?? 0))
+            .foregroundStyle(.yellow)
+            .interpolationMethod(.monotone)
+        }
+        .chartYScale(domain: .automatic(includesZero: false))
+        .frame(height: 140)
+      } header: { chartHeader("Temperature", detail: "last 24h") }
+    }
+  }
+
+  @ViewBuilder
+  private var humidityLast24hChart: some View {
+    let pts = series24h.filter { $0.humidityPct != nil }
+    if pts.count >= 2 {
+      Section {
+        Chart {
+          // 40-60% comfort band reference lines (matches webapp).
+          RuleMark(y: .value("40%", 40))
+            .foregroundStyle(.green.opacity(0.4))
+            .lineStyle(StrokeStyle(lineWidth: 1, dash: [6, 3]))
+          RuleMark(y: .value("60%", 60))
+            .foregroundStyle(.green.opacity(0.4))
+            .lineStyle(StrokeStyle(lineWidth: 1, dash: [6, 3]))
+          ForEach(pts) { p in
+            LineMark(x: .value("Time", p.capturedAt),
+                     y: .value("%", Double(p.humidityPct ?? 0)))
+              .foregroundStyle(.teal)
+              .interpolationMethod(.monotone)
+          }
+        }
+        .chartYScale(domain: 0...100)
+        .frame(height: 140)
+      } header: { chartHeader("Humidity", detail: "last 24h") }
+    }
+  }
+
+  @ViewBuilder
+  private var co2SevenDayMaxChart: some View {
+    // history is reversed in the original list; for the chart we want
+    // oldest→newest so the x-axis reads left to right naturally.
+    let pts = history.filter { $0.co2Max != nil }
+    if pts.count >= 2 {
+      Section {
+        Chart(pts, id: \.date) { p in
+          LineMark(x: .value("Day", p.date),
+                   y: .value("ppm", p.co2Max ?? 0))
+            .foregroundStyle(accent)
+            .symbol(.circle)
+          // Threshold rule.
+          RuleMark(y: .value("1000", 1000))
+            .foregroundStyle(.orange.opacity(0.5))
+            .lineStyle(StrokeStyle(lineWidth: 1, dash: [6, 3]))
+        }
+        .chartYScale(domain: .automatic(includesZero: false))
+        .chartXAxis {
+          AxisMarks(values: .automatic(desiredCount: 7)) { value in
+            AxisValueLabel {
+              if let iso = value.as(String.self) {
+                Text(weekdayShort(iso))
+              }
+            }
+            AxisGridLine()
+          }
+        }
+        .frame(height: 160)
+      } header: { chartHeader("CO₂ 7-day max", detail: "daily peak") }
+    }
+  }
+
+  @ViewBuilder
+  private var pollenHistoryChart: some View {
+    let pts = pollen.history.filter { $0.grassMax != nil }
+    if pts.count >= 2 {
+      Section {
+        Chart(pts) { p in
+          BarMark(x: .value("Day", p.date),
+                  y: .value("grains/m³", p.grassMax ?? 0))
+            .foregroundStyle(.green)
+            .cornerRadius(2)
+        }
+        .chartYScale(domain: .automatic(includesZero: true))
+        .chartXAxis {
+          AxisMarks(values: .automatic(desiredCount: 7)) { value in
+            AxisValueLabel {
+              if let iso = value.as(String.self) {
+                Text(weekdayShort(iso))
+              }
+            }
+            AxisGridLine()
+          }
+        }
+        .frame(height: 160)
+      } header: { chartHeader("Grass pollen 7 days", detail: "daily max") }
+    }
+  }
+
+  private func chartHeader(_ title: String, detail: String?) -> some View {
+    HStack(spacing: 6) {
+      Text(title)
+      if let detail {
+        Text(detail).font(.caption).foregroundStyle(.secondary)
+      }
+    }
+  }
+
+  /// Short weekday from a "yyyy-MM-dd" string. Falls back to MM-DD when
+  /// the value can't be parsed.
+  private func weekdayShort(_ iso: String) -> String {
+    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+    guard let d = fmt.date(from: iso) else { return String(iso.suffix(5)) }
+    let cal = Calendar.current
+    if cal.isDateInToday(d) { return "Today" }
+    let w = DateFormatter(); w.dateFormat = "EEE"
+    return w.string(from: d)
+  }
+
   /// Pull the current aggregation from AirStore. Cheap — the store
   /// walks the SwiftData rows directly; no network, no decode.
   private func refresh() {
     summary = store.summary()
     history = store.history(days: 7).daily
+    series24h = store.readings24h()
   }
 }

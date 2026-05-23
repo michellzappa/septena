@@ -59,8 +59,8 @@ struct DayTimelineView: View {
           ForEach(Array(clusters.enumerated()), id: \.offset) { _, c in
             dot(c, width: w)
           }
-          if let wake = wakeHour { marker("☀️", at: wake, width: w) }
-          if shouldShowMoon, let moon = moonHour { marker("🌙", at: moon, width: w, opacity: moonOpacity) }
+          if let wake = wakeHour { marker("sun.max.fill", at: wake, width: w) }
+          if shouldShowMoon, let moon = moonHour { marker("moon.fill", at: moon, width: w, opacity: moonOpacity) }
           if isToday {
             nowIndicator(width: w)
           }
@@ -253,9 +253,9 @@ struct DayTimelineView: View {
       .position(x: pct(c.hour) * width / 100, y: 14)
   }
 
-  private func marker(_ glyph: String, at hour: Double, width: CGFloat,
+  private func marker(_ symbol: String, at hour: Double, width: CGFloat,
                       opacity: Double = 1) -> some View {
-    Text(glyph)
+    Image(systemName: symbol)
       .font(.system(size: 11))
       .opacity(opacity)
       .position(x: pct(hour) * width / 100, y: 14)

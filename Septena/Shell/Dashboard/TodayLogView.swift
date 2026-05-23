@@ -288,7 +288,7 @@ struct TodayLogView: View {
       }
     }
 
-    return out.sorted { hhmmToDouble($0.timeLabel) < hhmmToDouble($1.timeLabel) }
+    return out.sorted { hhmmToDouble($0.timeLabel) > hhmmToDouble($1.timeLabel) }
   }
 
   // MARK: - Label helpers

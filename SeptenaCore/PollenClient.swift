@@ -87,6 +87,23 @@ private func pollenBand(species: String, value: Double?) -> PollenBand {
   return .veryHigh
 }
 
+/// Daily roll-up over a historical window. The bar chart on the Air
+/// dashboard maps one of these per day. Mirrors webapp's
+/// `AirPollenDayPoint` shape.
+struct PollenDayPoint: Codable, Hashable, Identifiable {
+  let date: String              // "yyyy-MM-dd"
+  let grass: Double?
+  let grassMax: Double?
+  let birch: Double?
+  let birchMax: Double?
+  let tree: Double?
+  let treeMax: Double?
+  let weed: Double?
+  let weedMax: Double?
+
+  var id: String { date }
+}
+
 // MARK: - Client
 
 /// Fetches + caches pollen for the user's current location. Permission
@@ -103,6 +120,11 @@ private func pollenBand(species: String, value: Double?) -> PollenBand {
 final class PollenClient: NSObject {
   /// Most recent successful fetch. Nil before first load.
   var today: PollenSummary? = nil
+  /// 7-day rolling history (today + 6 past). Populated by
+  /// `refreshHistory()` on the same Open-Meteo call shape. Empty
+  /// until that runs. Cached in UserDefaults separately from
+  /// `today` so each can refresh on its own cadence.
+  var history: [PollenDayPoint] = []
   var lastError: String? = nil
   /// Coarse status for view-side gating.
   var state: State = .idle
@@ -155,6 +177,7 @@ final class PollenClient: NSObject {
   /// don't accidentally show yesterday's reading as today's. Cleared
   /// whenever a fresh fetch overwrites it.
   private static let cacheKey = "septena.pollen.today.v1"
+  private static let historyCacheKey = "septena.pollen.history.v1"
   private static let cacheTTL: TimeInterval = 6 * 3600
 
   override init() {
@@ -163,6 +186,42 @@ final class PollenClient: NSObject {
     locationManager.delegate = self
     locationManager.desiredAccuracy = kCLLocationAccuracyKilometer  // pollen is per-city; precision is wasted battery
     paintFromCache()
+  }
+
+  /// Fetch the past 7 days (today + 6 past) and update `history`.
+  /// Runs piggyback on whatever lat/lon `refresh()` already resolved
+  /// — re-uses the auth gate. Cached for 6h in UserDefaults; the
+  /// view's `.onAppear` calls this on every visit but the disk-cache
+  /// short-circuit makes it free after the first fetch in the window.
+  func refreshHistory(force: Bool = false) async {
+    if !force, !history.isEmpty, isHistoryFresh() {
+      return
+    }
+    let auth = locationManager.authorizationStatus
+    // CLAuthorizationStatus.authorizedWhenInUse is iOS-only; macOS uses
+    // .authorizedAlways as its sole "granted" value.
+    #if os(macOS)
+    guard auth == .authorizedAlways else {
+      return
+    }
+    #else
+    guard auth == .authorizedWhenInUse || auth == .authorizedAlways else {
+      // Don't double-prompt — `refresh()` handles the permission UX,
+      // history fetch silently waits its turn.
+      return
+    }
+    #endif
+    do {
+      let location = try await requestCurrentLocation()
+      let points = try await fetchOpenMeteoHistory(lat: location.coordinate.latitude,
+                                                   lon: location.coordinate.longitude)
+      history = points
+      writeHistoryCache(points)
+    } catch {
+      // Surface only through the existing lastError pipe — history
+      // failure doesn't override the headline-summary state.
+      lastError = error.localizedDescription
+    }
   }
 
   /// Pull pollen for the user's current location. No-op (returns the
@@ -245,6 +304,73 @@ final class PollenClient: NSObject {
     return rollUp(payload, species: species)
   }
 
+  /// Same endpoint as `fetchOpenMeteo`, but with `past_days=6` so the
+  /// response covers today + the previous 6 days in a single GET.
+  /// We group by date prefix and aggregate per day, returning oldest
+  /// first so the bar chart x-axis reads left → right naturally.
+  private func fetchOpenMeteoHistory(lat: Double, lon: Double) async throws -> [PollenDayPoint] {
+    let species = ["grass_pollen", "birch_pollen", "ragweed_pollen",
+                   "olive_pollen", "mugwort_pollen", "alder_pollen"]
+    var components = URLComponents(string: "https://air-quality-api.open-meteo.com/v1/air-quality")!
+    components.queryItems = [
+      URLQueryItem(name: "latitude",  value: String(lat)),
+      URLQueryItem(name: "longitude", value: String(lon)),
+      URLQueryItem(name: "hourly",    value: species.joined(separator: ",")),
+      URLQueryItem(name: "timezone",  value: "auto"),
+      URLQueryItem(name: "past_days", value: "6"),
+      URLQueryItem(name: "forecast_days", value: "1"),
+    ]
+    let url = components.url!
+    let (data, response) = try await URLSession.shared.data(from: url)
+    guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+      throw NSError(domain: "PollenClient", code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "Open-Meteo returned a non-200 response"])
+    }
+    let payload = try JSONDecoder().decode(OpenMeteoResponse.self, from: data)
+    return rollUpByDay(payload, species: species)
+  }
+
+  /// Group hourly samples by their date prefix and aggregate per day.
+  /// Returns 7 points (today + 6 past), oldest first. Days with no
+  /// samples are dropped rather than rendered as gaps.
+  private func rollUpByDay(_ payload: OpenMeteoResponse, species: [String]) -> [PollenDayPoint] {
+    // Group hourly indices by date prefix.
+    var indicesByDate: [String: [Int]] = [:]
+    for (idx, t) in payload.hourly.time.enumerated() {
+      let date = String(t.prefix(10))
+      indicesByDate[date, default: []].append(idx)
+    }
+    let sortedDates = indicesByDate.keys.sorted()
+
+    func vals(_ key: String, indices: [Int]) -> [Double] {
+      let arr = payload.hourly.values[key] ?? []
+      return indices.compactMap { idx in idx < arr.count ? arr[idx] : nil }
+    }
+    func avg(_ key: String, indices: [Int]) -> Double? {
+      let xs = vals(key, indices: indices); guard !xs.isEmpty else { return nil }
+      return (xs.reduce(0, +) / Double(xs.count)).rounded(toPlaces: 1)
+    }
+    func mx(_ keys: [String], indices: [Int]) -> Double? {
+      let xs = keys.flatMap { vals($0, indices: indices) }
+      return xs.max()?.rounded(toPlaces: 1)
+    }
+
+    return sortedDates.map { date in
+      let idxs = indicesByDate[date] ?? []
+      let grass    = avg("grass_pollen",  indices: idxs)
+      let grassMax = mx(["grass_pollen"], indices: idxs)
+      let birch    = avg("birch_pollen",  indices: idxs)
+      let birchMax = mx(["birch_pollen"], indices: idxs)
+      let tree     = mx(["birch_pollen", "alder_pollen", "olive_pollen"], indices: idxs)
+      let weed     = mx(["ragweed_pollen", "mugwort_pollen"], indices: idxs)
+      return PollenDayPoint(date: date,
+                            grass: grass, grassMax: grassMax,
+                            birch: birch, birchMax: birchMax,
+                            tree: tree,   treeMax: tree,
+                            weed: weed,   weedMax: weed)
+    }
+  }
+
   /// Open-Meteo's `hourly.*` arrays are parallel — every species
   /// array has one entry per hour in `hourly.time`. For "today" we
   /// keep entries whose time prefix matches today's ISO date, then
@@ -298,10 +424,19 @@ final class PollenClient: NSObject {
       today = v
       state = isCacheFresh() ? .ready : .idle
     }
+    if let v = readHistoryCache() {
+      history = v
+    }
   }
 
   private func isCacheFresh() -> Bool {
     let savedAt = UserDefaults.standard.double(forKey: Self.cacheKey + ".savedAt")
+    guard savedAt > 0 else { return false }
+    return Date().timeIntervalSince1970 - savedAt < Self.cacheTTL
+  }
+
+  private func isHistoryFresh() -> Bool {
+    let savedAt = UserDefaults.standard.double(forKey: Self.historyCacheKey + ".savedAt")
     guard savedAt > 0 else { return false }
     return Date().timeIntervalSince1970 - savedAt < Self.cacheTTL
   }
@@ -312,9 +447,20 @@ final class PollenClient: NSObject {
     UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: Self.cacheKey + ".savedAt")
   }
 
+  private func writeHistoryCache(_ points: [PollenDayPoint]) {
+    guard let data = try? JSONEncoder().encode(points) else { return }
+    UserDefaults.standard.set(data, forKey: Self.historyCacheKey)
+    UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: Self.historyCacheKey + ".savedAt")
+  }
+
   private func readCache() -> PollenSummary? {
     guard let data = UserDefaults.standard.data(forKey: Self.cacheKey) else { return nil }
     return try? JSONDecoder().decode(PollenSummary.self, from: data)
+  }
+
+  private func readHistoryCache() -> [PollenDayPoint]? {
+    guard let data = UserDefaults.standard.data(forKey: Self.historyCacheKey) else { return nil }
+    return try? JSONDecoder().decode([PollenDayPoint].self, from: data)
   }
 }
 
@@ -345,8 +491,13 @@ extension PollenClient: CLLocationManagerDelegate {
     Task { @MainActor in
       switch manager.authorizationStatus {
       case .denied, .restricted: state = .denied
+      #if os(macOS)
+      case .authorizedAlways:
+        if state == .locating { await refresh() }
+      #else
       case .authorizedWhenInUse, .authorizedAlways:
         if state == .locating { await refresh() }
+      #endif
       default: break
       }
     }

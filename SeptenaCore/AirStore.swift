@@ -162,6 +162,19 @@ final class AirStore {
     )
   }
 
+  /// Raw readings over the last `hours` hours, sorted oldest-first.
+  /// Powers the CO2 / temp / humidity 24h line charts. We return the
+  /// entities directly rather than copying into a struct — the view is
+  /// in the same module and the entity is read-only at that layer.
+  func readings24h(hours: Int = 24, now: Date = Date()) -> [AirReadingEntity] {
+    let cutoff = now.addingTimeInterval(-Double(hours) * 3600)
+    let rows = (try? context.fetch(FetchDescriptor<AirReadingEntity>(
+      predicate: #Predicate { $0.capturedAt >= cutoff },
+      sortBy: [SortDescriptor(\.capturedAt)]
+    ))) ?? []
+    return rows
+  }
+
   /// Daily averages over the past `days` days, ordered oldest-first to
   /// match the FastAPI response shape AirDestinationView reverses.
   func history(days: Int = 7, now: Date = Date()) -> AirHistoryResponse {
