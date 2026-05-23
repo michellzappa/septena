@@ -202,6 +202,15 @@ final class SeptenaServices {
           }
           return nil
         }
+        if recordName.hasPrefix("air-reading:") {
+          let id = AirReadingCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<AirReadingEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
         if recordName.hasPrefix("caffeine-event:") {
           let id = CaffeineEventCloudKitSchema.entityID(from: recordName)
           if let entity = try? context.fetch(FetchDescriptor<CaffeineEventEntity>(
@@ -430,6 +439,16 @@ final class SeptenaServices {
           } else {
             context.insert(GutEventEntity(cloudKit: record))
           }
+        case AirReadingCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = AirReadingCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<AirReadingEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(AirReadingEntity(cloudKit: record))
+          }
         case CaffeineEventCloudKitSchema.recordType:
           batchTouchedData = true
           let id = CaffeineEventCloudKitSchema.entityID(from: record.recordID.recordName)
@@ -631,6 +650,14 @@ final class SeptenaServices {
           )).first {
             context.delete(entity)
           }
+        case AirReadingCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = AirReadingCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<AirReadingEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
         case CaffeineEventCloudKitSchema.recordType:
           batchTouchedData = true
           let id = CaffeineEventCloudKitSchema.entityID(from: recordID.recordName)
@@ -732,6 +759,7 @@ final class SeptenaServices {
       trainingMutator.bind(ckEngine: ckEngine)
       areasMutator.bind(ckEngine: ckEngine)
       projectsMutator.bind(ckEngine: ckEngine)
+      airStore.bind(ckEngine: ckEngine)
       ckEngine.start()
       try? await ckEngine.fetchChanges()
       // Pipe Aranet snapshots into the local store. The bridge runs in

@@ -33,6 +33,8 @@ struct SeptenaApp: App {
   private var areasMutator: AreasMutator { services.areasMutator }
   private var projectsMutator: ProjectsMutator { services.projectsMutator }
   private var httpOutbox: HTTPOutbox { services.httpOutbox }
+  private var aranetBridge: AranetBridge { services.aranetBridge }
+  private var airStore: AirStore { services.airStore }
   /// Drives drainer kicks on foreground / coming-back-online transitions.
   @Environment(\.scenePhase) private var scenePhase
   #if os(iOS)
@@ -61,6 +63,8 @@ struct SeptenaApp: App {
         .environment(httpOutbox)
         .environment(dayClock)
         .environment(ckEngine)
+        .environment(aranetBridge)
+        .environment(airStore)
         .modelContainer(localStore.container)
         .onChange(of: scenePhase) { _, phase in
           // Foreground transitions are the best moment to flush any

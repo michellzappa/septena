@@ -2,15 +2,22 @@ import SwiftUI
 
 // Air mini-app — sensor snapshot above a per-day stats list. CO2 is the
 // headline number (the band drives the accent overlay); temp / humidity
-// trail. Read-only for now since readings come from the room sensor.
+// trail.
+//
+// Data flow (post-Mac-Mini): AranetBridge connects to the Aranet4 over
+// CoreBluetooth while this view is on screen; each reading lands in
+// AirStore (SwiftData) which also computes the summary + 7-day history.
+// The legacy FastAPI client.airSummary() path is gone — air data is now
+// fully local on the iOS device that captured it. CloudKit fan-out across
+// devices is the next pass (see AirStore.swift header).
 
 struct AirDestinationView: View {
-  @Environment(SeptenaClient.self) private var client
   @Environment(SectionTheme.self) private var theme
+  @Environment(AranetBridge.self) private var bridge
+  @Environment(AirStore.self) private var store
 
   @State private var summary: AirSummary? = nil
   @State private var history: [AirHistoryPoint] = []
-  @State private var loading = true
 
   private var accent: Color { theme.color(for: "air") }
 
@@ -28,20 +35,34 @@ struct AirDestinationView: View {
   var body: some View {
     List {
       summarySection
-      Section("7-day average") {
-        ForEach(Array(history.reversed()), id: \.date) { p in
-          LogRow(
-            title: friendlyDate(p.date),
-            detail: detailLine(p),
-            trailing: p.co2Avg.map { "\(Int($0)) ppm" }
-          )
-          .listRowInsets(EdgeInsets())
+      if !history.isEmpty {
+        Section("7-day average") {
+          ForEach(Array(history.reversed()), id: \.date) { p in
+            LogRow(
+              title: friendlyDate(p.date),
+              detail: detailLine(p),
+              trailing: p.co2Avg.map { "\(Int($0)) ppm" }
+            )
+            .listRowInsets(EdgeInsets())
+          }
         }
       }
-      if !loading && history.isEmpty && summary == nil {
-        ContentUnavailableView("No air data",
-                               systemImage: theme.icon(for: "air"),
-                               description: Text("Check your sensor connection in the webapp."))
+      if history.isEmpty && summary?.latest == nil {
+        Section {
+          ContentUnavailableView {
+            Label("No air data yet", systemImage: theme.icon(for: "air"))
+          } description: {
+            Text(emptyDescription)
+          } actions: {
+            if bridge.state == .idle ||
+               bridge.state == .disconnected ||
+               bridge.state == .bluetoothOff ||
+               bridge.state == .unauthorized {
+              Button("Connect Aranet") { bridge.start() }
+                .buttonStyle(.borderedProminent)
+            }
+          }
+        }
       }
     }
     #if os(macOS)
@@ -56,29 +77,50 @@ struct AirDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
-    .task {
-      paintFromCache()
-      await load()
+    .onAppear {
+      // Don't auto-start the bridge here — building CBCentralManager is
+      // what triggers iOS's Bluetooth permission prompt, and surprising
+      // the user with that on first launch of the Air tab (before they
+      // even know there's a sensor feature) is poor UX. We do *resume*
+      // a previously-started session though: if the user has already
+      // granted permission and connected once, `bridge.start()` is
+      // cheap and silent — no second prompt — and reuses the stored
+      // peripheral UUID for an instant reconnect.
+      if bridge.hasKnownPeripheral { bridge.start() }
+      refresh()
+    }
+    .onDisappear {
+      // Don't `stop()` — the user may flip to Settings to inspect the
+      // device and then back, and a re-scan each time is wasteful. The
+      // bridge stays connected; the system will drop it when the app
+      // suspends.
+    }
+    .onReceive(NotificationCenter.default
+      .publisher(for: .septenaAirChanged)) { _ in
+      refresh()
     }
   }
 
+  // MARK: - Summary
+
+  @ViewBuilder
   private var summarySection: some View {
     Section {
+      HStack(alignment: .top, spacing: 24) {
+        stat(value: summary?.latest?.co2Ppm.map { "\(Int($0))" } ?? "—",
+             label: "CO2 ppm",
+             tint: bandColor(summary?.co2Band))
+        stat(value: summary?.latest?.tempC.map { String(format: "%.1f", $0) } ?? "—",
+             label: "temp",
+             tint: .secondary,
+             unit: "°C")
+        stat(value: summary?.latest?.humidityPct.map { "\(Int($0))" } ?? "—",
+             label: "humidity",
+             tint: .secondary,
+             unit: "%")
+        Spacer()
+      }
       if let s = summary {
-        HStack(alignment: .top, spacing: 24) {
-          stat(value: s.latest?.co2Ppm.map { "\(Int($0))" } ?? "—",
-               label: "CO2 ppm",
-               tint: bandColor(s.co2Band))
-          stat(value: s.latest?.tempC.map { String(format: "%.1f", $0) } ?? "—",
-               label: "temp",
-               tint: .secondary,
-               unit: "°C")
-          stat(value: s.latest?.humidityPct.map { "\(Int($0))" } ?? "—",
-               label: "humidity",
-               tint: .secondary,
-               unit: "%")
-          Spacer()
-        }
         HStack(spacing: 18) {
           mini("Today avg", value: s.today.co2Avg.map { "\(Int($0))" })
           mini("Today max", value: s.today.co2Max.map { "\(Int($0))" })
@@ -86,9 +128,63 @@ struct AirDestinationView: View {
           Spacer()
         }
         .padding(.top, 4)
-      } else if loading {
-        ProgressView().frame(maxWidth: .infinity)
       }
+      connectionFooter
+    }
+  }
+
+  @ViewBuilder
+  private var connectionFooter: some View {
+    HStack(spacing: 6) {
+      Circle()
+        .fill(statusColor)
+        .frame(width: 6, height: 6)
+      Text(statusLabel)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      if let name = bridge.deviceName, bridge.state == .connected {
+        Text("· \(name)")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+      }
+      Spacer()
+    }
+    .padding(.top, 4)
+  }
+
+  private var statusColor: Color {
+    switch bridge.state {
+    case .connected:    return .green
+    case .connecting,
+         .scanning:     return .yellow
+    case .bluetoothOff,
+         .unauthorized: return .red
+    case .disconnected: return .orange
+    case .idle:         return .secondary
+    }
+  }
+
+  private var statusLabel: String {
+    switch bridge.state {
+    case .connected:    return "Connected"
+    case .connecting:   return "Connecting…"
+    case .scanning:     return "Scanning…"
+    case .disconnected: return "Disconnected"
+    case .bluetoothOff: return "Bluetooth off"
+    case .unauthorized: return "Bluetooth permission denied"
+    case .idle:         return "Idle"
+    }
+  }
+
+  private var emptyDescription: String {
+    switch bridge.state {
+    case .bluetoothOff:
+      return "Turn on Bluetooth to connect to your Aranet4."
+    case .unauthorized:
+      return "Allow Bluetooth in iOS Settings → Septena."
+    default:
+      return "Make sure your Aranet4 is nearby and powered on."
     }
   }
 
@@ -140,30 +236,10 @@ struct AirDestinationView: View {
     return p.string(from: d)
   }
 
-  private enum CacheKey {
-    static let summary = "air.summary"
-    static let history = "air.history"
-  }
-
-  private func paintFromCache() {
-    if let v = ResponseCache.load(AirSummary.self, forKey: CacheKey.summary) { summary = v }
-    if let v = ResponseCache.load([AirHistoryPoint].self, forKey: CacheKey.history) { history = v }
-    loading = false
-  }
-
-  private func load() async {
-    loading = true
-    async let s = try? await client.airSummary()
-    async let h = try? await client.airHistory(days: 7)
-    let (sRes, hRes) = await (s, h)
-    if let sRes {
-      summary = sRes
-      ResponseCache.save(sRes, forKey: CacheKey.summary)
-    }
-    if let daily = hRes?.daily {
-      history = daily
-      ResponseCache.save(daily, forKey: CacheKey.history)
-    }
-    loading = false
+  /// Pull the current aggregation from AirStore. Cheap — the store
+  /// walks the SwiftData rows directly; no network, no decode.
+  private func refresh() {
+    summary = store.summary()
+    history = store.history(days: 7).daily
   }
 }

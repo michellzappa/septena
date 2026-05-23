@@ -13,6 +13,7 @@ enum WeekDestination: String, Hashable, Identifiable {
   case habits, chores, training, supplements, sleep, nutrition
   case air, groceries, calendar, caffeine, cannabis, body, gut
   case activity
+  case today
 
   var id: String { rawValue }
 }
@@ -221,6 +222,20 @@ struct WeekDashboardView: View {
       case .body:        BodyDestinationView()
       case .gut:         GutDestinationView()
       case .activity:    ActivityDestinationView()
+      case .today:
+        TodayLogView(
+          date: clock.today,
+          habits: dailies.habits,
+          supplements: dailies.supplements,
+          chores: dailies.chores,
+          tasks: completedTasks,
+          caffeine: caffeineToday?.entries ?? [],
+          cannabis: cannabisToday?.entries ?? [],
+          gut: gutToday?.entries ?? [],
+          nutrition: todayNutrition,
+          training: recentTraining,
+          calendar: dailies.calendarEvents
+        )
       }
     }
     #if os(iOS)
@@ -677,6 +692,7 @@ struct WeekDashboardView: View {
       calendar: dailies.calendarEvents,
       macroColors: macroColors
     )
+    .onTapGesture { sheetDest = .today }
   }
 
   // MARK: - Tiles

@@ -1050,6 +1050,29 @@ enum GutEventCloudKitSchema {
   }
 }
 
+enum AirReadingCloudKitSchema {
+  /// CKRecord type. Must match what's published in the CloudKit
+  /// dashboard schema; if you change this string, push a new schema
+  /// version too or fetches will silently return zero rows.
+  static let recordType = "AirReading"
+
+  enum Field {
+    static let date        = "date"        // String "yyyy-MM-dd"
+    static let time        = "time"        // String "HH:mm:ss"
+    static let capturedAt  = "capturedAt"  // Date — authoritative timestamp
+    static let co2Ppm      = "co2Ppm"      // Int64?
+    static let tempC       = "tempC"       // Double?
+    static let humidityPct = "humidityPct" // Int64?
+    static let pressureHPa = "pressureHPa" // Double?
+    static let batteryPct  = "batteryPct"  // Int64?
+  }
+
+  static func recordName(for id: String) -> String { "air-reading:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("air-reading:".count))
+  }
+}
+
 enum CaffeineEventCloudKitSchema {
   static let recordType = "CaffeineEvent"
 
@@ -1465,6 +1488,47 @@ extension GutEventEntity: ChecklistCloudKitBackedEntity {
   convenience init(cloudKit record: CKRecord) {
     self.init(id: GutEventCloudKitSchema.entityID(from: record.recordID.recordName),
               date: "", time: "", bristol: 4)
+    apply(record)
+  }
+}
+
+extension AirReadingEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: AirReadingCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: AirReadingCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[AirReadingCloudKitSchema.Field.date]        = date
+    record[AirReadingCloudKitSchema.Field.time]        = time
+    record[AirReadingCloudKitSchema.Field.capturedAt]  = capturedAt
+    record[AirReadingCloudKitSchema.Field.co2Ppm]      = co2Ppm.map { Int64($0) }
+    record[AirReadingCloudKitSchema.Field.tempC]       = tempC
+    record[AirReadingCloudKitSchema.Field.humidityPct] = humidityPct.map { Int64($0) }
+    record[AirReadingCloudKitSchema.Field.pressureHPa] = pressureHPa
+    record[AirReadingCloudKitSchema.Field.batteryPct]  = batteryPct.map { Int64($0) }
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let value = record[AirReadingCloudKitSchema.Field.date] as? String { date = value }
+    if let value = record[AirReadingCloudKitSchema.Field.time] as? String { time = value }
+    if let value = record[AirReadingCloudKitSchema.Field.capturedAt] as? Date { capturedAt = value }
+    // CloudKit normalizes integers to Int64; SwiftData stores them as
+    // Int. Cast through Int64 first so a value of 0 doesn't get
+    // mis-decoded as nil under bridging.
+    co2Ppm      = (record[AirReadingCloudKitSchema.Field.co2Ppm]      as? Int64).map(Int.init)
+    tempC       =  record[AirReadingCloudKitSchema.Field.tempC]       as? Double
+    humidityPct = (record[AirReadingCloudKitSchema.Field.humidityPct] as? Int64).map(Int.init)
+    pressureHPa =  record[AirReadingCloudKitSchema.Field.pressureHPa] as? Double
+    batteryPct  = (record[AirReadingCloudKitSchema.Field.batteryPct]  as? Int64).map(Int.init)
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: AirReadingCloudKitSchema.entityID(from: record.recordID.recordName),
+              date: "", time: "", capturedAt: .now)
     apply(record)
   }
 }

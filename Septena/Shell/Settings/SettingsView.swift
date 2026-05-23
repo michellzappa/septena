@@ -1504,6 +1504,28 @@ private struct AranetIntegrationDetail: View {
           Text(err).font(.caption).foregroundStyle(.orange)
         }
       }
+
+      Section {
+        Toggle("Background capture (experimental)", isOn: Binding(
+          get: { bridge.backgroundCaptureEnabled },
+          set: { newValue in
+            bridge.backgroundCaptureEnabled = newValue
+            // Bouncing the bridge picks up the new filter mode +
+            // restore-identifier choice on the next scan.
+            if bridge.state != .idle { bridge.stop() }
+            if newValue { bridge.start() }
+          }
+        ))
+      } header: {
+        Text("Background")
+      } footer: {
+        VStack(alignment: .leading, spacing: 6) {
+          Text("When on, Septena keeps listening for Aranet broadcasts while the app is suspended. Resolution drops from one reading per minute (foreground) to roughly one reading every 15–30 minutes (iOS throttles background BLE scans), but you get overnight coverage for sleep × air quality analysis.")
+          Text("Works only if your Aranet4's ad packets include a service UUID. Open Console.app, filter on com.septena.cloud, and look for a `services=[…]` value on the discovery line — if that's empty, background capture won't deliver anything.")
+            .foregroundStyle(.secondary)
+        }
+        .font(.caption)
+      }
     }
     .formStyle(.grouped)
   }
