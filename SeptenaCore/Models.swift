@@ -1743,7 +1743,7 @@ struct DraftEntry: Codable, Hashable, Identifiable {
   var difficulty: String      // "easy" | "medium" | "hard" | ""
   var durationMin: Double?
   var distanceM: Double?
-  var level: Int?
+  var level: Double?
   var isCardio: Bool
   var status: Status
   var savedFile: String?      // backend filename, used on re-edit
@@ -1759,7 +1759,7 @@ struct DraftEntry: Codable, Hashable, Identifiable {
       difficulty: last?.difficulty ?? "medium",
       durationMin: last?.durationMin,
       distanceM: last?.distanceM,
-      level: last?.level.flatMap { Int($0) },
+      level: last?.level,
       isCardio: cardio,
       status: .pending,
       savedFile: nil,

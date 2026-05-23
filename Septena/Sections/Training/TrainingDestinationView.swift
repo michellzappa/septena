@@ -187,7 +187,6 @@ struct TrainingDestinationView: View {
   private func activeSessionSection(_ d: DraftSession) -> some View {
     Section {
       HStack(spacing: 12) {
-        Text(d.emoji ?? "▶").font(.title3).frame(width: 24)
         VStack(alignment: .leading, spacing: 2) {
           Text(d.label).font(.headline)
           Text("\(d.doneCount)/\(max(d.totalCount, 1)) done · started \(d.time)")
@@ -1046,7 +1045,7 @@ final class TrainingDraftStore {
       difficulty: entry.difficulty.isEmpty ? nil : entry.difficulty,
       durationMin: entry.durationMin,
       distanceM: entry.distanceM,
-      level: entry.level.map(Double.init),
+      level: entry.level,
       note: entry.note.isEmpty ? nil : entry.note,
       concludedAt: "\(d.date)T\(d.time.isEmpty ? "00:00" : d.time):00"
     )
@@ -1098,7 +1097,7 @@ struct TrainingSessionView: View {
         }
       }
       .background(Theme.paperBackground)
-      .navigationTitle(store.draft.map { "\($0.emoji ?? "💪") \($0.label)" } ?? "Start training")
+      .navigationTitle(store.draft?.label ?? "Start training")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif
@@ -1147,7 +1146,6 @@ struct TrainingSessionView: View {
           ForEach(store.sessionTypes) { type in
             Button { start(type) } label: {
               HStack(spacing: 12) {
-                Text(type.emoji ?? "💪").font(.title3)
                 VStack(alignment: .leading, spacing: 2) {
                   Text(type.label).font(.septenaTaskTitle)
                     .foregroundStyle(Theme.inkPrimary)
@@ -1379,7 +1377,7 @@ struct TrainingExerciseCard: View {
       if let m = entry.distanceM, m > 0 {
         parts.append(m >= 1000 ? String(format: "%.1f km", m/1000) : "\(Int(m)) m")
       }
-      if let l = entry.level, l > 0 { parts.append("L\(l)") }
+      if let l = entry.level, l > 0 { parts.append("L\(fmt(l))") }
     } else {
       if let w = entry.weight, w > 0 {
         parts.append(w.truncatingRemainder(dividingBy: 1) == 0
@@ -1495,38 +1493,11 @@ struct TrainingExerciseCard: View {
                     get: { entry.distanceM.map { fmt($0) } ?? "" },
                     set: { setDistance($0) }
                   ))
-      levelDotPicker
-    }
-  }
-
-  /// 1–5 tappable dots, opacity ramps with the chosen level so the picker
-  /// reads as one calm accent gradient instead of a numeric input. Pairs
-  /// with the difficulty picker visually. Historical entries with level >5
-  /// max out the row.
-  private var levelDotPicker: some View {
-    let current = entry.level ?? 0
-    return VStack(alignment: .leading, spacing: 4) {
-      Text("LEVEL")
-        .font(.caption2.weight(.semibold))
-        .foregroundStyle(.secondary)
-      HStack(spacing: 6) {
-        ForEach(1...5, id: \.self) { n in
-          let isLit = current >= n
-          let opacity = 0.30 + 0.175 * Double(current - 1)   // 0.30 → 1.00
-          Button {
-            // Tap a lit dot to clear back to nil; tap empty to set.
-            setLevel(current == n ? nil : n)
-          } label: {
-            Circle()
-              .fill(accent.opacity(isLit ? opacity : 0.08))
-              .frame(width: 12, height: 12)
-          }
-          .buttonStyle(.plain)
-          .accessibilityLabel("Level \(n)")
-          .accessibilityAddTraits(isLit ? .isSelected : [])
-        }
-      }
-      .frame(minHeight: 22)   // align baseline with sibling number fields
+      numberField(label: "Level",
+                  value: Binding(
+                    get: { entry.level.map { fmt($0) } ?? "" },
+                    set: { setLevel($0) }
+                  ))
     }
   }
 
@@ -1576,7 +1547,7 @@ struct TrainingExerciseCard: View {
   private func setDistance(_ s: String) {
     store.update { $0.entries[index].distanceM = Double(s.replacingOccurrences(of: ",", with: ".")) }
   }
-  private func setLevel(_ v: Int?) {
-    store.update { $0.entries[index].level = v }
+  private func setLevel(_ s: String) {
+    store.update { $0.entries[index].level = Double(s.replacingOccurrences(of: ",", with: ".")) }
   }
 }
