@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // Edit sheet for a single logged caffeine entry. Standard SwiftUI Form
 // presented via `.sheet(item:)` — same affordance Apple uses across
@@ -7,9 +8,10 @@ import SwiftUI
 // action, not in the sheet.
 
 struct EditCaffeineEntrySheet: View {
-  @Environment(SeptenaClient.self) private var client
-  @Environment(HTTPOutbox.self) private var outbox
+  @Environment(\.modelContext) private var modelContext
   @Environment(\.dismiss) private var dismiss
+
+  private var caffeine: CaffeineMutator { SeptenaServices.shared.caffeineMutator }
 
   /// Day the entry belongs to (path query param). Caller passes the day
   /// from the surrounding `CaffeineDayResponse`.
@@ -114,9 +116,7 @@ struct EditCaffeineEntrySheet: View {
   }
 
   private func loadBeans() async {
-    if let cfg = try? await client.caffeineConfig() {
-      beans = cfg.beans
-    }
+    beans = ChecklistMirror.loadCaffeineBeans(context: modelContext)
   }
 
   private func save() {
@@ -142,21 +142,12 @@ struct EditCaffeineEntrySheet: View {
       return t.isEmpty ? nil : t
     }()
 
-    var body: [String: Any] = [
-      "time": hhmm,
-      "method": method,
-      "timezone": TimeZone.current.identifier,
-    ]
-    if let beansValue { body["beans"] = beansValue } else { body["beans"] = NSNull() }
-    if let gramsValue { body["grams"] = gramsValue } else { body["grams"] = NSNull() }
-    if let noteValue  { body["note"]  = noteValue  } else { body["note"]  = NSNull() }
-
-    outbox.enqueue(
-      method: "PUT",
-      path: "/api/caffeine/entry/\(original.id)?date=\(date)",
-      body: body,
-      kind: "caffeine.update"
-    )
+    caffeine.updateEntry(id: original.id,
+                         time: hhmm,
+                         method: method,
+                         beans: .some(beansValue),
+                         grams: .some(gramsValue),
+                         note: .some(noteValue))
     Haptics.tick()
 
     var updated = original

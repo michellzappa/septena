@@ -1136,12 +1136,16 @@ struct GutEntry: Codable, Identifiable, Hashable {
   var blood: Int             // 0–N severity
   var volume: String?        // "small" | "medium" | "large"
   var discomfortLevel: String?     // "low" | "med" | "high"
+  var discomfortStart: String?     // ISO timestamp (export only)
+  var discomfortEnd: String?       // ISO timestamp (export only)
   var discomfortHours: Double?
   var note: String?
 
   enum CodingKeys: String, CodingKey {
     case id, date, time, bristol, blood, volume, note
     case discomfortLevel = "discomfort_level"
+    case discomfortStart = "discomfort_start"
+    case discomfortEnd = "discomfort_end"
     case discomfortHours = "discomfort_hours"
   }
 }
@@ -1178,6 +1182,44 @@ struct GutHistoryPoint: Codable, Hashable {
 
 struct GutHistoryResponse: Codable {
   let daily: [GutHistoryPoint]
+}
+
+// MARK: - Export DTOs (one-shot CK bootstrap pull)
+
+struct GutExportResponse: Codable {
+  let entries: [GutEntry]
+}
+
+struct CaffeineExportEntry: Codable, Hashable {
+  let id: String
+  let date: String
+  let time: String
+  let method: String
+  let beans: String?
+  let grams: Double?
+  let note: String?
+}
+
+struct CaffeineExportResponse: Codable {
+  let entries: [CaffeineExportEntry]
+  let beans: [CaffeineBean]
+}
+
+struct CannabisExportEntry: Codable, Hashable {
+  let id: String
+  let date: String
+  let time: String
+  let method: String
+  let strain: String?
+  let hit: Int?
+  let grams: Double?
+  let effect: String?
+  let note: String?
+}
+
+struct CannabisExportResponse: Codable {
+  let entries: [CannabisExportEntry]
+  let strains: [CannabisStrain]
 }
 
 // MARK: - Settings
@@ -1302,6 +1344,11 @@ struct CaffeineBean: Codable, Identifiable, Hashable {
   let id: String
   var name: String
 
+  init(id: String, name: String) {
+    self.id = id
+    self.name = name
+  }
+
   init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
     id = try c.decode(String.self, forKey: .id)
@@ -1314,6 +1361,11 @@ struct CaffeineBean: Codable, Identifiable, Hashable {
 struct CaffeineConfig: Codable, Hashable {
   var beans: [CaffeineBean]
   var methods: [String]?
+
+  init(beans: [CaffeineBean], methods: [String]? = nil) {
+    self.beans = beans
+    self.methods = methods
+  }
 
   init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -1345,6 +1397,11 @@ struct CannabisStrain: Codable, Identifiable, Hashable {
 struct CannabisConfig: Codable, Hashable {
   var strains: [CannabisStrain]
   var usesPerCapsule: Int
+
+  init(strains: [CannabisStrain], usesPerCapsule: Int) {
+    self.strains = strains
+    self.usesPerCapsule = usesPerCapsule
+  }
 
   init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)

@@ -521,6 +521,162 @@ final class ChoreEventEntity {
   }
 }
 
+@Model
+final class GutEventEntity {
+  @Attribute(.unique) var id: String
+  var date: String
+  var time: String
+  var bristol: Int
+  var blood: Int
+  var volume: String?
+  var discomfortLevel: String?
+  var discomfortStart: String?
+  var discomfortEnd: String?
+  var note: String?
+  var updatedAt: Date
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       date: String,
+       time: String,
+       bristol: Int,
+       blood: Int = 0,
+       volume: String? = nil,
+       discomfortLevel: String? = nil,
+       discomfortStart: String? = nil,
+       discomfortEnd: String? = nil,
+       note: String? = nil,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.date = date
+    self.time = time
+    self.bristol = bristol
+    self.blood = blood
+    self.volume = volume
+    self.discomfortLevel = discomfortLevel
+    self.discomfortStart = discomfortStart
+    self.discomfortEnd = discomfortEnd
+    self.note = note
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
+@Model
+final class CaffeineEventEntity {
+  @Attribute(.unique) var id: String
+  var date: String
+  var time: String
+  var method: String   // "v60" | "matcha" | "other"
+  var beans: String?
+  var grams: Double?
+  var note: String?
+  var updatedAt: Date
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       date: String,
+       time: String,
+       method: String,
+       beans: String? = nil,
+       grams: Double? = nil,
+       note: String? = nil,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.date = date
+    self.time = time
+    self.method = method
+    self.beans = beans
+    self.grams = grams
+    self.note = note
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
+@Model
+final class CaffeineBeanEntity {
+  @Attribute(.unique) var id: String
+  var name: String
+  var sortIndex: Int
+  var updatedAt: Date
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       name: String,
+       sortIndex: Int = 0,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.name = name
+    self.sortIndex = sortIndex
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
+@Model
+final class CannabisEventEntity {
+  @Attribute(.unique) var id: String
+  var date: String
+  var time: String
+  var method: String   // "vape" | "edible"
+  var strain: String?
+  var hit: Int?
+  var grams: Double?
+  var effect: String?
+  var note: String?
+  var updatedAt: Date
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       date: String,
+       time: String,
+       method: String,
+       strain: String? = nil,
+       hit: Int? = nil,
+       grams: Double? = nil,
+       effect: String? = nil,
+       note: String? = nil,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.date = date
+    self.time = time
+    self.method = method
+    self.strain = strain
+    self.hit = hit
+    self.grams = grams
+    self.effect = effect
+    self.note = note
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
+@Model
+final class CannabisStrainEntity {
+  @Attribute(.unique) var id: String
+  var name: String
+  var sortIndex: Int
+  var updatedAt: Date
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       name: String,
+       sortIndex: Int = 0,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.name = name
+    self.sortIndex = sortIndex
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
 // MARK: - DTO ↔ Entity bridging
 
 extension SeptenaTask {
@@ -702,6 +858,93 @@ enum ChoreEventCloudKitSchema {
   static func recordName(for id: String) -> String { "chore-event:\(id)" }
   static func entityID(from recordName: String) -> String {
     String(recordName.dropFirst("chore-event:".count))
+  }
+}
+
+enum GutEventCloudKitSchema {
+  static let recordType = "GutEvent"
+
+  enum Field {
+    static let date = "date"
+    static let time = "time"
+    static let bristol = "bristol"
+    static let blood = "blood"
+    static let volume = "volume"
+    static let discomfortLevel = "discomfortLevel"
+    static let discomfortStart = "discomfortStart"
+    static let discomfortEnd = "discomfortEnd"
+    static let note = "note"
+  }
+
+  static func recordName(for id: String) -> String { "gut-event:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("gut-event:".count))
+  }
+}
+
+enum CaffeineEventCloudKitSchema {
+  static let recordType = "CaffeineEvent"
+
+  enum Field {
+    static let date = "date"
+    static let time = "time"
+    static let method = "method"
+    static let beans = "beans"
+    static let grams = "grams"
+    static let note = "note"
+  }
+
+  static func recordName(for id: String) -> String { "caffeine-event:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("caffeine-event:".count))
+  }
+}
+
+enum CaffeineBeanCloudKitSchema {
+  static let recordType = "CaffeineBean"
+
+  enum Field {
+    static let name = "name"
+    static let sortIndex = "sortIndex"
+  }
+
+  static func recordName(for id: String) -> String { "caffeine-bean:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("caffeine-bean:".count))
+  }
+}
+
+enum CannabisEventCloudKitSchema {
+  static let recordType = "CannabisEvent"
+
+  enum Field {
+    static let date = "date"
+    static let time = "time"
+    static let method = "method"
+    static let strain = "strain"
+    static let hit = "hit"
+    static let grams = "grams"
+    static let effect = "effect"
+    static let note = "note"
+  }
+
+  static func recordName(for id: String) -> String { "cannabis-event:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("cannabis-event:".count))
+  }
+}
+
+enum CannabisStrainCloudKitSchema {
+  static let recordType = "CannabisStrain"
+
+  enum Field {
+    static let name = "name"
+    static let sortIndex = "sortIndex"
+  }
+
+  static func recordName(for id: String) -> String { "cannabis-strain:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("cannabis-strain:".count))
   }
 }
 
@@ -927,6 +1170,168 @@ extension ChoreEventEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
+extension GutEventEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: GutEventCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: GutEventCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[GutEventCloudKitSchema.Field.date] = date
+    record[GutEventCloudKitSchema.Field.time] = time
+    record[GutEventCloudKitSchema.Field.bristol] = bristol
+    record[GutEventCloudKitSchema.Field.blood] = blood
+    record[GutEventCloudKitSchema.Field.volume] = volume
+    record[GutEventCloudKitSchema.Field.discomfortLevel] = discomfortLevel
+    record[GutEventCloudKitSchema.Field.discomfortStart] = discomfortStart
+    record[GutEventCloudKitSchema.Field.discomfortEnd] = discomfortEnd
+    record[GutEventCloudKitSchema.Field.note] = note
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let value = record[GutEventCloudKitSchema.Field.date] as? String { date = value }
+    if let value = record[GutEventCloudKitSchema.Field.time] as? String { time = value }
+    if let value = record[GutEventCloudKitSchema.Field.bristol] as? Int { bristol = value }
+    if let value = record[GutEventCloudKitSchema.Field.blood] as? Int { blood = value }
+    volume = optionalChecklistString(record[GutEventCloudKitSchema.Field.volume])
+    discomfortLevel = optionalChecklistString(record[GutEventCloudKitSchema.Field.discomfortLevel])
+    discomfortStart = optionalChecklistString(record[GutEventCloudKitSchema.Field.discomfortStart])
+    discomfortEnd = optionalChecklistString(record[GutEventCloudKitSchema.Field.discomfortEnd])
+    note = optionalChecklistString(record[GutEventCloudKitSchema.Field.note])
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: GutEventCloudKitSchema.entityID(from: record.recordID.recordName),
+              date: "", time: "", bristol: 4)
+    apply(record)
+  }
+}
+
+extension CaffeineEventEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: CaffeineEventCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: CaffeineEventCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[CaffeineEventCloudKitSchema.Field.date] = date
+    record[CaffeineEventCloudKitSchema.Field.time] = time
+    record[CaffeineEventCloudKitSchema.Field.method] = method
+    record[CaffeineEventCloudKitSchema.Field.beans] = beans
+    record[CaffeineEventCloudKitSchema.Field.grams] = grams
+    record[CaffeineEventCloudKitSchema.Field.note] = note
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let value = record[CaffeineEventCloudKitSchema.Field.date] as? String { date = value }
+    if let value = record[CaffeineEventCloudKitSchema.Field.time] as? String { time = value }
+    if let value = record[CaffeineEventCloudKitSchema.Field.method] as? String { method = value }
+    beans = optionalChecklistString(record[CaffeineEventCloudKitSchema.Field.beans])
+    grams = record[CaffeineEventCloudKitSchema.Field.grams] as? Double
+    note = optionalChecklistString(record[CaffeineEventCloudKitSchema.Field.note])
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: CaffeineEventCloudKitSchema.entityID(from: record.recordID.recordName),
+              date: "", time: "", method: "v60")
+    apply(record)
+  }
+}
+
+extension CaffeineBeanEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: CaffeineBeanCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: CaffeineBeanCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[CaffeineBeanCloudKitSchema.Field.name] = name
+    record[CaffeineBeanCloudKitSchema.Field.sortIndex] = sortIndex
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let value = record[CaffeineBeanCloudKitSchema.Field.name] as? String { name = value }
+    if let value = record[CaffeineBeanCloudKitSchema.Field.sortIndex] as? Int { sortIndex = value }
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: CaffeineBeanCloudKitSchema.entityID(from: record.recordID.recordName), name: "")
+    apply(record)
+  }
+}
+
+extension CannabisEventEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: CannabisEventCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: CannabisEventCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[CannabisEventCloudKitSchema.Field.date] = date
+    record[CannabisEventCloudKitSchema.Field.time] = time
+    record[CannabisEventCloudKitSchema.Field.method] = method
+    record[CannabisEventCloudKitSchema.Field.strain] = strain
+    record[CannabisEventCloudKitSchema.Field.hit] = hit
+    record[CannabisEventCloudKitSchema.Field.grams] = grams
+    record[CannabisEventCloudKitSchema.Field.effect] = effect
+    record[CannabisEventCloudKitSchema.Field.note] = note
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let value = record[CannabisEventCloudKitSchema.Field.date] as? String { date = value }
+    if let value = record[CannabisEventCloudKitSchema.Field.time] as? String { time = value }
+    if let value = record[CannabisEventCloudKitSchema.Field.method] as? String { method = value }
+    strain = optionalChecklistString(record[CannabisEventCloudKitSchema.Field.strain])
+    hit = record[CannabisEventCloudKitSchema.Field.hit] as? Int
+    grams = record[CannabisEventCloudKitSchema.Field.grams] as? Double
+    effect = optionalChecklistString(record[CannabisEventCloudKitSchema.Field.effect])
+    note = optionalChecklistString(record[CannabisEventCloudKitSchema.Field.note])
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: CannabisEventCloudKitSchema.entityID(from: record.recordID.recordName),
+              date: "", time: "", method: "vape")
+    apply(record)
+  }
+}
+
+extension CannabisStrainEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: CannabisStrainCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: CannabisStrainCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[CannabisStrainCloudKitSchema.Field.name] = name
+    record[CannabisStrainCloudKitSchema.Field.sortIndex] = sortIndex
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let value = record[CannabisStrainCloudKitSchema.Field.name] as? String { name = value }
+    if let value = record[CannabisStrainCloudKitSchema.Field.sortIndex] as? Int { sortIndex = value }
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: CannabisStrainCloudKitSchema.entityID(from: record.recordID.recordName), name: "")
+    apply(record)
+  }
+}
+
 // MARK: - LocalStore
 
 @MainActor
@@ -943,6 +1348,9 @@ final class LocalStore {
                          ChoreDefinitionEntity.self, ChoreEventEntity.self,
                          ChoreSnapshotEntity.self,
                          GoalEntity.self,
+                         GutEventEntity.self,
+                         CaffeineEventEntity.self, CaffeineBeanEntity.self,
+                         CannabisEventEntity.self, CannabisStrainEntity.self,
                          OutboxEntity.self, HTTPOutboxEntity.self])
     // Explicitly opt OUT of NSPersistentCloudKitContainer mirroring. Having
     // CloudKit in the target entitlements would otherwise switch SwiftData

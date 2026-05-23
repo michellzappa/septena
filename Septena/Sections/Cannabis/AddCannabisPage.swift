@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // Cannabis palette — mirrors the webapp command palette (components/
 // command-palette.tsx :: page === "cannabis"). Rows, in order:
@@ -15,15 +16,18 @@ import SwiftUI
 // (start/continue/edible) always show.
 
 struct AddCannabisPage: View {
-  @Environment(SeptenaClient.self) private var client
-  @Environment(HTTPOutbox.self) private var outbox
+  @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
   @State private var strains: [CannabisStrain] = []
-  @State private var usesPerCapsule: Int = 3
   @State private var entries: [CannabisEntry] = []
   @State private var working = false
+
+  /// Constant capsule size — matches CannabisDestinationView. 3 uses × 0.05g.
+  private let usesPerCapsule: Int = 3
+
+  private var cannabis: CannabisMutator { SeptenaServices.shared.cannabisMutator }
 
   private var trimmed: String {
     router.query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -134,66 +138,16 @@ struct AddCannabisPage: View {
   }
 
   private func commit(method: String, strain: String?, hit: Int?) {
-    let time = nowHHMM()
-    var body: [String: Any] = [
-      "date": SeptenaDate.today,
-      "time": time,
-      "method": method,
-    ]
-    if let strain { body["strain"] = strain }
-    if let hit { body["hit"] = hit }
-    outbox.enqueue(method: "POST", path: "/api/cannabis/entry",
-                   body: body, kind: "cannabis.add")
-    // Optimistically advance the cached day so a quick re-open of the FAB
-    // progresses from this hit rather than the stale server state, which
-    // hasn't been written yet by the outbox.
-    appendToCache(method: method, strain: strain, hit: hit, time: time)
+    cannabis.addEntry(date: SeptenaDate.today, time: nowHHMM(),
+                      method: method, strain: strain, hit: hit)
     AddInfoSection.cannabis.notifyTilesChanged()
     Haptics.tick()
     dismiss()
   }
 
-  private func appendToCache(method: String, strain: String?, hit: Int?, time: String) {
-    let newEntry = CannabisEntry(
-      id: "pending-\(UUID().uuidString)",
-      time: time,
-      method: method,
-      strain: strain,
-      hit: hit,
-      grams: nil,
-      note: nil,
-      effect: nil
-    )
-    let prior = ResponseCache.load(CannabisDayResponse.self, forKey: "cannabis.today")
-    let next = (prior?.entries ?? []) + [newEntry]
-    let updated = CannabisDayResponse(
-      date: prior?.date ?? SeptenaDate.today,
-      entries: next,
-      sessionCount: (prior?.sessionCount ?? 0) + 1,
-      totalG: prior?.totalG
-    )
-    ResponseCache.save(updated, forKey: "cannabis.today")
-    entries = next
-  }
-
   private func load() async {
-    // Paint last-known state from cache first so we don't regress to an older
-    // server snapshot while an enqueued add is still draining.
-    if let cached = ResponseCache.load(CannabisDayResponse.self, forKey: "cannabis.today") {
-      entries = cached.entries
-    }
-    if let cfg = try? await client.cannabisConfig() {
-      strains = cfg.strains
-      usesPerCapsule = max(1, cfg.usesPerCapsule)
-    }
-    if let day = try? await client.cannabisDay(date: SeptenaDate.today) {
-      let cached = ResponseCache.load(CannabisDayResponse.self, forKey: "cannabis.today")
-      if (cached?.entries.count ?? 0) <= day.entries.count {
-        entries = day.entries
-        ResponseCache.save(day, forKey: "cannabis.today")
-      } else {
-        entries = cached?.entries ?? day.entries
-      }
-    }
+    strains = ChecklistMirror.loadCannabisStrains(context: modelContext)
+    let day = ChecklistMirror.loadCannabisDay(context: modelContext, date: SeptenaDate.today)
+    entries = day.entries
   }
 }

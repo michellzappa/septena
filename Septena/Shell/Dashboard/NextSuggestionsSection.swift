@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // Time-of-day action suggestions for the Next view. Mirrors the webapp's
 // `hooks/use-next-actions.ts` engine: for each contributing section (caffeine,
@@ -143,28 +144,49 @@ final class NextSuggestionsModel {
     let today = self.today
     let since14 = Self.daysAgoISO(14)
     let since30 = Self.daysAgoISO(30)
+    let ctx = LocalStore.shared.container.mainContext
 
-    async let caffeineHist = try? await client.caffeineEntries(days: 14)
-    async let caffeineDay  = try? await client.caffeineDay(date: today)
-    async let cannabisHist = try? await client.cannabisEntries(days: 14)
-    async let cannabisDay  = try? await client.cannabisDay(date: today)
+    // Caffeine/cannabis now read from CK-synced SwiftData (no network hop).
+    let cafEntries = (try? ctx.fetch(FetchDescriptor<CaffeineEventEntity>(
+      predicate: #Predicate { $0.date >= since14 }
+    ))) ?? []
+    let cafToday = ChecklistMirror.loadCaffeineDay(context: ctx, date: today)
+    let canEntries = (try? ctx.fetch(FetchDescriptor<CannabisEventEntity>(
+      predicate: #Predicate { $0.date >= since14 }
+    ))) ?? []
+    let canToday = ChecklistMirror.loadCannabisDay(context: ctx, date: today)
     async let nutrition    = try? await client.nutritionEntries(since: since14)
     async let training     = try? await client.trainingEntries(since: since30)
     async let workout      = try? await client.suggestedWorkout()
     // Settings live in CloudKit — read from the local mirror, not FastAPI.
-    let st: AppSettings? = SettingsMirror.loadSettings(context: LocalStore.shared.container.mainContext)
+    let st: AppSettings? = SettingsMirror.loadSettings(context: ctx)
 
-    let (caf, cafD, can, canD, nut, tr, sw) =
-      await (caffeineHist, caffeineDay, cannabisHist, cannabisDay,
-             nutrition, training, workout)
+    let (nut, tr, sw) = await (nutrition, training, workout)
+
+    let cafTimePoints: [CaffeineTimePoint] = cafEntries.compactMap { e in
+      let parts = e.time.split(separator: ":")
+      guard let hh = parts.first.flatMap({ Int($0) }) else { return nil }
+      let mm = parts.dropFirst().first.flatMap { Int($0) } ?? 0
+      return CaffeineTimePoint(date: e.date, time: e.time,
+                               hour: Double(hh) + Double(mm) / 60.0,
+                               method: e.method, beans: e.beans, grams: e.grams)
+    }
+    let canTimePoints: [CannabisTimePoint] = canEntries.compactMap { e in
+      let parts = e.time.split(separator: ":")
+      guard let hh = parts.first.flatMap({ Int($0) }) else { return nil }
+      let mm = parts.dropFirst().first.flatMap { Int($0) } ?? 0
+      return CannabisTimePoint(date: e.date, time: e.time,
+                               hour: Double(hh) + Double(mm) / 60.0,
+                               method: e.method, strain: e.strain, hit: e.hit)
+    }
 
     suggestions = Self.compute(
       today: today,
       isToday: true,
-      caffeineHistory: caf?.entries ?? [],
-      caffeineToday: cafD?.entries ?? [],
-      cannabisHistory: can?.entries ?? [],
-      cannabisToday: canD?.entries ?? [],
+      caffeineHistory: cafTimePoints,
+      caffeineToday: cafToday.entries,
+      cannabisHistory: canTimePoints,
+      cannabisToday: canToday.entries,
       nutrition: nut ?? [],
       training: tr ?? [],
       workout: sw?.suggested,

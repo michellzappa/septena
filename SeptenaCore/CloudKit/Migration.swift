@@ -807,6 +807,9 @@ final class ChecklistCloudKitBootstrapper {
     static let supplements = "septena.bootstrap.supplements.v1"
     static let chores      = "septena.bootstrap.chores.v1"
     static let goals       = "septena.bootstrap.goals.v1"
+    static let gut         = "septena.bootstrap.gut.v1"
+    static let caffeine    = "septena.bootstrap.caffeine.v1"
+    static let cannabis    = "septena.bootstrap.cannabis.v1"
   }
 
   /// First-run bridge for habits/supplements/chores. Seeds the local
@@ -868,6 +871,39 @@ final class ChecklistCloudKitBootstrapper {
         defaults.set(true, forKey: BootstrapKey.goals)
         importedAny = true
         SeptenaLog.info("[Bootstrap] goals imported: \(goals.count)")
+      }
+    }
+
+    // Gut/caffeine/cannabis are event-log sections; FastAPI exports return
+    // every record on disk (no days-window). User wants the complete history
+    // imported — we trust the server export to contain only real data.
+    if force || !defaults.bool(forKey: BootstrapKey.gut) {
+      if let gut = try? await client.gutExport() {
+        ChecklistMirror.replaceAllGutEntries(gut, context: context)
+        queueGutMirrorForUpload()
+        defaults.set(true, forKey: BootstrapKey.gut)
+        importedAny = true
+        SeptenaLog.info("[Bootstrap] gut imported: \(gut.entries.count) entries")
+      }
+    }
+
+    if force || !defaults.bool(forKey: BootstrapKey.caffeine) {
+      if let caffeine = try? await client.caffeineExport() {
+        ChecklistMirror.replaceAllCaffeineExport(caffeine, context: context)
+        queueCaffeineMirrorForUpload()
+        defaults.set(true, forKey: BootstrapKey.caffeine)
+        importedAny = true
+        SeptenaLog.info("[Bootstrap] caffeine imported: entries=\(caffeine.entries.count) beans=\(caffeine.beans.count)")
+      }
+    }
+
+    if force || !defaults.bool(forKey: BootstrapKey.cannabis) {
+      if let cannabis = try? await client.cannabisExport() {
+        ChecklistMirror.replaceAllCannabisExport(cannabis, context: context)
+        queueCannabisMirrorForUpload()
+        defaults.set(true, forKey: BootstrapKey.cannabis)
+        importedAny = true
+        SeptenaLog.info("[Bootstrap] cannabis imported: entries=\(cannabis.entries.count) strains=\(cannabis.strains.count)")
       }
     }
 
@@ -956,6 +992,35 @@ final class ChecklistCloudKitBootstrapper {
     }
     for event in events {
       engine.noteChoreEventChange(id: event.id)
+    }
+  }
+
+  private func queueGutMirrorForUpload() {
+    let entries = (try? context.fetch(FetchDescriptor<GutEventEntity>())) ?? []
+    for entry in entries {
+      engine.noteGutEventChange(id: entry.id)
+    }
+  }
+
+  private func queueCaffeineMirrorForUpload() {
+    let entries = (try? context.fetch(FetchDescriptor<CaffeineEventEntity>())) ?? []
+    let beans = (try? context.fetch(FetchDescriptor<CaffeineBeanEntity>())) ?? []
+    for entry in entries {
+      engine.noteCaffeineEventChange(id: entry.id)
+    }
+    for bean in beans {
+      engine.noteCaffeineBeanChange(id: bean.id)
+    }
+  }
+
+  private func queueCannabisMirrorForUpload() {
+    let entries = (try? context.fetch(FetchDescriptor<CannabisEventEntity>())) ?? []
+    let strains = (try? context.fetch(FetchDescriptor<CannabisStrainEntity>())) ?? []
+    for entry in entries {
+      engine.noteCannabisEventChange(id: entry.id)
+    }
+    for strain in strains {
+      engine.noteCannabisStrainChange(id: strain.id)
     }
   }
 }

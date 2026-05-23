@@ -1,17 +1,19 @@
 import SwiftUI
+import SwiftData
 
 // Gut mini-app — today's movements (and any open discomfort window).
-// Weekly trends will be shown via graphs (not a list) in a later pass.
+// Reads from local SwiftData (CloudKit-synced) and writes via GutMutator.
 
 struct GutDestinationView: View {
-  @Environment(SeptenaClient.self) private var client
-  @Environment(HTTPOutbox.self) private var outbox
+  @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
 
   @State private var today: GutDayResponse? = nil
   @State private var loading = true
   @State private var editing: GutEntry? = nil
   @State private var history: [GutHistoryPoint] = []
+
+  private var gut: GutMutator { SeptenaServices.shared.gutMutator }
 
   private var accent: Color { theme.color(for: "gut") }
 
@@ -83,51 +85,23 @@ struct GutDestinationView: View {
     #endif
     .tint(accent)
     .task {
-      paintFromCache()
-      await load()
+      reload()
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
+      reload()
     }
     .sheet(item: $editing) { entry in
       EditGutEntrySheet(
         date: today?.date ?? SeptenaDate.today,
         original: entry,
-        onSave: { updated in applyLocalUpdate(updated) }
+        onSave: { _ in reload() }
       )
     }
   }
 
-  private func applyLocalUpdate(_ updated: GutEntry) {
-    guard let t = today else { return }
-    var entries = t.entries
-    guard let idx = entries.firstIndex(where: { $0.id == updated.id }) else { return }
-    entries[idx] = updated
-    today = GutDayResponse(
-      date: t.date,
-      entries: entries,
-      movementCount: t.movementCount,
-      maxBlood: entries.map(\.blood).max() ?? 0,
-      totalDiscomfortH: entries.compactMap(\.discomfortHours).reduce(0, +)
-    )
-    if let today { ResponseCache.save(today, forKey: CacheKey.today) }
-  }
-
   private func delete(_ entry: GutEntry) {
-    guard let t = today else { return }
-    let day = t.date
-    outbox.enqueue(
-      method: "DELETE",
-      path: "/api/gut/entry/\(entry.id)?date=\(day)",
-      body: nil,
-      kind: "gut.delete"
-    )
-    let entries = t.entries.filter { $0.id != entry.id }
-    today = GutDayResponse(
-      date: t.date,
-      entries: entries,
-      movementCount: max(0, t.movementCount - 1),
-      maxBlood: entries.map(\.blood).max() ?? 0,
-      totalDiscomfortH: entries.compactMap(\.discomfortHours).reduce(0, +)
-    )
-    if let today { ResponseCache.save(today, forKey: CacheKey.today) }
+    gut.deleteEntry(id: entry.id)
+    reload()
     Haptics.warning()
   }
 
@@ -197,24 +171,9 @@ struct GutDestinationView: View {
     return parts.isEmpty ? nil : parts.joined(separator: " · ")
   }
 
-  private enum CacheKey {
-    static let today = "gut.today"
-  }
-
-  private func paintFromCache() {
-    if let v = ResponseCache.load(GutDayResponse.self, forKey: CacheKey.today) { today = v }
-    loading = false
-  }
-
-  private func load() async {
-    loading = true
-    if let tRes = try? await client.gutDay(date: SeptenaDate.today) {
-      today = tRes
-      ResponseCache.save(tRes, forKey: CacheKey.today)
-    }
-    if let h = try? await client.gutHistory(days: 365) {
-      history = h.daily
-    }
+  private func reload() {
+    today = ChecklistMirror.loadGutDay(context: modelContext, date: SeptenaDate.today)
+    history = ChecklistMirror.loadGutHistory(context: modelContext, days: 365).daily
     loading = false
   }
 }

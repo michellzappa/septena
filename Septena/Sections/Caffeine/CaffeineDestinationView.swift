@@ -1,18 +1,19 @@
 import SwiftUI
+import SwiftData
 
-// Caffeine mini-app — today's sessions log. Each entry is a LogRow
-// (method · beans · grams + time). Weekly trends will be shown via
-// graphs (not a list) in a later pass.
+// Caffeine mini-app — today's sessions log, reads from SwiftData and
+// writes through CaffeineMutator.
 
 struct CaffeineDestinationView: View {
-  @Environment(SeptenaClient.self) private var client
-  @Environment(HTTPOutbox.self) private var outbox
+  @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
 
   @State private var today: CaffeineDayResponse? = nil
   @State private var loading = true
   @State private var editing: CaffeineEntry? = nil
   @State private var history: [CaffeineHistoryPoint] = []
+
+  private var caffeine: CaffeineMutator { SeptenaServices.shared.caffeineMutator }
 
   private var accent: Color { theme.color(for: "caffeine") }
 
@@ -87,66 +88,23 @@ struct CaffeineDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
-    .task {
-      paintFromCache()
-      await load()
+    .task { reload() }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
+      reload()
     }
     .sheet(item: $editing) { entry in
       EditCaffeineEntrySheet(
         date: today?.date ?? SeptenaDate.today,
         original: entry,
-        onSave: { updated in applyLocalUpdate(updated) }
+        onSave: { _ in reload() }
       )
-    }
-  }
-
-  /// Swap an edited entry into the in-memory `today.entries` so the UI
-  /// reflects the change immediately. The outbox carries the PUT to the
-  /// server; the next `load()` will reconcile.
-  private func applyLocalUpdate(_ updated: CaffeineEntry) {
-    guard var t = today else { return }
-    if let idx = t.entries.firstIndex(where: { $0.id == updated.id }) {
-      var entries = t.entries
-      entries[idx] = updated
-      t = CaffeineDayResponse(
-        date: t.date,
-        entries: entries,
-        sessionCount: t.sessionCount,
-        totalG: entries.reduce(0.0) { $0 + ($1.grams ?? 0) }
-      )
-      today = t
-      ResponseCache.save(t, forKey: CacheKey.today)
     }
   }
 
   private func delete(_ entry: CaffeineEntry) {
-    guard var t = today else { return }
-    let day = t.date
-    outbox.enqueue(
-      method: "DELETE",
-      path: "/api/caffeine/entry/\(entry.id)?date=\(day)",
-      body: nil,
-      kind: "caffeine.delete"
-    )
-    let entries = t.entries.filter { $0.id != entry.id }
-    t = CaffeineDayResponse(
-      date: t.date,
-      entries: entries,
-      sessionCount: max(0, t.sessionCount - 1),
-      totalG: entries.reduce(0.0) { $0 + ($1.grams ?? 0) }
-    )
-    today = t
-    ResponseCache.save(t, forKey: CacheKey.today)
+    caffeine.deleteEntry(id: entry.id)
+    reload()
     Haptics.warning()
-  }
-
-  private enum CacheKey {
-    static let today = "caffeine.today"
-  }
-
-  private func paintFromCache() {
-    if let v = ResponseCache.load(CaffeineDayResponse.self, forKey: CacheKey.today) { today = v }
-    loading = false
   }
 
   private var summary: some View {
@@ -193,15 +151,9 @@ struct CaffeineDestinationView: View {
     return parts.isEmpty ? nil : parts.joined(separator: " · ")
   }
 
-  private func load() async {
-    loading = true
-    if let tRes = try? await client.caffeineDay(date: SeptenaDate.today) {
-      today = tRes
-      ResponseCache.save(tRes, forKey: CacheKey.today)
-    }
-    if let h = try? await client.caffeineHistory(days: 365) {
-      history = h.daily
-    }
+  private func reload() {
+    today = ChecklistMirror.loadCaffeineDay(context: modelContext, date: SeptenaDate.today)
+    history = ChecklistMirror.loadCaffeineHistory(context: modelContext, days: 365).daily
     loading = false
   }
 }

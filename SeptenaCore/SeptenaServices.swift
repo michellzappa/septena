@@ -33,6 +33,9 @@ final class SeptenaServices {
   let taskMutator: TaskMutator
   let checklistMutator: ChecklistMutator
   let goalMutator: GoalMutator
+  let gutMutator: GutMutator
+  let caffeineMutator: CaffeineMutator
+  let cannabisMutator: CannabisMutator
   let areasMutator: AreasMutator
   let projectsMutator: ProjectsMutator
   let httpOutbox: HTTPOutbox
@@ -49,6 +52,9 @@ final class SeptenaServices {
     self.taskMutator = TaskMutator(client: client, context: context, ckEngine: nil)
     self.checklistMutator = ChecklistMutator(context: context, ckEngine: nil)
     self.goalMutator = GoalMutator(context: context, ckEngine: nil)
+    self.gutMutator = GutMutator(context: context, ckEngine: nil)
+    self.caffeineMutator = CaffeineMutator(context: context, ckEngine: nil)
+    self.cannabisMutator = CannabisMutator(context: context, ckEngine: nil)
     self.areasMutator = AreasMutator(client: client, context: context)
     self.projectsMutator = ProjectsMutator(client: client, context: context)
     self.httpOutbox = HTTPOutbox(client: client, context: context)
@@ -167,6 +173,51 @@ final class SeptenaServices {
         if recordName.hasPrefix("goal:") {
           let id = GoalCloudKitSchema.entityID(from: recordName)
           if let entity = try? context.fetch(FetchDescriptor<GoalEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
+        if recordName.hasPrefix("gut-event:") {
+          let id = GutEventCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<GutEventEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
+        if recordName.hasPrefix("caffeine-event:") {
+          let id = CaffeineEventCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<CaffeineEventEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
+        if recordName.hasPrefix("caffeine-bean:") {
+          let id = CaffeineBeanCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<CaffeineBeanEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
+        if recordName.hasPrefix("cannabis-event:") {
+          let id = CannabisEventCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<CannabisEventEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
+        if recordName.hasPrefix("cannabis-strain:") {
+          let id = CannabisStrainCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<CannabisStrainEntity>(
             predicate: #Predicate { $0.id == id }
           )).first {
             return entity.toCloudKitRecord()
@@ -310,6 +361,56 @@ final class SeptenaServices {
           } else {
             context.insert(GoalEntity(cloudKit: record))
           }
+        case GutEventCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = GutEventCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<GutEventEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(GutEventEntity(cloudKit: record))
+          }
+        case CaffeineEventCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = CaffeineEventCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<CaffeineEventEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(CaffeineEventEntity(cloudKit: record))
+          }
+        case CaffeineBeanCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = CaffeineBeanCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<CaffeineBeanEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(CaffeineBeanEntity(cloudKit: record))
+          }
+        case CannabisEventCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = CannabisEventCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<CannabisEventEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(CannabisEventEntity(cloudKit: record))
+          }
+        case CannabisStrainCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = CannabisStrainCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<CannabisStrainEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(CannabisStrainEntity(cloudKit: record))
+          }
         default:
           SeptenaLog.info("[CKEngine] applyFetched: unknown recordType \(record.recordType) id=\(record.recordID.recordName)")
         }
@@ -413,6 +514,46 @@ final class SeptenaServices {
           )).first {
             context.delete(entity)
           }
+        case GutEventCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = GutEventCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<GutEventEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
+        case CaffeineEventCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = CaffeineEventCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<CaffeineEventEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
+        case CaffeineBeanCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = CaffeineBeanCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<CaffeineBeanEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
+        case CannabisEventCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = CannabisEventCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<CannabisEventEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
+        case CannabisStrainCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = CannabisStrainCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<CannabisStrainEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
         default:
           SeptenaLog.info("[CKEngine] applyDeleted: unknown recordType \(recordType) id=\(recordID.recordName)")
         }
@@ -435,6 +576,9 @@ final class SeptenaServices {
       taskMutator.bind(ckEngine: ckEngine)
       checklistMutator.bind(ckEngine: ckEngine)
       goalMutator.bind(ckEngine: ckEngine)
+      gutMutator.bind(ckEngine: ckEngine)
+      caffeineMutator.bind(ckEngine: ckEngine)
+      cannabisMutator.bind(ckEngine: ckEngine)
       areasMutator.bind(ckEngine: ckEngine)
       projectsMutator.bind(ckEngine: ckEngine)
       ckEngine.start()
@@ -907,6 +1051,423 @@ final class GoalMutator {
   private func commit(_ entity: GoalEntity, op: String) {
     saveContext("CK goals \(op)")
     ckEngine?.noteGoalChange(id: entity.id)
+    postChanged()
+  }
+
+  private func saveContext(_ label: String) {
+    do { try context.save() }
+    catch { SeptenaLog.error(label, error) }
+  }
+
+  private func postChanged() {
+    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+  }
+}
+
+@MainActor
+@Observable
+final class GutMutator {
+  private let context: ModelContext
+  private var ckEngine: CKEngine?
+
+  init(context: ModelContext, ckEngine: CKEngine? = nil) {
+    self.context = context
+    self.ckEngine = ckEngine
+  }
+
+  func bind(ckEngine: CKEngine) {
+    self.ckEngine = ckEngine
+  }
+
+  @discardableResult
+  func addEntry(date: String,
+                time: String,
+                bristol: Int,
+                blood: Int = 0,
+                volume: String? = nil,
+                discomfortLevel: String? = nil,
+                discomfortStart: String? = nil,
+                discomfortEnd: String? = nil,
+                note: String? = nil) -> GutEventEntity {
+    let id = uniqueID()
+    let entity = GutEventEntity(id: id,
+                                date: date,
+                                time: time,
+                                bristol: bristol,
+                                blood: blood,
+                                volume: volume,
+                                discomfortLevel: discomfortLevel,
+                                discomfortStart: discomfortStart,
+                                discomfortEnd: discomfortEnd,
+                                note: note)
+    context.insert(entity)
+    commit(entity, op: "create")
+    return entity
+  }
+
+  func updateEntry(id: String,
+                   time: String? = nil,
+                   bristol: Int? = nil,
+                   blood: Int? = nil,
+                   volume: String?? = nil,
+                   discomfortLevel: String?? = nil,
+                   discomfortStart: String?? = nil,
+                   discomfortEnd: String?? = nil,
+                   note: String?? = nil) {
+    guard let entity = fetch(id: id) else { return }
+    if let time { entity.time = time }
+    if let bristol { entity.bristol = bristol }
+    if let blood { entity.blood = blood }
+    if let volume { entity.volume = volume }
+    if let discomfortLevel { entity.discomfortLevel = discomfortLevel }
+    if let discomfortStart { entity.discomfortStart = discomfortStart }
+    if let discomfortEnd { entity.discomfortEnd = discomfortEnd }
+    if let note { entity.note = note }
+    entity.updatedAt = .now
+    commit(entity, op: "update")
+  }
+
+  func deleteEntry(id: String) {
+    guard let entity = fetch(id: id) else { return }
+    context.delete(entity)
+    saveContext("CK gut delete")
+    ckEngine?.noteGutEventDeletion(id: id)
+    postChanged()
+  }
+
+  private func fetch(id: String) -> GutEventEntity? {
+    try? context.fetch(FetchDescriptor<GutEventEntity>(
+      predicate: #Predicate { $0.id == id }
+    )).first
+  }
+
+  private func uniqueID() -> String {
+    var attempt = String(UUID().uuidString.lowercased().prefix(8))
+    while fetch(id: attempt) != nil {
+      attempt = String(UUID().uuidString.lowercased().prefix(8))
+    }
+    return attempt
+  }
+
+  private func commit(_ entity: GutEventEntity, op: String) {
+    saveContext("CK gut \(op)")
+    ckEngine?.noteGutEventChange(id: entity.id)
+    postChanged()
+  }
+
+  private func saveContext(_ label: String) {
+    do { try context.save() }
+    catch { SeptenaLog.error(label, error) }
+  }
+
+  private func postChanged() {
+    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+  }
+}
+
+@MainActor
+@Observable
+final class CaffeineMutator {
+  private let context: ModelContext
+  private var ckEngine: CKEngine?
+
+  init(context: ModelContext, ckEngine: CKEngine? = nil) {
+    self.context = context
+    self.ckEngine = ckEngine
+  }
+
+  func bind(ckEngine: CKEngine) {
+    self.ckEngine = ckEngine
+  }
+
+  // MARK: - Entries
+
+  @discardableResult
+  func addEntry(date: String,
+                time: String,
+                method: String,
+                beans: String? = nil,
+                grams: Double? = nil,
+                note: String? = nil) -> CaffeineEventEntity {
+    let id = uniqueEntryID()
+    let entity = CaffeineEventEntity(id: id,
+                                     date: date,
+                                     time: time,
+                                     method: method,
+                                     beans: beans,
+                                     grams: grams,
+                                     note: note)
+    context.insert(entity)
+    commitEntry(entity, op: "create")
+    return entity
+  }
+
+  func updateEntry(id: String,
+                   time: String? = nil,
+                   method: String? = nil,
+                   beans: String?? = nil,
+                   grams: Double?? = nil,
+                   note: String?? = nil) {
+    guard let entity = fetchEntry(id: id) else { return }
+    if let time { entity.time = time }
+    if let method { entity.method = method }
+    if let beans { entity.beans = beans }
+    if let grams { entity.grams = grams }
+    if let note { entity.note = note }
+    entity.updatedAt = .now
+    commitEntry(entity, op: "update")
+  }
+
+  func deleteEntry(id: String) {
+    guard let entity = fetchEntry(id: id) else { return }
+    context.delete(entity)
+    saveContext("CK caffeine delete")
+    ckEngine?.noteCaffeineEventDeletion(id: id)
+    postChanged()
+  }
+
+  // MARK: - Beans catalog
+
+  @discardableResult
+  func addBean(name: String) -> CaffeineBeanEntity {
+    let id = uniqueBeanID(for: name)
+    let entity = CaffeineBeanEntity(id: id, name: name, sortIndex: nextBeanSortIndex())
+    context.insert(entity)
+    commitBean(entity, op: "create")
+    return entity
+  }
+
+  func updateBean(id: String, name: String) {
+    guard let entity = fetchBean(id: id) else { return }
+    entity.name = name
+    entity.updatedAt = .now
+    commitBean(entity, op: "update")
+  }
+
+  func deleteBean(id: String) {
+    guard let entity = fetchBean(id: id) else { return }
+    context.delete(entity)
+    saveContext("CK caffeine-bean delete")
+    ckEngine?.noteCaffeineBeanDeletion(id: id)
+    postChanged()
+  }
+
+  // MARK: - Helpers
+
+  private func fetchEntry(id: String) -> CaffeineEventEntity? {
+    try? context.fetch(FetchDescriptor<CaffeineEventEntity>(
+      predicate: #Predicate { $0.id == id }
+    )).first
+  }
+
+  private func fetchBean(id: String) -> CaffeineBeanEntity? {
+    try? context.fetch(FetchDescriptor<CaffeineBeanEntity>(
+      predicate: #Predicate { $0.id == id }
+    )).first
+  }
+
+  private func uniqueEntryID() -> String {
+    var attempt = String(UUID().uuidString.lowercased().prefix(8))
+    while fetchEntry(id: attempt) != nil {
+      attempt = String(UUID().uuidString.lowercased().prefix(8))
+    }
+    return attempt
+  }
+
+  private func uniqueBeanID(for name: String) -> String {
+    let base = name.lowercased()
+      .replacingOccurrences(of: " ", with: "-")
+      .filter { $0.isLetter || $0.isNumber || $0 == "-" }
+    var attempt = base.isEmpty ? IDShortcode.generate(length: 4) : base
+    var n = 2
+    while fetchBean(id: attempt) != nil {
+      attempt = "\(base)-\(n)"
+      n += 1
+    }
+    return attempt
+  }
+
+  private func nextBeanSortIndex() -> Int {
+    ((try? context.fetch(FetchDescriptor<CaffeineBeanEntity>(
+      sortBy: [SortDescriptor(\.sortIndex, order: .reverse)]
+    )).first?.sortIndex) ?? -1) + 1
+  }
+
+  private func commitEntry(_ entity: CaffeineEventEntity, op: String) {
+    saveContext("CK caffeine \(op)")
+    ckEngine?.noteCaffeineEventChange(id: entity.id)
+    postChanged()
+  }
+
+  private func commitBean(_ entity: CaffeineBeanEntity, op: String) {
+    saveContext("CK caffeine-bean \(op)")
+    ckEngine?.noteCaffeineBeanChange(id: entity.id)
+    postChanged()
+  }
+
+  private func saveContext(_ label: String) {
+    do { try context.save() }
+    catch { SeptenaLog.error(label, error) }
+  }
+
+  private func postChanged() {
+    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+  }
+}
+
+@MainActor
+@Observable
+final class CannabisMutator {
+  private let context: ModelContext
+  private var ckEngine: CKEngine?
+
+  /// Per-use weight for vape entries. The legacy server auto-computed this
+  /// from a capsule lifecycle (uses-remaining counter); on CK we keep it
+  /// simple and use a constant — user confirmed 0.05g per use is always
+  /// correct for their hardware.
+  static let gramsPerVapeUse: Double = 0.05
+
+  init(context: ModelContext, ckEngine: CKEngine? = nil) {
+    self.context = context
+    self.ckEngine = ckEngine
+  }
+
+  func bind(ckEngine: CKEngine) {
+    self.ckEngine = ckEngine
+  }
+
+  // MARK: - Entries
+
+  @discardableResult
+  func addEntry(date: String,
+                time: String,
+                method: String,
+                strain: String? = nil,
+                hit: Int? = nil,
+                grams: Double? = nil,
+                effect: String? = nil,
+                note: String? = nil) -> CannabisEventEntity {
+    let id = uniqueEntryID()
+    // Vape entries auto-fill grams from the constant when not supplied.
+    let resolvedGrams = grams ?? (method == "vape" ? Self.gramsPerVapeUse : nil)
+    let entity = CannabisEventEntity(id: id,
+                                     date: date,
+                                     time: time,
+                                     method: method,
+                                     strain: strain,
+                                     hit: hit,
+                                     grams: resolvedGrams,
+                                     effect: effect,
+                                     note: note)
+    context.insert(entity)
+    commitEntry(entity, op: "create")
+    return entity
+  }
+
+  func updateEntry(id: String,
+                   time: String? = nil,
+                   method: String? = nil,
+                   strain: String?? = nil,
+                   hit: Int?? = nil,
+                   grams: Double?? = nil,
+                   effect: String?? = nil,
+                   note: String?? = nil) {
+    guard let entity = fetchEntry(id: id) else { return }
+    if let time { entity.time = time }
+    if let method { entity.method = method }
+    if let strain { entity.strain = strain }
+    if let hit { entity.hit = hit }
+    if let grams { entity.grams = grams }
+    if let effect { entity.effect = effect }
+    if let note { entity.note = note }
+    entity.updatedAt = .now
+    commitEntry(entity, op: "update")
+  }
+
+  func deleteEntry(id: String) {
+    guard let entity = fetchEntry(id: id) else { return }
+    context.delete(entity)
+    saveContext("CK cannabis delete")
+    ckEngine?.noteCannabisEventDeletion(id: id)
+    postChanged()
+  }
+
+  // MARK: - Strains catalog
+
+  @discardableResult
+  func addStrain(name: String) -> CannabisStrainEntity {
+    let id = uniqueStrainID(for: name)
+    let entity = CannabisStrainEntity(id: id, name: name, sortIndex: nextStrainSortIndex())
+    context.insert(entity)
+    commitStrain(entity, op: "create")
+    return entity
+  }
+
+  func updateStrain(id: String, name: String) {
+    guard let entity = fetchStrain(id: id) else { return }
+    entity.name = name
+    entity.updatedAt = .now
+    commitStrain(entity, op: "update")
+  }
+
+  func deleteStrain(id: String) {
+    guard let entity = fetchStrain(id: id) else { return }
+    context.delete(entity)
+    saveContext("CK cannabis-strain delete")
+    ckEngine?.noteCannabisStrainDeletion(id: id)
+    postChanged()
+  }
+
+  // MARK: - Helpers
+
+  private func fetchEntry(id: String) -> CannabisEventEntity? {
+    try? context.fetch(FetchDescriptor<CannabisEventEntity>(
+      predicate: #Predicate { $0.id == id }
+    )).first
+  }
+
+  private func fetchStrain(id: String) -> CannabisStrainEntity? {
+    try? context.fetch(FetchDescriptor<CannabisStrainEntity>(
+      predicate: #Predicate { $0.id == id }
+    )).first
+  }
+
+  private func uniqueEntryID() -> String {
+    var attempt = String(UUID().uuidString.lowercased().prefix(8))
+    while fetchEntry(id: attempt) != nil {
+      attempt = String(UUID().uuidString.lowercased().prefix(8))
+    }
+    return attempt
+  }
+
+  private func uniqueStrainID(for name: String) -> String {
+    let base = name.lowercased()
+      .replacingOccurrences(of: " ", with: "-")
+      .filter { $0.isLetter || $0.isNumber || $0 == "-" }
+    var attempt = base.isEmpty ? IDShortcode.generate(length: 4) : base
+    var n = 2
+    while fetchStrain(id: attempt) != nil {
+      attempt = "\(base)-\(n)"
+      n += 1
+    }
+    return attempt
+  }
+
+  private func nextStrainSortIndex() -> Int {
+    ((try? context.fetch(FetchDescriptor<CannabisStrainEntity>(
+      sortBy: [SortDescriptor(\.sortIndex, order: .reverse)]
+    )).first?.sortIndex) ?? -1) + 1
+  }
+
+  private func commitEntry(_ entity: CannabisEventEntity, op: String) {
+    saveContext("CK cannabis \(op)")
+    ckEngine?.noteCannabisEventChange(id: entity.id)
+    postChanged()
+  }
+
+  private func commitStrain(_ entity: CannabisStrainEntity, op: String) {
+    saveContext("CK cannabis-strain \(op)")
+    ckEngine?.noteCannabisStrainChange(id: entity.id)
     postChanged()
   }
 

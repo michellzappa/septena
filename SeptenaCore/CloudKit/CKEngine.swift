@@ -201,6 +201,16 @@ func noteChoreEventChange(id: String) { noteChange(recordName: ChoreEventCloudKi
 func noteChoreEventDeletion(id: String) { noteDeletion(recordName: ChoreEventCloudKitSchema.recordName(for: id), kind: "choreEvent") }
 func noteGoalChange(id: String) { noteChange(recordName: GoalCloudKitSchema.recordName(for: id), kind: "goal") }
 func noteGoalDeletion(id: String) { noteDeletion(recordName: GoalCloudKitSchema.recordName(for: id), kind: "goal") }
+func noteGutEventChange(id: String) { noteChange(recordName: GutEventCloudKitSchema.recordName(for: id), kind: "gutEvent") }
+func noteGutEventDeletion(id: String) { noteDeletion(recordName: GutEventCloudKitSchema.recordName(for: id), kind: "gutEvent") }
+func noteCaffeineEventChange(id: String) { noteChange(recordName: CaffeineEventCloudKitSchema.recordName(for: id), kind: "caffeineEvent") }
+func noteCaffeineEventDeletion(id: String) { noteDeletion(recordName: CaffeineEventCloudKitSchema.recordName(for: id), kind: "caffeineEvent") }
+func noteCaffeineBeanChange(id: String) { noteChange(recordName: CaffeineBeanCloudKitSchema.recordName(for: id), kind: "caffeineBean") }
+func noteCaffeineBeanDeletion(id: String) { noteDeletion(recordName: CaffeineBeanCloudKitSchema.recordName(for: id), kind: "caffeineBean") }
+func noteCannabisEventChange(id: String) { noteChange(recordName: CannabisEventCloudKitSchema.recordName(for: id), kind: "cannabisEvent") }
+func noteCannabisEventDeletion(id: String) { noteDeletion(recordName: CannabisEventCloudKitSchema.recordName(for: id), kind: "cannabisEvent") }
+func noteCannabisStrainChange(id: String) { noteChange(recordName: CannabisStrainCloudKitSchema.recordName(for: id), kind: "cannabisStrain") }
+func noteCannabisStrainDeletion(id: String) { noteDeletion(recordName: CannabisStrainCloudKitSchema.recordName(for: id), kind: "cannabisStrain") }
 
   private func noteChange(recordName: String, kind: String) {
     guard let engine else {

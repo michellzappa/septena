@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import EventKit
 
 // Week module — the synthesizing dashboard. Each module gets a tile that
@@ -28,6 +29,7 @@ enum NutritionSheet: Hashable, Identifiable {
 struct WeekDashboardView: View {
   @Environment(SeptenaClient.self) private var client
   @Environment(HTTPOutbox.self) private var outbox
+  @Environment(\.modelContext) private var modelContext
   @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(TaskMutator.self) private var taskMutator
   @Environment(SectionTheme.self) private var theme
@@ -403,13 +405,12 @@ struct WeekDashboardView: View {
       recentTraining = e
       ResponseCache.save(e, forKey: CacheKey.recentTraining)
     }
-    // Caffeine + Cannabis — second wave so the heavier core fetches above
-    // render their tiles first.
-    async let cafToday = try? await client.caffeineDay(date: SeptenaDate.today)
-    async let cafHist  = try? await client.caffeineHistory(days: 7)
-    async let cnbToday = try? await client.cannabisDay(date: SeptenaDate.today)
-    async let cnbHist  = try? await client.cannabisHistory(days: 7)
-    let (cafT, cafH, cnbT, cnbH) = await (cafToday, cafHist, cnbToday, cnbHist)
+    // Caffeine + Cannabis — read from local SwiftData (CK-synced) so the
+    // dashboard renders instantly from the mirror without a network hop.
+    let cafT: CaffeineDayResponse? = ChecklistMirror.loadCaffeineDay(context: modelContext, date: SeptenaDate.today)
+    let cafH: CaffeineHistoryResponse? = ChecklistMirror.loadCaffeineHistory(context: modelContext, days: 7)
+    let cnbT: CannabisDayResponse? = ChecklistMirror.loadCannabisDay(context: modelContext, date: SeptenaDate.today)
+    let cnbH: CannabisHistoryResponse? = ChecklistMirror.loadCannabisHistory(context: modelContext, days: 7)
 
     // QuickAdd menu preset data — fire-and-forget on a separate Task so it
     // doesn't block the rest of `loadAll()`. Adding these to the second
@@ -422,16 +423,22 @@ struct WeekDashboardView: View {
     Task { @MainActor [client] in
       // Caffeine: only the last entry is needed (Repeat is the menu's
       // only contextual action — bean-picking lives in the sheet).
-      if let entries = try? await client.caffeineEntries(days: 7),
-         let last = entries.entries.last {
-        caffeineLastEntry = last
+      // Pull from local SwiftData; CK has the canonical history now.
+      let recentDescriptor = FetchDescriptor<CaffeineEventEntity>(
+        sortBy: [SortDescriptor(\.date, order: .reverse), SortDescriptor(\.time, order: .reverse)]
+      )
+      if let last = (try? modelContext.fetch(recentDescriptor))?.first {
+        let hh = last.time.split(separator: ":").first.flatMap { Int($0) } ?? 0
+        let mm = last.time.split(separator: ":").dropFirst().first.flatMap { Int($0) } ?? 0
+        caffeineLastEntry = CaffeineTimePoint(date: last.date,
+                                              time: last.time,
+                                              hour: Double(hh) + Double(mm) / 60.0,
+                                              method: last.method,
+                                              beans: last.beans,
+                                              grams: last.grams)
       }
-      // Cannabis: usesPerCapsule is the only field the smart menu reads
-      // (to know when the current capsule is exhausted). Strain list is
-      // not consumed by the menu anymore.
-      if let cnbCfg = try? await client.cannabisConfig() {
-        cannabisUsesPerCapsule = max(1, cnbCfg.usesPerCapsule)
-      }
+      // Cannabis: usesPerCapsule is a constant on CK (3 uses × 0.05g).
+      cannabisUsesPerCapsule = 3
       // Nutrition: 30-day meal history feeds the menu's "Recommended"
       // scoring and the NutritionSearchSheet's full searchable list.
       let since = SeptenaDate.format(
@@ -468,9 +475,9 @@ struct WeekDashboardView: View {
       ResponseCache.save(cnh, forKey: CacheKey.cannabisHistory)
     }
     async let wRows = try? await client.withingsHistory(days: 14)
-    async let gutT  = try? await client.gutDay(date: SeptenaDate.today)
-    async let gutH  = try? await client.gutHistory(days: 7)
-    let (wR, gT, gH) = await (wRows, gutT, gutH)
+    let gT: GutDayResponse? = ChecklistMirror.loadGutDay(context: modelContext, date: SeptenaDate.today)
+    let gH: GutHistoryResponse? = ChecklistMirror.loadGutHistory(context: modelContext, days: 7)
+    let wR = await wRows
     if let wR {
       let sorted = wR.sorted { $0.date > $1.date }
       bodyRows = sorted
@@ -558,38 +565,26 @@ struct WeekDashboardView: View {
   private func refresh(section: AddInfoSection) async {
     switch section {
     case .cannabis:
-      async let day  = try? await client.cannabisDay(date: SeptenaDate.today)
-      async let hist = try? await client.cannabisHistory(days: 7)
-      if let d = await day {
-        cannabisToday = d
-        ResponseCache.save(d, forKey: CacheKey.cannabisToday)
-      }
-      if let h = (await hist)?.daily {
-        cannabisHistory = h
-        ResponseCache.save(h, forKey: CacheKey.cannabisHistory)
-      }
+      let d = ChecklistMirror.loadCannabisDay(context: modelContext, date: SeptenaDate.today)
+      cannabisToday = d
+      ResponseCache.save(d, forKey: CacheKey.cannabisToday)
+      let h = ChecklistMirror.loadCannabisHistory(context: modelContext, days: 7).daily
+      cannabisHistory = h
+      ResponseCache.save(h, forKey: CacheKey.cannabisHistory)
     case .caffeine:
-      async let day  = try? await client.caffeineDay(date: SeptenaDate.today)
-      async let hist = try? await client.caffeineHistory(days: 7)
-      if let d = await day {
-        caffeineToday = d
-        ResponseCache.save(d, forKey: CacheKey.caffeineToday)
-      }
-      if let h = (await hist)?.daily {
-        caffeineHistory = h
-        ResponseCache.save(h, forKey: CacheKey.caffeineHistory)
-      }
+      let d = ChecklistMirror.loadCaffeineDay(context: modelContext, date: SeptenaDate.today)
+      caffeineToday = d
+      ResponseCache.save(d, forKey: CacheKey.caffeineToday)
+      let h = ChecklistMirror.loadCaffeineHistory(context: modelContext, days: 7).daily
+      caffeineHistory = h
+      ResponseCache.save(h, forKey: CacheKey.caffeineHistory)
     case .gut:
-      async let day  = try? await client.gutDay(date: SeptenaDate.today)
-      async let hist = try? await client.gutHistory(days: 7)
-      if let d = await day {
-        gutToday = d
-        ResponseCache.save(d, forKey: CacheKey.gutToday)
-      }
-      if let h = (await hist)?.daily {
-        gutHistory = h
-        ResponseCache.save(h, forKey: CacheKey.gutHistory)
-      }
+      let d = ChecklistMirror.loadGutDay(context: modelContext, date: SeptenaDate.today)
+      gutToday = d
+      ResponseCache.save(d, forKey: CacheKey.gutToday)
+      let h = ChecklistMirror.loadGutHistory(context: modelContext, days: 7).daily
+      gutHistory = h
+      ResponseCache.save(h, forKey: CacheKey.gutHistory)
     case .nutrition:
       async let ents  = try? await client.nutritionEntries(since: SeptenaDate.today)
       async let stats = try? await client.nutritionStats(days: 7)
@@ -1127,16 +1122,9 @@ struct WeekDashboardView: View {
   }
 
   private func commitCaffeine(method: String, beans: String?, grams: Double?) {
-    var body: [String: Any] = [
-      "date": SeptenaDate.today,
-      "time": nowHHMM(),
-      "method": method,
-      "timezone": TimeZone.current.identifier,
-    ]
-    if let beans { body["beans"] = beans }
-    if let grams { body["grams"] = grams }
-    outbox.enqueue(method: "POST", path: "/api/caffeine/entry",
-                   body: body, kind: "caffeine.add")
+    SeptenaServices.shared.caffeineMutator.addEntry(
+      date: SeptenaDate.today, time: nowHHMM(),
+      method: method, beans: beans, grams: grams)
     AddInfoSection.caffeine.notifyTilesChanged()
     Haptics.tick()
   }
@@ -1192,45 +1180,15 @@ struct WeekDashboardView: View {
   }
 
   private func commitCannabis(method: String, strain: String?, hit: Int?) {
-    let time = nowHHMM()
-    var body: [String: Any] = [
-      "date": SeptenaDate.today,
-      "time": time,
-      "method": method,
-    ]
-    if let strain { body["strain"] = strain }
-    if let hit { body["hit"] = hit }
-    outbox.enqueue(method: "POST", path: "/api/cannabis/entry",
-                   body: body, kind: "cannabis.add")
-    appendCannabisToCache(method: method, strain: strain, hit: hit, time: time)
+    SeptenaServices.shared.cannabisMutator.addEntry(
+      date: SeptenaDate.today, time: nowHHMM(),
+      method: method, strain: strain, hit: hit)
+    // Refresh tile state from the freshly-mutated SwiftData store so the
+    // "Continue · Hit N" counter advances immediately.
+    cannabisToday = ChecklistMirror.loadCannabisDay(context: modelContext, date: SeptenaDate.today)
+    ResponseCache.save(cannabisToday, forKey: CacheKey.cannabisToday)
     AddInfoSection.cannabis.notifyTilesChanged()
     Haptics.tick()
-  }
-
-  /// Optimistic cache update — mirrors AddCannabisPage.appendToCache so the
-  /// "Continue · Hit N" counter advances immediately when the user opens
-  /// the menu again before the outbox has drained to the server.
-  private func appendCannabisToCache(method: String, strain: String?, hit: Int?, time: String) {
-    let newEntry = CannabisEntry(
-      id: "pending-\(UUID().uuidString)",
-      time: time,
-      method: method,
-      strain: strain,
-      hit: hit,
-      grams: nil,
-      note: nil,
-      effect: nil
-    )
-    let prior = ResponseCache.load(CannabisDayResponse.self, forKey: CacheKey.cannabisToday)
-    let next = (prior?.entries ?? []) + [newEntry]
-    let updated = CannabisDayResponse(
-      date: prior?.date ?? SeptenaDate.today,
-      entries: next,
-      sessionCount: (prior?.sessionCount ?? 0) + 1,
-      totalG: prior?.totalG
-    )
-    ResponseCache.save(updated, forKey: CacheKey.cannabisToday)
-    cannabisToday = updated
   }
 
   // Body — latest Withings weigh-in + bidirectional weight chart.
@@ -1306,12 +1264,8 @@ struct WeekDashboardView: View {
   }
 
   private func commitGut(bristol: Int) {
-    outbox.enqueue(method: "POST", path: "/api/gut/entry",
-                   body: ["date": SeptenaDate.today,
-                          "time": nowHHMM(),
-                          "bristol": bristol,
-                          "blood": 0],
-                   kind: "gut.add")
+    SeptenaServices.shared.gutMutator.addEntry(
+      date: SeptenaDate.today, time: nowHHMM(), bristol: bristol)
     GutBristolRecorder.record(bristol)
     AddInfoSection.gut.notifyTilesChanged()
     Haptics.tick()

@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // Caffeine palette — mirrors the webapp command palette (components/
 // command-palette.tsx :: page === "caffeine"). Rows, in order:
@@ -13,14 +14,15 @@ import SwiftUI
 //   3. Empty-state hint when no beans *and* no prior entry exists.
 
 struct AddCaffeinePage: View {
-  @Environment(SeptenaClient.self) private var client
-  @Environment(HTTPOutbox.self) private var outbox
+  @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
   @State private var beans: [CaffeineBean] = []
-  @State private var lastEntry: CaffeineTimePoint? = nil
+  @State private var lastEntry: (method: String, beans: String?, grams: Double?, date: String)? = nil
   @State private var working = false
+
+  private var caffeine: CaffeineMutator { SeptenaServices.shared.caffeineMutator }
 
   private var trimmed: String {
     router.query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -36,7 +38,9 @@ struct AddCaffeinePage: View {
     List {
       if let last = lastEntry {
         Section {
-          Button { repeatLast(last) } label: {
+          Button {
+            commit(method: last.method, beans: last.beans, grams: last.grams)
+          } label: {
             AddInfoRow(
               title: "Repeat: \(last.beans ?? last.method.uppercased())",
               subtitle: repeatSubtitle(for: last),
@@ -79,7 +83,7 @@ struct AddCaffeinePage: View {
     #endif
   }
 
-  private func repeatSubtitle(for entry: CaffeineTimePoint) -> String {
+  private func repeatSubtitle(for entry: (method: String, beans: String?, grams: Double?, date: String)) -> String {
     var s = entry.method.uppercased()
     if let g = entry.grams { s += " · \(grams(g))g" }
     s += " · last \(entry.date)"
@@ -96,38 +100,26 @@ struct AddCaffeinePage: View {
     g == g.rounded() ? String(Int(g)) : String(format: "%.1f", g)
   }
 
-  private func repeatLast(_ entry: CaffeineTimePoint) {
-    commit(method: entry.method, beans: entry.beans, grams: entry.grams)
-  }
-
   private func logBean(_ bean: CaffeineBean) {
     commit(method: lastMethod, beans: bean.name, grams: lastGrams)
   }
 
   private func commit(method: String, beans: String?, grams: Double?) {
-    var body: [String: Any] = [
-      "date": SeptenaDate.today,
-      "time": nowHHMM(),
-      "method": method,
-      "timezone": TimeZone.current.identifier,
-    ]
-    if let beans { body["beans"] = beans }
-    if let grams { body["grams"] = grams }
-    outbox.enqueue(method: "POST", path: "/api/caffeine/entry",
-                   body: body, kind: "caffeine.add")
+    caffeine.addEntry(date: SeptenaDate.today, time: nowHHMM(),
+                      method: method, beans: beans, grams: grams)
     AddInfoSection.caffeine.notifyTilesChanged()
     Haptics.tick()
     dismiss()
   }
 
   private func load() async {
-    if let cfg = try? await client.caffeineConfig() {
-      beans = cfg.beans
-    }
-    // Pull a 7-day window so "Repeat" still works the morning after a gap,
-    // matching getCaffeineEntries(7) in the webapp's command palette.
-    if let res = try? await client.caffeineEntries(days: 7) {
-      lastEntry = res.entries.last
+    beans = ChecklistMirror.loadCaffeineBeans(context: modelContext)
+    // Find the most recent entry across all entries for "repeat" support.
+    let entries = (try? modelContext.fetch(FetchDescriptor<CaffeineEventEntity>(
+      sortBy: [SortDescriptor(\.date, order: .reverse), SortDescriptor(\.time, order: .reverse)]
+    ))) ?? []
+    if let last = entries.first {
+      lastEntry = (method: last.method, beans: last.beans, grams: last.grams, date: last.date)
     }
   }
 }

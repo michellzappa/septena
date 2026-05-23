@@ -1,13 +1,15 @@
 import SwiftUI
+import SwiftData
 
 // Edit sheet for a logged cannabis session. Standard SwiftUI `Form` in a
-// `NavigationStack` presented via `.sheet(item:)`. Save enqueues
-// `PUT /api/cannabis/entry/{id}` through HTTPOutbox.
+// `NavigationStack` presented via `.sheet(item:)`. Writes go through
+// CannabisMutator (SwiftData + CloudKit).
 
 struct EditCannabisEntrySheet: View {
-  @Environment(SeptenaClient.self) private var client
-  @Environment(HTTPOutbox.self) private var outbox
+  @Environment(\.modelContext) private var modelContext
   @Environment(\.dismiss) private var dismiss
+
+  private var cannabis: CannabisMutator { SeptenaServices.shared.cannabisMutator }
 
   let date: String
   let original: CannabisEntry
@@ -109,9 +111,7 @@ struct EditCannabisEntrySheet: View {
   }
 
   private func loadStrains() async {
-    if let cfg = try? await client.cannabisConfig() {
-      strains = cfg.strains
-    }
+    strains = ChecklistMirror.loadCannabisStrains(context: modelContext)
   }
 
   private func save() {
@@ -138,22 +138,19 @@ struct EditCannabisEntrySheet: View {
       return t.isEmpty ? nil : t
     }()
 
-    var body: [String: Any] = [
-      "time": hhmm,
-      "method": method,
-      "timezone": TimeZone.current.identifier,
-    ]
-    body["strain"] = strainValue ?? NSNull()
-    body["hit"]    = (method == "vape" ? hit : NSNull())
-    body["note"]   = noteValue ?? NSNull()
-    body["effect"] = effectValue ?? NSNull()
+    let hitValue: Int? = method == "vape" ? hit : nil
+    // Recompute grams from the method on edit — switching to edible clears
+    // grams; switching to vape stamps the constant 0.05g.
+    let gramsValue: Double? = method == "vape" ? CannabisMutator.gramsPerVapeUse : nil
 
-    outbox.enqueue(
-      method: "PUT",
-      path: "/api/cannabis/entry/\(original.id)?date=\(date)",
-      body: body,
-      kind: "cannabis.update"
-    )
+    cannabis.updateEntry(id: original.id,
+                         time: hhmm,
+                         method: method,
+                         strain: .some(strainValue),
+                         hit: .some(hitValue),
+                         grams: .some(gramsValue),
+                         effect: .some(effectValue),
+                         note: .some(noteValue))
     Haptics.tick()
 
     let rebuilt = CannabisEntry(

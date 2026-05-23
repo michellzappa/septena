@@ -403,6 +403,18 @@ final class SeptenaClient {
                       as: GutHistoryResponse.self)
   }
 
+  func gutExport() async throws -> GutExportResponse {
+    try await getJSON("/api/gut/export", as: GutExportResponse.self)
+  }
+
+  func caffeineExport() async throws -> CaffeineExportResponse {
+    try await getJSON("/api/caffeine/export", as: CaffeineExportResponse.self)
+  }
+
+  func cannabisExport() async throws -> CannabisExportResponse {
+    try await getJSON("/api/cannabis/export", as: CannabisExportResponse.self)
+  }
+
   func completeChore(id: String, date: String) async throws {
     let body: [String: Any] = ["chore_id": id, "date": date]
     _ = try await postJSON("/api/chores/complete", body: body, as: EmptyResponse.self)

@@ -1,19 +1,24 @@
 import SwiftUI
+import SwiftData
 
-// Cannabis mini-app — today's sessions log. Entries note method
-// (vape/edible), strain, optional effect. Weekly trends will be
-// shown via graphs (not a list) in a later pass.
+// Cannabis mini-app — reads from SwiftData (CloudKit-synced), writes
+// through CannabisMutator. Grams = 0.05 per vape use is a hardcoded
+// constant; the capsule lifecycle no longer roundtrips through FastAPI.
 
 struct CannabisDestinationView: View {
-  @Environment(SeptenaClient.self) private var client
-  @Environment(HTTPOutbox.self) private var outbox
+  @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
 
   @State private var today: CannabisDayResponse? = nil
   @State private var loading = true
   @State private var editing: CannabisEntry? = nil
-  @State private var usesPerCapsule: Int = 3
   @State private var history: [CannabisHistoryPoint] = []
+
+  /// Capsule dot count for the legacy HitDots indicator.
+  /// 3 uses × 0.05g = 0.15g per capsule (Storz & Bickel default).
+  private let usesPerCapsule: Int = 3
+
+  private var cannabis: CannabisMutator { SeptenaServices.shared.cannabisMutator }
 
   private var accent: Color { theme.color(for: "cannabis") }
 
@@ -84,50 +89,22 @@ struct CannabisDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
-    .task {
-      paintFromCache()
-      await load()
-    }
+    .task { reload() }
     .sheet(item: $editing) { entry in
       EditCannabisEntrySheet(
         date: today?.date ?? SeptenaDate.today,
         original: entry,
-        onSave: { updated in applyLocalUpdate(updated) }
+        onSave: { _ in reload() }
       )
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
+      reload()
     }
   }
 
-  private func applyLocalUpdate(_ updated: CannabisEntry) {
-    guard let t = today else { return }
-    var entries = t.entries
-    guard let idx = entries.firstIndex(where: { $0.id == updated.id }) else { return }
-    entries[idx] = updated
-    today = CannabisDayResponse(
-      date: t.date,
-      entries: entries,
-      sessionCount: t.sessionCount,
-      totalG: entries.compactMap(\.grams).reduce(0, +)
-    )
-    if let today { ResponseCache.save(today, forKey: CacheKey.today) }
-  }
-
   private func delete(_ entry: CannabisEntry) {
-    guard let t = today else { return }
-    let day = t.date
-    outbox.enqueue(
-      method: "DELETE",
-      path: "/api/cannabis/entry/\(entry.id)?date=\(day)",
-      body: nil,
-      kind: "cannabis.delete"
-    )
-    let entries = t.entries.filter { $0.id != entry.id }
-    today = CannabisDayResponse(
-      date: t.date,
-      entries: entries,
-      sessionCount: max(0, t.sessionCount - 1),
-      totalG: entries.compactMap(\.grams).reduce(0, +)
-    )
-    if let today { ResponseCache.save(today, forKey: CacheKey.today) }
+    cannabis.deleteEntry(id: entry.id)
+    reload()
     Haptics.warning()
   }
 
@@ -183,27 +160,9 @@ struct CannabisDestinationView: View {
       + String(repeating: "○", count: total - clamped)
   }
 
-  private enum CacheKey {
-    static let today = "cannabis.today"
-  }
-
-  private func paintFromCache() {
-    if let v = ResponseCache.load(CannabisDayResponse.self, forKey: CacheKey.today) { today = v }
-    loading = false
-  }
-
-  private func load() async {
-    loading = true
-    if let cfg = try? await client.cannabisConfig() {
-      usesPerCapsule = max(1, cfg.usesPerCapsule)
-    }
-    if let tRes = try? await client.cannabisDay(date: SeptenaDate.today) {
-      today = tRes
-      ResponseCache.save(tRes, forKey: CacheKey.today)
-    }
-    if let h = try? await client.cannabisHistory(days: 365) {
-      history = h.daily
-    }
+  private func reload() {
+    today = ChecklistMirror.loadCannabisDay(context: modelContext, date: SeptenaDate.today)
+    history = ChecklistMirror.loadCannabisHistory(context: modelContext, days: 365).daily
     loading = false
   }
 }

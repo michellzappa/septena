@@ -21,12 +21,12 @@ private let bristolScale: [BristolEntry] = [
 ]
 
 struct AddGutPage: View {
-  @Environment(SeptenaClient.self) private var client
-  @Environment(HTTPOutbox.self) private var outbox
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
   @State private var working = false
+
+  private var gut: GutMutator { SeptenaServices.shared.gutMutator }
 
   private var trimmed: String {
     router.query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -56,12 +56,7 @@ struct AddGutPage: View {
   }
 
   private func log(_ item: BristolEntry) {
-    outbox.enqueue(method: "POST", path: "/api/gut/entry",
-                   body: ["date": SeptenaDate.today,
-                          "time": nowHHMM(),
-                          "bristol": item.id,
-                          "blood": 0],
-                   kind: "gut.add")
+    gut.addEntry(date: SeptenaDate.today, time: nowHHMM(), bristol: item.id)
     GutBristolRecorder.record(item.id)
     AddInfoSection.gut.notifyTilesChanged()
     Haptics.tick()

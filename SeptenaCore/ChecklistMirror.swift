@@ -546,4 +546,309 @@ enum ChecklistMirror {
     }
     return try? JSONDecoder().decode(T.self, from: data)
   }
+
+  // MARK: - Gut (CloudKit-backed)
+
+  /// Seed SwiftData with every gut entry from FastAPI export. Upserts by
+  /// id; deletes any local rows the server doesn't know about. Called
+  /// once during bootstrap; from then on writes go through GutMutator.
+  static func replaceAllGutEntries(_ response: GutExportResponse, context: ModelContext) {
+    let existing = (try? context.fetch(FetchDescriptor<GutEventEntity>())) ?? []
+    let existingByID = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
+    var seen = Set<String>()
+    for entry in response.entries {
+      seen.insert(entry.id)
+      let entity = existingByID[entry.id] ?? GutEventEntity(id: entry.id,
+                                                            date: entry.date,
+                                                            time: entry.time,
+                                                            bristol: entry.bristol)
+      entity.date = entry.date
+      entity.time = entry.time
+      entity.bristol = entry.bristol
+      entity.blood = entry.blood
+      entity.volume = entry.volume
+      entity.discomfortLevel = entry.discomfortLevel
+      entity.discomfortStart = entry.discomfortStart
+      entity.discomfortEnd = entry.discomfortEnd
+      entity.note = entry.note
+      entity.updatedAt = .now
+      if entity.modelContext == nil { context.insert(entity) }
+    }
+    for entity in existing where !seen.contains(entity.id) {
+      context.delete(entity)
+    }
+    try? context.save()
+  }
+
+  /// Build a `GutDayResponse` from local SwiftData. Mirrors the shape
+  /// `client.gutDay(date:)` returned before the CK migration so callers
+  /// can swap the source without touching their UI logic.
+  static func loadGutDay(context: ModelContext, date: String) -> GutDayResponse {
+    let entities = (try? context.fetch(FetchDescriptor<GutEventEntity>(
+      predicate: #Predicate { $0.date == date },
+      sortBy: [SortDescriptor(\.time)]
+    ))) ?? []
+    var maxBlood = 0
+    var totalDiscomfortH: Double = 0
+    let entries: [GutEntry] = entities.map { e in
+      if e.blood > maxBlood { maxBlood = e.blood }
+      let hours = discomfortHours(start: e.discomfortStart, end: e.discomfortEnd)
+      if let hours { totalDiscomfortH += hours }
+      return GutEntry(id: e.id,
+                      date: e.date,
+                      time: e.time,
+                      bristol: e.bristol,
+                      blood: e.blood,
+                      volume: e.volume,
+                      discomfortLevel: e.discomfortLevel,
+                      discomfortStart: e.discomfortStart,
+                      discomfortEnd: e.discomfortEnd,
+                      discomfortHours: hours,
+                      note: e.note)
+    }
+    return GutDayResponse(date: date,
+                          entries: entries,
+                          movementCount: entries.count,
+                          maxBlood: maxBlood,
+                          totalDiscomfortH: totalDiscomfortH)
+  }
+
+  /// Daily aggregated history from local SwiftData, for the heatmap.
+  static func loadGutHistory(context: ModelContext, days: Int) -> GutHistoryResponse {
+    let today = SeptenaDate.today
+    guard let todayDate = SeptenaDate.parse(today) else {
+      return GutHistoryResponse(daily: [])
+    }
+    let start = Calendar.current.date(byAdding: .day, value: -(days - 1), to: todayDate) ?? todayDate
+    let startStr = SeptenaDate.format(start) ?? today
+    let entities = (try? context.fetch(FetchDescriptor<GutEventEntity>(
+      predicate: #Predicate { $0.date >= startStr && $0.date <= today }
+    ))) ?? []
+    let byDate = Dictionary(grouping: entities, by: \.date)
+    var daily: [GutHistoryPoint] = []
+    for offset in (0..<days).reversed() {
+      guard let d = Calendar.current.date(byAdding: .day, value: -offset, to: todayDate),
+            let key = SeptenaDate.format(d) else { continue }
+      let items = byDate[key] ?? []
+      var bristolSum = 0
+      var bristolN = 0
+      var maxBlood = 0
+      var discomfortH: Double = 0
+      for e in items {
+        if e.bristol > 0 {
+          bristolSum += e.bristol
+          bristolN += 1
+        }
+        if e.blood > maxBlood { maxBlood = e.blood }
+        if let hours = discomfortHours(start: e.discomfortStart, end: e.discomfortEnd) {
+          discomfortH += hours
+        }
+      }
+      daily.append(GutHistoryPoint(
+        date: key,
+        movements: items.count,
+        avgBristol: bristolN > 0 ? Double(bristolSum) / Double(bristolN) : nil,
+        maxBlood: maxBlood,
+        discomfortH: discomfortH
+      ))
+    }
+    return GutHistoryResponse(daily: daily)
+  }
+
+  private static func discomfortHours(start: String?, end: String?) -> Double? {
+    guard let start, let end else { return nil }
+    let fmt = ISO8601DateFormatter()
+    fmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    var s = fmt.date(from: start)
+    var e = fmt.date(from: end)
+    if s == nil || e == nil {
+      let alt = ISO8601DateFormatter()
+      alt.formatOptions = [.withInternetDateTime]
+      s = s ?? alt.date(from: start)
+      e = e ?? alt.date(from: end)
+    }
+    guard let s, let e, e > s else { return nil }
+    return (e.timeIntervalSince(s) / 3600.0 * 100).rounded() / 100
+  }
+
+  // MARK: - Caffeine (CloudKit-backed)
+
+  static func replaceAllCaffeineExport(_ response: CaffeineExportResponse, context: ModelContext) {
+    // Entries
+    let existingEntries = (try? context.fetch(FetchDescriptor<CaffeineEventEntity>())) ?? []
+    let entriesByID = Dictionary(uniqueKeysWithValues: existingEntries.map { ($0.id, $0) })
+    var seenEntries = Set<String>()
+    for row in response.entries {
+      seenEntries.insert(row.id)
+      let entity = entriesByID[row.id] ?? CaffeineEventEntity(id: row.id,
+                                                              date: row.date,
+                                                              time: row.time,
+                                                              method: row.method)
+      entity.date = row.date
+      entity.time = row.time
+      entity.method = row.method
+      entity.beans = row.beans
+      entity.grams = row.grams
+      entity.note = row.note
+      entity.updatedAt = .now
+      if entity.modelContext == nil { context.insert(entity) }
+    }
+    for entity in existingEntries where !seenEntries.contains(entity.id) {
+      context.delete(entity)
+    }
+    // Beans catalog
+    let existingBeans = (try? context.fetch(FetchDescriptor<CaffeineBeanEntity>())) ?? []
+    let beansByID = Dictionary(uniqueKeysWithValues: existingBeans.map { ($0.id, $0) })
+    var seenBeans = Set<String>()
+    for (idx, bean) in response.beans.enumerated() {
+      seenBeans.insert(bean.id)
+      let entity = beansByID[bean.id] ?? CaffeineBeanEntity(id: bean.id, name: bean.name, sortIndex: idx)
+      entity.name = bean.name
+      entity.sortIndex = idx
+      entity.updatedAt = .now
+      if entity.modelContext == nil { context.insert(entity) }
+    }
+    for entity in existingBeans where !seenBeans.contains(entity.id) {
+      context.delete(entity)
+    }
+    try? context.save()
+  }
+
+  static func loadCaffeineDay(context: ModelContext, date: String) -> CaffeineDayResponse {
+    let entities = (try? context.fetch(FetchDescriptor<CaffeineEventEntity>(
+      predicate: #Predicate { $0.date == date },
+      sortBy: [SortDescriptor(\.time)]
+    ))) ?? []
+    var totalG: Double = 0
+    let entries: [CaffeineEntry] = entities.map { e in
+      if let g = e.grams { totalG += g }
+      return CaffeineEntry(id: e.id, time: e.time, method: e.method,
+                           beans: e.beans, grams: e.grams, note: e.note)
+    }
+    return CaffeineDayResponse(date: date,
+                               entries: entries,
+                               sessionCount: entries.count,
+                               totalG: totalG > 0 ? totalG : nil)
+  }
+
+  static func loadCaffeineHistory(context: ModelContext, days: Int) -> CaffeineHistoryResponse {
+    let today = SeptenaDate.today
+    guard let todayDate = SeptenaDate.parse(today) else {
+      return CaffeineHistoryResponse(daily: [])
+    }
+    let start = Calendar.current.date(byAdding: .day, value: -(days - 1), to: todayDate) ?? todayDate
+    let startStr = SeptenaDate.format(start) ?? today
+    let entities = (try? context.fetch(FetchDescriptor<CaffeineEventEntity>(
+      predicate: #Predicate { $0.date >= startStr && $0.date <= today }
+    ))) ?? []
+    let byDate = Dictionary(grouping: entities, by: \.date)
+    var daily: [CaffeineHistoryPoint] = []
+    for offset in (0..<days).reversed() {
+      guard let d = Calendar.current.date(byAdding: .day, value: -offset, to: todayDate),
+            let key = SeptenaDate.format(d) else { continue }
+      let items = byDate[key] ?? []
+      let totalG = items.compactMap(\.grams).reduce(0, +)
+      daily.append(CaffeineHistoryPoint(date: key, sessions: items.count,
+                                        totalG: totalG > 0 ? totalG : nil))
+    }
+    return CaffeineHistoryResponse(daily: daily)
+  }
+
+  static func loadCaffeineBeans(context: ModelContext) -> [CaffeineBean] {
+    let entities = (try? context.fetch(FetchDescriptor<CaffeineBeanEntity>(
+      sortBy: [SortDescriptor(\.sortIndex), SortDescriptor(\.name)]
+    ))) ?? []
+    return entities.map { CaffeineBean(id: $0.id, name: $0.name) }
+  }
+
+  // MARK: - Cannabis (CloudKit-backed)
+
+  static func replaceAllCannabisExport(_ response: CannabisExportResponse, context: ModelContext) {
+    let existingEntries = (try? context.fetch(FetchDescriptor<CannabisEventEntity>())) ?? []
+    let entriesByID = Dictionary(uniqueKeysWithValues: existingEntries.map { ($0.id, $0) })
+    var seenEntries = Set<String>()
+    for row in response.entries {
+      seenEntries.insert(row.id)
+      let entity = entriesByID[row.id] ?? CannabisEventEntity(id: row.id,
+                                                              date: row.date,
+                                                              time: row.time,
+                                                              method: row.method)
+      entity.date = row.date
+      entity.time = row.time
+      entity.method = row.method
+      entity.strain = row.strain
+      entity.hit = row.hit
+      entity.grams = row.grams
+      entity.effect = row.effect
+      entity.note = row.note
+      entity.updatedAt = .now
+      if entity.modelContext == nil { context.insert(entity) }
+    }
+    for entity in existingEntries where !seenEntries.contains(entity.id) {
+      context.delete(entity)
+    }
+    let existingStrains = (try? context.fetch(FetchDescriptor<CannabisStrainEntity>())) ?? []
+    let strainsByID = Dictionary(uniqueKeysWithValues: existingStrains.map { ($0.id, $0) })
+    var seenStrains = Set<String>()
+    for (idx, strain) in response.strains.enumerated() {
+      seenStrains.insert(strain.id)
+      let entity = strainsByID[strain.id] ?? CannabisStrainEntity(id: strain.id, name: strain.name, sortIndex: idx)
+      entity.name = strain.name
+      entity.sortIndex = idx
+      entity.updatedAt = .now
+      if entity.modelContext == nil { context.insert(entity) }
+    }
+    for entity in existingStrains where !seenStrains.contains(entity.id) {
+      context.delete(entity)
+    }
+    try? context.save()
+  }
+
+  static func loadCannabisDay(context: ModelContext, date: String) -> CannabisDayResponse {
+    let entities = (try? context.fetch(FetchDescriptor<CannabisEventEntity>(
+      predicate: #Predicate { $0.date == date },
+      sortBy: [SortDescriptor(\.time)]
+    ))) ?? []
+    var totalG: Double = 0
+    let entries: [CannabisEntry] = entities.map { e in
+      if let g = e.grams { totalG += g }
+      return CannabisEntry(id: e.id, time: e.time, method: e.method,
+                           strain: e.strain, hit: e.hit, grams: e.grams,
+                           note: e.note, effect: e.effect)
+    }
+    return CannabisDayResponse(date: date,
+                               entries: entries,
+                               sessionCount: entries.count,
+                               totalG: totalG > 0 ? totalG : nil)
+  }
+
+  static func loadCannabisHistory(context: ModelContext, days: Int) -> CannabisHistoryResponse {
+    let today = SeptenaDate.today
+    guard let todayDate = SeptenaDate.parse(today) else {
+      return CannabisHistoryResponse(daily: [])
+    }
+    let start = Calendar.current.date(byAdding: .day, value: -(days - 1), to: todayDate) ?? todayDate
+    let startStr = SeptenaDate.format(start) ?? today
+    let entities = (try? context.fetch(FetchDescriptor<CannabisEventEntity>(
+      predicate: #Predicate { $0.date >= startStr && $0.date <= today }
+    ))) ?? []
+    let byDate = Dictionary(grouping: entities, by: \.date)
+    var daily: [CannabisHistoryPoint] = []
+    for offset in (0..<days).reversed() {
+      guard let d = Calendar.current.date(byAdding: .day, value: -offset, to: todayDate),
+            let key = SeptenaDate.format(d) else { continue }
+      let items = byDate[key] ?? []
+      let totalG = items.compactMap(\.grams).reduce(0, +)
+      daily.append(CannabisHistoryPoint(date: key, sessions: items.count,
+                                        totalG: totalG > 0 ? totalG : nil))
+    }
+    return CannabisHistoryResponse(daily: daily)
+  }
+
+  static func loadCannabisStrains(context: ModelContext) -> [CannabisStrain] {
+    let entities = (try? context.fetch(FetchDescriptor<CannabisStrainEntity>(
+      sortBy: [SortDescriptor(\.sortIndex), SortDescriptor(\.name)]
+    ))) ?? []
+    return entities.map { CannabisStrain(id: $0.id, name: $0.name) }
+  }
 }

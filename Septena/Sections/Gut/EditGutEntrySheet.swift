@@ -6,12 +6,13 @@ import SwiftUI
 // through HTTPOutbox.
 
 struct EditGutEntrySheet: View {
-  @Environment(HTTPOutbox.self) private var outbox
   @Environment(\.dismiss) private var dismiss
 
   let date: String
   let original: GutEntry
   let onSave: (GutEntry) -> Void
+
+  private var gut: GutMutator { SeptenaServices.shared.gutMutator }
 
   @State private var time: Date = Date()
   @State private var bristol: Int = 4
@@ -130,24 +131,33 @@ struct EditGutEntrySheet: View {
     let volumeValue: String? = volume.isEmpty ? nil : volume
     let discomfortLvlValue: String? = discomfortLevel.isEmpty ? nil : discomfortLevel
 
-    // Server keys are snake_case. `NSNull` clears a field; absent keys
-    // leave it unchanged. We always send every editable field so the
-    // semantics from this sheet are predictable.
-    var body: [String: Any] = [
-      "time": hhmm,
-      "bristol": bristol,
-      "blood": blood,
-    ]
-    body["volume"]            = volumeValue ?? NSNull()
-    body["discomfort_level"]  = discomfortLvlValue ?? NSNull()
-    body["discomfort_hours"]  = hoursValue ?? 0
-    body["note"]              = noteValue ?? NSNull()
+    // Translate the hours-string into start/end timestamps. The server's
+    // old PUT-handler did this server-side; on CK we own that math.
+    var startISO: String? = nil
+    var endISO: String? = nil
+    if let h = hoursValue, h > 0 {
+      let calFmt = DateFormatter()
+      calFmt.dateFormat = "yyyy-MM-dd'T'HH:mm"
+      calFmt.calendar = Calendar(identifier: .gregorian)
+      calFmt.locale = Locale(identifier: "en_US_POSIX")
+      calFmt.timeZone = TimeZone.current
+      if let start = calFmt.date(from: "\(original.date)T\(hhmm)") {
+        let end = start.addingTimeInterval(h * 3600)
+        startISO = calFmt.string(from: start)
+        endISO = calFmt.string(from: end)
+      }
+    }
 
-    outbox.enqueue(
-      method: "PUT",
-      path: "/api/gut/entry/\(original.id)?date=\(date)",
-      body: body,
-      kind: "gut.update"
+    gut.updateEntry(
+      id: original.id,
+      time: hhmm,
+      bristol: bristol,
+      blood: blood,
+      volume: .some(volumeValue),
+      discomfortLevel: .some(discomfortLvlValue),
+      discomfortStart: .some(startISO),
+      discomfortEnd: .some(endISO),
+      note: .some(noteValue)
     )
     GutBristolRecorder.record(bristol)
     Haptics.tick()
@@ -160,6 +170,8 @@ struct EditGutEntrySheet: View {
       blood: blood,
       volume: volumeValue,
       discomfortLevel: discomfortLvlValue,
+      discomfortStart: startISO,
+      discomfortEnd: endISO,
       discomfortHours: hoursValue,
       note: noteValue
     )

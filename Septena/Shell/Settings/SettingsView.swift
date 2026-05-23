@@ -244,14 +244,19 @@ final class SettingsStore {
     let needsLegacySettings = mirroredSettings == nil
     let needsLegacySections = mirroredSections.isEmpty
 
-    async let caf   = try? await client.caffeineConfig()
-    async let cnb   = try? await client.cannabisConfig()
     async let macs  = try? await client.nutritionMacrosConfig()
     async let sess  = try? await client.sessionTypes()
-    // Chores are CloudKit-authoritative — pull from the local mirror.
+    // Chores/caffeine/cannabis are CloudKit-authoritative — pull from the
+    // local mirror, not FastAPI.
     let ch: [ChoreItem]? = ChecklistMirror.loadChores(context: context)
-    let cf = await caf
-    let cn = await cnb
+    let cf: CaffeineConfig? = {
+      let beans = ChecklistMirror.loadCaffeineBeans(context: context)
+      return CaffeineConfig(beans: beans)
+    }()
+    let cn: CannabisConfig? = {
+      let strains = ChecklistMirror.loadCannabisStrains(context: context)
+      return CannabisConfig(strains: strains, usesPerCapsule: 3)
+    }()
     let mc = await macs
     let st = await sess
     // Only overwrite + cache the values where the network actually
@@ -1463,14 +1468,14 @@ struct SyncSettingsPane: View {
         MigrationDomainRow(name: "Chores",                    detail: "CloudKit", state: .cloudKit)
         MigrationDomainRow(name: "Goals",                     detail: "CloudKit", state: .cloudKit)
         MigrationDomainRow(name: "Settings + Sections",       detail: "Next",     state: .next)
+        MigrationDomainRow(name: "Gut",                       detail: "CloudKit", state: .cloudKit)
+        MigrationDomainRow(name: "Caffeine",                  detail: "CloudKit", state: .cloudKit)
+        MigrationDomainRow(name: "Cannabis",                  detail: "CloudKit", state: .cloudKit)
         MigrationDomainRow(name: "Training",                  detail: "FastAPI",  state: .legacy)
         MigrationDomainRow(name: "Nutrition",                 detail: "FastAPI",  state: .legacy)
         MigrationDomainRow(name: "Sleep",                     detail: "FastAPI",  state: .legacy)
         MigrationDomainRow(name: "Groceries",                 detail: "FastAPI",  state: .legacy)
-        MigrationDomainRow(name: "Caffeine",                  detail: "FastAPI",  state: .legacy)
-        MigrationDomainRow(name: "Cannabis",                  detail: "FastAPI",  state: .legacy)
         MigrationDomainRow(name: "Body",                      detail: "FastAPI",  state: .legacy)
-        MigrationDomainRow(name: "Gut",                       detail: "FastAPI",  state: .legacy)
         MigrationDomainRow(name: "Air",                       detail: "FastAPI",  state: .legacy)
         MigrationDomainRow(name: "Activity",                  detail: "HealthKit", state: .native)
         MigrationDomainRow(name: "Calendar",                  detail: "EventKit", state: .native)
@@ -1730,6 +1735,11 @@ struct SyncSettingsPane: View {
       let choreDefs = (try? modelContext.fetch(FetchDescriptor<ChoreDefinitionEntity>())) ?? []
       let choreEvents = (try? modelContext.fetch(FetchDescriptor<ChoreEventEntity>())) ?? []
       let goals = (try? modelContext.fetch(FetchDescriptor<GoalEntity>())) ?? []
+      let gut = (try? modelContext.fetch(FetchDescriptor<GutEventEntity>())) ?? []
+      let caffeine = (try? modelContext.fetch(FetchDescriptor<CaffeineEventEntity>())) ?? []
+      let beans = (try? modelContext.fetch(FetchDescriptor<CaffeineBeanEntity>())) ?? []
+      let cannabis = (try? modelContext.fetch(FetchDescriptor<CannabisEventEntity>())) ?? []
+      let strains = (try? modelContext.fetch(FetchDescriptor<CannabisStrainEntity>())) ?? []
       for row in tasks { row.cloudKitSystemFields = nil }
       for row in areas { row.cloudKitSystemFields = nil }
       for row in projects { row.cloudKitSystemFields = nil }
@@ -1742,6 +1752,11 @@ struct SyncSettingsPane: View {
       for row in choreDefs { row.cloudKitSystemFields = nil }
       for row in choreEvents { row.cloudKitSystemFields = nil }
       for row in goals { row.cloudKitSystemFields = nil }
+      for row in gut { row.cloudKitSystemFields = nil }
+      for row in caffeine { row.cloudKitSystemFields = nil }
+      for row in beans { row.cloudKitSystemFields = nil }
+      for row in cannabis { row.cloudKitSystemFields = nil }
+      for row in strains { row.cloudKitSystemFields = nil }
       try? modelContext.save()
       for row in tasks { ckEngine.noteTaskChange(id: row.id) }
       for row in areas { ckEngine.noteAreaChange(id: row.id) }
@@ -1755,9 +1770,16 @@ struct SyncSettingsPane: View {
       for row in choreDefs { ckEngine.noteChoreDefinitionChange(id: row.id) }
       for row in choreEvents { ckEngine.noteChoreEventChange(id: row.id) }
       for row in goals { ckEngine.noteGoalChange(id: row.id) }
-      let total = tasks.count + areas.count + projects.count + settings.count
-        + sections.count + habitDefs.count + habitStates.count
-        + supDefs.count + supStates.count + choreDefs.count + choreEvents.count + goals.count
+      for row in gut { ckEngine.noteGutEventChange(id: row.id) }
+      for row in caffeine { ckEngine.noteCaffeineEventChange(id: row.id) }
+      for row in beans { ckEngine.noteCaffeineBeanChange(id: row.id) }
+      for row in cannabis { ckEngine.noteCannabisEventChange(id: row.id) }
+      for row in strains { ckEngine.noteCannabisStrainChange(id: row.id) }
+      let coreCount = tasks.count + areas.count + projects.count + settings.count + sections.count
+      let checklistCount = habitDefs.count + habitStates.count + supDefs.count + supStates.count
+        + choreDefs.count + choreEvents.count + goals.count
+      let logCount = gut.count + caffeine.count + beans.count + cannabis.count + strains.count
+      let total = coreCount + checklistCount + logCount
       migrationStatus = "✅ Zone reset and \(total) entities re-queued for upload."
     } catch {
       migrationStatus = "❌ Zone reset failed: \(error.localizedDescription)"
