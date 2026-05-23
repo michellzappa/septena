@@ -18,6 +18,7 @@
 		0A871A3A42EE54FEC6B17A0A /* AddInfoRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D3C4FD96F6113A7975BA394 /* AddInfoRouter.swift */; };
 		0BD73B4B6206D9A9878C1EA8 /* QuickFindView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAB04CA79A9C3207CCE972F9 /* QuickFindView.swift */; };
 		0C5C19796C2D4515B47D2690 /* AirStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23414685B03BA930E6C4D94 /* AirStore.swift */; };
+		5441C30D38B94A9CA289C527 /* TrainingConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3433AE6FCB2549D390F9E43A /* TrainingConfigStore.swift */; };
 		0ED02C4262546D720DCBE5DE /* AddChorePage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B241213EA8E591629280B7EE /* AddChorePage.swift */; };
 		0ED59BE06DEBD263BBFA0D91 /* BadgeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EC7C9D9CAC52C91AFE79AE7 /* BadgeManager.swift */; };
 		1044DAF00212F1890D0BBCC3 /* AreaRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = C729259A5867D99CC64AA9C3 /* AreaRecord.swift */; };
@@ -192,6 +193,7 @@
 		B211B2678BDDD3B30FD9307D /* ResponseCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D6916E979E5B0D7497CAEF /* ResponseCache.swift */; };
 		B28E04772BF9921F6B165657 /* CannabisQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D82674F62302252DB1B8167 /* CannabisQuickAddMenu.swift */; };
 		B29CF73788726A5C55ABF071 /* AirStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23414685B03BA930E6C4D94 /* AirStore.swift */; };
+		06CB84746E264F6A858A8F59 /* TrainingConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3433AE6FCB2549D390F9E43A /* TrainingConfigStore.swift */; };
 		B45A3DCE0AC3B32856BA727C /* SettingsMirror.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5439F75303F906465F9F2C6 /* SettingsMirror.swift */; };
 		B4FF26A77957BACDB89050C5 /* WeekDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4847155874CE3B82AD612728 /* WeekDashboardView.swift */; };
 		B52F421956F45A0367348241 /* PlatformDelegates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1654FD32744DA1974DA1C1CE /* PlatformDelegates.swift */; };
@@ -434,6 +436,7 @@
 		C03DC46C772E45B60ECB7343 /* SectionTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionTheme.swift; sourceTree = "<group>"; };
 		C15C11DB7FD7994318364996 /* SupplementsDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementsDestinationView.swift; sourceTree = "<group>"; };
 		C23414685B03BA930E6C4D94 /* AirStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AirStore.swift; sourceTree = "<group>"; };
+		3433AE6FCB2549D390F9E43A /* TrainingConfigStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrainingConfigStore.swift; sourceTree = "<group>"; };
 		C27BE273FD1D064942278AD1 /* NextComplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextComplication.swift; sourceTree = "<group>"; };
 		C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C4E0ADF5987E9D7E112126AB /* EditHabitSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditHabitSheet.swift; sourceTree = "<group>"; };
@@ -881,6 +884,7 @@
 				858259E63BAAEEF2BE43D00B /* Sections */,
 				CCA388A73616C38F7456E6BE /* AranetBridge.swift */,
 				C23414685B03BA930E6C4D94 /* AirStore.swift */,
+				3433AE6FCB2549D390F9E43A /* TrainingConfigStore.swift */,
 			);
 			path = SeptenaCore;
 			sourceTree = "<group>";
@@ -1186,6 +1190,7 @@
 				AB4D0CE5A8F8961949BC886D /* WeekDashboardView.swift in Sources */,
 				9A403F3BAF0087FD1583B6E3 /* AranetBridge.swift in Sources */,
 				0C5C19796C2D4515B47D2690 /* AirStore.swift in Sources */,
+				5441C30D38B94A9CA289C527 /* TrainingConfigStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1340,6 +1345,7 @@
 				B4FF26A77957BACDB89050C5 /* WeekDashboardView.swift in Sources */,
 				C2F0C7B6B510698BFF2B27C8 /* AranetBridge.swift in Sources */,
 				B29CF73788726A5C55ABF071 /* AirStore.swift in Sources */,
+				06CB84746E264F6A858A8F59 /* TrainingConfigStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
