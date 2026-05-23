@@ -1277,8 +1277,60 @@ struct ExerciseDefinition: Codable, Identifiable, Hashable {
   let id: String           // slug, e.g. "chest-press"
   var name: String
   var type: String         // strength|cardio|mobility|core
-  var subgroup: String?
+  var subgroup: String?    // TODO: remove subgroup after primaryMuscle backfill ships
   var aliases: [String]?
+  var primaryMuscle: Muscle?
+  var secondaryMuscles: [Muscle]
+  var archived: Bool
+
+  init(id: String,
+       name: String,
+       type: String,
+       subgroup: String? = nil,
+       aliases: [String]? = nil,
+       primaryMuscle: Muscle? = nil,
+       secondaryMuscles: [Muscle] = [],
+       archived: Bool = false) {
+    self.id = id
+    self.name = name
+    self.type = type
+    self.subgroup = subgroup
+    self.aliases = aliases
+    self.primaryMuscle = primaryMuscle
+    self.secondaryMuscles = secondaryMuscles
+    self.archived = archived
+  }
+
+  init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    id = try c.decode(String.self, forKey: .id)
+    name = try c.decode(String.self, forKey: .name)
+    type = try c.decodeIfPresent(String.self, forKey: .type) ?? "strength"
+    subgroup = try c.decodeIfPresent(String.self, forKey: .subgroup)
+    aliases = try c.decodeIfPresent([String].self, forKey: .aliases)
+    primaryMuscle = try c.decodeIfPresent(Muscle.self, forKey: .primaryMuscle)
+    secondaryMuscles = (try? c.decodeIfPresent([Muscle].self, forKey: .secondaryMuscles)) ?? []
+    archived = (try? c.decodeIfPresent(Bool.self, forKey: .archived)) ?? false
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var c = encoder.container(keyedBy: CodingKeys.self)
+    try c.encode(id, forKey: .id)
+    try c.encode(name, forKey: .name)
+    try c.encode(type, forKey: .type)
+    try c.encodeIfPresent(subgroup, forKey: .subgroup)
+    try c.encodeIfPresent(aliases, forKey: .aliases)
+    try c.encodeIfPresent(primaryMuscle, forKey: .primaryMuscle)
+    try c.encode(secondaryMuscles, forKey: .secondaryMuscles)
+    try c.encode(archived, forKey: .archived)
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case id, name, type, subgroup, aliases
+    case primaryMuscle = "primary_muscle"
+    case secondaryMuscles = "secondary_muscles"
+    case archived
+  }
 }
 
 /// Full snapshot from `GET /api/training/export`. iOS bootstrap calls this
@@ -1564,6 +1616,15 @@ enum SeptenaDate {
 // and active-session logger. Lives at the end of the file so the existing
 // model section above stays untouched.
 
+/// Coarse muscle-group taxonomy. 10 fixed values — deliberate; adding fine
+/// anatomy is Phase 3 scope. Used for filter chips in the catalog editor.
+enum Muscle: String, Codable, CaseIterable, Hashable, Identifiable, Sendable {
+  case chest, back, shoulders, biceps, triceps
+  case quads, hamstrings, glutes, calves, core
+  var id: String { rawValue }
+  var label: String { rawValue.capitalized }
+}
+
 /// One configured session type from `GET /api/training/session-types`.
 /// The server owns the list so users can rename, reorder, or add custom
 /// splits without an app update. `exercises` is the canonical template;
@@ -1573,6 +1634,7 @@ struct SessionTypeConfig: Codable, Hashable, Identifiable {
   let label: String        // "Upper"
   let emoji: String?       // "💪"
   let exercises: [String]  // canonical exercise list (may be empty)
+  let archived: Bool
 
   init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -1580,19 +1642,21 @@ struct SessionTypeConfig: Codable, Hashable, Identifiable {
     label = try c.decodeIfPresent(String.self, forKey: .label) ?? id.capitalized
     emoji = try c.decodeIfPresent(String.self, forKey: .emoji)
     exercises = (try? c.decodeIfPresent([String].self, forKey: .exercises)) ?? []
+    archived = (try? c.decodeIfPresent(Bool.self, forKey: .archived)) ?? false
   }
 
-  enum CodingKeys: String, CodingKey { case id, label, emoji, exercises }
+  enum CodingKeys: String, CodingKey { case id, label, emoji, exercises, archived }
 
-  init(id: String, label: String, emoji: String?, exercises: [String]) {
+  init(id: String, label: String, emoji: String?, exercises: [String], archived: Bool = false) {
     self.id = id
     self.label = label
     self.emoji = emoji
     self.exercises = exercises
+    self.archived = archived
   }
 
-  static func make(id: String, label: String, emoji: String?, exercises: [String]) -> SessionTypeConfig {
-    SessionTypeConfig(id: id, label: label, emoji: emoji, exercises: exercises)
+  static func make(id: String, label: String, emoji: String?, exercises: [String], archived: Bool = false) -> SessionTypeConfig {
+    SessionTypeConfig(id: id, label: label, emoji: emoji, exercises: exercises, archived: archived)
   }
 }
 
