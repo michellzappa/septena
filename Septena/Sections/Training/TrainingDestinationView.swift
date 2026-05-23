@@ -409,7 +409,7 @@ struct TrainingDestinationView: View {
             .foregroundStyle(.secondary)
         }
         ProgressView(value: progress)
-          .tint(overCeiling ? .orange : (overTarget ? .green : accent))
+          .tint(accent)
         Text(overCeiling
              ? "Past the 20-set ceiling — consider a deload."
              : overTarget
@@ -586,15 +586,15 @@ struct TrainingDestinationView: View {
                 Text(item.label).font(.caption.weight(.medium))
                 Text("\(item.count)")
                   .font(.caption2.monospacedDigit())
-                  .foregroundStyle(isSelected ? Color.white.opacity(0.85) : .secondary)
+                  .foregroundStyle(accent.opacity(isSelected ? 1.0 : 0.55))
               }
               .padding(.horizontal, 10)
               .padding(.vertical, 5)
               .background(
-                isSelected ? accent : accent.opacity(0.10),
+                accent.opacity(isSelected ? 0.28 : 0.10),
                 in: Capsule()
               )
-              .foregroundStyle(isSelected ? Color.white : accent)
+              .foregroundStyle(accent)
             }
             .buttonStyle(.plain)
           }
@@ -1358,7 +1358,7 @@ struct TrainingExerciseCard: View {
   private var statusTint: Color {
     switch entry.status {
     case .done:    return accent
-    case .failed:  return .red
+    case .failed:  return accent.opacity(0.5)
     case .skipped: return Theme.inkSecondary
     default:       return Theme.inkSecondary
     }
@@ -1445,21 +1445,36 @@ struct TrainingExerciseCard: View {
   }
 
   private var difficultyPicker: some View {
-    HStack(spacing: 6) {
-      ForEach(["easy", "medium", "hard"], id: \.self) { d in
+    // Three rungs encoded as 1, 2, 3 dots — opacity ramps with intensity so
+    // "easy" reads as faint accent, "hard" reads as full accent. Capsule
+    // background brightens on selection so the active rung pops without
+    // introducing a second hue.
+    let levels: [(id: String, dots: Int)] = [
+      ("easy", 1), ("medium", 2), ("hard", 3),
+    ]
+    return HStack(spacing: 6) {
+      ForEach(levels, id: \.id) { rung in
+        let isSelected = entry.difficulty == rung.id
+        let dotOpacity = 0.30 + 0.35 * Double(rung.dots - 1)   // 0.30 / 0.65 / 1.00
         Button {
-          store.update { $0.entries[index].difficulty = d }
+          store.update { $0.entries[index].difficulty = rung.id }
         } label: {
-          Text(d.capitalized)
-            .font(.septenaMetaStrong)
-            .padding(.horizontal, 10).padding(.vertical, 5)
-            .background(
-              entry.difficulty == d ? accent.opacity(0.22) : Theme.mutedSurface,
-              in: Capsule()
-            )
-            .foregroundStyle(entry.difficulty == d ? accent : Theme.inkSecondary)
+          HStack(spacing: 3) {
+            ForEach(0..<rung.dots, id: \.self) { _ in
+              Circle()
+                .fill(accent.opacity(dotOpacity))
+                .frame(width: 7, height: 7)
+            }
+          }
+          .padding(.horizontal, 10).padding(.vertical, 7)
+          .background(
+            accent.opacity(isSelected ? 0.22 : 0.06),
+            in: Capsule()
+          )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(rung.id.capitalized)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
       }
       Spacer()
     }
@@ -1469,7 +1484,7 @@ struct TrainingExerciseCard: View {
   // MARK: - Cardio fields
 
   private var cardioInputs: some View {
-    HStack(spacing: 10) {
+    HStack(alignment: .top, spacing: 10) {
       numberField(label: "Duration", unit: "min",
                   value: Binding(
                     get: { entry.durationMin.map { fmt($0) } ?? "" },
@@ -1480,11 +1495,38 @@ struct TrainingExerciseCard: View {
                     get: { entry.distanceM.map { fmt($0) } ?? "" },
                     set: { setDistance($0) }
                   ))
-      numberField(label: "Level",
-                  value: Binding(
-                    get: { entry.level.map(String.init) ?? "" },
-                    set: { setLevel(Int($0)) }
-                  ))
+      levelDotPicker
+    }
+  }
+
+  /// 1–5 tappable dots, opacity ramps with the chosen level so the picker
+  /// reads as one calm accent gradient instead of a numeric input. Pairs
+  /// with the difficulty picker visually. Historical entries with level >5
+  /// max out the row.
+  private var levelDotPicker: some View {
+    let current = entry.level ?? 0
+    return VStack(alignment: .leading, spacing: 4) {
+      Text("LEVEL")
+        .font(.caption2.weight(.semibold))
+        .foregroundStyle(.secondary)
+      HStack(spacing: 6) {
+        ForEach(1...5, id: \.self) { n in
+          let isLit = current >= n
+          let opacity = 0.30 + 0.175 * Double(current - 1)   // 0.30 → 1.00
+          Button {
+            // Tap a lit dot to clear back to nil; tap empty to set.
+            setLevel(current == n ? nil : n)
+          } label: {
+            Circle()
+              .fill(accent.opacity(isLit ? opacity : 0.08))
+              .frame(width: 12, height: 12)
+          }
+          .buttonStyle(.plain)
+          .accessibilityLabel("Level \(n)")
+          .accessibilityAddTraits(isLit ? .isSelected : [])
+        }
+      }
+      .frame(minHeight: 22)   // align baseline with sibling number fields
     }
   }
 

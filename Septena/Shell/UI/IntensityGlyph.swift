@@ -1,24 +1,28 @@
 import SwiftUI
 
 // Text-free indicators for difficulty and cardio level — Swift sibling of
-// the webapp's `components/intensity-glyph.tsx`. Difficulty is a row of
-// three pips on a green → amber → red ramp (easy=1, medium=2, hard=3).
-// Level is a five-bar signal-strength glyph, lit proportional to value.
+// the webapp's `components/intensity-glyph.tsx`. Both ramp the section's
+// accent by opacity so a single chromatic axis carries intensity. The
+// previous green→amber→red ramp introduced a second hue that fought the
+// section accent in the log list.
 
 struct DifficultyGlyph: View {
   let difficulty: String?
+  /// Section accent — defaults to the inherited tint so callers can let
+  /// `SectionTheme` flow through without thinking about it.
+  var accent: Color = .accentColor
 
   private struct Spec {
     let filled: Int
-    let color: Color
+    let opacity: Double
     let label: String
   }
 
   private var spec: Spec? {
     switch (difficulty ?? "").lowercased() {
-    case "easy":   return Spec(filled: 1, color: Color(red: 0.13, green: 0.77, blue: 0.37), label: "Easy")
-    case "medium": return Spec(filled: 2, color: Color(red: 0.96, green: 0.62, blue: 0.04), label: "Medium")
-    case "hard":   return Spec(filled: 3, color: Color(red: 0.94, green: 0.27, blue: 0.27), label: "Hard")
+    case "easy":   return Spec(filled: 1, opacity: 0.30, label: "Easy")
+    case "medium": return Spec(filled: 2, opacity: 0.65, label: "Medium")
+    case "hard":   return Spec(filled: 3, opacity: 1.00, label: "Hard")
     default:       return nil
     }
   }
@@ -28,12 +32,8 @@ struct DifficultyGlyph: View {
       HStack(spacing: 2) {
         ForEach(0..<3, id: \.self) { i in
           Circle()
-            .fill(i < spec.filled ? spec.color : Color.secondary.opacity(0.18))
+            .fill(i < spec.filled ? accent.opacity(spec.opacity) : accent.opacity(0.10))
             .frame(width: 5, height: 5)
-            .overlay(
-              Circle()
-                .stroke(Color.secondary.opacity(0.35), lineWidth: i < spec.filled ? 0 : 0.5)
-            )
         }
       }
       .accessibilityLabel("Difficulty \(spec.label)")
@@ -54,13 +54,13 @@ struct LevelGlyph: View {
       HStack(alignment: .bottom, spacing: 1.5) {
         ForEach(0..<bars, id: \.self) { i in
           let isLit = i < lit
+          // Opacity ramps with how many bars are lit so higher levels read
+          // as a denser accent stack. Empty bars keep a faint accent ghost
+          // (no extra hue) so the glyph still reads as one chromatic axis.
+          let opacity = 0.25 + 0.15 * Double(lit - 1)
           RoundedRectangle(cornerRadius: 0.75, style: .continuous)
-            .fill(isLit ? accent : Color.secondary.opacity(0.18))
+            .fill(isLit ? accent.opacity(opacity) : accent.opacity(0.10))
             .frame(width: 3, height: CGFloat(4 + i * 2))
-            .overlay(
-              RoundedRectangle(cornerRadius: 0.75, style: .continuous)
-                .stroke(Color.secondary.opacity(0.35), lineWidth: isLit ? 0 : 0.5)
-            )
         }
       }
       .accessibilityLabel("Level \(level)")
