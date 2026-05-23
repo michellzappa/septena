@@ -1323,6 +1323,100 @@ enum MuscleInference {
   }
 }
 
+// MARK: - Routine slug repair
+
+/// Legacy training data shipped routine references using a slug convention
+/// (spaces, mixed case) that doesn't match the current canonical hyphenated
+/// ids. Those references render as italic placeholders in RoutineDetailView
+/// because no ExerciseDefinitionEntity exists for them.
+///
+/// The repair is conservative: it never rewrites the routine reference
+/// (which would mean choosing a canonical id and risk destroying the user's
+/// label). Instead it backfills a stub ExerciseDefinitionEntity using the
+/// orphaned slug as the id verbatim, a humanized name, a type guessed from
+/// keywords, and a muscle inferred via MuscleInference. The user can then
+/// rename / re-type the stub from the Exercises catalog with zero data loss.
+@MainActor
+enum RoutineSlugRepair {
+  static let userDefaultsKey = "training.routineSlugRepair.v1"
+
+  static func runIfNeeded(context: ModelContext) {
+    guard !UserDefaults.standard.bool(forKey: userDefaultsKey) else { return }
+    let routines = (try? context.fetch(FetchDescriptor<SessionTypeEntity>())) ?? []
+    let exercises = (try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>())) ?? []
+    let existingIds = Set(exercises.map(\.id))
+
+    var orphaned = Set<String>()
+    for routine in routines {
+      for slug in routine.exercises where !existingIds.contains(slug) {
+        orphaned.insert(slug)
+      }
+    }
+    guard !orphaned.isEmpty else {
+      UserDefaults.standard.set(true, forKey: userDefaultsKey)
+      return
+    }
+
+    var sortIndex = (exercises.map(\.sortIndex).max() ?? -1) + 1
+    var created = 0
+    for slug in orphaned.sorted() {
+      let stub = ExerciseDefinitionEntity(
+        id: slug,
+        name: humanize(slug),
+        type: inferType(from: slug),
+        sortIndex: sortIndex
+      )
+      let inference = MuscleInference.infer(for: stub)
+      stub.primaryMuscle = inference.primary?.rawValue
+      stub.secondaryMuscles = inference.secondaries.map(\.rawValue)
+      context.insert(stub)
+      SeptenaServices.shared.ckEngine.noteExerciseDefinitionChange(id: slug)
+      sortIndex += 1
+      created += 1
+    }
+    try? context.save()
+    UserDefaults.standard.set(true, forKey: userDefaultsKey)
+    SeptenaLog.info("[RoutineSlugRepair] created \(created) stub exercises for orphaned routine slugs")
+  }
+
+  // "chest press" → "Chest Press"; "diverging-seated-row" → "Diverging Seated Row"
+  private static func humanize(_ slug: String) -> String {
+    slug.split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+      .map { word -> String in
+        guard let first = word.first else { return "" }
+        return first.uppercased() + word.dropFirst().lowercased()
+      }
+      .joined(separator: " ")
+  }
+
+  // Quick keyword pass — only impacts the default when MuscleInference can't
+  // resolve a muscle. Cardio/mobility/core branches mirror the catalog's
+  // type system; everything else falls through to "strength" since most
+  // logged exercises are weighted.
+  private static func inferType(from slug: String) -> String {
+    let s = slug.lowercased()
+    if s.contains("run") || s.contains("jog") || s.contains("bike") ||
+       s.contains("cycle") || s.contains("treadmill") ||
+       s.contains("elliptical") || s.contains("stair") ||
+       s.contains("swim") || s.contains("walk") || s.contains("hik") ||
+       s.contains("erg") || s == "rowing" || s.contains("zone-2") ||
+       s.contains("z2") || s.contains("burpee") || s.contains("jump rope") ||
+       s.contains("jumping-rope") || s.contains("kettlebell swing") {
+      return "cardio"
+    }
+    if s.contains("stretch") || s.contains("mobility") ||
+       s.contains("yoga") || s.contains("foam") {
+      return "mobility"
+    }
+    if s.contains("plank") || s.contains("crunch") || s.contains("hollow") ||
+       s.contains("ab ") || s.contains("dead bug") || s.contains("deadbug") ||
+       s.contains("pallof") || s.contains("twist") || s.contains("mountain climber") {
+      return "core"
+    }
+    return "strength"
+  }
+}
+
 // MARK: - Training muscle backfill v2
 
 /// Second-pass backfill that re-runs the *improved* matcher (library

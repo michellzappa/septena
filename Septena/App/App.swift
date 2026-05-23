@@ -128,6 +128,9 @@ struct SeptenaApp: App {
           TrainingMuscleBackfill.runIfNeeded(context: localStore.container.mainContext)
           TrainingLibraryEnrichment.runIfNeeded(context: localStore.container.mainContext)
           TrainingMuscleBackfillV2.runIfNeeded(context: localStore.container.mainContext)
+          // Repair orphan routine slugs *after* the backfills run so any
+          // stub entities created here inherit the latest inference rules.
+          RoutineSlugRepair.runIfNeeded(context: localStore.container.mainContext)
           await runRemindersAutoImport()
         }
         .onReceive(NotificationCenter.default
