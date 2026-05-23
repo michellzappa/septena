@@ -1308,7 +1308,6 @@ private struct CalendarDetail: View {
 
 private enum MigrationDomainState {
   case cloudKit
-  case next
   case legacy
   /// HealthKit / EventKit-backed sections — never migrating to CloudKit,
   /// data already lives in the native iOS framework.
@@ -1317,7 +1316,6 @@ private enum MigrationDomainState {
   var symbol: String {
     switch self {
     case .cloudKit: return "checkmark.circle.fill"
-    case .next: return "arrow.right.circle"
     case .legacy: return "server.rack"
     case .native: return "applelogo"
     }
@@ -1326,7 +1324,6 @@ private enum MigrationDomainState {
   var color: Color {
     switch self {
     case .cloudKit: return .green
-    case .next: return .blue
     case .legacy: return .secondary
     case .native: return .purple
     }
@@ -1467,7 +1464,7 @@ struct SyncSettingsPane: View {
         MigrationDomainRow(name: "Supplements",               detail: "CloudKit", state: .cloudKit)
         MigrationDomainRow(name: "Chores",                    detail: "CloudKit", state: .cloudKit)
         MigrationDomainRow(name: "Goals",                     detail: "CloudKit", state: .cloudKit)
-        MigrationDomainRow(name: "Settings + Sections",       detail: "Next",     state: .next)
+        MigrationDomainRow(name: "Settings + Sections",       detail: "CloudKit", state: .cloudKit)
         MigrationDomainRow(name: "Gut",                       detail: "CloudKit", state: .cloudKit)
         MigrationDomainRow(name: "Caffeine",                  detail: "CloudKit", state: .cloudKit)
         MigrationDomainRow(name: "Cannabis",                  detail: "CloudKit", state: .cloudKit)
