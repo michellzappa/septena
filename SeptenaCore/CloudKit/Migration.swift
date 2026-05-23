@@ -1323,6 +1323,125 @@ enum MuscleInference {
   }
 }
 
+// MARK: - Duplicate exercise merge
+
+/// Collapses ExerciseDefinitionEntity rows that share a case-insensitive
+/// display name. The collision shows up when a stub created by
+/// RoutineSlugRepair (e.g. id "chest press", name "Chest Press") lives
+/// alongside a library-imported or manually-added row with the same
+/// canonical name (e.g. id "machine-chest-press", name "Chest Press").
+///
+/// Conservative merge strategy:
+///   1. Pick a canonical per name group:
+///        a. prefer non-archived
+///        b. prefer ids without whitespace (canonical hyphenated form)
+///        c. prefer lower sortIndex (oldest, more established)
+///        d. tiebreak: id alphabetical
+///   2. Nil-fill the canonical from each duplicate (primaryMuscle,
+///      secondaryMuscles, subgroup). Never overwrites existing values.
+///   3. Union the aliases lists into the canonical, and add each
+///      duplicate's id as an alias too so future lookups still resolve.
+///   4. Rewrite SessionTypeEntity.exercises arrays — any reference to
+///      a duplicate's id maps to the canonical's id; dedupe within the
+///      routine in case the canonical was already listed.
+///   5. Delete the non-canonical rows + notify CKEngine of deletions.
+@MainActor
+enum DuplicateExerciseMerge {
+  static let userDefaultsKey = "training.duplicateExerciseMerge.v1"
+
+  static func runIfNeeded(context: ModelContext) {
+    guard !UserDefaults.standard.bool(forKey: userDefaultsKey) else { return }
+    let exercises = (try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>())) ?? []
+    let routines = (try? context.fetch(FetchDescriptor<SessionTypeEntity>())) ?? []
+
+    let groups = Dictionary(grouping: exercises) { $0.name.lowercased() }
+    let dupGroups = groups.values.filter { $0.count > 1 }
+    guard !dupGroups.isEmpty else {
+      UserDefaults.standard.set(true, forKey: userDefaultsKey)
+      return
+    }
+
+    var redirect: [String: String] = [:]  // duplicate id → canonical id
+    var deleted = 0
+    let engine = SeptenaServices.shared.ckEngine
+
+    for group in dupGroups {
+      let canonical = pickCanonical(group)
+      for duplicate in group where duplicate.id != canonical.id {
+        if canonical.primaryMuscle == nil, let m = duplicate.primaryMuscle {
+          canonical.primaryMuscle = m
+        }
+        if canonical.secondaryMuscles.isEmpty, !duplicate.secondaryMuscles.isEmpty {
+          canonical.secondaryMuscles = duplicate.secondaryMuscles
+        }
+        if canonical.subgroup == nil, let s = duplicate.subgroup {
+          canonical.subgroup = s
+        }
+        var aliasSet = Set(canonical.aliases)
+        for alias in duplicate.aliases where !aliasSet.contains(alias) {
+          canonical.aliases.append(alias); aliasSet.insert(alias)
+        }
+        if !aliasSet.contains(duplicate.id) {
+          canonical.aliases.append(duplicate.id)
+        }
+        redirect[duplicate.id] = canonical.id
+      }
+      canonical.updatedAt = .now
+      engine.noteExerciseDefinitionChange(id: canonical.id)
+    }
+
+    // Rewrite routine slugs
+    var routinesUpdated = 0
+    for routine in routines {
+      var changed = false
+      var seen: Set<String> = []
+      var rewritten: [String] = []
+      for slug in routine.exercises {
+        let resolved = redirect[slug] ?? slug
+        if resolved != slug { changed = true }
+        // Dedupe within the routine in case canonical was already present
+        if seen.insert(resolved).inserted {
+          rewritten.append(resolved)
+        } else {
+          changed = true
+        }
+      }
+      if changed {
+        routine.exercises = rewritten
+        routine.updatedAt = .now
+        engine.noteSessionTypeChange(id: routine.id)
+        routinesUpdated += 1
+      }
+    }
+
+    // Delete the non-canonical entities last so redirect lookups above
+    // can still resolve their ids.
+    for group in dupGroups {
+      let canonical = pickCanonical(group)
+      for duplicate in group where duplicate.id != canonical.id {
+        engine.noteExerciseDefinitionDeletion(id: duplicate.id)
+        context.delete(duplicate)
+        deleted += 1
+      }
+    }
+
+    try? context.save()
+    UserDefaults.standard.set(true, forKey: userDefaultsKey)
+    SeptenaLog.info("[DuplicateExerciseMerge] removed \(deleted) duplicates, rewrote \(routinesUpdated) routines")
+  }
+
+  private static func pickCanonical(_ group: [ExerciseDefinitionEntity]) -> ExerciseDefinitionEntity {
+    group.sorted { a, b in
+      if a.archived != b.archived { return !a.archived }   // non-archived first
+      let aHasSpace = a.id.contains(" ") || a.id.contains("_")
+      let bHasSpace = b.id.contains(" ") || b.id.contains("_")
+      if aHasSpace != bHasSpace { return !aHasSpace }      // hyphenated first
+      if a.sortIndex != b.sortIndex { return a.sortIndex < b.sortIndex }
+      return a.id < b.id
+    }.first!
+  }
+}
+
 // MARK: - Routine slug repair
 
 /// Legacy training data shipped routine references using a slug convention

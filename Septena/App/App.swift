@@ -131,6 +131,9 @@ struct SeptenaApp: App {
           // Repair orphan routine slugs *after* the backfills run so any
           // stub entities created here inherit the latest inference rules.
           RoutineSlugRepair.runIfNeeded(context: localStore.container.mainContext)
+          // Run after RoutineSlugRepair so any stubs it created that
+          // collide with library/manual entries get collapsed.
+          DuplicateExerciseMerge.runIfNeeded(context: localStore.container.mainContext)
           await runRemindersAutoImport()
         }
         .onReceive(NotificationCenter.default
