@@ -291,38 +291,32 @@ extension AranetBridge: CBCentralManagerDelegate {
     let name = peripheral.name ?? advName ?? ""
     let lower = name.lowercased()
     guard lower.hasPrefix("aranet4") else {
-      // Not our device — but if it's another Aranet model, log it so
-      // the user gets a hint about model mismatch when nothing parses.
-      if lower.hasPrefix("aranet") {
-        SeptenaLog.info("[Aranet] saw non-Aranet4 model: \(name) — skipped")
-      }
+      // Skip non-Aranet4 siblings (Aranet2, Radon, Rn+). We used to
+      // log each occurrence, but `allowDuplicates=true` means the
+      // same sibling spams the console; if a model mismatch becomes
+      // an actual support issue we can promote this back to a log.
       return
     }
 
     let mfg = advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data
-    // Service UUIDs from the ad packet. Critical diagnostic: iOS will
-    // only deliver background BLE scan callbacks for scans filtered on
-    // a specific service UUID, so we need to know whether the Aranet4
-    // includes one in its ads at all (varies by firmware). Logged on
-    // every hit so the Settings "Enable background capture" toggle's
-    // viability is self-evident from the console.
-    let svcUUIDs   = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] ?? []
-    let overflowUUIDs = advertisementData[CBAdvertisementDataOverflowServiceUUIDsKey] as? [CBUUID] ?? []
-    let svcList = (svcUUIDs + overflowUUIDs).map(\.uuidString).joined(separator: ",")
-    let hex = mfg?.prefix(32).map { String(format: "%02x", $0) }.joined(separator: " ") ?? "—"
-    SeptenaLog.info("[Aranet] ad from \(name) rssi=\(RSSI) bytes=\(mfg?.count ?? 0) " +
-                    "services=[\(svcList.isEmpty ? "—" : svcList)] mfg=\(hex)")
-
     guard let mfg, let snap = AranetSnapshot(advertisementData: mfg) else {
       // Discovery without parseable payload — that's the "Smart Home
-      // Integration is off" case. The watchdog will surface guidance
-      // to the user; nothing for us to do here per-ad.
+      // Integration is off" case. The watchdog surfaces guidance to
+      // the user; nothing per-ad.
       return
     }
 
-    // First successful parse → remember the device, flip state to
-    // "connected" (i.e. receiving), and cancel the watchdog.
+    // First successful parse this session — log once with diagnostics
+    // useful for debugging (service UUIDs, byte layout, RSSI) then go
+    // silent for the rest of the session. Subsequent ads are the same
+    // 60s-resolution payload repeating; logging each one buries the
+    // rest of the console and burns disk.
     if latest == nil {
+      let svcUUIDs = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] ?? []
+      let overflow = advertisementData[CBAdvertisementDataOverflowServiceUUIDsKey] as? [CBUUID] ?? []
+      let svcList = (svcUUIDs + overflow).map(\.uuidString).joined(separator: ",")
+      let hex = mfg.prefix(32).map { String(format: "%02x", $0) }.joined(separator: " ")
+      SeptenaLog.info("[Aranet] first ad parsed from \(name) rssi=\(RSSI) services=[\(svcList.isEmpty ? "—" : svcList)] mfg=\(hex)")
       UserDefaults.standard.set(peripheral.identifier.uuidString,
                                 forKey: kKnownPeripheralKey)
     }
