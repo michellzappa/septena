@@ -797,7 +797,11 @@ private struct PaletteSwatchGrid: View {
             )
             .overlay(
               Circle()
+              #if canImport(UIKit)
                 .strokeBorder(Color(UIColor.systemBackground), lineWidth: isSelected ? 2 : 0)
+              #else
+                .strokeBorder(Color(NSColor.windowBackgroundColor), lineWidth: isSelected ? 2 : 0)
+              #endif
             )
         }
         .buttonStyle(.plain)
