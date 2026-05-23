@@ -697,63 +697,49 @@ struct WeekDashboardView: View {
 
   // MARK: - Tiles
   //
-  // Order is driven by `/api/sections` (the same list Settings shows) so
-  // the homepage and Settings always agree. Each section key dispatches
-  // to its tile; unknown keys are skipped. If the sections list hasn't
-  // loaded yet, fall back to the legacy static order so the dashboard
-  // never renders empty.
+  // Order is canonical — driven by `HomepageDomain.defaultOrder` — and is
+  // the same across every (future) homepage layout mode. The server-provided
+  // `settingsStore.sections` list is now a *visibility filter* only: if the
+  // user has hidden a section server-side, that domain is skipped. While
+  // the server list is still loading (empty), every domain renders so cold
+  // launch never paints blank.
 
   @ViewBuilder
   private var tiles: some View {
-    if settingsStore.sections.isEmpty {
-      legacyTileOrder
-    } else {
-      ForEach(settingsStore.sections, id: \.key) { sec in
-        tile(for: sec.key)
-      }
+    ForEach(visibleDomains) { domain in
+      tile(for: domain)
+    }
+  }
+
+  /// Canonical order, filtered by what the user has enabled server-side.
+  /// Empty `settingsStore.sections` (cold launch / load failure) means
+  /// "show everything" — same fallback semantics as the previous
+  /// legacy-order path.
+  private var visibleDomains: [HomepageDomain] {
+    let serverKeys = Set(settingsStore.sections.map(\.key))
+    return HomepageDomain.defaultOrder.filter { domain in
+      serverKeys.isEmpty || serverKeys.contains(domain.id)
     }
   }
 
   @ViewBuilder
-  private func tile(for key: String) -> some View {
-    switch key {
-    case "tasks":       tasksTile
-    case "habits":      habitsTile
-    case "training":    trainingTile
-    case "chores":      choresTile
-    case "supplements": supplementsTile
-    case "sleep":       sleepTile
-    case "nutrition":   nutritionTile
-    case "air":         airTile
-    case "groceries":   groceriesTile
-    // Calendar is surfaced inline in the Next tab (mirroring the webapp's
-    // /api/calendar/day integration), not as a standalone tile.
-    case "calendar":    EmptyView()
-    case "caffeine":    caffeineTile
-    case "cannabis":    cannabisTile
-    case "body":        bodyTile
-    case "gut":         gutTile
-    case "activity":    activityTile
-    default:            EmptyView()
+  private func tile(for domain: HomepageDomain) -> some View {
+    switch domain {
+    case .tasks:       tasksTile
+    case .habits:      habitsTile
+    case .training:    trainingTile
+    case .chores:      choresTile
+    case .supplements: supplementsTile
+    case .sleep:       sleepTile
+    case .nutrition:   nutritionTile
+    case .air:         airTile
+    case .groceries:   groceriesTile
+    case .caffeine:    caffeineTile
+    case .cannabis:    cannabisTile
+    case .body:        bodyTile
+    case .gut:         gutTile
+    case .activity:    activityTile
     }
-  }
-
-  @ViewBuilder
-  private var legacyTileOrder: some View {
-    tasksTile
-    habitsTile
-    trainingTile
-    choresTile
-    supplementsTile
-    sleepTile
-    nutritionTile
-    airTile
-    groceriesTile
-    caffeineTile
-    cannabisTile
-    bodyTile
-    gutTile
-    activityTile
   }
 
   // Tasks — live counts from /api/tasks/counts and per-day completion
