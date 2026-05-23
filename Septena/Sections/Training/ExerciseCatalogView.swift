@@ -8,15 +8,33 @@ struct ExerciseCatalogView: View {
 
   @Environment(\.modelContext) private var context
   @State private var searchText = ""
-  @State private var selectedMuscle: Muscle? = nil
+  @State private var muscleFilter: MuscleFilter = .all
   @State private var showArchived = false
   @State private var showNewDetail = false
   @State private var showLibrary = false
 
+  // Three-state filter: All, an individual muscle, or the "Unassigned"
+  // bucket (primaryMuscle == nil). Unassigned exists as a first-class
+  // option so users can triage exercises the backfill missed in one tap.
+  private enum MuscleFilter: Hashable {
+    case all
+    case unassigned
+    case muscle(Muscle)
+  }
+
+  private var unassignedCount: Int {
+    allExercises.filter { !$0.archived && $0.primaryMuscle == nil }.count
+  }
+
   private var filtered: [ExerciseDefinitionEntity] {
     allExercises.filter { entity in
       guard showArchived || !entity.archived else { return false }
-      if let m = selectedMuscle {
+      switch muscleFilter {
+      case .all:
+        break
+      case .unassigned:
+        guard entity.primaryMuscle == nil else { return false }
+      case .muscle(let m):
         guard entity.primaryMuscle == m.rawValue ||
               entity.secondaryMuscles.contains(m.rawValue) else { return false }
       }
@@ -32,7 +50,7 @@ struct ExerciseCatalogView: View {
 
   var body: some View {
     List {
-      muscleFilter
+      muscleFilterStrip
       ForEach(filtered) { entity in
         NavigationLink {
           ExerciseDetailView(entity: entity)
@@ -85,15 +103,22 @@ struct ExerciseCatalogView: View {
   }
 
   @ViewBuilder
-  private var muscleFilter: some View {
+  private var muscleFilterStrip: some View {
     ScrollView(.horizontal, showsIndicators: false) {
       HStack(spacing: 8) {
-        filterChip(label: "All", isSelected: selectedMuscle == nil) {
-          selectedMuscle = nil
+        filterChip(label: "All", isSelected: muscleFilter == .all) {
+          muscleFilter = .all
+        }
+        if unassignedCount > 0 {
+          filterChip(label: "Unassigned (\(unassignedCount))",
+                     isSelected: muscleFilter == .unassigned) {
+            muscleFilter = muscleFilter == .unassigned ? .all : .unassigned
+          }
         }
         ForEach(Muscle.allCases) { muscle in
-          filterChip(label: muscle.label, isSelected: selectedMuscle == muscle) {
-            selectedMuscle = selectedMuscle == muscle ? nil : muscle
+          filterChip(label: muscle.label,
+                     isSelected: muscleFilter == .muscle(muscle)) {
+            muscleFilter = muscleFilter == .muscle(muscle) ? .all : .muscle(muscle)
           }
         }
       }

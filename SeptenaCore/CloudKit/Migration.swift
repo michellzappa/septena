@@ -1192,3 +1192,177 @@ enum TrainingLibraryEnrichment {
     SeptenaLog.info("[TrainingLibraryEnrichment] enriched \(updated) exercises from library")
   }
 }
+
+// MARK: - Muscle inference (unified)
+
+/// Single source of truth for "given this exercise, what muscles is it?".
+/// Tries three sources in order and returns the first hit:
+///   1. Library lookup on the entity's id (covers canonical slugs)
+///   2. Library lookup on each of the entity's stored aliases
+///   3. Library lookup on a normalized slug derived from the name
+///   4. Keyword classifier as a last resort (primary muscle only)
+/// Conservative — returns nil rather than guessing wildly.
+@MainActor
+enum MuscleInference {
+  struct Result {
+    var primary: Muscle?
+    var secondaries: [Muscle]
+    var source: String  // "library" | "keyword" | "none"
+  }
+
+  static func infer(for entity: ExerciseDefinitionEntity) -> Result {
+    if let lib = libraryMatch(for: entity) {
+      return Result(primary: lib.primaryMuscle,
+                    secondaries: lib.secondaryMuscles,
+                    source: "library")
+    }
+    let text = ((entity.name) + " " + (entity.subgroup ?? "")).lowercased()
+    if let m = classify(text) {
+      return Result(primary: m, secondaries: [], source: "keyword")
+    }
+    return Result(primary: nil, secondaries: [], source: "none")
+  }
+
+  private static func libraryMatch(for entity: ExerciseDefinitionEntity) -> LibraryExercise? {
+    if let hit = DefaultExerciseLibrary.byAnySlug[entity.id] { return hit }
+    for alias in entity.aliases {
+      if let hit = DefaultExerciseLibrary.byAnySlug[alias.lowercased()] { return hit }
+    }
+    let nameSlug = slugify(entity.name)
+    if let hit = DefaultExerciseLibrary.byAnySlug[nameSlug] { return hit }
+    return nil
+  }
+
+  private static func slugify(_ name: String) -> String {
+    let lower = name.lowercased()
+    var out = ""
+    var lastWasHyphen = true
+    for char in lower {
+      if char.isLetter || char.isNumber {
+        out.append(char); lastWasHyphen = false
+      } else if !lastWasHyphen {
+        out.append("-"); lastWasHyphen = true
+      }
+    }
+    return out.trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+  }
+
+  /// Keyword classifier — broader than the v1 backfill. Order matters:
+  /// specific overrides ("leg press" → quads) come before the generic
+  /// pattern ("press" → chest).
+  static func classify(_ text: String) -> Muscle? {
+    // Overrides
+    if text.contains("leg press") { return .quads }
+    if text.contains("leg curl") || text.contains("hamstring curl") { return .hamstrings }
+    if text.contains("calf raise") { return .calves }
+
+    // Hamstrings
+    if text.contains("deadlift") || text.contains("romanian") ||
+       text.contains(" rdl") || text.contains("hinge") ||
+       text.contains("nordic") || text.contains("hamstring") ||
+       text.contains("hex bar") || text.contains("trap bar") { return .hamstrings }
+
+    // Glutes
+    if text.contains("glute") || text.contains("hip thrust") ||
+       text.contains("bridge") || text.contains("abduction") ||
+       text.contains("kickback") || text.contains("sumo") { return .glutes }
+
+    // Quads
+    if text.contains("squat") || text.contains("lunge") ||
+       text.contains("leg extension") || text.contains("step-up") ||
+       text.contains("step up") || text.contains("goblet") ||
+       text.contains("pistol") || text.contains("quad") { return .quads }
+
+    // Shoulders
+    if text.contains("shoulder") || text.contains("overhead press") ||
+       text.contains("ohp") || text.contains("military") ||
+       text.contains("lateral raise") || text.contains("lateral ") ||
+       text.contains("front raise") || text.contains("rear delt") ||
+       text.contains("delt") || text.contains("arnold") ||
+       text.contains("upright row") { return .shoulders }
+
+    // Triceps
+    if text.contains("tricep") || text.contains("skull") ||
+       text.contains("pushdown") || text.contains("pressdown") ||
+       text.contains("close-grip") || text.contains("close grip") { return .triceps }
+
+    // Back
+    if text.contains("row") || text.contains("pull-up") || text.contains("pullup") ||
+       text.contains("chinup") || text.contains("chin-up") ||
+       text.contains("pulldown") || text.contains("lat ") ||
+       text.contains("lats") || text.contains("shrug") ||
+       text.contains("meadows") || text.contains("t-bar") ||
+       text.contains("trap ") { return .back }
+
+    // Chest
+    if text.contains("press") || text.contains("bench") ||
+       text.contains("push") || text.contains("dip") ||
+       text.contains("fly") || text.contains("pec") ||
+       text.contains("crossover") { return .chest }
+
+    // Biceps (curl that wasn't a leg curl)
+    if text.contains("curl") || text.contains("hammer") ||
+       text.contains("preacher") || text.contains("concentration curl") ||
+       text.contains("spider curl") { return .biceps }
+
+    // Calves
+    if text.contains("calf") || text.contains("calves") ||
+       text.contains("donkey") { return .calves }
+
+    // Core
+    if text.contains("plank") || text.contains("crunch") ||
+       text.contains("ab ") || text.contains("abs ") ||
+       text.contains("sit-up") || text.contains("situp") ||
+       text.contains("hollow") || text.contains("dead bug") ||
+       text.contains("deadbug") || text.contains("twist") ||
+       text.contains("pallof") || text.contains("rollout") ||
+       text.contains("leg raise") || text.contains("mountain climber") ||
+       text.contains("core") { return .core }
+
+    return nil
+  }
+}
+
+// MARK: - Training muscle backfill v2
+
+/// Second-pass backfill that re-runs the *improved* matcher (library
+/// id + alias + name-derived slug + broader keyword rules). Conservative:
+///   - primaryMuscle filled only if currently nil
+///   - secondaryMuscles filled only if currently empty AND library matched
+/// Never overwrites existing user-set values. Runs once, gated by
+/// UserDefaults `training.muscleBackfill.v2`, so users who got partial
+/// coverage from v1 still benefit from the wider net.
+@MainActor
+enum TrainingMuscleBackfillV2 {
+  static let userDefaultsKey = "training.muscleBackfill.v2"
+
+  static func runIfNeeded(context: ModelContext) {
+    guard !UserDefaults.standard.bool(forKey: userDefaultsKey) else { return }
+    let defs = (try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>())) ?? []
+    var updated = 0
+    for entity in defs {
+      let needsPrimary = entity.primaryMuscle == nil
+      let needsSecondary = entity.secondaryMuscles.isEmpty
+      guard needsPrimary || needsSecondary else { continue }
+
+      let result = MuscleInference.infer(for: entity)
+      var changed = false
+      if needsPrimary, let m = result.primary {
+        entity.primaryMuscle = m.rawValue
+        changed = true
+      }
+      if needsSecondary, !result.secondaries.isEmpty {
+        entity.secondaryMuscles = result.secondaries.map(\.rawValue)
+        changed = true
+      }
+      if changed {
+        entity.updatedAt = .now
+        SeptenaServices.shared.ckEngine.noteExerciseDefinitionChange(id: entity.id)
+        updated += 1
+      }
+    }
+    try? context.save()
+    UserDefaults.standard.set(true, forKey: userDefaultsKey)
+    SeptenaLog.info("[TrainingMuscleBackfill v2] updated \(updated) exercises")
+  }
+}
