@@ -1095,10 +1095,13 @@ enum ChecklistMirror {
       let day = window[i]
       let from = max(0, i - 6)
       let slice = window[from...i]
+      // 7-day rolling SUM — the Z2 chart stacks this on top of the day's
+      // bar so the column visualizes week-to-date progress against the
+      // weekly target. (Server-side `/api/training/cardio-history` named
+      // this `rolling_7d`; webapp shipped the same shape.)
       let sum = slice.map { $0.minutes }.reduce(0, +)
-      let avg = Double(sum) / Double(slice.count)
       if i >= window.count - days {
-        daily.append(CardioDay(date: day.date, minutes: day.minutes, rolling7d: avg))
+        daily.append(CardioDay(date: day.date, minutes: day.minutes, rolling7d: Double(sum)))
       }
     }
     return CardioHistoryResponse(daily: daily, targetWeeklyMin: 150)
