@@ -1076,9 +1076,15 @@ enum ChecklistMirror {
       predicate: #Predicate { $0.date >= startStr && $0.date <= today }
     ))) ?? []
     let defs = (try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>())) ?? []
-    let cardioExercises = Set(defs.filter { $0.type == "cardio" || $0.type == "mobility" }.map(\.name))
+    // Lowercased on both sides — entry.exercise stores the name the user
+    // logged, which may have different casing than the def's catalog name
+    // (especially for stubs created by RoutineSlugRepair which humanizes).
+    let cardioExercises = Set(defs
+      .filter { $0.type == "cardio" || $0.type == "mobility" }
+      .map { $0.name.lowercased() })
     let cardioByDate: [String: Int] = entries.reduce(into: [:]) { acc, e in
-      let isCardio = cardioExercises.contains(e.exercise) || e.durationMin != nil || e.distanceM != nil
+      let isCardio = cardioExercises.contains(e.exercise.lowercased()) ||
+                     e.durationMin != nil || e.distanceM != nil
       guard isCardio else { return }
       let mins = Int(e.durationMin?.rounded() ?? 0)
       if mins > 0 { acc[e.date, default: 0] += mins }
@@ -1225,8 +1231,13 @@ enum ChecklistMirror {
     ))) ?? []
     let defs = (try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>())) ?? []
 
-    let defByName = Dictionary(uniqueKeysWithValues: defs.map { ($0.name, $0) })
-    let cardioNames = Set(defs.filter { $0.type == "cardio" || $0.type == "mobility" }.map(\.name))
+    // All name-keyed dictionaries below are lowercased so the join survives
+    // casing drift between entry.exercise (the logged name) and def.name
+    // (the catalog display label).
+    let defByName = Dictionary(uniqueKeysWithValues: defs.map { ($0.name.lowercased(), $0) })
+    let cardioNames = Set(defs
+      .filter { $0.type == "cardio" || $0.type == "mobility" }
+      .map { $0.name.lowercased() })
     let cardioTypeID = types.first { $0.id == "cardio" }?.id ?? "cardio"
 
     let entriesByDate = Dictionary(grouping: entries, by: \.date)
@@ -1235,16 +1246,19 @@ enum ChecklistMirror {
     // For each day, decide which session-type IDs it counts as.
     func classify(_ rows: [ExerciseEntryEntity]) -> Set<String> {
       var matched: Set<String> = []
-      let names = rows.map(\.exercise)
-      let strengthNames = names.filter { !cardioNames.contains($0) }
-      // Strength-day: ≥MIN_STRENGTH exercises whose names appear in a type's list.
+      let lowerNames = rows.map { $0.exercise.lowercased() }
+      let strengthNames = lowerNames.filter { !cardioNames.contains($0) }
+      // Strength-day: ≥MIN_STRENGTH exercises whose names appear in a type's
+      // canonical exercise list. SessionTypeEntity.exercises stores slugs;
+      // match case-insensitively against the entry name too.
       for t in types where t.id != cardioTypeID {
-        let hits = strengthNames.filter { t.exercises.contains($0) }.count
+        let lowerList = Set(t.exercises.map { $0.lowercased() })
+        let hits = strengthNames.filter { lowerList.contains($0) }.count
         if hits >= MIN_STRENGTH { matched.insert(t.id) }
       }
       // Cardio-day: ≥MIN_CARDIO_MIN of cardio with no strength session.
       let cardioMin = rows.reduce(0.0) { acc, e in
-        let name = e.exercise
+        let name = e.exercise.lowercased()
         let isCardio = cardioNames.contains(name) || (defByName[name]?.type ?? "") == "cardio"
         return acc + (isCardio ? (e.durationMin ?? 0) : 0)
       }
