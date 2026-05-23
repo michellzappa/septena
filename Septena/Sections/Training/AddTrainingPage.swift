@@ -1,13 +1,9 @@
 import SwiftUI
 
-// Training page — suggested session pinned at top, then static fallback
-// types. v1 dismisses and lets the user complete the session in whatever
-// training UI exists; no draft state is persisted from here. Mirrors the
-// webapp's flow up to the point where IndexedDB draft logic kicks in.
-
-private let staticSessionTypes: [String] = [
-  "Upper", "Lower", "Push", "Pull", "Conditioning", "Cardio",
-]
+// Training page — suggested session pinned at top, then the user's
+// real (non-archived) SessionTypeConfig list pulled from SwiftData.
+// No more hardcoded fallback: every routine the user has authored
+// (including Yoga, Conditioning, custom splits, etc.) shows up here.
 
 struct AddTrainingPage: View {
   @Environment(SeptenaClient.self) private var client
@@ -17,9 +13,19 @@ struct AddTrainingPage: View {
   @Bindable var router: AddInfoRouter
   @State private var suggested: SuggestedWorkout? = nil
   @State private var daysAgo: [String: Int] = [:]
+  @State private var sessionTypes: [SessionTypeConfig] = []
 
   private var trimmed: String {
     router.query.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  private var filteredTypes: [SessionTypeConfig] {
+    let active = sessionTypes.filter { !$0.archived }
+    guard !trimmed.isEmpty else { return active }
+    return active.filter {
+      $0.label.localizedCaseInsensitiveContains(trimmed) ||
+      $0.id.localizedCaseInsensitiveContains(trimmed)
+    }
   }
 
   var body: some View {
@@ -39,13 +45,11 @@ struct AddTrainingPage: View {
         }
       }
       Section("Session type") {
-        let types = staticSessionTypes
-          .filter { trimmed.isEmpty || $0.localizedCaseInsensitiveContains(trimmed) }
-        ForEach(types, id: \.self) { type in
-          Button { start(type) } label: {
+        ForEach(filteredTypes) { type in
+          Button { start(type.label) } label: {
             AddInfoRow(
-              title: type,
-              subtitle: subtitle(for: type),
+              title: type.label,
+              subtitle: subtitle(for: type.id),
               tint: tint
             )
           }
@@ -59,8 +63,8 @@ struct AddTrainingPage: View {
     #endif
   }
 
-  private func subtitle(for type: String) -> String? {
-    guard let n = daysAgo[type.lowercased()] else { return nil }
+  private func subtitle(for typeID: String) -> String? {
+    guard let n = daysAgo[typeID.lowercased()] else { return nil }
     if n == 0 { return "Today" }
     if n == 1 { return "1 day ago" }
     return "\(n) days ago"
@@ -79,5 +83,6 @@ struct AddTrainingPage: View {
     let resp = ChecklistMirror.loadSuggestedWorkout(context: modelContext)
     suggested = resp.suggested
     daysAgo = resp.daysAgo
+    sessionTypes = ChecklistMirror.loadSessionTypes(context: modelContext) ?? []
   }
 }

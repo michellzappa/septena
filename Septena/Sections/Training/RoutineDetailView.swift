@@ -67,19 +67,15 @@ struct RoutineDetailView: View {
       }
     }
     .navigationTitle(isNew ? "New Routine" : label)
+    // Edit mode is always-on so the drag handles for reordering /
+    // swipe-to-delete on the Exercises section are visible without
+    // the user toggling an Edit button.
+    .environment(\.editMode, .constant(.active))
     .toolbar {
-      ToolbarItem(placement: .cancellationAction) {
-        Button("Cancel") { dismiss() }
-      }
       ToolbarItem(placement: .confirmationAction) {
         Button("Save") { save() }
           .disabled(label.trimmingCharacters(in: .whitespaces).isEmpty)
       }
-      #if os(iOS)
-      ToolbarItem(placement: .navigationBarLeading) {
-        EditButton()
-      }
-      #endif
     }
     .sheet(isPresented: $showPicker) {
       ExercisePickerSheet(preselected: exercises, onDone: { newIDs in
