@@ -1471,10 +1471,10 @@ struct SyncSettingsPane: View {
         MigrationDomainRow(name: "Gut",                       detail: "CloudKit", state: .cloudKit)
         MigrationDomainRow(name: "Caffeine",                  detail: "CloudKit", state: .cloudKit)
         MigrationDomainRow(name: "Cannabis",                  detail: "CloudKit", state: .cloudKit)
+        MigrationDomainRow(name: "Groceries",                 detail: "CloudKit", state: .cloudKit)
         MigrationDomainRow(name: "Training",                  detail: "FastAPI",  state: .legacy)
         MigrationDomainRow(name: "Nutrition",                 detail: "FastAPI",  state: .legacy)
         MigrationDomainRow(name: "Sleep",                     detail: "FastAPI",  state: .legacy)
-        MigrationDomainRow(name: "Groceries",                 detail: "FastAPI",  state: .legacy)
         MigrationDomainRow(name: "Body",                      detail: "FastAPI",  state: .legacy)
         MigrationDomainRow(name: "Air",                       detail: "FastAPI",  state: .legacy)
         MigrationDomainRow(name: "Activity",                  detail: "HealthKit", state: .native)
@@ -1740,6 +1740,8 @@ struct SyncSettingsPane: View {
       let beans = (try? modelContext.fetch(FetchDescriptor<CaffeineBeanEntity>())) ?? []
       let cannabis = (try? modelContext.fetch(FetchDescriptor<CannabisEventEntity>())) ?? []
       let strains = (try? modelContext.fetch(FetchDescriptor<CannabisStrainEntity>())) ?? []
+      let groceries = (try? modelContext.fetch(FetchDescriptor<GroceryItemEntity>())) ?? []
+      let groceryCats = (try? modelContext.fetch(FetchDescriptor<GroceryCategoryEntity>())) ?? []
       for row in tasks { row.cloudKitSystemFields = nil }
       for row in areas { row.cloudKitSystemFields = nil }
       for row in projects { row.cloudKitSystemFields = nil }
@@ -1757,6 +1759,8 @@ struct SyncSettingsPane: View {
       for row in beans { row.cloudKitSystemFields = nil }
       for row in cannabis { row.cloudKitSystemFields = nil }
       for row in strains { row.cloudKitSystemFields = nil }
+      for row in groceries { row.cloudKitSystemFields = nil }
+      for row in groceryCats { row.cloudKitSystemFields = nil }
       try? modelContext.save()
       for row in tasks { ckEngine.noteTaskChange(id: row.id) }
       for row in areas { ckEngine.noteAreaChange(id: row.id) }
@@ -1775,11 +1779,14 @@ struct SyncSettingsPane: View {
       for row in beans { ckEngine.noteCaffeineBeanChange(id: row.id) }
       for row in cannabis { ckEngine.noteCannabisEventChange(id: row.id) }
       for row in strains { ckEngine.noteCannabisStrainChange(id: row.id) }
+      for row in groceries { ckEngine.noteGroceryItemChange(id: row.id) }
+      for row in groceryCats { ckEngine.noteGroceryCategoryChange(id: row.id) }
       let coreCount = tasks.count + areas.count + projects.count + settings.count + sections.count
       let checklistCount = habitDefs.count + habitStates.count + supDefs.count + supStates.count
         + choreDefs.count + choreEvents.count + goals.count
       let logCount = gut.count + caffeine.count + beans.count + cannabis.count + strains.count
-      let total = coreCount + checklistCount + logCount
+      let groceryCount = groceries.count + groceryCats.count
+      let total = coreCount + checklistCount + logCount + groceryCount
       migrationStatus = "✅ Zone reset and \(total) entities re-queued for upload."
     } catch {
       migrationStatus = "❌ Zone reset failed: \(error.localizedDescription)"

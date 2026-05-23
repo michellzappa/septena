@@ -36,6 +36,7 @@ final class SeptenaServices {
   let gutMutator: GutMutator
   let caffeineMutator: CaffeineMutator
   let cannabisMutator: CannabisMutator
+  let groceryMutator: GroceryMutator
   let areasMutator: AreasMutator
   let projectsMutator: ProjectsMutator
   let httpOutbox: HTTPOutbox
@@ -55,6 +56,7 @@ final class SeptenaServices {
     self.gutMutator = GutMutator(context: context, ckEngine: nil)
     self.caffeineMutator = CaffeineMutator(context: context, ckEngine: nil)
     self.cannabisMutator = CannabisMutator(context: context, ckEngine: nil)
+    self.groceryMutator = GroceryMutator(context: context, ckEngine: nil)
     self.areasMutator = AreasMutator(client: client, context: context)
     self.projectsMutator = ProjectsMutator(client: client, context: context)
     self.httpOutbox = HTTPOutbox(client: client, context: context)
@@ -218,6 +220,24 @@ final class SeptenaServices {
         if recordName.hasPrefix("cannabis-strain:") {
           let id = CannabisStrainCloudKitSchema.entityID(from: recordName)
           if let entity = try? context.fetch(FetchDescriptor<CannabisStrainEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
+        if recordName.hasPrefix("grocery-item:") {
+          let id = GroceryItemCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<GroceryItemEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
+        if recordName.hasPrefix("grocery-cat:") {
+          let id = GroceryCategoryCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<GroceryCategoryEntity>(
             predicate: #Predicate { $0.id == id }
           )).first {
             return entity.toCloudKitRecord()
@@ -411,6 +431,26 @@ final class SeptenaServices {
           } else {
             context.insert(CannabisStrainEntity(cloudKit: record))
           }
+        case GroceryItemCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = GroceryItemCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<GroceryItemEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(GroceryItemEntity(cloudKit: record))
+          }
+        case GroceryCategoryCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = GroceryCategoryCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<GroceryCategoryEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(GroceryCategoryEntity(cloudKit: record))
+          }
         default:
           SeptenaLog.info("[CKEngine] applyFetched: unknown recordType \(record.recordType) id=\(record.recordID.recordName)")
         }
@@ -554,6 +594,22 @@ final class SeptenaServices {
           )).first {
             context.delete(entity)
           }
+        case GroceryItemCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = GroceryItemCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<GroceryItemEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
+        case GroceryCategoryCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = GroceryCategoryCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<GroceryCategoryEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
         default:
           SeptenaLog.info("[CKEngine] applyDeleted: unknown recordType \(recordType) id=\(recordID.recordName)")
         }
@@ -579,6 +635,7 @@ final class SeptenaServices {
       gutMutator.bind(ckEngine: ckEngine)
       caffeineMutator.bind(ckEngine: ckEngine)
       cannabisMutator.bind(ckEngine: ckEngine)
+      groceryMutator.bind(ckEngine: ckEngine)
       areasMutator.bind(ckEngine: ckEngine)
       projectsMutator.bind(ckEngine: ckEngine)
       ckEngine.start()
@@ -1468,6 +1525,164 @@ final class CannabisMutator {
   private func commitStrain(_ entity: CannabisStrainEntity, op: String) {
     saveContext("CK cannabis-strain \(op)")
     ckEngine?.noteCannabisStrainChange(id: entity.id)
+    postChanged()
+  }
+
+  private func saveContext(_ label: String) {
+    do { try context.save() }
+    catch { SeptenaLog.error(label, error) }
+  }
+
+  private func postChanged() {
+    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+  }
+}
+
+
+@MainActor
+@Observable
+final class GroceryMutator {
+  private let context: ModelContext
+  private var ckEngine: CKEngine?
+
+  init(context: ModelContext, ckEngine: CKEngine? = nil) {
+    self.context = context
+    self.ckEngine = ckEngine
+  }
+
+  func bind(ckEngine: CKEngine) {
+    self.ckEngine = ckEngine
+  }
+
+  // MARK: - Items
+
+  @discardableResult
+  func addItem(name: String, category: String, emoji: String = "") -> GroceryItemEntity {
+    let id = uniqueItemID(for: name)
+    let entity = GroceryItemEntity(id: id,
+                                   name: name,
+                                   category: category,
+                                   emoji: emoji,
+                                   low: false,
+                                   sortIndex: nextItemSortIndex())
+    context.insert(entity)
+    commitItem(entity, op: "create")
+    return entity
+  }
+
+  func updateItem(id: String,
+                  name: String? = nil,
+                  category: String? = nil,
+                  emoji: String? = nil) {
+    guard let entity = fetchItem(id: id) else { return }
+    if let name { entity.name = name }
+    if let category { entity.category = category }
+    if let emoji { entity.emoji = emoji }
+    entity.updatedAt = .now
+    commitItem(entity, op: "update")
+  }
+
+  /// Toggle the `low` flag. Setting low=false stamps lastBought to today.
+  func setLow(id: String, low: Bool) {
+    guard let entity = fetchItem(id: id) else { return }
+    entity.low = low
+    if !low {
+      entity.lastBought = SeptenaDate.today
+    }
+    entity.updatedAt = .now
+    commitItem(entity, op: low ? "needed" : "bought")
+  }
+
+  func deleteItem(id: String) {
+    guard let entity = fetchItem(id: id) else { return }
+    context.delete(entity)
+    saveContext("CK grocery item delete")
+    ckEngine?.noteGroceryItemDeletion(id: id)
+    postChanged()
+  }
+
+  // MARK: - Categories
+
+  @discardableResult
+  func addCategory(name: String) -> GroceryCategoryEntity {
+    let id = uniqueCategoryID(for: name)
+    let entity = GroceryCategoryEntity(id: id, name: name, sortIndex: nextCategorySortIndex())
+    context.insert(entity)
+    commitCategory(entity, op: "create")
+    return entity
+  }
+
+  func updateCategory(id: String, name: String) {
+    guard let entity = fetchCategory(id: id) else { return }
+    entity.name = name
+    entity.updatedAt = .now
+    commitCategory(entity, op: "update")
+  }
+
+  func deleteCategory(id: String) {
+    guard let entity = fetchCategory(id: id) else { return }
+    context.delete(entity)
+    saveContext("CK grocery category delete")
+    ckEngine?.noteGroceryCategoryDeletion(id: id)
+    postChanged()
+  }
+
+  // MARK: - Helpers
+
+  private func fetchItem(id: String) -> GroceryItemEntity? {
+    try? context.fetch(FetchDescriptor<GroceryItemEntity>(
+      predicate: #Predicate { $0.id == id }
+    )).first
+  }
+
+  private func fetchCategory(id: String) -> GroceryCategoryEntity? {
+    try? context.fetch(FetchDescriptor<GroceryCategoryEntity>(
+      predicate: #Predicate { $0.id == id }
+    )).first
+  }
+
+  private func uniqueItemID(for name: String) -> String {
+    var attempt = String(UUID().uuidString.lowercased().prefix(8))
+    while fetchItem(id: attempt) != nil {
+      attempt = String(UUID().uuidString.lowercased().prefix(8))
+    }
+    return attempt
+  }
+
+  private func uniqueCategoryID(for name: String) -> String {
+    let base = name.lowercased()
+      .replacingOccurrences(of: " ", with: "-")
+      .filter { $0.isLetter || $0.isNumber || $0 == "-" }
+    var attempt = base.isEmpty ? IDShortcode.generate(length: 4) : base
+    var n = 2
+    while fetchCategory(id: attempt) != nil {
+      attempt = "\(base)-\(n)"
+      n += 1
+    }
+    return attempt
+  }
+
+  private func nextItemSortIndex() -> Int {
+    ((try? context.fetch(FetchDescriptor<GroceryItemEntity>(
+      sortBy: [SortDescriptor(\.sortIndex, order: .reverse)]
+    )).first?.sortIndex) ?? -1) + 1
+  }
+
+  private func nextCategorySortIndex() -> Int {
+    ((try? context.fetch(FetchDescriptor<GroceryCategoryEntity>(
+      sortBy: [SortDescriptor(\.sortIndex, order: .reverse)]
+    )).first?.sortIndex) ?? -1) + 1
+  }
+
+  private func commitItem(_ entity: GroceryItemEntity, op: String) {
+    saveContext("CK grocery item \(op)")
+    ckEngine?.noteGroceryItemChange(id: entity.id)
+    postChanged()
+  }
+
+  private func commitCategory(_ entity: GroceryCategoryEntity, op: String) {
+    saveContext("CK grocery category \(op)")
+    ckEngine?.noteGroceryCategoryChange(id: entity.id)
     postChanged()
   }
 

@@ -147,6 +147,8 @@ enum Theme {
   /// icon almost disappears). Same swatch in both modes — dark mode reads
   /// it as a warm gold, light mode as a saturated amber.
   static let todayAccent    = Color(red: 0.96, green: 0.78, blue: 0.13)
+  /// Muted moonlight indigo — marks "Someday" tasks in mixed lists.
+  static let somedayAccent  = Color(red: 0.50, green: 0.50, blue: 0.75)
   static let upcomingAccent = Color.red
   static let anytimeAccent  = Color.secondary
   static let logbookAccent  = Color.secondary

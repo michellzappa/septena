@@ -7,8 +7,9 @@ import SwiftUI
 // `POST /api/groceries/item`.
 
 struct EditGroceryItemSheet: View {
-  @Environment(HTTPOutbox.self) private var outbox
   @Environment(\.dismiss) private var dismiss
+
+  private var grocery: GroceryMutator { SeptenaServices.shared.groceryMutator }
 
   let original: GroceryItem?
   let categories: [GroceryCategory]
@@ -66,18 +67,8 @@ struct EditGroceryItemSheet: View {
     let n = name.trimmingCharacters(in: .whitespaces)
     let e = emoji.trimmingCharacters(in: .whitespaces)
     let c = category.isEmpty ? fallbackID : category
-    let body: [String: Any] = [
-      "name": n,
-      "emoji": e,
-      "category": c,
-    ]
     if let original {
-      outbox.enqueue(
-        method: "PATCH",
-        path: "/api/groceries/item/\(original.id)",
-        body: body,
-        kind: "groceries.update"
-      )
+      grocery.updateItem(id: original.id, name: n, category: c, emoji: e)
       Haptics.tick()
       var rebuilt = original
       rebuilt.name = n
@@ -85,12 +76,7 @@ struct EditGroceryItemSheet: View {
       rebuilt.category = c
       onDone(rebuilt)
     } else {
-      outbox.enqueue(
-        method: "POST",
-        path: "/api/groceries/item",
-        body: body,
-        kind: "groceries.create"
-      )
+      grocery.addItem(name: n, category: c, emoji: e)
       Haptics.tick()
       onDone(nil)
     }

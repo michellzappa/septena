@@ -211,6 +211,10 @@ func noteCannabisEventChange(id: String) { noteChange(recordName: CannabisEventC
 func noteCannabisEventDeletion(id: String) { noteDeletion(recordName: CannabisEventCloudKitSchema.recordName(for: id), kind: "cannabisEvent") }
 func noteCannabisStrainChange(id: String) { noteChange(recordName: CannabisStrainCloudKitSchema.recordName(for: id), kind: "cannabisStrain") }
 func noteCannabisStrainDeletion(id: String) { noteDeletion(recordName: CannabisStrainCloudKitSchema.recordName(for: id), kind: "cannabisStrain") }
+func noteGroceryItemChange(id: String) { noteChange(recordName: GroceryItemCloudKitSchema.recordName(for: id), kind: "groceryItem") }
+func noteGroceryItemDeletion(id: String) { noteDeletion(recordName: GroceryItemCloudKitSchema.recordName(for: id), kind: "groceryItem") }
+func noteGroceryCategoryChange(id: String) { noteChange(recordName: GroceryCategoryCloudKitSchema.recordName(for: id), kind: "groceryCategory") }
+func noteGroceryCategoryDeletion(id: String) { noteDeletion(recordName: GroceryCategoryCloudKitSchema.recordName(for: id), kind: "groceryCategory") }
 
   private func noteChange(recordName: String, kind: String) {
     guard let engine else {

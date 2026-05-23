@@ -13,6 +13,9 @@ struct TaskCheckbox: View {
   /// 'promoted to Today' — moves the today indicator into the same spot
   /// as completion so it no longer sits inline with the title.
   var isToday: Bool = false
+  /// When true (and not done and not today), the checkbox stroke switches to
+  /// `Theme.somedayAccent` (muted indigo) to signal a parked/deferred task.
+  var isSomeday: Bool = false
   let onToggle: () -> Void
 
   // Smaller rounded square than the old circle glyph — reads as a checkbox,
@@ -30,13 +33,16 @@ struct TaskCheckbox: View {
   #endif
 
   /// Checkbox chrome is neutral gray by default; Today rows swap stroke
-  /// and fill to `Theme.todayAccent` so the checkbox itself signals the
-  /// promotion (no inset sun glyph).
+  /// and fill to `Theme.todayAccent`; Someday rows use `Theme.somedayAccent`.
   private var boxStrokeColor: Color {
-    isToday ? Theme.todayAccent : Theme.inkSecondary.opacity(0.55)
+    if isToday   { return Theme.todayAccent }
+    if isSomeday { return Theme.somedayAccent }
+    return Theme.inkSecondary.opacity(0.55)
   }
   private var boxFillColor: Color {
-    isToday ? Theme.todayAccent : Theme.inkSecondary.opacity(0.85)
+    if isToday   { return Theme.todayAccent }
+    if isSomeday { return Theme.somedayAccent }
+    return Theme.inkSecondary.opacity(0.85)
   }
 
   var body: some View {
@@ -104,6 +110,7 @@ struct InlineEditTaskRow: View {
   /// so it can suppress the indicator on the Today filter (where every
   /// row carries it implicitly).
   var isToday: Bool = false
+  var isSomeday: Bool = false
   /// Auto-focus the title field on appear. True when the row was just
   /// created via ⌘N / + (so the user can start typing immediately);
   /// false for editing an existing task (user explicitly taps the
@@ -128,7 +135,7 @@ struct InlineEditTaskRow: View {
 
   var body: some View {
     HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
-      TaskCheckbox(isDone: isDone, isToday: isToday, onToggle: onToggleDone)
+      TaskCheckbox(isDone: isDone, isToday: isToday, isSomeday: isSomeday, onToggle: onToggleDone)
         .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 
       VStack(alignment: .leading, spacing: 4) {

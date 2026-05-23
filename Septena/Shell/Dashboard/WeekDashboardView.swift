@@ -329,10 +329,10 @@ struct WeekDashboardView: View {
     async let ntarget = try? await client.nutritionMacrosConfig()
     async let asum = try? await client.airSummary()
     async let ahist = try? await client.airHistory(days: 7)
-    async let groc = try? await client.groceries()
+    let gRes: [GroceryItem]? = ChecklistMirror.loadGroceryItems(context: modelContext)
     let (ca, e, t, o) = await (car, ents, tc, on)
     let (ns, ne, nt) = await (nstats, nents, ntarget)
-    let (asRes, ahRes, gRes) = await (asum, ahist, groc)
+    let (asRes, ahRes) = await (asum, ahist)
     if let colors = appSettings?.nutrition?.macroColors {
       macroColors = colors
       ResponseCache.save(colors, forKey: CacheKey.macroColors)
@@ -619,10 +619,9 @@ struct WeekDashboardView: View {
       supplementHistory = s.daily.map { $0.done }
       ResponseCache.save(supplementHistory, forKey: CacheKey.supplementHistory)
     case .groceries:
-      if let g = try? await client.groceries() {
-        groceries = g
-        ResponseCache.save(g, forKey: CacheKey.groceries)
-      }
+      let g = ChecklistMirror.loadGroceryItems(context: modelContext)
+      groceries = g
+      ResponseCache.save(g, forKey: CacheKey.groceries)
     case .tasks:
       async let tc = try? await TaskReads.counts(
         client: client, context: LocalStore.shared.container.mainContext)
@@ -1058,14 +1057,10 @@ struct WeekDashboardView: View {
   }
 
   private func commitGroceryMarkLow(_ item: GroceryItem) {
-    outbox.enqueue(method: "PATCH", path: "/api/groceries/item/\(item.id)",
-                   body: ["low": true], kind: "groceries.patch")
-    // Optimistic local flip so the same menu re-opened a moment later
-    // doesn't re-list the item under "stocked." Matches the optimistic
-    // patterns in other tile menus (acted sets in NextItemsModel).
-    if let idx = groceries.firstIndex(where: { $0.id == item.id }) {
-      groceries[idx].low = true
-    }
+    SeptenaServices.shared.groceryMutator.setLow(id: item.id, low: true)
+    // Refresh the tile state from SwiftData so the same menu re-opened a
+    // moment later doesn't re-list this item under "stocked."
+    groceries = ChecklistMirror.loadGroceryItems(context: modelContext)
     AddInfoSection.groceries.notifyTilesChanged()
     Haptics.tick()
   }

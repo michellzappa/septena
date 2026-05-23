@@ -1,16 +1,18 @@
 import SwiftUI
+import SwiftData
 
 // Type-to-create groceries. Stocked items are shown below — tap to flip
 // `low` so the user can mark them as needed without leaving the palette.
 
 struct AddGroceryPage: View {
-  @Environment(SeptenaClient.self) private var client
-  @Environment(HTTPOutbox.self) private var outbox
+  @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
   @State private var items: [GroceryItem] = []
   @State private var working = false
+
+  private var grocery: GroceryMutator { SeptenaServices.shared.groceryMutator }
 
   private var trimmed: String {
     router.query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -52,31 +54,30 @@ struct AddGroceryPage: View {
         }
       }
     }
-    .task { await load() }
+    .task { load() }
     #if os(iOS)
     .listStyle(.insetGrouped)
     #endif
   }
 
   private func create(name: String) {
-    outbox.enqueue(method: "POST", path: "/api/groceries/item",
-                   body: ["name": name, "category": "other"],
-                   kind: "groceries.add")
+    // Default new items to low=true since the user is creating them
+    // from the QuickAdd palette — implicit "I need this".
+    let entity = grocery.addItem(name: name, category: "other")
+    grocery.setLow(id: entity.id, low: true)
     AddInfoSection.groceries.notifyTilesChanged()
     Haptics.tick()
     dismiss()
   }
 
   private func markLow(_ item: GroceryItem) {
-    outbox.enqueue(method: "PATCH", path: "/api/groceries/item/\(item.id)",
-                   body: ["low": true],
-                   kind: "groceries.patch")
+    grocery.setLow(id: item.id, low: true)
     AddInfoSection.groceries.notifyTilesChanged()
     Haptics.tick()
     dismiss()
   }
 
-  private func load() async {
-    items = (try? await client.groceries()) ?? []
+  private func load() {
+    items = ChecklistMirror.loadGroceryItems(context: modelContext)
   }
 }

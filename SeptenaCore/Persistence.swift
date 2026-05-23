@@ -657,6 +657,60 @@ final class CannabisEventEntity {
 }
 
 @Model
+final class GroceryItemEntity {
+  @Attribute(.unique) var id: String
+  var name: String
+  var category: String
+  var emoji: String
+  var low: Bool
+  var lastBought: String?
+  var sortIndex: Int
+  var updatedAt: Date
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       name: String,
+       category: String,
+       emoji: String = "",
+       low: Bool = false,
+       lastBought: String? = nil,
+       sortIndex: Int = 0,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.name = name
+    self.category = category
+    self.emoji = emoji
+    self.low = low
+    self.lastBought = lastBought
+    self.sortIndex = sortIndex
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
+@Model
+final class GroceryCategoryEntity {
+  @Attribute(.unique) var id: String
+  var name: String
+  var sortIndex: Int
+  var updatedAt: Date
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       name: String,
+       sortIndex: Int = 0,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.name = name
+    self.sortIndex = sortIndex
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
+@Model
 final class CannabisStrainEntity {
   @Attribute(.unique) var id: String
   var name: String
@@ -931,6 +985,38 @@ enum CannabisEventCloudKitSchema {
   static func recordName(for id: String) -> String { "cannabis-event:\(id)" }
   static func entityID(from recordName: String) -> String {
     String(recordName.dropFirst("cannabis-event:".count))
+  }
+}
+
+enum GroceryItemCloudKitSchema {
+  static let recordType = "GroceryItem"
+
+  enum Field {
+    static let name = "name"
+    static let category = "category"
+    static let emoji = "emoji"
+    static let low = "low"
+    static let lastBought = "lastBought"
+    static let sortIndex = "sortIndex"
+  }
+
+  static func recordName(for id: String) -> String { "grocery-item:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("grocery-item:".count))
+  }
+}
+
+enum GroceryCategoryCloudKitSchema {
+  static let recordType = "GroceryCategory"
+
+  enum Field {
+    static let name = "name"
+    static let sortIndex = "sortIndex"
+  }
+
+  static func recordName(for id: String) -> String { "grocery-cat:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("grocery-cat:".count))
   }
 }
 
@@ -1307,6 +1393,65 @@ extension CannabisEventEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
+extension GroceryItemEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: GroceryItemCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: GroceryItemCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[GroceryItemCloudKitSchema.Field.name] = name
+    record[GroceryItemCloudKitSchema.Field.category] = category
+    record[GroceryItemCloudKitSchema.Field.emoji] = emoji
+    record[GroceryItemCloudKitSchema.Field.low] = low ? 1 : 0
+    record[GroceryItemCloudKitSchema.Field.lastBought] = lastBought
+    record[GroceryItemCloudKitSchema.Field.sortIndex] = sortIndex
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let value = record[GroceryItemCloudKitSchema.Field.name] as? String { name = value }
+    if let value = record[GroceryItemCloudKitSchema.Field.category] as? String { category = value }
+    if let value = record[GroceryItemCloudKitSchema.Field.emoji] as? String { emoji = value }
+    if let value = record[GroceryItemCloudKitSchema.Field.low] as? Int { low = value != 0 }
+    lastBought = optionalChecklistString(record[GroceryItemCloudKitSchema.Field.lastBought])
+    if let value = record[GroceryItemCloudKitSchema.Field.sortIndex] as? Int { sortIndex = value }
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: GroceryItemCloudKitSchema.entityID(from: record.recordID.recordName),
+              name: "", category: "other")
+    apply(record)
+  }
+}
+
+extension GroceryCategoryEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: GroceryCategoryCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: GroceryCategoryCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[GroceryCategoryCloudKitSchema.Field.name] = name
+    record[GroceryCategoryCloudKitSchema.Field.sortIndex] = sortIndex
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let value = record[GroceryCategoryCloudKitSchema.Field.name] as? String { name = value }
+    if let value = record[GroceryCategoryCloudKitSchema.Field.sortIndex] as? Int { sortIndex = value }
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: GroceryCategoryCloudKitSchema.entityID(from: record.recordID.recordName), name: "")
+    apply(record)
+  }
+}
+
 extension CannabisStrainEntity: ChecklistCloudKitBackedEntity {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
@@ -1351,6 +1496,7 @@ final class LocalStore {
                          GutEventEntity.self,
                          CaffeineEventEntity.self, CaffeineBeanEntity.self,
                          CannabisEventEntity.self, CannabisStrainEntity.self,
+                         GroceryItemEntity.self, GroceryCategoryEntity.self,
                          OutboxEntity.self, HTTPOutboxEntity.self])
     // Explicitly opt OUT of NSPersistentCloudKitContainer mirroring. Having
     // CloudKit in the target entitlements would otherwise switch SwiftData

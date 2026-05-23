@@ -851,4 +851,66 @@ enum ChecklistMirror {
     ))) ?? []
     return entities.map { CannabisStrain(id: $0.id, name: $0.name) }
   }
+
+  // MARK: - Groceries (CloudKit-backed)
+
+  /// Seed SwiftData from the FastAPI snapshot. Upserts items + categories
+  /// by id and deletes anything the server doesn't know about. No history
+  /// — the user explicitly said groceries is a current-state list only.
+  static func replaceAllGroceries(items: [GroceryItem],
+                                  categories: [GroceryCategory],
+                                  context: ModelContext) {
+    let existingItems = (try? context.fetch(FetchDescriptor<GroceryItemEntity>())) ?? []
+    let itemsByID = Dictionary(uniqueKeysWithValues: existingItems.map { ($0.id, $0) })
+    var seenItems = Set<String>()
+    for (idx, item) in items.enumerated() {
+      seenItems.insert(item.id)
+      let entity = itemsByID[item.id] ?? GroceryItemEntity(id: item.id,
+                                                           name: item.name,
+                                                           category: item.category,
+                                                           emoji: item.emoji)
+      entity.name = item.name
+      entity.category = item.category
+      entity.emoji = item.emoji
+      entity.low = item.low
+      entity.lastBought = item.lastBought
+      entity.sortIndex = idx
+      entity.updatedAt = .now
+      if entity.modelContext == nil { context.insert(entity) }
+    }
+    for entity in existingItems where !seenItems.contains(entity.id) {
+      context.delete(entity)
+    }
+
+    let existingCats = (try? context.fetch(FetchDescriptor<GroceryCategoryEntity>())) ?? []
+    let catsByID = Dictionary(uniqueKeysWithValues: existingCats.map { ($0.id, $0) })
+    var seenCats = Set<String>()
+    for (idx, cat) in categories.enumerated() {
+      seenCats.insert(cat.id)
+      let entity = catsByID[cat.id] ?? GroceryCategoryEntity(id: cat.id, name: cat.name, sortIndex: idx)
+      entity.name = cat.name
+      entity.sortIndex = idx
+      entity.updatedAt = .now
+      if entity.modelContext == nil { context.insert(entity) }
+    }
+    for entity in existingCats where !seenCats.contains(entity.id) {
+      context.delete(entity)
+    }
+    try? context.save()
+  }
+
+  static func loadGroceryItems(context: ModelContext) -> [GroceryItem] {
+    let entities = (try? context.fetch(FetchDescriptor<GroceryItemEntity>(
+      sortBy: [SortDescriptor(\.sortIndex), SortDescriptor(\.name, comparator: .localizedStandard)]
+    ))) ?? []
+    return entities.map { GroceryItem(id: $0.id, name: $0.name, category: $0.category,
+                                      emoji: $0.emoji, low: $0.low, lastBought: $0.lastBought) }
+  }
+
+  static func loadGroceryCategories(context: ModelContext) -> [GroceryCategory] {
+    let entities = (try? context.fetch(FetchDescriptor<GroceryCategoryEntity>(
+      sortBy: [SortDescriptor(\.sortIndex), SortDescriptor(\.name, comparator: .localizedStandard)]
+    ))) ?? []
+    return entities.map { GroceryCategory(id: $0.id, name: $0.name) }
+  }
 }

@@ -810,6 +810,7 @@ final class ChecklistCloudKitBootstrapper {
     static let gut         = "septena.bootstrap.gut.v1"
     static let caffeine    = "septena.bootstrap.caffeine.v1"
     static let cannabis    = "septena.bootstrap.cannabis.v1"
+    static let groceries   = "septena.bootstrap.groceries.v1"
   }
 
   /// First-run bridge for habits/supplements/chores. Seeds the local
@@ -904,6 +905,22 @@ final class ChecklistCloudKitBootstrapper {
         defaults.set(true, forKey: BootstrapKey.cannabis)
         importedAny = true
         SeptenaLog.info("[Bootstrap] cannabis imported: entries=\(cannabis.entries.count) strains=\(cannabis.strains.count)")
+      }
+    }
+
+    // Groceries is a snapshot section — no history, just the current
+    // pantry + category list. /api/groceries already returns both in one
+    // call, so no /export endpoint is needed.
+    if force || !defaults.bool(forKey: BootstrapKey.groceries) {
+      if let groceries = try? await client.groceriesFull() {
+        let categories = groceries.categories.isEmpty ? DEFAULT_GROCERY_CATEGORIES : groceries.categories
+        ChecklistMirror.replaceAllGroceries(items: groceries.items,
+                                            categories: categories,
+                                            context: context)
+        queueGroceryMirrorForUpload()
+        defaults.set(true, forKey: BootstrapKey.groceries)
+        importedAny = true
+        SeptenaLog.info("[Bootstrap] groceries imported: items=\(groceries.items.count) cats=\(categories.count)")
       }
     }
 
@@ -1021,6 +1038,17 @@ final class ChecklistCloudKitBootstrapper {
     }
     for strain in strains {
       engine.noteCannabisStrainChange(id: strain.id)
+    }
+  }
+
+  private func queueGroceryMirrorForUpload() {
+    let items = (try? context.fetch(FetchDescriptor<GroceryItemEntity>())) ?? []
+    let cats = (try? context.fetch(FetchDescriptor<GroceryCategoryEntity>())) ?? []
+    for item in items {
+      engine.noteGroceryItemChange(id: item.id)
+    }
+    for cat in cats {
+      engine.noteGroceryCategoryChange(id: cat.id)
     }
   }
 }

@@ -1,15 +1,18 @@
 import SwiftUI
+import SwiftData
 
-// Groceries mini-app — pantry list with a "low" flag per item. Two
+// Groceries mini-app — pantry list with a "low" flag per item. Reads
+// from SwiftData (CloudKit-synced) and writes via GroceryMutator. Two
 // sections: items currently marked low (shopping list) above the full
 // stocked pantry, with stocked items grouped by user-defined category in
 // the user's chosen order. Tap a row to toggle low ↔ in-stock; tap the
 // emoji/name to edit. Category management lives in the webapp.
 
 struct GroceriesDestinationView: View {
-  @Environment(SeptenaClient.self) private var client
-  @Environment(HTTPOutbox.self) private var outbox
+  @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
+
+  private var grocery: GroceryMutator { SeptenaServices.shared.groceryMutator }
 
   @State private var items: [GroceryItem] = []
   @State private var categories: [GroceryCategory] = DEFAULT_GROCERY_CATEGORIES
@@ -135,22 +138,22 @@ struct GroceriesDestinationView: View {
           .tint(accent)
       }
     }
-    .task {
-      paintFromCache()
-      await load()
+    .task { reload() }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
+      reload()
     }
     .sheet(item: $editing) { item in
       EditGroceryItemSheet(
         original: item,
         categories: categories,
-        onDone: { updated in if let updated { applyLocalUpdate(updated) } }
+        onDone: { _ in reload() }
       )
     }
     .sheet(isPresented: $creating) {
       EditGroceryItemSheet(
         original: nil,
         categories: categories,
-        onDone: { _ in Task { await load() } }
+        onDone: { _ in reload() }
       )
       #if os(iOS)
       .presentationDetents([.medium, .large])
@@ -159,57 +162,25 @@ struct GroceriesDestinationView: View {
     }
   }
 
-  private func applyLocalUpdate(_ updated: GroceryItem) {
-    guard let idx = items.firstIndex(where: { $0.id == updated.id }) else { return }
-    items[idx] = updated
-    ResponseCache.save(items, forKey: Self.cacheKey)
-  }
 
   private func delete(_ item: GroceryItem) {
-    outbox.enqueue(
-      method: "DELETE",
-      path: "/api/groceries/item/\(item.id)",
-      body: nil,
-      kind: "groceries.delete"
-    )
-    items.removeAll { $0.id == item.id }
-    ResponseCache.save(items, forKey: Self.cacheKey)
+    grocery.deleteItem(id: item.id)
+    reload()
     Haptics.warning()
   }
 
   // MARK: - Actions
 
   private func toggle(_ item: GroceryItem) {
-    let next = !item.low
-    if let i = items.firstIndex(where: { $0.id == item.id }) {
-      items[i].low = next   // optimistic flip
-    }
+    grocery.setLow(id: item.id, low: !item.low)
+    reload()
     Haptics.tap()
-    outbox.enqueue(method: "PATCH",
-                   path: "/api/groceries/item/\(item.id)",
-                   body: ["low": next],
-                   kind: "groceries.patch")
   }
 
-  private static let cacheKey = "groceries.items"
-  private static let categoriesCacheKey = "groceries.categories"
-
-  private func paintFromCache() {
-    if let v = ResponseCache.load([GroceryItem].self, forKey: Self.cacheKey) { items = v }
-    if let c = ResponseCache.load([GroceryCategory].self, forKey: Self.categoriesCacheKey), !c.isEmpty {
-      categories = c
-    }
-    loading = false
-  }
-
-  private func load() async {
-    loading = true
-    if let res = try? await client.groceriesFull() {
-      items = res.items
-      categories = res.categories
-      ResponseCache.save(res.items, forKey: Self.cacheKey)
-      ResponseCache.save(res.categories, forKey: Self.categoriesCacheKey)
-    }
+  private func reload() {
+    items = ChecklistMirror.loadGroceryItems(context: modelContext)
+    let cats = ChecklistMirror.loadGroceryCategories(context: modelContext)
+    categories = cats.isEmpty ? DEFAULT_GROCERY_CATEGORIES : cats
     loading = false
   }
 }
