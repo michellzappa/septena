@@ -815,6 +815,7 @@ struct SectionDetailPane: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(CKEngine.self) private var ckEngine
   let sectionKey: String
+  @State private var showingColorPicker = false
 
   /// Local task prefs — only read for `sectionKey == "tasks"`, but
   /// SwiftUI requires the property be declared at view-init so the
@@ -851,9 +852,22 @@ struct SectionDetailPane: View {
   private var identitySection: some View {
     Section {
       HStack(spacing: 12) {
-        RoundedRectangle(cornerRadius: 6, style: .continuous)
-          .fill(accent)
-          .frame(width: 28, height: 28)
+        Button {
+          showingColorPicker.toggle()
+        } label: {
+          RoundedRectangle(cornerRadius: 6, style: .continuous)
+            .fill(accent)
+            .frame(width: 28, height: 28)
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $showingColorPicker, arrowEdge: .leading) {
+          PaletteSwatchGrid(selectedHex: server?.color ?? "") { hex in
+            updateColor(hex)
+            showingColorPicker = false
+          }
+          .padding(12)
+          .presentationCompactAdaptation(.popover)
+        }
         VStack(alignment: .leading, spacing: 1) {
           Text(label).foregroundStyle(.primary)
           Text(sectionKey)
@@ -861,9 +875,6 @@ struct SectionDetailPane: View {
             .foregroundStyle(.secondary)
         }
         Spacer()
-      }
-      PaletteSwatchGrid(selectedHex: server?.color ?? "") { hex in
-        updateColor(hex)
       }
     } footer: {
       if let m = manifest, !m.shortDescription.isEmpty {
@@ -1571,10 +1582,52 @@ private enum MigrationDomainState {
   }
 }
 
+/// Snapshot of per-domain SwiftData row counts shown next to each Sync row.
+/// `fetch` is a single pass over the model container — fine to call on view
+/// appear and on `.septenaDataChanged`.
+private struct DomainCounts {
+  var tasks: Int = 0          // tasks + areas + projects
+  var habits: Int = 0
+  var supplements: Int = 0
+  var chores: Int = 0
+  var goals: Int = 0
+  var sections: Int = 0       // sections + (1 for settings if present)
+  var gut: Int = 0
+  var caffeine: Int = 0
+  var cannabis: Int = 0
+  var groceries: Int = 0
+  var training: Int = 0       // entries only — the user-meaningful number
+
+  static let empty = DomainCounts()
+
+  @MainActor
+  static func fetch(context: ModelContext) -> DomainCounts {
+    func count<T: PersistentModel>(_ type: T.Type) -> Int {
+      (try? context.fetchCount(FetchDescriptor<T>())) ?? 0
+    }
+    var c = DomainCounts()
+    c.tasks       = count(TaskEntity.self) + count(AreaEntity.self) + count(ProjectEntity.self)
+    c.habits      = count(HabitDefinitionEntity.self)
+    c.supplements = count(SupplementDefinitionEntity.self)
+    c.chores      = count(ChoreDefinitionEntity.self)
+    c.goals       = count(GoalEntity.self)
+    c.sections    = count(SectionEntity.self) + count(SettingsEntity.self)
+    c.gut         = count(GutEventEntity.self)
+    c.caffeine    = count(CaffeineEventEntity.self)
+    c.cannabis    = count(CannabisEventEntity.self)
+    c.groceries   = count(GroceryItemEntity.self)
+    c.training    = count(ExerciseEntryEntity.self)
+    return c
+  }
+}
+
 private struct MigrationDomainRow: View {
   let name: String
   let detail: String
   let state: MigrationDomainState
+  /// Local SwiftData entry count. `nil` for legacy/native sections that
+  /// don't have a local mirror (FastAPI/HealthKit/EventKit).
+  var count: Int? = nil
 
   var body: some View {
     HStack {
@@ -1582,6 +1635,12 @@ private struct MigrationDomainRow: View {
         .foregroundStyle(state.color)
       Text(name)
       Spacer()
+      if let count {
+        Text("\(count)")
+          .monospacedDigit()
+          .foregroundStyle(.secondary)
+        Text("·").foregroundStyle(.tertiary)
+      }
       Text(detail)
         .foregroundStyle(.secondary)
     }
@@ -1611,6 +1670,10 @@ struct SyncSettingsPane: View {
   /// pinpoint where the two SwiftData mirrors disagree.
   @State private var inboxDiag: String = ""
   @State private var isDiagnosing = false
+  /// Per-section local entry counts shown alongside each Sync row. Refreshed
+  /// on appear and whenever data changes; useful for spotting bootstrap
+  /// misses (e.g. Training showing 0 after a re-import).
+  @State private var domainCounts: DomainCounts = .empty
   @State private var isInspecting = false
   @State private var inspectorReport: ServerInspectorReport?
 
@@ -1700,17 +1763,17 @@ struct SyncSettingsPane: View {
         // Per-section breakdown of current backend. Order matches
         // SectionManifest.all (catalog order) so the list lines up with
         // the sidebar above. Tasks bundles areas + projects.
-        MigrationDomainRow(name: "Tasks (+ areas, projects)", detail: "CloudKit", state: .cloudKit)
-        MigrationDomainRow(name: "Habits",                    detail: "CloudKit", state: .cloudKit)
-        MigrationDomainRow(name: "Supplements",               detail: "CloudKit", state: .cloudKit)
-        MigrationDomainRow(name: "Chores",                    detail: "CloudKit", state: .cloudKit)
-        MigrationDomainRow(name: "Goals",                     detail: "CloudKit", state: .cloudKit)
-        MigrationDomainRow(name: "Settings + Sections",       detail: "CloudKit", state: .cloudKit)
-        MigrationDomainRow(name: "Gut",                       detail: "CloudKit", state: .cloudKit)
-        MigrationDomainRow(name: "Caffeine",                  detail: "CloudKit", state: .cloudKit)
-        MigrationDomainRow(name: "Cannabis",                  detail: "CloudKit", state: .cloudKit)
-        MigrationDomainRow(name: "Groceries",                 detail: "CloudKit", state: .cloudKit)
-        MigrationDomainRow(name: "Training",                  detail: "CloudKit", state: .cloudKit)
+        MigrationDomainRow(name: "Tasks (+ areas, projects)", detail: "CloudKit", state: .cloudKit, count: domainCounts.tasks)
+        MigrationDomainRow(name: "Habits",                    detail: "CloudKit", state: .cloudKit, count: domainCounts.habits)
+        MigrationDomainRow(name: "Supplements",               detail: "CloudKit", state: .cloudKit, count: domainCounts.supplements)
+        MigrationDomainRow(name: "Chores",                    detail: "CloudKit", state: .cloudKit, count: domainCounts.chores)
+        MigrationDomainRow(name: "Goals",                     detail: "CloudKit", state: .cloudKit, count: domainCounts.goals)
+        MigrationDomainRow(name: "Settings + Sections",       detail: "CloudKit", state: .cloudKit, count: domainCounts.sections)
+        MigrationDomainRow(name: "Gut",                       detail: "CloudKit", state: .cloudKit, count: domainCounts.gut)
+        MigrationDomainRow(name: "Caffeine",                  detail: "CloudKit", state: .cloudKit, count: domainCounts.caffeine)
+        MigrationDomainRow(name: "Cannabis",                  detail: "CloudKit", state: .cloudKit, count: domainCounts.cannabis)
+        MigrationDomainRow(name: "Groceries",                 detail: "CloudKit", state: .cloudKit, count: domainCounts.groceries)
+        MigrationDomainRow(name: "Training",                  detail: "CloudKit", state: .cloudKit, count: domainCounts.training)
         MigrationDomainRow(name: "Nutrition",                 detail: "FastAPI",  state: .legacy)
         MigrationDomainRow(name: "Sleep",                     detail: "FastAPI",  state: .legacy)
         MigrationDomainRow(name: "Body",                      detail: "FastAPI",  state: .legacy)
@@ -1797,12 +1860,22 @@ struct SyncSettingsPane: View {
       #endif
     }
     .formStyle(.grouped)
-    .onAppear { serverURL = nav.serverURL }
+    .onAppear {
+      serverURL = nav.serverURL
+      refreshDomainCounts()
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
+      refreshDomainCounts()
+    }
     #if DEBUG
     .sheet(item: $inspectorReport) { report in
       ServerInspectorSheet(report: report, onAction: handleInspectorAction)
     }
     #endif
+  }
+
+  private func refreshDomainCounts() {
+    domainCounts = DomainCounts.fetch(context: modelContext)
   }
 
   private var lastSyncedDescription: String {
