@@ -981,6 +981,36 @@ final class TrainingDraftStore {
     suggested = s.suggested?.type
   }
 
+  /// Re-hydrate progression context (last-entry, PR baselines, recents)
+  /// and nil-fill any missing prefill fields on the active draft. Safe
+  /// to call repeatedly; never overwrites user-set values. Pays for
+  /// itself when a draft persisted by an older build is loaded against
+  /// a newer prefill / casing rule.
+  func backfillDraftFromHistory(context: ModelContext) {
+    guard var d = draft else { return }
+    let exercises = d.entries.map(\.exercise)
+    let last = ChecklistMirror.loadLastEntries(context: context, exercises: exercises)
+    let lastByLowered = Dictionary(uniqueKeysWithValues: exercises.compactMap { ex -> (String, LastEntryValues)? in
+      guard let v = last[ex] else { return nil }
+      return (ex.lowercased(), v)
+    })
+    d.lastByExercise = lastByLowered
+    d.prBaselines = TrainingPRCalculator.baselines(for: exercises, in: context)
+    d.recentByExercise = TrainingPRCalculator.recents(for: exercises, in: context, limit: 3)
+
+    for i in d.entries.indices {
+      guard let l = last[d.entries[i].exercise] else { continue }
+      if d.entries[i].weight == nil, let v = l.weight { d.entries[i].weight = v }
+      if d.entries[i].sets == nil, let s = l.sets, let n = Int(s) { d.entries[i].sets = n }
+      if (d.entries[i].reps ?? "").isEmpty, let v = l.reps { d.entries[i].reps = v }
+      if d.entries[i].durationMin == nil, let v = l.durationMin { d.entries[i].durationMin = v }
+      if d.entries[i].distanceM == nil, let v = l.distanceM { d.entries[i].distanceM = v }
+      if d.entries[i].level == nil, let v = l.level { d.entries[i].level = v }
+    }
+    draft = d
+    persist()
+  }
+
 
   // MARK: - Start / discard
 
@@ -1131,6 +1161,11 @@ struct TrainingSessionView: View {
       if store.sessionTypes.isEmpty {
         store.refreshCatalog(context: modelContext)
       }
+      // Bring any persisted draft up to date against the current
+      // prefill / muscle-inference rules. Safe to call when no draft
+      // exists (no-ops); fills empty weights / sets / reps that were
+      // missed when the draft was first built against older code.
+      store.backfillDraftFromHistory(context: modelContext)
       // Skip the picker when the dashboard's QuickAdd menu pre-selected
       // a type. We wait until after `refreshCatalog` so the lookup can
       // resolve labels → SessionTypeConfig. Cleared immediately so a
