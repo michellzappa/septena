@@ -641,6 +641,36 @@ struct ExerciseEntry: Codable, Identifiable, Hashable {
     case concludedAt = "concluded_at"
     case loggedAt = "logged_at"
   }
+
+  /// Explicit init for CloudKit-backed code paths — the custom decoder above
+  /// suppresses Swift's synthesized memberwise initializer.
+  init(date: String,
+       session: String,
+       exercise: String?,
+       weight: Double?,
+       sets: String?,
+       reps: String?,
+       difficulty: String?,
+       durationMin: Double?,
+       distanceM: Double?,
+       level: Double?,
+       file: String?,
+       concludedAt: String?,
+       loggedAt: String?) {
+    self.date = date
+    self.session = session
+    self.exercise = exercise
+    self.weight = weight
+    self.sets = sets
+    self.reps = reps
+    self.difficulty = difficulty
+    self.durationMin = durationMin
+    self.distanceM = distanceM
+    self.level = level
+    self.file = file
+    self.concludedAt = concludedAt
+    self.loggedAt = loggedAt
+  }
 }
 
 /// One day of cardio minutes; from `/api/training/cardio-history`. Used by
@@ -696,6 +726,24 @@ struct ProgressionPoint: Codable, Hashable {
     case date, weight, sets, reps, level, difficulty
     case durationMin = "duration_min"
     case distanceM = "distance_m"
+  }
+
+  init(date: String,
+       weight: Double? = nil,
+       sets: String? = nil,
+       reps: String? = nil,
+       difficulty: String? = nil,
+       durationMin: Double? = nil,
+       distanceM: Double? = nil,
+       level: Double? = nil) {
+    self.date = date
+    self.weight = weight
+    self.sets = sets
+    self.reps = reps
+    self.difficulty = difficulty
+    self.durationMin = durationMin
+    self.distanceM = distanceM
+    self.level = level
   }
 }
 
@@ -1222,6 +1270,30 @@ struct CannabisExportResponse: Codable {
   let strains: [CannabisStrain]
 }
 
+/// One exercise in the user-editable catalog. Drives the logger's
+/// "what fields does this exercise need" decision (strength = weight/sets/reps,
+/// cardio = duration/distance/level, etc).
+struct ExerciseDefinition: Codable, Identifiable, Hashable {
+  let id: String           // slug, e.g. "chest-press"
+  var name: String
+  var type: String         // strength|cardio|mobility|core
+  var subgroup: String?
+  var aliases: [String]?
+}
+
+/// Full snapshot from `GET /api/training/export`. iOS bootstrap calls this
+/// once to seed SwiftData with every historical entry plus both catalogs.
+struct TrainingExportResponse: Codable {
+  let entries: [ExerciseEntry]
+  let sessionTypes: [SessionTypeConfig]
+  let exercises: [ExerciseDefinition]
+
+  enum CodingKeys: String, CodingKey {
+    case entries, exercises
+    case sessionTypes = "session_types"
+  }
+}
+
 // MARK: - Settings
 //
 // Mirror of the webapp's AppSettings shape but trimmed to the fields the
@@ -1438,6 +1510,15 @@ struct SuggestedWorkoutResponse: Codable, Hashable {
     case suggested
     case daysAgo = "days_ago"
   }
+
+  init(suggested: SuggestedWorkout?, daysAgo: [String: Int]) {
+    self.suggested = suggested
+    self.daysAgo = daysAgo
+  }
+
+  static func make(suggested: SuggestedWorkout?, daysAgo: [String: Int]) -> SuggestedWorkoutResponse {
+    SuggestedWorkoutResponse(suggested: suggested, daysAgo: daysAgo)
+  }
 }
 
 // MARK: - Goals
@@ -1502,6 +1583,17 @@ struct SessionTypeConfig: Codable, Hashable, Identifiable {
   }
 
   enum CodingKeys: String, CodingKey { case id, label, emoji, exercises }
+
+  init(id: String, label: String, emoji: String?, exercises: [String]) {
+    self.id = id
+    self.label = label
+    self.emoji = emoji
+    self.exercises = exercises
+  }
+
+  static func make(id: String, label: String, emoji: String?, exercises: [String]) -> SessionTypeConfig {
+    SessionTypeConfig(id: id, label: label, emoji: emoji, exercises: exercises)
+  }
 }
 
 struct SessionTypesResponse: Codable {
@@ -1551,6 +1643,26 @@ struct LastEntryValues: Codable, Hashable {
   var isCardio: Bool {
     (durationMin ?? 0) > 0 || (distanceM ?? 0) > 0 || (level ?? 0) > 0
   }
+
+  init(date: String? = nil,
+       weight: Double? = nil,
+       sets: String? = nil,
+       reps: String? = nil,
+       difficulty: String? = nil,
+       durationMin: Double? = nil,
+       distanceM: Double? = nil,
+       level: Double? = nil) {
+    self.date = date
+    self.weight = weight
+    self.sets = sets
+    self.reps = reps
+    self.difficulty = difficulty
+    self.durationMin = durationMin
+    self.distanceM = distanceM
+    self.level = level
+  }
+
+  static let empty = LastEntryValues()
 }
 
 /// Per-exercise entry inside an in-progress draft session. Persisted to

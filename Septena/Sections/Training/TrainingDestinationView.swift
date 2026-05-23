@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import Charts
 
 // Training mini-app — historical log of exercise entries grouped by
@@ -8,7 +9,8 @@ import Charts
 
 struct TrainingDestinationView: View {
   @Environment(SeptenaClient.self) private var client
-  @Environment(HTTPOutbox.self) private var outbox
+  private var trainingMutator: TrainingMutator { SeptenaServices.shared.trainingMutator }
+  @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
   @Environment(NavigationState.self) private var nav
   @Environment(TrainingDraftStore.self) private var draftStore
@@ -146,14 +148,9 @@ struct TrainingDestinationView: View {
   }
 
   private func delete(_ entry: ExerciseEntry) {
-    guard let file = entry.file else { return }
-    outbox.enqueue(
-      method: "DELETE",
-      path: "/api/training/entries",
-      body: ["file": file],
-      kind: "training.delete"
-    )
-    entries.removeAll { $0.file == file }
+    guard let id = entry.file else { return }
+    trainingMutator.deleteEntry(id: id)
+    entries.removeAll { $0.file == id }
     ResponseCache.save(entries, forKey: CacheKey.entries)
     Haptics.warning()
   }
@@ -250,17 +247,12 @@ struct TrainingDestinationView: View {
   private func load() async {
     loading = true
     let since = sinceDate(daysBack: 90)
-    async let e: [ExerciseEntry]? = try? await client.trainingEntries(since: since)
-    async let c: CardioHistoryResponse? = try? await client.trainingCardioHistory(days: 30)
-    let (entriesRes, cardioRes) = await (e, c)
-    if let entriesRes {
-      entries = entriesRes
-      ResponseCache.save(entriesRes, forKey: CacheKey.entries)
-    }
-    if let cardioRes {
-      cardio = cardioRes
-      ResponseCache.save(cardioRes, forKey: CacheKey.cardio)
-    }
+    let entriesRes = ChecklistMirror.loadTrainingEntries(context: modelContext, since: since)
+    let cardioRes = ChecklistMirror.loadTrainingCardioHistory(context: modelContext, days: 30)
+    entries = entriesRes
+    ResponseCache.save(entriesRes, forKey: CacheKey.entries)
+    cardio = cardioRes
+    ResponseCache.save(cardioRes, forKey: CacheKey.cardio)
     loading = false
   }
 
@@ -791,9 +783,8 @@ struct TrainingDestinationView: View {
       return
     }
     progressionLoading = true
-    if let data = try? await client.trainingProgression(exercise: selectedExercise) {
-      progression = data
-    }
+    progression = ChecklistMirror.loadTrainingProgression(context: modelContext,
+                                                          exercise: selectedExercise)
     progressionLoading = false
   }
 
@@ -984,15 +975,11 @@ final class TrainingDraftStore {
   /// ≥3 upper-group exercises, "cardio" needs ≥30 Z2 min and no strength,
   /// etc.) — far richer than what we'd derive from the flat `session`
   /// field client-side. So we just read it directly.
-  func refreshCatalog(client: SeptenaClient) async {
-    async let types = try? await client.sessionTypes()
-    async let sw    = try? await client.suggestedWorkout()
-    let (t, s) = await (types, sw)
-    if let t { sessionTypes = t }
-    if let s {
-      daysAgo = s.daysAgo
-      suggested = s.suggested?.type
-    }
+  func refreshCatalog(context: ModelContext) {
+    sessionTypes = ChecklistMirror.loadSessionTypes(context: context)
+    let s = ChecklistMirror.loadSuggestedWorkout(context: context)
+    daysAgo = s.daysAgo
+    suggested = s.suggested?.type
   }
 
 
@@ -1000,10 +987,9 @@ final class TrainingDraftStore {
 
   /// Build a fresh draft for `type`, pre-filling each exercise from the
   /// user's last entry for it. Replaces any existing draft.
-  func start(type: SessionTypeConfig, client: SeptenaClient) async {
+  func start(type: SessionTypeConfig, context: ModelContext) {
     let exercises = type.exercises
-    let last: [String: LastEntryValues] =
-      (try? await client.lastEntries(exercises: exercises)) ?? [:]
+    let last = ChecklistMirror.loadLastEntries(context: context, exercises: exercises)
     let entries = exercises.map { ex in
       DraftEntry.from(exercise: ex, last: last[ex])
     }
@@ -1043,25 +1029,30 @@ final class TrainingDraftStore {
     persist()
   }
 
-  /// POST one entry to the backend and flip its status to `done` on
-  /// success / `failed` on error. Mirrors the webapp's per-exercise save.
-  func markDone(index: Int, client: SeptenaClient) async {
+  /// Save one entry locally via CloudKit-backed TrainingMutator. Flips the
+  /// row's status to `done` immediately; CK upload is fire-and-forget.
+  func markDone(index: Int, mutator: TrainingMutator) {
     guard let d = draft, d.entries.indices.contains(index) else { return }
     update { $0.entries[index].status = .saving }
-    do {
-      var entry = d.entries[index]
-      entry.status = .done
-      let written = try await client.postTrainingSession(
-        date: d.date, time: d.time, sessionType: d.sessionType,
-        entries: [entry]
-      )
-      update {
-        $0.entries[index].status = .done
-        $0.entries[index].savedFile = written.first
-      }
-    } catch {
-      SeptenaLog.error("training save failed", error)
-      update { $0.entries[index].status = .failed }
+    let entry = d.entries[index]
+    let saved = mutator.addEntry(
+      date: d.date,
+      time: d.time,
+      sessionType: d.sessionType,
+      exercise: entry.exercise,
+      weight: entry.weight,
+      sets: entry.sets.map(String.init),
+      reps: entry.reps,
+      difficulty: entry.difficulty.isEmpty ? nil : entry.difficulty,
+      durationMin: entry.durationMin,
+      distanceM: entry.distanceM,
+      level: entry.level.map(Double.init),
+      note: entry.note.isEmpty ? nil : entry.note,
+      concludedAt: "\(d.date)T\(d.time.isEmpty ? "00:00" : d.time):00"
+    )
+    update {
+      $0.entries[index].status = .done
+      $0.entries[index].savedFile = saved.id
     }
   }
 
@@ -1084,6 +1075,8 @@ final class TrainingDraftStore {
 
 struct TrainingSessionView: View {
   @Environment(SeptenaClient.self) private var client
+  private var trainingMutator: TrainingMutator { SeptenaServices.shared.trainingMutator }
+  @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
   @Environment(TrainingDraftStore.self) private var store
   @Environment(NavigationState.self) private var nav
@@ -1125,7 +1118,7 @@ struct TrainingSessionView: View {
     }
     .task {
       if store.sessionTypes.isEmpty {
-        await store.refreshCatalog(client: client)
+        store.refreshCatalog(context: modelContext)
       }
       // Skip the picker when the dashboard's QuickAdd menu pre-selected
       // a type. We wait until after `refreshCatalog` so the lookup can
@@ -1138,7 +1131,7 @@ struct TrainingSessionView: View {
            $0.label.caseInsensitiveCompare(pending) == .orderedSame
          }) {
         nav.pendingTrainingType = nil
-        await store.start(type: match, client: client)
+        store.start(type: match, context: modelContext)
       }
     }
   }
@@ -1274,7 +1267,7 @@ struct TrainingSessionView: View {
   // MARK: - Actions
 
   private func start(_ type: SessionTypeConfig) {
-    Task { await store.start(type: type, client: client) }
+    store.start(type: type, context: modelContext)
   }
 
   private func finish() {
@@ -1299,6 +1292,7 @@ struct TrainingSessionView: View {
 /// distance/level for cardio) plus the difficulty pills and a Done button.
 struct TrainingExerciseCard: View {
   @Environment(SeptenaClient.self) private var client
+  private var trainingMutator: TrainingMutator { SeptenaServices.shared.trainingMutator }
   @Environment(TrainingDraftStore.self) private var store
   @Environment(\.a11yMotion) private var motion
 
@@ -1418,10 +1412,8 @@ struct TrainingExerciseCard: View {
       Spacer()
       Button(entry.status == .failed ? "Retry"
              : entry.status == .done ? "Update" : "Done") {
-        Task {
-          await store.markDone(index: index, client: client)
-          if entry.status != .failed { expanded = false }
-        }
+        store.markDone(index: index, mutator: trainingMutator)
+        if entry.status != .failed { expanded = false }
       }
       .buttonStyle(.borderedProminent)
       .tint(accent)

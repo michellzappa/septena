@@ -215,6 +215,12 @@ func noteGroceryItemChange(id: String) { noteChange(recordName: GroceryItemCloud
 func noteGroceryItemDeletion(id: String) { noteDeletion(recordName: GroceryItemCloudKitSchema.recordName(for: id), kind: "groceryItem") }
 func noteGroceryCategoryChange(id: String) { noteChange(recordName: GroceryCategoryCloudKitSchema.recordName(for: id), kind: "groceryCategory") }
 func noteGroceryCategoryDeletion(id: String) { noteDeletion(recordName: GroceryCategoryCloudKitSchema.recordName(for: id), kind: "groceryCategory") }
+func noteExerciseEntryChange(id: String) { noteChange(recordName: ExerciseEntryCloudKitSchema.recordName(for: id), kind: "exerciseEntry") }
+func noteExerciseEntryDeletion(id: String) { noteDeletion(recordName: ExerciseEntryCloudKitSchema.recordName(for: id), kind: "exerciseEntry") }
+func noteExerciseDefinitionChange(id: String) { noteChange(recordName: ExerciseDefinitionCloudKitSchema.recordName(for: id), kind: "exerciseDefinition") }
+func noteExerciseDefinitionDeletion(id: String) { noteDeletion(recordName: ExerciseDefinitionCloudKitSchema.recordName(for: id), kind: "exerciseDefinition") }
+func noteSessionTypeChange(id: String) { noteChange(recordName: SessionTypeCloudKitSchema.recordName(for: id), kind: "sessionType") }
+func noteSessionTypeDeletion(id: String) { noteDeletion(recordName: SessionTypeCloudKitSchema.recordName(for: id), kind: "sessionType") }
 
   private func noteChange(recordName: String, kind: String) {
     guard let engine else {

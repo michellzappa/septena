@@ -415,6 +415,10 @@ final class SeptenaClient {
     try await getJSON("/api/cannabis/export", as: CannabisExportResponse.self)
   }
 
+  func trainingExport() async throws -> TrainingExportResponse {
+    try await getJSON("/api/training/export", as: TrainingExportResponse.self)
+  }
+
   func completeChore(id: String, date: String) async throws {
     let body: [String: Any] = ["chore_id": id, "date": date]
     _ = try await postJSON("/api/chores/complete", body: body, as: EmptyResponse.self)

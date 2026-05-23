@@ -245,7 +245,8 @@ final class SettingsStore {
     let needsLegacySections = mirroredSections.isEmpty
 
     async let macs  = try? await client.nutritionMacrosConfig()
-    async let sess  = try? await client.sessionTypes()
+    // Training session-types live in CloudKit — local mirror, no network.
+    let st: [SessionTypeConfig]? = ChecklistMirror.loadSessionTypes(context: context)
     // Chores/caffeine/cannabis are CloudKit-authoritative — pull from the
     // local mirror, not FastAPI.
     let ch: [ChoreItem]? = ChecklistMirror.loadChores(context: context)
@@ -258,7 +259,6 @@ final class SettingsStore {
       return CannabisConfig(strains: strains, usesPerCapsule: 3)
     }()
     let mc = await macs
-    let st = await sess
     // Only overwrite + cache the values where the network actually
     // returned something — failed fetches leave the (cache-primed)
     // values alone instead of wiping them to nil / empty.
@@ -738,8 +738,82 @@ private struct AppIconPreview: View {
 // only. Tasks is special-cased to host the local task prefs (badge,
 // today, sort) that used to live in a top-level Tasks pane.
 
+// MARK: - Palette
+
+private struct PaletteSwatch: Identifiable {
+  let id: String
+  let label: String
+  let hex: String
+}
+
+private let sectionPalette: [PaletteSwatch] = [
+  // Bright row — Tailwind 500
+  .init(id: "red",        label: "Red",        hex: "#ef4444"),
+  .init(id: "orange",     label: "Orange",     hex: "#f97316"),
+  .init(id: "amber",      label: "Amber",      hex: "#f59e0b"),
+  .init(id: "yellow",     label: "Yellow",     hex: "#eab308"),
+  .init(id: "lime",       label: "Lime",       hex: "#84cc16"),
+  .init(id: "green",      label: "Green",      hex: "#22c55e"),
+  .init(id: "emerald",    label: "Emerald",    hex: "#10b981"),
+  .init(id: "teal",       label: "Teal",       hex: "#14b8a6"),
+  .init(id: "cyan",       label: "Cyan",       hex: "#06b6d4"),
+  .init(id: "sky",        label: "Sky",        hex: "#0ea5e9"),
+  .init(id: "blue",       label: "Blue",       hex: "#3b82f6"),
+  .init(id: "indigo",     label: "Indigo",     hex: "#6366f1"),
+  .init(id: "violet",     label: "Violet",     hex: "#8b5cf6"),
+  .init(id: "purple",     label: "Purple",     hex: "#a855f7"),
+  .init(id: "pink",       label: "Pink",       hex: "#ec4899"),
+  .init(id: "rose",       label: "Rose",       hex: "#f43f5e"),
+  // Earth row — Tailwind 700/800 warm hues
+  .init(id: "terracotta", label: "Terracotta", hex: "#9a3412"),
+  .init(id: "brown",      label: "Brown",      hex: "#b45309"),
+  .init(id: "mustard",    label: "Mustard",    hex: "#854d0e"),
+  .init(id: "olive",      label: "Olive",      hex: "#3f6212"),
+  .init(id: "taupe",      label: "Taupe",      hex: "#78716c"),
+  .init(id: "espresso",   label: "Espresso",   hex: "#44403c"),
+]
+
+private struct PaletteSwatchGrid: View {
+  let selectedHex: String
+  let onSelect: (String) -> Void
+
+  private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 8)
+
+  var body: some View {
+    LazyVGrid(columns: columns, spacing: 8) {
+      ForEach(sectionPalette) { swatch in
+        let color = parseHexColor(swatch.hex)
+        let isSelected = selectedHex.lowercased() == swatch.hex.lowercased()
+        Button {
+          onSelect(swatch.hex)
+        } label: {
+          Circle()
+            .fill(color)
+            .frame(width: 28, height: 28)
+            .overlay(
+              Circle()
+                .strokeBorder(Color.primary.opacity(isSelected ? 0.9 : 0), lineWidth: 2)
+                .padding(isSelected ? -3 : 0)
+            )
+            .overlay(
+              Circle()
+                .strokeBorder(Color(UIColor.systemBackground), lineWidth: isSelected ? 2 : 0)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(swatch.label)
+      }
+    }
+    .padding(.vertical, 4)
+  }
+}
+
+// MARK: - Section detail pane
+
 struct SectionDetailPane: View {
   @Environment(SettingsStore.self) private var store
+  @Environment(\.modelContext) private var modelContext
+  @Environment(CKEngine.self) private var ckEngine
   let sectionKey: String
 
   /// Local task prefs — only read for `sectionKey == "tasks"`, but
@@ -788,10 +862,29 @@ struct SectionDetailPane: View {
         }
         Spacer()
       }
+      PaletteSwatchGrid(selectedHex: server?.color ?? "") { hex in
+        updateColor(hex)
+      }
     } footer: {
       if let m = manifest, !m.shortDescription.isEmpty {
         Text(m.shortDescription)
       }
+    }
+  }
+
+  private func updateColor(_ hex: String) {
+    let descriptor = FetchDescriptor<SectionEntity>(
+      predicate: #Predicate { $0.id == sectionKey }
+    )
+    guard let entity = try? modelContext.fetch(descriptor).first else { return }
+    entity.color = hex
+    entity.updatedAt = .now
+    try? modelContext.save()
+    ckEngine.noteSectionChange(id: sectionKey)
+    store.sections = store.sections.map { config in
+      config.key == sectionKey
+        ? SeptenaClient.SectionConfig(key: config.key, label: config.label, color: hex)
+        : config
     }
   }
 
@@ -975,6 +1068,7 @@ struct IntegrationsSettingsPane: View {
   @State private var remindersBridge = RemindersBridge.shared
   @State private var calendarBridge = CalendarBridge.shared
   @State private var healthBridge = HealthKitBridge.shared
+  @Environment(AranetBridge.self) private var aranetBridge
 
   var body: some View {
     Form {
@@ -1014,11 +1108,38 @@ struct IntegrationsSettingsPane: View {
         ) {
           Task { _ = await healthBridge.requestAccess() }
         }
+
+        // Aranet4 CO2 sensor — replaces the legacy Mac-Mini-based polling
+        // path. Detail pane has scan/forget controls + live status.
+        NavigationLink {
+          AranetIntegrationDetail()
+            .navigationTitle("Aranet")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+        } label: {
+          stateRow(title: "Aranet",
+                   systemImage: "sensor",
+                   state: aranetStateLabel,
+                   isGranted: aranetBridge.state == .connected)
+        }
       } footer: {
         Text("Grant access here, or manage permissions in iOS Settings → Privacy.")
       }
     }
     .formStyle(.grouped)
+  }
+
+  private var aranetStateLabel: String {
+    switch aranetBridge.state {
+    case .connected:    return "Connected"
+    case .connecting:   return "Connecting"
+    case .scanning:     return "Scanning"
+    case .disconnected: return "Disconnected"
+    case .bluetoothOff: return "Bluetooth off"
+    case .unauthorized: return "Denied"
+    case .idle:         return "Not connected"
+    }
   }
 
   private func stateRow(title: String,
@@ -1304,6 +1425,126 @@ private struct CalendarDetail: View {
   }
 }
 
+// MARK: - Aranet detail
+//
+// Reached from Integrations → Aranet. Shows live connection state +
+// latest reading, scan/forget controls, and a short explanation of the
+// foreground-only model. The bridge handles all CoreBluetooth state;
+// this view is purely a control + status surface.
+
+private struct AranetIntegrationDetail: View {
+  @Environment(AranetBridge.self) private var bridge
+
+  var body: some View {
+    Form {
+      Section {
+        statusRow
+      } header: {
+        Text("Status")
+      } footer: {
+        Text("Septena connects to your Aranet4 directly over Bluetooth while the app is open. Readings live on this device only — no backend involved.")
+      }
+
+      if let snap = bridge.latest {
+        Section("Latest reading") {
+          readingRow("CO2", "\(snap.co2Ppm) ppm")
+          readingRow("Temperature", String(format: "%.1f °C", snap.tempC))
+          readingRow("Humidity", "\(snap.humidityPct)%")
+          readingRow("Pressure", String(format: "%.1f hPa", snap.pressureHPa))
+          readingRow("Battery", "\(snap.batteryPct)%")
+        }
+      }
+
+      Section {
+        switch bridge.state {
+        case .idle, .disconnected, .bluetoothOff, .unauthorized:
+          Button {
+            bridge.start()
+          } label: {
+            Label("Scan for Aranet", systemImage: "magnifyingglass")
+          }
+          .disabled(bridge.state == .bluetoothOff || bridge.state == .unauthorized)
+        case .scanning, .connecting:
+          HStack {
+            ProgressView()
+            Text(bridge.state == .scanning ? "Scanning…" : "Connecting…")
+              .foregroundStyle(.secondary)
+            Spacer()
+            Button("Cancel") { bridge.stop() }
+          }
+        case .connected:
+          Button(role: .destructive) {
+            bridge.stop()
+          } label: {
+            Label("Disconnect", systemImage: "stop.circle")
+          }
+        }
+
+        // "Forget device" clears the stored peripheral identifier so the
+        // next scan picks a different Aranet — useful if the user
+        // swapped hardware. Always available; cheap operation.
+        Button(role: .destructive) {
+          bridge.forget()
+        } label: {
+          Label("Forget device", systemImage: "trash")
+        }
+      } footer: {
+        if let err = bridge.lastError {
+          Text(err).font(.caption).foregroundStyle(.orange)
+        }
+      }
+    }
+    .formStyle(.grouped)
+  }
+
+  private var statusRow: some View {
+    HStack(spacing: 10) {
+      Circle().fill(statusColor).frame(width: 10, height: 10)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(statusLabel).foregroundStyle(.primary)
+        if let name = bridge.deviceName {
+          Text(name).font(.caption).foregroundStyle(.secondary)
+        }
+      }
+      Spacer()
+    }
+  }
+
+  private func readingRow(_ label: String, _ value: String) -> some View {
+    HStack {
+      Text(label).foregroundStyle(.primary)
+      Spacer()
+      Text(value)
+        .font(.subheadline.monospacedDigit())
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  private var statusColor: Color {
+    switch bridge.state {
+    case .connected:    return .green
+    case .connecting,
+         .scanning:     return .yellow
+    case .bluetoothOff,
+         .unauthorized: return .red
+    case .disconnected: return .orange
+    case .idle:         return .secondary
+    }
+  }
+
+  private var statusLabel: String {
+    switch bridge.state {
+    case .connected:    return "Connected"
+    case .connecting:   return "Connecting…"
+    case .scanning:     return "Scanning…"
+    case .disconnected: return "Disconnected"
+    case .bluetoothOff: return "Bluetooth is off"
+    case .unauthorized: return "Bluetooth permission denied"
+    case .idle:         return "Not connected"
+    }
+  }
+}
+
 // MARK: - Sync
 
 private enum MigrationDomainState {
@@ -1469,7 +1710,7 @@ struct SyncSettingsPane: View {
         MigrationDomainRow(name: "Caffeine",                  detail: "CloudKit", state: .cloudKit)
         MigrationDomainRow(name: "Cannabis",                  detail: "CloudKit", state: .cloudKit)
         MigrationDomainRow(name: "Groceries",                 detail: "CloudKit", state: .cloudKit)
-        MigrationDomainRow(name: "Training",                  detail: "FastAPI",  state: .legacy)
+        MigrationDomainRow(name: "Training",                  detail: "CloudKit", state: .cloudKit)
         MigrationDomainRow(name: "Nutrition",                 detail: "FastAPI",  state: .legacy)
         MigrationDomainRow(name: "Sleep",                     detail: "FastAPI",  state: .legacy)
         MigrationDomainRow(name: "Body",                      detail: "FastAPI",  state: .legacy)
@@ -1739,6 +1980,9 @@ struct SyncSettingsPane: View {
       let strains = (try? modelContext.fetch(FetchDescriptor<CannabisStrainEntity>())) ?? []
       let groceries = (try? modelContext.fetch(FetchDescriptor<GroceryItemEntity>())) ?? []
       let groceryCats = (try? modelContext.fetch(FetchDescriptor<GroceryCategoryEntity>())) ?? []
+      let exEntries = (try? modelContext.fetch(FetchDescriptor<ExerciseEntryEntity>())) ?? []
+      let exDefs = (try? modelContext.fetch(FetchDescriptor<ExerciseDefinitionEntity>())) ?? []
+      let sessTypes = (try? modelContext.fetch(FetchDescriptor<SessionTypeEntity>())) ?? []
       for row in tasks { row.cloudKitSystemFields = nil }
       for row in areas { row.cloudKitSystemFields = nil }
       for row in projects { row.cloudKitSystemFields = nil }
@@ -1758,6 +2002,9 @@ struct SyncSettingsPane: View {
       for row in strains { row.cloudKitSystemFields = nil }
       for row in groceries { row.cloudKitSystemFields = nil }
       for row in groceryCats { row.cloudKitSystemFields = nil }
+      for row in exEntries { row.cloudKitSystemFields = nil }
+      for row in exDefs { row.cloudKitSystemFields = nil }
+      for row in sessTypes { row.cloudKitSystemFields = nil }
       try? modelContext.save()
       for row in tasks { ckEngine.noteTaskChange(id: row.id) }
       for row in areas { ckEngine.noteAreaChange(id: row.id) }
@@ -1778,12 +2025,16 @@ struct SyncSettingsPane: View {
       for row in strains { ckEngine.noteCannabisStrainChange(id: row.id) }
       for row in groceries { ckEngine.noteGroceryItemChange(id: row.id) }
       for row in groceryCats { ckEngine.noteGroceryCategoryChange(id: row.id) }
+      for row in exEntries { ckEngine.noteExerciseEntryChange(id: row.id) }
+      for row in exDefs { ckEngine.noteExerciseDefinitionChange(id: row.id) }
+      for row in sessTypes { ckEngine.noteSessionTypeChange(id: row.id) }
       let coreCount = tasks.count + areas.count + projects.count + settings.count + sections.count
       let checklistCount = habitDefs.count + habitStates.count + supDefs.count + supStates.count
         + choreDefs.count + choreEvents.count + goals.count
       let logCount = gut.count + caffeine.count + beans.count + cannabis.count + strains.count
       let groceryCount = groceries.count + groceryCats.count
-      let total = coreCount + checklistCount + logCount + groceryCount
+      let trainingCount = exEntries.count + exDefs.count + sessTypes.count
+      let total = coreCount + checklistCount + logCount + groceryCount + trainingCount
       migrationStatus = "✅ Zone reset and \(total) entities re-queued for upload."
     } catch {
       migrationStatus = "❌ Zone reset failed: \(error.localizedDescription)"

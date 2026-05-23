@@ -7,7 +7,7 @@ import SwiftUI
 // branches on cardio vs strength fields based on exercise type.
 
 struct EditExerciseEntrySheet: View {
-  @Environment(HTTPOutbox.self) private var outbox
+  private var trainingMutator: TrainingMutator { SeptenaServices.shared.trainingMutator }
   @Environment(\.dismiss) private var dismiss
 
   let original: ExerciseEntry
@@ -126,57 +126,57 @@ struct EditExerciseEntrySheet: View {
   }
 
   private func save() {
-    guard let file = original.file else { return }
-    var body: [String: Any] = ["file": file]
-    if isCardio {
-      body["duration_min"] = parseDouble(durationMin) ?? ""
-      body["distance_m"]   = parseInt(distanceM) ?? ""
-      body["level"]        = parseInt(level) ?? ""
-    } else {
-      body["weight"] = parseDouble(weight) ?? ""
-      body["sets"]   = parseInt(sets) ?? ""
-      body["reps"]   = parseInt(reps) ?? reps.trimmingCharacters(in: .whitespacesAndNewlines)
-      body["difficulty"] = difficulty
-    }
-    let noteValue = note.trimmingCharacters(in: .whitespacesAndNewlines)
-    body["note"] = noteValue
+    guard let id = original.file else { return }
+    let noteTrim = note.trimmingCharacters(in: .whitespacesAndNewlines)
+    let setsStr = parseInt(sets).map(String.init) ?? sets.trimmingCharacters(in: .whitespaces)
+    let repsStr = parseInt(reps).map(String.init) ?? reps.trimmingCharacters(in: .whitespaces)
 
-    outbox.enqueue(
-      method: "PUT",
-      path: "/api/training/entries",
-      body: body,
-      kind: "training.update"
-    )
+    if isCardio {
+      trainingMutator.updateEntry(
+        id: id,
+        weight: .some(nil),
+        sets: .some(nil),
+        reps: .some(nil),
+        difficulty: .some(nil),
+        durationMin: .some(parseDouble(durationMin)),
+        distanceM: .some(parseInt(distanceM).map(Double.init)),
+        level: .some(parseInt(level).map(Double.init)),
+        note: .some(noteTrim.isEmpty ? nil : noteTrim)
+      )
+    } else {
+      trainingMutator.updateEntry(
+        id: id,
+        weight: .some(parseDouble(weight)),
+        sets: .some(setsStr.isEmpty ? nil : setsStr),
+        reps: .some(repsStr.isEmpty ? nil : repsStr),
+        difficulty: .some(difficulty.isEmpty ? nil : difficulty),
+        durationMin: .some(nil),
+        distanceM: .some(nil),
+        level: .some(nil),
+        note: .some(noteTrim.isEmpty ? nil : noteTrim)
+      )
+    }
     Haptics.tick()
 
-    // Build optimistic local entry. `ExerciseEntry` has a custom decoder
-    // but no matching memberwise init exposed; we re-encode and decode to
-    // produce the updated value, keeping the same shape as a server
-    // round-trip.
-    var dict: [String: Any] = [
-      "date": original.date,
-      "session": original.session,
-      "exercise": original.exercise ?? "",
-      "file": file,
-    ]
-    if let c = original.concludedAt { dict["concluded_at"] = c }
-    if let l = original.loggedAt    { dict["logged_at"]    = l }
-    if isCardio {
-      if let v = parseDouble(durationMin) { dict["duration_min"] = v }
-      if let v = parseInt(distanceM)      { dict["distance_m"]   = v }
-      if let v = parseInt(level)          { dict["level"]        = v }
-    } else {
-      if let v = parseDouble(weight) { dict["weight"] = v }
-      if let v = parseInt(sets)      { dict["sets"]   = v }
-      if let v = parseInt(reps)      { dict["reps"]   = v } else if !reps.trimmingCharacters(in: .whitespaces).isEmpty {
-        dict["reps"] = reps
-      }
-      if !difficulty.isEmpty { dict["difficulty"] = difficulty }
-    }
-    if let data = try? JSONSerialization.data(withJSONObject: dict),
-       let rebuilt = try? JSONDecoder().decode(ExerciseEntry.self, from: data) {
-      onSave(rebuilt)
-    }
+    // Optimistic in-flight callback. Synthesize an updated entry so the
+    // caller's list refreshes immediately; the mirror reload via
+    // .septenaDataChanged will reconcile shortly after.
+    let updated = ExerciseEntry(
+      date: original.date,
+      session: original.session,
+      exercise: original.exercise,
+      weight: isCardio ? nil : parseDouble(weight),
+      sets: isCardio ? nil : (setsStr.isEmpty ? nil : setsStr),
+      reps: isCardio ? nil : (repsStr.isEmpty ? nil : repsStr),
+      difficulty: isCardio ? nil : (difficulty.isEmpty ? nil : difficulty),
+      durationMin: isCardio ? parseDouble(durationMin) : nil,
+      distanceM: isCardio ? parseInt(distanceM).map(Double.init) : nil,
+      level: isCardio ? parseInt(level).map(Double.init) : nil,
+      file: id,
+      concludedAt: original.concludedAt,
+      loggedAt: original.loggedAt
+    )
+    onSave(updated)
     dismiss()
   }
 }

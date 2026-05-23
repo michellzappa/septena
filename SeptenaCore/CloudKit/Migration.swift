@@ -811,6 +811,7 @@ final class ChecklistCloudKitBootstrapper {
     static let caffeine    = "septena.bootstrap.caffeine.v1"
     static let cannabis    = "septena.bootstrap.cannabis.v1"
     static let groceries   = "septena.bootstrap.groceries.v1"
+    static let training    = "septena.bootstrap.training.v1"
   }
 
   /// First-run bridge for habits/supplements/chores. Seeds the local
@@ -921,6 +922,17 @@ final class ChecklistCloudKitBootstrapper {
         defaults.set(true, forKey: BootstrapKey.groceries)
         importedAny = true
         SeptenaLog.info("[Bootstrap] groceries imported: items=\(groceries.items.count) cats=\(categories.count)")
+      }
+    }
+
+    // Training — entries + session-type/exercise catalogs in one snapshot.
+    if force || !defaults.bool(forKey: BootstrapKey.training) {
+      if let training = try? await client.trainingExport() {
+        ChecklistMirror.replaceAllTrainingExport(training, context: context)
+        queueTrainingMirrorForUpload()
+        defaults.set(true, forKey: BootstrapKey.training)
+        importedAny = true
+        SeptenaLog.info("[Bootstrap] training imported: entries=\(training.entries.count) types=\(training.sessionTypes.count) defs=\(training.exercises.count)")
       }
     }
 
@@ -1050,5 +1062,14 @@ final class ChecklistCloudKitBootstrapper {
     for cat in cats {
       engine.noteGroceryCategoryChange(id: cat.id)
     }
+  }
+
+  private func queueTrainingMirrorForUpload() {
+    let entries = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>())) ?? []
+    let defs = (try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>())) ?? []
+    let types = (try? context.fetch(FetchDescriptor<SessionTypeEntity>())) ?? []
+    for e in entries { engine.noteExerciseEntryChange(id: e.id) }
+    for d in defs { engine.noteExerciseDefinitionChange(id: d.id) }
+    for t in types { engine.noteSessionTypeChange(id: t.id) }
   }
 }

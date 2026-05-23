@@ -913,4 +913,381 @@ enum ChecklistMirror {
     ))) ?? []
     return entities.map { GroceryCategory(id: $0.id, name: $0.name) }
   }
+
+  // MARK: - Training (CloudKit-backed)
+
+  /// Replace SwiftData with the server's full snapshot. Upsert by id, delete
+  /// locals the server doesn't know about. Entries arrive without their own
+  /// id (server's `file` field), so synthesize one on first import.
+  static func replaceAllTrainingExport(_ response: TrainingExportResponse, context: ModelContext) {
+    // Entries — server keys by `file` or composite; map to a stable short id.
+    let existingEntries = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>())) ?? []
+    let entriesByFile: [String: ExerciseEntryEntity] = Dictionary(
+      uniqueKeysWithValues: existingEntries.compactMap { entity -> (String, ExerciseEntryEntity)? in
+        // Re-import key: server-side filename if present in note metadata,
+        // else the composite of date+exercise+loggedAt the server returns.
+        // We accept either as the "what server calls this row" key.
+        let key = entity.id
+        return (key, entity)
+      })
+    var seenIDs = Set<String>()
+    for row in response.entries {
+      let id = row.file.map { Self.normaliseTrainingID($0) } ?? row.id
+      seenIDs.insert(id)
+      let entity = entriesByFile[id] ?? ExerciseEntryEntity(
+        id: id,
+        date: row.date,
+        time: Self.deriveTime(from: row.concludedAt),
+        sessionType: row.session,
+        exercise: row.exercise ?? ""
+      )
+      entity.date = row.date
+      entity.time = Self.deriveTime(from: row.concludedAt)
+      entity.sessionType = row.session
+      entity.exercise = row.exercise ?? ""
+      entity.weight = row.weight
+      entity.sets = row.sets
+      entity.reps = row.reps
+      entity.difficulty = row.difficulty
+      entity.durationMin = row.durationMin
+      entity.distanceM = row.distanceM
+      entity.level = row.level
+      entity.concludedAt = row.concludedAt
+      entity.loggedAt = row.loggedAt
+      entity.updatedAt = .now
+      if entity.modelContext == nil { context.insert(entity) }
+    }
+    for entity in existingEntries where !seenIDs.contains(entity.id) {
+      context.delete(entity)
+    }
+
+    // Session types
+    let existingTypes = (try? context.fetch(FetchDescriptor<SessionTypeEntity>())) ?? []
+    let typesByID = Dictionary(uniqueKeysWithValues: existingTypes.map { ($0.id, $0) })
+    var seenTypes = Set<String>()
+    for (idx, st) in response.sessionTypes.enumerated() {
+      seenTypes.insert(st.id)
+      let entity = typesByID[st.id] ?? SessionTypeEntity(id: st.id,
+                                                         label: st.label,
+                                                         emoji: st.emoji,
+                                                         exercises: st.exercises,
+                                                         sortIndex: idx)
+      entity.label = st.label
+      entity.emoji = st.emoji
+      entity.exercises = st.exercises
+      entity.sortIndex = idx
+      entity.updatedAt = .now
+      if entity.modelContext == nil { context.insert(entity) }
+    }
+    for entity in existingTypes where !seenTypes.contains(entity.id) {
+      context.delete(entity)
+    }
+
+    // Exercise definitions
+    let existingDefs = (try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>())) ?? []
+    let defsByID = Dictionary(uniqueKeysWithValues: existingDefs.map { ($0.id, $0) })
+    var seenDefs = Set<String>()
+    for (idx, def) in response.exercises.enumerated() {
+      seenDefs.insert(def.id)
+      let entity = defsByID[def.id] ?? ExerciseDefinitionEntity(id: def.id,
+                                                                name: def.name,
+                                                                type: def.type,
+                                                                subgroup: def.subgroup,
+                                                                aliases: def.aliases ?? [],
+                                                                sortIndex: idx)
+      entity.name = def.name
+      entity.type = def.type
+      entity.subgroup = def.subgroup
+      entity.aliases = def.aliases ?? []
+      entity.sortIndex = idx
+      entity.updatedAt = .now
+      if entity.modelContext == nil { context.insert(entity) }
+    }
+    for entity in existingDefs where !seenDefs.contains(entity.id) {
+      context.delete(entity)
+    }
+
+    try? context.save()
+  }
+
+  /// Server's `file` field (`2026-05-23--chest-press--01.json`) is fine as
+  /// a stable key — but we want short CK record names. Hash it down to 12
+  /// chars deterministically so the same row imports to the same id.
+  private static func normaliseTrainingID(_ raw: String) -> String {
+    let trimmed = raw.replacingOccurrences(of: ".json", with: "")
+    let hash = trimmed.unicodeScalars.reduce(UInt64(5381)) { acc, c in
+      acc &* 33 &+ UInt64(c.value)
+    }
+    return String(hash, radix: 36).prefix(12).description
+  }
+
+  /// Pull "HH:MM" off the server's "YYYY-MM-DDTHH:MM:SS" concludedAt stamp.
+  private static func deriveTime(from concludedAt: String?) -> String {
+    guard let s = concludedAt else { return "" }
+    let parts = s.split(separator: "T")
+    guard parts.count == 2 else { return "" }
+    let hm = parts[1].split(separator: ":")
+    guard hm.count >= 2 else { return "" }
+    return "\(hm[0]):\(hm[1])"
+  }
+
+  // MARK: Training readers
+
+  static func loadTrainingEntries(context: ModelContext, since: String? = nil) -> [ExerciseEntry] {
+    var descriptor = FetchDescriptor<ExerciseEntryEntity>(
+      sortBy: [SortDescriptor(\.date, order: .reverse),
+               SortDescriptor(\.loggedAt, order: .reverse)]
+    )
+    if let since {
+      descriptor.predicate = #Predicate { $0.date >= since }
+    }
+    let entities = (try? context.fetch(descriptor)) ?? []
+    return entities.map(Self.makeExerciseEntry)
+  }
+
+  static func loadTrainingProgression(context: ModelContext, exercise: String) -> [ProgressionPoint] {
+    let entities = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(
+      predicate: #Predicate { $0.exercise == exercise },
+      sortBy: [SortDescriptor(\.date), SortDescriptor(\.loggedAt)]
+    ))) ?? []
+    return entities.map { e in
+      ProgressionPoint(date: e.date,
+                       weight: e.weight,
+                       sets: e.sets,
+                       reps: e.reps,
+                       difficulty: e.difficulty,
+                       durationMin: e.durationMin,
+                       distanceM: e.distanceM,
+                       level: e.level)
+    }
+  }
+
+  static func loadTrainingCardioHistory(context: ModelContext, days: Int) -> CardioHistoryResponse {
+    let today = SeptenaDate.today
+    guard let todayDate = SeptenaDate.parse(today) else {
+      return CardioHistoryResponse(daily: [], targetWeeklyMin: 150)
+    }
+    // Pull a window with 6 extra days so the rolling-7d at the left edge has
+    // full lookback. Cardio entries are those whose exercise is in a cardio
+    // definition OR have durationMin/distanceM set.
+    let lookbackStart = Calendar.current.date(byAdding: .day, value: -(days + 6 - 1), to: todayDate) ?? todayDate
+    let startStr = SeptenaDate.format(lookbackStart) ?? today
+    let entries = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(
+      predicate: #Predicate { $0.date >= startStr && $0.date <= today }
+    ))) ?? []
+    let defs = (try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>())) ?? []
+    let cardioExercises = Set(defs.filter { $0.type == "cardio" || $0.type == "mobility" }.map(\.name))
+    let cardioByDate: [String: Int] = entries.reduce(into: [:]) { acc, e in
+      let isCardio = cardioExercises.contains(e.exercise) || e.durationMin != nil || e.distanceM != nil
+      guard isCardio else { return }
+      let mins = Int(e.durationMin?.rounded() ?? 0)
+      if mins > 0 { acc[e.date, default: 0] += mins }
+    }
+    var window: [CardioDay] = []
+    for offset in (0..<(days + 6)).reversed() {
+      guard let d = Calendar.current.date(byAdding: .day, value: -offset, to: todayDate),
+            let key = SeptenaDate.format(d) else { continue }
+      window.append(CardioDay(date: key, minutes: cardioByDate[key] ?? 0, rolling7d: nil))
+    }
+    // Rolling 7-day average, fill only the last `days` entries.
+    var daily: [CardioDay] = []
+    for i in 0..<window.count {
+      let day = window[i]
+      let from = max(0, i - 6)
+      let slice = window[from...i]
+      let sum = slice.map { $0.minutes }.reduce(0, +)
+      let avg = Double(sum) / Double(slice.count)
+      if i >= window.count - days {
+        daily.append(CardioDay(date: day.date, minutes: day.minutes, rolling7d: avg))
+      }
+    }
+    return CardioHistoryResponse(daily: daily, targetWeeklyMin: 150)
+  }
+
+  static func loadTrainingSummary(context: ModelContext, since: String? = nil) -> [ExerciseSummary] {
+    var descriptor = FetchDescriptor<ExerciseEntryEntity>(
+      sortBy: [SortDescriptor(\.date)]
+    )
+    if let since {
+      descriptor.predicate = #Predicate { $0.date >= since }
+    }
+    let entities = (try? context.fetch(descriptor)) ?? []
+    let byExercise = Dictionary(grouping: entities, by: \.exercise)
+    return byExercise.map { (name, rows) -> ExerciseSummary in
+      let sorted = rows.sorted {
+        ($0.date, $0.loggedAt ?? "") < ($1.date, $1.loggedAt ?? "")
+      }
+      let last = sorted.last
+      let prev = sorted.dropLast().last
+      let weightLast = last?.weight
+      let weightPrev = prev?.weight
+      let trend: String?
+      switch (weightLast, weightPrev) {
+      case let (a?, b?) where a > b: trend = "up"
+      case let (a?, b?) where a < b: trend = "down"
+      case (_?, _?): trend = "flat"
+      default: trend = nil
+      }
+      return ExerciseSummary(name: name,
+                             count: rows.count,
+                             latestWeight: last?.weight,
+                             latestDate: last?.date,
+                             trend: trend)
+    }.sorted { ($0.latestDate ?? "") > ($1.latestDate ?? "") }
+  }
+
+  static func loadSessionTypes(context: ModelContext) -> [SessionTypeConfig] {
+    let entities = (try? context.fetch(FetchDescriptor<SessionTypeEntity>(
+      sortBy: [SortDescriptor(\.sortIndex), SortDescriptor(\.label, comparator: .localizedStandard)]
+    ))) ?? []
+    return entities.map { e in
+      SessionTypeConfig.make(id: e.id, label: e.label, emoji: e.emoji, exercises: e.exercises)
+    }
+  }
+
+  static func loadExerciseDefinitions(context: ModelContext) -> [ExerciseDefinition] {
+    let entities = (try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>(
+      sortBy: [SortDescriptor(\.sortIndex), SortDescriptor(\.name, comparator: .localizedStandard)]
+    ))) ?? []
+    return entities.map { ExerciseDefinition(id: $0.id, name: $0.name, type: $0.type,
+                                             subgroup: $0.subgroup, aliases: $0.aliases) }
+  }
+
+  /// For each exercise name, walk the progression backward picking the most-
+  /// recent non-null value per field. Mirrors the server's last-entries logic.
+  static func loadLastEntries(context: ModelContext, exercises: [String]) -> [String: LastEntryValues] {
+    var out: [String: LastEntryValues] = [:]
+    for name in exercises {
+      let entities = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(
+        predicate: #Predicate { $0.exercise == name },
+        sortBy: [SortDescriptor(\.date, order: .reverse), SortDescriptor(\.loggedAt, order: .reverse)]
+      ))) ?? []
+      if entities.isEmpty { continue }
+      var values = LastEntryValues.empty
+      values.date = entities.first?.date
+      for e in entities {
+        if values.weight == nil, let v = e.weight { values.weight = v }
+        if values.sets == nil, let v = e.sets { values.sets = v }
+        if values.reps == nil, let v = e.reps { values.reps = v }
+        if values.difficulty == nil, let v = e.difficulty { values.difficulty = v }
+        if values.durationMin == nil, let v = e.durationMin { values.durationMin = v }
+        if values.distanceM == nil, let v = e.distanceM { values.distanceM = v }
+        if values.level == nil, let v = e.level { values.level = v }
+      }
+      out[name] = values
+    }
+    return out
+  }
+
+  /// Map an ExerciseEntryEntity to the wire shape views already consume.
+  private static func makeExerciseEntry(_ e: ExerciseEntryEntity) -> ExerciseEntry {
+    ExerciseEntry(date: e.date,
+                  session: e.sessionType,
+                  exercise: e.exercise,
+                  weight: e.weight,
+                  sets: e.sets,
+                  reps: e.reps,
+                  difficulty: e.difficulty,
+                  durationMin: e.durationMin,
+                  distanceM: e.distanceM,
+                  level: e.level,
+                  file: e.id,
+                  concludedAt: e.concludedAt,
+                  loggedAt: e.loggedAt)
+  }
+
+  // MARK: Suggested workout (ported from FastAPI)
+  //
+  // Classify past days by which session-type they best match (≥3 strength
+  // exercises matching a type's catalog, or ≥30 min cardio with no strength).
+  // Track days-since per type; suggest the one longest unworked, respecting
+  // a 2-day rest from the most recent session.
+
+  static func loadSuggestedWorkout(context: ModelContext) -> SuggestedWorkoutResponse {
+    let MIN_STRENGTH = 3
+    let MIN_CARDIO_MIN = 30
+
+    let entries = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(
+      sortBy: [SortDescriptor(\.date)]
+    ))) ?? []
+    let types = (try? context.fetch(FetchDescriptor<SessionTypeEntity>(
+      sortBy: [SortDescriptor(\.sortIndex)]
+    ))) ?? []
+    let defs = (try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>())) ?? []
+
+    let defByName = Dictionary(uniqueKeysWithValues: defs.map { ($0.name, $0) })
+    let cardioNames = Set(defs.filter { $0.type == "cardio" || $0.type == "mobility" }.map(\.name))
+    let cardioTypeID = types.first { $0.id == "cardio" }?.id ?? "cardio"
+
+    let entriesByDate = Dictionary(grouping: entries, by: \.date)
+    let sortedDates = entriesByDate.keys.sorted(by: >)   // newest first
+
+    // For each day, decide which session-type IDs it counts as.
+    func classify(_ rows: [ExerciseEntryEntity]) -> Set<String> {
+      var matched: Set<String> = []
+      let names = rows.map(\.exercise)
+      let strengthNames = names.filter { !cardioNames.contains($0) }
+      // Strength-day: ≥MIN_STRENGTH exercises whose names appear in a type's list.
+      for t in types where t.id != cardioTypeID {
+        let hits = strengthNames.filter { t.exercises.contains($0) }.count
+        if hits >= MIN_STRENGTH { matched.insert(t.id) }
+      }
+      // Cardio-day: ≥MIN_CARDIO_MIN of cardio with no strength session.
+      let cardioMin = rows.reduce(0.0) { acc, e in
+        let name = e.exercise
+        let isCardio = cardioNames.contains(name) || (defByName[name]?.type ?? "") == "cardio"
+        return acc + (isCardio ? (e.durationMin ?? 0) : 0)
+      }
+      if cardioMin >= Double(MIN_CARDIO_MIN), strengthNames.isEmpty {
+        matched.insert(cardioTypeID)
+      }
+      return matched
+    }
+
+    let today = SeptenaDate.today
+    guard let todayDate = SeptenaDate.parse(today) else {
+      return SuggestedWorkoutResponse.make(suggested: nil, daysAgo: [:])
+    }
+
+    var daysAgo: [String: Int] = [:]
+    for typeID in types.map(\.id) where !typeID.isEmpty {
+      for dateStr in sortedDates {
+        guard let day = SeptenaDate.parse(dateStr) else { continue }
+        let matched = classify(entriesByDate[dateStr] ?? [])
+        if matched.contains(typeID) {
+          let comps = Calendar.current.dateComponents([.day], from: day, to: todayDate)
+          daysAgo[typeID] = comps.day ?? 0
+          break
+        }
+      }
+    }
+
+    // Most-recent session date across any type — for the 2-day rest gate.
+    var lastSession: Date? = nil
+    for dateStr in sortedDates {
+      if !classify(entriesByDate[dateStr] ?? []).isEmpty {
+        lastSession = SeptenaDate.parse(dateStr)
+        break
+      }
+    }
+    if let last = lastSession {
+      let comps = Calendar.current.dateComponents([.day], from: last, to: todayDate)
+      if (comps.day ?? 99) < 2 {
+        return SuggestedWorkoutResponse.make(suggested: nil, daysAgo: daysAgo)
+      }
+    }
+
+    // Pick the type with the largest days-ago. Types never trained get
+    // priority (treat missing as +infinity).
+    let candidates = types.filter { !$0.id.isEmpty }
+    let pick: SessionTypeEntity? = candidates.max { a, b in
+      (daysAgo[a.id] ?? Int.max) < (daysAgo[b.id] ?? Int.max)
+    }
+    guard let suggestion = pick else {
+      return SuggestedWorkoutResponse.make(suggested: nil, daysAgo: daysAgo)
+    }
+    let reason: String? = daysAgo[suggestion.id].map { "\($0) days since last \(suggestion.label)" }
+    let sw = SuggestedWorkout(type: suggestion.id, reason: reason)
+    return SuggestedWorkoutResponse.make(suggested: sw, daysAgo: daysAgo)
+  }
 }

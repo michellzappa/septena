@@ -314,8 +314,8 @@ struct WeekDashboardView: View {
     let c: ChoreHistoryResponse? = ChecklistMirror.loadChoresHistory(context: ctx, days: 7)
     let s: SupplementHistoryResponse? = ChecklistMirror.loadSupplementsHistory(context: ctx, days: 7)
     let appSettings: AppSettings? = SettingsMirror.loadSettings(context: ctx)
-    async let car = try? await client.trainingCardioHistory(days: 7)
-    async let ents = try? await client.trainingEntries(since: sinceDate(daysBack: 7))
+    let ca: CardioHistoryResponse? = ChecklistMirror.loadTrainingCardioHistory(context: ctx, days: 7)
+    let e: [ExerciseEntry]? = ChecklistMirror.loadTrainingEntries(context: ctx, since: sinceDate(daysBack: 7))
     async let tc = try? await TaskReads.counts(
       client: client, context: LocalStore.shared.container.mainContext)
     let th: TasksHistory? = TaskReads.tasksHistory(
@@ -330,7 +330,7 @@ struct WeekDashboardView: View {
     async let asum = try? await client.airSummary()
     async let ahist = try? await client.airHistory(days: 7)
     let gRes: [GroceryItem]? = ChecklistMirror.loadGroceryItems(context: modelContext)
-    let (ca, e, t, o) = await (car, ents, tc, on)
+    let (t, o) = await (tc, on)
     let (ns, ne, nt) = await (nstats, nents, ntarget)
     let (asRes, ahRes) = await (asum, ahist)
     if let colors = appSettings?.nutrition?.macroColors {
@@ -450,13 +450,10 @@ struct WeekDashboardView: View {
       // Training: session-type catalog + suggested + daysAgo. Feeds the
       // menu's "Start: {suggested}" row and the "Recent" section. All
       // three come from existing endpoints — no new server work needed.
-      if let types = try? await client.sessionTypes() {
-        trainingSessionTypes = types
-      }
-      if let resp = try? await client.suggestedWorkout() {
-        trainingSuggestedId = resp.suggested?.type
-        trainingDaysAgo = resp.daysAgo
-      }
+      trainingSessionTypes = ChecklistMirror.loadSessionTypes(context: modelContext)
+      let resp = ChecklistMirror.loadSuggestedWorkout(context: modelContext)
+      trainingSuggestedId = resp.suggested?.type
+      trainingDaysAgo = resp.daysAgo
     }
     if let cafT {
       caffeineToday = cafT
@@ -643,18 +640,15 @@ struct WeekDashboardView: View {
         ResponseCache.save(items, forKey: CacheKey.completedTasks)
       }
     case .training:
-      async let car  = try? await client.trainingCardioHistory(days: 7)
-      async let ents = try? await client.trainingEntries(since: sinceDate(daysBack: 7))
-      if let c = await car {
-        cardio = c
-        ResponseCache.save(c, forKey: CacheKey.cardio)
-      }
-      if let e = await ents {
-        trainingSessionDates = Set(e.map(\.date))
-        recentTraining = e
-        ResponseCache.save(trainingSessionDates, forKey: CacheKey.trainingDates)
-        ResponseCache.save(e, forKey: CacheKey.recentTraining)
-      }
+      let c = ChecklistMirror.loadTrainingCardioHistory(context: modelContext, days: 7)
+      cardio = c
+      ResponseCache.save(c, forKey: CacheKey.cardio)
+      let e = ChecklistMirror.loadTrainingEntries(context: modelContext,
+                                                  since: sinceDate(daysBack: 7))
+      trainingSessionDates = Set(e.map(\.date))
+      recentTraining = e
+      ResponseCache.save(trainingSessionDates, forKey: CacheKey.trainingDates)
+      ResponseCache.save(e, forKey: CacheKey.recentTraining)
     }
   }
 

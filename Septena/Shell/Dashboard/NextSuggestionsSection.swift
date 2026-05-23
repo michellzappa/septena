@@ -156,12 +156,13 @@ final class NextSuggestionsModel {
     ))) ?? []
     let canToday = ChecklistMirror.loadCannabisDay(context: ctx, date: today)
     async let nutrition    = try? await client.nutritionEntries(since: since14)
-    async let training     = try? await client.trainingEntries(since: since30)
-    async let workout      = try? await client.suggestedWorkout()
+    // Training lives in CloudKit — local mirror reads, no network.
+    let tr: [ExerciseEntry]? = ChecklistMirror.loadTrainingEntries(context: ctx, since: since30)
+    let sw: SuggestedWorkoutResponse? = ChecklistMirror.loadSuggestedWorkout(context: ctx)
     // Settings live in CloudKit — read from the local mirror, not FastAPI.
     let st: AppSettings? = SettingsMirror.loadSettings(context: ctx)
 
-    let (nut, tr, sw) = await (nutrition, training, workout)
+    let nut = await nutrition
 
     let cafTimePoints: [CaffeineTimePoint] = cafEntries.compactMap { e in
       let parts = e.time.split(separator: ":")

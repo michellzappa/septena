@@ -7,6 +7,7 @@ import SwiftData
 
 struct QuickFindView: View {
   @Environment(\.dismiss) private var dismiss
+  @Environment(\.modelContext) private var modelContext
   @Environment(NavigationState.self) private var nav
   @Environment(SeptenaClient.self) private var client
   @Environment(SectionTheme.self) private var theme
@@ -59,7 +60,7 @@ struct QuickFindView: View {
     .onAppear {
       // Pre-warm the session-type list so the training launcher reads
       // populated on first ⌘K. Cheap; the store keeps a cached copy.
-      Task { await trainingDraft.refreshCatalog(client: client) }
+      trainingDraft.refreshCatalog(context: modelContext)
     }
     .onChange(of: query) { selection = 0 }
   }
@@ -316,7 +317,7 @@ struct QuickFindView: View {
 
   private func startType(_ type: SessionTypeConfig) {
     Task {
-      await trainingDraft.start(type: type, client: client)
+      trainingDraft.start(type: type, context: modelContext)
       nav.showTrainingSession = true
       dismiss()
     }

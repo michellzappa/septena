@@ -731,6 +731,120 @@ final class CannabisStrainEntity {
   }
 }
 
+@Model
+final class ExerciseEntryEntity {
+  @Attribute(.unique) var id: String
+  var date: String           // YYYY-MM-DD
+  var time: String           // HH:MM session start
+  var sessionType: String    // upper|lower|cardio|yoga|...
+  var exercise: String       // canonical exercise name
+  var weight: Double?
+  var sets: String?          // int or "AMRAP"
+  var reps: String?          // int or string
+  var difficulty: String?
+  var durationMin: Double?
+  var distanceM: Double?
+  var level: Double?
+  var note: String?
+  var concludedAt: String?   // ISO8601
+  var loggedAt: String?      // ISO8601
+  var updatedAt: Date
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       date: String,
+       time: String,
+       sessionType: String,
+       exercise: String,
+       weight: Double? = nil,
+       sets: String? = nil,
+       reps: String? = nil,
+       difficulty: String? = nil,
+       durationMin: Double? = nil,
+       distanceM: Double? = nil,
+       level: Double? = nil,
+       note: String? = nil,
+       concludedAt: String? = nil,
+       loggedAt: String? = nil,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.date = date
+    self.time = time
+    self.sessionType = sessionType
+    self.exercise = exercise
+    self.weight = weight
+    self.sets = sets
+    self.reps = reps
+    self.difficulty = difficulty
+    self.durationMin = durationMin
+    self.distanceM = distanceM
+    self.level = level
+    self.note = note
+    self.concludedAt = concludedAt
+    self.loggedAt = loggedAt
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
+@Model
+final class ExerciseDefinitionEntity {
+  @Attribute(.unique) var id: String   // slug, e.g. "chest-press"
+  var name: String
+  var type: String                     // strength|cardio|mobility|core
+  var subgroup: String?                // free-form: "push", "pull", "upper"
+  var aliases: [String]
+  var sortIndex: Int
+  var updatedAt: Date
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       name: String,
+       type: String,
+       subgroup: String? = nil,
+       aliases: [String] = [],
+       sortIndex: Int = 0,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.name = name
+    self.type = type
+    self.subgroup = subgroup
+    self.aliases = aliases
+    self.sortIndex = sortIndex
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
+@Model
+final class SessionTypeEntity {
+  @Attribute(.unique) var id: String   // "upper", "lower", "cardio", ...
+  var label: String
+  var emoji: String?
+  var exercises: [String]              // canonical exercise list
+  var sortIndex: Int
+  var updatedAt: Date
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       label: String,
+       emoji: String? = nil,
+       exercises: [String] = [],
+       sortIndex: Int = 0,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.label = label
+    self.emoji = emoji
+    self.exercises = exercises
+    self.sortIndex = sortIndex
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
 // MARK: - DTO ↔ Entity bridging
 
 extension SeptenaTask {
@@ -1031,6 +1145,65 @@ enum CannabisStrainCloudKitSchema {
   static func recordName(for id: String) -> String { "cannabis-strain:\(id)" }
   static func entityID(from recordName: String) -> String {
     String(recordName.dropFirst("cannabis-strain:".count))
+  }
+}
+
+enum ExerciseEntryCloudKitSchema {
+  static let recordType = "ExerciseEntry"
+
+  enum Field {
+    static let date = "date"
+    static let time = "time"
+    static let sessionType = "sessionType"
+    static let exercise = "exercise"
+    static let weight = "weight"
+    static let sets = "sets"
+    static let reps = "reps"
+    static let difficulty = "difficulty"
+    static let durationMin = "durationMin"
+    static let distanceM = "distanceM"
+    static let level = "level"
+    static let note = "note"
+    static let concludedAt = "concludedAt"
+    static let loggedAt = "loggedAt"
+  }
+
+  static func recordName(for id: String) -> String { "exercise-entry:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("exercise-entry:".count))
+  }
+}
+
+enum ExerciseDefinitionCloudKitSchema {
+  static let recordType = "ExerciseDefinition"
+
+  enum Field {
+    static let name = "name"
+    static let type = "type"
+    static let subgroup = "subgroup"
+    static let aliases = "aliases"
+    static let sortIndex = "sortIndex"
+  }
+
+  static func recordName(for id: String) -> String { "exercise-def:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("exercise-def:".count))
+  }
+}
+
+enum SessionTypeCloudKitSchema {
+  static let recordType = "SessionType"
+
+  enum Field {
+    static let label = "label"
+    static let emoji = "emoji"
+    static let exercises = "exercises"
+    static let sortIndex = "sortIndex"
+  }
+
+  static func recordName(for id: String) -> String { "session-type:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("session-type:".count))
   }
 }
 
@@ -1477,6 +1650,117 @@ extension CannabisStrainEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
+extension ExerciseEntryEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: ExerciseEntryCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: ExerciseEntryCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[ExerciseEntryCloudKitSchema.Field.date] = date
+    record[ExerciseEntryCloudKitSchema.Field.time] = time
+    record[ExerciseEntryCloudKitSchema.Field.sessionType] = sessionType
+    record[ExerciseEntryCloudKitSchema.Field.exercise] = exercise
+    record[ExerciseEntryCloudKitSchema.Field.weight] = weight
+    record[ExerciseEntryCloudKitSchema.Field.sets] = sets
+    record[ExerciseEntryCloudKitSchema.Field.reps] = reps
+    record[ExerciseEntryCloudKitSchema.Field.difficulty] = difficulty
+    record[ExerciseEntryCloudKitSchema.Field.durationMin] = durationMin
+    record[ExerciseEntryCloudKitSchema.Field.distanceM] = distanceM
+    record[ExerciseEntryCloudKitSchema.Field.level] = level
+    record[ExerciseEntryCloudKitSchema.Field.note] = note
+    record[ExerciseEntryCloudKitSchema.Field.concludedAt] = concludedAt
+    record[ExerciseEntryCloudKitSchema.Field.loggedAt] = loggedAt
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let v = record[ExerciseEntryCloudKitSchema.Field.date] as? String { date = v }
+    if let v = record[ExerciseEntryCloudKitSchema.Field.time] as? String { time = v }
+    if let v = record[ExerciseEntryCloudKitSchema.Field.sessionType] as? String { sessionType = v }
+    if let v = record[ExerciseEntryCloudKitSchema.Field.exercise] as? String { exercise = v }
+    weight = record[ExerciseEntryCloudKitSchema.Field.weight] as? Double
+    sets = optionalChecklistString(record[ExerciseEntryCloudKitSchema.Field.sets])
+    reps = optionalChecklistString(record[ExerciseEntryCloudKitSchema.Field.reps])
+    difficulty = optionalChecklistString(record[ExerciseEntryCloudKitSchema.Field.difficulty])
+    durationMin = record[ExerciseEntryCloudKitSchema.Field.durationMin] as? Double
+    distanceM = record[ExerciseEntryCloudKitSchema.Field.distanceM] as? Double
+    level = record[ExerciseEntryCloudKitSchema.Field.level] as? Double
+    note = optionalChecklistString(record[ExerciseEntryCloudKitSchema.Field.note])
+    concludedAt = optionalChecklistString(record[ExerciseEntryCloudKitSchema.Field.concludedAt])
+    loggedAt = optionalChecklistString(record[ExerciseEntryCloudKitSchema.Field.loggedAt])
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: ExerciseEntryCloudKitSchema.entityID(from: record.recordID.recordName),
+              date: "", time: "", sessionType: "", exercise: "")
+    apply(record)
+  }
+}
+
+extension ExerciseDefinitionEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: ExerciseDefinitionCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: ExerciseDefinitionCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[ExerciseDefinitionCloudKitSchema.Field.name] = name
+    record[ExerciseDefinitionCloudKitSchema.Field.type] = type
+    record[ExerciseDefinitionCloudKitSchema.Field.subgroup] = subgroup
+    record[ExerciseDefinitionCloudKitSchema.Field.aliases] = aliases as NSArray
+    record[ExerciseDefinitionCloudKitSchema.Field.sortIndex] = sortIndex
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let v = record[ExerciseDefinitionCloudKitSchema.Field.name] as? String { name = v }
+    if let v = record[ExerciseDefinitionCloudKitSchema.Field.type] as? String { type = v }
+    subgroup = optionalChecklistString(record[ExerciseDefinitionCloudKitSchema.Field.subgroup])
+    aliases = (record[ExerciseDefinitionCloudKitSchema.Field.aliases] as? [String]) ?? []
+    if let v = record[ExerciseDefinitionCloudKitSchema.Field.sortIndex] as? Int { sortIndex = v }
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: ExerciseDefinitionCloudKitSchema.entityID(from: record.recordID.recordName),
+              name: "", type: "strength")
+    apply(record)
+  }
+}
+
+extension SessionTypeEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: SessionTypeCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: SessionTypeCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[SessionTypeCloudKitSchema.Field.label] = label
+    record[SessionTypeCloudKitSchema.Field.emoji] = emoji
+    record[SessionTypeCloudKitSchema.Field.exercises] = exercises as NSArray
+    record[SessionTypeCloudKitSchema.Field.sortIndex] = sortIndex
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let v = record[SessionTypeCloudKitSchema.Field.label] as? String { label = v }
+    emoji = optionalChecklistString(record[SessionTypeCloudKitSchema.Field.emoji])
+    exercises = (record[SessionTypeCloudKitSchema.Field.exercises] as? [String]) ?? []
+    if let v = record[SessionTypeCloudKitSchema.Field.sortIndex] as? Int { sortIndex = v }
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: SessionTypeCloudKitSchema.entityID(from: record.recordID.recordName), label: "")
+    apply(record)
+  }
+}
+
 // MARK: - LocalStore
 
 @MainActor
@@ -1497,6 +1781,9 @@ final class LocalStore {
                          CaffeineEventEntity.self, CaffeineBeanEntity.self,
                          CannabisEventEntity.self, CannabisStrainEntity.self,
                          GroceryItemEntity.self, GroceryCategoryEntity.self,
+                         ExerciseEntryEntity.self, ExerciseDefinitionEntity.self,
+                         SessionTypeEntity.self,
+                         AirReadingEntity.self,
                          OutboxEntity.self, HTTPOutboxEntity.self])
     // Explicitly opt OUT of NSPersistentCloudKitContainer mirroring. Having
     // CloudKit in the target entitlements would otherwise switch SwiftData

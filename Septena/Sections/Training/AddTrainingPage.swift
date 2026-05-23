@@ -11,6 +11,7 @@ private let staticSessionTypes: [String] = [
 
 struct AddTrainingPage: View {
   @Environment(SeptenaClient.self) private var client
+  @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
@@ -75,9 +76,8 @@ struct AddTrainingPage: View {
   }
 
   private func load() async {
-    if let resp = try? await client.suggestedWorkout() {
-      suggested = resp.suggested
-      daysAgo = resp.daysAgo
-    }
+    let resp = ChecklistMirror.loadSuggestedWorkout(context: modelContext)
+    suggested = resp.suggested
+    daysAgo = resp.daysAgo
   }
 }

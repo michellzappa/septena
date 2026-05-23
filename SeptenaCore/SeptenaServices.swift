@@ -37,9 +37,18 @@ final class SeptenaServices {
   let caffeineMutator: CaffeineMutator
   let cannabisMutator: CannabisMutator
   let groceryMutator: GroceryMutator
+  let trainingMutator: TrainingMutator
   let areasMutator: AreasMutator
   let projectsMutator: ProjectsMutator
   let httpOutbox: HTTPOutbox
+  /// Live Aranet4 CO2 sensor connection (CoreBluetooth). Single
+  /// process-wide instance so views, Settings, and the on-launch
+  /// auto-start path all read the same connection state.
+  let aranetBridge: AranetBridge
+  /// Local persistence + aggregation for air readings. Subscribes to
+  /// `aranetBridge.onSnapshot` in `start()` so every sample lands in
+  /// SwiftData without any view-side glue.
+  let airStore: AirStore
 
   /// Cached start task. Holds the work of wiring CKEngine + binding
   /// mutators; replays its result to any caller. Nil until first
@@ -57,9 +66,12 @@ final class SeptenaServices {
     self.caffeineMutator = CaffeineMutator(context: context, ckEngine: nil)
     self.cannabisMutator = CannabisMutator(context: context, ckEngine: nil)
     self.groceryMutator = GroceryMutator(context: context, ckEngine: nil)
+    self.trainingMutator = TrainingMutator(context: context, ckEngine: nil)
     self.areasMutator = AreasMutator(client: client, context: context)
     self.projectsMutator = ProjectsMutator(client: client, context: context)
     self.httpOutbox = HTTPOutbox(client: client, context: context)
+    self.aranetBridge = AranetBridge()
+    self.airStore = AirStore(context: context)
   }
 
   /// Idempotent. First caller wires CKEngine's record provider / apply
@@ -238,6 +250,33 @@ final class SeptenaServices {
         if recordName.hasPrefix("grocery-cat:") {
           let id = GroceryCategoryCloudKitSchema.entityID(from: recordName)
           if let entity = try? context.fetch(FetchDescriptor<GroceryCategoryEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
+        if recordName.hasPrefix("exercise-entry:") {
+          let id = ExerciseEntryCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
+        if recordName.hasPrefix("exercise-def:") {
+          let id = ExerciseDefinitionCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
+        if recordName.hasPrefix("session-type:") {
+          let id = SessionTypeCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<SessionTypeEntity>(
             predicate: #Predicate { $0.id == id }
           )).first {
             return entity.toCloudKitRecord()
@@ -451,6 +490,36 @@ final class SeptenaServices {
           } else {
             context.insert(GroceryCategoryEntity(cloudKit: record))
           }
+        case ExerciseEntryCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = ExerciseEntryCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(ExerciseEntryEntity(cloudKit: record))
+          }
+        case ExerciseDefinitionCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = ExerciseDefinitionCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(ExerciseDefinitionEntity(cloudKit: record))
+          }
+        case SessionTypeCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = SessionTypeCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<SessionTypeEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(SessionTypeEntity(cloudKit: record))
+          }
         default:
           SeptenaLog.info("[CKEngine] applyFetched: unknown recordType \(record.recordType) id=\(record.recordID.recordName)")
         }
@@ -610,6 +679,30 @@ final class SeptenaServices {
           )).first {
             context.delete(entity)
           }
+        case ExerciseEntryCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = ExerciseEntryCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
+        case ExerciseDefinitionCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = ExerciseDefinitionCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
+        case SessionTypeCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = SessionTypeCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<SessionTypeEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
         default:
           SeptenaLog.info("[CKEngine] applyDeleted: unknown recordType \(recordType) id=\(recordID.recordName)")
         }
@@ -636,10 +729,20 @@ final class SeptenaServices {
       caffeineMutator.bind(ckEngine: ckEngine)
       cannabisMutator.bind(ckEngine: ckEngine)
       groceryMutator.bind(ckEngine: ckEngine)
+      trainingMutator.bind(ckEngine: ckEngine)
       areasMutator.bind(ckEngine: ckEngine)
       projectsMutator.bind(ckEngine: ckEngine)
       ckEngine.start()
       try? await ckEngine.fetchChanges()
+      // Pipe Aranet snapshots into the local store. The bridge runs in
+      // the foreground only — the consumer (AirDestinationView /
+      // Settings) calls `aranetBridge.start()` when its view appears
+      // and `stop()` on disappear, so we don't hold a BLE scan open
+      // app-wide. Wiring the sink here is just so anyone who *does*
+      // start the bridge gets persistence for free.
+      aranetBridge.onSnapshot = { [airStore] snap in
+        airStore.ingest(snap)
+      }
       let checklistBootstrapper = ChecklistCloudKitBootstrapper(context: context,
                                                                 engine: ckEngine,
                                                                 client: client)
@@ -1694,4 +1797,297 @@ final class GroceryMutator {
   private func postChanged() {
     NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
   }
+}
+
+// MARK: - TrainingMutator
+//
+// CloudKit-backed mutations for training entries + catalogs (exercise
+// definitions, session types). Local-first: write to SwiftData, then queue
+// the change with CKEngine for upload. Mirrors the Grocery/Caffeine pattern.
+
+@MainActor
+@Observable
+final class TrainingMutator {
+  private let context: ModelContext
+  private var ckEngine: CKEngine?
+
+  init(context: ModelContext, ckEngine: CKEngine? = nil) {
+    self.context = context
+    self.ckEngine = ckEngine
+  }
+
+  func bind(ckEngine: CKEngine) { self.ckEngine = ckEngine }
+
+  // MARK: - Entries
+
+  @discardableResult
+  func addEntry(date: String,
+                time: String,
+                sessionType: String,
+                exercise: String,
+                weight: Double? = nil,
+                sets: String? = nil,
+                reps: String? = nil,
+                difficulty: String? = nil,
+                durationMin: Double? = nil,
+                distanceM: Double? = nil,
+                level: Double? = nil,
+                note: String? = nil,
+                concludedAt: String? = nil) -> ExerciseEntryEntity {
+    let id = uniqueEntryID()
+    let entity = ExerciseEntryEntity(
+      id: id,
+      date: date,
+      time: time,
+      sessionType: sessionType,
+      exercise: exercise,
+      weight: weight,
+      sets: sets,
+      reps: reps,
+      difficulty: difficulty,
+      durationMin: durationMin,
+      distanceM: distanceM,
+      level: level,
+      note: note,
+      concludedAt: concludedAt,
+      loggedAt: ISO8601DateFormatter().string(from: Date())
+    )
+    context.insert(entity)
+    commitEntry(entity, op: "create")
+    return entity
+  }
+
+  /// Convenience: log a whole session in one call. Each entry shares a
+  /// `concludedAt` stamp so views can group them as one workout.
+  @discardableResult
+  func addSession(date: String,
+                  time: String,
+                  sessionType: String,
+                  entries: [TrainingEntryDraft]) -> [ExerciseEntryEntity] {
+    let concluded = "\(date)T\(time.isEmpty ? "00:00" : time):00"
+    var saved: [ExerciseEntryEntity] = []
+    for draft in entries where !draft.skipped {
+      let entity = addEntry(
+        date: date,
+        time: time,
+        sessionType: sessionType,
+        exercise: draft.exercise,
+        weight: draft.weight,
+        sets: draft.sets,
+        reps: draft.reps,
+        difficulty: draft.difficulty,
+        durationMin: draft.durationMin,
+        distanceM: draft.distanceM,
+        level: draft.level,
+        note: draft.note,
+        concludedAt: concluded
+      )
+      saved.append(entity)
+    }
+    return saved
+  }
+
+  func updateEntry(id: String,
+                   weight: Double?? = nil,
+                   sets: String?? = nil,
+                   reps: String?? = nil,
+                   difficulty: String?? = nil,
+                   durationMin: Double?? = nil,
+                   distanceM: Double?? = nil,
+                   level: Double?? = nil,
+                   note: String?? = nil) {
+    guard let entity = fetchEntry(id: id) else { return }
+    if let v = weight { entity.weight = v }
+    if let v = sets { entity.sets = v }
+    if let v = reps { entity.reps = v }
+    if let v = difficulty { entity.difficulty = v }
+    if let v = durationMin { entity.durationMin = v }
+    if let v = distanceM { entity.distanceM = v }
+    if let v = level { entity.level = v }
+    if let v = note { entity.note = v }
+    entity.updatedAt = .now
+    commitEntry(entity, op: "update")
+  }
+
+  func deleteEntry(id: String) {
+    guard let entity = fetchEntry(id: id) else { return }
+    context.delete(entity)
+    saveContext("CK exercise entry delete")
+    ckEngine?.noteExerciseEntryDeletion(id: id)
+    postChanged()
+  }
+
+  // MARK: - Exercise definitions
+
+  @discardableResult
+  func addExerciseDefinition(name: String, type: String, subgroup: String? = nil) -> ExerciseDefinitionEntity {
+    let id = uniqueDefinitionID(for: name)
+    let entity = ExerciseDefinitionEntity(id: id,
+                                          name: name,
+                                          type: type,
+                                          subgroup: subgroup,
+                                          sortIndex: nextDefinitionSortIndex())
+    context.insert(entity)
+    commitDefinition(entity, op: "create")
+    return entity
+  }
+
+  func updateExerciseDefinition(id: String,
+                                name: String? = nil,
+                                type: String? = nil,
+                                subgroup: String?? = nil,
+                                aliases: [String]? = nil) {
+    guard let entity = fetchDefinition(id: id) else { return }
+    if let name { entity.name = name }
+    if let type { entity.type = type }
+    if let subgroup { entity.subgroup = subgroup }
+    if let aliases { entity.aliases = aliases }
+    entity.updatedAt = .now
+    commitDefinition(entity, op: "update")
+  }
+
+  func deleteExerciseDefinition(id: String) {
+    guard let entity = fetchDefinition(id: id) else { return }
+    context.delete(entity)
+    saveContext("CK exercise definition delete")
+    ckEngine?.noteExerciseDefinitionDeletion(id: id)
+    postChanged()
+  }
+
+  // MARK: - Session types
+
+  @discardableResult
+  func addSessionType(label: String, emoji: String? = nil, exercises: [String] = []) -> SessionTypeEntity {
+    let id = uniqueSessionTypeID(for: label)
+    let entity = SessionTypeEntity(id: id,
+                                   label: label,
+                                   emoji: emoji,
+                                   exercises: exercises,
+                                   sortIndex: nextSessionTypeSortIndex())
+    context.insert(entity)
+    commitSessionType(entity, op: "create")
+    return entity
+  }
+
+  func updateSessionType(id: String,
+                         label: String? = nil,
+                         emoji: String?? = nil,
+                         exercises: [String]? = nil) {
+    guard let entity = fetchSessionType(id: id) else { return }
+    if let label { entity.label = label }
+    if let emoji { entity.emoji = emoji }
+    if let exercises { entity.exercises = exercises }
+    entity.updatedAt = .now
+    commitSessionType(entity, op: "update")
+  }
+
+  func deleteSessionType(id: String) {
+    guard let entity = fetchSessionType(id: id) else { return }
+    context.delete(entity)
+    saveContext("CK session type delete")
+    ckEngine?.noteSessionTypeDeletion(id: id)
+    postChanged()
+  }
+
+  // MARK: - Helpers
+
+  private func fetchEntry(id: String) -> ExerciseEntryEntity? {
+    try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(predicate: #Predicate { $0.id == id })).first
+  }
+  private func fetchDefinition(id: String) -> ExerciseDefinitionEntity? {
+    try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>(predicate: #Predicate { $0.id == id })).first
+  }
+  private func fetchSessionType(id: String) -> SessionTypeEntity? {
+    try? context.fetch(FetchDescriptor<SessionTypeEntity>(predicate: #Predicate { $0.id == id })).first
+  }
+
+  private func uniqueEntryID() -> String {
+    var attempt = String(UUID().uuidString.lowercased().prefix(8))
+    while fetchEntry(id: attempt) != nil {
+      attempt = String(UUID().uuidString.lowercased().prefix(8))
+    }
+    return attempt
+  }
+
+  private func slugify(_ s: String) -> String {
+    s.lowercased()
+      .replacingOccurrences(of: " ", with: "-")
+      .filter { $0.isLetter || $0.isNumber || $0 == "-" }
+  }
+
+  private func uniqueDefinitionID(for name: String) -> String {
+    let base = slugify(name)
+    var attempt = base.isEmpty ? IDShortcode.generate(length: 4) : base
+    var n = 2
+    while fetchDefinition(id: attempt) != nil {
+      attempt = "\(base)-\(n)"
+      n += 1
+    }
+    return attempt
+  }
+
+  private func uniqueSessionTypeID(for label: String) -> String {
+    let base = slugify(label)
+    var attempt = base.isEmpty ? IDShortcode.generate(length: 4) : base
+    var n = 2
+    while fetchSessionType(id: attempt) != nil {
+      attempt = "\(base)-\(n)"
+      n += 1
+    }
+    return attempt
+  }
+
+  private func nextDefinitionSortIndex() -> Int {
+    ((try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>(
+      sortBy: [SortDescriptor(\.sortIndex, order: .reverse)]
+    )).first?.sortIndex) ?? -1) + 1
+  }
+
+  private func nextSessionTypeSortIndex() -> Int {
+    ((try? context.fetch(FetchDescriptor<SessionTypeEntity>(
+      sortBy: [SortDescriptor(\.sortIndex, order: .reverse)]
+    )).first?.sortIndex) ?? -1) + 1
+  }
+
+  private func commitEntry(_ entity: ExerciseEntryEntity, op: String) {
+    saveContext("CK exercise entry \(op)")
+    ckEngine?.noteExerciseEntryChange(id: entity.id)
+    postChanged()
+  }
+
+  private func commitDefinition(_ entity: ExerciseDefinitionEntity, op: String) {
+    saveContext("CK exercise definition \(op)")
+    ckEngine?.noteExerciseDefinitionChange(id: entity.id)
+    postChanged()
+  }
+
+  private func commitSessionType(_ entity: SessionTypeEntity, op: String) {
+    saveContext("CK session type \(op)")
+    ckEngine?.noteSessionTypeChange(id: entity.id)
+    postChanged()
+  }
+
+  private func saveContext(_ label: String) {
+    do { try context.save() }
+    catch { SeptenaLog.error(label, error) }
+  }
+
+  private func postChanged() {
+    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+  }
+}
+
+/// Lightweight draft used by `TrainingMutator.addSession` so callers don't
+/// have to pass a dozen positional arguments per exercise.
+struct TrainingEntryDraft {
+  var exercise: String
+  var weight: Double? = nil
+  var sets: String? = nil
+  var reps: String? = nil
+  var difficulty: String? = nil
+  var durationMin: Double? = nil
+  var distanceM: Double? = nil
+  var level: Double? = nil
+  var note: String? = nil
+  var skipped: Bool = false
 }
