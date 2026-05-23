@@ -1000,6 +1000,7 @@ final class TrainingDraftStore {
       return (ex.lowercased(), v)
     })
     let prBaselines = TrainingPRCalculator.baselines(for: exercises, in: context)
+    let recents = TrainingPRCalculator.recents(for: exercises, in: context, limit: 3)
     let now = Date()
     let timeF = DateFormatter()
     timeF.dateFormat = "HH:mm"
@@ -1016,7 +1017,8 @@ final class TrainingDraftStore {
       startedAt: isoF.string(from: now),
       updatedAt: isoF.string(from: now),
       lastByExercise: lastByExercise,
-      prBaselines: prBaselines
+      prBaselines: prBaselines,
+      recentByExercise: recents
     )
     persist()
   }
@@ -1318,7 +1320,14 @@ struct TrainingExerciseCard: View {
     .padding(12)
     .background(
       RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-        .fill(Theme.cardSurface)
+        .fill(expanded ? accent.opacity(0.12) : Theme.cardSurface)
+    )
+    .overlay(
+      // Subtle accent stroke when open — bright-light gym test: bg
+      // tint alone can vanish against a sunlit screen, the stroke
+      // makes the open card readable at a glance.
+      RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+        .stroke(accent.opacity(expanded ? 0.45 : 0), lineWidth: 1.5)
     )
     .opacity(opacityFor(entry.status))
     .contentShape(Rectangle())
@@ -1346,11 +1355,6 @@ struct TrainingExerciseCard: View {
           Text(s)
             .font(.septenaMeta)
             .foregroundStyle(Theme.inkSecondary)
-        }
-        if let l = lastTimeLine {
-          Text(l)
-            .font(.septenaMeta)
-            .foregroundStyle(Theme.inkSecondary.opacity(0.75))
         }
       }
       Spacer()
@@ -1409,42 +1413,100 @@ struct TrainingExerciseCard: View {
 
   // MARK: - Progression hints
 
-  private var lastValues: LastEntryValues? {
-    store.draft?.lastByExercise[entry.exercise.lowercased()]
-  }
-
   private var baseline: PRBaseline? {
     store.draft?.prBaselines[entry.exercise.lowercased()]
   }
 
-  /// "Last: 60kg · 3×8 · 2d ago" — one-line recap of the user's last
-  /// session for this exercise. Built from LastEntryValues so it
-  /// reflects the same numbers used to prefill the inputs. Returns
-  /// nil when there's no historical entry at all.
-  private var lastTimeLine: String? {
-    guard let l = lastValues else { return nil }
-    var parts: [String] = []
-    if entry.isCardio {
-      if let d = l.durationMin, d > 0 { parts.append("\(Int(d)) min") }
-      if let m = l.distanceM, m > 0 {
-        parts.append(m >= 1000 ? String(format: "%.1f km", m/1000) : "\(Int(m)) m")
-      }
-      if let lvl = l.level, lvl > 0 { parts.append("L\(fmt(lvl))") }
-    } else {
-      if let w = l.weight, w > 0 {
-        parts.append(w.truncatingRemainder(dividingBy: 1) == 0
-                     ? "\(Int(w))kg" : String(format: "%.1fkg", w))
-      }
-      if let s = l.sets, let r = l.reps { parts.append("\(s)×\(r)") }
-    }
-    if let when = relativeDays(from: l.date) { parts.append(when) }
-    guard !parts.isEmpty else { return nil }
-    return "Last: " + parts.joined(separator: " · ")
+  private var recents: [RecentExerciseEntry] {
+    store.draft?.recentByExercise[entry.exercise.lowercased()] ?? []
   }
 
   private var isPR: Bool {
     guard let baseline else { return false }
     return TrainingPRCalculator.isPR(draft: entry, baseline: baseline)
+  }
+
+  /// Compact 3-row table of the user's most recent sessions for this
+  /// exercise. Type-aware columns: strength shows date / weight /
+  /// sets×reps; cardio shows date / duration / distance / level.
+  /// Monospaced digits + accent-tinted column headers so it reads
+  /// like a table even in glance-while-resting mode at the gym.
+  @ViewBuilder
+  private var recentSessionsTable: some View {
+    if recents.isEmpty {
+      EmptyView()
+    } else {
+      VStack(alignment: .leading, spacing: 4) {
+        Text("RECENT")
+          .font(.caption2.weight(.semibold))
+          .foregroundStyle(.secondary)
+        VStack(spacing: 2) {
+          if entry.isCardio {
+            ForEach(Array(recents.enumerated()), id: \.offset) { _, r in
+              recentRow(date: r.date, columns: cardioColumns(r))
+            }
+          } else {
+            ForEach(Array(recents.enumerated()), id: \.offset) { _, r in
+              recentRow(date: r.date, columns: strengthColumns(r))
+            }
+          }
+        }
+        .font(.system(.footnote, design: .rounded).monospacedDigit())
+      }
+      .padding(.bottom, 10)
+    }
+  }
+
+  private func recentRow(date: String, columns: [String]) -> some View {
+    HStack(spacing: 12) {
+      Text(shortDate(date))
+        .foregroundStyle(Theme.inkSecondary)
+        .frame(width: 64, alignment: .leading)
+      ForEach(Array(columns.enumerated()), id: \.offset) { _, value in
+        Text(value)
+          .foregroundStyle(Theme.inkPrimary)
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
+    }
+  }
+
+  private func strengthColumns(_ r: RecentExerciseEntry) -> [String] {
+    let weight: String = {
+      guard let w = r.weight, w > 0 else { return "—" }
+      return w.truncatingRemainder(dividingBy: 1) == 0
+        ? "\(Int(w))kg" : String(format: "%.1fkg", w)
+    }()
+    let setsReps: String = {
+      guard let s = r.sets, let reps = r.reps else { return "—" }
+      return "\(s)×\(reps)"
+    }()
+    return [weight, setsReps]
+  }
+
+  private func cardioColumns(_ r: RecentExerciseEntry) -> [String] {
+    let dur: String = {
+      guard let d = r.durationMin, d > 0 else { return "—" }
+      return "\(Int(d))m"
+    }()
+    let dist: String = {
+      guard let m = r.distanceM, m > 0 else { return "—" }
+      return m >= 1000 ? String(format: "%.1fkm", m/1000) : "\(Int(m))m"
+    }()
+    let lvl: String = {
+      guard let l = r.level, l > 0 else { return "—" }
+      return "L\(fmt(l))"
+    }()
+    return [dur, dist, lvl]
+  }
+
+  // "2026-05-23" → "May 23", "2026-05-20" → "May 20". Compact month
+  // abbreviation; the year is implicit since recents are recent.
+  private func shortDate(_ iso: String) -> String {
+    guard let d = SeptenaDate.parse(iso) else { return iso }
+    let f = DateFormatter()
+    f.dateFormat = "MMM d"
+    f.locale = Locale(identifier: "en_US_POSIX")
+    return f.string(from: d)
   }
 
   private var prPill: some View {
@@ -1457,25 +1519,13 @@ struct TrainingExerciseCard: View {
       .accessibilityLabel("Personal record")
   }
 
-  // "2026-05-20" → "2d ago", "Today", "Yesterday". Returns nil for
-  // missing / unparseable dates so the line collapses cleanly.
-  private func relativeDays(from iso: String?) -> String? {
-    guard let iso, let date = SeptenaDate.parse(iso) else { return nil }
-    let cal = Calendar.current
-    let days = cal.dateComponents([.day], from: cal.startOfDay(for: date),
-                                  to: cal.startOfDay(for: Date())).day ?? 0
-    switch days {
-    case 0: return "today"
-    case 1: return "1d ago"
-    default: return "\(days)d ago"
-    }
-  }
 
   // MARK: - Editor (expanded)
 
   @ViewBuilder
   private var editor: some View {
     Divider().padding(.vertical, 10)
+    recentSessionsTable
     if entry.isCardio {
       cardioInputs
     } else {

@@ -12,6 +12,22 @@ import SwiftData
 // Same-day entries are included; we don't filter them out because
 // a PR set earlier in the same session legitimately moves the bar.
 
+/// Compact snapshot of a single past entry for a given exercise.
+/// Used by the active-session card's "last 3 sessions" mini-table.
+/// All numeric fields are optional — strength entries leave the
+/// cardio fields nil and vice versa; the renderer picks the columns
+/// to show based on the entry's type.
+struct RecentExerciseEntry: Hashable, Sendable, Codable {
+  let date: String           // YYYY-MM-DD
+  let weight: Double?
+  let sets: String?
+  let reps: String?
+  let durationMin: Double?
+  let distanceM: Double?
+  let level: Double?
+  let difficulty: String?
+}
+
 // Top-level (not nested in TrainingPRCalculator) so DraftSession's
 // synthesized Codable conformance — which can't cross actor isolation
 // boundaries on nested types — stays clean.
@@ -53,6 +69,40 @@ enum TrainingPRCalculator {
     var out: [String: PRBaseline] = [:]
     for (key, rows) in grouped {
       out[key] = baseline(from: rows)
+    }
+    return out
+  }
+
+  /// Top `limit` most-recent entries per exercise, newest first. Same
+  /// case-insensitive keying as `baselines(for:in:)`. Built from the
+  /// same fetch so callers can reuse it; computed-in-tandem is fine
+  /// because both walk every ExerciseEntryEntity anyway.
+  static func recents(for exerciseNames: [String],
+                      in context: ModelContext,
+                      limit: Int = 3) -> [String: [RecentExerciseEntry]] {
+    let wanted = Set(exerciseNames.map { $0.lowercased() })
+    guard !wanted.isEmpty else { return [:] }
+    let entries = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(
+      sortBy: [SortDescriptor(\.date, order: .reverse),
+               SortDescriptor(\.loggedAt, order: .reverse)]
+    ))) ?? []
+    let filtered = entries.filter { wanted.contains($0.exercise.lowercased()) }
+    let grouped = Dictionary(grouping: filtered, by: { $0.exercise.lowercased() })
+
+    var out: [String: [RecentExerciseEntry]] = [:]
+    for (key, rows) in grouped {
+      out[key] = rows.prefix(limit).map { row in
+        RecentExerciseEntry(
+          date: row.date,
+          weight: row.weight,
+          sets: row.sets,
+          reps: row.reps,
+          durationMin: row.durationMin,
+          distanceM: row.distanceM,
+          level: row.level,
+          difficulty: row.difficulty
+        )
+      }
     }
     return out
   }

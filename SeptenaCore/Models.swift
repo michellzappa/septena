@@ -1788,6 +1788,10 @@ struct DraftSession: Codable, Hashable {
   /// stays put across the session even if the user logs a new PR
   /// on the first set.
   var prBaselines: [String: PRBaseline] = [:]
+  /// Top N most-recent historical entries per exercise (newest first),
+  /// captured at start() and frozen for the workout. Drives the compact
+  /// "last 3" table inside each card's expanded editor.
+  var recentByExercise: [String: [RecentExerciseEntry]] = [:]
 
   /// Index of the next pending entry, or nil if everything's done/skipped.
   var nextPendingIndex: Int? {
