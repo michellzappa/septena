@@ -253,33 +253,68 @@ final class NextItemsModel {
   /// on the first frame instead of empty sections while the network
   /// catches up.
   func paintFromCache() {
-    if let v = ResponseCache.load([HabitDayItem].self, forKey: CacheKey.habits) { habits = v }
-    if let v = ResponseCache.load([String].self, forKey: CacheKey.habitBuckets) { habitBuckets = v }
-    if let v = ResponseCache.load([SupplementDayItem].self, forKey: CacheKey.supplements) { supplements = v }
-    if let v = ResponseCache.load([ChoreItem].self, forKey: CacheKey.chores) { chores = v }
+    let context = LocalStore.shared.container.mainContext
+    if let day = ChecklistMirror.loadHabitsDay(context: context, date: today) {
+      habits = day.buckets.flatMap { day.grouped[$0] ?? [] }
+      habitBuckets = day.buckets
+      ResponseCache.save(habits, forKey: CacheKey.habits)
+      ResponseCache.save(habitBuckets, forKey: CacheKey.habitBuckets)
+    } else {
+      if let v = ResponseCache.load([HabitDayItem].self, forKey: CacheKey.habits) { habits = v }
+      if let v = ResponseCache.load([String].self, forKey: CacheKey.habitBuckets) { habitBuckets = v }
+    }
+    if let day = ChecklistMirror.loadSupplementsDay(context: context, date: today) {
+      supplements = day.items
+      ResponseCache.save(supplements, forKey: CacheKey.supplements)
+    } else if let v = ResponseCache.load([SupplementDayItem].self, forKey: CacheKey.supplements) {
+      supplements = v
+    }
+    let mirroredChores = ChecklistMirror.loadChores(context: context)
+    if !mirroredChores.isEmpty {
+      chores = mirroredChores
+      ResponseCache.save(mirroredChores, forKey: CacheKey.chores)
+    } else if let v = ResponseCache.load([ChoreItem].self, forKey: CacheKey.chores) {
+      chores = v
+    }
     calendarEvents = CalendarBridge.shared.todayEvents()
     hasLoaded = true
   }
 
   func load(client: SeptenaClient) async {
-    async let h = try? await client.habitsDay(date: today)
-    async let s = try? await client.supplementsDay(date: today)
-    async let c = try? await client.chores()
-    let (hRes, sRes, cRes) = await (h, s, c)
-    if let hRes {
+    let context = LocalStore.shared.container.mainContext
+
+    if let hRes = ChecklistMirror.loadHabitsDay(context: context, date: today) {
       habits = hRes.buckets.flatMap { hRes.grouped[$0] ?? [] }
       habitBuckets = hRes.buckets
       ResponseCache.save(habits, forKey: CacheKey.habits)
       ResponseCache.save(habitBuckets, forKey: CacheKey.habitBuckets)
+    } else if let hRes = try? await client.habitsDay(date: today) {
+      habits = hRes.buckets.flatMap { hRes.grouped[$0] ?? [] }
+      habitBuckets = hRes.buckets
+      ResponseCache.save(habits, forKey: CacheKey.habits)
+      ResponseCache.save(habitBuckets, forKey: CacheKey.habitBuckets)
+      ChecklistMirror.replaceHabitsDay(hRes, context: context)
     }
-    if let sRes {
+
+    if let sRes = ChecklistMirror.loadSupplementsDay(context: context, date: today) {
       supplements = sRes.items
       ResponseCache.save(supplements, forKey: CacheKey.supplements)
+    } else if let sRes = try? await client.supplementsDay(date: today) {
+      supplements = sRes.items
+      ResponseCache.save(supplements, forKey: CacheKey.supplements)
+      ChecklistMirror.replaceSupplementsDay(sRes, context: context)
     }
-    if let cRes {
+
+    let mirroredChores = ChecklistMirror.loadChores(context: context)
+    if !mirroredChores.isEmpty {
+      chores = mirroredChores
+      ResponseCache.save(mirroredChores, forKey: CacheKey.chores)
+    } else if let cRes = try? await client.chores() {
       chores = cRes
       ResponseCache.save(cRes, forKey: CacheKey.chores)
+      ChecklistMirror.replaceChores(cRes, context: context)
     }
+
     // Local EventKit fetch — no network. Returns [] when access isn't
     // granted yet; the user grants in Calendar destination view / Settings.
     calendarEvents = CalendarBridge.shared.todayEvents()
@@ -294,67 +329,76 @@ final class NextItemsModel {
 
   // MARK: - Mutations (optimistic local flips, server-side write)
 
-  func toggleHabit(_ habit: HabitDayItem, outbox: HTTPOutbox) {
+  func toggleHabit(_ habit: HabitDayItem, mutator: ChecklistMutator) {
     let next = !habit.done
     if next { Haptics.success() } else { Haptics.tap() }
     if let i = habits.firstIndex(where: { $0.id == habit.id }) {
       habits[i].done = next
       if next { habits[i].skipped = false }
+      habits[i].time = next ? currentTimeString() : nil
     }
     actedHabits.insert(habit.id)
-    outbox.enqueue(method: "POST", path: "/api/habits/toggle",
-                   body: ["habit_id": habit.id, "date": today, "done": next],
-                   kind: "habits.toggle")
+    mutator.toggleHabit(id: habit.id, date: today, done: next)
   }
 
-  func skipHabit(_ habit: HabitDayItem, skipped: Bool, outbox: HTTPOutbox) {
+  func skipHabit(_ habit: HabitDayItem, skipped: Bool, mutator: ChecklistMutator) {
     Haptics.tick()
     if let i = habits.firstIndex(where: { $0.id == habit.id }) {
       habits[i].skipped = skipped
-      if skipped { habits[i].done = false }
+      if skipped {
+        habits[i].done = false
+        habits[i].time = nil
+      }
     }
     actedHabits.insert(habit.id)
-    outbox.enqueue(method: "POST", path: "/api/habits/skip",
-                   body: ["habit_id": habit.id, "date": today, "skipped": skipped],
-                   kind: "habits.skip")
+    mutator.skipHabit(id: habit.id, date: today, skipped: skipped)
   }
 
-  func toggleSupplement(_ supp: SupplementDayItem, outbox: HTTPOutbox) {
+  func toggleSupplement(_ supp: SupplementDayItem, mutator: ChecklistMutator) {
     let next = !supp.done
     if next { Haptics.success() } else { Haptics.tap() }
     if let i = supplements.firstIndex(where: { $0.id == supp.id }) {
       supplements[i].done = next
+      supplements[i].time = next ? currentTimeString() : nil
     }
     actedSupplements.insert(supp.id)
-    outbox.enqueue(method: "POST", path: "/api/supplements/toggle",
-                   body: ["supplement_id": supp.id, "date": today, "done": next],
-                   kind: "supplements.toggle")
+    mutator.toggleSupplement(id: supp.id, date: today, done: next)
   }
 
-  func completeChore(_ chore: ChoreItem, outbox: HTTPOutbox) {
+  func completeChore(_ chore: ChoreItem, mutator: ChecklistMutator) {
     Haptics.success()
     completedChores.insert(chore.id)
     deferredChores.removeValue(forKey: chore.id)
-    outbox.enqueue(method: "POST", path: "/api/chores/complete",
-                   body: ["chore_id": chore.id, "date": today],
-                   kind: "chores.complete")
+    if let i = chores.firstIndex(where: { $0.id == chore.id }) {
+      chores[i].lastCompleted = today
+      chores[i].lastCompletedTime = currentTimeString()
+    }
+    mutator.completeChore(id: chore.id, date: today)
   }
 
-  func deferChore(_ chore: ChoreItem, mode: String, label: String, outbox: HTTPOutbox) {
+  func deferChore(_ chore: ChoreItem, mode: String, label: String, mutator: ChecklistMutator) {
     Haptics.tick()
     deferredChores[chore.id] = label
     completedChores.remove(chore.id)
-    outbox.enqueue(method: "POST", path: "/api/chores/defer",
-                   body: ["chore_id": chore.id, "mode": mode],
-                   kind: "chores.defer")
+    mutator.deferChore(id: chore.id, mode: mode, from: today)
   }
 
-  func uncompleteChore(_ chore: ChoreItem, outbox: HTTPOutbox) {
+  func uncompleteChore(_ chore: ChoreItem, mutator: ChecklistMutator) {
     Haptics.tap()
     completedChores.remove(chore.id)
-    outbox.enqueue(method: "POST", path: "/api/chores/uncomplete",
-                   body: ["chore_id": chore.id, "date": today],
-                   kind: "chores.uncomplete")
+    if let i = chores.firstIndex(where: { $0.id == chore.id }) {
+      chores[i].lastCompleted = nil
+      chores[i].lastCompletedTime = nil
+    }
+    mutator.uncompleteChore(id: chore.id, date: today)
+  }
+
+  private func currentTimeString() -> String {
+    let formatter = DateFormatter()
+    formatter.calendar = Calendar(identifier: .gregorian)
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.dateFormat = "HH:mm"
+    return formatter.string(from: .now)
   }
 }
 
@@ -362,7 +406,7 @@ final class NextItemsModel {
 
 struct NextOpenSection: View {
   var model: NextItemsModel
-  @Environment(HTTPOutbox.self) private var outbox
+  @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(SectionTheme.self) private var theme
 
   /// Habits are bucketed by time-of-day on the server ("morning" / "afternoon"
@@ -402,7 +446,7 @@ struct NextOpenSection: View {
         if !events.isEmpty { Hairline().padding(.top, 8) }
         sectionHeader("Chores", tint: theme.color(for: "chores"))
         ForEach(chores) { chore in
-          ChoreRow(chore: chore, model: model, outbox: outbox,
+          ChoreRow(chore: chore, model: model, checklistMutator: checklistMutator,
                    tint: theme.color(for: "chores"))
         }
       }
@@ -412,7 +456,7 @@ struct NextOpenSection: View {
         habitBucketHeader(bucket: currentHabitBucket,
                           tint: theme.color(for: "habits"))
         ForEach(habits) { habit in
-          HabitRow(habit: habit, model: model, outbox: outbox,
+          HabitRow(habit: habit, model: model, checklistMutator: checklistMutator,
                    tint: theme.color(for: "habits"))
         }
       }
@@ -423,7 +467,7 @@ struct NextOpenSection: View {
         }
         sectionHeader("Supplements", tint: theme.color(for: "supplements"))
         ForEach(supplements) { supp in
-          SupplementRow(supplement: supp, model: model, outbox: outbox,
+          SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator,
                         tint: theme.color(for: "supplements"))
         }
       }
@@ -435,7 +479,7 @@ struct NextOpenSection: View {
 
 struct NextDoneSection: View {
   var model: NextItemsModel
-  @Environment(HTTPOutbox.self) private var outbox
+  @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(SectionTheme.self) private var theme
 
   var body: some View {
@@ -458,14 +502,14 @@ struct NextDoneSection: View {
       if !chores.isEmpty {
         if !events.isEmpty { Hairline().padding(.top, 8) }
         ForEach(chores) { chore in
-          ChoreRow(chore: chore, model: model, outbox: outbox,
+          ChoreRow(chore: chore, model: model, checklistMutator: checklistMutator,
                    tint: theme.color(for: "chores"))
         }
       }
       if !habits.isEmpty {
         if !events.isEmpty || !chores.isEmpty { Hairline().padding(.top, 8) }
         ForEach(habits) { habit in
-          HabitRow(habit: habit, model: model, outbox: outbox,
+          HabitRow(habit: habit, model: model, checklistMutator: checklistMutator,
                    tint: theme.color(for: "habits"))
         }
       }
@@ -474,7 +518,7 @@ struct NextDoneSection: View {
           Hairline().padding(.top, 8)
         }
         ForEach(supplements) { supp in
-          SupplementRow(supplement: supp, model: model, outbox: outbox,
+          SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator,
                         tint: theme.color(for: "supplements"))
         }
       }
@@ -491,7 +535,7 @@ struct NextDoneSection: View {
 struct HabitRow: View {
   let habit: HabitDayItem
   var model: NextItemsModel
-  let outbox: HTTPOutbox
+  let checklistMutator: ChecklistMutator
   let tint: Color
   var onDelete: (() -> Void)? = nil
 
@@ -501,7 +545,7 @@ struct HabitRow: View {
       TaskCheckbox(
         tint: habit.skipped && !habit.done ? Theme.inkSecondary : tint,
         isDone: inactive
-      ) { model.toggleHabit(habit, outbox: outbox) }
+      ) { model.toggleHabit(habit, mutator: checklistMutator) }
 
       Text(habit.emoji ?? "•").font(.body)
       Text(habit.name)
@@ -520,7 +564,7 @@ struct HabitRow: View {
     .padding(.vertical, Theme.rowVPadding)
     .contextMenu {
       Button {
-        model.skipHabit(habit, skipped: !habit.skipped, outbox: outbox)
+        model.skipHabit(habit, skipped: !habit.skipped, mutator: checklistMutator)
       } label: {
         Label(habit.skipped ? "Unskip" : "Skip today",
               systemImage: habit.skipped ? "arrow.uturn.left" : "forward.end")
@@ -541,14 +585,14 @@ struct HabitRow: View {
 struct SupplementRow: View {
   let supplement: SupplementDayItem
   var model: NextItemsModel
-  let outbox: HTTPOutbox
+  let checklistMutator: ChecklistMutator
   let tint: Color
   var onDelete: (() -> Void)? = nil
 
   var body: some View {
     HStack(spacing: 12) {
       TaskCheckbox(tint: tint, isDone: supplement.done) {
-        model.toggleSupplement(supplement, outbox: outbox)
+        model.toggleSupplement(supplement, mutator: checklistMutator)
       }
       Text(supplement.emoji ?? "•").font(.body)
       Text(supplement.name)
@@ -594,7 +638,7 @@ private struct SupplementRowContextMenu: ViewModifier {
 struct ChoreRow: View {
   let chore: ChoreItem
   var model: NextItemsModel
-  let outbox: HTTPOutbox
+  let checklistMutator: ChecklistMutator
   let tint: Color
   var onDelete: (() -> Void)? = nil
 
@@ -609,9 +653,9 @@ struct ChoreRow: View {
         isDone: inactive
       ) {
         if isDone {
-          model.uncompleteChore(chore, outbox: outbox)
+          model.uncompleteChore(chore, mutator: checklistMutator)
         } else {
-          model.completeChore(chore, outbox: outbox)
+          model.completeChore(chore, mutator: checklistMutator)
         }
       }
       Text(chore.emoji ?? "•").font(.body)
@@ -634,12 +678,12 @@ struct ChoreRow: View {
     .contextMenu {
       if !isDone && deferLabel == nil {
         Button {
-          model.deferChore(chore, mode: "day", label: "Tomorrow", outbox: outbox)
+          model.deferChore(chore, mode: "day", label: "Tomorrow", mutator: checklistMutator)
         } label: {
           Label("Defer to tomorrow", systemImage: "calendar.badge.plus")
         }
         Button {
-          model.deferChore(chore, mode: "weekend", label: "Weekend", outbox: outbox)
+          model.deferChore(chore, mode: "weekend", label: "Weekend", mutator: checklistMutator)
         } label: {
           Label("Defer to weekend", systemImage: "calendar.badge.clock")
         }
@@ -819,4 +863,3 @@ private struct BucketTimeLeft: View {
     return (text, color)
   }
 }
-

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		002C465DC1BF297DFED1A82A /* GroceriesQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04282C19B1BCFF16B61F4CA1 /* GroceriesQuickAddMenu.swift */; };
+		0139A2BF409AD0CFD4AA7E80 /* SettingsMirror.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5439F75303F906465F9F2C6 /* SettingsMirror.swift */; };
 		01E672AE9CC6DC0BCC948870 /* NutritionDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42EB061D69FA656547DC171F /* NutritionDestinationView.swift */; };
 		04112426A92819E814A6F66A /* QuickFindView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAB04CA79A9C3207CCE972F9 /* QuickFindView.swift */; };
 		0448F507E1F1600F9933AEED /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5ECFDA9128B73993023CB6 /* Models.swift */; };
@@ -22,6 +23,7 @@
 		10550EB285720325B123ED7E /* EditCaffeineEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFF7884F079CD77F2AA126F9 /* EditCaffeineEntrySheet.swift */; };
 		11091A62DB6744BDE8673415 /* EditSupplementSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F70E70D8BC6F8B767D06FF9 /* EditSupplementSheet.swift */; };
 		116F32431DCC98176BC52830 /* ChoresDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E31867A580D7D96DFB20391B /* ChoresDestinationView.swift */; };
+		14A026D5D1BAFF0B4943D0E0 /* GutBristolRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52B5EEA9B508AB5AAB6152F8 /* GutBristolRecorder.swift */; };
 		15B7B63A6FAFF96F8697F226 /* AirDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 841912A106FECA1706069D4A /* AirDestinationView.swift */; };
 		183F34C5DC50F1B0DE238401 /* CannabisQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D82674F62302252DB1B8167 /* CannabisQuickAddMenu.swift */; };
 		187093B93D48863B5E1E1E37 /* RemindersBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561130AE996F0E92FE02767D /* RemindersBridge.swift */; };
@@ -48,6 +50,7 @@
 		2933A423AA89C0FC06C738DD /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBA5CADFC4205866897E4F8C /* App.swift */; };
 		2A5F1570FB36894B1FBE4364 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B0FAB25573797D6BF8C9482 /* ContentView.swift */; };
 		2C68F00EF16E552C12B176AE /* GutDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2AF70B89A0D3FC41DAFAFE9 /* GutDestinationView.swift */; };
+		2D0446FF68EAE29C3AEEC770 /* GutBristolRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52B5EEA9B508AB5AAB6152F8 /* GutBristolRecorder.swift */; };
 		2DCD1163302ADF72541A9664 /* EditChoreSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25DD66C82573E23BF3CCA2F8 /* EditChoreSheet.swift */; };
 		2E71534FB75930353C9B6320 /* HabitsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D38FA671236F83BEFCB8EBE /* HabitsDestinationView.swift */; };
 		2ED32D83DAF70E51745C9183 /* GroceriesDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FA781FD1BD2DC0AA7388700 /* GroceriesDestinationView.swift */; };
@@ -69,6 +72,7 @@
 		3D46571B9A58D75B1947368B /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB3DA6C707EA3988C90D573B /* SidebarView.swift */; };
 		3E0EF1DA201030BB6F2A4019 /* NutritionRecommendations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CEAA5532CD1C1A47DB1BBAC /* NutritionRecommendations.swift */; };
 		3EEDE3247DF0EDB92F55843D /* IntensityGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7DF7DE41AF304A9324BC6E /* IntensityGlyph.swift */; };
+		3EFD534FCC0E072DCACD3839 /* SectionRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B8CA0380F3FD3679CE4C676 /* SectionRecord.swift */; };
 		403EE99D65456FD99F82D568 /* ActivityDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80D7DFAC856BBE635EBBC6E4 /* ActivityDestinationView.swift */; };
 		424F6899E25CE8A32DF9C1A6 /* AddTaskIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5961822BB83BCF87B27E11AD /* AddTaskIntent.swift */; };
 		450F6EE8AD17A6935567940D /* DayClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFD8EA98B891BB43A0CE4640 /* DayClock.swift */; };
@@ -99,8 +103,8 @@
 		5C2CAF18F7F1BB26F040A597 /* CKEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3A43D786998D198C9BCA480 /* CKEngine.swift */; };
 		5FC8B85066ABC219A5C9EC86 /* NextWatchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 851BE2CCE51793135E27E354 /* NextWatchView.swift */; };
 		616C90B23EBD22005C6BBBAB /* AddGutPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 804ACCAA2E1FE43802EA25AB /* AddGutPage.swift */; };
-		63C0C4DF131A491BAB9F8DB2 /* GutBristolRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BD81EAADE544C509D548C02 /* GutBristolRecorder.swift */; };
 		64BB65F0683A560F5055BA6A /* NextItemsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A26475D9A9D19DC0840960D /* NextItemsSection.swift */; };
+		6521E27B88444ACE53AE24BE /* ChecklistMirror.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9D2A0C223ECB0DAA0D3EB12 /* ChecklistMirror.swift */; };
 		65246BE2E94DD5324730533D /* Plausible.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CA646178F906B39ADA6689F /* Plausible.swift */; };
 		6599659F45F9B6EF50FC2C1B /* ServerInspectorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53E343B15A4B6F29FBF956B8 /* ServerInspectorSheet.swift */; };
 		65D36118770101C467F95896 /* OfflineBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6070C12AEE965B38143B003 /* OfflineBanner.swift */; };
@@ -123,18 +127,19 @@
 		7EACBD21879EB225D558CF78 /* SharedComplicationData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F191C9B4CF7C226C46AC330 /* SharedComplicationData.swift */; };
 		7F86986DFF10251984C6D58F /* EditGroceryItemSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4C5E5E15422EB17DB5D3960 /* EditGroceryItemSheet.swift */; };
 		7FE5815A1FDDD537C1337A6E /* AddInfoSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8762C7A4DFED340274D8BD37 /* AddInfoSection.swift */; };
+		7FFEA95721A7FACE74618002 /* ChecklistMirror.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9D2A0C223ECB0DAA0D3EB12 /* ChecklistMirror.swift */; };
 		829009F90CB9E37A6D1D9341 /* LogRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DDBCEACF8957679BD5E02F2 /* LogRow.swift */; };
 		82BBE632A990482C26C7BB0F /* QuickAddToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A926F2FA426ABCDD73F33BE /* QuickAddToolbar.swift */; };
 		83D51A84E5045C1EC509EC83 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB3DA6C707EA3988C90D573B /* SidebarView.swift */; };
 		88D354F6ACC5B87602A1B731 /* ShortcutAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB6A01D91E7B3ED63B6BFDE /* ShortcutAction.swift */; };
 		88D6592312AB55D1A314C247 /* EditNutritionEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C79C561E59D69B3653B65047 /* EditNutritionEntrySheet.swift */; };
+		8920FD91C3706F090902F4A5 /* SettingsRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C93BF01E5F69A01E9E9302 /* SettingsRecord.swift */; };
 		892B9AF1DFB498BD9A0C0B67 /* AddNutritionPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB3A88C2CE6907A4D7BF34C2 /* AddNutritionPage.swift */; };
 		8B2588E5DB7635580E73217D /* EditChoreSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25DD66C82573E23BF3CCA2F8 /* EditChoreSheet.swift */; };
 		8BB0BE46187F796D00BAB65A /* GroceriesQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04282C19B1BCFF16B61F4CA1 /* GroceriesQuickAddMenu.swift */; };
 		8C4B8E2EEE2504ED9E24D5EA /* NavigationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C59B083F7F5C67ABE440868 /* NavigationState.swift */; };
 		8C64426276695251AE35D327 /* ChoresQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = F531676F7BCEFA46F3A7D827 /* ChoresQuickAddMenu.swift */; };
 		8D494DC3944E6DF820478280 /* AddGutPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 804ACCAA2E1FE43802EA25AB /* AddGutPage.swift */; };
-		4AC96267389746D89855EE54 /* GutBristolRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BD81EAADE544C509D548C02 /* GutBristolRecorder.swift */; };
 		8F36E77E81D7EAC78F51D64A /* NewNutritionEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C180106D47D0477F75695A /* NewNutritionEntrySheet.swift */; };
 		91693AEE32D3825C811733E8 /* AddTrainingPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F955392D23BB02F27DD39CD9 /* AddTrainingPage.swift */; };
 		91CF39EC64CE090D8FDB9C65 /* EditHabitSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4E0ADF5987E9D7E112126AB /* EditHabitSheet.swift */; };
@@ -174,12 +179,14 @@
 		ACD44B47A763255CA20575BE /* HTTPOutbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BE54D41FA8376A929C7D29 /* HTTPOutbox.swift */; };
 		AD6AB8AB9F61D39820850F23 /* SeptenaWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1130C3EBCF558AF0EFB27AB9 /* SeptenaWatchApp.swift */; };
 		AD8E6D6E9DFA518DBC2B50CA /* AddChorePage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B241213EA8E591629280B7EE /* AddChorePage.swift */; };
+		ADCA538CBFB1E75DCC416215 /* SettingsRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C93BF01E5F69A01E9E9302 /* SettingsRecord.swift */; };
 		AF5A77B5B730923A825F7C89 /* Outbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD295FAB7B881CAC43EE8C34 /* Outbox.swift */; };
 		B09EA3455FBF702224C33616 /* CalendarBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7027B881D1D8B1B09B105034 /* CalendarBridge.swift */; };
 		B0DA42E828CAC0BD0B0E64B9 /* TrainingDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C8645572712693D81587B7C /* TrainingDestinationView.swift */; };
 		B1890C3913BBCEC6EFF39807 /* SearchTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48D2DD3CC83AA08A30DA2938 /* SearchTabView.swift */; };
 		B211B2678BDDD3B30FD9307D /* ResponseCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D6916E979E5B0D7497CAEF /* ResponseCache.swift */; };
 		B28E04772BF9921F6B165657 /* CannabisQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D82674F62302252DB1B8167 /* CannabisQuickAddMenu.swift */; };
+		B45A3DCE0AC3B32856BA727C /* SettingsMirror.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5439F75303F906465F9F2C6 /* SettingsMirror.swift */; };
 		B4FF26A77957BACDB89050C5 /* WeekDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4847155874CE3B82AD612728 /* WeekDashboardView.swift */; };
 		B52F421956F45A0367348241 /* PlatformDelegates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1654FD32744DA1974DA1C1CE /* PlatformDelegates.swift */; };
 		B5C4876EC67FCD081FB3E0C5 /* WatchConnectivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A09644381782A9A298BDC709 /* WatchConnectivity.swift */; };
@@ -205,6 +212,7 @@
 		C69F364723C44FE9F240239A /* BodyDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68B6F4EE0E6882204B5E6088 /* BodyDestinationView.swift */; };
 		C7AC2E4E116DAB445A500573 /* AreasBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E598D0EF28BF638E97F3F22 /* AreasBackend.swift */; };
 		C8431A57209DF77F8D9F9E59 /* CannabisDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8426035C14708F9B19546DE /* CannabisDestinationView.swift */; };
+		C8F7E91227008E29DA40DB5C /* SectionRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B8CA0380F3FD3679CE4C676 /* SectionRecord.swift */; };
 		C9730A8D5FCB43EAC9A6C304 /* NewNutritionEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C180106D47D0477F75695A /* NewNutritionEntrySheet.swift */; };
 		C9A195F8FF0C63824E0A5BD8 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */; };
 		CAC1308955C25982A48369D8 /* NextComplicationBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FBFFB14069FB717EF02173A /* NextComplicationBundle.swift */; };
@@ -355,7 +363,9 @@
 		4F191C9B4CF7C226C46AC330 /* SharedComplicationData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedComplicationData.swift; sourceTree = "<group>"; };
 		4FA781FD1BD2DC0AA7388700 /* GroceriesDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceriesDestinationView.swift; sourceTree = "<group>"; };
 		50371A7532E006FCD529D414 /* AddGroceryPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGroceryPage.swift; sourceTree = "<group>"; };
+		50C93BF01E5F69A01E9E9302 /* SettingsRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRecord.swift; sourceTree = "<group>"; };
 		5122E5C1D750654468CDCE96 /* SeptenaWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeptenaWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		52B5EEA9B508AB5AAB6152F8 /* GutBristolRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GutBristolRecorder.swift; sourceTree = "<group>"; };
 		533ABAE12036AA623BE82B59 /* NutritionSearchSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionSearchSheet.swift; sourceTree = "<group>"; };
 		53E343B15A4B6F29FBF956B8 /* ServerInspectorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerInspectorSheet.swift; sourceTree = "<group>"; };
 		53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
@@ -373,6 +383,7 @@
 		6392DC43E2FE913972F42911 /* NextSuggestionsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextSuggestionsSection.swift; sourceTree = "<group>"; };
 		64EB95DB6A86885B3FA483C1 /* Migration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Migration.swift; sourceTree = "<group>"; };
 		68B6F4EE0E6882204B5E6088 /* BodyDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyDestinationView.swift; sourceTree = "<group>"; };
+		6B8CA0380F3FD3679CE4C676 /* SectionRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionRecord.swift; sourceTree = "<group>"; };
 		6CEAA5532CD1C1A47DB1BBAC /* NutritionRecommendations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionRecommendations.swift; sourceTree = "<group>"; };
 		7027B881D1D8B1B09B105034 /* CalendarBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarBridge.swift; sourceTree = "<group>"; };
 		757E2ED9D591D3EB6A07DF8A /* WatchBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchBridge.swift; sourceTree = "<group>"; };
@@ -385,7 +396,6 @@
 		7F911216C13CBFC7E330714A /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		7FD1B7B2BAE523F2E4D3F99C /* ProjectsBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectsBackend.swift; sourceTree = "<group>"; };
 		804ACCAA2E1FE43802EA25AB /* AddGutPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGutPage.swift; sourceTree = "<group>"; };
-		5BD81EAADE544C509D548C02 /* GutBristolRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GutBristolRecorder.swift; sourceTree = "<group>"; };
 		80D7DFAC856BBE635EBBC6E4 /* ActivityDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityDestinationView.swift; sourceTree = "<group>"; };
 		8416FB0AD38638BF7038BF2A /* NextDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextDashboardView.swift; sourceTree = "<group>"; };
 		841912A106FECA1706069D4A /* AirDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirDestinationView.swift; sourceTree = "<group>"; };
@@ -430,12 +440,14 @@
 		D5B59047A762635E5A4D89D0 /* EditExerciseEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditExerciseEntrySheet.swift; sourceTree = "<group>"; };
 		D6070C12AEE965B38143B003 /* OfflineBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineBanner.swift; sourceTree = "<group>"; };
 		D7A9CFE2B4EA160E84F58544 /* RemindersImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersImportView.swift; sourceTree = "<group>"; };
+		D9D2A0C223ECB0DAA0D3EB12 /* ChecklistMirror.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChecklistMirror.swift; sourceTree = "<group>"; };
 		DB960188319E54312A616C00 /* HabitsQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitsQuickAddMenu.swift; sourceTree = "<group>"; };
 		DFD8EA98B891BB43A0CE4640 /* DayClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayClock.swift; sourceTree = "<group>"; };
 		E0B5F0D2E1B01AAEF2217FA4 /* TasksQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksQuickAddMenu.swift; sourceTree = "<group>"; };
 		E0E984505A489247AADAB293 /* ConsistencyHeatmap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsistencyHeatmap.swift; sourceTree = "<group>"; };
 		E17D3542734AB0B32527C12C /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
 		E31867A580D7D96DFB20391B /* ChoresDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoresDestinationView.swift; sourceTree = "<group>"; };
+		E5439F75303F906465F9F2C6 /* SettingsMirror.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsMirror.swift; sourceTree = "<group>"; };
 		EB3DA6C707EA3988C90D573B /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		F05E01AB86D25931CD682001 /* WatchAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchAppDelegate.swift; sourceTree = "<group>"; };
 		F0BEBB91083B3194167B548E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -515,7 +527,7 @@
 			children = (
 				804ACCAA2E1FE43802EA25AB /* AddGutPage.swift */,
 				0BCB8601AE73D7F70536C902 /* EditGutEntrySheet.swift */,
-				5BD81EAADE544C509D548C02 /* GutBristolRecorder.swift */,
+				52B5EEA9B508AB5AAB6152F8 /* GutBristolRecorder.swift */,
 				D2AF70B89A0D3FC41DAFAFE9 /* GutDestinationView.swift */,
 				6326F985506DA489D2B176A7 /* GutQuickAddMenu.swift */,
 			);
@@ -680,6 +692,8 @@
 				64EB95DB6A86885B3FA483C1 /* Migration.swift */,
 				1A7C4DF4E90BB39F4A0D23DE /* ProjectRecord.swift */,
 				7FD1B7B2BAE523F2E4D3F99C /* ProjectsBackend.swift */,
+				6B8CA0380F3FD3679CE4C676 /* SectionRecord.swift */,
+				50C93BF01E5F69A01E9E9302 /* SettingsRecord.swift */,
 				1CBF0DAD74F9392D507229CE /* TaskReads.swift */,
 				62BF9F7C16DF9595A999267D /* TaskRecord.swift */,
 				3882D64DF6517B0447F5F65C /* TasksBackend.swift */,
@@ -832,6 +846,7 @@
 			children = (
 				8EC7C9D9CAC52C91AFE79AE7 /* BadgeManager.swift */,
 				7027B881D1D8B1B09B105034 /* CalendarBridge.swift */,
+				D9D2A0C223ECB0DAA0D3EB12 /* ChecklistMirror.swift */,
 				1E25F81FE5AA4B6BBC056275 /* DateParser.swift */,
 				DFD8EA98B891BB43A0CE4640 /* DayClock.swift */,
 				53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */,
@@ -846,6 +861,7 @@
 				C03DC46C772E45B60ECB7343 /* SectionTheme.swift */,
 				583220978001091137587977 /* SeptenaClient.swift */,
 				5D227602C1039FA2206A539A /* SeptenaServices.swift */,
+				E5439F75303F906465F9F2C6 /* SettingsMirror.swift */,
 				B6DD7C05D998EF1301A6410D /* SuggestionEngine.swift */,
 				9C1C012D9D64C42D35820701 /* CloudKit */,
 				858259E63BAAEEF2BE43D00B /* Sections */,
@@ -1046,7 +1062,6 @@
 				0ED02C4262546D720DCBE5DE /* AddChorePage.swift in Sources */,
 				ED0AA58CABA5CF7F1EEA51BC /* AddGroceryPage.swift in Sources */,
 				616C90B23EBD22005C6BBBAB /* AddGutPage.swift in Sources */,
-				63C0C4DF131A491BAB9F8DB2 /* GutBristolRecorder.swift in Sources */,
 				F97689E39AD64A5101DB4296 /* AddHabitPage.swift in Sources */,
 				0A871A3A42EE54FEC6B17A0A /* AddInfoRouter.swift in Sources */,
 				1B693725E48BCC5939FE1196 /* AddInfoRow.swift in Sources */,
@@ -1071,6 +1086,7 @@
 				58DD67805AA678ADFA0709BB /* CalendarDestinationView.swift in Sources */,
 				E180CC3F5D34C7CD682290A9 /* CannabisDestinationView.swift in Sources */,
 				B28E04772BF9921F6B165657 /* CannabisQuickAddMenu.swift in Sources */,
+				7FFEA95721A7FACE74618002 /* ChecklistMirror.swift in Sources */,
 				116F32431DCC98176BC52830 /* ChoresDestinationView.swift in Sources */,
 				8C64426276695251AE35D327 /* ChoresQuickAddMenu.swift in Sources */,
 				331439A1A265FAA64B5B02B6 /* ConsistencyHeatmap.swift in Sources */,
@@ -1090,6 +1106,7 @@
 				A97FAA9330439D1F0842F071 /* GoalsView.swift in Sources */,
 				3C51EABA92695B18A7853BC1 /* GroceriesDestinationView.swift in Sources */,
 				8BB0BE46187F796D00BAB65A /* GroceriesQuickAddMenu.swift in Sources */,
+				2D0446FF68EAE29C3AEEC770 /* GutBristolRecorder.swift in Sources */,
 				2C68F00EF16E552C12B176AE /* GutDestinationView.swift in Sources */,
 				C340BAAC69B40F5B9CD987BD /* GutQuickAddMenu.swift in Sources */,
 				ACD44B47A763255CA20575BE /* HTTPOutbox.swift in Sources */,
@@ -1130,10 +1147,13 @@
 				CC39344C28C121004522CAB8 /* RootTabView.swift in Sources */,
 				B1890C3913BBCEC6EFF39807 /* SearchTabView.swift in Sources */,
 				A7F3580380663FA1FA645ED0 /* SectionManifest.swift in Sources */,
+				C8F7E91227008E29DA40DB5C /* SectionRecord.swift in Sources */,
 				07B127F5FBCE0DE19AFCD387 /* SectionTheme.swift in Sources */,
 				D770995846D0B23AC3F77F34 /* SeptenaClient.swift in Sources */,
 				288822C1F37C59515A97A967 /* SeptenaServices.swift in Sources */,
 				C3AC44E24947DE4D47DA8A42 /* ServerInspectorSheet.swift in Sources */,
+				B45A3DCE0AC3B32856BA727C /* SettingsMirror.swift in Sources */,
+				ADCA538CBFB1E75DCC416215 /* SettingsRecord.swift in Sources */,
 				B60A9AE489FD7502DC0B83B8 /* SettingsView.swift in Sources */,
 				88D354F6ACC5B87602A1B731 /* ShortcutAction.swift in Sources */,
 				83D51A84E5045C1EC509EC83 /* SidebarView.swift in Sources */,
@@ -1192,7 +1212,6 @@
 				AD8E6D6E9DFA518DBC2B50CA /* AddChorePage.swift in Sources */,
 				933FEAF27E7304E27A956B84 /* AddGroceryPage.swift in Sources */,
 				8D494DC3944E6DF820478280 /* AddGutPage.swift in Sources */,
-				4AC96267389746D89855EE54 /* GutBristolRecorder.swift in Sources */,
 				F85E889C41CE2E31C1502315 /* AddHabitPage.swift in Sources */,
 				490A398C3B11F900B233B2F3 /* AddInfoRouter.swift in Sources */,
 				D2ED87D701557BCC94446AC6 /* AddInfoRow.swift in Sources */,
@@ -1217,6 +1236,7 @@
 				7DD6DCA0A66C144DA6686FF4 /* CalendarDestinationView.swift in Sources */,
 				C8431A57209DF77F8D9F9E59 /* CannabisDestinationView.swift in Sources */,
 				183F34C5DC50F1B0DE238401 /* CannabisQuickAddMenu.swift in Sources */,
+				6521E27B88444ACE53AE24BE /* ChecklistMirror.swift in Sources */,
 				27FAA27C1B4C0F8D3EC2A94B /* ChoresDestinationView.swift in Sources */,
 				1C507D0995C20ECA4DA6479F /* ChoresQuickAddMenu.swift in Sources */,
 				EA56ADCFD84CE200C7CEF2A9 /* ConsistencyHeatmap.swift in Sources */,
@@ -1236,6 +1256,7 @@
 				E9970D5068FD243A6FF27686 /* GoalsView.swift in Sources */,
 				2ED32D83DAF70E51745C9183 /* GroceriesDestinationView.swift in Sources */,
 				002C465DC1BF297DFED1A82A /* GroceriesQuickAddMenu.swift in Sources */,
+				14A026D5D1BAFF0B4943D0E0 /* GutBristolRecorder.swift in Sources */,
 				57CDC37DD71D40C12819E6C6 /* GutDestinationView.swift in Sources */,
 				E680A3EF175E9F47A1C8D641 /* GutQuickAddMenu.swift in Sources */,
 				39CD08C5DEE045DA2046A98C /* HTTPOutbox.swift in Sources */,
@@ -1276,10 +1297,13 @@
 				6B3C51BC822675123EE51792 /* RootTabView.swift in Sources */,
 				9E8F15EC733A433E18D82362 /* SearchTabView.swift in Sources */,
 				95FF3A61C542C9B1633050C3 /* SectionManifest.swift in Sources */,
+				3EFD534FCC0E072DCACD3839 /* SectionRecord.swift in Sources */,
 				D3D801AE0714FA3E8696508A /* SectionTheme.swift in Sources */,
 				9ED913F259DC6E83E4EDB824 /* SeptenaClient.swift in Sources */,
 				D70A3B473E3ACD222FD15870 /* SeptenaServices.swift in Sources */,
 				6599659F45F9B6EF50FC2C1B /* ServerInspectorSheet.swift in Sources */,
+				0139A2BF409AD0CFD4AA7E80 /* SettingsMirror.swift in Sources */,
+				8920FD91C3706F090902F4A5 /* SettingsRecord.swift in Sources */,
 				76C049B6FAEBDE6471287104 /* SettingsView.swift in Sources */,
 				A1D4907004FD78EC3D6F7C6F /* ShortcutAction.swift in Sources */,
 				3D46571B9A58D75B1947368B /* SidebarView.swift in Sources */,

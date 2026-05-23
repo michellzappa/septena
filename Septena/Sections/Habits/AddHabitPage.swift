@@ -30,7 +30,7 @@ private func visibleBuckets(_ all: [String]) -> [String] {
 
 struct AddHabitPage: View {
   @Environment(SeptenaClient.self) private var client
-  @Environment(HTTPOutbox.self) private var outbox
+  @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
@@ -101,11 +101,7 @@ struct AddHabitPage: View {
   }
 
   private func toggle(_ item: HabitDayItem) {
-    outbox.enqueue(method: "POST", path: "/api/habits/toggle",
-                   body: ["habit_id": item.id,
-                          "date": SeptenaDate.today,
-                          "done": true],
-                   kind: "habits.toggle")
+    checklistMutator.toggleHabit(id: item.id, date: SeptenaDate.today, done: true)
     AddInfoSection.habits.notifyTilesChanged()
     Haptics.tick()
     dismiss()
@@ -114,18 +110,19 @@ struct AddHabitPage: View {
   private func create(name: String) {
     guard !working else { return }
     working = true
-    Task {
-      defer { working = false }
-      do {
-        try await client.createHabit(name: name, bucket: createBucket)
-        AddInfoSection.habits.notifyTilesChanged()
-        Haptics.tick()
-        dismiss()
-      } catch { Haptics.warning() }
-    }
+    _ = checklistMutator.createHabit(name: name, bucket: createBucket)
+    working = false
+    AddInfoSection.habits.notifyTilesChanged()
+    Haptics.tick()
+    dismiss()
   }
 
   private func load() async {
-    day = try? await client.habitsDay(date: SeptenaDate.today)
+    let context = LocalStore.shared.container.mainContext
+    if let mirrored = ChecklistMirror.loadHabitsDay(context: context, date: SeptenaDate.today) {
+      day = mirrored
+    } else {
+      day = try? await client.habitsDay(date: SeptenaDate.today)
+    }
   }
 }

@@ -7,7 +7,7 @@ import SwiftUI
 
 struct SupplementsDestinationView: View {
   @Environment(SeptenaClient.self) private var client
-  @Environment(HTTPOutbox.self) private var outbox
+  @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(SectionTheme.self) private var theme
 
   @State private var model = NextItemsModel()
@@ -23,7 +23,7 @@ struct SupplementsDestinationView: View {
       Section {
         ForEach(model.supplements) { supp in
           Button { editing = supp } label: {
-            SupplementRow(supplement: supp, model: model, outbox: outbox, tint: accent,
+            SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator, tint: accent,
                           onDelete: { delete(supp) })
           }
           .buttonStyle(.plain)
@@ -97,12 +97,7 @@ struct SupplementsDestinationView: View {
   }
 
   private func delete(_ supp: SupplementDayItem) {
-    outbox.enqueue(
-      method: "DELETE",
-      path: "/api/supplements/delete/\(supp.id)",
-      body: nil,
-      kind: "supplements.delete"
-    )
+    checklistMutator.deleteSupplement(id: supp.id)
     model.supplements.removeAll { $0.id == supp.id }
     Haptics.warning()
   }

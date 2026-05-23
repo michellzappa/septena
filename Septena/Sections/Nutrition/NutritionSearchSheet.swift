@@ -77,12 +77,18 @@ struct NutritionSearchSheet: View {
           }
         }
       }
+#if os(iOS) || os(tvOS)
       .listStyle(.insetGrouped)
+#endif
       .navigationTitle("Search meals")
-      #if os(iOS)
+#if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
-      #endif
+#endif
+#if os(iOS) || os(tvOS)
       .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always))
+#else
+      .searchable(text: $query)
+#endif
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button("Cancel") { dismiss() }

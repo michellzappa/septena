@@ -2,6 +2,11 @@ import Foundation
 import CloudKit
 import SwiftData
 
+private func optionalProjectString(_ value: CKRecordValue?) -> String? {
+  guard let string = value as? String else { return nil }
+  return string.isEmpty ? nil : string
+}
+
 // ProjectRecord — ProjectEntity ↔ CKRecord mapping. See [TaskRecord.swift]
 // for the schema-rigidity background and field-reservation pattern.
 
@@ -77,13 +82,13 @@ extension ProjectEntity {
   func apply(_ record: CKRecord) {
     if let v = record[ProjectCloudKitSchema.Field.title] as? String { title = v }
     if let v = record[ProjectCloudKitSchema.Field.status] as? String { statusRaw = v }
-    area = record[ProjectCloudKitSchema.Field.area] as? String
-    created = record[ProjectCloudKitSchema.Field.created] as? String
-    completedAt = record[ProjectCloudKitSchema.Field.completedAt] as? String
-    context = record[ProjectCloudKitSchema.Field.context] as? String
-    githubRepo = record[ProjectCloudKitSchema.Field.githubRepo] as? String
-    notes = (record[ProjectCloudKitSchema.Field.notesText] as? String)
-      ?? (record.encryptedValues[ProjectCloudKitSchema.Field.encryptedNotes] as? String)
+    area = optionalProjectString(record[ProjectCloudKitSchema.Field.area])
+    created = optionalProjectString(record[ProjectCloudKitSchema.Field.created])
+    completedAt = optionalProjectString(record[ProjectCloudKitSchema.Field.completedAt])
+    context = optionalProjectString(record[ProjectCloudKitSchema.Field.context])
+    githubRepo = optionalProjectString(record[ProjectCloudKitSchema.Field.githubRepo])
+    notes = optionalProjectString(record[ProjectCloudKitSchema.Field.notesText])
+      ?? optionalProjectString(record.encryptedValues[ProjectCloudKitSchema.Field.encryptedNotes])
     captureCloudKitSystemFields(from: record)
   }
 

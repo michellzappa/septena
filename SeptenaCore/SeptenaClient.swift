@@ -131,6 +131,12 @@ final class SeptenaClient {
     try await getJSON("/api/habits/day/\(date)", as: HabitsDayResponse.self)
   }
 
+  func habitsRange(days: Int = 14) async throws -> HabitsRangeResponse {
+    try await getJSON("/api/habits/range",
+                      query: [URLQueryItem(name: "days", value: String(days))],
+                      as: HabitsRangeResponse.self)
+  }
+
   func toggleHabit(id: String, date: String, done: Bool) async throws {
     let body: [String: Any] = ["habit_id": id, "date": date, "done": done]
     _ = try await postJSON("/api/habits/toggle", body: body, as: EmptyResponse.self)
@@ -148,6 +154,12 @@ final class SeptenaClient {
     try await getJSON("/api/supplements/day/\(date)", as: SupplementsDayResponse.self)
   }
 
+  func supplementsRange(days: Int = 14) async throws -> SupplementsRangeResponse {
+    try await getJSON("/api/supplements/range",
+                      query: [URLQueryItem(name: "days", value: String(days))],
+                      as: SupplementsRangeResponse.self)
+  }
+
   func toggleSupplement(id: String, date: String, done: Bool) async throws {
     let body: [String: Any] = ["supplement_id": id, "date": date, "done": done]
     _ = try await postJSON("/api/supplements/toggle", body: body, as: EmptyResponse.self)
@@ -163,6 +175,12 @@ final class SeptenaClient {
 
   func chores() async throws -> [ChoreItem] {
     try await getJSON("/api/chores/list", as: ChoresListResponse.self).chores
+  }
+
+  func choresExport(days: Int = 3650) async throws -> ChoresExportResponse {
+    try await getJSON("/api/chores/export",
+                      query: [URLQueryItem(name: "days", value: String(days))],
+                      as: ChoresExportResponse.self)
   }
 
   /// N-day completion/total history for chores; powers the Week tile

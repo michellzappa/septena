@@ -5,7 +5,7 @@ import SwiftUI
 // `POST /api/supplements/new`.
 
 struct EditSupplementSheet: View {
-  @Environment(HTTPOutbox.self) private var outbox
+  @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(\.dismiss) private var dismiss
 
   let original: SupplementDayItem?
@@ -45,33 +45,14 @@ struct EditSupplementSheet: View {
     let n = name.trimmingCharacters(in: .whitespaces)
     let e = emoji.trimmingCharacters(in: .whitespaces)
     if let original {
-      let body: [String: Any] = [
-        "id": original.id,
-        "name": n,
-        "emoji": e,
-      ]
-      outbox.enqueue(
-        method: "PUT",
-        path: "/api/supplements/update",
-        body: body,
-        kind: "supplements.update"
-      )
+      checklistMutator.updateSupplement(id: original.id, name: n, emoji: e)
       Haptics.tick()
       var rebuilt = original
       rebuilt.name = n
       rebuilt.emoji = e.isEmpty ? nil : e
       onDone(rebuilt)
     } else {
-      let body: [String: Any] = [
-        "name": n,
-        "emoji": e,
-      ]
-      outbox.enqueue(
-        method: "POST",
-        path: "/api/supplements/new",
-        body: body,
-        kind: "supplements.create"
-      )
+      _ = checklistMutator.createSupplement(name: n, emoji: e)
       Haptics.tick()
       onDone(nil)
     }

@@ -392,12 +392,34 @@ struct HabitDayItem: Codable, Identifiable, Hashable {
   }
 
   enum CodingKeys: String, CodingKey { case id, name, emoji, bucket, done, skipped, note, time }
+
+  init(id: String,
+       name: String,
+       emoji: String?,
+       bucket: String,
+       done: Bool,
+       skipped: Bool,
+       note: String?,
+       time: String?) {
+    self.id = id
+    self.name = name
+    self.emoji = emoji
+    self.bucket = bucket
+    self.done = done
+    self.skipped = skipped
+    self.note = note
+    self.time = time
+  }
 }
 
 struct HabitsDayResponse: Codable {
   var date: String
   var buckets: [String]
   var grouped: [String: [HabitDayItem]]
+}
+
+struct HabitsRangeResponse: Codable {
+  var days: [HabitsDayResponse]
 }
 
 /// Single supplement instance for a given day. From `/api/supplements/day/{date}`.
@@ -420,11 +442,29 @@ struct SupplementDayItem: Codable, Identifiable, Hashable {
   }
 
   enum CodingKeys: String, CodingKey { case id, name, emoji, done, note, time }
+
+  init(id: String,
+       name: String,
+       emoji: String?,
+       done: Bool,
+       note: String?,
+       time: String?) {
+    self.id = id
+    self.name = name
+    self.emoji = emoji
+    self.done = done
+    self.note = note
+    self.time = time
+  }
 }
 
 struct SupplementsDayResponse: Codable {
   var date: String
   var items: [SupplementDayItem]
+}
+
+struct SupplementsRangeResponse: Codable {
+  var days: [SupplementsDayResponse]
 }
 
 /// Recurring chore. From `/api/chores/list`.
@@ -461,10 +501,63 @@ struct ChoreItem: Codable, Identifiable, Hashable {
     case daysOverdue = "days_overdue"
     case cadenceDays = "cadence_days"
   }
+
+  init(fromFallbackID id: String,
+       name: String,
+       emoji: String?,
+       dueDate: String?,
+       lastCompleted: String?,
+       lastCompletedTime: String?,
+       daysOverdue: Int,
+       cadenceDays: Int?) {
+    self.id = id
+    self.name = name
+    self.emoji = emoji
+    self.dueDate = dueDate
+    self.lastCompleted = lastCompleted
+    self.lastCompletedTime = lastCompletedTime
+    self.daysOverdue = daysOverdue
+    self.cadenceDays = cadenceDays
+  }
 }
 
 struct ChoresListResponse: Codable {
   var chores: [ChoreItem]
+}
+
+struct ChoreDefinitionPayload: Codable, Hashable {
+  let id: String
+  var name: String
+  var emoji: String?
+  var cadenceDays: Int
+
+  enum CodingKeys: String, CodingKey {
+    case id, name, emoji
+    case cadenceDays = "cadence_days"
+  }
+}
+
+struct ChoreEventPayload: Codable, Hashable {
+  let recordID: String
+  let choreID: String
+  let action: String
+  let date: String
+  var newDueDate: String?
+  var reason: String?
+  var note: String?
+  var time: String?
+
+  enum CodingKeys: String, CodingKey {
+    case recordID = "record_id"
+    case choreID = "chore_id"
+    case action, date, reason, note, time
+    case newDueDate = "new_due_date"
+  }
+}
+
+struct ChoresExportResponse: Codable {
+  var definitions: [ChoreDefinitionPayload]
+  var events: [ChoreEventPayload]
 }
 
 // MARK: - History (per-day adherence for the Week tile histograms)

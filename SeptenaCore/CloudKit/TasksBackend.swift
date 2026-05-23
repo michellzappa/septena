@@ -73,6 +73,16 @@ final class CloudKitTasksBackend: TasksBackend {
     return try? context.fetch(descriptor).first
   }
 
+  /// Tasks are content, not label entities, but new CloudKit-authored task
+  /// ids still use the same unambiguous base32 alphabet for compactness.
+  private func uniqueTaskID() -> String {
+    let first = IDShortcode.generate(length: 6)
+    if fetch(id: first) == nil { return first }
+    let second = IDShortcode.generate(length: 8)
+    if fetch(id: second) == nil { return second }
+    return String(UUID().uuidString.prefix(12)).lowercased()
+  }
+
   /// Persists the local mutation, tells the engine, posts the notification
   /// so views repaint. Save errors are logged but not propagated — the
   /// FastAPI path swallows them too, and there's no caller that can act
@@ -102,7 +112,7 @@ final class CloudKitTasksBackend: TasksBackend {
               scheduled: Date?, due: Date?, today: Bool,
               notes: String?, status: String?,
               deferPush: Bool = false) -> SeptenaTask {
-    let id = UUID().uuidString.lowercased()
+    let id = uniqueTaskID()
     let todayIso = SeptenaDate.today
     let effectiveArea = project != nil ? nil : area
     let entity = TaskEntity(

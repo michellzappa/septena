@@ -27,6 +27,7 @@ enum NutritionSheet: Hashable, Identifiable {
 struct WeekDashboardView: View {
   @Environment(SeptenaClient.self) private var client
   @Environment(HTTPOutbox.self) private var outbox
+  @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(TaskMutator.self) private var taskMutator
   @Environment(SectionTheme.self) private var theme
   @Environment(TabSelection.self) private var tabSelection
@@ -883,17 +884,7 @@ struct WeekDashboardView: View {
 
 
   private func commitHabitToggle(_ item: HabitDayItem) {
-    outbox.enqueue(method: "POST", path: "/api/habits/toggle",
-                   body: ["habit_id": item.id,
-                          "date": SeptenaDate.today,
-                          "done": true],
-                   kind: "habits.toggle")
-    // Track in `actedHabits` so NextItemsSection keeps the row in place
-    // (struck through) rather than hopping to "done" mid-flick. The menu's
-    // own filter still sees `.done = false` here, so a rapid re-open could
-    // show the same habit until the next refresh — acceptable for a
-    // close-on-tap menu and matches the existing AddHabitPage pattern.
-    dailies.actedHabits.insert(item.id)
+    dailies.toggleHabit(item, mutator: checklistMutator)
     AddInfoSection.habits.notifyTilesChanged()
     Haptics.tick()
   }
@@ -1032,10 +1023,7 @@ struct WeekDashboardView: View {
   }
 
   private func commitChoreComplete(_ chore: ChoreItem) {
-    outbox.enqueue(method: "POST", path: "/api/chores/complete",
-                   body: ["chore_id": chore.id, "date": SeptenaDate.today],
-                   kind: "chores.complete")
-    dailies.completedChores.insert(chore.id)
+    dailies.completeChore(chore, mutator: checklistMutator)
     AddInfoSection.chores.notifyTilesChanged()
     Haptics.tick()
   }
@@ -1069,12 +1057,7 @@ struct WeekDashboardView: View {
   }
 
   private func commitSupplementToggle(_ item: SupplementDayItem) {
-    outbox.enqueue(method: "POST", path: "/api/supplements/toggle",
-                   body: ["supplement_id": item.id,
-                          "date": SeptenaDate.today,
-                          "done": true],
-                   kind: "supplements.toggle")
-    dailies.actedSupplements.insert(item.id)
+    dailies.toggleSupplement(item, mutator: checklistMutator)
     AddInfoSection.supplements.notifyTilesChanged()
     Haptics.tick()
   }

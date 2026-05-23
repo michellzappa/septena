@@ -2,8 +2,9 @@
 import WatchConnectivity
 
 /// iPhone side of the watch ↔ phone WCSession channel.
-/// Receives fetch/mutation messages from SeptenaWatch, calls SeptenaClient,
-/// and replies so the watch can stay stateless.
+/// Receives fetch/mutation messages from SeptenaWatch, answers reads from
+/// the client, and routes checklist writes through the shared CloudKit
+/// mutation stack so the watch doesn't keep a hidden FastAPI write path.
 final class WatchBridge: NSObject, WCSessionDelegate {
   static let shared = WatchBridge()
 
@@ -51,6 +52,7 @@ final class WatchBridge: NSObject, WCSessionDelegate {
       return
     }
     let client = await MainActor.run { ClientProvider.shared.client }
+    let services = await MainActor.run { SeptenaServices.shared }
     let date   = msg["date"] as? String ?? SeptenaDate.today
     let id     = msg["id"]   as? String ?? ""
 
@@ -65,16 +67,25 @@ final class WatchBridge: NSObject, WCSessionDelegate {
 
       case "toggleHabit":
         let done = msg["done"] as? Bool ?? true
-        try await client.toggleHabit(id: id, date: date, done: done)
+        await services.start()
+        await MainActor.run {
+          services.checklistMutator.toggleHabit(id: id, date: date, done: done)
+        }
         replyHandler(["ok": true])
 
       case "toggleSupplement":
         let done = msg["done"] as? Bool ?? true
-        try await client.toggleSupplement(id: id, date: date, done: done)
+        await services.start()
+        await MainActor.run {
+          services.checklistMutator.toggleSupplement(id: id, date: date, done: done)
+        }
         replyHandler(["ok": true])
 
       case "completeChore":
-        try await client.completeChore(id: id, date: date)
+        await services.start()
+        await MainActor.run {
+          services.checklistMutator.completeChore(id: id, date: date)
+        }
         replyHandler(["ok": true])
 
       default:

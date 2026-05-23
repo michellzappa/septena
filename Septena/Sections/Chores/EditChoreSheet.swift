@@ -5,7 +5,7 @@ import SwiftUI
 // enqueues `POST /api/chores/definitions`.
 
 struct EditChoreSheet: View {
-  @Environment(HTTPOutbox.self) private var outbox
+  @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(\.dismiss) private var dismiss
 
   let original: ChoreItem?
@@ -83,18 +83,8 @@ struct EditChoreSheet: View {
   private func save() {
     let n = name.trimmingCharacters(in: .whitespaces)
     let e = emoji.trimmingCharacters(in: .whitespaces)
-    let body: [String: Any] = [
-      "name": n,
-      "emoji": e,
-      "cadence_days": cadenceDays,
-    ]
     if let original {
-      outbox.enqueue(
-        method: "PUT",
-        path: "/api/chores/definitions/\(original.id)",
-        body: body,
-        kind: "chores.update"
-      )
+      checklistMutator.updateChore(id: original.id, name: n, cadenceDays: cadenceDays, emoji: e)
       Haptics.tick()
       var rebuilt = original
       rebuilt.name = n
@@ -102,12 +92,7 @@ struct EditChoreSheet: View {
       rebuilt.cadenceDays = cadenceDays
       onDone(rebuilt)
     } else {
-      outbox.enqueue(
-        method: "POST",
-        path: "/api/chores/definitions",
-        body: body,
-        kind: "chores.create"
-      )
+      _ = checklistMutator.createChore(name: n, cadenceDays: cadenceDays, emoji: e)
       Haptics.tick()
       onDone(nil)
     }

@@ -5,7 +5,7 @@ import SwiftUI
 
 struct AddChorePage: View {
   @Environment(SeptenaClient.self) private var client
-  @Environment(HTTPOutbox.self) private var outbox
+  @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
@@ -67,9 +67,7 @@ struct AddChorePage: View {
   }
 
   private func complete(_ chore: ChoreItem) {
-    outbox.enqueue(method: "POST", path: "/api/chores/complete",
-                   body: ["chore_id": chore.id, "date": SeptenaDate.today],
-                   kind: "chores.complete")
+    checklistMutator.completeChore(id: chore.id, date: SeptenaDate.today)
     AddInfoSection.chores.notifyTilesChanged()
     Haptics.tick()
     dismiss()
@@ -78,18 +76,16 @@ struct AddChorePage: View {
   private func create(name: String) {
     guard !working else { return }
     working = true
-    Task {
-      defer { working = false }
-      do {
-        try await client.createChoreDefinition(name: name, cadenceDays: 7)
-        AddInfoSection.chores.notifyTilesChanged()
-        Haptics.tick()
-        dismiss()
-      } catch { Haptics.warning() }
-    }
+    _ = checklistMutator.createChore(name: name, cadenceDays: 7)
+    working = false
+    AddInfoSection.chores.notifyTilesChanged()
+    Haptics.tick()
+    dismiss()
   }
 
   private func load() async {
-    chores = (try? await client.chores()) ?? []
+    let context = LocalStore.shared.container.mainContext
+    let mirrored = ChecklistMirror.loadChores(context: context)
+    chores = mirrored.isEmpty ? ((try? await client.chores()) ?? []) : mirrored
   }
 }

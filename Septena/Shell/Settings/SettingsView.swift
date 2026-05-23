@@ -97,8 +97,18 @@ final class SettingsStore {
   /// `sections`) and the section-config sub-panes render with last-known
   /// data instead of empty / default state during the network round-trip.
   func paintFromCache() {
-    if let v = ResponseCache.load(AppSettings.self, forKey: CacheKey.serverSettings) { serverSettings = v }
-    if let v = ResponseCache.load([SeptenaClient.SectionConfig].self, forKey: CacheKey.sections) { sections = v }
+    let context = LocalStore.shared.container.mainContext
+    if let v = SettingsMirror.loadSettings(context: context) {
+      serverSettings = v
+    } else if let v = ResponseCache.load(AppSettings.self, forKey: CacheKey.serverSettings) {
+      serverSettings = v
+    }
+    let mirroredSections = SettingsMirror.loadSections(context: context)
+    if !mirroredSections.isEmpty {
+      sections = mirroredSections
+    } else if let v = ResponseCache.load([SeptenaClient.SectionConfig].self, forKey: CacheKey.sections) {
+      sections = v
+    }
     if let v = ResponseCache.load(CaffeineConfig.self, forKey: CacheKey.caffeine) { caffeine = v }
     if let v = ResponseCache.load(CannabisConfig.self, forKey: CacheKey.cannabis) { cannabis = v }
     if let v = ResponseCache.load(MacrosConfig.self, forKey: CacheKey.macros) { macros = v }
@@ -109,20 +119,47 @@ final class SettingsStore {
   func refresh(from client: SeptenaClient) async {
     serverLoading = true
     defer { serverLoading = false }
-    async let s     = try? await client.settings()
-    async let secs  = try? await client.sections()
+    let context = LocalStore.shared.container.mainContext
+    let mirroredSettings = SettingsMirror.loadSettings(context: context)
+    let mirroredSections = SettingsMirror.loadSections(context: context)
+
+    if let mirroredSettings {
+      serverSettings = mirroredSettings
+      ResponseCache.save(mirroredSettings, forKey: CacheKey.serverSettings)
+    }
+    if !mirroredSections.isEmpty {
+      sections = mirroredSections
+      ResponseCache.save(mirroredSections, forKey: CacheKey.sections)
+    }
+
+    let needsLegacySettings = mirroredSettings == nil
+    let needsLegacySections = mirroredSections.isEmpty
+
     async let caf   = try? await client.caffeineConfig()
     async let cnb   = try? await client.cannabisConfig()
     async let macs  = try? await client.nutritionMacrosConfig()
     async let sess  = try? await client.sessionTypes()
     async let chrs  = try? await client.chores()
-    let (sv, sc, cf, cn) = await (s, secs, caf, cnb)
-    let (mc, st, ch) = await (macs, sess, chrs)
+    let cf = await caf
+    let cn = await cnb
+    let mc = await macs
+    let st = await sess
+    let ch = await chrs
     // Only overwrite + cache the values where the network actually
     // returned something — failed fetches leave the (cache-primed)
     // values alone instead of wiping them to nil / empty.
-    if let sv { serverSettings = sv; ResponseCache.save(sv, forKey: CacheKey.serverSettings) }
-    if let sc { sections = sc; ResponseCache.save(sc, forKey: CacheKey.sections) }
+    if needsLegacySettings, let sv = try? await client.settings() {
+      serverSettings = sv
+      ResponseCache.save(sv, forKey: CacheKey.serverSettings)
+      SettingsMirror.upsert(settings: sv, context: context,
+                            engine: SeptenaServices.shared.ckEngine)
+    }
+    if needsLegacySections, let sc = try? await client.sections() {
+      sections = sc
+      ResponseCache.save(sc, forKey: CacheKey.sections)
+      SettingsMirror.replaceSections(sc, context: context,
+                                     engine: SeptenaServices.shared.ckEngine)
+    }
     if let cf { caffeine = cf; ResponseCache.save(cf, forKey: CacheKey.caffeine) }
     if let cn { cannabis = cn; ResponseCache.save(cn, forKey: CacheKey.cannabis) }
     if let mc { macros = mc; ResponseCache.save(mc, forKey: CacheKey.macros) }
@@ -980,11 +1017,51 @@ private struct CalendarDetail: View {
 
 // MARK: - Sync
 
+private enum MigrationDomainState {
+  case cloudKit
+  case next
+  case legacy
+
+  var symbol: String {
+    switch self {
+    case .cloudKit: return "checkmark.circle.fill"
+    case .next: return "arrow.right.circle"
+    case .legacy: return "server.rack"
+    }
+  }
+
+  var color: Color {
+    switch self {
+    case .cloudKit: return .green
+    case .next: return .blue
+    case .legacy: return .secondary
+    }
+  }
+}
+
+private struct MigrationDomainRow: View {
+  let name: String
+  let detail: String
+  let state: MigrationDomainState
+
+  var body: some View {
+    HStack {
+      Image(systemName: state.symbol)
+        .foregroundStyle(state.color)
+      Text(name)
+      Spacer()
+      Text(detail)
+        .foregroundStyle(.secondary)
+    }
+  }
+}
+
 struct SyncSettingsPane: View {
   @Environment(NavigationState.self) private var nav
   @Environment(SeptenaClient.self) private var client
   @Environment(SectionTheme.self) private var theme
   @Environment(SettingsStore.self) private var store
+  @Environment(HTTPOutbox.self) private var httpOutbox
   @Environment(\.modelContext) private var modelContext
 
   @State private var serverURL: String = ""
@@ -1022,7 +1099,7 @@ struct SyncSettingsPane: View {
         }
       }
 
-      Section("Server URL") {
+      Section("Legacy FastAPI URL") {
         TextField("http://100.74.150.55:7000", text: $serverURL)
           #if os(iOS)
           .textInputAutocapitalization(.never)
@@ -1053,12 +1130,12 @@ struct SyncSettingsPane: View {
         } label: {
           HStack {
             if isSyncing { ProgressView().controlSize(.small) }
-            Text("Sync Now")
+            Text("Pull Legacy Cache")
           }
         }
         .disabled(isSyncing)
       } footer: {
-        Text("No auth — Septena is reachable on the tailnet.")
+        Text("FastAPI still serves unmigrated domains. Tasks, areas, and projects sync through CloudKit.")
       }
 
       #if DEBUG
@@ -1083,6 +1160,19 @@ struct SyncSettingsPane: View {
         Text("CloudKit writes go to the Development environment in debug builds; the schema auto-creates from your first save.")
       }
 
+      Section("Migration Status") {
+        LabeledContent("CloudKit pending writes",
+                       value: String(ckEngine.pendingRecordZoneChangesCount))
+        LabeledContent("Legacy HTTP pending writes",
+                       value: String(httpOutbox.pendingCount))
+        MigrationDomainRow(name: "Tasks", detail: "CloudKit", state: .cloudKit)
+        MigrationDomainRow(name: "Areas", detail: "CloudKit", state: .cloudKit)
+        MigrationDomainRow(name: "Projects", detail: "CloudKit", state: .cloudKit)
+        MigrationDomainRow(name: "Settings + Sections", detail: "Next", state: .next)
+        MigrationDomainRow(name: "Habits, Supplements, Chores", detail: "FastAPI", state: .legacy)
+        MigrationDomainRow(name: "Goals, Groceries, Health Logs", detail: "FastAPI", state: .legacy)
+      }
+
       // Recovery tooling. Export is non-destructive — safe to run any
       // time. Re-sync re-pushes every local task/area/project into
       // CloudKit and verifies the round-trip; useful after a zone reset.
@@ -1098,7 +1188,7 @@ struct SyncSettingsPane: View {
         } label: {
           HStack {
             if isMigrating { ProgressView().controlSize(.small) }
-            Label("Re-sync to iCloud", systemImage: "icloud.and.arrow.up")
+            Label("Re-sync Migrated Data to iCloud", systemImage: "icloud.and.arrow.up")
           }
         }
         // Block when iCloud isn't ready — pushing into CloudKit without
@@ -1162,7 +1252,7 @@ struct SyncSettingsPane: View {
       } header: {
         Text("Recovery (dev)")
       } footer: {
-        Text("Export writes a JSON snapshot (tasks + areas + projects) to Application Support. Re-sync re-uploads this device's local mirror. Repair Merge fetches the whole CloudKit zone into this device, then pushes the local union back. Replace Local Mirror snapshots this device, discards local task state, and pulls the current CloudKit zone.")
+        Text("Export writes a JSON snapshot of migrated data to Application Support. Re-sync re-uploads this device's local mirror. Repair Merge fetches the whole CloudKit zone into this device, then pushes the local union back. Replace Local Mirror snapshots this device, discards migrated local state, and pulls the current CloudKit zone.")
       }
       #endif
     }

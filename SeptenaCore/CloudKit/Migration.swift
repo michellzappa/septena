@@ -102,8 +102,32 @@ struct ProjectSnapshot: Codable {
   }
 }
 
+struct SettingsSnapshot: Codable {
+  var id: String
+  var payloadJSON: String
+
+  init?(_ e: SettingsEntity) {
+    guard let json = String(data: e.payloadData, encoding: .utf8) else { return nil }
+    self.id = e.id
+    self.payloadJSON = json
+  }
+}
+
+struct SectionSnapshot: Codable {
+  var id: String
+  var title: String
+  var color: String
+
+  init(_ e: SectionEntity) {
+    self.id = e.id
+    self.title = e.title
+    self.color = e.color
+  }
+}
+
 struct TasksSnapshotFile: Codable {
   /// 1 = tasks only (legacy). 2 = tasks + areas + projects.
+  /// 3 = tasks + areas + projects + settings + sections.
   var schemaVersion: Int
   var createdAt: Date
   var sourceBackend: String   // "fastAPI" at the moment of snapshot
@@ -111,6 +135,9 @@ struct TasksSnapshotFile: Codable {
   /// v2+. Decoded as empty when reading a v1 snapshot.
   var areas: [AreaSnapshot]?
   var projects: [ProjectSnapshot]?
+  /// v3+.
+  var settings: SettingsSnapshot?
+  var sections: [SectionSnapshot]?
 }
 
 // MARK: - Errors
@@ -186,13 +213,17 @@ final class TasksMigrator {
     let tasks = try context.fetch(FetchDescriptor<TaskEntity>())
     let areas = try context.fetch(FetchDescriptor<AreaEntity>())
     let projects = try context.fetch(FetchDescriptor<ProjectEntity>())
+    let settings = try context.fetch(FetchDescriptor<SettingsEntity>()).first
+    let sections = try context.fetch(FetchDescriptor<SectionEntity>())
     let snapshot = TasksSnapshotFile(
-      schemaVersion: 2,
+      schemaVersion: 3,
       createdAt: Date(),
       sourceBackend: "cloudKit",
       tasks: tasks.map(TaskSnapshot.init),
       areas: areas.map(AreaSnapshot.init),
-      projects: projects.map(ProjectSnapshot.init)
+      projects: projects.map(ProjectSnapshot.init),
+      settings: settings.flatMap(SettingsSnapshot.init),
+      sections: sections.map(SectionSnapshot.init)
     )
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -203,7 +234,7 @@ final class TasksMigrator {
     let url = try Self.snapshotsDirectory()
       .appendingPathComponent("tasks-\(reason)-\(ts).json")
     try data.write(to: url, options: .atomic)
-    logger.info("Exported \(tasks.count, privacy: .public) tasks, \(areas.count, privacy: .public) areas, \(projects.count, privacy: .public) projects → \(url.lastPathComponent, privacy: .public)")
+    logger.info("Exported \(tasks.count, privacy: .public) tasks, \(areas.count, privacy: .public) areas, \(projects.count, privacy: .public) projects, settings=\(settings != nil, privacy: .public), \(sections.count, privacy: .public) sections → \(url.lastPathComponent, privacy: .public)")
     return url
   }
 
@@ -278,12 +309,38 @@ final class TasksMigrator {
       entity.deletedAt = s.deletedAt
       if entity.modelContext == nil { context.insert(entity) }
     }
+    if let s = file.settings,
+       let data = s.payloadJSON.data(using: .utf8) {
+      let singletonID = s.id
+      let descriptor = FetchDescriptor<SettingsEntity>(
+        predicate: #Predicate { $0.id == singletonID }
+      )
+      let entity = (try? context.fetch(descriptor).first)
+        ?? SettingsEntity(id: singletonID, payloadData: data)
+      entity.payloadData = data
+      entity.updatedAt = .now
+      if entity.modelContext == nil { context.insert(entity) }
+    }
+    for s in file.sections ?? [] {
+      let id = s.id
+      let descriptor = FetchDescriptor<SectionEntity>(
+        predicate: #Predicate { $0.id == id }
+      )
+      let entity = (try? context.fetch(descriptor).first)
+        ?? SectionEntity(id: id, title: s.title, color: s.color)
+      entity.title = s.title
+      entity.color = s.color
+      entity.updatedAt = .now
+      if entity.modelContext == nil { context.insert(entity) }
+    }
     try context.save()
     NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
     let areaCount = file.areas?.count ?? 0
     let projectCount = file.projects?.count ?? 0
-    logger.info("Imported \(file.tasks.count, privacy: .public) tasks, \(areaCount, privacy: .public) areas, \(projectCount, privacy: .public) projects from \(url.lastPathComponent, privacy: .public)")
-    return file.tasks.count + areaCount + projectCount
+    let sectionCount = file.sections?.count ?? 0
+    let settingsCount = file.settings == nil ? 0 : 1
+    logger.info("Imported \(file.tasks.count, privacy: .public) tasks, \(areaCount, privacy: .public) areas, \(projectCount, privacy: .public) projects, \(settingsCount, privacy: .public) settings, \(sectionCount, privacy: .public) sections from \(url.lastPathComponent, privacy: .public)")
+    return file.tasks.count + areaCount + projectCount + settingsCount + sectionCount
   }
 
   // MARK: Repair merge
@@ -316,6 +373,8 @@ final class TasksMigrator {
         TaskCloudKitSchema.recordType,
         AreaCloudKitSchema.recordType,
         ProjectCloudKitSchema.recordType,
+        SettingsCloudKitSchema.recordType,
+        SectionCloudKitSchema.recordType,
       ])
     } catch {
       logger.error("repair full-zone query failed: \(error.localizedDescription, privacy: .public)")
@@ -325,6 +384,8 @@ final class TasksMigrator {
     var cloudTasks = 0
     var cloudAreas = 0
     var cloudProjects = 0
+    var cloudSettings = 0
+    var cloudSections = 0
     for record in cloudRecords {
       switch record.recordType {
       case TaskCloudKitSchema.recordType:
@@ -336,6 +397,12 @@ final class TasksMigrator {
       case ProjectCloudKitSchema.recordType:
         cloudProjects += 1
         applyProject(record)
+      case SettingsCloudKitSchema.recordType:
+        cloudSettings += 1
+        applySettings(record)
+      case SectionCloudKitSchema.recordType:
+        cloudSections += 1
+        applySection(record)
       default:
         logger.info("Repair ignored unknown CK record type \(record.recordType, privacy: .public)")
       }
@@ -347,6 +414,8 @@ final class TasksMigrator {
     )
     let tasks = try context.fetch(taskDescriptor)
     let areas = try context.fetch(FetchDescriptor<AreaEntity>())
+    let settings = try context.fetch(FetchDescriptor<SettingsEntity>())
+    let sections = try context.fetch(FetchDescriptor<SectionEntity>())
     let projectDescriptor = FetchDescriptor<ProjectEntity>(
       predicate: #Predicate { $0.deletedAt == nil }
     )
@@ -355,6 +424,8 @@ final class TasksMigrator {
     for entity in tasks { engine.noteTaskChange(id: entity.id) }
     for entity in areas { engine.noteAreaChange(id: entity.id) }
     for entity in projects { engine.noteProjectChange(id: entity.id) }
+    for _ in settings { engine.noteSettingsChange() }
+    for entity in sections { engine.noteSectionChange(id: entity.id) }
 
     do {
       try await engine.sendChanges()
@@ -368,8 +439,8 @@ final class TasksMigrator {
     }
 
     NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
-    let localTotal = tasks.count + areas.count + projects.count
-    logger.info("Repair merged cloud Task/Area/Project \(cloudTasks, privacy: .public)/\(cloudAreas, privacy: .public)/\(cloudProjects, privacy: .public); pushed local total \(localTotal, privacy: .public)")
+    let localTotal = tasks.count + areas.count + projects.count + settings.count + sections.count
+    logger.info("Repair merged cloud Task/Area/Project/Settings/Section \(cloudTasks, privacy: .public)/\(cloudAreas, privacy: .public)/\(cloudProjects, privacy: .public)/\(cloudSettings, privacy: .public)/\(cloudSections, privacy: .public); pushed local total \(localTotal, privacy: .public)")
 
     return RepairSyncResult(
       snapshotURL: snapshotURL,
@@ -398,6 +469,8 @@ final class TasksMigrator {
         TaskCloudKitSchema.recordType,
         AreaCloudKitSchema.recordType,
         ProjectCloudKitSchema.recordType,
+        SettingsCloudKitSchema.recordType,
+        SectionCloudKitSchema.recordType,
       ])
     } catch {
       logger.error("replace-local full-zone query failed: \(error.localizedDescription, privacy: .public)")
@@ -407,18 +480,26 @@ final class TasksMigrator {
     let existingTasks = try context.fetch(FetchDescriptor<TaskEntity>())
     let existingAreas = try context.fetch(FetchDescriptor<AreaEntity>())
     let existingProjects = try context.fetch(FetchDescriptor<ProjectEntity>())
+    let existingSettings = try context.fetch(FetchDescriptor<SettingsEntity>())
+    let existingSections = try context.fetch(FetchDescriptor<SectionEntity>())
     let deletedTasks = existingTasks.count
     let deletedAreas = existingAreas.count
     let deletedProjects = existingProjects.count
+    let deletedSettings = existingSettings.count
+    let deletedSections = existingSections.count
 
     for entity in existingTasks { context.delete(entity) }
     for entity in existingAreas { context.delete(entity) }
     for entity in existingProjects { context.delete(entity) }
+    for entity in existingSettings { context.delete(entity) }
+    for entity in existingSections { context.delete(entity) }
     try context.save()
 
     var cloudTasks = 0
     var cloudAreas = 0
     var cloudProjects = 0
+    var cloudSettings = 0
+    var cloudSections = 0
     for record in cloudRecords {
       switch record.recordType {
       case AreaCloudKitSchema.recordType:
@@ -430,6 +511,12 @@ final class TasksMigrator {
       case TaskCloudKitSchema.recordType:
         cloudTasks += 1
         applyTask(record)
+      case SettingsCloudKitSchema.recordType:
+        cloudSettings += 1
+        applySettings(record)
+      case SectionCloudKitSchema.recordType:
+        cloudSections += 1
+        applySection(record)
       default:
         logger.info("Replace-local ignored unknown CK record type \(record.recordType, privacy: .public)")
       }
@@ -446,7 +533,7 @@ final class TasksMigrator {
     }
 
     NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
-    logger.info("Replaced local mirror from CloudKit. Deleted Task/Area/Project \(deletedTasks, privacy: .public)/\(deletedAreas, privacy: .public)/\(deletedProjects, privacy: .public); loaded \(cloudTasks, privacy: .public)/\(cloudAreas, privacy: .public)/\(cloudProjects, privacy: .public)")
+    logger.info("Replaced local mirror from CloudKit. Deleted Task/Area/Project/Settings/Section \(deletedTasks, privacy: .public)/\(deletedAreas, privacy: .public)/\(deletedProjects, privacy: .public)/\(deletedSettings, privacy: .public)/\(deletedSections, privacy: .public); loaded \(cloudTasks, privacy: .public)/\(cloudAreas, privacy: .public)/\(cloudProjects, privacy: .public)/\(cloudSettings, privacy: .public)/\(cloudSections, privacy: .public)")
 
     return ReplaceLocalMirrorResult(
       snapshotURL: snapshotURL,
@@ -495,6 +582,30 @@ final class TasksMigrator {
     }
   }
 
+  private func applySettings(_ record: CKRecord) {
+    let singletonID = SettingsCloudKitSchema.singletonID
+    let descriptor = FetchDescriptor<SettingsEntity>(
+      predicate: #Predicate { $0.id == singletonID }
+    )
+    if let entity = try? context.fetch(descriptor).first {
+      entity.apply(record)
+    } else {
+      context.insert(SettingsEntity(cloudKit: record))
+    }
+  }
+
+  private func applySection(_ record: CKRecord) {
+    let id = SectionCloudKitSchema.entityID(from: record.recordID.recordName)
+    let descriptor = FetchDescriptor<SectionEntity>(
+      predicate: #Predicate { $0.id == id }
+    )
+    if let entity = try? context.fetch(descriptor).first {
+      entity.apply(record)
+    } else {
+      context.insert(SectionEntity(cloudKit: record))
+    }
+  }
+
   // MARK: Migrate to CloudKit
 
   /// Push every local task, area, and project into CloudKit, wait for the
@@ -512,7 +623,11 @@ final class TasksMigrator {
       do {
         let areas = try await client.areas()
         let projects = try await client.projects()
+        let settings = try await client.settings()
+        let sections = try await client.sections()
         seedAreaProjectMirror(areas: areas, projects: projects)
+        SettingsMirror.upsert(settings: settings, context: context)
+        SettingsMirror.replaceSections(sections, context: context)
       } catch {
         // Non-fatal: if the network is unreachable we proceed with
         // whatever's locally cached. A subsequent migration retry will
@@ -532,11 +647,13 @@ final class TasksMigrator {
     )
     let tasks = try context.fetch(taskDescriptor)
     let areas = try context.fetch(FetchDescriptor<AreaEntity>())
+    let settings = try context.fetch(FetchDescriptor<SettingsEntity>())
+    let sections = try context.fetch(FetchDescriptor<SectionEntity>())
     let projectDescriptor = FetchDescriptor<ProjectEntity>(
       predicate: #Predicate { $0.deletedAt == nil }
     )
     let projects = try context.fetch(projectDescriptor)
-    guard !tasks.isEmpty || !areas.isEmpty || !projects.isEmpty else {
+    guard !tasks.isEmpty || !areas.isEmpty || !projects.isEmpty || !settings.isEmpty || !sections.isEmpty else {
       throw MigrationError.noEntities
     }
 
@@ -547,6 +664,8 @@ final class TasksMigrator {
     for entity in tasks { engine.noteTaskChange(id: entity.id) }
     for entity in areas { engine.noteAreaChange(id: entity.id) }
     for entity in projects { engine.noteProjectChange(id: entity.id) }
+    for _ in settings { engine.noteSettingsChange() }
+    for entity in sections { engine.noteSectionChange(id: entity.id) }
     do {
       try await engine.sendChanges()
     } catch {
@@ -570,14 +689,16 @@ final class TasksMigrator {
     // 6. Verify counts haven't dropped.
     let afterTasks = try context.fetch(taskDescriptor)
     let afterAreas = try context.fetch(FetchDescriptor<AreaEntity>())
+    let afterSettings = try context.fetch(FetchDescriptor<SettingsEntity>())
+    let afterSections = try context.fetch(FetchDescriptor<SectionEntity>())
     let afterProjects = try context.fetch(projectDescriptor)
-    let before = tasks.count + areas.count + projects.count
-    let after = afterTasks.count + afterAreas.count + afterProjects.count
+    let before = tasks.count + areas.count + projects.count + settings.count + sections.count
+    let after = afterTasks.count + afterAreas.count + afterProjects.count + afterSettings.count + afterSections.count
     guard after >= before else {
       throw MigrationError.countMismatch(local: before, afterPull: after)
     }
 
-    logger.info("Migration verified: \(tasks.count, privacy: .public) tasks, \(areas.count, privacy: .public) areas, \(projects.count, privacy: .public) projects now in CloudKit")
+    logger.info("Migration verified: \(tasks.count, privacy: .public) tasks, \(areas.count, privacy: .public) areas, \(projects.count, privacy: .public) projects, \(settings.count, privacy: .public) settings, \(sections.count, privacy: .public) sections now in CloudKit")
     return MigrationResult(
       snapshotURL: snapshotURL,
       migratedCount: before,
@@ -659,4 +780,113 @@ struct ReplaceLocalMirrorResult {
   let cloudTasksCount: Int
   let cloudAreasCount: Int
   let cloudProjectsCount: Int
+}
+
+@MainActor
+final class ChecklistCloudKitBootstrapper {
+  private let context: ModelContext
+  private let engine: CKEngine
+  private let client: SeptenaClient
+
+  init(context: ModelContext, engine: CKEngine, client: SeptenaClient) {
+    self.context = context
+    self.engine = engine
+    self.client = client
+  }
+
+  /// First-run bridge for habits/supplements. We seed the local canonical
+  /// mirror from FastAPI range endpoints only when this domain has not yet
+  /// round-tripped through CloudKit on this install.
+  func bootstrapIfNeeded(historyDays: Int = 3650) async throws {
+    var importedAny = false
+
+    if needsHabitBootstrap {
+      let habits = try await client.habitsRange(days: historyDays)
+      ChecklistMirror.replaceAllHabitsHistory(habits, context: context)
+      queueHabitMirrorForUpload()
+      importedAny = true
+    }
+
+    if needsSupplementBootstrap {
+      let supplements = try await client.supplementsRange(days: historyDays)
+      ChecklistMirror.replaceAllSupplementsHistory(supplements, context: context)
+      queueSupplementMirrorForUpload()
+      importedAny = true
+    }
+
+    if needsChoreBootstrap,
+       let chores = try? await client.choresExport(days: historyDays) {
+      ChecklistMirror.replaceAllChoresExport(chores, context: context)
+      queueChoreMirrorForUpload()
+      importedAny = true
+    }
+
+    guard importedAny else { return }
+    try? context.save()
+    try await engine.sendChanges()
+    try await engine.fetchChanges()
+  }
+
+  private var needsHabitBootstrap: Bool {
+    let defs = (try? context.fetch(FetchDescriptor<HabitDefinitionEntity>())) ?? []
+    let states = (try? context.fetch(FetchDescriptor<HabitDayStateEntity>())) ?? []
+    guard defs.contains(where: { $0.cloudKitSystemFields != nil }) == false,
+          states.contains(where: { $0.cloudKitSystemFields != nil }) == false else {
+      return false
+    }
+    return true
+  }
+
+  private var needsSupplementBootstrap: Bool {
+    let defs = (try? context.fetch(FetchDescriptor<SupplementDefinitionEntity>())) ?? []
+    let states = (try? context.fetch(FetchDescriptor<SupplementDayStateEntity>())) ?? []
+    guard defs.contains(where: { $0.cloudKitSystemFields != nil }) == false,
+          states.contains(where: { $0.cloudKitSystemFields != nil }) == false else {
+      return false
+    }
+    return true
+  }
+
+  private var needsChoreBootstrap: Bool {
+    let defs = (try? context.fetch(FetchDescriptor<ChoreDefinitionEntity>())) ?? []
+    let events = (try? context.fetch(FetchDescriptor<ChoreEventEntity>())) ?? []
+    guard defs.contains(where: { $0.cloudKitSystemFields != nil }) == false,
+          events.contains(where: { $0.cloudKitSystemFields != nil }) == false else {
+      return false
+    }
+    return true
+  }
+
+  private func queueHabitMirrorForUpload() {
+    let defs = (try? context.fetch(FetchDescriptor<HabitDefinitionEntity>())) ?? []
+    let states = (try? context.fetch(FetchDescriptor<HabitDayStateEntity>())) ?? []
+    for def in defs {
+      engine.noteHabitDefinitionChange(id: def.id)
+    }
+    for state in states {
+      engine.noteHabitEventChange(id: state.id)
+    }
+  }
+
+  private func queueSupplementMirrorForUpload() {
+    let defs = (try? context.fetch(FetchDescriptor<SupplementDefinitionEntity>())) ?? []
+    let states = (try? context.fetch(FetchDescriptor<SupplementDayStateEntity>())) ?? []
+    for def in defs {
+      engine.noteSupplementDefinitionChange(id: def.id)
+    }
+    for state in states {
+      engine.noteSupplementEventChange(id: state.id)
+    }
+  }
+
+  private func queueChoreMirrorForUpload() {
+    let defs = (try? context.fetch(FetchDescriptor<ChoreDefinitionEntity>())) ?? []
+    let events = (try? context.fetch(FetchDescriptor<ChoreEventEntity>())) ?? []
+    for def in defs {
+      engine.noteChoreDefinitionChange(id: def.id)
+    }
+    for event in events {
+      engine.noteChoreEventChange(id: event.id)
+    }
+  }
 }

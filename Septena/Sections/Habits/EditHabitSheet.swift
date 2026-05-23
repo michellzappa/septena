@@ -6,7 +6,7 @@ import SwiftUI
 // through HTTPOutbox; create enqueues `POST /api/habits/new`.
 
 struct EditHabitSheet: View {
-  @Environment(HTTPOutbox.self) private var outbox
+  @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(\.dismiss) private var dismiss
 
   let original: HabitDayItem?
@@ -60,18 +60,7 @@ struct EditHabitSheet: View {
     let n = name.trimmingCharacters(in: .whitespaces)
     let e = emoji.trimmingCharacters(in: .whitespaces)
     if let original {
-      let body: [String: Any] = [
-        "id": original.id,
-        "name": n,
-        "bucket": bucket,
-        "emoji": e,
-      ]
-      outbox.enqueue(
-        method: "PUT",
-        path: "/api/habits/update",
-        body: body,
-        kind: "habits.update"
-      )
+      checklistMutator.updateHabit(id: original.id, name: n, bucket: bucket, emoji: e)
       Haptics.tick()
       var rebuilt = original
       rebuilt.name = n
@@ -79,17 +68,7 @@ struct EditHabitSheet: View {
       rebuilt.emoji = e.isEmpty ? nil : e
       onDone(rebuilt)
     } else {
-      let body: [String: Any] = [
-        "name": n,
-        "bucket": bucket,
-        "emoji": e,
-      ]
-      outbox.enqueue(
-        method: "POST",
-        path: "/api/habits/new",
-        body: body,
-        kind: "habits.create"
-      )
+      _ = checklistMutator.createHabit(name: n, bucket: bucket, emoji: e)
       Haptics.tick()
       onDone(nil)
     }

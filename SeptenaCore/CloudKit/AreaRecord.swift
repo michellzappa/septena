@@ -2,6 +2,11 @@ import Foundation
 import CloudKit
 import SwiftData
 
+private func optionalAreaString(_ value: CKRecordValue?) -> String? {
+  guard let string = value as? String else { return nil }
+  return string.isEmpty ? nil : string
+}
+
 // AreaRecord — AreaEntity ↔ CKRecord mapping. Mirrors TaskRecord one-for-one
 // so the engine treats areas the same way it treats tasks: a uniformly
 // shaped record with a `recordType` discriminator and an `id` that doubles
@@ -61,7 +66,7 @@ extension AreaEntity {
 extension AreaEntity {
   func apply(_ record: CKRecord) {
     if let v = record[AreaCloudKitSchema.Field.title] as? String { title = v }
-    context = record[AreaCloudKitSchema.Field.context] as? String
+    context = optionalAreaString(record[AreaCloudKitSchema.Field.context])
     captureCloudKitSystemFields(from: record)
   }
 

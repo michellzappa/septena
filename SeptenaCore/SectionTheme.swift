@@ -1,9 +1,8 @@
 import SwiftUI
 
-// Live mirror of Septena's Tasks section accent. Refreshed from /api/sections
-// at app launch and on settings change. Falls back to the asset-catalog
-// AccentColor (neutral blue) if the fetch fails or the server returns no
-// `tasks` row — no opinionated default hue baked into code.
+// Live mirror of Septena's section accents. CloudKit-backed sections are
+// preferred; FastAPI `/api/sections` remains import fallback until the
+// rest of the migration is cut over.
 
 @MainActor
 @Observable
@@ -37,8 +36,7 @@ final class SectionTheme {
   /// `refresh()` on app launch so tiles render with the right color on
   /// cold launch instead of the fallback gray.
   func paintFromCache() {
-    if let sections = ResponseCache.load([SeptenaClient.SectionConfig].self,
-                                         forKey: Self.cacheKey) {
+    if let sections = loadSectionsForPaint() {
       applySections(sections)
     }
   }
@@ -46,18 +44,33 @@ final class SectionTheme {
   static let cacheKey = "theme.sections"
 
   func refresh(from client: SeptenaClient) async {
-    // Per-section colors are still fetched (other section icons may surface
-    // them), but the *app accent* is deliberately pinned to the system
-    // Color.accentColor — Septena no longer derives its primary hue from
-    // the Tasks-section color. Keeps the app reading as neutral / macOS
-    // standard.
+    if let sections = loadSectionsForPaint(), !sections.isEmpty {
+      applySections(sections)
+      ResponseCache.save(sections, forKey: Self.cacheKey)
+      return
+    }
+
+    // Per-section colors are still imported from FastAPI if the local
+    // CloudKit mirror is empty. The *app accent* is deliberately pinned
+    // to the system Color.accentColor.
     do {
       let sections = try await client.sections()
       applySections(sections)
       ResponseCache.save(sections, forKey: Self.cacheKey)
+      SettingsMirror.replaceSections(sections,
+                                     context: LocalStore.shared.container.mainContext,
+                                     engine: SeptenaServices.shared.ckEngine)
     } catch {
       SeptenaLog.error("section color refresh failed", error)
     }
+  }
+
+  private func loadSectionsForPaint() -> [SeptenaClient.SectionConfig]? {
+    let context = LocalStore.shared.container.mainContext
+    let mirrored = SettingsMirror.loadSections(context: context)
+    if !mirrored.isEmpty { return mirrored }
+    return ResponseCache.load([SeptenaClient.SectionConfig].self,
+                              forKey: Self.cacheKey)
   }
 
   private func applySections(_ sections: [SeptenaClient.SectionConfig]) {

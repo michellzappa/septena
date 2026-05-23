@@ -1,3 +1,4 @@
+import CloudKit
 import Foundation
 import SwiftData
 
@@ -7,10 +8,11 @@ import SwiftData
 //
 // ⚠️  When adding a new label-style entity (anything users will rename and
 //     reference by name, like areas/projects/chores/habits/sections), use
-//     the uniform `id + slug + previousSlugs` model documented in
+//     the uniform `id + title` model documented in
 //     [IDENTIFIERS.md](IDENTIFIERS.md). Tasks-style content entities are
-//     exempt (id-only). The Areas/Projects entities below are the
-//     reference implementation.
+//     exempt (id-only). Areas/Projects still carry legacy slug columns
+//     until the SwiftData schema can drop them safely, but current code
+//     does not read or write those fields.
 
 // MARK: - Entities
 
@@ -150,13 +152,12 @@ final class ProjectEntity {
   /// the same contract — captured on round-trip through CloudKit so the
   /// next save preserves recordChangeTag.
   var cloudKitSystemFields: Data?
-  /// Human-friendly, mutable identifier derived from `title`. Updates on
-  /// every rename, deduped across live projects. Nil on legacy records
-  /// that haven't been backfilled yet — resolver falls back to id-as-slug
-  /// for those. See [IDENTIFIERS.md].
+  /// Legacy transition column from the removed slug model. Kept only to
+  /// avoid a destructive SwiftData schema change during the CloudKit
+  /// migration; current code leaves it nil and does not resolve by it.
   var slug: String?
-  /// Last ~3 slugs, FIFO. Lets a lookup for a recently-renamed entity
-  /// still resolve. Empty by default.
+  /// Legacy transition column from the removed slug model. Current code
+  /// leaves it empty and does not resolve by it.
   var previousSlugs: [String] = []
 
   init(id: String,
@@ -206,9 +207,11 @@ final class AreaEntity {
   var updatedAt: String?
   /// CKRecord system-fields blob. See `TaskEntity.cloudKitSystemFields`.
   var cloudKitSystemFields: Data?
-  /// Mutable natural-name identifier — see ProjectEntity.slug.
+  /// Legacy transition column from the removed slug model. See
+  /// ProjectEntity.slug.
   var slug: String?
-  /// FIFO of the last 3 slugs — see ProjectEntity.previousSlugs.
+  /// Legacy transition column from the removed slug model. See
+  /// ProjectEntity.previousSlugs.
   var previousSlugs: [String] = []
 
   init(id: String, title: String, context: String? = nil,
@@ -224,6 +227,269 @@ final class AreaEntity {
     self.cloudKitSystemFields = cloudKitSystemFields
     self.slug = slug
     self.previousSlugs = previousSlugs
+  }
+}
+
+@Model
+final class SettingsEntity {
+  @Attribute(.unique) var id: String
+  var payloadData: Data
+  var updatedAt: Date
+  /// CKRecord system-fields blob. Same contract as the other mirrored
+  /// entities: preserves recordChangeTag across updates.
+  var cloudKitSystemFields: Data?
+
+  init(id: String = SettingsCloudKitSchema.singletonID,
+       payloadData: Data,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.payloadData = payloadData
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
+@Model
+final class SectionEntity {
+  @Attribute(.unique) var id: String
+  var title: String
+  var color: String
+  var updatedAt: Date
+  /// CKRecord system-fields blob. Same contract as the other mirrored
+  /// entities: preserves recordChangeTag across updates.
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       title: String,
+       color: String,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.title = title
+    self.color = color
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
+@Model
+final class HabitDefinitionEntity {
+  @Attribute(.unique) var id: String
+  var title: String
+  var emoji: String?
+  var bucket: String
+  var sortIndex: Int
+  var updatedAt: Date
+  /// CKRecord system-fields blob. Same contract as tasks/projects/areas.
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       title: String,
+       emoji: String? = nil,
+       bucket: String,
+       sortIndex: Int = 0,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.title = title
+    self.emoji = emoji
+    self.bucket = bucket
+    self.sortIndex = sortIndex
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
+@Model
+final class HabitDayStateEntity {
+  @Attribute(.unique) var id: String
+  var date: String
+  var habitID: String
+  var done: Bool
+  var skipped: Bool
+  var note: String?
+  var time: String?
+  var updatedAt: Date
+  /// CKRecord system-fields blob. Same contract as tasks/projects/areas.
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       date: String,
+       habitID: String,
+       done: Bool,
+       skipped: Bool,
+       note: String? = nil,
+       time: String? = nil,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.date = date
+    self.habitID = habitID
+    self.done = done
+    self.skipped = skipped
+    self.note = note
+    self.time = time
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
+@Model
+final class SupplementDefinitionEntity {
+  @Attribute(.unique) var id: String
+  var title: String
+  var emoji: String?
+  var sortIndex: Int
+  var updatedAt: Date
+  /// CKRecord system-fields blob. Same contract as tasks/projects/areas.
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       title: String,
+       emoji: String? = nil,
+       sortIndex: Int = 0,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.title = title
+    self.emoji = emoji
+    self.sortIndex = sortIndex
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
+@Model
+final class SupplementDayStateEntity {
+  @Attribute(.unique) var id: String
+  var date: String
+  var supplementID: String
+  var done: Bool
+  var note: String?
+  var time: String?
+  var updatedAt: Date
+  /// CKRecord system-fields blob. Same contract as tasks/projects/areas.
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       date: String,
+       supplementID: String,
+       done: Bool,
+       note: String? = nil,
+       time: String? = nil,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.date = date
+    self.supplementID = supplementID
+    self.done = done
+    self.note = note
+    self.time = time
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
+@Model
+final class ChoreSnapshotEntity {
+  @Attribute(.unique) var id: String
+  var title: String
+  var emoji: String?
+  var dueDate: String?
+  var lastCompleted: String?
+  var lastCompletedTime: String?
+  var daysOverdue: Int
+  var cadenceDays: Int?
+  var sortIndex: Int
+  var updatedAt: Date
+
+  init(id: String,
+       title: String,
+       emoji: String? = nil,
+       dueDate: String? = nil,
+       lastCompleted: String? = nil,
+       lastCompletedTime: String? = nil,
+       daysOverdue: Int = 0,
+       cadenceDays: Int? = nil,
+       sortIndex: Int = 0,
+       updatedAt: Date = .now) {
+    self.id = id
+    self.title = title
+    self.emoji = emoji
+    self.dueDate = dueDate
+    self.lastCompleted = lastCompleted
+    self.lastCompletedTime = lastCompletedTime
+    self.daysOverdue = daysOverdue
+    self.cadenceDays = cadenceDays
+    self.sortIndex = sortIndex
+    self.updatedAt = updatedAt
+  }
+}
+
+@Model
+final class ChoreDefinitionEntity {
+  @Attribute(.unique) var id: String
+  var title: String
+  var emoji: String?
+  var cadenceDays: Int
+  var sortIndex: Int
+  var updatedAt: Date
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       title: String,
+       emoji: String? = nil,
+       cadenceDays: Int,
+       sortIndex: Int = 0,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.title = title
+    self.emoji = emoji
+    self.cadenceDays = cadenceDays
+    self.sortIndex = sortIndex
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
+@Model
+final class ChoreEventEntity {
+  @Attribute(.unique) var id: String
+  var choreID: String
+  var action: String
+  var date: String
+  var newDueDate: String?
+  var reason: String?
+  var note: String?
+  var time: String?
+  var sortKey: String
+  var updatedAt: Date
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       choreID: String,
+       action: String,
+       date: String,
+       newDueDate: String? = nil,
+       reason: String? = nil,
+       note: String? = nil,
+       time: String? = nil,
+       sortKey: String,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.choreID = choreID
+    self.action = action
+    self.date = date
+    self.newDueDate = newDueDate
+    self.reason = reason
+    self.note = note
+    self.time = time
+    self.sortKey = sortKey
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
   }
 }
 
@@ -281,6 +547,343 @@ extension Area {
   }
 }
 
+extension SeptenaClient.SectionConfig {
+  init(_ e: SectionEntity) {
+    self.init(key: e.id, label: e.title, color: e.color)
+  }
+}
+
+// MARK: - Checklist CloudKit mapping
+
+private func optionalChecklistString(_ value: CKRecordValue?) -> String? {
+  guard let string = value as? String else { return nil }
+  return string.isEmpty ? nil : string
+}
+
+enum HabitDefinitionCloudKitSchema {
+  static let recordType = "HabitDefinition"
+
+  enum Field {
+    static let title = "title"
+    static let emoji = "emoji"
+    static let bucket = "bucket"
+    static let sortIndex = "sortIndex"
+  }
+
+  static func recordName(for id: String) -> String { "habit-def:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("habit-def:".count))
+  }
+}
+
+enum HabitEventCloudKitSchema {
+  static let recordType = "HabitEvent"
+
+  enum Field {
+    static let date = "date"
+    static let habitID = "habitID"
+    static let done = "done"
+    static let skipped = "skipped"
+    static let note = "note"
+    static let time = "time"
+  }
+
+  static func recordName(for id: String) -> String { "habit-event:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("habit-event:".count))
+  }
+}
+
+enum SupplementDefinitionCloudKitSchema {
+  static let recordType = "SupplementDefinition"
+
+  enum Field {
+    static let title = "title"
+    static let emoji = "emoji"
+    static let sortIndex = "sortIndex"
+  }
+
+  static func recordName(for id: String) -> String { "supplement-def:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("supplement-def:".count))
+  }
+}
+
+enum SupplementEventCloudKitSchema {
+  static let recordType = "SupplementEvent"
+
+  enum Field {
+    static let date = "date"
+    static let supplementID = "supplementID"
+    static let done = "done"
+    static let note = "note"
+    static let time = "time"
+  }
+
+  static func recordName(for id: String) -> String { "supplement-event:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("supplement-event:".count))
+  }
+}
+
+enum ChoreDefinitionCloudKitSchema {
+  static let recordType = "ChoreDefinition"
+
+  enum Field {
+    static let title = "title"
+    static let emoji = "emoji"
+    static let cadenceDays = "cadenceDays"
+    static let sortIndex = "sortIndex"
+  }
+
+  static func recordName(for id: String) -> String { "chore-def:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("chore-def:".count))
+  }
+}
+
+enum ChoreEventCloudKitSchema {
+  static let recordType = "ChoreEvent"
+
+  enum Field {
+    static let choreID = "choreID"
+    static let action = "action"
+    static let date = "date"
+    static let newDueDate = "newDueDate"
+    static let reason = "reason"
+    static let note = "note"
+    static let time = "time"
+    static let sortKey = "sortKey"
+  }
+
+  static func recordName(for id: String) -> String { "chore-event:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("chore-event:".count))
+  }
+}
+
+private protocol ChecklistCloudKitBackedEntity: AnyObject {
+  var cloudKitSystemFields: Data? { get set }
+}
+
+extension ChecklistCloudKitBackedEntity {
+  fileprivate func decodedCloudKitRecord() -> CKRecord? {
+    guard let data = cloudKitSystemFields else { return nil }
+    let unarchiver = try? NSKeyedUnarchiver(forReadingFrom: data)
+    unarchiver?.requiresSecureCoding = true
+    return unarchiver.flatMap { CKRecord(coder: $0) }
+  }
+
+  fileprivate func captureCloudKitSystemFields(from record: CKRecord) {
+    let archiver = NSKeyedArchiver(requiringSecureCoding: true)
+    record.encodeSystemFields(with: archiver)
+    archiver.finishEncoding()
+    cloudKitSystemFields = archiver.encodedData
+  }
+}
+
+extension HabitDefinitionEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: HabitDefinitionCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: HabitDefinitionCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[HabitDefinitionCloudKitSchema.Field.title] = title
+    record[HabitDefinitionCloudKitSchema.Field.emoji] = emoji
+    record[HabitDefinitionCloudKitSchema.Field.bucket] = bucket
+    record[HabitDefinitionCloudKitSchema.Field.sortIndex] = sortIndex
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let value = record[HabitDefinitionCloudKitSchema.Field.title] as? String { title = value }
+    emoji = optionalChecklistString(record[HabitDefinitionCloudKitSchema.Field.emoji])
+    if let value = record[HabitDefinitionCloudKitSchema.Field.bucket] as? String { bucket = value }
+    if let value = record[HabitDefinitionCloudKitSchema.Field.sortIndex] as? Int { sortIndex = value }
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: HabitDefinitionCloudKitSchema.entityID(from: record.recordID.recordName),
+              title: "",
+              bucket: "morning")
+    apply(record)
+  }
+}
+
+extension HabitDayStateEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: HabitEventCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: HabitEventCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[HabitEventCloudKitSchema.Field.date] = date
+    record[HabitEventCloudKitSchema.Field.habitID] = habitID
+    record[HabitEventCloudKitSchema.Field.done] = done ? 1 : 0
+    record[HabitEventCloudKitSchema.Field.skipped] = skipped ? 1 : 0
+    record[HabitEventCloudKitSchema.Field.note] = note
+    record[HabitEventCloudKitSchema.Field.time] = time
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let value = record[HabitEventCloudKitSchema.Field.date] as? String { date = value }
+    if let value = record[HabitEventCloudKitSchema.Field.habitID] as? String { habitID = value }
+    if let value = record[HabitEventCloudKitSchema.Field.done] as? Int { done = value != 0 }
+    if let value = record[HabitEventCloudKitSchema.Field.skipped] as? Int { skipped = value != 0 }
+    note = optionalChecklistString(record[HabitEventCloudKitSchema.Field.note])
+    time = optionalChecklistString(record[HabitEventCloudKitSchema.Field.time])
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: HabitEventCloudKitSchema.entityID(from: record.recordID.recordName),
+              date: "",
+              habitID: "",
+              done: false,
+              skipped: false)
+    apply(record)
+  }
+}
+
+extension SupplementDefinitionEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: SupplementDefinitionCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: SupplementDefinitionCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[SupplementDefinitionCloudKitSchema.Field.title] = title
+    record[SupplementDefinitionCloudKitSchema.Field.emoji] = emoji
+    record[SupplementDefinitionCloudKitSchema.Field.sortIndex] = sortIndex
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let value = record[SupplementDefinitionCloudKitSchema.Field.title] as? String { title = value }
+    emoji = optionalChecklistString(record[SupplementDefinitionCloudKitSchema.Field.emoji])
+    if let value = record[SupplementDefinitionCloudKitSchema.Field.sortIndex] as? Int { sortIndex = value }
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: SupplementDefinitionCloudKitSchema.entityID(from: record.recordID.recordName),
+              title: "")
+    apply(record)
+  }
+}
+
+extension SupplementDayStateEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: SupplementEventCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: SupplementEventCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[SupplementEventCloudKitSchema.Field.date] = date
+    record[SupplementEventCloudKitSchema.Field.supplementID] = supplementID
+    record[SupplementEventCloudKitSchema.Field.done] = done ? 1 : 0
+    record[SupplementEventCloudKitSchema.Field.note] = note
+    record[SupplementEventCloudKitSchema.Field.time] = time
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let value = record[SupplementEventCloudKitSchema.Field.date] as? String { date = value }
+    if let value = record[SupplementEventCloudKitSchema.Field.supplementID] as? String { supplementID = value }
+    if let value = record[SupplementEventCloudKitSchema.Field.done] as? Int { done = value != 0 }
+    note = optionalChecklistString(record[SupplementEventCloudKitSchema.Field.note])
+    time = optionalChecklistString(record[SupplementEventCloudKitSchema.Field.time])
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: SupplementEventCloudKitSchema.entityID(from: record.recordID.recordName),
+              date: "",
+              supplementID: "",
+              done: false)
+    apply(record)
+  }
+}
+
+extension ChoreDefinitionEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: ChoreDefinitionCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: ChoreDefinitionCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[ChoreDefinitionCloudKitSchema.Field.title] = title
+    record[ChoreDefinitionCloudKitSchema.Field.emoji] = emoji
+    record[ChoreDefinitionCloudKitSchema.Field.cadenceDays] = cadenceDays
+    record[ChoreDefinitionCloudKitSchema.Field.sortIndex] = sortIndex
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let value = record[ChoreDefinitionCloudKitSchema.Field.title] as? String { title = value }
+    emoji = optionalChecklistString(record[ChoreDefinitionCloudKitSchema.Field.emoji])
+    if let value = record[ChoreDefinitionCloudKitSchema.Field.cadenceDays] as? Int { cadenceDays = value }
+    if let value = record[ChoreDefinitionCloudKitSchema.Field.sortIndex] as? Int { sortIndex = value }
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: ChoreDefinitionCloudKitSchema.entityID(from: record.recordID.recordName),
+              title: "",
+              cadenceDays: 1)
+    apply(record)
+  }
+}
+
+extension ChoreEventEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: ChoreEventCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: ChoreEventCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[ChoreEventCloudKitSchema.Field.choreID] = choreID
+    record[ChoreEventCloudKitSchema.Field.action] = action
+    record[ChoreEventCloudKitSchema.Field.date] = date
+    record[ChoreEventCloudKitSchema.Field.newDueDate] = newDueDate
+    record[ChoreEventCloudKitSchema.Field.reason] = reason
+    record[ChoreEventCloudKitSchema.Field.note] = note
+    record[ChoreEventCloudKitSchema.Field.time] = time
+    record[ChoreEventCloudKitSchema.Field.sortKey] = sortKey
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let value = record[ChoreEventCloudKitSchema.Field.choreID] as? String { choreID = value }
+    if let value = record[ChoreEventCloudKitSchema.Field.action] as? String { action = value }
+    if let value = record[ChoreEventCloudKitSchema.Field.date] as? String { date = value }
+    newDueDate = optionalChecklistString(record[ChoreEventCloudKitSchema.Field.newDueDate])
+    reason = optionalChecklistString(record[ChoreEventCloudKitSchema.Field.reason])
+    note = optionalChecklistString(record[ChoreEventCloudKitSchema.Field.note])
+    time = optionalChecklistString(record[ChoreEventCloudKitSchema.Field.time])
+    if let value = record[ChoreEventCloudKitSchema.Field.sortKey] as? String { sortKey = value }
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: ChoreEventCloudKitSchema.entityID(from: record.recordID.recordName),
+              choreID: "",
+              action: "complete",
+              date: "",
+              sortKey: "")
+    apply(record)
+  }
+}
+
 // MARK: - LocalStore
 
 @MainActor
@@ -291,6 +894,11 @@ final class LocalStore {
 
   private init() {
     let schema = Schema([TaskEntity.self, ProjectEntity.self, AreaEntity.self,
+                         SettingsEntity.self, SectionEntity.self,
+                         HabitDefinitionEntity.self, HabitDayStateEntity.self,
+                         SupplementDefinitionEntity.self, SupplementDayStateEntity.self,
+                         ChoreDefinitionEntity.self, ChoreEventEntity.self,
+                         ChoreSnapshotEntity.self,
                          OutboxEntity.self, HTTPOutboxEntity.self])
     // Explicitly opt OUT of NSPersistentCloudKitContainer mirroring. Having
     // CloudKit in the target entitlements would otherwise switch SwiftData

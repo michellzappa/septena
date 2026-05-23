@@ -8,7 +8,7 @@ import SwiftUI
 
 struct ChoresDestinationView: View {
   @Environment(SeptenaClient.self) private var client
-  @Environment(HTTPOutbox.self) private var outbox
+  @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(SectionTheme.self) private var theme
 
   @State private var model = NextItemsModel()
@@ -118,7 +118,7 @@ struct ChoresDestinationView: View {
   @ViewBuilder
   private func row(for chore: ChoreItem) -> some View {
     Button { editing = chore } label: {
-      ChoreRow(chore: chore, model: model, outbox: outbox, tint: accent,
+      ChoreRow(chore: chore, model: model, checklistMutator: checklistMutator, tint: accent,
                onDelete: { delete(chore) })
     }
     .buttonStyle(.plain)
@@ -126,12 +126,7 @@ struct ChoresDestinationView: View {
   }
 
   private func delete(_ chore: ChoreItem) {
-    outbox.enqueue(
-      method: "DELETE",
-      path: "/api/chores/definitions/\(chore.id)",
-      body: nil,
-      kind: "chores.delete"
-    )
+    checklistMutator.deleteChore(id: chore.id)
     model.chores.removeAll { $0.id == chore.id }
     Haptics.warning()
   }

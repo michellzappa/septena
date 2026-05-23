@@ -184,6 +184,21 @@ func noteAreaChange(id: String) { noteChange(recordName: AreaCloudKitSchema.reco
 func noteAreaDeletion(id: String) { noteDeletion(recordName: AreaCloudKitSchema.recordName(for: id), kind: "area") }
 func noteProjectChange(id: String) { noteChange(recordName: ProjectCloudKitSchema.recordName(for: id), kind: "project") }
 func noteProjectDeletion(id: String) { noteDeletion(recordName: ProjectCloudKitSchema.recordName(for: id), kind: "project") }
+func noteSettingsChange() { noteChange(recordName: SettingsCloudKitSchema.singletonID, kind: "settings") }
+func noteSectionChange(id: String) { noteChange(recordName: SectionCloudKitSchema.recordName(for: id), kind: "section") }
+func noteSectionDeletion(id: String) { noteDeletion(recordName: SectionCloudKitSchema.recordName(for: id), kind: "section") }
+func noteHabitDefinitionChange(id: String) { noteChange(recordName: HabitDefinitionCloudKitSchema.recordName(for: id), kind: "habitDefinition") }
+func noteHabitDefinitionDeletion(id: String) { noteDeletion(recordName: HabitDefinitionCloudKitSchema.recordName(for: id), kind: "habitDefinition") }
+func noteHabitEventChange(id: String) { noteChange(recordName: HabitEventCloudKitSchema.recordName(for: id), kind: "habitEvent") }
+func noteHabitEventDeletion(id: String) { noteDeletion(recordName: HabitEventCloudKitSchema.recordName(for: id), kind: "habitEvent") }
+func noteSupplementDefinitionChange(id: String) { noteChange(recordName: SupplementDefinitionCloudKitSchema.recordName(for: id), kind: "supplementDefinition") }
+func noteSupplementDefinitionDeletion(id: String) { noteDeletion(recordName: SupplementDefinitionCloudKitSchema.recordName(for: id), kind: "supplementDefinition") }
+func noteSupplementEventChange(id: String) { noteChange(recordName: SupplementEventCloudKitSchema.recordName(for: id), kind: "supplementEvent") }
+func noteSupplementEventDeletion(id: String) { noteDeletion(recordName: SupplementEventCloudKitSchema.recordName(for: id), kind: "supplementEvent") }
+func noteChoreDefinitionChange(id: String) { noteChange(recordName: ChoreDefinitionCloudKitSchema.recordName(for: id), kind: "choreDefinition") }
+func noteChoreDefinitionDeletion(id: String) { noteDeletion(recordName: ChoreDefinitionCloudKitSchema.recordName(for: id), kind: "choreDefinition") }
+func noteChoreEventChange(id: String) { noteChange(recordName: ChoreEventCloudKitSchema.recordName(for: id), kind: "choreEvent") }
+func noteChoreEventDeletion(id: String) { noteDeletion(recordName: ChoreEventCloudKitSchema.recordName(for: id), kind: "choreEvent") }
 
   private func noteChange(recordName: String, kind: String) {
     guard let engine else {

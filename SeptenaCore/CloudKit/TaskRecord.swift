@@ -2,6 +2,11 @@ import Foundation
 import CloudKit
 import SwiftData
 
+private func optionalTaskString(_ value: CKRecordValue?) -> String? {
+  guard let string = value as? String else { return nil }
+  return string.isEmpty ? nil : string
+}
+
 // TaskRecord — TaskEntity ↔ CKRecord mapping. Phase 0 scaffolding.
 //
 // CloudKit record types are effectively frozen once a schema is deployed
@@ -112,15 +117,15 @@ extension TaskEntity {
 func apply(_ record: CKRecord) {
     if let v = record[TaskCloudKitSchema.Field.title] as? String { title = v }
     if let v = record[TaskCloudKitSchema.Field.status] as? String { statusRaw = v }
-    created = record[TaskCloudKitSchema.Field.created] as? String
-    scheduled = record[TaskCloudKitSchema.Field.scheduled] as? String
-    due = record[TaskCloudKitSchema.Field.deadline] as? String
+    created = optionalTaskString(record[TaskCloudKitSchema.Field.created])
+    scheduled = optionalTaskString(record[TaskCloudKitSchema.Field.scheduled])
+    due = optionalTaskString(record[TaskCloudKitSchema.Field.deadline])
     if let v = record[TaskCloudKitSchema.Field.today] as? Int { today = v != 0 }
-    todaySetOn = record[TaskCloudKitSchema.Field.todaySetOn] as? String
-    completedAt = record[TaskCloudKitSchema.Field.completedAt] as? String
-    area = record[TaskCloudKitSchema.Field.area] as? String
-    project = record[TaskCloudKitSchema.Field.project] as? String
-    recurrenceUnit = record[TaskCloudKitSchema.Field.recurrenceUnit] as? String
+    todaySetOn = optionalTaskString(record[TaskCloudKitSchema.Field.todaySetOn])
+    completedAt = optionalTaskString(record[TaskCloudKitSchema.Field.completedAt])
+    area = optionalTaskString(record[TaskCloudKitSchema.Field.area])
+    project = optionalTaskString(record[TaskCloudKitSchema.Field.project])
+    recurrenceUnit = optionalTaskString(record[TaskCloudKitSchema.Field.recurrenceUnit])
     if let v = record[TaskCloudKitSchema.Field.recurrenceInterval] as? Int {
       recurrenceInterval = v
     }
@@ -129,8 +134,8 @@ func apply(_ record: CKRecord) {
     }
     // Read plain first, fall back to the legacy encrypted bag for records
     // that haven't been re-saved since the plaintext switch.
-    notes = (record[TaskCloudKitSchema.Field.notesText] as? String)
-      ?? (record.encryptedValues[TaskCloudKitSchema.Field.encryptedNotes] as? String)
+    notes = optionalTaskString(record[TaskCloudKitSchema.Field.notesText])
+      ?? optionalTaskString(record.encryptedValues[TaskCloudKitSchema.Field.encryptedNotes])
     captureCloudKitSystemFields(from: record)
   }
 

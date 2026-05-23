@@ -29,6 +29,7 @@ struct SeptenaApp: App {
   private let services = SeptenaServices.shared
   private var ckEngine: CKEngine { services.ckEngine }
   private var taskMutator: TaskMutator { services.taskMutator }
+  private var checklistMutator: ChecklistMutator { services.checklistMutator }
   private var areasMutator: AreasMutator { services.areasMutator }
   private var projectsMutator: ProjectsMutator { services.projectsMutator }
   private var httpOutbox: HTTPOutbox { services.httpOutbox }
@@ -54,6 +55,7 @@ struct SeptenaApp: App {
         .environment(trainingDraft)
         .environment(settingsStore)
         .environment(taskMutator)
+        .environment(checklistMutator)
         .environment(areasMutator)
         .environment(projectsMutator)
         .environment(httpOutbox)
@@ -107,14 +109,13 @@ struct SeptenaApp: App {
           #endif
           // Two-phase load for tile order + section colors. Disk reads
           // are synchronous so the dashboard renders with the user's
-          // ordering and palette on the first frame; the network refresh
-          // overwrites them when it lands.
+          // ordering and palette on the first frame; then pull CloudKit
+          // before refreshing the mirror-backed settings surfaces.
           theme.paintFromCache()
           settingsStore.paintFromCache()
+          try? await ckEngine.fetchChanges()
           await theme.refresh(from: clientProvider.client)
           await settingsStore.refresh(from: clientProvider.client)
-          // CKSyncEngine owns the read path. Ask it to pull from CK.
-          try? await ckEngine.fetchChanges()
           // Backstop for users whose local mirror is missing areas/projects
           // (e.g. installed before Phase 5b pushed them to CK). If either
           // table is empty AND FastAPI is reachable, pull once and fold

@@ -6,7 +6,7 @@ import SwiftUI
 
 struct AddSupplementPage: View {
   @Environment(SeptenaClient.self) private var client
-  @Environment(HTTPOutbox.self) private var outbox
+  @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
@@ -48,17 +48,18 @@ struct AddSupplementPage: View {
   }
 
   private func toggle(_ item: SupplementDayItem) {
-    outbox.enqueue(method: "POST", path: "/api/supplements/toggle",
-                   body: ["supplement_id": item.id,
-                          "date": SeptenaDate.today,
-                          "done": true],
-                   kind: "supplements.toggle")
+    checklistMutator.toggleSupplement(id: item.id, date: SeptenaDate.today, done: true)
     AddInfoSection.supplements.notifyTilesChanged()
     Haptics.tick()
     dismiss()
   }
 
   private func load() async {
-    day = try? await client.supplementsDay(date: SeptenaDate.today)
+    let context = LocalStore.shared.container.mainContext
+    if let mirrored = ChecklistMirror.loadSupplementsDay(context: context, date: SeptenaDate.today) {
+      day = mirrored
+    } else {
+      day = try? await client.supplementsDay(date: SeptenaDate.today)
+    }
   }
 }
