@@ -796,8 +796,11 @@ final class ExerciseDefinitionEntity {
   var subgroup: String?                // free-form: "push", "pull", "upper"
   var aliases: [String]
   var primaryMuscle: String?           // Muscle.rawValue, nil until backfill
-  var secondaryMuscles: [String]       // [Muscle.rawValue]
-  var archived: Bool
+  // SwiftData lightweight migration reads the property initializer here as
+  // the storage-level default for existing rows; without it the new
+  // mandatory attribute trips a 134110 store-load failure.
+  var secondaryMuscles: [String] = []
+  var archived: Bool = false
   var sortIndex: Int
   var updatedAt: Date
   var cloudKitSystemFields: Data?
@@ -833,7 +836,7 @@ final class SessionTypeEntity {
   var label: String
   var emoji: String?
   var exercises: [String]              // canonical exercise list
-  var archived: Bool
+  var archived: Bool = false
   var sortIndex: Int
   var updatedAt: Date
   var cloudKitSystemFields: Data?
