@@ -1382,7 +1382,7 @@ struct TrainingExerciseCard: View {
         .font(.system(size: 18, weight: .regular))
         .frame(width: 22)
       HStack(spacing: 6) {
-        Text(entry.exercise.capitalized)
+        Text(displayName(entry.exercise))
           .font(.septenaCardTitle)
           .foregroundStyle(Theme.inkPrimary)
         if isPR { prPill }
@@ -1593,40 +1593,57 @@ struct TrainingExerciseCard: View {
   }
 
   private var difficultyPicker: some View {
-    // Three rungs encoded as 1, 2, 3 dots — opacity ramps with intensity so
-    // "easy" reads as faint accent, "hard" reads as full accent. Capsule
-    // background brightens on selection so the active rung pops without
-    // introducing a second hue.
-    let levels: [(id: String, dots: Int)] = [
-      ("easy", 1), ("medium", 2), ("hard", 3),
+    // Three equal-width pills, each ~48pt tall. Big number on top, short
+    // label below. Selected pill is filled accent with white text;
+    // unselected is clear with a 1.5pt accent stroke. Sized for a
+    // glance + thumb tap at the gym, and high-contrast against the
+    // expanded card's accent-tinted background.
+    let levels: [(id: String, label: String)] = [
+      ("easy", "Easy"), ("medium", "Med"), ("hard", "Hard"),
     ]
-    return HStack(spacing: 6) {
-      ForEach(levels, id: \.id) { rung in
+    return HStack(spacing: 8) {
+      ForEach(Array(levels.enumerated()), id: \.element.id) { idx, rung in
         let isSelected = entry.difficulty == rung.id
-        let dotOpacity = 0.30 + 0.35 * Double(rung.dots - 1)   // 0.30 / 0.65 / 1.00
         Button {
           store.update { $0.entries[index].difficulty = rung.id }
         } label: {
-          HStack(spacing: 3) {
-            ForEach(0..<rung.dots, id: \.self) { _ in
-              Circle()
-                .fill(accent.opacity(dotOpacity))
-                .frame(width: 7, height: 7)
-            }
+          VStack(spacing: 2) {
+            Text("\(idx + 1)")
+              .font(.system(.title2, design: .rounded).weight(.bold))
+              .monospacedDigit()
+            Text(rung.label.uppercased())
+              .font(.caption2.weight(.semibold))
+              .tracking(0.5)
           }
-          .padding(.horizontal, 10).padding(.vertical, 7)
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, 10)
           .background(
-            accent.opacity(isSelected ? 0.22 : 0.06),
-            in: Capsule()
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+              .fill(isSelected ? accent : Color.clear)
           )
+          .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+              .stroke(isSelected ? Color.clear : accent.opacity(0.55),
+                      lineWidth: 1.5)
+          )
+          .foregroundStyle(isSelected ? Color.white : Theme.inkPrimary)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(rung.id.capitalized)
+        .accessibilityLabel(rung.label)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
       }
-      Spacer()
     }
     .padding(.top, 8)
+  }
+
+  /// Routine slugs come in two flavours — "Chest-Press" (post-edit
+  /// canonical) and "chest press" (legacy). Replace any separator
+  /// with a space and Title-Case the words for display.
+  private func displayName(_ slug: String) -> String {
+    slug
+      .replacingOccurrences(of: "-", with: " ")
+      .replacingOccurrences(of: "_", with: " ")
+      .capitalized
   }
 
   // MARK: - Cardio fields
