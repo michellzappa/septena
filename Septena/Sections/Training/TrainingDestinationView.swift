@@ -990,11 +990,11 @@ final class TrainingDraftStore {
     guard var d = draft else { return }
     let exercises = d.entries.map(\.exercise)
     let last = ChecklistMirror.loadLastEntries(context: context, exercises: exercises)
-    let lastByLowered = Dictionary(uniqueKeysWithValues: exercises.compactMap { ex -> (String, LastEntryValues)? in
+    let lastByKey = Dictionary(uniqueKeysWithValues: exercises.compactMap { ex -> (String, LastEntryValues)? in
       guard let v = last[ex] else { return nil }
-      return (ex.lowercased(), v)
+      return (exerciseKey(ex), v)
     })
-    d.lastByExercise = lastByLowered
+    d.lastByExercise = lastByKey
     d.prBaselines = TrainingPRCalculator.baselines(for: exercises, in: context)
     d.recentByExercise = TrainingPRCalculator.recents(for: exercises, in: context, limit: 3)
 
@@ -1022,12 +1022,12 @@ final class TrainingDraftStore {
     let entries = exercises.map { ex in
       DraftEntry.from(exercise: ex, last: last[ex])
     }
-    // Snapshot last-entry + PR baselines per exercise. Keyed by lowercased
-    // name so the card's lookup is case-insensitive (matches the casing
-    // contract used by ChecklistMirror's Z2 / suggestion paths).
+    // Snapshot last-entry + PR baselines per exercise. Keyed by the
+    // canonical exerciseKey so the card's lookup survives separator
+    // drift (chest-press / chest press / Chest_Press all match).
     let lastByExercise = Dictionary(uniqueKeysWithValues: exercises.compactMap { ex -> (String, LastEntryValues)? in
       guard let v = last[ex] else { return nil }
-      return (ex.lowercased(), v)
+      return (exerciseKey(ex), v)
     })
     let prBaselines = TrainingPRCalculator.baselines(for: exercises, in: context)
     let recents = TrainingPRCalculator.recents(for: exercises, in: context, limit: 3)
@@ -1425,11 +1425,11 @@ struct TrainingExerciseCard: View {
   // MARK: - Progression hints
 
   private var baseline: PRBaseline? {
-    store.draft?.prBaselines[entry.exercise.lowercased()]
+    store.draft?.prBaselines[exerciseKey(entry.exercise)]
   }
 
   private var recents: [RecentExerciseEntry] {
-    store.draft?.recentByExercise[entry.exercise.lowercased()] ?? []
+    store.draft?.recentByExercise[exerciseKey(entry.exercise)] ?? []
   }
 
   private var isPR: Bool {

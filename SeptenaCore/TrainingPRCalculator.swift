@@ -1,6 +1,17 @@
 import Foundation
 import SwiftData
 
+/// Canonical join key for matching exercise labels across surfaces.
+/// Lowercases and strips every non-alphanumeric character so that
+/// "Chest-Press", "chest press", "Chest_Press" all collapse to
+/// "chestpress". Use both sides of any name-keyed lookup (routine
+/// slug vs. historical entry name) to survive separator drift that
+/// accumulated across legacy data, RoutineSlugRepair stubs, and
+/// the in-app catalog editor.
+func exerciseKey(_ name: String) -> String {
+  name.lowercased().filter { $0.isLetter || $0.isNumber }
+}
+
 // PRBaseline "best ever" stats per exercise. Drives the PR pill in
 // TrainingExerciseCard: when the current draft exceeds the relevant
 // baseline field, the card shows a "PR" badge. Computed once at
@@ -59,12 +70,12 @@ enum TrainingPRCalculator {
   /// exercise name; callers should look up using the same casing.
   static func baselines(for exerciseNames: [String],
                         in context: ModelContext) -> [String: PRBaseline] {
-    let wanted = Set(exerciseNames.map { $0.lowercased() })
+    let wanted = Set(exerciseNames.map { exerciseKey($0) })
     guard !wanted.isEmpty else { return [:] }
     let entries = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>())) ?? []
     let grouped = Dictionary(grouping: entries.filter {
-      wanted.contains($0.exercise.lowercased())
-    }, by: { $0.exercise.lowercased() })
+      wanted.contains(exerciseKey($0.exercise))
+    }, by: { exerciseKey($0.exercise) })
 
     var out: [String: PRBaseline] = [:]
     for (key, rows) in grouped {
@@ -80,14 +91,14 @@ enum TrainingPRCalculator {
   static func recents(for exerciseNames: [String],
                       in context: ModelContext,
                       limit: Int = 3) -> [String: [RecentExerciseEntry]] {
-    let wanted = Set(exerciseNames.map { $0.lowercased() })
+    let wanted = Set(exerciseNames.map { exerciseKey($0) })
     guard !wanted.isEmpty else { return [:] }
     let entries = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(
       sortBy: [SortDescriptor(\.date, order: .reverse),
                SortDescriptor(\.loggedAt, order: .reverse)]
     ))) ?? []
-    let filtered = entries.filter { wanted.contains($0.exercise.lowercased()) }
-    let grouped = Dictionary(grouping: filtered, by: { $0.exercise.lowercased() })
+    let filtered = entries.filter { wanted.contains(exerciseKey($0.exercise)) }
+    let grouped = Dictionary(grouping: filtered, by: { exerciseKey($0.exercise) })
 
     var out: [String: [RecentExerciseEntry]] = [:]
     for (key, rows) in grouped {

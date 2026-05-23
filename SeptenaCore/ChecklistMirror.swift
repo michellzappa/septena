@@ -1177,18 +1177,18 @@ enum ChecklistMirror {
   /// entries say "Chest Press"). A SwiftData #Predicate can't lowercase
   /// strings inline, so we fetch all entries once and bucket in Swift.
   static func loadLastEntries(context: ModelContext, exercises: [String]) -> [String: LastEntryValues] {
-    let wanted = Set(exercises.map { $0.lowercased() })
+    let wanted = Set(exercises.map { exerciseKey($0) })
     guard !wanted.isEmpty else { return [:] }
     let all = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(
       sortBy: [SortDescriptor(\.date, order: .reverse),
                SortDescriptor(\.loggedAt, order: .reverse)]
     ))) ?? []
-    let grouped = Dictionary(grouping: all.filter { wanted.contains($0.exercise.lowercased()) },
-                              by: { $0.exercise.lowercased() })
+    let grouped = Dictionary(grouping: all.filter { wanted.contains(exerciseKey($0.exercise)) },
+                              by: { exerciseKey($0.exercise) })
 
     var out: [String: LastEntryValues] = [:]
     for name in exercises {
-      guard let entities = grouped[name.lowercased()], !entities.isEmpty else { continue }
+      guard let entities = grouped[exerciseKey(name)], !entities.isEmpty else { continue }
       var values = LastEntryValues.empty
       values.date = entities.first?.date
       for e in entities {
