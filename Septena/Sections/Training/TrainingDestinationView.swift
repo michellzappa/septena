@@ -1454,11 +1454,11 @@ struct TrainingExerciseCard: View {
         VStack(spacing: 2) {
           if entry.isCardio {
             ForEach(Array(recents.enumerated()), id: \.offset) { _, r in
-              recentRow(date: r.date, columns: cardioColumns(r))
+              recentRow(date: r.date, columns: cardioColumns(r), difficulty: r.difficulty)
             }
           } else {
             ForEach(Array(recents.enumerated()), id: \.offset) { _, r in
-              recentRow(date: r.date, columns: strengthColumns(r))
+              recentRow(date: r.date, columns: strengthColumns(r), difficulty: r.difficulty)
             }
           }
         }
@@ -1468,7 +1468,7 @@ struct TrainingExerciseCard: View {
     }
   }
 
-  private func recentRow(date: String, columns: [String]) -> some View {
+  private func recentRow(date: String, columns: [String], difficulty: String?) -> some View {
     HStack(spacing: 12) {
       Text(shortDate(date))
         .foregroundStyle(Theme.inkSecondary)
@@ -1478,6 +1478,13 @@ struct TrainingExerciseCard: View {
           .foregroundStyle(Theme.inkPrimary)
           .frame(maxWidth: .infinity, alignment: .leading)
       }
+      // Difficulty as accent-opacity dots — same visual vocabulary as
+      // the input picker below so the table reads as "what you'll be
+      // doing next" rather than a foreign log row. Fixed width keeps
+      // numeric columns aligned across rows even when one set has
+      // difficulty and the next doesn't.
+      DifficultyGlyph(difficulty: difficulty, accent: accent)
+        .frame(width: 22, alignment: .leading)
     }
   }
 
