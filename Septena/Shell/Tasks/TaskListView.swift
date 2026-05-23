@@ -802,6 +802,7 @@ struct TaskListView: View {
         notes: $editingNotes,
         isDone: task.status == .done,
         isToday: task.today && filter != .today,
+        isSomeday: task.status == .someday && filter != .someday,
         // Tap-to-edit and ⌘N both want the keyboard up immediately —
         // any time the inline editor mounts, it should claim focus.
         autoFocus: true,
@@ -1225,15 +1226,17 @@ struct TaskListView: View {
     return result
   }
 
-  /// Total ordering for `visibleItems`. For due-date sort, tasks without a
-  /// `due` sink to the bottom; ties (and the no-due bucket) fall back to
-  /// case-insensitive title so the order is stable across reloads.
+  /// Total ordering for `visibleItems`. Today tasks float to the top;
+  /// Someday tasks sink to the bottom. Within each band the chosen sort
+  /// applies. For due-date sort, tasks without a `due` sink within their
+  /// band; ties fall back to case-insensitive title for stability.
   private func taskSortComparator(_ sort: TaskSort) -> (SeptenaTask, SeptenaTask) -> Bool {
+    let base: (SeptenaTask, SeptenaTask) -> Bool
     switch sort {
     case .alphabetical:
-      return { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+      base = { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
     case .dueDate:
-      return { a, b in
+      base = { a, b in
         switch (a.due, b.due) {
         case let (la?, lb?) where la != lb: return la < lb
         case (_?, nil):                     return true
@@ -1246,7 +1249,7 @@ struct TaskListView: View {
       // Oldest first → newest sinks to the bottom (matches the "newest at
       // the end of the list" feel of most task apps). Tasks missing
       // `created` (legacy rows) fall through to title for stability.
-      return { a, b in
+      base = { a, b in
         switch (a.created, b.created) {
         case let (la?, lb?) where la != lb: return la < lb
         case (_?, nil):                     return true
@@ -1255,6 +1258,13 @@ struct TaskListView: View {
           return a.title.localizedCaseInsensitiveCompare(b.title) == .orderedAscending
         }
       }
+    }
+    return { a, b in
+      let aToday = a.today, bToday = b.today
+      if aToday != bToday { return aToday }
+      let aSomeday = a.status == .someday, bSomeday = b.status == .someday
+      if aSomeday != bSomeday { return !aSomeday }
+      return base(a, b)
     }
   }
 
@@ -2128,6 +2138,7 @@ private struct TaskListDisplayRow<MetaLine: View, TrailingDate: View>: View {
         tint: accent,
         isDone: task.status == .done,
         isToday: task.today && filter != .today,
+        isSomeday: task.status == .someday && filter != .someday,
         onToggle: onToggle
       )
       .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
