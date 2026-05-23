@@ -48,6 +48,8 @@
 	<array>
 		<string>remote-notification</string>
 		<string>bluetooth-central</string>
+		<string>processing</string>
+		<string>fetch</string>
 	</array>
 	<key>UILaunchScreen</key>
 	<dict/>

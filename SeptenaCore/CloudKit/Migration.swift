@@ -1152,3 +1152,43 @@ enum TrainingMuscleBackfill {
     return nil
   }
 }
+
+// MARK: - Library enrichment
+
+/// One-shot pass that enriches existing ExerciseDefinitionEntity rows with
+/// muscle metadata from the canonical DefaultExerciseLibrary, matched by
+/// slug. Fills missing fields only — never overwrites user data:
+///   - primaryMuscle is set only if currently nil
+///   - secondaryMuscles is set only if currently empty
+/// Name, type, aliases, archived stay untouched. Runs after the keyword
+/// backfill so library hits override keyword guesses for known slugs.
+@MainActor
+enum TrainingLibraryEnrichment {
+  static let userDefaultsKey = "training.libraryEnrich.v1"
+
+  static func runIfNeeded(context: ModelContext) {
+    guard !UserDefaults.standard.bool(forKey: userDefaultsKey) else { return }
+    let defs = (try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>())) ?? []
+    var updated = 0
+    for entity in defs {
+      guard let lib = DefaultExerciseLibrary.bySlug[entity.id] else { continue }
+      var changed = false
+      if entity.primaryMuscle == nil, let m = lib.primaryMuscle {
+        entity.primaryMuscle = m.rawValue
+        changed = true
+      }
+      if entity.secondaryMuscles.isEmpty, !lib.secondaryMuscles.isEmpty {
+        entity.secondaryMuscles = lib.secondaryMuscles.map { $0.rawValue }
+        changed = true
+      }
+      if changed {
+        entity.updatedAt = .now
+        SeptenaServices.shared.ckEngine.noteExerciseDefinitionChange(id: entity.id)
+        updated += 1
+      }
+    }
+    try? context.save()
+    UserDefaults.standard.set(true, forKey: userDefaultsKey)
+    SeptenaLog.info("[TrainingLibraryEnrichment] enriched \(updated) exercises from library")
+  }
+}

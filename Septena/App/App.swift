@@ -126,6 +126,7 @@ struct SeptenaApp: App {
           httpOutbox.kickDrain()
           BadgeManager.shared.start(context: localStore.container.mainContext)
           TrainingMuscleBackfill.runIfNeeded(context: localStore.container.mainContext)
+          TrainingLibraryEnrichment.runIfNeeded(context: localStore.container.mainContext)
           await runRemindersAutoImport()
         }
         .onReceive(NotificationCenter.default

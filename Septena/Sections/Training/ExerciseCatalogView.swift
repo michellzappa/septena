@@ -11,6 +11,7 @@ struct ExerciseCatalogView: View {
   @State private var selectedMuscle: Muscle? = nil
   @State private var showArchived = false
   @State private var showNewDetail = false
+  @State private var showLibrary = false
 
   private var filtered: [ExerciseDefinitionEntity] {
     allExercises.filter { entity in
@@ -67,11 +68,19 @@ struct ExerciseCatalogView: View {
         }
       }
       ToolbarItem(placement: .secondaryAction) {
+        Button { showLibrary = true } label: {
+          Label("Browse library", systemImage: "books.vertical")
+        }
+      }
+      ToolbarItem(placement: .secondaryAction) {
         Toggle("Show archived", isOn: $showArchived)
       }
     }
     .navigationDestination(isPresented: $showNewDetail) {
       ExerciseDetailView(entity: nil)
+    }
+    .sheet(isPresented: $showLibrary) {
+      ExerciseLibrarySheet()
     }
   }
 
