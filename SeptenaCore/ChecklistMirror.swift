@@ -1171,14 +1171,24 @@ enum ChecklistMirror {
 
   /// For each exercise name, walk the progression backward picking the most-
   /// recent non-null value per field. Mirrors the server's last-entries logic.
+  ///
+  /// Case-insensitive on the name join: routine slugs may differ in casing
+  /// from how the user logged the entry (e.g. routine has "chest press",
+  /// entries say "Chest Press"). A SwiftData #Predicate can't lowercase
+  /// strings inline, so we fetch all entries once and bucket in Swift.
   static func loadLastEntries(context: ModelContext, exercises: [String]) -> [String: LastEntryValues] {
+    let wanted = Set(exercises.map { $0.lowercased() })
+    guard !wanted.isEmpty else { return [:] }
+    let all = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(
+      sortBy: [SortDescriptor(\.date, order: .reverse),
+               SortDescriptor(\.loggedAt, order: .reverse)]
+    ))) ?? []
+    let grouped = Dictionary(grouping: all.filter { wanted.contains($0.exercise.lowercased()) },
+                              by: { $0.exercise.lowercased() })
+
     var out: [String: LastEntryValues] = [:]
     for name in exercises {
-      let entities = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(
-        predicate: #Predicate { $0.exercise == name },
-        sortBy: [SortDescriptor(\.date, order: .reverse), SortDescriptor(\.loggedAt, order: .reverse)]
-      ))) ?? []
-      if entities.isEmpty { continue }
+      guard let entities = grouped[name.lowercased()], !entities.isEmpty else { continue }
       var values = LastEntryValues.empty
       values.date = entities.first?.date
       for e in entities {
@@ -1190,6 +1200,7 @@ enum ChecklistMirror {
         if values.distanceM == nil, let v = e.distanceM { values.distanceM = v }
         if values.level == nil, let v = e.level { values.level = v }
       }
+      // Key by the input casing so callers indexing with routine slugs hit.
       out[name] = values
     }
     return out
