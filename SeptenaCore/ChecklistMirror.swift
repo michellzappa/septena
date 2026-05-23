@@ -1144,7 +1144,7 @@ enum ChecklistMirror {
       sortBy: [SortDescriptor(\.sortIndex), SortDescriptor(\.label, comparator: .localizedStandard)]
     ))) ?? []
     return entities.map { e in
-      SessionTypeConfig.make(id: e.id, label: e.label, emoji: e.emoji, exercises: e.exercises)
+      SessionTypeConfig.make(id: e.id, label: e.label, emoji: e.emoji, exercises: e.exercises, archived: e.archived)
     }
   }
 
@@ -1152,8 +1152,15 @@ enum ChecklistMirror {
     let entities = (try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>(
       sortBy: [SortDescriptor(\.sortIndex), SortDescriptor(\.name, comparator: .localizedStandard)]
     ))) ?? []
-    return entities.map { ExerciseDefinition(id: $0.id, name: $0.name, type: $0.type,
-                                             subgroup: $0.subgroup, aliases: $0.aliases) }
+    return entities.map { e in
+      ExerciseDefinition(
+        id: e.id, name: e.name, type: e.type,
+        subgroup: e.subgroup, aliases: e.aliases,
+        primaryMuscle: e.primaryMuscle.flatMap(Muscle.init(rawValue:)),
+        secondaryMuscles: e.secondaryMuscles.compactMap(Muscle.init(rawValue:)),
+        archived: e.archived
+      )
+    }
   }
 
   /// For each exercise name, walk the progression backward picking the most-

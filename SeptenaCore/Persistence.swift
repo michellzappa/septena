@@ -795,6 +795,9 @@ final class ExerciseDefinitionEntity {
   var type: String                     // strength|cardio|mobility|core
   var subgroup: String?                // free-form: "push", "pull", "upper"
   var aliases: [String]
+  var primaryMuscle: String?           // Muscle.rawValue, nil until backfill
+  var secondaryMuscles: [String]       // [Muscle.rawValue]
+  var archived: Bool
   var sortIndex: Int
   var updatedAt: Date
   var cloudKitSystemFields: Data?
@@ -804,6 +807,9 @@ final class ExerciseDefinitionEntity {
        type: String,
        subgroup: String? = nil,
        aliases: [String] = [],
+       primaryMuscle: String? = nil,
+       secondaryMuscles: [String] = [],
+       archived: Bool = false,
        sortIndex: Int = 0,
        updatedAt: Date = .now,
        cloudKitSystemFields: Data? = nil) {
@@ -812,6 +818,9 @@ final class ExerciseDefinitionEntity {
     self.type = type
     self.subgroup = subgroup
     self.aliases = aliases
+    self.primaryMuscle = primaryMuscle
+    self.secondaryMuscles = secondaryMuscles
+    self.archived = archived
     self.sortIndex = sortIndex
     self.updatedAt = updatedAt
     self.cloudKitSystemFields = cloudKitSystemFields
@@ -824,6 +833,7 @@ final class SessionTypeEntity {
   var label: String
   var emoji: String?
   var exercises: [String]              // canonical exercise list
+  var archived: Bool
   var sortIndex: Int
   var updatedAt: Date
   var cloudKitSystemFields: Data?
@@ -832,6 +842,7 @@ final class SessionTypeEntity {
        label: String,
        emoji: String? = nil,
        exercises: [String] = [],
+       archived: Bool = false,
        sortIndex: Int = 0,
        updatedAt: Date = .now,
        cloudKitSystemFields: Data? = nil) {
@@ -839,6 +850,7 @@ final class SessionTypeEntity {
     self.label = label
     self.emoji = emoji
     self.exercises = exercises
+    self.archived = archived
     self.sortIndex = sortIndex
     self.updatedAt = updatedAt
     self.cloudKitSystemFields = cloudKitSystemFields
@@ -1206,6 +1218,9 @@ enum ExerciseDefinitionCloudKitSchema {
     static let subgroup = "subgroup"
     static let aliases = "aliases"
     static let sortIndex = "sortIndex"
+    static let primaryMuscle = "primaryMuscle"
+    static let secondaryMuscles = "secondaryMuscles"
+    static let archived = "archived"
   }
 
   static func recordName(for id: String) -> String { "exercise-def:\(id)" }
@@ -1222,6 +1237,7 @@ enum SessionTypeCloudKitSchema {
     static let emoji = "emoji"
     static let exercises = "exercises"
     static let sortIndex = "sortIndex"
+    static let archived = "archived"
   }
 
   static func recordName(for id: String) -> String { "session-type:\(id)" }
@@ -1776,6 +1792,9 @@ extension ExerciseDefinitionEntity: ChecklistCloudKitBackedEntity {
     record[ExerciseDefinitionCloudKitSchema.Field.subgroup] = subgroup
     record[ExerciseDefinitionCloudKitSchema.Field.aliases] = aliases as NSArray
     record[ExerciseDefinitionCloudKitSchema.Field.sortIndex] = sortIndex
+    record[ExerciseDefinitionCloudKitSchema.Field.primaryMuscle] = primaryMuscle
+    record[ExerciseDefinitionCloudKitSchema.Field.secondaryMuscles] = secondaryMuscles as NSArray
+    record[ExerciseDefinitionCloudKitSchema.Field.archived] = Int64(archived ? 1 : 0)
     return record
   }
 
@@ -1785,6 +1804,9 @@ extension ExerciseDefinitionEntity: ChecklistCloudKitBackedEntity {
     subgroup = optionalChecklistString(record[ExerciseDefinitionCloudKitSchema.Field.subgroup])
     aliases = (record[ExerciseDefinitionCloudKitSchema.Field.aliases] as? [String]) ?? []
     if let v = record[ExerciseDefinitionCloudKitSchema.Field.sortIndex] as? Int { sortIndex = v }
+    primaryMuscle = optionalChecklistString(record[ExerciseDefinitionCloudKitSchema.Field.primaryMuscle])
+    secondaryMuscles = (record[ExerciseDefinitionCloudKitSchema.Field.secondaryMuscles] as? [String]) ?? []
+    archived = (record[ExerciseDefinitionCloudKitSchema.Field.archived] as? Int64).map { $0 != 0 } ?? false
     updatedAt = .now
     captureCloudKitSystemFields(from: record)
   }
@@ -1807,6 +1829,7 @@ extension SessionTypeEntity: ChecklistCloudKitBackedEntity {
     record[SessionTypeCloudKitSchema.Field.emoji] = emoji
     record[SessionTypeCloudKitSchema.Field.exercises] = exercises as NSArray
     record[SessionTypeCloudKitSchema.Field.sortIndex] = sortIndex
+    record[SessionTypeCloudKitSchema.Field.archived] = Int64(archived ? 1 : 0)
     return record
   }
 
@@ -1815,6 +1838,7 @@ extension SessionTypeEntity: ChecklistCloudKitBackedEntity {
     emoji = optionalChecklistString(record[SessionTypeCloudKitSchema.Field.emoji])
     exercises = (record[SessionTypeCloudKitSchema.Field.exercises] as? [String]) ?? []
     if let v = record[SessionTypeCloudKitSchema.Field.sortIndex] as? Int { sortIndex = v }
+    archived = (record[SessionTypeCloudKitSchema.Field.archived] as? Int64).map { $0 != 0 } ?? false
     updatedAt = .now
     captureCloudKitSystemFields(from: record)
   }
