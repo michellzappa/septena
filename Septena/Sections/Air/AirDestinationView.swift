@@ -15,6 +15,7 @@ struct AirDestinationView: View {
   @Environment(SectionTheme.self) private var theme
   @Environment(AranetBridge.self) private var bridge
   @Environment(AirStore.self) private var store
+  @Environment(PollenClient.self) private var pollen
 
   @State private var summary: AirSummary? = nil
   @State private var history: [AirHistoryPoint] = []
@@ -35,6 +36,7 @@ struct AirDestinationView: View {
   var body: some View {
     List {
       summarySection
+      pollenSection
       if !history.isEmpty {
         Section("7-day average") {
           ForEach(Array(history.reversed()), id: \.date) { p in
@@ -88,6 +90,11 @@ struct AirDestinationView: View {
       // peripheral UUID for an instant reconnect.
       if bridge.hasKnownPeripheral { bridge.start() }
       refresh()
+      // Fire pollen refresh as a side task — it's cached for 6h, so
+      // most appearances are a no-op. First load asks for location
+      // permission inline; the user can dismiss the prompt and the
+      // section gracefully shows the "denied" CTA instead.
+      Task { await pollen.refresh() }
     }
     .onDisappear {
       // Don't `stop()` — the user may flip to Settings to inspect the
@@ -98,6 +105,111 @@ struct AirDestinationView: View {
     .onReceive(NotificationCenter.default
       .publisher(for: .septenaAirChanged)) { _ in
       refresh()
+    }
+  }
+
+  // MARK: - Pollen
+
+  /// Pollen card: today's grass / tree / weed roll-up + overall band
+  /// pulled from Open-Meteo. Hidden until the first successful fetch
+  /// so we don't render empty rows during the location prompt.
+  @ViewBuilder
+  private var pollenSection: some View {
+    switch pollen.state {
+    case .denied:
+      Section {
+        VStack(alignment: .leading, spacing: 4) {
+          Text("Pollen needs location access")
+            .font(.subheadline.weight(.medium))
+          Text("Allow location in iOS Settings → Privacy → Location → Septena to see daily pollen counts for your area.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      } header: { Text("Pollen") }
+    case .failed(let msg):
+      Section {
+        Text(msg).font(.caption).foregroundStyle(.orange)
+      } header: { Text("Pollen") }
+    default:
+      if let p = pollen.today {
+        Section {
+          // Three big stats — grass / tree / weed are the rollups
+          // a user actually cares about during allergy season. Birch
+          // and friends live inside `tree`; ragweed/mugwort in `weed`.
+          HStack(alignment: .top, spacing: 24) {
+            pollenStat("Grass", value: p.grassMax ?? p.grass, species: "grass")
+            pollenStat("Tree",  value: p.treeMax,             species: "tree")
+            pollenStat("Weed",  value: p.weedMax,             species: "weed")
+            Spacer()
+          }
+          // Overall band footer — single-glance "is today bad".
+          if let bandLabel = pollenBandLabel(p.overallBand) {
+            HStack(spacing: 6) {
+              Circle()
+                .fill(pollenBandColor(p.overallBand))
+                .frame(width: 6, height: 6)
+              Text("Overall: \(bandLabel)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+              Spacer()
+            }
+            .padding(.top, 4)
+          }
+        } header: { Text("Pollen") } footer: {
+          Text("Counts in grains/m³ from Open-Meteo. Cached for 6h.")
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+        }
+      }
+    }
+  }
+
+  private func pollenStat(_ label: String, value: Double?, species: String) -> some View {
+    VStack(alignment: .leading, spacing: 2) {
+      Text(value.map { String(format: "%.0f", $0) } ?? "—")
+        .font(.system(.title3, design: .rounded).weight(.semibold))
+        .foregroundStyle(pollenBandColor(bandRaw(species: species, value: value)))
+      Text(label).font(.caption).foregroundStyle(.secondary)
+    }
+  }
+
+  /// Mirrors the threshold ladder in PollenClient; duplicated here so
+  /// the view doesn't reach into PollenClient's internals just for a
+  /// color. If you adjust thresholds in one place, update the other.
+  private func bandRaw(species: String, value: Double?) -> String {
+    guard let v = value else { return "unknown" }
+    let key: String = species == "tree" ? "birch" : (species == "weed" ? "ragweed" : species)
+    let t: (low: Double, medium: Double, high: Double)?
+    switch key {
+    case "grass":   t = (5, 20, 50)
+    case "birch":   t = (10, 50, 200)
+    case "ragweed": t = (5, 11, 25)
+    default:        t = nil
+    }
+    guard let t else { return "unknown" }
+    if v <= t.low    { return "low" }
+    if v <= t.medium { return "medium" }
+    if v <= t.high   { return "high" }
+    return "very_high"
+  }
+
+  private func pollenBandColor(_ raw: String) -> Color {
+    switch raw {
+    case "low":       return .green
+    case "medium":    return .yellow
+    case "high":      return .orange
+    case "very_high": return .red
+    default:          return .secondary
+    }
+  }
+
+  private func pollenBandLabel(_ raw: String) -> String? {
+    switch raw {
+    case "low":       return "Low"
+    case "medium":    return "Medium"
+    case "high":      return "High"
+    case "very_high": return "Very high"
+    default:          return nil
     }
   }
 

@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import EventKit
 import CloudKit
+import CoreLocation
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -1068,6 +1069,7 @@ struct IntegrationsSettingsPane: View {
   @State private var calendarBridge = CalendarBridge.shared
   @State private var healthBridge = HealthKitBridge.shared
   @Environment(AranetBridge.self) private var aranetBridge
+  @Environment(PollenClient.self) private var pollenClient
 
   var body: some View {
     Form {
@@ -1122,6 +1124,22 @@ struct IntegrationsSettingsPane: View {
                    state: aranetStateLabel,
                    isGranted: aranetBridge.state == .connected)
         }
+
+        // Pollen via Open-Meteo. Detail pane handles location auth
+        // + a manual refresh button. Status label tracks the bridge's
+        // state so the row is self-explanatory.
+        NavigationLink {
+          PollenIntegrationDetail()
+            .navigationTitle("Pollen")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+        } label: {
+          stateRow(title: "Pollen",
+                   systemImage: "leaf",
+                   state: pollenStateLabel,
+                   isGranted: pollenClient.state == .ready)
+        }
       } footer: {
         Text("Grant access here, or manage permissions in iOS Settings → Privacy.")
       }
@@ -1138,6 +1156,17 @@ struct IntegrationsSettingsPane: View {
     case .bluetoothOff: return "Bluetooth off"
     case .unauthorized: return "Denied"
     case .idle:         return "Not connected"
+    }
+  }
+
+  private var pollenStateLabel: String {
+    switch pollenClient.state {
+    case .ready:    return "Ready"
+    case .locating: return "Locating"
+    case .fetching: return "Fetching"
+    case .denied:   return "Denied"
+    case .failed:   return "Failed"
+    case .idle:     return "Grant"
     }
   }
 
@@ -1566,6 +1595,175 @@ private struct AranetIntegrationDetail: View {
   }
 }
 
+// MARK: - Pollen detail
+//
+// Reached from Integrations → Pollen. Surfaces location auth + the
+// most-recent Open-Meteo fetch + a manual refresh control. No
+// per-species toggles or threshold tuning today — the species set
+// and band thresholds are pinned to match the webapp; if those need
+// to diverge, this is the right pane to grow.
+
+private struct PollenIntegrationDetail: View {
+  @Environment(PollenClient.self) private var pollen
+  // Tick on a 30s timer so "Last fetched 2 minutes ago" stays honest
+  // while the user has the pane open. Cheap; the work is one
+  // RelativeDateTimeFormatter call.
+  @State private var ticker = Date()
+  private let tickTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
+
+  var body: some View {
+    Form {
+      Section {
+        statusRow
+        if let when = pollen.lastFetchedAt {
+          HStack {
+            Text("Last fetched")
+            Spacer()
+            Text(relativeDate(when))
+              .foregroundStyle(.secondary)
+              .font(.subheadline)
+          }
+        }
+      } header: {
+        Text("Status")
+      } footer: {
+        Text("Septena reads pollen counts from your current city using Open-Meteo's free air quality API. Cached for 6 hours; refreshes on the Air page or manually below.")
+      }
+
+      // Today's roll-up. Only shown once a fetch has succeeded so we
+      // don't render dashes when the user lands here on first launch.
+      if let p = pollen.today {
+        Section("Today (\(p.date))") {
+          row("Grass",   value: format(p.grassMax ?? p.grass))
+          row("Birch",   value: format(p.birchMax ?? p.birch))
+          row("Tree",    value: format(p.treeMax))
+          row("Weed",    value: format(p.weedMax))
+          row("Overall", value: bandLabel(p.overallBand))
+        }
+      }
+
+      Section {
+        // Permission gate. Three buttons across the auth states so
+        // the action always matches what iOS will actually let us do.
+        switch pollen.locationAuthorization {
+        case .notDetermined:
+          Button {
+            pollen.requestLocationPermission()
+            // Kick a refresh — auth callback will fire fetch when
+            // the user accepts; if they decline, refresh harmlessly
+            // flips state to .denied which the row above reflects.
+            Task { await pollen.refresh(force: true) }
+          } label: {
+            Label("Grant location access", systemImage: "location.fill")
+          }
+        case .denied, .restricted:
+          // Cannot re-prompt programmatically once denied — only
+          // iOS Settings can unblock. Open it directly via the
+          // standard openSettings URL.
+          #if canImport(UIKit)
+          Button {
+            if let url = URL(string: UIApplication.openSettingsURLString) {
+              UIApplication.shared.open(url)
+            }
+          } label: {
+            Label("Open iOS Settings", systemImage: "gear")
+          }
+          #else
+          Text("Enable Location in System Settings → Privacy → Location → Septena.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+          #endif
+        default:
+          Button {
+            Task { await pollen.refresh(force: true) }
+          } label: {
+            Label(pollen.state == .fetching ? "Refreshing…" : "Refresh now",
+                  systemImage: "arrow.clockwise")
+          }
+          .disabled(pollen.state == .fetching || pollen.state == .locating)
+        }
+      }
+
+      Section {
+        Link(destination: URL(string: "https://open-meteo.com/en/docs/air-quality-api")!) {
+          HStack {
+            Text("Open-Meteo")
+            Spacer()
+            Image(systemName: "arrow.up.right.square")
+              .foregroundStyle(.secondary)
+          }
+        }
+      } header: {
+        Text("Source")
+      } footer: {
+        Text("Free, no API key required. Pollen species: grass, birch, alder, olive, ragweed, mugwort. Thresholds match the EAN/Open-Meteo conventions.")
+      }
+    }
+    .formStyle(.grouped)
+    .onReceive(tickTimer) { ticker = $0 }
+  }
+
+  private var statusRow: some View {
+    HStack(spacing: 10) {
+      Circle().fill(statusColor).frame(width: 10, height: 10)
+      Text(statusLabel).foregroundStyle(.primary)
+      Spacer()
+    }
+  }
+
+  private func row(_ label: String, value: String) -> some View {
+    HStack {
+      Text(label).foregroundStyle(.primary)
+      Spacer()
+      Text(value).font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
+    }
+  }
+
+  private func format(_ v: Double?) -> String {
+    guard let v else { return "—" }
+    return String(format: "%.0f grains/m³", v)
+  }
+
+  private func bandLabel(_ raw: String) -> String {
+    switch raw {
+    case "low":       return "Low"
+    case "medium":    return "Medium"
+    case "high":      return "High"
+    case "very_high": return "Very high"
+    default:          return "—"
+    }
+  }
+
+  private func relativeDate(_ d: Date) -> String {
+    _ = ticker  // touch the published tick so SwiftUI re-evaluates this string every 30s
+    let f = RelativeDateTimeFormatter()
+    f.unitsStyle = .short
+    return f.localizedString(for: d, relativeTo: Date())
+  }
+
+  private var statusColor: Color {
+    switch pollen.state {
+    case .ready:        return .green
+    case .locating,
+         .fetching:     return .yellow
+    case .denied:       return .red
+    case .failed:       return .orange
+    case .idle:         return .secondary
+    }
+  }
+
+  private var statusLabel: String {
+    switch pollen.state {
+    case .ready:        return "Ready"
+    case .locating:     return "Locating…"
+    case .fetching:     return "Fetching…"
+    case .denied:       return "Location denied"
+    case .failed(let m):return "Failed: \(m)"
+    case .idle:         return "Not yet fetched"
+    }
+  }
+}
+
 // MARK: - Sync
 
 private enum MigrationDomainState {
@@ -1607,6 +1805,7 @@ private struct DomainCounts {
   var cannabis: Int = 0
   var groceries: Int = 0
   var training: Int = 0       // entries only — the user-meaningful number
+  var air: Int = 0            // AirReading rows captured from Aranet over BLE
 
   static let empty = DomainCounts()
 
@@ -1627,6 +1826,7 @@ private struct DomainCounts {
     c.cannabis    = count(CannabisEventEntity.self)
     c.groceries   = count(GroceryItemEntity.self)
     c.training    = count(ExerciseEntryEntity.self)
+    c.air         = count(AirReadingEntity.self)
     return c
   }
 }
@@ -1784,10 +1984,15 @@ struct SyncSettingsPane: View {
         MigrationDomainRow(name: "Cannabis",                  detail: "CloudKit", state: .cloudKit, count: domainCounts.cannabis)
         MigrationDomainRow(name: "Groceries",                 detail: "CloudKit", state: .cloudKit, count: domainCounts.groceries)
         MigrationDomainRow(name: "Training",                  detail: "CloudKit", state: .cloudKit, count: domainCounts.training)
+        // Air is hybrid: live BLE capture from Aranet (foreground +
+        // background scan), persisted as AirReadingEntity, fanned out
+        // via CKSyncEngine. Detail string spells out the capture path
+        // so the migration table doesn't imply "we hit some endpoint
+        // for air data" — there's no endpoint anymore.
+        MigrationDomainRow(name: "Air",                       detail: "CloudKit · Aranet BLE", state: .cloudKit, count: domainCounts.air)
         MigrationDomainRow(name: "Nutrition",                 detail: "FastAPI",  state: .legacy)
         MigrationDomainRow(name: "Sleep",                     detail: "FastAPI",  state: .legacy)
         MigrationDomainRow(name: "Body",                      detail: "FastAPI",  state: .legacy)
-        MigrationDomainRow(name: "Air",                       detail: "FastAPI",  state: .legacy)
         MigrationDomainRow(name: "Activity",                  detail: "HealthKit", state: .native)
         MigrationDomainRow(name: "Calendar",                  detail: "EventKit", state: .native)
       }

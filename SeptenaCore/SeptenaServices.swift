@@ -49,6 +49,10 @@ final class SeptenaServices {
   /// `aranetBridge.onSnapshot` in `start()` so every sample lands in
   /// SwiftData without any view-side glue.
   let airStore: AirStore
+  /// Pollen fetcher (Open-Meteo + Core Location). Single shared
+  /// instance so the cache survives view transitions and a refresh
+  /// triggered by Settings doesn't double-fetch with the Air tab.
+  let pollenClient: PollenClient
 
   /// Cached start task. Holds the work of wiring CKEngine + binding
   /// mutators; replays its result to any caller. Nil until first
@@ -72,6 +76,7 @@ final class SeptenaServices {
     self.httpOutbox = HTTPOutbox(client: client, context: context)
     self.aranetBridge = AranetBridge()
     self.airStore = AirStore(context: context)
+    self.pollenClient = PollenClient()
   }
 
   /// Idempotent. First caller wires CKEngine's record provider / apply
