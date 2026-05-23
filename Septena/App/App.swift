@@ -116,29 +116,6 @@ struct SeptenaApp: App {
           try? await ckEngine.fetchChanges()
           await theme.refresh(from: clientProvider.client)
           await settingsStore.refresh(from: clientProvider.client)
-          // Backstop for users whose local mirror is missing areas/projects
-          // (e.g. installed before Phase 5b pushed them to CK). If either
-          // table is empty AND FastAPI is reachable, pull once and fold
-          // in. After they re-run Re-sync to iCloud, the engine's
-          // applyFetchedRecord keeps the mirror in sync from CK and this
-          // branch is a no-op.
-          let context = localStore.container.mainContext
-          let areaCount = (try? context.fetchCount(FetchDescriptor<AreaEntity>())) ?? 0
-          let projectCount = (try? context.fetchCount(FetchDescriptor<ProjectEntity>())) ?? 0
-          SeptenaLog.info("[Hydrate] CK mode launch: areas=\(areaCount) projects=\(projectCount)")
-          if areaCount == 0 || projectCount == 0 {
-            SeptenaLog.info("[Hydrate] mirror gap — pulling from FastAPI as one-shot")
-            if let areas = try? await clientProvider.client.areas(),
-               let projects = try? await clientProvider.client.projects() {
-              let syncer = Syncer(client: clientProvider.client, context: context)
-              syncer.applyAreas(areas)
-              syncer.applyProjects(projects)
-              NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
-              SeptenaLog.info("[Hydrate] seeded \(areas.count) areas, \(projects.count) projects from FastAPI — run Re-sync to iCloud to push to CloudKit")
-            } else {
-              SeptenaLog.info("[Hydrate] FastAPI pull failed — sidebar will be empty for areas/projects until reachable")
-            }
-          }
           // Flush anything that was queued in a prior session (e.g. the
           // app was killed mid-drain). Tasks are CloudKit-only now; only
           // the non-task HTTP outbox needs kicking.
@@ -243,9 +220,7 @@ struct SeptenaApp: App {
 
   /// Drains the Reminders source list into Septena when the user has opted
   /// in. Routes through `taskMutator` so imports land in CloudKit like every
-  /// other task creation path — historically this called `client.create`
-  /// directly, which bypassed the CK migration and silently wrote to
-  /// FastAPI. Posts `.septenaTasksChanged` after a successful run so any
+  /// other task creation path. Posts `.septenaTasksChanged` after a successful run so any
   /// open task list refreshes without manual reload.
   @MainActor
   private func runRemindersAutoImport() async {

@@ -56,10 +56,7 @@ struct AddSupplementPage: View {
 
   private func load() async {
     let context = LocalStore.shared.container.mainContext
-    if let mirrored = ChecklistMirror.loadSupplementsDay(context: context, date: SeptenaDate.today) {
-      day = mirrored
-    } else {
-      day = try? await client.supplementsDay(date: SeptenaDate.today)
-    }
+    // Supplements are CloudKit-authoritative — read directly from the local mirror.
+    day = ChecklistMirror.loadSupplementsDay(context: context, date: SeptenaDate.today)
   }
 }

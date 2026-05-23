@@ -151,11 +151,12 @@ final class NextSuggestionsModel {
     async let nutrition    = try? await client.nutritionEntries(since: since14)
     async let training     = try? await client.trainingEntries(since: since30)
     async let workout      = try? await client.suggestedWorkout()
-    async let settings     = try? await client.settings()
+    // Settings live in CloudKit — read from the local mirror, not FastAPI.
+    let st: AppSettings? = SettingsMirror.loadSettings(context: LocalStore.shared.container.mainContext)
 
-    let (caf, cafD, can, canD, nut, tr, sw, st) =
+    let (caf, cafD, can, canD, nut, tr, sw) =
       await (caffeineHist, caffeineDay, cannabisHist, cannabisDay,
-             nutrition, training, workout, settings)
+             nutrition, training, workout)
 
     suggestions = Self.compute(
       today: today,

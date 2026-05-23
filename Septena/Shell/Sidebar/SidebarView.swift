@@ -195,15 +195,7 @@ struct SidebarRootView: View {
   /// top-left "…" overflow menu (and ⌘, on macOS).
   @ViewBuilder
   private var sidebarPhone: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 0) {
-        smartLists.padding(.top, 12).padding(.bottom, 24)
-        // areasAndProjects renders its own per-section cards
-        // (Mimestream-style), so no outer card wrapping here.
-        areasAndProjects
-        Spacer(minLength: 40)
-      }
-    }
+    sidebarScrollContent(topPadding: 12, bottomPadding: 24, spacerMinLength: 40)
     .background(Theme.sidebarBackground)
     // Empty nav bar so iOS renders its default scroll-edge fade as
     // sidebar rows pass behind the top safe area.
@@ -218,65 +210,8 @@ struct SidebarRootView: View {
     // The floating + bubble that used to sit beside the tab bar has
     // been removed; New Project / New Area remain reachable from the
     // Areas/Projects sheets.
-    .toolbar {
-      ToolbarItem(placement: .navigation) {
-        Menu {
-          // Capture actions live alongside Settings in the "…" menu so
-          // the iOS sidebar matches what macOS gets in its dedicated `+`
-          // toolbar button. Sheets are mounted by `SidebarSheets`.
-          Button {
-            showingNewArea = true
-            newAreaName = ""
-          } label: {
-            Label("New Area", systemImage: "square.stack.3d.up")
-          }
-          Button {
-            showingNewProject = true
-          } label: {
-            Label("New Project", systemImage: "number")
-          }
-          Divider()
-          Button {
-            nav.showSettings = true
-          } label: {
-            Label("Settings", systemImage: "gearshape")
-          }
-        } label: {
-          Image(systemName: "ellipsis.circle")
-        }
-        .accessibilityLabel("More")
-      }
-      ToolbarItem(placement: .primaryAction) {
-        Button { nav.showQuickFind = true } label: {
-          Image(systemName: "magnifyingglass")
-        }
-        .accessibilityLabel("Search")
-      }
-    }
-    .modifier(SidebarSheets(
-      showingCreateMenu: $showingCreateMenu,
-      showingNewProject: $showingNewProject,
-      showingNewArea: $showingNewArea,
-      newAreaName: $newAreaName,
-      errorMessage: $errorMessage,
-      newProjectInArea: $newProjectInArea,
-      areas: areas,
-      onNewTodo: {
-        nav.path = [.filter(.inbox)]
-        nav.shouldStartCreating = true
-      },
-      onCreateProject: { title, areaId in createProject(title: title, areaId: areaId) },
-      onCreateArea: { createArea() }
-    ))
-    .task { await load() }
-    .refreshable { await load() }
-    // Auto-refresh counts whenever a task / project / area mutation happens
-    // anywhere in the app. SeptenaClient fans this out from postJSON /
-    // putJSON / deleteRaw, so this catches creates, completions, moves,
-    // schedule changes, Reminders imports, area edits, etc.
-    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
-      Task { await load() }
-    }
+    .toolbar { phoneToolbar }
+    .modifier(sidebarBehavior)
   }
 
   /// macOS layout: full-bleed scroll list. Creation actions live in the
@@ -284,46 +219,96 @@ struct SidebarRootView: View {
   /// Settings is the discreet last item in the toolbar's overflow.
   @ViewBuilder
   private var sidebarMac: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 0) {
-        smartLists.padding(.top, 12).padding(.bottom, 12)
-        areasAndProjects
-        Spacer(minLength: 24)
-      }
-    }
+    sidebarScrollContent(topPadding: 12, bottomPadding: 12, spacerMinLength: 24)
     // No explicit background — NavigationSplitView renders its sidebar
     // column with the system Liquid Glass material on macOS 26 (Tahoe).
-    .toolbar {
-      // Primary action on the sidebar column: a Menu offering both list
-      // shapes (Project under an Area, or top-level Project, or Area).
-      // System styles this as a Liquid Glass pill on macOS 26.
-      ToolbarItem(placement: .primaryAction) {
-        Menu {
-          Button {
-            newAreaName = ""
-            showingNewArea = true
-          } label: {
-            Label("New Area", systemImage: "square.stack.3d.up")
-          }
-          Button {
-            showingNewProject = true
-          } label: {
-            Label("New Project", systemImage: "number")
-          }
-        } label: {
-          Image(systemName: "plus")
-        }
-        .menuStyle(.button)
-        .help("New Area or Project")
-      }
-      ToolbarItem(placement: .primaryAction) {
-        Button { nav.showQuickFind = true } label: {
-          Image(systemName: "magnifyingglass")
-        }
-        .help("Quick Find (⌘K)")
+    .toolbar { macToolbar }
+    .modifier(sidebarBehavior)
+  }
+
+  private func sidebarScrollContent(topPadding: CGFloat,
+                                    bottomPadding: CGFloat,
+                                    spacerMinLength: CGFloat) -> some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 0) {
+        smartLists
+          .padding(.top, topPadding)
+          .padding(.bottom, bottomPadding)
+        // areasAndProjects renders its own per-section cards
+        // (Mimestream-style), so no outer card wrapping here.
+        areasAndProjects
+        Spacer(minLength: spacerMinLength)
       }
     }
-    .modifier(SidebarSheets(
+  }
+
+  @ToolbarContentBuilder
+  private var phoneToolbar: some ToolbarContent {
+    ToolbarItem(placement: .navigation) { phoneMoreMenu }
+    ToolbarItem(placement: .primaryAction) { searchButton(accessibilityLabel: "Search") }
+  }
+
+  @ToolbarContentBuilder
+  private var macToolbar: some ToolbarContent {
+    ToolbarItem(placement: .primaryAction) { macCreateMenu }
+    ToolbarItem(placement: .primaryAction) { searchButton(help: "Quick Find (⌘K)") }
+  }
+
+  private var phoneMoreMenu: some View {
+    Menu {
+      Button {
+        showingNewArea = true
+        newAreaName = ""
+      } label: {
+        Label("New Area", systemImage: "square.stack.3d.up")
+      }
+      Button {
+        showingNewProject = true
+      } label: {
+        Label("New Project", systemImage: "number")
+      }
+      Divider()
+      Button {
+        nav.showSettings = true
+      } label: {
+        Label("Settings", systemImage: "gearshape")
+      }
+    } label: {
+      Image(systemName: "ellipsis.circle")
+    }
+    .accessibilityLabel("More")
+  }
+
+  private var macCreateMenu: some View {
+    Menu {
+      Button {
+        newAreaName = ""
+        showingNewArea = true
+      } label: {
+        Label("New Area", systemImage: "square.stack.3d.up")
+      }
+      Button {
+        showingNewProject = true
+      } label: {
+        Label("New Project", systemImage: "number")
+      }
+    } label: {
+      Image(systemName: "plus")
+    }
+    .menuStyle(.button)
+    .help("New Area or Project")
+  }
+
+  private func searchButton(accessibilityLabel: String? = nil,
+                            help: String? = nil) -> some View {
+    Button { nav.showQuickFind = true } label: {
+      Image(systemName: "magnifyingglass")
+    }
+    .modifier(SidebarButtonLabelModifier(accessibilityLabel: accessibilityLabel, help: help))
+  }
+
+  private var sidebarBehavior: some ViewModifier {
+    SidebarBehaviorModifier(
       showingCreateMenu: $showingCreateMenu,
       showingNewProject: $showingNewProject,
       showingNewArea: $showingNewArea,
@@ -336,17 +321,9 @@ struct SidebarRootView: View {
         nav.shouldStartCreating = true
       },
       onCreateProject: { title, areaId in createProject(title: title, areaId: areaId) },
-      onCreateArea: { createArea() }
-    ))
-    .task { await load() }
-    .refreshable { await load() }
-    // Auto-refresh counts whenever a task / project / area mutation happens
-    // anywhere in the app. SeptenaClient fans this out from postJSON /
-    // putJSON / deleteRaw, so this catches creates, completions, moves,
-    // schedule changes, Reminders imports, area edits, etc.
-    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
-      Task { await load() }
-    }
+      onCreateArea: { createArea() },
+      reload: { Task { await load() } }
+    )
   }
 
   // MARK: - Create handlers
@@ -997,6 +974,67 @@ struct SmartListRow: View {
     }
     .frame(height: Theme.sidebarSmartRowHeight)
     .contentShape(Rectangle())
+  }
+}
+
+private struct SidebarBehaviorModifier: ViewModifier {
+  @Binding var showingCreateMenu: Bool
+  @Binding var showingNewProject: Bool
+  @Binding var showingNewArea: Bool
+  @Binding var newAreaName: String
+  @Binding var errorMessage: String?
+  @Binding var newProjectInArea: String?
+
+  let areas: [Area]
+  let onNewTodo: () -> Void
+  let onCreateProject: (String, String?) -> Void
+  let onCreateArea: () -> Void
+  let reload: () -> Void
+
+  func body(content: Content) -> some View {
+    content
+      .modifier(SidebarSheets(
+        showingCreateMenu: $showingCreateMenu,
+        showingNewProject: $showingNewProject,
+        showingNewArea: $showingNewArea,
+        newAreaName: $newAreaName,
+        errorMessage: $errorMessage,
+        newProjectInArea: $newProjectInArea,
+        areas: areas,
+        onNewTodo: onNewTodo,
+        onCreateProject: onCreateProject,
+        onCreateArea: onCreateArea
+      ))
+      .task { reload() }
+      .refreshable { reload() }
+      .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
+        reload()
+      }
+      .onReceive(NotificationCenter.default.publisher(for: .septenaStructureChanged)) { _ in
+        reload()
+      }
+  }
+}
+
+private struct SidebarButtonLabelModifier: ViewModifier {
+  let accessibilityLabel: String?
+  let help: String?
+
+  func body(content: Content) -> some View {
+    if let accessibilityLabel {
+      if let help {
+        content
+          .accessibilityLabel(accessibilityLabel)
+          .help(help)
+      } else {
+        content
+          .accessibilityLabel(accessibilityLabel)
+      }
+    } else if let help {
+      content.help(help)
+    } else {
+      content
+    }
   }
 }
 

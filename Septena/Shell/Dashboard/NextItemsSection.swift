@@ -283,36 +283,25 @@ final class NextItemsModel {
   func load(client: SeptenaClient) async {
     let context = LocalStore.shared.container.mainContext
 
+    // Habits / Supplements / Chores are CloudKit-authoritative — read
+    // directly from the local SwiftData mirror. CKEngine keeps it fresh
+    // via fetchChanges() + silent pushes; no FastAPI fallback needed.
     if let hRes = ChecklistMirror.loadHabitsDay(context: context, date: today) {
       habits = hRes.buckets.flatMap { hRes.grouped[$0] ?? [] }
       habitBuckets = hRes.buckets
       ResponseCache.save(habits, forKey: CacheKey.habits)
       ResponseCache.save(habitBuckets, forKey: CacheKey.habitBuckets)
-    } else if let hRes = try? await client.habitsDay(date: today) {
-      habits = hRes.buckets.flatMap { hRes.grouped[$0] ?? [] }
-      habitBuckets = hRes.buckets
-      ResponseCache.save(habits, forKey: CacheKey.habits)
-      ResponseCache.save(habitBuckets, forKey: CacheKey.habitBuckets)
-      ChecklistMirror.replaceHabitsDay(hRes, context: context)
     }
 
     if let sRes = ChecklistMirror.loadSupplementsDay(context: context, date: today) {
       supplements = sRes.items
       ResponseCache.save(supplements, forKey: CacheKey.supplements)
-    } else if let sRes = try? await client.supplementsDay(date: today) {
-      supplements = sRes.items
-      ResponseCache.save(supplements, forKey: CacheKey.supplements)
-      ChecklistMirror.replaceSupplementsDay(sRes, context: context)
     }
 
     let mirroredChores = ChecklistMirror.loadChores(context: context)
+    chores = mirroredChores
     if !mirroredChores.isEmpty {
-      chores = mirroredChores
       ResponseCache.save(mirroredChores, forKey: CacheKey.chores)
-    } else if let cRes = try? await client.chores() {
-      chores = cRes
-      ResponseCache.save(cRes, forKey: CacheKey.chores)
-      ChecklistMirror.replaceChores(cRes, context: context)
     }
 
     // Local EventKit fetch — no network. Returns [] when access isn't

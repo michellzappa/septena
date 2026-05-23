@@ -8,13 +8,12 @@ import SwiftData
 struct TaskListView: View {
   @Environment(SeptenaClient.self) private var client
   /// Task write-path: applies optimistic SwiftData changes, enqueues
-  /// outbox ops, and drains to FastAPI with retry. Every mutation in this
-  /// view routes through here instead of `client.*` so the UI never
-  /// blocks on the network and offline edits survive an app restart.
+  /// CloudKit-backed ops. Every mutation in this view routes through here
+  /// instead of `client.*` so the UI never blocks on the network and
+  /// offline edits survive an app restart.
   @Environment(TaskMutator.self) private var mutator
-  /// CloudKit engine. Consulted by `load()` when the backend flag is on
-  /// so reads pull from CK + local mirror instead of the (stale) FastAPI
-  /// list endpoint.
+  /// CloudKit engine. The SwiftData mirror is refreshed by the engine and
+  /// `load()` re-reads from that local mirror.
   @Environment(CKEngine.self) private var ckEngine
   @Environment(NavigationState.self) private var nav
   @Environment(SectionTheme.self) private var theme
@@ -205,7 +204,7 @@ struct TaskListView: View {
   /// context menu) or every currently-selected task (batch action bar).
   /// Folding the two callers into one builder means new actions land in
   /// both surfaces at once.
-  private enum ActionTarget {
+  fileprivate enum ActionTarget {
     case single(SeptenaTask)
     case bulk(Set<String>)
     var ids: [String] {
@@ -308,86 +307,35 @@ struct TaskListView: View {
     UserDefaults.standard.string(forKey: "septena.newTodos.dismissedDate") == SeptenaDate.today
 
   var body: some View {
+    taskList
+      .modifier(TaskListModalPresenter(
+        whenSheet: $whenSheet,
+        showingMoveSheet: $showingMoveSheet,
+        moveTargetId: $moveTargetId,
+        bulkSheet: $bulkSheet,
+        showingRepeatSheet: $showingRepeatSheet,
+        repeatTargetId: $repeatTargetId,
+        areas: areas,
+        projects: projects,
+        currentTask: currentTask,
+        currentScheduled: currentScheduled,
+        currentDeadline: currentDeadline,
+        currentRecurrence: currentRecurrence,
+        useInspectorForDetails: useInspectorForDetails,
+        detailsPaneIsOpen: detailsPaneIsOpen,
+        detailsPaneContent: { detailsPaneContent },
+        applyWhen: applyWhen,
+        applyMove: applyMove,
+        applyRecurrence: applyRecurrence,
+        multiSelectionIDs: { Array(multiSelection) }
+      ))
+  }
+
+  private var taskList: some View {
     List {
-      // Title is owned by the parent when embedded (Project / Area detail).
-      if !embedded {
-        ScreenTitle(icon: titleIcon, iconTint: titleTint, title: filter.title)
-          .listRowSeparator(.hidden)
-          .listRowBackground(Color.clear)
-          .listRowInsets(EdgeInsets())
-      } else {
-        // Parent-supplied title + notes (Project / Area detail). Lives inside
-        // the List so it scrolls away with the rows instead of pinning above.
-        embeddedHeader()
-          .listRowSeparator(.hidden)
-          .listRowBackground(Color.clear)
-          .listRowInsets(EdgeInsets())
-      }
-
-      // compact "You have N new to-dos" banner on Today.
-      if filter == .today && !rolledInReview.isEmpty && !newTodosDismissed {
-        newTodosBanner(count: rolledInReview.count)
-          .listRowSeparator(.hidden)
-          .listRowBackground(Color.clear)
-          .listRowInsets(EdgeInsets())
-      }
-
-      // Apple Reminders mirror — only on Inbox.
-      if filter == .inbox {
-        RemindersInboxSection(onImported: { Task { await load() } })
-          .listRowSeparator(.hidden)
-          .listRowBackground(Color.clear)
-          .listRowInsets(EdgeInsets())
-      }
-
-      if loadedFilters.contains(filter) && visibleItems.isEmpty && review.isEmpty && doneToday.isEmpty && !isLoading {
-        ContentUnavailableView(
-          "Nothing here yet",
-          systemImage: titleIcon,
-          description: Text("Tap the + button to add a task.")
-        )
-        .frame(maxWidth: .infinity)
-        .padding(.top, 40)
-        .listRowSeparator(.hidden)
-        .listRowBackground(Color.clear)
-        .listRowInsets(EdgeInsets())
-      }
-
-      // ── OPEN block ──────────────────────────────────────────────
-      if filter == .today {
-        groupedOpenItems
-      } else if filter == .unscheduled {
-        ForEach(review) { task in row(task).asListRow() }
-        groupedOpenItems
-      } else if filter == .upcoming {
-        ForEach(review) { task in row(task).asListRow() }
-        groupedUpcomingItems
-      } else {
-        ForEach(review) { task in row(task).asListRow() }
-        ForEach(visibleItems) { task in row(task).asListRow() }
-      }
-
-      // "Show N logged items" — collapsed by default. Skipped on Logbook
-      // (that screen *is* the log) and on Today / Inbox where it's noise.
-      if showsLoggedSection && !loggedItems.isEmpty {
-        loggedToggleRow.asListRow()
-        if showLogged {
-          ForEach(sortedLoggedItems) { task in
-            loggedRow(task).asListRow()
-          }
-        }
-      }
-
-      // Empty bottom area that catches a tap anywhere below the last row
-      // and dismisses any open inline edit. The List itself swallows
-      // background taps, so we have to opt into this surface as a real
-      // row. InlineEditTaskRow's internal .onTapGesture swallow protects
-      // taps inside the editor from reaching this surface.
-      Color.clear
-        .frame(minHeight: 240)
-        .contentShape(Rectangle())
-        .onTapGesture { dismissInlineEdit() }
-        .asListRow()
+      taskListHeader
+      taskListRows
+      taskListFooter
     }
     .listStyle(.plain)
     .scrollContentBackground(.hidden)
@@ -455,103 +403,6 @@ struct TaskListView: View {
     } message: {
       Text(errorMessage ?? "")
     }
-    .sheet(item: $whenSheet) { sheet in
-      switch sheet.kind {
-      case .scheduled:
-        DatePickerSheet(
-          title: "When",
-          initialDate: currentScheduled(for: sheet.taskId),
-          setLabel: "Set Date",
-          updateLabel: "Update Date",
-          clearLabel: "No Date"
-        ) { date in
-          applyWhen(id: sheet.taskId, kind: .scheduled, date: date)
-        }
-        .presentationDetents([.medium, .large])
-        .presentationBackground(.thinMaterial)
-        .presentationCornerRadius(Theme.cornerRadius)
-      case .due:
-        DatePickerSheet(
-          title: "Deadline",
-          initialDate: currentDeadline(for: sheet.taskId),
-          setLabel: "Set Deadline",
-          updateLabel: "Update Deadline",
-          clearLabel: "Remove Deadline"
-        ) { date in
-          applyWhen(id: sheet.taskId, kind: .due, date: date)
-        }
-        .presentationDetents([.medium, .large])
-        .presentationBackground(.thinMaterial)
-        .presentationCornerRadius(Theme.cornerRadius)
-      }
-    }
-    .sheet(isPresented: $showingMoveSheet) {
-      let target = currentTask(id: moveTargetId)
-      MovePickerSheet(
-        areas: areas,
-        projects: projects,
-        currentAreaId: target?.area,
-        currentProjectId: target?.project
-      ) { areaId, projectId in
-        if let id = moveTargetId {
-          applyMove(id: id, areaId: areaId, projectId: projectId)
-        }
-        moveTargetId = nil
-      }
-      .presentationDetents([.medium, .large])
-      .presentationBackground(.thinMaterial)
-      .presentationCornerRadius(Theme.cornerRadius)
-    }
-    .sheet(item: $bulkSheet) { sheet in
-      switch sheet {
-      case .when(let kind):
-        DatePickerSheet(
-          title: kind == .due ? "Deadline" : "When",
-          initialDate: nil,
-          setLabel: kind == .due ? "Set Deadline" : "Set Date",
-          updateLabel: kind == .due ? "Update Deadline" : "Update Date",
-          clearLabel: kind == .due ? "Remove Deadline" : "No Date"
-        ) { date in
-          let ids = Array(multiSelection)
-          for id in ids { applyWhen(id: id, kind: kind, date: date) }
-        }
-        .presentationDetents([.medium, .large])
-        .presentationBackground(.thinMaterial)
-        .presentationCornerRadius(Theme.cornerRadius)
-      case .move:
-        MovePickerSheet(
-          areas: areas,
-          projects: projects,
-          currentAreaId: nil,
-          currentProjectId: nil
-        ) { areaId, projectId in
-          let ids = Array(multiSelection)
-          for id in ids { applyMove(id: id, areaId: areaId, projectId: projectId) }
-        }
-        .presentationDetents([.medium, .large])
-        .presentationBackground(.thinMaterial)
-        .presentationCornerRadius(Theme.cornerRadius)
-      }
-    }
-    .sheet(isPresented: $showingRepeatSheet) {
-      RecurrencePickerSheet(initial: currentRecurrence(for: repeatTargetId)) { rule in
-        if let id = repeatTargetId {
-          applyRecurrence(id: id, rule: rule)
-        }
-        repeatTargetId = nil
-      }
-      .presentationDetents([.medium, .large])
-      .presentationBackground(.thinMaterial)
-      .presentationCornerRadius(Theme.cornerRadius)
-    }
-    // Details — sheet on iPhone compact (where `.inspector` renders
-    // as a blank near-fullscreen panel), trailing inspector column on
-    // iPad regular / macOS. Same content view either way.
-    .modifier(TaskDetailsPresenter(
-      isOpen: detailsPaneIsOpen,
-      useInspector: useInspectorForDetails,
-      content: { detailsPaneContent }
-    ))
     // Re-load on every appearance so completed tasks (kept visible in-place
     // while the user is on the screen) drop off when they return.
     .onAppear { Task { await load() } }
@@ -561,6 +412,9 @@ struct TaskListView: View {
     // bootstrap fetch. Without this, the list only refreshes when the
     // view re-appears (i.e. you have to navigate away and back).
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
+      Task { await load() }
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaStructureChanged)) { _ in
       Task { await load() }
     }
     // Filter swaps reuse this same view (no .id(route) at the App level for
@@ -592,6 +446,97 @@ struct TaskListView: View {
         startDraft()
       }
     }
+  }
+
+  @ViewBuilder
+  private var taskListHeader: some View {
+    titleRow
+    newTodosBannerRow
+    remindersRow
+    emptyStateRow
+  }
+
+  @ViewBuilder
+  private var taskListRows: some View {
+    switch filter {
+    case .today:
+      groupedOpenItems
+    case .unscheduled:
+      reviewRows
+      groupedOpenItems
+    case .upcoming:
+      reviewRows
+      groupedUpcomingItems
+    default:
+      reviewRows
+      visibleRows
+    }
+
+    if showsLoggedSection && !loggedItems.isEmpty {
+      loggedToggleRow.asListRow()
+      if showLogged {
+        ForEach(sortedLoggedItems) { task in
+          loggedRow(task).asListRow()
+        }
+      }
+    }
+  }
+
+  private var taskListFooter: some View {
+    Color.clear
+      .frame(minHeight: 240)
+      .contentShape(Rectangle())
+      .onTapGesture { dismissInlineEdit() }
+      .asListRow()
+  }
+
+  @ViewBuilder
+  private var titleRow: some View {
+    if !embedded {
+      ScreenTitle(icon: titleIcon, iconTint: titleTint, title: filter.title)
+        .plainListChrome()
+    } else {
+      embeddedHeader()
+        .plainListChrome()
+    }
+  }
+
+  @ViewBuilder
+  private var newTodosBannerRow: some View {
+    if filter == .today && !rolledInReview.isEmpty && !newTodosDismissed {
+      newTodosBanner(count: rolledInReview.count)
+        .plainListChrome()
+    }
+  }
+
+  @ViewBuilder
+  private var remindersRow: some View {
+    if filter == .inbox {
+      RemindersInboxSection(onImported: { Task { await load() } })
+        .plainListChrome()
+    }
+  }
+
+  @ViewBuilder
+  private var emptyStateRow: some View {
+    if loadedFilters.contains(filter) && visibleItems.isEmpty && review.isEmpty && doneToday.isEmpty && !isLoading {
+      ContentUnavailableView(
+        "Nothing here yet",
+        systemImage: titleIcon,
+        description: Text("Tap the + button to add a task.")
+      )
+      .frame(maxWidth: .infinity)
+      .padding(.top, 40)
+      .plainListChrome()
+    }
+  }
+
+  private var reviewRows: some View {
+    ForEach(review) { task in row(task).asListRow() }
+  }
+
+  private var visibleRows: some View {
+    ForEach(visibleItems) { task in row(task).asListRow() }
   }
 
   /// Existing deadline for a target task, so the picker sheet can
@@ -889,7 +834,23 @@ struct TaskListView: View {
       // the row's height as the editor pane unfolds below.
       .transition(.identity)
     } else {
-      taskBody(task)
+      TaskListDisplayRow(
+        task: task,
+        filter: filter,
+        inMultiSelect: inMultiSelect,
+        isSelected: multiSelection.contains(task.id),
+        accent: theme.accent,
+        metaLine: { metaLine(task) },
+        trailingDate: { trailingDate(task) },
+        onToggle: { toggle(task) },
+        onTap: {
+          if inMultiSelect {
+            toggleMultiSelection(for: task.id)
+          } else {
+            startEdit(task)
+          }
+        }
+      )
         .transition(.identity)
         // Right-click should make it visually clear which row the menu
         // refers to — flip the selection cursor onto this task before the
@@ -903,11 +864,7 @@ struct TaskListView: View {
           // In multi-select mode the long-press / right-click menu acts on
           // the whole selection (auto-including this row if it wasn't yet),
           // so the user can right-click any row to apply the batch action.
-          if inMultiSelect {
-            rowActionsMenu(target: .bulk(multiSelection.union([task.id])))
-          } else {
-            rowActionsMenu(target: .single(task))
-          }
+          taskContextMenu(for: task)
         }
     }
   }
@@ -918,230 +875,84 @@ struct TaskListView: View {
   /// surfaces at once.
   @ViewBuilder
   private func rowActionsMenu(target: ActionTarget) -> some View {
-    let ids = target.ids
-    // Enter multi-select with this row pre-selected — discoverable entry
-    // point so the swipe gesture isn't the only way in. Bulk mode already
-    // is multi-select, so we skip it there.
-    if case let .single(task) = target {
-      Button {
+    TaskListRowContextMenu(
+      target: target,
+      filter: filter,
+      rankedSuggestions: rankedSuggestions(for: target),
+      onSelectSingle: { task in
         if editingTaskId != nil { commitEdit() }
         multiSelection.insert(task.id)
         Haptics.tick()
-      } label: {
-        Label("Select", systemImage: "checkmark.circle")
-      }
-      Divider()
-    }
-    // Smart-sort suggestions — single-target only (per-task rankings).
-    if case let .single(task) = target,
-       filter == .inbox,
-       task.status == .open,
-       let top = suggestionEngine.topSuggestion(for: task.id) {
-      let ranked = suggestionEngine.suggestions[task.id] ?? [top]
-      Section("Suggested") {
-        ForEach(Array(ranked.enumerated()), id: \.element) { _, s in
-          Button {
-            applySuggestion(task: task, suggestion: s)
-          } label: {
-            Label("Move to \(s.title)",
-                  systemImage: s.kind == .area ? "tray" : "folder")
-          }
+      },
+      onApplySuggestion: applySuggestion,
+      onMoveToToday: { ids, today in
+        Haptics.tick()
+        for id in ids { mutator.moveToToday(id: id, today: today) }
+        Task { await load() }
+      },
+      onOpenWhen: { target in
+        switch target {
+        case .single(let t): whenSheet = WhenSheet(taskId: t.id, kind: .scheduled)
+        case .bulk:          bulkSheet = .when(.scheduled)
         }
-      }
-      Divider()
-    }
-    // Today toggle. For single-target we look at the row's flag to pick
-    // promote vs. demote; for bulk we always show both (promote covers any
-    // unset rows, demote covers any set ones) so the action is unambiguous.
-    let singleTodayFlag: Bool? = {
-      if case let .single(task) = target { return task.today }
-      return nil
-    }()
-    if singleTodayFlag == true {
-      Button {
-        Haptics.tick()
-        for id in ids { mutator.moveToToday(id: id, today: false) }
-        Task { await load() }
-      } label: {
-        Label("Remove from Today", systemImage: "sun.min")
-      }
-    } else if singleTodayFlag == false && filter != .today {
-      Button {
-        Haptics.tick()
-        for id in ids { mutator.moveToToday(id: id, today: true) }
-        Task { await load() }
-      } label: {
-        Label("Move to Today", systemImage: "sun.max.fill")
-      }
-    } else if target.isBulk {
-      Button {
-        Haptics.tick()
-        for id in ids { mutator.moveToToday(id: id, today: true) }
-        Task { await load() }
-      } label: { Label("Move to Today", systemImage: "sun.max.fill") }
-      Button {
-        Haptics.tick()
-        for id in ids { mutator.moveToToday(id: id, today: false) }
-        Task { await load() }
-      } label: { Label("Remove from Today", systemImage: "sun.min") }
-    }
-    Button {
-      switch target {
-      case .single(let t): whenSheet = WhenSheet(taskId: t.id, kind: .scheduled)
-      case .bulk:          bulkSheet = .when(.scheduled)
-      }
-    } label: {
-      Label("When…", systemImage: "calendar")
-    }
-    Button {
-      switch target {
-      case .single(let t): whenSheet = WhenSheet(taskId: t.id, kind: .due)
-      case .bulk:          bulkSheet = .when(.due)
-      }
-    } label: {
-      Label("Deadline…", systemImage: "flag")
-    }
-    Button {
-      switch target {
-      case .single(let t):
-        moveTargetId = t.id
-        showingMoveSheet = true
-      case .bulk:
-        bulkSheet = .move
-      }
-    } label: {
-      Label("Move…", systemImage: "folder")
-    }
-    // Repeat is per-task semantics; suppress in bulk so we don't apply one
-    // recurrence rule to N unrelated tasks.
-    if case let .single(task) = target {
-      Button {
-        repeatTargetId = task.id; showingRepeatSheet = true
-      } label: {
-        Label("Repeat…", systemImage: "repeat")
-      }
-    }
-    Divider()
-    // Demote to Someday — for single we hide if already there; bulk always
-    // shows (some of the selection may not be in Someday yet).
-    let allSomeday: Bool = {
-      if case let .single(task) = target { return task.status == .someday }
-      return false
-    }()
-    if !allSomeday {
-      Button {
+      },
+      onOpenDeadline: { target in
+        switch target {
+        case .single(let t): whenSheet = WhenSheet(taskId: t.id, kind: .due)
+        case .bulk:          bulkSheet = .when(.due)
+        }
+      },
+      onOpenMove: { target in
+        switch target {
+        case .single(let t):
+          moveTargetId = t.id
+          showingMoveSheet = true
+        case .bulk:
+          bulkSheet = .move
+        }
+      },
+      onOpenRepeat: { task in
+        repeatTargetId = task.id
+        showingRepeatSheet = true
+      },
+      onMoveToSomeday: { ids in
         for id in ids { applySomeday(id) }
-      } label: {
-        Label("Move to Someday", systemImage: "moon.stars.fill")
+      },
+      onCancel: { ids in
+        for id in ids { applyCancel(id) }
+      },
+      onDelete: { target in
+        Haptics.warning()
+        for id in target.ids { applyDelete(id) }
+        if target.isBulk { multiSelection.removeAll() }
       }
-    }
-    Button {
-      for id in ids { applyCancel(id) }
-    } label: {
-      // Labelled "Cancel Task" (not "Cancel") so iOS doesn't treat this as
-      // a dismiss button — a bare "Cancel" inside a menu has shown up as
-      // no-op in past iOS builds.
-      Label(target.isBulk ? "Cancel Tasks" : "Cancel Task", systemImage: "xmark.circle")
-    }
-    Divider()
-    Button(role: .destructive) {
-      Haptics.warning()
-      for id in ids { applyDelete(id) }
-      if target.isBulk { multiSelection.removeAll() }
-    } label: {
-      Label("Delete", systemImage: "trash")
-    }
+    )
   }
 
   @ViewBuilder
-  private func taskBody(_ task: SeptenaTask) -> some View {
-    // `.firstTextBaseline` lines the checkbox up with the title's text
-    // baseline; the alignment guide on the box anchors it by visual center
-    // so the box reads as centered with the title cap-height, not bottom-
-    // anchored. For multi-line rows the title still wins the alignment.
-    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
-      // Promoted-to-Today tasks wear a sun-in-circle glyph as their
-      // checkbox. Suppressed on the Today filter itself — the page
-      // header already says 'Today', so every checkbox carrying a sun
-      // would be noise.
-      TaskCheckbox(
-        isDone: task.status == .done,
-        isToday: task.today && filter != .today
-      ) { toggle(task) }
-        .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
-
-      VStack(alignment: .leading, spacing: 4) {
-        // Cancelled tasks share the visual language of done tasks
-        // (strikethrough + dimmed) so the user gets immediate feedback
-        // when they cancel — even though the server filters cancelled
-        // out of non-logbook views on the next reload.
-        let isInactive = task.status == .done || task.status == .cancelled
-        Text(task.title)
-          .font(.septenaTaskTitle)
-          .foregroundStyle(isInactive ? Theme.inkSecondary : Theme.inkPrimary)
-          .strikethrough(isInactive)
-          .opacity(isInactive ? 0.5 : 1)
-          .lineLimit(1)
-          .truncationMode(.tail)
-          .multilineTextAlignment(.leading)
-
-        metaLine(task)
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-
-      // Notes glyph on the right when the task has any — kept out of the
-      // meta line so it doesn't crowd the project/area/date chips below.
-      if !(task.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-        Image(systemName: "text.alignleft")
-          .font(.system(size: 12))
-          .foregroundStyle(Theme.inkSecondary)
-      }
-      // Trailing date / status — one clear signal per row. See
-      // `trailingDate` for the full rule set.
-      trailingDate(task)
-      // Things-style trailing radio indicator. Only present while a
-      // multi-select session is active so the rest of the time the row
-      // chrome is unchanged.
-      if inMultiSelect {
-        Image(systemName: multiSelection.contains(task.id) ? "checkmark.circle.fill" : "circle")
-          .font(.system(size: 20))
-          .foregroundStyle(multiSelection.contains(task.id) ? theme.accent : Theme.inkSecondary.opacity(0.5))
-          .padding(.leading, 4)
-          .accessibilityLabel(multiSelection.contains(task.id) ? "Selected" : "Not selected")
-      }
+  private func taskContextMenu(for task: SeptenaTask) -> some View {
+    if inMultiSelect {
+      rowActionsMenu(target: .bulk(multiSelection.union([task.id])))
+    } else {
+      rowActionsMenu(target: .single(task))
     }
-    .padding(.horizontal, Theme.hPadding)
-    // Explicit vertical padding (not frame-min-height centering) so the
-    // title's Y is anchored to a fixed offset from the row top.
-    // TextField's internal metrics differ slightly from Text on iOS,
-    // which made the centered-content approach shift the title on edit
-    // open. Equal padding top + bottom on closed rows; the editor uses
-    // the same top padding.
-    .padding(.vertical, Theme.rowVPadding)
-    // Hit area covers the FULL padded row (checkbox + title column +
-    // padding above/below). Inner controls — TaskCheckbox button, action
-    // icons — still consume their own taps via gesture priority, so they
-    // toggle / open without selecting first.
-    .contentShape(Rectangle())
-    // Tap = inline edit (Reminders-style). Title focuses, keyboard
-    // accessory chips appear. The (i) button in the editor is the
-    // ONLY path that opens the Details pane — we deliberately do NOT
-    // set `selectedTaskId` here, because that drives the inspector
-    // binding and would render a blank pane behind the editor.
-    //
-    // While a multi-select session is active, tap toggles selection
-    // instead of opening the editor — matches Things/Mail behavior
-    // once a selection batch is in progress.
-    .onTapGesture {
-      if inMultiSelect {
-        if multiSelection.contains(task.id) {
-          multiSelection.remove(task.id)
-        } else {
-          multiSelection.insert(task.id)
-        }
-      } else {
-        startEdit(task)
-      }
+  }
+
+  private func rankedSuggestions(for target: ActionTarget) -> [SuggestionEngine.Suggestion]? {
+    guard case let .single(task) = target,
+          filter == .inbox,
+          task.status == .open,
+          let top = suggestionEngine.topSuggestion(for: task.id) else {
+      return nil
+    }
+    return suggestionEngine.suggestions[task.id] ?? [top]
+  }
+
+  private func toggleMultiSelection(for id: String) {
+    if multiSelection.contains(id) {
+      multiSelection.remove(id)
+    } else {
+      multiSelection.insert(id)
     }
   }
 
@@ -2177,6 +1988,322 @@ private struct TaskDetailsPresenter<C: View>: ViewModifier {
   }
 }
 
+private struct TaskListModalPresenter<DetailsContent: View>: ViewModifier {
+  @Binding var whenSheet: TaskListView.WhenSheet?
+  @Binding var showingMoveSheet: Bool
+  @Binding var moveTargetId: String?
+  @Binding var bulkSheet: TaskListView.BulkSheet?
+  @Binding var showingRepeatSheet: Bool
+  @Binding var repeatTargetId: String?
+
+  let areas: [Area]
+  let projects: [Project]
+  let currentTask: (String?) -> SeptenaTask?
+  let currentScheduled: (String?) -> Date?
+  let currentDeadline: (String?) -> Date?
+  let currentRecurrence: (String?) -> Recurrence?
+  let useInspectorForDetails: Bool
+  let detailsPaneIsOpen: Binding<Bool>
+  @ViewBuilder let detailsPaneContent: () -> DetailsContent
+  let applyWhen: (String, TaskListView.WhenKind, Date?) -> Void
+  let applyMove: (String, String?, String?) -> Void
+  let applyRecurrence: (String, Recurrence?) -> Void
+  let multiSelectionIDs: () -> [String]
+
+  func body(content: Content) -> some View {
+    content
+      .sheet(item: $whenSheet) { sheet in
+        switch sheet.kind {
+        case .scheduled:
+          DatePickerSheet(
+            title: "When",
+            initialDate: currentScheduled(sheet.taskId),
+            setLabel: "Set Date",
+            updateLabel: "Update Date",
+            clearLabel: "No Date"
+          ) { date in
+            applyWhen(sheet.taskId, .scheduled, date)
+          }
+          .presentationDetents([.medium, .large])
+          .presentationBackground(.thinMaterial)
+          .presentationCornerRadius(Theme.cornerRadius)
+        case .due:
+          DatePickerSheet(
+            title: "Deadline",
+            initialDate: currentDeadline(sheet.taskId),
+            setLabel: "Set Deadline",
+            updateLabel: "Update Deadline",
+            clearLabel: "Remove Deadline"
+          ) { date in
+            applyWhen(sheet.taskId, .due, date)
+          }
+          .presentationDetents([.medium, .large])
+          .presentationBackground(.thinMaterial)
+          .presentationCornerRadius(Theme.cornerRadius)
+        }
+      }
+      .sheet(isPresented: $showingMoveSheet) {
+        let target = currentTask(moveTargetId)
+        MovePickerSheet(
+          areas: areas,
+          projects: projects,
+          currentAreaId: target?.area,
+          currentProjectId: target?.project
+        ) { areaId, projectId in
+          if let id = moveTargetId {
+            applyMove(id, areaId, projectId)
+          }
+          moveTargetId = nil
+        }
+        .presentationDetents([.medium, .large])
+        .presentationBackground(.thinMaterial)
+        .presentationCornerRadius(Theme.cornerRadius)
+      }
+      .sheet(item: $bulkSheet) { sheet in
+        switch sheet {
+        case .when(let kind):
+          DatePickerSheet(
+            title: kind == .due ? "Deadline" : "When",
+            initialDate: nil,
+            setLabel: kind == .due ? "Set Deadline" : "Set Date",
+            updateLabel: kind == .due ? "Update Deadline" : "Update Date",
+            clearLabel: kind == .due ? "Remove Deadline" : "No Date"
+          ) { date in
+            for id in multiSelectionIDs() {
+              applyWhen(id, kind, date)
+            }
+          }
+          .presentationDetents([.medium, .large])
+          .presentationBackground(.thinMaterial)
+          .presentationCornerRadius(Theme.cornerRadius)
+        case .move:
+          MovePickerSheet(
+            areas: areas,
+            projects: projects,
+            currentAreaId: nil,
+            currentProjectId: nil
+          ) { areaId, projectId in
+            for id in multiSelectionIDs() {
+              applyMove(id, areaId, projectId)
+            }
+          }
+          .presentationDetents([.medium, .large])
+          .presentationBackground(.thinMaterial)
+          .presentationCornerRadius(Theme.cornerRadius)
+        }
+      }
+      .sheet(isPresented: $showingRepeatSheet) {
+        RecurrencePickerSheet(initial: currentRecurrence(repeatTargetId)) { rule in
+          if let id = repeatTargetId {
+            applyRecurrence(id, rule)
+          }
+          repeatTargetId = nil
+        }
+        .presentationDetents([.medium, .large])
+        .presentationBackground(.thinMaterial)
+        .presentationCornerRadius(Theme.cornerRadius)
+      }
+      .modifier(TaskDetailsPresenter(
+        isOpen: detailsPaneIsOpen,
+        useInspector: useInspectorForDetails,
+        content: detailsPaneContent
+      ))
+  }
+}
+
+private struct TaskListDisplayRow<MetaLine: View, TrailingDate: View>: View {
+  let task: SeptenaTask
+  let filter: TaskFilter
+  let inMultiSelect: Bool
+  let isSelected: Bool
+  let accent: Color
+  @ViewBuilder let metaLine: () -> MetaLine
+  @ViewBuilder let trailingDate: () -> TrailingDate
+  let onToggle: () -> Void
+  let onTap: () -> Void
+
+  var body: some View {
+    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
+      TaskCheckbox(
+        tint: accent,
+        isDone: task.status == .done,
+        isToday: task.today && filter != .today,
+        onToggle: onToggle
+      )
+      .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+
+      VStack(alignment: .leading, spacing: 4) {
+        Text(task.title)
+          .font(.septenaTaskTitle)
+          .foregroundStyle(isInactive ? Theme.inkSecondary : Theme.inkPrimary)
+          .strikethrough(isInactive)
+          .opacity(isInactive ? 0.5 : 1)
+          .lineLimit(1)
+          .truncationMode(.tail)
+          .multilineTextAlignment(.leading)
+
+        metaLine()
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+
+      if hasNotes {
+        Image(systemName: "text.alignleft")
+          .font(.system(size: 12))
+          .foregroundStyle(Theme.inkSecondary)
+      }
+
+      trailingDate()
+
+      if inMultiSelect {
+        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+          .font(.system(size: 20))
+          .foregroundStyle(isSelected ? accent : Theme.inkSecondary.opacity(0.5))
+          .padding(.leading, 4)
+          .accessibilityLabel(isSelected ? "Selected" : "Not selected")
+      }
+    }
+    .padding(.horizontal, Theme.hPadding)
+    .padding(.vertical, Theme.rowVPadding)
+    .contentShape(Rectangle())
+    .onTapGesture(perform: onTap)
+  }
+
+  private var isInactive: Bool {
+    task.status == .done || task.status == .cancelled
+  }
+
+  private var hasNotes: Bool {
+    !(task.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+}
+
+private struct TaskListRowContextMenu: View {
+  let target: TaskListView.ActionTarget
+  let filter: TaskFilter
+  let rankedSuggestions: [SuggestionEngine.Suggestion]?
+  let onSelectSingle: (SeptenaTask) -> Void
+  let onApplySuggestion: (SeptenaTask, SuggestionEngine.Suggestion) -> Void
+  let onMoveToToday: ([String], Bool) -> Void
+  let onOpenWhen: (TaskListView.ActionTarget) -> Void
+  let onOpenDeadline: (TaskListView.ActionTarget) -> Void
+  let onOpenMove: (TaskListView.ActionTarget) -> Void
+  let onOpenRepeat: (SeptenaTask) -> Void
+  let onMoveToSomeday: ([String]) -> Void
+  let onCancel: ([String]) -> Void
+  let onDelete: (TaskListView.ActionTarget) -> Void
+
+  var body: some View {
+    if case let .single(task) = target {
+      Button {
+        onSelectSingle(task)
+      } label: {
+        Label("Select", systemImage: "checkmark.circle")
+      }
+      Divider()
+    }
+
+    if let rankedSuggestions,
+       case let .single(task) = target {
+      Section("Suggested") {
+        ForEach(Array(rankedSuggestions.enumerated()), id: \.element) { _, suggestion in
+          Button {
+            onApplySuggestion(task, suggestion)
+          } label: {
+            Label("Move to \(suggestion.title)",
+                  systemImage: suggestion.kind == .area ? "tray" : "folder")
+          }
+        }
+      }
+      Divider()
+    }
+
+    if singleTodayFlag == true {
+      Button {
+        onMoveToToday(target.ids, false)
+      } label: {
+        Label("Remove from Today", systemImage: "sun.min")
+      }
+    } else if singleTodayFlag == false && filter != .today {
+      Button {
+        onMoveToToday(target.ids, true)
+      } label: {
+        Label("Move to Today", systemImage: "sun.max.fill")
+      }
+    } else if target.isBulk {
+      Button {
+        onMoveToToday(target.ids, true)
+      } label: {
+        Label("Move to Today", systemImage: "sun.max.fill")
+      }
+      Button {
+        onMoveToToday(target.ids, false)
+      } label: {
+        Label("Remove from Today", systemImage: "sun.min")
+      }
+    }
+
+    Button {
+      onOpenWhen(target)
+    } label: {
+      Label("When…", systemImage: "calendar")
+    }
+
+    Button {
+      onOpenDeadline(target)
+    } label: {
+      Label("Deadline…", systemImage: "flag")
+    }
+
+    Button {
+      onOpenMove(target)
+    } label: {
+      Label("Move…", systemImage: "folder")
+    }
+
+    if case let .single(task) = target {
+      Button {
+        onOpenRepeat(task)
+      } label: {
+        Label("Repeat…", systemImage: "repeat")
+      }
+    }
+
+    Divider()
+
+    if !allSomeday {
+      Button {
+        onMoveToSomeday(target.ids)
+      } label: {
+        Label("Move to Someday", systemImage: "moon.stars.fill")
+      }
+    }
+
+    Button {
+      onCancel(target.ids)
+    } label: {
+      Label(target.isBulk ? "Cancel Tasks" : "Cancel Task", systemImage: "xmark.circle")
+    }
+
+    Divider()
+
+    Button(role: .destructive) {
+      onDelete(target)
+    } label: {
+      Label("Delete", systemImage: "trash")
+    }
+  }
+
+  private var singleTodayFlag: Bool? {
+    if case let .single(task) = target { return task.today }
+    return nil
+  }
+
+  private var allSomeday: Bool {
+    if case let .single(task) = target { return task.status == TaskStatus.someday }
+    return false
+  }
+}
+
 /// Bundles ⌘N, ⌘T, ↑/↓, ⌘↑/⌘↓, Enter, Esc, Space into one modifier so the
 /// TaskListView body stays small enough for the SwiftUI type-checker.
 /// While a row is being edited, arrow/return/space/escape are forwarded to
@@ -2298,6 +2425,12 @@ extension View {
   func asListRow() -> some View {
     self
       .listRowSeparator(.hidden)
+      .listRowBackground(Color.clear)
+      .listRowInsets(EdgeInsets())
+  }
+
+  func plainListChrome() -> some View {
+    listRowSeparator(.hidden)
       .listRowBackground(Color.clear)
       .listRowInsets(EdgeInsets())
   }

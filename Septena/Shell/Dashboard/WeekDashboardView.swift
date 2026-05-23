@@ -1,4 +1,5 @@
 import SwiftUI
+import EventKit
 
 // Week module — the synthesizing dashboard. Each module gets a tile that
 // (a) renders live stats / histogram for that module and (b) pushes into
@@ -100,63 +101,34 @@ struct WeekDashboardView: View {
   }
 
   var body: some View {
-    NavigationStack {
-      ScrollView {
-        VStack(spacing: 18) {
-          todayTimeline
-          LazyVGrid(columns: columns, spacing: 14) {
-            tiles
-          }
-        }
-        .padding(.horizontal, Theme.hPadding)
-        .padding(.top, 12)
-        .padding(.bottom, 80)
-      }
-      .background(Theme.groupedBackground)
-      // Tab bar already labels this view. Keep the nav bar present so
-      // iOS's default scroll-edge effect kicks in (content fades to bg
-      // material as it scrolls under the top — same shape as the
-      // bottom tab bar). No .toolbarBackground override — the default
-      // transparent-until-scrolled state is exactly what we want.
-      .navigationTitle("")
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      // Consistent home-page chrome across Week / Next / Tasks:
-      //   • top-left "…" menu (Settings today; room to grow)
-      //   • top-right magnifyingglass → universal Quick Find sheet
-      .toolbar { homeToolbar }
-      // Two-phase load: paint cached blobs synchronously so tiles +
-      // histograms appear immediately on cold launch, then kick off the
-      // network refresh in the background. Pull-to-refresh skips the
-      // cache step since it's a manual "I want fresh data now" gesture.
-      .task {
+    WeekDashboardScreen(
+      currentDay: clock.today,
+      onInitialLoad: {
         paintFromCache()
         await loadAll()
-      }
-      .refreshable { await loadAll() }
-      // CK fetch landed (push, foreground refresh, or pull-to-refresh on
-      // any other surface) — repaint so today's task counts reflect
-      // mutations from other devices.
-      .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
+      },
+      onRefresh: loadAll,
+      onTaskChange: {
         Task { await loadAll() }
-      }
-      // Day rollover: the dashboard is the most date-sensitive surface
-      // (today's timeline, today's totals, 7-day windows ending today).
-      // Refetch everything when `clock.today` flips.
-      .onChange(of: clock.today) { _, _ in
+      },
+      onDayChange: {
         Task { await loadAll() }
-      }
-      // Quick-add finished — repaint just that tile from cache (instant,
-      // for sections that wrote optimistic state) and refetch its
-      // endpoints in the background to reconcile with the server. Scoped
-      // to the touched section so the rest of the dashboard stays put.
-      .onReceive(NotificationCenter.default.publisher(for: .tilesDidChange)) { note in
-        guard let key = note.userInfo?[TileChangeKey.section] as? String,
-              let section = AddInfoSection(rawValue: key) else { return }
+      },
+      onTileChange: { section in
         repaint(section: section)
         Task { await refresh(section: section) }
+      },
+      toolbar: { homeToolbar }
+    ) {
+      VStack(spacing: 18) {
+        todayTimeline
+        LazyVGrid(columns: columns, spacing: 14) {
+          tiles
+        }
       }
+      .padding(.horizontal, Theme.hPadding)
+      .padding(.top, 12)
+      .padding(.bottom, 80)
     }
     // Sheets, not pushes — iPhone navigation into module destinations
     // is a bottom-sheet slide-over so the dashboard stays visually
@@ -252,6 +224,8 @@ struct WeekDashboardView: View {
     #if os(iOS)
     .presentationDetents([.medium, .large])
     .presentationDragIndicator(.visible)
+    #else
+    .frame(width: 560, height: 600)
     #endif
   }
 
@@ -331,11 +305,15 @@ struct WeekDashboardView: View {
   /// the cached blob alone — last-known-good wins until the next refresh.
   private func loadAll() async {
     async let _ = dailies.load(client: client)
-    async let hh = try? await client.habitsHistory(days: 7)
-    async let ch = try? await client.choresHistory(days: 7)
+    // Habits / Supplements / Chores / Settings come from the CloudKit-
+    // backed local mirror — no FastAPI round-trip.
+    let ctx = LocalStore.shared.container.mainContext
+    let h: HabitHistoryResponse? = ChecklistMirror.loadHabitsHistory(context: ctx, days: 7)
+    let c: ChoreHistoryResponse? = ChecklistMirror.loadChoresHistory(context: ctx, days: 7)
+    let s: SupplementHistoryResponse? = ChecklistMirror.loadSupplementsHistory(context: ctx, days: 7)
+    let appSettings: AppSettings? = SettingsMirror.loadSettings(context: ctx)
     async let car = try? await client.trainingCardioHistory(days: 7)
     async let ents = try? await client.trainingEntries(since: sinceDate(daysBack: 7))
-    async let sh = try? await client.supplementsHistory(days: 7)
     async let tc = try? await TaskReads.counts(
       client: client, context: LocalStore.shared.container.mainContext)
     let th: TasksHistory? = TaskReads.tasksHistory(
@@ -350,11 +328,10 @@ struct WeekDashboardView: View {
     async let asum = try? await client.airSummary()
     async let ahist = try? await client.airHistory(days: 7)
     async let groc = try? await client.groceries()
-    async let appSettings = try? await client.settings()
-    let (h, c, ca, e, s, t, o) = await (hh, ch, car, ents, sh, tc, on)
+    let (ca, e, t, o) = await (car, ents, tc, on)
     let (ns, ne, nt) = await (nstats, nents, ntarget)
     let (asRes, ahRes, gRes) = await (asum, ahist, groc)
-    if let colors = (await appSettings)?.nutrition?.macroColors {
+    if let colors = appSettings?.nutrition?.macroColors {
       macroColors = colors
       ResponseCache.save(colors, forKey: CacheKey.macroColors)
     }
@@ -630,22 +607,22 @@ struct WeekDashboardView: View {
       }
     case .habits:
       async let _ = dailies.load(client: client)
-      if let h = try? await client.habitsHistory(days: 7) {
-        habitHistory = h.daily.map { $0.done }
-        ResponseCache.save(habitHistory, forKey: CacheKey.habitHistory)
-      }
+      let h = ChecklistMirror.loadHabitsHistory(
+        context: LocalStore.shared.container.mainContext, days: 7)
+      habitHistory = h.daily.map { $0.done }
+      ResponseCache.save(habitHistory, forKey: CacheKey.habitHistory)
     case .chores:
       async let _ = dailies.load(client: client)
-      if let c = try? await client.choresHistory(days: 7) {
-        choreHistory = c.daily.map { $0.completed }
-        ResponseCache.save(choreHistory, forKey: CacheKey.choreHistory)
-      }
+      let c = ChecklistMirror.loadChoresHistory(
+        context: LocalStore.shared.container.mainContext, days: 7)
+      choreHistory = c.daily.map { $0.completed }
+      ResponseCache.save(choreHistory, forKey: CacheKey.choreHistory)
     case .supplements:
       async let _ = dailies.load(client: client)
-      if let s = try? await client.supplementsHistory(days: 7) {
-        supplementHistory = s.daily.map { $0.done }
-        ResponseCache.save(supplementHistory, forKey: CacheKey.supplementHistory)
-      }
+      let s = ChecklistMirror.loadSupplementsHistory(
+        context: LocalStore.shared.container.mainContext, days: 7)
+      supplementHistory = s.daily.map { $0.done }
+      ResponseCache.save(supplementHistory, forKey: CacheKey.supplementHistory)
     case .groceries:
       if let g = try? await client.groceries() {
         groceries = g
@@ -697,7 +674,7 @@ struct WeekDashboardView: View {
   // MARK: - Today timeline (single row above the tile grid)
 
   private var todayTimeline: some View {
-    DayTimelineView(
+    WeekDashboardTimelineCard(
       date: clock.today,
       oura: ouraNights.first,
       caffeine: caffeineToday?.entries ?? [],
@@ -711,11 +688,6 @@ struct WeekDashboardView: View {
       tasks: completedTasks,
       calendar: dailies.calendarEvents,
       macroColors: macroColors
-    )
-    .padding(14)
-    .background(
-      RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-        .fill(Theme.secondaryGroupedBackground)
     )
   }
 
@@ -791,22 +763,14 @@ struct WeekDashboardView: View {
     let doneToday = tasksHistory?.daily.last?.done ?? 0
     let totalToday = doneToday + openToday
     let bars = tasksHistory?.daily.map(\.done) ?? []
-    return ModuleTile(
-      title: "Tasks",
+    return WeekTasksTile(
       accent: theme.color(for: "tasks"),
-      stats: [.init(label: "Today",    value: "\(openToday)"),
-              .init(label: "Inbox",    value: "\(inbox)"),
-              .init(label: "Upcoming", value: "\(upcoming)")],
-      // Today's completion progress: done so far vs. everything
-      // scheduled for today (done + still open). Defaults to a full
-      // bar when there's nothing today, so the empty state doesn't
-      // read as 0%.
-      progress: .init(label: "Done / today",
-                      current: Double(doneToday),
-                      target: Double(max(totalToday, 1))),
-      history: bars.isEmpty
-        ? nil
-        : .init(label: "7-day completions", values: bars)
+      openToday: openToday,
+      inbox: inbox,
+      upcoming: upcoming,
+      doneToday: doneToday,
+      totalToday: totalToday,
+      bars: bars
     )
     .contentShape(Rectangle())
     .onTapGesture { tabSelection.current = .tasks }
@@ -854,20 +818,12 @@ struct WeekDashboardView: View {
     let total = dailies.habits.count
     let done = dailies.habits.filter { $0.done }.count
     let skipped = dailies.habits.filter { $0.skipped }.count
-    let accent = theme.color(for: "habits")
-    return ModuleTile(
-      title: "Habits",
-      accent: accent,
-      stats: [
-        .init(label: "Today",   value: "\(done)"),
-        .init(label: "Skipped", value: "\(skipped)")
-      ],
-      progress: .init(
-        label: "Today's progress",
-        current: Double(done),
-        target: Double(max(total, 1))
-      ),
-      history: .init(label: "7-day adherence", values: habitHistory)
+    return WeekHabitsTile(
+      accent: theme.color(for: "habits"),
+      done: done,
+      skipped: skipped,
+      total: total,
+      history: habitHistory
     )
     .contentShape(Rectangle())
     .onTapGesture { sheetDest = .habits }
@@ -922,22 +878,13 @@ struct WeekDashboardView: View {
     let strengthBars = days.map { Int(((strengthByDate[$0] ?? 0) / maxS) * 50) }
     let cardioBars   = days.map { Int(((cardioByDate[$0]   ?? 0) / maxC) * 50) }
 
-    return ModuleTile(
-      title: "Training",
+    return WeekTrainingTile(
       accent: accent,
-      stats: [
-        .init(label: "Sessions", value: "\(sessionCount)/7"),
-        .init(label: "Z2 min",   value: "\(minutes)", unit: "m")
-      ],
-      progress: .init(
-        label: "Z2 cardio",
-        current: Double(minutes),
-        target: Double(max(target, 1)),
-        unit: "m"
-      ),
-      history: .init(label: "7-day effort",
-                     values: strengthBars,
-                     secondaryValues: cardioBars)
+      sessionCount: sessionCount,
+      minutes: minutes,
+      target: target,
+      strengthBars: strengthBars,
+      cardioBars: cardioBars
     )
     .contentShape(Rectangle())
     .onTapGesture { sheetDest = .training }
@@ -990,18 +937,13 @@ struct WeekDashboardView: View {
     }.count
     let done = doneIDs.count
     let total = dueToday + overdue + done
-    let accent = theme.color(for: "chores")
-    return ModuleTile(
-      title: "Chores",
-      accent: accent,
-      stats: [
-        .init(label: "Due today", value: "\(dueToday)"),
-        .init(label: "Overdue",   value: "\(overdue)")
-      ],
-      progress: .init(label: "Today done",
-                      current: Double(done),
-                      target: Double(max(total, 1))),
-      history: .init(label: "7-day done", values: choreHistory)
+    return WeekChoresTile(
+      accent: theme.color(for: "chores"),
+      dueToday: dueToday,
+      overdue: overdue,
+      done: done,
+      total: total,
+      history: choreHistory
     )
     .contentShape(Rectangle())
     .onTapGesture { sheetDest = .chores }
@@ -1032,17 +974,11 @@ struct WeekDashboardView: View {
   private var supplementsTile: some View {
     let total = dailies.supplements.count
     let done = dailies.supplements.filter { $0.done }.count
-    let accent = theme.color(for: "supplements")
-    return ModuleTile(
-      title: "Supplements",
-      accent: accent,
-      stats: [.init(label: "Today", value: "\(done)")],
-      progress: .init(
-        label: "Today's stack",
-        current: Double(done),
-        target: Double(max(total, 1))
-      ),
-      history: .init(label: "7-day adherence", values: supplementHistory)
+    return WeekSupplementsTile(
+      accent: theme.color(for: "supplements"),
+      done: done,
+      total: total,
+      history: supplementHistory
     )
     .contentShape(Rectangle())
     .onTapGesture { sheetDest = .supplements }
@@ -1066,27 +1002,17 @@ struct WeekDashboardView: View {
   // histogram. Reverse the server order so the bar furthest right is
   // most-recent.
   private var sleepTile: some View {
-    let accent = theme.color(for: "sleep")
     let last = ouraNights.first
     let lastH = last?.totalH ?? 0
     let score = last?.sleepScore.map { "\($0)" } ?? "—"
-    // Score-out-of-100 bars matched to the webapp: each bar runs to a
-    // constant ceiling of 100, with the score in full accent and the
-    // gap-to-100 in a lighter tone so the actual score reads at a glance.
     let bars = ouraNights.reversed().map { $0.sleepScore ?? 0 }
     return Button { sheetDest = .sleep } label: {
-      ModuleTile(
-        title: "Sleep",
-        accent: accent,
-        stats: [
-          .init(label: "Last night", value: formatHoursShort(lastH), unit: "h"),
-          .init(label: "Score",      value: score)
-        ],
-        progress: .init(label: "Target", current: lastH, target: 8, unit: "h"),
-        history: .init(label: "7-day score",
-                       values: bars.isEmpty
-                         ? Array(repeating: 0, count: 7) : bars,
-                       ceiling: 100)
+      WeekSleepTile(
+        accent: theme.color(for: "sleep"),
+        lastHoursText: formatHoursShort(lastH),
+        lastHours: lastH,
+        score: score,
+        bars: bars
       )
     }
     .buttonStyle(.plain)
@@ -1094,28 +1020,17 @@ struct WeekDashboardView: View {
 
   // Air — latest CO2 with band-derived accent; 7-day CO2 average bars.
   private var airTile: some View {
-    let accent = theme.color(for: "air")
     let latest = airSummary?.latest?.co2Ppm.map { Int($0) }
     let todayOver = airSummary?.today.minutesOver1000 ?? 0
     let bars = airHistory.map { Int($0.co2Avg ?? 0) }
-    // Progress is "air-quality budget" — every minute over 1000 ppm
-    // eats into a soft 60-minute daily allowance.
     let budget = 60
     return Button { sheetDest = .air } label: {
-      ModuleTile(
-        title: "Air",
-        accent: accent,
-        stats: [
-          .init(label: "CO2", value: latest.map { "\($0)" } ?? "—", unit: "ppm"),
-          .init(label: "Over 1000", value: "\(todayOver)", unit: "m")
-        ],
-        progress: .init(label: "Bad-air budget",
-                        current: Double(min(todayOver, budget)),
-                        target: Double(budget),
-                        unit: "m"),
-        history: .init(label: "7-day CO2 avg",
-                       values: bars.isEmpty
-                         ? Array(repeating: 0, count: 7) : bars)
+      WeekAirTile(
+        accent: theme.color(for: "air"),
+        latestCO2: latest,
+        todayOver: todayOver,
+        budget: budget,
+        bars: bars
       )
     }
     .buttonStyle(.plain)
@@ -1123,24 +1038,17 @@ struct WeekDashboardView: View {
 
   // Groceries — shopping-list size as the headline stat.
   private var groceriesTile: some View {
-    let accent = theme.color(for: "groceries")
     let lowCount = groceries.filter { $0.low }.count
     let stocked = groceries.count - lowCount
     let boughtPerDay = groceriesBoughtPerDay()
     let totalBought7d = boughtPerDay.reduce(0, +)
-    return ModuleTile(
-      title: "Groceries",
-      accent: accent,
-      stats: [
-        .init(label: "Need",       value: "\(lowCount)"),
-        .init(label: "7-day buys", value: "\(totalBought7d)")
-      ],
-      progress: groceries.isEmpty ? nil : .init(
-        label: "Stocked",
-        current: Double(stocked),
-        target: Double(max(groceries.count, 1))
-      ),
-      history: .init(label: "Bought (7d)", values: boughtPerDay)
+    return WeekGroceriesTile(
+      accent: theme.color(for: "groceries"),
+      lowCount: lowCount,
+      totalBought7d: totalBought7d,
+      stocked: stocked,
+      totalItems: groceries.count,
+      boughtPerDay: boughtPerDay
     )
     .contentShape(Rectangle())
     .onTapGesture { sheetDest = .groceries }
@@ -1544,5 +1452,319 @@ struct WeekDashboardView: View {
                    body: body, kind: "nutrition.add")
     AddInfoSection.nutrition.notifyTilesChanged()
     Haptics.tick()
+  }
+}
+
+private struct WeekDashboardScreen<CurrentDay: Equatable, Toolbar: ToolbarContent, Content: View>: View {
+  let currentDay: CurrentDay
+  let onInitialLoad: () async -> Void
+  let onRefresh: () async -> Void
+  let onTaskChange: () -> Void
+  let onDayChange: () -> Void
+  let onTileChange: (AddInfoSection) -> Void
+  @ToolbarContentBuilder let toolbar: () -> Toolbar
+  @ViewBuilder let content: () -> Content
+
+  var body: some View {
+    NavigationStack {
+      ScrollView {
+        content()
+      }
+      .background(Theme.groupedBackground)
+      // Tab bar already labels this view. Keep the nav bar present so
+      // iOS's default scroll-edge effect kicks in (content fades to bg
+      // material as it scrolls under the top — same shape as the
+      // bottom tab bar). No .toolbarBackground override — the default
+      // transparent-until-scrolled state is exactly what we want.
+      .navigationTitle("")
+      #if os(iOS)
+      .navigationBarTitleDisplayMode(.inline)
+      #endif
+      // Consistent home-page chrome across Week / Next / Tasks:
+      //   • top-left "…" menu (Settings today; room to grow)
+      //   • top-right magnifyingglass → universal Quick Find sheet
+      .toolbar { toolbar() }
+      // Two-phase load: paint cached blobs synchronously so tiles +
+      // histograms appear immediately on cold launch, then kick off the
+      // network refresh in the background. Pull-to-refresh skips the
+      // cache step since it's a manual "I want fresh data now" gesture.
+      .task {
+        await onInitialLoad()
+      }
+      .refreshable {
+        await onRefresh()
+      }
+      // CK fetch landed (push, foreground refresh, or pull-to-refresh on
+      // any other surface) — repaint so today's task counts reflect
+      // mutations from other devices.
+      .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
+        onTaskChange()
+      }
+      // Day rollover: the dashboard is the most date-sensitive surface
+      // (today's timeline, today's totals, 7-day windows ending today).
+      // Refetch everything when `clock.today` flips.
+      .onChange(of: currentDay) { _, _ in
+        onDayChange()
+      }
+      // Quick-add finished — repaint just that tile from cache (instant,
+      // for sections that wrote optimistic state) and refetch its
+      // endpoints in the background to reconcile with the server. Scoped
+      // to the touched section so the rest of the dashboard stays put.
+      .onReceive(NotificationCenter.default.publisher(for: .tilesDidChange)) { note in
+        guard let key = note.userInfo?[TileChangeKey.section] as? String,
+              let section = AddInfoSection(rawValue: key) else { return }
+        onTileChange(section)
+      }
+    }
+  }
+}
+
+private struct WeekDashboardTimelineCard: View {
+  let date: String
+  let oura: OuraNight?
+  let caffeine: [CaffeineEntry]
+  let cannabis: [CannabisEntry]
+  let nutrition: [NutritionEntry]
+  let gut: [GutEntry]
+  let habits: [HabitDayItem]
+  let supplements: [SupplementDayItem]
+  let chores: [ChoreItem]
+  let training: [ExerciseEntry]
+  let tasks: [SeptenaTask]
+  let calendar: [EKEvent]
+  let macroColors: MacroColors?
+
+  var body: some View {
+    DayTimelineView(
+      date: date,
+      oura: oura,
+      caffeine: caffeine,
+      cannabis: cannabis,
+      nutrition: nutrition,
+      gut: gut,
+      habits: habits,
+      supplements: supplements,
+      chores: chores,
+      training: training,
+      tasks: tasks,
+      calendar: calendar,
+      macroColors: macroColors
+    )
+    .padding(14)
+    .background(
+      RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+        .fill(Theme.secondaryGroupedBackground)
+    )
+  }
+}
+
+private struct WeekTasksTile: View {
+  let accent: Color
+  let openToday: Int
+  let inbox: Int
+  let upcoming: Int
+  let doneToday: Int
+  let totalToday: Int
+  let bars: [Int]
+
+  var body: some View {
+    ModuleTile(
+      title: "Tasks",
+      accent: accent,
+      stats: [
+        .init(label: "Today", value: "\(openToday)"),
+        .init(label: "Inbox", value: "\(inbox)"),
+        .init(label: "Upcoming", value: "\(upcoming)")
+      ],
+      progress: .init(
+        label: "Done / today",
+        current: Double(doneToday),
+        target: Double(max(totalToday, 1))
+      ),
+      history: bars.isEmpty ? nil : .init(label: "7-day completions", values: bars)
+    )
+  }
+}
+
+private struct WeekHabitsTile: View {
+  let accent: Color
+  let done: Int
+  let skipped: Int
+  let total: Int
+  let history: [Int]
+
+  var body: some View {
+    ModuleTile(
+      title: "Habits",
+      accent: accent,
+      stats: [
+        .init(label: "Today", value: "\(done)"),
+        .init(label: "Skipped", value: "\(skipped)")
+      ],
+      progress: .init(
+        label: "Today's progress",
+        current: Double(done),
+        target: Double(max(total, 1))
+      ),
+      history: .init(label: "7-day adherence", values: history)
+    )
+  }
+}
+
+private struct WeekTrainingTile: View {
+  let accent: Color
+  let sessionCount: Int
+  let minutes: Int
+  let target: Int
+  let strengthBars: [Int]
+  let cardioBars: [Int]
+
+  var body: some View {
+    ModuleTile(
+      title: "Training",
+      accent: accent,
+      stats: [
+        .init(label: "Sessions", value: "\(sessionCount)/7"),
+        .init(label: "Z2 min", value: "\(minutes)", unit: "m")
+      ],
+      progress: .init(
+        label: "Z2 cardio",
+        current: Double(minutes),
+        target: Double(max(target, 1)),
+        unit: "m"
+      ),
+      history: .init(
+        label: "7-day effort",
+        values: strengthBars,
+        secondaryValues: cardioBars
+      )
+    )
+  }
+}
+
+private struct WeekChoresTile: View {
+  let accent: Color
+  let dueToday: Int
+  let overdue: Int
+  let done: Int
+  let total: Int
+  let history: [Int]
+
+  var body: some View {
+    ModuleTile(
+      title: "Chores",
+      accent: accent,
+      stats: [
+        .init(label: "Due today", value: "\(dueToday)"),
+        .init(label: "Overdue", value: "\(overdue)")
+      ],
+      progress: .init(
+        label: "Today done",
+        current: Double(done),
+        target: Double(max(total, 1))
+      ),
+      history: .init(label: "7-day done", values: history)
+    )
+  }
+}
+
+private struct WeekSupplementsTile: View {
+  let accent: Color
+  let done: Int
+  let total: Int
+  let history: [Int]
+
+  var body: some View {
+    ModuleTile(
+      title: "Supplements",
+      accent: accent,
+      stats: [.init(label: "Today", value: "\(done)")],
+      progress: .init(
+        label: "Today's stack",
+        current: Double(done),
+        target: Double(max(total, 1))
+      ),
+      history: .init(label: "7-day adherence", values: history)
+    )
+  }
+}
+
+private struct WeekSleepTile: View {
+  let accent: Color
+  let lastHoursText: String
+  let lastHours: Double
+  let score: String
+  let bars: [Int]
+
+  var body: some View {
+    ModuleTile(
+      title: "Sleep",
+      accent: accent,
+      stats: [
+        .init(label: "Last night", value: lastHoursText, unit: "h"),
+        .init(label: "Score", value: score)
+      ],
+      progress: .init(label: "Target", current: lastHours, target: 8, unit: "h"),
+      history: .init(
+        label: "7-day score",
+        values: bars.isEmpty ? Array(repeating: 0, count: 7) : bars,
+        ceiling: 100
+      )
+    )
+  }
+}
+
+private struct WeekAirTile: View {
+  let accent: Color
+  let latestCO2: Int?
+  let todayOver: Int
+  let budget: Int
+  let bars: [Int]
+
+  var body: some View {
+    ModuleTile(
+      title: "Air",
+      accent: accent,
+      stats: [
+        .init(label: "CO2", value: latestCO2.map { "\($0)" } ?? "—", unit: "ppm"),
+        .init(label: "Over 1000", value: "\(todayOver)", unit: "m")
+      ],
+      progress: .init(
+        label: "Bad-air budget",
+        current: Double(min(todayOver, budget)),
+        target: Double(budget),
+        unit: "m"
+      ),
+      history: .init(
+        label: "7-day CO2 avg",
+        values: bars.isEmpty ? Array(repeating: 0, count: 7) : bars
+      )
+    )
+  }
+}
+
+private struct WeekGroceriesTile: View {
+  let accent: Color
+  let lowCount: Int
+  let totalBought7d: Int
+  let stocked: Int
+  let totalItems: Int
+  let boughtPerDay: [Int]
+
+  var body: some View {
+    ModuleTile(
+      title: "Groceries",
+      accent: accent,
+      stats: [
+        .init(label: "Need", value: "\(lowCount)"),
+        .init(label: "7-day buys", value: "\(totalBought7d)")
+      ],
+      progress: totalItems == 0 ? nil : .init(
+        label: "Stocked",
+        current: Double(stocked),
+        target: Double(max(totalItems, 1))
+      ),
+      history: .init(label: "Bought (7d)", values: boughtPerDay)
+    )
   }
 }

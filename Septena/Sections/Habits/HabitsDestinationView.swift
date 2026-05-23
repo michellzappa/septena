@@ -59,9 +59,10 @@ struct HabitsDestinationView: View {
     .task {
       model.paintFromCache()
       await model.load(client: client)
-      if let resp = try? await client.habitsHistory(days: 365) {
-        history = resp.daily
-      }
+      // History is computed locally from the CloudKit-backed mirror.
+      let resp = ChecklistMirror.loadHabitsHistory(
+        context: LocalStore.shared.container.mainContext, days: 365)
+      history = resp.daily
     }
     .sheet(item: $editing) { habit in
       EditHabitSheet(

@@ -119,10 +119,7 @@ struct AddHabitPage: View {
 
   private func load() async {
     let context = LocalStore.shared.container.mainContext
-    if let mirrored = ChecklistMirror.loadHabitsDay(context: context, date: SeptenaDate.today) {
-      day = mirrored
-    } else {
-      day = try? await client.habitsDay(date: SeptenaDate.today)
-    }
+    // Habits are CloudKit-authoritative — read directly from the local mirror.
+    day = ChecklistMirror.loadHabitsDay(context: context, date: SeptenaDate.today)
   }
 }

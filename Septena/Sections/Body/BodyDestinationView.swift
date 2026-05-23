@@ -337,9 +337,9 @@ struct BodyDestinationView: View {
 
   private func load() async {
     loading = true
-    async let rs = try? client.withingsHistory(days: 21)
-    async let st = try? client.settings()
-    let (loadedRows, loadedSettings) = await (rs, st)
+    let loadedRows = try? await client.withingsHistory(days: 21)
+    // Settings live in CloudKit — read from the local mirror, not FastAPI.
+    let loadedSettings = SettingsMirror.loadSettings(context: LocalStore.shared.container.mainContext)
     if let loadedRows {
       let sorted = loadedRows.sorted { $0.date > $1.date }
       rows = sorted

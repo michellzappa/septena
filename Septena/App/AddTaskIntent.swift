@@ -8,8 +8,8 @@ import AppIntents
 // CKEngine has been bound. `SeptenaServices.shared.start()` is the
 // shared, idempotent entry point: both the scene and this intent call
 // it, the first one wires the stack, the second awaits the same task.
-// Once it returns, `taskMutator.create(...)` routes to CloudKit instead
-// of falling back to FastAPI.
+// Once it returns, `taskMutator.create(...)` routes through the same
+// CloudKit-backed mutation stack as the main app.
 
 struct AddTaskIntent: AppIntent {
   static let title: LocalizedStringResource = "Add Task"

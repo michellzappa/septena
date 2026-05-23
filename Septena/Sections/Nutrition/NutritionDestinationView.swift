@@ -839,8 +839,9 @@ struct NutritionDestinationView: View {
     async let e: [NutritionEntry]? = try? await client.nutritionEntries(since: since)
     async let s: NutritionStatsResponse? = try? await client.nutritionStats(days: 30)
     async let m: MacrosConfig? = try? await client.nutritionMacrosConfig()
-    async let settings: AppSettings? = try? await client.settings()
-    let (entriesRes, statsRes, macrosRes, settingsRes) = await (e, s, m, settings)
+    // Settings live in CloudKit — read from the local mirror, not FastAPI.
+    let settingsRes: AppSettings? = SettingsMirror.loadSettings(context: LocalStore.shared.container.mainContext)
+    let (entriesRes, statsRes, macrosRes) = await (e, s, m)
     if let entriesRes {
       entries = entriesRes
       ResponseCache.save(entriesRes, forKey: CacheKey.entries)

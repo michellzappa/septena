@@ -1,5 +1,4 @@
 import WatchKit
-import WidgetKit
 
 final class WatchAppDelegate: NSObject, WKApplicationDelegate {
   func handle(_ backgroundTasks: Set<WKRefreshBackgroundTask>) {
