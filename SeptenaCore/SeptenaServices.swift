@@ -32,6 +32,7 @@ final class SeptenaServices {
   let ckEngine: CKEngine
   let taskMutator: TaskMutator
   let checklistMutator: ChecklistMutator
+  let goalMutator: GoalMutator
   let areasMutator: AreasMutator
   let projectsMutator: ProjectsMutator
   let httpOutbox: HTTPOutbox
@@ -47,6 +48,7 @@ final class SeptenaServices {
     self.ckEngine = CKEngine()
     self.taskMutator = TaskMutator(client: client, context: context, ckEngine: nil)
     self.checklistMutator = ChecklistMutator(context: context, ckEngine: nil)
+    self.goalMutator = GoalMutator(context: context, ckEngine: nil)
     self.areasMutator = AreasMutator(client: client, context: context)
     self.projectsMutator = ProjectsMutator(client: client, context: context)
     self.httpOutbox = HTTPOutbox(client: client, context: context)
@@ -71,6 +73,9 @@ final class SeptenaServices {
       let context = LocalStore.shared.container.mainContext
       let client = ClientProvider.shared.client
       let settingsSingletonID = SettingsCloudKitSchema.singletonID
+      var batchTouchedTasks = false
+      var batchTouchedStructure = false
+      var batchTouchedData = false
 
       // Single dispatcher for outbound records. CK record IDs are
       // zone-wide, so Area/Project record names are type-prefixed to
@@ -159,6 +164,15 @@ final class SeptenaServices {
           }
           return nil
         }
+        if recordName.hasPrefix("goal:") {
+          let id = GoalCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<GoalEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
         if recordName == SettingsCloudKitSchema.singletonID {
           if let entity = try? context.fetch(FetchDescriptor<SettingsEntity>(
             predicate: #Predicate { $0.id == settingsSingletonID }
@@ -178,6 +192,7 @@ final class SeptenaServices {
       ckEngine.applyFetchedRecord = { record in
         switch record.recordType {
         case TaskCloudKitSchema.recordType:
+          batchTouchedTasks = true
           let id = record.recordID.recordName
           if let entity = try? context.fetch(FetchDescriptor<TaskEntity>(
             predicate: #Predicate { $0.id == id }
@@ -187,6 +202,7 @@ final class SeptenaServices {
             context.insert(TaskEntity(cloudKit: record))
           }
         case ProjectCloudKitSchema.recordType:
+          batchTouchedStructure = true
           let id = ProjectCloudKitSchema.entityID(from: record.recordID.recordName)
           if let entity = try? context.fetch(FetchDescriptor<ProjectEntity>(
             predicate: #Predicate { $0.id == id }
@@ -196,6 +212,7 @@ final class SeptenaServices {
             context.insert(ProjectEntity(cloudKit: record))
           }
         case AreaCloudKitSchema.recordType:
+          batchTouchedStructure = true
           let id = AreaCloudKitSchema.entityID(from: record.recordID.recordName)
           if let entity = try? context.fetch(FetchDescriptor<AreaEntity>(
             predicate: #Predicate { $0.id == id }
@@ -205,6 +222,7 @@ final class SeptenaServices {
             context.insert(AreaEntity(cloudKit: record))
           }
         case SettingsCloudKitSchema.recordType:
+          batchTouchedData = true
           if let entity = try? context.fetch(FetchDescriptor<SettingsEntity>(
             predicate: #Predicate { $0.id == settingsSingletonID }
           )).first {
@@ -213,6 +231,7 @@ final class SeptenaServices {
             context.insert(SettingsEntity(cloudKit: record))
           }
         case SectionCloudKitSchema.recordType:
+          batchTouchedData = true
           let id = SectionCloudKitSchema.entityID(from: record.recordID.recordName)
           if let entity = try? context.fetch(FetchDescriptor<SectionEntity>(
             predicate: #Predicate { $0.id == id }
@@ -222,6 +241,7 @@ final class SeptenaServices {
             context.insert(SectionEntity(cloudKit: record))
           }
         case HabitDefinitionCloudKitSchema.recordType:
+          batchTouchedData = true
           let id = HabitDefinitionCloudKitSchema.entityID(from: record.recordID.recordName)
           if let entity = try? context.fetch(FetchDescriptor<HabitDefinitionEntity>(
             predicate: #Predicate { $0.id == id }
@@ -231,6 +251,7 @@ final class SeptenaServices {
             context.insert(HabitDefinitionEntity(cloudKit: record))
           }
         case HabitEventCloudKitSchema.recordType:
+          batchTouchedData = true
           let id = HabitEventCloudKitSchema.entityID(from: record.recordID.recordName)
           if let entity = try? context.fetch(FetchDescriptor<HabitDayStateEntity>(
             predicate: #Predicate { $0.id == id }
@@ -240,6 +261,7 @@ final class SeptenaServices {
             context.insert(HabitDayStateEntity(cloudKit: record))
           }
         case SupplementDefinitionCloudKitSchema.recordType:
+          batchTouchedData = true
           let id = SupplementDefinitionCloudKitSchema.entityID(from: record.recordID.recordName)
           if let entity = try? context.fetch(FetchDescriptor<SupplementDefinitionEntity>(
             predicate: #Predicate { $0.id == id }
@@ -249,6 +271,7 @@ final class SeptenaServices {
             context.insert(SupplementDefinitionEntity(cloudKit: record))
           }
         case SupplementEventCloudKitSchema.recordType:
+          batchTouchedData = true
           let id = SupplementEventCloudKitSchema.entityID(from: record.recordID.recordName)
           if let entity = try? context.fetch(FetchDescriptor<SupplementDayStateEntity>(
             predicate: #Predicate { $0.id == id }
@@ -258,6 +281,7 @@ final class SeptenaServices {
             context.insert(SupplementDayStateEntity(cloudKit: record))
           }
         case ChoreDefinitionCloudKitSchema.recordType:
+          batchTouchedData = true
           let id = ChoreDefinitionCloudKitSchema.entityID(from: record.recordID.recordName)
           if let entity = try? context.fetch(FetchDescriptor<ChoreDefinitionEntity>(
             predicate: #Predicate { $0.id == id }
@@ -267,6 +291,7 @@ final class SeptenaServices {
             context.insert(ChoreDefinitionEntity(cloudKit: record))
           }
         case ChoreEventCloudKitSchema.recordType:
+          batchTouchedData = true
           let id = ChoreEventCloudKitSchema.entityID(from: record.recordID.recordName)
           if let entity = try? context.fetch(FetchDescriptor<ChoreEventEntity>(
             predicate: #Predicate { $0.id == id }
@@ -274,6 +299,16 @@ final class SeptenaServices {
             entity.apply(record)
           } else {
             context.insert(ChoreEventEntity(cloudKit: record))
+          }
+        case GoalCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = GoalCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<GoalEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(GoalEntity(cloudKit: record))
           }
         default:
           SeptenaLog.info("[CKEngine] applyFetched: unknown recordType \(record.recordType) id=\(record.recordID.recordName)")
@@ -284,6 +319,7 @@ final class SeptenaServices {
       ckEngine.applyDeletedRecord = { recordID, recordType in
         switch recordType {
         case TaskCloudKitSchema.recordType:
+          batchTouchedTasks = true
           let id = recordID.recordName
           if let entity = try? context.fetch(FetchDescriptor<TaskEntity>(
             predicate: #Predicate { $0.id == id }
@@ -291,6 +327,7 @@ final class SeptenaServices {
             context.delete(entity)
           }
         case ProjectCloudKitSchema.recordType:
+          batchTouchedStructure = true
           let id = ProjectCloudKitSchema.entityID(from: recordID.recordName)
           if let entity = try? context.fetch(FetchDescriptor<ProjectEntity>(
             predicate: #Predicate { $0.id == id }
@@ -298,6 +335,7 @@ final class SeptenaServices {
             context.delete(entity)
           }
         case AreaCloudKitSchema.recordType:
+          batchTouchedStructure = true
           let id = AreaCloudKitSchema.entityID(from: recordID.recordName)
           if let entity = try? context.fetch(FetchDescriptor<AreaEntity>(
             predicate: #Predicate { $0.id == id }
@@ -305,12 +343,14 @@ final class SeptenaServices {
             context.delete(entity)
           }
         case SettingsCloudKitSchema.recordType:
+          batchTouchedData = true
           if let entity = try? context.fetch(FetchDescriptor<SettingsEntity>(
             predicate: #Predicate { $0.id == settingsSingletonID }
           )).first {
             context.delete(entity)
           }
         case SectionCloudKitSchema.recordType:
+          batchTouchedData = true
           let id = SectionCloudKitSchema.entityID(from: recordID.recordName)
           if let entity = try? context.fetch(FetchDescriptor<SectionEntity>(
             predicate: #Predicate { $0.id == id }
@@ -318,6 +358,7 @@ final class SeptenaServices {
             context.delete(entity)
           }
         case HabitDefinitionCloudKitSchema.recordType:
+          batchTouchedData = true
           let id = HabitDefinitionCloudKitSchema.entityID(from: recordID.recordName)
           if let entity = try? context.fetch(FetchDescriptor<HabitDefinitionEntity>(
             predicate: #Predicate { $0.id == id }
@@ -325,6 +366,7 @@ final class SeptenaServices {
             context.delete(entity)
           }
         case HabitEventCloudKitSchema.recordType:
+          batchTouchedData = true
           let id = HabitEventCloudKitSchema.entityID(from: recordID.recordName)
           if let entity = try? context.fetch(FetchDescriptor<HabitDayStateEntity>(
             predicate: #Predicate { $0.id == id }
@@ -332,6 +374,7 @@ final class SeptenaServices {
             context.delete(entity)
           }
         case SupplementDefinitionCloudKitSchema.recordType:
+          batchTouchedData = true
           let id = SupplementDefinitionCloudKitSchema.entityID(from: recordID.recordName)
           if let entity = try? context.fetch(FetchDescriptor<SupplementDefinitionEntity>(
             predicate: #Predicate { $0.id == id }
@@ -339,6 +382,7 @@ final class SeptenaServices {
             context.delete(entity)
           }
         case SupplementEventCloudKitSchema.recordType:
+          batchTouchedData = true
           let id = SupplementEventCloudKitSchema.entityID(from: recordID.recordName)
           if let entity = try? context.fetch(FetchDescriptor<SupplementDayStateEntity>(
             predicate: #Predicate { $0.id == id }
@@ -346,6 +390,7 @@ final class SeptenaServices {
             context.delete(entity)
           }
         case ChoreDefinitionCloudKitSchema.recordType:
+          batchTouchedData = true
           let id = ChoreDefinitionCloudKitSchema.entityID(from: recordID.recordName)
           if let entity = try? context.fetch(FetchDescriptor<ChoreDefinitionEntity>(
             predicate: #Predicate { $0.id == id }
@@ -353,8 +398,17 @@ final class SeptenaServices {
             context.delete(entity)
           }
         case ChoreEventCloudKitSchema.recordType:
+          batchTouchedData = true
           let id = ChoreEventCloudKitSchema.entityID(from: recordID.recordName)
           if let entity = try? context.fetch(FetchDescriptor<ChoreEventEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
+        case GoalCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = GoalCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<GoalEntity>(
             predicate: #Predicate { $0.id == id }
           )).first {
             context.delete(entity)
@@ -365,11 +419,22 @@ final class SeptenaServices {
       }
       ckEngine.applyDidFinishBatch = {
         try? context.save()
-        NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
-        NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+        if batchTouchedTasks {
+          NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+        }
+        if batchTouchedStructure {
+          NotificationCenter.default.post(name: .septenaStructureChanged, object: nil)
+        }
+        if batchTouchedData {
+          NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+        }
+        batchTouchedTasks = false
+        batchTouchedStructure = false
+        batchTouchedData = false
       }
       taskMutator.bind(ckEngine: ckEngine)
       checklistMutator.bind(ckEngine: ckEngine)
+      goalMutator.bind(ckEngine: ckEngine)
       areasMutator.bind(ckEngine: ckEngine)
       projectsMutator.bind(ckEngine: ckEngine)
       ckEngine.start()
@@ -767,5 +832,90 @@ final class ChecklistMutator {
 
   private func postChecklistChanged() {
     NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+  }
+}
+
+// MARK: - GoalMutator
+
+@MainActor
+@Observable
+final class GoalMutator {
+  private let context: ModelContext
+  private var ckEngine: CKEngine?
+
+  init(context: ModelContext, ckEngine: CKEngine? = nil) {
+    self.context = context
+    self.ckEngine = ckEngine
+  }
+
+  func bind(ckEngine: CKEngine) {
+    self.ckEngine = ckEngine
+  }
+
+  @discardableResult
+  func createGoal(text: String) -> Goal {
+    let id = uniqueGoalID()
+    let today = SeptenaDate.today
+    let entity = GoalEntity(id: id,
+                            text: text,
+                            sections: [],
+                            created: today,
+                            sortIndex: nextSortIndex())
+    context.insert(entity)
+    commit(entity, op: "create")
+    return Goal(entity)
+  }
+
+  func updateGoal(id: String, text: String, sections: [String]) {
+    guard let entity = fetchGoal(id: id) else { return }
+    entity.text = text
+    entity.sections = sections
+    entity.updatedAt = .now
+    commit(entity, op: "update")
+  }
+
+  func deleteGoal(id: String) {
+    guard let entity = fetchGoal(id: id) else { return }
+    context.delete(entity)
+    saveContext("CK goals delete")
+    ckEngine?.noteGoalDeletion(id: id)
+    postChanged()
+  }
+
+  // MARK: - Helpers
+
+  private func fetchGoal(id: String) -> GoalEntity? {
+    try? context.fetch(FetchDescriptor<GoalEntity>(
+      predicate: #Predicate { $0.id == id }
+    )).first
+  }
+
+  private func uniqueGoalID() -> String {
+    let first = IDShortcode.generate(length: 4)
+    if fetchGoal(id: first) == nil { return first }
+    let second = IDShortcode.generate(length: 6)
+    if fetchGoal(id: second) == nil { return second }
+    return String(UUID().uuidString.prefix(8)).lowercased()
+  }
+
+  private func nextSortIndex() -> Int {
+    ((try? context.fetch(FetchDescriptor<GoalEntity>(
+      sortBy: [SortDescriptor(\.sortIndex, order: .reverse)]
+    )).first?.sortIndex) ?? -1) + 1
+  }
+
+  private func commit(_ entity: GoalEntity, op: String) {
+    saveContext("CK goals \(op)")
+    ckEngine?.noteGoalChange(id: entity.id)
+    postChanged()
+  }
+
+  private func saveContext(_ label: String) {
+    do { try context.save() }
+    catch { SeptenaLog.error(label, error) }
+  }
+
+  private func postChanged() {
+    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
   }
 }

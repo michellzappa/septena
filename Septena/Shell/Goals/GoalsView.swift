@@ -1,22 +1,24 @@
 import SwiftUI
+import SwiftData
 
 // Goals tab — a list of free-text intentions tagged with section keys.
 // Goals are read-often, write-rarely; agents use them as context for
 // understanding what the user is working toward across each section.
 //
-// Create: tap + in toolbar → POST /api/goals (returns new Goal with server
-//   ID) → immediately open the edit sheet so the user fills in real text.
-// Edit: tap any row → edit sheet → outbox-enqueued PUT /api/goals/{id}.
-// Delete: swipe-to-delete on row OR delete button inside edit sheet →
-//   outbox-enqueued DELETE /api/goals/{id}.
+// Mutations go through GoalMutator → SwiftData → CKEngine (CloudKit).
+// Reads come from the local SwiftData mirror painted instantly on load;
+// .septenaDataChanged triggers a cache refresh after CKEngine delivers
+// new/updated records from other devices.
 
 struct GoalsView: View {
   @Environment(SeptenaClient.self) private var client
-  @Environment(HTTPOutbox.self) private var outbox
   @Environment(SectionTheme.self) private var theme
+  @Environment(\.modelContext) private var context
   #if os(iOS)
   @Environment(\.horizontalSizeClass) private var hSize
   #endif
+
+  private var goalMutator: GoalMutator { SeptenaServices.shared.goalMutator }
 
   @State private var goals: [Goal] = []
   @State private var availableSections: [SeptenaClient.SectionConfig] = []
@@ -51,12 +53,15 @@ struct GoalsView: View {
           }
         }
         .task { await load() }
+        .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
+          goals = LocalCache.goals(in: context)
+        }
         .sheet(item: $editing) { goal in
           EditGoalSheet(
             goal: goal,
             availableSections: availableSections,
             theme: theme,
-            outbox: outbox,
+            mutator: goalMutator,
             onUpdate: { updated in
               if let idx = goals.firstIndex(where: { $0.id == updated.id }) {
                 goals[idx] = updated
@@ -108,32 +113,21 @@ struct GoalsView: View {
   private func load() async {
     loading = true
     defer { loading = false }
-    async let g = try? client.goals()
-    async let s = try? client.sections()
-    goals = await g ?? []
-    availableSections = (await s ?? []).filter { $0.key != "goals" }
+    // Goals + sections both come from the local SwiftData mirror (CK-authoritative).
+    goals = LocalCache.goals(in: context)
+    availableSections = SettingsMirror.loadSections(context: context)
+      .filter { $0.key != "goals" }
   }
 
   private func addGoal() {
-    Task {
-      do {
-        let goal = try await client.createGoal(text: "New goal")
-        goals.insert(goal, at: 0)
-        editing = goal
-        Haptics.tick()
-      } catch {
-        SeptenaLog.error("createGoal", error)
-      }
-    }
+    let goal = goalMutator.createGoal(text: "New goal")
+    goals.insert(goal, at: 0)
+    editing = goal
+    Haptics.tick()
   }
 
   private func deleteGoal(_ goal: Goal) {
-    outbox.enqueue(
-      method: "DELETE",
-      path: "/api/goals/\(goal.id)",
-      body: nil,
-      kind: "goals.delete"
-    )
+    goalMutator.deleteGoal(id: goal.id)
     goals.removeAll { $0.id == goal.id }
     Haptics.warning()
   }
@@ -212,7 +206,7 @@ struct EditGoalSheet: View {
   let goal: Goal
   let availableSections: [SeptenaClient.SectionConfig]
   let theme: SectionTheme
-  let outbox: HTTPOutbox
+  let mutator: GoalMutator
   let onUpdate: (Goal) -> Void
   let onDelete: (String) -> Void
 
@@ -223,13 +217,13 @@ struct EditGoalSheet: View {
   init(goal: Goal,
        availableSections: [SeptenaClient.SectionConfig],
        theme: SectionTheme,
-       outbox: HTTPOutbox,
+       mutator: GoalMutator,
        onUpdate: @escaping (Goal) -> Void,
        onDelete: @escaping (String) -> Void) {
     self.goal = goal
     self.availableSections = availableSections
     self.theme = theme
-    self.outbox = outbox
+    self.mutator = mutator
     self.onUpdate = onUpdate
     self.onDelete = onDelete
     _text = State(initialValue: goal.text == "New goal" ? "" : goal.text)
@@ -306,12 +300,7 @@ struct EditGoalSheet: View {
     let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !clean.isEmpty else { return }
     let sections = Array(selectedSections)
-    outbox.enqueue(
-      method: "PUT",
-      path: "/api/goals/\(goal.id)",
-      body: ["text": clean, "sections": sections],
-      kind: "goals.update"
-    )
+    mutator.updateGoal(id: goal.id, text: clean, sections: sections)
     Haptics.tick()
     var updated = goal
     updated.text = clean
@@ -321,12 +310,7 @@ struct EditGoalSheet: View {
   }
 
   private func delete() {
-    outbox.enqueue(
-      method: "DELETE",
-      path: "/api/goals/\(goal.id)",
-      body: nil,
-      kind: "goals.delete"
-    )
+    mutator.deleteGoal(id: goal.id)
     Haptics.warning()
     onDelete(goal.id)
     dismiss()

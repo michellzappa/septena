@@ -165,6 +165,94 @@ enum ChecklistMirror {
     try? context.save()
   }
 
+  /// Local history aggregation for the Habits dashboard tile + destination view.
+  /// Mirrors the shape of `/api/habits/history?days=N`. Total is the current
+  /// definition count (we don't track per-day membership history, since the
+  /// dashboard only cares about the success-rate trend, not headcount drift).
+  static func loadHabitsHistory(context: ModelContext, days: Int) -> HabitHistoryResponse {
+    let today = SeptenaDate.today
+    guard let todayDate = SeptenaDate.parse(today) else {
+      return HabitHistoryResponse(daily: [], total: 0)
+    }
+    let calendar = Calendar.current
+    let startDate = calendar.date(byAdding: .day, value: -(days - 1), to: todayDate) ?? todayDate
+    let startStr = SeptenaDate.format(startDate) ?? today
+
+    let total = (try? context.fetchCount(FetchDescriptor<HabitDefinitionEntity>())) ?? 0
+    let states = (try? context.fetch(FetchDescriptor<HabitDayStateEntity>(
+      predicate: #Predicate { $0.date >= startStr && $0.date <= today && $0.done == true }
+    ))) ?? []
+    let doneByDate = Dictionary(grouping: states, by: \.date).mapValues(\.count)
+
+    var daily: [HabitHistoryPoint] = []
+    var grandTotal = 0
+    for offset in (0..<days).reversed() {
+      guard let date = calendar.date(byAdding: .day, value: -offset, to: todayDate),
+            let dateStr = SeptenaDate.format(date) else { continue }
+      let done = doneByDate[dateStr] ?? 0
+      let percent = total > 0 ? Int(round(Double(done) * 100 / Double(total))) : 0
+      daily.append(HabitHistoryPoint(date: dateStr, done: done, total: total, percent: percent))
+      grandTotal += done
+    }
+    return HabitHistoryResponse(daily: daily, total: grandTotal)
+  }
+
+  static func loadSupplementsHistory(context: ModelContext, days: Int) -> SupplementHistoryResponse {
+    let today = SeptenaDate.today
+    guard let todayDate = SeptenaDate.parse(today) else {
+      return SupplementHistoryResponse(daily: [], total: 0)
+    }
+    let calendar = Calendar.current
+    let startDate = calendar.date(byAdding: .day, value: -(days - 1), to: todayDate) ?? todayDate
+    let startStr = SeptenaDate.format(startDate) ?? today
+
+    let total = (try? context.fetchCount(FetchDescriptor<SupplementDefinitionEntity>())) ?? 0
+    let states = (try? context.fetch(FetchDescriptor<SupplementDayStateEntity>(
+      predicate: #Predicate { $0.date >= startStr && $0.date <= today && $0.done == true }
+    ))) ?? []
+    let doneByDate = Dictionary(grouping: states, by: \.date).mapValues(\.count)
+
+    var daily: [SupplementHistoryPoint] = []
+    var grandTotal = 0
+    for offset in (0..<days).reversed() {
+      guard let date = calendar.date(byAdding: .day, value: -offset, to: todayDate),
+            let dateStr = SeptenaDate.format(date) else { continue }
+      let done = doneByDate[dateStr] ?? 0
+      let percent = total > 0 ? Int(round(Double(done) * 100 / Double(total))) : 0
+      daily.append(SupplementHistoryPoint(date: dateStr, done: done, total: total, percent: percent))
+      grandTotal += done
+    }
+    return SupplementHistoryResponse(daily: daily, total: grandTotal)
+  }
+
+  static func loadChoresHistory(context: ModelContext, days: Int) -> ChoreHistoryResponse {
+    let today = SeptenaDate.today
+    guard let todayDate = SeptenaDate.parse(today) else {
+      return ChoreHistoryResponse(daily: [], total: 0)
+    }
+    let calendar = Calendar.current
+    let startDate = calendar.date(byAdding: .day, value: -(days - 1), to: todayDate) ?? todayDate
+    let startStr = SeptenaDate.format(startDate) ?? today
+
+    let total = (try? context.fetchCount(FetchDescriptor<ChoreDefinitionEntity>())) ?? 0
+    let completeAction = "complete"
+    let events = (try? context.fetch(FetchDescriptor<ChoreEventEntity>(
+      predicate: #Predicate { $0.date >= startStr && $0.date <= today && $0.action == completeAction }
+    ))) ?? []
+    let completedByDate = Dictionary(grouping: events, by: \.date).mapValues(\.count)
+
+    var daily: [ChoreHistoryPoint] = []
+    var grandTotal = 0
+    for offset in (0..<days).reversed() {
+      guard let date = calendar.date(byAdding: .day, value: -offset, to: todayDate),
+            let dateStr = SeptenaDate.format(date) else { continue }
+      let completed = completedByDate[dateStr] ?? 0
+      daily.append(ChoreHistoryPoint(date: dateStr, completed: completed, total: total))
+      grandTotal += completed
+    }
+    return ChoreHistoryResponse(daily: daily, total: grandTotal)
+  }
+
   static func loadSupplementsDay(context: ModelContext, date: String) -> SupplementsDayResponse? {
     let defs = (try? context.fetch(FetchDescriptor<SupplementDefinitionEntity>(
       sortBy: [SortDescriptor(\.sortIndex), SortDescriptor(\.title, comparator: .localizedStandard)]

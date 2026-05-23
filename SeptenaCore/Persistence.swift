@@ -392,6 +392,34 @@ final class SupplementDayStateEntity {
 }
 
 @Model
+final class GoalEntity {
+  @Attribute(.unique) var id: String
+  var text: String
+  var sections: [String]
+  var created: String      // YYYY-MM-DD
+  var sortIndex: Int
+  var updatedAt: Date
+  /// CKRecord system-fields blob. Same contract as tasks/projects/areas.
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       text: String,
+       sections: [String] = [],
+       created: String,
+       sortIndex: Int = 0,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.text = text
+    self.sections = sections
+    self.created = created
+    self.sortIndex = sortIndex
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
+@Model
 final class ChoreSnapshotEntity {
   @Attribute(.unique) var id: String
   var title: String
@@ -550,6 +578,21 @@ extension Area {
 extension SeptenaClient.SectionConfig {
   init(_ e: SectionEntity) {
     self.init(key: e.id, label: e.title, color: e.color)
+  }
+}
+
+extension Goal {
+  init(_ e: GoalEntity) {
+    // Format updatedAt Date → YYYY-MM-DD string for the wire DTO.
+    let fmt = DateFormatter()
+    fmt.calendar = Calendar(identifier: .gregorian)
+    fmt.locale = Locale(identifier: "en_US_POSIX")
+    fmt.dateFormat = "yyyy-MM-dd"
+    self.init(id: e.id,
+              text: e.text,
+              sections: e.sections,
+              created: e.created,
+              updated: fmt.string(from: e.updatedAt))
   }
 }
 
@@ -899,6 +942,7 @@ final class LocalStore {
                          SupplementDefinitionEntity.self, SupplementDayStateEntity.self,
                          ChoreDefinitionEntity.self, ChoreEventEntity.self,
                          ChoreSnapshotEntity.self,
+                         GoalEntity.self,
                          OutboxEntity.self, HTTPOutboxEntity.self])
     // Explicitly opt OUT of NSPersistentCloudKitContainer mirroring. Having
     // CloudKit in the target entitlements would otherwise switch SwiftData
@@ -1092,6 +1136,16 @@ enum LocalCache {
       guard e.status == .open, let d = e.due, d <= today else { return acc }
       return acc + 1
     }
+  }
+
+  @MainActor
+  static func goals(in context: ModelContext) -> [Goal] {
+    let descriptor = FetchDescriptor<GoalEntity>(
+      sortBy: [SortDescriptor(\.sortIndex, order: .reverse),
+               SortDescriptor(\.updatedAt, order: .reverse)]
+    )
+    let rows = (try? context.fetch(descriptor)) ?? []
+    return rows.map(Goal.init)
   }
 
   @MainActor

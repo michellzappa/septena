@@ -145,7 +145,7 @@ final class CloudKitProjectsBackend: ProjectsBackend {
       engine.noteProjectChange(id: id)
       SeptenaLog.info("[CK] project \(op) id=\(id) title=\"\(title)\" → engine.noteProjectChange")
     }
-    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    NotificationCenter.default.post(name: .septenaStructureChanged, object: nil)
   }
 
   func create(title: String, area: String?) async throws -> Project {

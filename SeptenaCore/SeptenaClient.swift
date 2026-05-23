@@ -6,10 +6,12 @@ import Foundation
 // MARK: - Change notification
 
 extension Notification.Name {
-  /// Posted by SeptenaClient after any task / project / area mutation
-  /// completes. Sidebar (and any other observer) subscribes to refresh
-  /// counts without having to know about each individual mutation path.
+  /// Posted after task mutations and CloudKit task-sync batches complete.
   static let septenaTasksChanged = Notification.Name("septena.tasksChanged")
+  /// Posted after area / project structure changes and CloudKit batches
+  /// that update those records. Lets task-centric views avoid reloading
+  /// when only navigation structure changed.
+  static let septenaStructureChanged = Notification.Name("septena.structureChanged")
   /// Generic mutation broadcast — fires after any non-task mutation (habits,
   /// supplements, chores, gut, nutrition, caffeine, cannabis, groceries).
   /// Destinations that show those sections subscribe to refresh themselves

@@ -28,17 +28,8 @@ enum IDShortcode {
   }
 }
 
-// AreasBackend — the mutation seam for areas across FastAPI ⇄ CloudKit.
-// Same pattern as `TasksBackend`: a thin protocol with a CK impl that
-// works against `CKEngine`, and a `TaskMutator`-style facade
-// (`AreasMutator`) that views call without worrying about which backend
-// is current.
-//
-// On the FastAPI side, areas live as a single replaced-wholesale array
-// (`PUT /api/tasks/areas`). To make per-row semantics work uniformly, the
-// FastAPI impl reads the current list, applies the mutation, and writes
-// the whole list back. Phase 6 deletes this layer — CK becomes the only
-// backend and the bulk-replace dance disappears.
+// AreasBackend — the mutation seam for areas. Views call `AreasMutator`
+// without caring how the write reaches the CloudKit mirror.
 
 @MainActor
 protocol AreasBackend: AnyObject {
@@ -183,7 +174,7 @@ final class CloudKitAreasBackend: AreasBackend {
       engine.noteAreaChange(id: id)
       SeptenaLog.info("[CK] area \(op) id=\(id) title=\"\(title)\" → engine.noteAreaChange")
     }
-    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    NotificationCenter.default.post(name: .septenaStructureChanged, object: nil)
   }
 
   func create(title: String, context ctx: String?) async throws -> Area {
