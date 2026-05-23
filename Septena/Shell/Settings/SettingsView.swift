@@ -971,29 +971,13 @@ struct SectionDetailPane: View {
 
   @ViewBuilder
   private var trainingConfig: some View {
-    if !store.sessionTypes.isEmpty {
-      Section("Session types") {
-        ForEach(store.sessionTypes) { t in
-          VStack(alignment: .leading, spacing: 4) {
-            HStack {
-              if let e = t.emoji { Text(e) }
-              Text(t.label).foregroundStyle(.primary)
-              Spacer()
-              Text(t.id)
-                .font(.caption.monospaced())
-                .foregroundStyle(.secondary)
-            }
-            if !t.exercises.isEmpty {
-              Text(t.exercises.joined(separator: " · "))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-          }
-          .padding(.vertical, 2)
-        }
-      }
-    } else {
-      EmptyView()
+    Section("Training") {
+      NavigationLink {
+        ExerciseCatalogView()
+      } label: { Label("Exercises", systemImage: "figure.strengthtraining.traditional") }
+      NavigationLink {
+        RoutineCatalogView()
+      } label: { Label("Routines", systemImage: "list.bullet.rectangle") }
     }
   }
 
