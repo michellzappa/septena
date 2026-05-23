@@ -992,6 +992,14 @@ final class TrainingDraftStore {
     let entries = exercises.map { ex in
       DraftEntry.from(exercise: ex, last: last[ex])
     }
+    // Snapshot last-entry + PR baselines per exercise. Keyed by lowercased
+    // name so the card's lookup is case-insensitive (matches the casing
+    // contract used by ChecklistMirror's Z2 / suggestion paths).
+    let lastByExercise = Dictionary(uniqueKeysWithValues: exercises.compactMap { ex -> (String, LastEntryValues)? in
+      guard let v = last[ex] else { return nil }
+      return (ex.lowercased(), v)
+    })
+    let prBaselines = TrainingPRCalculator.baselines(for: exercises, in: context)
     let now = Date()
     let timeF = DateFormatter()
     timeF.dateFormat = "HH:mm"
@@ -1006,7 +1014,9 @@ final class TrainingDraftStore {
       label: type.label,
       entries: entries,
       startedAt: isoF.string(from: now),
-      updatedAt: isoF.string(from: now)
+      updatedAt: isoF.string(from: now),
+      lastByExercise: lastByExercise,
+      prBaselines: prBaselines
     )
     persist()
   }
@@ -1326,13 +1336,21 @@ struct TrainingExerciseCard: View {
         .font(.system(size: 18, weight: .regular))
         .frame(width: 22)
       VStack(alignment: .leading, spacing: 2) {
-        Text(entry.exercise.capitalized)
-          .font(.septenaCardTitle)
-          .foregroundStyle(Theme.inkPrimary)
+        HStack(spacing: 6) {
+          Text(entry.exercise.capitalized)
+            .font(.septenaCardTitle)
+            .foregroundStyle(Theme.inkPrimary)
+          if isPR { prPill }
+        }
         if let s = summaryLine {
           Text(s)
             .font(.septenaMeta)
             .foregroundStyle(Theme.inkSecondary)
+        }
+        if let l = lastTimeLine {
+          Text(l)
+            .font(.septenaMeta)
+            .foregroundStyle(Theme.inkSecondary.opacity(0.75))
         }
       }
       Spacer()
@@ -1387,6 +1405,70 @@ struct TrainingExerciseCard: View {
       if !entry.difficulty.isEmpty { parts.append(entry.difficulty) }
     }
     return parts.isEmpty ? nil : parts.joined(separator: " · ")
+  }
+
+  // MARK: - Progression hints
+
+  private var lastValues: LastEntryValues? {
+    store.draft?.lastByExercise[entry.exercise.lowercased()]
+  }
+
+  private var baseline: PRBaseline? {
+    store.draft?.prBaselines[entry.exercise.lowercased()]
+  }
+
+  /// "Last: 60kg · 3×8 · 2d ago" — one-line recap of the user's last
+  /// session for this exercise. Built from LastEntryValues so it
+  /// reflects the same numbers used to prefill the inputs. Returns
+  /// nil when there's no historical entry at all.
+  private var lastTimeLine: String? {
+    guard let l = lastValues else { return nil }
+    var parts: [String] = []
+    if entry.isCardio {
+      if let d = l.durationMin, d > 0 { parts.append("\(Int(d)) min") }
+      if let m = l.distanceM, m > 0 {
+        parts.append(m >= 1000 ? String(format: "%.1f km", m/1000) : "\(Int(m)) m")
+      }
+      if let lvl = l.level, lvl > 0 { parts.append("L\(fmt(lvl))") }
+    } else {
+      if let w = l.weight, w > 0 {
+        parts.append(w.truncatingRemainder(dividingBy: 1) == 0
+                     ? "\(Int(w))kg" : String(format: "%.1fkg", w))
+      }
+      if let s = l.sets, let r = l.reps { parts.append("\(s)×\(r)") }
+    }
+    if let when = relativeDays(from: l.date) { parts.append(when) }
+    guard !parts.isEmpty else { return nil }
+    return "Last: " + parts.joined(separator: " · ")
+  }
+
+  private var isPR: Bool {
+    guard let baseline else { return false }
+    return TrainingPRCalculator.isPR(draft: entry, baseline: baseline)
+  }
+
+  private var prPill: some View {
+    Text("PR")
+      .font(.caption2.weight(.bold))
+      .padding(.horizontal, 6)
+      .padding(.vertical, 2)
+      .background(accent.opacity(0.18), in: Capsule())
+      .foregroundStyle(accent)
+      .accessibilityLabel("Personal record")
+  }
+
+  // "2026-05-20" → "2d ago", "Today", "Yesterday". Returns nil for
+  // missing / unparseable dates so the line collapses cleanly.
+  private func relativeDays(from iso: String?) -> String? {
+    guard let iso, let date = SeptenaDate.parse(iso) else { return nil }
+    let cal = Calendar.current
+    let days = cal.dateComponents([.day], from: cal.startOfDay(for: date),
+                                  to: cal.startOfDay(for: Date())).day ?? 0
+    switch days {
+    case 0: return "today"
+    case 1: return "1d ago"
+    default: return "\(days)d ago"
+    }
   }
 
   // MARK: - Editor (expanded)

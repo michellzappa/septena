@@ -14,6 +14,7 @@
 		0448F507E1F1600F9933AEED /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5ECFDA9128B73993023CB6 /* Models.swift */; };
 		06404AD63413258122570D58 /* RemindersImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A9CFE2B4EA160E84F58544 /* RemindersImportView.swift */; };
 		06CB84746E264F6A858A8F59 /* TrainingConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3433AE6FCB2549D390F9E43A /* TrainingConfigStore.swift */; };
+		FAFAFAFA000000000000C003 /* TrainingPRCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAFAFAFA000000000000C001 /* TrainingPRCalculator.swift */; };
 		07B127F5FBCE0DE19AFCD387 /* SectionTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03DC46C772E45B60ECB7343 /* SectionTheme.swift */; };
 		07F54D0DB13468114771FD91 /* Outbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD295FAB7B881CAC43EE8C34 /* Outbox.swift */; };
 		0A871A3A42EE54FEC6B17A0A /* AddInfoRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D3C4FD96F6113A7975BA394 /* AddInfoRouter.swift */; };
@@ -98,6 +99,7 @@
 		5330AF71083A1F3514B862B8 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */; };
 		533D26E5CB13EAC2F2B088B2 /* TrainingQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F79B52B56CF74E2F11586CC /* TrainingQuickAddMenu.swift */; };
 		5441C30D38B94A9CA289C527 /* TrainingConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3433AE6FCB2549D390F9E43A /* TrainingConfigStore.swift */; };
+		FAFAFAFA000000000000C002 /* TrainingPRCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAFAFAFA000000000000C001 /* TrainingPRCalculator.swift */; };
 		56E87EA383673A4ACE86F2CD /* BadgeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EC7C9D9CAC52C91AFE79AE7 /* BadgeManager.swift */; };
 		57C60FD78BA0AE6412721809 /* NutritionSearchSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 533ABAE12036AA623BE82B59 /* NutritionSearchSheet.swift */; };
 		57CDC37DD71D40C12819E6C6 /* GutDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2AF70B89A0D3FC41DAFAFE9 /* GutDestinationView.swift */; };
@@ -373,6 +375,7 @@
 		300B15288763456C89D8AF5E /* RoutineDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineDetailView.swift; sourceTree = "<group>"; };
 		31313A0E804B33A3E43FC1F6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		3433AE6FCB2549D390F9E43A /* TrainingConfigStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrainingConfigStore.swift; sourceTree = "<group>"; };
+		FAFAFAFA000000000000C001 /* TrainingPRCalculator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrainingPRCalculator.swift; sourceTree = "<group>"; };
 		3841DB555C39521C2A088942 /* CaffeineQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaffeineQuickAddMenu.swift; sourceTree = "<group>"; };
 		3882D64DF6517B0447F5F65C /* TasksBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksBackend.swift; sourceTree = "<group>"; };
 		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -915,6 +918,7 @@
 				CCA388A73616C38F7456E6BE /* AranetBridge.swift */,
 				C23414685B03BA930E6C4D94 /* AirStore.swift */,
 				3433AE6FCB2549D390F9E43A /* TrainingConfigStore.swift */,
+				FAFAFAFA000000000000C001 /* TrainingPRCalculator.swift */,
 				FAFAFAFA000000000000A001 /* DefaultExerciseLibrary.swift */,
 				168F70A74A3AA9D2A0E234DB /* PollenClient.swift */,
 			);
@@ -1228,6 +1232,7 @@
 				9A403F3BAF0087FD1583B6E3 /* AranetBridge.swift in Sources */,
 				0C5C19796C2D4515B47D2690 /* AirStore.swift in Sources */,
 				5441C30D38B94A9CA289C527 /* TrainingConfigStore.swift in Sources */,
+				FAFAFAFA000000000000C002 /* TrainingPRCalculator.swift in Sources */,
 				FAFAFAFA000000000000A002 /* DefaultExerciseLibrary.swift in Sources */,
 				FAFAFAFA000000000000B002 /* ExerciseLibrarySheet.swift in Sources */,
 				39DF76042915AEA3F266DB4E /* PollenClient.swift in Sources */,
@@ -1391,6 +1396,7 @@
 				C2F0C7B6B510698BFF2B27C8 /* AranetBridge.swift in Sources */,
 				B29CF73788726A5C55ABF071 /* AirStore.swift in Sources */,
 				06CB84746E264F6A858A8F59 /* TrainingConfigStore.swift in Sources */,
+				FAFAFAFA000000000000C003 /* TrainingPRCalculator.swift in Sources */,
 				FAFAFAFA000000000000A003 /* DefaultExerciseLibrary.swift in Sources */,
 				FAFAFAFA000000000000B003 /* ExerciseLibrarySheet.swift in Sources */,
 				A1039E0E7E67EBD3249D3115 /* PollenClient.swift in Sources */,

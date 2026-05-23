@@ -1780,6 +1780,14 @@ struct DraftSession: Codable, Hashable {
   var entries: [DraftEntry]
   var startedAt: String      // ISO8601
   var updatedAt: String
+  /// Snapshot of "last time" values for each exercise in the session,
+  /// captured at start() and stable for the whole workout so the
+  /// progression hints don't shift mid-set. Keyed by lowercased name.
+  var lastByExercise: [String: LastEntryValues] = [:]
+  /// PR baselines captured at start() so the "PR" pill threshold
+  /// stays put across the session even if the user logs a new PR
+  /// on the first set.
+  var prBaselines: [String: PRBaseline] = [:]
 
   /// Index of the next pending entry, or nil if everything's done/skipped.
   var nextPendingIndex: Int? {
