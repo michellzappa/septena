@@ -1332,7 +1332,9 @@ struct TrainingExerciseCard: View {
     .opacity(opacityFor(entry.status))
     .contentShape(Rectangle())
     .onTapGesture {
-      motion.run(.easeInOut(duration: 0.18)) { expanded.toggle() }
+      // No animation on expand/collapse — at the gym you want the
+      // editor to be there or not, no in-between motion.
+      expanded.toggle()
     }
   }
 
@@ -1344,18 +1346,11 @@ struct TrainingExerciseCard: View {
         .foregroundStyle(statusTint)
         .font(.system(size: 18, weight: .regular))
         .frame(width: 22)
-      VStack(alignment: .leading, spacing: 2) {
-        HStack(spacing: 6) {
-          Text(entry.exercise.capitalized)
-            .font(.septenaCardTitle)
-            .foregroundStyle(Theme.inkPrimary)
-          if isPR { prPill }
-        }
-        if let s = summaryLine {
-          Text(s)
-            .font(.septenaMeta)
-            .foregroundStyle(Theme.inkSecondary)
-        }
+      HStack(spacing: 6) {
+        Text(entry.exercise.capitalized)
+          .font(.septenaCardTitle)
+          .foregroundStyle(Theme.inkPrimary)
+        if isPR { prPill }
       }
       Spacer()
       Image(systemName: expanded ? "chevron.up" : "chevron.down")
@@ -1390,25 +1385,6 @@ struct TrainingExerciseCard: View {
     case .skipped: return 0.45
     default:       return 1
     }
-  }
-
-  private var summaryLine: String? {
-    var parts: [String] = []
-    if entry.isCardio {
-      if let d = entry.durationMin, d > 0 { parts.append("\(Int(d)) min") }
-      if let m = entry.distanceM, m > 0 {
-        parts.append(m >= 1000 ? String(format: "%.1f km", m/1000) : "\(Int(m)) m")
-      }
-      if let l = entry.level, l > 0 { parts.append("L\(fmt(l))") }
-    } else {
-      if let w = entry.weight, w > 0 {
-        parts.append(w.truncatingRemainder(dividingBy: 1) == 0
-                     ? "\(Int(w))kg" : String(format: "%.1fkg", w))
-      }
-      if let s = entry.sets, let r = entry.reps { parts.append("\(s)×\(r)") }
-      if !entry.difficulty.isEmpty { parts.append(entry.difficulty) }
-    }
-    return parts.isEmpty ? nil : parts.joined(separator: " · ")
   }
 
   // MARK: - Progression hints
