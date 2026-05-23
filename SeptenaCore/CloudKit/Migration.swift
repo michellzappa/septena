@@ -794,67 +794,129 @@ final class ChecklistCloudKitBootstrapper {
     self.client = client
   }
 
-  /// First-run bridge for habits/supplements. We seed the local canonical
-  /// mirror from FastAPI range endpoints only when this domain has not yet
-  /// round-tripped through CloudKit on this install.
-  func bootstrapIfNeeded(historyDays: Int = 3650) async throws {
+  // Per-install completion flags. The original `cloudKitSystemFields ==
+  // nil` heuristic was fragile: as soon as the user toggled a single
+  // habit/supplement/chore the corresponding record got CK system fields
+  // stamped, after which the bootstrap permanently believed there was
+  // nothing left to import — even though years of FastAPI history had
+  // never been touched. UserDefaults gives us an unambiguous "this domain
+  // has imported its FastAPI history" record that survives across launches
+  // and isn't perturbed by ordinary mutations.
+  private enum BootstrapKey {
+    static let habits      = "septena.bootstrap.habits.v1"
+    static let supplements = "septena.bootstrap.supplements.v1"
+    static let chores      = "septena.bootstrap.chores.v1"
+    static let goals       = "septena.bootstrap.goals.v1"
+  }
+
+  /// First-run bridge for habits/supplements/chores. Seeds the local
+  /// canonical mirror from FastAPI range endpoints only when this domain
+  /// has not yet been imported on this install. Idempotent — re-running
+  /// after success is a no-op.
+  func bootstrapIfNeeded(historyDays: Int = 30) async throws {
+    try await bootstrap(historyDays: historyDays, force: false)
+  }
+
+  /// Manual "import history from FastAPI again" path for the Settings
+  /// recovery button. Ignores the completion flags and re-pulls from the
+  /// server, then queues everything for CloudKit upload. Use when:
+  ///   - Bootstrap silently no-op'd because the old `cloudKitSystemFields`
+  ///     heuristic was already poisoned by a single CK round-trip
+  ///   - The user wants to re-sync from the source of truth after a wipe
+  func forceBootstrap(historyDays: Int = 30) async throws {
+    try await bootstrap(historyDays: historyDays, force: true)
+  }
+
+  private func bootstrap(historyDays: Int, force: Bool) async throws {
     var importedAny = false
+    let defaults = UserDefaults.standard
 
-    if needsHabitBootstrap {
-      let habits = try await client.habitsRange(days: historyDays)
-      ChecklistMirror.replaceAllHabitsHistory(habits, context: context)
-      queueHabitMirrorForUpload()
-      importedAny = true
+    if force || !defaults.bool(forKey: BootstrapKey.habits) {
+      if let habits = try? await client.habitsRange(days: historyDays) {
+        ChecklistMirror.replaceAllHabitsHistory(habits, context: context)
+        queueHabitMirrorForUpload()
+        defaults.set(true, forKey: BootstrapKey.habits)
+        importedAny = true
+        SeptenaLog.info("[Bootstrap] habits imported: \(habits.days.count) days")
+      }
     }
 
-    if needsSupplementBootstrap {
-      let supplements = try await client.supplementsRange(days: historyDays)
-      ChecklistMirror.replaceAllSupplementsHistory(supplements, context: context)
-      queueSupplementMirrorForUpload()
-      importedAny = true
+    if force || !defaults.bool(forKey: BootstrapKey.supplements) {
+      if let supplements = try? await client.supplementsRange(days: historyDays) {
+        ChecklistMirror.replaceAllSupplementsHistory(supplements, context: context)
+        queueSupplementMirrorForUpload()
+        defaults.set(true, forKey: BootstrapKey.supplements)
+        importedAny = true
+        SeptenaLog.info("[Bootstrap] supplements imported: \(supplements.days.count) days")
+      }
     }
 
-    if needsChoreBootstrap,
-       let chores = try? await client.choresExport(days: historyDays) {
-      ChecklistMirror.replaceAllChoresExport(chores, context: context)
-      queueChoreMirrorForUpload()
-      importedAny = true
+    if force || !defaults.bool(forKey: BootstrapKey.chores) {
+      if let chores = try? await client.choresExport(days: historyDays) {
+        ChecklistMirror.replaceAllChoresExport(chores, context: context)
+        queueChoreMirrorForUpload()
+        defaults.set(true, forKey: BootstrapKey.chores)
+        importedAny = true
+        SeptenaLog.info("[Bootstrap] chores imported: defs=\(chores.definitions.count) events=\(chores.events.count)")
+      }
+    }
+
+    if force || !defaults.bool(forKey: BootstrapKey.goals) {
+      if let goals = try? await client.goals() {
+        importGoals(goals)
+        queueGoalsForUpload()
+        defaults.set(true, forKey: BootstrapKey.goals)
+        importedAny = true
+        SeptenaLog.info("[Bootstrap] goals imported: \(goals.count)")
+      }
     }
 
     guard importedAny else { return }
     try? context.save()
-    try await engine.sendChanges()
-    try await engine.fetchChanges()
+    // sendChanges / fetchChanges can throw transient CloudKit errors
+    // (CAS Op-Lock conflicts, zoneBusy, network blips). The engine has
+    // already accepted the pending changes into its persistent state —
+    // they'll drain on the next opportunity regardless of whether this
+    // synchronous push succeeds. We `try?` so a transient failure during
+    // the explicit flush doesn't bubble up as a user-visible bootstrap
+    // error when the local import itself was successful.
+    do {
+      try await engine.sendChanges()
+    } catch {
+      SeptenaLog.info("[Bootstrap] sendChanges deferred: \(error.localizedDescription)")
+    }
+    do {
+      try await engine.fetchChanges()
+    } catch {
+      SeptenaLog.info("[Bootstrap] fetchChanges deferred: \(error.localizedDescription)")
+    }
   }
 
-  private var needsHabitBootstrap: Bool {
-    let defs = (try? context.fetch(FetchDescriptor<HabitDefinitionEntity>())) ?? []
-    let states = (try? context.fetch(FetchDescriptor<HabitDayStateEntity>())) ?? []
-    guard defs.contains(where: { $0.cloudKitSystemFields != nil }) == false,
-          states.contains(where: { $0.cloudKitSystemFields != nil }) == false else {
-      return false
+  private func importGoals(_ goals: [Goal]) {
+    let existing = (try? context.fetch(FetchDescriptor<GoalEntity>())) ?? []
+    let existingByID = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
+    var seenIDs = Set<String>()
+    for (index, goal) in goals.enumerated() {
+      seenIDs.insert(goal.id)
+      let entity = existingByID[goal.id] ?? GoalEntity(
+        id: goal.id,
+        text: goal.text,
+        sections: goal.sections,
+        created: goal.created,
+        sortIndex: index
+      )
+      entity.text = goal.text
+      entity.sections = goal.sections
+      entity.created = goal.created
+      entity.sortIndex = index
+      entity.updatedAt = .now
+      if entity.modelContext == nil { context.insert(entity) }
     }
-    return true
-  }
-
-  private var needsSupplementBootstrap: Bool {
-    let defs = (try? context.fetch(FetchDescriptor<SupplementDefinitionEntity>())) ?? []
-    let states = (try? context.fetch(FetchDescriptor<SupplementDayStateEntity>())) ?? []
-    guard defs.contains(where: { $0.cloudKitSystemFields != nil }) == false,
-          states.contains(where: { $0.cloudKitSystemFields != nil }) == false else {
-      return false
-    }
-    return true
-  }
-
-  private var needsChoreBootstrap: Bool {
-    let defs = (try? context.fetch(FetchDescriptor<ChoreDefinitionEntity>())) ?? []
-    let events = (try? context.fetch(FetchDescriptor<ChoreEventEntity>())) ?? []
-    guard defs.contains(where: { $0.cloudKitSystemFields != nil }) == false,
-          events.contains(where: { $0.cloudKitSystemFields != nil }) == false else {
-      return false
-    }
-    return true
+    // Don't delete locally-only goals — the user may have created them on
+    // this device after bootstrap, and a forced re-import shouldn't wipe
+    // those. FastAPI is the source of historical data, not the canonical
+    // current state.
+    _ = seenIDs
   }
 
   private func queueHabitMirrorForUpload() {
@@ -876,6 +938,13 @@ final class ChecklistCloudKitBootstrapper {
     }
     for state in states {
       engine.noteSupplementEventChange(id: state.id)
+    }
+  }
+
+  private func queueGoalsForUpload() {
+    let goals = (try? context.fetch(FetchDescriptor<GoalEntity>())) ?? []
+    for goal in goals {
+      engine.noteGoalChange(id: goal.id)
     }
   }
 

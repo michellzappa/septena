@@ -199,6 +199,8 @@ func noteChoreDefinitionChange(id: String) { noteChange(recordName: ChoreDefinit
 func noteChoreDefinitionDeletion(id: String) { noteDeletion(recordName: ChoreDefinitionCloudKitSchema.recordName(for: id), kind: "choreDefinition") }
 func noteChoreEventChange(id: String) { noteChange(recordName: ChoreEventCloudKitSchema.recordName(for: id), kind: "choreEvent") }
 func noteChoreEventDeletion(id: String) { noteDeletion(recordName: ChoreEventCloudKitSchema.recordName(for: id), kind: "choreEvent") }
+func noteGoalChange(id: String) { noteChange(recordName: GoalCloudKitSchema.recordName(for: id), kind: "goal") }
+func noteGoalDeletion(id: String) { noteDeletion(recordName: GoalCloudKitSchema.recordName(for: id), kind: "goal") }
 
   private func noteChange(recordName: String, kind: String) {
     guard let engine else {
@@ -426,9 +428,32 @@ func handleEvent(
       // already knows about them), so this is the only path that
       // updates `cloudKitSystemFields` post-send.
       SeptenaLog.info("[CKEngine] sent: saves=\(sent.savedRecords.count) deletes=\(sent.deletedRecordIDs.count) failedSaves=\(sent.failedRecordSaves.count) failedDeletes=\(sent.failedRecordDeletes.count)")
+
+      // For serverRecordChanged (oplock) failures: CKSyncEngine doesn't
+      // populate CKError.serverRecord in this context, so we fetch the
+      // current server version directly. This must happen before the
+      // MainActor block so the fresh records are ready to fold in.
+      // Capture database on MainActor first (CKSyncEngine breaks @MainActor isolation).
+      let oplockIDs = sent.failedRecordSaves.compactMap { fail -> CKRecord.ID? in
+        guard let ckErr = fail.error as? CKError, ckErr.code == .serverRecordChanged else { return nil }
+        return fail.record.recordID
+      }
+      var freshServerRecords: [CKRecord] = []
+      if !oplockIDs.isEmpty {
+        let db: CKDatabase = await MainActor.run { self.database }
+        let results = (try? await db.records(for: oplockIDs)) ?? [:]
+        freshServerRecords = results.values.compactMap { try? $0.get() }
+        SeptenaLog.info("[CKEngine] fetched \(freshServerRecords.count) fresh records for oplock resolution")
+      }
+
       await MainActor.run {
         for save in sent.savedRecords {
           applyFetchedRecord?(save)
+        }
+        // Apply fresh server versions of oplock-conflicting records so the
+        // next CKSyncEngine retry sends the correct etag instead of looping.
+        for fresh in freshServerRecords {
+          applyFetchedRecord?(fresh)
         }
         for fail in sent.failedRecordSaves {
           SeptenaLog.error("[CKEngine] sent.save FAIL id=\(fail.record.recordID.recordName) error=\(fail.error.localizedDescription)")

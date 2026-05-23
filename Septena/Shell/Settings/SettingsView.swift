@@ -2,6 +2,9 @@ import SwiftUI
 import SwiftData
 import EventKit
 import CloudKit
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // Settings — the single unified surface for everything user-configurable.
 // One sheet, one store, one entry point (sidebar row + ⌘,).
@@ -38,6 +41,112 @@ enum SettingsKey {
   /// state — there's no per-project manual order in this app, so one global
   /// choice is the whole sort surface.
   static let taskSort         = "septena.task.sort"
+}
+
+enum AppIconOption: String, CaseIterable, Identifiable {
+  case `default` = "AppIcon"
+  case red       = "AppIconRed"
+  case orange    = "AppIconOrange"
+  case yellow    = "AppIconYellow"
+  case green     = "AppIconGreen"
+  case cyan      = "AppIconCyan"
+  case blue      = "AppIconBlue"
+  case purple    = "AppIconPurple"
+
+  var id: String { rawValue }
+
+  var title: String {
+    switch self {
+    case .default: return "Default"
+    case .red:     return "Red"
+    case .orange:  return "Orange"
+    case .yellow:  return "Yellow"
+    case .green:   return "Green"
+    case .cyan:    return "Cyan"
+    case .blue:    return "Blue"
+    case .purple:  return "Purple"
+    }
+  }
+
+  var alternateIconName: String? {
+    self == .default ? nil : rawValue
+  }
+
+  var background: Color {
+    background(forDarkMode: false)
+  }
+
+  func background(forDarkMode isDarkMode: Bool) -> Color {
+    if isDarkMode {
+      return .clear
+    }
+    switch self {
+    case .default: return .white
+    case .red:     return parseHexColor("#ef4444")
+    case .orange:  return parseHexColor("#f97316")
+    case .yellow:  return parseHexColor("#eab308")
+    case .green:   return parseHexColor("#22c55e")
+    case .cyan:    return parseHexColor("#06b6d4")
+    case .blue:    return parseHexColor("#3b82f6")
+    case .purple:  return parseHexColor("#8b5cf6")
+    }
+  }
+
+  var dotColors: [Color] {
+    dotColors(forDarkMode: false)
+  }
+
+  func dotColors(forDarkMode isDarkMode: Bool) -> [Color] {
+    if isDarkMode {
+      switch self {
+      case .default:
+        return [
+          parseHexColor("#ef4444"),
+          parseHexColor("#f97316"),
+          parseHexColor("#eab308"),
+          parseHexColor("#22c55e"),
+          parseHexColor("#06b6d4"),
+          parseHexColor("#3b82f6"),
+          parseHexColor("#8b5cf6"),
+        ]
+      case .red:
+        return Array(repeating: parseHexColor("#ef4444"), count: 7)
+      case .orange:
+        return Array(repeating: parseHexColor("#f97316"), count: 7)
+      case .yellow:
+        return Array(repeating: parseHexColor("#eab308"), count: 7)
+      case .green:
+        return Array(repeating: parseHexColor("#22c55e"), count: 7)
+      case .cyan:
+        return Array(repeating: parseHexColor("#06b6d4"), count: 7)
+      case .blue:
+        return Array(repeating: parseHexColor("#3b82f6"), count: 7)
+      case .purple:
+        return Array(repeating: parseHexColor("#8b5cf6"), count: 7)
+      }
+    }
+    switch self {
+    case .default:
+      return [
+        parseHexColor("#ef4444"),
+        parseHexColor("#f97316"),
+        parseHexColor("#eab308"),
+        parseHexColor("#22c55e"),
+        parseHexColor("#06b6d4"),
+        parseHexColor("#3b82f6"),
+        parseHexColor("#8b5cf6"),
+      ]
+    default:
+      return Array(repeating: .white, count: 7)
+    }
+  }
+
+  #if os(iOS)
+  static var current: AppIconOption {
+    guard let name = UIApplication.shared.alternateIconName else { return .default }
+    return AppIconOption(rawValue: name) ?? .default
+  }
+  #endif
 }
 
 /// Sort modes for tasks within a project or area detail view. Areas and
@@ -139,12 +248,12 @@ final class SettingsStore {
     async let cnb   = try? await client.cannabisConfig()
     async let macs  = try? await client.nutritionMacrosConfig()
     async let sess  = try? await client.sessionTypes()
-    async let chrs  = try? await client.chores()
+    // Chores are CloudKit-authoritative — pull from the local mirror.
+    let ch: [ChoreItem]? = ChecklistMirror.loadChores(context: context)
     let cf = await caf
     let cn = await cnb
     let mc = await macs
     let st = await sess
-    let ch = await chrs
     // Only overwrite + cache the values where the network actually
     // returned something — failed fetches leave the (cache-primed)
     // values alone instead of wiping them to nil / empty.
@@ -427,17 +536,192 @@ struct PrivacySettingsPane: View {
 // MARK: - General
 
 struct GeneralSettingsPane: View {
+  #if os(iOS)
+  @State private var selectedIcon: AppIconOption = .current
+  @State private var iconError: String? = nil
+  @State private var iconChangeInFlight = false
+  #endif
+
   var body: some View {
     Form {
+      #if os(iOS)
+      if UIApplication.shared.supportsAlternateIcons {
+        appIconSection
+      } else {
+        Section {
+          Text("App icon selection isn’t available on this device.")
+            .font(.callout)
+            .foregroundStyle(.secondary)
+        }
+      }
+      #else
       Section {
-        Text("App-wide settings will appear here.")
+        Text("App icon selection is available on the iPhone and iPad app.")
           .font(.callout)
           .foregroundStyle(.secondary)
       }
+      #endif
     }
     .formStyle(.grouped)
+    #if os(iOS)
+    .onAppear { selectedIcon = .current }
+    .alert("Couldn’t Change App Icon", isPresented: Binding(
+      get: { iconError != nil },
+      set: { if !$0 { iconError = nil } }
+    )) {
+      Button("OK", role: .cancel) { iconError = nil }
+    } message: {
+      Text(iconError ?? "Please try again.")
+    }
+    #endif
+  }
+
+  #if os(iOS)
+  private var appIconSection: some View {
+    Section {
+      VStack(alignment: .leading, spacing: 16) {
+        HStack(spacing: 14) {
+          AppIconPreview(option: selectedIcon, size: 62)
+          VStack(alignment: .leading, spacing: 3) {
+            Text("Current Icon")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+            Text(selectedIcon.title)
+              .font(.headline)
+            if selectedIcon == .default {
+              Text("The original multicolor icon.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            } else {
+              Text("Light mode uses a \(selectedIcon.title.lowercased()) background with white discs. Dark mode uses transparent artwork so the system background shows through behind \(selectedIcon.title.lowercased()) discs.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            }
+          }
+          Spacer()
+        }
+
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 12)], spacing: 12) {
+          ForEach(AppIconOption.allCases) { option in
+            Button {
+              selectIcon(option)
+            } label: {
+              AppIconChoiceCard(option: option,
+                                isSelected: option == selectedIcon,
+                                isDisabled: iconChangeInFlight)
+            }
+            .buttonStyle(.plain)
+            .disabled(iconChangeInFlight)
+          }
+        }
+      }
+      .padding(.vertical, 4)
+    } header: {
+      Text("App Icon")
+    } footer: {
+      Text("iOS shows a confirmation prompt each time you switch icons.")
+    }
+  }
+
+  private func selectIcon(_ option: AppIconOption) {
+    guard option != selectedIcon, !iconChangeInFlight else { return }
+    iconChangeInFlight = true
+    UIApplication.shared.setAlternateIconName(option.alternateIconName) { error in
+      DispatchQueue.main.async {
+        iconChangeInFlight = false
+        if let error {
+          selectedIcon = .current
+          iconError = error.localizedDescription
+        } else {
+          selectedIcon = option
+        }
+      }
+    }
+  }
+  #endif
+}
+
+#if os(iOS)
+private struct AppIconChoiceCard: View {
+  let option: AppIconOption
+  let isSelected: Bool
+  let isDisabled: Bool
+
+  var body: some View {
+    VStack(spacing: 8) {
+      ZStack(alignment: .topTrailing) {
+        AppIconPreview(option: option, size: 64)
+        if isSelected {
+          Image(systemName: "checkmark.circle.fill")
+            .font(.system(size: 18, weight: .semibold))
+            .foregroundStyle(.white, .green)
+            .shadow(color: .black.opacity(0.16), radius: 4, y: 1)
+            .offset(x: 5, y: -5)
+        }
+      }
+      Text(option.title)
+        .font(.footnote.weight(isSelected ? .semibold : .regular))
+        .foregroundStyle(.primary)
+        .lineLimit(1)
+        .minimumScaleFactor(0.9)
+    }
+    .frame(maxWidth: .infinity)
+    .padding(.horizontal, 10)
+    .padding(.vertical, 10)
+    .background(cardBackground)
+    .overlay(
+      RoundedRectangle(cornerRadius: 16, style: .continuous)
+        .stroke(isSelected ? option.background.opacity(option == .default ? 0.18 : 0.92)
+                           : Color.primary.opacity(0.08),
+                lineWidth: isSelected ? 2 : 1)
+    )
+    .opacity(isDisabled ? 0.7 : 1)
+    .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+  }
+
+  private var cardBackground: some ShapeStyle {
+    isSelected
+      ? AnyShapeStyle(option.background.opacity(option == .default ? 0.08 : 0.16))
+      : AnyShapeStyle(Color(uiColor: .secondarySystemGroupedBackground))
   }
 }
+
+private struct AppIconPreview: View {
+  @Environment(\.colorScheme) private var colorScheme
+  let option: AppIconOption
+  let size: CGFloat
+
+  private let discCenters: [CGPoint] = [
+    CGPoint(x: 0.50, y: 0.2235),
+    CGPoint(x: 0.7171, y: 0.3256),
+    CGPoint(x: 0.7709, y: 0.5631),
+    CGPoint(x: 0.6206, y: 0.7505),
+    CGPoint(x: 0.3794, y: 0.7505),
+    CGPoint(x: 0.2291, y: 0.5631),
+    CGPoint(x: 0.2829, y: 0.3256),
+  ]
+
+  var body: some View {
+    let isDarkMode = colorScheme == .dark
+    ZStack {
+      RoundedRectangle(cornerRadius: size * 0.223, style: .continuous)
+        .fill(option.background(forDarkMode: isDarkMode))
+      ForEach(Array(discCenters.enumerated()), id: \.offset) { index, center in
+        Circle()
+          .fill(option.dotColors(forDarkMode: isDarkMode)[index])
+          .frame(width: size * 0.182, height: size * 0.182)
+          .position(x: size * center.x, y: size * center.y)
+      }
+    }
+    .frame(width: size, height: size)
+    .overlay(
+      RoundedRectangle(cornerRadius: size * 0.223, style: .continuous)
+        .stroke(Color.black.opacity(isDarkMode ? 0.12 : (option == .default ? 0.07 : 0.09)), lineWidth: 0.8)
+    )
+    .shadow(color: .black.opacity(0.10), radius: 4, y: 2)
+  }
+}
+#endif
 
 // MARK: - Section detail
 //
@@ -1021,12 +1305,16 @@ private enum MigrationDomainState {
   case cloudKit
   case next
   case legacy
+  /// HealthKit / EventKit-backed sections — never migrating to CloudKit,
+  /// data already lives in the native iOS framework.
+  case native
 
   var symbol: String {
     switch self {
     case .cloudKit: return "checkmark.circle.fill"
     case .next: return "arrow.right.circle"
     case .legacy: return "server.rack"
+    case .native: return "applelogo"
     }
   }
 
@@ -1035,6 +1323,7 @@ private enum MigrationDomainState {
     case .cloudKit: return .green
     case .next: return .blue
     case .legacy: return .secondary
+    case .native: return .purple
     }
   }
 }
@@ -1165,12 +1454,26 @@ struct SyncSettingsPane: View {
                        value: String(ckEngine.pendingRecordZoneChangesCount))
         LabeledContent("Legacy HTTP pending writes",
                        value: String(httpOutbox.pendingCount))
-        MigrationDomainRow(name: "Tasks", detail: "CloudKit", state: .cloudKit)
-        MigrationDomainRow(name: "Areas", detail: "CloudKit", state: .cloudKit)
-        MigrationDomainRow(name: "Projects", detail: "CloudKit", state: .cloudKit)
-        MigrationDomainRow(name: "Settings + Sections", detail: "Next", state: .next)
-        MigrationDomainRow(name: "Habits, Supplements, Chores", detail: "FastAPI", state: .legacy)
-        MigrationDomainRow(name: "Goals, Groceries, Health Logs", detail: "FastAPI", state: .legacy)
+        // Per-section breakdown of current backend. Order matches
+        // SectionManifest.all (catalog order) so the list lines up with
+        // the sidebar above. Tasks bundles areas + projects.
+        MigrationDomainRow(name: "Tasks (+ areas, projects)", detail: "CloudKit", state: .cloudKit)
+        MigrationDomainRow(name: "Habits",                    detail: "CloudKit", state: .cloudKit)
+        MigrationDomainRow(name: "Supplements",               detail: "CloudKit", state: .cloudKit)
+        MigrationDomainRow(name: "Chores",                    detail: "CloudKit", state: .cloudKit)
+        MigrationDomainRow(name: "Goals",                     detail: "CloudKit", state: .cloudKit)
+        MigrationDomainRow(name: "Settings + Sections",       detail: "Next",     state: .next)
+        MigrationDomainRow(name: "Training",                  detail: "FastAPI",  state: .legacy)
+        MigrationDomainRow(name: "Nutrition",                 detail: "FastAPI",  state: .legacy)
+        MigrationDomainRow(name: "Sleep",                     detail: "FastAPI",  state: .legacy)
+        MigrationDomainRow(name: "Groceries",                 detail: "FastAPI",  state: .legacy)
+        MigrationDomainRow(name: "Caffeine",                  detail: "FastAPI",  state: .legacy)
+        MigrationDomainRow(name: "Cannabis",                  detail: "FastAPI",  state: .legacy)
+        MigrationDomainRow(name: "Body",                      detail: "FastAPI",  state: .legacy)
+        MigrationDomainRow(name: "Gut",                       detail: "FastAPI",  state: .legacy)
+        MigrationDomainRow(name: "Air",                       detail: "FastAPI",  state: .legacy)
+        MigrationDomainRow(name: "Activity",                  detail: "HealthKit", state: .native)
+        MigrationDomainRow(name: "Calendar",                  detail: "EventKit", state: .native)
       }
 
       // Recovery tooling. Export is non-destructive — safe to run any
@@ -1183,27 +1486,6 @@ struct SyncSettingsPane: View {
           Label("Export Snapshot…", systemImage: "square.and.arrow.up")
         }
         .disabled(isMigrating)
-        Button {
-          Task { await runMigration() }
-        } label: {
-          HStack {
-            if isMigrating { ProgressView().controlSize(.small) }
-            Label("Re-sync Migrated Data to iCloud", systemImage: "icloud.and.arrow.up")
-          }
-        }
-        // Block when iCloud isn't ready — pushing into CloudKit without
-        // an account would either silently fail or create records under
-        // a stale identity. Same gate the engine would hit anyway.
-        .disabled(isMigrating || ckEngine.accountStatus != .available)
-        Button {
-          Task { await runRepairMerge() }
-        } label: {
-          HStack {
-            if isMigrating { ProgressView().controlSize(.small) }
-            Label("Repair CloudKit Merge", systemImage: "arrow.triangle.merge")
-          }
-        }
-        .disabled(isMigrating || ckEngine.accountStatus != .available)
         Button(role: .destructive) {
           Task { await runReplaceLocalMirror() }
         } label: {
@@ -1231,6 +1513,21 @@ struct SyncSettingsPane: View {
           }
         }
         .disabled(isInspecting || ckEngine.accountStatus != .available)
+        Button {
+          Task { await runReimportChecklistHistory() }
+        } label: {
+          HStack {
+            if isMigrating { ProgressView().controlSize(.small) }
+            Label("Re-import Habits/Supps/Chores/Goals from FastAPI", systemImage: "arrow.down.doc")
+          }
+        }
+        .disabled(isMigrating || ckEngine.accountStatus != .available)
+        Button(role: .destructive) {
+          Task { await runPruneOldEvents() }
+        } label: {
+          Label("Prune Events Older Than 30 Days", systemImage: "calendar.badge.minus")
+        }
+        .disabled(isMigrating || ckEngine.accountStatus != .available)
         Button(role: .destructive) {
           Task { await runResetZone() }
         } label: {
@@ -1252,7 +1549,7 @@ struct SyncSettingsPane: View {
       } header: {
         Text("Recovery (dev)")
       } footer: {
-        Text("Export writes a JSON snapshot of migrated data to Application Support. Re-sync re-uploads this device's local mirror. Repair Merge fetches the whole CloudKit zone into this device, then pushes the local union back. Replace Local Mirror snapshots this device, discards migrated local state, and pulls the current CloudKit zone.")
+        Text("Export writes a JSON snapshot of migrated data to Application Support. Replace Local Mirror snapshots this device, discards migrated local state, and pulls the current CloudKit zone.")
       }
       #endif
     }
@@ -1348,60 +1645,122 @@ struct SyncSettingsPane: View {
   /// any stale system fields on local entities so the next migrate
   /// writes fresh.
   @MainActor
+  /// Force-re-import habits/supplements/chores history from FastAPI and
+  /// push it into CloudKit. The original bootstrap heuristic
+  /// (`cloudKitSystemFields == nil` on local rows) breaks the moment the
+  /// user toggles a single item — that one record gets CK-stamped and the
+  /// bootstrap permanently no-ops, leaving years of history unimported.
+  /// This button ignores the completion flags and re-pulls from FastAPI.
+  private func runReimportChecklistHistory() async {
+    isMigrating = true
+    defer { isMigrating = false }
+    migrationStatus = "Re-importing habits/supplements/chores/goals from FastAPI…"
+    let bootstrapper = ChecklistCloudKitBootstrapper(
+      context: modelContext,
+      engine: ckEngine,
+      client: client
+    )
+    do {
+      try await bootstrapper.forceBootstrap()
+      migrationStatus = "✅ Re-imported habits/supplements/chores/goals. The CloudKit push continues in the background — refresh a tile to see the data."
+    } catch {
+      migrationStatus = "❌ Re-import failed: \(error.localizedDescription)"
+    }
+  }
+
+  @MainActor
+  /// Delete habit/supplement/chore event rows older than 30 days from
+  /// the local SwiftData mirror, then reset the CK zone and re-queue what
+  /// remains. Used to drop the decade of FastAPI history the bootstrap
+  /// pulled in but the user never actually generated on this device.
+  private func runPruneOldEvents() async {
+    isMigrating = true
+    defer { isMigrating = false }
+    migrationStatus = "Pruning events older than 30 days…"
+    let calendar = Calendar.current
+    let cutoffDate = calendar.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd"
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = TimeZone.current
+    let cutoff = formatter.string(from: cutoffDate)
+
+    let habitStates = (try? modelContext.fetch(FetchDescriptor<HabitDayStateEntity>(
+      predicate: #Predicate { $0.date < cutoff }
+    ))) ?? []
+    let supStates = (try? modelContext.fetch(FetchDescriptor<SupplementDayStateEntity>(
+      predicate: #Predicate { $0.date < cutoff }
+    ))) ?? []
+    let choreEvents = (try? modelContext.fetch(FetchDescriptor<ChoreEventEntity>(
+      predicate: #Predicate { $0.date < cutoff }
+    ))) ?? []
+
+    let pruned = habitStates.count + supStates.count + choreEvents.count
+    for row in habitStates { modelContext.delete(row) }
+    for row in supStates { modelContext.delete(row) }
+    for row in choreEvents { modelContext.delete(row) }
+    try? modelContext.save()
+
+    migrationStatus = "Pruned \(pruned) old events. Resetting CloudKit zone and re-queueing…"
+    await runResetZone()
+    if migrationStatus.hasPrefix("✅") {
+      migrationStatus = "✅ Pruned \(pruned) old events (cutoff \(cutoff)). " + migrationStatus.dropFirst(2)
+    }
+  }
+
   private func runResetZone() async {
     isMigrating = true
     defer { isMigrating = false }
     migrationStatus = "Resetting CloudKit zone…"
     do {
       try await ckEngine.resetZone()
-      // Wipe any system-fields blobs on local entities — they referred
-      // to records in the zone we just deleted. Next migrate will
-      // recapture fresh tags via applyFetchedRecord. Covers tasks,
-      // areas, and projects (all three now live in CloudKit).
+      // Wipe stale system-fields blobs on every CK-backed entity type —
+      // they all referred to records in the zone we just deleted. Then
+      // re-queue each one so the freshly-restarted engine pushes the
+      // current local mirror to the empty zone.
       let tasks = (try? modelContext.fetch(FetchDescriptor<TaskEntity>())) ?? []
       let areas = (try? modelContext.fetch(FetchDescriptor<AreaEntity>())) ?? []
       let projects = (try? modelContext.fetch(FetchDescriptor<ProjectEntity>())) ?? []
+      let settings = (try? modelContext.fetch(FetchDescriptor<SettingsEntity>())) ?? []
+      let sections = (try? modelContext.fetch(FetchDescriptor<SectionEntity>())) ?? []
+      let habitDefs = (try? modelContext.fetch(FetchDescriptor<HabitDefinitionEntity>())) ?? []
+      let habitStates = (try? modelContext.fetch(FetchDescriptor<HabitDayStateEntity>())) ?? []
+      let supDefs = (try? modelContext.fetch(FetchDescriptor<SupplementDefinitionEntity>())) ?? []
+      let supStates = (try? modelContext.fetch(FetchDescriptor<SupplementDayStateEntity>())) ?? []
+      let choreDefs = (try? modelContext.fetch(FetchDescriptor<ChoreDefinitionEntity>())) ?? []
+      let choreEvents = (try? modelContext.fetch(FetchDescriptor<ChoreEventEntity>())) ?? []
+      let goals = (try? modelContext.fetch(FetchDescriptor<GoalEntity>())) ?? []
       for row in tasks { row.cloudKitSystemFields = nil }
       for row in areas { row.cloudKitSystemFields = nil }
       for row in projects { row.cloudKitSystemFields = nil }
+      for row in settings { row.cloudKitSystemFields = nil }
+      for row in sections { row.cloudKitSystemFields = nil }
+      for row in habitDefs { row.cloudKitSystemFields = nil }
+      for row in habitStates { row.cloudKitSystemFields = nil }
+      for row in supDefs { row.cloudKitSystemFields = nil }
+      for row in supStates { row.cloudKitSystemFields = nil }
+      for row in choreDefs { row.cloudKitSystemFields = nil }
+      for row in choreEvents { row.cloudKitSystemFields = nil }
+      for row in goals { row.cloudKitSystemFields = nil }
       try? modelContext.save()
-      let total = tasks.count + areas.count + projects.count
-      migrationStatus = "✅ Zone reset (\(total) entities cleared). Now run Migrate to push local state fresh."
+      for row in tasks { ckEngine.noteTaskChange(id: row.id) }
+      for row in areas { ckEngine.noteAreaChange(id: row.id) }
+      for row in projects { ckEngine.noteProjectChange(id: row.id) }
+      if !settings.isEmpty { ckEngine.noteSettingsChange() }
+      for row in sections { ckEngine.noteSectionChange(id: row.id) }
+      for row in habitDefs { ckEngine.noteHabitDefinitionChange(id: row.id) }
+      for row in habitStates { ckEngine.noteHabitEventChange(id: row.id) }
+      for row in supDefs { ckEngine.noteSupplementDefinitionChange(id: row.id) }
+      for row in supStates { ckEngine.noteSupplementEventChange(id: row.id) }
+      for row in choreDefs { ckEngine.noteChoreDefinitionChange(id: row.id) }
+      for row in choreEvents { ckEngine.noteChoreEventChange(id: row.id) }
+      for row in goals { ckEngine.noteGoalChange(id: row.id) }
+      let total = tasks.count + areas.count + projects.count + settings.count
+        + sections.count + habitDefs.count + habitStates.count
+        + supDefs.count + supStates.count + choreDefs.count + choreEvents.count + goals.count
+      migrationStatus = "✅ Zone reset and \(total) entities re-queued for upload."
     } catch {
       migrationStatus = "❌ Zone reset failed: \(error.localizedDescription)"
-    }
-  }
-
-  @MainActor
-  private func runMigration() async {
-    isMigrating = true
-    defer { isMigrating = false }
-    migrationStatus = "Re-syncing…"
-    // Pass the client so the migrator can hydrate FastAPI areas/projects
-    // into the local mirror before pushing — without this, a fresh
-    // install with no Syncer pull yet would push zero areas/projects to
-    // CloudKit, then have task.area / task.project links pointing at
-    // records that don't exist.
-    let migrator = TasksMigrator(context: modelContext, engine: ckEngine, client: client)
-    do {
-      let result = try await migrator.migrateToCloudKit()
-      migrationStatus = "✅ Re-sync complete: \(result.tasksCount) tasks, \(result.areasCount) areas, \(result.projectsCount) projects. Snapshot: \(result.snapshotURL.lastPathComponent)."
-    } catch {
-      migrationStatus = "❌ \(error.localizedDescription)"
-    }
-  }
-
-  @MainActor
-  private func runRepairMerge() async {
-    isMigrating = true
-    defer { isMigrating = false }
-    migrationStatus = "Repair merging CloudKit…"
-    let migrator = TasksMigrator(context: modelContext, engine: ckEngine, client: client)
-    do {
-      let result = try await migrator.repairMergeWithCloudKit()
-      migrationStatus = "✅ Repair merge complete. Cloud: \(result.cloudTasksCount) tasks, \(result.cloudAreasCount) areas, \(result.cloudProjectsCount) projects. Local pushed: \(result.localTasksCount) tasks, \(result.localAreasCount) areas, \(result.localProjectsCount) projects. Snapshot: \(result.snapshotURL.lastPathComponent)."
-    } catch {
-      migrationStatus = "❌ Repair merge failed: \(error.localizedDescription)"
     }
   }
 
