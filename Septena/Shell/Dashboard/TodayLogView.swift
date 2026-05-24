@@ -31,6 +31,11 @@ struct TodayLogView: View {
   // Local mutable copies for optimistic UI after mutations.
   @State private var events: [TodayEvent] = []
 
+  // Edit sheets for consumable log entries.
+  @State private var editingCaffeine: CaffeineEntry? = nil
+  @State private var editingCannabis: CannabisEntry? = nil
+  @State private var editingGut: GutEntry? = nil
+
   var body: some View {
     List {
       if events.isEmpty {
@@ -59,17 +64,52 @@ struct TodayLogView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .onAppear { events = buildEvents() }
+    .sheet(item: $editingCaffeine) { entry in
+      EditCaffeineEntrySheet(date: date, original: entry) { updated in
+        replaceEvent(id: "caf-\(entry.id)", title: caffeineLabel(updated),
+                     detail: updated.beans, time: updated.time, kind: .caffeine(updated))
+      }
+    }
+    .sheet(item: $editingCannabis) { entry in
+      EditCannabisEntrySheet(date: date, original: entry) { updated in
+        replaceEvent(id: "cnb-\(entry.id)", title: cannabisLabel(updated),
+                     detail: updated.strain, time: updated.time, kind: .cannabis(updated))
+      }
+    }
+    .sheet(item: $editingGut) { entry in
+      EditGutEntrySheet(date: date, original: entry) { updated in
+        replaceEvent(id: "gut-\(entry.id)", title: bristolLabel(updated.bristol),
+                     detail: gutDetail(updated), time: updated.time, kind: .gut(updated))
+      }
+    }
   }
 
   // MARK: - Row
 
-  private func row(for event: TodayEvent) -> some View {
+  private func rowContent(for event: TodayEvent) -> some View {
     HStack(spacing: 10) {
       Circle()
         .fill(event.color)
         .frame(width: 8, height: 8)
         .padding(.leading, Theme.hPadding)
       LogRow(title: event.title, detail: event.detail, trailing: event.timeLabel)
+    }
+  }
+
+  @ViewBuilder
+  private func row(for event: TodayEvent) -> some View {
+    switch event.kind {
+    case .caffeine(let e):
+      Button { editingCaffeine = e } label: { rowContent(for: event) }
+        .buttonStyle(.plain)
+    case .cannabis(let e):
+      Button { editingCannabis = e } label: { rowContent(for: event) }
+        .buttonStyle(.plain)
+    case .gut(let e):
+      Button { editingGut = e } label: { rowContent(for: event) }
+        .buttonStyle(.plain)
+    default:
+      rowContent(for: event)
     }
   }
 
@@ -169,10 +209,18 @@ struct TodayLogView: View {
     }
   }
 
-  // MARK: - Optimistic removal
+  // MARK: - Optimistic mutations
 
   private func remove(id: String) {
     events.removeAll { $0.id == id }
+  }
+
+  private func replaceEvent(id: String, title: String, detail: String?,
+                             time: String, kind: TodayEventKind) {
+    guard let idx = events.firstIndex(where: { $0.id == id }) else { return }
+    let old = events[idx]
+    events[idx] = TodayEvent(id: old.id, time: time, section: old.section,
+                              color: old.color, title: title, detail: detail, kind: kind)
   }
 
   // MARK: - Event building

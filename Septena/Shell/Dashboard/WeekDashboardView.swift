@@ -38,13 +38,33 @@ struct WeekDashboardView: View {
   @Environment(NavigationState.self) private var nav
   @Environment(SettingsStore.self) private var settingsStore
   @Environment(DayClock.self) private var clock
+  /// In-progress training draft (if any). Powers the "Resume {label}"
+  /// row at the top of the Training quickadd menu — same affordance
+  /// `TrainingDestinationView.activeSessionSection` shows at the top
+  /// of the Training pane, surfaced one navigation hop earlier.
+  @Environment(TrainingDraftStore.self) private var trainingDraft
+  /// Which renderer the homepage uses. Phase 2: only `.tiles` is wired
+  /// to real content; the other modes render a "Coming soon" placeholder
+  /// that resets back to Tiles. Phases 3-5 land the actual renderers.
+  @AppStorage(SettingsKey.homepageLayout)
+  private var homepageLayoutRaw: String = HomepageLayoutMode.tiles.rawValue
+  @AppStorage(SettingsKey.homepageShowTodayTimeline)
+  private var showTodayTimeline: Bool = true
+  /// Fasting tracking master toggle + heatmap metric preference. When
+  /// off, both the tile and the heatmap render protein like before;
+  /// when on, the tile morphs based on the live `FastingState` and the
+  /// heatmap encodes whichever metric the user picked in Settings.
+  @AppStorage(SettingsKey.nutritionTrackFasting)
+  private var nutritionTrackFasting: Bool = false
+  @AppStorage(SettingsKey.nutritionHeatmapMetric)
+  private var nutritionHeatmapMetricRaw: String = NutritionHeatmapMetric.protein.rawValue
   #if os(iOS)
   @Environment(\.horizontalSizeClass) private var hSize
   #endif
 
   @State private var dailies = NextItemsModel()
-  @State private var habitHistory: [Int] = Array(repeating: 0, count: 7)
-  @State private var choreHistory: [Int] = Array(repeating: 0, count: 7)
+  @State private var habitHistory: [Int] = Array(repeating: 0, count: 90)
+  @State private var choreHistory: [Int] = Array(repeating: 0, count: 90)
   @State private var cardio: CardioHistoryResponse? = nil
   @State private var trainingSessionDates: Set<String> = []
   /// Session-type catalog + recency for the Training QuickAdd menu.
@@ -52,7 +72,7 @@ struct WeekDashboardView: View {
   @State private var trainingSessionTypes: [SessionTypeConfig] = []
   @State private var trainingSuggestedId: String? = nil
   @State private var trainingDaysAgo: [String: Int] = [:]
-  @State private var supplementHistory: [Int] = Array(repeating: 0, count: 7)
+  @State private var supplementHistory: [Int] = Array(repeating: 0, count: 90)
   @State private var taskCounts: TasksCounts? = nil
   @State private var tasksHistory: TasksHistory? = nil
   @State private var completedTasks: [SeptenaTask] = []
@@ -124,10 +144,8 @@ struct WeekDashboardView: View {
       toolbar: { homeToolbar }
     ) {
       VStack(spacing: 18) {
-        todayTimeline
-        LazyVGrid(columns: columns, spacing: 14) {
-          tiles
-        }
+        if showTodayTimeline { todayTimeline }
+        layoutBody
       }
       .padding(.horizontal, Theme.hPadding)
       .padding(.top, 12)
@@ -182,6 +200,18 @@ struct WeekDashboardView: View {
 
   private var homeMenu: some View {
     Menu {
+      ForEach(HomepageLayoutMode.allCases) { mode in
+        Button {
+          homepageLayoutRaw = mode.rawValue
+        } label: {
+          Label(mode.title, systemImage: mode == currentLayoutMode ? "checkmark" : mode.icon)
+        }
+      }
+      Divider()
+      Toggle(isOn: $showTodayTimeline) {
+        Label("Show Today", systemImage: "clock")
+      }
+      Divider()
       Button {
         nav.showSettings = true
       } label: {
@@ -325,25 +355,30 @@ struct WeekDashboardView: View {
     // Habits / Supplements / Chores / Settings come from the CloudKit-
     // backed local mirror — no FastAPI round-trip.
     let ctx = LocalStore.shared.container.mainContext
-    let h: HabitHistoryResponse? = ChecklistMirror.loadHabitsHistory(context: ctx, days: 7)
-    let c: ChoreHistoryResponse? = ChecklistMirror.loadChoresHistory(context: ctx, days: 7)
-    let s: SupplementHistoryResponse? = ChecklistMirror.loadSupplementsHistory(context: ctx, days: 7)
+    // History window: 30 days so the Heatmap layout mode has a meaningful
+    // strip width. Tile-mode bar charts render the same arrays and now
+    // show 30 thinner bars instead of 7 — visually denser but still
+    // readable. If a particular tile feels cramped, slice `.suffix(7)`
+    // in just that tile's builder.
+    let h: HabitHistoryResponse? = ChecklistMirror.loadHabitsHistory(context: ctx, days: 90)
+    let c: ChoreHistoryResponse? = ChecklistMirror.loadChoresHistory(context: ctx, days: 90)
+    let s: SupplementHistoryResponse? = ChecklistMirror.loadSupplementsHistory(context: ctx, days: 90)
     let appSettings: AppSettings? = SettingsMirror.loadSettings(context: ctx)
-    let ca: CardioHistoryResponse? = ChecklistMirror.loadTrainingCardioHistory(context: ctx, days: 7)
-    let e: [ExerciseEntry]? = ChecklistMirror.loadTrainingEntries(context: ctx, since: sinceDate(daysBack: 7))
+    let ca: CardioHistoryResponse? = ChecklistMirror.loadTrainingCardioHistory(context: ctx, days: 90)
+    let e: [ExerciseEntry]? = ChecklistMirror.loadTrainingEntries(context: ctx, since: sinceDate(daysBack: 90))
     async let tc = try? await TaskReads.counts(
       client: client, context: LocalStore.shared.container.mainContext)
     let th: TasksHistory? = TaskReads.tasksHistory(
-      days: 7, context: LocalStore.shared.container.mainContext)
+      days: 90, context: LocalStore.shared.container.mainContext)
     async let tl = try? await TaskReads.list(
       view: "logbook", days: 1,
       client: client, context: LocalStore.shared.container.mainContext)
-    async let on = try? await client.ouraHistory(days: 7)
-    async let nstats = try? await client.nutritionStats(days: 7)
+    async let on = try? await client.ouraHistory(days: 90)
+    async let nstats = try? await client.nutritionStats(days: 90)
     async let nents = try? await client.nutritionEntries(since: SeptenaDate.today)
     async let ntarget = try? await client.nutritionMacrosConfig()
     async let asum = try? await client.airSummary()
-    async let ahist = try? await client.airHistory(days: 7)
+    async let ahist = try? await client.airHistory(days: 90)
     let gRes: [GroceryItem]? = ChecklistMirror.loadGroceryItems(context: modelContext)
     let (t, o) = await (tc, on)
     let (ns, ne, nt) = await (nstats, nents, ntarget)
@@ -423,9 +458,9 @@ struct WeekDashboardView: View {
     // Caffeine + Cannabis — read from local SwiftData (CK-synced) so the
     // dashboard renders instantly from the mirror without a network hop.
     let cafT: CaffeineDayResponse? = ChecklistMirror.loadCaffeineDay(context: modelContext, date: SeptenaDate.today)
-    let cafH: CaffeineHistoryResponse? = ChecklistMirror.loadCaffeineHistory(context: modelContext, days: 7)
+    let cafH: CaffeineHistoryResponse? = ChecklistMirror.loadCaffeineHistory(context: modelContext, days: 90)
     let cnbT: CannabisDayResponse? = ChecklistMirror.loadCannabisDay(context: modelContext, date: SeptenaDate.today)
-    let cnbH: CannabisHistoryResponse? = ChecklistMirror.loadCannabisHistory(context: modelContext, days: 7)
+    let cnbH: CannabisHistoryResponse? = ChecklistMirror.loadCannabisHistory(context: modelContext, days: 90)
 
     // QuickAdd menu preset data — fire-and-forget on a separate Task so it
     // doesn't block the rest of `loadAll()`. Adding these to the second
@@ -486,9 +521,9 @@ struct WeekDashboardView: View {
       cannabisHistory = cnh
       ResponseCache.save(cnh, forKey: CacheKey.cannabisHistory)
     }
-    async let wRows = try? await client.withingsHistory(days: 14)
+    async let wRows = try? await client.withingsHistory(days: 90)
     let gT: GutDayResponse? = ChecklistMirror.loadGutDay(context: modelContext, date: SeptenaDate.today)
-    let gH: GutHistoryResponse? = ChecklistMirror.loadGutHistory(context: modelContext, days: 7)
+    let gH: GutHistoryResponse? = ChecklistMirror.loadGutHistory(context: modelContext, days: 90)
     let wR = await wRows
     if let wR {
       let sorted = wR.sorted { $0.date > $1.date }
@@ -580,26 +615,26 @@ struct WeekDashboardView: View {
       let d = ChecklistMirror.loadCannabisDay(context: modelContext, date: SeptenaDate.today)
       cannabisToday = d
       ResponseCache.save(d, forKey: CacheKey.cannabisToday)
-      let h = ChecklistMirror.loadCannabisHistory(context: modelContext, days: 7).daily
+      let h = ChecklistMirror.loadCannabisHistory(context: modelContext, days: 90).daily
       cannabisHistory = h
       ResponseCache.save(h, forKey: CacheKey.cannabisHistory)
     case .caffeine:
       let d = ChecklistMirror.loadCaffeineDay(context: modelContext, date: SeptenaDate.today)
       caffeineToday = d
       ResponseCache.save(d, forKey: CacheKey.caffeineToday)
-      let h = ChecklistMirror.loadCaffeineHistory(context: modelContext, days: 7).daily
+      let h = ChecklistMirror.loadCaffeineHistory(context: modelContext, days: 90).daily
       caffeineHistory = h
       ResponseCache.save(h, forKey: CacheKey.caffeineHistory)
     case .gut:
       let d = ChecklistMirror.loadGutDay(context: modelContext, date: SeptenaDate.today)
       gutToday = d
       ResponseCache.save(d, forKey: CacheKey.gutToday)
-      let h = ChecklistMirror.loadGutHistory(context: modelContext, days: 7).daily
+      let h = ChecklistMirror.loadGutHistory(context: modelContext, days: 90).daily
       gutHistory = h
       ResponseCache.save(h, forKey: CacheKey.gutHistory)
     case .nutrition:
       async let ents  = try? await client.nutritionEntries(since: SeptenaDate.today)
-      async let stats = try? await client.nutritionStats(days: 7)
+      async let stats = try? await client.nutritionStats(days: 90)
       if let e = await ents {
         let today = SeptenaDate.today
         let todays = e.filter { $0.date == today }
@@ -615,19 +650,19 @@ struct WeekDashboardView: View {
     case .habits:
       async let _ = dailies.load(client: client)
       let h = ChecklistMirror.loadHabitsHistory(
-        context: LocalStore.shared.container.mainContext, days: 7)
+        context: LocalStore.shared.container.mainContext, days: 90)
       habitHistory = h.daily.map { $0.done }
       ResponseCache.save(habitHistory, forKey: CacheKey.habitHistory)
     case .chores:
       async let _ = dailies.load(client: client)
       let c = ChecklistMirror.loadChoresHistory(
-        context: LocalStore.shared.container.mainContext, days: 7)
+        context: LocalStore.shared.container.mainContext, days: 90)
       choreHistory = c.daily.map { $0.completed }
       ResponseCache.save(choreHistory, forKey: CacheKey.choreHistory)
     case .supplements:
       async let _ = dailies.load(client: client)
       let s = ChecklistMirror.loadSupplementsHistory(
-        context: LocalStore.shared.container.mainContext, days: 7)
+        context: LocalStore.shared.container.mainContext, days: 90)
       supplementHistory = s.daily.map { $0.done }
       ResponseCache.save(supplementHistory, forKey: CacheKey.supplementHistory)
     case .groceries:
@@ -638,7 +673,7 @@ struct WeekDashboardView: View {
       async let tc = try? await TaskReads.counts(
         client: client, context: LocalStore.shared.container.mainContext)
       let th: TasksHistory? = TaskReads.tasksHistory(
-        days: 7, context: LocalStore.shared.container.mainContext)
+        days: 90, context: LocalStore.shared.container.mainContext)
       async let tl = try? await TaskReads.list(
         view: "logbook", days: 1,
         client: client, context: LocalStore.shared.container.mainContext)
@@ -655,11 +690,11 @@ struct WeekDashboardView: View {
         ResponseCache.save(items, forKey: CacheKey.completedTasks)
       }
     case .training:
-      let c = ChecklistMirror.loadTrainingCardioHistory(context: modelContext, days: 7)
+      let c = ChecklistMirror.loadTrainingCardioHistory(context: modelContext, days: 90)
       cardio = c
       ResponseCache.save(c, forKey: CacheKey.cardio)
       let e = ChecklistMirror.loadTrainingEntries(context: modelContext,
-                                                  since: sinceDate(daysBack: 7))
+                                                  since: sinceDate(daysBack: 90))
       trainingSessionDates = Set(e.map(\.date))
       recentTraining = e
       ResponseCache.save(trainingSessionDates, forKey: CacheKey.trainingDates)
@@ -672,6 +707,14 @@ struct WeekDashboardView: View {
     let f = DateFormatter()
     f.dateFormat = "yyyy-MM-dd"
     return f.string(from: d)
+  }
+
+  /// Sessions in the trailing 7 days, derived from the full 90-day
+  /// `trainingSessionDates` set. Lexicographic compare on ISO
+  /// `yyyy-MM-dd` strings is correct ordering, no Date parse needed.
+  private var weeklySessionCount: Int {
+    let cutoff = sinceDate(daysBack: 7)
+    return trainingSessionDates.filter { $0 >= cutoff }.count
   }
 
   // MARK: - Today timeline (single row above the tile grid)
@@ -695,14 +738,94 @@ struct WeekDashboardView: View {
     .onTapGesture { sheetDest = .today }
   }
 
+  // MARK: - Layout mode dispatch
+
+  /// Resolved layout mode from `@AppStorage`. Falls back to `.tiles`
+  /// for unknown raw values (e.g. a future build wrote a case this
+  /// build doesn't know about).
+  private var currentLayoutMode: HomepageLayoutMode {
+    HomepageLayoutMode(rawValue: homepageLayoutRaw) ?? .tiles
+  }
+
+  /// Renders the homepage body for the currently-selected layout mode.
+  /// Phase 2: only `.tiles` is implemented; the other modes render the
+  /// shared "Coming soon" placeholder. Phases 3-5 swap each case out
+  /// for a real renderer reading from `HomepageDomainData`.
+  @ViewBuilder
+  private var layoutBody: some View {
+    switch currentLayoutMode {
+    case .tiles:
+      LazyVGrid(columns: columns, spacing: 14) {
+        tiles
+      }
+    case .dense:
+      DenseHomepageView(
+        items: visibleDomainData,
+        onTap: handleDomainTap,
+        menuContent: { domain in quickAddMenu(for: domain) }
+      )
+    case .heatmap:
+      HeatmapHomepageView(
+        items: visibleDomainData,
+        onTap: handleDomainTap,
+        menuContent: { domain in quickAddMenu(for: domain) }
+      )
+    }
+  }
+
+  /// Domain data array in canonical order, filtered by server visibility
+  /// + dropping any domain whose builder returned `nil` (currently only
+  /// Activity-on-Mac when HealthKit is unavailable). Future renderers
+  /// (Heatmap, List) consume this same property.
+  private var visibleDomainData: [HomepageDomainData] {
+    visibleDomains.compactMap { domainData(for: $0) }
+  }
+
+  /// Single tap router for `HomepageDomainData.tap` actions. Phase 3
+  /// renderers don't know about `sheetDest` or `tabSelection` — they
+  /// call back here, mirroring the per-tile gestures the Tiles mode
+  /// wires up inline.
+  private func handleDomainTap(_ tap: DomainTapAction) {
+    switch tap {
+    case .openSheet(let dest):
+      sheetDest = dest
+    case .switchToTasksTab:
+      tabSelection.current = .tasks
+    }
+  }
+
+  /// Per-domain quickadd menu, surfaced as a `.contextMenu` on the
+  /// Dense and Heatmap rows. Mirrors the same menus the Tiles renderer
+  /// attaches inline (`habitsQuickAddMenu`, `caffeineQuickAddMenu`,
+  /// etc.). Domains without a quickadd affordance (sleep, air, body,
+  /// activity) return `EmptyView`, which SwiftUI silently suppresses
+  /// — so those rows show no menu on long-press / right-click rather
+  /// than an empty popover.
+  @ViewBuilder
+  private func quickAddMenu(for domain: HomepageDomain) -> some View {
+    switch domain {
+    case .tasks:       tasksQuickAddMenu
+    case .habits:      habitsQuickAddMenu
+    case .training:    trainingQuickAddMenu
+    case .chores:      choresQuickAddMenu
+    case .supplements: supplementsQuickAddMenu
+    case .nutrition:   nutritionQuickAddMenu
+    case .groceries:   groceriesQuickAddMenu
+    case .caffeine:    caffeineQuickAddMenu
+    case .cannabis:    cannabisQuickAddMenu
+    case .gut:         gutQuickAddMenu
+    case .sleep, .air, .body, .activity:
+      EmptyView()
+    }
+  }
+
   // MARK: - Tiles
   //
-  // Order is canonical — driven by `HomepageDomain.defaultOrder` — and is
-  // the same across every (future) homepage layout mode. The server-provided
-  // `settingsStore.sections` list is now a *visibility filter* only: if the
-  // user has hidden a section server-side, that domain is skipped. While
-  // the server list is still loading (empty), every domain renders so cold
-  // launch never paints blank.
+  // Order and visibility both come from Settings (`settingsStore.sections`),
+  // and the resolved list is the same across every layout mode
+  // (Tiles / Dense / Heatmap). User reorders in Settings → Sections →
+  // all three modes update. `HomepageDomain.defaultOrder` is only the
+  // cold-launch fallback before the section list has loaded.
 
   @ViewBuilder
   private var tiles: some View {
@@ -711,15 +834,16 @@ struct WeekDashboardView: View {
     }
   }
 
-  /// Canonical order, filtered by what the user has enabled server-side.
-  /// Empty `settingsStore.sections` (cold launch / load failure) means
-  /// "show everything" — same fallback semantics as the previous
-  /// legacy-order path.
+  /// Domain order + visibility, driven by Settings so reordering in
+  /// Settings → Sections applies uniformly to every layout mode.
+  /// Falls back to `HomepageDomain.defaultOrder` only on cold launch /
+  /// load failure. Section keys we don't recognise as a
+  /// `HomepageDomain` (e.g. `"calendar"`, which is surfaced inline in
+  /// the Next tab) are dropped.
   private var visibleDomains: [HomepageDomain] {
-    let serverKeys = Set(settingsStore.sections.map(\.key))
-    return HomepageDomain.defaultOrder.filter { domain in
-      serverKeys.isEmpty || serverKeys.contains(domain.id)
-    }
+    let serverKeys = settingsStore.sections.map(\.key)
+    guard !serverKeys.isEmpty else { return HomepageDomain.defaultOrder }
+    return serverKeys.compactMap { HomepageDomain(rawValue: $0) }
   }
 
   @ViewBuilder
@@ -742,6 +866,453 @@ struct WeekDashboardView: View {
     }
   }
 
+  // MARK: - Mode-agnostic domain data
+  //
+  // Phase 1b: every domain produces a `HomepageDomainData` from the
+  // same @State the bespoke `Week*Tile` views read from. The current
+  // Tiles renderer doesn't consume this yet — it's the contract future
+  // modes (Dense / Heatmap / List) will read from. Keeping the
+  // construction in one place per domain means the four modes can't
+  // drift on what "today's number" means.
+  //
+  // Returns `nil` only for Activity when HealthKit isn't available
+  // (matches the current tile's behaviour of rendering EmptyView).
+  func domainData(for domain: HomepageDomain) -> HomepageDomainData? {
+    switch domain {
+    case .tasks:       return tasksDomainData()
+    case .habits:      return habitsDomainData()
+    case .training:    return trainingDomainData()
+    case .chores:      return choresDomainData()
+    case .supplements: return supplementsDomainData()
+    case .sleep:       return sleepDomainData()
+    case .nutrition:   return nutritionDomainData()
+    case .air:         return airDomainData()
+    case .groceries:   return groceriesDomainData()
+    case .caffeine:    return caffeineDomainData()
+    case .cannabis:    return cannabisDomainData()
+    case .body:        return bodyDomainData()
+    case .gut:         return gutDomainData()
+    case .activity:    return activityDomainData()
+    }
+  }
+
+  private func tasksDomainData() -> HomepageDomainData {
+    let openToday = taskCounts.map { $0.todayCount + $0.reviewCount } ?? 0
+    let inbox = taskCounts?.inboxCount ?? 0
+    let upcoming = taskCounts?.upcomingCount ?? 0
+    let doneToday = tasksHistory?.daily.last?.done ?? 0
+    let totalToday = doneToday + openToday
+    let bars = tasksHistory?.daily.map(\.done) ?? []
+    return HomepageDomainData(
+      domain: .tasks,
+      title: "Tasks",
+      accent: theme.color(for: "tasks"),
+      headline: "\(openToday) open · \(doneToday)/\(totalToday) done",
+      headlineStats: [
+        .init(label: "Today", value: "\(openToday)"),
+        .init(label: "Inbox", value: "\(inbox)"),
+        .init(label: "Upcoming", value: "\(upcoming)"),
+      ],
+      progress: .init(label: "Done today",
+                      current: Double(doneToday),
+                      target: Double(max(totalToday, 1))),
+      history: .bars(bars),
+      tap: .switchToTasksTab
+    )
+  }
+
+  private func habitsDomainData() -> HomepageDomainData {
+    let total = dailies.habits.count
+    let done = dailies.habits.filter { $0.done }.count
+    let skipped = dailies.habits.filter { $0.skipped }.count
+    return HomepageDomainData(
+      domain: .habits,
+      title: "Habits",
+      accent: theme.color(for: "habits"),
+      headline: skipped > 0
+        ? "\(done)/\(total) · \(skipped) skipped"
+        : "\(done)/\(total)",
+      headlineStats: [
+        .init(label: "Done", value: "\(done)"),
+        .init(label: "Skipped", value: "\(skipped)"),
+        .init(label: "Total", value: "\(total)"),
+      ],
+      progress: .init(label: "Today",
+                      current: Double(done),
+                      target: Double(max(total, 1))),
+      history: .bars(habitHistory),
+      tap: .openSheet(.habits)
+    )
+  }
+
+  private func trainingDomainData() -> HomepageDomainData {
+    // Sessions + Z2 minutes are always **trailing 7 days** so they read
+    // sensibly against the weekly target (`targetWeeklyMin`, default
+    // 150). The training data window is 90 days for the heatmap strip,
+    // but the headline / progress are weekly stats — independent of the
+    // history-series window.
+    let sessionCount = weeklySessionCount
+    let minutes = Int(cardio?.daily.last?.rolling7d ?? 0)
+    let target = cardio?.targetWeeklyMin ?? 150
+    // Domain data drives Heatmap mode, which needs the long window —
+    // the tile (which uses `lastSevenDays`) stays at 7 by design.
+    let days = lastNDays(90)
+    var strengthByDate: [String: Double] = [:]
+    var cardioByDate: [String: Double] = [:]
+    for e in recentTraining {
+      let isCardio = (e.distanceM ?? 0) > 0
+        || ((e.durationMin ?? 0) > 0 && e.weight == nil)
+      if isCardio {
+        if let d = e.durationMin, d > 0 {
+          cardioByDate[e.date, default: 0] += d
+        }
+      } else if let w = e.weight, w > 0,
+                let s = e.sets.flatMap(Int.init), s > 0,
+                let r = e.reps.flatMap(Int.init), r > 0 {
+        strengthByDate[e.date, default: 0] += w * Double(s * r)
+      }
+    }
+    let strengthSeries = days.map { strengthByDate[$0] ?? 0 }
+    let cardioSeries = days.map { cardioByDate[$0] ?? 0 }
+    return HomepageDomainData(
+      domain: .training,
+      title: "Training",
+      accent: theme.color(for: "training"),
+      headline: "\(sessionCount) sessions · \(minutes)/\(target) min",
+      headlineStats: [
+        .init(label: "Sessions", value: "\(sessionCount)"),
+        .init(label: "Z2", value: "\(minutes)", unit: "min"),
+      ],
+      progress: .init(label: "Weekly Z2",
+                      current: Double(minutes),
+                      target: Double(max(target, 1)),
+                      unit: "min"),
+      history: .stackedBars(primary: strengthSeries, secondary: cardioSeries),
+      tap: .openSheet(.training),
+      // Training spikes hard on rest days (zero) and peaks on session
+      // days. The Dense sparkline smooths to a trailing-7d average —
+      // same reason Apple Watch's Exercise ring shows weekly load,
+      // not point samples. Heatmap mode keeps daily cells.
+      smoothSparkline: true
+    )
+  }
+
+  private func choresDomainData() -> HomepageDomainData {
+    let todayISO = SeptenaDate.today
+    let serverDoneIDs = Set(dailies.chores
+                              .filter { $0.lastCompleted == todayISO }
+                              .map(\.id))
+    let doneIDs = serverDoneIDs.union(dailies.completedChores)
+    let dueToday = dailies.chores.filter {
+      $0.daysOverdue == 0 && !doneIDs.contains($0.id)
+    }.count
+    let overdue = dailies.chores.filter {
+      $0.daysOverdue > 0 && !doneIDs.contains($0.id)
+    }.count
+    let done = doneIDs.count
+    let total = dueToday + overdue + done
+    return HomepageDomainData(
+      domain: .chores,
+      title: "Chores",
+      accent: theme.color(for: "chores"),
+      headline: overdue > 0
+        ? "\(done)/\(total) · \(overdue) overdue"
+        : "\(done)/\(total)",
+      headlineStats: [
+        .init(label: "Due", value: "\(dueToday)"),
+        .init(label: "Overdue", value: "\(overdue)"),
+        .init(label: "Done", value: "\(done)"),
+      ],
+      progress: .init(label: "Today",
+                      current: Double(done),
+                      target: Double(max(total, 1))),
+      history: .bars(choreHistory),
+      tap: .openSheet(.chores)
+    )
+  }
+
+  private func supplementsDomainData() -> HomepageDomainData {
+    let total = dailies.supplements.count
+    let done = dailies.supplements.filter { $0.done }.count
+    return HomepageDomainData(
+      domain: .supplements,
+      title: "Supplements",
+      accent: theme.color(for: "supplements"),
+      headline: "\(done)/\(total)",
+      headlineStats: [
+        .init(label: "Done", value: "\(done)"),
+        .init(label: "Total", value: "\(total)"),
+      ],
+      progress: .init(label: "Today",
+                      current: Double(done),
+                      target: Double(max(total, 1))),
+      history: .bars(supplementHistory),
+      tap: .openSheet(.supplements)
+    )
+  }
+
+  private func sleepDomainData() -> HomepageDomainData {
+    let last = ouraNights.first
+    let lastH = last?.totalH ?? 0
+    let score = last?.sleepScore.map { "\($0)" } ?? "—"
+    let bars = ouraNights.reversed().map { $0.sleepScore ?? 0 }
+    return HomepageDomainData(
+      domain: .sleep,
+      title: "Sleep",
+      accent: theme.color(for: "sleep"),
+      headline: lastH > 0
+        ? "\(formatHoursShort(lastH)) · score \(score)"
+        : "—",
+      headlineStats: [
+        .init(label: "Hours", value: formatHoursShort(lastH)),
+        .init(label: "Score", value: score),
+      ],
+      progress: nil,
+      history: .bars(bars),
+      tap: .openSheet(.sleep)
+    )
+  }
+
+  private func nutritionDomainData() -> HomepageDomainData {
+    let accent = theme.color(for: "nutrition")
+    let state = currentFastingState(now: Date())
+    let metric = NutritionHeatmapMetric(rawValue: nutritionHeatmapMetricRaw) ?? .protein
+
+    // History series: heatmap metric preference wins for any mode that
+    // reads `history` (Dense, Heatmap). Tiles use `nutritionTile` and
+    // ignore this. Only honor the "fasting" pick when the master
+    // toggle is on, otherwise the picker preference is dormant.
+    let history: HistorySeries = {
+      if nutritionTrackFasting, metric == .fasting {
+        let windows = nutritionStats?.fasting ?? []
+        let hours = windows.map { Int(($0.hours ?? 0).rounded()) }
+        return .bars(hours.isEmpty ? Array(repeating: 0, count: 90) : hours)
+      }
+      let bars = nutritionStats?.daily.map { Int($0.proteinG) }
+                ?? Array(repeating: 0, count: 90)
+      return .bars(bars)
+    }()
+
+    if nutritionTrackFasting, case .fasting(_, let since, let totalMin) = state {
+      let targetMin = nutritionTarget?.fasting?.min ?? FastingDefaults.targetMinH
+      let h = totalMin / 60, m = totalMin % 60
+      return HomepageDomainData(
+        domain: .nutrition,
+        title: "Nutrition",
+        accent: accent,
+        headline: "\(h)h \(m)m fasting · since \(since)",
+        headlineStats: [
+          .init(label: "Fasting", value: "\(h)h \(m)m"),
+          .init(label: "Since", value: since),
+        ],
+        progress: .init(label: "Fast vs target",
+                        current: min(Double(totalMin) / 60, targetMin),
+                        target: max(targetMin, 1),
+                        unit: "h"),
+        history: history,
+        tap: .openSheet(.nutrition)
+      )
+    }
+
+    let proteinTarget = nutritionTarget?.protein.min ?? 150
+    return HomepageDomainData(
+      domain: .nutrition,
+      title: "Nutrition",
+      accent: accent,
+      headline: "\(Int(todayProteinSum))g protein · \(Int(todayKcalSum)) kcal",
+      headlineStats: [
+        .init(label: "Protein", value: "\(Int(todayProteinSum))", unit: "g"),
+        .init(label: "Kcal", value: "\(Int(todayKcalSum))"),
+      ],
+      progress: .init(label: "Today's protein",
+                      current: todayProteinSum,
+                      target: max(proteinTarget, 1),
+                      unit: "g"),
+      history: history,
+      tap: .openSheet(.nutrition)
+    )
+  }
+
+  private func airDomainData() -> HomepageDomainData {
+    let latest = airSummary?.latest?.co2Ppm.map { Int($0) }
+    let todayOver = airSummary?.today.minutesOver1000 ?? 0
+    let bars = airHistory.map { Int($0.co2Avg ?? 0) }
+    let budget = 60
+    return HomepageDomainData(
+      domain: .air,
+      title: "Air",
+      accent: theme.color(for: "air"),
+      headline: latest.map { "\($0) ppm · \(todayOver)/\(budget) min" }
+        ?? "—",
+      headlineStats: [
+        .init(label: "CO₂", value: latest.map { "\($0)" } ?? "—", unit: "ppm"),
+        .init(label: "Over 1000", value: "\(todayOver)", unit: "min"),
+      ],
+      progress: .init(label: "Over 1000 ppm",
+                      current: Double(min(todayOver, budget)),
+                      target: Double(budget),
+                      unit: "min"),
+      history: .bars(bars),
+      tap: .openSheet(.air)
+    )
+  }
+
+  private func groceriesDomainData() -> HomepageDomainData {
+    let lowCount = groceries.filter { $0.low }.count
+    let stocked = groceries.count - lowCount
+    let boughtPerDay = groceriesBoughtPerDay()
+    let totalBought7d = boughtPerDay.reduce(0, +)
+    return HomepageDomainData(
+      domain: .groceries,
+      title: "Groceries",
+      accent: theme.color(for: "groceries"),
+      headline: lowCount > 0
+        ? "\(lowCount) low · \(stocked) stocked"
+        : "\(stocked) stocked",
+      headlineStats: [
+        .init(label: "Low", value: "\(lowCount)"),
+        .init(label: "Stocked", value: "\(stocked)"),
+        .init(label: "Bought 7d", value: "\(totalBought7d)"),
+      ],
+      progress: nil,
+      history: .bars(boughtPerDay),
+      tap: .openSheet(.groceries)
+    )
+  }
+
+  private func caffeineDomainData() -> HomepageDomainData {
+    let sessions = caffeineToday?.sessionCount ?? 0
+    let grams = caffeineToday?.totalG ?? 0
+    let bars = caffeineHistory.map { $0.sessions }
+    let dailyLimit = 3
+    return HomepageDomainData(
+      domain: .caffeine,
+      title: "Caffeine",
+      accent: theme.color(for: "caffeine"),
+      headline: "\(sessions) · \(String(format: "%.1f", grams))g",
+      headlineStats: [
+        .init(label: "Today", value: "\(sessions)"),
+        .init(label: "Grams", value: String(format: "%.1f", grams), unit: "g"),
+      ],
+      progress: .init(label: "Today / limit",
+                      current: Double(min(sessions, dailyLimit)),
+                      target: Double(dailyLimit)),
+      history: .bars(bars.isEmpty ? Array(repeating: 0, count: 90) : bars),
+      tap: .openSheet(.caffeine)
+    )
+  }
+
+  private func cannabisDomainData() -> HomepageDomainData {
+    let sessions = cannabisToday?.sessionCount ?? 0
+    let grams = cannabisToday?.totalG ?? 0
+    let bars = cannabisHistory.map { $0.sessions }
+    let dailyLimit = 2
+    return HomepageDomainData(
+      domain: .cannabis,
+      title: "Cannabis",
+      accent: theme.color(for: "cannabis"),
+      headline: "\(sessions) · \(String(format: "%.2f", grams))g",
+      headlineStats: [
+        .init(label: "Today", value: "\(sessions)"),
+        .init(label: "Grams", value: String(format: "%.2f", grams), unit: "g"),
+      ],
+      progress: .init(label: "Today / limit",
+                      current: Double(min(sessions, dailyLimit)),
+                      target: Double(dailyLimit)),
+      history: .bars(bars.isEmpty ? Array(repeating: 0, count: 90) : bars),
+      tap: .openSheet(.cannabis)
+    )
+  }
+
+  private func bodyDomainData() -> HomepageDomainData {
+    let latest = bodyRows.first
+    let weight = latest?.weightKg
+    let fat = latest?.fatPct
+    let actualSeries = weeklyWeightActual()
+    let present = actualSeries.compactMap { $0 }
+    let avg = present.isEmpty ? 0.0 : present.reduce(0, +) / Double(present.count)
+    let centeredValues: [Double?] = actualSeries.map { $0.map { $0 - avg } }
+    let fatTarget: Double = 18
+    return HomepageDomainData(
+      domain: .body,
+      title: "Body",
+      accent: theme.color(for: "body"),
+      headline: {
+        let parts = [
+          weight.map { String(format: "%.1f kg", $0) },
+          fat.map { String(format: "%.1f%%", $0) },
+        ].compactMap { $0 }
+        return parts.isEmpty ? "—" : parts.joined(separator: " · ")
+      }(),
+      headlineStats: [
+        .init(label: "Weight",
+              value: weight.map { String(format: "%.1f", $0) } ?? "—",
+              unit: "kg"),
+        .init(label: "Fat",
+              value: fat.map { String(format: "%.1f", $0) } ?? "—",
+              unit: "%"),
+      ],
+      progress: .init(label: "Body fat target",
+                      current: fat.map { min($0, fatTarget * 2) } ?? 0,
+                      target: fatTarget,
+                      unit: "%"),
+      history: .centered(values: centeredValues, baseline: avg),
+      tap: .openSheet(.body)
+    )
+  }
+
+  private func gutDomainData() -> HomepageDomainData {
+    let count = gutToday?.movementCount ?? 0
+    let discomfort = gutToday?.totalDiscomfortH ?? 0
+    let bars = gutHistory.map { $0.movements }
+    let dailyTarget = 2
+    return HomepageDomainData(
+      domain: .gut,
+      title: "Gut",
+      accent: theme.color(for: "gut"),
+      headline: discomfort > 0
+        ? "\(count) · \(String(format: "%.1f", discomfort))h disc."
+        : "\(count)",
+      headlineStats: [
+        .init(label: "Today", value: "\(count)"),
+        .init(label: "Discomfort",
+              value: String(format: "%.1f", discomfort),
+              unit: "h"),
+      ],
+      progress: .init(label: "Today / typical",
+                      current: Double(min(count, dailyTarget)),
+                      target: Double(dailyTarget)),
+      history: .bars(bars.isEmpty ? Array(repeating: 0, count: 90) : bars),
+      tap: .openSheet(.gut)
+    )
+  }
+
+  private func activityDomainData() -> HomepageDomainData? {
+    let bridge = HealthKitBridge.shared
+    guard bridge.isAvailable else { return nil }
+    let stepsTarget = 8000
+    return HomepageDomainData(
+      domain: .activity,
+      title: "Activity",
+      accent: theme.color(for: "activity"),
+      headline: "\(bridge.stepsToday) steps · \(bridge.exerciseMinutesToday) min",
+      headlineStats: [
+        .init(label: "Steps", value: "\(bridge.stepsToday)"),
+        .init(label: "Active",
+              value: "\(Int(bridge.activeKcalToday))",
+              unit: "kcal"),
+        .init(label: "Exercise",
+              value: "\(bridge.exerciseMinutesToday)",
+              unit: "m"),
+      ],
+      progress: .init(label: "Steps target",
+                      current: Double(min(bridge.stepsToday, stepsTarget)),
+                      target: Double(stepsTarget)),
+      history: .bars(bridge.stepsHistory),
+      tap: .openSheet(.activity)
+    )
+  }
+
   // Tasks — live counts from /api/tasks/counts and per-day completion
   // history from /api/tasks/history. Tapping the tile switches to the
   // Tasks tab (the full task app); other tiles open a sheet, but Tasks
@@ -752,7 +1323,12 @@ struct WeekDashboardView: View {
     let upcoming = taskCounts?.upcomingCount ?? 0
     let doneToday = tasksHistory?.daily.last?.done ?? 0
     let totalToday = doneToday + openToday
-    let bars = tasksHistory?.daily.map(\.done) ?? []
+    // Tile histograms render at 7 days regardless of the underlying
+    // loader window (90d for Heatmap + Dense). At ~150pt tile width,
+    // 90 bars compress into invisibility. Sparkline mode reads from
+    // the full @State arrays via `HomepageDomainData`, so this slice
+    // is tile-mode-only.
+    let bars = Array((tasksHistory?.daily.map(\.done) ?? []).suffix(7))
     return WeekTasksTile(
       accent: theme.color(for: "tasks"),
       openToday: openToday,
@@ -813,7 +1389,7 @@ struct WeekDashboardView: View {
       done: done,
       skipped: skipped,
       total: total,
-      history: habitHistory
+      history: Array(habitHistory.suffix(7))
     )
     .contentShape(Rectangle())
     .onTapGesture { sheetDest = .habits }
@@ -843,8 +1419,11 @@ struct WeekDashboardView: View {
   // the chart and a half-sized bar reads as ~half that week's effort.
   private var trainingTile: some View {
     let accent = theme.color(for: "training")
-    let sessionCount = trainingSessionDates.count
-    let minutes = cardio?.daily.reduce(0) { $0 + $1.minutes } ?? 0
+    // Same fix as `trainingDomainData`: stats are trailing 7 days so
+    // they read sensibly against the weekly Z2 target. Tile bar chart
+    // still renders 7 days regardless via `lastSevenDays`.
+    let sessionCount = weeklySessionCount
+    let minutes = Int(cardio?.daily.last?.rolling7d ?? 0)
     let target = cardio?.targetWeeklyMin ?? 150
 
     let days = lastSevenDays
@@ -886,6 +1465,7 @@ struct WeekDashboardView: View {
       sessionTypes: trainingSessionTypes,
       suggestedId: trainingSuggestedId,
       daysAgo: trainingDaysAgo,
+      activeDraft: trainingDraft.draft,
       onStart: { typeId in
         // Empty id = "no suggestion, open the picker" — leave pendingType
         // nil so TrainingSessionView shows its picker. Otherwise pass the
@@ -894,17 +1474,32 @@ struct WeekDashboardView: View {
           nav.pendingTrainingType = typeId
         }
         nav.showTrainingSession = true
+      },
+      onResume: {
+        // Resume = open the sheet without setting `pendingTrainingType`.
+        // TrainingSessionView's auto-start logic only fires when
+        // `store.draft == nil`, so with a live draft the sheet just
+        // shows it.
+        nav.showTrainingSession = true
       }
     )
   }
 
   /// Last 7 ISO yyyy-MM-dd dates, oldest → newest. Used to align the
-  /// training tile's two-series histogram so absent days still render as
-  /// zero-height bars instead of being collapsed out of the chart.
-  private var lastSevenDays: [String] {
+  /// training tile's two-series histogram so absent days still render
+  /// as zero-height bars instead of being collapsed out of the chart.
+  /// Stays at 7 — the training tile's bar chart was designed for it
+  /// and looked cramped at 30. The longer-window training domain data
+  /// uses `lastNDays(_:)` directly.
+  private var lastSevenDays: [String] { lastNDays(7) }
+
+  /// Last N ISO yyyy-MM-dd dates, oldest → newest. Generalisation of
+  /// `lastSevenDays` for callers that need a longer window — currently
+  /// `trainingDomainData` (90 days for the Heatmap mode).
+  private func lastNDays(_ n: Int) -> [String] {
     let cal = Calendar.current
     let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
-    return (0..<7).reversed().compactMap { offset in
+    return (0..<n).reversed().compactMap { offset in
       cal.date(byAdding: .day, value: -offset, to: Date()).map(fmt.string(from:))
     }
   }
@@ -933,7 +1528,7 @@ struct WeekDashboardView: View {
       overdue: overdue,
       done: done,
       total: total,
-      history: choreHistory
+      history: Array(choreHistory.suffix(7))
     )
     .contentShape(Rectangle())
     .onTapGesture { sheetDest = .chores }
@@ -968,7 +1563,7 @@ struct WeekDashboardView: View {
       accent: theme.color(for: "supplements"),
       done: done,
       total: total,
-      history: supplementHistory
+      history: Array(supplementHistory.suffix(7))
     )
     .contentShape(Rectangle())
     .onTapGesture { sheetDest = .supplements }
@@ -995,7 +1590,7 @@ struct WeekDashboardView: View {
     let last = ouraNights.first
     let lastH = last?.totalH ?? 0
     let score = last?.sleepScore.map { "\($0)" } ?? "—"
-    let bars = ouraNights.reversed().map { $0.sleepScore ?? 0 }
+    let bars = Array(ouraNights.reversed().map { $0.sleepScore ?? 0 }.suffix(7))
     return Button { sheetDest = .sleep } label: {
       WeekSleepTile(
         accent: theme.color(for: "sleep"),
@@ -1012,7 +1607,7 @@ struct WeekDashboardView: View {
   private var airTile: some View {
     let latest = airSummary?.latest?.co2Ppm.map { Int($0) }
     let todayOver = airSummary?.today.minutesOver1000 ?? 0
-    let bars = airHistory.map { Int($0.co2Avg ?? 0) }
+    let bars = Array(airHistory.map { Int($0.co2Avg ?? 0) }.suffix(7))
     let budget = 60
     return Button { sheetDest = .air } label: {
       WeekAirTile(
@@ -1030,7 +1625,8 @@ struct WeekDashboardView: View {
   private var groceriesTile: some View {
     let lowCount = groceries.filter { $0.low }.count
     let stocked = groceries.count - lowCount
-    let boughtPerDay = groceriesBoughtPerDay()
+    let boughtPerDayFull = groceriesBoughtPerDay()
+    let boughtPerDay = Array(boughtPerDayFull.suffix(7))
     let totalBought7d = boughtPerDay.reduce(0, +)
     return WeekGroceriesTile(
       accent: theme.color(for: "groceries"),
@@ -1061,17 +1657,18 @@ struct WeekDashboardView: View {
     Haptics.tick()
   }
 
-  /// Items bought per day for the last 7 days (oldest → newest, today last),
-  /// derived from each item's `lastBought` date.
+  /// Items bought per day for the last 30 days (oldest → newest, today
+  /// last), derived from each item's `lastBought` date. Bumped from 7
+  /// → 30 in Phase 4b for the Heatmap mode strip.
   private func groceriesBoughtPerDay() -> [Int] {
     let cal = Calendar.current
     let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
     let today = cal.startOfDay(for: Date())
-    var counts = Array(repeating: 0, count: 7)
+    var counts = Array(repeating: 0, count: 90)
     for item in groceries {
       guard let lb = item.lastBought, let d = fmt.date(from: lb) else { continue }
       let diff = cal.dateComponents([.day], from: cal.startOfDay(for: d), to: today).day ?? Int.max
-      if diff >= 0 && diff < 7 { counts[6 - diff] += 1 }
+      if diff >= 0 && diff < 30 { counts[29 - diff] += 1 }
     }
     return counts
   }
@@ -1081,7 +1678,7 @@ struct WeekDashboardView: View {
     let accent = theme.color(for: "caffeine")
     let sessions = caffeineToday?.sessionCount ?? 0
     let grams = caffeineToday?.totalG ?? 0
-    let bars = caffeineHistory.map { $0.sessions }
+    let bars = Array(caffeineHistory.map { $0.sessions }.suffix(7))
     let dailyLimit = 3   // soft default until Settings.targets is wired
     return ModuleTile(
       title: "Caffeine",
@@ -1125,7 +1722,7 @@ struct WeekDashboardView: View {
     let accent = theme.color(for: "cannabis")
     let sessions = cannabisToday?.sessionCount ?? 0
     let grams = cannabisToday?.totalG ?? 0
-    let bars = cannabisHistory.map { $0.sessions }
+    let bars = Array(cannabisHistory.map { $0.sessions }.suffix(7))
     let dailyLimit = 2
     return ModuleTile(
       title: "Cannabis",
@@ -1190,7 +1787,10 @@ struct WeekDashboardView: View {
     let latest = bodyRows.first
     let weight = latest?.weightKg
     let fat    = latest?.fatPct
-    let actualSeries = weeklyWeightActual()
+    // Tile chart is a 7-day window; the full 90-day series lives on
+    // `bodyDomainData` for Sparkline / Heatmap modes.
+    let actualSeriesFull = weeklyWeightActual()
+    let actualSeries = Array(actualSeriesFull.suffix(7))
     let present = actualSeries.compactMap { $0 }
     let avg = present.isEmpty ? 0.0 : present.reduce(0, +) / Double(present.count)
     let centeredValues: [Double?] = actualSeries.map { $0.map { $0 - avg } }
@@ -1220,7 +1820,7 @@ struct WeekDashboardView: View {
     let accent = theme.color(for: "gut")
     let count = gutToday?.movementCount ?? 0
     let discomfort = gutToday?.totalDiscomfortH ?? 0
-    let bars = gutHistory.map { $0.movements }
+    let bars = Array(gutHistory.map { $0.movements }.suffix(7))
     let dailyTarget = 2
     return ModuleTile(
       title: "Gut",
@@ -1283,7 +1883,7 @@ struct WeekDashboardView: View {
                           current: Double(min(bridge.stepsToday, stepsTarget)),
                           target: Double(stepsTarget)),
           history: .init(label: "7-day steps",
-                         values: bridge.stepsHistory)
+                         values: Array(bridge.stepsHistory.suffix(7)))
         )
       }
       .buttonStyle(.plain)
@@ -1293,9 +1893,10 @@ struct WeekDashboardView: View {
   // Settings is reached from the sidebar (and ⌘, on macOS) — it's an
   // app-level surface, not a Week tile, and not on this toolbar.
 
-  /// Last 7 calendar days oldest→newest (today rightmost) of carry-forward
-  /// weights from `bodyRows`. A day with no weigh-in inherits the most
-  /// recent prior weight; days before the first ever weigh-in are nil.
+  /// Last 30 calendar days oldest→newest (today rightmost) of
+  /// carry-forward weights from `bodyRows`. A day with no weigh-in
+  /// inherits the most recent prior weight; days before the first ever
+  /// weigh-in are nil. Bumped from 7 → 30 in Phase 4b.
   private func weeklyWeightSeries() -> [Double?] {
     let cal = Calendar.current
     let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
@@ -1307,7 +1908,7 @@ struct WeekDashboardView: View {
     let knownDates = byDate.keys.sorted()
     var out: [Double?] = []
     let today = cal.startOfDay(for: Date())
-    for offset in (0..<7).reversed() {
+    for offset in (0..<30).reversed() {
       let d = cal.date(byAdding: .day, value: -offset, to: today) ?? today
       let key = fmt.string(from: d)
       if let exact = byDate[key] {
@@ -1321,16 +1922,17 @@ struct WeekDashboardView: View {
     return out
   }
 
-  /// Last 7 calendar days with actual weigh-ins only — no carry-forward.
-  /// Days without a measurement are nil so the centered chart shows stubs
-  /// rather than collapsing to zero deviation.
+  /// Last 30 calendar days with actual weigh-ins only — no
+  /// carry-forward. Days without a measurement are nil so the centered
+  /// chart shows stubs rather than collapsing to zero deviation. Bumped
+  /// from 7 → 30 in Phase 4b.
   private func weeklyWeightActual() -> [Double?] {
     let cal = Calendar.current
     let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
     var byDate: [String: Double] = [:]
     for r in bodyRows { if let w = r.weightKg { byDate[r.date] = w } }
     let today = cal.startOfDay(for: Date())
-    return (0..<7).reversed().map { offset -> Double? in
+    return (0..<30).reversed().map { offset -> Double? in
       guard let d = cal.date(byAdding: .day, value: -offset, to: today) else { return nil }
       return byDate[fmt.string(from: d)]
     }
@@ -1345,27 +1947,102 @@ struct WeekDashboardView: View {
   // Nutrition — today's protein + kcal from today's entries; histogram
   // is per-day protein from /api/nutrition/stats; progress bar uses the
   // user's protein target from /api/nutrition/macros-config.
+  //
+  // When fasting tracking is on and the live state machine reports a
+  // fasting window, the tile morphs: headline becomes the live timer,
+  // progress tracks the target fasting band, and the history becomes
+  // 7-day completed-fast hours instead of protein grams.
   private var nutritionTile: some View {
+    // TimelineView lets the live timer minute-tick while the tile is
+    // visible; the rest of the tile re-renders harmlessly each minute.
+    TimelineView(.periodic(from: .now, by: 60)) { ctx in
+      nutritionTileBody(now: ctx.date)
+    }
+  }
+
+  @ViewBuilder
+  private func nutritionTileBody(now: Date) -> some View {
     let accent = theme.color(for: "nutrition")
-    let proteinTarget = nutritionTarget?.protein.min ?? 150
-    let bars = nutritionStats?.daily.map { Int($0.proteinG) }
-              ?? Array(repeating: 0, count: 7)
-    return ModuleTile(
-      title: "Nutrition",
-      accent: accent,
-      stats: [
-        .init(label: "Protein", value: "\(Int(todayProteinSum))", unit: "g"),
-        .init(label: "Kcal",    value: "\(Int(todayKcalSum))")
-      ],
-      progress: .init(label: "Today's protein",
-                      current: todayProteinSum,
-                      target: max(proteinTarget, 1),
-                      unit: "g"),
-      history: .init(label: "7-day protein", values: bars)
+    let state = currentFastingState(now: now)
+    if nutritionTrackFasting, case .fasting(_, let since, let totalMin) = state {
+      ModuleTile(
+        title: "Nutrition",
+        accent: accent,
+        stats: [
+          .init(label: "Fasting", value: fastingDurationText(totalMin: totalMin)),
+          .init(label: "Since", value: since)
+        ],
+        progress: fastingProgressRow(totalMin: totalMin),
+        history: .init(label: "7-day fasts (h)", values: fastingHoursBars())
+      )
+      .contentShape(Rectangle())
+      .onTapGesture { sheetDest = .nutrition }
+      .contextMenu { nutritionQuickAddMenu }
+    } else {
+      let proteinTarget = nutritionTarget?.protein.min ?? 150
+      let bars = Array((nutritionStats?.daily.map { Int($0.proteinG) }
+                ?? Array(repeating: 0, count: 7)).suffix(7))
+      ModuleTile(
+        title: "Nutrition",
+        accent: accent,
+        stats: [
+          .init(label: "Protein", value: "\(Int(todayProteinSum))", unit: "g"),
+          .init(label: "Kcal",    value: "\(Int(todayKcalSum))")
+        ],
+        progress: .init(label: "Today's protein",
+                        current: todayProteinSum,
+                        target: max(proteinTarget, 1),
+                        unit: "g"),
+        history: .init(label: "7-day protein", values: bars)
+      )
+      .contentShape(Rectangle())
+      .onTapGesture { sheetDest = .nutrition }
+      .contextMenu { nutritionQuickAddMenu }
+    }
+  }
+
+  /// Live fasting state derived from `nutritionStats`. Returns `.fed`
+  /// when tracking is off or the stats payload isn't loaded yet, so
+  /// callers can branch with a single switch.
+  private func currentFastingState(now: Date) -> FastingState {
+    guard let stats = nutritionStats else { return .fed }
+    let inputs = FastingStateInputs(
+      todayLatestMeal: stats.todayLatestMeal,
+      todayMealCount: stats.todayMealCount ?? 0,
+      yesterdayLastMeal: stats.yesterdayLastMeal
     )
-    .contentShape(Rectangle())
-    .onTapGesture { sheetDest = .nutrition }
-    .contextMenu { nutritionQuickAddMenu }
+    return computeFastingState(inputs: inputs, now: now)
+  }
+
+  private func fastingDurationText(totalMin: Int) -> String {
+    "\(totalMin / 60)h \(totalMin % 60)m"
+  }
+
+  /// Progress bar fills toward the user's target fasting minimum (the
+  /// short end of the band). Once past it, the bar shows full but the
+  /// timer keeps counting in the headline.
+  private func fastingProgressRow(totalMin: Int) -> ModuleTile.ProgressBar {
+    let targetMin = nutritionTarget?.fasting?.min ?? FastingDefaults.targetMinH
+    let hours = Double(totalMin) / 60
+    return .init(
+      label: "Fast vs target",
+      current: min(hours, targetMin),
+      target: max(targetMin, 1),
+      unit: "h"
+    )
+  }
+
+  /// Last-7 completed-fast hours, oldest→newest. Gaps (sparse-log
+  /// days where the heuristic couldn't anchor a window) collapse to 0
+  /// — the bar just renders short rather than disappearing.
+  private func fastingHoursBars() -> [Int] {
+    let windows = nutritionStats?.fasting ?? []
+    let last7 = windows.suffix(7)
+    let bars = last7.map { Int(($0.hours ?? 0).rounded()) }
+    if bars.count < 7 {
+      return Array(repeating: 0, count: 7 - bars.count) + bars
+    }
+    return bars
   }
 
   @ViewBuilder private var nutritionQuickAddMenu: some View {
@@ -1397,6 +2074,36 @@ struct WeekDashboardView: View {
                    body: body, kind: "nutrition.add")
     AddInfoSection.nutrition.notifyTilesChanged()
     Haptics.tick()
+  }
+}
+
+/// Empty-state shown when the user has selected a layout mode whose
+/// renderer hasn't been built yet. Mirrors the system
+/// `ContentUnavailableView` shape but stays plain `VStack` so the same
+/// view renders cleanly inside the existing `LazyVGrid`'s parent stack
+/// without an iOS-version gate.
+private struct ComingSoonLayoutPlaceholder: View {
+  let mode: HomepageLayoutMode
+  let onUseTiles: () -> Void
+
+  var body: some View {
+    VStack(spacing: 12) {
+      Image(systemName: mode.icon)
+        .font(.system(size: 44, weight: .regular))
+        .foregroundStyle(.secondary)
+      Text("\(mode.title) layout — coming soon")
+        .font(.headline)
+      Text(mode.summary)
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+        .multilineTextAlignment(.center)
+        .padding(.horizontal)
+      Button("Use Tiles", action: onUseTiles)
+        .buttonStyle(.bordered)
+        .padding(.top, 4)
+    }
+    .frame(maxWidth: .infinity)
+    .padding(.vertical, 48)
   }
 }
 
@@ -1652,7 +2359,7 @@ private struct WeekSleepTile: View {
       progress: .init(label: "Target", current: lastHours, target: 8, unit: "h"),
       history: .init(
         label: "7-day score",
-        values: bars.isEmpty ? Array(repeating: 0, count: 7) : bars,
+        values: bars.isEmpty ? Array(repeating: 0, count: 90) : bars,
         ceiling: 100
       )
     )
@@ -1682,7 +2389,7 @@ private struct WeekAirTile: View {
       ),
       history: .init(
         label: "7-day CO2 avg",
-        values: bars.isEmpty ? Array(repeating: 0, count: 7) : bars
+        values: bars.isEmpty ? Array(repeating: 0, count: 90) : bars
       )
     )
   }
@@ -1709,7 +2416,7 @@ private struct WeekGroceriesTile: View {
         current: Double(stocked),
         target: Double(max(totalItems, 1))
       ),
-      history: .init(label: "Bought (7d)", values: boughtPerDay)
+      history: .init(label: "Bought (90d)", values: boughtPerDay)
     )
   }
 }

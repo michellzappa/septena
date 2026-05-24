@@ -40,6 +40,28 @@ enum HomepageDomain: String, CaseIterable, Hashable, Identifiable {
 
   var id: String { rawValue }
 
+  /// SF Symbol used by the Dense / List renderers as the leading row
+  /// icon. Kept here (not on `HomepageDomainData`) because the icon is
+  /// a pure identity attribute — it never depends on today's data.
+  var icon: String {
+    switch self {
+    case .tasks:       return "checklist"
+    case .habits:      return "repeat"
+    case .training:    return "figure.strengthtraining.traditional"
+    case .chores:      return "house"
+    case .supplements: return "pills"
+    case .sleep:       return "bed.double"
+    case .nutrition:   return "fork.knife"
+    case .air:         return "wind"
+    case .groceries:   return "cart"
+    case .caffeine:    return "cup.and.saucer"
+    case .cannabis:    return "leaf"
+    case .body:        return "scalemass"
+    case .gut:         return "circle.bottomhalf.filled"
+    case .activity:    return "figure.walk"
+    }
+  }
+
   /// The canonical homepage order. Every layout mode iterates this list; the
   /// renderer is what varies per mode, not the sequence.
   ///
