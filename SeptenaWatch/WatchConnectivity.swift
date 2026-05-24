@@ -71,21 +71,19 @@ final class WatchConnectivity {
       let date = today
       let bkt  = currentBucket()
 
-      // Parallel fetch of all six record types.
-      async let habitDefsTask   = fetchAll("HabitDefinition")
-      async let habitEventsTask = fetchAll("HabitEvent")
-      async let suppDefsTask    = fetchAll("SupplementDefinition")
-      async let suppEventsTask  = fetchAll("SupplementEvent")
-      async let choreDefsTask   = fetchAll("ChoreDefinition")
-      async let choreEventsTask = fetchAll("ChoreEvent")
-
-      let (habitDefRecs, habitEventRecs,
-           suppDefRecs, suppEventRecs,
-           choreDefRecs, choreEventRecs) = try await (
-        habitDefsTask, habitEventsTask,
-        suppDefsTask,  suppEventsTask,
-        choreDefsTask, choreEventsTask
-      )
+      // One zone replay covers every record type — avoids per-type
+      // CKQuery, which would require a Queryable index on `recordName`.
+      let byType = try await fetchAllByType(recordTypes: [
+        "HabitDefinition", "HabitEvent",
+        "SupplementDefinition", "SupplementEvent",
+        "ChoreDefinition", "ChoreEvent",
+      ])
+      let habitDefRecs   = byType["HabitDefinition", default: []]
+      let habitEventRecs = byType["HabitEvent", default: []]
+      let suppDefRecs    = byType["SupplementDefinition", default: []]
+      let suppEventRecs  = byType["SupplementEvent", default: []]
+      let choreDefRecs   = byType["ChoreDefinition", default: []]
+      let choreEventRecs = byType["ChoreEvent", default: []]
 
       // Decode into lightweight value types.
       let habitDefs = habitDefRecs.map(HabitDef.init)
@@ -222,28 +220,38 @@ final class WatchConnectivity {
 
   // MARK: - CloudKit read helper
 
-  private func fetchAll(_ recordType: String) async throws -> [CKRecord] {
-    let query = CKQuery(recordType: recordType, predicate: NSPredicate(value: true))
-    var results: [CKRecord] = []
+  /// Full-zone replay grouped by record type. Mirrors the iOS-side
+  /// `CKEngine.fetchAllRecords` pattern: zone-change pages from a nil
+  /// token return every live record without needing Queryable indexes
+  /// on the system `recordName` field.
+  private func fetchAllByType(
+    recordTypes: [CKRecord.RecordType]
+  ) async throws -> [CKRecord.RecordType: [CKRecord]] {
+    let accepted = Set(recordTypes)
+    var token: CKServerChangeToken?
+    var moreComing = true
+    var recordsByID: [CKRecord.ID: CKRecord] = [:]
 
-    let (matchResults, cursor) = try await db.records(
-      matching: query,
-      inZoneWith: ckZoneID
-    )
-    for (_, result) in matchResults {
-      if let r = try? result.get() { results.append(r) }
-    }
-
-    var nextCursor = cursor
-    while let c = nextCursor {
-      let (more, moreCursor) = try await db.records(continuingMatchFrom: c)
-      for (_, result) in more {
-        if let r = try? result.get() { results.append(r) }
+    while moreComing {
+      let page = try await db.recordZoneChanges(
+        inZoneWith: ckZoneID,
+        since: token,
+        desiredKeys: nil,
+        resultsLimit: nil
+      )
+      for (recordID, result) in page.modificationResultsByID {
+        if case .success(let modification) = result {
+          let record = modification.record
+          if accepted.contains(record.recordType) {
+            recordsByID[recordID] = record
+          }
+        }
       }
-      nextCursor = moreCursor
+      token = page.changeToken
+      moreComing = page.moreComing
     }
 
-    return results
+    return Dictionary(grouping: recordsByID.values, by: \.recordType)
   }
 
   // MARK: - Complication
