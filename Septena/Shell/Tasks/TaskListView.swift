@@ -63,6 +63,12 @@ struct TaskListView: View {
   @State private var areas: [Area]
   @State private var projects: [Project]
 
+  /// Which area/project cluster (if any) is currently the hovered drop
+  /// target during a drag. All rows + header sharing the same key light
+  /// up together, so the whole cluster reads as one landing zone — not
+  /// just whatever row the pointer happens to be over.
+  @State private var hoveredDropGroupKey: String? = nil
+
   /// Filters we've successfully loaded from the network at least once.
   /// Gates the "Nothing here yet" empty state so it never flashes during
   /// a section swap — only after a real network response confirms emptiness.
@@ -766,8 +772,26 @@ struct TaskListView: View {
   // MARK: - Row
 
   @ViewBuilder
-  private func row(_ task: SeptenaTask) -> some View {
+  private func row(_ task: SeptenaTask,
+                   dropGroup: TaskGroupDrop? = nil) -> some View {
     rowContent(task)
+      // Drag source — only when not editing the row inline, so the text
+      // field stays interactive. Dragging the row publishes its id so any
+      // group header (or sidebar item) can pick it up and re-home the task
+      // to a new area/project. Things-style: faded mini preview, no
+      // reordering yet — phase 2 (post-CloudKit migration) will add a
+      // persistent sortOrder for in-list reorder.
+      .modifier(TaskRowDraggable(taskId: task.id,
+                                 title: task.title,
+                                 enabled: editingTaskId != task.id))
+      // Make the whole row a drop landing zone for its cluster — drag
+      // any task onto any other row in the project/area and the dragged
+      // task gets re-homed to that cluster. Highlight binds to the
+      // parent-level `hoveredDropGroupKey` so the entire cluster (header
+      // + every row) lights up as one band, not just the hovered cell.
+      .modifier(ClusterDropTarget(groupKey: dropGroup?.key,
+                                  hovered: $hoveredDropGroupKey,
+                                  onDrop: dropGroup?.accept))
       // One shared highlight backplate covers both the closed-row and
       // inline-editor branches, so the accent tint stays put when the
       // row swaps state — no cross-fade needed.
@@ -1172,20 +1196,32 @@ struct TaskListView: View {
     // 2. Areas in sidebar order: direct-area tasks, then each project's tasks.
     ForEach(areas) { area in
       let areaTasks = byArea[area.id] ?? []
+      let areaDrop = TaskGroupDrop(key: "area:\(area.id)") { ids in
+        for id in ids { applyMove(id: id, areaId: area.id, projectId: nil) }
+      }
       if !areaTasks.isEmpty {
-        groupHeader(icon: "square.stack.3d.up.fill", title: area.title) {
-          nav.path = [.area(area)]
-        }
+        groupHeader(
+          icon: "square.stack.3d.up.fill",
+          title: area.title,
+          onTap: { nav.path = [.area(area)] },
+          dropGroup: areaDrop
+        )
         .asListRow()
-        ForEach(areaTasks) { task in row(task).asListRow() }
+        ForEach(areaTasks) { task in row(task, dropGroup: areaDrop).asListRow() }
       }
       ForEach(projects.filter { $0.area == area.id }) { project in
         if let tasks = byProject[project.id], !tasks.isEmpty {
-          groupHeader(icon: nil, title: project.title) {
-            nav.path = [.project(project)]
+          let projectDrop = TaskGroupDrop(key: "project:\(project.id)") { ids in
+            for id in ids { applyMove(id: id, areaId: nil, projectId: project.id) }
           }
+          groupHeader(
+            icon: nil,
+            title: project.title,
+            onTap: { nav.path = [.project(project)] },
+            dropGroup: projectDrop
+          )
           .asListRow()
-          ForEach(tasks) { task in row(task).asListRow() }
+          ForEach(tasks) { task in row(task, dropGroup: projectDrop).asListRow() }
         }
       }
     }
@@ -1193,11 +1229,17 @@ struct TaskListView: View {
     // 3. Top-level projects (no area).
     ForEach(projects.filter { $0.area == nil }) { project in
       if let tasks = byProject[project.id], !tasks.isEmpty {
-        groupHeader(icon: nil, title: project.title) {
-          nav.path = [.project(project)]
+        let projectDrop = TaskGroupDrop(key: "project:\(project.id)") { ids in
+          for id in ids { applyMove(id: id, areaId: nil, projectId: project.id) }
         }
+        groupHeader(
+          icon: nil,
+          title: project.title,
+          onTap: { nav.path = [.project(project)] },
+          dropGroup: projectDrop
+        )
         .asListRow()
-        ForEach(tasks) { task in row(task).asListRow() }
+        ForEach(tasks) { task in row(task, dropGroup: projectDrop).asListRow() }
       }
     }
   }
@@ -1278,7 +1320,17 @@ struct TaskListView: View {
   }
 
   @ViewBuilder
-  private func groupHeader(icon: String?, title: String, onTap: (() -> Void)? = nil) -> some View {
+  private func groupHeader(icon: String?,
+                           title: String,
+                           onTap: (() -> Void)? = nil,
+                           dropGroup: TaskGroupDrop? = nil) -> some View {
+    groupHeaderBody(icon: icon, title: title, onTap: onTap)
+      .modifier(ClusterDropTarget(groupKey: dropGroup?.key,
+                                  hovered: $hoveredDropGroupKey,
+                                  onDrop: dropGroup?.accept))
+  }
+
+  private func groupHeaderBody(icon: String?, title: String, onTap: (() -> Void)? = nil) -> some View {
     // Same icon column width and same icon→text gap as task rows so
     // every icon sits at one X and every text starts at one X.
     VStack(alignment: .leading, spacing: 0) {
@@ -2444,5 +2496,84 @@ extension View {
     listRowSeparator(.hidden)
       .listRowBackground(Color.clear)
       .listRowInsets(EdgeInsets())
+  }
+}
+
+// MARK: - Drag & drop
+
+/// Wraps a task row in a `.draggable` that publishes the task's id as a
+/// String payload. The preview is a compact title chip so the user can see
+/// what they're carrying without the whole row's metadata cluttering the
+/// drag image (matches Things' minimalist drag chip).
+private struct TaskRowDraggable: ViewModifier {
+  let taskId: String
+  let title: String
+  let enabled: Bool
+
+  func body(content: Content) -> some View {
+    if enabled {
+      content.draggable(taskId) {
+        Text(title)
+          .font(.system(size: 14, weight: .medium))
+          .foregroundStyle(Theme.inkPrimary)
+          .lineLimit(1)
+          .padding(.horizontal, 12)
+          .padding(.vertical, 8)
+          .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+              .fill(Theme.cardSurface)
+              .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
+          )
+      }
+    } else {
+      content
+    }
+  }
+}
+
+/// Bundle of (cluster identity, drop handler) handed to every row +
+/// header that lives inside the same project/area cluster. Header and
+/// rows share one key so the `ClusterDropTarget` modifier can light
+/// them all up together when any one of them is targeted by a drag.
+struct TaskGroupDrop {
+  let key: String
+  let accept: ([String]) -> Void
+}
+
+/// Drop target applied to every cell (header + rows) in a cluster. The
+/// `hovered` binding is owned by the parent `TaskListView`, so all
+/// cells with the same `groupKey` highlight in unison — the whole
+/// cluster reads as one landing band, not one cell. Tap-throughs still
+/// work because the highlight is purely a background fill.
+private struct ClusterDropTarget: ViewModifier {
+  let groupKey: String?
+  @Binding var hovered: String?
+  let onDrop: (([String]) -> Void)?
+
+  func body(content: Content) -> some View {
+    if let groupKey, let onDrop {
+      content
+        .background(
+          Theme.tasksAccent
+            .opacity(hovered == groupKey ? 0.16 : 0)
+            .animation(.easeOut(duration: 0.12), value: hovered)
+        )
+        .dropDestination(for: String.self) { ids, _ in
+          guard !ids.isEmpty else { return false }
+          Haptics.tick()
+          onDrop(ids)
+          hovered = nil
+          return true
+        } isTargeted: { hovering in
+          if hovering {
+            if hovered != groupKey { Haptics.tick() }
+            hovered = groupKey
+          } else if hovered == groupKey {
+            hovered = nil
+          }
+        }
+    } else {
+      content
+    }
   }
 }

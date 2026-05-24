@@ -37,6 +37,7 @@ struct SidebarRootView: View {
   @Environment(SectionTheme.self) private var theme
   @Environment(AreasMutator.self) private var areasMutator
   @Environment(ProjectsMutator.self) private var projectsMutator
+  @Environment(TaskMutator.self) private var taskMutator
   @Environment(\.modelContext) private var modelContext
 
   @State private var areas: [Area]
@@ -568,6 +569,10 @@ struct SidebarRootView: View {
         SidebarAreaRow(name: area.title, count: areaOpenCount[area.id] ?? 0)
       }
       .contextMenu { areaMenu(area) }
+      // Drop a dragged task (payload: task id String) onto this area
+      // row to re-home it. Independent of the SidebarDragID dropDest
+      // below — SwiftUI dispatches by payload type.
+      .modifier(SidebarTaskDropTarget(kind: .area(area.id), mutator: taskMutator))
       #if os(macOS)
       // Drag-to-reorder is macOS-only. On iPadOS, attaching `.draggable`
       // to a tappable row plays a "lift" preview on every tap that reads
@@ -640,6 +645,7 @@ struct SidebarRootView: View {
                         count: projectOpenCount[project.id] ?? 0)
     }
     .contextMenu { projectMenu(project) }
+    .modifier(SidebarTaskDropTarget(kind: .project(project.id), mutator: taskMutator))
     #if os(macOS)
     .draggable(SidebarDragID.project(project.id, parent: parent)) {
       Text(project.title)
@@ -1413,6 +1419,49 @@ private struct SidebarSheets: ViewModifier {
         Button("OK") { errorMessage = nil }
       } message: {
         Text(errorMessage ?? "")
+      }
+  }
+}
+
+// MARK: - Task drop into sidebar
+
+/// Drop target for tasks dragged from a TaskListView onto a sidebar
+/// area / project row. Payload is the task id string. On drop we
+/// re-home the task via `TaskMutator.moveToArea` / `moveToProject`;
+/// the list view's next load picks up the change.
+private struct SidebarTaskDropTarget: ViewModifier {
+  enum Kind {
+    case area(String)
+    case project(String)
+  }
+
+  let kind: Kind
+  let mutator: TaskMutator
+  @State private var isTargeted = false
+
+  func body(content: Content) -> some View {
+    content
+      .background(
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+          .fill(Theme.tasksAccent.opacity(isTargeted ? 0.18 : 0))
+          .animation(.easeOut(duration: 0.12), value: isTargeted)
+      )
+      .dropDestination(for: String.self) { ids, _ in
+        guard !ids.isEmpty else { return false }
+        Haptics.tick()
+        for id in ids {
+          switch kind {
+          case .area(let areaId):
+            mutator.moveToArea(id: id, area: areaId)
+            mutator.moveToProject(id: id, project: nil)
+          case .project(let projectId):
+            mutator.moveToProject(id: id, project: projectId)
+          }
+        }
+        return true
+      } isTargeted: { hovering in
+        if hovering && !isTargeted { Haptics.tick() }
+        isTargeted = hovering
       }
   }
 }
