@@ -82,6 +82,10 @@ var applyDidFinishBatch: (() -> Void)?
   /// called explicitly (e.g. on scenePhase active). Observable so views
   /// can disable migration / show a banner without polling.
 var accountStatus: CKAccountStatus = .couldNotDetermine
+  /// Number of in-flight `sendChanges` / `fetchChanges` calls. Views can
+  /// observe `isSyncing` to show a sync indicator while > 0.
+  private(set) var inflightSyncCount: Int = 0
+  var isSyncing: Bool { inflightSyncCount > 0 }
   private var lastSendFailureSummary: String?
 
 init() {
@@ -223,6 +227,10 @@ func noteExerciseDefinitionChange(id: String) { noteChange(recordName: ExerciseD
 func noteExerciseDefinitionDeletion(id: String) { noteDeletion(recordName: ExerciseDefinitionCloudKitSchema.recordName(for: id), kind: "exerciseDefinition") }
 func noteSessionTypeChange(id: String) { noteChange(recordName: SessionTypeCloudKitSchema.recordName(for: id), kind: "sessionType") }
 func noteSessionTypeDeletion(id: String) { noteDeletion(recordName: SessionTypeCloudKitSchema.recordName(for: id), kind: "sessionType") }
+func noteNutritionEntryChange(id: String) { noteChange(recordName: NutritionEntryCloudKitSchema.recordName(for: id), kind: "nutritionEntry") }
+func noteNutritionEntryDeletion(id: String) { noteDeletion(recordName: NutritionEntryCloudKitSchema.recordName(for: id), kind: "nutritionEntry") }
+func noteNutritionDayChange(id: String) { noteChange(recordName: NutritionDailySummaryCloudKitSchema.recordName(for: id), kind: "nutritionDay") }
+func noteNutritionDayDeletion(id: String) { noteDeletion(recordName: NutritionDailySummaryCloudKitSchema.recordName(for: id), kind: "nutritionDay") }
 
   private func noteChange(recordName: String, kind: String) {
     guard let engine else {
@@ -263,6 +271,8 @@ func noteSessionTypeDeletion(id: String) { noteDeletion(recordName: SessionTypeC
   func sendChanges() async throws {
     guard let engine else { return }
     lastSendFailureSummary = nil
+    inflightSyncCount += 1
+    defer { inflightSyncCount -= 1 }
     try await engine.sendChanges()
   }
 
@@ -275,6 +285,8 @@ func noteSessionTypeDeletion(id: String) { noteDeletion(recordName: SessionTypeC
   /// completion. Migration uses this to verify the push round-tripped.
   func fetchChanges() async throws {
     guard let engine else { return }
+    inflightSyncCount += 1
+    defer { inflightSyncCount -= 1 }
     try await engine.fetchChanges()
   }
 

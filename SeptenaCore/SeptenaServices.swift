@@ -38,6 +38,7 @@ final class SeptenaServices {
   let cannabisMutator: CannabisMutator
   let groceryMutator: GroceryMutator
   let trainingMutator: TrainingMutator
+  let nutritionMutator: NutritionMutator
   let areasMutator: AreasMutator
   let projectsMutator: ProjectsMutator
   let httpOutbox: HTTPOutbox
@@ -71,6 +72,7 @@ final class SeptenaServices {
     self.cannabisMutator = CannabisMutator(context: context, ckEngine: nil)
     self.groceryMutator = GroceryMutator(context: context, ckEngine: nil)
     self.trainingMutator = TrainingMutator(context: context, ckEngine: nil)
+    self.nutritionMutator = NutritionMutator(context: context, ckEngine: nil)
     self.areasMutator = AreasMutator(context: context)
     self.projectsMutator = ProjectsMutator(context: context)
     self.httpOutbox = HTTPOutbox(client: client, context: context)
@@ -291,6 +293,24 @@ final class SeptenaServices {
         if recordName.hasPrefix("session-type:") {
           let id = SessionTypeCloudKitSchema.entityID(from: recordName)
           if let entity = try? context.fetch(FetchDescriptor<SessionTypeEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
+        if recordName.hasPrefix("nutrition-entry:") {
+          let id = NutritionEntryCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<NutritionEntryEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
+        if recordName.hasPrefix("nutrition-day:") {
+          let id = NutritionDailySummaryCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<NutritionDailySummaryEntity>(
             predicate: #Predicate { $0.id == id }
           )).first {
             return entity.toCloudKitRecord()
@@ -544,6 +564,26 @@ final class SeptenaServices {
           } else {
             context.insert(SessionTypeEntity(cloudKit: record))
           }
+        case NutritionEntryCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = NutritionEntryCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<NutritionEntryEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(NutritionEntryEntity(cloudKit: record))
+          }
+        case NutritionDailySummaryCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = NutritionDailySummaryCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<NutritionDailySummaryEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(NutritionDailySummaryEntity(cloudKit: record))
+          }
         default:
           SeptenaLog.info("[CKEngine] applyFetched: unknown recordType \(record.recordType) id=\(record.recordID.recordName)")
         }
@@ -735,6 +775,22 @@ final class SeptenaServices {
           )).first {
             context.delete(entity)
           }
+        case NutritionEntryCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = NutritionEntryCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<NutritionEntryEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
+        case NutritionDailySummaryCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = NutritionDailySummaryCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<NutritionDailySummaryEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
         default:
           SeptenaLog.info("[CKEngine] applyDeleted: unknown recordType \(recordType) id=\(recordID.recordName)")
         }
@@ -762,6 +818,7 @@ final class SeptenaServices {
       cannabisMutator.bind(ckEngine: ckEngine)
       groceryMutator.bind(ckEngine: ckEngine)
       trainingMutator.bind(ckEngine: ckEngine)
+      nutritionMutator.bind(ckEngine: ckEngine)
       areasMutator.bind(ckEngine: ckEngine)
       projectsMutator.bind(ckEngine: ckEngine)
       airStore.bind(ckEngine: ckEngine)
@@ -2119,4 +2176,228 @@ struct TrainingEntryDraft {
   var level: Double? = nil
   var note: String? = nil
   var skipped: Bool = false
+}
+
+// MARK: - NutritionMutator
+//
+// CloudKit-backed mutations for nutrition entries and daily summaries.
+// Local-first: write to SwiftData, rebuild the day summary, then queue
+// with CKEngine. Mirrors the Grocery/Training pattern.
+
+@MainActor
+@Observable
+final class NutritionMutator {
+  private let context: ModelContext
+  private var ckEngine: CKEngine?
+
+  init(context: ModelContext, ckEngine: CKEngine? = nil) {
+    self.context = context
+    self.ckEngine = ckEngine
+  }
+
+  func bind(ckEngine: CKEngine) {
+    self.ckEngine = ckEngine
+  }
+
+  @discardableResult
+  func addEntry(loggedAt: Date,
+                emoji: String? = nil,
+                foods: [String],
+                note: String? = nil,
+                mealType: String? = nil,
+                source: String? = nil,
+                proteinG: Double = 0,
+                fatG: Double = 0,
+                carbsG: Double = 0,
+                fiberG: Double? = nil,
+                sugarG: Double? = nil,
+                saturatedFatG: Double? = nil,
+                alcoholG: Double? = nil,
+                kcal: Double? = nil,
+                sodiumMg: Double? = nil,
+                cholesterolMg: Double? = nil,
+                potassiumMg: Double? = nil,
+                waterMl: Double? = nil) -> NutritionEntryEntity {
+    let id = generateID()
+    let now = Date.now
+    let entity = NutritionEntryEntity(
+      id: id, loggedAt: loggedAt, updatedAt: now,
+      emoji: emoji, foods: foods.joined(separator: "\n"),
+      note: note, mealType: mealType, source: source,
+      proteinG: proteinG, fatG: fatG, carbsG: carbsG,
+      fiberG: fiberG, sugarG: sugarG, saturatedFatG: saturatedFatG,
+      alcoholG: alcoholG, kcal: kcal,
+      sodiumMg: sodiumMg, cholesterolMg: cholesterolMg,
+      potassiumMg: potassiumMg, waterMl: waterMl,
+      cloudKitSystemFields: nil
+    )
+    context.insert(entity)
+    rebuildSummary(forDay: dayID(from: loggedAt))
+    commitEntry(entity, op: "create")
+    return entity
+  }
+
+  func updateEntry(id: String,
+                   pickedTime: Date? = nil,
+                   emoji: String? = nil,
+                   foods: [String]? = nil,
+                   note: String? = nil,
+                   mealType: String? = nil,
+                   proteinG: Double? = nil,
+                   fatG: Double? = nil,
+                   carbsG: Double? = nil,
+                   fiberG: Double? = nil,
+                   sugarG: Double? = nil,
+                   saturatedFatG: Double? = nil,
+                   alcoholG: Double? = nil,
+                   kcal: Double? = nil,
+                   sodiumMg: Double? = nil,
+                   cholesterolMg: Double? = nil,
+                   potassiumMg: Double? = nil,
+                   waterMl: Double? = nil) {
+    guard let entity = fetchEntry(id: id) else { return }
+    let oldDay = dayID(from: entity.loggedAt)
+    if let pickedTime {
+      let cal = Calendar.current
+      let todayComponents = cal.dateComponents([.year, .month, .day], from: entity.loggedAt)
+      var timeComponents = cal.dateComponents([.hour, .minute], from: pickedTime)
+      timeComponents.year = todayComponents.year
+      timeComponents.month = todayComponents.month
+      timeComponents.day = todayComponents.day
+      if let merged = cal.date(from: timeComponents) {
+        entity.loggedAt = merged
+      }
+    }
+    if let emoji { entity.emoji = emoji }
+    if let foods { entity.foods = foods.joined(separator: "\n") }
+    if let note { entity.note = note }
+    if let mealType { entity.mealType = mealType }
+    if let proteinG { entity.proteinG = proteinG }
+    if let fatG { entity.fatG = fatG }
+    if let carbsG { entity.carbsG = carbsG }
+    if let fiberG { entity.fiberG = fiberG }
+    if let sugarG { entity.sugarG = sugarG }
+    if let saturatedFatG { entity.saturatedFatG = saturatedFatG }
+    if let alcoholG { entity.alcoholG = alcoholG }
+    if let kcal { entity.kcal = kcal }
+    if let sodiumMg { entity.sodiumMg = sodiumMg }
+    if let cholesterolMg { entity.cholesterolMg = cholesterolMg }
+    if let potassiumMg { entity.potassiumMg = potassiumMg }
+    if let waterMl { entity.waterMl = waterMl }
+    entity.updatedAt = .now
+    let newDay = dayID(from: entity.loggedAt)
+    rebuildSummary(forDay: oldDay)
+    if newDay != oldDay { rebuildSummary(forDay: newDay) }
+    commitEntry(entity, op: "update")
+  }
+
+  func deleteEntry(id: String) {
+    guard let entity = fetchEntry(id: id) else { return }
+    let day = dayID(from: entity.loggedAt)
+    context.delete(entity)
+    rebuildSummary(forDay: day)
+    saveContext("CK nutrition entry delete")
+    ckEngine?.noteNutritionEntryDeletion(id: id)
+    postChanged()
+  }
+
+  // MARK: - Helpers
+
+  private func rebuildSummary(forDay day: String) {
+    let entries = (try? context.fetch(FetchDescriptor<NutritionEntryEntity>())) ?? []
+    let dayEntries = entries.filter { dayID(from: $0.loggedAt) == day }
+
+    if dayEntries.isEmpty {
+      if let existing = fetchSummary(id: day) {
+        context.delete(existing)
+        saveContext("CK nutrition day summary delete")
+        ckEngine?.noteNutritionDayDeletion(id: day)
+      }
+      return
+    }
+
+    let sorted = dayEntries.sorted { $0.loggedAt < $1.loggedAt }
+    let totalKcal = dayEntries.reduce(0.0) { sum, e in
+      sum + (e.kcal ?? (4 * e.proteinG + 9 * e.fatG + 4 * e.carbsG + 7 * (e.alcoholG ?? 0)))
+    }
+    let sumOpt: (KeyPath<NutritionEntryEntity, Double?>) -> Double? = { kp in
+      let vals = dayEntries.compactMap { $0[keyPath: kp] }
+      return vals.isEmpty ? nil : vals.reduce(0, +)
+    }
+
+    let existing = fetchSummary(id: day)
+    let summary = existing ?? NutritionDailySummaryEntity(
+      id: day, date: day, entryCount: 0,
+      firstLoggedAt: nil, lastLoggedAt: nil, computedAt: .now,
+      kcal: nil, proteinG: nil, fatG: nil, carbsG: nil,
+      fiberG: nil, sugarG: nil, saturatedFatG: nil, alcoholG: nil,
+      sodiumMg: nil, cholesterolMg: nil, potassiumMg: nil, waterMl: nil,
+      cloudKitSystemFields: nil
+    )
+    if existing == nil { context.insert(summary) }
+
+    summary.entryCount = dayEntries.count
+    summary.firstLoggedAt = sorted.first?.loggedAt
+    summary.lastLoggedAt = sorted.last?.loggedAt
+    summary.computedAt = .now
+    summary.kcal = totalKcal > 0 ? totalKcal : nil
+    summary.proteinG = dayEntries.reduce(0, { $0 + $1.proteinG }) > 0
+      ? dayEntries.reduce(0, { $0 + $1.proteinG }) : nil
+    summary.fatG = dayEntries.reduce(0, { $0 + $1.fatG }) > 0
+      ? dayEntries.reduce(0, { $0 + $1.fatG }) : nil
+    summary.carbsG = dayEntries.reduce(0, { $0 + $1.carbsG }) > 0
+      ? dayEntries.reduce(0, { $0 + $1.carbsG }) : nil
+    summary.fiberG = sumOpt(\.fiberG)
+    summary.sugarG = sumOpt(\.sugarG)
+    summary.saturatedFatG = sumOpt(\.saturatedFatG)
+    summary.alcoholG = sumOpt(\.alcoholG)
+    summary.sodiumMg = sumOpt(\.sodiumMg)
+    summary.cholesterolMg = sumOpt(\.cholesterolMg)
+    summary.potassiumMg = sumOpt(\.potassiumMg)
+    summary.waterMl = sumOpt(\.waterMl)
+
+    saveContext("CK nutrition day summary rebuild")
+    ckEngine?.noteNutritionDayChange(id: day)
+  }
+
+  private func fetchEntry(id: String) -> NutritionEntryEntity? {
+    try? context.fetch(FetchDescriptor<NutritionEntryEntity>(
+      predicate: #Predicate { $0.id == id }
+    )).first
+  }
+
+  private func fetchSummary(id: String) -> NutritionDailySummaryEntity? {
+    try? context.fetch(FetchDescriptor<NutritionDailySummaryEntity>(
+      predicate: #Predicate { $0.id == id }
+    )).first
+  }
+
+  private func generateID() -> String {
+    var attempt = IDShortcode.generate(length: 8)
+    while fetchEntry(id: attempt) != nil {
+      attempt = IDShortcode.generate(length: 8)
+    }
+    return attempt
+  }
+
+  private func dayID(from date: Date) -> String {
+    let cal = Calendar.current
+    let comps = cal.dateComponents([.year, .month, .day], from: date)
+    return String(format: "%04d-%02d-%02d", comps.year ?? 0, comps.month ?? 0, comps.day ?? 0)
+  }
+
+  private func commitEntry(_ entity: NutritionEntryEntity, op: String) {
+    saveContext("CK nutrition entry \(op)")
+    ckEngine?.noteNutritionEntryChange(id: entity.id)
+    postChanged()
+  }
+
+  private func saveContext(_ label: String) {
+    do { try context.save() }
+    catch { SeptenaLog.error(label, error) }
+  }
+
+  private func postChanged() {
+    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+  }
 }

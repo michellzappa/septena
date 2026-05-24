@@ -852,6 +852,13 @@ enum ChecklistMirror {
     return entities.map { CannabisStrain(id: $0.id, name: $0.name) }
   }
 
+  static func loadSupplementDefinitions(context: ModelContext) -> [SupplementDefinition] {
+    let entities = (try? context.fetch(FetchDescriptor<SupplementDefinitionEntity>(
+      sortBy: [SortDescriptor(\.sortIndex), SortDescriptor(\.title, comparator: .localizedStandard)]
+    ))) ?? []
+    return entities.map { SupplementDefinition(id: $0.id, name: $0.title, emoji: $0.emoji) }
+  }
+
   // MARK: - Groceries (CloudKit-backed)
 
   /// Seed SwiftData from the FastAPI snapshot. Upserts items + categories
@@ -1346,5 +1353,248 @@ enum ChecklistMirror {
     let reason: String? = daysAgo[suggestion.id].map { "\($0) days since last \(suggestion.label)" }
     let sw = SuggestedWorkout(type: suggestion.id, reason: reason)
     return SuggestedWorkoutResponse.make(suggested: sw, daysAgo: daysAgo)
+  }
+
+  // MARK: - Nutrition (CloudKit-backed)
+
+  /// Seed SwiftData from a FastAPI export. Upserts by file/id; deletes
+  /// any local rows the server doesn't know about; rebuilds all day
+  /// summaries. Called once by NutritionBootstrap; writes thereafter go
+  /// through NutritionMutator.
+  static func replaceAllNutritionExport(_ response: NutritionExportResponse, context: ModelContext) {
+    let existing = (try? context.fetch(FetchDescriptor<NutritionEntryEntity>())) ?? []
+    let existingByID = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
+    var seen = Set<String>()
+    for dto in response.entries {
+      seen.insert(dto.file)
+      let loggedAt = nutritionDate(date: dto.date, time: dto.time) ?? .now
+      let entity = existingByID[dto.file] ?? {
+        let e = NutritionEntryEntity(
+          id: dto.file, loggedAt: loggedAt, updatedAt: loggedAt,
+          emoji: dto.emoji, foods: dto.foods.joined(separator: "\n"),
+          note: nil, mealType: nil, source: nil,
+          proteinG: dto.proteinG, fatG: dto.fatG, carbsG: dto.carbsG,
+          fiberG: dto.fiberG, sugarG: nil, saturatedFatG: nil, alcoholG: nil,
+          kcal: dto.kcal, sodiumMg: nil, cholesterolMg: nil, potassiumMg: nil,
+          waterMl: nil, cloudKitSystemFields: nil
+        )
+        context.insert(e)
+        return e
+      }()
+      entity.loggedAt = loggedAt
+      entity.updatedAt = loggedAt
+      entity.emoji = dto.emoji
+      entity.foods = dto.foods.joined(separator: "\n")
+      entity.proteinG = dto.proteinG
+      entity.fatG = dto.fatG
+      entity.carbsG = dto.carbsG
+      entity.fiberG = dto.fiberG
+      entity.kcal = dto.kcal
+    }
+    for entity in existing where !seen.contains(entity.id) {
+      context.delete(entity)
+    }
+    try? context.save()
+    rebuildAllNutritionSummaries(context: context)
+    if let macros = response.macros {
+      NutritionPrefs.saveMacrosConfig(macros)
+    }
+  }
+
+  /// Wipe and recompute every NutritionDailySummaryEntity from scratch.
+  /// Use after bulk import; incremental writes use NutritionMutator.
+  static func rebuildAllNutritionSummaries(context: ModelContext) {
+    let allEntries = (try? context.fetch(FetchDescriptor<NutritionEntryEntity>())) ?? []
+    let allSummaries = (try? context.fetch(FetchDescriptor<NutritionDailySummaryEntity>())) ?? []
+    for s in allSummaries { context.delete(s) }
+
+    let cal = Calendar.current
+    func dayKey(_ date: Date) -> String {
+      let c = cal.dateComponents([.year, .month, .day], from: date)
+      return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+    }
+
+    let grouped = Dictionary(grouping: allEntries, by: { dayKey($0.loggedAt) })
+    for (day, entries) in grouped {
+      let sorted = entries.sorted { $0.loggedAt < $1.loggedAt }
+      let totalKcal = entries.reduce(0.0) {
+        $0 + ($1.kcal ?? (4 * $1.proteinG + 9 * $1.fatG + 4 * $1.carbsG + 7 * ($1.alcoholG ?? 0)))
+      }
+      func sumOpt(_ kp: KeyPath<NutritionEntryEntity, Double?>) -> Double? {
+        let vals = entries.compactMap { $0[keyPath: kp] }
+        return vals.isEmpty ? nil : vals.reduce(0, +)
+      }
+      let summary = NutritionDailySummaryEntity(
+        id: day, date: day, entryCount: entries.count,
+        firstLoggedAt: sorted.first?.loggedAt,
+        lastLoggedAt: sorted.last?.loggedAt,
+        computedAt: .now,
+        kcal: totalKcal > 0 ? totalKcal : nil,
+        proteinG: entries.reduce(0, { $0 + $1.proteinG }),
+        fatG: entries.reduce(0, { $0 + $1.fatG }),
+        carbsG: entries.reduce(0, { $0 + $1.carbsG }),
+        fiberG: sumOpt(\.fiberG),
+        sugarG: sumOpt(\.sugarG),
+        saturatedFatG: sumOpt(\.saturatedFatG),
+        alcoholG: sumOpt(\.alcoholG),
+        sodiumMg: sumOpt(\.sodiumMg),
+        cholesterolMg: sumOpt(\.cholesterolMg),
+        potassiumMg: sumOpt(\.potassiumMg),
+        waterMl: sumOpt(\.waterMl),
+        cloudKitSystemFields: nil
+      )
+      context.insert(summary)
+    }
+    try? context.save()
+  }
+
+  static func loadNutritionEntries(context: ModelContext, since: String? = nil) -> [NutritionEntry] {
+    let today = SeptenaDate.today
+    var descriptor = FetchDescriptor<NutritionEntryEntity>(
+      sortBy: [SortDescriptor(\.loggedAt, order: .reverse)]
+    )
+    if let since {
+      let sinceDate = nutritionDate(date: since, time: "00:00") ?? .distantPast
+      descriptor.predicate = #Predicate { $0.loggedAt >= sinceDate }
+    }
+    let entities = (try? context.fetch(descriptor)) ?? []
+    return entities.map { makeNutritionEntry($0) }
+  }
+
+  static func loadNutritionToday(context: ModelContext) -> [NutritionEntry] {
+    loadNutritionEntries(context: context, since: SeptenaDate.today)
+  }
+
+  static func loadNutritionSummaries(context: ModelContext, days: Int) -> [NutritionDailySummaryEntity] {
+    let today = SeptenaDate.today
+    guard let todayDate = SeptenaDate.parse(today) else { return [] }
+    let start = Calendar.current.date(byAdding: .day, value: -(days - 1), to: todayDate) ?? todayDate
+    let startStr = SeptenaDate.format(start) ?? today
+    return (try? context.fetch(FetchDescriptor<NutritionDailySummaryEntity>(
+      predicate: #Predicate { $0.date >= startStr && $0.date <= today },
+      sortBy: [SortDescriptor(\.date)]
+    ))) ?? []
+  }
+
+  /// Compute a `NutritionStatsResponse` from local SwiftData entries.
+  /// Computes directly off `NutritionEntryEntity` rather than the day
+  /// summaries — summaries are a CK-sync cache and may be missing or stale
+  /// on a freshly bootstrapped device.
+  static func buildNutritionStatsResponse(context: ModelContext, days: Int = 90) -> NutritionStatsResponse {
+    let today = SeptenaDate.today
+    guard let todayDate = SeptenaDate.parse(today) else {
+      return NutritionStatsResponse(daily: [], fasting: nil,
+                                    todayMealCount: nil, todayLatestMeal: nil)
+    }
+    let cal = Calendar.current
+    let start = cal.date(byAdding: .day, value: -(days - 1), to: todayDate) ?? todayDate
+    let startOfStartDay = cal.startOfDay(for: start)
+
+    let entries = (try? context.fetch(FetchDescriptor<NutritionEntryEntity>(
+      predicate: #Predicate { $0.loggedAt >= startOfStartDay },
+      sortBy: [SortDescriptor(\.loggedAt)]
+    ))) ?? []
+
+    func dayKey(_ date: Date) -> String {
+      let c = cal.dateComponents([.year, .month, .day], from: date)
+      return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+    }
+    let byDay = Dictionary(grouping: entries, by: { dayKey($0.loggedAt) })
+
+    // Daily macro totals — one point per day that has entries.
+    let daily: [NutritionDailyPoint] = byDay.keys.sorted().map { day in
+      let es = byDay[day] ?? []
+      let kcal = es.reduce(0.0) { sum, e in
+        sum + (e.kcal ?? (4 * e.proteinG + 9 * e.fatG + 4 * e.carbsG + 7 * (e.alcoholG ?? 0)))
+      }
+      let fiberVals = es.compactMap(\.fiberG)
+      return NutritionDailyPoint(
+        date: day,
+        proteinG: es.reduce(0, { $0 + $1.proteinG }),
+        fatG: es.reduce(0, { $0 + $1.fatG }),
+        carbsG: es.reduce(0, { $0 + $1.carbsG }),
+        fiberG: fiberVals.isEmpty ? nil : fiberVals.reduce(0, +),
+        kcal: kcal
+      )
+    }
+
+    // Today stats
+    let todayEntries = byDay[today] ?? []
+    let todayMealCount = todayEntries.isEmpty ? nil : todayEntries.count
+    let todayLatestMeal: String? = todayEntries.map(\.loggedAt).max().map { nutritionTimeStr($0) }
+
+    // Fasting windows: last meal of day N-1 → first meal of day N
+    var fasting: [FastingWindow] = []
+    var yesterdayLastMeal: String?
+    let firstOfDay: [String: Date] = byDay.compactMapValues { $0.map(\.loggedAt).min() }
+    let lastOfDay:  [String: Date] = byDay.compactMapValues { $0.map(\.loggedAt).max() }
+    for offset in 0..<days {
+      guard let dayDate = cal.date(byAdding: .day, value: -offset, to: todayDate) else { continue }
+      let dayStr = dayKey(dayDate)
+      guard let prevDate = cal.date(byAdding: .day, value: -1, to: dayDate) else { continue }
+      let prevStr = dayKey(prevDate)
+      guard let firstMealDate = firstOfDay[dayStr],
+            let lastMealDate  = lastOfDay[prevStr] else { continue }
+      let hours = firstMealDate.timeIntervalSince(lastMealDate) / 3600
+      fasting.append(FastingWindow(
+        date: dayStr,
+        hours: hours > 0 ? hours : nil,
+        lastMeal: nutritionTimeStr(lastMealDate),
+        firstMeal: nutritionTimeStr(firstMealDate)
+      ))
+      if dayStr == today {
+        yesterdayLastMeal = nutritionTimeStr(lastMealDate)
+      }
+    }
+
+    let validFastHours = fasting.compactMap(\.hours).filter { $0 >= 6 && $0 <= 24 }
+    let avgFastH: Double? = validFastHours.isEmpty ? nil
+      : validFastHours.reduce(0, +) / Double(validFastHours.count)
+
+    return NutritionStatsResponse(
+      daily: daily,
+      fasting: fasting.isEmpty ? nil : fasting,
+      todayMealCount: todayMealCount,
+      todayLatestMeal: todayLatestMeal,
+      yesterdayLastMeal: yesterdayLastMeal,
+      avgFastH: avgFastH
+    )
+  }
+
+  // MARK: Nutrition helpers
+
+  private static func makeNutritionEntry(_ e: NutritionEntryEntity) -> NutritionEntry {
+    let cal = Calendar.current
+    let comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: e.loggedAt)
+    let dateStr = String(format: "%04d-%02d-%02d",
+                         comps.year ?? 0, comps.month ?? 0, comps.day ?? 0)
+    let timeStr = String(format: "%02d:%02d", comps.hour ?? 0, comps.minute ?? 0)
+    let computedKcal = 4 * e.proteinG + 9 * e.fatG + 4 * e.carbsG + 7 * (e.alcoholG ?? 0)
+    return NutritionEntry(
+      date: dateStr,
+      time: timeStr,
+      emoji: e.emoji,
+      proteinG: e.proteinG,
+      fatG: e.fatG,
+      carbsG: e.carbsG,
+      fiberG: e.fiberG,
+      kcal: e.kcal ?? computedKcal,
+      foods: e.foods.split(separator: "\n", omittingEmptySubsequences: true).map(String.init),
+      file: e.id
+    )
+  }
+
+  private static func nutritionDate(date: String, time: String) -> Date? {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd HH:mm"
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    return formatter.date(from: "\(date) \(time)")
+  }
+
+  private static func nutritionTimeStr(_ date: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "HH:mm"
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    return formatter.string(from: date)
   }
 }

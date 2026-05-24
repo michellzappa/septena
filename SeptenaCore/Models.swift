@@ -458,6 +458,18 @@ struct SupplementDayItem: Codable, Identifiable, Hashable {
   }
 }
 
+struct SupplementDefinition: Codable, Identifiable, Hashable {
+  let id: String
+  var name: String
+  var emoji: String?
+
+  init(id: String, name: String, emoji: String?) {
+    self.id = id
+    self.name = name
+    self.emoji = emoji
+  }
+}
+
 struct SupplementsDayResponse: Codable {
   var date: String
   var items: [SupplementDayItem]
@@ -926,6 +938,46 @@ struct MacrosConfig: Codable, Hashable {
   let kcal: MacroRange
   var fiber: MacroRange?
   var fasting: MacroRange?
+}
+
+/// Full snapshot from `GET /api/nutrition/export`. iOS bootstrap calls this
+/// once to seed the CloudKit-backed local store. Macros are optional — the
+/// server may return nil if the user hasn't configured targets yet.
+struct NutritionExportResponse: Codable {
+  let entries: [NutritionEntry]
+  var macros: MacrosConfig?
+}
+
+/// Macro targets and fasting prefs, persisted in NSUbiquitousKeyValueStore.
+/// Replaces the `GET /api/nutrition/macros-config` FastAPI endpoint.
+enum NutritionPrefs {
+  private static let kvsKey = "nutrition.macrosConfig"
+
+  /// Reads from UserDefaults.standard. NSUbiquitousKeyValueStore would be
+  /// nicer for cross-device sync of macro targets but the app doesn't
+  /// declare the ubiquity-kvstore-identifier entitlement, so KVS calls
+  /// silently no-op. Falls back to KVS in case the entitlement is added
+  /// later, so historical writes aren't lost.
+  static func loadMacrosConfig() -> MacrosConfig? {
+    if let data = UserDefaults.standard.data(forKey: kvsKey),
+       let config = try? JSONDecoder().decode(MacrosConfig.self, from: data) {
+      return config
+    }
+    if let data = NSUbiquitousKeyValueStore.default.data(forKey: kvsKey),
+       let config = try? JSONDecoder().decode(MacrosConfig.self, from: data) {
+      return config
+    }
+    return nil
+  }
+
+  static func saveMacrosConfig(_ config: MacrosConfig) {
+    guard let data = try? JSONEncoder().encode(config) else { return }
+    UserDefaults.standard.set(data, forKey: kvsKey)
+    // Write to KVS too in case the ubiquity entitlement gets added later —
+    // call is a no-op without it but doesn't crash.
+    NSUbiquitousKeyValueStore.default.set(data, forKey: kvsKey)
+    NSUbiquitousKeyValueStore.default.synchronize()
+  }
 }
 
 // MARK: - Air
@@ -1928,4 +1980,85 @@ struct DraftSession: Codable, Hashable {
 
   var doneCount: Int { entries.filter { $0.status == .done }.count }
   var totalCount: Int { entries.filter { $0.status != .skipped }.count }
+}
+
+// MARK: - Insights (cross-section correlations)
+
+public struct CorrelationRow: Codable, Hashable, Identifiable {
+  public let predictor: String
+  public let predictorSection: String
+  public let predictorUnit: String
+  public let target: String
+  public let targetSection: String
+  public let targetUnit: String
+  public let r: Double
+  public let n: Int
+  public let lag: Int
+  public let p: Double?
+  public let tier: String
+  public let absR: Double
+
+  public var id: String { "\(predictor)→\(target)@\(lag)" }
+
+  enum CodingKeys: String, CodingKey {
+    case predictor, target, r, n, lag, p, tier
+    case predictorSection = "predictor_section"
+    case predictorUnit    = "predictor_unit"
+    case targetSection    = "target_section"
+    case targetUnit       = "target_unit"
+    case absR             = "abs_r"
+  }
+}
+
+public struct CorrelationCounts: Codable, Hashable {
+  public let predictors: Int
+  public let targets: Int
+  public let pairsEvaluated: Int
+  public let pairsReported: Int
+
+  enum CodingKeys: String, CodingKey {
+    case predictors, targets
+    case pairsEvaluated = "pairs_evaluated"
+    case pairsReported  = "pairs_reported"
+  }
+}
+
+public struct CorrelationsResponse: Codable {
+  public let days: Int
+  public let minN: Int?
+  public let strongR: Double?
+  public let lags: [Int]?
+  public let counts: CorrelationCounts?
+  public let rows: [CorrelationRow]
+
+  enum CodingKeys: String, CodingKey {
+    case days, lags, counts, rows
+    case minN = "min_n"
+    case strongR = "strong_r"
+  }
+}
+
+public struct CorrelationPairPoint: Codable, Hashable {
+  public let date: String
+  public let x: Double
+  public let y: Double
+}
+
+public struct CorrelationPair: Codable {
+  public let predictor: String
+  public let predictorSection: String
+  public let predictorUnit: String
+  public let target: String
+  public let targetSection: String
+  public let targetUnit: String
+  public let lag: Int
+  public let points: [CorrelationPairPoint]
+
+  enum CodingKeys: String, CodingKey {
+    case predictor, target, lag, points
+    case predictorSection = "predictor_section"
+    case predictorUnit    = "predictor_unit"
+    case targetSection    = "target_section"
+    case targetUnit       = "target_unit"
+  }
 }

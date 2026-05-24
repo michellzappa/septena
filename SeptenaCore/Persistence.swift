@@ -867,6 +867,148 @@ final class SessionTypeEntity {
   }
 }
 
+// MARK: - Nutrition entities
+
+@Model
+final class NutritionEntryEntity {
+  @Attribute(.unique) var id: String
+  var loggedAt: Date
+  var updatedAt: Date
+  var emoji: String?
+  var foods: String         // \n-joined list
+  var note: String?
+  var mealType: String?     // breakfast|lunch|dinner|snack
+  var source: String?       // manual|import|barcode|mcp
+
+  // Macros (g) — protein/fat/carbs are always present; rest are optional
+  var proteinG: Double
+  var fatG: Double
+  var carbsG: Double
+  var fiberG: Double?
+  var sugarG: Double?
+  var saturatedFatG: Double?
+  var alcoholG: Double?
+
+  // Other nutrients
+  var kcal: Double?         // user override; falls back to 4P+9F+4C+7A on read
+  var sodiumMg: Double?
+  var cholesterolMg: Double?
+  var potassiumMg: Double?
+  var waterMl: Double?
+
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       loggedAt: Date = .now,
+       updatedAt: Date = .now,
+       emoji: String? = nil,
+       foods: String = "",
+       note: String? = nil,
+       mealType: String? = nil,
+       source: String? = nil,
+       proteinG: Double = 0,
+       fatG: Double = 0,
+       carbsG: Double = 0,
+       fiberG: Double? = nil,
+       sugarG: Double? = nil,
+       saturatedFatG: Double? = nil,
+       alcoholG: Double? = nil,
+       kcal: Double? = nil,
+       sodiumMg: Double? = nil,
+       cholesterolMg: Double? = nil,
+       potassiumMg: Double? = nil,
+       waterMl: Double? = nil,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.loggedAt = loggedAt
+    self.updatedAt = updatedAt
+    self.emoji = emoji
+    self.foods = foods
+    self.note = note
+    self.mealType = mealType
+    self.source = source
+    self.proteinG = proteinG
+    self.fatG = fatG
+    self.carbsG = carbsG
+    self.fiberG = fiberG
+    self.sugarG = sugarG
+    self.saturatedFatG = saturatedFatG
+    self.alcoholG = alcoholG
+    self.kcal = kcal
+    self.sodiumMg = sodiumMg
+    self.cholesterolMg = cholesterolMg
+    self.potassiumMg = potassiumMg
+    self.waterMl = waterMl
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
+@Model
+final class NutritionDailySummaryEntity {
+  @Attribute(.unique) var id: String    // YYYY-MM-DD in user TZ at compute time
+  var date: String                       // same
+  var entryCount: Int
+  var firstLoggedAt: Date?               // earliest entry that day — fasting window anchor
+  var lastLoggedAt: Date?                // latest entry that day
+  var computedAt: Date
+
+  // Totals — nil when no entry that day reported the field
+  var kcal: Double?
+  var proteinG: Double?
+  var fatG: Double?
+  var carbsG: Double?
+  var fiberG: Double?
+  var sugarG: Double?
+  var saturatedFatG: Double?
+  var alcoholG: Double?
+  var sodiumMg: Double?
+  var cholesterolMg: Double?
+  var potassiumMg: Double?
+  var waterMl: Double?
+
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       date: String,
+       entryCount: Int = 0,
+       firstLoggedAt: Date? = nil,
+       lastLoggedAt: Date? = nil,
+       computedAt: Date = .now,
+       kcal: Double? = nil,
+       proteinG: Double? = nil,
+       fatG: Double? = nil,
+       carbsG: Double? = nil,
+       fiberG: Double? = nil,
+       sugarG: Double? = nil,
+       saturatedFatG: Double? = nil,
+       alcoholG: Double? = nil,
+       sodiumMg: Double? = nil,
+       cholesterolMg: Double? = nil,
+       potassiumMg: Double? = nil,
+       waterMl: Double? = nil,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.date = date
+    self.entryCount = entryCount
+    self.firstLoggedAt = firstLoggedAt
+    self.lastLoggedAt = lastLoggedAt
+    self.computedAt = computedAt
+    self.kcal = kcal
+    self.proteinG = proteinG
+    self.fatG = fatG
+    self.carbsG = carbsG
+    self.fiberG = fiberG
+    self.sugarG = sugarG
+    self.saturatedFatG = saturatedFatG
+    self.alcoholG = alcoholG
+    self.sodiumMg = sodiumMg
+    self.cholesterolMg = cholesterolMg
+    self.potassiumMg = potassiumMg
+    self.waterMl = waterMl
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
 // MARK: - DTO ↔ Entity bridging
 
 extension SeptenaTask {
@@ -1257,6 +1399,65 @@ enum SessionTypeCloudKitSchema {
   static func recordName(for id: String) -> String { "session-type:\(id)" }
   static func entityID(from recordName: String) -> String {
     String(recordName.dropFirst("session-type:".count))
+  }
+}
+
+enum NutritionEntryCloudKitSchema {
+  static let recordType = "NutritionEntry"
+
+  enum Field {
+    static let loggedAt       = "loggedAt"
+    static let emoji          = "emoji"
+    static let foods          = "foods"
+    static let note           = "note"
+    static let mealType       = "mealType"
+    static let source         = "source"
+    static let proteinG       = "proteinG"
+    static let fatG           = "fatG"
+    static let carbsG         = "carbsG"
+    static let fiberG         = "fiberG"
+    static let sugarG         = "sugarG"
+    static let saturatedFatG  = "saturatedFatG"
+    static let alcoholG       = "alcoholG"
+    static let kcal           = "kcal"
+    static let sodiumMg       = "sodiumMg"
+    static let cholesterolMg  = "cholesterolMg"
+    static let potassiumMg    = "potassiumMg"
+    static let waterMl        = "waterMl"
+  }
+
+  static func recordName(for id: String) -> String { "nutrition-entry:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("nutrition-entry:".count))
+  }
+}
+
+enum NutritionDailySummaryCloudKitSchema {
+  static let recordType = "NutritionDaySum"
+
+  enum Field {
+    static let date          = "date"
+    static let entryCount    = "entryCount"
+    static let firstLoggedAt = "firstLoggedAt"
+    static let lastLoggedAt  = "lastLoggedAt"
+    static let computedAt    = "computedAt"
+    static let kcal          = "kcal"
+    static let proteinG      = "proteinG"
+    static let fatG          = "fatG"
+    static let carbsG        = "carbsG"
+    static let fiberG        = "fiberG"
+    static let sugarG        = "sugarG"
+    static let saturatedFatG = "saturatedFatG"
+    static let alcoholG      = "alcoholG"
+    static let sodiumMg      = "sodiumMg"
+    static let cholesterolMg = "cholesterolMg"
+    static let potassiumMg   = "potassiumMg"
+    static let waterMl       = "waterMl"
+  }
+
+  static func recordName(for id: String) -> String { "nutrition-day:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("nutrition-day:".count))
   }
 }
 
@@ -1869,6 +2070,118 @@ extension SessionTypeEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
+extension NutritionEntryEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: NutritionEntryCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: NutritionEntryCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[NutritionEntryCloudKitSchema.Field.loggedAt]      = loggedAt as NSDate
+    record[NutritionEntryCloudKitSchema.Field.emoji]         = emoji
+    record[NutritionEntryCloudKitSchema.Field.foods]         = foods
+    record[NutritionEntryCloudKitSchema.Field.note]          = note
+    record[NutritionEntryCloudKitSchema.Field.mealType]      = mealType
+    record[NutritionEntryCloudKitSchema.Field.source]        = source
+    record[NutritionEntryCloudKitSchema.Field.proteinG]      = proteinG
+    record[NutritionEntryCloudKitSchema.Field.fatG]          = fatG
+    record[NutritionEntryCloudKitSchema.Field.carbsG]        = carbsG
+    record[NutritionEntryCloudKitSchema.Field.fiberG]        = fiberG
+    record[NutritionEntryCloudKitSchema.Field.sugarG]        = sugarG
+    record[NutritionEntryCloudKitSchema.Field.saturatedFatG] = saturatedFatG
+    record[NutritionEntryCloudKitSchema.Field.alcoholG]      = alcoholG
+    record[NutritionEntryCloudKitSchema.Field.kcal]          = kcal
+    record[NutritionEntryCloudKitSchema.Field.sodiumMg]      = sodiumMg
+    record[NutritionEntryCloudKitSchema.Field.cholesterolMg] = cholesterolMg
+    record[NutritionEntryCloudKitSchema.Field.potassiumMg]   = potassiumMg
+    record[NutritionEntryCloudKitSchema.Field.waterMl]       = waterMl
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let v = record[NutritionEntryCloudKitSchema.Field.loggedAt] as? Date { loggedAt = v }
+    emoji         = optionalChecklistString(record[NutritionEntryCloudKitSchema.Field.emoji])
+    if let v = record[NutritionEntryCloudKitSchema.Field.foods] as? String { foods = v }
+    note          = optionalChecklistString(record[NutritionEntryCloudKitSchema.Field.note])
+    mealType      = optionalChecklistString(record[NutritionEntryCloudKitSchema.Field.mealType])
+    source        = optionalChecklistString(record[NutritionEntryCloudKitSchema.Field.source])
+    if let v = record[NutritionEntryCloudKitSchema.Field.proteinG] as? Double { proteinG = v }
+    if let v = record[NutritionEntryCloudKitSchema.Field.fatG]     as? Double { fatG     = v }
+    if let v = record[NutritionEntryCloudKitSchema.Field.carbsG]   as? Double { carbsG   = v }
+    fiberG        = record[NutritionEntryCloudKitSchema.Field.fiberG]        as? Double
+    sugarG        = record[NutritionEntryCloudKitSchema.Field.sugarG]        as? Double
+    saturatedFatG = record[NutritionEntryCloudKitSchema.Field.saturatedFatG] as? Double
+    alcoholG      = record[NutritionEntryCloudKitSchema.Field.alcoholG]      as? Double
+    kcal          = record[NutritionEntryCloudKitSchema.Field.kcal]          as? Double
+    sodiumMg      = record[NutritionEntryCloudKitSchema.Field.sodiumMg]      as? Double
+    cholesterolMg = record[NutritionEntryCloudKitSchema.Field.cholesterolMg] as? Double
+    potassiumMg   = record[NutritionEntryCloudKitSchema.Field.potassiumMg]   as? Double
+    waterMl       = record[NutritionEntryCloudKitSchema.Field.waterMl]       as? Double
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: NutritionEntryCloudKitSchema.entityID(from: record.recordID.recordName))
+    apply(record)
+  }
+}
+
+extension NutritionDailySummaryEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: NutritionDailySummaryCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: NutritionDailySummaryCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[NutritionDailySummaryCloudKitSchema.Field.date]          = date
+    record[NutritionDailySummaryCloudKitSchema.Field.entryCount]    = entryCount
+    record[NutritionDailySummaryCloudKitSchema.Field.computedAt]    = computedAt as NSDate
+    record[NutritionDailySummaryCloudKitSchema.Field.firstLoggedAt] = firstLoggedAt.map { $0 as NSDate }
+    record[NutritionDailySummaryCloudKitSchema.Field.lastLoggedAt]  = lastLoggedAt.map  { $0 as NSDate }
+    record[NutritionDailySummaryCloudKitSchema.Field.kcal]          = kcal
+    record[NutritionDailySummaryCloudKitSchema.Field.proteinG]      = proteinG
+    record[NutritionDailySummaryCloudKitSchema.Field.fatG]          = fatG
+    record[NutritionDailySummaryCloudKitSchema.Field.carbsG]        = carbsG
+    record[NutritionDailySummaryCloudKitSchema.Field.fiberG]        = fiberG
+    record[NutritionDailySummaryCloudKitSchema.Field.sugarG]        = sugarG
+    record[NutritionDailySummaryCloudKitSchema.Field.saturatedFatG] = saturatedFatG
+    record[NutritionDailySummaryCloudKitSchema.Field.alcoholG]      = alcoholG
+    record[NutritionDailySummaryCloudKitSchema.Field.sodiumMg]      = sodiumMg
+    record[NutritionDailySummaryCloudKitSchema.Field.cholesterolMg] = cholesterolMg
+    record[NutritionDailySummaryCloudKitSchema.Field.potassiumMg]   = potassiumMg
+    record[NutritionDailySummaryCloudKitSchema.Field.waterMl]       = waterMl
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let v = record[NutritionDailySummaryCloudKitSchema.Field.date] as? String { date = v }
+    if let v = record[NutritionDailySummaryCloudKitSchema.Field.entryCount] as? Int { entryCount = v }
+    if let v = record[NutritionDailySummaryCloudKitSchema.Field.computedAt]    as? Date { computedAt    = v }
+    firstLoggedAt = record[NutritionDailySummaryCloudKitSchema.Field.firstLoggedAt] as? Date
+    lastLoggedAt  = record[NutritionDailySummaryCloudKitSchema.Field.lastLoggedAt]  as? Date
+    kcal          = record[NutritionDailySummaryCloudKitSchema.Field.kcal]          as? Double
+    proteinG      = record[NutritionDailySummaryCloudKitSchema.Field.proteinG]      as? Double
+    fatG          = record[NutritionDailySummaryCloudKitSchema.Field.fatG]          as? Double
+    carbsG        = record[NutritionDailySummaryCloudKitSchema.Field.carbsG]        as? Double
+    fiberG        = record[NutritionDailySummaryCloudKitSchema.Field.fiberG]        as? Double
+    sugarG        = record[NutritionDailySummaryCloudKitSchema.Field.sugarG]        as? Double
+    saturatedFatG = record[NutritionDailySummaryCloudKitSchema.Field.saturatedFatG] as? Double
+    alcoholG      = record[NutritionDailySummaryCloudKitSchema.Field.alcoholG]      as? Double
+    sodiumMg      = record[NutritionDailySummaryCloudKitSchema.Field.sodiumMg]      as? Double
+    cholesterolMg = record[NutritionDailySummaryCloudKitSchema.Field.cholesterolMg] as? Double
+    potassiumMg   = record[NutritionDailySummaryCloudKitSchema.Field.potassiumMg]   as? Double
+    waterMl       = record[NutritionDailySummaryCloudKitSchema.Field.waterMl]       as? Double
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: NutritionDailySummaryCloudKitSchema.entityID(from: record.recordID.recordName),
+              date: "")
+    apply(record)
+  }
+}
+
 // MARK: - LocalStore
 
 @MainActor
@@ -1891,6 +2204,7 @@ final class LocalStore {
                          GroceryItemEntity.self, GroceryCategoryEntity.self,
                          ExerciseEntryEntity.self, ExerciseDefinitionEntity.self,
                          SessionTypeEntity.self,
+                         NutritionEntryEntity.self, NutritionDailySummaryEntity.self,
                          AirReadingEntity.self,
                          OutboxEntity.self, HTTPOutboxEntity.self])
     // Explicitly opt OUT of NSPersistentCloudKitContainer mirroring. Having

@@ -235,23 +235,11 @@ final class SeptenaClient {
 
   // MARK: - Nutrition
 
-  /// Logged nutrition entries since the given YYYY-MM-DD.
-  func nutritionEntries(since: String? = nil) async throws -> [NutritionEntry] {
-    let q: [URLQueryItem] = since.map { [URLQueryItem(name: "since", value: $0)] } ?? []
-    return try await getJSON("/api/nutrition/entries", query: q, as: [NutritionEntry].self)
-  }
-
-  /// Per-day macro totals + today summary. Powers the Nutrition tile
-  /// histogram and the destination's daily averages.
-  func nutritionStats(days: Int = 7) async throws -> NutritionStatsResponse {
-    try await getJSON("/api/nutrition/stats",
-                      query: [URLQueryItem(name: "days", value: String(days))],
-                      as: NutritionStatsResponse.self)
-  }
-
-  /// User's configured macro targets (protein/fat/carbs/kcal ranges).
-  func nutritionMacrosConfig() async throws -> MacrosConfig {
-    try await getJSON("/api/nutrition/macros-config", as: MacrosConfig.self)
+  /// Full snapshot for iOS CK bootstrap. Every entry on disk, plus the
+  /// user's macro config. Ship + deploy the server endpoint before this
+  /// iOS code ships; `GET /api/nutrition/export` in the FastAPI repo.
+  func nutritionExport() async throws -> NutritionExportResponse {
+    try await getJSON("/api/nutrition/export", as: NutritionExportResponse.self)
   }
 
   // MARK: - Settings
@@ -580,27 +568,6 @@ final class SeptenaClient {
     _ = try await postJSON("/api/gut/entry", body: body, as: EmptyResponse.self)
   }
 
-  /// Log a meal. `foods` is a non-empty list; macros are optional and
-  /// inherited from the source entry when duplicating a recent meal.
-  func addNutritionEntry(date: String,
-                         time: String,
-                         foods: [String],
-                         proteinG: Double? = nil,
-                         fatG: Double? = nil,
-                         carbsG: Double? = nil,
-                         fiberG: Double? = nil,
-                         kcal: Double? = nil,
-                         emoji: String? = nil) async throws {
-    var body: [String: Any] = ["date": date, "time": time, "foods": foods]
-    if let proteinG { body["protein_g"] = proteinG }
-    if let fatG     { body["fat_g"]     = fatG }
-    if let carbsG   { body["carbs_g"]   = carbsG }
-    if let fiberG   { body["fiber_g"]   = fiberG }
-    if let kcal     { body["kcal"]      = kcal }
-    if let emoji    { body["emoji"]     = emoji }
-    _ = try await postJSON("/api/nutrition/entries", body: body, as: EmptyResponse.self)
-  }
-
   /// Caffeine config — beans + method list. Optional endpoint; the page
   /// falls back gracefully when this 404s.
   func caffeineConfig() async throws -> CaffeineConfig {
@@ -650,6 +617,10 @@ final class SeptenaClient {
   func suggestedWorkout() async throws -> SuggestedWorkoutResponse {
     try await getJSON("/api/training/suggested-workout", as: SuggestedWorkoutResponse.self)
   }
+
+  // Insights compute lives client-side now (see CorrelationEngine).
+  // No /api/insights/* endpoint is called — all data comes from SwiftData
+  // (CloudKit-mirrored) plus the existing /api/health/oura read endpoint.
 
   // MARK: - HTTP helpers
 

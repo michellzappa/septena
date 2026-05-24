@@ -1288,3 +1288,27 @@ enum TrainingMuscleBackfillV2 {
     SeptenaLog.info("[TrainingMuscleBackfill v2] updated \(updated) exercises")
   }
 }
+
+// MARK: - Nutrition CloudKit bootstrap
+
+/// One-shot async migration that pulls every historical nutrition entry from
+/// the FastAPI export endpoint, seeds SwiftData + day summaries, and saves
+/// the macros config to NSUbiquitousKeyValueStore. Gated by a UserDefaults
+/// flag so it runs exactly once per device.
+@MainActor
+enum NutritionBootstrap {
+  static let userDefaultsKey = "nutrition.ckBootstrap.v1"
+
+  static func runIfNeeded(context: ModelContext, client: SeptenaClient) async {
+    guard !UserDefaults.standard.bool(forKey: userDefaultsKey) else { return }
+    do {
+      let response = try await client.nutritionExport()
+      ChecklistMirror.replaceAllNutritionExport(response, context: context)
+      UserDefaults.standard.set(true, forKey: userDefaultsKey)
+      SeptenaLog.info("[NutritionBootstrap] seeded \(response.entries.count) entries")
+    } catch {
+      SeptenaLog.error("[NutritionBootstrap] failed", error)
+      // Leave flag unset — will retry next launch.
+    }
+  }
+}
