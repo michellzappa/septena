@@ -66,10 +66,8 @@ final class WatchBridge: NSObject, WCSessionDelegate {
             date: date
           )
         }
-        let data      = try JSONEncoder().encode(response)
-        let serverURL = UserDefaults.standard.string(forKey: "septena.serverURL")
-                        ?? SeptenaClient.default.absoluteString
-        replyHandler(["items": data, "serverURL": serverURL])
+        let data = try JSONEncoder().encode(response)
+        replyHandler(["items": data])
 
       case "toggleHabit":
         let done = msg["done"] as? Bool ?? true

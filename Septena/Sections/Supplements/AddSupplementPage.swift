@@ -5,7 +5,6 @@ import SwiftUI
 // day (no bucket grouping returned by the server).
 
 struct AddSupplementPage: View {
-  @Environment(SeptenaClient.self) private var client
   @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss

@@ -18,7 +18,6 @@ import Charts
 struct InsightsDestinationView: View {
   @Environment(\.dismiss) private var dismiss
   @Environment(\.modelContext) private var modelContext
-  @Environment(SeptenaClient.self) private var client
   @Environment(SectionTheme.self) private var theme
 
   #if os(iOS)

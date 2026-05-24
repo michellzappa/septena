@@ -31,7 +31,7 @@ final class TodayTasksModel {
                              filter: .today)
   }
 
-  func load(client: SeptenaClient) async {
+  func load() async {
     let context = LocalStore.shared.container.mainContext
     // CloudKit-mode read: TaskReads.list returns LocalCache directly,
     // so we just need to ensure the mirror is fresh, then repaint.
@@ -280,7 +280,7 @@ final class NextItemsModel {
     hasLoaded = true
   }
 
-  func load(client: SeptenaClient) async {
+  func load() async {
     let context = LocalStore.shared.container.mainContext
 
     // Habits / Supplements / Chores are CloudKit-authoritative — read

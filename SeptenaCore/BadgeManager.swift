@@ -11,7 +11,7 @@ import AppKit
 // Drives the app-icon badge from local overdue-task state.
 //
 // Reacts to: the General toggle (UserDefaults `septena.badge.showOverdue`)
-// and `.septenaTasksChanged` (posted after every mutation by SeptenaClient).
+// and `.septenaTasksChanged` (posted after every task mutation / CK apply).
 // Recomputes via LocalCache.overdueCount — same definition the Today sidebar
 // pill uses, so the icon and the in-app pill always agree.
 

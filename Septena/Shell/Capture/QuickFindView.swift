@@ -9,7 +9,6 @@ struct QuickFindView: View {
   @Environment(\.dismiss) private var dismiss
   @Environment(\.modelContext) private var modelContext
   @Environment(NavigationState.self) private var nav
-  @Environment(SeptenaClient.self) private var client
   @Environment(SectionTheme.self) private var theme
   @Environment(TrainingDraftStore.self) private var trainingDraft
   @Environment(\.a11yMotion) private var motion

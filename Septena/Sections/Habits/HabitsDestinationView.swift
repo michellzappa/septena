@@ -7,7 +7,6 @@ import SwiftUI
 // showing every bucket rather than only "now".
 
 struct HabitsDestinationView: View {
-  @Environment(SeptenaClient.self) private var client
   @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(SectionTheme.self) private var theme
 
@@ -58,7 +57,7 @@ struct HabitsDestinationView: View {
     }
     .task {
       model.paintFromCache()
-      await model.load(client: client)
+      await model.load()
       // History is computed locally from the CloudKit-backed mirror.
       let resp = ChecklistMirror.loadHabitsHistory(
         context: LocalStore.shared.container.mainContext, days: 365)
@@ -79,7 +78,7 @@ struct HabitsDestinationView: View {
       EditHabitSheet(
         original: nil,
         buckets: model.habitBuckets,
-        onDone: { _ in Task { await model.load(client: client) } }
+        onDone: { _ in Task { await model.load() } }
       )
       #if os(iOS)
       .presentationDetents([.medium, .large])

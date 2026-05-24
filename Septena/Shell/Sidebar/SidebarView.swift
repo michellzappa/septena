@@ -32,7 +32,6 @@ struct SidebarDragID: Codable, Hashable, Transferable {
 }
 
 struct SidebarRootView: View {
-  @Environment(SeptenaClient.self) private var client
   @Environment(NavigationState.self) private var nav
   @Environment(SectionTheme.self) private var theme
   @Environment(AreasMutator.self) private var areasMutator

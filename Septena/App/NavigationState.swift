@@ -61,7 +61,4 @@ final class NavigationState {
   /// shortcuts ("Start: Upper", etc.). Cleared after consumption.
   var pendingTrainingType: String? = nil
 
-  /// Persisted base URL — UserDefaults-backed, mirrored from ClientProvider.
-  var serverURL: String = UserDefaults.standard.string(forKey: "septena.serverURL")
-    ?? SeptenaClient.default.absoluteString
 }

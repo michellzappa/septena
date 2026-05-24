@@ -28,7 +28,6 @@ enum NutritionSheet: Hashable, Identifiable {
 }
 
 struct WeekDashboardView: View {
-  @Environment(SeptenaClient.self) private var client
   @Environment(AirStore.self) private var airStore
   @Environment(\.modelContext) private var modelContext
   @Environment(ChecklistMutator.self) private var checklistMutator
@@ -397,7 +396,7 @@ struct WeekDashboardView: View {
   /// cold launch repaints from disk. Failures leave both the @State and
   /// the cached blob alone — last-known-good wins until the next refresh.
   private func loadAll() async {
-    async let _ = dailies.load(client: client)
+    async let _ = dailies.load()
     // Habits / Supplements / Chores / Settings come from the CloudKit-
     // backed local mirror — no FastAPI round-trip.
     let ctx = LocalStore.shared.container.mainContext
@@ -516,7 +515,7 @@ struct WeekDashboardView: View {
     // inline-but-sequential here would block tile rendering if any one
     // request stalls. The dashboard tiles don't need this data for first
     // paint, only when the user opens a context menu.
-    Task { @MainActor [client] in
+    Task { @MainActor in
       // Caffeine: only the last entry is needed (Repeat is the menu's
       // only contextual action — bean-picking lives in the sheet).
       // Pull from local SwiftData; CK has the canonical history now.
@@ -683,19 +682,19 @@ struct WeekDashboardView: View {
       nutritionStats = s
       ResponseCache.save(s, forKey: CacheKey.nutritionStats)
     case .habits:
-      async let _ = dailies.load(client: client)
+      async let _ = dailies.load()
       let h = ChecklistMirror.loadHabitsHistory(
         context: LocalStore.shared.container.mainContext, days: 90)
       habitHistory = h.daily.map { $0.done }
       ResponseCache.save(habitHistory, forKey: CacheKey.habitHistory)
     case .chores:
-      async let _ = dailies.load(client: client)
+      async let _ = dailies.load()
       let c = ChecklistMirror.loadChoresHistory(
         context: LocalStore.shared.container.mainContext, days: 90)
       choreHistory = c.daily.map { $0.completed }
       ResponseCache.save(choreHistory, forKey: CacheKey.choreHistory)
     case .supplements:
-      async let _ = dailies.load(client: client)
+      async let _ = dailies.load()
       let s = ChecklistMirror.loadSupplementsHistory(
         context: LocalStore.shared.container.mainContext, days: 90)
       supplementHistory = s.daily.map { $0.done }

@@ -176,9 +176,9 @@
 		9E8994F78DFE201A05147CE2 /* TrainingQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F79B52B56CF74E2F11586CC /* TrainingQuickAddMenu.swift */; };
 		9E8F15EC733A433E18D82362 /* SearchTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48D2DD3CC83AA08A30DA2938 /* SearchTabView.swift */; };
 		9EA753D4BE7912ACB670B69F /* ModuleTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = F79D2478011E9353A0DF90AC /* ModuleTile.swift */; };
-		9ED913F259DC6E83E4EDB824 /* SeptenaClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 583220978001091137587977 /* SeptenaClient.swift */; };
 		A1B1C1D1E1F1020202020202 /* OuraProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B1C1D1E1F1010101010101 /* OuraProvider.swift */; };
 		B2C2D2E2F2A2020202020202 /* WithingsProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C2D2E2F2A2010101010101 /* WithingsProvider.swift */; };
+		C3D3E3F3A3B3020202020202 /* Logging.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D3E3F3A3B3010101010101 /* Logging.swift */; };
 		A0989A011D4F4AD3A890BD6A /* ExercisePickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F37F2CBF6D294C3B9BDB4504 /* ExercisePickerSheet.swift */; };
 		A1039E0E7E67EBD3249D3115 /* PollenClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 168F70A74A3AA9D2A0E234DB /* PollenClient.swift */; };
 		A14B8DF03D6FC0799D8AA8C2 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = E17D3542734AB0B32527C12C /* AppIcon.icns */; };
@@ -259,9 +259,9 @@
 		D4B1495C0BDE3AF22A629505 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */; };
 		D4F38C66817C3036A92F03C7 /* Accessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26ED5AC7B6F2400A0A4B378C /* Accessibility.swift */; };
 		D70A3B473E3ACD222FD15870 /* SeptenaServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D227602C1039FA2206A539A /* SeptenaServices.swift */; };
-		D770995846D0B23AC3F77F34 /* SeptenaClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 583220978001091137587977 /* SeptenaClient.swift */; };
 		A1B1C1D1E1F1030303030303 /* OuraProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B1C1D1E1F1010101010101 /* OuraProvider.swift */; };
 		B2C2D2E2F2A2030303030303 /* WithingsProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C2D2E2F2A2010101010101 /* WithingsProvider.swift */; };
+		C3D3E3F3A3B3030303030303 /* Logging.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D3E3F3A3B3010101010101 /* Logging.swift */; };
 		D8337D72DCD514F36A6094B4 /* MenuBarMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD90B8D1D8A0A978D1CE744C /* MenuBarMenu.swift */; };
 		D84CE356C37CEBDDCCDF1B74 /* SeptenaWatchComplication.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B456DE05339EB2A12EB2A9BE /* SeptenaWatchComplication.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		D96F2922568F67A65AAA9AAC /* CaffeineDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACEBFC5E297AA01C582EE1A5 /* CaffeineDestinationView.swift */; };
@@ -435,9 +435,9 @@
 		53E343B15A4B6F29FBF956B8 /* ServerInspectorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerInspectorSheet.swift; sourceTree = "<group>"; };
 		53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
 		561130AE996F0E92FE02767D /* RemindersBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersBridge.swift; sourceTree = "<group>"; };
-		583220978001091137587977 /* SeptenaClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptenaClient.swift; sourceTree = "<group>"; };
 		A1B1C1D1E1F1010101010101 /* OuraProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OuraProvider.swift; sourceTree = "<group>"; };
 		B2C2D2E2F2A2010101010101 /* WithingsProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WithingsProvider.swift; sourceTree = "<group>"; };
+		C3D3E3F3A3B3010101010101 /* Logging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logging.swift; sourceTree = "<group>"; };
 		59055370ABA84DB912D64D1E /* SeptenaMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeptenaMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5961822BB83BCF87B27E11AD /* AddTaskIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTaskIntent.swift; sourceTree = "<group>"; };
 		5B49A0D20B2ECD672137900F /* Info-Mac.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Info-Mac.plist"; sourceTree = "<group>"; };
@@ -966,7 +966,6 @@
 				561130AE996F0E92FE02767D /* RemindersBridge.swift */,
 				C9D6916E979E5B0D7497CAEF /* ResponseCache.swift */,
 				C03DC46C772E45B60ECB7343 /* SectionTheme.swift */,
-				583220978001091137587977 /* SeptenaClient.swift */,
 				5D227602C1039FA2206A539A /* SeptenaServices.swift */,
 				E5439F75303F906465F9F2C6 /* SettingsMirror.swift */,
 				B6DD7C05D998EF1301A6410D /* SuggestionEngine.swift */,
@@ -980,6 +979,7 @@
 				168F70A74A3AA9D2A0E234DB /* PollenClient.swift */,
 				A1B1C1D1E1F1010101010101 /* OuraProvider.swift */,
 				B2C2D2E2F2A2010101010101 /* WithingsProvider.swift */,
+				C3D3E3F3A3B3010101010101 /* Logging.swift */,
 			);
 			path = SeptenaCore;
 			sourceTree = "<group>";
@@ -1274,9 +1274,9 @@
 				A7F3580380663FA1FA645ED0 /* SectionManifest.swift in Sources */,
 				C8F7E91227008E29DA40DB5C /* SectionRecord.swift in Sources */,
 				07B127F5FBCE0DE19AFCD387 /* SectionTheme.swift in Sources */,
-				D770995846D0B23AC3F77F34 /* SeptenaClient.swift in Sources */,
 				A1B1C1D1E1F1030303030303 /* OuraProvider.swift in Sources */,
 				B2C2D2E2F2A2030303030303 /* WithingsProvider.swift in Sources */,
+				C3D3E3F3A3B3030303030303 /* Logging.swift in Sources */,
 				288822C1F37C59515A97A967 /* SeptenaServices.swift in Sources */,
 				C3AC44E24947DE4D47DA8A42 /* ServerInspectorSheet.swift in Sources */,
 				B45A3DCE0AC3B32856BA727C /* SettingsMirror.swift in Sources */,
@@ -1453,9 +1453,9 @@
 				95FF3A61C542C9B1633050C3 /* SectionManifest.swift in Sources */,
 				3EFD534FCC0E072DCACD3839 /* SectionRecord.swift in Sources */,
 				D3D801AE0714FA3E8696508A /* SectionTheme.swift in Sources */,
-				9ED913F259DC6E83E4EDB824 /* SeptenaClient.swift in Sources */,
 				A1B1C1D1E1F1020202020202 /* OuraProvider.swift in Sources */,
 				B2C2D2E2F2A2020202020202 /* WithingsProvider.swift in Sources */,
+				C3D3E3F3A3B3020202020202 /* Logging.swift in Sources */,
 				D70A3B473E3ACD222FD15870 /* SeptenaServices.swift in Sources */,
 				6599659F45F9B6EF50FC2C1B /* ServerInspectorSheet.swift in Sources */,
 				0139A2BF409AD0CFD4AA7E80 /* SettingsMirror.swift in Sources */,

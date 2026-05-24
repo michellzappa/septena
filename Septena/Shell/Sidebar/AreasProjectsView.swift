@@ -93,7 +93,6 @@ func markdownAttributed(_ raw: String) -> AttributedString {
 
 struct AreaDetailView: View {
   let area: Area
-  @Environment(SeptenaClient.self) private var client
   @Environment(SectionTheme.self) private var theme
   @Environment(NavigationState.self) private var nav
   @Environment(AreasMutator.self) private var areasMutator
@@ -286,7 +285,6 @@ struct AreaDetailView: View {
 
 struct ProjectDetailView: View {
   let project: Project
-  @Environment(SeptenaClient.self) private var client
   @Environment(SectionTheme.self) private var theme
   @Environment(ProjectsMutator.self) private var projectsMutator
   @Environment(\.dismiss) private var dismiss

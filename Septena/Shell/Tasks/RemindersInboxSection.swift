@@ -7,7 +7,6 @@ import EventKit
 // original reminder so dedupe is automatic.
 
 struct RemindersInboxSection: View {
-  @Environment(SeptenaClient.self) private var client
   @Environment(TaskMutator.self) private var mutator
   @Environment(SectionTheme.self) private var theme
   @Environment(NavigationState.self) private var nav

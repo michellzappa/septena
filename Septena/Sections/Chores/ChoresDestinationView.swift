@@ -7,7 +7,6 @@ import SwiftUI
 // (the app-wide list-row menu pattern — no swipe actions anywhere).
 
 struct ChoresDestinationView: View {
-  @Environment(SeptenaClient.self) private var client
   @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(SectionTheme.self) private var theme
 
@@ -85,7 +84,7 @@ struct ChoresDestinationView: View {
     }
     .task {
       model.paintFromCache()
-      await model.load(client: client)
+      await model.load()
       // History is computed locally from the CloudKit-backed mirror.
       let resp = ChecklistMirror.loadChoresHistory(
         context: LocalStore.shared.container.mainContext, days: 365)
@@ -104,7 +103,7 @@ struct ChoresDestinationView: View {
     .sheet(isPresented: $creating) {
       EditChoreSheet(
         original: nil,
-        onDone: { _ in Task { await model.load(client: client) } }
+        onDone: { _ in Task { await model.load() } }
       )
       #if os(iOS)
       .presentationDetents([.medium, .large])

@@ -11,7 +11,6 @@ import SwiftData
 // new/updated records from other devices.
 
 struct GoalsView: View {
-  @Environment(SeptenaClient.self) private var client
   @Environment(SectionTheme.self) private var theme
   @Environment(\.modelContext) private var context
   #if os(iOS)

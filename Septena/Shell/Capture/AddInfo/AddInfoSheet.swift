@@ -6,7 +6,6 @@ import SwiftUI
 
 struct AddInfoSheet: View {
   @Environment(\.dismiss) private var dismiss
-  @Environment(SeptenaClient.self) private var client
   @Environment(SectionTheme.self) private var theme
   @Environment(NavigationState.self) private var nav
 

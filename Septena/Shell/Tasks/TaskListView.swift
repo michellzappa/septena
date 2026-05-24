@@ -6,7 +6,6 @@ import SwiftData
 // from the server in the background and fold the response back in.
 
 struct TaskListView: View {
-  @Environment(SeptenaClient.self) private var client
   /// Task write-path: applies optimistic SwiftData changes, enqueues
   /// CloudKit-backed ops. Every mutation in this view routes through here
   /// instead of `client.*` so the UI never blocks on the network and

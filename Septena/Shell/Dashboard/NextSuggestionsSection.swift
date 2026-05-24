@@ -140,7 +140,7 @@ final class NextSuggestionsModel {
     hasLoaded = true
   }
 
-  func load(client: SeptenaClient) async {
+  func load() async {
     let today = self.today
     let since14 = Self.daysAgoISO(14)
     let since30 = Self.daysAgoISO(30)

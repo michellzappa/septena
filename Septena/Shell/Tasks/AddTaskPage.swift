@@ -27,7 +27,6 @@ private enum TaskBucket {
 
 struct AddTaskPage: View {
   @Environment(NavigationState.self) private var nav
-  @Environment(SeptenaClient.self) private var client
   @Environment(TaskMutator.self) private var mutator
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss

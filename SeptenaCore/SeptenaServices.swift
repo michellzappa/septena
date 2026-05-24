@@ -61,9 +61,8 @@ final class SeptenaServices {
 
   private init() {
     let context = LocalStore.shared.container.mainContext
-    let client = ClientProvider.shared.client
     self.ckEngine = CKEngine()
-    self.taskMutator = TaskMutator(client: client, context: context, ckEngine: nil)
+    self.taskMutator = TaskMutator(context: context, ckEngine: nil)
     self.checklistMutator = ChecklistMutator(context: context, ckEngine: nil)
     self.goalMutator = GoalMutator(context: context, ckEngine: nil)
     self.gutMutator = GutMutator(context: context, ckEngine: nil)
@@ -96,7 +95,6 @@ final class SeptenaServices {
     }
     let task = Task { @MainActor [self] in
       let context = LocalStore.shared.container.mainContext
-      let client = ClientProvider.shared.client
       let settingsSingletonID = SettingsCloudKitSchema.singletonID
       var batchTouchedTasks = false
       var batchTouchedStructure = false

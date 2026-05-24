@@ -4,7 +4,6 @@ import SwiftUI
 // Pulled out of Today so Today stays focused on tasks (mirrors the web app).
 
 struct NextView: View {
-  @Environment(SeptenaClient.self) private var client
   @Environment(SectionTheme.self) private var theme
   @Environment(DayClock.self) private var clock
 
@@ -52,15 +51,15 @@ struct NextView: View {
       model.paintFromCache()
       tasksModel.paintFromCache()
       suggestionsModel.paintFromCache()
-      async let a: () = model.load(client: client)
-      async let b: () = tasksModel.load(client: client)
-      async let c: () = suggestionsModel.load(client: client)
+      async let a: () = model.load()
+      async let b: () = tasksModel.load()
+      async let c: () = suggestionsModel.load()
       _ = await (a, b, c)
     }
     .refreshable {
-      async let a: () = model.load(client: client)
-      async let b: () = tasksModel.load(client: client)
-      async let c: () = suggestionsModel.load(client: client)
+      async let a: () = model.load()
+      async let b: () = tasksModel.load()
+      async let c: () = suggestionsModel.load()
       _ = await (a, b, c)
     }
     // Repaint when other surfaces (Tasks tab, menu bar, outbox drain)
@@ -73,9 +72,9 @@ struct NextView: View {
     // the new day's bucket and completion state.
     .onChange(of: clock.today) { _, _ in
       Task {
-        async let a: () = model.load(client: client)
-        async let b: () = tasksModel.load(client: client)
-        async let c: () = suggestionsModel.load(client: client)
+        async let a: () = model.load()
+        async let b: () = tasksModel.load()
+        async let c: () = suggestionsModel.load()
         _ = await (a, b, c)
       }
     }

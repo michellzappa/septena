@@ -6,7 +6,6 @@ import SwiftUI
 // (including Yoga, Conditioning, custom splits, etc.) shows up here.
 
 struct AddTrainingPage: View {
-  @Environment(SeptenaClient.self) private var client
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss

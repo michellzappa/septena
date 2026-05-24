@@ -8,7 +8,6 @@ import Charts
 // Bottom: per-weigh-in LogRows for the last 21 days.
 
 struct BodyDestinationView: View {
-  @Environment(SeptenaClient.self) private var client
   @Environment(SectionTheme.self) private var theme
 
   @State private var rows: [WithingsRow] = []

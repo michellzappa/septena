@@ -4,7 +4,6 @@ import SwiftUI
 // for today. Type-to-create with cadence 7d default.
 
 struct AddChorePage: View {
-  @Environment(SeptenaClient.self) private var client
   @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss

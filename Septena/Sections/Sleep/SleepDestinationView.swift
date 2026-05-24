@@ -7,7 +7,6 @@ import Charts
 // Bottom: per-night LogRows for the last 14 nights.
 
 struct SleepDestinationView: View {
-  @Environment(SeptenaClient.self) private var client
   @Environment(SectionTheme.self) private var theme
 
   @State private var nights: [OuraNight] = []

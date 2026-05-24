@@ -29,7 +29,6 @@ private func visibleBuckets(_ all: [String]) -> [String] {
 }
 
 struct AddHabitPage: View {
-  @Environment(SeptenaClient.self) private var client
   @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss

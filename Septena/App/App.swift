@@ -10,7 +10,6 @@ import AppKit
 
 @main
 struct SeptenaApp: App {
-  @State private var clientProvider = ClientProvider.shared
   @State private var navigation = NavigationState()
   @State private var theme = SectionTheme()
   @State private var trainingDraft = TrainingDraftStore()
@@ -48,7 +47,6 @@ struct SeptenaApp: App {
   var body: some Scene {
     WindowGroup {
       RootTabView()
-        .environment(clientProvider.client)
         .environment(navigation)
         .environment(theme)
         .environment(trainingDraft)

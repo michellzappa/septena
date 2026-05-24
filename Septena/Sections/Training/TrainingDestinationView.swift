@@ -8,7 +8,6 @@ import Charts
 // Header summary: this week's session count + Z2 minutes vs target.
 
 struct TrainingDestinationView: View {
-  @Environment(SeptenaClient.self) private var client
   private var trainingMutator: TrainingMutator { SeptenaServices.shared.trainingMutator }
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
@@ -1231,7 +1230,6 @@ final class TrainingDraftStore {
 // state.
 
 struct TrainingSessionView: View {
-  @Environment(SeptenaClient.self) private var client
   private var trainingMutator: TrainingMutator { SeptenaServices.shared.trainingMutator }
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
@@ -1484,7 +1482,6 @@ struct TrainingSessionView: View {
 /// summary; tapping expands to weight/sets/reps inputs (or duration/
 /// distance/level for cardio) plus the difficulty pills and a Done button.
 struct TrainingExerciseCard: View {
-  @Environment(SeptenaClient.self) private var client
   private var trainingMutator: TrainingMutator { SeptenaServices.shared.trainingMutator }
   @Environment(TrainingDraftStore.self) private var store
   @Environment(\.a11yMotion) private var motion

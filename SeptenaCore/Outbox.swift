@@ -50,7 +50,6 @@ final class OutboxEntity {
 @MainActor
 @Observable
 final class TaskMutator {
-  private let client: SeptenaClient
   private let context: ModelContext
 
   /// CloudKit dependency. Held as optional because App.swift can't
@@ -74,8 +73,7 @@ final class TaskMutator {
   /// UI ("N pending mutations") keeps compiling; always reports zero.
   var pendingCount: Int { 0 }
 
-  init(client: SeptenaClient, context: ModelContext, ckEngine: CKEngine? = nil) {
-    self.client = client
+  init(context: ModelContext, ckEngine: CKEngine? = nil) {
     self.context = context
     self.ckEngine = ckEngine
   }
