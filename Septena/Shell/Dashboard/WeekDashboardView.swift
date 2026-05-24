@@ -137,6 +137,9 @@ struct WeekDashboardView: View {
       onDayChange: {
         Task { await loadAll() }
       },
+      onDataChange: {
+        Task { await repaintAllMirrors() }
+      },
       onTileChange: { section in
         repaint(section: section)
         Task { await refresh(section: section) }
@@ -694,6 +697,16 @@ struct WeekDashboardView: View {
       recentTraining = e
       ResponseCache.save(trainingSessionDates, forKey: CacheKey.trainingDates)
       ResponseCache.save(e, forKey: CacheKey.recentTraining)
+    }
+  }
+
+  /// Re-read every CK-backed tile from its SwiftData mirror. Triggered
+  /// by `.septenaDataChanged` so CK fetch arrivals (push, periodic, or
+  /// cross-device writes) repaint the dashboard. Tasks have their own
+  /// `.septenaTasksChanged` path and are skipped here.
+  private func repaintAllMirrors() async {
+    for section in AddInfoSection.allCases where section != .tasks {
+      await refresh(section: section)
     }
   }
 
@@ -2113,6 +2126,7 @@ private struct WeekDashboardScreen<CurrentDay: Equatable, Toolbar: ToolbarConten
   let onRefresh: () async -> Void
   let onTaskChange: () -> Void
   let onDayChange: () -> Void
+  let onDataChange: () -> Void
   let onTileChange: (AddInfoSection) -> Void
   @ToolbarContentBuilder let toolbar: () -> Toolbar
   @ViewBuilder let content: () -> Content
@@ -2151,6 +2165,15 @@ private struct WeekDashboardScreen<CurrentDay: Equatable, Toolbar: ToolbarConten
       // mutations from other devices.
       .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
         onTaskChange()
+      }
+      // CK fetch batch landed for any non-task domain (push, periodic
+      // fetch, or a write on another device). Refresh every CK-backed
+      // tile from its SwiftData mirror. Without this, the dashboard
+      // stays stuck on whatever `loadAll` saw at cold launch — entries
+      // logged on another device never repaint until the user pulls to
+      // refresh or visits the section.
+      .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
+        onDataChange()
       }
       // Day rollover: the dashboard is the most date-sensitive surface
       // (today's timeline, today's totals, 7-day windows ending today).

@@ -953,7 +953,10 @@ final class ChecklistMutator {
     state.date = date
     state.supplementID = id
     state.done = true
-    state.note = nil
+    // Empty string rather than nil so the `note` field registers with
+    // CloudKit on first toggle. Display code already treats "" the same
+    // as nil (both render as "no note").
+    state.note = ""
     state.time = currentTimeString()
     state.updatedAt = .now
     if state.modelContext == nil { context.insert(state) }
@@ -1000,10 +1003,16 @@ final class ChecklistMutator {
   }
 
   func completeChore(id: String, date: String) {
+    // `note` (and `reason` in the defer path) get empty-string defaults so
+    // the fields register with CloudKit on first event write, enabling the
+    // MCP gateway to write them. `newDueDate` stays nil for completions —
+    // it's a date string and "" isn't a valid date.
     let event = ChoreEventEntity(id: uniqueChoreEventID(for: id, date: date),
                                  choreID: id,
                                  action: "complete",
                                  date: date,
+                                 reason: "",
+                                 note: "",
                                  time: currentTimeString(),
                                  sortKey: sortKey(for: date))
     context.insert(event)
@@ -1017,6 +1026,7 @@ final class ChecklistMutator {
                                  date: today,
                                  newDueDate: deferredDueDate(mode: mode, from: today),
                                  reason: mode,
+                                 note: "",
                                  sortKey: sortKey(for: today))
     context.insert(event)
     commitChoreEvent(event, op: "defer")
@@ -1063,7 +1073,10 @@ final class ChecklistMutator {
     state.habitID = id
     state.done = done
     state.skipped = skipped
-    state.note = normalizedNote
+    // Empty string rather than nil when there's no note/time so the fields
+    // register with CloudKit on first write. `time` stays nil when absent —
+    // empty isn't a valid HH:MM. Display code treats "" the same as nil.
+    state.note = normalizedNote ?? ""
     state.time = normalizedTime
     state.updatedAt = .now
     if state.modelContext == nil { context.insert(state) }
@@ -1329,10 +1342,14 @@ final class GutMutator {
                 bristol: Int,
                 blood: Int = 0,
                 volume: String? = nil,
-                discomfortLevel: String? = nil,
+                // Free-form text defaults to "" rather than nil so the first
+                // in-app entry registers these fields with CloudKit, enabling
+                // the MCP gateway (which uses Web Services API) to write to
+                // them. Enum / time fields stay nil — empty isn't a valid value.
+                discomfortLevel: String? = "",
                 discomfortStart: String? = nil,
                 discomfortEnd: String? = nil,
-                note: String? = nil) -> GutEventEntity {
+                note: String? = "") -> GutEventEntity {
     let id = uniqueID()
     let entity = GutEventEntity(id: id,
                                 date: date,
@@ -1432,7 +1449,9 @@ final class CaffeineMutator {
                 method: String,
                 beans: String? = nil,
                 grams: Double? = nil,
-                note: String? = nil) -> CaffeineEventEntity {
+                // Free-form text defaults to "" so the field registers with
+                // CloudKit on first in-app write. See GutMutator for details.
+                note: String? = "") -> CaffeineEventEntity {
     let id = uniqueEntryID()
     let entity = CaffeineEventEntity(id: id,
                                      date: date,
@@ -1589,8 +1608,10 @@ final class CannabisMutator {
                 strain: String? = nil,
                 hit: Int? = nil,
                 grams: Double? = nil,
-                effect: String? = nil,
-                note: String? = nil) -> CannabisEventEntity {
+                // Free-form text defaults to "" so the field registers with
+                // CloudKit on first in-app write. See GutMutator for details.
+                effect: String? = "",
+                note: String? = "") -> CannabisEventEntity {
     let id = uniqueEntryID()
     // Vape entries auto-fill grams from the constant when not supplied.
     let resolvedGrams = grams ?? (method == "vape" ? Self.gramsPerVapeUse : nil)
@@ -2199,11 +2220,21 @@ final class NutritionMutator {
 
   @discardableResult
   func addEntry(loggedAt: Date,
-                emoji: String? = nil,
+                // Free-form text defaults to "" so these fields register
+                // with CloudKit on first in-app write. mealType stays nil —
+                // it's an enum (breakfast|lunch|dinner|snack) and "" isn't
+                // a valid value.
+                emoji: String? = "",
                 foods: [String],
-                note: String? = nil,
+                note: String? = "",
                 mealType: String? = nil,
-                source: String? = nil,
+                // Default "manual" — every entry written through this mutator
+                // is user-initiated in the app. Callers that aren't (bootstrap,
+                // import, MCP) pass their own value. This also guarantees the
+                // `source` field gets populated on at least one record, which
+                // is what registers the field with CloudKit so the Web Services
+                // API (used by the MCP gateway) can write to it.
+                source: String? = "manual",
                 proteinG: Double = 0,
                 fatG: Double = 0,
                 carbsG: Double = 0,
