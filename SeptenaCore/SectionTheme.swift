@@ -1,5 +1,23 @@
 import SwiftUI
 
+// MARK: - SectionConfig (value type for palette plumbing)
+
+/// In-memory shape for a single section's accent. Lives here (not in
+/// SeptenaClient) because it has no FastAPI dependency anymore — the
+/// SectionTheme palette and CloudKit SectionEntity mirror both produce
+/// and consume values of this type.
+public struct SectionConfig: Codable, Hashable {
+  public let key: String
+  public let label: String
+  public let color: String          // hex (e.g. "#ef4444") or "hsl(...)"
+
+  public init(key: String, label: String, color: String) {
+    self.key = key
+    self.label = label
+    self.color = color
+  }
+}
+
 // Live mirror of Septena's section accents. Sources, in order of preference:
 //   1. CloudKit-backed `SectionEntity` (user-customized colors).
 //   2. ResponseCache disk blob (last-known state, primes cold launch).
@@ -14,7 +32,7 @@ final class SectionTheme {
   /// `HomepageDomain.rawValue` so every tile renders with a sensible color
   /// before the user touches Settings. Edits in Settings overwrite the
   /// SectionEntity records and CK syncs the change to other devices.
-  static let defaultPalette: [SeptenaClient.SectionConfig] = [
+  static let defaultPalette: [SectionConfig] = [
     .init(key: "tasks",       label: "Tasks",       color: "#ef4444"),
     .init(key: "habits",      label: "Habits",      color: "#22c55e"),
     .init(key: "training",    label: "Training",    color: "#f97316"),
@@ -88,15 +106,15 @@ final class SectionTheme {
                                    engine: SeptenaServices.shared.ckEngine)
   }
 
-  private func loadSectionsForPaint() -> [SeptenaClient.SectionConfig]? {
+  private func loadSectionsForPaint() -> [SectionConfig]? {
     let context = LocalStore.shared.container.mainContext
     let mirrored = SettingsMirror.loadSections(context: context)
     if !mirrored.isEmpty { return mirrored }
-    return ResponseCache.load([SeptenaClient.SectionConfig].self,
+    return ResponseCache.load([SectionConfig].self,
                               forKey: Self.cacheKey)
   }
 
-  private func applySections(_ sections: [SeptenaClient.SectionConfig]) {
+  private func applySections(_ sections: [SectionConfig]) {
     var byKey: [String: Color] = [:]
     for s in sections {
       if let c = parseColor(s.color) { byKey[s.key] = c }

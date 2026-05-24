@@ -15,7 +15,7 @@ enum SettingsMirror {
     return try? decoder.decode(AppSettings.self, from: entity.payloadData)
   }
 
-  static func loadSections(context: ModelContext) -> [SeptenaClient.SectionConfig] {
+  static func loadSections(context: ModelContext) -> [SectionConfig] {
     let descriptor = FetchDescriptor<SectionEntity>()
     let rows = (try? context.fetch(descriptor)) ?? []
     let settings = loadSettings(context: context)
@@ -37,7 +37,7 @@ enum SettingsMirror {
           return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
         }
       }
-      .map(SeptenaClient.SectionConfig.init)
+      .map(SectionConfig.init)
   }
 
   static func upsert(settings: AppSettings,
@@ -62,7 +62,7 @@ enum SettingsMirror {
     }
   }
 
-  static func replaceSections(_ sections: [SeptenaClient.SectionConfig],
+  static func replaceSections(_ sections: [SectionConfig],
                               context: ModelContext,
                               engine: CKEngine? = nil) {
     let descriptor = FetchDescriptor<SectionEntity>()

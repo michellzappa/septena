@@ -115,18 +115,6 @@ final class SeptenaClient {
   // No /api/insights/* endpoint is called — all data comes from SwiftData
   // (CloudKit-mirrored) plus the existing /api/health/oura read endpoint.
 
-  // MARK: - Section config (color palette type — used by SectionTheme)
-
-  /// In-memory shape for a single section's accent. Kept here (not in
-  /// Models.swift) because SectionTheme's default palette and CK mirror
-  /// both produce / consume values of this type. No HTTP endpoint reads
-  /// or writes it anymore — purely a value-type for palette plumbing.
-  struct SectionConfig: Codable, Hashable {
-    let key: String
-    let label: String
-    let color: String          // hex (e.g. "#ef4444") or "hsl(...)"
-  }
-
   // MARK: - HTTP helpers
 
   private func url(_ path: String, query: [URLQueryItem] = []) throws -> URL {

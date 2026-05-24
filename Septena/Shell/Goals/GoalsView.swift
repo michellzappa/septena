@@ -21,7 +21,7 @@ struct GoalsView: View {
   private var goalMutator: GoalMutator { SeptenaServices.shared.goalMutator }
 
   @State private var goals: [Goal] = []
-  @State private var availableSections: [SeptenaClient.SectionConfig] = []
+  @State private var availableSections: [SectionConfig] = []
   @State private var loading = true
   @State private var editing: Goal? = nil
 
@@ -204,7 +204,7 @@ struct EditGoalSheet: View {
   @Environment(\.dismiss) private var dismiss
 
   let goal: Goal
-  let availableSections: [SeptenaClient.SectionConfig]
+  let availableSections: [SectionConfig]
   let theme: SectionTheme
   let mutator: GoalMutator
   let onUpdate: (Goal) -> Void
@@ -215,7 +215,7 @@ struct EditGoalSheet: View {
   @State private var showDeleteConfirm = false
 
   init(goal: Goal,
-       availableSections: [SeptenaClient.SectionConfig],
+       availableSections: [SectionConfig],
        theme: SectionTheme,
        mutator: GoalMutator,
        onUpdate: @escaping (Goal) -> Void,

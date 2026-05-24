@@ -207,7 +207,7 @@ enum TaskSort: String, CaseIterable, Identifiable {
 @Observable
 final class SettingsStore {
   var serverSettings: AppSettings? = nil
-  var sections: [SeptenaClient.SectionConfig] = []
+  var sections: [SectionConfig] = []
   var caffeine: CaffeineConfig? = nil
   var cannabis: CannabisConfig? = nil
   var macros: MacrosConfig? = nil
@@ -239,7 +239,7 @@ final class SettingsStore {
     let mirroredSections = SettingsMirror.loadSections(context: context)
     if !mirroredSections.isEmpty {
       sections = mirroredSections
-    } else if let v = ResponseCache.load([SeptenaClient.SectionConfig].self, forKey: CacheKey.sections) {
+    } else if let v = ResponseCache.load([SectionConfig].self, forKey: CacheKey.sections) {
       sections = v
     }
     if let v = ResponseCache.load(CaffeineConfig.self, forKey: CacheKey.caffeine) { caffeine = v }
@@ -489,7 +489,7 @@ struct SettingsView: View {
 /// (icon, defaults) with the live server overrides (label, accent).
 struct SectionEntry: Identifiable, Hashable {
   let manifest: SectionManifest
-  let server: SeptenaClient.SectionConfig
+  let server: SectionConfig
   var id: String { manifest.key }
   var key: String { manifest.key }
   /// Server label wins; manifest default is the fallback when the server
@@ -924,7 +924,7 @@ struct SectionDetailPane: View {
   private var heatmapMetricRaw: String = NutritionHeatmapMetric.protein.rawValue
 
   private var manifest: SectionManifest? { SectionManifest.byKey[sectionKey] }
-  private var server: SeptenaClient.SectionConfig? {
+  private var server: SectionConfig? {
     store.sections.first(where: { $0.key == sectionKey })
   }
   private var label: String {
@@ -1045,7 +1045,7 @@ struct SectionDetailPane: View {
     ckEngine.noteSectionChange(id: sectionKey)
     store.sections = store.sections.map { config in
       config.key == sectionKey
-        ? SeptenaClient.SectionConfig(key: config.key, label: config.label, color: hex)
+        ? SectionConfig(key: config.key, label: config.label, color: hex)
         : config
     }
   }

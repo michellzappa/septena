@@ -1063,7 +1063,7 @@ extension Area {
   }
 }
 
-extension SeptenaClient.SectionConfig {
+extension SectionConfig {
   init(_ e: SectionEntity) {
     self.init(key: e.id, label: e.title, color: e.color)
   }
