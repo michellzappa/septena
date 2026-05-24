@@ -194,9 +194,9 @@ extension Notification.Name {
 /// their own dev-app credentials) and wire them through this enum.
 enum WithingsAppCredentials {
   /// Withings dev-app `client_id`.
-  static let clientID: String = ""
+  static let clientID: String = "REDACTED-WITHINGS"
   /// Withings dev-app `client_secret`.
-  static let clientSecret: String = ""
+  static let clientSecret: String = "REDACTED-WITHINGS"
   /// Must match the redirect URI registered in the Withings dev app.
   /// The `septena` scheme is declared in Septena/Info.plist so the OS
   /// can route it back if anything ever opens the URL externally;
@@ -381,7 +381,17 @@ final class WithingsProvider {
     if code >= 400 {
       throw SeptenaError.server(code, String(data: data, encoding: .utf8) ?? "")
     }
-    let envelope = try JSONDecoder().decode(TokenEnvelope.self, from: data)
+    let envelope: TokenEnvelope
+    do {
+      envelope = try JSONDecoder().decode(TokenEnvelope.self, from: data)
+    } catch {
+      // Surface the raw body so the user can paste it back if Withings
+      // ever returns an unexpected shape — this is the kind of thing
+      // that breaks silently otherwise.
+      let raw = String(data: data, encoding: .utf8) ?? "<non-utf8>"
+      SeptenaLog.error("Withings token decode failed; body=\(raw)", error)
+      throw WithingsError.malformedTokenResponse
+    }
     if envelope.status != 0 {
       throw WithingsError.apiStatus(envelope.status, envelope.error ?? "unknown")
     }
@@ -511,13 +521,17 @@ final class WithingsProvider {
     let accessToken: String?
     let refreshToken: String?
     let expiresIn: Int?
-    let userid: Int?
     enum CodingKeys: String, CodingKey {
       case accessToken  = "access_token"
       case refreshToken = "refresh_token"
       case expiresIn    = "expires_in"
-      case userid
     }
+    // Withings includes `userid`, `scope`, `token_type`, `csrf_token`
+    // in the body. We don't need them and skipping them lets the
+    // decoder ignore type mismatches in fields we never read (notably
+    // `userid`, which is documented as String in some responses and
+    // Int in others). Decodable ignores unknown keys by default, so
+    // just leaving them out of CodingKeys is enough.
   }
 
   private struct MeasureEnvelope: Decodable {
