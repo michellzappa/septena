@@ -107,12 +107,10 @@ struct SeptenaApp: App {
           #if os(macOS)
           MacAppDelegate.ckEngine = ckEngine
           #endif
-          // Two-phase load for tile order + section colors. Disk reads
-          // are synchronous so the dashboard renders with the user's
-          // ordering and palette on the first frame; then pull CloudKit
-          // before refreshing the mirror-backed settings surfaces.
-          theme.paintFromCache()
-          settingsStore.paintFromCache()
+          // `SectionTheme.init` and `SettingsStore.init` already hydrated
+          // tile order + accent colors from disk synchronously, so the
+          // first frame is correct. Pull CloudKit, then refresh the
+          // mirror-backed surfaces to absorb any remote changes.
           try? await ckEngine.fetchChanges()
           await theme.refresh()
           await settingsStore.refresh()

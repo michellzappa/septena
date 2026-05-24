@@ -215,6 +215,14 @@ final class SettingsStore {
   var chores: [ChoreItem] = []
   var serverLoading: Bool = false
 
+  /// Hydrate from the local mirror / disk cache during construction so the
+  /// dashboard's first frame uses the user's saved section order and config
+  /// instead of an empty array (which falls back to `HomepageDomain.defaultOrder`
+  /// and causes a half-second reorder flash).
+  init() {
+    paintFromCache()
+  }
+
   private enum CacheKey {
     static let serverSettings = "settings.serverSettings"
     static let sections       = "settings.sections"

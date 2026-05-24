@@ -62,6 +62,14 @@ final class SectionTheme {
   /// `chores`, `supplements`, ...). Populated by `refresh()`.
   private(set) var accentByKey: [String: Color] = [:]
 
+  /// Hydrate from the local mirror / disk cache during construction so the
+  /// very first frame the dashboard renders already has the user's accent
+  /// colors. Doing this in `.task` instead leaves a half-second flash of
+  /// gray placeholders while SwiftUI waits for the task closure to fire.
+  init() {
+    paintFromCache()
+  }
+
   /// Resolve any section's accent — falls back to `inkSecondary` for
   /// sections we don't know about (or before the first refresh completes).
   func color(for sectionKey: String) -> Color {

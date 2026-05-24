@@ -111,6 +111,41 @@ struct WeekDashboardView: View {
   /// renders the fasting tile in.
   @State private var macroColors: MacroColors? = nil
 
+  /// Prime every tile's `@State` from disk *before* the first body render.
+  /// Without this, SwiftUI shows the literal defaults (zero-filled
+  /// histograms, nil summaries) for a frame until `.task`'s `paintFromCache`
+  /// fires. Reads are UserDefaults blobs — fast and safe to do in init.
+  init() {
+    if let v = ResponseCache.load([Int].self, forKey: CacheKey.habitHistory) { _habitHistory = State(initialValue: v) }
+    if let v = ResponseCache.load([Int].self, forKey: CacheKey.choreHistory) { _choreHistory = State(initialValue: v) }
+    if let v = ResponseCache.load(CardioHistoryResponse.self, forKey: CacheKey.cardio) { _cardio = State(initialValue: v) }
+    if let v = ResponseCache.load(Set<String>.self, forKey: CacheKey.trainingDates) { _trainingSessionDates = State(initialValue: v) }
+    if let v = ResponseCache.load([Int].self, forKey: CacheKey.supplementHistory) { _supplementHistory = State(initialValue: v) }
+    if let v = ResponseCache.load(TasksCounts.self, forKey: CacheKey.taskCounts) { _taskCounts = State(initialValue: v) }
+    if let v = ResponseCache.load(TasksHistory.self, forKey: CacheKey.tasksHistory) { _tasksHistory = State(initialValue: v) }
+    if let v = ResponseCache.load([SeptenaTask].self, forKey: CacheKey.completedTasks) { _completedTasks = State(initialValue: v) }
+    if let v = ResponseCache.load([OuraNight].self, forKey: CacheKey.ouraNights) { _ouraNights = State(initialValue: v) }
+    if let v = ResponseCache.load(NutritionStatsResponse.self, forKey: CacheKey.nutritionStats) { _nutritionStats = State(initialValue: v) }
+    if let v = ResponseCache.load(MacrosConfig.self, forKey: CacheKey.nutritionTarget) { _nutritionTarget = State(initialValue: v) }
+    if let v = ResponseCache.load([NutritionEntry].self, forKey: CacheKey.todayNutrition) {
+      _todayNutrition = State(initialValue: v)
+      _todayProteinSum = State(initialValue: v.reduce(0) { $0 + $1.proteinG })
+      _todayKcalSum    = State(initialValue: v.reduce(0) { $0 + $1.kcal })
+    }
+    if let v = ResponseCache.load(AirSummary.self, forKey: CacheKey.airSummary) { _airSummary = State(initialValue: v) }
+    if let v = ResponseCache.load([AirHistoryPoint].self, forKey: CacheKey.airHistory) { _airHistory = State(initialValue: v) }
+    if let v = ResponseCache.load([GroceryItem].self, forKey: CacheKey.groceries) { _groceries = State(initialValue: v) }
+    if let v = ResponseCache.load(CaffeineDayResponse.self, forKey: CacheKey.caffeineToday) { _caffeineToday = State(initialValue: v) }
+    if let v = ResponseCache.load([CaffeineHistoryPoint].self, forKey: CacheKey.caffeineHistory) { _caffeineHistory = State(initialValue: v) }
+    if let v = ResponseCache.load(CannabisDayResponse.self, forKey: CacheKey.cannabisToday) { _cannabisToday = State(initialValue: v) }
+    if let v = ResponseCache.load([CannabisHistoryPoint].self, forKey: CacheKey.cannabisHistory) { _cannabisHistory = State(initialValue: v) }
+    if let v = ResponseCache.load([WithingsRow].self, forKey: CacheKey.bodyRows) { _bodyRows = State(initialValue: v) }
+    if let v = ResponseCache.load(GutDayResponse.self, forKey: CacheKey.gutToday) { _gutToday = State(initialValue: v) }
+    if let v = ResponseCache.load([GutHistoryPoint].self, forKey: CacheKey.gutHistory) { _gutHistory = State(initialValue: v) }
+    if let v = ResponseCache.load([ExerciseEntry].self, forKey: CacheKey.recentTraining) { _recentTraining = State(initialValue: v) }
+    if let v = ResponseCache.load(MacroColors.self, forKey: CacheKey.macroColors) { _macroColors = State(initialValue: v) }
+  }
+
   /// iPhone compact: 1 column. iPad regular: 3 columns.
   /// macOS: adaptive — packs as many ~280pt tiles as fit, so wider windows
   /// get 4 or 5 columns automatically. LazyVGrid reflows on resize.
