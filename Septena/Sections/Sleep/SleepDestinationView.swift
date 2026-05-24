@@ -268,7 +268,7 @@ struct SleepDestinationView: View {
       Chart {
         ForEach(last7) { n in
           if let s = n.sleepScore {
-            LineMark(x: .value("Day", weekdayLabel(n.date)),
+            LineMark(x: .value("Day", n.date),
                      y: .value("Score", s),
                      series: .value("Series", "Sleep"))
               .foregroundStyle(accent)
@@ -277,7 +277,7 @@ struct SleepDestinationView: View {
               .accessibilityValue("Sleep score \(s)")
           }
           if let r = n.readinessScore {
-            LineMark(x: .value("Day", weekdayLabel(n.date)),
+            LineMark(x: .value("Day", n.date),
                      y: .value("Score", r),
                      series: .value("Series", "Readiness"))
               .foregroundStyle(accent.opacity(0.55))
@@ -292,6 +292,18 @@ struct SleepDestinationView: View {
           .accessibilityHidden(true)
       }
       .chartYScale(domain: 0...100)
+      .chartXScale(domain: last7.map(\.date))
+      .chartXAxis {
+        AxisMarks(values: last7.map(\.date)) { v in
+          AxisValueLabel {
+            if let iso = v.as(String.self) {
+              Text(verbatim: weekdayInitial(iso)).font(.caption2)
+            }
+          }
+          AxisTick()
+          AxisGridLine()
+        }
+      }
       .frame(height: 140)
     }
     .a11yCombineKeepingChildren(summary)
@@ -310,21 +322,21 @@ struct SleepDestinationView: View {
       Chart {
         ForEach(last7) { n in
           if let d = n.deepH {
-            BarMark(x: .value("Day", weekdayLabel(n.date)),
+            BarMark(x: .value("Day", n.date),
                     y: .value("Deep", d))
               .foregroundStyle(accent)
               .accessibilityLabel(weekdayFull(n.date))
               .accessibilityValue("Deep \(String(format: "%.1f", d)) hours")
           }
           if let r = n.remH {
-            BarMark(x: .value("Day", weekdayLabel(n.date)),
+            BarMark(x: .value("Day", n.date),
                     y: .value("REM", r))
               .foregroundStyle(accent.opacity(0.7))
               .accessibilityLabel(weekdayFull(n.date))
               .accessibilityValue("REM \(String(format: "%.1f", r)) hours")
           }
           if let l = n.lightH {
-            BarMark(x: .value("Day", weekdayLabel(n.date)),
+            BarMark(x: .value("Day", n.date),
                     y: .value("Light", l))
               .foregroundStyle(accent.opacity(0.4))
               .accessibilityLabel(weekdayFull(n.date))
@@ -338,6 +350,18 @@ struct SleepDestinationView: View {
         "Light": accent.opacity(0.4)
       ])
       .chartLegend(position: .bottom, alignment: .center, spacing: 8)
+      .chartXScale(domain: last7.map(\.date))
+      .chartXAxis {
+        AxisMarks(values: last7.map(\.date)) { v in
+          AxisValueLabel {
+            if let iso = v.as(String.self) {
+              Text(verbatim: weekdayInitial(iso)).font(.caption2)
+            }
+          }
+          AxisTick()
+          AxisGridLine()
+        }
+      }
       .frame(height: 140)
     }
     .a11yCombineKeepingChildren(summary)
@@ -354,12 +378,12 @@ struct SleepDestinationView: View {
       Chart {
         ForEach(last7) { n in
           if let t = n.totalH {
-            LineMark(x: .value("Day", weekdayLabel(n.date)),
+            LineMark(x: .value("Day", n.date),
                      y: .value("Hours", t))
               .foregroundStyle(accent)
               .interpolationMethod(.monotone)
               .accessibilityHidden(true)
-            PointMark(x: .value("Day", weekdayLabel(n.date)),
+            PointMark(x: .value("Day", n.date),
                       y: .value("Hours", t))
               .foregroundStyle(accent)
               .symbolSize(40)
@@ -373,6 +397,18 @@ struct SleepDestinationView: View {
           .accessibilityHidden(true)
       }
       .chartYScale(domain: 0...10)
+      .chartXScale(domain: last7.map(\.date))
+      .chartXAxis {
+        AxisMarks(values: last7.map(\.date)) { v in
+          AxisValueLabel {
+            if let iso = v.as(String.self) {
+              Text(verbatim: weekdayInitial(iso)).font(.caption2)
+            }
+          }
+          AxisTick()
+          AxisGridLine()
+        }
+      }
       .frame(height: 140)
     }
     .a11yCombineKeepingChildren(summary)
@@ -392,14 +428,14 @@ struct SleepDestinationView: View {
       Chart {
         ForEach(last7) { n in
           if let s = n.stressHighMin {
-            BarMark(x: .value("Day", weekdayLabel(n.date)),
+            BarMark(x: .value("Day", n.date),
                     y: .value("Stress", s))
               .foregroundStyle(stressColor(n.stressSummary))
               .accessibilityLabel(weekdayFull(n.date))
               .accessibilityValue("Stress \(s) minutes")
           }
           if let r = n.recoveryHighMin {
-            BarMark(x: .value("Day", weekdayLabel(n.date)),
+            BarMark(x: .value("Day", n.date),
                     y: .value("Recovery", r))
               .foregroundStyle(Color.green)
               .accessibilityLabel(weekdayFull(n.date))
@@ -412,6 +448,18 @@ struct SleepDestinationView: View {
         "Recovery": Color.green
       ])
       .chartLegend(position: .bottom, alignment: .center, spacing: 8)
+      .chartXScale(domain: last7.map(\.date))
+      .chartXAxis {
+        AxisMarks(values: last7.map(\.date)) { v in
+          AxisValueLabel {
+            if let iso = v.as(String.self) {
+              Text(verbatim: weekdayInitial(iso)).font(.caption2)
+            }
+          }
+          AxisTick()
+          AxisGridLine()
+        }
+      }
       .frame(height: 140)
     }
     .a11yCombineKeepingChildren(summary)
@@ -492,14 +540,11 @@ struct SleepDestinationView: View {
     return pretty.string(from: d)
   }
 
-  private func weekdayLabel(_ iso: String) -> String {
-    let fmt = DateFormatter()
-    fmt.dateFormat = "yyyy-MM-dd"
-    fmt.timeZone = .current
-    guard let d = fmt.date(from: iso) else { return iso }
-    let wd = DateFormatter()
-    wd.dateFormat = "EEE"
-    return wd.string(from: d)
+  private func weekdayInitial(_ iso: String) -> String {
+    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+    guard let d = fmt.date(from: iso) else { return "" }
+    let w = DateFormatter(); w.dateFormat = "EEEEE"
+    return w.string(from: d)
   }
 
   // Full weekday name for VoiceOver — visual axis uses abbreviated form.
