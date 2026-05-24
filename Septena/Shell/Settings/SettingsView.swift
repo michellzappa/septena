@@ -300,7 +300,7 @@ struct SettingsView: View {
   /// for per-section rows resolved against `SectionManifest` + the live
   /// `store.sections` list.
   enum SettingsDestination: Hashable {
-    case general, integrations, sync, importExport, privacy, about
+    case general, integrations, sync, importExport, skills, privacy, about
     case section(String)
   }
 
@@ -382,7 +382,7 @@ struct SettingsView: View {
   #endif
 
   private var staticDestinations: [SettingsDestination] {
-    [.general, .integrations, .sync, .importExport, .privacy, .about]
+    [.general, .integrations, .sync, .importExport, .skills, .privacy, .about]
   }
 
   /// Per-section sidebar rows, in server order (`section_order` from
@@ -432,6 +432,7 @@ struct SettingsView: View {
     case .integrations: return "Integrations"
     case .sync:         return "Sync"
     case .importExport: return "Import & Export"
+    case .skills:       return "Skills"
     case .privacy:      return "Privacy"
     case .about:        return "About"
     case .section(let key):
@@ -449,6 +450,7 @@ struct SettingsView: View {
     case .integrations: return "app.connected.to.app.below.fill"
     case .sync:         return "arrow.triangle.2.circlepath"
     case .importExport: return "square.and.arrow.up.on.square"
+    case .skills:       return "sparkles"
     case .privacy:      return "hand.raised"
     case .about:        return "info.circle"
     case .section:      return ""  // unreachable; sectionRow handles section dests
@@ -461,6 +463,7 @@ struct SettingsView: View {
     case .integrations: return .indigo
     case .sync:         return .blue
     case .importExport: return .orange
+    case .skills:       return .pink
     case .privacy:      return .teal
     case .about:        return .purple
     case .section:      return .gray  // unreachable; see above
@@ -474,6 +477,7 @@ struct SettingsView: View {
     case .integrations:      IntegrationsSettingsPane()
     case .sync:              SyncSettingsPane()
     case .importExport:      ImportExportSettingsPane()
+    case .skills:            SkillsSettingsPane()
     case .privacy:           PrivacySettingsPane()
     case .about:             AboutSettingsPane()
     case .section(let key):  SectionDetailPane(sectionKey: key)
@@ -936,10 +940,63 @@ struct SectionDetailPane: View {
     Form {
       identitySection
       sectionSpecific
-      // No read-only footer here: per-section pages are mostly identity
-      // today; the footer made sense when this pane lived inside Server.
+      skillAndDataSection
     }
     .formStyle(.grouped)
+  }
+
+  /// Bottom-of-page row, shared by every section. Two entries:
+  ///   • Section Skill — navigates to the per-section MCP brief.
+  ///   • Export Data   — ShareLink with a JSON snapshot of this section.
+  /// Both are conditional: skill only shows if `SectionSkill.byKey[key]`
+  /// exists; export only shows if this key is in `exportableSectionKeys`
+  /// (resolved against ImportExportService).
+  @ViewBuilder
+  private var skillAndDataSection: some View {
+    Section {
+      if SectionSkill.byKey[sectionKey] != nil {
+        NavigationLink {
+          SectionSkillView(sectionKey: sectionKey)
+        } label: {
+          Label("Section Skill", systemImage: "sparkles")
+        }
+      }
+      sectionExportRow
+    } header: {
+      Text("Skill & Data")
+    } footer: {
+      Text("Section Skill briefs an AI assistant on how to use this section via the Septena MCP. Export downloads every record in this section as JSON.")
+    }
+  }
+
+  @ViewBuilder
+  private var sectionExportRow: some View {
+    // Build payload lazily on render. Empty Data → ShareLink still renders
+    // but the file will be near-empty; that's the user's signal that this
+    // section has no exportable rows yet (or a code path missing in
+    // ImportExportService.collectTables).
+    let payload = (try? ImportExportService.exportSection(sectionKey)) ?? Data()
+    let filename = "septena-\(sectionKey)-\(ImportExportService.todayStamp).json"
+    ShareLink(item: ExportFile(data: payload, suggestedName: filename),
+              preview: SharePreview(filename, image: Image(systemName: "square.and.arrow.up"))) {
+      HStack {
+        Label("Export Data", systemImage: "square.and.arrow.up")
+          .foregroundStyle(.primary)
+        Spacer()
+        Text(SectionDetailPane.formatBytes(payload.count))
+          .font(.caption.monospacedDigit())
+          .foregroundStyle(.secondary)
+      }
+    }
+  }
+
+  // Local copy of byteSize — ImportExportSettingsPane's helper is private.
+  // Cheap; not worth refactoring shared state for one call site.
+  private static func formatBytes(_ bytes: Int) -> String {
+    let f = ByteCountFormatter()
+    f.allowedUnits = [.useBytes, .useKB, .useMB]
+    f.countStyle = .file
+    return f.string(fromByteCount: Int64(bytes))
   }
 
   @ViewBuilder
@@ -2669,6 +2726,214 @@ private func row(_ label: String, _ value: String) -> some View {
 // can actually produce.
 
 import UniformTypeIdentifiers
+
+// MARK: - Skills
+
+/// Top-level Skills page. Lists every section that has an MCP skill brief,
+/// plus a "Connection" row at top showing the universal preamble. Each row
+/// navigates to a `SectionSkillView`.
+///
+/// Skills are static content (defined in `SectionSkill.all`); this pane
+/// just renders them. To add a section, edit `SectionSkill.swift`.
+struct SkillsSettingsPane: View {
+  @Environment(SettingsStore.self) private var store
+
+  /// Show section skills in the user's actual sidebar order when possible,
+  /// falling back to the catalog order in `SectionSkill.all`. Skills for
+  /// sections the user doesn't have installed are still shown — they're
+  /// informational, and someone evaluating which sections to enable
+  /// benefits from previewing the skill content.
+  private var orderedKeys: [String] {
+    let order = store.serverSettings?.sectionOrder ?? []
+    let known = Set(SectionSkill.byKey.keys)
+    let head  = order.filter { known.contains($0) }
+    let rest  = SectionSkill.all.map(\.key).filter { !head.contains($0) }
+    return head + rest
+  }
+
+  var body: some View {
+    Form {
+      Section {
+        NavigationLink {
+          SkillPreambleView()
+        } label: {
+          Label("Connection & conventions", systemImage: "antenna.radiowaves.left.and.right")
+        }
+      } header: {
+        Text("MCP")
+      } footer: {
+        Text("Connect Claude or another MCP client to mcp.septena.app to read and write your Septena data. The brief below is what the model needs to know to use the connection well.")
+      }
+
+      Section {
+        ForEach(orderedKeys, id: \.self) { key in
+          if let skill = SectionSkill.byKey[key] {
+            NavigationLink {
+              SectionSkillView(sectionKey: key)
+            } label: {
+              skillRowLabel(for: key, skill: skill)
+            }
+          }
+        }
+      } header: {
+        Text("Section skills")
+      } footer: {
+        Text("Each brief teaches a model how to use one section through the MCP — tools available, conventions, examples.")
+      }
+    }
+    .formStyle(.grouped)
+  }
+
+  @ViewBuilder
+  private func skillRowLabel(for key: String, skill: SectionSkill) -> some View {
+    let entry = store.sections.first(where: { $0.key == key })
+    let label = entry?.label
+      ?? SectionManifest.byKey[key]?.defaultLabel
+      ?? key.capitalized
+    let color = parseHexColor(entry?.color ?? "")
+    HStack(spacing: 12) {
+      ColoredGlyph(icon: skillSectionIcon(key: key), color: color, size: 22)
+      VStack(alignment: .leading, spacing: 1) {
+        Text(label).foregroundStyle(.primary)
+        Text(skill.summary)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+      }
+    }
+  }
+
+  private func skillSectionIcon(key: String) -> String {
+    if let domain = HomepageDomain(rawValue: key) { return domain.icon }
+    return "circle.fill"
+  }
+}
+
+/// Per-section skill detail. Reused by both the Skills top-level pane
+/// (via SkillsSettingsPane) and the bottom of each section's settings
+/// page (via SectionDetailPane.skillAndDataSection).
+struct SectionSkillView: View {
+  @Environment(SettingsStore.self) private var store
+  let sectionKey: String
+
+  private var skill: SectionSkill? { SectionSkill.byKey[sectionKey] }
+  private var label: String {
+    store.sections.first(where: { $0.key == sectionKey })?.label
+      ?? SectionManifest.byKey[sectionKey]?.defaultLabel
+      ?? sectionKey.capitalized
+  }
+
+  var body: some View {
+    Form {
+      if let skill {
+        Section {
+          Text(skill.summary)
+            .font(.callout)
+            .foregroundStyle(.primary)
+        } header: {
+          Text("\(label) skill")
+        }
+
+        Section("Tools") {
+          ForEach(skill.tools, id: \.name) { tool in
+            VStack(alignment: .leading, spacing: 3) {
+              Text(tool.name)
+                .font(.callout.monospaced())
+                .foregroundStyle(.primary)
+              Text(tool.blurb)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+              if let inputs = tool.inputs {
+                Text(inputs)
+                  .font(.caption2.monospaced())
+                  .foregroundStyle(.secondary)
+                  .textSelection(.enabled)
+              }
+            }
+            .padding(.vertical, 3)
+          }
+        }
+
+        Section("Conventions & examples") {
+          Text(.init(skill.body))
+            .font(.callout)
+            .foregroundStyle(.primary)
+            .textSelection(.enabled)
+        }
+
+        Section {
+          Button {
+            SkillCopy.copy(skill.fullMarkdown)
+          } label: {
+            Label("Copy full skill", systemImage: "doc.on.doc")
+          }
+          ShareLink(item: skill.fullMarkdown) {
+            Label("Share…", systemImage: "square.and.arrow.up")
+          }
+        } footer: {
+          Text("The copied text includes the connection preamble + this section's brief — paste it into an MCP client's system prompt or a Claude conversation to teach it how to use the section.")
+        }
+      } else {
+        Section {
+          Label("No skill yet", systemImage: "questionmark.circle")
+            .foregroundStyle(.secondary)
+        } footer: {
+          Text("This section doesn't yet have MCP tools. A skill will appear here when it does.")
+        }
+      }
+    }
+    .formStyle(.grouped)
+    .navigationTitle("\(label) skill")
+    #if os(iOS)
+    .navigationBarTitleDisplayMode(.inline)
+    #endif
+  }
+}
+
+/// Connection preamble shown above all section skills. Static content
+/// pulled from `SectionSkill.preamble`.
+struct SkillPreambleView: View {
+  var body: some View {
+    Form {
+      Section {
+        Text(.init(SectionSkill.preamble))
+          .font(.callout)
+          .textSelection(.enabled)
+      }
+      Section {
+        Button {
+          SkillCopy.copy(SectionSkill.preamble)
+        } label: {
+          Label("Copy preamble", systemImage: "doc.on.doc")
+        }
+        ShareLink(item: SectionSkill.preamble) {
+          Label("Share…", systemImage: "square.and.arrow.up")
+        }
+      } footer: {
+        Text("Universal conventions every section relies on. Each section skill below extends this.")
+      }
+    }
+    .formStyle(.grouped)
+    .navigationTitle("Connection & conventions")
+    #if os(iOS)
+    .navigationBarTitleDisplayMode(.inline)
+    #endif
+  }
+}
+
+/// Tiny cross-platform pasteboard wrapper. Lives at file scope so all
+/// skill views (and the per-section detail pane footer) share one impl.
+private enum SkillCopy {
+  static func copy(_ text: String) {
+    #if canImport(UIKit)
+    UIPasteboard.general.string = text
+    #elseif canImport(AppKit)
+    let pb = NSPasteboard.general
+    pb.clearContents()
+    pb.setString(text, forType: .string)
+    #endif
+  }
+}
 
 private let importExportEnvelopeVersion = 1
 
