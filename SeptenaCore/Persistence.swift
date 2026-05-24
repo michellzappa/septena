@@ -1275,6 +1275,28 @@ enum OuraNightCloudKitSchema {
   }
 }
 
+enum WithingsRowCloudKitSchema {
+  /// One CKRecord per day. recordName is `withings-row:<yyyy-MM-dd>`;
+  /// date doubles as the unique entity ID so upserts are idempotent
+  /// across devices.
+  static let recordType = "WithingsRow"
+
+  enum Field {
+    static let weightKg      = "weightKg"
+    static let fatPct        = "fatPct"
+    static let fatMassKg     = "fatMassKg"
+    static let fatFreeMassKg = "fatFreeMassKg"
+    static let muscleMassKg  = "muscleMassKg"
+    static let hydrationKg   = "hydrationKg"
+    static let boneMassKg    = "boneMassKg"
+  }
+
+  static func recordName(for id: String) -> String { "withings-row:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("withings-row:".count))
+  }
+}
+
 enum CaffeineEventCloudKitSchema {
   static let recordType = "CaffeineEvent"
 
@@ -1854,6 +1876,41 @@ extension OuraNightEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
+extension WithingsRowEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: WithingsRowCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: WithingsRowCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[WithingsRowCloudKitSchema.Field.weightKg]      = weightKg
+    record[WithingsRowCloudKitSchema.Field.fatPct]        = fatPct
+    record[WithingsRowCloudKitSchema.Field.fatMassKg]     = fatMassKg
+    record[WithingsRowCloudKitSchema.Field.fatFreeMassKg] = fatFreeMassKg
+    record[WithingsRowCloudKitSchema.Field.muscleMassKg]  = muscleMassKg
+    record[WithingsRowCloudKitSchema.Field.hydrationKg]   = hydrationKg
+    record[WithingsRowCloudKitSchema.Field.boneMassKg]    = boneMassKg
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    weightKg      = record[WithingsRowCloudKitSchema.Field.weightKg]      as? Double
+    fatPct        = record[WithingsRowCloudKitSchema.Field.fatPct]        as? Double
+    fatMassKg     = record[WithingsRowCloudKitSchema.Field.fatMassKg]     as? Double
+    fatFreeMassKg = record[WithingsRowCloudKitSchema.Field.fatFreeMassKg] as? Double
+    muscleMassKg  = record[WithingsRowCloudKitSchema.Field.muscleMassKg]  as? Double
+    hydrationKg   = record[WithingsRowCloudKitSchema.Field.hydrationKg]   as? Double
+    boneMassKg    = record[WithingsRowCloudKitSchema.Field.boneMassKg]    as? Double
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: WithingsRowCloudKitSchema.entityID(from: record.recordID.recordName))
+    apply(record)
+  }
+}
+
 extension CaffeineEventEntity: ChecklistCloudKitBackedEntity {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
@@ -2299,6 +2356,7 @@ final class LocalStore {
                          NutritionEntryEntity.self, NutritionDailySummaryEntity.self,
                          AirReadingEntity.self,
                          OuraNightEntity.self,
+                         WithingsRowEntity.self,
                          OutboxEntity.self])
     // Explicitly opt OUT of NSPersistentCloudKitContainer mirroring. Having
     // CloudKit in the target entitlements would otherwise switch SwiftData

@@ -225,6 +225,15 @@ final class SeptenaServices {
           }
           return nil
         }
+        if recordName.hasPrefix("withings-row:") {
+          let id = WithingsRowCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<WithingsRowEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
         if recordName.hasPrefix("caffeine-event:") {
           let id = CaffeineEventCloudKitSchema.entityID(from: recordName)
           if let entity = try? context.fetch(FetchDescriptor<CaffeineEventEntity>(
@@ -492,6 +501,17 @@ final class SeptenaServices {
             context.insert(OuraNightEntity(cloudKit: record))
           }
           NotificationCenter.default.post(name: .septenaOuraChanged, object: nil)
+        case WithingsRowCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = WithingsRowCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<WithingsRowEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(WithingsRowEntity(cloudKit: record))
+          }
+          NotificationCenter.default.post(name: .septenaWithingsChanged, object: nil)
         case CaffeineEventCloudKitSchema.recordType:
           batchTouchedData = true
           let id = CaffeineEventCloudKitSchema.entityID(from: record.recordID.recordName)
@@ -729,6 +749,14 @@ final class SeptenaServices {
           )).first {
             context.delete(entity)
           }
+        case WithingsRowCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = WithingsRowCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<WithingsRowEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
         case CaffeineEventCloudKitSchema.recordType:
           batchTouchedData = true
           let id = CaffeineEventCloudKitSchema.entityID(from: recordID.recordName)
@@ -849,6 +877,7 @@ final class SeptenaServices {
       projectsMutator.bind(ckEngine: ckEngine)
       airStore.bind(ckEngine: ckEngine)
       OuraStore.shared.bind(ckEngine: ckEngine)
+      WithingsStore.shared.bind(ckEngine: ckEngine)
       ckEngine.start()
       try? await ckEngine.fetchChanges()
       // Pipe Aranet snapshots into the local store. The bridge runs in
