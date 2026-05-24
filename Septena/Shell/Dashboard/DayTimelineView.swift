@@ -44,7 +44,17 @@ struct DayTimelineView: View {
     VStack(spacing: 4) {
       header
       GeometryReader { geo in
-        let w = geo.size.width
+        // Sanitize the proposed width before threading it through the
+        // helper functions below — they all compute `pct(...) * w /
+        // 100` for `.frame(width:)` and `.position(x:)`, and a NaN or
+        // negative `w` (which SwiftUI can pass during transient
+        // layout passes at app launch, sheet animations, or rotation)
+        // cascades into NaN frame dimensions that CoreGraphics rejects
+        // and log-spams once per shape per render pass. Clamping to a
+        // safe 0 here is enough — children render at zero size for
+        // the bad pass and recover on the next.
+        let rawW = geo.size.width
+        let w: CGFloat = (rawW.isFinite && rawW > 0) ? rawW : 0
         ZStack(alignment: .leading) {
           rail
           ForEach(Array(calendarBars.enumerated()), id: \.offset) { _, b in
@@ -136,7 +146,7 @@ struct DayTimelineView: View {
   }
 
   private func ticks(width: CGFloat) -> some View {
-    ForEach(tickHours, id: \.self) { h in
+    ForEach(hourMarks(width: width), id: \.self) { h in
       Rectangle()
         .fill(Color.primary.opacity(0.08))
         .frame(width: 1, height: 10)
@@ -270,13 +280,18 @@ struct DayTimelineView: View {
 
   private var axisLabels: some View {
     GeometryReader { geo in
+      // Same sanitization as the main timeline GeometryReader — a NaN
+      // width here positions every hour label at NaN, which CoreGraphics
+      // rejects with the same log-spam.
+      let rawW = geo.size.width
+      let w: CGFloat = (rawW.isFinite && rawW > 0) ? rawW : 0
       ZStack(alignment: .leading) {
-        ForEach(axisHours, id: \.self) { h in
+        ForEach(hourMarks(width: w), id: \.self) { h in
           Text("\(h)")
             .font(.system(size: 9))
             .monospacedDigit()
             .foregroundStyle(.secondary)
-            .position(x: pct(Double(h)) * geo.size.width / 100, y: 6)
+            .position(x: pct(Double(h)) * w / 100, y: 6)
         }
       }
     }
@@ -323,22 +338,28 @@ struct DayTimelineView: View {
     return Double(comps.hour ?? 0) + Double(comps.minute ?? 0) / 60
   }
 
-  private var tickHours: [Int] {
-    [6, 9, 12, 15, 18, 21].filter {
-      Double($0) > windowStart + 0.5 && Double($0) < windowEnd - 0.5
-    }
+  /// Step size (in hours) for tick marks and axis labels given available pixels.
+  /// ~18px per label comfortably fits "12"; halve the step as space opens up.
+  private func labelStep(width: CGFloat) -> Int {
+    let pxPerHour = width / CGFloat(max(1, windowSpan))
+    if pxPerHour >= 18 { return 1 }
+    if pxPerHour >= 9  { return 2 }
+    if pxPerHour >= 5  { return 3 }
+    return 6
   }
 
-  /// Sparse hour labels under the rail — start, mid, end.
-  private var axisHours: [Int] {
+  /// Hours within the visible window at the appropriate step for this width.
+  private func hourMarks(width: CGFloat) -> [Int] {
+    let step = labelStep(width: width)
     let start = Int(windowStart.rounded(.up))
-    let end = Int(windowEnd.rounded(.down))
-    if end - start <= 0 { return [] }
-    var ticks: [Int] = [start]
-    let mid = (start + end) / 2
-    if mid != start && mid != end { ticks.append(mid) }
-    ticks.append(end)
-    return ticks
+    let end   = Int(windowEnd.rounded(.down))
+    guard end > start else { return [] }
+    // Snap start up to the nearest multiple of step so labels land on even
+    // hours (e.g. step=2 → 8,10,12 not 7,9,11).
+    let snapped = start % step == 0 ? start : start + (step - start % step)
+    return stride(from: snapped, through: end, by: step)
+      .filter { Double($0) > windowStart + 0.2 && Double($0) < windowEnd - 0.2 }
+      .map { $0 }
   }
 
   // MARK: - Events → dots / bars / clusters

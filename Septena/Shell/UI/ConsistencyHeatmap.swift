@@ -16,9 +16,9 @@ struct HeatmapDay {
 
 struct ConsistencyHeatmap: View {
   let endDate: Date
-  /// Earliest date with data. The grid never extends back past this; if the
-  /// data is younger than the viewport, the heatmap simply renders fewer
-  /// weeks. Pass `nil` to fill the whole viewport.
+  /// Earliest date with data. Determines the left edge column (snapped to
+  /// the Monday of that week); the heatmap renders fewer columns when data
+  /// is younger than the viewport. Pass `nil` to fill the whole viewport.
   let firstDataDate: Date?
   let accent: Color
   let getDay: (String) -> HeatmapDay
@@ -35,7 +35,17 @@ struct ConsistencyHeatmap: View {
 
   var body: some View {
     GeometryReader { geo in
-      let weeksThatFit = max(1, Int(floor((geo.size.width + gap) / (cell + gap))))
+      // Guard against non-finite proposed width — SwiftUI can pass NaN
+      // during transient layout passes (sheet animations, container
+      // size hand-offs). `Int(floor(.nan))` is undefined behaviour and
+      // would either trap or produce a negative count that propagates
+      // into a negative-frame CoreGraphics warning. Falling back to 1
+      // week renders a single column harmlessly until the next pass.
+      let proposedWidth = geo.size.width
+      let weeksThatFit: Int = {
+        guard proposedWidth.isFinite, proposedWidth > 0 else { return 1 }
+        return max(1, Int(floor((proposedWidth + gap) / (cell + gap))))
+      }()
       let weeks = Self.weekColumns(
         endDate: endDate,
         firstDataDate: firstDataDate,
@@ -121,10 +131,10 @@ struct ConsistencyHeatmap: View {
   // MARK: - Week columns (Mon-start, like the webapp)
 
   /// Builds a column-major matrix of [week][weekday] dates that ends on the
-  /// week containing `endDate`, with up to `maxWeeks` columns. The start is
-  /// clamped forward to the week containing `firstDataDate` so we never
-  /// render empty pre-data weeks. Cells outside [firstDataDate, endDate]
-  /// are `nil` so the grid stays rectangular.
+  /// week containing `endDate`, with up to `maxWeeks` columns. The left edge
+  /// is the Monday of the week containing `firstDataDate` (or the viewport
+  /// boundary when `firstDataDate` is nil). Only cells past `endDate` are
+  /// nil; the leftmost column is always a full Mon→Sun so there's no gap.
   private static func weekColumns(
     endDate: Date,
     firstDataDate: Date?,
@@ -145,20 +155,17 @@ struct ConsistencyHeatmap: View {
       let dataMonday = mondayOfWeek(for: first, calendar: cal)
       return max(viewportFirstMonday, dataMonday)
     }()
-    // Real start of the window — used to null-out pre-first-data cells.
-    let startDate = firstDataDate.map { max($0, firstMonday) } ?? firstMonday
-
     var columns: [[Date?]] = []
     var cursor = firstMonday
     while cursor <= lastSunday {
       var week: [Date?] = []
       for offset in 0..<7 {
         let d = cal.date(byAdding: .day, value: offset, to: cursor)!
-        if d < startDate || d > endDate {
-          week.append(nil)
-        } else {
-          week.append(d)
-        }
+        // Only hide cells that are past endDate (right-side partial week).
+        // Left-side cells before firstDataDate are passed through so the
+        // first column is always a complete Mon→Sun — getDay returns level 0
+        // for those days, matching the visual weight of any other empty cell.
+        week.append(d > endDate ? nil : d)
       }
       columns.append(week)
       cursor = cal.date(byAdding: .day, value: 7, to: cursor)!

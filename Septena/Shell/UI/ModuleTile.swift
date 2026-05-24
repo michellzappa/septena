@@ -138,11 +138,12 @@ private struct ProgressRow: View {
       // platforms with no extra style work.
       GeometryReader { geo in
         let frac = max(0, min(1, progress.current / max(progress.target, 0.0001)))
+        let safeW: CGFloat = (geo.size.width.isFinite && geo.size.width > 0) ? geo.size.width : 0
         ZStack(alignment: .leading) {
           Capsule(style: .continuous).fill(accent.opacity(0.18))
           Capsule(style: .continuous)
             .fill(accent)
-            .frame(width: geo.size.width * frac)
+            .frame(width: safeW * frac)
             // Tween the bar width when current/target change — quick-add
             // commits a new value, the bar slides instead of snapping.
             .a11yAnimation(.snappy, value: frac)
@@ -234,8 +235,14 @@ private struct CenteredBarChart: View {
       let count     = max(values.count, 1)
       let gap: CGFloat    = 4
       let labelH: CGFloat = dayLabels == nil ? 0 : 14
-      let barsH: CGFloat  = geo.size.height - labelH - 2
-      let barW: CGFloat   = (geo.size.width - gap * CGFloat(count - 1)) / CGFloat(count)
+      // Sanitize the proposed size — geo.size can carry NaN during
+      // transient layout passes, and any subsequent subtract / divide
+      // propagates NaN into `.frame(width:height:)` calls which
+      // CoreGraphics rejects with per-render-pass log spam.
+      let safeW: CGFloat  = (geo.size.width.isFinite && geo.size.width > 0)  ? geo.size.width  : 0
+      let safeH: CGFloat  = (geo.size.height.isFinite && geo.size.height > 0) ? geo.size.height : 0
+      let barsH: CGFloat  = max(0, safeH - labelH - 2)
+      let barW: CGFloat   = max(0, (safeW - gap * CGFloat(count - 1)) / CGFloat(count))
       let midY: CGFloat   = barsH / 2
       let minH: CGFloat   = 3
 
@@ -243,7 +250,7 @@ private struct CenteredBarChart: View {
         ZStack(alignment: .topLeading) {
           Rectangle()
             .fill(accent.opacity(0.2))
-            .frame(width: geo.size.width, height: 1)
+            .frame(width: safeW, height: 1)
             .offset(y: midY)
 
           ForEach(Array(values.enumerated()), id: \.offset) { idx, v in
@@ -262,7 +269,7 @@ private struct CenteredBarChart: View {
               .offset(x: xPos, y: yPos)
           }
         }
-        .frame(width: geo.size.width, height: barsH)
+        .frame(width: safeW, height: barsH)
 
         if let dayLabels {
           HStack(spacing: gap) {
@@ -309,8 +316,14 @@ struct Histogram: View {
       let count = max(values.count, 1)
       let gap: CGFloat = 6
       let labelH: CGFloat = dayLabels == nil ? 0 : 14
-      let barsH = max(geo.size.height - labelH, 4)
-      let barW = (geo.size.width - gap * CGFloat(count - 1)) / CGFloat(count)
+      // Sanitize proposed size — NaN width/height from transient
+      // layout passes propagates into `.frame(width:height:)` calls
+      // that CoreGraphics rejects. Same defensive pattern as
+      // `CenteredBarChart`, `DayTimelineView`, and `ConsistencyHeatmap`.
+      let safeW: CGFloat = (geo.size.width.isFinite && geo.size.width > 0)  ? geo.size.width  : 0
+      let safeH: CGFloat = (geo.size.height.isFinite && geo.size.height > 0) ? geo.size.height : 0
+      let barsH = max(safeH - labelH, 4)
+      let barW = max(0, (safeW - gap * CGFloat(count - 1)) / CGFloat(count))
       VStack(spacing: 2) {
         HStack(alignment: .bottom, spacing: gap) {
           ForEach(Array(values.enumerated()), id: \.offset) { idx, v in
@@ -342,11 +355,20 @@ struct Histogram: View {
               }
               .frame(width: barW, height: barsH)
               .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
-            } else {
+            } else if v > 0 {
+              // Min-height of 4pt so a tiny-but-positive value still
+              // reads as a stub bar (a "1" in a series whose max is
+              // 100 would otherwise be sub-pixel). Zero values fall
+              // through to the empty branch below — a missed day
+              // reads as a gap, not a stub.
               let h = max(CGFloat(v) / CGFloat(maxV) * barsH, 4)
               RoundedRectangle(cornerRadius: 3, style: .continuous)
                 .fill(accent)
                 .frame(width: barW, height: h)
+            } else {
+              // Empty slot: preserve column layout (so neighboring
+              // bars stay at their day positions) but render nothing.
+              Color.clear.frame(width: barW, height: barsH)
             }
           }
         }
