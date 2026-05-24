@@ -31,6 +31,11 @@ final class NavigationState {
   /// and the macOS toolbar gear; the sheet closes via its own Done button.
   var showSettings = false
 
+  /// Drives the Insights full-screen page. Flipped from the dashboard "…"
+  /// menu. Mounted at the RootTabView level so it covers the whole tab
+  /// shell (not a section drawer like the other module destinations).
+  var showInsights = false
+
   /// Drives the Quick Find palette (Command-Shift-F). A floating sheet over the
   /// main window; selecting a result routes via `path` and dismisses itself.
   var showQuickFind = false

@@ -439,8 +439,12 @@ struct TaskListView: View {
     // Consume the global "start a new task" trigger from the sidebar
     // Menu or detail toolbar so the new-task flow stays inline (same
     // as ⌘N) instead of opening a modal sheet.
-    .onChange(of: nav.shouldStartCreating) { _, fire in
-      guard fire else { return }
+    .onChange(of: nav.shouldStartCreating) { _, _ in
+      // Read the live value rather than the captured `fire` so this
+      // handler stays idempotent: if .onAppear already consumed the
+      // flag in the same render cycle, the late-firing onChange sees
+      // false and bails instead of creating a duplicate draft.
+      guard nav.shouldStartCreating else { return }
       SeptenaLog.info("[Create] shouldStartCreating observed → startDraft (via onChange)")
       nav.shouldStartCreating = false
       startDraft()

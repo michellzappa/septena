@@ -191,9 +191,11 @@ struct WeekDashboardView: View {
   private var homeToolbar: some ToolbarContent {
     #if os(iOS)
     ToolbarItem(placement: .topBarLeading) { homeMenu }
+    ToolbarItem(placement: .topBarTrailing) { SyncIndicator() }
     ToolbarItem(placement: .topBarTrailing) { homeSearch }
     #else
     ToolbarItem(placement: .primaryAction) { homeMenu }
+    ToolbarItem(placement: .primaryAction) { SyncIndicator() }
     ToolbarItem(placement: .primaryAction) { homeSearch }
     #endif
   }
@@ -210,6 +212,12 @@ struct WeekDashboardView: View {
       Divider()
       Toggle(isOn: $showTodayTimeline) {
         Label("Show Today", systemImage: "clock")
+      }
+      Divider()
+      Button {
+        nav.showInsights = true
+      } label: {
+        Label("Insights", systemImage: "chart.dots.scatter")
       }
       Divider()
       Button {
@@ -374,14 +382,13 @@ struct WeekDashboardView: View {
       view: "logbook", days: 1,
       client: client, context: LocalStore.shared.container.mainContext)
     async let on = try? await client.ouraHistory(days: 90)
-    async let nstats = try? await client.nutritionStats(days: 90)
-    async let nents = try? await client.nutritionEntries(since: SeptenaDate.today)
-    async let ntarget = try? await client.nutritionMacrosConfig()
+    let ns: NutritionStatsResponse? = ChecklistMirror.buildNutritionStatsResponse(context: modelContext, days: 90)
+    let ne: [NutritionEntry]? = ChecklistMirror.loadNutritionToday(context: modelContext)
+    let nt: MacrosConfig? = NutritionPrefs.loadMacrosConfig()
     async let asum = try? await client.airSummary()
     async let ahist = try? await client.airHistory(days: 90)
     let gRes: [GroceryItem]? = ChecklistMirror.loadGroceryItems(context: modelContext)
     let (t, o) = await (tc, on)
-    let (ns, ne, nt) = await (nstats, nents, ntarget)
     let (asRes, ahRes) = await (asum, ahist)
     if let colors = appSettings?.nutrition?.macroColors {
       macroColors = colors
@@ -494,9 +501,7 @@ struct WeekDashboardView: View {
       let since = SeptenaDate.format(
         Calendar.current.date(byAdding: .day, value: -30, to: .now)
       ) ?? SeptenaDate.today
-      if let entries = try? await client.nutritionEntries(since: since) {
-        nutritionHistory = entries
-      }
+      nutritionHistory = ChecklistMirror.loadNutritionEntries(context: modelContext, since: since)
       // Training: session-type catalog + suggested + daysAgo. Feeds the
       // menu's "Start: {suggested}" row and the "Recent" section. All
       // three come from existing endpoints — no new server work needed.
@@ -581,14 +586,11 @@ struct WeekDashboardView: View {
         gutHistory = v
       }
     case .nutrition:
-      if let v = ResponseCache.load([NutritionEntry].self, forKey: CacheKey.todayNutrition) {
-        todayNutrition = v
-        todayProteinSum = v.reduce(0) { $0 + $1.proteinG }
-        todayKcalSum    = v.reduce(0) { $0 + $1.kcal }
-      }
-      if let v = ResponseCache.load(NutritionStatsResponse.self, forKey: CacheKey.nutritionStats) {
-        nutritionStats = v
-      }
+      let repaintToday = ChecklistMirror.loadNutritionToday(context: modelContext)
+      todayNutrition = repaintToday
+      todayProteinSum = repaintToday.reduce(0) { $0 + $1.proteinG }
+      todayKcalSum    = repaintToday.reduce(0) { $0 + $1.kcal }
+      nutritionStats = ChecklistMirror.buildNutritionStatsResponse(context: modelContext, days: 90)
     case .habits:
       if let v = ResponseCache.load([Int].self, forKey: CacheKey.habitHistory) { habitHistory = v }
     case .chores:
@@ -633,20 +635,14 @@ struct WeekDashboardView: View {
       gutHistory = h
       ResponseCache.save(h, forKey: CacheKey.gutHistory)
     case .nutrition:
-      async let ents  = try? await client.nutritionEntries(since: SeptenaDate.today)
-      async let stats = try? await client.nutritionStats(days: 90)
-      if let e = await ents {
-        let today = SeptenaDate.today
-        let todays = e.filter { $0.date == today }
-        todayNutrition = todays
-        todayProteinSum = todays.reduce(0) { $0 + $1.proteinG }
-        todayKcalSum    = todays.reduce(0) { $0 + $1.kcal }
-        ResponseCache.save(todays, forKey: CacheKey.todayNutrition)
-      }
-      if let s = await stats {
-        nutritionStats = s
-        ResponseCache.save(s, forKey: CacheKey.nutritionStats)
-      }
+      let todays = ChecklistMirror.loadNutritionToday(context: modelContext)
+      todayNutrition = todays
+      todayProteinSum = todays.reduce(0) { $0 + $1.proteinG }
+      todayKcalSum    = todays.reduce(0) { $0 + $1.kcal }
+      ResponseCache.save(todays, forKey: CacheKey.todayNutrition)
+      let s = ChecklistMirror.buildNutritionStatsResponse(context: modelContext, days: 90)
+      nutritionStats = s
+      ResponseCache.save(s, forKey: CacheKey.nutritionStats)
     case .habits:
       async let _ = dailies.load(client: client)
       let h = ChecklistMirror.loadHabitsHistory(
@@ -1364,10 +1360,16 @@ struct WeekDashboardView: View {
       onCreateInInbox: {
         tabSelection.current = .tasks
         nav.path = [.filter(.inbox)]
-        // Trip the "start inline create" flag — TaskListView consumes
-        // and clears it on its next render. Mirrors the sidebar's
-        // "New To-Do" path so create flows always look the same.
-        nav.shouldStartCreating = true
+        // Trip the "start inline create" flag on the next runloop so
+        // the tab/filter swap settles first. Same-tick mutation would
+        // let TaskListView's .onAppear (tab becoming visible) AND
+        // .onChange(shouldStartCreating) both fire, each calling
+        // startDraft and creating duplicate tasks; the filter onChange
+        // would then clobber editingTaskId so neither row stays in the
+        // inline editor.
+        DispatchQueue.main.async {
+          nav.shouldStartCreating = true
+        }
       },
       onGoToInbox: {
         tabSelection.current = .tasks
@@ -2059,23 +2061,18 @@ struct WeekDashboardView: View {
     )
   }
 
-  /// POST a fresh nutrition entry mirroring the meal's macros + emoji at
-  /// the current time. Same payload as AddNutritionPage.duplicate so the
-  /// server treats this menu commit identically to the palette one.
+  /// Duplicate a meal at the current time via NutritionMutator.
   private func commitNutritionDuplicate(_ entry: NutritionEntry) {
-    var body: [String: Any] = [
-      "date": SeptenaDate.today,
-      "time": nowHHMM(),
-      "foods": entry.foods,
-      "protein_g": entry.proteinG,
-      "fat_g": entry.fatG,
-      "carbs_g": entry.carbsG,
-      "kcal": entry.kcal,
-    ]
-    if let fiberG = entry.fiberG { body["fiber_g"] = fiberG }
-    if let emoji = entry.emoji { body["emoji"] = emoji }
-    outbox.enqueue(method: "POST", path: "/api/nutrition/entries",
-                   body: body, kind: "nutrition.add")
+    SeptenaServices.shared.nutritionMutator.addEntry(
+      loggedAt: Date.now,
+      emoji: entry.emoji,
+      foods: entry.foods,
+      proteinG: entry.proteinG,
+      fatG: entry.fatG,
+      carbsG: entry.carbsG,
+      fiberG: entry.fiberG,
+      kcal: entry.kcal
+    )
     AddInfoSection.nutrition.notifyTilesChanged()
     Haptics.tick()
   }

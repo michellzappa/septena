@@ -12,7 +12,6 @@ struct TodayLogView: View {
   @Environment(SectionTheme.self) private var theme
   @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(TaskMutator.self) private var taskMutator
-  @Environment(HTTPOutbox.self) private var outbox
 
   let date: String
 
@@ -184,12 +183,7 @@ struct TodayLogView: View {
     case .nutrition(let e):
       Button(role: .destructive) {
         remove(id: event.id)
-        outbox.enqueue(
-          method: "DELETE",
-          path: "/api/nutrition/entries",
-          body: ["file": e.file],
-          kind: "nutrition.delete"
-        )
+        SeptenaServices.shared.nutritionMutator.deleteEntry(id: e.file)
         Haptics.warning()
       } label: {
         Label("Delete", systemImage: "trash")

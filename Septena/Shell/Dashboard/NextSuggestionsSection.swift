@@ -155,14 +155,12 @@ final class NextSuggestionsModel {
       predicate: #Predicate { $0.date >= since14 }
     ))) ?? []
     let canToday = ChecklistMirror.loadCannabisDay(context: ctx, date: today)
-    async let nutrition    = try? await client.nutritionEntries(since: since14)
+    let nut = ChecklistMirror.loadNutritionEntries(context: ctx, since: since14)
     // Training lives in CloudKit — local mirror reads, no network.
     let tr: [ExerciseEntry]? = ChecklistMirror.loadTrainingEntries(context: ctx, since: since30)
     let sw: SuggestedWorkoutResponse? = ChecklistMirror.loadSuggestedWorkout(context: ctx)
     // Settings live in CloudKit — read from the local mirror, not FastAPI.
     let st: AppSettings? = SettingsMirror.loadSettings(context: ctx)
-
-    let nut = await nutrition
 
     let cafTimePoints: [CaffeineTimePoint] = cafEntries.compactMap { e in
       let parts = e.time.split(separator: ":")
@@ -188,7 +186,7 @@ final class NextSuggestionsModel {
       caffeineToday: cafToday.entries,
       cannabisHistory: canTimePoints,
       cannabisToday: canToday.entries,
-      nutrition: nut ?? [],
+      nutrition: nut,
       training: tr ?? [],
       workout: sw?.suggested,
       workoutDaysAgo: sw?.daysAgo ?? [:],

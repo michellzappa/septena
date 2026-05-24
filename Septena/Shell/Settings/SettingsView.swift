@@ -268,7 +268,7 @@ final class SettingsStore {
     let needsLegacySettings = mirroredSettings == nil
     let needsLegacySections = mirroredSections.isEmpty
 
-    async let macs  = try? await client.nutritionMacrosConfig()
+    let macs: MacrosConfig? = NutritionPrefs.loadMacrosConfig()
     // Training session-types live in CloudKit — local mirror, no network.
     let st: [SessionTypeConfig]? = ChecklistMirror.loadSessionTypes(context: context)
     // Chores/caffeine/cannabis are CloudKit-authoritative — pull from the
@@ -282,7 +282,7 @@ final class SettingsStore {
       let strains = ChecklistMirror.loadCannabisStrains(context: context)
       return CannabisConfig(strains: strains, usesPerCapsule: 3)
     }()
-    let mc = await macs
+    let mc = macs
     // Only overwrite + cache the values where the network actually
     // returned something — failed fetches leave the (cache-primed)
     // values alone instead of wiping them to nil / empty.
@@ -319,7 +319,7 @@ struct SettingsView: View {
   /// for per-section rows resolved against `SectionManifest` + the live
   /// `store.sections` list.
   enum SettingsDestination: Hashable {
-    case general, integrations, sync, privacy, about
+    case general, integrations, sync, importExport, privacy, about
     case section(String)
   }
 
@@ -450,6 +450,7 @@ struct SettingsView: View {
     case .general:      return "General"
     case .integrations: return "Integrations"
     case .sync:         return "Sync"
+    case .importExport: return "Import & Export"
     case .privacy:      return "Privacy"
     case .about:        return "About"
     case .section(let key):
@@ -466,6 +467,7 @@ struct SettingsView: View {
     case .general:      return "gearshape"
     case .integrations: return "app.connected.to.app.below.fill"
     case .sync:         return "arrow.triangle.2.circlepath"
+    case .importExport: return "square.and.arrow.up.on.square"
     case .privacy:      return "hand.raised"
     case .about:        return "info.circle"
     case .section:      return ""  // unreachable; sectionRow handles section dests
@@ -477,6 +479,7 @@ struct SettingsView: View {
     case .general:      return .gray
     case .integrations: return .indigo
     case .sync:         return .blue
+    case .importExport: return .orange
     case .privacy:      return .teal
     case .about:        return .purple
     case .section:      return .gray  // unreachable; see above
@@ -489,6 +492,7 @@ struct SettingsView: View {
     case .general:           GeneralSettingsPane()
     case .integrations:      IntegrationsSettingsPane()
     case .sync:              SyncSettingsPane()
+    case .importExport:      ImportExportSettingsPane()
     case .privacy:           PrivacySettingsPane()
     case .about:             AboutSettingsPane()
     case .section(let key):  SectionDetailPane(sectionKey: key)
@@ -917,6 +921,7 @@ struct SectionDetailPane: View {
   @Environment(CKEngine.self) private var ckEngine
   let sectionKey: String
   @State private var showingColorPicker = false
+  @State private var showingSupplementSheet = false
 
   /// Local task prefs — only read for `sectionKey == "tasks"`, but
   /// SwiftUI requires the property be declared at view-init so the
@@ -1013,13 +1018,14 @@ struct SectionDetailPane: View {
   @ViewBuilder
   private var sectionSpecific: some View {
     switch sectionKey {
-    case "tasks":       tasksConfig
-    case "caffeine":    caffeineConfig
-    case "cannabis":    cannabisConfig
-    case "training":    trainingConfig
-    case "chores":      choresConfig
-    case "nutrition":   nutritionConfig
-    default:            EmptyView()
+    case "tasks":        tasksConfig
+    case "caffeine":     caffeineConfig
+    case "cannabis":     cannabisConfig
+    case "training":     trainingConfig
+    case "chores":       choresConfig
+    case "nutrition":    nutritionConfig
+    case "supplements":  supplementsConfig
+    default:             EmptyView()
     }
   }
 
@@ -1104,6 +1110,23 @@ struct SectionDetailPane: View {
       }
     } else {
       EmptyView()
+    }
+  }
+
+  @ViewBuilder
+  private var supplementsConfig: some View {
+    Section {
+      Button {
+        showingSupplementSheet = true
+      } label: {
+        Label("Manage Supplements", systemImage: "pills")
+      }
+    } footer: {
+      Text("Renaming a supplement doesn't affect its history — events are linked by ID.")
+    }
+    .sheet(isPresented: $showingSupplementSheet) {
+      SupplementTypeSheet()
+        .environment(SeptenaServices.shared.checklistMutator)
     }
   }
 
@@ -1935,6 +1958,7 @@ private struct DomainCounts {
   var groceries: Int = 0
   var training: Int = 0       // entries only — the user-meaningful number
   var air: Int = 0            // AirReading rows captured from Aranet over BLE
+  var nutrition: Int = 0      // NutritionEntryEntity + NutritionDailySummaryEntity
 
   static let empty = DomainCounts()
 
@@ -1956,6 +1980,7 @@ private struct DomainCounts {
     c.groceries   = count(GroceryItemEntity.self)
     c.training    = count(ExerciseEntryEntity.self)
     c.air         = count(AirReadingEntity.self)
+    c.nutrition   = count(NutritionEntryEntity.self) + count(NutritionDailySummaryEntity.self)
     return c
   }
 }
@@ -2119,7 +2144,7 @@ struct SyncSettingsPane: View {
         // so the migration table doesn't imply "we hit some endpoint
         // for air data" — there's no endpoint anymore.
         MigrationDomainRow(name: "Air",                       detail: "CloudKit · Aranet BLE", state: .cloudKit, count: domainCounts.air)
-        MigrationDomainRow(name: "Nutrition",                 detail: "FastAPI",  state: .legacy)
+        MigrationDomainRow(name: "Nutrition",                 detail: "CloudKit", state: .cloudKit, count: domainCounts.nutrition)
         MigrationDomainRow(name: "Sleep",                     detail: "FastAPI",  state: .legacy)
         MigrationDomainRow(name: "Body",                      detail: "FastAPI",  state: .legacy)
         MigrationDomainRow(name: "Activity",                  detail: "HealthKit", state: .native)
@@ -2367,6 +2392,8 @@ struct SyncSettingsPane: View {
       let exEntries = (try? modelContext.fetch(FetchDescriptor<ExerciseEntryEntity>())) ?? []
       let exDefs = (try? modelContext.fetch(FetchDescriptor<ExerciseDefinitionEntity>())) ?? []
       let sessTypes = (try? modelContext.fetch(FetchDescriptor<SessionTypeEntity>())) ?? []
+      let nutEntries = (try? modelContext.fetch(FetchDescriptor<NutritionEntryEntity>())) ?? []
+      let nutDays = (try? modelContext.fetch(FetchDescriptor<NutritionDailySummaryEntity>())) ?? []
       for row in tasks { row.cloudKitSystemFields = nil }
       for row in areas { row.cloudKitSystemFields = nil }
       for row in projects { row.cloudKitSystemFields = nil }
@@ -2389,6 +2416,8 @@ struct SyncSettingsPane: View {
       for row in exEntries { row.cloudKitSystemFields = nil }
       for row in exDefs { row.cloudKitSystemFields = nil }
       for row in sessTypes { row.cloudKitSystemFields = nil }
+      for row in nutEntries { row.cloudKitSystemFields = nil }
+      for row in nutDays { row.cloudKitSystemFields = nil }
       try? modelContext.save()
       for row in tasks { ckEngine.noteTaskChange(id: row.id) }
       for row in areas { ckEngine.noteAreaChange(id: row.id) }
@@ -2412,13 +2441,16 @@ struct SyncSettingsPane: View {
       for row in exEntries { ckEngine.noteExerciseEntryChange(id: row.id) }
       for row in exDefs { ckEngine.noteExerciseDefinitionChange(id: row.id) }
       for row in sessTypes { ckEngine.noteSessionTypeChange(id: row.id) }
+      for row in nutEntries { ckEngine.noteNutritionEntryChange(id: row.id) }
+      for row in nutDays { ckEngine.noteNutritionDayChange(id: row.id) }
       let coreCount = tasks.count + areas.count + projects.count + settings.count + sections.count
       let checklistCount = habitDefs.count + habitStates.count + supDefs.count + supStates.count
         + choreDefs.count + choreEvents.count + goals.count
       let logCount = gut.count + caffeine.count + beans.count + cannabis.count + strains.count
       let groceryCount = groceries.count + groceryCats.count
       let trainingCount = exEntries.count + exDefs.count + sessTypes.count
-      let total = coreCount + checklistCount + logCount + groceryCount + trainingCount
+      let nutritionCount = nutEntries.count + nutDays.count
+      let total = coreCount + checklistCount + logCount + groceryCount + trainingCount + nutritionCount
       migrationStatus = "✅ Zone reset and \(total) entities re-queued for upload."
     } catch {
       migrationStatus = "❌ Zone reset failed: \(error.localizedDescription)"
@@ -2705,4 +2737,1212 @@ private func row(_ label: String, _ value: String) -> some View {
       .foregroundStyle(.secondary)
       .multilineTextAlignment(.trailing)
   }
+}
+
+// MARK: - Import & Export
+//
+// One pane for getting data in and out of Septena. Export produces a
+// stable JSON envelope per section (and an "Everything" bundle); import
+// parses the same envelope, validates it against the local schema, and
+// previews per-table counts before any writes land. The JSON format is
+// designed to round-trip — anything exported here is a valid import.
+//
+// Envelope shape (stable, versioned):
+//   {
+//     "septena_export_version": 1,
+//     "section": "<section key>" | "all",
+//     "exported_at": "<ISO-8601>",
+//     "app_version": "<CFBundleShortVersionString> (<CFBundleVersion>)",
+//     "tables": {
+//        "<table_name>": [ { ...record... }, ... ],
+//        ...
+//     }
+//   }
+//
+// Sections that aren't backed by exportable local entities (e.g. `air`,
+// `activity`, `sleep`) are skipped — Import/Export only lists what it
+// can actually produce.
+
+import UniformTypeIdentifiers
+
+private let importExportEnvelopeVersion = 1
+
+/// Sections the exporter understands today. Order matches the Settings
+/// sidebar.
+private let exportableSectionKeys: [String] = [
+  "tasks", "training", "nutrition", "habits", "chores",
+  "supplements", "groceries", "caffeine", "cannabis", "gut",
+]
+
+struct ImportExportSettingsPane: View {
+  @Environment(SettingsStore.self) private var store
+  @State private var exportError: String? = nil
+  @State private var importDoc: ImportExportEnvelope? = nil
+  @State private var importMessage: String? = nil
+  @State private var importIsError: Bool = false
+  @State private var showingPaste = false
+  @State private var showingFilePicker = false
+  @State private var pasteBuffer: String = ""
+
+  var body: some View {
+    Form {
+      exportSection
+      importSection
+      schemaPromptsSection
+      formatSection
+    }
+    .formStyle(.grouped)
+    .sheet(isPresented: $showingPaste) {
+      pasteSheet
+    }
+    .fileImporter(isPresented: $showingFilePicker,
+                  allowedContentTypes: [.json],
+                  allowsMultipleSelection: false) { result in
+      handleFileImport(result)
+    }
+  }
+
+  // MARK: Export
+
+  @ViewBuilder
+  private var exportSection: some View {
+    Section {
+      exportRow(label: "Everything",
+                systemImage: "tray.full",
+                fileBase: "septena-export") {
+        try ImportExportService.exportAll()
+      }
+      ForEach(exportableSectionKeys, id: \.self) { key in
+        exportRow(label: sectionLabel(for: key),
+                  systemImage: sectionGlyph(for: key),
+                  fileBase: "septena-\(key)") {
+          try ImportExportService.exportSection(key)
+        }
+      }
+    } header: {
+      Text("Export")
+    } footer: {
+      Text("JSON dumps of every record in the local store. Use these as a backup, to move to another device, or to feed into other tools.")
+    }
+  }
+
+  @ViewBuilder
+  private func exportRow(label: String,
+                         systemImage: String,
+                         fileBase: String,
+                         build: @escaping () throws -> Data) -> some View {
+    let payload = (try? build()) ?? Data()
+    let filename = "\(fileBase)-\(ImportExportService.todayStamp).json"
+    ShareLink(item: ExportFile(data: payload, suggestedName: filename),
+              preview: SharePreview(filename, image: Image(systemName: systemImage))) {
+      HStack {
+        Label(label, systemImage: systemImage)
+          .foregroundStyle(.primary)
+        Spacer()
+        Text(byteSize(payload.count))
+          .font(.caption.monospacedDigit())
+          .foregroundStyle(.secondary)
+        Image(systemName: "square.and.arrow.up")
+          .font(.callout)
+          .foregroundStyle(.secondary)
+      }
+    }
+  }
+
+  // MARK: Import
+
+  @ViewBuilder
+  private var importSection: some View {
+    Section {
+      Button {
+        showingFilePicker = true
+      } label: {
+        Label("Choose JSON file…", systemImage: "doc.badge.plus")
+      }
+      Button {
+        pasteBuffer = ""
+        importMessage = nil
+        importIsError = false
+        showingPaste = true
+      } label: {
+        Label("Paste JSON…", systemImage: "doc.on.clipboard")
+      }
+
+      if let doc = importDoc {
+        importPreview(doc)
+      } else if let msg = importMessage {
+        Label(msg, systemImage: importIsError ? "exclamationmark.triangle" : "checkmark.circle")
+          .foregroundStyle(importIsError ? .red : .green)
+          .font(.callout)
+      }
+    } header: {
+      Text("Import")
+    } footer: {
+      Text("Provide JSON in the Septena export format. Records are merged by id — existing rows update in place, new rows are inserted. Definition tables (habits, supplements, chores, beans, strains, grocery items) apply now; event/log tables preview only in this build.")
+    }
+  }
+
+  @ViewBuilder
+  private func importPreview(_ doc: ImportExportEnvelope) -> some View {
+    let sectionName = doc.section == "all"
+      ? "Everything"
+      : sectionLabel(for: doc.section)
+    VStack(alignment: .leading, spacing: 8) {
+      HStack {
+        Label("Loaded — \(sectionName)", systemImage: "checkmark.seal")
+          .foregroundStyle(.green)
+        Spacer()
+        Button("Clear", role: .destructive) {
+          importDoc = nil
+          importMessage = nil
+        }
+        .buttonStyle(.borderless)
+        .font(.caption)
+      }
+      if let ts = doc.exportedAt {
+        Text("Exported \(ts)")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+      Divider()
+      ForEach(doc.tables.keys.sorted(), id: \.self) { table in
+        HStack {
+          Text(table)
+            .font(.callout.monospaced())
+          Spacer()
+          Text("\(doc.tables[table]?.count ?? 0) rows")
+            .font(.callout.monospacedDigit())
+            .foregroundStyle(.secondary)
+        }
+      }
+      Divider()
+      HStack {
+        Spacer()
+        Button {
+          applyImport(doc)
+        } label: {
+          Label("Apply", systemImage: "tray.and.arrow.down")
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(.orange)
+      }
+    }
+    .padding(.vertical, 4)
+  }
+
+  @ViewBuilder
+  private var pasteSheet: some View {
+    NavigationStack {
+      VStack(alignment: .leading, spacing: 8) {
+        Text("Paste a Septena JSON export below.")
+          .font(.callout)
+          .foregroundStyle(.secondary)
+        TextEditor(text: $pasteBuffer)
+          .font(.body.monospaced())
+          .frame(minHeight: 240)
+          .overlay(
+            RoundedRectangle(cornerRadius: 8)
+              .strokeBorder(.secondary.opacity(0.2))
+          )
+        if importIsError, let msg = importMessage {
+          Text(msg).font(.callout).foregroundStyle(.red)
+        }
+      }
+      .padding()
+      .navigationTitle("Paste JSON")
+      #if os(iOS)
+      .navigationBarTitleDisplayMode(.inline)
+      #endif
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Cancel") { showingPaste = false }
+        }
+        ToolbarItem(placement: .confirmationAction) {
+          Button("Load") {
+            handlePaste(pasteBuffer)
+          }
+          .disabled(pasteBuffer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+      }
+    }
+  }
+
+  // MARK: Schema prompts
+  //
+  // One copyable LLM prompt per section. Paste the prompt into Claude /
+  // ChatGPT / etc. along with whatever source data you have (CSV, journal
+  // entries, freeform notes) and the model produces a JSON envelope that
+  // round-trips through this importer. The schema is generated from the
+  // same field list the exporter uses, so the prompt is always in sync.
+
+  @ViewBuilder
+  private var schemaPromptsSection: some View {
+    Section {
+      ForEach(exportableSectionKeys, id: \.self) { key in
+        schemaPromptRow(for: key)
+      }
+    } header: {
+      Text("Schema prompts")
+    } footer: {
+      Text("Copy a prompt and paste it into an LLM along with the source data you want to import. The model returns JSON that pastes straight into Import above.")
+    }
+  }
+
+  @ViewBuilder
+  private func schemaPromptRow(for key: String) -> some View {
+    DisclosureGroup {
+      VStack(alignment: .leading, spacing: 8) {
+        Text(ImportExportService.schemaPrompt(for: key))
+          .font(.caption.monospaced())
+          .foregroundStyle(.secondary)
+          .textSelection(.enabled)
+        Button {
+          copyToPasteboard(ImportExportService.schemaPrompt(for: key))
+        } label: {
+          Label("Copy prompt", systemImage: "doc.on.doc")
+        }
+        .buttonStyle(.bordered)
+      }
+      .padding(.vertical, 4)
+    } label: {
+      Label(sectionLabel(for: key), systemImage: sectionGlyph(for: key))
+    }
+  }
+
+  private func copyToPasteboard(_ text: String) {
+    #if canImport(UIKit)
+    UIPasteboard.general.string = text
+    #elseif canImport(AppKit)
+    let pb = NSPasteboard.general
+    pb.clearContents()
+    pb.setString(text, forType: .string)
+    #endif
+  }
+
+  // MARK: Format reference
+
+  @ViewBuilder
+  private var formatSection: some View {
+    Section {
+      DisclosureGroup("Envelope") {
+        Text(ImportExportService.envelopeReference)
+          .font(.caption.monospaced())
+          .foregroundStyle(.secondary)
+          .textSelection(.enabled)
+      }
+    } header: {
+      Text("Format")
+    } footer: {
+      Text("Format version \(importExportEnvelopeVersion). The exporter above produces files that round-trip through this importer unchanged.")
+    }
+  }
+
+  // MARK: Handlers
+
+  private func handlePaste(_ text: String) {
+    do {
+      importDoc = try ImportExportService.parseEnvelope(Data(text.utf8))
+      importMessage = nil
+      importIsError = false
+      showingPaste = false
+    } catch {
+      importMessage = error.localizedDescription
+      importIsError = true
+    }
+  }
+
+  private func handleFileImport(_ result: Result<[URL], Error>) {
+    importMessage = nil
+    importIsError = false
+    importDoc = nil
+    switch result {
+    case .success(let urls):
+      guard let url = urls.first else { return }
+      let scoped = url.startAccessingSecurityScopedResource()
+      defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+      do {
+        importDoc = try ImportExportService.parseEnvelope(try Data(contentsOf: url))
+      } catch {
+        importMessage = error.localizedDescription
+        importIsError = true
+      }
+    case .failure(let error):
+      importMessage = error.localizedDescription
+      importIsError = true
+    }
+  }
+
+  private func applyImport(_ doc: ImportExportEnvelope) {
+    do {
+      let result = try ImportExportService.apply(doc)
+      importDoc = nil
+      importMessage = "Imported \(result.applied) row\(result.applied == 1 ? "" : "s"); skipped \(result.skipped) (unsupported table\(result.skipped == 1 ? "" : "s"))."
+      importIsError = false
+    } catch {
+      importMessage = error.localizedDescription
+      importIsError = true
+    }
+  }
+
+  // MARK: Helpers
+
+  private func sectionLabel(for key: String) -> String {
+    store.sections.first(where: { $0.key == key })?.label
+      ?? SectionManifest.byKey[key]?.defaultLabel
+      ?? key.capitalized
+  }
+
+  private func sectionGlyph(for key: String) -> String {
+    if let domain = HomepageDomain(rawValue: key) { return domain.icon }
+    if key == "calendar" { return "calendar" }
+    return "circle.fill"
+  }
+
+  private func byteSize(_ bytes: Int) -> String {
+    let f = ByteCountFormatter()
+    f.allowedUnits = [.useKB, .useMB]
+    f.countStyle = .file
+    return f.string(fromByteCount: Int64(bytes))
+  }
+}
+
+// MARK: - ShareLink payload
+
+private struct ExportFile: Transferable {
+  let data: Data
+  let suggestedName: String
+
+  static var transferRepresentation: some TransferRepresentation {
+    DataRepresentation(exportedContentType: .json) { item in
+      item.data
+    }
+    .suggestedFileName { $0.suggestedName }
+  }
+}
+
+// MARK: - Parsed envelope
+
+struct ImportExportEnvelope {
+  let version: Int
+  let section: String
+  let exportedAt: String?
+  let appVersion: String?
+  let tables: [String: [[String: Any]]]
+}
+
+// MARK: - Service
+//
+// Pure functions: build a JSON `Data` blob for a given section (or all),
+// or parse an inbound `Data` blob into an `ImportExportEnvelope`. No UI
+// state — the pane drives it.
+
+enum ImportExportService {
+  enum ImportError: LocalizedError {
+    case notJSON
+    case missingEnvelope
+    case unsupportedVersion(Int)
+    case unsupportedSection(String)
+    case malformed(String)
+
+    var errorDescription: String? {
+      switch self {
+      case .notJSON: return "File isn't valid JSON."
+      case .missingEnvelope: return "Missing Septena export envelope (septena_export_version / section / tables)."
+      case .unsupportedVersion(let v): return "Export version \(v) is newer than this build understands."
+      case .unsupportedSection(let s): return "Unknown section: \(s)."
+      case .malformed(let m): return m
+      }
+    }
+  }
+
+  static var todayStamp: String {
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd"
+    return f.string(from: .now)
+  }
+
+  /// Skill-style LLM prompt for one section. Self-contained: states the
+  /// goal, the exact envelope shape to produce, and every field expected
+  /// in every table (with type + required/optional). Designed to be
+  /// copy-pasted into Claude / ChatGPT with arbitrary source data
+  /// appended underneath.
+  static func schemaPrompt(for sectionKey: String) -> String {
+    let sectionLabel = SectionManifest.byKey[sectionKey]?.defaultLabel
+      ?? sectionKey.capitalized
+    let tables = schemaTables(for: sectionKey)
+    var out = """
+    # Septena \(sectionLabel) Import
+
+    You convert source data into a JSON document that Septena's Settings → Import & Export pane can apply.
+
+    ## Output
+
+    Return **only** the JSON below — no commentary, no markdown fences. Wrap your records in this envelope verbatim, substituting only `tables`:
+
+    ```
+    {
+      "septena_export_version": 1,
+      "section": "\(sectionKey)",
+      "exported_at": "<current ISO-8601 timestamp>",
+      "tables": {
+    """
+    for (i, t) in tables.enumerated() {
+      let comma = (i == tables.count - 1) ? "" : ","
+      out += "\n    \"\(t.name)\": [ … ]\(comma)"
+    }
+    out += """
+
+      }
+    }
+    ```
+
+    ## Tables
+
+    """
+    for t in tables {
+      out += "\n### `\(t.name)` — \(t.purpose)\n"
+      for f in t.fields {
+        let req = f.required ? "**required**" : "optional"
+        let note = f.note.map { " — \($0)" } ?? ""
+        out += "- `\(f.name)` (\(f.type), \(req))\(note)\n"
+      }
+    }
+    out += """
+
+    ## Rules
+    - `id` is a stable string; reuse the same id to update an existing row, choose a new one to insert.
+    - Dates: `YYYY-MM-DD`. Times: `HH:MM`. Timestamps: ISO-8601 (e.g. `2026-05-24T08:30:00Z`).
+    - Omit optional fields you don't have rather than sending `null`.
+    - Skip any record you can't confidently map; partial data is better than fabricated data.
+
+    ## Source data
+    <paste your source data below this line>
+    """
+    return out
+  }
+
+  /// Table schemas exposed to the prompt builder. Kept in sync with the
+  /// entity → dict mappers above; if you add a field there, add it here.
+  private static func schemaTables(for sectionKey: String) -> [SchemaTable] {
+    switch sectionKey {
+    case "tasks":
+      return [
+        .init(name: "task", purpose: "one row per task / to-do", fields: [
+          .req("id", "string"), .req("title", "string"),
+          .opt("status", "string", "open | done | cancelled | someday"),
+          .opt("created", "date"), .opt("scheduled", "date"),
+          .opt("due", "date"), .opt("today", "bool"),
+          .opt("todaySetOn", "date"), .opt("completedAt", "timestamp"),
+          .opt("area", "string", "area id"),
+          .opt("project", "string", "project id"),
+          .opt("notes", "string"),
+          .opt("recurrenceUnit", "string", "day | week | month | year"),
+          .opt("recurrenceInterval", "int"),
+          .opt("recurrenceAfterCompletion", "bool"),
+        ]),
+        .init(name: "project", purpose: "a project grouping tasks", fields: [
+          .req("id", "string"), .req("title", "string"),
+          .opt("status", "string", "active | completed | cancelled"),
+          .opt("area", "string", "area id"),
+          .opt("created", "date"), .opt("completedAt", "timestamp"),
+          .opt("notes", "string"), .opt("context", "string"),
+        ]),
+        .init(name: "area", purpose: "a top-level area of life", fields: [
+          .req("id", "string"), .req("title", "string"),
+          .opt("context", "string"),
+        ]),
+      ]
+    case "training":
+      return [
+        .init(name: "exerciseDefinition", purpose: "exercise catalog entry", fields: [
+          .req("id", "string", "slug, e.g. chest-press"),
+          .req("name", "string"),
+          .req("type", "string", "strength | cardio | mobility | core"),
+          .opt("subgroup", "string"), .opt("aliases", "[string]"),
+          .opt("primaryMuscle", "string"),
+          .opt("secondaryMuscles", "[string]"),
+          .opt("archived", "bool"), .opt("sortIndex", "int"),
+        ]),
+        .init(name: "sessionType", purpose: "a workout template (upper, lower, …)", fields: [
+          .req("id", "string"), .req("label", "string"),
+          .opt("emoji", "string"), .opt("exercises", "[string]"),
+          .opt("kind", "string"), .opt("archived", "bool"),
+          .opt("sortIndex", "int"),
+        ]),
+        .init(name: "exerciseEntry", purpose: "one logged set or interval", fields: [
+          .req("id", "string"), .req("date", "date"),
+          .req("time", "time", "session start"),
+          .req("sessionType", "string"), .req("exercise", "string"),
+          .opt("weight", "double"), .opt("sets", "string", "int or \"AMRAP\""),
+          .opt("reps", "string"), .opt("difficulty", "string"),
+          .opt("durationMin", "double"), .opt("distanceM", "double"),
+          .opt("level", "double"), .opt("note", "string"),
+          .opt("concludedAt", "timestamp"), .opt("loggedAt", "timestamp"),
+        ]),
+      ]
+    case "nutrition":
+      return [
+        .init(name: "nutritionEntry", purpose: "a single meal / snack", fields: [
+          .req("id", "string"), .req("loggedAt", "timestamp"),
+          .opt("emoji", "string"), .opt("foods", "string", "newline-joined list"),
+          .opt("note", "string"),
+          .opt("mealType", "string", "breakfast | lunch | dinner | snack"),
+          .opt("source", "string"),
+          .req("proteinG", "double"), .req("fatG", "double"),
+          .req("carbsG", "double"),
+          .opt("fiberG", "double"), .opt("sugarG", "double"),
+          .opt("saturatedFatG", "double"), .opt("alcoholG", "double"),
+          .opt("kcal", "double", "falls back to 4P+9F+4C+7A if omitted"),
+          .opt("sodiumMg", "double"), .opt("cholesterolMg", "double"),
+          .opt("potassiumMg", "double"), .opt("waterMl", "double"),
+        ]),
+      ]
+    case "habits":
+      return [
+        .init(name: "habitDefinition", purpose: "a habit you track", fields: [
+          .req("id", "string"), .req("title", "string"),
+          .req("bucket", "string", "free-form group key, e.g. morning"),
+          .opt("emoji", "string"), .opt("sortIndex", "int"),
+        ]),
+        .init(name: "habitDayState", purpose: "one habit on one day", fields: [
+          .req("id", "string", "stable per habit+day, e.g. <habitID>:<date>"),
+          .req("date", "date"), .req("habitID", "string"),
+          .req("done", "bool"), .req("skipped", "bool"),
+          .opt("note", "string"), .opt("time", "time"),
+        ]),
+      ]
+    case "chores":
+      return [
+        .init(name: "choreDefinition", purpose: "a recurring chore", fields: [
+          .req("id", "string"), .req("title", "string"),
+          .req("cadenceDays", "int"),
+          .opt("emoji", "string"), .opt("sortIndex", "int"),
+        ]),
+        .init(name: "choreEvent", purpose: "completion / skip / reschedule", fields: [
+          .req("id", "string"), .req("choreID", "string"),
+          .req("action", "string", "completed | skipped | rescheduled"),
+          .req("date", "date"), .req("sortKey", "string"),
+          .opt("newDueDate", "date"), .opt("reason", "string"),
+          .opt("note", "string"), .opt("time", "time"),
+        ]),
+      ]
+    case "supplements":
+      return [
+        .init(name: "supplementDefinition", purpose: "a supplement you take", fields: [
+          .req("id", "string"), .req("title", "string"),
+          .opt("emoji", "string"), .opt("sortIndex", "int"),
+        ]),
+        .init(name: "supplementDayState", purpose: "one supplement on one day", fields: [
+          .req("id", "string"), .req("date", "date"),
+          .req("supplementID", "string"), .req("done", "bool"),
+          .opt("note", "string"), .opt("time", "time"),
+        ]),
+      ]
+    case "groceries":
+      return [
+        .init(name: "groceryCategory", purpose: "a shopping aisle / pantry group", fields: [
+          .req("id", "string"), .req("name", "string"),
+          .opt("sortIndex", "int"),
+        ]),
+        .init(name: "groceryItem", purpose: "one item in the shopping list / pantry", fields: [
+          .req("id", "string"), .req("name", "string"),
+          .req("category", "string", "groceryCategory.id"),
+          .opt("emoji", "string"), .opt("low", "bool", "marked as running low"),
+          .opt("lastBought", "date"), .opt("sortIndex", "int"),
+        ]),
+      ]
+    case "caffeine":
+      return [
+        .init(name: "caffeineBean", purpose: "a coffee bean / source you use", fields: [
+          .req("id", "string"), .req("name", "string"),
+          .opt("sortIndex", "int"),
+        ]),
+        .init(name: "caffeineEvent", purpose: "one drink", fields: [
+          .req("id", "string"), .req("date", "date"), .req("time", "time"),
+          .req("method", "string", "v60 | matcha | other"),
+          .opt("beans", "string", "caffeineBean.id"),
+          .opt("grams", "double"), .opt("note", "string"),
+        ]),
+      ]
+    case "cannabis":
+      return [
+        .init(name: "cannabisStrain", purpose: "a strain you use", fields: [
+          .req("id", "string"), .req("name", "string"),
+          .opt("sortIndex", "int"),
+        ]),
+        .init(name: "cannabisEvent", purpose: "one session", fields: [
+          .req("id", "string"), .req("date", "date"), .req("time", "time"),
+          .req("method", "string", "vape | edible"),
+          .opt("strain", "string", "cannabisStrain.id"),
+          .opt("hit", "int"), .opt("grams", "double"),
+          .opt("effect", "string"), .opt("note", "string"),
+        ]),
+      ]
+    case "gut":
+      return [
+        .init(name: "gutEvent", purpose: "one bowel-movement log", fields: [
+          .req("id", "string"), .req("date", "date"), .req("time", "time"),
+          .req("bristol", "int", "1–7"), .req("blood", "int", "0–3"),
+          .opt("volume", "string"), .opt("discomfortLevel", "string"),
+          .opt("discomfortStart", "time"), .opt("discomfortEnd", "time"),
+          .opt("note", "string"),
+        ]),
+      ]
+    default:
+      return []
+    }
+  }
+
+  struct SchemaTable {
+    let name: String
+    let purpose: String
+    let fields: [SchemaField]
+  }
+
+  struct SchemaField {
+    let name: String
+    let type: String
+    let required: Bool
+    let note: String?
+    static func req(_ name: String, _ type: String, _ note: String? = nil) -> SchemaField {
+      SchemaField(name: name, type: type, required: true, note: note)
+    }
+    static func opt(_ name: String, _ type: String, _ note: String? = nil) -> SchemaField {
+      SchemaField(name: name, type: type, required: false, note: note)
+    }
+  }
+
+  static let envelopeReference = """
+{
+  "septena_export_version": 1,
+  "section": "tasks" | "training" | … | "all",
+  "exported_at": "<ISO-8601>",
+  "app_version": "<short> (<build>)",
+  "tables": {
+    "task":    [{ "id": …, "title": …, … }],
+    "project": [...],
+    …
+  }
+}
+"""
+
+  // MARK: Build
+
+  @MainActor
+  static func exportAll() throws -> Data {
+    var tables: [String: [[String: Any]]] = [:]
+    for key in exportableSectionKeys {
+      let sectionTables = try collectTables(for: key)
+      for (k, v) in sectionTables { tables[k] = v }
+    }
+    return try encode(section: "all", tables: tables)
+  }
+
+  @MainActor
+  static func exportSection(_ key: String) throws -> Data {
+    let tables = try collectTables(for: key)
+    return try encode(section: key, tables: tables)
+  }
+
+  @MainActor
+  private static func collectTables(for key: String) throws -> [String: [[String: Any]]] {
+    let ctx = LocalStore.shared.container.mainContext
+    switch key {
+    case "tasks":
+      return [
+        "task":    try fetchAll(TaskEntity.self, ctx: ctx).map(taskDict),
+        "project": try fetchAll(ProjectEntity.self, ctx: ctx).map(projectDict),
+        "area":    try fetchAll(AreaEntity.self, ctx: ctx).map(areaDict),
+      ]
+    case "training":
+      return [
+        "exerciseEntry":      try fetchAll(ExerciseEntryEntity.self, ctx: ctx).map(exerciseEntryDict),
+        "exerciseDefinition": try fetchAll(ExerciseDefinitionEntity.self, ctx: ctx).map(exerciseDefinitionDict),
+        "sessionType":        try fetchAll(SessionTypeEntity.self, ctx: ctx).map(sessionTypeDict),
+      ]
+    case "nutrition":
+      return [
+        "nutritionEntry":        try fetchAll(NutritionEntryEntity.self, ctx: ctx).map(nutritionEntryDict),
+        "nutritionDailySummary": try fetchAll(NutritionDailySummaryEntity.self, ctx: ctx).map(nutritionSummaryDict),
+      ]
+    case "habits":
+      return [
+        "habitDefinition": try fetchAll(HabitDefinitionEntity.self, ctx: ctx).map(habitDefinitionDict),
+        "habitDayState":   try fetchAll(HabitDayStateEntity.self, ctx: ctx).map(habitDayStateDict),
+      ]
+    case "supplements":
+      return [
+        "supplementDefinition": try fetchAll(SupplementDefinitionEntity.self, ctx: ctx).map(supplementDefinitionDict),
+        "supplementDayState":   try fetchAll(SupplementDayStateEntity.self, ctx: ctx).map(supplementDayStateDict),
+      ]
+    case "chores":
+      return [
+        "choreDefinition": try fetchAll(ChoreDefinitionEntity.self, ctx: ctx).map(choreDefinitionDict),
+        "choreEvent":      try fetchAll(ChoreEventEntity.self, ctx: ctx).map(choreEventDict),
+      ]
+    case "caffeine":
+      return [
+        "caffeineBean":  try fetchAll(CaffeineBeanEntity.self, ctx: ctx).map(caffeineBeanDict),
+        "caffeineEvent": try fetchAll(CaffeineEventEntity.self, ctx: ctx).map(caffeineEventDict),
+      ]
+    case "cannabis":
+      return [
+        "cannabisStrain": try fetchAll(CannabisStrainEntity.self, ctx: ctx).map(cannabisStrainDict),
+        "cannabisEvent":  try fetchAll(CannabisEventEntity.self, ctx: ctx).map(cannabisEventDict),
+      ]
+    case "groceries":
+      return [
+        "groceryItem":     try fetchAll(GroceryItemEntity.self, ctx: ctx).map(groceryItemDict),
+        "groceryCategory": try fetchAll(GroceryCategoryEntity.self, ctx: ctx).map(groceryCategoryDict),
+      ]
+    case "gut":
+      return [
+        "gutEvent": try fetchAll(GutEventEntity.self, ctx: ctx).map(gutEventDict),
+      ]
+    default:
+      throw ImportError.unsupportedSection(key)
+    }
+  }
+
+  @MainActor
+  private static func fetchAll<E: PersistentModel>(_ type: E.Type,
+                                                   ctx: ModelContext) throws -> [E] {
+    try ctx.fetch(FetchDescriptor<E>())
+  }
+
+  private static func encode(section: String,
+                             tables: [String: [[String: Any]]]) throws -> Data {
+    let envelope: [String: Any] = [
+      "septena_export_version": importExportEnvelopeVersion,
+      "section": section,
+      "exported_at": ISO8601DateFormatter().string(from: .now),
+      "app_version": appVersion(),
+      "tables": tables,
+    ]
+    return try JSONSerialization.data(withJSONObject: envelope,
+                                      options: [.prettyPrinted, .sortedKeys])
+  }
+
+  private static func appVersion() -> String {
+    let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+    let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
+    return "\(v) (\(b))"
+  }
+
+  // MARK: Parse
+
+  static func parseEnvelope(_ data: Data) throws -> ImportExportEnvelope {
+    let raw: Any
+    do {
+      raw = try JSONSerialization.jsonObject(with: data, options: [])
+    } catch {
+      throw ImportError.notJSON
+    }
+    guard let dict = raw as? [String: Any],
+          let version = dict["septena_export_version"] as? Int,
+          let section = dict["section"] as? String,
+          let tablesRaw = dict["tables"] as? [String: Any]
+    else { throw ImportError.missingEnvelope }
+    if version > importExportEnvelopeVersion {
+      throw ImportError.unsupportedVersion(version)
+    }
+    var typed: [String: [[String: Any]]] = [:]
+    for (table, rows) in tablesRaw {
+      guard let rows = rows as? [[String: Any]] else {
+        throw ImportError.malformed("Table '\(table)' is not an array of objects.")
+      }
+      typed[table] = rows
+    }
+    return ImportExportEnvelope(
+      version: version,
+      section: section,
+      exportedAt: dict["exported_at"] as? String,
+      appVersion: dict["app_version"] as? String,
+      tables: typed
+    )
+  }
+
+  // MARK: Apply
+  //
+  // v1 limits write-back to the simple, idempotent definition rows that
+  // are pure upserts by id and have a `noteXChange(id:)` on `CKEngine`.
+  // Event/log rows (nutrition entries, caffeine events, training entries,
+  // etc.) route through dedicated mutators that handle recurrence,
+  // summaries, and CK fan-out — those land in a follow-up. Unsupported
+  // tables are counted toward `skipped` so the user sees what landed.
+
+  struct ApplyResult {
+    var applied: Int
+    var skipped: Int
+  }
+
+  @MainActor
+  static func apply(_ doc: ImportExportEnvelope) throws -> ApplyResult {
+    let ctx = LocalStore.shared.container.mainContext
+    let engine = SeptenaServices.shared.ckEngine
+    var applied = 0
+    var skipped = 0
+    for (table, rows) in doc.tables {
+      switch table {
+      case "habitDefinition":
+        for r in rows { try upsertHabitDefinition(r, ctx: ctx, engine: engine); applied += 1 }
+      case "supplementDefinition":
+        for r in rows { try upsertSupplementDefinition(r, ctx: ctx, engine: engine); applied += 1 }
+      case "choreDefinition":
+        for r in rows { try upsertChoreDefinition(r, ctx: ctx, engine: engine); applied += 1 }
+      case "caffeineBean":
+        for r in rows { try upsertCaffeineBean(r, ctx: ctx, engine: engine); applied += 1 }
+      case "cannabisStrain":
+        for r in rows { try upsertCannabisStrain(r, ctx: ctx, engine: engine); applied += 1 }
+      case "groceryCategory":
+        for r in rows { try upsertGroceryCategory(r, ctx: ctx, engine: engine); applied += 1 }
+      case "groceryItem":
+        for r in rows { try upsertGroceryItem(r, ctx: ctx, engine: engine); applied += 1 }
+      default:
+        skipped += rows.count
+      }
+    }
+    try ctx.save()
+    return ApplyResult(applied: applied, skipped: skipped)
+  }
+}
+
+// MARK: - Entity → dict mappers
+
+@MainActor private func taskDict(_ e: TaskEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "title": e.title, "status": e.statusRaw,
+    "created": e.created, "scheduled": e.scheduled, "due": e.due,
+    "today": e.today, "todaySetOn": e.todaySetOn, "completedAt": e.completedAt,
+    "area": e.area, "project": e.project, "notes": e.notes,
+    "recurrenceUnit": e.recurrenceUnit,
+    "recurrenceInterval": e.recurrenceInterval,
+    "recurrenceAfterCompletion": e.recurrenceAfterCompletion,
+    "sortIndex": e.sortIndex,
+    "updatedAt": e.updatedAt, "deletedAt": e.deletedAt,
+  ])
+}
+
+@MainActor private func projectDict(_ e: ProjectEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "title": e.title, "status": e.statusRaw, "area": e.area,
+    "created": e.created, "completedAt": e.completedAt,
+    "notes": e.notes, "context": e.context, "githubRepo": e.githubRepo,
+    "updatedAt": e.updatedAt, "deletedAt": e.deletedAt,
+  ])
+}
+
+@MainActor private func areaDict(_ e: AreaEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "title": e.title, "context": e.context,
+    "updatedAt": e.updatedAt,
+  ])
+}
+
+@MainActor private func habitDefinitionDict(_ e: HabitDefinitionEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "title": e.title, "emoji": e.emoji,
+    "bucket": e.bucket, "sortIndex": e.sortIndex,
+    "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor private func habitDayStateDict(_ e: HabitDayStateEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "date": e.date, "habitID": e.habitID,
+    "done": e.done, "skipped": e.skipped, "note": e.note, "time": e.time,
+    "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor private func supplementDefinitionDict(_ e: SupplementDefinitionEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "title": e.title, "emoji": e.emoji,
+    "sortIndex": e.sortIndex, "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor private func supplementDayStateDict(_ e: SupplementDayStateEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "date": e.date, "supplementID": e.supplementID,
+    "done": e.done, "note": e.note, "time": e.time,
+    "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor private func choreDefinitionDict(_ e: ChoreDefinitionEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "title": e.title, "emoji": e.emoji,
+    "cadenceDays": e.cadenceDays, "sortIndex": e.sortIndex,
+    "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor private func choreEventDict(_ e: ChoreEventEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "choreID": e.choreID, "action": e.action,
+    "date": e.date, "newDueDate": e.newDueDate,
+    "reason": e.reason, "note": e.note, "time": e.time,
+    "sortKey": e.sortKey, "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor private func caffeineBeanDict(_ e: CaffeineBeanEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "name": e.name, "sortIndex": e.sortIndex,
+    "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor private func caffeineEventDict(_ e: CaffeineEventEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "date": e.date, "time": e.time, "method": e.method,
+    "beans": e.beans, "grams": e.grams, "note": e.note,
+    "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor private func cannabisStrainDict(_ e: CannabisStrainEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "name": e.name, "sortIndex": e.sortIndex,
+    "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor private func cannabisEventDict(_ e: CannabisEventEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "date": e.date, "time": e.time, "method": e.method,
+    "strain": e.strain, "hit": e.hit, "grams": e.grams,
+    "effect": e.effect, "note": e.note,
+    "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor private func groceryItemDict(_ e: GroceryItemEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "name": e.name, "category": e.category, "emoji": e.emoji,
+    "low": e.low, "lastBought": e.lastBought,
+    "sortIndex": e.sortIndex, "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor private func groceryCategoryDict(_ e: GroceryCategoryEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "name": e.name, "sortIndex": e.sortIndex,
+    "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor private func gutEventDict(_ e: GutEventEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "date": e.date, "time": e.time,
+    "bristol": e.bristol, "blood": e.blood, "volume": e.volume,
+    "discomfortLevel": e.discomfortLevel,
+    "discomfortStart": e.discomfortStart,
+    "discomfortEnd": e.discomfortEnd,
+    "note": e.note, "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor private func exerciseEntryDict(_ e: ExerciseEntryEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "date": e.date, "time": e.time,
+    "sessionType": e.sessionType, "exercise": e.exercise,
+    "weight": e.weight, "sets": e.sets, "reps": e.reps,
+    "difficulty": e.difficulty, "durationMin": e.durationMin,
+    "distanceM": e.distanceM, "level": e.level, "note": e.note,
+    "concludedAt": e.concludedAt, "loggedAt": e.loggedAt,
+    "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor private func exerciseDefinitionDict(_ e: ExerciseDefinitionEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "name": e.name, "type": e.type, "subgroup": e.subgroup,
+    "aliases": e.aliases, "primaryMuscle": e.primaryMuscle,
+    "secondaryMuscles": e.secondaryMuscles, "archived": e.archived,
+    "sortIndex": e.sortIndex, "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor private func sessionTypeDict(_ e: SessionTypeEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "label": e.label, "emoji": e.emoji,
+    "exercises": e.exercises, "archived": e.archived,
+    "sortIndex": e.sortIndex, "kind": e.kindRaw,
+    "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor private func nutritionEntryDict(_ e: NutritionEntryEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "loggedAt": isoDate(e.loggedAt),
+    "updatedAt": isoDate(e.updatedAt),
+    "emoji": e.emoji, "foods": e.foods, "note": e.note,
+    "mealType": e.mealType, "source": e.source,
+    "proteinG": e.proteinG, "fatG": e.fatG, "carbsG": e.carbsG,
+    "fiberG": e.fiberG, "sugarG": e.sugarG,
+    "saturatedFatG": e.saturatedFatG, "alcoholG": e.alcoholG,
+    "kcal": e.kcal, "sodiumMg": e.sodiumMg,
+    "cholesterolMg": e.cholesterolMg, "potassiumMg": e.potassiumMg,
+    "waterMl": e.waterMl,
+  ])
+}
+
+@MainActor private func nutritionSummaryDict(_ e: NutritionDailySummaryEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "date": e.date, "entryCount": e.entryCount,
+    "firstLoggedAt": e.firstLoggedAt.map(isoDate),
+    "lastLoggedAt": e.lastLoggedAt.map(isoDate),
+    "computedAt": isoDate(e.computedAt),
+    "kcal": e.kcal, "proteinG": e.proteinG, "fatG": e.fatG, "carbsG": e.carbsG,
+    "fiberG": e.fiberG, "sugarG": e.sugarG,
+    "saturatedFatG": e.saturatedFatG, "alcoholG": e.alcoholG,
+    "sodiumMg": e.sodiumMg, "cholesterolMg": e.cholesterolMg,
+    "potassiumMg": e.potassiumMg, "waterMl": e.waterMl,
+  ])
+}
+
+private func isoDate(_ d: Date) -> String {
+  ISO8601DateFormatter().string(from: d)
+}
+
+/// Strips nil values so the JSON stays compact and `JSONSerialization`
+/// doesn't trip on `Any?`.
+private func compact(_ dict: [String: Any?]) -> [String: Any] {
+  var out: [String: Any] = [:]
+  for (k, v) in dict {
+    guard let v else { continue }
+    out[k] = v
+  }
+  return out
+}
+
+// MARK: - Upserts (definition tables only)
+
+@MainActor
+private func upsertHabitDefinition(_ r: [String: Any],
+                                   ctx: ModelContext,
+                                   engine: CKEngine) throws {
+  guard let id = r["id"] as? String,
+        let title = r["title"] as? String,
+        let bucket = r["bucket"] as? String
+  else { throw ImportExportService.ImportError.malformed("habitDefinition row missing id/title/bucket") }
+  let existing = try ctx.fetch(FetchDescriptor<HabitDefinitionEntity>(
+    predicate: #Predicate { $0.id == id })).first
+  let e = existing ?? HabitDefinitionEntity(id: id, title: title, bucket: bucket)
+  if existing == nil { ctx.insert(e) }
+  e.title = title
+  e.bucket = bucket
+  e.emoji = r["emoji"] as? String
+  e.sortIndex = r["sortIndex"] as? Int ?? 0
+  e.updatedAt = .now
+  engine.noteHabitDefinitionChange(id: id)
+}
+
+@MainActor
+private func upsertSupplementDefinition(_ r: [String: Any],
+                                        ctx: ModelContext,
+                                        engine: CKEngine) throws {
+  guard let id = r["id"] as? String, let title = r["title"] as? String
+  else { throw ImportExportService.ImportError.malformed("supplementDefinition row missing id/title") }
+  let existing = try ctx.fetch(FetchDescriptor<SupplementDefinitionEntity>(
+    predicate: #Predicate { $0.id == id })).first
+  let e = existing ?? SupplementDefinitionEntity(id: id, title: title)
+  if existing == nil { ctx.insert(e) }
+  e.title = title
+  e.emoji = r["emoji"] as? String
+  e.sortIndex = r["sortIndex"] as? Int ?? 0
+  e.updatedAt = .now
+  engine.noteSupplementDefinitionChange(id: id)
+}
+
+@MainActor
+private func upsertChoreDefinition(_ r: [String: Any],
+                                   ctx: ModelContext,
+                                   engine: CKEngine) throws {
+  guard let id = r["id"] as? String,
+        let title = r["title"] as? String,
+        let cadence = r["cadenceDays"] as? Int
+  else { throw ImportExportService.ImportError.malformed("choreDefinition row missing id/title/cadenceDays") }
+  let existing = try ctx.fetch(FetchDescriptor<ChoreDefinitionEntity>(
+    predicate: #Predicate { $0.id == id })).first
+  let e = existing ?? ChoreDefinitionEntity(id: id, title: title, cadenceDays: cadence)
+  if existing == nil { ctx.insert(e) }
+  e.title = title
+  e.cadenceDays = cadence
+  e.emoji = r["emoji"] as? String
+  e.sortIndex = r["sortIndex"] as? Int ?? 0
+  e.updatedAt = .now
+  engine.noteChoreDefinitionChange(id: id)
+}
+
+@MainActor
+private func upsertCaffeineBean(_ r: [String: Any],
+                                ctx: ModelContext,
+                                engine: CKEngine) throws {
+  guard let id = r["id"] as? String, let name = r["name"] as? String
+  else { throw ImportExportService.ImportError.malformed("caffeineBean row missing id/name") }
+  let existing = try ctx.fetch(FetchDescriptor<CaffeineBeanEntity>(
+    predicate: #Predicate { $0.id == id })).first
+  let e = existing ?? CaffeineBeanEntity(id: id, name: name)
+  if existing == nil { ctx.insert(e) }
+  e.name = name
+  e.sortIndex = r["sortIndex"] as? Int ?? 0
+  e.updatedAt = .now
+  engine.noteCaffeineBeanChange(id: id)
+}
+
+@MainActor
+private func upsertCannabisStrain(_ r: [String: Any],
+                                  ctx: ModelContext,
+                                  engine: CKEngine) throws {
+  guard let id = r["id"] as? String, let name = r["name"] as? String
+  else { throw ImportExportService.ImportError.malformed("cannabisStrain row missing id/name") }
+  let existing = try ctx.fetch(FetchDescriptor<CannabisStrainEntity>(
+    predicate: #Predicate { $0.id == id })).first
+  let e = existing ?? CannabisStrainEntity(id: id, name: name)
+  if existing == nil { ctx.insert(e) }
+  e.name = name
+  e.sortIndex = r["sortIndex"] as? Int ?? 0
+  e.updatedAt = .now
+  engine.noteCannabisStrainChange(id: id)
+}
+
+@MainActor
+private func upsertGroceryCategory(_ r: [String: Any],
+                                   ctx: ModelContext,
+                                   engine: CKEngine) throws {
+  guard let id = r["id"] as? String, let name = r["name"] as? String
+  else { throw ImportExportService.ImportError.malformed("groceryCategory row missing id/name") }
+  let existing = try ctx.fetch(FetchDescriptor<GroceryCategoryEntity>(
+    predicate: #Predicate { $0.id == id })).first
+  let e = existing ?? GroceryCategoryEntity(id: id, name: name)
+  if existing == nil { ctx.insert(e) }
+  e.name = name
+  e.sortIndex = r["sortIndex"] as? Int ?? 0
+  e.updatedAt = .now
+  engine.noteGroceryCategoryChange(id: id)
+}
+
+@MainActor
+private func upsertGroceryItem(_ r: [String: Any],
+                               ctx: ModelContext,
+                               engine: CKEngine) throws {
+  guard let id = r["id"] as? String,
+        let name = r["name"] as? String,
+        let category = r["category"] as? String
+  else { throw ImportExportService.ImportError.malformed("groceryItem row missing id/name/category") }
+  let existing = try ctx.fetch(FetchDescriptor<GroceryItemEntity>(
+    predicate: #Predicate { $0.id == id })).first
+  let e = existing ?? GroceryItemEntity(id: id, name: name, category: category)
+  if existing == nil { ctx.insert(e) }
+  e.name = name
+  e.category = category
+  e.emoji = r["emoji"] as? String ?? ""
+  e.low = r["low"] as? Bool ?? false
+  e.lastBought = r["lastBought"] as? String
+  e.sortIndex = r["sortIndex"] as? Int ?? 0
+  e.updatedAt = .now
+  engine.noteGroceryItemChange(id: id)
 }

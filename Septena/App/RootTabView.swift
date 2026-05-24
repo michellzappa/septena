@@ -94,6 +94,19 @@ struct RootTabView: View {
           .frame(minWidth: 560, minHeight: 600)
           #endif
       }
+      // Insights — mounted at the tab root so it covers the full screen
+      // (no detents, no peek-through to the dashboard underneath). On
+      // macOS this falls back to a large sheet sized to fill the window.
+      #if os(iOS)
+      .fullScreenCover(isPresented: $nav.showInsights) {
+        InsightsDestinationView()
+      }
+      #else
+      .sheet(isPresented: $nav.showInsights) {
+        InsightsDestinationView()
+          .frame(minWidth: 720, minHeight: 560)
+      }
+      #endif
   }
 
   // Standard iOS 26 TabView with the system tab-bar minimize behavior
