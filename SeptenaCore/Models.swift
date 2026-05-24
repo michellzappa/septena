@@ -1186,10 +1186,6 @@ struct WithingsRow: Codable, Identifiable, Hashable {
   }
 }
 
-struct WithingsResponse: Codable {
-  let withings: [WithingsRow]
-}
-
 // MARK: - Gut
 
 struct GutEntry: Codable, Identifiable, Hashable {

@@ -1,10 +1,12 @@
 import Foundation
 
-// Septena REST client — a thin proxy for the only domain still on
-// FastAPI: Withings weigh-ins. Oura now hits the Oura Cloud API
-// directly via `OuraProvider`; every other section is CloudKit-backed
-// and reads/writes locally. No auth; base URL is set via Settings
-// (defaults to http://100.74.150.55:7000).
+// Septena REST client — historical. All FastAPI endpoints are gone:
+// Oura goes through `OuraProvider`, Withings through `WithingsProvider`,
+// and every other section is CloudKit-backed. This file remains as a
+// vestigial @Environment object so the dozens of views that still
+// declare `@Environment(SeptenaClient.self)` keep compiling; a follow-up
+// pass can sweep all of those out and delete the file along with
+// `ClientProvider` and the Sync settings pane.
 
 // MARK: - Change notification
 
@@ -94,21 +96,6 @@ final class SeptenaClient {
             ?? `default`.absoluteString
     return SeptenaClient(baseURL: URL(string: raw) ?? `default`)
   }()
-
-  // MARK: - Health (Withings)
-
-  /// N days of Withings weigh-ins. Server returns newest-first via the
-  /// `withings` array; callers re-sort as needed.
-  func withingsHistory(days: Int = 14) async throws -> [WithingsRow] {
-    try await getJSON("/api/health/withings",
-                      query: [URLQueryItem(name: "days", value: String(days))],
-                      as: WithingsResponse.self).withings
-  }
-
-  // Insights compute lives client-side now (see CorrelationEngine).
-  // No /api/insights/* endpoint is called — Oura data comes from
-  // OuraProvider (direct), Withings from the line above, everything
-  // else from SwiftData (CloudKit-mirrored).
 
   // MARK: - HTTP helpers
 

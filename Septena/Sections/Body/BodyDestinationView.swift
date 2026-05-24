@@ -337,7 +337,7 @@ struct BodyDestinationView: View {
 
   private func load() async {
     loading = true
-    let loadedRows = try? await client.withingsHistory(days: 21)
+    let loadedRows = try? await WithingsProvider.shared.fetchHistory(days: 21)
     // Settings live in CloudKit — read from the local mirror, not FastAPI.
     let loadedSettings = SettingsMirror.loadSettings(context: LocalStore.shared.container.mainContext)
     if let loadedRows {

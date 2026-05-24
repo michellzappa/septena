@@ -565,7 +565,7 @@ struct WeekDashboardView: View {
       cannabisHistory = cnh
       ResponseCache.save(cnh, forKey: CacheKey.cannabisHistory)
     }
-    async let wRows = try? await client.withingsHistory(days: 90)
+    async let wRows = try? await WithingsProvider.shared.fetchHistory(days: 90)
     let gT: GutDayResponse? = ChecklistMirror.loadGutDay(context: modelContext, date: SeptenaDate.today)
     let gH: GutHistoryResponse? = ChecklistMirror.loadGutHistory(context: modelContext, days: 90)
     let wR = await wRows

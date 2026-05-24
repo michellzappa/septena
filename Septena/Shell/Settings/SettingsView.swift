@@ -1186,6 +1186,8 @@ struct SectionDetailPane: View {
         row("Calories","\(Int(m.kcal.min))–\(Int(m.kcal.max)) kcal")
       }
     }
+    MacroTilesEditor(initialPrefs: MacroCatalog.reconcile(
+      store.serverSettings?.nutrition?.macroTiles ?? MacroCatalog.defaultTilePrefs()))
     Section {
       Toggle("Track fasting", isOn: $trackFasting)
     } footer: {
@@ -1241,6 +1243,125 @@ struct SectionDetailPane: View {
   }
 }
 
+// MARK: - Macro tiles editor
+//
+// Reorderable / toggleable / recolorable list of nutrition macro tiles.
+// Persists through `NutritionPrefsWriter.saveTilePrefs` which writes to
+// `AppSettings.nutrition.macroTiles` and queues a CloudKit push.
+//
+// Local @State is the source of truth while the sheet is open — the writer
+// fires on every change so other devices see the edit immediately. We don't
+// re-sync from `store.serverSettings` while editing; that would cause a row
+// to jump back if a CK push round-trips during a drag.
+
+struct MacroTilesEditor: View {
+  @Environment(\.modelContext) private var modelContext
+
+  @State private var prefs: [MacroTilePref]
+
+  init(initialPrefs: [MacroTilePref]) {
+    _prefs = State(initialValue: initialPrefs)
+  }
+
+  var body: some View {
+    Section {
+      ForEach($prefs) { $pref in
+        MacroTileRow(pref: $pref, onChange: persist)
+      }
+      .onMove { indices, newOffset in
+        prefs.move(fromOffsets: indices, toOffset: newOffset)
+        persist()
+      }
+    } header: {
+      HStack {
+        Text("Macro tiles")
+        Spacer()
+        Button("Reset") {
+          prefs = MacroCatalog.defaultTilePrefs()
+          persist()
+        }
+        .font(.caption)
+      }
+    } footer: {
+      Text("Drag to reorder. Toggle to show or hide a tile on the Nutrition dashboard. Tap a swatch to change its color.")
+    }
+    // Drag handles are off by default in a Form; flip edit mode on so the user
+    // can reorder without having to hunt for an Edit button.
+    .environment(\.editMode, .constant(.active))
+  }
+
+  private func persist() {
+    NutritionPrefsWriter.saveTilePrefs(
+      prefs,
+      context: modelContext,
+      engine: SeptenaServices.shared.ckEngine)
+  }
+}
+
+private struct MacroTileRow: View {
+  @Binding var pref: MacroTilePref
+  var onChange: () -> Void
+
+  var body: some View {
+    let macro = MacroCatalog.byID[pref.id]
+    HStack(spacing: 12) {
+      ColorPicker(selection: colorBinding, supportsOpacity: false) {
+        EmptyView()
+      }
+      .labelsHidden()
+      .frame(width: 28, height: 28)
+
+      VStack(alignment: .leading, spacing: 1) {
+        Text(macro?.label ?? pref.id)
+          .font(.body)
+        if let unit = macro?.unit, !unit.isEmpty {
+          Text(unit).font(.caption2).foregroundStyle(.secondary)
+        }
+      }
+
+      Spacer()
+
+      Toggle("", isOn: Binding(
+        get: { pref.visible },
+        set: { pref.visible = $0; onChange() }
+      ))
+      .labelsHidden()
+    }
+  }
+
+  /// Color picker is bound to a `Color`, but the model stores hex. Convert
+  /// both ways and fall back to the catalog's default when the user hasn't
+  /// overridden the swatch yet.
+  private var colorBinding: Binding<Color> {
+    Binding(
+      get: {
+        let hex = pref.colorHex ?? MacroCatalog.byID[pref.id]?.defaultColorHex
+        return Color(hexString: hex) ?? .gray
+      },
+      set: { newColor in
+        pref.colorHex = newColor.toHexString()
+        onChange()
+      }
+    )
+  }
+}
+
+private extension Color {
+  /// Best-effort hex string ("#rrggbb"). Falls back to "#888888" if the
+  /// underlying CGColor can't be resolved (e.g. system dynamic colors).
+  func toHexString() -> String {
+    #if canImport(UIKit)
+    let ui = UIColor(self)
+    var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+    guard ui.getRed(&r, green: &g, blue: &b, alpha: &a) else { return "#888888" }
+    let ri = Int(round(r * 255)), gi = Int(round(g * 255)), bi = Int(round(b * 255))
+    return String(format: "#%02x%02x%02x", ri, gi, bi)
+    #else
+    return "#888888"
+    #endif
+  }
+}
+
 /// Tolerant parse of "#rrggbb" hex strings. Falls back to gray for
 /// hsl(...) or other formats — the server returns either, but only the
 /// hex form decodes natively. A future pass can add hsl() support.
@@ -1267,6 +1388,7 @@ struct IntegrationsSettingsPane: View {
   @State private var calendarBridge = CalendarBridge.shared
   @State private var healthBridge = HealthKitBridge.shared
   @State private var ouraProvider = OuraProvider.shared
+  @State private var withingsProvider = WithingsProvider.shared
   @Environment(AranetBridge.self) private var aranetBridge
   @Environment(PollenClient.self) private var pollenClient
 
@@ -1337,6 +1459,21 @@ struct IntegrationsSettingsPane: View {
                    systemImage: "circle.circle",
                    state: ouraProvider.hasToken ? "Connected" : "Grant",
                    isGranted: ouraProvider.hasToken)
+        }
+
+        // Withings — direct iOS client (OAuth2). Replaces the old
+        // FastAPI proxy at /api/health/withings.
+        NavigationLink {
+          WithingsIntegrationDetail()
+            .navigationTitle("Withings")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+        } label: {
+          stateRow(title: "Withings",
+                   systemImage: "scalemass",
+                   state: withingsProvider.hasTokens ? "Connected" : "Connect",
+                   isGranted: withingsProvider.hasTokens)
         }
 
         // Pollen via Open-Meteo. Detail pane handles location auth
@@ -1912,6 +2049,103 @@ private struct OuraIntegrationDetail: View {
       let rows = try await provider.fetchHistory(days: 365)
       let withScore = rows.compactMap(\.sleepScore).count
       lastResult = "Backfill complete — \(rows.count) nights, \(withScore) with a sleep score. Syncing to iCloud."
+    } catch {
+      lastResult = "Backfill failed: \(error.localizedDescription)"
+    }
+  }
+}
+
+// Withings → OAuth2 connect / backfill / disconnect. "Connect" opens
+// ASWebAuthenticationSession against account.withings.com; the returned
+// code is exchanged for access + refresh tokens stored in Keychain.
+// Backfill pulls the last 365 days into SwiftData + CloudKit so other
+// devices pick them up via CKSyncEngine.
+private struct WithingsIntegrationDetail: View {
+  @State private var provider = WithingsProvider.shared
+  @State private var working = false
+  @State private var lastResult: String? = nil
+
+  var body: some View {
+    Form {
+      if !provider.isConfigured {
+        Section {
+          Text("Withings app credentials are not configured.")
+            .foregroundStyle(.secondary)
+        } footer: {
+          Text("Register a Withings dev app at developer.withings.com (Public Health Data API), then paste your client_id and client_secret into WithingsAppCredentials in WithingsProvider.swift. The redirect URI should be septena://withings/callback.")
+        }
+      }
+
+      Section {
+        HStack {
+          Label("Status", systemImage: "scalemass")
+          Spacer()
+          Text(provider.hasTokens ? "Connected" : "Not connected")
+            .foregroundStyle(provider.hasTokens ? .green : .secondary)
+        }
+
+        if provider.hasTokens {
+          Button {
+            Task { await runBackfill() }
+          } label: {
+            HStack {
+              Label("Backfill last 365 days", systemImage: "arrow.clockwise")
+              Spacer()
+              if working { ProgressView().controlSize(.small) }
+            }
+          }
+          .disabled(working)
+          Button("Disconnect", role: .destructive) {
+            provider.disconnect()
+            lastResult = nil
+          }
+          .disabled(working)
+        } else {
+          Button {
+            Task { await runConnect() }
+          } label: {
+            HStack {
+              Label("Connect Withings", systemImage: "link")
+              Spacer()
+              if working { ProgressView().controlSize(.small) }
+            }
+          }
+          .disabled(!provider.isConfigured || working)
+        }
+
+        if let lastResult {
+          Text(lastResult)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      } footer: {
+        Text("Tokens live in this device's Keychain and never leave it. Weigh-ins sync to your other devices via iCloud.")
+      }
+    }
+    .formStyle(.grouped)
+  }
+
+  private func runConnect() async {
+    working = true
+    defer { working = false }
+    lastResult = "Opening Withings sign-in…"
+    do {
+      try await provider.connect()
+      lastResult = "Connected. Backfilling last 365 days…"
+      let rows = try await provider.fetchHistory(days: 365)
+      lastResult = "Connected — \(rows.count) days fetched. Syncing to iCloud."
+    } catch {
+      lastResult = "Failed: \(error.localizedDescription)"
+    }
+  }
+
+  private func runBackfill() async {
+    working = true
+    defer { working = false }
+    lastResult = "Backfilling last 365 days…"
+    do {
+      let rows = try await provider.fetchHistory(days: 365)
+      lastResult = "Backfill complete — \(rows.count) days, syncing to iCloud."
     } catch {
       lastResult = "Backfill failed: \(error.localizedDescription)"
     }
