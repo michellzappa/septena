@@ -31,10 +31,10 @@
 	<string>Septena shows upcoming events from your calendars on the Week dashboard.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>Septena shows upcoming events from your calendars on the Week dashboard.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Septena looks up local pollen counts (grass, tree, weed) for your area on the Air page using Open-Meteo's free air quality API.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Septena reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Septena looks up local pollen counts (grass, tree, weed) for your area on the Air page using Open-Meteo's free air quality API.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>Septena imports tasks from your Reminders lists into the Inbox.</string>
 	<key>NSRemindersUsageDescription</key>
@@ -55,18 +55,18 @@
 	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
+	<key>UIStatusBarHidden</key>
+	<true/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
 		<string>UIInterfaceOrientationPortrait</string>
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-	<key>UISupportedInterfaceOrientations~iphone</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 </dict>
 </plist>

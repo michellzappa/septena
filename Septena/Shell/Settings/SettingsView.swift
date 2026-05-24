@@ -42,6 +42,29 @@ enum SettingsKey {
   /// state — there's no per-project manual order in this app, so one global
   /// choice is the whole sort surface.
   static let taskSort         = "septena.task.sort"
+  /// Which renderer the homepage uses. Raw value of `HomepageLayoutMode`.
+  /// Default (`tiles`) preserves the existing card-grid behaviour, so
+  /// users with no setting see no change.
+  static let homepageLayout   = "septena.homepage.layout"
+  /// Whether the day-timeline strip renders above the homepage layout.
+  /// Default on; users who want a denser dashboard can hide it.
+  static let homepageShowTodayTimeline = "septena.homepage.showTodayTimeline"
+  /// Master toggle for fasting tracking. When on, the nutrition tile
+  /// morphs into a live fasting timer once the state machine detects a
+  /// fasting window, and the nutrition heatmap may show fasting hours
+  /// per day (see `nutritionHeatmapMetric`). Off → no fasting UI.
+  static let nutritionTrackFasting = "septena.nutrition.trackFasting"
+  /// Which metric the nutrition heatmap encodes per cell. Either
+  /// "protein" (default) or "fasting". Persistent preference; not
+  /// state-based — the heatmap is historical, so the choice doesn't
+  /// flip with current fasting state.
+  static let nutritionHeatmapMetric = "septena.nutrition.heatmapMetric"
+}
+
+enum NutritionHeatmapMetric: String, CaseIterable, Identifiable {
+  case protein, fasting
+  var id: String { rawValue }
+  var label: String { self == .protein ? "Protein" : "Fasting hours" }
 }
 
 enum AppIconOption: String, CaseIterable, Identifiable {
@@ -405,17 +428,21 @@ struct SettingsView: View {
   }
 
   private func sectionRow(_ entry: SectionEntry) -> some View {
-    // No per-section icon vocabulary in the app yet — match the webapp
-    // and use a plain color dot. Sized to align with the 22pt
-    // ColoredGlyph slot used by the static rows above.
+    // Reuse the homepage's per-section SF Symbol so the same glyph
+    // identifies a section in Dense/Heatmap tiles and the Settings
+    // sidebar. `calendar` isn't a homepage domain — fall back to its
+    // own symbol; anything else unknown falls back to a neutral dot.
     Label {
       Text(entry.label)
     } icon: {
-      Circle()
-        .fill(entry.accent)
-        .frame(width: 14, height: 14)
-        .frame(width: 22, height: 22, alignment: .center)
+      ColoredGlyph(icon: sectionIcon(for: entry.key), color: entry.accent, size: 22)
     }
+  }
+
+  private func sectionIcon(for key: String) -> String {
+    if let domain = HomepageDomain(rawValue: key) { return domain.icon }
+    if key == "calendar" { return "calendar" }
+    return "circle.fill"
   }
 
   private func title(for dest: SettingsDestination) -> String {
@@ -548,8 +575,19 @@ struct GeneralSettingsPane: View {
   @State private var iconChangeInFlight = false
   #endif
 
+  /// Persists the homepage renderer choice. Default `.tiles.rawValue`
+  /// matches the existing behaviour so users with no stored value see
+  /// no change after the layout-mode plumbing lands.
+  @AppStorage(SettingsKey.homepageLayout)
+  private var homepageLayoutRaw: String = HomepageLayoutMode.tiles.rawValue
+  @AppStorage(SettingsKey.homepageShowTodayTimeline)
+  private var showTodayTimeline: Bool = true
+
   var body: some View {
     Form {
+      homepageLayoutSection
+      homepageTimelineSection
+
       #if os(iOS)
       if UIApplication.shared.supportsAlternateIcons {
         appIconSection
@@ -580,6 +618,64 @@ struct GeneralSettingsPane: View {
       Text(iconError ?? "Please try again.")
     }
     #endif
+  }
+
+  /// Two-way binding for the homepage layout picker. Falls back to
+  /// `.tiles` if a future build ever writes an unknown raw value.
+  private var homepageLayoutBinding: Binding<HomepageLayoutMode> {
+    Binding(
+      get: { HomepageLayoutMode(rawValue: homepageLayoutRaw) ?? .tiles },
+      set: { homepageLayoutRaw = $0.rawValue }
+    )
+  }
+
+  /// Picker for which renderer the homepage uses. Same domain order
+  /// across every mode — only presentation varies. Modes that aren't
+  /// implemented yet are listed but tagged "Coming soon" in their
+  /// row so users can see what's planned without picking a dud.
+  @ViewBuilder
+  private var homepageLayoutSection: some View {
+    let current = homepageLayoutBinding.wrappedValue
+    Section {
+      Picker(selection: homepageLayoutBinding) {
+        ForEach(HomepageLayoutMode.allCases) { mode in
+          Label {
+            HStack {
+              Text(mode.title)
+              if !mode.isImplemented {
+                Spacer()
+                Text("Coming soon")
+                  .font(.caption2)
+                  .foregroundStyle(.secondary)
+              }
+            }
+          } icon: {
+            Image(systemName: mode.icon)
+          }
+          .tag(mode)
+        }
+      } label: {
+        Text("Layout")
+      }
+      #if os(iOS)
+      .pickerStyle(.navigationLink)
+      #endif
+    } header: {
+      Text("Homepage layout")
+    } footer: {
+      Text(current.summary)
+    }
+  }
+
+  @ViewBuilder
+  private var homepageTimelineSection: some View {
+    Section {
+      Toggle(isOn: $showTodayTimeline) {
+        Label("Show Today timeline", systemImage: "clock")
+      }
+    } footer: {
+      Text("Renders the day-timeline strip above the homepage layout.")
+    }
   }
 
   #if os(iOS)
@@ -647,6 +743,42 @@ struct GeneralSettingsPane: View {
   #endif
 }
 
+private struct AppIconPreview: View {
+  @Environment(\.colorScheme) private var colorScheme
+  let option: AppIconOption
+  let size: CGFloat
+
+  private let discCenters: [CGPoint] = [
+    CGPoint(x: 0.50, y: 0.2235),
+    CGPoint(x: 0.7171, y: 0.3256),
+    CGPoint(x: 0.7709, y: 0.5631),
+    CGPoint(x: 0.6206, y: 0.7505),
+    CGPoint(x: 0.3794, y: 0.7505),
+    CGPoint(x: 0.2291, y: 0.5631),
+    CGPoint(x: 0.2829, y: 0.3256),
+  ]
+
+  var body: some View {
+    let isDarkMode = colorScheme == .dark
+    ZStack {
+      RoundedRectangle(cornerRadius: size * 0.223, style: .continuous)
+        .fill(option.background(forDarkMode: isDarkMode))
+      ForEach(Array(discCenters.enumerated()), id: \.offset) { index, center in
+        Circle()
+          .fill(option.dotColors(forDarkMode: isDarkMode)[index])
+          .frame(width: size * 0.182, height: size * 0.182)
+          .position(x: size * center.x, y: size * center.y)
+      }
+    }
+    .frame(width: size, height: size)
+    .overlay(
+      RoundedRectangle(cornerRadius: size * 0.223, style: .continuous)
+        .stroke(Color.black.opacity(isDarkMode ? 0.12 : (option == .default ? 0.07 : 0.09)), lineWidth: 0.8)
+    )
+    .shadow(color: .black.opacity(0.10), radius: 4, y: 2)
+  }
+}
+
 #if os(iOS)
 private struct AppIconChoiceCard: View {
   let option: AppIconOption
@@ -689,42 +821,6 @@ private struct AppIconChoiceCard: View {
     isSelected
       ? AnyShapeStyle(option.background.opacity(option == .default ? 0.08 : 0.16))
       : AnyShapeStyle(Color(uiColor: .secondarySystemGroupedBackground))
-  }
-}
-
-private struct AppIconPreview: View {
-  @Environment(\.colorScheme) private var colorScheme
-  let option: AppIconOption
-  let size: CGFloat
-
-  private let discCenters: [CGPoint] = [
-    CGPoint(x: 0.50, y: 0.2235),
-    CGPoint(x: 0.7171, y: 0.3256),
-    CGPoint(x: 0.7709, y: 0.5631),
-    CGPoint(x: 0.6206, y: 0.7505),
-    CGPoint(x: 0.3794, y: 0.7505),
-    CGPoint(x: 0.2291, y: 0.5631),
-    CGPoint(x: 0.2829, y: 0.3256),
-  ]
-
-  var body: some View {
-    let isDarkMode = colorScheme == .dark
-    ZStack {
-      RoundedRectangle(cornerRadius: size * 0.223, style: .continuous)
-        .fill(option.background(forDarkMode: isDarkMode))
-      ForEach(Array(discCenters.enumerated()), id: \.offset) { index, center in
-        Circle()
-          .fill(option.dotColors(forDarkMode: isDarkMode)[index])
-          .frame(width: size * 0.182, height: size * 0.182)
-          .position(x: size * center.x, y: size * center.y)
-      }
-    }
-    .frame(width: size, height: size)
-    .overlay(
-      RoundedRectangle(cornerRadius: size * 0.223, style: .continuous)
-        .stroke(Color.black.opacity(isDarkMode ? 0.12 : (option == .default ? 0.07 : 0.09)), lineWidth: 0.8)
-    )
-    .shadow(color: .black.opacity(0.10), radius: 4, y: 2)
   }
 }
 #endif
@@ -829,6 +925,13 @@ struct SectionDetailPane: View {
   @AppStorage(SettingsKey.badgeShowOverdue)    private var taskBadge: Bool = false
   @AppStorage(SettingsKey.todayShowCompleted)  private var todayShowCompleted: Bool = true
   @AppStorage(SettingsKey.taskSort)            private var taskSortRaw: String = TaskSort.dateAdded.rawValue
+
+  /// Nutrition prefs — only read when `sectionKey == "nutrition"`, but
+  /// declared at view-init for the same reason as the task prefs above.
+  @AppStorage(SettingsKey.nutritionTrackFasting)
+  private var trackFasting: Bool = false
+  @AppStorage(SettingsKey.nutritionHeatmapMetric)
+  private var heatmapMetricRaw: String = NutritionHeatmapMetric.protein.rawValue
 
   private var manifest: SectionManifest? { SectionManifest.byKey[sectionKey] }
   private var server: SeptenaClient.SectionConfig? {
@@ -1013,8 +1116,34 @@ struct SectionDetailPane: View {
         row("Carbs",   "\(Int(m.carbs.min))–\(Int(m.carbs.max)) g")
         row("Calories","\(Int(m.kcal.min))–\(Int(m.kcal.max)) kcal")
       }
-    } else {
-      EmptyView()
+    }
+    Section {
+      Toggle("Track fasting", isOn: $trackFasting)
+    } footer: {
+      Text("When on, the Nutrition tile shows a live fasting timer after your last meal of the day, and you can choose what the heatmap encodes.")
+    }
+    if trackFasting {
+      // Fasting target sits with the rest of the fasting UX — only
+      // shown when tracking is on, since it's only meaningful then.
+      // Read-only mirror of the server's `macros.fasting` band; falls
+      // back to the built-in 14–16h default if macros-config hasn't
+      // loaded or doesn't include a fasting entry yet.
+      Section("Fasting target") {
+        if let fasting = store.macros?.fasting {
+          row("Range", "\(Int(fasting.min))–\(Int(fasting.max)) h")
+        } else {
+          row("Range", "\(Int(FastingDefaults.targetMinH))–\(Int(FastingDefaults.targetMaxH)) h")
+        }
+      }
+      Section("Heatmap shows") {
+        Picker("Heatmap metric", selection: $heatmapMetricRaw) {
+          ForEach(NutritionHeatmapMetric.allCases) { m in
+            Text(m.label).tag(m.rawValue)
+          }
+        }
+        .pickerStyle(.inline)
+        .labelsHidden()
+      }
     }
   }
 
@@ -2034,15 +2163,6 @@ struct SyncSettingsPane: View {
           }
         }
         .disabled(isInspecting || ckEngine.accountStatus != .available)
-        Button {
-          Task { await runReimportChecklistHistory() }
-        } label: {
-          HStack {
-            if isMigrating { ProgressView().controlSize(.small) }
-            Label("Re-import All Sections from FastAPI", systemImage: "arrow.down.doc")
-          }
-        }
-        .disabled(isMigrating || ckEngine.accountStatus != .available)
         Button(role: .destructive) {
           Task { await runPruneOldEvents() }
         } label: {
@@ -2175,30 +2295,6 @@ struct SyncSettingsPane: View {
   /// slate every save into the existing records would 409. Also clears
   /// any stale system fields on local entities so the next migrate
   /// writes fresh.
-  @MainActor
-  /// Force-re-import habits/supplements/chores history from FastAPI and
-  /// push it into CloudKit. The original bootstrap heuristic
-  /// (`cloudKitSystemFields == nil` on local rows) breaks the moment the
-  /// user toggles a single item — that one record gets CK-stamped and the
-  /// bootstrap permanently no-ops, leaving years of history unimported.
-  /// This button ignores the completion flags and re-pulls from FastAPI.
-  private func runReimportChecklistHistory() async {
-    isMigrating = true
-    defer { isMigrating = false }
-    migrationStatus = "Re-importing all sections from FastAPI…"
-    let bootstrapper = ChecklistCloudKitBootstrapper(
-      context: modelContext,
-      engine: ckEngine,
-      client: client
-    )
-    do {
-      try await bootstrapper.forceBootstrap()
-      migrationStatus = "✅ Re-imported all sections. The CloudKit push continues in the background — refresh a tile to see the data."
-    } catch {
-      migrationStatus = "❌ Re-import failed: \(error.localizedDescription)"
-    }
-  }
-
   @MainActor
   /// Delete habit/supplement/chore event rows older than 30 days from
   /// the local SwiftData mirror, then reset the CK zone and re-queue what
@@ -2526,26 +2622,76 @@ struct AboutSettingsPane: View {
   var body: some View {
     Form {
       Section {
-        VStack(alignment: .center, spacing: 8) {
-          ColoredGlyph(icon: "circle.grid.cross.fill", color: .blue, size: 56)
-            .opacity(0.0) // placeholder slot; brand glyph below
-          Text("Septena")
-            .font(.title2.bold())
+        VStack(alignment: .center, spacing: 14) {
+          AppIconPreview(option: .default, size: 72)
+            .padding(.top, 4)
+          VStack(spacing: 4) {
+            Text("Septena")
+              .font(.title2.bold())
+            Text("One app for several corners of personal health")
+              .font(.subheadline)
+              .foregroundStyle(.secondary)
+              .multilineTextAlignment(.center)
+          }
           Text("Version \(version) (\(build))")
-            .font(.callout)
-            .foregroundStyle(.secondary)
+            .font(.caption)
+            .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
+        .padding(.vertical, 12)
         .listRowBackground(Color.clear)
       }
+
+      Section {
+        Text("Track training, nutrition, habits, sleep, supplements, caffeine, chores, and more — all in one place, synced across your devices with iCloud.")
+          .font(.callout)
+          .foregroundStyle(.secondary)
+      }
+
       Section("Links") {
-        Link("Source", destination: URL(string: "https://github.com/")!)
-        Link("Feedback", destination: URL(string: "mailto:mz@envisioning.com")!)
-        Link("License", destination: URL(string: "https://opensource.org/licenses/MIT")!)
+        outboundLink("Website", destination: "https://septena.app", icon: "globe")
+        outboundLink("Feedback", destination: "mailto:mz@envisioning.com", icon: "envelope")
+        outboundLink("License", destination: "https://opensource.org/licenses/MIT", icon: "doc.text")
+      }
+
+      Section {
+        infoRow("Platform", platformLabel)
+        infoRow("Version", version)
+        infoRow("Build", build)
       }
     }
     .formStyle(.grouped)
+  }
+
+  private var platformLabel: String {
+    #if os(macOS)
+    return "macOS"
+    #else
+    return "iOS · iPadOS"
+    #endif
+  }
+
+  private func outboundLink(_ title: String, destination: String, icon: String) -> some View {
+    Link(destination: URL(string: destination)!) {
+      HStack {
+        Label(title, systemImage: icon)
+          .foregroundStyle(.primary)
+        Spacer()
+        Image(systemName: "arrow.up.right")
+          .font(.caption2)
+          .foregroundStyle(.tertiary)
+      }
+    }
+  }
+
+  private func infoRow(_ label: String, _ value: String) -> some View {
+    HStack {
+      Text(label)
+      Spacer()
+      Text(value)
+        .foregroundStyle(.secondary)
+        .font(.callout.monospacedDigit())
+    }
   }
 }
 

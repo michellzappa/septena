@@ -124,7 +124,7 @@ struct RootTabView: View {
       GoalsView()
         .tabItem {
           Label("Goals", systemImage: "smallcircle.filled.circle")
-            .imageScale(.small)
+            .environment(\.symbolVariants, .none)
         }
         .tag(SeptenaTab.goals)
     }
