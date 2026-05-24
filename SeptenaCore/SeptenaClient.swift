@@ -1,11 +1,9 @@
 import Foundation
 
-// Septena REST client — talks to the FastAPI backend in /api/tasks.
-// Most domains have moved to CloudKit; what remains here is the
-// not-yet-migrated read surface (areas/projects bootstrap for migration,
-// settings/sections, the Today aggregator, health-integration proxies
-// for Oura/Withings/Air, and the nutrition CK bootstrap).
-// No auth; base URL is set via Settings (defaults to http://100.74.150.55:7000).
+// Septena REST client — a thin proxy for the only domains still on
+// FastAPI: Oura sleep history and Withings weigh-ins. Every other
+// section is CloudKit-backed and reads/writes locally. No auth; base
+// URL is set via Settings (defaults to http://100.74.150.55:7000).
 
 // MARK: - Change notification
 
@@ -72,16 +70,10 @@ final class SeptenaClient {
   private let baseURL: URL
   private let session: URLSession
 
-  /// True after a transport-level failure (URLError) on the last network
-  /// call; cleared on the next successful round-trip. HTTP status errors
-  /// (4xx/5xx) and decoding failures don't flip this — they mean we did
-  /// reach the server. OfflineBanner observes this for the global indicator.
-  var isOffline: Bool = false
-
   /// Concurrent identical GETs share one in-flight Task. Different call
-  /// sites (TaskListView.load, sidebar.load, ProjectDetailView.loadProgress
-  /// all asking for `view=all&project=X` on the same navigation) fan into
-  /// one network round-trip instead of N. Keyed by absolute URL string.
+  /// sites (Sleep, Body, Insights all asking for `oura?days=90` on the
+  /// same dashboard repaint) fan into one network round-trip instead of
+  /// N. Keyed by absolute URL string.
   private var inFlightGETs: [String: Task<Data, Error>] = [:]
 
   init(baseURL: URL) {
@@ -101,16 +93,6 @@ final class SeptenaClient {
             ?? `default`.absoluteString
     return SeptenaClient(baseURL: URL(string: raw) ?? `default`)
   }()
-
-  // MARK: - Connection test
-
-  func ping() async throws -> String {
-    // Cheap reachability check via an Oura probe (1 day = tiny payload).
-    // Oura/Withings proxies are the only domains still on FastAPI, so
-    // this is a useful real check rather than a synthetic /health hit.
-    _ = try await ouraHistory(days: 1)
-    return "OK — Septena reachable"
-  }
 
   // MARK: - Health (Oura)
 
@@ -138,7 +120,7 @@ final class SeptenaClient {
   /// In-memory shape for a single section's accent. Kept here (not in
   /// Models.swift) because SectionTheme's default palette and CK mirror
   /// both produce / consume values of this type. No HTTP endpoint reads
-  /// or writes it anymore.
+  /// or writes it anymore — purely a value-type for palette plumbing.
   struct SectionConfig: Codable, Hashable {
     let key: String
     let label: String
@@ -183,14 +165,7 @@ final class SeptenaClient {
     // Only the creator clears the slot — followers must not wipe a slot
     // that's been replaced by a later, distinct request for the same URL.
     defer { if isCreator { inFlightGETs[key] = nil } }
-    let data: Data
-    do {
-      data = try await task.value
-      isOffline = false
-    } catch let urlError as URLError {
-      isOffline = true
-      throw urlError
-    }
+    let data = try await task.value
     do {
       return try JSONDecoder().decode(type, from: data)
     } catch {

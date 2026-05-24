@@ -47,10 +47,7 @@ struct SeptenaApp: App {
 
   var body: some Scene {
     WindowGroup {
-      VStack(spacing: 0) {
-        OfflineBanner()
-        RootTabView()
-      }
+      RootTabView()
         .environment(clientProvider.client)
         .environment(navigation)
         .environment(theme)

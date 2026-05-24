@@ -374,13 +374,13 @@ struct WeekDashboardView: View {
     let appSettings: AppSettings? = SettingsMirror.loadSettings(context: ctx)
     let ca: CardioHistoryResponse? = ChecklistMirror.loadTrainingCardioHistory(context: ctx, days: 90)
     let e: [ExerciseEntry]? = ChecklistMirror.loadTrainingEntries(context: ctx, since: sinceDate(daysBack: 90))
-    async let tc = try? await TaskReads.counts(
-      client: client, context: LocalStore.shared.container.mainContext)
+    async let tc = TaskReads.counts(
+      context: LocalStore.shared.container.mainContext)
     let th: TasksHistory? = TaskReads.tasksHistory(
       days: 90, context: LocalStore.shared.container.mainContext)
-    async let tl = try? await TaskReads.list(
+    async let tl = TaskReads.list(
       view: "logbook", days: 1,
-      client: client, context: LocalStore.shared.container.mainContext)
+      context: LocalStore.shared.container.mainContext)
     async let on = try? await client.ouraHistory(days: 90)
     let ns: NutritionStatsResponse? = ChecklistMirror.buildNutritionStatsResponse(context: modelContext, days: 90)
     let ne: [NutritionEntry]? = ChecklistMirror.loadNutritionToday(context: modelContext)
@@ -428,15 +428,14 @@ struct WeekDashboardView: View {
       supplementHistory = s.daily.map { $0.done }
       ResponseCache.save(supplementHistory, forKey: CacheKey.supplementHistory)
     }
-    if let t {
-      taskCounts = t
-      ResponseCache.save(t, forKey: CacheKey.taskCounts)
-    }
+    taskCounts = t
+    ResponseCache.save(t, forKey: CacheKey.taskCounts)
     if let thRes = th {
       tasksHistory = thRes
       ResponseCache.save(thRes, forKey: CacheKey.tasksHistory)
     }
-    if let items = (await tl)?.items {
+    do {
+      let items = await tl.items
       completedTasks = items
       ResponseCache.save(items, forKey: CacheKey.completedTasks)
     }
@@ -668,25 +667,23 @@ struct WeekDashboardView: View {
       groceries = g
       ResponseCache.save(g, forKey: CacheKey.groceries)
     case .tasks:
-      async let tc = try? await TaskReads.counts(
-        client: client, context: LocalStore.shared.container.mainContext)
+      async let tc = TaskReads.counts(
+        context: LocalStore.shared.container.mainContext)
       let th: TasksHistory? = TaskReads.tasksHistory(
         days: 90, context: LocalStore.shared.container.mainContext)
-      async let tl = try? await TaskReads.list(
+      async let tl = TaskReads.list(
         view: "logbook", days: 1,
-        client: client, context: LocalStore.shared.container.mainContext)
-      if let t = await tc {
-        taskCounts = t
-        ResponseCache.save(t, forKey: CacheKey.taskCounts)
+        context: LocalStore.shared.container.mainContext)
+      let t = await tc
+      taskCounts = t
+      ResponseCache.save(t, forKey: CacheKey.taskCounts)
+      if let th {
+        tasksHistory = th
+        ResponseCache.save(th, forKey: CacheKey.tasksHistory)
       }
-      if let t = th {
-        tasksHistory = t
-        ResponseCache.save(t, forKey: CacheKey.tasksHistory)
-      }
-      if let items = (await tl)?.items {
-        completedTasks = items
-        ResponseCache.save(items, forKey: CacheKey.completedTasks)
-      }
+      let items = await tl.items
+      completedTasks = items
+      ResponseCache.save(items, forKey: CacheKey.completedTasks)
     case .training:
       let c = ChecklistMirror.loadTrainingCardioHistory(context: modelContext, days: 90)
       cardio = c

@@ -145,15 +145,10 @@ struct AddTaskPage: View {
   }
 
   private func loadTodays() async {
-    do {
-      let resp = try await TaskReads.list(
-        view: "today",
-        client: client,
-        context: LocalStore.shared.container.mainContext
-      )
-      todays = resp.items.filter { $0.status == .open }
-    } catch {
-      todays = []
-    }
+    let resp = await TaskReads.list(
+      view: "today",
+      context: LocalStore.shared.container.mainContext
+    )
+    todays = resp.items.filter { $0.status == .open }
   }
 }

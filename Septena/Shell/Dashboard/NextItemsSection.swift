@@ -35,7 +35,7 @@ final class TodayTasksModel {
     let context = LocalStore.shared.container.mainContext
     // CloudKit-mode read: TaskReads.list returns LocalCache directly,
     // so we just need to ensure the mirror is fresh, then repaint.
-    _ = try? await TaskReads.list(view: "today", client: client, context: context)
+    _ = await TaskReads.list(view: "today", context: context)
     refreshFromCache()
     actedTasks = []
     hasLoaded = true

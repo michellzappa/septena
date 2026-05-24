@@ -2000,10 +2000,7 @@ struct SyncSettingsPane: View {
   @Environment(\.modelContext) private var modelContext
 
   @State private var serverURL: String = ""
-  @State private var isChecking = false
-  @State private var connectionStatus: String = ""
 
-  @AppStorage(SettingsKey.syncLastSucceeded) private var lastSyncedAt: Double = 0
   /// CloudKit engine, injected via environment from App.swift. Used
   /// only by the DEBUG migration buttons below.
   @Environment(CKEngine.self) private var ckEngine
@@ -2023,43 +2020,18 @@ struct SyncSettingsPane: View {
   var body: some View {
     Form {
       Section {
-        HStack {
-          Image(systemName: client.isOffline ? "wifi.slash" : "checkmark.circle.fill")
-            .foregroundStyle(client.isOffline ? Color.red : Color.green)
-          Text(client.isOffline ? "Offline" : "Connected")
-            .foregroundStyle(.primary)
-          Spacer()
-          if lastSyncedAt > 0 {
-            Text("Last sync: \(lastSyncedDescription)")
-              .font(.callout)
-              .foregroundStyle(.secondary)
-          }
-        }
-      }
-
-      Section("Legacy FastAPI URL") {
         TextField("http://100.74.150.55:7000", text: $serverURL)
           #if os(iOS)
           .textInputAutocapitalization(.never)
           .keyboardType(.URL)
           .autocorrectionDisabled()
           #endif
-        Button {
-          Task { await testConnection() }
-        } label: {
-          HStack {
-            if isChecking { ProgressView().controlSize(.small) }
-            Text("Test Connection")
-          }
-        }
-        .disabled(isChecking || serverURL.isEmpty)
-        if !connectionStatus.isEmpty {
-          Text(connectionStatus)
-            .font(.callout)
-            .foregroundStyle(connectionStatus.hasPrefix("✅") ? .green : .red)
-        }
         Button("Save") { save() }
           .disabled(serverURL.isEmpty || serverURL == nav.serverURL)
+      } header: {
+        Text("FastAPI URL (Oura / Withings proxy)")
+      } footer: {
+        Text("Only Oura sleep and Withings weigh-ins still go through FastAPI. Every other section is CloudKit-backed.")
       }
 
       #if DEBUG
@@ -2199,29 +2171,6 @@ struct SyncSettingsPane: View {
 
   private func refreshDomainCounts() {
     domainCounts = DomainCounts.fetch(context: modelContext)
-  }
-
-  private var lastSyncedDescription: String {
-    let date = Date(timeIntervalSince1970: lastSyncedAt)
-    let f = RelativeDateTimeFormatter()
-    f.unitsStyle = .short
-    return f.localizedString(for: date, relativeTo: Date())
-  }
-
-  private func testConnection() async {
-    isChecking = true
-    connectionStatus = "Testing…"
-    defer { isChecking = false }
-    guard let url = URL(string: serverURL) else {
-      connectionStatus = "❌ Invalid URL"; return
-    }
-    do {
-      let testClient = SeptenaClient(baseURL: url)
-      let result = try await testClient.ping()
-      connectionStatus = "✅ \(result)"
-    } catch {
-      connectionStatus = "❌ \(error.localizedDescription)"
-    }
   }
 
   private func save() {

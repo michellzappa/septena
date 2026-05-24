@@ -29,19 +29,14 @@ private final class MenuBarTodayLoader {
   }
 
   func refresh() async {
-    do {
-      let resp = try await TaskReads.list(
-        view: "today",
-        client: ClientProvider.shared.client,
-        context: LocalStore.shared.container.mainContext
-      )
-      // Mirror the Today screen: pinned-today (`items`) plus scheduled/due
-      // rolling in (`review`). Completed-today rows live in `done` and stay
-      // out of the menu bar.
-      items = (resp.items + (resp.review ?? [])).filter { $0.status == .open }
-    } catch {
-      // Silent: stale items remain visible until the next refresh.
-    }
+    let resp = await TaskReads.list(
+      view: "today",
+      context: LocalStore.shared.container.mainContext
+    )
+    // Mirror the Today screen: pinned-today (`items`) plus scheduled/due
+    // rolling in (`review`). Completed-today rows live in `done` and stay
+    // out of the menu bar.
+    items = (resp.items + (resp.review ?? [])).filter { $0.status == .open }
   }
 }
 

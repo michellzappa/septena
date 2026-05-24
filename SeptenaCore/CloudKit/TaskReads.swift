@@ -1,18 +1,13 @@
 import Foundation
 import SwiftData
 
-// TaskReads — the read-side seam for the FastAPI ⇄ CloudKit cutover.
+// TaskReads — the read side of the task data path. Synthesizes
+// `TasksListResponse` / `TasksCounts` from the local SwiftData mirror
+// that CKSyncEngine keeps fresh; the shape matches what the (now
+// retired) FastAPI endpoints used to return so existing view code
+// doesn't have to branch on backend.
 //
-// Phase 5: every place in the app that fetched task data through
-// `SeptenaClient.list / .counts` for displaying lists, badge counts,
-// or the dashboard now goes through here. When the backend flag is
-// `.fastAPI` the call passes straight through to the network client;
-// when it's `.cloudKit` we synthesize the same response shape from
-// the local SwiftData mirror (which CKSyncEngine keeps fresh). View
-// code doesn't have to branch — same return type, same call site.
-//
-// Mutations are NOT routed here — `TaskMutator` owns the write side
-// and has been backend-aware since Phase 1.
+// Mutations live in `TaskMutator`. No FastAPI seams remain in either path.
 
 @MainActor
 enum TaskReads {
@@ -34,9 +29,7 @@ enum TaskReads {
                    area: String? = nil,
                    project: String? = nil,
                    days: Int = 90,
-                   client: SeptenaClient,
-                   context: ModelContext) async throws -> TasksListResponse {
-    _ = client
+                   context: ModelContext) async -> TasksListResponse {
     // See note on `counts(...)` — same off-main race applies. Force
     // MainActor execution so SwiftData reads never hit the cooperative
     // executor.
@@ -127,9 +120,7 @@ enum TaskReads {
 
   // MARK: - counts
 
-  static func counts(client: SeptenaClient,
-                     context: ModelContext) async throws -> TasksCounts {
-    _ = client
+  static func counts(context: ModelContext) async -> TasksCounts {
     // Force the SwiftData reads onto the main thread regardless of
     // caller's executor. The enum-level @MainActor annotation isn't
     // enough because ModelContext isn't Sendable — when passed across

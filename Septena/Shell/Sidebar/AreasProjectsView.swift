@@ -225,7 +225,7 @@ struct AreaDetailView: View {
     if !cachedProjects.isEmpty { projects = cachedProjects }
 
     async let allInArea = TaskReads.list(view: "all", area: area.id,
-                                         client: client, context: modelContext)
+                                         context: modelContext)
     areas = LocalCache.areas(in: modelContext)
     projects = LocalCache.projects(in: modelContext)
 
@@ -243,7 +243,8 @@ struct AreaDetailView: View {
     }
 
     // Group tasks by project to compute progress per project.
-    if let items = try? await allInArea.items {
+    do {
+      let items = await allInArea.items
       var done: [String: Int] = [:]
       var total: [String: Int] = [:]
       for t in items {
@@ -490,8 +491,8 @@ struct ProjectDetailView: View {
       progress = t > 0 ? Double(d) / Double(t) : 0
     }
     do {
-      let all = try await TaskReads.list(view: "all", project: project.id,
-                                         client: client, context: modelContext).items
+      let all = await TaskReads.list(view: "all", project: project.id,
+                                     context: modelContext).items
       var done = 0, total = 0
       for t in all {
         switch t.status {

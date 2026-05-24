@@ -856,30 +856,26 @@ struct SidebarRootView: View {
     if !cachedProjects.isEmpty { projects = cachedProjects }
     let cachedTasks = LocalCache.allTasks(in: modelContext)
     if !cachedTasks.isEmpty { apply(aggregate: Self.aggregate(tasks: cachedTasks)) }
-    do {
-      // CloudKit is the only backend. LocalCache is authoritative —
-      // CKSyncEngine keeps SwiftData fresh.
-      async let c = TaskReads.counts(client: client, context: modelContext)
-      async let all = TaskReads.list(view: "all", client: client, context: modelContext)
-      areas = LocalCache.areas(in: modelContext)
-      projects = LocalCache.projects(in: modelContext)
-      let serverCounts = try await c
-      // 'Next' is the chores / habits / supplements ritual. Merged
-      // locally from the CloudKit-mirrored SwiftData store — no more
-      // round-trip to FastAPI for the badge count.
-      let next = ChecklistMirror.loadNextItems(context: modelContext,
-                                               date: SeptenaDate.today)
-      nextCount = next.items.count
+    // CloudKit is the only backend. LocalCache is authoritative —
+    // CKSyncEngine keeps SwiftData fresh.
+    async let c = TaskReads.counts(context: modelContext)
+    async let all = TaskReads.list(view: "all", context: modelContext)
+    areas = LocalCache.areas(in: modelContext)
+    projects = LocalCache.projects(in: modelContext)
+    let serverCounts = await c
+    // 'Next' is the chores / habits / supplements ritual. Merged
+    // locally from the CloudKit-mirrored SwiftData store — no FastAPI
+    // round-trip for the badge count.
+    let next = ChecklistMirror.loadNextItems(context: modelContext,
+                                             date: SeptenaDate.today)
+    nextCount = next.items.count
 
-      let items = try await all.items
-      var agg = Self.aggregate(tasks: items)
-      // Per-smart-list counts come from LocalCache via TaskReads.counts.
-      // Per-project / per-area roll-ups stay from the local aggregate.
-      agg.counts = serverCounts
-      apply(aggregate: agg)
-    } catch {
-      errorMessage = error.localizedDescription
-    }
+    let items = await all.items
+    var agg = Self.aggregate(tasks: items)
+    // Per-smart-list counts come from LocalCache via TaskReads.counts.
+    // Per-project / per-area roll-ups stay from the local aggregate.
+    agg.counts = serverCounts
+    apply(aggregate: agg)
   }
 
   private struct Aggregate {
