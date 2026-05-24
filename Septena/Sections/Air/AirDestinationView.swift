@@ -365,6 +365,14 @@ struct AirDestinationView: View {
   // webapp's thresholds (1000 ok→poor, 1400 poor→bad, 40-60% humidity
   // comfort) so the visual language stays consistent.
 
+  /// Fixed 24h X window shared by all three last-24h charts so the
+  /// time axis lines up across them (and isn't compressed when one
+  /// metric has fewer non-nil samples than another).
+  private var last24hWindow: ClosedRange<Date> {
+    let now = Date()
+    return now.addingTimeInterval(-24 * 3600)...now
+  }
+
   @ViewBuilder
   private var co2Last24hChart: some View {
     let pts = series24h.filter { $0.co2Ppm != nil }
@@ -381,14 +389,21 @@ struct AirDestinationView: View {
           RuleMark(y: .value("1400", 1400))
             .foregroundStyle(.red.opacity(0.6))
             .lineStyle(StrokeStyle(lineWidth: 1, dash: [6, 3]))
-          // Reading line.
+          // Reading line + per-sample dots so every ad we captured
+          // in the window is visible (Aranet broadcasts ~every 5s
+          // when foreground-scanned, so density carries information).
           ForEach(pts) { p in
             LineMark(x: .value("Time", p.capturedAt),
                      y: .value("ppm", p.co2Ppm ?? 0))
               .foregroundStyle(accent)
               .interpolationMethod(.monotone)
+            PointMark(x: .value("Time", p.capturedAt),
+                      y: .value("ppm", p.co2Ppm ?? 0))
+              .foregroundStyle(accent)
+              .symbolSize(10)
           }
         }
+        .chartXScale(domain: last24hWindow)
         .chartYScale(domain: .automatic(includesZero: false))
         .frame(height: 200)
       } header: { chartHeader("CO₂ last 24h", detail: co2Last24hDetail) }
@@ -414,7 +429,12 @@ struct AirDestinationView: View {
                    y: .value("°C", p.tempC ?? 0))
             .foregroundStyle(.yellow)
             .interpolationMethod(.monotone)
+          PointMark(x: .value("Time", p.capturedAt),
+                    y: .value("°C", p.tempC ?? 0))
+            .foregroundStyle(.yellow)
+            .symbolSize(10)
         }
+        .chartXScale(domain: last24hWindow)
         .chartYScale(domain: .automatic(includesZero: false))
         .frame(height: 140)
       } header: { chartHeader("Temperature", detail: "last 24h") }
@@ -439,8 +459,13 @@ struct AirDestinationView: View {
                      y: .value("%", Double(p.humidityPct ?? 0)))
               .foregroundStyle(.teal)
               .interpolationMethod(.monotone)
+            PointMark(x: .value("Time", p.capturedAt),
+                      y: .value("%", Double(p.humidityPct ?? 0)))
+              .foregroundStyle(.teal)
+              .symbolSize(10)
           }
         }
+        .chartXScale(domain: last24hWindow)
         .chartYScale(domain: 0...100)
         .frame(height: 140)
       } header: { chartHeader("Humidity", detail: "last 24h") }
