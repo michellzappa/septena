@@ -23,10 +23,6 @@ struct CaffeineDestinationView: View {
       Section("Today") {
         if let today, !today.entries.isEmpty {
           ForEach(Array(today.entries.reversed())) { entry in
-            // Standard List "tap row → edit" pattern: Button with
-            // `.plain` style preserves the row chrome; destructive
-            // delete lives in the long-press context menu, matching the
-            // rest of the app.
             Button {
               editing = entry
             } label: {
@@ -39,6 +35,9 @@ struct CaffeineDestinationView: View {
             .buttonStyle(.plain)
             .listRowInsets(EdgeInsets())
             .contextMenu {
+              Button { editing = entry } label: {
+                Label("Edit", systemImage: "pencil")
+              }
               Button(role: .destructive) {
                 delete(entry)
               } label: {

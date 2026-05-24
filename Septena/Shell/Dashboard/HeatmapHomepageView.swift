@@ -228,22 +228,20 @@ private struct HeatmapDomainRow: View {
   static func buildLevelMap(from history: HistorySeries?, windowDays: Int) -> [String: Int] {
     var levels = Self.levels(for: history)
     guard !levels.isEmpty else { return [:] }
-    // Pad or trim so the array covers exactly windowDays entries ending at
-    // today. Without this, APIs that return fewer entries than requested
-    // (e.g. Oura on nights with missing data) leave the oldest heatmap
-    // cells with no map entry, falling through to ?? 0 and appearing empty.
+    // Pad with leading zeros if shorter than window so every date in the
+    // viewport has an entry. Do NOT truncate when longer — sources like
+    // Oura append a trailing 0 for today (sleep not yet recorded) to shift
+    // the anchor back by one day so the week-rounded first column is covered.
     if levels.count < windowDays {
       levels = Array(repeating: 0, count: windowDays - levels.count) + levels
-    } else if levels.count > windowDays {
-      levels = Array(levels.suffix(windowDays))
     }
     let cal = Calendar.current
     let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
     let today = cal.startOfDay(for: Date())
     var map: [String: Int] = [:]
     for (i, level) in levels.enumerated() {
-      // levels is oldest-first; index 0 → today-(windowDays-1), last → today.
-      let daysBack = windowDays - 1 - i
+      // levels is oldest-first; last element maps to today.
+      let daysBack = levels.count - 1 - i
       if let d = cal.date(byAdding: .day, value: -daysBack, to: today) {
         map[fmt.string(from: d)] = level
       }

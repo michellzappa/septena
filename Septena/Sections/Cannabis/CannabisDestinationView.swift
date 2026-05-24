@@ -40,6 +40,9 @@ struct CannabisDestinationView: View {
             .buttonStyle(.plain)
             .listRowInsets(EdgeInsets())
             .contextMenu {
+              Button { editing = entry } label: {
+                Label("Edit", systemImage: "pencil")
+              }
               Button(role: .destructive) {
                 delete(entry)
               } label: {

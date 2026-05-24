@@ -1055,7 +1055,11 @@ struct WeekDashboardView: View {
     let last = ouraNights.first
     let lastH = last?.totalH ?? 0
     let score = last?.sleepScore.map { "\($0)" } ?? "—"
-    let bars = ouraNights.reversed().map { $0.sleepScore ?? 0 }
+    // Oura only records completed nights, so the array ends at yesterday.
+    // Append a 0 for today (no sleep recorded yet) so buildLevelMap anchors
+    // bars[0] to today-90 instead of today-89, giving the week-rounded first
+    // column's Monday cell an actual data entry rather than a phantom gap.
+    let bars = ouraNights.reversed().map { $0.sleepScore ?? 0 } + [0]
     return HomepageDomainData(
       domain: .sleep,
       title: "Sleep",
