@@ -775,27 +775,21 @@ struct TaskListView: View {
 
   // MARK: - Row
 
+  /// `dropGroup` is intentionally NOT applied here — `.swipeActions` must
+  /// be the direct child of List, and wrapping with extra modifiers below
+  /// it can confuse List's row-cell discovery. Callers in
+  /// `groupedOpenItems` apply `.taskClusterDrop(...)` AFTER `.asListRow()`
+  /// so drag/drop sits on the outer list cell.
   @ViewBuilder
-  private func row(_ task: SeptenaTask,
-                   dropGroup: TaskGroupDrop? = nil) -> some View {
+  private func row(_ task: SeptenaTask) -> some View {
     rowContent(task)
       // Drag source — only when not editing the row inline, so the text
       // field stays interactive. Dragging the row publishes its id so any
       // group header (or sidebar item) can pick it up and re-home the task
-      // to a new area/project. Things-style: faded mini preview, no
-      // reordering yet — phase 2 (post-CloudKit migration) will add a
-      // persistent sortOrder for in-list reorder.
+      // to a new area/project.
       .modifier(TaskRowDraggable(taskId: task.id,
                                  title: task.title,
                                  enabled: editingTaskId != task.id))
-      // Make the whole row a drop landing zone for its cluster — drag
-      // any task onto any other row in the project/area and the dragged
-      // task gets re-homed to that cluster. Highlight binds to the
-      // parent-level `hoveredDropGroupKey` so the entire cluster (header
-      // + every row) lights up as one band, not just the hovered cell.
-      .modifier(ClusterDropTarget(groupKey: dropGroup?.key,
-                                  hovered: $hoveredDropGroupKey,
-                                  onDrop: dropGroup?.accept))
       // One shared highlight backplate covers both the closed-row and
       // inline-editor branches, so the accent tint stays put when the
       // row swaps state — no cross-fade needed.
@@ -1204,28 +1198,32 @@ struct TaskListView: View {
         for id in ids { applyMove(id: id, areaId: area.id, projectId: nil) }
       }
       if !areaTasks.isEmpty {
-        groupHeader(
-          icon: "square.stack.3d.up.fill",
-          title: area.title,
-          onTap: { nav.path = [.area(area)] },
-          dropGroup: areaDrop
+        taskClusterDrop(
+          groupHeader(icon: "square.stack.3d.up.fill",
+                      title: area.title,
+                      onTap: { nav.path = [.area(area)] })
+            .asListRow(),
+          group: areaDrop
         )
-        .asListRow()
-        ForEach(areaTasks) { task in row(task, dropGroup: areaDrop).asListRow() }
+        ForEach(areaTasks) { task in
+          taskClusterDrop(row(task).asListRow(), group: areaDrop)
+        }
       }
       ForEach(projects.filter { $0.area == area.id }) { project in
         if let tasks = byProject[project.id], !tasks.isEmpty {
           let projectDrop = TaskGroupDrop(key: "project:\(project.id)") { ids in
             for id in ids { applyMove(id: id, areaId: nil, projectId: project.id) }
           }
-          groupHeader(
-            icon: nil,
-            title: project.title,
-            onTap: { nav.path = [.project(project)] },
-            dropGroup: projectDrop
+          taskClusterDrop(
+            groupHeader(icon: nil,
+                        title: project.title,
+                        onTap: { nav.path = [.project(project)] })
+              .asListRow(),
+            group: projectDrop
           )
-          .asListRow()
-          ForEach(tasks) { task in row(task, dropGroup: projectDrop).asListRow() }
+          ForEach(tasks) { task in
+            taskClusterDrop(row(task).asListRow(), group: projectDrop)
+          }
         }
       }
     }
@@ -1236,14 +1234,16 @@ struct TaskListView: View {
         let projectDrop = TaskGroupDrop(key: "project:\(project.id)") { ids in
           for id in ids { applyMove(id: id, areaId: nil, projectId: project.id) }
         }
-        groupHeader(
-          icon: nil,
-          title: project.title,
-          onTap: { nav.path = [.project(project)] },
-          dropGroup: projectDrop
+        taskClusterDrop(
+          groupHeader(icon: nil,
+                      title: project.title,
+                      onTap: { nav.path = [.project(project)] })
+            .asListRow(),
+          group: projectDrop
         )
-        .asListRow()
-        ForEach(tasks) { task in row(task, dropGroup: projectDrop).asListRow() }
+        ForEach(tasks) { task in
+          taskClusterDrop(row(task).asListRow(), group: projectDrop)
+        }
       }
     }
   }
@@ -1323,15 +1323,25 @@ struct TaskListView: View {
     }
   }
 
+  /// Drop target is applied at the callsite (on the outer list cell),
+  /// not here — see `row(_:)` comment for why.
   @ViewBuilder
   private func groupHeader(icon: String?,
                            title: String,
-                           onTap: (() -> Void)? = nil,
-                           dropGroup: TaskGroupDrop? = nil) -> some View {
+                           onTap: (() -> Void)? = nil) -> some View {
     groupHeaderBody(icon: icon, title: title, onTap: onTap)
-      .modifier(ClusterDropTarget(groupKey: dropGroup?.key,
-                                  hovered: $hoveredDropGroupKey,
-                                  onDrop: dropGroup?.accept))
+  }
+
+  /// Cluster-drop helper: wraps an outer list cell so the *whole row*
+  /// becomes a drop landing zone for the given project/area cluster.
+  /// Highlight binds to the parent-level `hoveredDropGroupKey` so the
+  /// entire cluster (header + every row) lights up as one band, not
+  /// just the hovered cell. Apply AFTER `.asListRow()`.
+  private func taskClusterDrop<V: View>(_ view: V,
+                                        group: TaskGroupDrop) -> some View {
+    view.modifier(ClusterDropTarget(groupKey: group.key,
+                                    hovered: $hoveredDropGroupKey,
+                                    onDrop: group.accept))
   }
 
   private func groupHeaderBody(icon: String?, title: String, onTap: (() -> Void)? = nil) -> some View {
