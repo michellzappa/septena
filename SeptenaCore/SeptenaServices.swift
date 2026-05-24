@@ -776,10 +776,6 @@ final class SeptenaServices {
       aranetBridge.onSnapshot = { [airStore] snap in
         airStore.ingest(snap)
       }
-      let checklistBootstrapper = ChecklistCloudKitBootstrapper(context: context,
-                                                                engine: ckEngine,
-                                                                client: client)
-      try? await checklistBootstrapper.bootstrapIfNeeded()
     }
     startTask = task
     await task.value
