@@ -107,7 +107,16 @@ init() {
     do {
       let status = try await container.accountStatus()
       if status != accountStatus {
-        logger.info("CKEngine account status: \(String(describing: status), privacy: .public)")
+        let label: String
+        switch status {
+        case .available:          label = "available"
+        case .noAccount:          label = "noAccount"
+        case .restricted:         label = "restricted"
+        case .couldNotDetermine:  label = "couldNotDetermine"
+        case .temporarilyUnavailable: label = "temporarilyUnavailable"
+        @unknown default:         label = "unknown(\(status.rawValue))"
+        }
+        logger.info("CKEngine account status: \(label, privacy: .public)")
       }
       accountStatus = status
     } catch {

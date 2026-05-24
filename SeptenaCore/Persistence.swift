@@ -2515,10 +2515,10 @@ enum LocalCache {
     // One-line summary covers the healthy case. Used to be a dozen lines
     // of [TaskState]/[AreaState]/[ProjectState] info; the per-bucket
     // detail wasn't actionable when everything was fine.
-    SeptenaLog.info("[Septena] tasks=\(rows.count) (open=\(open) today=\(todayFlag) overdue=\(dueLE) ck=\(withSystemFields)) areas=\(areas.count)/ck=\(areasWithCK) projects=\(projects.count)/ck=\(projectsWithCK)")
+    SeptenaLog.info("tasks=\(rows.count) (open=\(open) today=\(todayFlag) overdue=\(dueLE) ck=\(withSystemFields)) areas=\(areas.count)/ck=\(areasWithCK) projects=\(projects.count)/ck=\(projectsWithCK)")
 
     if pendingDel > 0 {
-      SeptenaLog.info("[Septena] \(pendingDel) tasks pending deletion")
+      SeptenaLog.info("\(pendingDel) tasks pending deletion")
     }
 
     // Crosswalk is silent in the healthy case (everything resolves).

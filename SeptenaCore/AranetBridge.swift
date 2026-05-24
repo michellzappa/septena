@@ -275,8 +275,8 @@ extension AranetBridge: CBCentralManagerDelegate {
   /// scan would be dropped on relaunch.
   func centralManager(_ central: CBCentralManager,
                       willRestoreState dict: [String: Any]) {
-    let services = dict[CBCentralManagerRestoredStateScanServicesKey] as? [CBUUID] ?? []
-    SeptenaLog.info("[Aranet] willRestoreState — restoring scan with services=\(services.map(\.uuidString))")
+    _ = dict[CBCentralManagerRestoredStateScanServicesKey] as? [CBUUID]
+    SeptenaLog.info("[Aranet] restoring background scan")
     wantsActive = true
     state = .scanning
   }
@@ -312,11 +312,7 @@ extension AranetBridge: CBCentralManagerDelegate {
     // 60s-resolution payload repeating; logging each one buries the
     // rest of the console and burns disk.
     if latest == nil {
-      let svcUUIDs = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] ?? []
-      let overflow = advertisementData[CBAdvertisementDataOverflowServiceUUIDsKey] as? [CBUUID] ?? []
-      let svcList = (svcUUIDs + overflow).map(\.uuidString).joined(separator: ",")
-      let hex = mfg.prefix(32).map { String(format: "%02x", $0) }.joined(separator: " ")
-      SeptenaLog.info("[Aranet] first ad parsed from \(name) rssi=\(RSSI) services=[\(svcList.isEmpty ? "—" : svcList)] mfg=\(hex)")
+      SeptenaLog.info("[Aranet] connected to \(name): CO2=\(snap.co2Ppm)ppm \(String(format: "%.1f", snap.tempC))°C \(snap.humidityPct)% batt=\(snap.batteryPct)%")
       UserDefaults.standard.set(peripheral.identifier.uuidString,
                                 forKey: kKnownPeripheralKey)
     }
