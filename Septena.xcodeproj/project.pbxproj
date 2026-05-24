@@ -70,7 +70,6 @@
 		3797CC96603DC088851E9CA3 /* TaskCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = A08DA8E8E77422BB9583A61C /* TaskCommands.swift */; };
 		37C637FA20354B02A5330048 /* ExerciseDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7961DD5158A64BE39F40AFCA /* ExerciseDetailView.swift */; };
 		38449958A37427F0F31973A9 /* TasksQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0B5F0D2E1B01AAEF2217FA4 /* TasksQuickAddMenu.swift */; };
-		39CD08C5DEE045DA2046A98C /* HTTPOutbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BE54D41FA8376A929C7D29 /* HTTPOutbox.swift */; };
 		39DF76042915AEA3F266DB4E /* PollenClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 168F70A74A3AA9D2A0E234DB /* PollenClient.swift */; };
 		3AD2CBA0A9A2EF4ACE740C5D /* HabitsQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB960188319E54312A616C00 /* HabitsQuickAddMenu.swift */; };
 		3C51EABA92695B18A7853BC1 /* GroceriesDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FA781FD1BD2DC0AA7388700 /* GroceriesDestinationView.swift */; };
@@ -201,7 +200,6 @@
 		AB68497A7AF5F88ED33EAB79 /* EditSupplementSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F70E70D8BC6F8B767D06FF9 /* EditSupplementSheet.swift */; };
 		D1C1F87FC588486EB9213B3F /* SupplementTypeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B73D2010A0604DBEB34C0478 /* SupplementTypeSheet.swift */; };
 		AB689CCEB13486AEB4AE05C8 /* IntensityGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7DF7DE41AF304A9324BC6E /* IntensityGlyph.swift */; };
-		ACD44B47A763255CA20575BE /* HTTPOutbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BE54D41FA8376A929C7D29 /* HTTPOutbox.swift */; };
 		AD6AB8AB9F61D39820850F23 /* SeptenaWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1130C3EBCF558AF0EFB27AB9 /* SeptenaWatchApp.swift */; };
 		AD8E6D6E9DFA518DBC2B50CA /* AddChorePage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B241213EA8E591629280B7EE /* AddChorePage.swift */; };
 		ADCA538CBFB1E75DCC416215 /* SettingsRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C93BF01E5F69A01E9E9302 /* SettingsRecord.swift */; };
@@ -411,7 +409,6 @@
 		3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		3C59B083F7F5C67ABE440868 /* NavigationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationState.swift; sourceTree = "<group>"; };
 		3C8645572712693D81587B7C /* TrainingDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingDestinationView.swift; sourceTree = "<group>"; };
-		40BE54D41FA8376A929C7D29 /* HTTPOutbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPOutbox.swift; sourceTree = "<group>"; };
 		40D9EAAB80FD7F9FAC57F20B /* GoalsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsView.swift; sourceTree = "<group>"; };
 		41F8977A576F2BB747E8DBD7 /* TaskComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskComponents.swift; sourceTree = "<group>"; };
 		42EB061D69FA656547DC171F /* NutritionDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionDestinationView.swift; sourceTree = "<group>"; };
@@ -955,7 +952,6 @@
 				DFD8EA98B891BB43A0CE4640 /* DayClock.swift */,
 				53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */,
 				F61B77A80F53A6EEEBBC90EA /* HealthKitBridge.swift */,
-				40BE54D41FA8376A929C7D29 /* HTTPOutbox.swift */,
 				7D5ECFDA9128B73993023CB6 /* Models.swift */,
 				AD295FAB7B881CAC43EE8C34 /* Outbox.swift */,
 				25DC8E705099DB99718A8596 /* Persistence.swift */,
@@ -1230,7 +1226,6 @@
 				2D0446FF68EAE29C3AEEC770 /* GutBristolRecorder.swift in Sources */,
 				2C68F00EF16E552C12B176AE /* GutDestinationView.swift in Sources */,
 				C340BAAC69B40F5B9CD987BD /* GutQuickAddMenu.swift in Sources */,
-				ACD44B47A763255CA20575BE /* HTTPOutbox.swift in Sources */,
 				CC74FC02CD22EC7F0A3AC8AF /* HabitsDestinationView.swift in Sources */,
 				58DC084B12BA54003373BF5F /* HabitsQuickAddMenu.swift in Sources */,
 				5330AF71083A1F3514B862B8 /* Haptics.swift in Sources */,
@@ -1408,7 +1403,6 @@
 				14A026D5D1BAFF0B4943D0E0 /* GutBristolRecorder.swift in Sources */,
 				57CDC37DD71D40C12819E6C6 /* GutDestinationView.swift in Sources */,
 				E680A3EF175E9F47A1C8D641 /* GutQuickAddMenu.swift in Sources */,
-				39CD08C5DEE045DA2046A98C /* HTTPOutbox.swift in Sources */,
 				2E71534FB75930353C9B6320 /* HabitsDestinationView.swift in Sources */,
 				3AD2CBA0A9A2EF4ACE740C5D /* HabitsQuickAddMenu.swift in Sources */,
 				28777ACD729D9C78846219C4 /* Haptics.swift in Sources */,

@@ -21,18 +21,17 @@ struct SeptenaApp: App {
   @State private var dayClock = DayClock()
   private let localStore = LocalStore.shared
   /// Process-wide accessor for the CloudKit-backed mutation stack.
-  /// Owns `ckEngine`, `taskMutator`, `areasMutator`, `projectsMutator`,
-  /// and `httpOutbox` so AppIntents (Siri / Shortcuts) can reach the
-  /// same instances the SwiftUI scene uses — see SeptenaServices.swift
-  /// for the rationale. The properties below are convenience aliases
-  /// so the view body / environment-injection sites read like before.
+  /// Owns `ckEngine`, `taskMutator`, `areasMutator`, `projectsMutator`
+  /// so AppIntents (Siri / Shortcuts) can reach the same instances the
+  /// SwiftUI scene uses — see SeptenaServices.swift for the rationale.
+  /// The properties below are convenience aliases so the view body /
+  /// environment-injection sites read like before.
   private let services = SeptenaServices.shared
   private var ckEngine: CKEngine { services.ckEngine }
   private var taskMutator: TaskMutator { services.taskMutator }
   private var checklistMutator: ChecklistMutator { services.checklistMutator }
   private var areasMutator: AreasMutator { services.areasMutator }
   private var projectsMutator: ProjectsMutator { services.projectsMutator }
-  private var httpOutbox: HTTPOutbox { services.httpOutbox }
   private var aranetBridge: AranetBridge { services.aranetBridge }
   private var airStore: AirStore { services.airStore }
   private var pollenClient: PollenClient { services.pollenClient }
@@ -61,7 +60,6 @@ struct SeptenaApp: App {
         .environment(checklistMutator)
         .environment(areasMutator)
         .environment(projectsMutator)
-        .environment(httpOutbox)
         .environment(dayClock)
         .environment(ckEngine)
         .environment(aranetBridge)
@@ -78,7 +76,6 @@ struct SeptenaApp: App {
           // refresh path independent of push delivery.
           if phase == .active {
             dayClock.refreshIfNeeded()
-            httpOutbox.kickDrain()
             Task {
               await ckEngine.refreshAccountStatus()
               try? await ckEngine.fetchChanges()
@@ -122,10 +119,6 @@ struct SeptenaApp: App {
           try? await ckEngine.fetchChanges()
           await theme.refresh(from: clientProvider.client)
           await settingsStore.refresh(from: clientProvider.client)
-          // Flush anything that was queued in a prior session (e.g. the
-          // app was killed mid-drain). Tasks are CloudKit-only now; only
-          // the non-task HTTP outbox needs kicking.
-          httpOutbox.kickDrain()
           BadgeManager.shared.start(context: localStore.container.mainContext)
           TrainingMuscleBackfill.runIfNeeded(context: localStore.container.mainContext)
           TrainingLibraryEnrichment.runIfNeeded(context: localStore.container.mainContext)

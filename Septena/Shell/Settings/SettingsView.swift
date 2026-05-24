@@ -2016,7 +2016,6 @@ struct SyncSettingsPane: View {
   @Environment(SeptenaClient.self) private var client
   @Environment(SectionTheme.self) private var theme
   @Environment(SettingsStore.self) private var store
-  @Environment(HTTPOutbox.self) private var httpOutbox
   @Environment(\.modelContext) private var modelContext
 
   @State private var serverURL: String = ""
@@ -2122,8 +2121,6 @@ struct SyncSettingsPane: View {
       Section("Migration Status") {
         LabeledContent("CloudKit pending writes",
                        value: String(ckEngine.pendingRecordZoneChangesCount))
-        LabeledContent("Legacy HTTP pending writes",
-                       value: String(httpOutbox.pendingCount))
         // Per-section breakdown of current backend. Order matches
         // SectionManifest.all (catalog order) so the list lines up with
         // the sidebar above. Tasks bundles areas + projects.

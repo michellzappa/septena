@@ -29,7 +29,6 @@ enum NutritionSheet: Hashable, Identifiable {
 
 struct WeekDashboardView: View {
   @Environment(SeptenaClient.self) private var client
-  @Environment(HTTPOutbox.self) private var outbox
   @Environment(\.modelContext) private var modelContext
   @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(TaskMutator.self) private var taskMutator

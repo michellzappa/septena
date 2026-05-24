@@ -2206,7 +2206,7 @@ final class LocalStore {
                          SessionTypeEntity.self,
                          NutritionEntryEntity.self, NutritionDailySummaryEntity.self,
                          AirReadingEntity.self,
-                         OutboxEntity.self, HTTPOutboxEntity.self])
+                         OutboxEntity.self])
     // Explicitly opt OUT of NSPersistentCloudKitContainer mirroring. Having
     // CloudKit in the target entitlements would otherwise switch SwiftData
     // into auto-mirror mode, which requires all-optional attributes and

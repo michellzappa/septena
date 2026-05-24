@@ -41,7 +41,6 @@ final class SeptenaServices {
   let nutritionMutator: NutritionMutator
   let areasMutator: AreasMutator
   let projectsMutator: ProjectsMutator
-  let httpOutbox: HTTPOutbox
   /// Live Aranet4 CO2 sensor connection (CoreBluetooth). Single
   /// process-wide instance so views, Settings, and the on-launch
   /// auto-start path all read the same connection state.
@@ -75,7 +74,6 @@ final class SeptenaServices {
     self.nutritionMutator = NutritionMutator(context: context, ckEngine: nil)
     self.areasMutator = AreasMutator(context: context)
     self.projectsMutator = ProjectsMutator(context: context)
-    self.httpOutbox = HTTPOutbox(client: client, context: context)
     self.aranetBridge = AranetBridge()
     self.airStore = AirStore(context: context)
     self.pollenClient = PollenClient()

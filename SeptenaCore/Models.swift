@@ -533,10 +533,6 @@ struct ChoreItem: Codable, Identifiable, Hashable {
   }
 }
 
-struct ChoresListResponse: Codable {
-  var chores: [ChoreItem]
-}
-
 struct ChoreDefinitionPayload: Codable, Hashable {
   let id: String
   var name: String
@@ -757,11 +753,6 @@ struct ProgressionPoint: Codable, Hashable {
     self.distanceM = distanceM
     self.level = level
   }
-}
-
-struct ProgressionResponse: Codable {
-  let exercise: String
-  let data: [ProgressionPoint]
 }
 
 /// One row from `/api/training/summary` — per-exercise rollup.
@@ -1072,13 +1063,8 @@ struct GroceryCategory: Codable, Identifiable, Hashable {
   var name: String
 }
 
-struct GroceriesResponse: Codable {
-  let items: [GroceryItem]
-  let categories: [GroceryCategory]?
-}
-
-/// Default fallback used when the backend response omits `categories` (older
-/// server) or returns an empty list. Matches the server-side defaults.
+/// Default category list — seeded into a fresh user's GroceriesDestinationView
+/// when no CloudKit categories have been created yet.
 let DEFAULT_GROCERY_CATEGORIES: [GroceryCategory] = [
   GroceryCategory(id: "produce",   name: "Produce"),
   GroceryCategory(id: "dairy",     name: "Dairy"),
@@ -1137,10 +1123,6 @@ struct CaffeineTimePoint: Codable, Hashable {
   var grams: Double?
 }
 
-struct CaffeineEntriesResponse: Codable {
-  let entries: [CaffeineTimePoint]
-}
-
 // MARK: - Cannabis
 
 struct CannabisEntry: Codable, Identifiable, Hashable {
@@ -1189,10 +1171,6 @@ struct CannabisTimePoint: Codable, Hashable {
   let method: String
   var strain: String?
   var hit: Int?
-}
-
-struct CannabisEntriesResponse: Codable {
-  let entries: [CannabisTimePoint]
 }
 
 // MARK: - Body (Withings)
@@ -1635,9 +1613,6 @@ struct Goal: Identifiable, Codable, Hashable {
   var updated: String
 }
 
-struct GoalsList: Decodable { let goals: [Goal] }
-struct GoalMutation: Decodable { let ok: Bool; let goal: Goal }
-
 // MARK: - Date helpers (Septena uses YYYY-MM-DD strings)
 
 enum SeptenaDate {
@@ -1765,11 +1740,6 @@ struct SessionTypeConfig: Codable, Hashable, Identifiable {
   static func make(id: String, label: String, emoji: String?, exercises: [String], archived: Bool = false, kind: SessionKind? = nil) -> SessionTypeConfig {
     SessionTypeConfig(id: id, label: label, emoji: emoji, exercises: exercises, archived: archived, kind: kind)
   }
-}
-
-struct SessionTypesResponse: Codable {
-  let sessionTypes: [SessionTypeConfig]
-  enum CodingKeys: String, CodingKey { case sessionTypes = "session_types" }
 }
 
 /// Last-entry prefill values for an exercise — drives the logger's default
@@ -1982,83 +1952,17 @@ struct DraftSession: Codable, Hashable {
   var totalCount: Int { entries.filter { $0.status != .skipped }.count }
 }
 
-// MARK: - Insights (cross-section correlations)
-
-public struct CorrelationRow: Codable, Hashable, Identifiable {
-  public let predictor: String
-  public let predictorSection: String
-  public let predictorUnit: String
-  public let target: String
-  public let targetSection: String
-  public let targetUnit: String
-  public let r: Double
-  public let n: Int
-  public let lag: Int
-  public let p: Double?
-  public let tier: String
-  public let absR: Double
-
-  public var id: String { "\(predictor)→\(target)@\(lag)" }
-
-  enum CodingKeys: String, CodingKey {
-    case predictor, target, r, n, lag, p, tier
-    case predictorSection = "predictor_section"
-    case predictorUnit    = "predictor_unit"
-    case targetSection    = "target_section"
-    case targetUnit       = "target_unit"
-    case absR             = "abs_r"
-  }
-}
-
-public struct CorrelationCounts: Codable, Hashable {
-  public let predictors: Int
-  public let targets: Int
-  public let pairsEvaluated: Int
-  public let pairsReported: Int
-
-  enum CodingKeys: String, CodingKey {
-    case predictors, targets
-    case pairsEvaluated = "pairs_evaluated"
-    case pairsReported  = "pairs_reported"
-  }
-}
-
-public struct CorrelationsResponse: Codable {
-  public let days: Int
-  public let minN: Int?
-  public let strongR: Double?
-  public let lags: [Int]?
-  public let counts: CorrelationCounts?
-  public let rows: [CorrelationRow]
-
-  enum CodingKeys: String, CodingKey {
-    case days, lags, counts, rows
-    case minN = "min_n"
-    case strongR = "strong_r"
-  }
-}
-
-public struct CorrelationPairPoint: Codable, Hashable {
+// MARK: - Insights (client-side correlation engine)
+//
+// Computed locally in CorrelationEngine — no wire format. Kept here so
+// the engine's output value type lives alongside the rest of the app's
+// domain models. Only the (date, x, y) point shape is shared; the
+// engine builds its richer Bucket / EvaluatedPair types on top.
+public struct CorrelationPairPoint: Hashable {
   public let date: String
   public let x: Double
   public let y: Double
-}
-
-public struct CorrelationPair: Codable {
-  public let predictor: String
-  public let predictorSection: String
-  public let predictorUnit: String
-  public let target: String
-  public let targetSection: String
-  public let targetUnit: String
-  public let lag: Int
-  public let points: [CorrelationPairPoint]
-
-  enum CodingKeys: String, CodingKey {
-    case predictor, target, lag, points
-    case predictorSection = "predictor_section"
-    case predictorUnit    = "predictor_unit"
-    case targetSection    = "target_section"
-    case targetUnit       = "target_unit"
+  public init(date: String, x: Double, y: Double) {
+    self.date = date; self.x = x; self.y = y
   }
 }
