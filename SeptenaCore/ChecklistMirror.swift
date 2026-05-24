@@ -971,11 +971,17 @@ enum ChecklistMirror {
                                                          label: st.label,
                                                          emoji: st.emoji,
                                                          exercises: st.exercises,
-                                                         sortIndex: idx)
+                                                         sortIndex: idx,
+                                                         kindRaw: st.kind.rawValue)
       entity.label = st.label
       entity.emoji = st.emoji
       entity.exercises = st.exercises
       entity.sortIndex = idx
+      // Mirror the kind from the seed config so an upstream-defined
+      // routine carries its category into the local mirror. Existing
+      // entities keep their stored kind if the incoming config falls
+      // back to the seed default (i.e. nothing user-meaningful to write).
+      entity.kindRaw = st.kind.rawValue
       entity.updatedAt = .now
       if entity.modelContext == nil { context.insert(entity) }
     }
@@ -1150,7 +1156,19 @@ enum ChecklistMirror {
       sortBy: [SortDescriptor(\.sortIndex), SortDescriptor(\.label, comparator: .localizedStandard)]
     ))) ?? []
     return entities.map { e in
-      SessionTypeConfig.make(id: e.id, label: e.label, emoji: e.emoji, exercises: e.exercises, archived: e.archived)
+      // Legacy rows (pre-`kind` field) read back with kindRaw == nil
+      // and get a seed default by id. New rows preserve whatever the
+      // user/CloudKit wrote.
+      let kind = e.kindRaw.flatMap(SessionKind.init(rawValue:))
+        ?? SessionKind.defaulted(for: e.id)
+      return SessionTypeConfig.make(
+        id: e.id,
+        label: e.label,
+        emoji: e.emoji,
+        exercises: e.exercises,
+        archived: e.archived,
+        kind: kind
+      )
     }
   }
 

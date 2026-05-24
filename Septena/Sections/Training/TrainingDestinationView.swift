@@ -850,7 +850,14 @@ struct TrainingDestinationView: View {
   }
 
   private func timeOnly(_ ts: String) -> String {
-    // Server returns ISO8601 like "2026-05-17T07:42:11" — grab HH:MM.
+    // `loggedAt` is written as UTC ISO8601 ("…Z"); display in the user's zone.
+    let iso = ISO8601DateFormatter()
+    if let d = iso.date(from: ts) {
+      let f = DateFormatter()
+      f.dateFormat = "HH:mm"
+      f.timeZone = .current
+      return f.string(from: d)
+    }
     if let tIdx = ts.firstIndex(of: "T") {
       let after = ts.index(after: tIdx)
       let end = ts.index(after, offsetBy: 5, limitedBy: ts.endIndex) ?? ts.endIndex
@@ -998,14 +1005,66 @@ final class TrainingDraftStore {
     d.prBaselines = TrainingPRCalculator.baselines(for: exercises, in: context)
     d.recentByExercise = TrainingPRCalculator.recents(for: exercises, in: context, limit: 3)
 
+    // Re-sync entries to **per-exercise** category, falling back to
+    // the routine's `kind` only when an exercise has no definition.
+    // Covers two cases:
+    //   1. Routine kind changed in Settings since the draft started
+    //      (e.g. Cardio routine that was first `.mixed`).
+    //   2. Routine mixes categories — e.g. an Upper strength routine
+    //      with Elliptical/Rowing as cardio warm-ups. Each entry
+    //      needs the input shape its exercise expects, not the
+    //      routine's blanket kind.
+    //
+    // We touch only the category flags and drop the now-irrelevant
+    // metric fields for the previous category — explicit values for
+    // the new kind are left alone in case the user already typed
+    // something.
+    let routineKind = sessionTypes.first(where: { $0.id == d.sessionType })?.kind ?? .mixed
+    let kinds = exerciseKinds(for: d.entries.map(\.exercise),
+                              fallback: routineKind, context: context)
+    for i in d.entries.indices {
+      let k = kinds[d.entries[i].exercise] ?? routineKind
+      let cardio = (k == .cardio)
+      let mobility = (k == .mobility)
+      if d.entries[i].isCardio != cardio || d.entries[i].isMobility != mobility {
+        d.entries[i].isCardio = cardio
+        d.entries[i].isMobility = mobility
+        if mobility {
+          d.entries[i].weight = nil
+          d.entries[i].sets = nil
+          d.entries[i].reps = nil
+          d.entries[i].durationMin = nil
+          d.entries[i].distanceM = nil
+          d.entries[i].level = nil
+        } else if cardio {
+          d.entries[i].weight = nil
+          d.entries[i].sets = nil
+          d.entries[i].reps = nil
+        } else {
+          d.entries[i].durationMin = nil
+          d.entries[i].distanceM = nil
+          d.entries[i].level = nil
+        }
+      }
+    }
+
     for i in d.entries.indices {
       guard let l = last[d.entries[i].exercise] else { continue }
-      if d.entries[i].weight == nil, let v = l.weight { d.entries[i].weight = v }
-      if d.entries[i].sets == nil, let s = l.sets, let n = Int(s) { d.entries[i].sets = n }
-      if (d.entries[i].reps ?? "").isEmpty, let v = l.reps { d.entries[i].reps = v }
-      if d.entries[i].durationMin == nil, let v = l.durationMin { d.entries[i].durationMin = v }
-      if d.entries[i].distanceM == nil, let v = l.distanceM { d.entries[i].distanceM = v }
-      if d.entries[i].level == nil, let v = l.level { d.entries[i].level = v }
+      // Only refill fields the entry's category cares about, so a
+      // cardio-shaped entry doesn't accidentally inherit a stray
+      // historical weight value from when the exercise was logged
+      // as strength.
+      if !d.entries[i].isMobility {
+        if d.entries[i].isCardio {
+          if d.entries[i].durationMin == nil, let v = l.durationMin { d.entries[i].durationMin = v }
+          if d.entries[i].distanceM == nil, let v = l.distanceM { d.entries[i].distanceM = v }
+          if d.entries[i].level == nil, let v = l.level { d.entries[i].level = v }
+        } else {
+          if d.entries[i].weight == nil, let v = l.weight { d.entries[i].weight = v }
+          if d.entries[i].sets == nil, let s = l.sets, let n = Int(s) { d.entries[i].sets = n }
+          if (d.entries[i].reps ?? "").isEmpty, let v = l.reps { d.entries[i].reps = v }
+        }
+      }
     }
     draft = d
     persist()
@@ -1016,11 +1075,68 @@ final class TrainingDraftStore {
 
   /// Build a fresh draft for `type`, pre-filling each exercise from the
   /// user's last entry for it. Replaces any existing draft.
+  ///
+  /// The draft entries' `isCardio` flag is taken from the routine's
+  /// `kind` — NOT from each exercise's last-entry shape. Without this,
+  /// a strength routine like "Upper" could open with cardio inputs if
+  /// any of its exercises had ever been logged with a `durationMin`,
+  /// which is the bug this fix targets.
+  /// Resolve each exercise's category by looking it up in the
+  /// `ExerciseDefinitionEntity` catalog. The catalog stores
+  /// `type: "strength" | "cardio" | "mobility" | "core"`; we map
+  /// those to `SessionKind`. Lookups go by `exerciseKey(_:)` so a
+  /// slug like "rowing-machine" matches a definition named "Rowing
+  /// Machine".
+  ///
+  /// Exercises with no matching definition fall back to the routine's
+  /// `kind`, preserving the previous routine-wide behaviour for
+  /// orphan slugs.
+  ///
+  /// Fetches the whole catalog once; cheap relative to per-entry
+  /// fetches and the catalog is small.
+  func exerciseKinds(for exercises: [String],
+                     fallback: SessionKind,
+                     context: ModelContext) -> [String: SessionKind] {
+    let defs = (try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>())) ?? []
+    let byKey: [String: ExerciseDefinitionEntity] = defs.reduce(into: [:]) { acc, def in
+      // Index by both id and name keys — routines may store either.
+      // First write wins on collision (rare).
+      let idKey = exerciseKey(def.id)
+      let nameKey = exerciseKey(def.name)
+      if acc[idKey] == nil { acc[idKey] = def }
+      if acc[nameKey] == nil { acc[nameKey] = def }
+    }
+    var out: [String: SessionKind] = [:]
+    for ex in exercises {
+      guard let def = byKey[exerciseKey(ex)] else {
+        out[ex] = fallback
+        continue
+      }
+      switch def.type.lowercased() {
+      case "cardio":   out[ex] = .cardio
+      case "mobility": out[ex] = .mobility
+      case "strength": out[ex] = .strength
+      case "core":     out[ex] = .strength    // core = strength input shape
+      default:         out[ex] = fallback
+      }
+    }
+    return out
+  }
+
   func start(type: SessionTypeConfig, context: ModelContext) {
     let exercises = type.exercises
     let last = ChecklistMirror.loadLastEntries(context: context, exercises: exercises)
-    let entries = exercises.map { ex in
-      DraftEntry.from(exercise: ex, last: last[ex])
+    // Per-exercise category, with the routine's `kind` as fallback for
+    // orphan exercises (slug exists in the routine but has no
+    // `ExerciseDefinitionEntity`). This is what lets an Upper routine
+    // mix cardio warm-ups (Elliptical, Rowing) and strength lifts
+    // (Chest Press) and render each with its own input shape.
+    let kinds = exerciseKinds(for: exercises, fallback: type.kind, context: context)
+    let entries = exercises.map { ex -> DraftEntry in
+      let k = kinds[ex] ?? type.kind
+      return DraftEntry.from(exercise: ex, last: last[ex],
+                             cardioOverride: k == .cardio,
+                             mobilityOverride: k == .mobility)
     }
     // Snapshot last-entry + PR baselines per exercise. Keyed by the
     // canonical exerciseKey so the card's lookup survives separator
@@ -1126,6 +1242,10 @@ struct TrainingSessionView: View {
   /// Re-render the elapsed counter once per minute. Cheap and avoids a
   /// timer goroutine flickering the whole sheet.
   @State private var tick = Date()
+  /// Snapshot of the just-finished session; populated by `finish()`
+  /// just before `discard()`. Driving `SessionCompleteSheet` off
+  /// `.sheet(item:)` so the celebration outlives the draft.
+  @State private var completionStats: SessionStats?
 
   private var accent: Color { theme.color(for: "training") }
 
@@ -1158,13 +1278,18 @@ struct TrainingSessionView: View {
       .tint(accent)
     }
     .task {
-      if store.sessionTypes.isEmpty {
-        store.refreshCatalog(context: modelContext)
-      }
+      // Always refresh — the catalog carries each routine's `kind`,
+      // and a stale cache means a routine edited in Settings (e.g.
+      // changed from `.mixed` to `.cardio`) still renders strength
+      // inputs because the `start(type:)` lookup matches the old
+      // config. SwiftData fetches are cheap.
+      store.refreshCatalog(context: modelContext)
       // Bring any persisted draft up to date against the current
-      // prefill / muscle-inference rules. Safe to call when no draft
-      // exists (no-ops); fills empty weights / sets / reps that were
-      // missed when the draft was first built against older code.
+      // prefill / muscle-inference / routine-kind rules. Safe to
+      // call when no draft exists (no-ops); fills empty weights /
+      // sets / reps that were missed when the draft was first built
+      // against older code, and re-syncs each entry's category if
+      // the routine's `kind` has since changed in Settings.
       store.backfillDraftFromHistory(context: modelContext)
       // Skip the picker when the dashboard's QuickAdd menu pre-selected
       // a type. We wait until after `refreshCatalog` so the lookup can
@@ -1179,6 +1304,18 @@ struct TrainingSessionView: View {
         nav.pendingTrainingType = nil
         store.start(type: match, context: modelContext)
       }
+    }
+    .sheet(item: $completionStats) { stats in
+      SessionCompleteSheet(stats: stats, accent: accent) {
+        completionStats = nil
+        dismiss()
+      }
+      #if os(iOS)
+      .presentationDetents([.large])
+      .presentationDragIndicator(.visible)
+      #else
+      .frame(width: 560, height: 720)
+      #endif
     }
   }
 
@@ -1316,8 +1453,19 @@ struct TrainingSessionView: View {
   }
 
   private func finish() {
+    // Snapshot the draft *before* discarding — the completion sheet
+    // needs its entries, started-at, and PR baselines. Routine kind
+    // comes from the catalog (per-routine), not per-exercise, since
+    // the celebration shows session-level stats and the totals are
+    // already filtered by entry shape internally.
+    if let d = store.draft {
+      let routineKind = store.sessionTypes
+        .first(where: { $0.id == d.sessionType })?.kind ?? .mixed
+      completionStats = SessionStats(from: d, kind: routineKind)
+    }
     store.discard()
-    dismiss()
+    // Don't dismiss yet — sheet's onDone handles that, otherwise the
+    // celebration vanishes the same beat it appears.
   }
 
   /// Whole-minute elapsed since the ISO8601 `startedAt`. Cheap re-eval on
@@ -1346,6 +1494,10 @@ struct TrainingExerciseCard: View {
   let accent: Color
 
   @State private var expanded = false
+  /// Bump on a successful Done tap to fire `ConfettiBurst` + a
+  /// `symbolEffect` bounce on the status check. Subtle celebration —
+  /// no banner, no sound, just the row briefly confirming the rep.
+  @State private var celebrate = 0
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -1399,7 +1551,13 @@ struct TrainingExerciseCard: View {
     switch entry.status {
     case .pending: Image(systemName: "circle")
     case .saving:  ProgressView().controlSize(.small)
-    case .done:    Image(systemName: "checkmark.circle.fill")
+    case .done:
+      // `symbolEffect(.bounce, value:)` re-runs whenever `celebrate`
+      // bumps — gives the check a small pop on completion. Doesn't
+      // fire on the initial render after re-opening the sheet (the
+      // status was already `.done`), only on a fresh Done tap.
+      Image(systemName: "checkmark.circle.fill")
+        .symbolEffect(.bounce, value: celebrate)
     case .failed:  Image(systemName: "exclamationmark.triangle.fill")
     case .skipped: Image(systemName: "minus.circle")
     }
@@ -1428,6 +1586,14 @@ struct TrainingExerciseCard: View {
     store.draft?.prBaselines[exerciseKey(entry.exercise)]
   }
 
+  /// Recent sessions for this exercise — all of them, regardless of
+  /// shape. The training history pane shows mixed strength + cardio
+  /// rows for the same exercise without complaint (each row renders
+  /// whichever metric fields it actually has); the in-session RECENT
+  /// table mirrors that. So a "Bike" exercise that was previously
+  /// logged as strength (weight only) and is now being logged as
+  /// cardio will show both flavours side-by-side, each in its own
+  /// row shape.
   private var recents: [RecentExerciseEntry] {
     store.draft?.recentByExercise[exerciseKey(entry.exercise)] ?? []
   }
@@ -1452,14 +1618,17 @@ struct TrainingExerciseCard: View {
           .font(.caption2.weight(.semibold))
           .foregroundStyle(.secondary)
         VStack(spacing: 2) {
-          if entry.isCardio {
-            ForEach(Array(recents.enumerated()), id: \.offset) { _, r in
-              recentRow(date: r.date, columns: cardioColumns(r), difficulty: r.difficulty)
-            }
-          } else {
-            ForEach(Array(recents.enumerated()), id: \.offset) { _, r in
-              recentRow(date: r.date, columns: strengthColumns(r), difficulty: r.difficulty)
-            }
+          // Each row renders whichever metric fields it actually has,
+          // independent of the current draft entry's category. Matches
+          // the training history pane (`detailLine(_:)`): a single
+          // row layout that shows weight/sets×reps when present and
+          // duration/distance/level when present — so a "Bike"
+          // exercise previously logged as strength still shows its
+          // weight history alongside fresh cardio rows.
+          ForEach(Array(recents.enumerated()), id: \.offset) { _, r in
+            recentRow(date: r.date,
+                      columns: adaptiveColumns(r),
+                      difficulty: r.difficulty)
           }
         }
         .font(.system(.footnote, design: .rounded).monospacedDigit())
@@ -1468,54 +1637,62 @@ struct TrainingExerciseCard: View {
     }
   }
 
+  /// Build the per-row metric columns from whichever fields are
+  /// populated. Strength bits come first (weight, sets×reps), then
+  /// cardio (duration, distance, level). Empty rows return an empty
+  /// array so the table still shows date + difficulty even when no
+  /// metrics were logged (e.g. mobility entries).
+  private func adaptiveColumns(_ r: RecentExerciseEntry) -> [String] {
+    var parts: [String] = []
+    if let w = r.weight, w > 0 {
+      parts.append(w.truncatingRemainder(dividingBy: 1) == 0
+                   ? "\(Int(w))kg" : String(format: "%.1fkg", w))
+    }
+    if let s = r.sets, let reps = r.reps {
+      parts.append("\(s)×\(reps)")
+    } else if let reps = r.reps {
+      parts.append(reps)
+    }
+    if let d = r.durationMin, d > 0 {
+      parts.append("\(Int(d))m")
+    }
+    if let m = r.distanceM, m > 0 {
+      parts.append(m >= 1000 ? String(format: "%.1fkm", m/1000) : "\(Int(m))m")
+    }
+    if let l = r.level, l > 0 {
+      parts.append("L\(fmt(l))")
+    }
+    return parts
+  }
+
   private func recentRow(date: String, columns: [String], difficulty: String?) -> some View {
-    HStack(spacing: 12) {
+    // Joined into one summary column (date · metrics · difficulty)
+    // because rows now carry variable metric counts — a strength
+    // row has weight + sets×reps, a cardio row has duration ±
+    // distance ± level, a mobility row has nothing. Forcing them
+    // into a fixed grid produced uneven column widths between
+    // rows. The history pane's `LogRow` uses the same shape.
+    let summary = columns.isEmpty ? "—" : columns.joined(separator: " · ")
+    return HStack(spacing: 12) {
       Text(shortDate(date))
         .foregroundStyle(Theme.inkSecondary)
         .frame(width: 64, alignment: .leading)
-      ForEach(Array(columns.enumerated()), id: \.offset) { _, value in
-        Text(value)
-          .foregroundStyle(Theme.inkPrimary)
-          .frame(maxWidth: .infinity, alignment: .leading)
-      }
+      Text(summary)
+        .foregroundStyle(Theme.inkPrimary)
+        .frame(maxWidth: .infinity, alignment: .leading)
       // Difficulty as accent-opacity dots — same visual vocabulary as
       // the input picker below so the table reads as "what you'll be
-      // doing next" rather than a foreign log row. Fixed width keeps
-      // numeric columns aligned across rows even when one set has
-      // difficulty and the next doesn't.
+      // doing next" rather than a foreign log row.
       DifficultyGlyph(difficulty: difficulty, accent: accent)
         .frame(width: 22, alignment: .leading)
     }
   }
 
-  private func strengthColumns(_ r: RecentExerciseEntry) -> [String] {
-    let weight: String = {
-      guard let w = r.weight, w > 0 else { return "—" }
-      return w.truncatingRemainder(dividingBy: 1) == 0
-        ? "\(Int(w))kg" : String(format: "%.1fkg", w)
-    }()
-    let setsReps: String = {
-      guard let s = r.sets, let reps = r.reps else { return "—" }
-      return "\(s)×\(reps)"
-    }()
-    return [weight, setsReps]
-  }
-
-  private func cardioColumns(_ r: RecentExerciseEntry) -> [String] {
-    let dur: String = {
-      guard let d = r.durationMin, d > 0 else { return "—" }
-      return "\(Int(d))m"
-    }()
-    let dist: String = {
-      guard let m = r.distanceM, m > 0 else { return "—" }
-      return m >= 1000 ? String(format: "%.1fkm", m/1000) : "\(Int(m))m"
-    }()
-    let lvl: String = {
-      guard let l = r.level, l > 0 else { return "—" }
-      return "L\(fmt(l))"
-    }()
-    return [dur, dist, lvl]
-  }
+  // Removed: `strengthColumns` / `cardioColumns`. Replaced by
+  // `adaptiveColumns(_:)` which picks per-row based on which fields
+  // each historical entry actually has. Mixed-shape recents (e.g. a
+  // Bike exercise with both old strength rows and new cardio rows)
+  // now display cleanly in a single table.
 
   // "2026-05-23" → "May 23", "2026-05-20" → "May 20". Compact month
   // abbreviation; the year is implicit since recents are recent.
@@ -1544,7 +1721,12 @@ struct TrainingExerciseCard: View {
   private var editor: some View {
     Divider().padding(.vertical, 10)
     recentSessionsTable
-    if entry.isCardio {
+    if entry.isMobility {
+      // Yoga / mobility: no weight/reps, no duration/distance — just
+      // record difficulty + tap Done. The session's start `time` on
+      // the parent draft is the only timestamp we keep.
+      difficultyPicker
+    } else if entry.isCardio {
       cardioInputs
     } else {
       strengthInputs
@@ -1560,12 +1742,23 @@ struct TrainingExerciseCard: View {
       Spacer()
       Button(entry.status == .failed ? "Retry"
              : entry.status == .done ? "Update" : "Done") {
+        let wasDone = (entry.status == .done)
         store.markDone(index: index, mutator: trainingMutator)
+        // Celebrate only on first completion, not re-saves of an
+        // already-done entry. Success haptic + confetti + status-icon
+        // bounce — small enough to fit the "you did a set" cadence.
+        if !wasDone {
+          Haptics.success()
+          celebrate += 1
+        }
         if entry.status != .failed { expanded = false }
       }
       .buttonStyle(.borderedProminent)
       .tint(accent)
       .disabled(entry.status == .saving)
+      .overlay(alignment: .center) {
+        ConfettiBurst(trigger: celebrate, accent: accent)
+      }
     }
     .padding(.top, 12)
   }
@@ -1648,9 +1841,12 @@ struct TrainingExerciseCard: View {
 
   // MARK: - Cardio fields
 
+  /// Cardio input row: minutes · distance · level. Matches the webapp
+  /// (`app/(app)/septena/training/session/active/page.tsx`) which uses
+  /// the same three fields in the same order for cardio entries.
   private var cardioInputs: some View {
     HStack(alignment: .top, spacing: 10) {
-      numberField(label: "Duration", unit: "min",
+      numberField(label: "Minutes",
                   value: Binding(
                     get: { entry.durationMin.map { fmt($0) } ?? "" },
                     set: { setDuration($0) }

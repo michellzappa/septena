@@ -84,6 +84,7 @@ enum TrainingConfigStore {
     emoji: String?,
     exercises: [String],
     archived: Bool = false,
+    kind: SessionKind? = nil,
     context: ModelContext
   ) -> SessionTypeEntity {
     let descriptor = FetchDescriptor<SessionTypeEntity>(
@@ -103,6 +104,12 @@ enum TrainingConfigStore {
     entity.emoji = emoji
     entity.exercises = exercises
     entity.archived = archived
+    // Only overwrite the stored kind when the caller explicitly
+    // passed one. Otherwise preserve whatever's there — including
+    // `nil` on legacy rows, which the read site treats as the seed
+    // default via `SessionKind.defaulted(for: id)`. Avoids stomping
+    // a user-chosen kind when an unrelated edit flows through here.
+    if let kind { entity.kindRaw = kind.rawValue }
     entity.updatedAt = .now
     try? context.save()
     ckEngine.noteSessionTypeChange(id: id)

@@ -838,6 +838,11 @@ final class SessionTypeEntity {
   var exercises: [String]              // canonical exercise list
   var archived: Bool = false
   var sortIndex: Int
+  /// Routine category — drives the draft session's input UI and the
+  /// quickadd-menu icon. Stored as `SessionKind.rawValue`. Optional so
+  /// legacy records (from before this field existed) continue to load;
+  /// they fall back to `SessionKind.defaulted(for: id)` at read time.
+  var kindRaw: String?
   var updatedAt: Date
   var cloudKitSystemFields: Data?
 
@@ -847,6 +852,7 @@ final class SessionTypeEntity {
        exercises: [String] = [],
        archived: Bool = false,
        sortIndex: Int = 0,
+       kindRaw: String? = nil,
        updatedAt: Date = .now,
        cloudKitSystemFields: Data? = nil) {
     self.id = id
@@ -855,6 +861,7 @@ final class SessionTypeEntity {
     self.exercises = exercises
     self.archived = archived
     self.sortIndex = sortIndex
+    self.kindRaw = kindRaw
     self.updatedAt = updatedAt
     self.cloudKitSystemFields = cloudKitSystemFields
   }
@@ -1241,6 +1248,10 @@ enum SessionTypeCloudKitSchema {
     static let exercises = "exercises"
     static let sortIndex = "sortIndex"
     static let archived = "archived"
+    /// Routine category — `SessionKind.rawValue`. Optional in CloudKit;
+    /// records written before this field existed read back as nil and
+    /// the read site falls back to `SessionKind.defaulted(for: id)`.
+    static let kind = "kind"
   }
 
   static func recordName(for id: String) -> String { "session-type:\(id)" }
@@ -1833,6 +1844,9 @@ extension SessionTypeEntity: ChecklistCloudKitBackedEntity {
     record[SessionTypeCloudKitSchema.Field.exercises] = exercises as NSArray
     record[SessionTypeCloudKitSchema.Field.sortIndex] = sortIndex
     record[SessionTypeCloudKitSchema.Field.archived] = Int64(archived ? 1 : 0)
+    // Only write `kind` when we have one — keeps records written by
+    // an older client minimal until the user (or migration) sets it.
+    if let kindRaw { record[SessionTypeCloudKitSchema.Field.kind] = kindRaw }
     return record
   }
 
@@ -1842,6 +1856,9 @@ extension SessionTypeEntity: ChecklistCloudKitBackedEntity {
     exercises = (record[SessionTypeCloudKitSchema.Field.exercises] as? [String]) ?? []
     if let v = record[SessionTypeCloudKitSchema.Field.sortIndex] as? Int { sortIndex = v }
     archived = (record[SessionTypeCloudKitSchema.Field.archived] as? Int64).map { $0 != 0 } ?? false
+    // Missing kind in the CK record (legacy) leaves `kindRaw` nil; the
+    // entity→config bridge fills in `SessionKind.defaulted(for: id)`.
+    kindRaw = optionalChecklistString(record[SessionTypeCloudKitSchema.Field.kind])
     updatedAt = .now
     captureCloudKitSystemFields(from: record)
   }

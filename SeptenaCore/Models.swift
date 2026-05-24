@@ -1629,12 +1629,62 @@ enum Muscle: String, Codable, CaseIterable, Hashable, Identifiable, Sendable {
 /// The server owns the list so users can rename, reorder, or add custom
 /// splits without an app update. `exercises` is the canonical template;
 /// empty for free-form types where exercises are picked per-session.
+/// The fundamental category of a training routine. Drives the draft
+/// session's input UI (weight + reps vs. duration + distance) and the
+/// per-routine SF Symbol shown in the quickadd menu.
+///
+/// Added to fix a bug where routines without a category fell back to
+/// per-exercise inference (`DraftEntry.from(exercise:last:)` reading
+/// `last?.isCardio`), so an Upper session could open in cardio mode if
+/// any of its exercises had ever been logged with a duration field.
+/// With `kind` declared on the routine itself, the category is locked
+/// to the routine identity regardless of historical entry shapes.
+///
+/// `.mixed` is the safe migration default for legacy routines whose
+/// id isn't recognised by the seed mapping in `SessionKind.defaulted(for:)`.
+enum SessionKind: String, Codable, Hashable, CaseIterable {
+  case strength
+  case cardio
+  case mobility    // yoga, stretching, mobility work
+  case mixed       // multi-category sessions; treated like strength for input UI
+
+  /// SF Symbol shown next to the routine row in the quickadd menu.
+  var icon: String {
+    switch self {
+    case .strength: return "figure.strengthtraining.traditional"
+    case .cardio:   return "figure.run"
+    case .mobility: return "figure.yoga"
+    case .mixed:    return "figure.mixed.cardio"
+    }
+  }
+
+  /// Hard-coded migration default for known seed routine ids. Returns
+  /// `.mixed` for anything unrecognised — those records keep the safe
+  /// default until the user picks a kind in Settings (future).
+  static func defaulted(for id: String) -> SessionKind {
+    switch id.lowercased() {
+    case "cardio", "run", "running", "bike", "cycling", "swim", "swimming",
+         "row", "rowing", "z2", "zone2":
+      return .cardio
+    case "yoga", "mobility", "stretch", "stretching", "flexibility":
+      return .mobility
+    case "upper", "lower", "push", "pull", "legs", "chest", "back",
+         "shoulders", "arms", "strength", "lifting", "full", "fullbody",
+         "full-body", "full_body":
+      return .strength
+    default:
+      return .mixed
+    }
+  }
+}
+
 struct SessionTypeConfig: Codable, Hashable, Identifiable {
   let id: String           // "upper", "lower", "cardio", "yoga", ...
   let label: String        // "Upper"
   let emoji: String?       // "💪"
   let exercises: [String]  // canonical exercise list (may be empty)
   let archived: Bool
+  let kind: SessionKind    // strength / cardio / mobility / mixed
 
   init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -1643,20 +1693,25 @@ struct SessionTypeConfig: Codable, Hashable, Identifiable {
     emoji = try c.decodeIfPresent(String.self, forKey: .emoji)
     exercises = (try? c.decodeIfPresent([String].self, forKey: .exercises)) ?? []
     archived = (try? c.decodeIfPresent(Bool.self, forKey: .archived)) ?? false
+    // Missing kind in legacy payloads → seed default by id, so an
+    // old "upper" record decodes as `.strength` without a migration.
+    let raw = try? c.decodeIfPresent(String.self, forKey: .kind)
+    kind = raw.flatMap(SessionKind.init(rawValue:)) ?? SessionKind.defaulted(for: id)
   }
 
-  enum CodingKeys: String, CodingKey { case id, label, emoji, exercises, archived }
+  enum CodingKeys: String, CodingKey { case id, label, emoji, exercises, archived, kind }
 
-  init(id: String, label: String, emoji: String?, exercises: [String], archived: Bool = false) {
+  init(id: String, label: String, emoji: String?, exercises: [String], archived: Bool = false, kind: SessionKind? = nil) {
     self.id = id
     self.label = label
     self.emoji = emoji
     self.exercises = exercises
     self.archived = archived
+    self.kind = kind ?? SessionKind.defaulted(for: id)
   }
 
-  static func make(id: String, label: String, emoji: String?, exercises: [String], archived: Bool = false) -> SessionTypeConfig {
-    SessionTypeConfig(id: id, label: label, emoji: emoji, exercises: exercises, archived: archived)
+  static func make(id: String, label: String, emoji: String?, exercises: [String], archived: Bool = false, kind: SessionKind? = nil) -> SessionTypeConfig {
+    SessionTypeConfig(id: id, label: label, emoji: emoji, exercises: exercises, archived: archived, kind: kind)
   }
 }
 
@@ -1745,22 +1800,95 @@ struct DraftEntry: Codable, Hashable, Identifiable {
   var distanceM: Double?
   var level: Double?
   var isCardio: Bool
+  /// True for mobility/yoga entries — no weight/reps, no
+  /// duration/distance, just a done/skip + optional difficulty + note.
+  /// Added so a `SessionKind.mobility` routine renders as a checklist
+  /// rather than borrowing cardio or strength input shapes.
+  var isMobility: Bool
   var status: Status
   var savedFile: String?      // backend filename, used on re-edit
   var note: String
 
-  static func from(exercise: String, last: LastEntryValues?) -> DraftEntry {
-    let cardio = last?.isCardio ?? false
+  enum CodingKeys: String, CodingKey {
+    case exercise, weight, sets, reps, difficulty, durationMin, distanceM,
+         level, isCardio, isMobility, status, savedFile, note
+  }
+
+  init(exercise: String,
+       weight: Double? = nil,
+       sets: Int? = nil,
+       reps: String? = nil,
+       difficulty: String = "",
+       durationMin: Double? = nil,
+       distanceM: Double? = nil,
+       level: Double? = nil,
+       isCardio: Bool = false,
+       isMobility: Bool = false,
+       status: Status = .pending,
+       savedFile: String? = nil,
+       note: String = "") {
+    self.exercise = exercise
+    self.weight = weight
+    self.sets = sets
+    self.reps = reps
+    self.difficulty = difficulty
+    self.durationMin = durationMin
+    self.distanceM = distanceM
+    self.level = level
+    self.isCardio = isCardio
+    self.isMobility = isMobility
+    self.status = status
+    self.savedFile = savedFile
+    self.note = note
+  }
+
+  /// Custom decoder so on-disk drafts written before `isMobility`
+  /// existed continue to load (the synthesised decoder would throw on
+  /// a missing key for the non-optional Bool). Same pattern other
+  /// model structs in this file use for forward-compatible additions.
+  init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    exercise = try c.decode(String.self, forKey: .exercise)
+    weight = try c.decodeIfPresent(Double.self, forKey: .weight)
+    sets = try c.decodeIfPresent(Int.self, forKey: .sets)
+    reps = try c.decodeIfPresent(String.self, forKey: .reps)
+    difficulty = try c.decodeIfPresent(String.self, forKey: .difficulty) ?? ""
+    durationMin = try c.decodeIfPresent(Double.self, forKey: .durationMin)
+    distanceM = try c.decodeIfPresent(Double.self, forKey: .distanceM)
+    level = try c.decodeIfPresent(Double.self, forKey: .level)
+    isCardio = try c.decodeIfPresent(Bool.self, forKey: .isCardio) ?? false
+    isMobility = try c.decodeIfPresent(Bool.self, forKey: .isMobility) ?? false
+    status = try c.decodeIfPresent(Status.self, forKey: .status) ?? .pending
+    savedFile = try c.decodeIfPresent(String.self, forKey: .savedFile)
+    note = try c.decodeIfPresent(String.self, forKey: .note) ?? ""
+  }
+
+  /// Build a fresh draft entry. The override flags (when non-nil)
+  /// take precedence over inferring from `last?.isCardio`, so a
+  /// routine that knows its own kind can lock the entry's input shape
+  /// regardless of stray historical entries that might have a
+  /// duration field set on a normally-strength exercise. At most one
+  /// override should be true — a mobility entry is neither cardio
+  /// nor strength.
+  static func from(exercise: String,
+                   last: LastEntryValues?,
+                   cardioOverride: Bool? = nil,
+                   mobilityOverride: Bool? = nil) -> DraftEntry {
+    let mobility = mobilityOverride ?? false
+    // Mobility wins: if it's a yoga/mobility routine, force-disable cardio
+    // even if the last entry for this exercise looked cardio-shaped.
+    let cardio = mobility ? false : (cardioOverride ?? (last?.isCardio ?? false))
     return DraftEntry(
       exercise: exercise,
-      weight: last?.weight,
-      sets: last?.sets.flatMap { Int($0) } ?? (cardio ? nil : 3),
-      reps: last?.reps ?? (cardio ? nil : "12"),
+      weight: mobility ? nil : last?.weight,
+      sets: mobility ? nil : (last?.sets.flatMap { Int($0) } ?? (cardio ? nil : 3)),
+      reps: mobility ? nil : (last?.reps ?? (cardio ? nil : "12")),
       difficulty: last?.difficulty ?? "medium",
-      durationMin: last?.durationMin,
-      distanceM: last?.distanceM,
-      level: last?.level,
+      durationMin: mobility ? nil : last?.durationMin,
+      distanceM: mobility ? nil : last?.distanceM,
+      level: mobility ? nil : last?.level,
       isCardio: cardio,
+      isMobility: mobility,
       status: .pending,
       savedFile: nil,
       note: ""
