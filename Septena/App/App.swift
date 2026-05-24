@@ -117,8 +117,8 @@ struct SeptenaApp: App {
           theme.paintFromCache()
           settingsStore.paintFromCache()
           try? await ckEngine.fetchChanges()
-          await theme.refresh(from: clientProvider.client)
-          await settingsStore.refresh(from: clientProvider.client)
+          await theme.refresh()
+          await settingsStore.refresh()
           BadgeManager.shared.start(context: localStore.container.mainContext)
           TrainingMuscleBackfill.runIfNeeded(context: localStore.container.mainContext)
           TrainingLibraryEnrichment.runIfNeeded(context: localStore.container.mainContext)
@@ -129,10 +129,6 @@ struct SeptenaApp: App {
           // Run after RoutineSlugRepair so any stubs it created that
           // collide with library/manual entries get collapsed.
           DuplicateExerciseMerge.runIfNeeded(context: localStore.container.mainContext)
-          await NutritionBootstrap.runIfNeeded(
-            context: localStore.container.mainContext,
-            client: ClientProvider.shared.client
-          )
           await runRemindersAutoImport()
         }
         .onReceive(NotificationCenter.default

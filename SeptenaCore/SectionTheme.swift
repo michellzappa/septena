@@ -1,12 +1,38 @@
 import SwiftUI
 
-// Live mirror of Septena's section accents. CloudKit-backed sections are
-// preferred; FastAPI `/api/sections` remains import fallback until the
-// rest of the migration is cut over.
+// Live mirror of Septena's section accents. Sources, in order of preference:
+//   1. CloudKit-backed `SectionEntity` (user-customized colors).
+//   2. ResponseCache disk blob (last-known state, primes cold launch).
+//   3. Hardcoded `defaultPalette` below (fresh install with no CK records).
+// No FastAPI involvement.
 
 @MainActor
 @Observable
 final class SectionTheme {
+  /// Baseline palette used when neither the CloudKit mirror nor the on-
+  /// disk cache has anything to offer (first-launch state). Keys match
+  /// `HomepageDomain.rawValue` so every tile renders with a sensible color
+  /// before the user touches Settings. Edits in Settings overwrite the
+  /// SectionEntity records and CK syncs the change to other devices.
+  static let defaultPalette: [SeptenaClient.SectionConfig] = [
+    .init(key: "tasks",       label: "Tasks",       color: "#ef4444"),
+    .init(key: "habits",      label: "Habits",      color: "#22c55e"),
+    .init(key: "training",    label: "Training",    color: "#f97316"),
+    .init(key: "chores",      label: "Chores",      color: "#a855f7"),
+    .init(key: "supplements", label: "Supplements", color: "#3b82f6"),
+    .init(key: "sleep",       label: "Sleep",       color: "#6366f1"),
+    .init(key: "nutrition",   label: "Nutrition",   color: "#f59e0b"),
+    .init(key: "air",         label: "Air",         color: "#14b8a6"),
+    .init(key: "groceries",   label: "Groceries",   color: "#84cc16"),
+    .init(key: "caffeine",    label: "Caffeine",    color: "#92400e"),
+    .init(key: "cannabis",    label: "Cannabis",    color: "#65a30d"),
+    .init(key: "body",        label: "Body",        color: "#ec4899"),
+    .init(key: "gut",         label: "Gut",         color: "#b45309"),
+    .init(key: "activity",    label: "Activity",    color: "#06b6d4"),
+    .init(key: "goals",       label: "Goals",       color: "#8b5cf6"),
+    .init(key: "insights",    label: "Insights",    color: "#0ea5e9"),
+  ]
+
   /// Neutral fallback — inherits from the asset catalog's AccentColor.
   static let fallback = Color.accentColor
 
@@ -43,26 +69,23 @@ final class SectionTheme {
 
   static let cacheKey = "theme.sections"
 
-  func refresh(from client: SeptenaClient) async {
+  func refresh() async {
     if let sections = loadSectionsForPaint(), !sections.isEmpty {
       applySections(sections)
       ResponseCache.save(sections, forKey: Self.cacheKey)
       return
     }
 
-    // Per-section colors are still imported from FastAPI if the local
-    // CloudKit mirror is empty. The *app accent* is deliberately pinned
-    // to the system Color.accentColor.
-    do {
-      let sections = try await client.sections()
-      applySections(sections)
-      ResponseCache.save(sections, forKey: Self.cacheKey)
-      SettingsMirror.replaceSections(sections,
-                                     context: LocalStore.shared.container.mainContext,
-                                     engine: SeptenaServices.shared.ckEngine)
-    } catch {
-      SeptenaLog.error("section color refresh failed", error)
-    }
+    // Fresh install with no CK records yet — paint with the hardcoded
+    // baseline palette and seed CloudKit so other devices inherit the
+    // same starting point. Users can recolor in Settings; that overwrite
+    // syncs through SettingsMirror.replaceSections.
+    let sections = Self.defaultPalette
+    applySections(sections)
+    ResponseCache.save(sections, forKey: Self.cacheKey)
+    SettingsMirror.replaceSections(sections,
+                                   context: LocalStore.shared.container.mainContext,
+                                   engine: SeptenaServices.shared.ckEngine)
   }
 
   private func loadSectionsForPaint() -> [SeptenaClient.SectionConfig]? {

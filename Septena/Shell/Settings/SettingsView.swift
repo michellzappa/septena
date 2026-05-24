@@ -249,58 +249,39 @@ final class SettingsStore {
     if let v = ResponseCache.load([ChoreItem].self, forKey: CacheKey.chores) { chores = v }
   }
 
-  func refresh(from client: SeptenaClient) async {
+  func refresh() async {
     serverLoading = true
     defer { serverLoading = false }
     let context = LocalStore.shared.container.mainContext
-    let mirroredSettings = SettingsMirror.loadSettings(context: context)
-    let mirroredSections = SettingsMirror.loadSections(context: context)
 
-    if let mirroredSettings {
+    // Every source below is local. Settings / sections are CloudKit-
+    // mirrored via SettingsEntity / SectionEntity; chores / beans /
+    // strains / session-types ride on their own CK entities; macros
+    // live in NSUbiquitousKeyValueStore.
+    if let mirroredSettings = SettingsMirror.loadSettings(context: context) {
       serverSettings = mirroredSettings
       ResponseCache.save(mirroredSettings, forKey: CacheKey.serverSettings)
     }
+    let mirroredSections = SettingsMirror.loadSections(context: context)
     if !mirroredSections.isEmpty {
       sections = mirroredSections
       ResponseCache.save(mirroredSections, forKey: CacheKey.sections)
     }
 
-    let needsLegacySettings = mirroredSettings == nil
-    let needsLegacySections = mirroredSections.isEmpty
-
     let macs: MacrosConfig? = NutritionPrefs.loadMacrosConfig()
-    // Training session-types live in CloudKit — local mirror, no network.
     let st: [SessionTypeConfig]? = ChecklistMirror.loadSessionTypes(context: context)
-    // Chores/caffeine/cannabis are CloudKit-authoritative — pull from the
-    // local mirror, not FastAPI.
     let ch: [ChoreItem]? = ChecklistMirror.loadChores(context: context)
-    let cf: CaffeineConfig? = {
+    let cf: CaffeineConfig = {
       let beans = ChecklistMirror.loadCaffeineBeans(context: context)
       return CaffeineConfig(beans: beans)
     }()
-    let cn: CannabisConfig? = {
+    let cn: CannabisConfig = {
       let strains = ChecklistMirror.loadCannabisStrains(context: context)
       return CannabisConfig(strains: strains, usesPerCapsule: 3)
     }()
-    let mc = macs
-    // Only overwrite + cache the values where the network actually
-    // returned something — failed fetches leave the (cache-primed)
-    // values alone instead of wiping them to nil / empty.
-    if needsLegacySettings, let sv = try? await client.settings() {
-      serverSettings = sv
-      ResponseCache.save(sv, forKey: CacheKey.serverSettings)
-      SettingsMirror.upsert(settings: sv, context: context,
-                            engine: SeptenaServices.shared.ckEngine)
-    }
-    if needsLegacySections, let sc = try? await client.sections() {
-      sections = sc
-      ResponseCache.save(sc, forKey: CacheKey.sections)
-      SettingsMirror.replaceSections(sc, context: context,
-                                     engine: SeptenaServices.shared.ckEngine)
-    }
-    if let cf { caffeine = cf; ResponseCache.save(cf, forKey: CacheKey.caffeine) }
-    if let cn { cannabis = cn; ResponseCache.save(cn, forKey: CacheKey.cannabis) }
-    if let mc { macros = mc; ResponseCache.save(mc, forKey: CacheKey.macros) }
+    caffeine = cf; ResponseCache.save(cf, forKey: CacheKey.caffeine)
+    cannabis = cn; ResponseCache.save(cn, forKey: CacheKey.cannabis)
+    if let macs { macros = macs; ResponseCache.save(macs, forKey: CacheKey.macros) }
     if let st { sessionTypes = st; ResponseCache.save(st, forKey: CacheKey.sessionTypes) }
     if let ch { chores = ch; ResponseCache.save(ch, forKey: CacheKey.chores) }
   }
@@ -2248,8 +2229,8 @@ struct SyncSettingsPane: View {
     nav.serverURL = serverURL
     ClientProvider.shared.update(baseURL: url)
     Task {
-      await theme.refresh(from: ClientProvider.shared.client)
-      await store.refresh(from: ClientProvider.shared.client)
+      await theme.refresh()
+      await store.refresh()
     }
   }
 

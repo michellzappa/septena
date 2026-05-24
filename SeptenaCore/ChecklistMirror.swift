@@ -1357,50 +1357,6 @@ enum ChecklistMirror {
 
   // MARK: - Nutrition (CloudKit-backed)
 
-  /// Seed SwiftData from a FastAPI export. Upserts by file/id; deletes
-  /// any local rows the server doesn't know about; rebuilds all day
-  /// summaries. Called once by NutritionBootstrap; writes thereafter go
-  /// through NutritionMutator.
-  static func replaceAllNutritionExport(_ response: NutritionExportResponse, context: ModelContext) {
-    let existing = (try? context.fetch(FetchDescriptor<NutritionEntryEntity>())) ?? []
-    let existingByID = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
-    var seen = Set<String>()
-    for dto in response.entries {
-      seen.insert(dto.file)
-      let loggedAt = nutritionDate(date: dto.date, time: dto.time) ?? .now
-      let entity = existingByID[dto.file] ?? {
-        let e = NutritionEntryEntity(
-          id: dto.file, loggedAt: loggedAt, updatedAt: loggedAt,
-          emoji: dto.emoji, foods: dto.foods.joined(separator: "\n"),
-          note: nil, mealType: nil, source: nil,
-          proteinG: dto.proteinG, fatG: dto.fatG, carbsG: dto.carbsG,
-          fiberG: dto.fiberG, sugarG: nil, saturatedFatG: nil, alcoholG: nil,
-          kcal: dto.kcal, sodiumMg: nil, cholesterolMg: nil, potassiumMg: nil,
-          waterMl: nil, cloudKitSystemFields: nil
-        )
-        context.insert(e)
-        return e
-      }()
-      entity.loggedAt = loggedAt
-      entity.updatedAt = loggedAt
-      entity.emoji = dto.emoji
-      entity.foods = dto.foods.joined(separator: "\n")
-      entity.proteinG = dto.proteinG
-      entity.fatG = dto.fatG
-      entity.carbsG = dto.carbsG
-      entity.fiberG = dto.fiberG
-      entity.kcal = dto.kcal
-    }
-    for entity in existing where !seen.contains(entity.id) {
-      context.delete(entity)
-    }
-    try? context.save()
-    rebuildAllNutritionSummaries(context: context)
-    if let macros = response.macros {
-      NutritionPrefs.saveMacrosConfig(macros)
-    }
-  }
-
   /// Wipe and recompute every NutritionDailySummaryEntity from scratch.
   /// Use after bulk import; incremental writes use NutritionMutator.
   static func rebuildAllNutritionSummaries(context: ModelContext) {

@@ -913,14 +913,6 @@ struct MacrosConfig: Codable, Hashable {
   var fasting: MacroRange?
 }
 
-/// Full snapshot from `GET /api/nutrition/export`. iOS bootstrap calls this
-/// once to seed the CloudKit-backed local store. Macros are optional — the
-/// server may return nil if the user hasn't configured targets yet.
-struct NutritionExportResponse: Codable {
-  let entries: [NutritionEntry]
-  var macros: MacrosConfig?
-}
-
 /// Macro targets and fasting prefs, persisted in NSUbiquitousKeyValueStore.
 /// Replaces the `GET /api/nutrition/macros-config` FastAPI endpoint.
 enum NutritionPrefs {

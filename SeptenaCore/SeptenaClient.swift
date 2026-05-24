@@ -105,26 +105,11 @@ final class SeptenaClient {
   // MARK: - Connection test
 
   func ping() async throws -> String {
-    // Cheap reachability check via the sections endpoint (still on FastAPI).
-    _ = try await sections()
+    // Cheap reachability check via an Oura probe (1 day = tiny payload).
+    // Oura/Withings proxies are the only domains still on FastAPI, so
+    // this is a useful real check rather than a synthetic /health hit.
+    _ = try await ouraHistory(days: 1)
     return "OK — Septena reachable"
-  }
-
-  // MARK: - Nutrition (CK bootstrap)
-
-  /// Full snapshot for iOS CloudKit bootstrap. Every entry on disk, plus
-  /// the user's macro config. Only invoked by Migration; live nutrition
-  /// reads/writes go through NutritionMutator + SwiftData.
-  func nutritionExport() async throws -> NutritionExportResponse {
-    try await getJSON("/api/nutrition/export", as: NutritionExportResponse.self)
-  }
-
-  // MARK: - Settings
-
-  /// User's full Septena configuration (targets, units, theme, time, etc).
-  /// Decoded with our trimmed AppSettings — extra server fields ignored.
-  func settings() async throws -> AppSettings {
-    try await getJSON("/api/settings", as: AppSettings.self)
   }
 
   // MARK: - Health (Oura)
@@ -144,39 +129,21 @@ final class SeptenaClient {
                       as: WithingsResponse.self).withings
   }
 
-  // MARK: - Sections (for theme accent)
+  // Insights compute lives client-side now (see CorrelationEngine).
+  // No /api/insights/* endpoint is called — all data comes from SwiftData
+  // (CloudKit-mirrored) plus the existing /api/health/oura read endpoint.
 
-  /// Live section config from Septena. We only care about the Tasks entry's
-  /// color, but the endpoint returns all sections — keep it generic.
+  // MARK: - Section config (color palette type — used by SectionTheme)
+
+  /// In-memory shape for a single section's accent. Kept here (not in
+  /// Models.swift) because SectionTheme's default palette and CK mirror
+  /// both produce / consume values of this type. No HTTP endpoint reads
+  /// or writes it anymore.
   struct SectionConfig: Codable, Hashable {
     let key: String
     let label: String
     let color: String          // hex (e.g. "#ef4444") or "hsl(...)"
   }
-
-  func sections() async throws -> [SectionConfig] {
-    try await getJSON("/api/sections", as: [SectionConfig].self)
-  }
-
-  // MARK: - Areas / Projects (migration bootstrap only)
-
-  /// Read-only — only consumed by Migration to seed the CloudKit mirror.
-  /// Live area writes go through AreasMutator → CloudKit.
-  func areas() async throws -> [Area] {
-    struct Wrap: Codable { var areas: [Area] }
-    return try await getJSON("/api/tasks/areas", as: Wrap.self).areas
-  }
-
-  /// Read-only — only consumed by Migration to seed the CloudKit mirror.
-  /// Live project writes go through ProjectsMutator → CloudKit.
-  func projects() async throws -> [Project] {
-    struct Wrap: Codable { var projects: [Project] }
-    return try await getJSON("/api/tasks/projects", as: Wrap.self).projects
-  }
-
-  // Insights compute lives client-side now (see CorrelationEngine).
-  // No /api/insights/* endpoint is called — all data comes from SwiftData
-  // (CloudKit-mirrored) plus the existing /api/health/oura read endpoint.
 
   // MARK: - HTTP helpers
 

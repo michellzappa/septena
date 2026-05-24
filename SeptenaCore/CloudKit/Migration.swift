@@ -176,15 +176,10 @@ final class TasksMigrator {
   private let logger = Logger(subsystem: "com.septena.cloud", category: "TasksMigrator")
   private let context: ModelContext
   private let engine: CKEngine
-  /// Optional — when present, the migrator hydrates local Area/Project
-  /// entities from FastAPI before pushing them to CloudKit. Skipped when
-  /// nil (used by tests / dry-run flows).
-  private let client: SeptenaClient?
 
-  init(context: ModelContext, engine: CKEngine, client: SeptenaClient? = nil) {
+  init(context: ModelContext, engine: CKEngine) {
     self.context = context
     self.engine = engine
-    self.client = client
   }
 
   // MARK: Snapshot file location
@@ -612,28 +607,6 @@ final class TasksMigrator {
   /// engine to drain, and verify the count round-trips. Throws on failure
   /// WITHOUT flipping the backend flag — caller flips on success.
   func migrateToCloudKit() async throws -> MigrationResult {
-    // 0. Pull canonical areas + projects + settings + sections from
-    //    FastAPI into SwiftData if they aren't already mirrored. This is
-    //    a one-time bootstrap so the CloudKit zone gets seeded with the
-    //    pre-cutover state; without it, an empty AreaEntity table would
-    //    push nothing to CloudKit and any task.area links would dangle.
-    if let client {
-      do {
-        let areas = try await client.areas()
-        let projects = try await client.projects()
-        let settings = try await client.settings()
-        let sections = try await client.sections()
-        seedAreaProjectMirror(areas: areas, projects: projects)
-        SettingsMirror.upsert(settings: settings, context: context)
-        SettingsMirror.replaceSections(sections, context: context)
-      } catch {
-        // Non-fatal: if the network is unreachable we proceed with
-        // whatever's locally cached. A subsequent migration retry will
-        // reconcile when the server is reachable.
-        logger.error("Pre-migration areas/projects pull failed: \(error.localizedDescription, privacy: .public)")
-      }
-    }
-
     // 1. Safety snapshot first. If anything below blows up, the user
     //    still has a JSON they can re-import.
     let snapshotURL = try exportToJSON(reason: "pre-migration")
@@ -707,48 +680,6 @@ final class TasksMigrator {
     )
   }
 
-  /// Insert-or-update local AreaEntity / ProjectEntity rows from the
-  /// FastAPI snapshot. Keeps existing `cloudKitSystemFields` intact (any
-  /// row that's already round-tripped through CK stays linked to its
-  /// server record). Called from `migrateToCloudKit` so the migration
-  /// always starts with a fresh mirror.
-  private func seedAreaProjectMirror(areas: [Area], projects: [Project]) {
-    let now = Date()
-    for dto in areas {
-      let id = dto.id
-      let descriptor = FetchDescriptor<AreaEntity>(
-        predicate: #Predicate { $0.id == id }
-      )
-      let entity = (try? context.fetch(descriptor).first)
-        ?? AreaEntity(id: id, title: dto.title)
-      entity.title = dto.title
-      entity.context = dto.context
-      entity.updatedAt = dto.updatedAt
-      entity.lastSyncedAt = now
-      if entity.modelContext == nil { context.insert(entity) }
-    }
-    for dto in projects {
-      let id = dto.id
-      let descriptor = FetchDescriptor<ProjectEntity>(
-        predicate: #Predicate { $0.id == id }
-      )
-      let entity = (try? context.fetch(descriptor).first)
-        ?? ProjectEntity(id: id, title: dto.title)
-      entity.title = dto.title
-      entity.statusRaw = dto.status.rawValue
-      entity.area = dto.area
-      entity.created = dto.created
-      entity.completedAt = dto.completedAt
-      entity.notes = dto.notes
-      entity.context = dto.context
-      entity.githubRepo = dto.githubRepo
-      entity.updatedAt = dto.updatedAt
-      entity.deletedAt = dto.deletedAt
-      entity.lastSyncedAt = now
-      if entity.modelContext == nil { context.insert(entity) }
-    }
-    try? context.save()
-  }
 }
 
 struct MigrationResult {
@@ -1287,26 +1218,3 @@ enum TrainingMuscleBackfillV2 {
   }
 }
 
-// MARK: - Nutrition CloudKit bootstrap
-
-/// One-shot async migration that pulls every historical nutrition entry from
-/// the FastAPI export endpoint, seeds SwiftData + day summaries, and saves
-/// the macros config to NSUbiquitousKeyValueStore. Gated by a UserDefaults
-/// flag so it runs exactly once per device.
-@MainActor
-enum NutritionBootstrap {
-  static let userDefaultsKey = "nutrition.ckBootstrap.v1"
-
-  static func runIfNeeded(context: ModelContext, client: SeptenaClient) async {
-    guard !UserDefaults.standard.bool(forKey: userDefaultsKey) else { return }
-    do {
-      let response = try await client.nutritionExport()
-      ChecklistMirror.replaceAllNutritionExport(response, context: context)
-      UserDefaults.standard.set(true, forKey: userDefaultsKey)
-      SeptenaLog.info("[NutritionBootstrap] seeded \(response.entries.count) entries")
-    } catch {
-      SeptenaLog.error("[NutritionBootstrap] failed", error)
-      // Leave flag unset — will retry next launch.
-    }
-  }
-}
