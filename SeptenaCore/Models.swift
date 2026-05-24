@@ -823,21 +823,37 @@ struct NutritionEntry: Codable, Identifiable, Hashable {
   var emoji: String?
   var proteinG: Double
   var fatG: Double
+  var saturatedFatG: Double?
   var carbsG: Double
+  var sugarG: Double?
   var fiberG: Double?
+  var alcoholG: Double?
   var kcal: Double
+  var sodiumMg: Double?
+  var cholesterolMg: Double?
+  var potassiumMg: Double?
+  var waterMl: Double?
   var foods: [String]
   var ingredients: [String]?
+  var photoAssetID: String?
   let file: String
 
   var id: String { file }
 
   enum CodingKeys: String, CodingKey {
     case date, time, emoji, kcal, foods, ingredients, file
-    case proteinG = "protein_g"
-    case fatG     = "fat_g"
-    case carbsG   = "carbs_g"
-    case fiberG   = "fiber_g"
+    case proteinG      = "protein_g"
+    case fatG          = "fat_g"
+    case saturatedFatG = "saturated_fat_g"
+    case carbsG        = "carbs_g"
+    case sugarG        = "sugar_g"
+    case fiberG        = "fiber_g"
+    case alcoholG      = "alcohol_g"
+    case sodiumMg      = "sodium_mg"
+    case cholesterolMg = "cholesterol_mg"
+    case potassiumMg   = "potassium_mg"
+    case waterMl       = "water_ml"
+    case photoAssetID  = "photo_asset_id"
   }
 }
 
@@ -1417,11 +1433,31 @@ struct MacroColors: Codable, Hashable {
   let fasting: String?
 }
 
+/// Per-macro tile preference. The id matches `MacroCatalog.Macro.id`.
+/// `colorHex` overrides the catalog's default tint; `visible` toggles whether
+/// the tile renders. Array position in `NutritionSettings.macroTiles` is the
+/// authoritative display order.
+struct MacroTilePref: Codable, Hashable, Identifiable {
+  var id: String
+  var colorHex: String?
+  var visible: Bool
+
+  enum CodingKeys: String, CodingKey {
+    case id
+    case colorHex = "color_hex"
+    case visible
+  }
+}
+
 struct NutritionSettings: Codable, Hashable {
   let macroColors: MacroColors?
+  /// Authoritative tile list. Nil for legacy payloads → consumers should
+  /// fall back to `MacroCatalog.defaultTilePrefs()`.
+  var macroTiles: [MacroTilePref]?
 
   enum CodingKeys: String, CodingKey {
     case macroColors = "macro_colors"
+    case macroTiles  = "macro_tiles"
   }
 }
 

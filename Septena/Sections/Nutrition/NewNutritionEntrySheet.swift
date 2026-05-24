@@ -1,4 +1,6 @@
 import SwiftUI
+import PhotosUI
+import Photos
 
 // New-entry sheet for a fresh meal. Same `Form` shape as
 // `EditNutritionEntrySheet` so the UI feels identical, but POSTs to
@@ -14,9 +16,19 @@ struct NewNutritionEntrySheet: View {
   @State private var ingredientsText: String = ""
   @State private var proteinG: String = ""
   @State private var fatG: String = ""
+  @State private var saturatedFatG: String = ""
   @State private var carbsG: String = ""
+  @State private var sugarG: String = ""
   @State private var fiberG: String = ""
+  @State private var alcoholG: String = ""
   @State private var kcal: String = ""
+  @State private var sodiumMg: String = ""
+  @State private var cholesterolMg: String = ""
+  @State private var potassiumMg: String = ""
+  @State private var waterMl: String = ""
+
+  @State private var photoItem: PhotosPickerItem? = nil
+  @State private var photoAssetID: String? = nil
 
   var body: some View {
     NavigationStack {
@@ -34,12 +46,43 @@ struct NewNutritionEntrySheet: View {
                     text: $ingredientsText, axis: .vertical)
             .lineLimit(1...6)
         }
+        Section("Photo") {
+          HStack(spacing: 12) {
+            MealPhotoThumbnail(assetID: photoAssetID, size: 56)
+            VStack(alignment: .leading, spacing: 2) {
+              PhotosPicker(
+                selection: $photoItem,
+                matching: .images,
+                photoLibrary: .shared()
+              ) {
+                Text(photoAssetID == nil ? "Choose photo…" : "Change photo")
+              }
+              if photoAssetID != nil {
+                Button(role: .destructive) {
+                  photoItem = nil
+                  photoAssetID = nil
+                } label: {
+                  Text("Remove").font(.caption)
+                }
+              }
+            }
+          }
+        }
         Section("Macros") {
           macroField("Protein (g)", text: $proteinG)
           macroField("Fat (g)", text: $fatG)
+          macroField("Saturated Fat (g)", text: $saturatedFatG)
           macroField("Carbs (g)", text: $carbsG)
+          macroField("Sugar (g)", text: $sugarG)
           macroField("Fiber (g)", text: $fiberG)
+          macroField("Alcohol (g)", text: $alcoholG)
           macroField("kcal", text: $kcal)
+        }
+        Section("Other Nutrients") {
+          macroField("Sodium (mg)", text: $sodiumMg)
+          macroField("Cholesterol (mg)", text: $cholesterolMg)
+          macroField("Potassium (mg)", text: $potassiumMg)
+          macroField("Water (ml)", text: $waterMl)
         }
       }
       .navigationTitle("New meal")
@@ -53,6 +96,16 @@ struct NewNutritionEntrySheet: View {
         ToolbarItem(placement: .confirmationAction) {
           Button("Save") { save() }
             .disabled(foodsText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+      }
+      .onChange(of: photoItem) { _, new in
+        guard let new else { return }
+        Task {
+          let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+          if status == .notDetermined {
+            _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+          }
+          await MainActor.run { photoAssetID = new.itemIdentifier }
         }
       }
     }
@@ -76,6 +129,11 @@ struct NewNutritionEntrySheet: View {
             .replacingOccurrences(of: ",", with: ".")) ?? 0
   }
 
+  private func parseOpt(_ s: String) -> Double? {
+    let v = parseDouble(s)
+    return v == 0 ? nil : v
+  }
+
   private func lines(_ s: String) -> [String] {
     s.split(whereSeparator: \.isNewline)
       .map { $0.trimmingCharacters(in: .whitespaces) }
@@ -83,16 +141,10 @@ struct NewNutritionEntrySheet: View {
   }
 
   private func save() {
-    let fmt = DateFormatter()
-    fmt.dateFormat = "HH:mm"
-    fmt.locale = Locale(identifier: "en_US_POSIX")
-    let hhmm = fmt.string(from: time)
     let foods = lines(foodsText)
     guard !foods.isEmpty else { return }
     let emojiValue = emoji.trimmingCharacters(in: .whitespacesAndNewlines)
 
-    let fiber = parseDouble(fiberG)
-    let k = parseDouble(kcal)
     SeptenaServices.shared.nutritionMutator.addEntry(
       loggedAt: time,
       emoji: emojiValue.isEmpty ? nil : emojiValue,
@@ -100,8 +152,16 @@ struct NewNutritionEntrySheet: View {
       proteinG: parseDouble(proteinG),
       fatG: parseDouble(fatG),
       carbsG: parseDouble(carbsG),
-      fiberG: fiber == 0 ? nil : fiber,
-      kcal: k == 0 ? nil : k
+      fiberG: parseOpt(fiberG),
+      sugarG: parseOpt(sugarG),
+      saturatedFatG: parseOpt(saturatedFatG),
+      alcoholG: parseOpt(alcoholG),
+      kcal: parseOpt(kcal),
+      sodiumMg: parseOpt(sodiumMg),
+      cholesterolMg: parseOpt(cholesterolMg),
+      potassiumMg: parseOpt(potassiumMg),
+      waterMl: parseOpt(waterMl),
+      photoAssetID: photoAssetID
     )
     AddInfoSection.nutrition.notifyTilesChanged()
     Haptics.tick()

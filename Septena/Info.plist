@@ -33,6 +33,8 @@
 	<string>Septena shows upcoming events from your calendars on the Week dashboard.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Septena reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Septena lets you attach a photo from your library to a meal log. Only a reference is stored — the photo stays in your Photos library.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Septena looks up local pollen counts (grass, tree, weed) for your area on the Air page using Open-Meteo's free air quality API.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>

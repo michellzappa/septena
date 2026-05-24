@@ -1,4 +1,6 @@
 import SwiftUI
+import PhotosUI
+import Photos
 
 // Edit/create sheet for a logged nutrition entry. Standard SwiftUI `Form` in a
 // `NavigationStack` presented via `.sheet(item:)` (edit) or
@@ -17,9 +19,24 @@ struct EditNutritionEntrySheet: View {
   @State private var ingredientsText: String = ""
   @State private var proteinG: String = ""
   @State private var fatG: String = ""
+  @State private var saturatedFatG: String = ""
   @State private var carbsG: String = ""
+  @State private var sugarG: String = ""
   @State private var fiberG: String = ""
+  @State private var alcoholG: String = ""
   @State private var kcal: String = ""
+  @State private var sodiumMg: String = ""
+  @State private var cholesterolMg: String = ""
+  @State private var potassiumMg: String = ""
+  @State private var waterMl: String = ""
+
+  // Photo attachment. The picker yields a `PhotosPickerItem` whose
+  // `itemIdentifier` is the PHAsset.localIdentifier — but only when the
+  // user has granted read access to Photos. We request that on first pick.
+  @State private var photoItem: PhotosPickerItem? = nil
+  @State private var photoAssetID: String? = nil
+  // Edited flag so we can distinguish "unchanged" from "explicitly cleared".
+  @State private var photoEdited: Bool = false
 
   var body: some View {
     NavigationStack {
@@ -40,12 +57,24 @@ struct EditNutritionEntrySheet: View {
                     text: $ingredientsText, axis: .vertical)
             .lineLimit(1...6)
         }
+        Section("Photo") {
+          photoRow
+        }
         Section("Macros") {
           macroField("Protein (g)", text: $proteinG)
           macroField("Fat (g)", text: $fatG)
+          macroField("Saturated Fat (g)", text: $saturatedFatG)
           macroField("Carbs (g)", text: $carbsG)
+          macroField("Sugar (g)", text: $sugarG)
           macroField("Fiber (g)", text: $fiberG)
+          macroField("Alcohol (g)", text: $alcoholG)
           macroField("kcal", text: $kcal)
+        }
+        Section("Other Nutrients") {
+          macroField("Sodium (mg)", text: $sodiumMg)
+          macroField("Cholesterol (mg)", text: $cholesterolMg)
+          macroField("Potassium (mg)", text: $potassiumMg)
+          macroField("Water (ml)", text: $waterMl)
         }
       }
       .navigationTitle(original == nil ? "New Meal" : "Edit Meal")
@@ -61,6 +90,50 @@ struct EditNutritionEntrySheet: View {
         }
       }
       .onAppear { seed() }
+      .onChange(of: photoItem) { _, new in
+        // PhotosPicker hands us a PhotosPickerItem; the local identifier is
+        // present when we have Photos library read access. Request it lazily
+        // — the user only sees the prompt after their first pick.
+        guard let new else { return }
+        Task { await capturePickedIdentifier(new) }
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var photoRow: some View {
+    HStack(spacing: 12) {
+      MealPhotoThumbnail(assetID: photoAssetID, size: 56)
+      VStack(alignment: .leading, spacing: 2) {
+        PhotosPicker(
+          selection: $photoItem,
+          matching: .images,
+          photoLibrary: .shared()
+        ) {
+          Text(photoAssetID == nil ? "Choose photo…" : "Change photo")
+        }
+        if photoAssetID != nil {
+          Button(role: .destructive) {
+            photoItem = nil
+            photoAssetID = nil
+            photoEdited = true
+          } label: {
+            Text("Remove").font(.caption)
+          }
+        }
+      }
+    }
+  }
+
+  private func capturePickedIdentifier(_ item: PhotosPickerItem) async {
+    // Photos read access is needed for `itemIdentifier` to be non-nil.
+    let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+    if status == .notDetermined {
+      _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+    }
+    await MainActor.run {
+      photoAssetID = item.itemIdentifier
+      photoEdited = true
     }
   }
 
@@ -79,25 +152,31 @@ struct EditNutritionEntrySheet: View {
 
   private func seed() {
     if let original {
-      emoji = original.emoji ?? ""
-      foodsText = original.foods.joined(separator: "\n")
+      emoji          = original.emoji ?? ""
+      foodsText      = original.foods.joined(separator: "\n")
       ingredientsText = (original.ingredients ?? []).joined(separator: "\n")
-      proteinG = numString(original.proteinG)
-      fatG     = numString(original.fatG)
-      carbsG   = numString(original.carbsG)
-      fiberG   = numString(original.fiberG ?? 0)
-      kcal     = numString(original.kcal)
+      proteinG       = numString(original.proteinG)
+      fatG           = numString(original.fatG)
+      saturatedFatG  = optString(original.saturatedFatG)
+      carbsG         = numString(original.carbsG)
+      sugarG         = optString(original.sugarG)
+      fiberG         = optString(original.fiberG)
+      alcoholG       = optString(original.alcoholG)
+      kcal           = numString(original.kcal)
+      sodiumMg       = optString(original.sodiumMg)
+      cholesterolMg  = optString(original.cholesterolMg)
+      potassiumMg    = optString(original.potassiumMg)
+      waterMl        = optString(original.waterMl)
+      photoAssetID   = original.photoAssetID
       let fmt = DateFormatter(); fmt.dateFormat = "HH:mm"
       time = fmt.date(from: original.time) ?? Date()
     } else {
-      emoji = ""
-      foodsText = ""
-      ingredientsText = ""
-      proteinG = ""
-      fatG = ""
-      carbsG = ""
-      fiberG = ""
-      kcal = ""
+      emoji = ""; foodsText = ""; ingredientsText = ""
+      proteinG = ""; fatG = ""; saturatedFatG = ""
+      carbsG = ""; sugarG = ""; fiberG = ""
+      alcoholG = ""; kcal = ""
+      sodiumMg = ""; cholesterolMg = ""; potassiumMg = ""; waterMl = ""
+      photoAssetID = nil
       time = Date()
     }
   }
@@ -106,9 +185,19 @@ struct EditNutritionEntrySheet: View {
     d == d.rounded() ? String(Int(d)) : String(format: "%.1f", d)
   }
 
+  private func optString(_ d: Double?) -> String {
+    guard let d, d != 0 else { return "" }
+    return d == d.rounded() ? String(Int(d)) : String(format: "%.1f", d)
+  }
+
   private func parseDouble(_ s: String) -> Double {
     Double(s.trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: ",", with: ".")) ?? 0
+  }
+
+  private func parseOpt(_ s: String) -> Double? {
+    let v = parseDouble(s)
+    return v == 0 ? nil : v
   }
 
   private func lines(_ s: String) -> [String] {
@@ -119,36 +208,118 @@ struct EditNutritionEntrySheet: View {
 
   private func save() {
     let foods = lines(foodsText)
-    let p = parseDouble(proteinG)
-    let f = parseDouble(fatG)
-    let c = parseDouble(carbsG)
-    let fb = parseDouble(fiberG)
-    let k = parseDouble(kcal)
     let emojiValue = emoji.trimmingCharacters(in: .whitespacesAndNewlines)
 
     let mutator = SeptenaServices.shared.nutritionMutator
     if let original {
+      // Double-optional: pass `.some(photoAssetID)` only when the user
+      // touched the picker this session; otherwise leave nil so the mutator
+      // doesn't clobber the existing value.
+      let photoArg: String?? = photoEdited ? .some(photoAssetID) : nil
       mutator.updateEntry(
         id: original.file,
         pickedTime: time,
         emoji: emojiValue.isEmpty ? nil : emojiValue,
         foods: foods,
-        proteinG: p, fatG: f, carbsG: c,
-        fiberG: fb == 0 ? nil : fb,
-        kcal: k == 0 ? nil : k
+        proteinG: parseDouble(proteinG),
+        fatG: parseDouble(fatG),
+        carbsG: parseDouble(carbsG),
+        fiberG: parseOpt(fiberG),
+        sugarG: parseOpt(sugarG),
+        saturatedFatG: parseOpt(saturatedFatG),
+        alcoholG: parseOpt(alcoholG),
+        kcal: parseOpt(kcal),
+        sodiumMg: parseOpt(sodiumMg),
+        cholesterolMg: parseOpt(cholesterolMg),
+        potassiumMg: parseOpt(potassiumMg),
+        waterMl: parseOpt(waterMl),
+        photoAssetID: photoArg
       )
     } else {
       mutator.addEntry(
         loggedAt: time,
         emoji: emojiValue.isEmpty ? nil : emojiValue,
         foods: foods,
-        proteinG: p, fatG: f, carbsG: c,
-        fiberG: fb == 0 ? nil : fb,
-        kcal: k == 0 ? nil : k
+        proteinG: parseDouble(proteinG),
+        fatG: parseDouble(fatG),
+        carbsG: parseDouble(carbsG),
+        fiberG: parseOpt(fiberG),
+        sugarG: parseOpt(sugarG),
+        saturatedFatG: parseOpt(saturatedFatG),
+        alcoholG: parseOpt(alcoholG),
+        kcal: parseOpt(kcal),
+        sodiumMg: parseOpt(sodiumMg),
+        cholesterolMg: parseOpt(cholesterolMg),
+        potassiumMg: parseOpt(potassiumMg),
+        waterMl: parseOpt(waterMl),
+        photoAssetID: photoAssetID
       )
     }
     Haptics.tick()
     onDone()
     dismiss()
+  }
+}
+
+// MARK: - Photo thumbnail
+//
+// Resolves a `PHAsset.localIdentifier` to a square thumbnail using PhotoKit.
+// Falls back to a neutral placeholder when no ID is set, when the asset has
+// been deleted from Photos, or when the user picked it on another device
+// (local identifiers don't roam — see [[project_cloudkit_migration]]).
+
+struct MealPhotoThumbnail: View {
+  let assetID: String?
+  let size: CGFloat
+
+  @State private var image: UIImage? = nil
+
+  var body: some View {
+    Group {
+      if let image {
+        Image(uiImage: image)
+          .resizable()
+          .scaledToFill()
+      } else {
+        ZStack {
+          RoundedRectangle(cornerRadius: 8)
+            .fill(Color.secondary.opacity(0.12))
+          Image(systemName: assetID == nil ? "photo" : "photo.badge.exclamationmark")
+            .foregroundStyle(.secondary)
+        }
+      }
+    }
+    .frame(width: size, height: size)
+    .clipShape(RoundedRectangle(cornerRadius: 8))
+    .task(id: assetID) { await load() }
+  }
+
+  private func load() async {
+    image = nil
+    guard let assetID, !assetID.isEmpty else { return }
+    let assets = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil)
+    guard let asset = assets.firstObject else { return }
+    let opts = PHImageRequestOptions()
+    opts.deliveryMode = .opportunistic
+    opts.isNetworkAccessAllowed = true
+    let target = CGSize(width: size * 3, height: size * 3)  // @3x
+    await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+      var resumed = false
+      PHImageManager.default().requestImage(
+        for: asset,
+        targetSize: target,
+        contentMode: .aspectFill,
+        options: opts
+      ) { img, info in
+        Task { @MainActor in self.image = img }
+        // `opportunistic` may call the handler twice (low-res then hi-res);
+        // resume only on the final delivery.
+        let isDegraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
+        if !isDegraded && !resumed {
+          resumed = true
+          cont.resume()
+        }
+      }
+    }
   }
 }

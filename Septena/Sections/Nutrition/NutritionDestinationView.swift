@@ -114,8 +114,7 @@ struct NutritionDestinationView: View {
   var body: some View {
     ScrollView {
       LazyVStack(spacing: 12) {
-        statsGrid
-        chartsGrid
+        macroTilesGrid
         entriesList
       }
       .padding(.horizontal, 12)
@@ -175,7 +174,14 @@ struct NutritionDestinationView: View {
       fatG: entry.fatG,
       carbsG: entry.carbsG,
       fiberG: entry.fiberG,
-      kcal: entry.kcal
+      sugarG: entry.sugarG,
+      saturatedFatG: entry.saturatedFatG,
+      alcoholG: entry.alcoholG,
+      kcal: entry.kcal == 0 ? nil : entry.kcal,
+      sodiumMg: entry.sodiumMg,
+      cholesterolMg: entry.cholesterolMg,
+      potassiumMg: entry.potassiumMg,
+      waterMl: entry.waterMl
     )
     Haptics.success()
   }
@@ -186,136 +192,246 @@ struct NutritionDestinationView: View {
     Haptics.warning()
   }
 
-  // MARK: - Stat tiles
+  // MARK: - Unified macro tiles
+  //
+  // Each enabled macro renders as a single tile that combines today's value,
+  // a "what's left vs. target" status line, and a 7-day mini histogram with
+  // target band. The specs array drives the grid — when macro tiles move to
+  // user settings, this is the only thing that changes.
 
-  private var statsGrid: some View {
+  private struct MacroTileSpec: Identifiable {
+    let id: String
+    let label: String
+    let unit: String          // displayed next to the value: "g", "h", "kcal"
+    let color: Color
+    let target: MacroRange
+    let todayValue: Double
+    let series: [DailyPoint]  // exactly 7 days, oldest → newest
+    let formatValue: (Double) -> String
+  }
+
+  private var macroTileSpecs: [MacroTileSpec] {
     let t = todayTotals
     let m = macros
-    return LazyVGrid(columns: tileColumns, spacing: 8) {
-      statTile(label: "Protein", value: t.protein, unit: "g",
-               target: m?.protein, color: proteinColor)
-      statTile(label: "Fat", value: t.fat, unit: "g",
-               target: m?.fat, color: fatColor)
-      statTile(label: "Carbs", value: t.carbs, unit: "g",
-               target: m?.carbs, color: carbsColor)
-      statTile(label: "Fiber", value: t.fiber, unit: "g",
-               target: m?.fiber ?? MacroRange(min: 25, max: 35, unit: "g"),
-               color: fiberColor)
-      statTile(label: "Kcal", value: t.kcal, unit: "",
-               target: m?.kcal, color: kcalColor)
-      fastingTile
-    }
+    let intStr: (Double) -> String = { $0 <= 0 ? "—" : String(Int($0.rounded())) }
+    let oneDec: (Double) -> String = { $0 <= 0 ? "—" : String(format: "%.1f", $0) }
+
+    var out: [MacroTileSpec] = []
+    out.append(.init(
+      id: "protein", label: "Protein", unit: "g", color: proteinColor,
+      target: m?.protein ?? MacroRange(min: 100, max: 140, unit: "g"),
+      todayValue: t.protein,
+      series: dailySeries { $0.proteinG },
+      formatValue: intStr))
+    out.append(.init(
+      id: "fat", label: "Fat", unit: "g", color: fatColor,
+      target: m?.fat ?? MacroRange(min: 50, max: 80, unit: "g"),
+      todayValue: t.fat,
+      series: dailySeries { $0.fatG },
+      formatValue: intStr))
+    out.append(.init(
+      id: "carbs", label: "Carbs", unit: "g", color: carbsColor,
+      target: m?.carbs ?? MacroRange(min: 150, max: 250, unit: "g"),
+      todayValue: t.carbs,
+      series: dailySeries { $0.carbsG },
+      formatValue: intStr))
+    out.append(.init(
+      id: "fiber", label: "Fiber", unit: "g", color: fiberColor,
+      target: m?.fiber ?? MacroRange(min: 25, max: 35, unit: "g"),
+      todayValue: t.fiber,
+      series: dailySeries { $0.fiberG ?? 0 },
+      formatValue: intStr))
+    out.append(.init(
+      id: "kcal", label: "Kcal", unit: "kcal", color: kcalColor,
+      target: m?.kcal ?? MacroRange(min: 1800, max: 2400, unit: "kcal"),
+      todayValue: t.kcal,
+      series: dailySeries { $0.kcal },
+      formatValue: intStr))
+    out.append(fastingSpec(oneDec: oneDec))
+    return out
   }
 
-  private var tileColumns: [GridItem] {
-    [GridItem(.flexible(), spacing: 8),
-     GridItem(.flexible(), spacing: 8),
-     GridItem(.flexible(), spacing: 8)]
-  }
-
-  private func statTile(label: String, value: Double, unit: String,
-                        target: MacroRange?, color: Color) -> some View {
-    let displayed = value > 0 ? Int(value.rounded()) : nil
-    let progress = target.map { progressTowardRange(value, min: $0.min, max: $0.max) } ?? 0
-    return VStack(alignment: .leading, spacing: 6) {
-      HStack(alignment: .firstTextBaseline, spacing: 2) {
-        Text(displayed.map { "\($0)" } ?? "—")
-          .font(.system(.title2, design: .rounded).weight(.semibold).monospacedDigit())
-          .foregroundStyle(displayed != nil ? color : Color.secondary)
-        if !unit.isEmpty {
-          Text(unit).font(.caption2).foregroundStyle(.secondary)
-        }
-      }
-      Text(label.uppercased())
-        .font(.caption2.weight(.semibold))
-        .foregroundStyle(.secondary)
-      progressBar(value: progress, color: color)
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.horizontal, 10)
-    .padding(.vertical, 10)
-    .background(Theme.secondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 14))
-  }
-
-  private var fastingTile: some View {
+  private func fastingSpec(oneDec: @escaping (Double) -> String) -> MacroTileSpec {
     let target = macros?.fasting ?? MacroRange(min: 14, max: 16, unit: "h")
-    let liveHours = liveFastingHours()
-    let recordedHours = (stats?.fasting ?? []).first(where: { $0.date == today })?.hours
-    let displayHours = liveHours ?? recordedHours
-    let mid = (target.min + target.max) / 2
-    let progress = displayHours.map { min(1.0, $0 / mid) } ?? 0
-    return VStack(alignment: .leading, spacing: 6) {
-      HStack(alignment: .firstTextBaseline, spacing: 2) {
-        Text(displayHours.map { String(format: "%.1f", $0) } ?? "—")
-          .font(.system(.title2, design: .rounded).weight(.semibold).monospacedDigit())
-          .foregroundStyle(displayHours != nil ? fastingColor : Color.secondary)
-        Text("h").font(.caption2).foregroundStyle(.secondary)
-      }
-      Text("FASTING")
-        .font(.caption2.weight(.semibold))
-        .foregroundStyle(.secondary)
-      progressBar(value: progress, color: fastingColor)
+    let fastByDate = Dictionary(uniqueKeysWithValues:
+      (stats?.fasting ?? []).map { ($0.date, $0) })
+    var series: [DailyPoint] = last7Dates.map { d in
+      DailyPoint(date: d, value: fastByDate[d]?.hours ?? 0)
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.horizontal, 10)
-    .padding(.vertical, 10)
-    .background(Theme.secondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 14))
+    let live = liveFastingHours()
+    if let live, let idx = series.firstIndex(where: { $0.date == today }) {
+      series[idx] = DailyPoint(date: today, value: live)
+    }
+    let todayValue = live ?? fastByDate[today]?.hours ?? 0
+    return .init(
+      id: "fasting", label: "Fasting", unit: "h", color: fastingColor,
+      target: target, todayValue: todayValue,
+      series: series, formatValue: oneDec)
   }
 
-  private func progressBar(value: Double, color: Color) -> some View {
-    GeometryReader { geo in
-      ZStack(alignment: .leading) {
-        Capsule().fill(Color.secondary.opacity(0.18))
-        Capsule().fill(color).frame(width: geo.size.width * CGFloat(max(0, min(1, value))))
-      }
+  private var macroTilesGrid: some View {
+    LazyVGrid(columns: macroTileColumns, spacing: 8) {
+      ForEach(macroTileSpecs) { spec in unifiedMacroTile(spec) }
     }
-    .frame(height: 4)
   }
 
-  // MARK: - Charts grid
-
-  private var chartColumns: [GridItem] {
+  private var macroTileColumns: [GridItem] {
     [GridItem(.flexible(), spacing: 8),
      GridItem(.flexible(), spacing: 8)]
-  }
-
-  private var chartsGrid: some View {
-    LazyVGrid(columns: chartColumns, spacing: 8) {
-      if let m = macros {
-        macroChart(label: "Protein", unit: "g", color: proteinColor,
-                   target: m.protein,
-                   series: dailySeries { $0.proteinG },
-                   todayValue: todayTotals.protein)
-        macroChart(label: "Fat", unit: "g", color: fatColor,
-                   target: m.fat,
-                   series: dailySeries { $0.fatG },
-                   todayValue: todayTotals.fat)
-        macroChart(label: "Carbs", unit: "g", color: carbsColor,
-                   target: m.carbs,
-                   series: dailySeries { $0.carbsG },
-                   todayValue: todayTotals.carbs)
-        macroChart(label: "Fiber", unit: "g", color: fiberColor,
-                   target: m.fiber ?? MacroRange(min: 25, max: 35, unit: "g"),
-                   series: dailySeries { $0.fiberG ?? 0 },
-                   todayValue: todayTotals.fiber)
-        macroChart(label: "Kcal", unit: "", color: kcalColor,
-                   target: m.kcal,
-                   series: dailySeries { $0.kcal },
-                   todayValue: todayTotals.kcal)
-        fastingChart
-      } else {
-        ForEach(0..<6, id: \.self) { _ in placeholderChart }
-      }
-    }
-  }
-
-  private var placeholderChart: some View {
-    RoundedRectangle(cornerRadius: 14)
-      .fill(Theme.secondaryGroupedBackground)
-      .frame(height: 180)
   }
 
   private struct DailyPoint: Hashable { let date: String; let value: Double }
+
+  // MARK: - Unified tile view
+
+  @ViewBuilder
+  private func unifiedMacroTile(_ spec: MacroTileSpec) -> some View {
+    let consumed = spec.todayValue
+    let lo = spec.target.min
+    let hi = spec.target.max
+    let unit = spec.unit
+    let color = spec.color
+
+    let avg: Double = {
+      let past = spec.series.filter { $0.date != today && $0.value > 0 }
+      guard !past.isEmpty else { return 0 }
+      return past.map(\.value).reduce(0, +) / Double(past.count)
+    }()
+
+    // yMax keeps the bar always inside the chart even if today blew past max.
+    // Floor at 1 so an empty all-zero week still renders the target band.
+    let dataMax = spec.series.map(\.value).max() ?? 0
+    let yMax = ceil(Swift.max(hi * 1.2, Swift.max(consumed * 1.1, dataMax * 1.1, 1)))
+
+    let summary = a11ySummary(spec: spec, consumed: consumed,
+                              avg: avg, lo: lo, hi: hi)
+
+    VStack(alignment: .leading, spacing: 6) {
+      HStack(alignment: .firstTextBaseline, spacing: 4) {
+        Text(spec.label.uppercased())
+          .font(.caption2.weight(.semibold))
+          .foregroundStyle(.secondary)
+        Spacer(minLength: 0)
+        Text(spec.formatValue(consumed))
+          .font(.system(.title3, design: .rounded).weight(.semibold).monospacedDigit())
+          .foregroundStyle(consumed > 0 ? color : Color.secondary)
+        Text(unit).font(.caption2).foregroundStyle(.secondary)
+      }
+      tileStatusLine(consumed: consumed, lo: lo, hi: hi,
+                     unit: unit, color: color, formatValue: spec.formatValue)
+      Chart {
+        RectangleMark(xStart: nil, xEnd: nil,
+                      yStart: .value("Min", lo),
+                      yEnd: .value("Max", hi))
+          .foregroundStyle(color.opacity(0.12))
+          .accessibilityHidden(true)
+        RuleMark(y: .value("Min", lo))
+          .foregroundStyle(color.opacity(0.6))
+          .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+          .accessibilityHidden(true)
+        RuleMark(y: .value("Max", hi))
+          .foregroundStyle(color.opacity(0.6))
+          .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+          .accessibilityHidden(true)
+        if avg > 0 {
+          RuleMark(y: .value("Avg", avg))
+            .foregroundStyle(color.opacity(0.85))
+            .lineStyle(StrokeStyle(lineWidth: 2))
+            .accessibilityHidden(true)
+        }
+        ForEach(spec.series, id: \.date) { p in
+          BarMark(
+            // Full ISO date as the category — see prior comment: collapsing
+            // by weekday-letter would merge same-letter days (S/S, T/T).
+            x: .value("Day", p.date),
+            y: .value(spec.label, p.value),
+            width: .ratio(0.6)
+          )
+          .foregroundStyle(barFill(value: p.value, isToday: p.date == today,
+                                   lo: lo, color: color))
+          .cornerRadius(2)
+          .accessibilityLabel(weekdayFull(p.date))
+          .accessibilityValue(p.value <= 0
+                              ? "no data"
+                              : "\(spec.formatValue(p.value)) \(unit)")
+        }
+      }
+      .chartXScale(domain: spec.series.map(\.date))
+      .chartYScale(domain: 0...yMax)
+      .chartYAxis(.hidden)
+      .chartXAxis {
+        AxisMarks(values: spec.series.map(\.date)) { v in
+          AxisValueLabel {
+            if let iso = v.as(String.self) {
+              Text(verbatim: weekdayInitial(iso))
+                .font(.system(size: 9))
+                .foregroundStyle(iso == today ? color : .secondary)
+            }
+          }
+        }
+      }
+      .frame(height: 72)
+    }
+    .padding(10)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(Theme.secondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 14))
+    .a11yCombineKeepingChildren(summary)
+  }
+
+  /// Today's status line — "12 g left to target", "in range", "8 g over", …
+  /// Color encodes urgency: muted below min, full at and above min, full above max.
+  private func tileStatusLine(consumed: Double, lo: Double, hi: Double,
+                              unit: String, color: Color,
+                              formatValue: (Double) -> String) -> some View {
+    let text: String
+    let tone: Color
+    if consumed <= 0 {
+      text = "no data today"
+      tone = .secondary
+    } else if consumed < lo {
+      text = "\(formatValue(lo - consumed)) \(unit) to target"
+      tone = color.opacity(0.7)
+    } else if consumed <= hi {
+      let room = hi - consumed
+      text = room > 0
+        ? "in range · \(formatValue(room)) \(unit) left"
+        : "in range"
+      tone = color
+    } else {
+      text = "\(formatValue(consumed - hi)) \(unit) over"
+      tone = color
+    }
+    return Text(text)
+      .font(.caption.monospacedDigit())
+      .foregroundStyle(tone)
+      .lineLimit(1)
+      .minimumScaleFactor(0.85)
+  }
+
+  private func barFill(value: Double, isToday: Bool, lo: Double, color: Color) -> Color {
+    if value <= 0 { return isToday ? color.opacity(0.18) : Color.secondary.opacity(0.2) }
+    return color.opacity(value < lo ? 0.55 : 1)
+  }
+
+  private func a11ySummary(spec: MacroTileSpec, consumed: Double, avg: Double,
+                           lo: Double, hi: Double) -> String {
+    let unit = spec.unit
+    let status: String
+    if consumed <= 0 {
+      status = "no data today"
+    } else if consumed < lo {
+      status = "\(spec.formatValue(lo - consumed)) \(unit) to target"
+    } else if consumed <= hi {
+      status = "in target"
+    } else {
+      status = "\(spec.formatValue(consumed - hi)) \(unit) over target"
+    }
+    let avgText = avg > 0
+      ? "Seven-day average \(spec.formatValue(avg)) \(unit)."
+      : ""
+    return "\(spec.label). Today \(spec.formatValue(consumed)) \(unit), \(status). "
+         + "Target \(spec.formatValue(lo)) to \(spec.formatValue(hi)) \(unit). \(avgText)"
+  }
 
   /// The seven ISO dates ending today (oldest → newest). Used to render an
   /// exact 7-bar window — `stats.daily` omits days with no entries, so a
@@ -335,200 +451,6 @@ struct NutritionDestinationView: View {
     return last7Dates.map { d in
       DailyPoint(date: d, value: byDate[d].map(pick) ?? 0)
     }
-  }
-
-  private func macroChart(label: String, unit: String, color: Color,
-                          target: MacroRange,
-                          series: [DailyPoint],
-                          todayValue: Double) -> some View {
-    let yMax = ceil(target.max * 1.2)
-    let avg: Double = {
-      let past = series.filter { $0.date != today }
-      guard !past.isEmpty else { return 0 }
-      return (past.map(\.value).reduce(0, +) / Double(past.count)).rounded()
-    }()
-    let consumed = Int(todayValue.rounded())
-    let left = max(0, Int(target.max.rounded()) - consumed)
-    let over = max(0, consumed - Int(target.max.rounded()))
-    let caption = over > 0
-      ? "\(consumed)\(unit) · \(over)\(unit) over"
-      : "\(consumed)\(unit) · \(left)\(unit) left"
-
-    let lo = Int(target.min.rounded())
-    let hi = Int(target.max.rounded())
-    let statusText = over > 0
-      ? "\(over)\(unit) over target"
-      : (consumed >= lo && consumed <= hi
-         ? "in target"
-         : "\(left)\(unit) left to target")
-    let avgText = avg > 0 ? "Seven-day average \(Int(avg))\(unit)." : ""
-    let summary = "\(label) chart. Today \(consumed)\(unit), \(statusText). "
-                + "Target \(lo) to \(hi)\(unit). \(avgText)"
-
-    return VStack(alignment: .leading, spacing: 4) {
-      Text(label).font(.subheadline.weight(.semibold))
-      Text(caption)
-        .font(.caption.monospacedDigit())
-        .foregroundStyle(color)
-      Chart {
-        RectangleMark(xStart: nil, xEnd: nil,
-                      yStart: .value("Min", target.min),
-                      yEnd: .value("Max", target.max))
-          .foregroundStyle(color.opacity(0.12))
-          .accessibilityHidden(true)
-        RuleMark(y: .value("Min", target.min))
-          .foregroundStyle(color.opacity(0.6))
-          .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-          .accessibilityHidden(true)
-        RuleMark(y: .value("Max", target.max))
-          .foregroundStyle(color.opacity(0.6))
-          .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-          .accessibilityHidden(true)
-        if avg > 0 {
-          RuleMark(y: .value("Avg", avg))
-            .foregroundStyle(color.opacity(0.85))
-            .lineStyle(StrokeStyle(lineWidth: 2))
-            .accessibilityHidden(true)
-        }
-        ForEach(series, id: \.date) { p in
-          BarMark(
-            // x is the full ISO date so each day is its own category.
-            // Using the weekday letter here would collide same-letter
-            // days (Sat/Sun → "S", Tue/Thu → "T") into a single column
-            // and silently render <7 bars. The axis formats the label
-            // back to a narrow weekday for display.
-            x: .value("Day", p.date),
-            y: .value(label, p.value),
-            width: .ratio(0.6)
-          )
-          .foregroundStyle(p.value == 0
-                           ? Color.secondary.opacity(0.2)
-                           : color.opacity(p.value < target.min ? 0.55 : 1))
-          .cornerRadius(2)
-          .accessibilityLabel(weekdayFull(p.date))
-          .accessibilityValue(p.value == 0
-                              ? "no entries"
-                              : "\(Int(p.value.rounded()))\(unit)")
-        }
-      }
-      .chartXScale(domain: series.map(\.date))
-      .chartYScale(domain: 0...yMax)
-      .chartYAxis {
-        AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { v in
-          AxisValueLabel { if let d = v.as(Double.self) { Text(verbatim: "\(Int(d))\(unit)").font(.caption2) } }
-          AxisGridLine().foregroundStyle(Color.secondary.opacity(0.1))
-        }
-      }
-      .chartXAxis {
-        AxisMarks(values: series.map(\.date)) { v in
-          AxisValueLabel {
-            if let iso = v.as(String.self) {
-              Text(verbatim: weekdayInitial(iso)).font(.caption2)
-            }
-          }
-        }
-      }
-      .frame(height: 110)
-    }
-    .padding(10)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .background(Theme.secondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 14))
-    .a11yCombineKeepingChildren(summary)
-  }
-
-  private var fastingChart: some View {
-    let target = macros?.fasting ?? MacroRange(min: 14, max: 16, unit: "h")
-    let yMax = ceil(target.max / 0.85)
-
-    let fastByDate = Dictionary(uniqueKeysWithValues:
-      (stats?.fasting ?? []).map { ($0.date, $0) })
-    var data: [DailyPoint] = last7Dates.map { d in
-      DailyPoint(date: d, value: fastByDate[d]?.hours ?? 0)
-    }
-    // Inject the live creeping bar for today when actively fasting.
-    if let live = liveFastingHours(),
-       let idx = data.firstIndex(where: { $0.date == today }) {
-      data[idx] = DailyPoint(date: today, value: live)
-    }
-
-    let past = data.filter { $0.date != today && $0.value > 0 }
-    let avg = past.isEmpty ? 0 : (past.map(\.value).reduce(0, +) / Double(past.count))
-    let mid = (target.min + target.max) / 2
-    let deltaCaption: String? = avg > 0
-      ? String(format: "%+.1fh vs target", avg - mid)
-      : nil
-
-    let avgText = avg > 0
-      ? "Seven-day average \(String(format: "%.1f", avg)) hours."
-      : ""
-    let summary = "Fasting chart. Target \(Int(target.min)) to \(Int(target.max)) hours. \(avgText)"
-
-    return VStack(alignment: .leading, spacing: 4) {
-      Text("Fasting").font(.subheadline.weight(.semibold))
-      Text(deltaCaption ?? " ")
-        .font(.caption.monospacedDigit())
-        .foregroundStyle(fastingColor)
-      Chart {
-        RectangleMark(xStart: nil, xEnd: nil,
-                      yStart: .value("Min", target.min),
-                      yEnd: .value("Max", target.max))
-          .foregroundStyle(fastingColor.opacity(0.12))
-          .accessibilityHidden(true)
-        RuleMark(y: .value("Min", target.min))
-          .foregroundStyle(fastingColor.opacity(0.6))
-          .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-          .accessibilityHidden(true)
-        RuleMark(y: .value("Max", target.max))
-          .foregroundStyle(fastingColor.opacity(0.6))
-          .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-          .accessibilityHidden(true)
-        if avg > 0 {
-          RuleMark(y: .value("Avg", avg))
-            .foregroundStyle(fastingColor.opacity(0.85))
-            .lineStyle(StrokeStyle(lineWidth: 2))
-            .accessibilityHidden(true)
-        }
-        ForEach(data, id: \.date) { p in
-          BarMark(
-            // See macroChart for why x is the ISO date, not the weekday
-            // letter — same-letter days would otherwise collapse.
-            x: .value("Day", p.date),
-            y: .value("Hours", p.value),
-            width: .ratio(0.6)
-          )
-          .foregroundStyle(p.value <= 0
-                           ? Color.secondary.opacity(0.2)
-                           : fastingColor.opacity(p.value >= target.min ? 1 : 0.55))
-          .cornerRadius(2)
-          .accessibilityLabel(weekdayFull(p.date))
-          .accessibilityValue(p.value <= 0
-                              ? "no data"
-                              : "\(String(format: "%.1f", p.value)) hours")
-        }
-      }
-      .chartXScale(domain: data.map(\.date))
-      .chartYScale(domain: 0...yMax)
-      .chartYAxis {
-        AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { v in
-          AxisValueLabel { if let d = v.as(Double.self) { Text(verbatim: "\(Int(d))h").font(.caption2) } }
-          AxisGridLine().foregroundStyle(Color.secondary.opacity(0.1))
-        }
-      }
-      .chartXAxis {
-        AxisMarks(values: data.map(\.date)) { v in
-          AxisValueLabel {
-            if let iso = v.as(String.self) {
-              Text(verbatim: weekdayInitial(iso)).font(.caption2)
-            }
-          }
-        }
-      }
-      .frame(height: 110)
-    }
-    .padding(10)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .background(Theme.secondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 14))
-    .a11yCombineKeepingChildren(summary)
   }
 
   // MARK: - Entries list
@@ -602,9 +524,14 @@ struct NutritionDestinationView: View {
             .font(.subheadline.weight(.medium))
             .lineLimit(1)
           Spacer()
-          Text(e.time)
-            .font(.caption.monospacedDigit())
-            .foregroundStyle(.secondary)
+          VStack(alignment: .trailing, spacing: 4) {
+            Text(e.time)
+              .font(.caption.monospacedDigit())
+              .foregroundStyle(.secondary)
+            if let pid = e.photoAssetID, !pid.isEmpty {
+              MealPhotoThumbnail(assetID: pid, size: 36)
+            }
+          }
         }
         if e.foods.count > 1 {
           Text(e.foods.dropFirst().joined(separator: " · "))
@@ -734,19 +661,6 @@ struct NutritionDestinationView: View {
     let parts = s.split(separator: ":")
     guard parts.count == 2, let h = Int(parts[0]), let m = Int(parts[1]) else { return nil }
     return Double(h) + Double(m) / 60
-  }
-
-  // MARK: - Range progress
-  //
-  // Mirrors `progressTowardRange` from lib/macro-targets.ts: 0 below min,
-  // ramps to 1.0 at min, holds 1.0 inside band, drops gently above max.
-
-  private func progressTowardRange(_ value: Double, min lo: Double, max hi: Double) -> Double {
-    guard value > 0 else { return 0 }
-    if value < lo { return value / lo * 0.95 }
-    if value <= hi { return 1.0 }
-    let over = (value - hi) / max(1, hi)
-    return Swift.max(0.5, 1.0 - over * 0.5)
   }
 
   // MARK: - Format helpers

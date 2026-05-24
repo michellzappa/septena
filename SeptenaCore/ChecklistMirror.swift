@@ -1532,10 +1532,18 @@ enum ChecklistMirror {
       emoji: e.emoji,
       proteinG: e.proteinG,
       fatG: e.fatG,
+      saturatedFatG: e.saturatedFatG,
       carbsG: e.carbsG,
+      sugarG: e.sugarG,
       fiberG: e.fiberG,
+      alcoholG: e.alcoholG,
       kcal: e.kcal ?? computedKcal,
+      sodiumMg: e.sodiumMg,
+      cholesterolMg: e.cholesterolMg,
+      potassiumMg: e.potassiumMg,
+      waterMl: e.waterMl,
       foods: e.foods.split(separator: "\n", omittingEmptySubsequences: true).map(String.init),
+      photoAssetID: e.photoAssetID,
       file: e.id
     )
   }
