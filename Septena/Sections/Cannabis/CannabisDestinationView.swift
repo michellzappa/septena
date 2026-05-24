@@ -12,6 +12,7 @@ struct CannabisDestinationView: View {
   @State private var today: CannabisDayResponse? = nil
   @State private var loading = true
   @State private var editing: CannabisEntry? = nil
+  @State private var managingTypes = false
   @State private var history: [CannabisHistoryPoint] = []
 
   /// Capsule dot count for the legacy HitDots indicator.
@@ -92,7 +93,20 @@ struct CannabisDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        Button { managingTypes = true } label: { Image(systemName: "plus") }
+          .tint(accent)
+      }
+    }
     .task { reload() }
+    .sheet(isPresented: $managingTypes) {
+      CannabisTypeSheet()
+        #if os(iOS)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        #endif
+    }
     .sheet(item: $editing) { entry in
       EditCannabisEntrySheet(
         date: today?.date ?? SeptenaDate.today,

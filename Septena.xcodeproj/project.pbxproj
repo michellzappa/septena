@@ -23,6 +23,7 @@
 		0ED59BE06DEBD263BBFA0D91 /* BadgeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EC7C9D9CAC52C91AFE79AE7 /* BadgeManager.swift */; };
 		1044DAF00212F1890D0BBCC3 /* AreaRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = C729259A5867D99CC64AA9C3 /* AreaRecord.swift */; };
 		10550EB285720325B123ED7E /* EditCaffeineEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFF7884F079CD77F2AA126F9 /* EditCaffeineEntrySheet.swift */; };
+		ECE15135AA3F4C27B32FAF94318651FB /* CaffeineTypeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 143AEA376AD3403C8B17AE863677999B /* CaffeineTypeSheet.swift */; };
 		11091A62DB6744BDE8673415 /* EditSupplementSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F70E70D8BC6F8B767D06FF9 /* EditSupplementSheet.swift */; };
 		116F32431DCC98176BC52830 /* ChoresDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E31867A580D7D96DFB20391B /* ChoresDestinationView.swift */; };
 		127A379491C1416D94315098 /* TodayLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C9CE8558AC348E4855A6CA6 /* TodayLogView.swift */; };
@@ -32,6 +33,7 @@
 		187093B93D48863B5E1E1E37 /* RemindersBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561130AE996F0E92FE02767D /* RemindersBridge.swift */; };
 		1872D480184BC0A84068D022 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBA5CADFC4205866897E4F8C /* App.swift */; };
 		1B5C67C9AB68E1F9822472D3 /* EditCannabisEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E49712FC24D8C18675935DF /* EditCannabisEntrySheet.swift */; };
+		58B73FC4098A408CACA04153C8637FB6 /* CannabisTypeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71E25F55030941F7AEEDA98D55D4E363 /* CannabisTypeSheet.swift */; };
 		1B693725E48BCC5939FE1196 /* AddInfoRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD5AAD8DD0E25AF940E3237C /* AddInfoRow.swift */; };
 		1C507D0995C20ECA4DA6479F /* ChoresQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = F531676F7BCEFA46F3A7D827 /* ChoresQuickAddMenu.swift */; };
 		1CBF0222F73BAE3CDDB0E342 /* ProjectRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A7C4DF4E90BB39F4A0D23DE /* ProjectRecord.swift */; };
@@ -128,6 +130,7 @@
 		74E631E4D6B41796BBE7B3FA /* AreaRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = C729259A5867D99CC64AA9C3 /* AreaRecord.swift */; };
 		76C049B6FAEBDE6471287104 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0365044C6EA062BBFCCA6B /* SettingsView.swift */; };
 		78A4E7FB3BB9AED6E920A21E /* EditCannabisEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E49712FC24D8C18675935DF /* EditCannabisEntrySheet.swift */; };
+		4DE0513FA4C449F29A031F9ACE599643 /* CannabisTypeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71E25F55030941F7AEEDA98D55D4E363 /* CannabisTypeSheet.swift */; };
 		78C28CA0B3780E99EC30BC75 /* DayClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFD8EA98B891BB43A0CE4640 /* DayClock.swift */; };
 		7B6E0700686F4161866A1A3E /* RoutineDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 300B15288763456C89D8AF5E /* RoutineDetailView.swift */; };
 		7BF180B58D52C2BD10BBC5AB /* MenuBarMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD90B8D1D8A0A978D1CE744C /* MenuBarMenu.swift */; };
@@ -209,6 +212,7 @@
 		B5C4876EC67FCD081FB3E0C5 /* WatchConnectivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A09644381782A9A298BDC709 /* WatchConnectivity.swift */; };
 		B60A9AE489FD7502DC0B83B8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0365044C6EA062BBFCCA6B /* SettingsView.swift */; };
 		B717FF226A4C4E3CA00A8928 /* EditCaffeineEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFF7884F079CD77F2AA126F9 /* EditCaffeineEntrySheet.swift */; };
+		53AE9D35D13046BB9E02BECFF6041939 /* CaffeineTypeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 143AEA376AD3403C8B17AE863677999B /* CaffeineTypeSheet.swift */; };
 		B96B17EC37A2CFD6C1F1E862 /* AddCaffeinePage.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEF5F3A2F7A70BEADFCF88CA /* AddCaffeinePage.swift */; };
 		B96C96E8E9B28590E7204C0C /* NextItemsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A26475D9A9D19DC0840960D /* NextItemsSection.swift */; };
 		BA110C8B6611A56723B23E66 /* NextSuggestionsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6392DC43E2FE913972F42911 /* NextSuggestionsSection.swift */; };
@@ -378,6 +382,7 @@
 		1CA646178F906B39ADA6689F /* Plausible.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plausible.swift; sourceTree = "<group>"; };
 		1CBF0DAD74F9392D507229CE /* TaskReads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskReads.swift; sourceTree = "<group>"; };
 		1D82674F62302252DB1B8167 /* CannabisQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CannabisQuickAddMenu.swift; sourceTree = "<group>"; };
+		71E25F55030941F7AEEDA98D55D4E363 /* CannabisTypeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CannabisTypeSheet.swift; sourceTree = "<group>"; };
 		1E25F81FE5AA4B6BBC056275 /* DateParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateParser.swift; sourceTree = "<group>"; };
 		1E49712FC24D8C18675935DF /* EditCannabisEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditCannabisEntrySheet.swift; sourceTree = "<group>"; };
 		1E598D0EF28BF638E97F3F22 /* AreasBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreasBackend.swift; sourceTree = "<group>"; };
@@ -392,6 +397,7 @@
 		31313A0E804B33A3E43FC1F6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		3433AE6FCB2549D390F9E43A /* TrainingConfigStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrainingConfigStore.swift; sourceTree = "<group>"; };
 		3841DB555C39521C2A088942 /* CaffeineQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaffeineQuickAddMenu.swift; sourceTree = "<group>"; };
+		143AEA376AD3403C8B17AE863677999B /* CaffeineTypeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaffeineTypeSheet.swift; sourceTree = "<group>"; };
 		3882D64DF6517B0447F5F65C /* TasksBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksBackend.swift; sourceTree = "<group>"; };
 		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
@@ -781,6 +787,7 @@
 				FEF5F3A2F7A70BEADFCF88CA /* AddCaffeinePage.swift */,
 				ACEBFC5E297AA01C582EE1A5 /* CaffeineDestinationView.swift */,
 				3841DB555C39521C2A088942 /* CaffeineQuickAddMenu.swift */,
+				143AEA376AD3403C8B17AE863677999B /* CaffeineTypeSheet.swift */,
 				AFF7884F079CD77F2AA126F9 /* EditCaffeineEntrySheet.swift */,
 			);
 			path = Caffeine;
@@ -792,6 +799,7 @@
 				1387A56A99DA78515CE7FA9F /* AddCannabisPage.swift */,
 				A8426035C14708F9B19546DE /* CannabisDestinationView.swift */,
 				1D82674F62302252DB1B8167 /* CannabisQuickAddMenu.swift */,
+				71E25F55030941F7AEEDA98D55D4E363 /* CannabisTypeSheet.swift */,
 				1E49712FC24D8C18675935DF /* EditCannabisEntrySheet.swift */,
 			);
 			path = Cannabis;
@@ -1178,7 +1186,9 @@
 				99C5E0B4C1F96A710C71DFFC /* DayTimelineView.swift in Sources */,
 				127A379491C1416D94315098 /* TodayLogView.swift in Sources */,
 				10550EB285720325B123ED7E /* EditCaffeineEntrySheet.swift in Sources */,
+				ECE15135AA3F4C27B32FAF94318651FB /* CaffeineTypeSheet.swift in Sources */,
 				1B5C67C9AB68E1F9822472D3 /* EditCannabisEntrySheet.swift in Sources */,
+				58B73FC4098A408CACA04153C8637FB6 /* CannabisTypeSheet.swift in Sources */,
 				2DCD1163302ADF72541A9664 /* EditChoreSheet.swift in Sources */,
 				E18A84E4ED0B805920276DF6 /* EditExerciseEntrySheet.swift in Sources */,
 				7F86986DFF10251984C6D58F /* EditGroceryItemSheet.swift in Sources */,
@@ -1350,7 +1360,9 @@
 				226BFDEF2964B3BA661ACC67 /* DayTimelineView.swift in Sources */,
 				8C4887ED959A4AF899C9C4A7 /* TodayLogView.swift in Sources */,
 				B717FF226A4C4E3CA00A8928 /* EditCaffeineEntrySheet.swift in Sources */,
+				53AE9D35D13046BB9E02BECFF6041939 /* CaffeineTypeSheet.swift in Sources */,
 				78A4E7FB3BB9AED6E920A21E /* EditCannabisEntrySheet.swift in Sources */,
+				4DE0513FA4C449F29A031F9ACE599643 /* CannabisTypeSheet.swift in Sources */,
 				8B2588E5DB7635580E73217D /* EditChoreSheet.swift in Sources */,
 				D0C21C52489E6C861A6B0A13 /* EditExerciseEntrySheet.swift in Sources */,
 				9A309102A56D669A431C6703 /* EditGroceryItemSheet.swift in Sources */,

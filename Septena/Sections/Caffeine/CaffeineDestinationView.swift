@@ -11,6 +11,7 @@ struct CaffeineDestinationView: View {
   @State private var today: CaffeineDayResponse? = nil
   @State private var loading = true
   @State private var editing: CaffeineEntry? = nil
+  @State private var managingTypes = false
   @State private var history: [CaffeineHistoryPoint] = []
 
   private var caffeine: CaffeineMutator { SeptenaServices.shared.caffeineMutator }
@@ -87,9 +88,22 @@ struct CaffeineDestinationView: View {
     .navigationBarTitleDisplayMode(.large)
     #endif
     .tint(accent)
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        Button { managingTypes = true } label: { Image(systemName: "plus") }
+          .tint(accent)
+      }
+    }
     .task { reload() }
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
       reload()
+    }
+    .sheet(isPresented: $managingTypes) {
+      CaffeineTypeSheet()
+        #if os(iOS)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        #endif
     }
     .sheet(item: $editing) { entry in
       EditCaffeineEntrySheet(
