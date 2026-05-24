@@ -236,16 +236,6 @@ public extension SectionManifest {
       supportsDashboard: true,
       settingsEditor: .appearance
     ),
-    .init(
-      key: "calendar",
-      defaultLabel: "Calendar",
-      shortDescription: "Day timeline from iOS Calendar",
-      activation: .integration,
-      onboarding: .optional,
-      supportsTab: false,
-      supportsDashboard: true,
-      settingsEditor: .sectionConfig
-    ),
   ]
 
   /// Constant-time lookup by key. Built once at type init; reads are
