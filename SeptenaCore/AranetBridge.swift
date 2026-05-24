@@ -341,7 +341,7 @@ extension AranetBridge: CBCentralManagerDelegate {
 ///    0–1    2    Company ID (0x0702, SAF Tehnika)
 ///    2–7    6    Vendor header / firmware identifiers
 ///    8–9    2    CO2 (UInt16 LE, ppm)
-///   10–11   2    Temperature (Int16 LE, × 20 → °C)
+///   10–11   2    Temperature (Int16 LE, units of 0.02°C → raw / 50)
 ///   12–13   2    Pressure (UInt16 LE, × 10 → hPa)
 ///   14      1    Humidity (UInt8, percent)
 ///   15      1    Battery (UInt8, percent)
@@ -400,7 +400,10 @@ struct AranetSnapshot: Equatable {
     let age = u16(19).map(Int.init) ?? 0
 
     self.co2Ppm      = Int(co2)
-    self.tempC       = Double(tempRaw) / 20.0
+    // Ad payload uses 0.02°C units (divisor 50). The GATT current-value
+    // characteristic uses 0.05°C (/20) — don't confuse the two if you
+    // port logic from `aranet_poller.py`, which reads via GATT.
+    self.tempC       = Double(tempRaw) / 50.0
     self.pressureHPa = Double(pressureRaw) / 10.0
     self.humidityPct = Int(humidity)
     self.batteryPct  = Int(battery)
