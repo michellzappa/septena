@@ -29,7 +29,7 @@ struct NutritionDestinationView: View {
   @State private var entries: [NutritionEntry] = []
   @State private var stats: NutritionStatsResponse? = nil
   @State private var macros: MacrosConfig? = nil
-  @State private var macroColors: MacroColors? = nil
+  @State private var tilePrefs: [MacroTilePref] = MacroCatalog.defaultTilePrefs()
   @State private var loading = true
   @State private var editing: NutritionEntry? = nil
   @State private var creating = false
@@ -41,29 +41,23 @@ struct NutritionDestinationView: View {
 
   // MARK: - Colors
   //
-  // Resolved from `settings.nutrition.macro_colors` (mirrors the webapp's
-  // `useMacroColors`). Per-key fallbacks match the webapp defaults in
-  // `lib/macro-targets.ts:FALLBACK_MACRO_COLORS` so partial server patches
-  // never leave a macro uncolored, and first paint isn't monochrome while
-  // settings are loading.
+  // Resolved from `NutritionSettings.macroTiles` (per-id override) with a
+  // fallback to `MacroCatalog.byID[id].defaultColorHex`. The catalog defaults
+  // mirror the webapp's `FALLBACK_MACRO_COLORS` so first paint isn't monochrome
+  // and partial settings never leave a macro uncolored.
 
-  private static let proteinFallback = Color(hex: 0xef4444)
-  private static let fatFallback     = Color(hex: 0xf59e0b)
-  private static let carbsFallback   = Color(hex: 0x3b82f6)
-  private static let fiberFallback   = Color(hex: 0x10b981)
-  private static let kcalFallback    = Color(hex: 0xeab308)
-  private static let fastingFallback = Color(hex: 0x8b5cf6)
-
-  private var proteinColor: Color { resolve(macroColors?.protein, fallback: Self.proteinFallback) }
-  private var fatColor: Color     { resolve(macroColors?.fat,     fallback: Self.fatFallback) }
-  private var carbsColor: Color   { resolve(macroColors?.carbs,   fallback: Self.carbsFallback) }
-  private var fiberColor: Color   { resolve(macroColors?.fiber,   fallback: Self.fiberFallback) }
-  private var kcalColor: Color    { resolve(macroColors?.kcal,    fallback: Self.kcalFallback) }
-  private var fastingColor: Color { resolve(macroColors?.fasting, fallback: Self.fastingFallback) }
-
-  private func resolve(_ hex: String?, fallback: Color) -> Color {
-    Color(hexString: hex) ?? fallback
+  private func color(for macroID: String) -> Color {
+    let override = tilePrefs.first(where: { $0.id == macroID })?.colorHex
+    let fallback = MacroCatalog.byID[macroID]?.defaultColorHex
+    return Color(hexString: override ?? fallback) ?? .gray
   }
+
+  private var proteinColor: Color { color(for: "protein") }
+  private var fatColor: Color     { color(for: "fat") }
+  private var carbsColor: Color   { color(for: "carbs") }
+  private var fiberColor: Color   { color(for: "fiber") }
+  private var kcalColor: Color    { color(for: "kcal") }
+  private var fastingColor: Color { color(for: "fasting") }
 
   private var today: String { SeptenaDate.today }
 
@@ -160,8 +154,25 @@ struct NutritionDestinationView: View {
     stats = ChecklistMirror.buildNutritionStatsResponse(context: ctx, days: 90)
     macros = NutritionPrefs.loadMacrosConfig()
     let settingsRes = SettingsMirror.loadSettings(context: ctx)
-    if let colors = settingsRes?.nutrition?.macroColors { macroColors = colors }
+    tilePrefs = MacroCatalog.reconcile(
+      settingsRes?.nutrition?.macroTiles
+        ?? legacyPrefs(from: settingsRes?.nutrition?.macroColors)
+        ?? MacroCatalog.defaultTilePrefs())
     loading = false
+  }
+
+  /// Bridges the legacy `MacroColors` shape (color-only, no order or
+  /// visibility) into the new `MacroTilePref` array. Nil if no legacy colors
+  /// were stored — callers then fall back to catalog defaults.
+  private func legacyPrefs(from colors: MacroColors?) -> [MacroTilePref]? {
+    guard let colors else { return nil }
+    let map: [String: String?] = [
+      "protein": colors.protein, "fat": colors.fat, "carbs": colors.carbs,
+      "fiber": colors.fiber, "kcal": colors.kcal, "fasting": colors.fasting,
+    ]
+    return MacroCatalog.all.map { m in
+      MacroTilePref(id: m.id, colorHex: map[m.id] ?? nil, visible: m.defaultVisible)
+    }
   }
 
   /// Re-log an existing meal at the current moment.
@@ -211,62 +222,78 @@ struct NutritionDestinationView: View {
   }
 
   private var macroTileSpecs: [MacroTileSpec] {
-    let t = todayTotals
-    let m = macros
-    let intStr: (Double) -> String = { $0 <= 0 ? "—" : String(Int($0.rounded())) }
-    let oneDec: (Double) -> String = { $0 <= 0 ? "—" : String(format: "%.1f", $0) }
-
-    var out: [MacroTileSpec] = []
-    out.append(.init(
-      id: "protein", label: "Protein", unit: "g", color: proteinColor,
-      target: m?.protein ?? MacroRange(min: 100, max: 140, unit: "g"),
-      todayValue: t.protein,
-      series: dailySeries { $0.proteinG },
-      formatValue: intStr))
-    out.append(.init(
-      id: "fat", label: "Fat", unit: "g", color: fatColor,
-      target: m?.fat ?? MacroRange(min: 50, max: 80, unit: "g"),
-      todayValue: t.fat,
-      series: dailySeries { $0.fatG },
-      formatValue: intStr))
-    out.append(.init(
-      id: "carbs", label: "Carbs", unit: "g", color: carbsColor,
-      target: m?.carbs ?? MacroRange(min: 150, max: 250, unit: "g"),
-      todayValue: t.carbs,
-      series: dailySeries { $0.carbsG },
-      formatValue: intStr))
-    out.append(.init(
-      id: "fiber", label: "Fiber", unit: "g", color: fiberColor,
-      target: m?.fiber ?? MacroRange(min: 25, max: 35, unit: "g"),
-      todayValue: t.fiber,
-      series: dailySeries { $0.fiberG ?? 0 },
-      formatValue: intStr))
-    out.append(.init(
-      id: "kcal", label: "Kcal", unit: "kcal", color: kcalColor,
-      target: m?.kcal ?? MacroRange(min: 1800, max: 2400, unit: "kcal"),
-      todayValue: t.kcal,
-      series: dailySeries { $0.kcal },
-      formatValue: intStr))
-    out.append(fastingSpec(oneDec: oneDec))
-    return out
+    tilePrefs.compactMap { pref in
+      guard pref.visible, let macro = MacroCatalog.byID[pref.id] else { return nil }
+      return makeSpec(for: macro)
+    }
   }
 
-  private func fastingSpec(oneDec: @escaping (Double) -> String) -> MacroTileSpec {
-    let target = macros?.fasting ?? MacroRange(min: 14, max: 16, unit: "h")
-    let fastByDate = Dictionary(uniqueKeysWithValues:
-      (stats?.fasting ?? []).map { ($0.date, $0) })
-    var series: [DailyPoint] = last7Dates.map { d in
-      DailyPoint(date: d, value: fastByDate[d]?.hours ?? 0)
-    }
-    let live = liveFastingHours()
-    if let live, let idx = series.firstIndex(where: { $0.date == today }) {
-      series[idx] = DailyPoint(date: today, value: live)
-    }
-    let todayValue = live ?? fastByDate[today]?.hours ?? 0
+  private func makeSpec(for macro: MacroCatalog.Macro) -> MacroTileSpec {
+    let formatter: (Double) -> String = macro.id == "fasting"
+      ? { $0 <= 0 ? "—" : String(format: "%.1f", $0) }
+      : { $0 <= 0 ? "—" : String(Int($0.rounded())) }
     return .init(
-      id: "fasting", label: "Fasting", unit: "h", color: fastingColor,
-      target: target, todayValue: todayValue,
-      series: series, formatValue: oneDec)
+      id: macro.id,
+      label: macro.label,
+      unit: macro.unit,
+      color: color(for: macro.id),
+      target: target(for: macro),
+      todayValue: todayValue(for: macro),
+      series: series(for: macro),
+      formatValue: formatter)
+  }
+
+  /// Pulls a target range from `MacrosConfig` when available, otherwise uses
+  /// the catalog's built-in default. Fasting + the 7 "new" macros (sat fat,
+  /// sugar, alcohol, sodium, …) always go through the catalog defaults until
+  /// `macros-config` learns about them.
+  private func target(for macro: MacroCatalog.Macro) -> MacroRange {
+    if let m = macros {
+      switch macro.id {
+      case "protein": return m.protein
+      case "fat":     return m.fat
+      case "carbs":   return m.carbs
+      case "kcal":    return m.kcal
+      case "fiber":   if let v = m.fiber   { return v }
+      case "fasting": if let v = m.fasting { return v }
+      default: break
+      }
+    }
+    return MacroRange(min: macro.defaultMin, max: macro.defaultMax, unit: macro.unit)
+  }
+
+  private func todayValue(for macro: MacroCatalog.Macro) -> Double {
+    switch macro.source {
+    case .entrySum(let field):
+      return todayEntries.reduce(0) { $0 + $1.value(for: field) }
+    case .fasting:
+      if let live = liveFastingHours() { return live }
+      return (stats?.fasting ?? []).first(where: { $0.date == today })?.hours ?? 0
+    }
+  }
+
+  private func series(for macro: MacroCatalog.Macro) -> [DailyPoint] {
+    switch macro.source {
+    case .entrySum(let field):
+      // Group all loaded entries by date and sum the chosen field. Days with
+      // no entries fall through as 0, matching the legacy chart behavior.
+      var byDate: [String: Double] = [:]
+      for e in entries {
+        byDate[e.date, default: 0] += e.value(for: field)
+      }
+      return last7Dates.map { DailyPoint(date: $0, value: byDate[$0] ?? 0) }
+    case .fasting:
+      let fastByDate = Dictionary(uniqueKeysWithValues:
+        (stats?.fasting ?? []).map { ($0.date, $0) })
+      var data: [DailyPoint] = last7Dates.map {
+        DailyPoint(date: $0, value: fastByDate[$0]?.hours ?? 0)
+      }
+      if let live = liveFastingHours(),
+         let idx = data.firstIndex(where: { $0.date == today }) {
+        data[idx] = DailyPoint(date: today, value: live)
+      }
+      return data
+    }
   }
 
   private var macroTilesGrid: some View {
@@ -442,14 +469,6 @@ struct NutritionDestinationView: View {
     let cal = Calendar.current
     return (0..<7).reversed().compactMap { off in
       cal.date(byAdding: .day, value: -off, to: Date()).map(fmt.string(from:))
-    }
-  }
-
-  private func dailySeries(_ pick: (NutritionDailyPoint) -> Double) -> [DailyPoint] {
-    let byDate = Dictionary(uniqueKeysWithValues:
-      (stats?.daily ?? []).map { ($0.date, $0) })
-    return last7Dates.map { d in
-      DailyPoint(date: d, value: byDate[d].map(pick) ?? 0)
     }
   }
 
