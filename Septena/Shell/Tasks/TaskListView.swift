@@ -2556,12 +2556,32 @@ private struct ClusterDropTarget: ViewModifier {
 
   func body(content: Content) -> some View {
     if let groupKey, let onDrop {
+      let isHot = (hovered == groupKey)
       content
-        .background(
+        // contentShape makes the FULL row droppable, not just the
+        // 24pt content area. Without this, `.dropDestination` only
+        // fires when the pointer is exactly over rendered glyphs/text,
+        // which makes the drop target feel "dead" most of the time.
+        .contentShape(Rectangle())
+        // Overlay (not background) so the tint sits ON TOP of the
+        // row's own background fill — guarantees the highlight is
+        // visible regardless of the row's selection/edit state.
+        // 4pt leading bar + soft full-width wash, Things-style.
+        .overlay(alignment: .leading) {
+          if isHot {
+            Rectangle()
+              .fill(Theme.tasksAccent)
+              .frame(width: 3)
+              .allowsHitTesting(false)
+              .transition(.opacity)
+          }
+        }
+        .overlay {
           Theme.tasksAccent
-            .opacity(hovered == groupKey ? 0.16 : 0)
-            .animation(.easeOut(duration: 0.12), value: hovered)
-        )
+            .opacity(isHot ? 0.18 : 0)
+            .allowsHitTesting(false)
+            .animation(.easeOut(duration: 0.12), value: isHot)
+        }
         .dropDestination(for: String.self) { ids, _ in
           guard !ids.isEmpty else { return false }
           Haptics.tick()
