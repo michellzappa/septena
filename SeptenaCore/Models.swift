@@ -814,10 +814,6 @@ struct OuraNight: Codable, Identifiable, Hashable {
   }
 }
 
-struct OuraHistoryResponse: Codable {
-  let oura: [OuraNight]
-}
-
 // MARK: - Nutrition
 
 /// One logged meal/snack. From `/api/nutrition/entries`.

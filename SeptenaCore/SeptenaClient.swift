@@ -1,9 +1,10 @@
 import Foundation
 
-// Septena REST client — a thin proxy for the only domains still on
-// FastAPI: Oura sleep history and Withings weigh-ins. Every other
-// section is CloudKit-backed and reads/writes locally. No auth; base
-// URL is set via Settings (defaults to http://100.74.150.55:7000).
+// Septena REST client — a thin proxy for the only domain still on
+// FastAPI: Withings weigh-ins. Oura now hits the Oura Cloud API
+// directly via `OuraProvider`; every other section is CloudKit-backed
+// and reads/writes locally. No auth; base URL is set via Settings
+// (defaults to http://100.74.150.55:7000).
 
 // MARK: - Change notification
 
@@ -71,9 +72,9 @@ final class SeptenaClient {
   private let session: URLSession
 
   /// Concurrent identical GETs share one in-flight Task. Different call
-  /// sites (Sleep, Body, Insights all asking for `oura?days=90` on the
-  /// same dashboard repaint) fan into one network round-trip instead of
-  /// N. Keyed by absolute URL string.
+  /// sites asking for the same `withings?days=90` on the same dashboard
+  /// repaint fan into one network round-trip instead of N. Keyed by
+  /// absolute URL string.
   private var inFlightGETs: [String: Task<Data, Error>] = [:]
 
   init(baseURL: URL) {
@@ -94,17 +95,10 @@ final class SeptenaClient {
     return SeptenaClient(baseURL: URL(string: raw) ?? `default`)
   }()
 
-  // MARK: - Health (Oura)
+  // MARK: - Health (Withings)
 
-  /// N nights of Oura sleep data. Server returns newest-first via the
-  /// `oura` array; the Sleep mini-app reverses for chronological charts.
-  func ouraHistory(days: Int = 7) async throws -> [OuraNight] {
-    try await getJSON("/api/health/oura",
-                      query: [URLQueryItem(name: "days", value: String(days))],
-                      as: OuraHistoryResponse.self).oura
-  }
-
-  /// N days of Withings weigh-ins. Same envelope as Oura.
+  /// N days of Withings weigh-ins. Server returns newest-first via the
+  /// `withings` array; callers re-sort as needed.
   func withingsHistory(days: Int = 14) async throws -> [WithingsRow] {
     try await getJSON("/api/health/withings",
                       query: [URLQueryItem(name: "days", value: String(days))],
@@ -112,8 +106,9 @@ final class SeptenaClient {
   }
 
   // Insights compute lives client-side now (see CorrelationEngine).
-  // No /api/insights/* endpoint is called — all data comes from SwiftData
-  // (CloudKit-mirrored) plus the existing /api/health/oura read endpoint.
+  // No /api/insights/* endpoint is called — Oura data comes from
+  // OuraProvider (direct), Withings from the line above, everything
+  // else from SwiftData (CloudKit-mirrored).
 
   // MARK: - HTTP helpers
 

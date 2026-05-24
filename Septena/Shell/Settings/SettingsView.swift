@@ -1258,6 +1258,7 @@ struct IntegrationsSettingsPane: View {
   @State private var remindersBridge = RemindersBridge.shared
   @State private var calendarBridge = CalendarBridge.shared
   @State private var healthBridge = HealthKitBridge.shared
+  @State private var ouraProvider = OuraProvider.shared
   @Environment(AranetBridge.self) private var aranetBridge
   @Environment(PollenClient.self) private var pollenClient
 
@@ -1313,6 +1314,21 @@ struct IntegrationsSettingsPane: View {
                    systemImage: "sensor",
                    state: aranetStateLabel,
                    isGranted: aranetBridge.state == .connected)
+        }
+
+        // Oura — direct iOS client (Personal Access Token). Replaces the
+        // old FastAPI proxy at /api/health/oura.
+        NavigationLink {
+          OuraIntegrationDetail()
+            .navigationTitle("Oura")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+        } label: {
+          stateRow(title: "Oura",
+                   systemImage: "circle.circle",
+                   state: ouraProvider.hasToken ? "Connected" : "Grant",
+                   isGranted: ouraProvider.hasToken)
         }
 
         // Pollen via Open-Meteo. Detail pane handles location auth
@@ -1792,6 +1808,107 @@ private struct AranetIntegrationDetail: View {
 // per-species toggles or threshold tuning today — the species set
 // and band thresholds are pinned to match the webapp; if those need
 // to diverge, this is the right pane to grow.
+
+// Oura → Personal Access Token entry. The user pastes a token from
+// cloud.ouraring.com/personal-access-tokens; OuraProvider stores it in
+// Keychain. Test button does a 1-day fetchHistory round-trip so the
+// user gets immediate confirmation the token works.
+private struct OuraIntegrationDetail: View {
+  @State private var provider = OuraProvider.shared
+  @State private var draft: String = ""
+  @State private var testing = false
+  @State private var lastResult: String? = nil
+
+  var body: some View {
+    Form {
+      Section {
+        SecureField("Personal Access Token", text: $draft)
+          #if os(iOS)
+          .textInputAutocapitalization(.never)
+          .autocorrectionDisabled()
+          #endif
+        HStack {
+          Button("Save") {
+            provider.setToken(draft)
+            draft = ""
+            lastResult = nil
+            // Kick off a full one-year backfill so the user's history
+            // lands in SwiftData + CloudKit immediately, not after the
+            // next dashboard visit.
+            Task { await runBackfill() }
+          }
+          .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+          Spacer()
+          if provider.hasToken {
+            Button("Remove", role: .destructive) {
+              provider.clearToken()
+              lastResult = nil
+            }
+          }
+        }
+      } header: {
+        Text("Token")
+      } footer: {
+        VStack(alignment: .leading, spacing: 6) {
+          Text("Create a Personal Access Token at cloud.ouraring.com/personal-access-tokens, then paste it here. Tokens stay on this device (Keychain) and are never sent to any Septena server.")
+          Link("Open Oura tokens page",
+               destination: URL(string: "https://cloud.ouraring.com/personal-access-tokens")!)
+            .font(.callout)
+        }
+      }
+
+      Section {
+        HStack {
+          Label("Status", systemImage: "circle.circle")
+          Spacer()
+          Text(provider.hasToken ? "Connected" : "Not configured")
+            .foregroundStyle(provider.hasToken ? .green : .secondary)
+        }
+        Button {
+          Task { await runTest() }
+        } label: {
+          HStack {
+            Label("Test connection", systemImage: "checkmark.seal")
+            Spacer()
+            if testing { ProgressView().controlSize(.small) }
+          }
+        }
+        .disabled(!provider.hasToken || testing)
+        if let lastResult {
+          Text(lastResult)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+    }
+    .formStyle(.grouped)
+  }
+
+  private func runTest() async {
+    testing = true
+    defer { testing = false }
+    do {
+      let rows = try await provider.fetchHistory(days: 7)
+      let withScore = rows.compactMap(\.sleepScore).count
+      lastResult = "OK — \(rows.count) days fetched, \(withScore) with a sleep score."
+    } catch {
+      lastResult = "Failed: \(error.localizedDescription)"
+    }
+  }
+
+  private func runBackfill() async {
+    testing = true
+    defer { testing = false }
+    lastResult = "Backfilling last 365 days…"
+    do {
+      let rows = try await provider.fetchHistory(days: 365)
+      let withScore = rows.compactMap(\.sleepScore).count
+      lastResult = "Backfill complete — \(rows.count) nights, \(withScore) with a sleep score. Syncing to iCloud."
+    } catch {
+      lastResult = "Backfill failed: \(error.localizedDescription)"
+    }
+  }
+}
 
 private struct PollenIntegrationDetail: View {
   @Environment(PollenClient.self) private var pollen

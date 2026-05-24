@@ -384,7 +384,7 @@ struct WeekDashboardView: View {
     async let tl = TaskReads.list(
       view: "logbook", days: 1,
       context: LocalStore.shared.container.mainContext)
-    async let on = try? await client.ouraHistory(days: 90)
+    async let on = try? await OuraProvider.shared.fetchHistory(days: 90)
     let ns: NutritionStatsResponse? = ChecklistMirror.buildNutritionStatsResponse(context: modelContext, days: 90)
     let ne: [NutritionEntry]? = ChecklistMirror.loadNutritionToday(context: modelContext)
     let nt: MacrosConfig? = NutritionPrefs.loadMacrosConfig()

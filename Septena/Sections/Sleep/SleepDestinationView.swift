@@ -447,7 +447,7 @@ struct SleepDestinationView: View {
 
   private func load() async {
     loading = true
-    if let n = try? await client.ouraHistory(days: 365) {
+    if let n = try? await OuraProvider.shared.fetchHistory(days: 365) {
       nights = n
       ResponseCache.save(n, forKey: Self.cacheKey)
     }

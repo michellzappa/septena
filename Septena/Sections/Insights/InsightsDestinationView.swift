@@ -330,7 +330,7 @@ struct InsightsDestinationView: View {
   private func recompute() async {
     loading = true
     defer { loading = false }
-    let oura = (try? await client.ouraHistory(days: windowDays)) ?? []
+    let oura = (try? await OuraProvider.shared.fetchHistory(days: windowDays)) ?? []
     let r = CorrelationEngine.runEverything(
       context: modelContext,
       ouraNights: oura,
