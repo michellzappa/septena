@@ -243,7 +243,10 @@ func noteNutritionDayDeletion(id: String) { noteDeletion(recordName: NutritionDa
     }
     let recordID = CKRecord.ID(recordName: recordName, zoneID: SeptenaCloudKit.zoneID)
     engine.state.add(pendingRecordZoneChanges: [.saveRecord(recordID)])
-    SeptenaLog.info("[CKEngine] note\(kind.capitalized)Change id=\(recordName) pending=\(engine.state.pendingRecordZoneChanges.count)")
+    // Per-record logging used to fire here; on a 365-day Oura backfill
+    // that produced 365 lines back-to-back. The `[CKEngine] sent: …`
+    // batch summary already reports what actually went out, so the
+    // per-enqueue log was pure noise and is gone.
   }
 
   private func noteDeletion(recordName: String, kind: String) {
@@ -253,7 +256,6 @@ func noteNutritionDayDeletion(id: String) { noteDeletion(recordName: NutritionDa
     }
     let recordID = CKRecord.ID(recordName: recordName, zoneID: SeptenaCloudKit.zoneID)
     engine.state.add(pendingRecordZoneChanges: [.deleteRecord(recordID)])
-    SeptenaLog.info("[CKEngine] note\(kind.capitalized)Deletion id=\(recordName) pending=\(engine.state.pendingRecordZoneChanges.count)")
   }
 
   /// Count of writes the engine has accepted but not yet sent to CloudKit.

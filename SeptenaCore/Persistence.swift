@@ -2507,35 +2507,41 @@ enum LocalCache {
       if e.pendingDeletion { pendingDel += 1 }
       if e.cloudKitSystemFields != nil { withSystemFields += 1 }
     }
-    SeptenaLog.info("[TaskState] total=\(rows.count) open=\(open) done=\(done) cancelled=\(cancelled) someday=\(someday)")
-    SeptenaLog.info("[TaskState] today=\(todayFlag) scheduled<=today=\(scheduledLE) due<=today=\(dueLE) inArea=\(withArea) inProject=\(withProject) pendingDeletion=\(pendingDel) withCKSystemFields=\(withSystemFields)")
-
     let areas = (try? context.fetch(FetchDescriptor<AreaEntity>())) ?? []
     let projects = (try? context.fetch(FetchDescriptor<ProjectEntity>())) ?? []
     let areasWithCK = areas.filter { $0.cloudKitSystemFields != nil }.count
     let projectsWithCK = projects.filter { $0.cloudKitSystemFields != nil }.count
-    SeptenaLog.info("[AreaState] total=\(areas.count) withCKSystemFields=\(areasWithCK)")
-    SeptenaLog.info("[ProjectState] total=\(projects.count) withCKSystemFields=\(projectsWithCK)")
 
-    // One-shot crosswalk: are the project ids on tasks actually the same
-    // strings as the ids on ProjectEntity? If task.project="signals" but
-    // ProjectEntity.id="proj-abc", `filter: .project("proj-abc")` returns
-    // nothing. Sample top 20 of each.
+    // One-line summary covers the healthy case. Used to be a dozen lines
+    // of [TaskState]/[AreaState]/[ProjectState] info; the per-bucket
+    // detail wasn't actionable when everything was fine.
+    SeptenaLog.info("[Septena] tasks=\(rows.count) (open=\(open) today=\(todayFlag) overdue=\(dueLE) ck=\(withSystemFields)) areas=\(areas.count)/ck=\(areasWithCK) projects=\(projects.count)/ck=\(projectsWithCK)")
+
+    if pendingDel > 0 {
+      SeptenaLog.info("[Septena] \(pendingDel) tasks pending deletion")
+    }
+
+    // Crosswalk is silent in the healthy case (everything resolves).
+    // When tasks reference ids that aren't in ProjectEntity / AreaEntity,
+    // or projects exist without any tasks, log just the orphans — those
+    // are actionable problems to investigate.
     let taskProjectIds = Set(rows.compactMap { $0.project })
     let projectIds = Set(projects.map { $0.id })
     let orphanedTaskProjectIds = taskProjectIds.subtracting(projectIds)
     let projectsWithNoTasks = projectIds.subtracting(taskProjectIds)
-    SeptenaLog.info("[Crosswalk] taskProjectIds=\(taskProjectIds.sorted().prefix(20))")
-    SeptenaLog.info("[Crosswalk] projectIds=\(projectIds.sorted().prefix(20))")
-    SeptenaLog.info("[Crosswalk] orphaned (task references id not in ProjectEntity)=\(orphanedTaskProjectIds.sorted().prefix(20))")
-    SeptenaLog.info("[Crosswalk] projects with no tasks=\(projectsWithNoTasks.sorted().prefix(20))")
-
     let taskAreaIds = Set(rows.compactMap { $0.area })
     let areaIds = Set(areas.map { $0.id })
     let orphanedTaskAreaIds = taskAreaIds.subtracting(areaIds)
-    SeptenaLog.info("[Crosswalk] taskAreaIds=\(taskAreaIds.sorted().prefix(20))")
-    SeptenaLog.info("[Crosswalk] areaIds=\(areaIds.sorted().prefix(20))")
-    SeptenaLog.info("[Crosswalk] orphaned (task references area not in AreaEntity)=\(orphanedTaskAreaIds.sorted().prefix(20))")
+
+    if !orphanedTaskProjectIds.isEmpty {
+      SeptenaLog.info("[Crosswalk] ⚠️ tasks reference project ids not in ProjectEntity: \(orphanedTaskProjectIds.sorted())")
+    }
+    if !orphanedTaskAreaIds.isEmpty {
+      SeptenaLog.info("[Crosswalk] ⚠️ tasks reference area ids not in AreaEntity: \(orphanedTaskAreaIds.sorted())")
+    }
+    if !projectsWithNoTasks.isEmpty {
+      SeptenaLog.info("[Crosswalk] projects with no tasks: \(projectsWithNoTasks.sorted())")
+    }
   }
 
   /// Count of open tasks whose hard deadline is today or in the past.
