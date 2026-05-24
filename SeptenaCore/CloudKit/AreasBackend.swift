@@ -44,89 +44,44 @@ protocol AreasBackend: AnyObject {
 @MainActor
 @Observable
 final class AreasMutator: AreasBackend {
-  private let client: SeptenaClient
   private let context: ModelContext
   private var ckBackend: CloudKitAreasBackend?
-  @ObservationIgnored private let fastBackend: FastAPIAreasBackend
 
-  init(client: SeptenaClient, context: ModelContext) {
-    self.client = client
+  init(context: ModelContext) {
     self.context = context
-    self.fastBackend = FastAPIAreasBackend(client: client)
   }
 
   func bind(ckEngine: CKEngine) {
     self.ckBackend = CloudKitAreasBackend(engine: ckEngine, context: context)
   }
 
-  private var current: AreasBackend {
-    if let ck = ckBackend { return ck }
-    return fastBackend
+  private func requireBackend() throws -> CloudKitAreasBackend {
+    guard let ck = ckBackend else {
+      throw NSError(
+        domain: "AreasMutator", code: -1,
+        userInfo: [NSLocalizedDescriptionKey: "AreasMutator used before CloudKit bind()"]
+      )
+    }
+    return ck
   }
 
   func create(title: String, context ctx: String? = nil) async throws -> Area {
-    try await current.create(title: title, context: ctx)
+    try await requireBackend().create(title: title, context: ctx)
   }
   func rename(id: String, to title: String) async throws {
-    try await current.rename(id: id, to: title)
+    try await requireBackend().rename(id: id, to: title)
   }
   func setContext(id: String, context ctx: String?) async throws {
-    try await current.setContext(id: id, context: ctx)
+    try await requireBackend().setContext(id: id, context: ctx)
   }
   func delete(id: String) async throws {
-    try await current.delete(id: id)
+    try await requireBackend().delete(id: id)
   }
 
-  /// Forensic — create a record with a specific id. CK-mode only.
+  /// Forensic — create a record with a specific id.
   @discardableResult
   func createWithExplicitID(id: String, title: String, context ctx: String? = nil) async throws -> Area {
-    guard let ck = ckBackend else {
-      throw NSError(domain: "AreasMutator", code: -1, userInfo: [NSLocalizedDescriptionKey: "createWithExplicitID requires CloudKit backend"])
-    }
-    return try await ck.createWithExplicitID(id: id, title: title, context: ctx)
-  }
-}
-
-// MARK: - FastAPI impl
-
-@MainActor
-private final class FastAPIAreasBackend: AreasBackend {
-  private let client: SeptenaClient
-  init(client: SeptenaClient) { self.client = client }
-
-  func create(title: String, context ctx: String?) async throws -> Area {
-    // FastAPI fallback is a dead-coded bootstrap path; CloudKit is the
-    // canonical write path. If reached, use a random shortcode for id —
-    // no slug derivation since the slug concept is gone.
-    let current = try await client.areas()
-    var id = IDShortcode.generate(length: 4)
-    while current.contains(where: { $0.id == id }) {
-      id = IDShortcode.generate(length: 6)
-    }
-    let next = current + [Area(id: id, title: title, context: ctx)]
-    let updated = try await client.replaceAreas(next)
-    return updated.first(where: { $0.id == id })
-      ?? Area(id: id, title: title, context: ctx)
-  }
-
-  func rename(id: String, to title: String) async throws {
-    var current = try await client.areas()
-    guard let idx = current.firstIndex(where: { $0.id == id }) else { return }
-    current[idx].title = title
-    _ = try await client.replaceAreas(current)
-  }
-
-  func setContext(id: String, context ctx: String?) async throws {
-    var current = try await client.areas()
-    guard let idx = current.firstIndex(where: { $0.id == id }) else { return }
-    current[idx].context = ctx
-    _ = try await client.replaceAreas(current)
-  }
-
-  func delete(id: String) async throws {
-    let current = try await client.areas()
-    let next = current.filter { $0.id != id }
-    _ = try await client.replaceAreas(next)
+    try await requireBackend().createWithExplicitID(id: id, title: title, context: ctx)
   }
 }
 

@@ -2,9 +2,8 @@ import Foundation
 import SwiftData
 
 // ProjectsBackend — mutation seam for projects, paralleling AreasBackend.
-// On FastAPI side projects have per-row create/update/delete endpoints, so
-// the impl is a thin pass-through. On the CloudKit side mutations are
-// applied locally and the engine is notified.
+// Mutations are applied locally to SwiftData and the CKEngine is notified;
+// the engine batches the upload to CloudKit.
 
 @MainActor
 protocol ProjectsBackend: AnyObject {
@@ -22,86 +21,53 @@ protocol ProjectsBackend: AnyObject {
 @MainActor
 @Observable
 final class ProjectsMutator: ProjectsBackend {
-  private let client: SeptenaClient
   private let context: ModelContext
   private var ckBackend: CloudKitProjectsBackend?
-  @ObservationIgnored private let fastBackend: FastAPIProjectsBackend
 
-  init(client: SeptenaClient, context: ModelContext) {
-    self.client = client
+  init(context: ModelContext) {
     self.context = context
-    self.fastBackend = FastAPIProjectsBackend(client: client)
   }
 
   func bind(ckEngine: CKEngine) {
     self.ckBackend = CloudKitProjectsBackend(engine: ckEngine, context: context)
   }
 
-  private var current: ProjectsBackend {
-    if let ck = ckBackend { return ck }
-    return fastBackend
+  private func requireBackend() throws -> CloudKitProjectsBackend {
+    guard let ck = ckBackend else {
+      throw NSError(
+        domain: "ProjectsMutator", code: -1,
+        userInfo: [NSLocalizedDescriptionKey: "ProjectsMutator used before CloudKit bind()"]
+      )
+    }
+    return ck
   }
 
   func create(title: String, area: String? = nil) async throws -> Project {
-    try await current.create(title: title, area: area)
+    try await requireBackend().create(title: title, area: area)
   }
   func rename(id: String, to title: String) async throws {
-    try await current.rename(id: id, to: title)
+    try await requireBackend().rename(id: id, to: title)
   }
   func setNotes(id: String, notes: String?) async throws {
-    try await current.setNotes(id: id, notes: notes)
+    try await requireBackend().setNotes(id: id, notes: notes)
   }
   func setStatus(id: String, status: ProjectStatus) async throws {
-    try await current.setStatus(id: id, status: status)
+    try await requireBackend().setStatus(id: id, status: status)
   }
   func setArea(id: String, area: String?) async throws {
-    try await current.setArea(id: id, area: area)
+    try await requireBackend().setArea(id: id, area: area)
   }
   func setGithubRepo(id: String, repo: String?) async throws {
-    try await current.setGithubRepo(id: id, repo: repo)
+    try await requireBackend().setGithubRepo(id: id, repo: repo)
   }
   func delete(id: String) async throws {
-    try await current.delete(id: id)
+    try await requireBackend().delete(id: id)
   }
 
-  /// Forensic — create a record with a specific id. CK-mode only.
+  /// Forensic — create a record with a specific id.
   @discardableResult
   func createWithExplicitID(id: String, title: String, area: String? = nil) async throws -> Project {
-    guard let ck = ckBackend else {
-      throw NSError(domain: "ProjectsMutator", code: -1, userInfo: [NSLocalizedDescriptionKey: "createWithExplicitID requires CloudKit backend"])
-    }
-    return try await ck.createWithExplicitID(id: id, title: title, area: area)
-  }
-}
-
-// MARK: - FastAPI impl
-
-@MainActor
-private final class FastAPIProjectsBackend: ProjectsBackend {
-  private let client: SeptenaClient
-  init(client: SeptenaClient) { self.client = client }
-
-  func create(title: String, area: String?) async throws -> Project {
-    try await client.createProject(title: title, area: area)
-  }
-  func rename(id: String, to title: String) async throws {
-    _ = try await client.updateProject(id: id, title: title)
-  }
-  func setNotes(id: String, notes: String?) async throws {
-    _ = try await client.updateProject(id: id, notes: notes ?? "")
-  }
-  func setStatus(id: String, status: ProjectStatus) async throws {
-    _ = try await client.updateProject(id: id, status: status.rawValue)
-  }
-  func setArea(id: String, area: String?) async throws {
-    _ = try await client.updateProject(id: id, area: .some(area))
-  }
-  func setGithubRepo(id: String, repo: String?) async throws {
-    let payload: String?? = .some(repo?.isEmpty == false ? repo : nil)
-    _ = try await client.updateProject(id: id, githubRepo: payload)
-  }
-  func delete(id: String) async throws {
-    try await client.deleteProject(id: id)
+    try await requireBackend().createWithExplicitID(id: id, title: title, area: area)
   }
 }
 

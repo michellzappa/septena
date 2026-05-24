@@ -18,8 +18,8 @@ import SwiftData
 ///      and an AppIntent racing each other both end up with a fully
 ///      bound stack and neither does the work twice.
 ///   3. Mutations call through `taskMutator` / `areasMutator` /
-///      `projectsMutator`; if `start()` has completed those go to
-///      CloudKit, otherwise to the (now dead-coded) FastAPI fallback.
+///      `projectsMutator`; these require `start()` to have completed so
+///      the CloudKit backend is bound. Calls before bind throw.
 ///
 /// AppDelegate intentionally still mirrors `ckEngine` into its own
 /// `static weak var` slot — that stash is set by App.swift's `.task`
@@ -71,8 +71,8 @@ final class SeptenaServices {
     self.cannabisMutator = CannabisMutator(context: context, ckEngine: nil)
     self.groceryMutator = GroceryMutator(context: context, ckEngine: nil)
     self.trainingMutator = TrainingMutator(context: context, ckEngine: nil)
-    self.areasMutator = AreasMutator(client: client, context: context)
-    self.projectsMutator = ProjectsMutator(client: client, context: context)
+    self.areasMutator = AreasMutator(context: context)
+    self.projectsMutator = ProjectsMutator(context: context)
     self.httpOutbox = HTTPOutbox(client: client, context: context)
     self.aranetBridge = AranetBridge()
     self.airStore = AirStore(context: context)
