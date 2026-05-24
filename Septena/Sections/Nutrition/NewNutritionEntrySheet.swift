@@ -6,7 +6,6 @@ import SwiftUI
 // from the Nutrition QuickAdd menu's "New meal…" item.
 
 struct NewNutritionEntrySheet: View {
-  @Environment(HTTPOutbox.self) private var outbox
   @Environment(\.dismiss) private var dismiss
 
   @State private var time: Date = Date()
@@ -92,23 +91,18 @@ struct NewNutritionEntrySheet: View {
     guard !foods.isEmpty else { return }
     let emojiValue = emoji.trimmingCharacters(in: .whitespacesAndNewlines)
 
-    var body: [String: Any] = [
-      "date": SeptenaDate.today,
-      "time": hhmm,
-      "foods": foods,
-      "protein_g": parseDouble(proteinG),
-      "fat_g": parseDouble(fatG),
-      "carbs_g": parseDouble(carbsG),
-      "kcal": parseDouble(kcal),
-    ]
     let fiber = parseDouble(fiberG)
-    if fiber > 0 { body["fiber_g"] = fiber }
-    if !emojiValue.isEmpty { body["emoji"] = emojiValue }
-    let ings = lines(ingredientsText)
-    if !ings.isEmpty { body["ingredients"] = ings }
-
-    outbox.enqueue(method: "POST", path: "/api/nutrition/entries",
-                   body: body, kind: "nutrition.add")
+    let k = parseDouble(kcal)
+    SeptenaServices.shared.nutritionMutator.addEntry(
+      loggedAt: time,
+      emoji: emojiValue.isEmpty ? nil : emojiValue,
+      foods: foods,
+      proteinG: parseDouble(proteinG),
+      fatG: parseDouble(fatG),
+      carbsG: parseDouble(carbsG),
+      fiberG: fiber == 0 ? nil : fiber,
+      kcal: k == 0 ? nil : k
+    )
     AddInfoSection.nutrition.notifyTilesChanged()
     Haptics.tick()
     dismiss()

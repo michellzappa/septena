@@ -2,16 +2,14 @@ import SwiftUI
 
 // Edit/create sheet for a logged nutrition entry. Standard SwiftUI `Form` in a
 // `NavigationStack` presented via `.sheet(item:)` (edit) or
-// `.sheet(isPresented:)` (create). Edit enqueues `PUT /api/nutrition/entries`
-// through HTTPOutbox; create enqueues `POST /api/nutrition/entries`. The server
-// identifies an existing entry by its filename (`file` field in the JSON body).
+// `.sheet(isPresented:)` (create). Mutations go through NutritionMutator
+// (local SwiftData + CKEngine queue).
 
 struct EditNutritionEntrySheet: View {
-  @Environment(HTTPOutbox.self) private var outbox
   @Environment(\.dismiss) private var dismiss
 
   let original: NutritionEntry?
-  let onDone: (NutritionEntry?) -> Void
+  let onDone: () -> Void
 
   @State private var time: Date = Date()
   @State private var emoji: String = ""
@@ -120,10 +118,7 @@ struct EditNutritionEntrySheet: View {
   }
 
   private func save() {
-    let fmt = DateFormatter(); fmt.dateFormat = "HH:mm"
-    let hhmm = fmt.string(from: time)
     let foods = lines(foodsText)
-    let ingredients = lines(ingredientsText)
     let p = parseDouble(proteinG)
     let f = parseDouble(fatG)
     let c = parseDouble(carbsG)
@@ -131,67 +126,29 @@ struct EditNutritionEntrySheet: View {
     let k = parseDouble(kcal)
     let emojiValue = emoji.trimmingCharacters(in: .whitespacesAndNewlines)
 
+    let mutator = SeptenaServices.shared.nutritionMutator
     if let original {
-      var body: [String: Any] = [
-        "file": original.file,
-        "date": original.date,
-        "time": hhmm,
-        "emoji": emojiValue,
-        "protein_g": p,
-        "fat_g": f,
-        "carbs_g": c,
-        "fiber_g": fb,
-        "kcal": k,
-        "foods": foods,
-      ]
-      if !ingredients.isEmpty {
-        body["ingredients"] = ingredients
-      }
-      outbox.enqueue(
-        method: "PUT",
-        path: "/api/nutrition/entries",
-        body: body,
-        kind: "nutrition.update"
-      )
-      Haptics.tick()
-      let rebuilt = NutritionEntry(
-        date: original.date,
-        time: hhmm,
+      mutator.updateEntry(
+        id: original.file,
+        pickedTime: time,
         emoji: emojiValue.isEmpty ? nil : emojiValue,
-        proteinG: p,
-        fatG: f,
-        carbsG: c,
-        fiberG: fb == 0 ? nil : fb,
-        kcal: k,
         foods: foods,
-        ingredients: ingredients.isEmpty ? nil : ingredients,
-        file: original.file
+        proteinG: p, fatG: f, carbsG: c,
+        fiberG: fb == 0 ? nil : fb,
+        kcal: k == 0 ? nil : k
       )
-      onDone(rebuilt)
     } else {
-      var body: [String: Any] = [
-        "date": SeptenaDate.today,
-        "time": hhmm,
-        "emoji": emojiValue,
-        "protein_g": p,
-        "fat_g": f,
-        "carbs_g": c,
-        "fiber_g": fb,
-        "kcal": k,
-        "foods": foods,
-      ]
-      if !ingredients.isEmpty {
-        body["ingredients"] = ingredients
-      }
-      outbox.enqueue(
-        method: "POST",
-        path: "/api/nutrition/entries",
-        body: body,
-        kind: "nutrition.create"
+      mutator.addEntry(
+        loggedAt: time,
+        emoji: emojiValue.isEmpty ? nil : emojiValue,
+        foods: foods,
+        proteinG: p, fatG: f, carbsG: c,
+        fiberG: fb == 0 ? nil : fb,
+        kcal: k == 0 ? nil : k
       )
-      Haptics.tick()
-      onDone(nil)
     }
+    Haptics.tick()
+    onDone()
     dismiss()
   }
 }

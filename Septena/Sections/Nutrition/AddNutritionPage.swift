@@ -11,10 +11,9 @@ private struct MealCandidate: Identifiable {
 }
 
 struct AddNutritionPage: View {
-  @Environment(SeptenaClient.self) private var client
-  @Environment(HTTPOutbox.self) private var outbox
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
+  @Environment(\.modelContext) private var modelContext
   @Bindable var router: AddInfoRouter
   @State private var recent: [NutritionEntry] = []
   @State private var working = false
@@ -103,19 +102,16 @@ struct AddNutritionPage: View {
   }
 
   private func duplicate(_ entry: NutritionEntry) {
-    var body: [String: Any] = [
-      "date": SeptenaDate.today,
-      "time": nowHHMM(),
-      "foods": entry.foods,
-      "protein_g": entry.proteinG,
-      "fat_g": entry.fatG,
-      "carbs_g": entry.carbsG,
-      "kcal": entry.kcal,
-    ]
-    if let fiberG = entry.fiberG { body["fiber_g"] = fiberG }
-    if let emoji = entry.emoji { body["emoji"] = emoji }
-    outbox.enqueue(method: "POST", path: "/api/nutrition/entries",
-                   body: body, kind: "nutrition.add")
+    SeptenaServices.shared.nutritionMutator.addEntry(
+      loggedAt: Date.now,
+      emoji: entry.emoji,
+      foods: entry.foods,
+      proteinG: entry.proteinG,
+      fatG: entry.fatG,
+      carbsG: entry.carbsG,
+      fiberG: entry.fiberG,
+      kcal: entry.kcal
+    )
     AddInfoSection.nutrition.notifyTilesChanged()
     Haptics.tick()
     dismiss()
@@ -123,7 +119,7 @@ struct AddNutritionPage: View {
 
   private func load() async {
     let since = ymd(daysAgo: 30)
-    recent = (try? await client.nutritionEntries(since: since)) ?? []
+    recent = ChecklistMirror.loadNutritionEntries(context: modelContext, since: since)
   }
 }
 

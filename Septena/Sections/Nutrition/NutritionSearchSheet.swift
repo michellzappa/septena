@@ -14,7 +14,6 @@ import SwiftUI
 
 struct NutritionSearchSheet: View {
   @Environment(SectionTheme.self) private var theme
-  @Environment(HTTPOutbox.self) private var outbox
   @Environment(\.dismiss) private var dismiss
 
   let entries: [NutritionEntry]
@@ -122,22 +121,18 @@ struct NutritionSearchSheet: View {
     .contentShape(Rectangle())
   }
 
-  /// Same payload as AddNutritionPage.duplicate — POST a fresh entry at
-  /// the current time, reusing the historical meal's macros + emoji.
+  /// Duplicate a historical meal, logging it at the current time.
   private func duplicate(_ entry: NutritionEntry) {
-    var body: [String: Any] = [
-      "date": SeptenaDate.today,
-      "time": nowHHMM(),
-      "foods": entry.foods,
-      "protein_g": entry.proteinG,
-      "fat_g": entry.fatG,
-      "carbs_g": entry.carbsG,
-      "kcal": entry.kcal,
-    ]
-    if let fiberG = entry.fiberG { body["fiber_g"] = fiberG }
-    if let emoji = entry.emoji { body["emoji"] = emoji }
-    outbox.enqueue(method: "POST", path: "/api/nutrition/entries",
-                   body: body, kind: "nutrition.add")
+    SeptenaServices.shared.nutritionMutator.addEntry(
+      loggedAt: Date.now,
+      emoji: entry.emoji,
+      foods: entry.foods,
+      proteinG: entry.proteinG,
+      fatG: entry.fatG,
+      carbsG: entry.carbsG,
+      fiberG: entry.fiberG,
+      kcal: entry.kcal
+    )
     AddInfoSection.nutrition.notifyTilesChanged()
     Haptics.tick()
     dismiss()

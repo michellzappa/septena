@@ -23,9 +23,8 @@ import Charts
 // the same product.
 
 struct NutritionDestinationView: View {
-  @Environment(SeptenaClient.self) private var client
-  @Environment(HTTPOutbox.self) private var outbox
   @Environment(DayClock.self) private var clock
+  @Environment(\.modelContext) private var modelContext
 
   @State private var entries: [NutritionEntry] = []
   @State private var stats: NutritionStatsResponse? = nil
@@ -135,26 +134,18 @@ struct NutritionDestinationView: View {
           .tint(kcalColor)
       }
     }
-    .task {
-      paintFromCache()
-      await load()
-    }
+    .task { reload() }
     // Day rollover: reload so the fasting row, today's totals, and the
     // "earlier days" grouping all reflect the new day's data.
-    .onChange(of: clock.today) { _, _ in
-      Task { await load() }
+    .onChange(of: clock.today) { _, _ in reload() }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
+      reload()
     }
     .sheet(item: $editing) { entry in
-      EditNutritionEntrySheet(
-        original: entry,
-        onDone: { updated in if let updated { applyLocalUpdate(updated) } }
-      )
+      EditNutritionEntrySheet(original: entry, onDone: { })
     }
     .sheet(isPresented: $creating) {
-      EditNutritionEntrySheet(
-        original: nil,
-        onDone: { _ in Task { await load() } }
-      )
+      EditNutritionEntrySheet(original: nil, onDone: { })
       #if os(iOS)
       .presentationDetents([.medium, .large])
       .presentationDragIndicator(.visible)
@@ -164,51 +155,34 @@ struct NutritionDestinationView: View {
 
   // MARK: - Edit / delete
 
-  private func applyLocalUpdate(_ updated: NutritionEntry) {
-    guard let idx = entries.firstIndex(where: { $0.file == updated.file }) else { return }
-    entries[idx] = updated
-    ResponseCache.save(entries, forKey: CacheKey.entries)
+  private func reload() {
+    let ctx = modelContext
+    entries = ChecklistMirror.loadNutritionEntries(context: ctx, since: sinceDate(daysBack: 90))
+    stats = ChecklistMirror.buildNutritionStatsResponse(context: ctx, days: 90)
+    macros = NutritionPrefs.loadMacrosConfig()
+    let settingsRes = SettingsMirror.loadSettings(context: ctx)
+    if let colors = settingsRes?.nutrition?.macroColors { macroColors = colors }
+    loading = false
   }
 
-  /// Re-log an existing meal at the current moment. POSTs a new entry with
-  /// the same macros/foods/emoji but `date`+`time` stamped to now. The
-  /// server allocates a fresh file id; we kick a refresh so the new row
-  /// appears once the outbox drains.
+  /// Re-log an existing meal at the current moment.
   private func logAgainNow(_ entry: NutritionEntry) {
-    let now = Date()
-    let dateFmt = DateFormatter(); dateFmt.dateFormat = "yyyy-MM-dd"
-    let timeFmt = DateFormatter(); timeFmt.dateFormat = "HH:mm"
-    var body: [String: Any] = [
-      "date": dateFmt.string(from: now),
-      "time": timeFmt.string(from: now),
-      "foods": entry.foods,
-      "protein_g": entry.proteinG,
-      "fat_g": entry.fatG,
-      "carbs_g": entry.carbsG,
-      "fiber_g": entry.fiberG ?? 0,
-      "kcal": entry.kcal,
-    ]
-    if let emoji = entry.emoji, !emoji.isEmpty { body["emoji"] = emoji }
-    if let ing = entry.ingredients, !ing.isEmpty { body["ingredients"] = ing }
-    outbox.enqueue(
-      method: "POST",
-      path: "/api/nutrition/entries",
-      body: body,
-      kind: "nutrition.add"
+    SeptenaServices.shared.nutritionMutator.addEntry(
+      loggedAt: Date.now,
+      emoji: entry.emoji,
+      foods: entry.foods,
+      proteinG: entry.proteinG,
+      fatG: entry.fatG,
+      carbsG: entry.carbsG,
+      fiberG: entry.fiberG,
+      kcal: entry.kcal
     )
     Haptics.success()
-    Task { await load() }
   }
 
   private func delete(_ entry: NutritionEntry) {
-    outbox.enqueue(
-      method: "DELETE",
-      path: "/api/nutrition/entries",
-      body: ["file": entry.file],
-      kind: "nutrition.delete"
-    )
+    SeptenaServices.shared.nutritionMutator.deleteEntry(id: entry.file)
     entries.removeAll { $0.file == entry.file }
-    ResponseCache.save(entries, forKey: CacheKey.entries)
     Haptics.warning()
   }
 
@@ -817,49 +791,6 @@ struct NutritionDestinationView: View {
   }
 
   // MARK: - Loading
-
-  private enum CacheKey {
-    static let entries = "nutrition.entries14"
-    static let stats   = "nutrition.stats"
-    static let macros  = "nutrition.macros"
-    static let colors  = "nutrition.macroColors"
-  }
-
-  private func paintFromCache() {
-    if let v = ResponseCache.load([NutritionEntry].self, forKey: CacheKey.entries) { entries = v }
-    if let v = ResponseCache.load(NutritionStatsResponse.self, forKey: CacheKey.stats) { stats = v }
-    if let v = ResponseCache.load(MacrosConfig.self, forKey: CacheKey.macros) { macros = v }
-    if let v = ResponseCache.load(MacroColors.self, forKey: CacheKey.colors) { macroColors = v }
-    loading = false
-  }
-
-  private func load() async {
-    loading = true
-    let since = sinceDate(daysBack: 14)
-    async let e: [NutritionEntry]? = try? await client.nutritionEntries(since: since)
-    async let s: NutritionStatsResponse? = try? await client.nutritionStats(days: 30)
-    async let m: MacrosConfig? = try? await client.nutritionMacrosConfig()
-    // Settings live in CloudKit — read from the local mirror, not FastAPI.
-    let settingsRes: AppSettings? = SettingsMirror.loadSettings(context: LocalStore.shared.container.mainContext)
-    let (entriesRes, statsRes, macrosRes) = await (e, s, m)
-    if let entriesRes {
-      entries = entriesRes
-      ResponseCache.save(entriesRes, forKey: CacheKey.entries)
-    }
-    if let statsRes {
-      stats = statsRes
-      ResponseCache.save(statsRes, forKey: CacheKey.stats)
-    }
-    if let macrosRes {
-      macros = macrosRes
-      ResponseCache.save(macrosRes, forKey: CacheKey.macros)
-    }
-    if let colors = settingsRes?.nutrition?.macroColors {
-      macroColors = colors
-      ResponseCache.save(colors, forKey: CacheKey.colors)
-    }
-    loading = false
-  }
 
   private func sinceDate(daysBack: Int) -> String {
     let d = Calendar.current.date(byAdding: .day, value: -daysBack, to: Date()) ?? Date()
