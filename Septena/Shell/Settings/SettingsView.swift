@@ -257,6 +257,16 @@ final class SettingsStore {
     if let v = ResponseCache.load([ChoreItem].self, forKey: CacheKey.chores) { chores = v }
   }
 
+  func moveSections(fromOffsets: IndexSet, toOffset: Int,
+                    context: ModelContext, engine: CKEngine?) {
+    sections.move(fromOffsets: fromOffsets, toOffset: toOffset)
+    var s = serverSettings ?? AppSettings(sectionOrder: nil, targets: nil, units: nil,
+                                          time: nil, theme: nil, eink: nil, nutrition: nil)
+    s.sectionOrder = sections.map(\.key)
+    serverSettings = s
+    SettingsMirror.upsert(settings: s, context: context, engine: engine)
+  }
+
   func refresh() async {
     serverLoading = true
     defer { serverLoading = false }
@@ -299,6 +309,8 @@ final class SettingsStore {
 
 struct SettingsView: View {
   @Environment(\.dismiss) private var dismiss
+  @Environment(\.modelContext) private var modelContext
+  @Environment(CKEngine.self) private var ckEngine
   @Environment(SettingsStore.self) private var store
   @State private var selection: SettingsDestination? = .general
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
@@ -365,7 +377,12 @@ struct SettingsView: View {
               sectionRow(entry)
             }
           }
+          .onMove { from, to in
+            store.moveSections(fromOffsets: from, toOffset: to,
+                               context: modelContext, engine: ckEngine)
+          }
         }
+        .environment(\.editMode, .constant(.active))
       }
     }
   }
@@ -382,6 +399,10 @@ struct SettingsView: View {
         SwiftUI.Section("Sections") {
           ForEach(sectionEntries) { entry in
             sectionRow(entry).tag(SettingsDestination.section(entry.key))
+          }
+          .onMove { from, to in
+            store.moveSections(fromOffsets: from, toOffset: to,
+                               context: modelContext, engine: ckEngine)
           }
         }
       }

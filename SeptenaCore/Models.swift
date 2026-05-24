@@ -1446,7 +1446,7 @@ struct MacroTilePref: Codable, Hashable, Identifiable {
 }
 
 struct NutritionSettings: Codable, Hashable {
-  let macroColors: MacroColors?
+  var macroColors: MacroColors?
   /// Authoritative tile list. Nil for legacy payloads → consumers should
   /// fall back to `MacroCatalog.defaultTilePrefs()`.
   var macroTiles: [MacroTilePref]?
@@ -1458,13 +1458,13 @@ struct NutritionSettings: Codable, Hashable {
 }
 
 struct AppSettings: Codable {
-  let sectionOrder: [String]?
-  let targets: AppTargets?
-  let units: AppUnits?
-  let time: AppTimeSettings?
-  let theme: String?        // "system" | "light" | "dark"
-  let eink: Bool?
-  let nutrition: NutritionSettings?
+  var sectionOrder: [String]?
+  var targets: AppTargets?
+  var units: AppUnits?
+  var time: AppTimeSettings?
+  var theme: String?        // "system" | "light" | "dark"
+  var eink: Bool?
+  var nutrition: NutritionSettings?
 
   enum CodingKeys: String, CodingKey {
     case sectionOrder = "section_order"
