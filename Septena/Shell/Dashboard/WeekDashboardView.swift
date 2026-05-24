@@ -29,6 +29,7 @@ enum NutritionSheet: Hashable, Identifiable {
 
 struct WeekDashboardView: View {
   @Environment(SeptenaClient.self) private var client
+  @Environment(AirStore.self) private var airStore
   @Environment(\.modelContext) private var modelContext
   @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(TaskMutator.self) private var taskMutator
@@ -384,11 +385,13 @@ struct WeekDashboardView: View {
     let ns: NutritionStatsResponse? = ChecklistMirror.buildNutritionStatsResponse(context: modelContext, days: 90)
     let ne: [NutritionEntry]? = ChecklistMirror.loadNutritionToday(context: modelContext)
     let nt: MacrosConfig? = NutritionPrefs.loadMacrosConfig()
-    async let asum = try? await client.airSummary()
-    async let ahist = try? await client.airHistory(days: 90)
+    // Air aggregates are computed locally from AirReadingEntity (CloudKit-
+    // mirrored). The legacy /api/air endpoints are gone — historical data
+    // lives entirely in SwiftData via AirStore.
+    let asRes: AirSummary? = airStore.summary()
+    let ahRes: AirHistoryResponse? = airStore.history(days: 90)
     let gRes: [GroceryItem]? = ChecklistMirror.loadGroceryItems(context: modelContext)
     let (t, o) = await (tc, on)
-    let (asRes, ahRes) = await (asum, ahist)
     if let colors = appSettings?.nutrition?.macroColors {
       macroColors = colors
       ResponseCache.save(colors, forKey: CacheKey.macroColors)

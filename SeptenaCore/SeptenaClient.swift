@@ -110,17 +110,6 @@ final class SeptenaClient {
     return "OK — Septena reachable"
   }
 
-  /// Delta-sync endpoint. Pass the `serverTime` returned from the previous
-  /// call as `since` to get only records changed (or tombstoned) since
-  /// that watermark. Pass nil on first sync to fetch a full snapshot.
-  /// Tasks are no longer pulled through this path (CloudKit owns them);
-  /// the projects + areas slices are still consumed by `Syncer.apply`.
-  func changes(since: String? = nil) async throws -> ChangesResponse {
-    var query: [URLQueryItem] = []
-    if let since { query.append(URLQueryItem(name: "since", value: since)) }
-    return try await getJSON("/api/tasks/changes", query: query, as: ChangesResponse.self)
-  }
-
   // MARK: - Nutrition (CK bootstrap)
 
   /// Full snapshot for iOS CloudKit bootstrap. Every entry on disk, plus
@@ -138,21 +127,6 @@ final class SeptenaClient {
     try await getJSON("/api/settings", as: AppSettings.self)
   }
 
-  // MARK: - Air
-
-  /// Snapshot for the Air mini-app — latest reading + today / last-24h
-  /// CO2/temp/humidity averages and CO2 band.
-  func airSummary() async throws -> AirSummary {
-    try await getJSON("/api/air/summary", as: AirSummary.self)
-  }
-
-  /// Per-day air stats; powers the Air tile histogram (CO2 average bars).
-  func airHistory(days: Int = 7) async throws -> AirHistoryResponse {
-    try await getJSON("/api/air/history",
-                      query: [URLQueryItem(name: "days", value: String(days))],
-                      as: AirHistoryResponse.self)
-  }
-
   // MARK: - Health (Oura)
 
   /// N nights of Oura sleep data. Server returns newest-first via the
@@ -168,21 +142,6 @@ final class SeptenaClient {
     try await getJSON("/api/health/withings",
                       query: [URLQueryItem(name: "days", value: String(days))],
                       as: WithingsResponse.self).withings
-  }
-
-  // MARK: - Today aggregator
-
-  /// Server-aggregated "Next" list (habits + supplements + chores, with
-  /// defers and bucket filters already applied). Used by the sidebar tile
-  /// count and any client that wants the merged Next slice without doing
-  /// its own four-fetch dance.
-  func nextItems(date: String,
-                 limit: Int? = nil,
-                 bucket: String? = nil) async throws -> NextItemsResponse {
-    var q: [URLQueryItem] = [URLQueryItem(name: "date", value: date)]
-    if let limit { q.append(URLQueryItem(name: "limit", value: String(limit))) }
-    if let bucket { q.append(URLQueryItem(name: "bucket", value: bucket)) }
-    return try await getJSON("/api/next/items", query: q, as: NextItemsResponse.self)
   }
 
   // MARK: - Sections (for theme accent)

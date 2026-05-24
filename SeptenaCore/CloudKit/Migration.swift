@@ -612,13 +612,11 @@ final class TasksMigrator {
   /// engine to drain, and verify the count round-trips. Throws on failure
   /// WITHOUT flipping the backend flag — caller flips on success.
   func migrateToCloudKit() async throws -> MigrationResult {
-    // 0. Pull canonical areas + projects from FastAPI into SwiftData if
-    //    they aren't already mirrored. Tasks are kept in sync by `Syncer`
-    //    in normal operation, but the bulk areas endpoint and per-row
-    //    project records don't always land in the cache before the user
-    //    hits Migrate. Without this, an empty AreaEntity table would
-    //    push nothing to CloudKit and any task.area links would dangle
-    //    once the cutover lands.
+    // 0. Pull canonical areas + projects + settings + sections from
+    //    FastAPI into SwiftData if they aren't already mirrored. This is
+    //    a one-time bootstrap so the CloudKit zone gets seeded with the
+    //    pre-cutover state; without it, an empty AreaEntity table would
+    //    push nothing to CloudKit and any task.area links would dangle.
     if let client {
       do {
         let areas = try await client.areas()

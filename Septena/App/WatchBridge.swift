@@ -51,7 +51,6 @@ final class WatchBridge: NSObject, WCSessionDelegate {
       replyHandler(["error": "missing action"])
       return
     }
-    let client = await MainActor.run { ClientProvider.shared.client }
     let services = await MainActor.run { SeptenaServices.shared }
     let date   = msg["date"] as? String ?? SeptenaDate.today
     let id     = msg["id"]   as? String ?? ""
@@ -59,7 +58,14 @@ final class WatchBridge: NSObject, WCSessionDelegate {
     do {
       switch action {
       case "fetchNext":
-        let response  = try await client.nextItems(date: date)
+        // Aggregated locally from CloudKit-mirrored SwiftData. Was a
+        // FastAPI round-trip pre-purge.
+        let response = await MainActor.run {
+          ChecklistMirror.loadNextItems(
+            context: LocalStore.shared.container.mainContext,
+            date: date
+          )
+        }
         let data      = try JSONEncoder().encode(response)
         let serverURL = UserDefaults.standard.string(forKey: "septena.serverURL")
                         ?? SeptenaClient.default.absoluteString

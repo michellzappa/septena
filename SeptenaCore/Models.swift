@@ -239,24 +239,6 @@ struct TasksListResponse: Codable {
   var done: [SeptenaTask]?      // present only on view=today
 }
 
-/// Response from `GET /api/tasks/changes?since=<iso8601>` — the delta-sync
-/// endpoint. `tasks` and `projects` include tombstones (deletedAt set);
-/// `areas` are wholesale (deletion is by-omission since the server stores
-/// them as a single replace-on-write array). Persist `serverTime` as the
-/// next `since` value.
-struct ChangesResponse: Codable {
-  var serverTime: String
-  var since: String?
-  var tasks: [SeptenaTask]
-  var projects: [Project]
-  var areas: [Area]
-
-  enum CodingKeys: String, CodingKey {
-    case serverTime = "server_time"
-    case since, tasks, projects, areas
-  }
-}
-
 // MARK: - Tasks history (per-day event aggregation)
 
 struct TasksHistoryDay: Codable, Hashable {

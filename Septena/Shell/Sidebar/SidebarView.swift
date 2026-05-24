@@ -864,13 +864,12 @@ struct SidebarRootView: View {
       areas = LocalCache.areas(in: modelContext)
       projects = LocalCache.projects(in: modelContext)
       let serverCounts = try await c
-      // 'Next' is the chores / habits / supplements ritual. The server
-      // does the merge + filter via /api/next/items; we just count.
-      if let next = try? await client.nextItems(date: SeptenaDate.today) {
-        nextCount = next.items.count
-      } else {
-        nextCount = nil
-      }
+      // 'Next' is the chores / habits / supplements ritual. Merged
+      // locally from the CloudKit-mirrored SwiftData store — no more
+      // round-trip to FastAPI for the badge count.
+      let next = ChecklistMirror.loadNextItems(context: modelContext,
+                                               date: SeptenaDate.today)
+      nextCount = next.items.count
 
       let items = try await all.items
       var agg = Self.aggregate(tasks: items)

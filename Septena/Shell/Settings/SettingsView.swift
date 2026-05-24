@@ -401,7 +401,7 @@ struct SettingsView: View {
   #endif
 
   private var staticDestinations: [SettingsDestination] {
-    [.general, .integrations, .sync, .privacy, .about]
+    [.general, .integrations, .sync, .importExport, .privacy, .about]
   }
 
   /// Per-section sidebar rows, in server order (`section_order` from
@@ -2021,7 +2021,6 @@ struct SyncSettingsPane: View {
   @State private var serverURL: String = ""
   @State private var isChecking = false
   @State private var connectionStatus: String = ""
-  @State private var isSyncing = false
 
   @AppStorage(SettingsKey.syncLastSucceeded) private var lastSyncedAt: Double = 0
   /// CloudKit engine, injected via environment from App.swift. Used
@@ -2080,20 +2079,6 @@ struct SyncSettingsPane: View {
         }
         Button("Save") { save() }
           .disabled(serverURL.isEmpty || serverURL == nav.serverURL)
-      }
-
-      Section {
-        Button {
-          Task { await syncNow() }
-        } label: {
-          HStack {
-            if isSyncing { ProgressView().controlSize(.small) }
-            Text("Pull Legacy Cache")
-          }
-        }
-        .disabled(isSyncing)
-      } footer: {
-        Text("FastAPI still serves unmigrated domains. Tasks, areas, and projects sync through CloudKit.")
       }
 
       #if DEBUG
@@ -2266,13 +2251,6 @@ struct SyncSettingsPane: View {
       await theme.refresh(from: ClientProvider.shared.client)
       await store.refresh(from: ClientProvider.shared.client)
     }
-  }
-
-  private func syncNow() async {
-    isSyncing = true
-    defer { isSyncing = false }
-    let syncer = Syncer(client: client, context: modelContext)
-    await syncer.pullAll()
   }
 
   #if DEBUG

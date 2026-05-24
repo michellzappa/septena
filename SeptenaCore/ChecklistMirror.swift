@@ -1597,4 +1597,96 @@ enum ChecklistMirror {
     formatter.locale = Locale(identifier: "en_US_POSIX")
     return formatter.string(from: date)
   }
+
+  // MARK: - Today aggregator (replaces /api/next/items)
+
+  /// Local equivalent of the FastAPI `/api/next/items` endpoint. Merges
+  /// today's open habits, supplements, and due-or-overdue chores from the
+  /// CloudKit-mirrored SwiftData store into a single ranked list. Same
+  /// `NextItemsResponse` shape the Watch and Sidebar already consume.
+  ///
+  /// Ordering: overdue chores first (most overdue at top), then due-today
+  /// chores, then habits by bucket, then supplements. `sortKey` increases
+  /// monotonically so callers can stable-sort if they re-merge.
+  static func loadNextItems(context: ModelContext,
+                            date: String,
+                            bucket: String? = nil,
+                            limit: Int? = nil) -> NextItemsResponse {
+    var items: [NextItem] = []
+    var sortKey = 0
+
+    // Chores: due today (daysOverdue >= 0) and not yet completed. Sort
+    // most-overdue first so the dashboard's "you're behind" signal stays
+    // visible at the top.
+    let chores = loadChores(context: context)
+      .filter { $0.daysOverdue >= 0 }
+      .filter { c in
+        // Hide chores already checked off today.
+        c.lastCompleted != date
+      }
+      .sorted { ($0.daysOverdue, $0.name) > ($1.daysOverdue, $1.name) }
+    for chore in chores {
+      let trailing: String?
+      if chore.daysOverdue == 0 {
+        trailing = "today"
+      } else if chore.daysOverdue == 1 {
+        trailing = "1 day late"
+      } else {
+        trailing = "\(chore.daysOverdue) days late"
+      }
+      items.append(NextItem(
+        id: chore.id,
+        kind: "chore",
+        title: chore.emoji.map { "\($0) \(chore.name)" } ?? chore.name,
+        subtitle: nil,
+        trailing: trailing,
+        overdue: chore.daysOverdue > 0,
+        sortKey: sortKey
+      ))
+      sortKey += 1
+    }
+
+    // Habits: open (not done, not skipped). Group by bucket in the
+    // canonical morning → afternoon → evening order the user defined.
+    if let habits = loadHabitsDay(context: context, date: date) {
+      for b in habits.buckets {
+        if let filter = bucket, b != filter { continue }
+        let grouped = habits.grouped[b] ?? []
+        for h in grouped where !h.done && !h.skipped {
+          items.append(NextItem(
+            id: h.id,
+            kind: "habit",
+            title: h.emoji.map { "\($0) \(h.name)" } ?? h.name,
+            subtitle: b,
+            trailing: nil,
+            overdue: false,
+            sortKey: sortKey
+          ))
+          sortKey += 1
+        }
+      }
+    }
+
+    // Supplements: open (not done). Server returns a flat list — keep
+    // declaration order.
+    if let supps = loadSupplementsDay(context: context, date: date) {
+      for s in supps.items where !s.done {
+        items.append(NextItem(
+          id: s.id,
+          kind: "supplement",
+          title: s.emoji.map { "\($0) \(s.name)" } ?? s.name,
+          subtitle: nil,
+          trailing: nil,
+          overdue: false,
+          sortKey: sortKey
+        ))
+        sortKey += 1
+      }
+    }
+
+    if let limit, items.count > limit {
+      items = Array(items.prefix(limit))
+    }
+    return NextItemsResponse(date: date, bucket: bucket ?? "", items: items)
+  }
 }
