@@ -896,6 +896,12 @@ final class NutritionEntryEntity {
   var potassiumMg: Double?
   var waterMl: Double?
 
+  /// PHAsset.localIdentifier for an attached photo from the user's Photos
+  /// library. Reference-only — image bytes stay in Photos. Local identifiers
+  /// are device-local, so the photo resolves only on the device that picked
+  /// it; cross-device resolution would require also storing PHCloudIdentifier.
+  var photoAssetID: String?
+
   var cloudKitSystemFields: Data?
 
   init(id: String,
@@ -918,6 +924,7 @@ final class NutritionEntryEntity {
        cholesterolMg: Double? = nil,
        potassiumMg: Double? = nil,
        waterMl: Double? = nil,
+       photoAssetID: String? = nil,
        cloudKitSystemFields: Data? = nil) {
     self.id = id
     self.loggedAt = loggedAt
@@ -939,6 +946,7 @@ final class NutritionEntryEntity {
     self.cholesterolMg = cholesterolMg
     self.potassiumMg = potassiumMg
     self.waterMl = waterMl
+    self.photoAssetID = photoAssetID
     self.cloudKitSystemFields = cloudKitSystemFields
   }
 }
@@ -1237,6 +1245,36 @@ enum AirReadingCloudKitSchema {
   }
 }
 
+enum OuraNightCloudKitSchema {
+  /// One CKRecord per night. recordName is `oura-night:<yyyy-MM-dd>`
+  /// so the date doubles as both the unique entity ID and the natural
+  /// identifier — upserts are idempotent across devices.
+  static let recordType = "OuraNight"
+
+  enum Field {
+    static let sleepScore      = "sleepScore"
+    static let readinessScore  = "readinessScore"
+    static let totalH          = "totalH"
+    static let deepH           = "deepH"
+    static let remH            = "remH"
+    static let lightH          = "lightH"
+    static let awakeH          = "awakeH"
+    static let efficiency      = "efficiency"
+    static let hrv             = "hrv"
+    static let restingHr       = "restingHr"
+    static let bedtime         = "bedtime"
+    static let wakeTime        = "wakeTime"
+    static let stressHighMin   = "stressHighMin"
+    static let recoveryHighMin = "recoveryHighMin"
+    static let stressSummary   = "stressSummary"
+  }
+
+  static func recordName(for id: String) -> String { "oura-night:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("oura-night:".count))
+  }
+}
+
 enum CaffeineEventCloudKitSchema {
   static let recordType = "CaffeineEvent"
 
@@ -1424,6 +1462,7 @@ enum NutritionEntryCloudKitSchema {
     static let cholesterolMg  = "cholesterolMg"
     static let potassiumMg    = "potassiumMg"
     static let waterMl        = "waterMl"
+    static let photoAssetID   = "photoAssetID"
   }
 
   static func recordName(for id: String) -> String { "nutrition-entry:\(id)" }
@@ -1764,6 +1803,57 @@ extension AirReadingEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
+extension OuraNightEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: OuraNightCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: OuraNightCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[OuraNightCloudKitSchema.Field.sleepScore]      = sleepScore.map { Int64($0) }
+    record[OuraNightCloudKitSchema.Field.readinessScore]  = readinessScore.map { Int64($0) }
+    record[OuraNightCloudKitSchema.Field.totalH]          = totalH
+    record[OuraNightCloudKitSchema.Field.deepH]           = deepH
+    record[OuraNightCloudKitSchema.Field.remH]            = remH
+    record[OuraNightCloudKitSchema.Field.lightH]          = lightH
+    record[OuraNightCloudKitSchema.Field.awakeH]          = awakeH
+    record[OuraNightCloudKitSchema.Field.efficiency]      = efficiency.map { Int64($0) }
+    record[OuraNightCloudKitSchema.Field.hrv]             = hrv.map { Int64($0) }
+    record[OuraNightCloudKitSchema.Field.restingHr]       = restingHr.map { Int64($0) }
+    record[OuraNightCloudKitSchema.Field.bedtime]         = bedtime
+    record[OuraNightCloudKitSchema.Field.wakeTime]        = wakeTime
+    record[OuraNightCloudKitSchema.Field.stressHighMin]   = stressHighMin.map { Int64($0) }
+    record[OuraNightCloudKitSchema.Field.recoveryHighMin] = recoveryHighMin.map { Int64($0) }
+    record[OuraNightCloudKitSchema.Field.stressSummary]   = stressSummary
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    sleepScore      = (record[OuraNightCloudKitSchema.Field.sleepScore]      as? Int64).map(Int.init)
+    readinessScore  = (record[OuraNightCloudKitSchema.Field.readinessScore]  as? Int64).map(Int.init)
+    totalH          =  record[OuraNightCloudKitSchema.Field.totalH]          as? Double
+    deepH           =  record[OuraNightCloudKitSchema.Field.deepH]           as? Double
+    remH            =  record[OuraNightCloudKitSchema.Field.remH]            as? Double
+    lightH          =  record[OuraNightCloudKitSchema.Field.lightH]          as? Double
+    awakeH          =  record[OuraNightCloudKitSchema.Field.awakeH]          as? Double
+    efficiency      = (record[OuraNightCloudKitSchema.Field.efficiency]      as? Int64).map(Int.init)
+    hrv             = (record[OuraNightCloudKitSchema.Field.hrv]             as? Int64).map(Int.init)
+    restingHr       = (record[OuraNightCloudKitSchema.Field.restingHr]       as? Int64).map(Int.init)
+    bedtime         =  record[OuraNightCloudKitSchema.Field.bedtime]         as? String
+    wakeTime        =  record[OuraNightCloudKitSchema.Field.wakeTime]        as? String
+    stressHighMin   = (record[OuraNightCloudKitSchema.Field.stressHighMin]   as? Int64).map(Int.init)
+    recoveryHighMin = (record[OuraNightCloudKitSchema.Field.recoveryHighMin] as? Int64).map(Int.init)
+    stressSummary   =  record[OuraNightCloudKitSchema.Field.stressSummary]   as? String
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: OuraNightCloudKitSchema.entityID(from: record.recordID.recordName))
+    apply(record)
+  }
+}
+
 extension CaffeineEventEntity: ChecklistCloudKitBackedEntity {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
@@ -2095,6 +2185,7 @@ extension NutritionEntryEntity: ChecklistCloudKitBackedEntity {
     record[NutritionEntryCloudKitSchema.Field.cholesterolMg] = cholesterolMg
     record[NutritionEntryCloudKitSchema.Field.potassiumMg]   = potassiumMg
     record[NutritionEntryCloudKitSchema.Field.waterMl]       = waterMl
+    record[NutritionEntryCloudKitSchema.Field.photoAssetID]  = photoAssetID
     return record
   }
 
@@ -2117,6 +2208,7 @@ extension NutritionEntryEntity: ChecklistCloudKitBackedEntity {
     cholesterolMg = record[NutritionEntryCloudKitSchema.Field.cholesterolMg] as? Double
     potassiumMg   = record[NutritionEntryCloudKitSchema.Field.potassiumMg]   as? Double
     waterMl       = record[NutritionEntryCloudKitSchema.Field.waterMl]       as? Double
+    photoAssetID  = optionalChecklistString(record[NutritionEntryCloudKitSchema.Field.photoAssetID])
     updatedAt = .now
     captureCloudKitSystemFields(from: record)
   }
@@ -2206,6 +2298,7 @@ final class LocalStore {
                          SessionTypeEntity.self,
                          NutritionEntryEntity.self, NutritionDailySummaryEntity.self,
                          AirReadingEntity.self,
+                         OuraNightEntity.self,
                          OutboxEntity.self])
     // Explicitly opt OUT of NSPersistentCloudKitContainer mirroring. Having
     // CloudKit in the target entitlements would otherwise switch SwiftData

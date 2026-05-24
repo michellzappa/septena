@@ -216,6 +216,15 @@ final class SeptenaServices {
           }
           return nil
         }
+        if recordName.hasPrefix("oura-night:") {
+          let id = OuraNightCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<OuraNightEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
         if recordName.hasPrefix("caffeine-event:") {
           let id = CaffeineEventCloudKitSchema.entityID(from: recordName)
           if let entity = try? context.fetch(FetchDescriptor<CaffeineEventEntity>(
@@ -472,6 +481,17 @@ final class SeptenaServices {
           } else {
             context.insert(AirReadingEntity(cloudKit: record))
           }
+        case OuraNightCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = OuraNightCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<OuraNightEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(OuraNightEntity(cloudKit: record))
+          }
+          NotificationCenter.default.post(name: .septenaOuraChanged, object: nil)
         case CaffeineEventCloudKitSchema.recordType:
           batchTouchedData = true
           let id = CaffeineEventCloudKitSchema.entityID(from: record.recordID.recordName)
@@ -701,6 +721,14 @@ final class SeptenaServices {
           )).first {
             context.delete(entity)
           }
+        case OuraNightCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = OuraNightCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<OuraNightEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
         case CaffeineEventCloudKitSchema.recordType:
           batchTouchedData = true
           let id = CaffeineEventCloudKitSchema.entityID(from: recordID.recordName)
@@ -820,6 +848,7 @@ final class SeptenaServices {
       areasMutator.bind(ckEngine: ckEngine)
       projectsMutator.bind(ckEngine: ckEngine)
       airStore.bind(ckEngine: ckEngine)
+      OuraStore.shared.bind(ckEngine: ckEngine)
       ckEngine.start()
       try? await ckEngine.fetchChanges()
       // Pipe Aranet snapshots into the local store. The bridge runs in
@@ -2246,7 +2275,8 @@ final class NutritionMutator {
                 sodiumMg: Double? = nil,
                 cholesterolMg: Double? = nil,
                 potassiumMg: Double? = nil,
-                waterMl: Double? = nil) -> NutritionEntryEntity {
+                waterMl: Double? = nil,
+                photoAssetID: String? = nil) -> NutritionEntryEntity {
     let id = generateID()
     let now = Date.now
     let entity = NutritionEntryEntity(
@@ -2258,6 +2288,7 @@ final class NutritionMutator {
       alcoholG: alcoholG, kcal: kcal,
       sodiumMg: sodiumMg, cholesterolMg: cholesterolMg,
       potassiumMg: potassiumMg, waterMl: waterMl,
+      photoAssetID: photoAssetID,
       cloudKitSystemFields: nil
     )
     context.insert(entity)
@@ -2283,7 +2314,8 @@ final class NutritionMutator {
                    sodiumMg: Double? = nil,
                    cholesterolMg: Double? = nil,
                    potassiumMg: Double? = nil,
-                   waterMl: Double? = nil) {
+                   waterMl: Double? = nil,
+                   photoAssetID: String?? = nil) {
     guard let entity = fetchEntry(id: id) else { return }
     let oldDay = dayID(from: entity.loggedAt)
     if let pickedTime {
@@ -2313,6 +2345,9 @@ final class NutritionMutator {
     if let cholesterolMg { entity.cholesterolMg = cholesterolMg }
     if let potassiumMg { entity.potassiumMg = potassiumMg }
     if let waterMl { entity.waterMl = waterMl }
+    // Double-optional: outer `.some(_)` means caller wants to write, inner
+    // value may be nil to clear the attachment.
+    if let photoAssetID { entity.photoAssetID = photoAssetID }
     entity.updatedAt = .now
     let newDay = dayID(from: entity.loggedAt)
     rebuildSummary(forDay: oldDay)
