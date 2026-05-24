@@ -203,7 +203,7 @@ struct SleepDestinationView: View {
     return VStack(spacing: 4) {
       Text(mins.map { "\($0)m" } ?? "—")
         .font(.system(.title2, design: .rounded).weight(.semibold).monospacedDigit())
-        .foregroundStyle(stressColor(summary))
+        .foregroundStyle(accent)
       Text("Stress")
         .font(.caption)
         .foregroundStyle(.secondary)
@@ -219,15 +219,6 @@ struct SleepDestinationView: View {
     .frame(maxWidth: .infinity)
     .padding(.vertical, 14)
     .background(Theme.secondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 16))
-  }
-
-  private func stressColor(_ summary: String?) -> Color {
-    switch summary {
-    case "stressful":            return .red
-    case "restored", "restorative": return .green
-    case "normal":               return .orange
-    default:                     return .secondary
-    }
   }
 
   // MARK: - Charts
@@ -430,22 +421,22 @@ struct SleepDestinationView: View {
           if let s = n.stressHighMin {
             BarMark(x: .value("Day", n.date),
                     y: .value("Stress", s))
-              .foregroundStyle(stressColor(n.stressSummary))
+              .foregroundStyle(accent)
               .accessibilityLabel(weekdayFull(n.date))
               .accessibilityValue("Stress \(s) minutes")
           }
           if let r = n.recoveryHighMin {
             BarMark(x: .value("Day", n.date),
                     y: .value("Recovery", r))
-              .foregroundStyle(Color.green)
+              .foregroundStyle(accent.opacity(0.55))
               .accessibilityLabel(weekdayFull(n.date))
               .accessibilityValue("Recovery \(r) minutes")
           }
         }
       }
       .chartForegroundStyleScale([
-        "Stress":   Color.red,
-        "Recovery": Color.green
+        "Stress":   accent,
+        "Recovery": accent.opacity(0.55)
       ])
       .chartLegend(position: .bottom, alignment: .center, spacing: 8)
       .chartXScale(domain: last7.map(\.date))
