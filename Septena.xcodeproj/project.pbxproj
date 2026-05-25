@@ -101,6 +101,7 @@
 		4C7EE421B5249E3E301C3211 /* TaskRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62BF9F7C16DF9595A999267D /* TaskRecord.swift */; };
 		4DE0513FA4C449F29A031F9ACE599643 /* CannabisTypeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71E25F55030941F7AEEDA98D55D4E363 /* CannabisTypeSheet.swift */; };
 		4F942DCF79C5D8EB5F471949 /* WatchAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F05E01AB86D25931CD682001 /* WatchAppDelegate.swift */; };
+		50A243F9AEE8BCD4C3217645 /* GutPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 121905DB16B21A4039F8D4E5 /* GutPlugin.swift */; };
 		513C8B1D41E5BA85B785129C /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E25F81FE5AA4B6BBC056275 /* DateParser.swift */; };
 		5330AF71083A1F3514B862B8 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */; };
 		533D26E5CB13EAC2F2B088B2 /* TrainingQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F79B52B56CF74E2F11586CC /* TrainingQuickAddMenu.swift */; };
@@ -129,6 +130,7 @@
 		688DF9C7BC0CB50A51BF1191 /* NutritionQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA8B3755DDC65DD48AF4C3E /* NutritionQuickAddMenu.swift */; };
 		68FEC658F37E69C0360A47D5 /* NextComplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = C27BE273FD1D064942278AD1 /* NextComplication.swift */; };
 		693B2845164FA3B7FC5828FE /* AddInfoSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C35D898846EB8A48B77811E /* AddInfoSheet.swift */; };
+		6B0182EEBF11267189607343 /* GutPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 121905DB16B21A4039F8D4E5 /* GutPlugin.swift */; };
 		6B3C51BC822675123EE51792 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ACB6256DD75D93215BDFD3C /* RootTabView.swift */; };
 		6D1BE00011E60EE3A490364D /* Migration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64EB95DB6A86885B3FA483C1 /* Migration.swift */; };
 		6DB169E3C4B6BC5BA8855D66 /* ResponseCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D6916E979E5B0D7497CAEF /* ResponseCache.swift */; };
@@ -412,6 +414,7 @@
 		0D0365044C6EA062BBFCCA6B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		0D3C4FD96F6113A7975BA394 /* AddInfoRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddInfoRouter.swift; sourceTree = "<group>"; };
 		1130C3EBCF558AF0EFB27AB9 /* SeptenaWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptenaWatchApp.swift; sourceTree = "<group>"; };
+		121905DB16B21A4039F8D4E5 /* GutPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GutPlugin.swift; sourceTree = "<group>"; };
 		13011C553B04F0ACEFD189CD /* PlatformShims.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformShims.swift; sourceTree = "<group>"; };
 		1387A56A99DA78515CE7FA9F /* AddCannabisPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddCannabisPage.swift; sourceTree = "<group>"; };
 		143AEA376AD3403C8B17AE863677999B /* CaffeineTypeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaffeineTypeSheet.swift; sourceTree = "<group>"; };
@@ -1003,6 +1006,7 @@
 				DEC92C4A0EDB0032A8216157 /* TestPlugin.swift */,
 				480BE4F0B92D70D332E473FF /* CaffeinePlugin.swift */,
 				471562D540F368C2B008038B /* CannabisPlugin.swift */,
+				121905DB16B21A4039F8D4E5 /* GutPlugin.swift */,
 			);
 			name = Plugins;
 			path = Plugins;
@@ -1416,6 +1420,7 @@
 				257986ED236E9DD52F6B7066 /* TestPlugin.swift in Sources */,
 				BB6E0880C11C8581A0EFE7AC /* CaffeinePlugin.swift in Sources */,
 				BDA42CE92BCC3758D45ED76B /* CannabisPlugin.swift in Sources */,
+				50A243F9AEE8BCD4C3217645 /* GutPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1609,6 +1614,7 @@
 				B1C08A4AB831AA701C7BDC75 /* TestPlugin.swift in Sources */,
 				268900096F5401045252C735 /* CaffeinePlugin.swift in Sources */,
 				A2656F10D275C4A2407A5283 /* CannabisPlugin.swift in Sources */,
+				6B0182EEBF11267189607343 /* GutPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

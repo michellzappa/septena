@@ -121,6 +121,7 @@ enum SectionRegistry {
     MoodPlugin.self,
     CaffeinePlugin.self,
     CannabisPlugin.self,
+    GutPlugin.self,
     TestPlugin.self,
   ]
 

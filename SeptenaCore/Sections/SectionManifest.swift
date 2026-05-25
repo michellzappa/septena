@@ -568,23 +568,7 @@ public extension SectionSkill {
     // caffeine migrated to CaffeinePlugin (Septena target). See
     // SectionSkill.resolve(_:) — registry lookup wins over this list.
     // cannabis migrated to CannabisPlugin (Septena target).
-    .init(
-      key: "gut",
-      summary: "Digestive event log.",
-      tools: [
-        .init("gut_events_list",  "By day or range. Defaults to last 7 days",
-              inputs: "optional: date, from, to, limit"),
-        .init("gut_event_log",    "Log an event",
-              inputs: "required: bristol (1-7) · optional: date (default today), time (HH:MM:SS), blood (boolean), volume (small|medium|large), discomfortLevel (free-form), discomfortStart (HH:MM), discomfortEnd (HH:MM), note"),
-        .init("gut_event_delete", "Remove an event",
-              inputs: "required: id"),
-      ],
-      body: """
-      `bristol` is the Bristol Stool Scale (1 = hard pellets, 7 = watery) and \
-      is required. Log `discomfortStart`/`discomfortEnd` as `HH:MM` when the \
-      user describes cramping or pain.
-      """
-    ),
+    // gut migrated to GutPlugin (Septena target).
     .init(
       key: "training",
       summary: "Log exercise sets, manage exercise catalog, define session-type templates.",

@@ -82,8 +82,8 @@ struct TodayLogView: View {
     }
     .sheet(item: $editingGut) { entry in
       EditGutEntrySheet(date: date, original: entry) { updated in
-        replaceEvent(id: "gut-\(entry.id)", title: bristolLabel(updated.bristol),
-                     detail: gutDetail(updated), time: updated.time, kind: .gut(updated))
+        replaceEvent(id: "gut-\(entry.id)", title: GutPlugin.bristolLabel(updated.bristol),
+                     detail: GutPlugin.detail(for: updated), time: updated.time, kind: .gut(updated))
       }
     }
     .sheet(item: $editingMood) { entry in
@@ -250,7 +250,6 @@ struct TodayLogView: View {
     let cS = theme.color(for: "supplements")
     let cR = theme.color(for: "chores")
     let cT = theme.color(for: "tasks")
-    let cG = theme.color(for: "gut")
     let cN = theme.color(for: "nutrition")
     let cTr = theme.color(for: "training")
     let cCal = theme.color(for: "calendar")
@@ -291,15 +290,8 @@ struct TodayLogView: View {
       ))
     }
 
-    // caffeine + cannabis migrated to their plugins (see SectionRegistry
-    // loop below).
-
-    for e in gut {
-      out.append(TodayEvent(
-        id: "gut-\(e.id)", time: e.time, section: "gut",
-        color: cG, title: bristolLabel(e.bristol), detail: gutDetail(e), kind: .gut(e)
-      ))
-    }
+    // caffeine, cannabis, gut migrated to their plugins (see
+    // SectionRegistry loop below).
 
     // Mood is migrated to SectionPlugin. Future sections will follow
     // the same pattern: their inline loops collapse to a single call
@@ -377,26 +369,7 @@ struct TodayLogView: View {
   // `cannabisLabel` moved to CannabisPlugin.label(for:) alongside the
   // Today block.
 
-  private func bristolLabel(_ n: Int) -> String {
-    switch n {
-    case 1: return "Type 1 — Separate lumps"
-    case 2: return "Type 2 — Lumpy sausage"
-    case 3: return "Type 3 — Cracked sausage"
-    case 4: return "Type 4 — Smooth sausage"
-    case 5: return "Type 5 — Soft blobs"
-    case 6: return "Type 6 — Fluffy pieces"
-    case 7: return "Type 7 — Liquid"
-    default: return "Bristol \(n)"
-    }
-  }
-
-  private func gutDetail(_ e: GutEntry) -> String? {
-    var parts: [String] = []
-    if let vol = e.volume { parts.append(vol) }
-    if e.blood > 0 { parts.append("blood \(e.blood)") }
-    if let note = e.note { parts.append(note) }
-    return parts.isEmpty ? nil : parts.joined(separator: " · ")
-  }
+  // `bristolLabel` + `gutDetail` moved to GutPlugin.
 
   private func trainingDetail(_ e: ExerciseEntry) -> String? {
     var parts: [String] = []
