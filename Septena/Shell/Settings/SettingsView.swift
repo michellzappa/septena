@@ -1039,6 +1039,7 @@ struct ManageSectionsPane: View {
         }
       }
       Spacer()
+      setupButton(for: manifest.key)
       if manifest.canDisable {
         Toggle("Enabled", isOn: Binding(
           get: { enabled },
@@ -1050,6 +1051,26 @@ struct ManageSectionsPane: View {
           .font(.caption)
           .foregroundStyle(.secondary)
       }
+    }
+  }
+
+  /// Manual onboarding trigger. Visible only when the section's plugin
+  /// declares an `onboarding(complete:)` view — for everything else,
+  /// the section has no setup flow to run. Tapping reuses the same
+  /// presentation path the off → on toggle uses.
+  @ViewBuilder
+  private func setupButton(for key: String) -> some View {
+    if let plugin = SectionRegistry.plugin(forKey: key),
+       plugin.onboarding(complete: {}) != nil {
+      Button {
+        pendingOnboarding = PendingOnboarding(key: key)
+      } label: {
+        Image(systemName: "wand.and.stars")
+          .font(.callout)
+          .foregroundStyle(.tint)
+      }
+      .buttonStyle(.borderless)
+      .accessibilityLabel("Run setup")
     }
   }
 
