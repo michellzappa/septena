@@ -111,6 +111,10 @@ final class SeptenaServices {
           seededAny = true
         }
       }
+      // Legacy migration: pre-`hasOnboarded` rows default to false; flip
+      // them to true so existing users don't see onboarding sheets for
+      // sections they've been using. Idempotent.
+      SettingsMirror.backfillHasOnboardedForLegacySections(context: context)
       if seededAny {
         NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
       }

@@ -284,6 +284,21 @@ public extension SectionManifest {
       supportsDashboard: true,
       settingsEditor: .appearance
     ),
+    // Sandbox section used to exercise the SectionPlugin + onboarding
+    // wiring without touching real user data. Hidden from Today and
+    // dashboard; only visible in Settings → Manage Sections. Delete
+    // this entry (and TestPlugin) before shipping to TestFlight /
+    // App Store.
+    .init(
+      key: "test",
+      defaultLabel: "Sandbox",
+      shortDescription: "Internal sandbox for trying out section flows",
+      activation: .optional,
+      onboarding: .optional,
+      supportsTab: false,
+      supportsDashboard: false,
+      settingsEditor: .none
+    ),
   ]
 
   /// Constant-time lookup by key. Built once at type init; reads are

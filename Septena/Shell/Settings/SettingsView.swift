@@ -945,6 +945,14 @@ struct ManageSectionsPane: View {
   @Environment(SettingsStore.self) private var store
   @Environment(\.modelContext) private var modelContext
   @Environment(CKEngine.self) private var ckEngine
+  @State private var pendingOnboarding: PendingOnboarding? = nil
+
+  /// Identifiable wrapper so `.sheet(item:)` can drive presentation
+  /// from the key alone — the plugin is looked up at render time.
+  private struct PendingOnboarding: Identifiable {
+    let key: String
+    var id: String { key }
+  }
 
   private var rows: [SectionManifest] {
     let order = store.serverSettings?.sectionOrder ?? store.sections.map(\.key)
@@ -971,6 +979,50 @@ struct ManageSectionsPane: View {
       }
     }
     .formStyle(.grouped)
+    .sheet(item: $pendingOnboarding) { pending in
+      onboardingSheet(for: pending.key)
+    }
+  }
+
+  /// Resolve the plugin for `key` and present its onboarding view. The
+  /// view is responsible for calling `complete()` to finish the flow;
+  /// any other dismissal (swipe down, Cancel button if the plugin
+  /// provides one) leaves the section disabled.
+  @ViewBuilder
+  private func onboardingSheet(for key: String) -> some View {
+    if let plugin = SectionRegistry.plugin(forKey: key),
+       let view = plugin.onboarding(complete: {
+         completeOnboarding(key: key)
+       }) {
+      view
+    } else {
+      // Defensive — shouldn't happen because we only set
+      // `pendingOnboarding` after confirming the plugin offers one.
+      Text("No onboarding available.")
+        .padding()
+    }
+  }
+
+  private func completeOnboarding(key: String) {
+    SettingsMirror.setSectionHasOnboarded(key,
+                                          hasOnboarded: true,
+                                          context: modelContext,
+                                          engine: ckEngine)
+    SettingsMirror.setSectionEnabled(key,
+                                     enabled: true,
+                                     context: modelContext,
+                                     engine: ckEngine)
+    store.sections = store.sections.map { config in
+      config.key == key
+        ? SectionConfig(key: config.key,
+                        label: config.label,
+                        color: config.color,
+                        isEnabled: true,
+                        showInToday: config.showInToday,
+                        hasOnboarded: true)
+        : config
+    }
+    pendingOnboarding = nil
   }
 
   @ViewBuilder
@@ -1026,6 +1078,20 @@ struct ManageSectionsPane: View {
   }
 
   private func setEnabled(_ key: String, _ enabled: Bool) {
+    // Off → on transition: if the section has a plugin onboarding flow
+    // and hasn't been onboarded yet, route through the sheet instead
+    // of enabling directly. The sheet's completion handler does the
+    // enable + hasOnboarded write.
+    if enabled,
+       let config = store.sections.first(where: { $0.key == key }),
+       !config.isEnabled,
+       !config.hasOnboarded,
+       let plugin = SectionRegistry.plugin(forKey: key),
+       plugin.onboarding(complete: {}) != nil {
+      pendingOnboarding = PendingOnboarding(key: key)
+      return
+    }
+
     SettingsMirror.setSectionEnabled(key,
                                      enabled: enabled,
                                      context: modelContext,
@@ -1036,7 +1102,8 @@ struct ManageSectionsPane: View {
                         label: config.label,
                         color: config.color,
                         isEnabled: enabled,
-                        showInToday: config.showInToday)
+                        showInToday: config.showInToday,
+                        hasOnboarded: config.hasOnboarded)
         : config
     }
   }
@@ -1052,7 +1119,8 @@ struct ManageSectionsPane: View {
                         label: config.label,
                         color: config.color,
                         isEnabled: config.isEnabled,
-                        showInToday: value)
+                        showInToday: value,
+                        hasOnboarded: config.hasOnboarded)
         : config
     }
   }
@@ -1236,7 +1304,8 @@ struct SectionDetailPane: View {
                         label: config.label,
                         color: config.color,
                         isEnabled: config.isEnabled,
-                        showInToday: value)
+                        showInToday: value,
+                        hasOnboarded: config.hasOnboarded)
         : config
     }
   }
@@ -1281,7 +1350,8 @@ struct SectionDetailPane: View {
                         label: config.label,
                         color: config.color,
                         isEnabled: enabled,
-                        showInToday: config.showInToday)
+                        showInToday: config.showInToday,
+                        hasOnboarded: config.hasOnboarded)
         : config
     }
   }
@@ -1301,7 +1371,8 @@ struct SectionDetailPane: View {
                         label: config.label,
                         color: hex,
                         isEnabled: config.isEnabled,
-                        showInToday: config.showInToday)
+                        showInToday: config.showInToday,
+                        hasOnboarded: config.hasOnboarded)
         : config
     }
   }

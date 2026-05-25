@@ -25,6 +25,19 @@ protocol SectionPlugin {
   /// for sections that don't appear in Today (or implement only the
   /// manifest and let `appearsInToday` gate them out).
   static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent]
+
+  /// First-enable setup flow. Return a view to present as a sheet when
+  /// the user flips this section from off → on for the first time
+  /// (i.e. `SectionEntity.hasOnboarded == false`). Return `nil` to
+  /// skip onboarding — the toggle enables immediately. The plugin
+  /// MUST call `complete()` from its view to finish the flow.
+  static func onboarding(complete: @escaping () -> Void) -> AnyView?
+}
+
+extension SectionPlugin {
+  /// Default: no onboarding. Sections that need a setup flow override
+  /// this; everything else inherits the no-op.
+  static func onboarding(complete: @escaping () -> Void) -> AnyView? { nil }
 }
 
 /// Bag of pre-loaded data + helpers passed into `todayEvents`. Avoids
@@ -55,6 +68,7 @@ struct TodayContext {
 enum SectionRegistry {
   static let all: [any SectionPlugin.Type] = [
     MoodPlugin.self,
+    TestPlugin.self,
   ]
 
   static var byKey: [String: any SectionPlugin.Type] {

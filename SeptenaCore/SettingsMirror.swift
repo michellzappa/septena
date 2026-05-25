@@ -47,9 +47,11 @@ enum SettingsMirror {
   /// stay invisible on the dashboard until manual install UX exists.
   ///
   /// `title` / `color` / `isEnabled` are pulled from the manifest's
-  /// defaults so the row matches the catalog. The CK engine isn't
-  /// notified — once install UX lands and the section is properly
-  /// owned by the user, the normal save path will push it.
+  /// defaults so the row matches the catalog. `hasOnboarded` mirrors
+  /// `isEnabled` at seed time: a section seeded enabled is already
+  /// "set up" (no onboarding to run); a section seeded disabled awaits
+  /// first-enable, at which point the toggle flow asks the plugin
+  /// whether onboarding is required.
   @discardableResult
   static func seedManifestSectionIfMissing(_ key: String,
                                            context: ModelContext) -> Bool {
@@ -58,13 +60,12 @@ enum SettingsMirror {
     )
     if (try? context.fetch(descriptor).first) != nil { return false }
     guard let manifest = SectionManifest.byKey[key] else { return false }
-    // Empty color string = "no user preference"; SectionTheme falls back
-    // to its built-in palette. Same shape SettingsMirror.replaceSections
-    // uses when the server returns no color override.
+    let seedEnabled = manifest.defaultEnabled
     let entity = SectionEntity(id: manifest.key,
                                title: manifest.defaultLabel,
                                color: "",
-                               isEnabled: manifest.defaultEnabled)
+                               isEnabled: seedEnabled,
+                               hasOnboarded: seedEnabled)
     context.insert(entity)
     do { try context.save() } catch {
       SeptenaLog.error("SettingsMirror.seedManifestSection", error)
@@ -73,12 +74,43 @@ enum SettingsMirror {
     return true
   }
 
-  /// Backfill every section in `SectionManifest.all` that doesn't yet
-  /// have a local `SectionEntity` row. Idempotent — existing rows are
-  /// left alone so user customizations (color, isEnabled) survive.
-  static func seedAllManifestSectionsIfMissing(context: ModelContext) {
-    for manifest in SectionManifest.all {
-      _ = seedManifestSectionIfMissing(manifest.key, context: context)
+  /// One-shot migration for users who upgrade from a build that pre-dates
+  /// the `hasOnboarded` field. Any pre-existing SectionEntity row with
+  /// `hasOnboarded=false` is upgraded to `true` so legacy users don't
+  /// see onboarding sheets for sections they've already been using.
+  /// Idempotent: safe to call on every launch.
+  static func backfillHasOnboardedForLegacySections(context: ModelContext) {
+    let descriptor = FetchDescriptor<SectionEntity>(
+      predicate: #Predicate { $0.hasOnboarded == false }
+    )
+    guard let rows = try? context.fetch(descriptor), !rows.isEmpty else { return }
+    for row in rows {
+      row.hasOnboarded = true
+    }
+    do {
+      try context.save()
+    } catch {
+      SeptenaLog.error("SettingsMirror.backfillHasOnboarded", error)
+    }
+  }
+
+  /// Toggle `hasOnboarded` on a single section. Pushes through CKEngine.
+  static func setSectionHasOnboarded(_ key: String,
+                                     hasOnboarded: Bool,
+                                     context: ModelContext,
+                                     engine: CKEngine? = nil) {
+    let descriptor = FetchDescriptor<SectionEntity>(
+      predicate: #Predicate { $0.id == key }
+    )
+    guard let entity = try? context.fetch(descriptor).first else { return }
+    guard entity.hasOnboarded != hasOnboarded else { return }
+    entity.hasOnboarded = hasOnboarded
+    entity.updatedAt = .now
+    do {
+      try context.save()
+      engine?.noteSectionChange(id: key)
+    } catch {
+      SeptenaLog.error("SettingsMirror.setSectionHasOnboarded", error)
     }
   }
 
