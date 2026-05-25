@@ -17,23 +17,30 @@ public struct SectionConfig: Codable, Hashable {
   /// Whether this section contributes to the Today log. Only meaningful
   /// for sections the manifest flags as `appearsInToday`.
   public let showInToday: Bool
+  /// True once the section's first-time onboarding has completed (or
+  /// been skipped). Distinguishes "first ever enable" from a later
+  /// toggle off → on. Stays true forever once set.
+  public let hasOnboarded: Bool
 
   public init(key: String,
               label: String,
               color: String,
               isEnabled: Bool = true,
-              showInToday: Bool = true) {
+              showInToday: Bool = true,
+              hasOnboarded: Bool = false) {
     self.key = key
     self.label = label
     self.color = color
     self.isEnabled = isEnabled
     self.showInToday = showInToday
+    self.hasOnboarded = hasOnboarded
   }
 
   // Custom decode so older ResponseCache blobs (pre-isEnabled /
-  // pre-showInToday) decode cleanly with sensible defaults.
+  // pre-showInToday / pre-hasOnboarded) decode cleanly with sensible
+  // defaults.
   private enum CodingKeys: String, CodingKey {
-    case key, label, color, isEnabled, showInToday
+    case key, label, color, isEnabled, showInToday, hasOnboarded
   }
   public init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -42,6 +49,7 @@ public struct SectionConfig: Codable, Hashable {
     self.color = try c.decode(String.self, forKey: .color)
     self.isEnabled = (try? c.decode(Bool.self, forKey: .isEnabled)) ?? true
     self.showInToday = (try? c.decode(Bool.self, forKey: .showInToday)) ?? true
+    self.hasOnboarded = (try? c.decode(Bool.self, forKey: .hasOnboarded)) ?? false
   }
 }
 

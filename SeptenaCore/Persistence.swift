@@ -264,6 +264,11 @@ final class SectionEntity {
   /// Independent of `isEnabled` so a section can stay visible on the
   /// dashboard but be muted from the Today timeline (or vice versa).
   var showInToday: Bool = true
+  /// Set to true once the section's onboarding flow has completed (or
+  /// been skipped) for this user. Distinguishes "first ever enable"
+  /// (which should run onboarding) from a later toggle off → on. Stays
+  /// true forever once set; data is never lost on disable.
+  var hasOnboarded: Bool = false
   var updatedAt: Date
   /// CKRecord system-fields blob. Same contract as the other mirrored
   /// entities: preserves recordChangeTag across updates.
@@ -274,6 +279,7 @@ final class SectionEntity {
        color: String,
        isEnabled: Bool = true,
        showInToday: Bool = true,
+       hasOnboarded: Bool = false,
        updatedAt: Date = .now,
        cloudKitSystemFields: Data? = nil) {
     self.id = id
@@ -281,6 +287,7 @@ final class SectionEntity {
     self.color = color
     self.isEnabled = isEnabled
     self.showInToday = showInToday
+    self.hasOnboarded = hasOnboarded
     self.updatedAt = updatedAt
     self.cloudKitSystemFields = cloudKitSystemFields
   }
@@ -1140,7 +1147,8 @@ extension SectionConfig {
               label: e.title,
               color: e.color,
               isEnabled: e.isEnabled,
-              showInToday: e.showInToday)
+              showInToday: e.showInToday,
+              hasOnboarded: e.hasOnboarded)
   }
 }
 

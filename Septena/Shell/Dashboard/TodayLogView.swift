@@ -314,15 +314,19 @@ struct TodayLogView: View {
       ))
     }
 
-    for e in mood {
-      // Use the quadrant color directly rather than the section accent
-      // — the affective dimension is the whole point of a mood log; a
-      // single section-wide color would erase it.
-      let quadColor = MoodQuadrant(rawValue: e.quadrant)?.color ?? .gray
-      out.append(TodayEvent(
-        id: "mood-\(e.id)", time: String(e.time.prefix(5)), section: "mood",
-        color: quadColor, title: e.emotion, detail: e.note, kind: .mood(e)
-      ))
+    // Mood is migrated to SectionPlugin. Future sections will follow
+    // the same pattern: their inline loops collapse to a single call
+    // through SectionRegistry. The non-migrated sections above stay
+    // inline until each gets its own plugin commit.
+    let todayCtx = TodayContext(
+      theme: theme,
+      habits: habits, supplements: supplements, chores: chores,
+      tasks: tasks, caffeine: caffeine, cannabis: cannabis,
+      gut: gut, nutrition: nutrition, training: training,
+      calendar: calendar, mood: mood
+    )
+    for plugin in SectionRegistry.all {
+      out.append(contentsOf: plugin.todayEvents(date: date, ctx: todayCtx))
     }
 
     for e in nutrition where e.date == date {
@@ -440,30 +444,5 @@ struct TodayLogView: View {
   }
 }
 
-// MARK: - Event model
-
-private enum TodayEventKind {
-  case habit(HabitDayItem)
-  case supplement(SupplementDayItem)
-  case chore(ChoreItem)
-  case task(SeptenaTask)
-  case caffeine(CaffeineEntry)
-  case cannabis(CannabisEntry)
-  case gut(GutEntry)
-  case nutrition(NutritionEntry)
-  case training(ExerciseEntry)
-  case calendar(EKEvent)
-  case mood(MoodEntry)
-}
-
-private struct TodayEvent: Identifiable {
-  let id: String
-  let time: String      // HH:MM — used for sort and display
-  let section: String
-  let color: Color
-  let title: String
-  let detail: String?
-  let kind: TodayEventKind
-
-  var timeLabel: String { time }
-}
+// Event model now lives in Septena/Shell/Dashboard/TodayEvent.swift so
+// that SectionPlugin implementations can construct events directly.

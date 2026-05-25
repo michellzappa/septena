@@ -122,10 +122,12 @@ enum SettingsMirror {
           || entity.color != section.color
           || entity.isEnabled != section.isEnabled
           || entity.showInToday != section.showInToday
+          || entity.hasOnboarded != section.hasOnboarded
         entity.title = section.label
         entity.color = section.color
         entity.isEnabled = section.isEnabled
         entity.showInToday = section.showInToday
+        entity.hasOnboarded = section.hasOnboarded
         entity.updatedAt = .now
         if changed { changedIDs.append(section.key) }
       } else {
@@ -133,7 +135,8 @@ enum SettingsMirror {
                                    title: section.label,
                                    color: section.color,
                                    isEnabled: section.isEnabled,
-                                   showInToday: section.showInToday)
+                                   showInToday: section.showInToday,
+                                   hasOnboarded: section.hasOnboarded)
         context.insert(entity)
         changedIDs.append(section.key)
       }
