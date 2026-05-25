@@ -288,6 +288,21 @@ public extension SectionManifest {
       supportsDashboard: true,
       settingsEditor: .appearance
     ),
+    // Goals — free-text intentions tagged with section keys. No
+    // homepage tile and no Today presence; surfaces inside the
+    // sections each goal is tagged with. Hidden from the future
+    // browse-catalog picker (`onboarding: .hidden`) but still listed
+    // in Manage Sections so the user can disable / re-enable it.
+    .init(
+      key: "goals",
+      defaultLabel: "Goals",
+      shortDescription: "Free-text intentions tagged with section keys",
+      activation: .optional,
+      onboarding: .hidden,
+      supportsTab: false,
+      supportsDashboard: false,
+      settingsEditor: .none
+    ),
     // Sandbox section used to exercise the SectionPlugin + onboarding
     // wiring without touching real user data. Hidden from Today and
     // dashboard; only visible in Settings → Manage Sections. Delete
