@@ -48,6 +48,7 @@
 		241E03A545CC2025FA858C82 /* TaskRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62BF9F7C16DF9595A999267D /* TaskRecord.swift */; };
 		248295C0B1F9318FB1841555 /* AddCaffeinePage.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEF5F3A2F7A70BEADFCF88CA /* AddCaffeinePage.swift */; };
 		257986ED236E9DD52F6B7066 /* TestPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC92C4A0EDB0032A8216157 /* TestPlugin.swift */; };
+		268900096F5401045252C735 /* CaffeinePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 480BE4F0B92D70D332E473FF /* CaffeinePlugin.swift */; };
 		278B79903C86B144C437F5D7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 75A7338B84E54DF44893A020 /* Assets.xcassets */; };
 		27FAA27C1B4C0F8D3EC2A94B /* ChoresDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E31867A580D7D96DFB20391B /* ChoresDestinationView.swift */; };
 		28777ACD729D9C78846219C4 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */; };
@@ -236,6 +237,7 @@
 		B96C96E8E9B28590E7204C0C /* NextItemsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A26475D9A9D19DC0840960D /* NextItemsSection.swift */; };
 		BA110C8B6611A56723B23E66 /* NextSuggestionsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6392DC43E2FE913972F42911 /* NextSuggestionsSection.swift */; };
 		BB19A2F7287FB286F1725A9C /* NextSuggestionsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6392DC43E2FE913972F42911 /* NextSuggestionsSection.swift */; };
+		BB6E0880C11C8581A0EFE7AC /* CaffeinePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 480BE4F0B92D70D332E473FF /* CaffeinePlugin.swift */; };
 		BD6E080D2682C87ACB9190DD /* AddInfoSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C35D898846EB8A48B77811E /* AddInfoSheet.swift */; };
 		BED02B3B08E74E921C1A15EF /* ActivityDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80D7DFAC856BBE635EBBC6E4 /* ActivityDestinationView.swift */; };
 		C0E093740769380C81FD31BA /* SupplementsQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = C62E8037BC8CBCE13C164828 /* SupplementsQuickAddMenu.swift */; };
@@ -447,6 +449,7 @@
 		43B06CF53AF54BE2BFCE87FF /* GoalRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalRecord.swift; sourceTree = "<group>"; };
 		44D44998956C28A061A4DBAE /* AreasProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreasProjectsView.swift; sourceTree = "<group>"; };
 		47CA5EA5A9284AB449966DCC /* NextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextView.swift; sourceTree = "<group>"; };
+		480BE4F0B92D70D332E473FF /* CaffeinePlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CaffeinePlugin.swift; sourceTree = "<group>"; };
 		482D9E9FA333137B98A9DBE1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		4847155874CE3B82AD612728 /* WeekDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekDashboardView.swift; sourceTree = "<group>"; };
 		48D2DD3CC83AA08A30DA2938 /* SearchTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchTabView.swift; sourceTree = "<group>"; };
@@ -995,6 +998,7 @@
 			children = (
 				C6311231B3AABDB9BC4CBB69 /* MoodPlugin.swift */,
 				DEC92C4A0EDB0032A8216157 /* TestPlugin.swift */,
+				480BE4F0B92D70D332E473FF /* CaffeinePlugin.swift */,
 			);
 			name = Plugins;
 			path = Plugins;
@@ -1406,6 +1410,7 @@
 				847CECE9D10903FA540FB129 /* MoodPlugin.swift in Sources */,
 				621E7AE4A735609BC4D52617 /* MoodCommitAnimation.swift in Sources */,
 				257986ED236E9DD52F6B7066 /* TestPlugin.swift in Sources */,
+				BB6E0880C11C8581A0EFE7AC /* CaffeinePlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1597,6 +1602,7 @@
 				005BF9123878A73595F78F13 /* MoodPlugin.swift in Sources */,
 				90485134CFA0D4BA5126024D /* MoodCommitAnimation.swift in Sources */,
 				B1C08A4AB831AA701C7BDC75 /* TestPlugin.swift in Sources */,
+				268900096F5401045252C735 /* CaffeinePlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

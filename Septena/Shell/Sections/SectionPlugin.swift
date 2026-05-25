@@ -32,6 +32,46 @@ protocol SectionPlugin {
   /// skip onboarding — the toggle enables immediately. The plugin
   /// MUST call `complete()` from its view to finish the flow.
   static func onboarding(complete: @escaping () -> Void) -> AnyView?
+
+  /// MCP / agent contract for this section. Declares the read/write
+  /// tools an LLM uses to manipulate this section's data, plus a
+  /// human-readable brief on conventions and examples. Tightly bound
+  /// to the plugin so the tool catalog can never drift out of sync
+  /// with the section's actual behavior — they live in the same file.
+  /// Return `nil` for sections that haven't migrated their skill yet
+  /// (still in `SectionSkill.all`); `SectionSkill.byKey` falls through.
+  static var mcpSkill: SectionSkill? { get }
+}
+
+// MARK: - SectionSkill resolution
+//
+// Sections that have migrated to the plugin model declare their MCP
+// skill inline; sections that haven't migrated still live in the
+// legacy `SectionSkill.all` list. These helpers give consumers one
+// answer regardless of where the skill is declared.
+
+extension SectionSkill {
+  /// Resolve a section's MCP skill, preferring an inline plugin
+  /// declaration over the legacy `SectionSkill.all` list.
+  @MainActor
+  static func resolve(_ key: String) -> SectionSkill? {
+    if let skill = SectionRegistry.plugin(forKey: key)?.mcpSkill {
+      return skill
+    }
+    return byKey[key]
+  }
+
+  /// Every section key that has an MCP skill declared anywhere — plugin
+  /// or legacy. Used by the Skills pane to enumerate everything an
+  /// agent can do via this app.
+  @MainActor
+  static var allKnownKeys: Set<String> {
+    var keys = Set(byKey.keys)
+    for plugin in SectionRegistry.all {
+      if let skill = plugin.mcpSkill { keys.insert(skill.key) }
+    }
+    return keys
+  }
 }
 
 extension SectionPlugin {
@@ -44,6 +84,11 @@ extension SectionPlugin {
   /// every off → on transition — useful for the Sandbox plugin which
   /// exists to exercise the flow, not commit to a real setup state.
   static var alwaysShowOnboarding: Bool { false }
+
+  /// Default: no inline MCP brief — the section either has its entry
+  /// in the legacy `SectionSkill.all` list (sections not yet migrated)
+  /// or no agent contract at all (sandbox / utility sections).
+  static var mcpSkill: SectionSkill? { nil }
 }
 
 /// Bag of pre-loaded data + helpers passed into `todayEvents`. Avoids
@@ -74,6 +119,7 @@ struct TodayContext {
 enum SectionRegistry {
   static let all: [any SectionPlugin.Type] = [
     MoodPlugin.self,
+    CaffeinePlugin.self,
     TestPlugin.self,
   ]
 

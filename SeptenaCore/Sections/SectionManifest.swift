@@ -337,6 +337,13 @@ public struct SectionSkill: Sendable, Hashable, Identifiable {
 
   public var id: String { key }
 
+  public init(key: String, summary: String, tools: [Tool], body: String) {
+    self.key = key
+    self.summary = summary
+    self.tools = tools
+    self.body = body
+  }
+
   public struct Tool: Sendable, Hashable {
     public let name: String
     public let blurb: String
@@ -558,33 +565,8 @@ public extension SectionSkill {
       chore is next due. Surface overdue items first.
       """
     ),
-    .init(
-      key: "caffeine",
-      summary: "Log coffee, matcha, and other caffeine sources.",
-      tools: [
-        .init("caffeine_events_list", "By day or range. Defaults to last 7 days",
-              inputs: "optional: date, from, to, limit"),
-        .init("caffeine_event_log",   "Log an intake",
-              inputs: "required: method (v60|matcha|other) · optional: date (default today), time (HH:MM:SS), beans (CaffeineBean id), grams (dose), note"),
-        .init("caffeine_event_delete", "Remove an event",
-              inputs: "required: id"),
-        .init("caffeine_beans_list",  "Bean / source catalog"),
-        .init("caffeine_bean_create", "Add a new source",
-              inputs: "required: name"),
-        .init("caffeine_bean_delete", "Remove a source",
-              inputs: "required: id"),
-      ],
-      body: """
-      ### Example
-      **"I had a v60 with the Ethiopian beans"**
-      ```
-      caffeine_beans_list()                                        → find bean id
-      caffeine_event_log(method: "v60", beans: <id>, grams: 18)
-      ```
-
-      Matcha doesn't need a bean reference unless tracking source.
-      """
-    ),
+    // caffeine migrated to CaffeinePlugin (Septena target). See
+    // SectionSkill.resolve(_:) — registry lookup wins over this list.
     .init(
       key: "cannabis",
       summary: "Log cannabis intake with strain and effect.",

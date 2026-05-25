@@ -68,7 +68,9 @@ struct TodayLogView: View {
     .onAppear { events = buildEvents() }
     .sheet(item: $editingCaffeine) { entry in
       EditCaffeineEntrySheet(date: date, original: entry) { updated in
-        replaceEvent(id: "caf-\(entry.id)", title: caffeineLabel(updated),
+        // Label rendering lives in CaffeinePlugin alongside the Today
+        // event production — single source of truth for the section.
+        replaceEvent(id: "caf-\(entry.id)", title: CaffeinePlugin.label(for: updated),
                      detail: updated.beans, time: updated.time, kind: .caffeine(updated))
       }
     }
@@ -248,7 +250,6 @@ struct TodayLogView: View {
     let cS = theme.color(for: "supplements")
     let cR = theme.color(for: "chores")
     let cT = theme.color(for: "tasks")
-    let cC = theme.color(for: "caffeine")
     let cZ = theme.color(for: "cannabis")
     let cG = theme.color(for: "gut")
     let cN = theme.color(for: "nutrition")
@@ -291,13 +292,7 @@ struct TodayLogView: View {
       ))
     }
 
-    for e in caffeine {
-      let label = caffeineLabel(e)
-      out.append(TodayEvent(
-        id: "caf-\(e.id)", time: e.time, section: "caffeine",
-        color: cC, title: label, detail: e.beans, kind: .caffeine(e)
-      ))
-    }
+    // caffeine migrated to CaffeinePlugin (see SectionRegistry loop below)
 
     for e in cannabis {
       let label = cannabisLabel(e)
@@ -384,15 +379,8 @@ struct TodayLogView: View {
 
   // MARK: - Label helpers
 
-  private func caffeineLabel(_ e: CaffeineEntry) -> String {
-    switch e.method {
-    case "v60":    return "V60"
-    case "matcha": return "Matcha"
-    case "aeropress": return "Aeropress"
-    case "espresso": return "Espresso"
-    default:       return e.method.capitalized
-    }
-  }
+  // `caffeineLabel` moved to CaffeinePlugin.label(for:) along with the
+  // Today block. Other section labels will follow as they migrate.
 
   private func cannabisLabel(_ e: CannabisEntry) -> String {
     switch e.method {

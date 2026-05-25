@@ -1148,7 +1148,7 @@ struct SectionDetailPane: View {
   @ViewBuilder
   private var skillAndDataSection: some View {
     Section {
-      if SectionSkill.byKey[sectionKey] != nil {
+      if SectionSkill.resolve(sectionKey) != nil {
         NavigationLink {
           SectionSkillView(sectionKey: sectionKey)
         } label: {
@@ -2740,9 +2740,9 @@ struct SkillsSettingsPane: View {
   /// benefits from previewing the skill content.
   private var orderedKeys: [String] {
     let order = store.serverSettings?.sectionOrder ?? []
-    let known = Set(SectionSkill.byKey.keys)
+    let known = SectionSkill.allKnownKeys
     let head  = order.filter { known.contains($0) }
-    let rest  = SectionSkill.all.map(\.key).filter { !head.contains($0) }
+    let rest  = known.subtracting(head).sorted()
     return head + rest
   }
 
@@ -2762,7 +2762,7 @@ struct SkillsSettingsPane: View {
 
       Section {
         ForEach(orderedKeys, id: \.self) { key in
-          if let skill = SectionSkill.byKey[key] {
+          if let skill = SectionSkill.resolve(key) {
             NavigationLink {
               SectionSkillView(sectionKey: key)
             } label: {
@@ -2811,7 +2811,7 @@ struct SectionSkillView: View {
   @Environment(SettingsStore.self) private var store
   let sectionKey: String
 
-  private var skill: SectionSkill? { SectionSkill.byKey[sectionKey] }
+  private var skill: SectionSkill? { SectionSkill.resolve(sectionKey) }
   private var label: String {
     store.sections.first(where: { $0.key == sectionKey })?.label
       ?? SectionManifest.byKey[sectionKey]?.defaultLabel
