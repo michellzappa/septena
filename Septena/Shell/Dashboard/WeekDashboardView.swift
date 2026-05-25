@@ -918,9 +918,9 @@ struct WeekDashboardView: View {
   /// `HomepageDomain` (e.g. `"calendar"`, which is surfaced inline in
   /// the Next tab) are dropped.
   private var visibleDomains: [HomepageDomain] {
-    let serverKeys = settingsStore.sections.map(\.key)
-    guard !serverKeys.isEmpty else { return HomepageDomain.defaultOrder }
-    return serverKeys.compactMap { HomepageDomain(rawValue: $0) }
+    let enabledKeys = settingsStore.sections.filter(\.isEnabled).map(\.key)
+    guard !enabledKeys.isEmpty else { return HomepageDomain.defaultOrder }
+    return enabledKeys.compactMap { HomepageDomain(rawValue: $0) }
   }
 
   @ViewBuilder

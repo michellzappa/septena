@@ -255,6 +255,10 @@ final class SectionEntity {
   @Attribute(.unique) var id: String
   var title: String
   var color: String
+  /// Whether the section is visible on the dashboard and Settings sidebar.
+  /// Disabling never deletes the row or any per-section data; toggling
+  /// back on restores the previous title/color customizations.
+  var isEnabled: Bool = true
   var updatedAt: Date
   /// CKRecord system-fields blob. Same contract as the other mirrored
   /// entities: preserves recordChangeTag across updates.
@@ -263,11 +267,13 @@ final class SectionEntity {
   init(id: String,
        title: String,
        color: String,
+       isEnabled: Bool = true,
        updatedAt: Date = .now,
        cloudKitSystemFields: Data? = nil) {
     self.id = id
     self.title = title
     self.color = color
+    self.isEnabled = isEnabled
     self.updatedAt = updatedAt
     self.cloudKitSystemFields = cloudKitSystemFields
   }
@@ -1123,7 +1129,7 @@ extension Area {
 
 extension SectionConfig {
   init(_ e: SectionEntity) {
-    self.init(key: e.id, label: e.title, color: e.color)
+    self.init(key: e.id, label: e.title, color: e.color, isEnabled: e.isEnabled)
   }
 }
 

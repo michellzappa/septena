@@ -65,6 +65,26 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
 
   public var id: String { key }
 
+  /// Whether the user can turn this section off. `.always` sections are
+  /// locked on; everything else can be disabled from Settings.
+  public var canDisable: Bool { activation != .always }
+
+  /// Default `isEnabled` for a freshly-seeded `SectionEntity`. `.always`
+  /// is always on. `.core`-onboarding sections start on; `.optional`
+  /// and `.hidden` start off. `.integration` sections wait for the
+  /// integration to be authorized before turning on.
+  public var defaultEnabled: Bool {
+    switch activation {
+    case .always: return true
+    case .integration: return false
+    case .optional:
+      switch onboarding {
+      case .core: return true
+      case .optional, .hidden: return false
+      }
+    }
+  }
+
   public enum Activation: String, Sendable, Hashable {
     /// Always installed; the user cannot uninstall.
     case always

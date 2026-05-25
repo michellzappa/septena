@@ -46,10 +46,10 @@ enum SettingsMirror {
   /// set was last synced — without this, a newly-shipped section would
   /// stay invisible on the dashboard until manual install UX exists.
   ///
-  /// `title` / `color` are pulled from the manifest's default so the
-  /// row matches the catalog. The CK engine isn't notified — once
-  /// install UX lands and the section is properly owned by the user,
-  /// the normal save path will push it.
+  /// `title` / `color` / `isEnabled` are pulled from the manifest's
+  /// defaults so the row matches the catalog. The CK engine isn't
+  /// notified — once install UX lands and the section is properly
+  /// owned by the user, the normal save path will push it.
   @discardableResult
   static func seedManifestSectionIfMissing(_ key: String,
                                            context: ModelContext) -> Bool {
@@ -63,13 +63,23 @@ enum SettingsMirror {
     // uses when the server returns no color override.
     let entity = SectionEntity(id: manifest.key,
                                title: manifest.defaultLabel,
-                               color: "")
+                               color: "",
+                               isEnabled: manifest.defaultEnabled)
     context.insert(entity)
     do { try context.save() } catch {
       SeptenaLog.error("SettingsMirror.seedManifestSection", error)
       return false
     }
     return true
+  }
+
+  /// Backfill every section in `SectionManifest.all` that doesn't yet
+  /// have a local `SectionEntity` row. Idempotent — existing rows are
+  /// left alone so user customizations (color, isEnabled) survive.
+  static func seedAllManifestSectionsIfMissing(context: ModelContext) {
+    for manifest in SectionManifest.all {
+      _ = seedManifestSectionIfMissing(manifest.key, context: context)
+    }
   }
 
   static func upsert(settings: AppSettings,
@@ -94,42 +104,64 @@ enum SettingsMirror {
     }
   }
 
+  /// Upsert-only. Section rows are never deleted by this code path —
+  /// disabling a section toggles `isEnabled` instead so all
+  /// customizations (title, color) and the row itself survive. This is
+  /// the absolute guarantee that no UX action can drop a SectionEntity.
   static func replaceSections(_ sections: [SectionConfig],
                               context: ModelContext,
                               engine: CKEngine? = nil) {
     let descriptor = FetchDescriptor<SectionEntity>()
     let existing = (try? context.fetch(descriptor)) ?? []
     let existingByID = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
-    let incomingIDs = Set(sections.map(\.key))
     var changedIDs: [String] = []
 
     for section in sections {
       if let entity = existingByID[section.key] {
-        let changed = entity.title != section.label || entity.color != section.color
+        let changed = entity.title != section.label
+          || entity.color != section.color
+          || entity.isEnabled != section.isEnabled
         entity.title = section.label
         entity.color = section.color
+        entity.isEnabled = section.isEnabled
         entity.updatedAt = .now
         if changed { changedIDs.append(section.key) }
       } else {
-        let entity = SectionEntity(id: section.key, title: section.label, color: section.color)
+        let entity = SectionEntity(id: section.key,
+                                   title: section.label,
+                                   color: section.color,
+                                   isEnabled: section.isEnabled)
         context.insert(entity)
         changedIDs.append(section.key)
       }
     }
 
-    let deletedIDs = existing
-      .filter { !incomingIDs.contains($0.id) }
-      .map(\.id)
-    for entity in existing where !incomingIDs.contains(entity.id) {
-      context.delete(entity)
-    }
-
     do {
       try context.save()
       for id in changedIDs { engine?.noteSectionChange(id: id) }
-      for id in deletedIDs { engine?.noteSectionDeletion(id: id) }
     } catch {
       SeptenaLog.error("SettingsMirror.replace sections", error)
+    }
+  }
+
+  /// Toggle `isEnabled` on a single section. Pushes the change through
+  /// CKEngine so other devices receive it. Never deletes the row.
+  static func setSectionEnabled(_ key: String,
+                                enabled: Bool,
+                                context: ModelContext,
+                                engine: CKEngine? = nil) {
+    let descriptor = FetchDescriptor<SectionEntity>(
+      predicate: #Predicate { $0.id == key }
+    )
+    guard let entity = try? context.fetch(descriptor).first else { return }
+    guard entity.isEnabled != enabled else { return }
+    entity.isEnabled = enabled
+    entity.updatedAt = .now
+    do {
+      try context.save()
+      engine?.noteSectionChange(id: key)
+    } catch {
+      SeptenaLog.error("SettingsMirror.setSectionEnabled", error)
     }
   }
 }

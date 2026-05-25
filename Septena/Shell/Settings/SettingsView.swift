@@ -321,6 +321,7 @@ struct SettingsView: View {
   /// `store.sections` list.
   enum SettingsDestination: Hashable {
     case general, integrations, importExport, skills, privacy, about
+    case manageSections
     case section(String)
   }
 
@@ -411,20 +412,21 @@ struct SettingsView: View {
   #endif
 
   private var staticDestinations: [SettingsDestination] {
-    [.general, .integrations, .importExport, .skills, .privacy, .about]
+    [.general, .integrations, .importExport, .skills, .manageSections, .privacy, .about]
   }
 
   /// Per-section sidebar rows, ordered by the user's saved `sectionOrder`
   /// (from the CloudKit-mirrored `AppSettings`), filtered to sections
   /// present in both the local manifest and the installed `SectionEntity`
-  /// set. Entries that exist on only one side are dropped — visible only
-  /// when both agree the section exists for this user.
+  /// set, and further filtered to those the user has enabled. Disabled
+  /// sections stay reachable via the "Manage Sections" master list.
   private var sectionEntries: [SectionEntry] {
     let installedByKey = Dictionary(uniqueKeysWithValues: store.sections.map { ($0.key, $0) })
     let order = store.serverSettings?.sectionOrder ?? store.sections.map(\.key)
     return order.compactMap { key in
       guard let manifest = SectionManifest.byKey[key],
-            let installed = installedByKey[key] else { return nil }
+            let installed = installedByKey[key],
+            installed.isEnabled else { return nil }
       return SectionEntry(manifest: manifest, server: installed)
     }
   }
@@ -463,6 +465,7 @@ struct SettingsView: View {
     case .skills:       return "Skills"
     case .privacy:      return "Privacy"
     case .about:        return "About"
+    case .manageSections: return "Manage Sections"
     case .section(let key):
       return store.sections.first(where: { $0.key == key })?.label
         ?? SectionManifest.byKey[key]?.defaultLabel
@@ -480,6 +483,7 @@ struct SettingsView: View {
     case .skills:       return "sparkles"
     case .privacy:      return "hand.raised"
     case .about:        return "info.circle"
+    case .manageSections: return "square.grid.2x2"
     case .section:      return ""  // unreachable; sectionRow handles section dests
     }
   }
@@ -492,6 +496,7 @@ struct SettingsView: View {
     case .skills:       return .pink
     case .privacy:      return .teal
     case .about:        return .purple
+    case .manageSections: return .blue
     case .section:      return .gray  // unreachable; see above
     }
   }
@@ -505,6 +510,7 @@ struct SettingsView: View {
     case .skills:            SkillsSettingsPane()
     case .privacy:           PrivacySettingsPane()
     case .about:             AboutSettingsPane()
+    case .manageSections:    ManageSectionsPane()
     case .section(let key):  SectionDetailPane(sectionKey: key)
     }
   }
@@ -925,6 +931,92 @@ private struct PaletteSwatchGrid: View {
   }
 }
 
+// MARK: - Manage Sections pane
+
+/// Master list of every section in `SectionManifest.all` with per-row
+/// enable/disable toggles. `.always` sections render as locked. Toggling
+/// here writes through `SettingsMirror.setSectionEnabled` — never deletes
+/// the SectionEntity row, so customizations (color, label) survive.
+struct ManageSectionsPane: View {
+  @Environment(SettingsStore.self) private var store
+  @Environment(\.modelContext) private var modelContext
+  @Environment(CKEngine.self) private var ckEngine
+
+  private var rows: [SectionManifest] {
+    let order = store.serverSettings?.sectionOrder ?? store.sections.map(\.key)
+    let orderedKeys = order.compactMap { SectionManifest.byKey[$0]?.key }
+    let orderedSet = Set(orderedKeys)
+    let trailing = SectionManifest.all
+      .filter { !orderedSet.contains($0.key) }
+      .map(\.key)
+    return (orderedKeys + trailing).compactMap { SectionManifest.byKey[$0] }
+  }
+
+  private func isEnabled(_ key: String) -> Bool {
+    store.sections.first(where: { $0.key == key })?.isEnabled ?? true
+  }
+
+  var body: some View {
+    Form {
+      Section {
+        ForEach(rows) { manifest in
+          row(for: manifest)
+        }
+      } footer: {
+        Text("Disabled sections stay in the central store. Toggling one off hides it on the dashboard and sidebar, but never deletes any data or your color and label customizations.")
+      }
+    }
+    .formStyle(.grouped)
+  }
+
+  @ViewBuilder
+  private func row(for manifest: SectionManifest) -> some View {
+    let enabled = isEnabled(manifest.key)
+    HStack(spacing: 12) {
+      VStack(alignment: .leading, spacing: 2) {
+        Text(label(for: manifest))
+        if !manifest.shortDescription.isEmpty {
+          Text(manifest.shortDescription)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+      Spacer()
+      if manifest.canDisable {
+        Toggle("", isOn: Binding(
+          get: { enabled },
+          set: { setEnabled(manifest.key, $0) }
+        ))
+        .labelsHidden()
+      } else {
+        Text("Always on")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+    }
+  }
+
+  private func label(for manifest: SectionManifest) -> String {
+    let server = store.sections.first(where: { $0.key == manifest.key })?.label ?? ""
+    return server.isEmpty ? manifest.defaultLabel : server
+  }
+
+  private func setEnabled(_ key: String, _ enabled: Bool) {
+    SettingsMirror.setSectionEnabled(key,
+                                     enabled: enabled,
+                                     context: modelContext,
+                                     engine: ckEngine)
+    store.sections = store.sections.map { config in
+      config.key == key
+        ? SectionConfig(key: config.key,
+                        label: config.label,
+                        color: config.color,
+                        isEnabled: enabled)
+        : config
+    }
+  }
+}
+
 // MARK: - Section detail pane
 
 struct SectionDetailPane: View {
@@ -1054,10 +1146,54 @@ struct SectionDetailPane: View {
         }
         Spacer()
       }
+      enabledRow
     } footer: {
       if let m = manifest, !m.shortDescription.isEmpty {
         Text(m.shortDescription)
       }
+    }
+  }
+
+  /// Show this section on the dashboard / sidebar. Hidden for `.always`
+  /// sections (e.g. Tasks). Disabling never deletes data — the section
+  /// can be re-enabled from here or from "Manage Sections".
+  @ViewBuilder
+  private var enabledRow: some View {
+    if let m = manifest, m.canDisable {
+      Toggle(isOn: Binding(
+        get: { server?.isEnabled ?? true },
+        set: { setEnabled($0) }
+      )) {
+        VStack(alignment: .leading, spacing: 1) {
+          Text("Show on dashboard")
+          Text("Disabling hides this section everywhere; your data and customizations stay.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+    } else if manifest != nil {
+      HStack {
+        Text("Always on")
+        Spacer()
+        Text("Required")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+    }
+  }
+
+  private func setEnabled(_ enabled: Bool) {
+    SettingsMirror.setSectionEnabled(sectionKey,
+                                     enabled: enabled,
+                                     context: modelContext,
+                                     engine: ckEngine)
+    store.sections = store.sections.map { config in
+      config.key == sectionKey
+        ? SectionConfig(key: config.key,
+                        label: config.label,
+                        color: config.color,
+                        isEnabled: enabled)
+        : config
     }
   }
 
@@ -1072,7 +1208,10 @@ struct SectionDetailPane: View {
     ckEngine.noteSectionChange(id: sectionKey)
     store.sections = store.sections.map { config in
       config.key == sectionKey
-        ? SectionConfig(key: config.key, label: config.label, color: hex)
+        ? SectionConfig(key: config.key,
+                        label: config.label,
+                        color: hex,
+                        isEnabled: config.isEnabled)
         : config
     }
   }

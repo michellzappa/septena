@@ -10,11 +10,27 @@ public struct SectionConfig: Codable, Hashable {
   public let key: String
   public let label: String
   public let color: String          // hex (e.g. "#ef4444") or "hsl(...)"
+  /// Whether the section is visible in the dashboard / sidebar. Disabled
+  /// rows still exist in the central store so their color / label
+  /// customizations survive a toggle.
+  public let isEnabled: Bool
 
-  public init(key: String, label: String, color: String) {
+  public init(key: String, label: String, color: String, isEnabled: Bool = true) {
     self.key = key
     self.label = label
     self.color = color
+    self.isEnabled = isEnabled
+  }
+
+  // Custom decode so older ResponseCache blobs (pre-isEnabled) decode
+  // cleanly and default to enabled.
+  private enum CodingKeys: String, CodingKey { case key, label, color, isEnabled }
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    self.key = try c.decode(String.self, forKey: .key)
+    self.label = try c.decode(String.self, forKey: .label)
+    self.color = try c.decode(String.self, forKey: .color)
+    self.isEnabled = (try? c.decode(Bool.self, forKey: .isEnabled)) ?? true
   }
 }
 

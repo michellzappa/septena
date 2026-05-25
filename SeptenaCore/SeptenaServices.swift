@@ -99,17 +99,20 @@ final class SeptenaServices {
       let context = LocalStore.shared.container.mainContext
       let settingsSingletonID = SettingsCloudKitSchema.singletonID
 
-      // Backfill: any SectionManifest entry that shipped in a newer build
-      // but isn't yet in the user's CloudKit-mirrored `SectionEntity` set.
-      // Without this, a freshly-shipped section stays invisible on the
-      // dashboard because `WeekDashboardView.visibleDomains` filters by
-      // `SettingsStore.sections` (which is that SectionEntity mirror).
-      // The proper "install section" UX is tracked under the App-Store-
-      // style flow noted in SectionManifest.
-      for key in ["mood"] {
-        if SettingsMirror.seedManifestSectionIfMissing(key, context: context) {
-          NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+      // Backfill: ensure every SectionManifest entry has a local
+      // SectionEntity row so the central store is the source of truth
+      // for which sections exist and whether they're enabled. Each
+      // missing row is seeded with manifest-derived defaults
+      // (`defaultEnabled`); existing rows (including user toggles) are
+      // left alone.
+      var seededAny = false
+      for manifest in SectionManifest.all {
+        if SettingsMirror.seedManifestSectionIfMissing(manifest.key, context: context) {
+          seededAny = true
         }
+      }
+      if seededAny {
+        NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
       }
       var batchTouchedTasks = false
       var batchTouchedStructure = false
