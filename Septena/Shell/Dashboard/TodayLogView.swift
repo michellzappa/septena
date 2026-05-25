@@ -250,7 +250,6 @@ struct TodayLogView: View {
     let cS = theme.color(for: "supplements")
     let cR = theme.color(for: "chores")
     let cT = theme.color(for: "tasks")
-    let cN = theme.color(for: "nutrition")
     let cCal = theme.color(for: "calendar")
 
     for h in habits where h.done {
@@ -307,18 +306,8 @@ struct TodayLogView: View {
       out.append(contentsOf: plugin.todayEvents(date: date, ctx: todayCtx))
     }
 
-    for e in nutrition where e.date == date {
-      let name = e.foods.first ?? "Meal"
-      let prefix = e.emoji.map { "\($0) " } ?? ""
-      let more = e.foods.count > 1 ? " +\(e.foods.count - 1)" : ""
-      let detail = "\(Int(e.proteinG))g protein · \(Int(e.kcal)) kcal"
-      out.append(TodayEvent(
-        id: "nut-\(e.id)", time: e.time, section: "nutrition",
-        color: cN, title: "\(prefix)\(name)\(more)", detail: detail, kind: .nutrition(e)
-      ))
-    }
-
-    // training migrated to TrainingPlugin (see SectionRegistry loop)
+    // nutrition + training migrated to their plugins (see
+    // SectionRegistry loop).
 
     let cal = Foundation.Calendar.current
     let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"

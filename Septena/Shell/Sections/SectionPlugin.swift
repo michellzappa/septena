@@ -123,6 +123,7 @@ enum SectionRegistry {
     CannabisPlugin.self,
     GutPlugin.self,
     TrainingPlugin.self,
+    NutritionPlugin.self,
     TestPlugin.self,
   ]
 

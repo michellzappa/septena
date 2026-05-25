@@ -626,55 +626,7 @@ public extension SectionSkill {
       - Don't reference categories by name; always resolve to id first.
       """
     ),
-    .init(
-      key: "nutrition",
-      summary: "Meal + macro log with auto-computed daily totals.",
-      tools: [
-        .init("nutrition_entries_list", "By day or range. Defaults to last 7 days",
-              inputs: "optional: date, from, to, limit"),
-        .init("nutrition_entry_log",    "Log a meal. foods is newline-separated; macros default to 0; kcal auto-computed if omitted; source auto-tagged 'mcp'",
-              inputs: """
-                required: foods · \
-                optional: loggedAt (ISO8601), emoji, note, mealType (breakfast|lunch|dinner|snack), \
-                proteinG, fatG, carbsG, \
-                fiberG, sugarG, saturatedFatG, alcoholG, \
-                kcal (override; else 4P+9F+4C+7A), \
-                sodiumMg, cholesterolMg, potassiumMg, waterMl
-                """),
-        .init("nutrition_entry_update", "Patch any subset of fields",
-              inputs: """
-                required: id · \
-                optional: loggedAt (ISO8601), foods, emoji, note, mealType (breakfast|lunch|dinner|snack), \
-                proteinG, fatG, carbsG, \
-                fiberG, sugarG, saturatedFatG, alcoholG, kcal, \
-                sodiumMg, cholesterolMg, potassiumMg, waterMl
-                """),
-        .init("nutrition_entry_delete", "Remove an entry",
-              inputs: "required: id"),
-        .init("nutrition_day_summary",  "Read-only daily rollup (kcal + macros + micros + entryCount + first/last loggedAt)",
-              inputs: "optional: date (default today)"),
-      ],
-      body: """
-      `foods` is a newline-separated list. \
-      **Estimate macros from food names** — the user expects the model to do \
-      the math, not ask back. `kcal` is computed `4P + 9F + 4C + 7A` if not \
-      overridden.
-
-      ### Example
-      **"Log lunch: chicken salad, rice, olive oil"**
-      ```
-      nutrition_entry_log(
-        foods: "chicken salad\\nrice\\nolive oil",
-        mealType: "lunch",
-        proteinG: 40, fatG: 20, carbsG: 50
-      )
-      ```
-
-      ### Don't
-      - Don't bundle multiple meals into one entry — separate `loggedAt` timestamps.
-      - Don't try to write a day summary — the app computes it automatically.
-      """
-    ),
+    // nutrition migrated to NutritionPlugin (Septena target).
   ]
 
   static let byKey: [String: SectionSkill] = Dictionary(
