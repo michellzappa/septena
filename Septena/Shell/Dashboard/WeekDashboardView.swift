@@ -292,18 +292,14 @@ struct WeekDashboardView: View {
   @ViewBuilder
   private func sheetContent(for dest: WeekDestination) -> some View {
     NavigationStack {
-      // Plugin-driven destination first; falls back to the inline
-      // switch for sections that haven't migrated yet (sleep, air,
-      // body, activity) and for special destinations that aren't
-      // manifest sections (calendar, today).
+      // Plugin-driven destination first; the inline fallback now
+      // handles only special destinations that aren't manifest
+      // sections — calendar (EventKit-backed) and today (the cross-
+      // section log).
       if let view = SectionRegistry.plugin(forKey: dest.rawValue)?.destinationView() {
         view
       } else {
         switch dest {
-        case .sleep:       SleepDestinationView()
-        case .air:         AirDestinationView()
-        case .body:        BodyDestinationView()
-        case .activity:    ActivityDestinationView()
         case .calendar:    CalendarDestinationView()
         case .today:
           TodayLogView(
