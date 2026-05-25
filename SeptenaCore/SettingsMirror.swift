@@ -40,6 +40,38 @@ enum SettingsMirror {
       .map(SectionConfig.init)
   }
 
+  /// Insert a SectionEntity for a manifest key if it isn't already in
+  /// the local store. Used at startup to backfill sections that were
+  /// added to `SectionManifest` after the user's CloudKit `SectionEntity`
+  /// set was last synced — without this, a newly-shipped section would
+  /// stay invisible on the dashboard until manual install UX exists.
+  ///
+  /// `title` / `color` are pulled from the manifest's default so the
+  /// row matches the catalog. The CK engine isn't notified — once
+  /// install UX lands and the section is properly owned by the user,
+  /// the normal save path will push it.
+  @discardableResult
+  static func seedManifestSectionIfMissing(_ key: String,
+                                           context: ModelContext) -> Bool {
+    let descriptor = FetchDescriptor<SectionEntity>(
+      predicate: #Predicate { $0.id == key }
+    )
+    if (try? context.fetch(descriptor).first) != nil { return false }
+    guard let manifest = SectionManifest.byKey[key] else { return false }
+    // Empty color string = "no user preference"; SectionTheme falls back
+    // to its built-in palette. Same shape SettingsMirror.replaceSections
+    // uses when the server returns no color override.
+    let entity = SectionEntity(id: manifest.key,
+                               title: manifest.defaultLabel,
+                               color: "")
+    context.insert(entity)
+    do { try context.save() } catch {
+      SeptenaLog.error("SettingsMirror.seedManifestSection", error)
+      return false
+    }
+    return true
+  }
+
   static func upsert(settings: AppSettings,
                      context: ModelContext,
                      engine: CKEngine? = nil) {

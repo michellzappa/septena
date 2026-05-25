@@ -22,10 +22,9 @@ import UIKit
 //                     — identity + (where applicable) catalog data
 //
 // Per-section rows are driven by `SectionManifest.all` filtered against
-// the server's `/api/sections` response (an "enabled" set today; will be
-// a CloudKit-backed per-account set in the future). Each row pushes to
-// `SectionDetailPane(key:)` which composes identity + section-specific
-// content.
+// the user's installed `SectionEntity` set (CloudKit-mirrored via
+// CKEngine). Each row pushes to `SectionDetailPane(key:)` which composes
+// identity + section-specific content.
 
 // MARK: - Default keys
 
@@ -198,9 +197,11 @@ enum TaskSort: String, CaseIterable, Identifiable {
 
 // MARK: - Store
 //
-// One Observable holding the cached /api/settings response. Local prefs
-// continue to live as @AppStorage at use sites — they're already shared
-// through the SettingsKey constants and don't need wrapping.
+// One Observable holding the in-memory view of the user's settings,
+// hydrated from the CloudKit-mirrored `SettingsEntity` + `SectionEntity`
+// records via SettingsMirror. Local prefs continue to live as @AppStorage
+// at use sites — they're already shared through the SettingsKey constants
+// and don't need wrapping.
 
 @MainActor
 @Observable
@@ -413,18 +414,18 @@ struct SettingsView: View {
     [.general, .integrations, .importExport, .skills, .privacy, .about]
   }
 
-  /// Per-section sidebar rows, in server order (`section_order` from
-  /// `/api/settings`), filtered to sections present in both the local
-  /// manifest and the live `store.sections` list. Server-only or
-  /// manifest-only keys are dropped — visible only when both agree the
-  /// section exists for this user.
+  /// Per-section sidebar rows, ordered by the user's saved `sectionOrder`
+  /// (from the CloudKit-mirrored `AppSettings`), filtered to sections
+  /// present in both the local manifest and the installed `SectionEntity`
+  /// set. Entries that exist on only one side are dropped — visible only
+  /// when both agree the section exists for this user.
   private var sectionEntries: [SectionEntry] {
-    let serverByKey = Dictionary(uniqueKeysWithValues: store.sections.map { ($0.key, $0) })
+    let installedByKey = Dictionary(uniqueKeysWithValues: store.sections.map { ($0.key, $0) })
     let order = store.serverSettings?.sectionOrder ?? store.sections.map(\.key)
     return order.compactMap { key in
       guard let manifest = SectionManifest.byKey[key],
-            let server = serverByKey[key] else { return nil }
-      return SectionEntry(manifest: manifest, server: server)
+            let installed = installedByKey[key] else { return nil }
+      return SectionEntry(manifest: manifest, server: installed)
     }
   }
 
@@ -516,15 +517,16 @@ struct SectionEntry: Identifiable, Hashable {
   let server: SectionConfig
   var id: String { manifest.key }
   var key: String { manifest.key }
-  /// Server label wins; manifest default is the fallback when the server
-  /// hasn't returned a label yet (cold launch before refresh).
+  /// Installed `SectionEntity.title` wins; manifest default is the
+  /// fallback when the user hasn't customized the label (or the local
+  /// mirror hasn't hydrated yet).
   var label: String {
     server.label.isEmpty ? manifest.defaultLabel : server.label
   }
-  /// Accent comes from the server (today) / CloudKit account (tomorrow).
-  /// No catalog default — `parseHexColor` already returns neutral gray
-  /// for empty / unparseable strings, which is the right fallback when
-  /// the user hasn't picked a color yet.
+  /// Accent comes from the user's `SectionEntity.color`. No catalog
+  /// default — `parseHexColor` already returns neutral gray for empty
+  /// or unparseable strings, which is the right fallback when the user
+  /// hasn't picked a color yet.
   var accent: Color { parseHexColor(server.color) }
 }
 
@@ -841,12 +843,13 @@ private struct AppIconChoiceCard: View {
 // MARK: - Section detail
 //
 // One pane per section, addressed by stable key. Identity (icon, label,
-// color, description) comes from the local `SectionManifest`; the server
-// label/color override the defaults when present. Per-key content below
-// uses cached catalog data from `SettingsStore` — caffeine beans,
-// cannabis strains, etc. Sections without catalog data show identity
-// only. Tasks is special-cased to host the local task prefs (badge,
-// today, sort) that used to live in a top-level Tasks pane.
+// color, description) comes from the local `SectionManifest`; the user's
+// installed `SectionEntity` (label/color) overrides the defaults when
+// present. Per-key content below uses cached catalog data from
+// `SettingsStore` — caffeine beans, cannabis strains, etc. Sections
+// without catalog data show identity only. Tasks is special-cased to
+// host the local task prefs (badge, today, sort) that used to live in
+// a top-level Tasks pane.
 
 // MARK: - Palette
 

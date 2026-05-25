@@ -1653,4 +1653,67 @@ enum ChecklistMirror {
     }
     return NextItemsResponse(date: date, bucket: bucket ?? "", items: items)
   }
+
+  // MARK: - Mood
+
+  static func loadMoodDay(context: ModelContext, date: String) -> MoodDayResponse {
+    let entities = (try? context.fetch(FetchDescriptor<MoodEventEntity>(
+      predicate: #Predicate { $0.date == date },
+      sortBy: [SortDescriptor(\.time)]
+    ))) ?? []
+    let entries: [MoodEntry] = entities.map { e in
+      MoodEntry(id: e.id, time: e.time, bucket: e.bucket,
+                quadrant: e.quadrant, arousal: e.arousal, valence: e.valence,
+                emotion: e.emotion, note: e.note)
+    }
+    var byBucket: [String: MoodEntry] = [:]
+    // Most-recent-wins per bucket — entries are sorted ascending by time,
+    // so overwriting in order leaves the latest in place.
+    for entry in entries { byBucket[entry.bucket] = entry }
+    return MoodDayResponse(date: date, entries: entries,
+                           logCount: entries.count, byBucket: byBucket)
+  }
+
+  static func loadMoodHistory(context: ModelContext, days: Int) -> MoodHistoryResponse {
+    let today = SeptenaDate.today
+    guard let todayDate = SeptenaDate.parse(today) else {
+      return MoodHistoryResponse(daily: [])
+    }
+    let start = Calendar.current.date(byAdding: .day, value: -(days - 1), to: todayDate) ?? todayDate
+    let startStr = SeptenaDate.format(start) ?? today
+    let entities = (try? context.fetch(FetchDescriptor<MoodEventEntity>(
+      predicate: #Predicate { $0.date >= startStr && $0.date <= today }
+    ))) ?? []
+    let byDate = Dictionary(grouping: entities, by: \.date)
+    // Stable tie-breaker: hap → lap → lan → han. Brighter quadrants win
+    // ties so an even day reads as "mostly fine" rather than darkening.
+    let tieOrder = ["hap": 0, "lap": 1, "lan": 2, "han": 3]
+    func dominantQuadrant(in items: [MoodEventEntity]) -> String? {
+      let counts = Dictionary(items.map { ($0.quadrant, 1) }, uniquingKeysWith: +)
+      return counts.max(by: { a, b in
+        if a.value != b.value { return a.value < b.value }
+        return (tieOrder[a.key] ?? 99) > (tieOrder[b.key] ?? 99)
+      })?.key
+    }
+    var daily: [MoodHistoryPoint] = []
+    for offset in (0..<days).reversed() {
+      guard let d = Calendar.current.date(byAdding: .day, value: -offset, to: todayDate),
+            let key = SeptenaDate.format(d) else { continue }
+      let items = byDate[key] ?? []
+      // Per-bucket dominant quadrant — populated only for buckets the
+      // user actually logged on this day, so the heatmap can leave
+      // empty cells empty instead of inferring a color.
+      var bucketQuadrants: [String: String] = [:]
+      for (bucket, bucketItems) in Dictionary(grouping: items, by: \.bucket) {
+        if let q = dominantQuadrant(in: bucketItems) {
+          bucketQuadrants[bucket] = q
+        }
+      }
+      daily.append(MoodHistoryPoint(date: key,
+                                    logs: items.count,
+                                    dominantQuadrant: dominantQuadrant(in: items),
+                                    bucketQuadrants: bucketQuadrants))
+    }
+    return MoodHistoryResponse(daily: daily)
+  }
 }

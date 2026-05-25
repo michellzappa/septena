@@ -1,6 +1,12 @@
 import SwiftUI
 import PhotosUI
 import Photos
+#if canImport(UIKit)
+import UIKit
+#endif
+#if canImport(AppKit)
+import AppKit
+#endif
 
 // Edit/create sheet for a logged nutrition entry. Standard SwiftUI `Form` in a
 // `NavigationStack` presented via `.sheet(item:)` (edit) or
@@ -272,14 +278,24 @@ struct MealPhotoThumbnail: View {
   let assetID: String?
   let size: CGFloat
 
+  #if canImport(UIKit)
   @State private var image: UIImage? = nil
+  #elseif canImport(AppKit)
+  @State private var image: NSImage? = nil
+  #endif
 
   var body: some View {
     Group {
       if let image {
+        #if canImport(UIKit)
         Image(uiImage: image)
           .resizable()
           .scaledToFill()
+        #elseif canImport(AppKit)
+        Image(nsImage: image)
+          .resizable()
+          .scaledToFill()
+        #endif
       } else {
         ZStack {
           RoundedRectangle(cornerRadius: 8)

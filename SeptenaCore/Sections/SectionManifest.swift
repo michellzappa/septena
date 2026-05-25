@@ -2,18 +2,18 @@ import SwiftUI
 
 // SectionManifest — the local, hard-coded catalog of every Septena
 // section ("mini-app"). One row per section, with the metadata needed
-// to render the Settings sidebar today and to drive a future App-Store-
-// style install/uninstall flow when the backend migrates to CloudKit.
+// to render the Settings sidebar and to drive a future App-Store-style
+// install/uninstall flow.
 //
 // What's here (catalog-level facts about the section itself):
 //   key, defaultLabel, shortDescription, activation, onboarding,
 //   supportsTab, supportsDashboard, settingsEditor
 //
 // What's NOT here:
-//   • color   — a user preference, lives in `/api/sections` today and
-//               will live in CloudKit per-account tomorrow. There is
-//               no catalog "default color"; sections with no preference
-//               render neutral.
+//   • color   — a per-account preference. Lives in the CloudKit-backed
+//               `SectionEntity` (mirrored to SwiftData via CKEngine).
+//               There is no catalog "default color"; sections with no
+//               preference render neutral.
 //   • icon    — Septena has no per-section icon vocabulary yet. When
 //               we design one, it'll be a separate concern (asset
 //               catalog + design system), not a guessed SF Symbol per
@@ -21,21 +21,24 @@ import SwiftUI
 //
 // Resolution order at runtime:
 //   1. `SectionManifest.byKey[key]`        — catalog facts
-//   2. Server `/api/sections` row, if any  — label override + color
-//   3. Manifest defaultLabel               — when server is unreachable
+//   2. `SectionEntity` row, if installed   — user label override + color
+//   3. Manifest defaultLabel               — fallback
 //
-// When CloudKit lands: replace step 2 with the per-account record
-// (enabled set + per-section overrides). The manifest stays as-is.
+// Visibility on the dashboard / Settings sidebar gates on whether the
+// user has a `SectionEntity` for the key. Until proper install UX
+// lands, newly-shipped sections (e.g. `mood`) are backfilled by
+// `SettingsMirror.seedManifestSectionIfMissing` at `SeptenaServices.start`.
 
 public struct SectionManifest: Sendable, Hashable, Identifiable {
   /// Stable key. Matches the webapp's `sections/manifest.json` and the
-  /// existing FastAPI `/api/sections` `key` field, so the same string
-  /// addresses a section across all three layers.
+  /// `SectionEntity.id` value, so the same string addresses a section
+  /// across iOS, web, and CloudKit.
   public let key: String
 
-  /// Default display label. Server label (when present) overrides this
-  /// at render time so users can still rename; the manifest value is the
-  /// pre-CloudKit fallback and the post-CloudKit default.
+  /// Default display label. The user's `SectionEntity.title` (when
+  /// installed) overrides this at render time so renames stick; the
+  /// manifest value is the catalog default and the fallback when no
+  /// SectionEntity exists yet.
   public let defaultLabel: String
 
   /// One-line catalog blurb shown in the future Browse Sections screen
@@ -210,6 +213,16 @@ public extension SectionManifest {
       key: "gut",
       defaultLabel: "Gut",
       shortDescription: "Digestion log",
+      activation: .optional,
+      onboarding: .optional,
+      supportsTab: false,
+      supportsDashboard: true,
+      settingsEditor: .none
+    ),
+    .init(
+      key: "mood",
+      defaultLabel: "Mood",
+      shortDescription: "Three-times-a-day affect check-ins",
       activation: .optional,
       onboarding: .optional,
       supportsTab: false,
@@ -553,6 +566,136 @@ public extension SectionSkill {
       `bristol` is the Bristol Stool Scale (1 = hard pellets, 7 = watery) and \
       is required. Log `discomfortStart`/`discomfortEnd` as `HH:MM` when the \
       user describes cramping or pain.
+      """
+    ),
+    .init(
+      key: "training",
+      summary: "Log exercise sets, manage exercise catalog, define session-type templates.",
+      tools: [
+        .init("training_entries_list",   "List exercise entries by day or range",
+              inputs: "optional: date, from, to, exercise (filter to one canonical name), limit"),
+        .init("training_entry_log",      "Log a set. Strength: weight/sets/reps. Cardio: durationMin/distanceM. Difficulty/note optional",
+              inputs: "required: sessionType (id e.g. 'upper'), exercise (canonical NAME — e.g. 'Chest press') · optional: date (default today), time (HH:MM), weight (kg), sets (int or 'AMRAP'), reps, difficulty, durationMin, distanceM, level, note, concludedAt (ISO8601)"),
+        .init("training_entry_update",   "Patch an entry",
+              inputs: "required: id · optional: date, time, sessionType, exercise, weight, sets, reps, difficulty, durationMin, distanceM, level, note, concludedAt"),
+        .init("training_entry_delete",   "Remove an entry",
+              inputs: "required: id"),
+        .init("training_exercises_list", "Exercise catalog (definitions)",
+              inputs: "optional: type (strength|cardio|mobility|core), archived (default false), limit"),
+        .init("training_exercise_create", "Add an exercise definition. id defaults to slugified name",
+              inputs: "required: name, type (strength|cardio|mobility|core) · optional: id (slug), subgroup (e.g. push/pull), aliases (array), primaryMuscle, secondaryMuscles (array)"),
+        .init("training_exercise_update", "Update an exercise definition",
+              inputs: "required: id · optional: name, type, subgroup, aliases, primaryMuscle, secondaryMuscles, archived"),
+        .init("training_exercise_delete", "Delete from catalog",
+              inputs: "required: id"),
+        .init("training_sessions_list",  "Session-type templates (e.g. 'upper', 'lower', 'cardio')",
+              inputs: "optional: archived (default false), limit"),
+        .init("training_session_create", "Create a session template. id is the canonical key",
+              inputs: "required: id (e.g. 'upper'), label · optional: emoji, exercises (array of canonical names), kind"),
+        .init("training_session_update", "Update a session template",
+              inputs: "required: id · optional: label, emoji, exercises, kind, archived"),
+        .init("training_session_delete", "Remove a session template",
+              inputs: "required: id"),
+      ],
+      body: """
+      ### Model
+      Training has three record types that work together:
+      - **ExerciseDefinition** — the catalog. Each has a stable slug `id` ('chest-press'), `name` ('Chest press'), `type` (strength/cardio/...), optional muscle tags.
+      - **SessionType** — a routine template. id is the key ('upper', 'lower', 'cardio'). Lists which exercises belong to that session.
+      - **ExerciseEntry** — one logged set or block. References `sessionType` by id and `exercise` by canonical NAME (not id).
+
+      ### Logging workflow
+      1. `training_sessions_list()` → find the sessionType id matching what the user did ('upper', 'cardio', etc.)
+      2. `training_exercises_list({type: "strength"})` → find the canonical exercise name
+      3. `training_entry_log({sessionType, exercise, weight, sets, reps})` → log it
+
+      ### Examples
+      **"I just did 3 sets of 8 chest press at 80kg"**
+      ```
+      training_entry_log(
+        sessionType: "upper",
+        exercise: "Chest press",
+        weight: 80,
+        sets: "3",
+        reps: "8"
+      )
+      ```
+
+      **"Ran 5k in 24 minutes"**
+      ```
+      training_entry_log(
+        sessionType: "cardio",
+        exercise: "Run",
+        durationMin: 24,
+        distanceM: 5000
+      )
+      ```
+
+      **"What did I do this week?"**
+      ```
+      training_entries_list({ from: "<monday>", to: "<sunday>" })
+      ```
+
+      ### Don't
+      - Don't pass an exercise id where `exercise` is expected — it's the **canonical name** (e.g. 'Chest press'), not the slug.
+      - Don't pass arbitrary strings for `sessionType` — resolve to an existing SessionType id first.
+      - Don't `training_exercise_delete` something that has historical entries unless the user is sure. Entries keep a denormalised exercise name, but the catalog reference is lost.
+      """
+    ),
+    .init(
+      key: "groceries",
+      summary: "Shopping list and pantry. Mark items low; clear when restocked.",
+      tools: [
+        .init("grocery_items_list",       "Items, with low-stock flag",
+              inputs: "optional: low (filter to running-low), category (id), limit"),
+        .init("grocery_item_create",      "Add an item",
+              inputs: "required: name, category (GroceryCategory id) · optional: emoji"),
+        .init("grocery_item_update",      "Patch an item",
+              inputs: "required: id · optional: name, category, emoji, low (boolean), lastBought (YYYY-MM-DD or null)"),
+        .init("grocery_item_set_low",     "Mark low / restocked. The daily workflow: low=true when running out, low=false when bought (auto-stamps lastBought=today)",
+              inputs: "required: id, low (boolean)"),
+        .init("grocery_item_delete",      "Remove an item",
+              inputs: "required: id"),
+        .init("grocery_categories_list",  "Categories"),
+        .init("grocery_category_create",  "Add a category",
+              inputs: "required: name"),
+        .init("grocery_category_delete",  "Remove a category",
+              inputs: "required: id"),
+      ],
+      body: """
+      ### Two record types
+      - **GroceryItem** — a pantry/shopping-list entry. Has a `low` flag (running out) and `lastBought` date.
+      - **GroceryCategory** — section header for items ('Produce', 'Dairy', etc.).
+
+      ### Most common workflow: marking items low
+      Day-to-day, users say "I'm out of milk" or "we need eggs." Use `grocery_item_set_low(id, low: true)`. When they restock, `grocery_item_set_low(id, low: false)` — it auto-stamps `lastBought=today`.
+
+      ### Examples
+      **"I'm out of milk"**
+      ```
+      grocery_items_list({})                  → find milk's id
+      grocery_item_set_low(id, low: true)
+      ```
+
+      **"What do I need to buy?"**
+      ```
+      grocery_items_list({ low: true })
+      ```
+
+      **"I bought milk"**
+      ```
+      grocery_item_set_low(id, low: false)    → clears low, stamps lastBought=today
+      ```
+
+      **"Add quinoa to my staples"**
+      ```
+      grocery_categories_list()                            → find category id
+      grocery_item_create(name: "Quinoa", category: <id>)
+      ```
+
+      ### Don't
+      - Don't use `grocery_item_update` for the low/restock workflow when `grocery_item_set_low` exists — the convenience tool handles the lastBought stamping.
+      - Don't reference categories by name; always resolve to id first.
       """
     ),
     .init(

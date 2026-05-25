@@ -564,6 +564,56 @@ final class GutEventEntity {
 }
 
 @Model
+final class MoodEventEntity {
+  @Attribute(.unique) var id: String
+  /// `YYYY-MM-DD` of the logged moment, in local time. Indexed for fast
+  /// day-scoped queries — mirrors CaffeineEventEntity.
+  var date: String
+  /// `HH:MM:SS` of the logged moment, in local time.
+  var time: String
+  /// Bucket derived from `time` at write: morning (<12), afternoon (12–17), evening (≥17).
+  /// Stored so dashboard heatmaps can slice without re-parsing every event.
+  var bucket: String
+  /// One of `hap | han | lan | lap` — the Russell circumplex quadrant.
+  var quadrant: String
+  /// Sub-position within the quadrant, 1...3. Higher = more activated.
+  var arousal: Int
+  /// Sub-position within the quadrant, 1...3. Higher = more pleasant.
+  var valence: Int
+  /// The specific emotion label from `MoodCatalog` (e.g. "Upbeat").
+  /// Stored as a string so renaming words later doesn't migrate the DB —
+  /// the (quadrant, arousal, valence) triple is the canonical identity.
+  var emotion: String
+  var note: String?
+  var updatedAt: Date
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       date: String,
+       time: String,
+       bucket: String,
+       quadrant: String,
+       arousal: Int,
+       valence: Int,
+       emotion: String,
+       note: String? = nil,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.date = date
+    self.time = time
+    self.bucket = bucket
+    self.quadrant = quadrant
+    self.arousal = arousal
+    self.valence = valence
+    self.emotion = emotion
+    self.note = note
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
+@Model
 final class CaffeineEventEntity {
   @Attribute(.unique) var id: String
   var date: String
@@ -2348,6 +2398,7 @@ final class LocalStore {
                          ChoreSnapshotEntity.self,
                          GoalEntity.self,
                          GutEventEntity.self,
+                         MoodEventEntity.self,
                          CaffeineEventEntity.self, CaffeineBeanEntity.self,
                          CannabisEventEntity.self, CannabisStrainEntity.self,
                          GroceryItemEntity.self, GroceryCategoryEntity.self,

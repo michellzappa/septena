@@ -4,16 +4,6 @@ import SwiftUI
 // done. Type a new name to create in the current bucket (morning before
 // 12, afternoon 12–17, evening after 17).
 
-private enum DayBucket: String, CaseIterable {
-  case morning, afternoon, evening
-  static var current: DayBucket {
-    let h = Calendar.current.component(.hour, from: .now)
-    if h < 12 { return .morning }
-    if h < 17 { return .afternoon }
-    return .evening
-  }
-}
-
 private func visibleBuckets(_ all: [String]) -> [String] {
   // Index into a canonical [morning, afternoon, evening] order so that an
   // unknown bucket name is treated as "always visible" (defensive against

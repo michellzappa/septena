@@ -1968,3 +1968,65 @@ public struct CorrelationPairPoint: Hashable {
     self.date = date; self.x = x; self.y = y
   }
 }
+
+// MARK: - Mood
+
+/// One logged check-in. Mirrors the Caffeine/Cannabis event shape so the
+/// dashboard heatmap and section views can share the same patterns.
+public struct MoodEntry: Codable, Identifiable, Hashable {
+  public let id: String
+  public let time: String        // HH:MM:SS
+  public var bucket: String      // morning | afternoon | evening
+  public var quadrant: String    // hap | han | lan | lap
+  public var arousal: Int        // 1...3
+  public var valence: Int        // 1...3
+  public var emotion: String     // catalog word, e.g. "Upbeat"
+  public var note: String?
+  public init(id: String, time: String, bucket: String,
+              quadrant: String, arousal: Int, valence: Int,
+              emotion: String, note: String? = nil) {
+    self.id = id; self.time = time; self.bucket = bucket
+    self.quadrant = quadrant; self.arousal = arousal; self.valence = valence
+    self.emotion = emotion; self.note = note
+  }
+}
+
+public struct MoodDayResponse: Codable {
+  public let date: String
+  public let entries: [MoodEntry]
+  public let logCount: Int
+  /// Bucket → most recent entry for that bucket (nil if none yet today).
+  public let byBucket: [String: MoodEntry]
+  public init(date: String, entries: [MoodEntry],
+              logCount: Int, byBucket: [String: MoodEntry]) {
+    self.date = date; self.entries = entries
+    self.logCount = logCount; self.byBucket = byBucket
+  }
+}
+
+public struct MoodHistoryPoint: Codable, Hashable {
+  public let date: String
+  public let logs: Int
+  /// Dominant quadrant for the day (`hap | han | lan | lap`), or nil if
+  /// the day had no logs. "Dominant" = most-logged; ties broken by the
+  /// circumplex order hap, lap, lan, han so colored cells stay stable.
+  public var dominantQuadrant: String?
+  /// Bucket (`morning | afternoon | evening`) → dominant quadrant for
+  /// that bucket on this day. Only contains entries for buckets the
+  /// user actually logged. Drives the 30-day per-bucket heatmap.
+  public var bucketQuadrants: [String: String]
+  public init(date: String,
+              logs: Int,
+              dominantQuadrant: String?,
+              bucketQuadrants: [String: String] = [:]) {
+    self.date = date
+    self.logs = logs
+    self.dominantQuadrant = dominantQuadrant
+    self.bucketQuadrants = bucketQuadrants
+  }
+}
+
+public struct MoodHistoryResponse: Codable {
+  public let daily: [MoodHistoryPoint]
+  public init(daily: [MoodHistoryPoint]) { self.daily = daily }
+}

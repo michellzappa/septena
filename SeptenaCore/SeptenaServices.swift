@@ -35,6 +35,7 @@ final class SeptenaServices {
   let goalMutator: GoalMutator
   let gutMutator: GutMutator
   let caffeineMutator: CaffeineMutator
+  let moodMutator: MoodMutator
   let cannabisMutator: CannabisMutator
   let groceryMutator: GroceryMutator
   let trainingMutator: TrainingMutator
@@ -67,6 +68,7 @@ final class SeptenaServices {
     self.goalMutator = GoalMutator(context: context, ckEngine: nil)
     self.gutMutator = GutMutator(context: context, ckEngine: nil)
     self.caffeineMutator = CaffeineMutator(context: context, ckEngine: nil)
+    self.moodMutator = MoodMutator(context: context)
     self.cannabisMutator = CannabisMutator(context: context, ckEngine: nil)
     self.groceryMutator = GroceryMutator(context: context, ckEngine: nil)
     self.trainingMutator = TrainingMutator(context: context, ckEngine: nil)
@@ -96,6 +98,19 @@ final class SeptenaServices {
     let task = Task { @MainActor [self] in
       let context = LocalStore.shared.container.mainContext
       let settingsSingletonID = SettingsCloudKitSchema.singletonID
+
+      // Backfill: any SectionManifest entry that shipped in a newer build
+      // but isn't yet in the user's CloudKit-mirrored `SectionEntity` set.
+      // Without this, a freshly-shipped section stays invisible on the
+      // dashboard because `WeekDashboardView.visibleDomains` filters by
+      // `SettingsStore.sections` (which is that SectionEntity mirror).
+      // The proper "install section" UX is tracked under the App-Store-
+      // style flow noted in SectionManifest.
+      for key in ["mood"] {
+        if SettingsMirror.seedManifestSectionIfMissing(key, context: context) {
+          NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+        }
+      }
       var batchTouchedTasks = false
       var batchTouchedStructure = false
       var batchTouchedData = false
@@ -2484,6 +2499,98 @@ final class NutritionMutator {
   }
 
   private func saveContext(_ label: String) {
+    do { try context.save() }
+    catch { SeptenaLog.error(label, error) }
+  }
+
+  private func postChanged() {
+    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+  }
+}
+@MainActor
+@Observable
+final class MoodMutator {
+  private let context: ModelContext
+
+  init(context: ModelContext) {
+    self.context = context
+  }
+
+  /// Buckets a wall-clock time string into morning / afternoon / evening
+  /// via the canonical `DayBucket`. Thin wrapper kept for call-site
+  /// readability — the rule lives in `DayBucket.from(time:)`.
+  static func bucket(for time: String) -> String {
+    DayBucket.from(time: time).rawValue
+  }
+
+  @discardableResult
+  func logEntry(date: String,
+                time: String,
+                quadrant: String,
+                arousal: Int,
+                valence: Int,
+                emotion: String,
+                note: String? = nil) -> MoodEventEntity {
+    let id = uniqueEntryID()
+    let entity = MoodEventEntity(id: id,
+                                 date: date,
+                                 time: time,
+                                 bucket: Self.bucket(for: time),
+                                 quadrant: quadrant,
+                                 arousal: arousal,
+                                 valence: valence,
+                                 emotion: emotion,
+                                 note: (note?.isEmpty ?? true) ? nil : note)
+    context.insert(entity)
+    save("CK mood create")
+    postChanged()
+    return entity
+  }
+
+  func updateEntry(id: String,
+                   time: String? = nil,
+                   quadrant: String? = nil,
+                   arousal: Int? = nil,
+                   valence: Int? = nil,
+                   emotion: String? = nil,
+                   note: String?? = nil) {
+    guard let entity = fetch(id: id) else { return }
+    if let time {
+      entity.time = time
+      entity.bucket = Self.bucket(for: time)
+    }
+    if let quadrant { entity.quadrant = quadrant }
+    if let arousal { entity.arousal = arousal }
+    if let valence { entity.valence = valence }
+    if let emotion { entity.emotion = emotion }
+    if let note { entity.note = (note?.isEmpty ?? true) ? nil : note }
+    entity.updatedAt = .now
+    save("CK mood update")
+    postChanged()
+  }
+
+  func deleteEntry(id: String) {
+    guard let entity = fetch(id: id) else { return }
+    context.delete(entity)
+    save("CK mood delete")
+    postChanged()
+  }
+
+  private func fetch(id: String) -> MoodEventEntity? {
+    try? context.fetch(FetchDescriptor<MoodEventEntity>(
+      predicate: #Predicate { $0.id == id }
+    )).first
+  }
+
+  private func uniqueEntryID() -> String {
+    var attempt = String(UUID().uuidString.lowercased().prefix(8))
+    while fetch(id: attempt) != nil {
+      attempt = String(UUID().uuidString.lowercased().prefix(8))
+    }
+    return attempt
+  }
+
+  private func save(_ label: String) {
     do { try context.save() }
     catch { SeptenaLog.error(label, error) }
   }

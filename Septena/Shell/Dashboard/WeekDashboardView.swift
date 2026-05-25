@@ -12,6 +12,7 @@ import EventKit
 enum WeekDestination: String, Hashable, Identifiable {
   case habits, chores, training, supplements, sleep, nutrition
   case air, groceries, calendar, caffeine, cannabis, body, gut
+  case mood
   case activity
   case today
 
@@ -95,9 +96,16 @@ struct WeekDashboardView: View {
   @State private var cannabisToday: CannabisDayResponse? = nil
   @State private var cannabisHistory: [CannabisHistoryPoint] = []
   @State private var cannabisUsesPerCapsule: Int = 3
+  @State private var cannabisLastVape: CannabisEntry? = nil
   @State private var bodyRows: [WithingsRow] = []
   @State private var gutToday: GutDayResponse? = nil
   @State private var gutHistory: [GutHistoryPoint] = []
+  @State private var moodToday: MoodDayResponse? = nil
+  @State private var moodHistory: [MoodHistoryPoint] = []
+  /// True while the dashboard QuickAdd is presenting AddMoodPage as a
+  /// standalone sheet (separate from `sheetDest` because Mood needs both
+  /// the destination route and the standalone check-in flow).
+  @State private var presentingMoodCheckin = false
   @State private var sheetDest: WeekDestination? = nil
   /// Today-scoped collections kept in state so DayTimelineView can read
   /// them. NextItemsModel already covers habits/supplements/chores and
@@ -141,6 +149,8 @@ struct WeekDashboardView: View {
     if let v = ResponseCache.load([WithingsRow].self, forKey: CacheKey.bodyRows) { _bodyRows = State(initialValue: v) }
     if let v = ResponseCache.load(GutDayResponse.self, forKey: CacheKey.gutToday) { _gutToday = State(initialValue: v) }
     if let v = ResponseCache.load([GutHistoryPoint].self, forKey: CacheKey.gutHistory) { _gutHistory = State(initialValue: v) }
+    if let v = ResponseCache.load(MoodDayResponse.self, forKey: CacheKey.moodToday) { _moodToday = State(initialValue: v) }
+    if let v = ResponseCache.load([MoodHistoryPoint].self, forKey: CacheKey.moodHistory) { _moodHistory = State(initialValue: v) }
     if let v = ResponseCache.load([ExerciseEntry].self, forKey: CacheKey.recentTraining) { _recentTraining = State(initialValue: v) }
     if let v = ResponseCache.load(MacroColors.self, forKey: CacheKey.macroColors) { _macroColors = State(initialValue: v) }
   }
@@ -296,6 +306,7 @@ struct WeekDashboardView: View {
       case .cannabis:    CannabisDestinationView()
       case .body:        BodyDestinationView()
       case .gut:         GutDestinationView()
+      case .mood:        MoodDestinationView()
       case .activity:    ActivityDestinationView()
       case .today:
         TodayLogView(
@@ -349,6 +360,8 @@ struct WeekDashboardView: View {
     static let bodyRows           = "week.bodyRows"
     static let gutToday           = "week.gutToday"
     static let gutHistory         = "week.gutHistory"
+    static let moodToday          = "week.moodToday"
+    static let moodHistory        = "week.moodHistory"
     static let recentTraining     = "week.recentTraining"
     static let macroColors        = "week.macroColors"
   }
@@ -384,6 +397,8 @@ struct WeekDashboardView: View {
     if let v = ResponseCache.load([WithingsRow].self, forKey: CacheKey.bodyRows) { bodyRows = v }
     if let v = ResponseCache.load(GutDayResponse.self, forKey: CacheKey.gutToday) { gutToday = v }
     if let v = ResponseCache.load([GutHistoryPoint].self, forKey: CacheKey.gutHistory) { gutHistory = v }
+    if let v = ResponseCache.load(MoodDayResponse.self, forKey: CacheKey.moodToday) { moodToday = v }
+    if let v = ResponseCache.load([MoodHistoryPoint].self, forKey: CacheKey.moodHistory) { moodHistory = v }
     if let v = ResponseCache.load([ExerciseEntry].self, forKey: CacheKey.recentTraining) { recentTraining = v }
     if let v = ResponseCache.load(MacroColors.self, forKey: CacheKey.macroColors) { macroColors = v }
   }
@@ -534,6 +549,19 @@ struct WeekDashboardView: View {
       }
       // Cannabis: usesPerCapsule is a constant on CK (3 uses × 0.05g).
       cannabisUsesPerCapsule = 3
+      // Last vape across all days — drives the "Continue · Hit N / Strain"
+      // row even when there's been no vape today. Mirrors the webapp's
+      // 30-day lookback (we just take the latest, no day cap needed since
+      // SwiftData is local).
+      let lastVapeDescriptor = FetchDescriptor<CannabisEventEntity>(
+        predicate: #Predicate { $0.method == "vape" },
+        sortBy: [SortDescriptor(\.date, order: .reverse), SortDescriptor(\.time, order: .reverse)]
+      )
+      if let last = (try? modelContext.fetch(lastVapeDescriptor))?.first {
+        cannabisLastVape = CannabisEntry(id: last.id, time: last.time, method: last.method,
+                                         strain: last.strain, hit: last.hit, grams: last.grams,
+                                         note: last.note, effect: last.effect)
+      }
       // Nutrition: 30-day meal history feeds the menu's "Recommended"
       // scoring and the NutritionSearchSheet's full searchable list.
       let since = SeptenaDate.format(
@@ -567,6 +595,12 @@ struct WeekDashboardView: View {
     async let wRows = try? await WithingsProvider.shared.fetchHistory(days: 90)
     let gT: GutDayResponse? = ChecklistMirror.loadGutDay(context: modelContext, date: SeptenaDate.today)
     let gH: GutHistoryResponse? = ChecklistMirror.loadGutHistory(context: modelContext, days: 90)
+    let mT: MoodDayResponse = ChecklistMirror.loadMoodDay(context: modelContext, date: SeptenaDate.today)
+    let mH: MoodHistoryResponse = ChecklistMirror.loadMoodHistory(context: modelContext, days: 90)
+    moodToday = mT
+    ResponseCache.save(mT, forKey: CacheKey.moodToday)
+    moodHistory = mH.daily
+    ResponseCache.save(mH.daily, forKey: CacheKey.moodHistory)
     let wR = await wRows
     if let wR {
       let sorted = wR.sorted { $0.date > $1.date }
@@ -856,6 +890,7 @@ struct WeekDashboardView: View {
     case .caffeine:    caffeineQuickAddMenu
     case .cannabis:    cannabisQuickAddMenu
     case .gut:         gutQuickAddMenu
+    case .mood:        moodQuickAddMenu
     case .sleep, .air, .body, .activity:
       EmptyView()
     }
@@ -904,6 +939,7 @@ struct WeekDashboardView: View {
     case .cannabis:    cannabisTile
     case .body:        bodyTile
     case .gut:         gutTile
+    case .mood:        moodTile
     case .activity:    activityTile
     }
   }
@@ -934,6 +970,7 @@ struct WeekDashboardView: View {
     case .cannabis:    return cannabisDomainData()
     case .body:        return bodyDomainData()
     case .gut:         return gutDomainData()
+    case .mood:        return moodDomainData()
     case .activity:    return activityDomainData()
     }
   }
@@ -1795,14 +1832,12 @@ struct WeekDashboardView: View {
     .contextMenu { cannabisQuickAddMenu }
   }
 
-  /// Last vape entry from today's cached entries — `nil` when there's no
-  /// vape today, in which case the menu defaults to "Continue · Hit 1".
-  /// We deliberately don't widen to a multi-day lookback: that would require
-  /// an extra fetch on every dashboard load to populate one menu row, and
-  /// the cost/value isn't worth it. Power users who want yesterday's strain
-  /// can hit "More…".
+  /// Last vape entry across all days — mirrors the webapp's 30-day lookback
+  /// so yesterday's strain/capsule is visible on the menu when there's been
+  /// no vape today. Populated by `loadAll()` via a SwiftData fetch and
+  /// refreshed after each commit so the "Continue · Hit N" counter advances.
   private var lastCannabisVape: CannabisEntry? {
-    cannabisToday?.entries.reversed().first { $0.method == "vape" }
+    cannabisToday?.entries.reversed().first { $0.method == "vape" } ?? cannabisLastVape
   }
 
   /// Edit-last opens the destination view (rather
@@ -2121,6 +2156,80 @@ struct WeekDashboardView: View {
     )
     AddInfoSection.nutrition.notifyTilesChanged()
     Haptics.tick()
+  }
+
+  // MARK: - Mood
+
+  // Mood — today's check-in count + last-7-day log bars. Bars are the
+  // raw log count per day; color stays neutral on the bar itself (the
+  // detail color story lives inside MoodDestinationView).
+  private var moodTile: some View {
+    let accent = theme.color(for: "mood")
+    let today = moodToday?.logCount ?? 0
+    let bars = Array(moodHistory.map { $0.logs }.suffix(7))
+    return ModuleTile(
+      title: "Mood",
+      accent: accent,
+      stats: [
+        .init(label: "Today",  value: "\(today)"),
+        .init(label: "Target", value: "3"),
+      ],
+      progress: .init(label: "Today / target",
+                      current: Double(min(today, 3)),
+                      target: 3),
+      history: .init(label: "7-day check-ins",
+                     values: bars.isEmpty
+                       ? Array(repeating: 0, count: 7) : bars)
+    )
+    .contentShape(Rectangle())
+    .onTapGesture { sheetDest = .mood }
+    .contextMenu { moodQuickAddMenu }
+    .sheet(isPresented: $presentingMoodCheckin) {
+      AddMoodPage(onLogged: {
+        Task { await refreshMood() }
+      })
+      #if os(iOS)
+      .presentationDetents([.medium, .large])
+      .presentationDragIndicator(.visible)
+      #endif
+    }
+  }
+
+  @ViewBuilder private var moodQuickAddMenu: some View {
+    MoodQuickAddMenu(onCheckIn: { presentingMoodCheckin = true })
+  }
+
+  private func moodDomainData() -> HomepageDomainData {
+    let today = moodToday?.logCount ?? 0
+    let bars = moodHistory.map { $0.logs }
+    return HomepageDomainData(
+      domain: .mood,
+      title: "Mood",
+      accent: theme.color(for: "mood"),
+      headline: "\(today) of 3 today",
+      headlineStats: [
+        .init(label: "Today",  value: "\(today)"),
+        .init(label: "Target", value: "3"),
+      ],
+      progress: .init(label: "Today / target",
+                      current: Double(min(today, 3)),
+                      target: 3),
+      history: .bars(bars.isEmpty ? Array(repeating: 0, count: 90) : bars),
+      tap: .openSheet(.mood)
+    )
+  }
+
+  /// Reload mood state after an in-app commit (the AddMoodPage sheet on
+  /// the dashboard tile). Mirrors the `refresh(section:)` pattern that
+  /// other domains use via tilesDidChange notifications — Mood doesn't
+  /// route through AddInfoSection so it refreshes itself.
+  private func refreshMood() async {
+    let d = ChecklistMirror.loadMoodDay(context: modelContext, date: SeptenaDate.today)
+    moodToday = d
+    ResponseCache.save(d, forKey: CacheKey.moodToday)
+    let h = ChecklistMirror.loadMoodHistory(context: modelContext, days: 90).daily
+    moodHistory = h
+    ResponseCache.save(h, forKey: CacheKey.moodHistory)
   }
 }
 

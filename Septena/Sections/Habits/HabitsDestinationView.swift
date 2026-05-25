@@ -139,12 +139,8 @@ struct HabitsDestinationView: View {
           .listRowInsets(EdgeInsets())
         }
       } header: {
-        HStack {
-          Text(bucket.capitalized)
-          Spacer()
-          Text("\(doneCount)/\(items.count)")
-            .monospacedDigit()
-        }
+        DayBucketHeader(bucket: bucket,
+                        trailing: "\(doneCount)/\(items.count)")
       }
     }
   }
