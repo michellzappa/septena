@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 @MainActor
 enum ChoresPlugin: SectionPlugin {
@@ -21,6 +22,10 @@ enum ChoresPlugin: SectionPlugin {
           kind: .chore(chore)
         )
       }
+  }
+
+  static func onboarding(complete: @escaping () -> Void) -> AnyView? {
+    AnyView(ChoresOnboardingView(complete: complete))
   }
 
   static var mcpSkill: SectionSkill? {
@@ -47,5 +52,151 @@ enum ChoresPlugin: SectionPlugin {
       chore is next due. Surface overdue items first.
       """
     )
+  }
+}
+
+/// Starter chores include a recommended cadence (in days). User can edit
+/// after import. Additive only — existing chore titles are skipped.
+private struct ChoreStarter: Identifiable, Hashable {
+  let id: String
+  let name: String
+  let emoji: String
+  let cadenceDays: Int
+
+  static let all: [ChoreStarter] = [
+    .init(id: "starter-dishes",       name: "Dishes",          emoji: "🍽️", cadenceDays: 1),
+    .init(id: "starter-trash",        name: "Take out trash",  emoji: "🗑️", cadenceDays: 3),
+    .init(id: "starter-laundry",      name: "Laundry",         emoji: "🧺", cadenceDays: 7),
+    .init(id: "starter-vacuum",       name: "Vacuum",          emoji: "🧹", cadenceDays: 7),
+    .init(id: "starter-bathroom",     name: "Clean bathroom",  emoji: "🛁", cadenceDays: 7),
+    .init(id: "starter-sheets",       name: "Change sheets",   emoji: "🛏️", cadenceDays: 14),
+    .init(id: "starter-fridge",       name: "Clean fridge",    emoji: "🧊", cadenceDays: 30),
+    .init(id: "starter-windows",      name: "Wash windows",    emoji: "🪟", cadenceDays: 90),
+  ]
+
+  var cadenceLabel: String {
+    switch cadenceDays {
+    case 1:           return "daily"
+    case 2...6:       return "every \(cadenceDays) days"
+    case 7:           return "weekly"
+    case 8...13:      return "every \(cadenceDays) days"
+    case 14:          return "every 2 weeks"
+    case 15...29:     return "every \(cadenceDays) days"
+    case 30:          return "monthly"
+    case 31...89:     return "every \(cadenceDays) days"
+    case 90:          return "quarterly"
+    default:          return "every \(cadenceDays) days"
+    }
+  }
+}
+
+private struct ChoresOnboardingView: View {
+  let complete: () -> Void
+  @Environment(ChecklistMutator.self) private var mutator
+  @Environment(SectionTheme.self) private var theme
+  @Environment(\.modelContext) private var modelContext
+  @State private var selected: Set<String> = []
+  @State private var existingTitles: Set<String> = []
+
+  private var accent: Color { theme.color(for: "chores") }
+
+  private func alreadyExists(_ s: ChoreStarter) -> Bool {
+    existingTitles.contains(s.name.lowercased())
+  }
+
+  private func loadExisting() {
+    let rows = (try? modelContext.fetch(FetchDescriptor<ChoreDefinitionEntity>())) ?? []
+    existingTitles = Set(rows.map { $0.title.lowercased() })
+  }
+
+  var body: some View {
+    NavigationStack {
+      Form {
+        Section {
+          VStack(alignment: .leading, spacing: 8) {
+            Text("Chores tracks recurring household tasks with computed due dates. Pick the ones that apply — the cadence is just a starting point you can adjust later.")
+              .foregroundStyle(.secondary)
+          }
+          .padding(.vertical, 4)
+        }
+        Section {
+          ForEach(ChoreStarter.all) { starter in
+            starterRow(starter)
+          }
+        }
+      }
+      .formStyle(.grouped)
+      .navigationTitle("Set up Chores")
+      #if os(iOS)
+      .navigationBarTitleDisplayMode(.inline)
+      #endif
+      .safeAreaInset(edge: .bottom) {
+        bottomBar
+      }
+      .onAppear { loadExisting() }
+    }
+  }
+
+  @ViewBuilder
+  private func starterRow(_ s: ChoreStarter) -> some View {
+    let exists = alreadyExists(s)
+    let isSelected = selected.contains(s.id)
+    Button {
+      guard !exists else { return }
+      if isSelected { selected.remove(s.id) } else { selected.insert(s.id) }
+    } label: {
+      HStack(spacing: 12) {
+        Text(s.emoji).font(.title3)
+          .opacity(exists ? 0.4 : 1)
+        VStack(alignment: .leading, spacing: 1) {
+          Text(s.name)
+            .foregroundStyle(exists ? .secondary : .primary)
+            .strikethrough(exists, color: .secondary)
+          Text(s.cadenceLabel)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        Spacer()
+        if exists {
+          Text("Already added")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        } else {
+          Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+            .foregroundStyle(isSelected ? accent : Color.secondary.opacity(0.6))
+            .font(.title3)
+        }
+      }
+    }
+    .buttonStyle(.plain)
+    .disabled(exists)
+  }
+
+  @ViewBuilder
+  private var bottomBar: some View {
+    HStack(spacing: 12) {
+      Button("Skip") { complete() }
+        .buttonStyle(.bordered)
+      Spacer()
+      Button(actionTitle) { addAndFinish() }
+        .buttonStyle(.borderedProminent)
+        .tint(accent)
+    }
+    .padding()
+    .background(.bar)
+  }
+
+  private var actionTitle: String {
+    selected.isEmpty ? "Done" : "Add \(selected.count) chore\(selected.count == 1 ? "" : "s")"
+  }
+
+  private func addAndFinish() {
+    let toAdd = ChoreStarter.all.filter {
+      selected.contains($0.id) && !alreadyExists($0)
+    }
+    for s in toAdd {
+      mutator.createChore(name: s.name, cadenceDays: s.cadenceDays, emoji: s.emoji)
+    }
+    complete()
   }
 }
