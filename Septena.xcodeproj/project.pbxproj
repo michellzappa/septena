@@ -52,6 +52,7 @@
 		268900096F5401045252C735 /* CaffeinePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 480BE4F0B92D70D332E473FF /* CaffeinePlugin.swift */; };
 		278B79903C86B144C437F5D7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 75A7338B84E54DF44893A020 /* Assets.xcassets */; };
 		27FAA27C1B4C0F8D3EC2A94B /* ChoresDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E31867A580D7D96DFB20391B /* ChoresDestinationView.swift */; };
+		2804B8EB5F36E3469B9CC898 /* GroceriesPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8717AC713A8CB083B56E69C /* GroceriesPlugin.swift */; };
 		28777ACD729D9C78846219C4 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */; };
 		2877A01512C66155EF4EEA54 /* NextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47CA5EA5A9284AB449966DCC /* NextView.swift */; };
 		288822C1F37C59515A97A967 /* SeptenaServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D227602C1039FA2206A539A /* SeptenaServices.swift */; };
@@ -241,6 +242,7 @@
 		B45A3DCE0AC3B32856BA727C /* SettingsMirror.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5439F75303F906465F9F2C6 /* SettingsMirror.swift */; };
 		B4FF26A77957BACDB89050C5 /* WeekDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4847155874CE3B82AD612728 /* WeekDashboardView.swift */; };
 		B52F421956F45A0367348241 /* PlatformDelegates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1654FD32744DA1974DA1C1CE /* PlatformDelegates.swift */; };
+		B531EF9C7FB18B241FFC6B21 /* GoalsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC8C2483181BE09B32245F3 /* GoalsPlugin.swift */; };
 		B5C4876EC67FCD081FB3E0C5 /* WatchConnectivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A09644381782A9A298BDC709 /* WatchConnectivity.swift */; };
 		B60A9AE489FD7502DC0B83B8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0365044C6EA062BBFCCA6B /* SettingsView.swift */; };
 		B717FF226A4C4E3CA00A8928 /* EditCaffeineEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFF7884F079CD77F2AA126F9 /* EditCaffeineEntrySheet.swift */; };
@@ -301,6 +303,7 @@
 		DC86ECB869790C73F0A68948 /* TaskCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = A08DA8E8E77422BB9583A61C /* TaskCommands.swift */; };
 		DD200EF411309E29B543963F /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5ECFDA9128B73993023CB6 /* Models.swift */; };
 		DD4C37A28620313CC2C805BE /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F13269D0CDB1EB49B2351D6 /* TaskDetailView.swift */; };
+		DE037C84144DB8873C4BB2B0 /* GoalsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC8C2483181BE09B32245F3 /* GoalsPlugin.swift */; };
 		DF016EF192B7891D2DBE3CB6 /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E25F81FE5AA4B6BBC056275 /* DateParser.swift */; };
 		E180CC3F5D34C7CD682290A9 /* CannabisDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8426035C14708F9B19546DE /* CannabisDestinationView.swift */; };
 		E18A84E4ED0B805920276DF6 /* EditExerciseEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5B59047A762635E5A4D89D0 /* EditExerciseEntrySheet.swift */; };
@@ -318,6 +321,7 @@
 		E9970D5068FD243A6FF27686 /* GoalsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40D9EAAB80FD7F9FAC57F20B /* GoalsView.swift */; };
 		E9D604A78C243E8ED46607A4 /* TaskReads.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CBF0DAD74F9392D507229CE /* TaskReads.swift */; };
 		EA56ADCFD84CE200C7CEF2A9 /* ConsistencyHeatmap.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0E984505A489247AADAB293 /* ConsistencyHeatmap.swift */; };
+		EBACFE355538C3B842F1DC74 /* GroceriesPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8717AC713A8CB083B56E69C /* GroceriesPlugin.swift */; };
 		EBC7FFA58086E91AA71EB01D /* NutritionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACE439E37CB04BBBC0C979CC /* NutritionPlugin.swift */; };
 		EC7046247C9EE5E65D11B2E0 /* TasksPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0E36B524CE0AB7DCE4252B /* TasksPlugin.swift */; };
 		EC80F6B72765AEF523B5A4E2 /* CKEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3A43D786998D198C9BCA480 /* CKEngine.swift */; };
@@ -536,6 +540,7 @@
 		A2A4FE569EF0885271CCDBD9 /* AddMoodPage.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AddMoodPage.swift; sourceTree = "<group>"; };
 		A4C5E5E15422EB17DB5D3960 /* EditGroceryItemSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditGroceryItemSheet.swift; sourceTree = "<group>"; };
 		A8426035C14708F9B19546DE /* CannabisDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CannabisDestinationView.swift; sourceTree = "<group>"; };
+		A8717AC713A8CB083B56E69C /* GroceriesPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GroceriesPlugin.swift; sourceTree = "<group>"; };
 		ACE439E37CB04BBBC0C979CC /* NutritionPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NutritionPlugin.swift; sourceTree = "<group>"; };
 		ACEBFC5E297AA01C582EE1A5 /* CaffeineDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaffeineDestinationView.swift; sourceTree = "<group>"; };
 		AD295FAB7B881CAC43EE8C34 /* Outbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Outbox.swift; sourceTree = "<group>"; };
@@ -566,6 +571,7 @@
 		C9D6916E979E5B0D7497CAEF /* ResponseCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResponseCache.swift; sourceTree = "<group>"; };
 		CAB04CA79A9C3207CCE972F9 /* QuickFindView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickFindView.swift; sourceTree = "<group>"; };
 		CCA388A73616C38F7456E6BE /* AranetBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AranetBridge.swift; sourceTree = "<group>"; };
+		CDC8C2483181BE09B32245F3 /* GoalsPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GoalsPlugin.swift; sourceTree = "<group>"; };
 		CE7DF7DE41AF304A9324BC6E /* IntensityGlyph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntensityGlyph.swift; sourceTree = "<group>"; };
 		CEA8B3755DDC65DD48AF4C3E /* NutritionQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionQuickAddMenu.swift; sourceTree = "<group>"; };
 		D0EBCAFF8036A11B0BBEC06E /* AddTaskPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTaskPage.swift; sourceTree = "<group>"; };
@@ -1031,6 +1037,8 @@
 				133C3DFB6771D681737DAB58 /* SupplementsPlugin.swift */,
 				574B2E277922DA5E20E37466 /* ChoresPlugin.swift */,
 				BB0E36B524CE0AB7DCE4252B /* TasksPlugin.swift */,
+				CDC8C2483181BE09B32245F3 /* GoalsPlugin.swift */,
+				A8717AC713A8CB083B56E69C /* GroceriesPlugin.swift */,
 			);
 			name = Plugins;
 			path = Plugins;
@@ -1451,6 +1459,8 @@
 				6FB1988A2BCFEDD715358E83 /* SupplementsPlugin.swift in Sources */,
 				1E83F8AD25AA4E38C44CDA45 /* ChoresPlugin.swift in Sources */,
 				7B0EB1B5087C2B93BB9892AF /* TasksPlugin.swift in Sources */,
+				B531EF9C7FB18B241FFC6B21 /* GoalsPlugin.swift in Sources */,
+				2804B8EB5F36E3469B9CC898 /* GroceriesPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1651,6 +1661,8 @@
 				F08229D90EDAE2BF53D1706B /* SupplementsPlugin.swift in Sources */,
 				3F5383B2831F9B4E8FE49083 /* ChoresPlugin.swift in Sources */,
 				EC7046247C9EE5E65D11B2E0 /* TasksPlugin.swift in Sources */,
+				DE037C84144DB8873C4BB2B0 /* GoalsPlugin.swift in Sources */,
+				EBACFE355538C3B842F1DC74 /* GroceriesPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

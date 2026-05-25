@@ -385,92 +385,12 @@ public extension SectionSkill {
 
   /// All section skills. Order here is the canonical display order on the
   /// Skills page. Sections without MCP tools yet are omitted.
-  static let all: [SectionSkill] = [
-    // tasks migrated to TasksPlugin (Septena target).
-    .init(
-      key: "goals",
-      summary: "Free-text intentions tagged with section keys. Always available.",
-      tools: [
-        .init("goals_list",   "All goals"),
-        .init("goals_create", "New goal, optionally tagged with section keys",
-              inputs: "required: text · optional: sections (array of section keys)"),
-        .init("goals_update", "Update text and/or tags. `sections` REPLACES existing tags",
-              inputs: "required: id · optional: text, sections (replaces)"),
-        .init("goals_delete", "Remove",
-              inputs: "required: id"),
-      ],
-      body: """
-      Goals are short text intentions (e.g. "swim twice a week") tagged \
-      with section keys so they surface in the right section view. \
-      `goals_update.sections` replaces — fetch first if you want to add.
-      """
-    ),
-    // habits migrated to HabitsPlugin (Septena target).
-    // supplements migrated to SupplementsPlugin (Septena target).
-    // chores migrated to ChoresPlugin (Septena target).
-    // caffeine migrated to CaffeinePlugin (Septena target). See
-    // SectionSkill.resolve(_:) — registry lookup wins over this list.
-    // cannabis migrated to CannabisPlugin (Septena target).
-    // gut migrated to GutPlugin (Septena target).
-    // training migrated to TrainingPlugin (Septena target).
-    .init(
-      key: "groceries",
-      summary: "Shopping list and pantry. Mark items low; clear when restocked.",
-      tools: [
-        .init("grocery_items_list",       "Items, with low-stock flag",
-              inputs: "optional: low (filter to running-low), category (id), limit"),
-        .init("grocery_item_create",      "Add an item",
-              inputs: "required: name, category (GroceryCategory id) · optional: emoji"),
-        .init("grocery_item_update",      "Patch an item",
-              inputs: "required: id · optional: name, category, emoji, low (boolean), lastBought (YYYY-MM-DD or null)"),
-        .init("grocery_item_set_low",     "Mark low / restocked. The daily workflow: low=true when running out, low=false when bought (auto-stamps lastBought=today)",
-              inputs: "required: id, low (boolean)"),
-        .init("grocery_item_delete",      "Remove an item",
-              inputs: "required: id"),
-        .init("grocery_categories_list",  "Categories"),
-        .init("grocery_category_create",  "Add a category",
-              inputs: "required: name"),
-        .init("grocery_category_delete",  "Remove a category",
-              inputs: "required: id"),
-      ],
-      body: """
-      ### Two record types
-      - **GroceryItem** — a pantry/shopping-list entry. Has a `low` flag (running out) and `lastBought` date.
-      - **GroceryCategory** — section header for items ('Produce', 'Dairy', etc.).
-
-      ### Most common workflow: marking items low
-      Day-to-day, users say "I'm out of milk" or "we need eggs." Use `grocery_item_set_low(id, low: true)`. When they restock, `grocery_item_set_low(id, low: false)` — it auto-stamps `lastBought=today`.
-
-      ### Examples
-      **"I'm out of milk"**
-      ```
-      grocery_items_list({})                  → find milk's id
-      grocery_item_set_low(id, low: true)
-      ```
-
-      **"What do I need to buy?"**
-      ```
-      grocery_items_list({ low: true })
-      ```
-
-      **"I bought milk"**
-      ```
-      grocery_item_set_low(id, low: false)    → clears low, stamps lastBought=today
-      ```
-
-      **"Add quinoa to my staples"**
-      ```
-      grocery_categories_list()                            → find category id
-      grocery_item_create(name: "Quinoa", category: <id>)
-      ```
-
-      ### Don't
-      - Don't use `grocery_item_update` for the low/restock workflow when `grocery_item_set_low` exists — the convenience tool handles the lastBought stamping.
-      - Don't reference categories by name; always resolve to id first.
-      """
-    ),
-    // nutrition migrated to NutritionPlugin (Septena target).
-  ]
+  // Every section that ships a skill brief has been migrated to its
+  // own SectionPlugin in the Septena target. This list is intentionally
+  // empty — SectionSkill.resolve(_:) walks SectionRegistry first and
+  // only falls back here for any future legacy entries. New sections
+  // should declare `mcpSkill` inline in their plugin, never here.
+  static let all: [SectionSkill] = []
 
   static let byKey: [String: SectionSkill] = Dictionary(
     uniqueKeysWithValues: SectionSkill.all.map { ($0.key, $0) }

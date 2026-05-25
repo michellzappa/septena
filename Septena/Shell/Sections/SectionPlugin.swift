@@ -119,9 +119,11 @@ struct TodayContext {
 enum SectionRegistry {
   static let all: [any SectionPlugin.Type] = [
     TasksPlugin.self,
+    GoalsPlugin.self,
     HabitsPlugin.self,
     SupplementsPlugin.self,
     ChoresPlugin.self,
+    GroceriesPlugin.self,
     MoodPlugin.self,
     CaffeinePlugin.self,
     CannabisPlugin.self,
