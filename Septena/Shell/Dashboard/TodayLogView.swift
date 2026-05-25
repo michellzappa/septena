@@ -251,7 +251,6 @@ struct TodayLogView: View {
     let cR = theme.color(for: "chores")
     let cT = theme.color(for: "tasks")
     let cN = theme.color(for: "nutrition")
-    let cTr = theme.color(for: "training")
     let cCal = theme.color(for: "calendar")
 
     for h in habits where h.done {
@@ -319,15 +318,7 @@ struct TodayLogView: View {
       ))
     }
 
-    for e in training where e.date == date {
-      guard let name = e.exercise else { continue }
-      let t = e.concludedAt.map { String($0.dropFirst(11).prefix(5)) } ?? "00:00"
-      let detail = trainingDetail(e)
-      out.append(TodayEvent(
-        id: "tr-\(e.id)", time: t, section: "training",
-        color: cTr, title: name, detail: detail, kind: .training(e)
-      ))
-    }
+    // training migrated to TrainingPlugin (see SectionRegistry loop)
 
     let cal = Foundation.Calendar.current
     let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
@@ -371,17 +362,7 @@ struct TodayLogView: View {
 
   // `bristolLabel` + `gutDetail` moved to GutPlugin.
 
-  private func trainingDetail(_ e: ExerciseEntry) -> String? {
-    var parts: [String] = []
-    if let w = e.weight { parts.append("\(Int(w))kg") }
-    if let s = e.sets, let r = e.reps { parts.append("\(s)×\(r)") }
-    else if let s = e.sets { parts.append("\(s) sets") }
-    if let d = e.durationMin { parts.append("\(Int(d)) min") }
-    if let dist = e.distanceM, dist > 0 {
-      parts.append(String(format: "%.1f km", dist / 1000))
-    }
-    return parts.isEmpty ? nil : parts.joined(separator: " · ")
-  }
+  // `trainingDetail` moved to TrainingPlugin.detail(for:).
 
   private func hhmmToDouble(_ s: String) -> Double {
     let parts = s.split(separator: ":")
