@@ -98,6 +98,48 @@ func sectionDetailRow(_ label: String, _ value: String) -> some View {
 // legacy `SectionSkill.all` list. These helpers give consumers one
 // answer regardless of where the skill is declared.
 
+extension SectionRegistry {
+  /// Single skill.md document covering every plugin-resident MCP brief.
+  /// Designed to be pasted into the gateway repo's `skill.md` so the
+  /// LLM-facing skill catalog can't drift from the app's plugin
+  /// declarations.
+  ///
+  /// Structure:
+  ///   - `SectionSkill.preamble` — connection + universal conventions
+  ///   - One H1 per section, in registry order, with summary + tools +
+  ///     body (markdown) drawn from the plugin's `mcpSkill`.
+  /// Plugins without an `mcpSkill` (Sandbox, Sleep, Body, Air, Activity)
+  /// are skipped.
+  @MainActor
+  static func fullSkillMarkdown() -> String {
+    var out = SectionSkill.preamble + "\n\n"
+    for plugin in SectionRegistry.all {
+      guard let skill = plugin.mcpSkill else { continue }
+      let toolList = skill.tools.map { tool -> String in
+        if let inputs = tool.inputs {
+          return "- `\(tool.name)` — \(tool.blurb)\n  - \(inputs)"
+        }
+        return "- `\(tool.name)` — \(tool.blurb)"
+      }.joined(separator: "\n")
+      out += """
+      # \(skill.key.capitalized) — Septena MCP skill
+
+      \(skill.summary)
+
+      ### Tools
+      \(toolList)
+
+      \(skill.body)
+
+      ---
+
+
+      """
+    }
+    return out.trimmingCharacters(in: .whitespacesAndNewlines) + "\n"
+  }
+}
+
 extension SectionSkill {
   /// Resolve a section's MCP skill, preferring an inline plugin
   /// declaration over the legacy `SectionSkill.all` list.

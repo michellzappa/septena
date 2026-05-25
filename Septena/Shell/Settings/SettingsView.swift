@@ -2621,9 +2621,40 @@ struct SkillsSettingsPane: View {
       } footer: {
         Text("Each brief teaches a model how to use one section through the MCP — tools available, conventions, examples.")
       }
+
+      Section {
+        Button {
+          SkillCopy.copy(SectionRegistry.fullSkillMarkdown())
+          showCopiedToast = true
+        } label: {
+          Label("Copy MCP gateway brief", systemImage: "doc.on.doc")
+        }
+      } header: {
+        Text("Gateway sync")
+      } footer: {
+        Text("Copies the preamble + every section's brief as one Markdown document. Paste into septena-mcp-gateway/skill.md so the LLM-facing catalog can't drift from the plugin definitions in this app.")
+      }
     }
     .formStyle(.grouped)
+    .overlay(alignment: .bottom) {
+      if showCopiedToast {
+        Text("Copied")
+          .font(.callout)
+          .padding(.horizontal, 14)
+          .padding(.vertical, 8)
+          .background(.thinMaterial, in: Capsule())
+          .padding(.bottom, 24)
+          .transition(.opacity)
+          .task {
+            try? await Task.sleep(for: .seconds(1.4))
+            showCopiedToast = false
+          }
+      }
+    }
+    .animation(.snappy, value: showCopiedToast)
   }
+
+  @State private var showCopiedToast = false
 
   @ViewBuilder
   private func skillRowLabel(for key: String, skill: SectionSkill) -> some View {
