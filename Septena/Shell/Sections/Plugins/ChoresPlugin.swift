@@ -26,6 +26,8 @@ enum ChoresPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(ChoresDestinationView()) }
 
+  static func detailPaneContent() -> AnyView? { AnyView(ChoresDetailContent()) }
+
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(ChoresOnboardingView(complete: complete))
   }
@@ -54,6 +56,29 @@ enum ChoresPlugin: SectionPlugin {
       chore is next due. Surface overdue items first.
       """
     )
+  }
+}
+
+private struct ChoresDetailContent: View {
+  @Environment(SettingsStore.self) private var store
+
+  var body: some View {
+    if !store.chores.isEmpty {
+      Section("Definitions") {
+        ForEach(store.chores) { c in
+          HStack {
+            if let e = c.emoji { Text(e) }
+            Text(c.name).foregroundStyle(.primary)
+            Spacer()
+            if let due = c.dueDate {
+              Text(due)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+            }
+          }
+        }
+      }
+    }
   }
 }
 

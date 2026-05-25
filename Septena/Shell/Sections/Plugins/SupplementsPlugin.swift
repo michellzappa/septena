@@ -27,6 +27,8 @@ enum SupplementsPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(SupplementsDestinationView()) }
 
+  static func detailPaneContent() -> AnyView? { AnyView(SupplementsDetailContent()) }
+
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(SupplementsOnboardingView(complete: complete))
   }
@@ -52,6 +54,26 @@ enum SupplementsPlugin: SectionPlugin {
       `supplements_toggle(id, done: false)` removes today's mark.
       """
     )
+  }
+}
+
+private struct SupplementsDetailContent: View {
+  @State private var showingSheet = false
+
+  var body: some View {
+    Section {
+      Button {
+        showingSheet = true
+      } label: {
+        Label("Manage Supplements", systemImage: "pills")
+      }
+    } footer: {
+      Text("Renaming a supplement doesn't affect its history — events are linked by ID.")
+    }
+    .sheet(isPresented: $showingSheet) {
+      SupplementTypeSheet()
+        .environment(SeptenaServices.shared.checklistMutator)
+    }
   }
 }
 

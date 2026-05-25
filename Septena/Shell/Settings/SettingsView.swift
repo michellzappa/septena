@@ -1121,22 +1121,12 @@ struct SectionDetailPane: View {
   @Environment(CKEngine.self) private var ckEngine
   let sectionKey: String
   @State private var showingColorPicker = false
-  @State private var showingSupplementSheet = false
+  // showingSupplementSheet moved into SupplementsPlugin's detailPaneContent.
 
-  /// Local task prefs — only read for `sectionKey == "tasks"`, but
-  /// SwiftUI requires the property be declared at view-init so the
-  /// `@AppStorage` binding wires up; the Tasks-specific section in
-  /// `body` is the only place these are consumed.
-  @AppStorage(SettingsKey.badgeShowOverdue)    private var taskBadge: Bool = false
-  @AppStorage(SettingsKey.todayShowCompleted)  private var todayShowCompleted: Bool = true
-  @AppStorage(SettingsKey.taskSort)            private var taskSortRaw: String = TaskSort.dateAdded.rawValue
-
-  /// Nutrition prefs — only read when `sectionKey == "nutrition"`, but
-  /// declared at view-init for the same reason as the task prefs above.
-  @AppStorage(SettingsKey.nutritionTrackFasting)
-  private var trackFasting: Bool = false
-  @AppStorage(SettingsKey.nutritionHeatmapMetric)
-  private var heatmapMetricRaw: String = NutritionHeatmapMetric.protein.rawValue
+  // Per-section preferences and sheets now live inside each plugin's
+  // detailPaneContent view, where they're only constructed when that
+  // section's page is showing. No more app-wide @AppStorage bindings
+  // declared up here for sections this pane doesn't always render.
 
   private var manifest: SectionManifest? { SectionManifest.byKey[sectionKey] }
   private var server: SectionConfig? {
@@ -1367,186 +1357,21 @@ struct SectionDetailPane: View {
   /// Per-key content. Tasks gets local prefs; the rest pull cached
   /// catalog data from `SettingsStore`. Unknown / un-cataloged keys
   /// fall through to identity-only.
+  /// Section-specific content is plugin-driven. Each migrated plugin
+  /// returns one or more `Section { ... }` blocks via `detailPaneContent`;
+  /// sections without a plugin or without a detail-pane override
+  /// render no extra content (identity row + onboarding trigger only).
   @ViewBuilder
   private var sectionSpecific: some View {
-    switch sectionKey {
-    case "tasks":        tasksConfig
-    case "caffeine":     caffeineConfig
-    case "cannabis":     cannabisConfig
-    case "training":     trainingConfig
-    case "chores":       choresConfig
-    case "nutrition":    nutritionConfig
-    case "supplements":  supplementsConfig
-    default:             EmptyView()
+    if let view = SectionRegistry.plugin(forKey: sectionKey)?.detailPaneContent() {
+      view
     }
   }
 
-  @ViewBuilder
-  private var caffeineConfig: some View {
-    if let caf = store.caffeine {
-      if !caf.beans.isEmpty {
-        Section("Beans") {
-          ForEach(caf.beans) { bean in
-            HStack {
-              Text(bean.name)
-              Spacer()
-              Text(bean.id)
-                .font(.caption.monospaced())
-                .foregroundStyle(.secondary)
-            }
-          }
-        }
-      }
-      if let methods = caf.methods, !methods.isEmpty {
-        Section("Methods") {
-          ForEach(methods, id: \.self) { Text($0) }
-        }
-      }
-    } else {
-      EmptyView()
-    }
-  }
-
-  @ViewBuilder
-  private var cannabisConfig: some View {
-    if let cnb = store.cannabis {
-      if !cnb.strains.isEmpty {
-        Section("Strains") {
-          ForEach(cnb.strains) { st in
-            HStack {
-              Text(st.name)
-              Spacer()
-              Text(st.id)
-                .font(.caption.monospaced())
-                .foregroundStyle(.secondary)
-            }
-          }
-        }
-      }
-      Section("Dosing") {
-        row("Uses per capsule", "\(cnb.usesPerCapsule)")
-      }
-    } else {
-      EmptyView()
-    }
-  }
-
-  @ViewBuilder
-  private var trainingConfig: some View {
-    Section("Training") {
-      NavigationLink {
-        ExerciseCatalogView()
-      } label: { Label("Exercises", systemImage: "figure.strengthtraining.traditional") }
-      NavigationLink {
-        RoutineCatalogView()
-      } label: { Label("Routines", systemImage: "list.bullet.rectangle") }
-    }
-  }
-
-  @ViewBuilder
-  private var choresConfig: some View {
-    if !store.chores.isEmpty {
-      Section("Definitions") {
-        ForEach(store.chores) { c in
-          HStack {
-            if let e = c.emoji { Text(e) }
-            Text(c.name).foregroundStyle(.primary)
-            Spacer()
-            if let due = c.dueDate {
-              Text(due)
-                .font(.caption.monospaced())
-                .foregroundStyle(.secondary)
-            }
-          }
-        }
-      }
-    } else {
-      EmptyView()
-    }
-  }
-
-  @ViewBuilder
-  private var supplementsConfig: some View {
-    Section {
-      Button {
-        showingSupplementSheet = true
-      } label: {
-        Label("Manage Supplements", systemImage: "pills")
-      }
-    } footer: {
-      Text("Renaming a supplement doesn't affect its history — events are linked by ID.")
-    }
-    .sheet(isPresented: $showingSupplementSheet) {
-      SupplementTypeSheet()
-        .environment(SeptenaServices.shared.checklistMutator)
-    }
-  }
-
-  @ViewBuilder
-  private var nutritionConfig: some View {
-    if let m = store.macros {
-      Section("Macro ranges") {
-        row("Protein", "\(Int(m.protein.min))–\(Int(m.protein.max)) g")
-        row("Fat",     "\(Int(m.fat.min))–\(Int(m.fat.max)) g")
-        row("Carbs",   "\(Int(m.carbs.min))–\(Int(m.carbs.max)) g")
-        row("Calories","\(Int(m.kcal.min))–\(Int(m.kcal.max)) kcal")
-      }
-    }
-    MacroTilesEditor(initialPrefs: MacroCatalog.reconcile(
-      store.serverSettings?.nutrition?.macroTiles ?? MacroCatalog.defaultTilePrefs()))
-    Section {
-      Toggle("Track fasting", isOn: $trackFasting)
-    } footer: {
-      Text("When on, the Nutrition tile shows a live fasting timer after your last meal of the day, and you can choose what the heatmap encodes.")
-    }
-    if trackFasting {
-      // Fasting target sits with the rest of the fasting UX — only
-      // shown when tracking is on, since it's only meaningful then.
-      // Read-only mirror of the server's `macros.fasting` band; falls
-      // back to the built-in 14–16h default if macros-config hasn't
-      // loaded or doesn't include a fasting entry yet.
-      Section("Fasting target") {
-        if let fasting = store.macros?.fasting {
-          row("Range", "\(Int(fasting.min))–\(Int(fasting.max)) h")
-        } else {
-          row("Range", "\(Int(FastingDefaults.targetMinH))–\(Int(FastingDefaults.targetMaxH)) h")
-        }
-      }
-      Section("Heatmap shows") {
-        Picker("Heatmap metric", selection: $heatmapMetricRaw) {
-          ForEach(NutritionHeatmapMetric.allCases) { m in
-            Text(m.label).tag(m.rawValue)
-          }
-        }
-        .pickerStyle(.inline)
-        .labelsHidden()
-      }
-    }
-  }
-
-  @ViewBuilder
-  private var tasksConfig: some View {
-    Section("Badge") {
-      Toggle("Show overdue indicator on app icon", isOn: $taskBadge)
-    }
-    Section("Today") {
-      Toggle("Show completed tasks in Today", isOn: $todayShowCompleted)
-    }
-    Section("Task sort") {
-      Picker("Sort tasks by", selection: $taskSortRaw) {
-        ForEach(TaskSort.allCases) { s in
-          Label(s.label, systemImage: s.icon).tag(s.rawValue)
-        }
-      }
-      .pickerStyle(.inline)
-      .labelsHidden()
-    }
-    Section {
-      Text("Areas and projects are managed in the Tasks tab.")
-        .font(.callout)
-        .foregroundStyle(.secondary)
-    }
-  }
+  // All per-section detail content now lives in the corresponding
+  // plugin's `detailPaneContent()` view. Sections without an override
+  // render the identity row + onboarding trigger only. See e.g.
+  // CaffeineDetailContent / TasksDetailContent / NutritionDetailContent.
 }
 
 // MARK: - Macro tiles editor

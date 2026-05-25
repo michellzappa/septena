@@ -12,6 +12,8 @@ enum NutritionPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(NutritionDestinationView()) }
 
+  static func detailPaneContent() -> AnyView? { AnyView(NutritionDetailContent()) }
+
   // MARK: - First-enable onboarding
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
@@ -116,5 +118,49 @@ enum NutritionPlugin: SectionPlugin {
       - Don't try to write a day summary — the app computes it automatically.
       """
     )
+  }
+}
+
+private struct NutritionDetailContent: View {
+  @Environment(SettingsStore.self) private var store
+  @AppStorage(SettingsKey.nutritionTrackFasting)
+  private var trackFasting: Bool = false
+  @AppStorage(SettingsKey.nutritionHeatmapMetric)
+  private var heatmapMetricRaw: String = NutritionHeatmapMetric.protein.rawValue
+
+  var body: some View {
+    if let m = store.macros {
+      Section("Macro ranges") {
+        sectionDetailRow("Protein", "\(Int(m.protein.min))–\(Int(m.protein.max)) g")
+        sectionDetailRow("Fat",     "\(Int(m.fat.min))–\(Int(m.fat.max)) g")
+        sectionDetailRow("Carbs",   "\(Int(m.carbs.min))–\(Int(m.carbs.max)) g")
+        sectionDetailRow("Calories","\(Int(m.kcal.min))–\(Int(m.kcal.max)) kcal")
+      }
+    }
+    MacroTilesEditor(initialPrefs: MacroCatalog.reconcile(
+      store.serverSettings?.nutrition?.macroTiles ?? MacroCatalog.defaultTilePrefs()))
+    Section {
+      Toggle("Track fasting", isOn: $trackFasting)
+    } footer: {
+      Text("When on, the Nutrition tile shows a live fasting timer after your last meal of the day, and you can choose what the heatmap encodes.")
+    }
+    if trackFasting {
+      Section("Fasting target") {
+        if let fasting = store.macros?.fasting {
+          sectionDetailRow("Range", "\(Int(fasting.min))–\(Int(fasting.max)) h")
+        } else {
+          sectionDetailRow("Range", "\(Int(FastingDefaults.targetMinH))–\(Int(FastingDefaults.targetMaxH)) h")
+        }
+      }
+      Section("Heatmap shows") {
+        Picker("Heatmap metric", selection: $heatmapMetricRaw) {
+          ForEach(NutritionHeatmapMetric.allCases) { m in
+            Text(m.label).tag(m.rawValue)
+          }
+        }
+        .pickerStyle(.inline)
+        .labelsHidden()
+      }
+    }
   }
 }

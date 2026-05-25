@@ -51,6 +51,8 @@ enum TrainingPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(TrainingDestinationView()) }
 
+  static func detailPaneContent() -> AnyView? { AnyView(TrainingDetailContent()) }
+
   // MARK: - First-enable onboarding
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
@@ -134,6 +136,19 @@ enum TrainingPlugin: SectionPlugin {
       - Don't `training_exercise_delete` something that has historical entries unless the user is sure. Entries keep a denormalised exercise name, but the catalog reference is lost.
       """
     )
+  }
+}
+
+private struct TrainingDetailContent: View {
+  var body: some View {
+    Section("Training") {
+      NavigationLink {
+        ExerciseCatalogView()
+      } label: { Label("Exercises", systemImage: "figure.strengthtraining.traditional") }
+      NavigationLink {
+        RoutineCatalogView()
+      } label: { Label("Routines", systemImage: "list.bullet.rectangle") }
+    }
   }
 }
 

@@ -48,6 +48,15 @@ protocol SectionPlugin {
   /// default-nil from the protocol extension.
   static func destinationView() -> AnyView?
 
+  /// Section-specific content rendered inside `SectionDetailPane` (the
+  /// per-section page in Settings). Used for read-only catalog
+  /// displays (caffeine beans, chore definitions, …) and section-only
+  /// preferences (nutrition macro tiles, fasting toggle). The
+  /// returned view should be one or more `Section { ... }` blocks so
+  /// it composes inside the enclosing `Form { ... }`. Default-nil for
+  /// identity-only sections.
+  static func detailPaneContent() -> AnyView?
+
   /// MCP / agent contract for this section. Declares the read/write
   /// tools an LLM uses to manipulate this section's data, plus a
   /// human-readable brief on conventions and examples. Tightly bound
@@ -56,6 +65,24 @@ protocol SectionPlugin {
   /// Return `nil` for sections that haven't migrated their skill yet
   /// (still in `SectionSkill.all`); `SectionSkill.byKey` falls through.
   static var mcpSkill: SectionSkill? { get }
+}
+
+// MARK: - Shared detail-pane chrome
+
+/// Simple "label · trailing value" row used in plugin detail-pane
+/// content. Mirrors the same shape as the existing private helper in
+/// SectionDetailPane so the look is consistent across migrated and
+/// inline sections.
+@MainActor
+@ViewBuilder
+func sectionDetailRow(_ label: String, _ value: String) -> some View {
+  HStack {
+    Text(label)
+    Spacer()
+    Text(value)
+      .foregroundStyle(.secondary)
+      .multilineTextAlignment(.trailing)
+  }
 }
 
 // MARK: - SectionSkill resolution
@@ -96,6 +123,12 @@ extension SectionPlugin {
   /// destination (e.g. utility plugins like Sandbox). Plugins that own
   /// their destination wrap it in AnyView and return it here.
   static func destinationView() -> AnyView? { nil }
+
+  /// Default: no detail-pane content beyond the identity row +
+  /// onboarding trigger that SectionDetailPane renders for every
+  /// section. Plugins override to add catalog displays / per-section
+  /// preferences (one or more `Section { ... }` blocks).
+  static func detailPaneContent() -> AnyView? { nil }
 
   /// Default: no onboarding. Sections that need a setup flow override
   /// this; everything else inherits the no-op.

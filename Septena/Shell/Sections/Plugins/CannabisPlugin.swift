@@ -30,6 +30,8 @@ enum CannabisPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(CannabisDestinationView()) }
 
+  static func detailPaneContent() -> AnyView? { AnyView(CannabisDetailContent()) }
+
   // MARK: - First-enable onboarding
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
@@ -69,6 +71,31 @@ enum CannabisPlugin: SectionPlugin {
       `effect` is subjective free-form: "relaxed", "creative", "couch-locked".
       """
     )
+  }
+}
+
+private struct CannabisDetailContent: View {
+  @Environment(SettingsStore.self) private var store
+
+  var body: some View {
+    if let cnb = store.cannabis {
+      if !cnb.strains.isEmpty {
+        Section("Strains") {
+          ForEach(cnb.strains) { st in
+            HStack {
+              Text(st.name)
+              Spacer()
+              Text(st.id)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+            }
+          }
+        }
+      }
+      Section("Dosing") {
+        sectionDetailRow("Uses per capsule", "\(cnb.usesPerCapsule)")
+      }
+    }
   }
 }
 

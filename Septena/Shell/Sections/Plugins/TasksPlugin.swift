@@ -12,6 +12,8 @@ enum TasksPlugin: SectionPlugin {
   // still handles tasks specially. When the full tile migration lands,
   // this slot will return the tile's destination instead.
 
+  static func detailPaneContent() -> AnyView? { AnyView(TasksDetailContent()) }
+
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(SectionExplainerView(
       sectionKey: "tasks",
@@ -132,5 +134,34 @@ enum TasksPlugin: SectionPlugin {
       - Don't claim a task is "added" without mentioning which view/list it landed in.
       """
     )
+  }
+}
+
+private struct TasksDetailContent: View {
+  @AppStorage(SettingsKey.badgeShowOverdue)   private var taskBadge: Bool = false
+  @AppStorage(SettingsKey.todayShowCompleted) private var todayShowCompleted: Bool = true
+  @AppStorage(SettingsKey.taskSort)           private var taskSortRaw: String = TaskSort.dateAdded.rawValue
+
+  var body: some View {
+    Section("Badge") {
+      Toggle("Show overdue indicator on app icon", isOn: $taskBadge)
+    }
+    Section("Today") {
+      Toggle("Show completed tasks in Today", isOn: $todayShowCompleted)
+    }
+    Section("Task sort") {
+      Picker("Sort tasks by", selection: $taskSortRaw) {
+        ForEach(TaskSort.allCases) { s in
+          Label(s.label, systemImage: s.icon).tag(s.rawValue)
+        }
+      }
+      .pickerStyle(.inline)
+      .labelsHidden()
+    }
+    Section {
+      Text("Areas and projects are managed in the Tasks tab.")
+        .font(.callout)
+        .foregroundStyle(.secondary)
+    }
   }
 }

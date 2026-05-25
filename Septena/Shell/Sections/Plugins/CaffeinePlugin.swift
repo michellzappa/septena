@@ -32,6 +32,8 @@ enum CaffeinePlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(CaffeineDestinationView()) }
 
+  static func detailPaneContent() -> AnyView? { AnyView(CaffeineDetailContent()) }
+
   // MARK: - First-enable onboarding
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
@@ -89,6 +91,37 @@ enum CaffeinePlugin: SectionPlugin {
       Matcha doesn't need a bean reference unless tracking source.
       """
     )
+  }
+}
+
+/// Section-specific content for the Settings detail pane. Read-only
+/// display of the user's bean catalog + brewing methods from the live
+/// SettingsStore — catalog editing happens on the Caffeine destination
+/// screen, not here.
+private struct CaffeineDetailContent: View {
+  @Environment(SettingsStore.self) private var store
+
+  var body: some View {
+    if let caf = store.caffeine {
+      if !caf.beans.isEmpty {
+        Section("Beans") {
+          ForEach(caf.beans) { bean in
+            HStack {
+              Text(bean.name)
+              Spacer()
+              Text(bean.id)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+            }
+          }
+        }
+      }
+      if let methods = caf.methods, !methods.isEmpty {
+        Section("Methods") {
+          ForEach(methods, id: \.self) { Text($0) }
+        }
+      }
+    }
   }
 }
 
