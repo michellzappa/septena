@@ -108,6 +108,7 @@ struct NutritionDestinationView: View {
   var body: some View {
     ScrollView {
       LazyVStack(spacing: 12) {
+        SectionGoalsStrip(sectionKey: "nutrition")
         macroTilesGrid
         entriesList
       }

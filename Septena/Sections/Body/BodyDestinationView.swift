@@ -32,6 +32,7 @@ struct BodyDestinationView: View {
 
   var body: some View {
     List {
+      SectionGoalsStrip(sectionKey: "body")
       statsSection
       chartsSection
       Section("Recent weigh-ins") {

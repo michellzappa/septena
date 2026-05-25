@@ -18,6 +18,7 @@ struct SupplementsDestinationView: View {
 
   var body: some View {
     List {
+      SectionGoalsStrip(sectionKey: "supplements")
       summary
       Section {
         ForEach(model.supplements) { supp in

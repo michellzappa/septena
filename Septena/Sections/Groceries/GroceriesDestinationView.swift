@@ -64,6 +64,7 @@ struct GroceriesDestinationView: View {
 
   var body: some View {
     List {
+      SectionGoalsStrip(sectionKey: "groceries")
       if !low.isEmpty {
         Section {
           ForEach(low) { item in

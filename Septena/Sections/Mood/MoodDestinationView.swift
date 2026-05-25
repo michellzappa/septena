@@ -24,6 +24,7 @@ struct MoodDestinationView: View {
 
   var body: some View {
     List {
+      SectionGoalsStrip(sectionKey: "mood")
       slotSection
       todaySection
       heatmapSection

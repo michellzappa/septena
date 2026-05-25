@@ -21,6 +21,7 @@ struct HabitsDestinationView: View {
 
   var body: some View {
     List {
+      SectionGoalsStrip(sectionKey: "habits")
       summary
       ForEach(model.habitBuckets, id: \.self) { bucket in
         bucketSection(bucket)

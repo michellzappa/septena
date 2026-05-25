@@ -40,6 +40,7 @@ struct AirDestinationView: View {
 
   var body: some View {
     List {
+      SectionGoalsStrip(sectionKey: "air")
       summarySection
       pollenSection
       co2Last24hChart

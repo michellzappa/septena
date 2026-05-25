@@ -55,6 +55,7 @@ struct TrainingDestinationView: View {
 
   var body: some View {
     List {
+      SectionGoalsStrip(sectionKey: "training")
       if let d = draftStore.draft {
         activeSessionSection(d)
       }

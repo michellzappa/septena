@@ -141,7 +141,7 @@ struct GoalsView: View {
 // along the bottom so each card reads as "this is what I'm working toward
 // in <area>" at a glance.
 
-private struct GoalTile: View {
+struct GoalTile: View {
   let goal: Goal
   let theme: SectionTheme
 

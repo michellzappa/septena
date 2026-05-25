@@ -29,6 +29,7 @@ struct SleepDestinationView: View {
 
   var body: some View {
     List {
+      SectionGoalsStrip(sectionKey: "sleep")
       scoresSection
       durationSection
       chartsSection

@@ -19,6 +19,7 @@ struct GutDestinationView: View {
 
   var body: some View {
     List {
+      SectionGoalsStrip(sectionKey: "gut")
       summary
       Section("Today") {
         if let today, !today.entries.isEmpty {

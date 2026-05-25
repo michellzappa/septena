@@ -14,6 +14,7 @@ struct ActivityDestinationView: View {
 
   var body: some View {
     List {
+      SectionGoalsStrip(sectionKey: "activity")
       switch bridge.access {
       case .granted:       grantedBody
       case .notDetermined: askForAccess

@@ -225,6 +225,7 @@
 		A7F3580380663FA1FA645ED0 /* SectionManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27161C741F9EC6CFC1F83CE0 /* SectionManifest.swift */; };
 		A90F8338D53AE42BA5F3FA33 /* SleepDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9859683174B5C2A84764D99C /* SleepDestinationView.swift */; };
 		A97FAA9330439D1F0842F071 /* GoalsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40D9EAAB80FD7F9FAC57F20B /* GoalsView.swift */; };
+		B9A070171BFD45F3891526C4 /* SectionGoalsStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3C6FC55D78F4D958C517B00 /* SectionGoalsStrip.swift */; };
 		AA0022D742A4E427536BC219 /* AddTaskPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0EBCAFF8036A11B0BBEC06E /* AddTaskPage.swift */; };
 		AA49332965231083B1AB9644 /* ProjectsBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FD1B7B2BAE523F2E4D3F99C /* ProjectsBackend.swift */; };
 		AAA65F1D4EAAA763A7255B45 /* SeptenaWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 5122E5C1D750654468CDCE96 /* SeptenaWatch.app */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -326,6 +327,7 @@
 		E82FB8F3AA77028D2377FF0F /* RemindersInboxSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B24F662EF5D7717780A4F8D /* RemindersInboxSection.swift */; };
 		E8CE6D6CCE3418CBE815E85A /* AreasBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E598D0EF28BF638E97F3F22 /* AreasBackend.swift */; };
 		E9970D5068FD243A6FF27686 /* GoalsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40D9EAAB80FD7F9FAC57F20B /* GoalsView.swift */; };
+		0676F36CEF04405B98DFCA29 /* SectionGoalsStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3C6FC55D78F4D958C517B00 /* SectionGoalsStrip.swift */; };
 		E9D604A78C243E8ED46607A4 /* TaskReads.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CBF0DAD74F9392D507229CE /* TaskReads.swift */; };
 		EA56ADCFD84CE200C7CEF2A9 /* ConsistencyHeatmap.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0E984505A489247AADAB293 /* ConsistencyHeatmap.swift */; };
 		EBACFE355538C3B842F1DC74 /* GroceriesPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8717AC713A8CB083B56E69C /* GroceriesPlugin.swift */; };
@@ -477,6 +479,7 @@
 		3C8645572712693D81587B7C /* TrainingDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingDestinationView.swift; sourceTree = "<group>"; };
 		3F23F5CB85029263FB4836E3 /* EditMoodEntrySheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditMoodEntrySheet.swift; sourceTree = "<group>"; };
 		40D9EAAB80FD7F9FAC57F20B /* GoalsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsView.swift; sourceTree = "<group>"; };
+		D3C6FC55D78F4D958C517B00 /* SectionGoalsStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionGoalsStrip.swift; sourceTree = "<group>"; };
 		41F8977A576F2BB747E8DBD7 /* TaskComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskComponents.swift; sourceTree = "<group>"; };
 		42EB061D69FA656547DC171F /* NutritionDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionDestinationView.swift; sourceTree = "<group>"; };
 		43B06CF53AF54BE2BFCE87FF /* GoalRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalRecord.swift; sourceTree = "<group>"; };
@@ -638,6 +641,7 @@
 			isa = PBXGroup;
 			children = (
 				40D9EAAB80FD7F9FAC57F20B /* GoalsView.swift */,
+				D3C6FC55D78F4D958C517B00 /* SectionGoalsStrip.swift */,
 			);
 			path = Goals;
 			sourceTree = "<group>";
@@ -1368,6 +1372,7 @@
 				AB68497A7AF5F88ED33EAB79 /* EditSupplementSheet.swift in Sources */,
 				D1C1F87FC588486EB9213B3F /* SupplementTypeSheet.swift in Sources */,
 				A97FAA9330439D1F0842F071 /* GoalsView.swift in Sources */,
+				B9A070171BFD45F3891526C4 /* SectionGoalsStrip.swift in Sources */,
 				3C51EABA92695B18A7853BC1 /* GroceriesDestinationView.swift in Sources */,
 				8BB0BE46187F796D00BAB65A /* GroceriesQuickAddMenu.swift in Sources */,
 				2D0446FF68EAE29C3AEEC770 /* GutBristolRecorder.swift in Sources */,
@@ -1575,6 +1580,7 @@
 				11091A62DB6744BDE8673415 /* EditSupplementSheet.swift in Sources */,
 				745A9B191F9F4549AB7ECE8D /* SupplementTypeSheet.swift in Sources */,
 				E9970D5068FD243A6FF27686 /* GoalsView.swift in Sources */,
+				0676F36CEF04405B98DFCA29 /* SectionGoalsStrip.swift in Sources */,
 				2ED32D83DAF70E51745C9183 /* GroceriesDestinationView.swift in Sources */,
 				002C465DC1BF297DFED1A82A /* GroceriesQuickAddMenu.swift in Sources */,
 				14A026D5D1BAFF0B4943D0E0 /* GutBristolRecorder.swift in Sources */,

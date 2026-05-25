@@ -25,6 +25,7 @@ struct CannabisDestinationView: View {
 
   var body: some View {
     List {
+      SectionGoalsStrip(sectionKey: "cannabis")
       summary
       Section("Today") {
         if let today, !today.entries.isEmpty {

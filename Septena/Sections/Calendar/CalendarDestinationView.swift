@@ -29,6 +29,7 @@ struct CalendarDestinationView: View {
 
   var body: some View {
     List {
+      SectionGoalsStrip(sectionKey: "calendar")
       switch bridge.access {
       case .granted:    grantedBody
       case .notDetermined: askForAccess

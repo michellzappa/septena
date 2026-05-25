@@ -42,6 +42,7 @@ struct ChoresDestinationView: View {
 
   var body: some View {
     List {
+      SectionGoalsStrip(sectionKey: "chores")
       summary
       if !today.isEmpty {
         Section("Today") { ForEach(today) { row(for: $0) } }
