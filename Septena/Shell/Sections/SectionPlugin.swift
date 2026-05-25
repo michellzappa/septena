@@ -38,6 +38,12 @@ extension SectionPlugin {
   /// Default: no onboarding. Sections that need a setup flow override
   /// this; everything else inherits the no-op.
   static func onboarding(complete: @escaping () -> Void) -> AnyView? { nil }
+
+  /// Default: onboarding shows once per user (gated on `hasOnboarded`).
+  /// A plugin that overrides this to `true` re-presents the sheet on
+  /// every off → on transition — useful for the Sandbox plugin which
+  /// exists to exercise the flow, not commit to a real setup state.
+  static var alwaysShowOnboarding: Bool { false }
 }
 
 /// Bag of pre-loaded data + helpers passed into `todayEvents`. Avoids

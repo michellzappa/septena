@@ -105,16 +105,16 @@ final class SeptenaServices {
       // missing row is seeded with manifest-derived defaults
       // (`defaultEnabled`); existing rows (including user toggles) are
       // left alone.
+      // Order matters: backfill runs BEFORE seeding so newly inserted
+      // sections (with manifest-derived hasOnboarded values) aren't
+      // accidentally clobbered by the legacy migration.
+      SettingsMirror.backfillHasOnboardedForLegacySections(context: context)
       var seededAny = false
       for manifest in SectionManifest.all {
         if SettingsMirror.seedManifestSectionIfMissing(manifest.key, context: context) {
           seededAny = true
         }
       }
-      // Legacy migration: pre-`hasOnboarded` rows default to false; flip
-      // them to true so existing users don't see onboarding sheets for
-      // sections they've been using. Idempotent.
-      SettingsMirror.backfillHasOnboardedForLegacySections(context: context)
       if seededAny {
         NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
       }

@@ -1060,15 +1060,16 @@ struct ManageSectionsPane: View {
 
   private func setEnabled(_ key: String, _ enabled: Bool) {
     // Off → on transition: if the section has a plugin onboarding flow
-    // and hasn't been onboarded yet, route through the sheet instead
-    // of enabling directly. The sheet's completion handler does the
-    // enable + hasOnboarded write.
+    // and either hasn't been onboarded yet OR the plugin opts into
+    // re-presenting on every enable (Sandbox), route through the sheet
+    // instead of enabling directly. The sheet's completion handler
+    // does the enable + hasOnboarded write.
     if enabled,
        let config = store.sections.first(where: { $0.key == key }),
        !config.isEnabled,
-       !config.hasOnboarded,
        let plugin = SectionRegistry.plugin(forKey: key),
-       plugin.onboarding(complete: {}) != nil {
+       plugin.onboarding(complete: {}) != nil,
+       (!config.hasOnboarded || plugin.alwaysShowOnboarding) {
       pendingOnboarding = PendingOnboarding(key: key)
       return
     }

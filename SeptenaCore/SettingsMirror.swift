@@ -75,13 +75,17 @@ enum SettingsMirror {
   }
 
   /// One-shot migration for users who upgrade from a build that pre-dates
-  /// the `hasOnboarded` field. Any pre-existing SectionEntity row with
-  /// `hasOnboarded=false` is upgraded to `true` so legacy users don't
-  /// see onboarding sheets for sections they've already been using.
-  /// Idempotent: safe to call on every launch.
+  /// the `hasOnboarded` field. Sections that are *currently enabled* on
+  /// this device are flipped to `hasOnboarded = true` — they've clearly
+  /// been in use, so no onboarding sheet should fire on their next
+  /// toggle. Disabled rows are left alone: either they were never
+  /// onboarded (fresh seed) or the user explicitly disabled them
+  /// after onboarding (in which case the bit's value already encodes
+  /// the right thing). Idempotent; must run BEFORE seeding so newly
+  /// seeded rows aren't accidentally swept into the migration.
   static func backfillHasOnboardedForLegacySections(context: ModelContext) {
     let descriptor = FetchDescriptor<SectionEntity>(
-      predicate: #Predicate { $0.hasOnboarded == false }
+      predicate: #Predicate { $0.hasOnboarded == false && $0.isEnabled == true }
     )
     guard let rows = try? context.fetch(descriptor), !rows.isEmpty else { return }
     for row in rows {

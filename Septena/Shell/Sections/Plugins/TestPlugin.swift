@@ -19,6 +19,10 @@ enum TestPlugin: SectionPlugin {
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(TestOnboardingView(complete: complete))
   }
+
+  /// Always re-present on enable. Sandbox is a test bed — repeated
+  /// access to the onboarding sheet is the point.
+  static var alwaysShowOnboarding: Bool { true }
 }
 
 /// Minimal first-enable onboarding flow. Demonstrates the pattern other
