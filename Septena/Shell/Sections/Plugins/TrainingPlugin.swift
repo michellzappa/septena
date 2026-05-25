@@ -53,6 +53,48 @@ enum TrainingPlugin: SectionPlugin {
 
   static func detailPaneContent() -> AnyView? { AnyView(TrainingDetailContent()) }
 
+  static var exportContribution: SectionExportContribution? {
+    SectionExportContribution(
+      tables: [
+        SchemaTable(name: "exerciseDefinition", purpose: "exercise catalog entry", fields: [
+          .req("id", "string", "slug, e.g. chest-press"),
+          .req("name", "string"),
+          .req("type", "string", "strength | cardio | mobility | core"),
+          .opt("subgroup", "string"), .opt("aliases", "[string]"),
+          .opt("primaryMuscle", "string"),
+          .opt("secondaryMuscles", "[string]"),
+          .opt("archived", "bool"), .opt("sortIndex", "int"),
+        ]),
+        SchemaTable(name: "sessionType", purpose: "a workout template (upper, lower, …)", fields: [
+          .req("id", "string"), .req("label", "string"),
+          .opt("emoji", "string"), .opt("exercises", "[string]"),
+          .opt("kind", "string"), .opt("archived", "bool"),
+          .opt("sortIndex", "int"),
+        ]),
+        SchemaTable(name: "exerciseEntry", purpose: "one logged set or interval", fields: [
+          .req("id", "string"), .req("date", "date"),
+          .req("time", "time", "session start"),
+          .req("sessionType", "string"), .req("exercise", "string"),
+          .opt("weight", "double"), .opt("sets", "string", "int or \"AMRAP\""),
+          .opt("reps", "string"), .opt("difficulty", "string"),
+          .opt("durationMin", "double"), .opt("distanceM", "double"),
+          .opt("level", "double"), .opt("note", "string"),
+          .opt("concludedAt", "timestamp"), .opt("loggedAt", "timestamp"),
+        ]),
+      ],
+      collect: { ctx in
+        let defs     = try ctx.fetch(FetchDescriptor<ExerciseDefinitionEntity>())
+        let sessions = try ctx.fetch(FetchDescriptor<SessionTypeEntity>())
+        let entries  = try ctx.fetch(FetchDescriptor<ExerciseEntryEntity>())
+        return [
+          "exerciseDefinition": defs.map(exerciseDefinitionExportDict),
+          "sessionType":        sessions.map(sessionTypeExportDict),
+          "exerciseEntry":      entries.map(exerciseEntryExportDict),
+        ]
+      }
+    )
+  }
+
   // MARK: - First-enable onboarding
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
@@ -275,4 +317,34 @@ private struct TrainingOnboardingView: View {
     }
     complete()
   }
+}
+
+@MainActor func exerciseEntryExportDict(_ e: ExerciseEntryEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "date": e.date, "time": e.time,
+    "sessionType": e.sessionType, "exercise": e.exercise,
+    "weight": e.weight, "sets": e.sets, "reps": e.reps,
+    "difficulty": e.difficulty, "durationMin": e.durationMin,
+    "distanceM": e.distanceM, "level": e.level, "note": e.note,
+    "concludedAt": e.concludedAt, "loggedAt": e.loggedAt,
+    "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor func exerciseDefinitionExportDict(_ e: ExerciseDefinitionEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "name": e.name, "type": e.type, "subgroup": e.subgroup,
+    "aliases": e.aliases, "primaryMuscle": e.primaryMuscle,
+    "secondaryMuscles": e.secondaryMuscles, "archived": e.archived,
+    "sortIndex": e.sortIndex, "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor func sessionTypeExportDict(_ e: SessionTypeEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "label": e.label, "emoji": e.emoji,
+    "exercises": e.exercises, "archived": e.archived,
+    "sortIndex": e.sortIndex, "kind": e.kindRaw,
+    "updatedAt": isoDate(e.updatedAt),
+  ])
 }

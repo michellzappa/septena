@@ -27,6 +27,32 @@ enum HabitsPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(HabitsDestinationView()) }
 
+  static var exportContribution: SectionExportContribution? {
+    SectionExportContribution(
+      tables: [
+        SchemaTable(name: "habitDefinition", purpose: "a habit you track", fields: [
+          .req("id", "string"), .req("title", "string"),
+          .req("bucket", "string", "free-form group key, e.g. morning"),
+          .opt("emoji", "string"), .opt("sortIndex", "int"),
+        ]),
+        SchemaTable(name: "habitDayState", purpose: "one habit on one day", fields: [
+          .req("id", "string", "stable per habit+day, e.g. <habitID>:<date>"),
+          .req("date", "date"), .req("habitID", "string"),
+          .req("done", "bool"), .req("skipped", "bool"),
+          .opt("note", "string"), .opt("time", "time"),
+        ]),
+      ],
+      collect: { ctx in
+        let defs   = try ctx.fetch(FetchDescriptor<HabitDefinitionEntity>())
+        let states = try ctx.fetch(FetchDescriptor<HabitDayStateEntity>())
+        return [
+          "habitDefinition": defs.map(habitDefinitionExportDict),
+          "habitDayState":   states.map(habitDayStateExportDict),
+        ]
+      }
+    )
+  }
+
   // MARK: - First-enable onboarding
   //
   // Curated starter list grouped by daypart. Tapping toggles inclusion;
@@ -228,4 +254,20 @@ private struct HabitsOnboardingView: View {
     }
     complete()
   }
+}
+
+@MainActor func habitDefinitionExportDict(_ e: HabitDefinitionEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "title": e.title, "emoji": e.emoji,
+    "bucket": e.bucket, "sortIndex": e.sortIndex,
+    "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor func habitDayStateExportDict(_ e: HabitDayStateEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "date": e.date, "habitID": e.habitID,
+    "done": e.done, "skipped": e.skipped, "note": e.note, "time": e.time,
+    "updatedAt": isoDate(e.updatedAt),
+  ])
 }

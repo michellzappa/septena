@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // Nutrition. The food-list rendering rules (first item + " +N" suffix
 // when there are more) and the macro detail line move here alongside
@@ -13,6 +14,35 @@ enum NutritionPlugin: SectionPlugin {
   static func destinationView() -> AnyView? { AnyView(NutritionDestinationView()) }
 
   static func detailPaneContent() -> AnyView? { AnyView(NutritionDetailContent()) }
+
+  static var exportContribution: SectionExportContribution? {
+    SectionExportContribution(
+      tables: [
+        SchemaTable(name: "nutritionEntry", purpose: "a single meal / snack", fields: [
+          .req("id", "string"), .req("loggedAt", "timestamp"),
+          .opt("emoji", "string"), .opt("foods", "string", "newline-joined list"),
+          .opt("note", "string"),
+          .opt("mealType", "string", "breakfast | lunch | dinner | snack"),
+          .opt("source", "string"),
+          .req("proteinG", "double"), .req("fatG", "double"),
+          .req("carbsG", "double"),
+          .opt("fiberG", "double"), .opt("sugarG", "double"),
+          .opt("saturatedFatG", "double"), .opt("alcoholG", "double"),
+          .opt("kcal", "double", "falls back to 4P+9F+4C+7A if omitted"),
+          .opt("sodiumMg", "double"), .opt("cholesterolMg", "double"),
+          .opt("potassiumMg", "double"), .opt("waterMl", "double"),
+        ]),
+      ],
+      collect: { ctx in
+        let entries   = try ctx.fetch(FetchDescriptor<NutritionEntryEntity>())
+        let summaries = try ctx.fetch(FetchDescriptor<NutritionDailySummaryEntity>())
+        return [
+          "nutritionEntry":        entries.map(nutritionEntryExportDict),
+          "nutritionDailySummary": summaries.map(nutritionSummaryExportDict),
+        ]
+      }
+    )
+  }
 
   // MARK: - First-enable onboarding
 
@@ -163,4 +193,33 @@ private struct NutritionDetailContent: View {
       }
     }
   }
+}
+
+@MainActor func nutritionEntryExportDict(_ e: NutritionEntryEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "loggedAt": isoDate(e.loggedAt),
+    "updatedAt": isoDate(e.updatedAt),
+    "emoji": e.emoji, "foods": e.foods, "note": e.note,
+    "mealType": e.mealType, "source": e.source,
+    "proteinG": e.proteinG, "fatG": e.fatG, "carbsG": e.carbsG,
+    "fiberG": e.fiberG, "sugarG": e.sugarG,
+    "saturatedFatG": e.saturatedFatG, "alcoholG": e.alcoholG,
+    "kcal": e.kcal, "sodiumMg": e.sodiumMg,
+    "cholesterolMg": e.cholesterolMg, "potassiumMg": e.potassiumMg,
+    "waterMl": e.waterMl,
+  ])
+}
+
+@MainActor func nutritionSummaryExportDict(_ e: NutritionDailySummaryEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "date": e.date, "entryCount": e.entryCount,
+    "firstLoggedAt": e.firstLoggedAt.map(isoDate),
+    "lastLoggedAt": e.lastLoggedAt.map(isoDate),
+    "computedAt": isoDate(e.computedAt),
+    "kcal": e.kcal, "proteinG": e.proteinG, "fatG": e.fatG, "carbsG": e.carbsG,
+    "fiberG": e.fiberG, "sugarG": e.sugarG,
+    "saturatedFatG": e.saturatedFatG, "alcoholG": e.alcoholG,
+    "sodiumMg": e.sodiumMg, "cholesterolMg": e.cholesterolMg,
+    "potassiumMg": e.potassiumMg, "waterMl": e.waterMl,
+  ])
 }

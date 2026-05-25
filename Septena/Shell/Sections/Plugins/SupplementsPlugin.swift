@@ -29,6 +29,30 @@ enum SupplementsPlugin: SectionPlugin {
 
   static func detailPaneContent() -> AnyView? { AnyView(SupplementsDetailContent()) }
 
+  static var exportContribution: SectionExportContribution? {
+    SectionExportContribution(
+      tables: [
+        SchemaTable(name: "supplementDefinition", purpose: "a supplement you take", fields: [
+          .req("id", "string"), .req("title", "string"),
+          .opt("emoji", "string"), .opt("sortIndex", "int"),
+        ]),
+        SchemaTable(name: "supplementDayState", purpose: "one supplement on one day", fields: [
+          .req("id", "string"), .req("date", "date"),
+          .req("supplementID", "string"), .req("done", "bool"),
+          .opt("note", "string"), .opt("time", "time"),
+        ]),
+      ],
+      collect: { ctx in
+        let defs   = try ctx.fetch(FetchDescriptor<SupplementDefinitionEntity>())
+        let states = try ctx.fetch(FetchDescriptor<SupplementDayStateEntity>())
+        return [
+          "supplementDefinition": defs.map(supplementDefinitionExportDict),
+          "supplementDayState":   states.map(supplementDayStateExportDict),
+        ]
+      }
+    )
+  }
+
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(SupplementsOnboardingView(complete: complete))
   }
@@ -205,4 +229,19 @@ private struct SupplementsOnboardingView: View {
     }
     complete()
   }
+}
+
+@MainActor func supplementDefinitionExportDict(_ e: SupplementDefinitionEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "title": e.title, "emoji": e.emoji,
+    "sortIndex": e.sortIndex, "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor func supplementDayStateExportDict(_ e: SupplementDayStateEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "date": e.date, "supplementID": e.supplementID,
+    "done": e.done, "note": e.note, "time": e.time,
+    "updatedAt": isoDate(e.updatedAt),
+  ])
 }

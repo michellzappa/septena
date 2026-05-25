@@ -14,6 +14,31 @@ enum GroceriesPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(GroceriesDestinationView()) }
 
+  static var exportContribution: SectionExportContribution? {
+    SectionExportContribution(
+      tables: [
+        SchemaTable(name: "groceryCategory", purpose: "a shopping aisle / pantry group", fields: [
+          .req("id", "string"), .req("name", "string"),
+          .opt("sortIndex", "int"),
+        ]),
+        SchemaTable(name: "groceryItem", purpose: "one item in the shopping list / pantry", fields: [
+          .req("id", "string"), .req("name", "string"),
+          .req("category", "string", "groceryCategory.id"),
+          .opt("emoji", "string"), .opt("low", "bool", "marked as running low"),
+          .opt("lastBought", "date"), .opt("sortIndex", "int"),
+        ]),
+      ],
+      collect: { ctx in
+        let cats  = try ctx.fetch(FetchDescriptor<GroceryCategoryEntity>())
+        let items = try ctx.fetch(FetchDescriptor<GroceryItemEntity>())
+        return [
+          "groceryCategory": cats.map(groceryCategoryExportDict),
+          "groceryItem":     items.map(groceryItemExportDict),
+        ]
+      }
+    )
+  }
+
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(GroceriesOnboardingView(complete: complete))
   }
@@ -199,4 +224,19 @@ private struct GroceriesOnboardingView: View {
     }
     complete()
   }
+}
+
+@MainActor func groceryCategoryExportDict(_ e: GroceryCategoryEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "name": e.name, "sortIndex": e.sortIndex,
+    "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor func groceryItemExportDict(_ e: GroceryItemEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "name": e.name, "category": e.category, "emoji": e.emoji,
+    "low": e.low, "lastBought": e.lastBought,
+    "sortIndex": e.sortIndex, "updatedAt": isoDate(e.updatedAt),
+  ])
 }

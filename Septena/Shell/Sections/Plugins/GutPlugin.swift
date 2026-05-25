@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // Digestive event log. The Bristol stool scale labels and the
 // detail-line construction (volume, blood, note) live here with the
@@ -8,6 +9,24 @@ import SwiftUI
 enum GutPlugin: SectionPlugin {
   static var manifest: SectionManifest {
     SectionManifest.byKey["gut"]!
+  }
+
+  static var exportContribution: SectionExportContribution? {
+    SectionExportContribution(
+      tables: [
+        SchemaTable(name: "gutEvent", purpose: "one bowel-movement log", fields: [
+          .req("id", "string"), .req("date", "date"), .req("time", "time"),
+          .req("bristol", "int", "1–7"), .req("blood", "int", "0–3"),
+          .opt("volume", "string"), .opt("discomfortLevel", "string"),
+          .opt("discomfortStart", "time"), .opt("discomfortEnd", "time"),
+          .opt("note", "string"),
+        ]),
+      ],
+      collect: { ctx in
+        let events = try ctx.fetch(FetchDescriptor<GutEventEntity>())
+        return ["gutEvent": events.map(gutEventExportDict)]
+      }
+    )
   }
 
   static func destinationView() -> AnyView? { AnyView(GutDestinationView()) }
@@ -92,4 +111,15 @@ enum GutPlugin: SectionPlugin {
       """
     )
   }
+}
+
+@MainActor func gutEventExportDict(_ e: GutEventEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "date": e.date, "time": e.time,
+    "bristol": e.bristol, "blood": e.blood, "volume": e.volume,
+    "discomfortLevel": e.discomfortLevel,
+    "discomfortStart": e.discomfortStart,
+    "discomfortEnd": e.discomfortEnd,
+    "note": e.note, "updatedAt": isoDate(e.updatedAt),
+  ])
 }

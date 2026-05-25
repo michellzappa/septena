@@ -28,6 +28,33 @@ enum ChoresPlugin: SectionPlugin {
 
   static func detailPaneContent() -> AnyView? { AnyView(ChoresDetailContent()) }
 
+  static var exportContribution: SectionExportContribution? {
+    SectionExportContribution(
+      tables: [
+        SchemaTable(name: "choreDefinition", purpose: "a recurring chore", fields: [
+          .req("id", "string"), .req("title", "string"),
+          .req("cadenceDays", "int"),
+          .opt("emoji", "string"), .opt("sortIndex", "int"),
+        ]),
+        SchemaTable(name: "choreEvent", purpose: "completion / skip / reschedule", fields: [
+          .req("id", "string"), .req("choreID", "string"),
+          .req("action", "string", "completed | skipped | rescheduled"),
+          .req("date", "date"), .req("sortKey", "string"),
+          .opt("newDueDate", "date"), .opt("reason", "string"),
+          .opt("note", "string"), .opt("time", "time"),
+        ]),
+      ],
+      collect: { ctx in
+        let defs   = try ctx.fetch(FetchDescriptor<ChoreDefinitionEntity>())
+        let events = try ctx.fetch(FetchDescriptor<ChoreEventEntity>())
+        return [
+          "choreDefinition": defs.map(choreDefinitionExportDict),
+          "choreEvent":      events.map(choreEventExportDict),
+        ]
+      }
+    )
+  }
+
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(ChoresOnboardingView(complete: complete))
   }
@@ -226,4 +253,21 @@ private struct ChoresOnboardingView: View {
     }
     complete()
   }
+}
+
+@MainActor func choreDefinitionExportDict(_ e: ChoreDefinitionEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "title": e.title, "emoji": e.emoji,
+    "cadenceDays": e.cadenceDays, "sortIndex": e.sortIndex,
+    "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor func choreEventExportDict(_ e: ChoreEventEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "choreID": e.choreID, "action": e.action,
+    "date": e.date, "newDueDate": e.newDueDate,
+    "reason": e.reason, "note": e.note, "time": e.time,
+    "sortKey": e.sortKey, "updatedAt": isoDate(e.updatedAt),
+  ])
 }

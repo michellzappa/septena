@@ -32,6 +32,32 @@ enum CannabisPlugin: SectionPlugin {
 
   static func detailPaneContent() -> AnyView? { AnyView(CannabisDetailContent()) }
 
+  static var exportContribution: SectionExportContribution? {
+    SectionExportContribution(
+      tables: [
+        SchemaTable(name: "cannabisStrain", purpose: "a strain you use", fields: [
+          .req("id", "string"), .req("name", "string"),
+          .opt("sortIndex", "int"),
+        ]),
+        SchemaTable(name: "cannabisEvent", purpose: "one session", fields: [
+          .req("id", "string"), .req("date", "date"), .req("time", "time"),
+          .req("method", "string", "vape | edible"),
+          .opt("strain", "string", "cannabisStrain.id"),
+          .opt("hit", "int"), .opt("grams", "double"),
+          .opt("effect", "string"), .opt("note", "string"),
+        ]),
+      ],
+      collect: { ctx in
+        let strains = try ctx.fetch(FetchDescriptor<CannabisStrainEntity>())
+        let events  = try ctx.fetch(FetchDescriptor<CannabisEventEntity>())
+        return [
+          "cannabisStrain": strains.map(cannabisStrainExportDict),
+          "cannabisEvent":  events.map(cannabisEventExportDict),
+        ]
+      }
+    )
+  }
+
   // MARK: - First-enable onboarding
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
@@ -219,4 +245,20 @@ private struct CannabisOnboardingView: View {
     }
     complete()
   }
+}
+
+@MainActor func cannabisStrainExportDict(_ e: CannabisStrainEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "name": e.name, "sortIndex": e.sortIndex,
+    "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor func cannabisEventExportDict(_ e: CannabisEventEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "date": e.date, "time": e.time, "method": e.method,
+    "strain": e.strain, "hit": e.hit, "grams": e.grams,
+    "effect": e.effect, "note": e.note,
+    "updatedAt": isoDate(e.updatedAt),
+  ])
 }

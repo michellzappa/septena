@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 @MainActor
 enum TasksPlugin: SectionPlugin {
@@ -13,6 +14,47 @@ enum TasksPlugin: SectionPlugin {
   // this slot will return the tile's destination instead.
 
   static func detailPaneContent() -> AnyView? { AnyView(TasksDetailContent()) }
+
+  static var exportContribution: SectionExportContribution? {
+    SectionExportContribution(
+      tables: [
+        SchemaTable(name: "task", purpose: "one row per task / to-do", fields: [
+          .req("id", "string"), .req("title", "string"),
+          .opt("status", "string", "open | done | cancelled | someday"),
+          .opt("created", "date"), .opt("scheduled", "date"),
+          .opt("due", "date"), .opt("today", "bool"),
+          .opt("todaySetOn", "date"), .opt("completedAt", "timestamp"),
+          .opt("area", "string", "area id"),
+          .opt("project", "string", "project id"),
+          .opt("notes", "string"),
+          .opt("recurrenceUnit", "string", "day | week | month | year"),
+          .opt("recurrenceInterval", "int"),
+          .opt("recurrenceAfterCompletion", "bool"),
+        ]),
+        SchemaTable(name: "project", purpose: "a project grouping tasks", fields: [
+          .req("id", "string"), .req("title", "string"),
+          .opt("status", "string", "active | completed | cancelled"),
+          .opt("area", "string", "area id"),
+          .opt("created", "date"), .opt("completedAt", "timestamp"),
+          .opt("notes", "string"), .opt("context", "string"),
+        ]),
+        SchemaTable(name: "area", purpose: "a top-level area of life", fields: [
+          .req("id", "string"), .req("title", "string"),
+          .opt("context", "string"),
+        ]),
+      ],
+      collect: { ctx in
+        let tasks    = try ctx.fetch(FetchDescriptor<TaskEntity>())
+        let projects = try ctx.fetch(FetchDescriptor<ProjectEntity>())
+        let areas    = try ctx.fetch(FetchDescriptor<AreaEntity>())
+        return [
+          "task":    tasks.map(taskExportDict),
+          "project": projects.map(projectExportDict),
+          "area":    areas.map(areaExportDict),
+        ]
+      }
+    )
+  }
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(SectionExplainerView(
@@ -164,4 +206,34 @@ private struct TasksDetailContent: View {
         .foregroundStyle(.secondary)
     }
   }
+}
+
+@MainActor func taskExportDict(_ e: TaskEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "title": e.title, "status": e.statusRaw,
+    "created": e.created, "scheduled": e.scheduled, "due": e.due,
+    "today": e.today, "todaySetOn": e.todaySetOn, "completedAt": e.completedAt,
+    "area": e.area, "project": e.project, "notes": e.notes,
+    "recurrenceUnit": e.recurrenceUnit,
+    "recurrenceInterval": e.recurrenceInterval,
+    "recurrenceAfterCompletion": e.recurrenceAfterCompletion,
+    "sortIndex": e.sortIndex,
+    "updatedAt": e.updatedAt, "deletedAt": e.deletedAt,
+  ])
+}
+
+@MainActor func projectExportDict(_ e: ProjectEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "title": e.title, "status": e.statusRaw, "area": e.area,
+    "created": e.created, "completedAt": e.completedAt,
+    "notes": e.notes, "context": e.context, "githubRepo": e.githubRepo,
+    "updatedAt": e.updatedAt, "deletedAt": e.deletedAt,
+  ])
+}
+
+@MainActor func areaExportDict(_ e: AreaEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "title": e.title, "context": e.context,
+    "updatedAt": e.updatedAt,
+  ])
 }
