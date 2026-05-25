@@ -24,6 +24,8 @@ enum ChoresPlugin: SectionPlugin {
       }
   }
 
+  static func destinationView() -> AnyView? { AnyView(ChoresDestinationView()) }
+
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(ChoresOnboardingView(complete: complete))
   }

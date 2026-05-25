@@ -6,6 +6,12 @@ enum TasksPlugin: SectionPlugin {
     SectionManifest.byKey["tasks"]!
   }
 
+  // Tasks doesn't have a dedicated DestinationView — the homepage tile
+  // routes into TaskListView with view parameters, not a single root.
+  // Leaving destinationView at the default-nil; the dashboard switch
+  // still handles tasks specially. When the full tile migration lands,
+  // this slot will return the tile's destination instead.
+
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(SectionExplainerView(
       sectionKey: "tasks",

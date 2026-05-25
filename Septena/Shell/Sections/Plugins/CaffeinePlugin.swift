@@ -30,6 +30,8 @@ enum CaffeinePlugin: SectionPlugin {
     }
   }
 
+  static func destinationView() -> AnyView? { AnyView(CaffeineDestinationView()) }
+
   // MARK: - First-enable onboarding
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {

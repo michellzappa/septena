@@ -84,6 +84,35 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
     SectionManifest.todayCapableKeys.contains(key)
   }
 
+  /// SF Symbol used by every surface that renders the section as a row
+  /// or tile (Settings sidebar, Dense / Heatmap homepage, dashboard
+  /// chrome). Lookup-by-key keeps the manifest init blocks terse;
+  /// `circle.fill` is the neutral fallback for any key without an
+  /// explicit entry (e.g. legacy / dev-only sections).
+  private static let iconByKey: [String: String] = [
+    "tasks":       "checklist",
+    "habits":      "repeat",
+    "training":    "figure.strengthtraining.traditional",
+    "chores":      "house",
+    "supplements": "pills",
+    "sleep":       "bed.double",
+    "nutrition":   "fork.knife",
+    "air":         "wind",
+    "groceries":   "cart",
+    "caffeine":    "cup.and.saucer",
+    "cannabis":    "leaf",
+    "body":        "scalemass",
+    "gut":         "circle.bottomhalf.filled",
+    "mood":        "face.smiling",
+    "activity":    "figure.walk",
+    "goals":       "target",
+    "test":        "wand.and.stars",
+  ]
+
+  public var iconSymbol: String {
+    SectionManifest.iconByKey[key] ?? "circle.fill"
+  }
+
   /// Default `isEnabled` for a freshly-seeded `SectionEntity`. `.always`
   /// is always on. `.core`-onboarding sections start on; `.optional`
   /// and `.hidden` start off. `.integration` sections wait for the

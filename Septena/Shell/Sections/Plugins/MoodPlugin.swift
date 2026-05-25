@@ -20,6 +20,8 @@ enum MoodPlugin: SectionPlugin {
     SectionManifest.byKey["mood"]!
   }
 
+  static func destinationView() -> AnyView? { AnyView(MoodDestinationView()) }
+
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(SectionExplainerView(
       sectionKey: "mood",

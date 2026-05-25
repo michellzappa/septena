@@ -28,6 +28,8 @@ enum CannabisPlugin: SectionPlugin {
     }
   }
 
+  static func destinationView() -> AnyView? { AnyView(CannabisDestinationView()) }
+
   // MARK: - First-enable onboarding
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {

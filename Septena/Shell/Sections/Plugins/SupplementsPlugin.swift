@@ -25,6 +25,8 @@ enum SupplementsPlugin: SectionPlugin {
       }
   }
 
+  static func destinationView() -> AnyView? { AnyView(SupplementsDestinationView()) }
+
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(SupplementsOnboardingView(complete: complete))
   }

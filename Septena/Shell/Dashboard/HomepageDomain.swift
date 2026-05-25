@@ -41,28 +41,10 @@ enum HomepageDomain: String, CaseIterable, Hashable, Identifiable {
 
   var id: String { rawValue }
 
-  /// SF Symbol used by the Dense / List renderers as the leading row
-  /// icon. Kept here (not on `HomepageDomainData`) because the icon is
-  /// a pure identity attribute — it never depends on today's data.
-  var icon: String {
-    switch self {
-    case .tasks:       return "checklist"
-    case .habits:      return "repeat"
-    case .training:    return "figure.strengthtraining.traditional"
-    case .chores:      return "house"
-    case .supplements: return "pills"
-    case .sleep:       return "bed.double"
-    case .nutrition:   return "fork.knife"
-    case .air:         return "wind"
-    case .groceries:   return "cart"
-    case .caffeine:    return "cup.and.saucer"
-    case .cannabis:    return "leaf"
-    case .body:        return "scalemass"
-    case .gut:         return "circle.bottomhalf.filled"
-    case .mood:        return "face.smiling"
-    case .activity:    return "figure.walk"
-    }
-  }
+  // Icon moved to SectionManifest.iconSymbol (lookup-by-key). Reach it
+  // via `SectionManifest.byKey[rawValue]?.iconSymbol`. Going through
+  // the manifest lets non-HomepageDomain section keys (goals, future
+  // additions) share the same icon registry.
 
   /// The canonical homepage order. Every layout mode iterates this list; the
   /// renderer is what varies per mode, not the sequence.

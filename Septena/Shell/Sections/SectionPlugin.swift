@@ -41,6 +41,13 @@ protocol SectionPlugin {
   /// safe no-op for already-imported items.
   static func onboarding(complete: @escaping () -> Void) -> AnyView?
 
+  /// The section's primary destination view — what shows when the
+  /// user taps the section's homepage tile or its sidebar row. Plugins
+  /// override this to return their own DestinationView wrapped in
+  /// AnyView. Sections without a dedicated destination inherit the
+  /// default-nil from the protocol extension.
+  static func destinationView() -> AnyView?
+
   /// MCP / agent contract for this section. Declares the read/write
   /// tools an LLM uses to manipulate this section's data, plus a
   /// human-readable brief on conventions and examples. Tightly bound
@@ -83,6 +90,13 @@ extension SectionSkill {
 }
 
 extension SectionPlugin {
+  /// The section's primary destination view — the screen the user
+  /// lands on when they tap into the section from the dashboard tile
+  /// or sidebar. Default returns nil for sections without a dedicated
+  /// destination (e.g. utility plugins like Sandbox). Plugins that own
+  /// their destination wrap it in AnyView and return it here.
+  static func destinationView() -> AnyView? { nil }
+
   /// Default: no onboarding. Sections that need a setup flow override
   /// this; everything else inherits the no-op.
   static func onboarding(complete: @escaping () -> Void) -> AnyView? { nil }

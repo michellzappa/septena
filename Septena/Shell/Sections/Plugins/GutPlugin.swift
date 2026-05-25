@@ -10,6 +10,8 @@ enum GutPlugin: SectionPlugin {
     SectionManifest.byKey["gut"]!
   }
 
+  static func destinationView() -> AnyView? { AnyView(GutDestinationView()) }
+
   // MARK: - First-enable onboarding
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {

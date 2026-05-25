@@ -12,6 +12,8 @@ enum GroceriesPlugin: SectionPlugin {
 
   static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] { [] }
 
+  static func destinationView() -> AnyView? { AnyView(GroceriesDestinationView()) }
+
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(GroceriesOnboardingView(complete: complete))
   }

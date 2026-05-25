@@ -292,37 +292,36 @@ struct WeekDashboardView: View {
   @ViewBuilder
   private func sheetContent(for dest: WeekDestination) -> some View {
     NavigationStack {
-      switch dest {
-      case .habits:      HabitsDestinationView()
-      case .chores:      ChoresDestinationView()
-      case .training:    TrainingDestinationView()
-      case .supplements: SupplementsDestinationView()
-      case .sleep:       SleepDestinationView()
-      case .nutrition:   NutritionDestinationView()
-      case .air:         AirDestinationView()
-      case .groceries:   GroceriesDestinationView()
-      case .calendar:    CalendarDestinationView()
-      case .caffeine:    CaffeineDestinationView()
-      case .cannabis:    CannabisDestinationView()
-      case .body:        BodyDestinationView()
-      case .gut:         GutDestinationView()
-      case .mood:        MoodDestinationView()
-      case .activity:    ActivityDestinationView()
-      case .today:
-        TodayLogView(
-          date: clock.today,
-          habits: dailies.habits,
-          supplements: dailies.supplements,
-          chores: dailies.chores,
-          tasks: completedTasks,
-          caffeine: caffeineToday?.entries ?? [],
-          cannabis: cannabisToday?.entries ?? [],
-          gut: gutToday?.entries ?? [],
-          nutrition: todayNutrition,
-          training: recentTraining,
-          calendar: dailies.calendarEvents,
-          mood: moodToday?.entries ?? []
-        )
+      // Plugin-driven destination first; falls back to the inline
+      // switch for sections that haven't migrated yet (sleep, air,
+      // body, activity) and for special destinations that aren't
+      // manifest sections (calendar, today).
+      if let view = SectionRegistry.plugin(forKey: dest.rawValue)?.destinationView() {
+        view
+      } else {
+        switch dest {
+        case .sleep:       SleepDestinationView()
+        case .air:         AirDestinationView()
+        case .body:        BodyDestinationView()
+        case .activity:    ActivityDestinationView()
+        case .calendar:    CalendarDestinationView()
+        case .today:
+          TodayLogView(
+            date: clock.today,
+            habits: dailies.habits,
+            supplements: dailies.supplements,
+            chores: dailies.chores,
+            tasks: completedTasks,
+            caffeine: caffeineToday?.entries ?? [],
+            cannabis: cannabisToday?.entries ?? [],
+            gut: gutToday?.entries ?? [],
+            nutrition: todayNutrition,
+            training: recentTraining,
+            calendar: dailies.calendarEvents,
+            mood: moodToday?.entries ?? []
+          )
+        default:           EmptyView()
+        }
       }
     }
     #if os(iOS)

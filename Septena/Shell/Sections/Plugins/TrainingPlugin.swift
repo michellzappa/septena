@@ -49,6 +49,8 @@ enum TrainingPlugin: SectionPlugin {
     return parts.isEmpty ? nil : parts.joined(separator: " · ")
   }
 
+  static func destinationView() -> AnyView? { AnyView(TrainingDestinationView()) }
+
   // MARK: - First-enable onboarding
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {

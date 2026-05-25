@@ -453,7 +453,7 @@ struct SettingsView: View {
   }
 
   private func sectionIcon(for key: String) -> String {
-    if let domain = HomepageDomain(rawValue: key) { return domain.icon }
+    if let m = SectionManifest.byKey[key] { return m.iconSymbol }
     if key == "calendar" { return "calendar" }
     return "circle.fill"
   }
@@ -2820,8 +2820,7 @@ struct SkillsSettingsPane: View {
   }
 
   private func skillSectionIcon(key: String) -> String {
-    if let domain = HomepageDomain(rawValue: key) { return domain.icon }
-    return "circle.fill"
+    return SectionManifest.byKey[key]?.iconSymbol ?? "circle.fill"
   }
 }
 
@@ -3279,7 +3278,7 @@ struct ImportExportSettingsPane: View {
   }
 
   private func sectionGlyph(for key: String) -> String {
-    if let domain = HomepageDomain(rawValue: key) { return domain.icon }
+    if let m = SectionManifest.byKey[key] { return m.iconSymbol }
     if key == "calendar" { return "calendar" }
     return "circle.fill"
   }

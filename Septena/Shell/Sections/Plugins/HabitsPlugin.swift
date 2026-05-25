@@ -25,6 +25,8 @@ enum HabitsPlugin: SectionPlugin {
       }
   }
 
+  static func destinationView() -> AnyView? { AnyView(HabitsDestinationView()) }
+
   // MARK: - First-enable onboarding
   //
   // Curated starter list grouped by daypart. Tapping toggles inclusion;

@@ -10,6 +10,8 @@ enum NutritionPlugin: SectionPlugin {
     SectionManifest.byKey["nutrition"]!
   }
 
+  static func destinationView() -> AnyView? { AnyView(NutritionDestinationView()) }
+
   // MARK: - First-enable onboarding
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {

@@ -113,7 +113,7 @@ private struct HeatmapDomainCard: View {
           .fill(data.accent.opacity(0.18))
           .frame(width: 28, height: 28)
           .overlay {
-            Image(systemName: data.domain.icon)
+            Image(systemName: SectionManifest.byKey[data.domain.rawValue]?.iconSymbol ?? "circle.fill")
               .font(.system(size: 14, weight: .semibold))
               .foregroundStyle(data.accent)
           }
@@ -199,7 +199,7 @@ private struct HeatmapDomainRow: View {
           .fill(data.accent.opacity(0.18))
           .frame(width: 28, height: 28)
           .overlay {
-            Image(systemName: data.domain.icon)
+            Image(systemName: SectionManifest.byKey[data.domain.rawValue]?.iconSymbol ?? "circle.fill")
               .font(.system(size: 14, weight: .semibold))
               .foregroundStyle(data.accent)
           }
