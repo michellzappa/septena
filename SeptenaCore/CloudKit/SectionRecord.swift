@@ -18,6 +18,7 @@ enum SectionCloudKitSchema {
     static let title = "title"
     static let color = "color"
     static let isEnabled = "isEnabled"
+    static let showInToday = "showInToday"
     static let updatedAt = "updatedAt"
     static let reservedString1 = "reservedString1"
     static let reservedInt1 = "reservedInt1"
@@ -48,6 +49,7 @@ extension SectionEntity {
     record[SectionCloudKitSchema.Field.title] = title
     record[SectionCloudKitSchema.Field.color] = color
     record[SectionCloudKitSchema.Field.isEnabled] = (isEnabled ? 1 : 0) as NSNumber
+    record[SectionCloudKitSchema.Field.showInToday] = (showInToday ? 1 : 0) as NSNumber
     record[SectionCloudKitSchema.Field.updatedAt] = updatedAt.ISO8601Format()
     return record
   }
@@ -57,6 +59,9 @@ extension SectionEntity {
     if let v = record[SectionCloudKitSchema.Field.color] as? String { color = v }
     if let v = record[SectionCloudKitSchema.Field.isEnabled] as? NSNumber {
       isEnabled = v.intValue != 0
+    }
+    if let v = record[SectionCloudKitSchema.Field.showInToday] as? NSNumber {
+      showInToday = v.intValue != 0
     }
     if let rawUpdatedAt = optionalSectionString(record[SectionCloudKitSchema.Field.updatedAt]),
        let parsed = ISO8601DateFormatter().date(from: rawUpdatedAt) {

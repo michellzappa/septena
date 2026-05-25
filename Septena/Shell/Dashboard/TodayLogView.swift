@@ -10,6 +10,7 @@ import EventKit
 
 struct TodayLogView: View {
   @Environment(SectionTheme.self) private var theme
+  @Environment(SettingsStore.self) private var settingsStore
   @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(TaskMutator.self) private var taskMutator
 
@@ -26,6 +27,7 @@ struct TodayLogView: View {
   let nutrition: [NutritionEntry]
   let training: [ExerciseEntry]
   let calendar: [EKEvent]
+  let mood: [MoodEntry]
 
   // Local mutable copies for optimistic UI after mutations.
   @State private var events: [TodayEvent] = []
@@ -34,6 +36,7 @@ struct TodayLogView: View {
   @State private var editingCaffeine: CaffeineEntry? = nil
   @State private var editingCannabis: CannabisEntry? = nil
   @State private var editingGut: GutEntry? = nil
+  @State private var editingMood: MoodEntry? = nil
 
   var body: some View {
     List {
@@ -81,6 +84,13 @@ struct TodayLogView: View {
                      detail: gutDetail(updated), time: updated.time, kind: .gut(updated))
       }
     }
+    .sheet(item: $editingMood) { entry in
+      EditMoodEntrySheet(date: date, original: entry) {
+        // EditMoodEntrySheet writes through MoodMutator which fires
+        // `septenaDataChanged`; the parent reload re-renders TodayLogView
+        // with fresh data. No optimistic replace needed.
+      }
+    }
   }
 
   // MARK: - Row
@@ -106,6 +116,9 @@ struct TodayLogView: View {
         .buttonStyle(.plain)
     case .gut(let e):
       Button { editingGut = e } label: { rowContent(for: event) }
+        .buttonStyle(.plain)
+    case .mood(let e):
+      Button { editingMood = e } label: { rowContent(for: event) }
         .buttonStyle(.plain)
     default:
       rowContent(for: event)
@@ -175,6 +188,15 @@ struct TodayLogView: View {
       Button(role: .destructive) {
         remove(id: event.id)
         SeptenaServices.shared.gutMutator.deleteEntry(id: e.id)
+        Haptics.warning()
+      } label: {
+        Label("Delete", systemImage: "trash")
+      }
+
+    case .mood(let e):
+      Button(role: .destructive) {
+        remove(id: event.id)
+        SeptenaServices.shared.moodMutator.deleteEntry(id: e.id)
         Haptics.warning()
       } label: {
         Label("Delete", systemImage: "trash")
@@ -292,6 +314,17 @@ struct TodayLogView: View {
       ))
     }
 
+    for e in mood {
+      // Use the quadrant color directly rather than the section accent
+      // — the affective dimension is the whole point of a mood log; a
+      // single section-wide color would erase it.
+      let quadColor = MoodQuadrant(rawValue: e.quadrant)?.color ?? .gray
+      out.append(TodayEvent(
+        id: "mood-\(e.id)", time: String(e.time.prefix(5)), section: "mood",
+        color: quadColor, title: e.emotion, detail: e.note, kind: .mood(e)
+      ))
+    }
+
     for e in nutrition where e.date == date {
       let name = e.foods.first ?? "Meal"
       let prefix = e.emoji.map { "\($0) " } ?? ""
@@ -330,7 +363,19 @@ struct TodayLogView: View {
       }
     }
 
-    return out.sorted { hhmmToDouble($0.timeLabel) > hhmmToDouble($1.timeLabel) }
+    // Per-section "Show in Today" filter. Calendar isn't a manifest
+    // section, so it's never filtered out here — visibility is governed
+    // by the user's calendar picker in Integrations.
+    let mutedSections: Set<String> = Set(
+      settingsStore.sections
+        .filter { !$0.showInToday || !$0.isEnabled }
+        .map(\.key)
+    )
+    let visible = mutedSections.isEmpty
+      ? out
+      : out.filter { !mutedSections.contains($0.section) }
+
+    return visible.sorted { hhmmToDouble($0.timeLabel) > hhmmToDouble($1.timeLabel) }
   }
 
   // MARK: - Label helpers
@@ -408,6 +453,7 @@ private enum TodayEventKind {
   case nutrition(NutritionEntry)
   case training(ExerciseEntry)
   case calendar(EKEvent)
+  case mood(MoodEntry)
 }
 
 private struct TodayEvent: Identifiable {

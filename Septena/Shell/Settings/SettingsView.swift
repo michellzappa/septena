@@ -418,15 +418,14 @@ struct SettingsView: View {
   /// Per-section sidebar rows, ordered by the user's saved `sectionOrder`
   /// (from the CloudKit-mirrored `AppSettings`), filtered to sections
   /// present in both the local manifest and the installed `SectionEntity`
-  /// set, and further filtered to those the user has enabled. Disabled
-  /// sections stay reachable via the "Manage Sections" master list.
+  /// set. Disabled sections are still listed so the user can tap in to
+  /// re-enable them; `sectionRow` renders them visually muted.
   private var sectionEntries: [SectionEntry] {
     let installedByKey = Dictionary(uniqueKeysWithValues: store.sections.map { ($0.key, $0) })
     let order = store.serverSettings?.sectionOrder ?? store.sections.map(\.key)
     return order.compactMap { key in
       guard let manifest = SectionManifest.byKey[key],
-            let installed = installedByKey[key],
-            installed.isEnabled else { return nil }
+            let installed = installedByKey[key] else { return nil }
       return SectionEntry(manifest: manifest, server: installed)
     }
   }
@@ -446,8 +445,10 @@ struct SettingsView: View {
     // own symbol; anything else unknown falls back to a neutral dot.
     Label {
       Text(entry.label)
+        .foregroundStyle(entry.isEnabled ? .primary : .secondary)
     } icon: {
       ColoredGlyph(icon: sectionIcon(for: entry.key), color: entry.accent, size: 22)
+        .opacity(entry.isEnabled ? 1 : 0.4)
     }
   }
 
@@ -534,6 +535,9 @@ struct SectionEntry: Identifiable, Hashable {
   /// or unparseable strings, which is the right fallback when the user
   /// hasn't picked a color yet.
   var accent: Color { parseHexColor(server.color) }
+  /// User has turned this section off. The row stays in the sidebar but
+  /// renders muted so it's clear the section isn't active.
+  var isEnabled: Bool { server.isEnabled }
 }
 
 // MARK: - Privacy
@@ -972,28 +976,48 @@ struct ManageSectionsPane: View {
   @ViewBuilder
   private func row(for manifest: SectionManifest) -> some View {
     let enabled = isEnabled(manifest.key)
-    HStack(spacing: 12) {
-      VStack(alignment: .leading, spacing: 2) {
-        Text(label(for: manifest))
-        if !manifest.shortDescription.isEmpty {
-          Text(manifest.shortDescription)
+    VStack(alignment: .leading, spacing: 6) {
+      HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 2) {
+          Text(label(for: manifest))
+            .foregroundStyle(enabled ? .primary : .secondary)
+          if !manifest.shortDescription.isEmpty {
+            Text(manifest.shortDescription)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+        }
+        Spacer()
+        if manifest.canDisable {
+          Toggle("Enabled", isOn: Binding(
+            get: { enabled },
+            set: { setEnabled(manifest.key, $0) }
+          ))
+          .labelsHidden()
+        } else {
+          Text("Always on")
             .font(.caption)
             .foregroundStyle(.secondary)
         }
       }
-      Spacer()
-      if manifest.canDisable {
-        Toggle("", isOn: Binding(
-          get: { enabled },
-          set: { setEnabled(manifest.key, $0) }
-        ))
-        .labelsHidden()
-      } else {
-        Text("Always on")
-          .font(.caption)
-          .foregroundStyle(.secondary)
+      if manifest.appearsInToday {
+        Toggle(isOn: Binding(
+          get: { showInToday(manifest.key) },
+          set: { setShowInToday(manifest.key, $0) }
+        )) {
+          Text("Show in Today")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .toggleStyle(.switch)
+        .controlSize(.mini)
+        .disabled(!enabled)
       }
     }
+  }
+
+  private func showInToday(_ key: String) -> Bool {
+    store.sections.first(where: { $0.key == key })?.showInToday ?? true
   }
 
   private func label(for manifest: SectionManifest) -> String {
@@ -1011,7 +1035,24 @@ struct ManageSectionsPane: View {
         ? SectionConfig(key: config.key,
                         label: config.label,
                         color: config.color,
-                        isEnabled: enabled)
+                        isEnabled: enabled,
+                        showInToday: config.showInToday)
+        : config
+    }
+  }
+
+  private func setShowInToday(_ key: String, _ value: Bool) {
+    SettingsMirror.setSectionShowInToday(key,
+                                         showInToday: value,
+                                         context: modelContext,
+                                         engine: ckEngine)
+    store.sections = store.sections.map { config in
+      config.key == key
+        ? SectionConfig(key: config.key,
+                        label: config.label,
+                        color: config.color,
+                        isEnabled: config.isEnabled,
+                        showInToday: value)
         : config
     }
   }
@@ -1147,6 +1188,7 @@ struct SectionDetailPane: View {
         Spacer()
       }
       enabledRow
+      showInTodayRow
     } footer: {
       if let m = manifest, !m.shortDescription.isEmpty {
         Text(m.shortDescription)
@@ -1154,9 +1196,46 @@ struct SectionDetailPane: View {
     }
   }
 
-  /// Show this section on the dashboard / sidebar. Hidden for `.always`
-  /// sections (e.g. Tasks). Disabling never deletes data — the section
-  /// can be re-enabled from here or from "Manage Sections".
+  /// Per-section opt-out for the Today timeline. Only shown for sections
+  /// the manifest marks as `appearsInToday` — others have nothing to
+  /// gate, so the toggle would be confusing.
+  @ViewBuilder
+  private var showInTodayRow: some View {
+    if let m = manifest, m.appearsInToday {
+      Toggle(isOn: Binding(
+        get: { server?.showInToday ?? true },
+        set: { setShowInToday($0) }
+      )) {
+        VStack(alignment: .leading, spacing: 1) {
+          Text("Show in Today")
+          Text("Include this section's entries in the Today log.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+    }
+  }
+
+  private func setShowInToday(_ value: Bool) {
+    SettingsMirror.setSectionShowInToday(sectionKey,
+                                         showInToday: value,
+                                         context: modelContext,
+                                         engine: ckEngine)
+    store.sections = store.sections.map { config in
+      config.key == sectionKey
+        ? SectionConfig(key: config.key,
+                        label: config.label,
+                        color: config.color,
+                        isEnabled: config.isEnabled,
+                        showInToday: value)
+        : config
+    }
+  }
+
+  /// Master enabled toggle. Hidden for `.always` sections (e.g. Tasks).
+  /// Disabling hides the section from the dashboard, sidebar, and every
+  /// other surface that filters on `isEnabled` — but never deletes data
+  /// or the SectionEntity row, so customizations survive a toggle.
   @ViewBuilder
   private var enabledRow: some View {
     if let m = manifest, m.canDisable {
@@ -1165,8 +1244,8 @@ struct SectionDetailPane: View {
         set: { setEnabled($0) }
       )) {
         VStack(alignment: .leading, spacing: 1) {
-          Text("Show on dashboard")
-          Text("Disabling hides this section everywhere; your data and customizations stay.")
+          Text("Enabled")
+          Text("Hides this section everywhere. Your data and customizations stay.")
             .font(.caption)
             .foregroundStyle(.secondary)
         }
@@ -1192,7 +1271,8 @@ struct SectionDetailPane: View {
         ? SectionConfig(key: config.key,
                         label: config.label,
                         color: config.color,
-                        isEnabled: enabled)
+                        isEnabled: enabled,
+                        showInToday: config.showInToday)
         : config
     }
   }
@@ -1211,7 +1291,8 @@ struct SectionDetailPane: View {
         ? SectionConfig(key: config.key,
                         label: config.label,
                         color: hex,
-                        isEnabled: config.isEnabled)
+                        isEnabled: config.isEnabled,
+                        showInToday: config.showInToday)
         : config
     }
   }

@@ -121,16 +121,19 @@ enum SettingsMirror {
         let changed = entity.title != section.label
           || entity.color != section.color
           || entity.isEnabled != section.isEnabled
+          || entity.showInToday != section.showInToday
         entity.title = section.label
         entity.color = section.color
         entity.isEnabled = section.isEnabled
+        entity.showInToday = section.showInToday
         entity.updatedAt = .now
         if changed { changedIDs.append(section.key) }
       } else {
         let entity = SectionEntity(id: section.key,
                                    title: section.label,
                                    color: section.color,
-                                   isEnabled: section.isEnabled)
+                                   isEnabled: section.isEnabled,
+                                   showInToday: section.showInToday)
         context.insert(entity)
         changedIDs.append(section.key)
       }
@@ -162,6 +165,27 @@ enum SettingsMirror {
       engine?.noteSectionChange(id: key)
     } catch {
       SeptenaLog.error("SettingsMirror.setSectionEnabled", error)
+    }
+  }
+
+  /// Toggle `showInToday` on a single section. Same shape as
+  /// `setSectionEnabled`: persists, syncs, never deletes.
+  static func setSectionShowInToday(_ key: String,
+                                    showInToday: Bool,
+                                    context: ModelContext,
+                                    engine: CKEngine? = nil) {
+    let descriptor = FetchDescriptor<SectionEntity>(
+      predicate: #Predicate { $0.id == key }
+    )
+    guard let entity = try? context.fetch(descriptor).first else { return }
+    guard entity.showInToday != showInToday else { return }
+    entity.showInToday = showInToday
+    entity.updatedAt = .now
+    do {
+      try context.save()
+      engine?.noteSectionChange(id: key)
+    } catch {
+      SeptenaLog.error("SettingsMirror.setSectionShowInToday", error)
     }
   }
 }

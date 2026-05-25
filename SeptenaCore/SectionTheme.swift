@@ -14,23 +14,34 @@ public struct SectionConfig: Codable, Hashable {
   /// rows still exist in the central store so their color / label
   /// customizations survive a toggle.
   public let isEnabled: Bool
+  /// Whether this section contributes to the Today log. Only meaningful
+  /// for sections the manifest flags as `appearsInToday`.
+  public let showInToday: Bool
 
-  public init(key: String, label: String, color: String, isEnabled: Bool = true) {
+  public init(key: String,
+              label: String,
+              color: String,
+              isEnabled: Bool = true,
+              showInToday: Bool = true) {
     self.key = key
     self.label = label
     self.color = color
     self.isEnabled = isEnabled
+    self.showInToday = showInToday
   }
 
-  // Custom decode so older ResponseCache blobs (pre-isEnabled) decode
-  // cleanly and default to enabled.
-  private enum CodingKeys: String, CodingKey { case key, label, color, isEnabled }
+  // Custom decode so older ResponseCache blobs (pre-isEnabled /
+  // pre-showInToday) decode cleanly with sensible defaults.
+  private enum CodingKeys: String, CodingKey {
+    case key, label, color, isEnabled, showInToday
+  }
   public init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
     self.key = try c.decode(String.self, forKey: .key)
     self.label = try c.decode(String.self, forKey: .label)
     self.color = try c.decode(String.self, forKey: .color)
     self.isEnabled = (try? c.decode(Bool.self, forKey: .isEnabled)) ?? true
+    self.showInToday = (try? c.decode(Bool.self, forKey: .showInToday)) ?? true
   }
 }
 

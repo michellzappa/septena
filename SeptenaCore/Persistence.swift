@@ -259,6 +259,11 @@ final class SectionEntity {
   /// Disabling never deletes the row or any per-section data; toggling
   /// back on restores the previous title/color customizations.
   var isEnabled: Bool = true
+  /// Whether this section contributes events to the Today log. Only
+  /// meaningful for sections the manifest marks as `appearsInToday`.
+  /// Independent of `isEnabled` so a section can stay visible on the
+  /// dashboard but be muted from the Today timeline (or vice versa).
+  var showInToday: Bool = true
   var updatedAt: Date
   /// CKRecord system-fields blob. Same contract as the other mirrored
   /// entities: preserves recordChangeTag across updates.
@@ -268,12 +273,14 @@ final class SectionEntity {
        title: String,
        color: String,
        isEnabled: Bool = true,
+       showInToday: Bool = true,
        updatedAt: Date = .now,
        cloudKitSystemFields: Data? = nil) {
     self.id = id
     self.title = title
     self.color = color
     self.isEnabled = isEnabled
+    self.showInToday = showInToday
     self.updatedAt = updatedAt
     self.cloudKitSystemFields = cloudKitSystemFields
   }
@@ -1129,7 +1136,11 @@ extension Area {
 
 extension SectionConfig {
   init(_ e: SectionEntity) {
-    self.init(key: e.id, label: e.title, color: e.color, isEnabled: e.isEnabled)
+    self.init(key: e.id,
+              label: e.title,
+              color: e.color,
+              isEnabled: e.isEnabled,
+              showInToday: e.showInToday)
   }
 }
 

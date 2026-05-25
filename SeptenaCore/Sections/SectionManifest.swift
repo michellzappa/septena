@@ -69,6 +69,21 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
   /// locked on; everything else can be disabled from Settings.
   public var canDisable: Bool { activation != .always }
 
+  /// Sections that contribute events to the Today log. Source of truth
+  /// for whether a "Show in Today" toggle is offered in Settings. Kept
+  /// as a static set here (rather than a per-entry init field) so that
+  /// the manifest entries stay terse — `TodayLogView` is the consumer.
+  public static let todayCapableKeys: Set<String> = [
+    "tasks", "habits", "supplements", "chores",
+    "training", "nutrition",
+    "caffeine", "cannabis", "gut", "mood",
+  ]
+
+  /// Whether this section has any presence on the Today timeline.
+  public var appearsInToday: Bool {
+    SectionManifest.todayCapableKeys.contains(key)
+  }
+
   /// Default `isEnabled` for a freshly-seeded `SectionEntity`. `.always`
   /// is always on. `.core`-onboarding sections start on; `.optional`
   /// and `.hidden` start off. `.integration` sections wait for the
