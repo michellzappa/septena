@@ -1,0 +1,44 @@
+name = "septena-mcp-gateway"
+main = "src/index.ts"
+compatibility_date = "2024-12-15"
+compatibility_flags = ["nodejs_compat_v2"]
+
+# Allow importing .md files as text modules. Used by src/landing.ts to embed
+# the skill brief served at GET / and GET /skill.md without escaping the
+# markdown into a TS template literal.
+[[rules]]
+type = "Text"
+globs = ["**/*.md"]
+fallthrough = true
+
+# Bind the Worker to the custom domain. Requires:
+#   • septena.app DNS on Cloudflare (done)
+#   • Zone "Active" in the Cloudflare dashboard
+routes = [{ pattern = "mcp.septena.app", custom_domain = true }]
+
+[vars]
+CK_CONTAINER = "iCloud.com.septena.cloud"
+# Flip to "production" once the CloudKit schema is deployed to Production.
+# Until then the gateway talks to CloudKit Development, accessible only to
+# Apple IDs on the developer team (i.e. you).
+CK_ENVIRONMENT = "development"
+CK_ZONE = "septena-v1"
+PUBLIC_URL = "https://mcp.septena.app"
+
+# Created via `wrangler kv namespace create <NAME>`; paste returned IDs here.
+[[kv_namespaces]]
+binding = "STATE"
+id = "2ad8a91b6ba54e579d843f5bdf215bf4"
+
+[[kv_namespaces]]
+binding = "TOKENS"
+id = "d89bf617d013488096dd64be9f826d7e"
+
+[[kv_namespaces]]
+binding = "CLIENTS"
+id = "8d9200723c194a03ac3e1482f24f173d"
+
+# ---- Secrets (NOT in this file — set via `wrangler secret put`) ----
+# CK_API_TOKEN    — CloudKit Dashboard → API Tokens; redirect URL must be
+#                   https://mcp.septena.app/auth/apple/callback
+# TOKEN_ENC_KEY   — 32-byte base64 (openssl rand -base64 32) for AES-GCM
