@@ -31,6 +31,14 @@ protocol SectionPlugin {
   /// (i.e. `SectionEntity.hasOnboarded == false`). Return `nil` to
   /// skip onboarding — the toggle enables immediately. The plugin
   /// MUST call `complete()` from its view to finish the flow.
+  ///
+  /// **Invariant: onboarding is additive only.** The view introduces
+  /// the section and optionally seeds defaults; it must never delete,
+  /// overwrite, or otherwise mutate existing user data. Concretely:
+  /// if a starter-list picker offers items the user already has,
+  /// those items are shown as "already added" and excluded from the
+  /// write batch. Re-running onboarding (via the wand button) is a
+  /// safe no-op for already-imported items.
   static func onboarding(complete: @escaping () -> Void) -> AnyView?
 
   /// MCP / agent contract for this section. Declares the read/write

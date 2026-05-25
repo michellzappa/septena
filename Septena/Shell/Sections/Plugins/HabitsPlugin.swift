@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 @MainActor
 enum HabitsPlugin: SectionPlugin {
@@ -105,9 +106,23 @@ private struct HabitsOnboardingView: View {
   let complete: () -> Void
   @Environment(ChecklistMutator.self) private var mutator
   @Environment(SectionTheme.self) private var theme
+  @Environment(\.modelContext) private var modelContext
   @State private var selected: Set<String> = []
+  /// Lowercased titles of habits the user already has. Built once on
+  /// appear — onboarding is additive-only, so any starter whose name
+  /// already exists is shown as "Already added" and can't be selected.
+  @State private var existingTitles: Set<String> = []
 
   private var accent: Color { theme.color(for: "habits") }
+
+  private func alreadyExists(_ starter: HabitStarter) -> Bool {
+    existingTitles.contains(starter.name.lowercased())
+  }
+
+  private func loadExisting() {
+    let rows = (try? modelContext.fetch(FetchDescriptor<HabitDefinitionEntity>())) ?? []
+    existingTitles = Set(rows.map { $0.title.lowercased() })
+  }
 
   private var grouped: [(String, [HabitStarter])] {
     let order = ["morning", "anytime", "evening"]
@@ -146,26 +161,39 @@ private struct HabitsOnboardingView: View {
       .safeAreaInset(edge: .bottom) {
         bottomBar
       }
+      .onAppear { loadExisting() }
     }
   }
 
   @ViewBuilder
   private func starterRow(_ starter: HabitStarter) -> some View {
+    let exists = alreadyExists(starter)
     let isSelected = selected.contains(starter.id)
     Button {
+      guard !exists else { return }
       if isSelected { selected.remove(starter.id) }
       else          { selected.insert(starter.id) }
     } label: {
       HStack(spacing: 12) {
         Text(starter.emoji).font(.title3)
-        Text(starter.name).foregroundStyle(.primary)
+          .opacity(exists ? 0.4 : 1)
+        Text(starter.name)
+          .foregroundStyle(exists ? .secondary : .primary)
+          .strikethrough(exists, color: .secondary)
         Spacer()
-        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-          .foregroundStyle(isSelected ? accent : Color.secondary.opacity(0.6))
-          .font(.title3)
+        if exists {
+          Text("Already added")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        } else {
+          Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+            .foregroundStyle(isSelected ? accent : Color.secondary.opacity(0.6))
+            .font(.title3)
+        }
       }
     }
     .buttonStyle(.plain)
+    .disabled(exists)
   }
 
   @ViewBuilder
@@ -187,7 +215,12 @@ private struct HabitsOnboardingView: View {
   }
 
   private func addAndFinish() {
-    let toAdd = HabitStarter.all.filter { selected.contains($0.id) }
+    // Double-guard against duplicates in case the existing set changed
+    // while the sheet was open (CK sync, multi-device). Additive only —
+    // never overwrites or modifies an existing habit.
+    let toAdd = HabitStarter.all.filter {
+      selected.contains($0.id) && !alreadyExists($0)
+    }
     for s in toAdd {
       mutator.createHabit(name: s.name, bucket: s.bucket, emoji: s.emoji)
     }
