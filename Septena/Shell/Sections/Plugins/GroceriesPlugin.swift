@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // Groceries — shopping list and pantry. Skill-only; the section's
 // real surface is the Groceries destination view, not Today.
@@ -10,6 +11,10 @@ enum GroceriesPlugin: SectionPlugin {
   }
 
   static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] { [] }
+
+  static func onboarding(complete: @escaping () -> Void) -> AnyView? {
+    AnyView(GroceriesOnboardingView(complete: complete))
+  }
 
   static var mcpSkill: SectionSkill? {
     SectionSkill(
@@ -68,5 +73,128 @@ enum GroceriesPlugin: SectionPlugin {
       - Don't reference categories by name; always resolve to id first.
       """
     )
+  }
+}
+
+/// Starter categories. Items themselves are user-specific; categories
+/// are a small fixed scaffold that makes the first grocery-list use
+/// productive. Additive only.
+private struct GroceryCategoryStarter: Identifiable, Hashable {
+  let id: String
+  let name: String
+
+  static let all: [GroceryCategoryStarter] = [
+    .init(id: "starter-produce",   name: "Produce"),
+    .init(id: "starter-dairy",     name: "Dairy"),
+    .init(id: "starter-pantry",    name: "Pantry"),
+    .init(id: "starter-frozen",    name: "Frozen"),
+    .init(id: "starter-meat-fish", name: "Meat & fish"),
+    .init(id: "starter-bakery",    name: "Bakery"),
+    .init(id: "starter-drinks",    name: "Drinks"),
+    .init(id: "starter-household", name: "Household"),
+  ]
+}
+
+private struct GroceriesOnboardingView: View {
+  let complete: () -> Void
+  @Environment(SectionTheme.self) private var theme
+  @Environment(\.modelContext) private var modelContext
+  @State private var selected: Set<String> = []
+  @State private var existingNames: Set<String> = []
+
+  private var accent: Color { theme.color(for: "groceries") }
+  private var mutator: GroceryMutator { SeptenaServices.shared.groceryMutator }
+
+  private func alreadyExists(_ s: GroceryCategoryStarter) -> Bool {
+    existingNames.contains(s.name.lowercased())
+  }
+
+  private func loadExisting() {
+    let rows = (try? modelContext.fetch(FetchDescriptor<GroceryCategoryEntity>())) ?? []
+    existingNames = Set(rows.map { $0.name.lowercased() })
+  }
+
+  var body: some View {
+    NavigationStack {
+      Form {
+        Section {
+          VStack(alignment: .leading, spacing: 8) {
+            Text("Groceries organizes items by category. Pick a few common categories — items themselves get added later as you go.")
+              .foregroundStyle(.secondary)
+          }
+          .padding(.vertical, 4)
+        }
+        Section("Categories") {
+          ForEach(GroceryCategoryStarter.all) { starter in
+            starterRow(starter)
+          }
+        }
+      }
+      .formStyle(.grouped)
+      .navigationTitle("Set up Groceries")
+      #if os(iOS)
+      .navigationBarTitleDisplayMode(.inline)
+      #endif
+      .safeAreaInset(edge: .bottom) {
+        bottomBar
+      }
+      .onAppear { loadExisting() }
+    }
+  }
+
+  @ViewBuilder
+  private func starterRow(_ s: GroceryCategoryStarter) -> some View {
+    let exists = alreadyExists(s)
+    let isSelected = selected.contains(s.id)
+    Button {
+      guard !exists else { return }
+      if isSelected { selected.remove(s.id) } else { selected.insert(s.id) }
+    } label: {
+      HStack(spacing: 12) {
+        Text(s.name)
+          .foregroundStyle(exists ? .secondary : .primary)
+          .strikethrough(exists, color: .secondary)
+        Spacer()
+        if exists {
+          Text("Already added")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        } else {
+          Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+            .foregroundStyle(isSelected ? accent : Color.secondary.opacity(0.6))
+            .font(.title3)
+        }
+      }
+    }
+    .buttonStyle(.plain)
+    .disabled(exists)
+  }
+
+  @ViewBuilder
+  private var bottomBar: some View {
+    HStack(spacing: 12) {
+      Button("Skip") { complete() }
+        .buttonStyle(.bordered)
+      Spacer()
+      Button(actionTitle) { addAndFinish() }
+        .buttonStyle(.borderedProminent)
+        .tint(accent)
+    }
+    .padding()
+    .background(.bar)
+  }
+
+  private var actionTitle: String {
+    selected.isEmpty ? "Done" : "Add \(selected.count) categor\(selected.count == 1 ? "y" : "ies")"
+  }
+
+  private func addAndFinish() {
+    let toAdd = GroceryCategoryStarter.all.filter {
+      selected.contains($0.id) && !alreadyExists($0)
+    }
+    for s in toAdd {
+      _ = mutator.addCategory(name: s.name)
+    }
+    complete()
   }
 }

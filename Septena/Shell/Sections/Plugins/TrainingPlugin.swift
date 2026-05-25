@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // Training section. Largest MCP brief migrated so far — three record
 // types (ExerciseDefinition, SessionType, ExerciseEntry) and twelve
@@ -46,6 +47,12 @@ enum TrainingPlugin: SectionPlugin {
       parts.append(String(format: "%.1f km", dist / 1000))
     }
     return parts.isEmpty ? nil : parts.joined(separator: " · ")
+  }
+
+  // MARK: - First-enable onboarding
+
+  static func onboarding(complete: @escaping () -> Void) -> AnyView? {
+    AnyView(TrainingOnboardingView(complete: complete))
   }
 
   // MARK: - MCP / agent contract
@@ -125,5 +132,130 @@ enum TrainingPlugin: SectionPlugin {
       - Don't `training_exercise_delete` something that has historical entries unless the user is sure. Entries keep a denormalised exercise name, but the catalog reference is lost.
       """
     )
+  }
+}
+
+/// Starter session templates. Picking a session creates a SessionType
+/// row the user can fill with exercises later. Additive only.
+private struct SessionStarter: Identifiable, Hashable {
+  let id: String
+  let label: String
+  let emoji: String
+
+  static let all: [SessionStarter] = [
+    .init(id: "starter-upper",    label: "Upper",     emoji: "💪"),
+    .init(id: "starter-lower",    label: "Lower",     emoji: "🦵"),
+    .init(id: "starter-push",     label: "Push",      emoji: "⬆️"),
+    .init(id: "starter-pull",     label: "Pull",      emoji: "⬇️"),
+    .init(id: "starter-legs",     label: "Legs",      emoji: "🦵"),
+    .init(id: "starter-cardio",   label: "Cardio",    emoji: "🏃"),
+    .init(id: "starter-mobility", label: "Mobility",  emoji: "🧘"),
+    .init(id: "starter-full",     label: "Full body", emoji: "🏋️"),
+  ]
+}
+
+private struct TrainingOnboardingView: View {
+  let complete: () -> Void
+  @Environment(SectionTheme.self) private var theme
+  @Environment(\.modelContext) private var modelContext
+  @State private var selected: Set<String> = []
+  @State private var existingLabels: Set<String> = []
+
+  private var accent: Color { theme.color(for: "training") }
+  private var mutator: TrainingMutator { SeptenaServices.shared.trainingMutator }
+
+  private func alreadyExists(_ s: SessionStarter) -> Bool {
+    existingLabels.contains(s.label.lowercased())
+  }
+
+  private func loadExisting() {
+    let rows = (try? modelContext.fetch(FetchDescriptor<SessionTypeEntity>())) ?? []
+    existingLabels = Set(rows.map { $0.label.lowercased() })
+  }
+
+  var body: some View {
+    NavigationStack {
+      Form {
+        Section {
+          VStack(alignment: .leading, spacing: 8) {
+            Text("Training groups workouts into session templates like Upper, Lower, or Cardio. Pick the ones you'll use — you can add exercises to each later, or define your own templates.")
+              .foregroundStyle(.secondary)
+          }
+          .padding(.vertical, 4)
+        }
+        Section("Session templates") {
+          ForEach(SessionStarter.all) { starter in
+            starterRow(starter)
+          }
+        }
+      }
+      .formStyle(.grouped)
+      .navigationTitle("Set up Training")
+      #if os(iOS)
+      .navigationBarTitleDisplayMode(.inline)
+      #endif
+      .safeAreaInset(edge: .bottom) {
+        bottomBar
+      }
+      .onAppear { loadExisting() }
+    }
+  }
+
+  @ViewBuilder
+  private func starterRow(_ s: SessionStarter) -> some View {
+    let exists = alreadyExists(s)
+    let isSelected = selected.contains(s.id)
+    Button {
+      guard !exists else { return }
+      if isSelected { selected.remove(s.id) } else { selected.insert(s.id) }
+    } label: {
+      HStack(spacing: 12) {
+        Text(s.emoji).font(.title3)
+          .opacity(exists ? 0.4 : 1)
+        Text(s.label)
+          .foregroundStyle(exists ? .secondary : .primary)
+          .strikethrough(exists, color: .secondary)
+        Spacer()
+        if exists {
+          Text("Already added")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        } else {
+          Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+            .foregroundStyle(isSelected ? accent : Color.secondary.opacity(0.6))
+            .font(.title3)
+        }
+      }
+    }
+    .buttonStyle(.plain)
+    .disabled(exists)
+  }
+
+  @ViewBuilder
+  private var bottomBar: some View {
+    HStack(spacing: 12) {
+      Button("Skip") { complete() }
+        .buttonStyle(.bordered)
+      Spacer()
+      Button(actionTitle) { addAndFinish() }
+        .buttonStyle(.borderedProminent)
+        .tint(accent)
+    }
+    .padding()
+    .background(.bar)
+  }
+
+  private var actionTitle: String {
+    selected.isEmpty ? "Done" : "Add \(selected.count) template\(selected.count == 1 ? "" : "s")"
+  }
+
+  private func addAndFinish() {
+    let toAdd = SessionStarter.all.filter {
+      selected.contains($0.id) && !alreadyExists($0)
+    }
+    for s in toAdd {
+      _ = mutator.addSessionType(label: s.label, emoji: s.emoji, exercises: [])
+    }
+    complete()
   }
 }
