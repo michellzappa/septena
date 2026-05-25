@@ -73,7 +73,8 @@ private struct DenseDomainRow: View {
 
       DomainSparkline(history: data.history,
                       accent: data.accent,
-                      smooth: data.smoothSparkline)
+                      smooth: data.smoothSparkline,
+                      dropTrailingTodayPending: data.trailingTodayPending)
         .frame(width: 84, height: 28)
 
       Image(systemName: "chevron.right")
@@ -100,6 +101,11 @@ private struct DomainSparkline: View {
   /// before plotting. Used for spiky cadences (training) where
   /// daily points hide the trend. See `HomepageDomainData.smoothSparkline`.
   var smooth: Bool = false
+  /// When true, treat the last element of a `.bars` series as a
+  /// pending-today placeholder and drop it before plotting. The
+  /// underlying value is kept in `HomepageDomainData.history` so the
+  /// Heatmap renderer can still anchor its date map to today.
+  var dropTrailingTodayPending: Bool = false
 
   /// Trailing-N-day rolling mean. The first `window-1` points
   /// average whatever's available so the line starts plotting
@@ -184,7 +190,10 @@ private struct DomainSparkline: View {
         // Align to the fixed 90-day window first, then optionally
         // smooth. Order matters: smoothing before alignment would
         // average actual data with padded zeros at the boundary.
-        let raw = aligned(values.map(Double.init))
+        let trimmed = dropTrailingTodayPending && !values.isEmpty
+          ? Array(values.dropLast())
+          : values
+        let raw = aligned(trimmed.map(Double.init))
         let smoothed = smooth ? rollingMean(raw) : raw
         if let series = nonEmpty(smoothed) {
           ForEach(Array(series.enumerated()), id: \.offset) { idx, value in

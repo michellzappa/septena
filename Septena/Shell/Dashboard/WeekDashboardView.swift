@@ -320,7 +320,8 @@ struct WeekDashboardView: View {
           gut: gutToday?.entries ?? [],
           nutrition: todayNutrition,
           training: recentTraining,
-          calendar: dailies.calendarEvents
+          calendar: dailies.calendarEvents,
+          mood: moodToday?.entries ?? []
         )
       }
     }
@@ -803,6 +804,7 @@ struct WeekDashboardView: View {
       cannabis: cannabisToday?.entries ?? [],
       nutrition: todayNutrition,
       gut: gutToday?.entries ?? [],
+      mood: moodToday?.entries ?? [],
       habits: dailies.habits,
       supplements: dailies.supplements,
       chores: dailies.chores,
@@ -1152,7 +1154,8 @@ struct WeekDashboardView: View {
       ],
       progress: nil,
       history: .bars(bars),
-      tap: .openSheet(.sleep)
+      tap: .openSheet(.sleep),
+      trailingTodayPending: true
     )
   }
 
@@ -2344,6 +2347,7 @@ private struct WeekDashboardTimelineCard: View {
   let cannabis: [CannabisEntry]
   let nutrition: [NutritionEntry]
   let gut: [GutEntry]
+  let mood: [MoodEntry]
   let habits: [HabitDayItem]
   let supplements: [SupplementDayItem]
   let chores: [ChoreItem]
@@ -2360,6 +2364,7 @@ private struct WeekDashboardTimelineCard: View {
       cannabis: cannabis,
       nutrition: nutrition,
       gut: gut,
+      mood: mood,
       habits: habits,
       supplements: supplements,
       chores: chores,

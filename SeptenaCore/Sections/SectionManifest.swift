@@ -567,26 +567,7 @@ public extension SectionSkill {
     ),
     // caffeine migrated to CaffeinePlugin (Septena target). See
     // SectionSkill.resolve(_:) — registry lookup wins over this list.
-    .init(
-      key: "cannabis",
-      summary: "Log cannabis intake with strain and effect.",
-      tools: [
-        .init("cannabis_events_list",  "By day or range. Defaults to last 7 days",
-              inputs: "optional: date, from, to, limit"),
-        .init("cannabis_event_log",    "Log an intake",
-              inputs: "required: method (vape|edible) · optional: date (default today), time (HH:MM:SS), strain (CannabisStrain id), hit (count for vape), grams (for edibles), effect (free-form, e.g. relaxed/creative), note"),
-        .init("cannabis_event_delete", "Remove an event",
-              inputs: "required: id"),
-        .init("cannabis_strains_list", "Strain catalog"),
-        .init("cannabis_strain_create", "Add a strain",
-              inputs: "required: name"),
-        .init("cannabis_strain_delete", "Remove a strain",
-              inputs: "required: id"),
-      ],
-      body: """
-      `effect` is subjective free-form: "relaxed", "creative", "couch-locked".
-      """
-    ),
+    // cannabis migrated to CannabisPlugin (Septena target).
     .init(
       key: "gut",
       summary: "Digestive event log.",

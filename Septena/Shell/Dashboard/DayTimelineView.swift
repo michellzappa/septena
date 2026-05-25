@@ -24,6 +24,7 @@ struct DayTimelineView: View {
   var cannabis: [CannabisEntry] = []
   var nutrition: [NutritionEntry] = []
   var gut: [GutEntry] = []
+  var mood: [MoodEntry] = []
   var habits: [HabitDayItem] = []
   var supplements: [SupplementDayItem] = []
   var chores: [ChoreItem] = []
@@ -383,6 +384,7 @@ struct DayTimelineView: View {
     for e in cannabis    { if let h = parseHHMM(e.time) { values.append(h) } }
     for e in nutrition where e.date == date { if let h = parseHHMM(e.time) { values.append(h) } }
     for e in gut         { if let h = parseHHMM(e.time) { values.append(h) } }
+    for e in mood        { if let h = parseHHMM(String(e.time.prefix(5))) { values.append(h) } }
     for e in habits where e.done {
       if let t = e.time, let h = parseHHMM(t) { values.append(h) }
     }
@@ -497,6 +499,15 @@ struct DayTimelineView: View {
     }
     for e in gut {
       if let h = parseHHMM(e.time) { add(h, color: cG) }
+    }
+    // Mood dots — colored by quadrant rather than a single section
+    // accent, so the timeline reads the affective valence at a glance
+    // (yellow morning + blue evening = a real signal).
+    for e in mood {
+      if let h = parseHHMM(String(e.time.prefix(5))) {
+        let color = MoodQuadrant(rawValue: e.quadrant)?.color ?? .gray
+        add(h, color: color)
+      }
     }
     for h_ in habits where h_.done {
       if let t = h_.time, let hh = parseHHMM(t) { add(hh, color: cH) }

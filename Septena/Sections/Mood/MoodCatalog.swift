@@ -17,24 +17,24 @@ enum MoodQuadrant: String, CaseIterable, Identifiable, Hashable {
   var id: String { rawValue }
 
   /// Plain-English label per the user's preference (chosen over the
-  /// HAP/HAN/LAP/LAN academic shorthand). Keeps the UI inviting while
-  /// the sub-grid axes still convey the circumplex.
+  /// HAP/HAN/LAP/LAN academic shorthand). Title-cased — these are
+  /// proper names for the quadrants, not sentence fragments.
   var title: String {
     switch self {
-    case .hap: return "High energy, pleasant"
-    case .han: return "High energy, unpleasant"
-    case .lan: return "Low energy, unpleasant"
-    case .lap: return "Low energy, pleasant"
+    case .hap: return "High Energy, Pleasant"
+    case .han: return "High Energy, Unpleasant"
+    case .lan: return "Low Energy, Unpleasant"
+    case .lap: return "Low Energy, Pleasant"
     }
   }
 
   /// One-word affective summary used in the quadrant card subtitle.
   var blurb: String {
     switch self {
-    case .hap: return "Activated · positive"
-    case .han: return "Activated · negative"
-    case .lan: return "Quiet · negative"
-    case .lap: return "Quiet · positive"
+    case .hap: return "Activated · Positive"
+    case .han: return "Activated · Negative"
+    case .lan: return "Quiet · Negative"
+    case .lap: return "Quiet · Positive"
     }
   }
 
@@ -49,6 +49,32 @@ enum MoodQuadrant: String, CaseIterable, Identifiable, Hashable {
     case .lap: return Color(red: 0.45, green: 0.78, blue: 0.52)
     }
   }
+
+  /// Spring physics tuned to embody the quadrant's affect. Used for
+  /// finer-grained interactions (chip cascade entry, header pop-in)
+  /// where the animation should feel native rather than spectacular.
+  var spring: Animation {
+    switch self {
+    case .hap: return .spring(duration: 0.42, bounce: 0.32)
+    case .han: return .spring(duration: 0.38, bounce: 0.18)
+    case .lap: return .spring(duration: 0.55, bounce: 0.28)
+    case .lan: return .spring(duration: 0.58, bounce: 0.12)
+    }
+  }
+
+  /// Slower spring used for the marquee transition between the 2×2
+  /// quadrant grid and the 3×3 emotion grid. Long enough that the
+  /// matched-geometry expand is legible as an event, not just a
+  /// near-instant snap. Same bounce profile as `spring` so the
+  /// quadrant's character carries through.
+  var expandSpring: Animation {
+    switch self {
+    case .hap: return .spring(duration: 0.85, bounce: 0.34)
+    case .han: return .spring(duration: 0.80, bounce: 0.20)
+    case .lap: return .spring(duration: 1.05, bounce: 0.30)
+    case .lan: return .spring(duration: 1.15, bounce: 0.14)
+    }
+  }
 }
 
 struct MoodEmotion: Hashable, Identifiable {
@@ -59,6 +85,38 @@ struct MoodEmotion: Hashable, Identifiable {
   let valence: Int
   let word: String
   var id: String { "\(quadrant.rawValue)-\(arousal)-\(valence)" }
+
+  /// 0...1 — how far this cell sits from the circumplex's neutral center
+  /// along the path toward its quadrant's signature pole. Used to drive
+  /// chip color saturation in the step-2 picker so the cells at the
+  /// quadrant's affective peak look the most "themselves."
+  ///
+  /// Each quadrant's pole is the corner farthest from the circumplex
+  /// origin:
+  ///   HAP: arousal 3, valence 3 → Ecstatic
+  ///   HAN: arousal 3, valence 1 → Enraged
+  ///   LAN: arousal 1, valence 1 → Despondent
+  ///   LAP: arousal 1, valence 3 → Tranquil
+  ///
+  /// The "opposite corner" within each quadrant — closest to neutral —
+  /// returns 0 (e.g. HAP's Focused at a=1, v=1).
+  var intensity: Double {
+    let a = Double(arousal - 1)         // 0...2
+    let v = Double(valence - 1)         // 0...2
+    let arousalDist: Double = {
+      switch quadrant {
+      case .hap, .han: return a         // pole at high arousal
+      case .lap, .lan: return 2 - a     // pole at low arousal
+      }
+    }()
+    let valenceDist: Double = {
+      switch quadrant {
+      case .hap, .lap: return v         // pole at high valence (pleasant)
+      case .han, .lan: return 2 - v     // pole at low valence (unpleasant)
+      }
+    }()
+    return (arousalDist + valenceDist) / 4
+  }
 }
 
 enum MoodCatalog {

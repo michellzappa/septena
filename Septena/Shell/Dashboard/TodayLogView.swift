@@ -76,7 +76,7 @@ struct TodayLogView: View {
     }
     .sheet(item: $editingCannabis) { entry in
       EditCannabisEntrySheet(date: date, original: entry) { updated in
-        replaceEvent(id: "cnb-\(entry.id)", title: cannabisLabel(updated),
+        replaceEvent(id: "cnb-\(entry.id)", title: CannabisPlugin.label(for: updated),
                      detail: updated.strain, time: updated.time, kind: .cannabis(updated))
       }
     }
@@ -250,7 +250,6 @@ struct TodayLogView: View {
     let cS = theme.color(for: "supplements")
     let cR = theme.color(for: "chores")
     let cT = theme.color(for: "tasks")
-    let cZ = theme.color(for: "cannabis")
     let cG = theme.color(for: "gut")
     let cN = theme.color(for: "nutrition")
     let cTr = theme.color(for: "training")
@@ -292,15 +291,8 @@ struct TodayLogView: View {
       ))
     }
 
-    // caffeine migrated to CaffeinePlugin (see SectionRegistry loop below)
-
-    for e in cannabis {
-      let label = cannabisLabel(e)
-      out.append(TodayEvent(
-        id: "cnb-\(e.id)", time: e.time, section: "cannabis",
-        color: cZ, title: label, detail: e.strain, kind: .cannabis(e)
-      ))
-    }
+    // caffeine + cannabis migrated to their plugins (see SectionRegistry
+    // loop below).
 
     for e in gut {
       out.append(TodayEvent(
@@ -382,13 +374,8 @@ struct TodayLogView: View {
   // `caffeineLabel` moved to CaffeinePlugin.label(for:) along with the
   // Today block. Other section labels will follow as they migrate.
 
-  private func cannabisLabel(_ e: CannabisEntry) -> String {
-    switch e.method {
-    case "vape":   return "Vape"
-    case "edible": return "Edible"
-    default:       return e.method.capitalized
-    }
-  }
+  // `cannabisLabel` moved to CannabisPlugin.label(for:) alongside the
+  // Today block.
 
   private func bristolLabel(_ n: Int) -> String {
     switch n {

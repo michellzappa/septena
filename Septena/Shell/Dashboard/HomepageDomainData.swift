@@ -82,4 +82,10 @@ struct HomepageDomainData {
   /// Heatmap mode ignores this flag — the heatmap strip *is* the
   /// "did I train today" consistency view and needs daily resolution.
   var smoothSparkline: Bool = false
+  /// True when the last element of `history` is a placeholder for
+  /// today's still-pending value (e.g. sleep — Oura only records
+  /// completed nights, so today reads as 0 until tomorrow morning).
+  /// The Heatmap renderer keeps it so the date map anchors to today;
+  /// the Sparkline renderer drops it so the line doesn't dive to 0.
+  var trailingTodayPending: Bool = false
 }

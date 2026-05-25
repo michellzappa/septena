@@ -198,6 +198,7 @@
 		A1B2C3D40000000000F10203 /* CorrelationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000F10201 /* CorrelationEngine.swift */; };
 		A1C7525645EBE54B283DC0D9 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25DC8E705099DB99718A8596 /* Persistence.swift */; };
 		A1D4907004FD78EC3D6F7C6F /* ShortcutAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB6A01D91E7B3ED63B6BFDE /* ShortcutAction.swift */; };
+		A2656F10D275C4A2407A5283 /* CannabisPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 471562D540F368C2B008038B /* CannabisPlugin.swift */; };
 		A34023762B95F32B5CC4D981 /* AreasProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44D44998956C28A061A4DBAE /* AreasProjectsView.swift */; };
 		A36B5F790EA56294CC9ADE5A /* AddNutritionPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB3A88C2CE6907A4D7BF34C2 /* AddNutritionPage.swift */; };
 		A4CE6F3B52A5191642AB9316 /* SharedComplicationData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F191C9B4CF7C226C46AC330 /* SharedComplicationData.swift */; };
@@ -239,6 +240,7 @@
 		BB19A2F7287FB286F1725A9C /* NextSuggestionsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6392DC43E2FE913972F42911 /* NextSuggestionsSection.swift */; };
 		BB6E0880C11C8581A0EFE7AC /* CaffeinePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 480BE4F0B92D70D332E473FF /* CaffeinePlugin.swift */; };
 		BD6E080D2682C87ACB9190DD /* AddInfoSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C35D898846EB8A48B77811E /* AddInfoSheet.swift */; };
+		BDA42CE92BCC3758D45ED76B /* CannabisPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 471562D540F368C2B008038B /* CannabisPlugin.swift */; };
 		BED02B3B08E74E921C1A15EF /* ActivityDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80D7DFAC856BBE635EBBC6E4 /* ActivityDestinationView.swift */; };
 		C0E093740769380C81FD31BA /* SupplementsQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = C62E8037BC8CBCE13C164828 /* SupplementsQuickAddMenu.swift */; };
 		C1F56FDF315938C5A58E8A98 /* PlatformShims.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13011C553B04F0ACEFD189CD /* PlatformShims.swift */; };
@@ -448,6 +450,7 @@
 		42EB061D69FA656547DC171F /* NutritionDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionDestinationView.swift; sourceTree = "<group>"; };
 		43B06CF53AF54BE2BFCE87FF /* GoalRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalRecord.swift; sourceTree = "<group>"; };
 		44D44998956C28A061A4DBAE /* AreasProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreasProjectsView.swift; sourceTree = "<group>"; };
+		471562D540F368C2B008038B /* CannabisPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CannabisPlugin.swift; sourceTree = "<group>"; };
 		47CA5EA5A9284AB449966DCC /* NextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextView.swift; sourceTree = "<group>"; };
 		480BE4F0B92D70D332E473FF /* CaffeinePlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CaffeinePlugin.swift; sourceTree = "<group>"; };
 		482D9E9FA333137B98A9DBE1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -999,6 +1002,7 @@
 				C6311231B3AABDB9BC4CBB69 /* MoodPlugin.swift */,
 				DEC92C4A0EDB0032A8216157 /* TestPlugin.swift */,
 				480BE4F0B92D70D332E473FF /* CaffeinePlugin.swift */,
+				471562D540F368C2B008038B /* CannabisPlugin.swift */,
 			);
 			name = Plugins;
 			path = Plugins;
@@ -1411,6 +1415,7 @@
 				621E7AE4A735609BC4D52617 /* MoodCommitAnimation.swift in Sources */,
 				257986ED236E9DD52F6B7066 /* TestPlugin.swift in Sources */,
 				BB6E0880C11C8581A0EFE7AC /* CaffeinePlugin.swift in Sources */,
+				BDA42CE92BCC3758D45ED76B /* CannabisPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1603,6 +1608,7 @@
 				90485134CFA0D4BA5126024D /* MoodCommitAnimation.swift in Sources */,
 				B1C08A4AB831AA701C7BDC75 /* TestPlugin.swift in Sources */,
 				268900096F5401045252C735 /* CaffeinePlugin.swift in Sources */,
+				A2656F10D275C4A2407A5283 /* CannabisPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

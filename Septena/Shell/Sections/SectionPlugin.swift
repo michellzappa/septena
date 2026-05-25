@@ -120,6 +120,7 @@ enum SectionRegistry {
   static let all: [any SectionPlugin.Type] = [
     MoodPlugin.self,
     CaffeinePlugin.self,
+    CannabisPlugin.self,
     TestPlugin.self,
   ]
 
