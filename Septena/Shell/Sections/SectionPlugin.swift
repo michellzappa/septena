@@ -57,6 +57,12 @@ protocol SectionPlugin {
   /// identity-only sections.
   static func detailPaneContent() -> AnyView?
 
+  /// Import/Export contribution. Returns the per-section schema tables
+  /// (what the LLM-prompt generator advertises) and a collect closure
+  /// (what the actual export writes). Default-nil for sections that
+  /// don't participate in import/export — they're simply skipped.
+  static var exportContribution: SectionExportContribution? { get }
+
   /// MCP / agent contract for this section. Declares the read/write
   /// tools an LLM uses to manipulate this section's data, plus a
   /// human-readable brief on conventions and examples. Tightly bound
@@ -129,6 +135,10 @@ extension SectionPlugin {
   /// section. Plugins override to add catalog displays / per-section
   /// preferences (one or more `Section { ... }` blocks).
   static func detailPaneContent() -> AnyView? { nil }
+
+  /// Default: no import/export participation. Plugins that own JSON
+  /// schema + entity-to-dict mappers override this.
+  static var exportContribution: SectionExportContribution? { nil }
 
   /// Default: no onboarding. Sections that need a setup flow override
   /// this; everything else inherits the no-op.

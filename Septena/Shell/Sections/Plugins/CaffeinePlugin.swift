@@ -34,6 +34,33 @@ enum CaffeinePlugin: SectionPlugin {
 
   static func detailPaneContent() -> AnyView? { AnyView(CaffeineDetailContent()) }
 
+  // MARK: - Import/Export
+
+  static var exportContribution: SectionExportContribution? {
+    SectionExportContribution(
+      tables: [
+        SchemaTable(name: "caffeineBean", purpose: "a coffee bean / source you use", fields: [
+          .req("id", "string"), .req("name", "string"),
+          .opt("sortIndex", "int"),
+        ]),
+        SchemaTable(name: "caffeineEvent", purpose: "one drink", fields: [
+          .req("id", "string"), .req("date", "date"), .req("time", "time"),
+          .req("method", "string", "v60 | matcha | other"),
+          .opt("beans", "string", "caffeineBean.id"),
+          .opt("grams", "double"), .opt("note", "string"),
+        ]),
+      ],
+      collect: { ctx in
+        let beans = try ctx.fetch(FetchDescriptor<CaffeineBeanEntity>())
+        let events = try ctx.fetch(FetchDescriptor<CaffeineEventEntity>())
+        return [
+          "caffeineBean":  beans.map(caffeineBeanExportDict),
+          "caffeineEvent": events.map(caffeineEventExportDict),
+        ]
+      }
+    )
+  }
+
   // MARK: - First-enable onboarding
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
@@ -246,4 +273,25 @@ private struct CaffeineOnboardingView: View {
     }
     complete()
   }
+}
+
+// MARK: - Export dict mappers
+//
+// Same shape as the legacy helpers in SettingsView.swift; moved here
+// so a future change to CaffeineEvent's columns updates the catalog
+// declaration, the tools list, and the JSON shape in one file.
+
+@MainActor func caffeineBeanExportDict(_ e: CaffeineBeanEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "name": e.name, "sortIndex": e.sortIndex,
+    "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor func caffeineEventExportDict(_ e: CaffeineEventEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "date": e.date, "time": e.time, "method": e.method,
+    "beans": e.beans, "grams": e.grams, "note": e.note,
+    "updatedAt": isoDate(e.updatedAt),
+  ])
 }

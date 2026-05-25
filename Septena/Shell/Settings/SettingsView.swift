@@ -3176,6 +3176,7 @@ enum ImportExportService {
   /// in every table (with type + required/optional). Designed to be
   /// copy-pasted into Claude / ChatGPT with arbitrary source data
   /// appended underneath.
+  @MainActor
   static func schemaPrompt(for sectionKey: String) -> String {
     let sectionLabel = SectionManifest.byKey[sectionKey]?.defaultLabel
       ?? sectionKey.capitalized
@@ -3233,7 +3234,14 @@ enum ImportExportService {
 
   /// Table schemas exposed to the prompt builder. Kept in sync with the
   /// entity → dict mappers above; if you add a field there, add it here.
+  @MainActor
   private static func schemaTables(for sectionKey: String) -> [SchemaTable] {
+    // Registry first: any plugin that declares exportContribution
+    // owns its schema. Falls through to the inline switch for
+    // sections still on the legacy path.
+    if let contribution = SectionRegistry.plugin(forKey: sectionKey)?.exportContribution {
+      return contribution.tables
+    }
     switch sectionKey {
     case "tasks":
       return [
@@ -3361,19 +3369,7 @@ enum ImportExportService {
           .opt("lastBought", "date"), .opt("sortIndex", "int"),
         ]),
       ]
-    case "caffeine":
-      return [
-        .init(name: "caffeineBean", purpose: "a coffee bean / source you use", fields: [
-          .req("id", "string"), .req("name", "string"),
-          .opt("sortIndex", "int"),
-        ]),
-        .init(name: "caffeineEvent", purpose: "one drink", fields: [
-          .req("id", "string"), .req("date", "date"), .req("time", "time"),
-          .req("method", "string", "v60 | matcha | other"),
-          .opt("beans", "string", "caffeineBean.id"),
-          .opt("grams", "double"), .opt("note", "string"),
-        ]),
-      ]
+    // caffeine schema lives in CaffeinePlugin.exportContribution.
     case "cannabis":
       return [
         .init(name: "cannabisStrain", purpose: "a strain you use", fields: [
@@ -3403,24 +3399,9 @@ enum ImportExportService {
     }
   }
 
-  struct SchemaTable {
-    let name: String
-    let purpose: String
-    let fields: [SchemaField]
-  }
-
-  struct SchemaField {
-    let name: String
-    let type: String
-    let required: Bool
-    let note: String?
-    static func req(_ name: String, _ type: String, _ note: String? = nil) -> SchemaField {
-      SchemaField(name: name, type: type, required: true, note: note)
-    }
-    static func opt(_ name: String, _ type: String, _ note: String? = nil) -> SchemaField {
-      SchemaField(name: name, type: type, required: false, note: note)
-    }
-  }
+  // SchemaTable / SchemaField hoisted to top-level types (see end of
+  // file) so plugin files can declare their own export contribution
+  // without needing to reach into ImportExportService's nesting.
 
   static let envelopeReference = """
 {
@@ -3457,6 +3438,9 @@ enum ImportExportService {
   @MainActor
   private static func collectTables(for key: String) throws -> [String: [[String: Any]]] {
     let ctx = LocalStore.shared.container.mainContext
+    if let contribution = SectionRegistry.plugin(forKey: key)?.exportContribution {
+      return try contribution.collect(ctx)
+    }
     switch key {
     case "tasks":
       return [
@@ -3490,11 +3474,7 @@ enum ImportExportService {
         "choreDefinition": try fetchAll(ChoreDefinitionEntity.self, ctx: ctx).map(choreDefinitionDict),
         "choreEvent":      try fetchAll(ChoreEventEntity.self, ctx: ctx).map(choreEventDict),
       ]
-    case "caffeine":
-      return [
-        "caffeineBean":  try fetchAll(CaffeineBeanEntity.self, ctx: ctx).map(caffeineBeanDict),
-        "caffeineEvent": try fetchAll(CaffeineEventEntity.self, ctx: ctx).map(caffeineEventDict),
-      ]
+    // caffeine collect lives in CaffeinePlugin.exportContribution.
     case "cannabis":
       return [
         "cannabisStrain": try fetchAll(CannabisStrainEntity.self, ctx: ctx).map(cannabisStrainDict),
@@ -3813,13 +3793,15 @@ enum ImportExportService {
   ])
 }
 
-private func isoDate(_ d: Date) -> String {
+// Internal (not private) so plugin export-contribution helpers in
+// sibling files can reuse the same compaction + ISO-date primitives.
+func isoDate(_ d: Date) -> String {
   ISO8601DateFormatter().string(from: d)
 }
 
 /// Strips nil values so the JSON stays compact and `JSONSerialization`
 /// doesn't trip on `Any?`.
-private func compact(_ dict: [String: Any?]) -> [String: Any] {
+func compact(_ dict: [String: Any?]) -> [String: Any] {
   var out: [String: Any] = [:]
   for (k, v) in dict {
     guard let v else { continue }
@@ -3955,4 +3937,37 @@ private func upsertGroceryItem(_ r: [String: Any],
   e.sortIndex = r["sortIndex"] as? Int ?? 0
   e.updatedAt = .now
   engine.noteGroceryItemChange(id: id)
+}
+
+// MARK: - Export schema types (top-level)
+//
+// Hoisted out of ImportExportService so plugin files can reference
+// them when declaring per-section export contributions.
+
+struct SchemaTable {
+  let name: String
+  let purpose: String
+  let fields: [SchemaField]
+}
+
+struct SchemaField {
+  let name: String
+  let type: String
+  let required: Bool
+  let note: String?
+  static func req(_ name: String, _ type: String, _ note: String? = nil) -> SchemaField {
+    SchemaField(name: name, type: type, required: true, note: note)
+  }
+  static func opt(_ name: String, _ type: String, _ note: String? = nil) -> SchemaField {
+    SchemaField(name: name, type: type, required: false, note: note)
+  }
+}
+
+/// Per-section export contribution. A plugin returns this if it wants
+/// to participate in Settings → Import & Export and the schema-prompt
+/// generator. `tables` declares the JSON shape; `collect` returns a
+/// freshly-built `[tableName: [row]]` dictionary for the user's data.
+struct SectionExportContribution {
+  let tables: [SchemaTable]
+  let collect: @MainActor (ModelContext) throws -> [String: [[String: Any]]]
 }
