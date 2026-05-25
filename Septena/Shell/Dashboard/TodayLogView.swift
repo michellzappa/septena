@@ -246,48 +246,9 @@ struct TodayLogView: View {
   private func buildEvents() -> [TodayEvent] {
     var out: [TodayEvent] = []
 
-    let cH = theme.color(for: "habits")
-    let cS = theme.color(for: "supplements")
-    let cR = theme.color(for: "chores")
-    let cT = theme.color(for: "tasks")
     let cCal = theme.color(for: "calendar")
 
-    for h in habits where h.done {
-      guard let t = h.time else { continue }
-      let label = [h.emoji, h.name].compactMap { $0 }.joined(separator: " ")
-      out.append(TodayEvent(
-        id: "habit-\(h.id)", time: t, section: "habits",
-        color: cH, title: label, detail: nil, kind: .habit(h)
-      ))
-    }
-
-    for s in supplements where s.done {
-      guard let t = s.time else { continue }
-      let label = [s.emoji, s.name].compactMap { $0 }.joined(separator: " ")
-      out.append(TodayEvent(
-        id: "supp-\(s.id)", time: t, section: "supplements",
-        color: cS, title: label, detail: nil, kind: .supplement(s)
-      ))
-    }
-
-    for c in chores where c.lastCompleted == date {
-      let t = c.lastCompletedTime ?? "00:00"
-      let label = [c.emoji, c.name].compactMap { $0 }.joined(separator: " ")
-      out.append(TodayEvent(
-        id: "chore-\(c.id)", time: t, section: "chores",
-        color: cR, title: label, detail: nil, kind: .chore(c)
-      ))
-    }
-
-    for task in tasks where task.status == .done {
-      guard let ts = task.completedAt, ts.hasPrefix(date), ts.count >= 16 else { continue }
-      let hhmm = String(ts.dropFirst(11).prefix(5))
-      out.append(TodayEvent(
-        id: "task-\(task.id)", time: hhmm, section: "tasks",
-        color: cT, title: task.title, detail: nil, kind: .task(task)
-      ))
-    }
-
+    // habits, supplements, chores, tasks migrated to their plugins.
     // caffeine, cannabis, gut migrated to their plugins (see
     // SectionRegistry loop below).
 

@@ -386,90 +386,7 @@ public extension SectionSkill {
   /// All section skills. Order here is the canonical display order on the
   /// Skills page. Sections without MCP tools yet are omitted.
   static let all: [SectionSkill] = [
-    .init(
-      key: "tasks",
-      summary: "Manage tasks, projects, and areas. Always available.",
-      tools: [
-        .init("tasks_list",          "List by view. Inbox = unscheduled, untoday; today = pinned; upcoming = future-scheduled; anytime EXCLUDES inbox-only tasks",
-              inputs: "optional: view (today|inbox|upcoming|anytime|someday|completed), limit"),
-        .init("tasks_create",        "New task. Without today/scheduled/due it lands in INBOX ONLY — invisible in today/anytime/upcoming. Set a routing field if the user expects to see it",
-              inputs: "required: title · optional: today (boolean — pins to Today), scheduled (YYYY-MM-DD — puts in upcoming), due (YYYY-MM-DD — deadline only, does NOT route into views), area (id, not a routing field), project (id, not a routing field)"),
-        .init("tasks_update",        "Patch any subset. Pass null to clear scheduled/due/area/project",
-              inputs: "required: id · optional: title, today, scheduled (YYYY-MM-DD or null), due (YYYY-MM-DD or null), area (id or null), project (id or null), status (open|cancelled)"),
-        .init("tasks_complete",      "Mark done. ERRORS on recurring — those must be done in-app so the next occurrence spawns",
-              inputs: "required: id"),
-        .init("tasks_defer",         "Set scheduled date, clear today",
-              inputs: "required: id, until (YYYY-MM-DD)"),
-        .init("tasks_move_to_today", "Pin to Today (today=true, clear scheduled)",
-              inputs: "required: id"),
-        .init("tasks_list_projects", "Resolve project name → id",
-              inputs: "optional: status (active|done|cancelled|all), limit"),
-        .init("tasks_list_areas",    "Resolve area name → id",
-              inputs: "optional: limit"),
-      ],
-      body: """
-      ### View routing — important
-      A task's visibility depends entirely on three fields: `today`, `scheduled`, `due`.
-
-      | Set on create        | Appears in view(s)            |
-      |----------------------|-------------------------------|
-      | `today: true`        | `today`, `anytime`            |
-      | `scheduled: <date>`  | `upcoming`, `anytime`         |
-      | `due: <date>` only   | `anytime` (deadline; no route)|
-      | None of the above    | **`inbox` only**              |
-
-      Notes:
-      - `anytime` does NOT mean "all tasks." It excludes inbox-only tasks.
-      - `area` / `project` are NOT routing fields. They tag a task for filtering inside views, but a task pinned to no view stays in inbox even if it has an area.
-      - `tasks_create` returns success for any schema-valid write — it does not tell you which view the task will land in. Reason about routing yourself.
-
-      ### Footgun
-      A bare `tasks_create(title: "X")` lands in `inbox` and stays invisible to anyone listing `today`/`anytime`/`upcoming`. Models have lost track of created tasks because of this — the write succeeded, but neither model nor user noticed it ended up in inbox.
-
-      **Default behavior to adopt**: if the user doesn't specify a date or "today," either:
-      1. Ask: "Do you want this on today's list, scheduled, or just in your inbox?"
-      2. Or proceed with no flags AND explicitly tell them "I put it in your inbox" so they know where to look.
-
-      Never claim a freshly created task is "added" without indicating where it lives.
-
-      ### Examples
-      **"Add 'pick up groceries' to today"**
-      ```
-      tasks_create(title: "pick up groceries", today: true)
-      ```
-
-      **"Add 'pick up groceries' for tomorrow"**
-      ```
-      tasks_create(title: "pick up groceries", scheduled: "<tomorrow YYYY-MM-DD>")
-      ```
-
-      **"Just add 'pick up groceries' to my list"**
-      ```
-      tasks_create(title: "pick up groceries")
-      → reply: "Added to your inbox."
-      ```
-
-      **"Move my errands to Saturday"**
-      ```
-      tasks_list(view: "today")                  → find ids
-      tasks_defer(id, until: "<next saturday>")  → for each
-      ```
-
-      **"Show me everything I haven't scheduled"**
-      ```
-      tasks_list(view: "inbox")
-      ```
-
-      ### Verification habit
-      If you're about to tell the user "I added/moved/scheduled X," and routing matters, list the destination view first to confirm X is actually there. `tasks_create` and `tasks_update` return success on any schema-valid write — they don't validate that the result matches user intent.
-
-      ### Don't
-      - Don't try to `tasks_complete` a recurring task. Tell the user to do it in the app.
-      - Don't reference area/project by name. Always resolve to id first via `tasks_list_areas` / `tasks_list_projects`.
-      - Don't assume `anytime` shows all tasks. It excludes inbox-only items.
-      - Don't claim a task is "added" without mentioning which view/list it landed in.
-      """
-    ),
+    // tasks migrated to TasksPlugin (Septena target).
     .init(
       key: "goals",
       summary: "Free-text intentions tagged with section keys. Always available.",
@@ -488,83 +405,9 @@ public extension SectionSkill {
       `goals_update.sections` replaces — fetch first if you want to add.
       """
     ),
-    .init(
-      key: "habits",
-      summary: "Daily routines with done/skipped state per date.",
-      tools: [
-        .init("habits_list",   "Definitions with today's state merged",
-              inputs: "optional: date (YYYY-MM-DD, default today)"),
-        .init("habits_create", "New definition",
-              inputs: "required: title, bucket (morning|evening|anytime) · optional: emoji"),
-        .init("habits_update", "Update fields",
-              inputs: "required: id · optional: title, bucket (morning|evening|anytime), emoji"),
-        .init("habits_delete", "Delete definition and all its events",
-              inputs: "required: id"),
-        .init("habits_toggle", "Mark done/skipped/unmarked for a date. Idempotent",
-              inputs: "required: id, done · optional: date, skipped"),
-      ],
-      body: """
-      Habits separate **definitions** (the thing) from **events** (per-date state).
-
-      ### Examples
-      **"Mark my morning habits done"**
-      ```
-      habits_list()                         → filter bucket == "morning"
-      habits_toggle(id, done: true)         → for each
-      ```
-
-      **"I'm taking a rest day from exercise"**
-      ```
-      habits_toggle(id, done: false, skipped: true)
-      ```
-
-      ### Don't
-      - Don't create a new definition to log today's completion.
-      """
-    ),
-    .init(
-      key: "supplements",
-      summary: "Daily supplement log — same shape as habits.",
-      tools: [
-        .init("supplements_list",   "Definitions with today's state merged",
-              inputs: "optional: date (default today)"),
-        .init("supplements_create", "New definition",
-              inputs: "required: title · optional: emoji"),
-        .init("supplements_update", "Update fields",
-              inputs: "required: id · optional: title, emoji"),
-        .init("supplements_delete", "Delete definition and events",
-              inputs: "required: id"),
-        .init("supplements_toggle", "Mark taken/untaken for a date",
-              inputs: "required: id, done · optional: date"),
-      ],
-      body: """
-      Same definition+state shape as habits. \
-      `supplements_toggle(id, done: false)` removes today's mark.
-      """
-    ),
-    .init(
-      key: "chores",
-      summary: "Recurring household tasks with computed due dates.",
-      tools: [
-        .init("chores_list",       "Definitions + computed due/last-completed (replays 180d)"),
-        .init("chores_create",     "New chore",
-              inputs: "required: title, cadenceDays · optional: emoji"),
-        .init("chores_update",     "Update fields",
-              inputs: "required: id · optional: title, cadenceDays (min 1), emoji"),
-        .init("chores_delete",     "Delete definition and events",
-              inputs: "required: id"),
-        .init("chores_complete",   "Log completion for today or a given date",
-              inputs: "required: id · optional: date (default today)"),
-        .init("chores_defer",      "Defer to 'day' (tomorrow) or 'weekend' (next Saturday)",
-              inputs: "required: id, mode (day|weekend) · optional: date"),
-        .init("chores_uncomplete", "Remove most recent completion",
-              inputs: "required: id · optional: date"),
-      ],
-      body: """
-      `chores_list` replays the last 180 days of events to compute when each \
-      chore is next due. Surface overdue items first.
-      """
-    ),
+    // habits migrated to HabitsPlugin (Septena target).
+    // supplements migrated to SupplementsPlugin (Septena target).
+    // chores migrated to ChoresPlugin (Septena target).
     // caffeine migrated to CaffeinePlugin (Septena target). See
     // SectionSkill.resolve(_:) — registry lookup wins over this list.
     // cannabis migrated to CannabisPlugin (Septena target).
