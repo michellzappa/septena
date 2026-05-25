@@ -138,7 +138,11 @@ public extension SectionManifest {
       key: "tasks",
       defaultLabel: "Tasks",
       shortDescription: "Inbox, projects, areas, today and upcoming",
-      activation: .always,
+      // Tasks is .optional like every other section: disabling never
+      // deletes data, and the architecture's data-preservation
+      // guarantees make a hard lock unnecessary. .always remains in
+      // the enum for future hypothetical "infrastructure" sections.
+      activation: .optional,
       onboarding: .core,
       supportsTab: true,
       supportsDashboard: true,

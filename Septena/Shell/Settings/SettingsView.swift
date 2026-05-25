@@ -1028,48 +1028,29 @@ struct ManageSectionsPane: View {
   @ViewBuilder
   private func row(for manifest: SectionManifest) -> some View {
     let enabled = isEnabled(manifest.key)
-    VStack(alignment: .leading, spacing: 6) {
-      HStack(spacing: 12) {
-        VStack(alignment: .leading, spacing: 2) {
-          Text(label(for: manifest))
-            .foregroundStyle(enabled ? .primary : .secondary)
-          if !manifest.shortDescription.isEmpty {
-            Text(manifest.shortDescription)
-              .font(.caption)
-              .foregroundStyle(.secondary)
-          }
-        }
-        Spacer()
-        if manifest.canDisable {
-          Toggle("Enabled", isOn: Binding(
-            get: { enabled },
-            set: { setEnabled(manifest.key, $0) }
-          ))
-          .labelsHidden()
-        } else {
-          Text("Always on")
+    HStack(spacing: 12) {
+      VStack(alignment: .leading, spacing: 2) {
+        Text(label(for: manifest))
+          .foregroundStyle(enabled ? .primary : .secondary)
+        if !manifest.shortDescription.isEmpty {
+          Text(manifest.shortDescription)
             .font(.caption)
             .foregroundStyle(.secondary)
         }
       }
-      if manifest.appearsInToday {
-        Toggle(isOn: Binding(
-          get: { showInToday(manifest.key) },
-          set: { setShowInToday(manifest.key, $0) }
-        )) {
-          Text("Show in Today")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-        .toggleStyle(.switch)
-        .controlSize(.mini)
-        .disabled(!enabled)
+      Spacer()
+      if manifest.canDisable {
+        Toggle("Enabled", isOn: Binding(
+          get: { enabled },
+          set: { setEnabled(manifest.key, $0) }
+        ))
+        .labelsHidden()
+      } else {
+        Text("Always on")
+          .font(.caption)
+          .foregroundStyle(.secondary)
       }
     }
-  }
-
-  private func showInToday(_ key: String) -> Bool {
-    store.sections.first(where: { $0.key == key })?.showInToday ?? true
   }
 
   private func label(for manifest: SectionManifest) -> String {
@@ -1108,22 +1089,6 @@ struct ManageSectionsPane: View {
     }
   }
 
-  private func setShowInToday(_ key: String, _ value: Bool) {
-    SettingsMirror.setSectionShowInToday(key,
-                                         showInToday: value,
-                                         context: modelContext,
-                                         engine: ckEngine)
-    store.sections = store.sections.map { config in
-      config.key == key
-        ? SectionConfig(key: config.key,
-                        label: config.label,
-                        color: config.color,
-                        isEnabled: config.isEnabled,
-                        showInToday: value,
-                        hasOnboarded: config.hasOnboarded)
-        : config
-    }
-  }
 }
 
 // MARK: - Section detail pane
@@ -1273,7 +1238,7 @@ struct SectionDetailPane: View {
     }
   }
 
-  /// Per-section opt-out for the Today timeline. Only shown for sections
+  /// Per-section opt-out for the Next timeline. Only shown for sections
   /// the manifest marks as `appearsInToday` — others have nothing to
   /// gate, so the toggle would be confusing.
   @ViewBuilder
@@ -1284,8 +1249,8 @@ struct SectionDetailPane: View {
         set: { setShowInToday($0) }
       )) {
         VStack(alignment: .leading, spacing: 1) {
-          Text("Show in Today")
-          Text("Include this section's entries in the Today log.")
+          Text("Show in Next")
+          Text("Include this section's entries in the Next timeline.")
             .font(.caption)
             .foregroundStyle(.secondary)
         }
