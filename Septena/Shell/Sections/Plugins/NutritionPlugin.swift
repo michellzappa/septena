@@ -67,7 +67,10 @@ enum NutritionPlugin: SectionPlugin {
   static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] {
     let accent = ctx.theme.color(for: "nutrition")
     return ctx.nutrition
-      .filter { $0.date == date }
+      // Filter out water-only entries — those belong to the Hydration
+      // section's Today block, not here. A real meal that happens to
+      // record waterMl still shows under Nutrition (it's a meal).
+      .filter { $0.date == date && !HydrationPlugin.isHydrationOnly($0) }
       .map { entry in
         TodayEvent(
           id: "nut-\(entry.id)",

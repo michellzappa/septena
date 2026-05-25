@@ -75,7 +75,7 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
   /// the manifest entries stay terse — `TodayLogView` is the consumer.
   public static let todayCapableKeys: Set<String> = [
     "tasks", "habits", "supplements", "chores",
-    "training", "nutrition",
+    "training", "nutrition", "hydration",
     "caffeine", "cannabis", "gut", "mood",
   ]
 
@@ -106,6 +106,7 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
     "mood":        "face.smiling",
     "activity":    "figure.walk",
     "goals":       "target",
+    "hydration":   "drop.fill",
     "test":        "wand.and.stars",
   ]
 
@@ -316,6 +317,23 @@ public extension SectionManifest {
       supportsTab: false,
       supportsDashboard: true,
       settingsEditor: .appearance
+    ),
+    // Hydration — water-only log. UX over existing nutrition data:
+    // every entry is a NutritionEntryEntity with `foods: ["Water"]`,
+    // `waterMl > 0`, and macros at 0. Logged via the hydration quick-
+    // add affordances; surfaces in Hydration's destination view and
+    // Today timeline. The same waterMl field on a real meal entry
+    // still counts toward the daily total without showing as a
+    // separate hydration row.
+    .init(
+      key: "hydration",
+      defaultLabel: "Hydration",
+      shortDescription: "Water intake against a daily target",
+      activation: .optional,
+      onboarding: .core,
+      supportsTab: false,
+      supportsDashboard: true,
+      settingsEditor: .none
     ),
     // Goals — free-text intentions tagged with section keys. No
     // homepage tile and no Today presence; surfaces inside the

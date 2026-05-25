@@ -241,6 +241,7 @@ enum SectionRegistry {
     GutPlugin.self,
     TrainingPlugin.self,
     NutritionPlugin.self,
+    HydrationPlugin.self,
     TestPlugin.self,
   ]
 
