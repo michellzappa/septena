@@ -1163,29 +1163,9 @@ struct SectionDetailPane: View {
   private var identitySection: some View {
     Section {
       HStack(spacing: 12) {
-        Button {
-          showingColorPicker.toggle()
-        } label: {
-          RoundedRectangle(cornerRadius: 6, style: .continuous)
-            .fill(accent)
-            .frame(width: 28, height: 28)
-        }
-        .buttonStyle(.plain)
-        .popover(isPresented: $showingColorPicker, arrowEdge: .leading) {
-          PaletteSwatchGrid(selectedHex: server?.color ?? "") { hex in
-            updateColor(hex)
-            showingColorPicker = false
-          }
-          .padding(12)
-          .presentationCompactAdaptation(.popover)
-        }
-        VStack(alignment: .leading, spacing: 1) {
-          Text(label).foregroundStyle(.primary)
-          Text(sectionKey)
-            .font(.caption.monospaced())
-            .foregroundStyle(.secondary)
-        }
+        Text(label).foregroundStyle(.primary)
         Spacer()
+        colorSwatchButton
       }
       enabledRow
       showInTodayRow
@@ -1193,6 +1173,35 @@ struct SectionDetailPane: View {
       if let m = manifest, !m.shortDescription.isEmpty {
         Text(m.shortDescription)
       }
+    }
+  }
+
+  /// Trailing-aligned, circular color swatch — reads as "tappable
+  /// settings affordance" the way iOS-native pickers (Lists app, Reminders
+  /// list color) do: a circle with a hairline border, a subtle pencil
+  /// glyph on hover/press to reinforce it can be changed.
+  @ViewBuilder
+  private var colorSwatchButton: some View {
+    Button {
+      showingColorPicker.toggle()
+    } label: {
+      Circle()
+        .fill(accent)
+        .overlay(
+          Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 0.5)
+        )
+        .frame(width: 26, height: 26)
+        .contentShape(Circle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel("Section color")
+    .popover(isPresented: $showingColorPicker, arrowEdge: .trailing) {
+      PaletteSwatchGrid(selectedHex: server?.color ?? "") { hex in
+        updateColor(hex)
+        showingColorPicker = false
+      }
+      .padding(12)
+      .presentationCompactAdaptation(.popover)
     }
   }
 
