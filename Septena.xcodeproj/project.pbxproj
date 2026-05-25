@@ -18,6 +18,7 @@
 		07B127F5FBCE0DE19AFCD387 /* SectionTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03DC46C772E45B60ECB7343 /* SectionTheme.swift */; };
 		07F54D0DB13468114771FD91 /* Outbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD295FAB7B881CAC43EE8C34 /* Outbox.swift */; };
 		08C1D850AC33EDFB75ADD93D /* MoodQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEF5AB60845609D46FB5790D /* MoodQuickAddMenu.swift */; };
+		092B2E981C4A35E2AFF06053 /* SectionExplainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1CEE126A22E14D793FDB9C4 /* SectionExplainer.swift */; };
 		0A871A3A42EE54FEC6B17A0A /* AddInfoRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D3C4FD96F6113A7975BA394 /* AddInfoRouter.swift */; };
 		0BD73B4B6206D9A9878C1EA8 /* QuickFindView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAB04CA79A9C3207CCE972F9 /* QuickFindView.swift */; };
 		0C5C19796C2D4515B47D2690 /* AirStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23414685B03BA930E6C4D94 /* AirStore.swift */; };
@@ -356,6 +357,7 @@
 		F33A979522BADF2F89A74A75 /* TodayEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB74A5AFBC9C70CD48B03DFB /* TodayEvent.swift */; };
 		F4251470458A2411D47FC255 /* WatchModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D19FFA7AF205D77FD446D409 /* WatchModels.swift */; };
 		F46ED9D5CAC9DA26811E4246 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 784D3E7D8D933961200812D6 /* PrivacyInfo.xcprivacy */; };
+		F553411F51C07D47D11B3A4F /* SectionExplainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1CEE126A22E14D793FDB9C4 /* SectionExplainer.swift */; };
 		F557E1F2F6F548E9E0082F10 /* NutritionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACE439E37CB04BBBC0C979CC /* NutritionPlugin.swift */; };
 		F5B490D2166BAEB13EE3383A /* TasksBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3882D64DF6517B0447F5F65C /* TasksBackend.swift */; };
 		F7739072DE3EDDE989C4B9FB /* Accessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26ED5AC7B6F2400A0A4B378C /* Accessibility.swift */; };
@@ -588,6 +590,7 @@
 		E0B5F0D2E1B01AAEF2217FA4 /* TasksQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksQuickAddMenu.swift; sourceTree = "<group>"; };
 		E0E984505A489247AADAB293 /* ConsistencyHeatmap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsistencyHeatmap.swift; sourceTree = "<group>"; };
 		E17D3542734AB0B32527C12C /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
+		E1CEE126A22E14D793FDB9C4 /* SectionExplainer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SectionExplainer.swift; sourceTree = "<group>"; };
 		E31867A580D7D96DFB20391B /* ChoresDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoresDestinationView.swift; sourceTree = "<group>"; };
 		E5439F75303F906465F9F2C6 /* SettingsMirror.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsMirror.swift; sourceTree = "<group>"; };
 		EB3DA6C707EA3988C90D573B /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
@@ -1039,6 +1042,7 @@
 				BB0E36B524CE0AB7DCE4252B /* TasksPlugin.swift */,
 				CDC8C2483181BE09B32245F3 /* GoalsPlugin.swift */,
 				A8717AC713A8CB083B56E69C /* GroceriesPlugin.swift */,
+				E1CEE126A22E14D793FDB9C4 /* SectionExplainer.swift */,
 			);
 			name = Plugins;
 			path = Plugins;
@@ -1461,6 +1465,7 @@
 				7B0EB1B5087C2B93BB9892AF /* TasksPlugin.swift in Sources */,
 				B531EF9C7FB18B241FFC6B21 /* GoalsPlugin.swift in Sources */,
 				2804B8EB5F36E3469B9CC898 /* GroceriesPlugin.swift in Sources */,
+				F553411F51C07D47D11B3A4F /* SectionExplainer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1663,6 +1668,7 @@
 				EC7046247C9EE5E65D11B2E0 /* TasksPlugin.swift in Sources */,
 				DE037C84144DB8873C4BB2B0 /* GoalsPlugin.swift in Sources */,
 				EBACFE355538C3B842F1DC74 /* GroceriesPlugin.swift in Sources */,
+				092B2E981C4A35E2AFF06053 /* SectionExplainer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -10,6 +10,23 @@ enum GutPlugin: SectionPlugin {
     SectionManifest.byKey["gut"]!
   }
 
+  // MARK: - First-enable onboarding
+
+  static func onboarding(complete: @escaping () -> Void) -> AnyView? {
+    AnyView(SectionExplainerView(
+      sectionKey: "gut",
+      title: "Set up Gut",
+      intro: "Gut is a private digestive event log. Useful when tracking down a food sensitivity, recovering from antibiotics, or just curious about patterns.",
+      bullets: [
+        ("Bristol Stool Scale", "1 = hard pellets, 7 = watery. Required for every entry."),
+        ("Volume + blood", "Small / medium / large; blood as a count. Both optional."),
+        ("Discomfort window", "Optional HH:MM start / end when cramping or pain matters."),
+      ],
+      actionLabel: "Got it",
+      complete: complete
+    ))
+  }
+
   // MARK: - Today timeline
 
   static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] {

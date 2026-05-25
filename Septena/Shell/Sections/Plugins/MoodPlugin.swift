@@ -20,6 +20,21 @@ enum MoodPlugin: SectionPlugin {
     SectionManifest.byKey["mood"]!
   }
 
+  static func onboarding(complete: @escaping () -> Void) -> AnyView? {
+    AnyView(SectionExplainerView(
+      sectionKey: "mood",
+      title: "Set up Mood",
+      intro: "Mood logs how you feel as a point on the affect circumplex — pleasant ↔ unpleasant on one axis, calm ↔ energetic on the other. Three check-ins a day is the suggested cadence; do more or fewer as you like.",
+      bullets: [
+        ("Tap or drag", "Pick a quadrant and pick a word that matches. Done."),
+        ("Three buckets", "Morning, afternoon, evening — but timestamps are exact, so log whenever it fits."),
+        ("Optional notes", "Add free-text context when something specific is shaping the feeling."),
+      ],
+      actionLabel: "Got it",
+      complete: complete
+    ))
+  }
+
   static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] {
     ctx.mood.map { e in
       // Use the quadrant color rather than the section accent — the

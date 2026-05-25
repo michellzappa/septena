@@ -10,6 +10,24 @@ enum NutritionPlugin: SectionPlugin {
     SectionManifest.byKey["nutrition"]!
   }
 
+  // MARK: - First-enable onboarding
+
+  static func onboarding(complete: @escaping () -> Void) -> AnyView? {
+    AnyView(SectionExplainerView(
+      sectionKey: "nutrition",
+      title: "Set up Nutrition",
+      intro: "Nutrition is a meal + macro log with auto-computed daily totals. Logging is fast — name the food, estimate macros, done.",
+      bullets: [
+        ("Foods", "Newline-separated list. \"chicken salad\", \"rice\", \"olive oil\" — one meal, three lines."),
+        ("Macros", "Protein, fat, carbs in grams. Calories auto-compute from 4P + 9F + 4C if you don't override."),
+        ("Meal type", "Breakfast / lunch / dinner / snack. Optional but useful for filtering daily summaries."),
+        ("Daily summary", "Totals roll up automatically — kcal, macros, micros. Nothing to write by hand."),
+      ],
+      actionLabel: "Got it",
+      complete: complete
+    ))
+  }
+
   // MARK: - Today timeline
 
   static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] {

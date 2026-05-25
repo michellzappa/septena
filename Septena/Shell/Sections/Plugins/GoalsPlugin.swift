@@ -11,6 +11,20 @@ enum GoalsPlugin: SectionPlugin {
 
   static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] { [] }
 
+  static func onboarding(complete: @escaping () -> Void) -> AnyView? {
+    AnyView(SectionExplainerView(
+      sectionKey: "goals",
+      title: "Set up Goals",
+      intro: "Goals are short text intentions tagged with section keys. They surface inside the sections they relate to — your training goal shows up in Training, your nutrition goal in Nutrition.",
+      bullets: [
+        ("Free-form text", "\"Swim twice a week\", \"Read 12 books this year.\" No deadlines, no progress bars — keep them readable."),
+        ("Tag by section", "Tag a goal with one or more section keys and it'll show up wherever the user is already looking."),
+      ],
+      actionLabel: "Got it",
+      complete: complete
+    ))
+  }
+
   static var mcpSkill: SectionSkill? {
     SectionSkill(
       key: "goals",

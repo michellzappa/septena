@@ -6,6 +6,22 @@ enum TasksPlugin: SectionPlugin {
     SectionManifest.byKey["tasks"]!
   }
 
+  static func onboarding(complete: @escaping () -> Void) -> AnyView? {
+    AnyView(SectionExplainerView(
+      sectionKey: "tasks",
+      title: "Set up Tasks",
+      intro: "Tasks routes by intent, not by tags. A task's visibility depends on three fields — today, scheduled, and due — so it pays to understand the routing model up front.",
+      bullets: [
+        ("Inbox", "A task with no today/scheduled/due lands in Inbox only. That's the parking spot for anything not yet committed."),
+        ("Today", "Pinning to Today commits you to it for the day. Use it for what you'll actually do."),
+        ("Scheduled / due", "Scheduled puts it in Upcoming. Due adds a deadline without scheduling — both surface in Anytime."),
+        ("Areas & projects", "Tag for filtering. They're not routing fields — a project task with no view pin still sits in Inbox."),
+      ],
+      actionLabel: "Got it",
+      complete: complete
+    ))
+  }
+
   static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] {
     let accent = ctx.theme.color(for: "tasks")
     return ctx.tasks
