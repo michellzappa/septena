@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // First real-data section migration. Caffeine's Today block, its
 // display-label helper, and its full MCP/agent contract all live here.
@@ -27,6 +28,12 @@ enum CaffeinePlugin: SectionPlugin {
         kind: .caffeine(entry)
       )
     }
+  }
+
+  // MARK: - First-enable onboarding
+
+  static func onboarding(complete: @escaping () -> Void) -> AnyView? {
+    AnyView(CaffeineOnboardingView(complete: complete))
   }
 
   /// Human-readable label for a caffeine entry's brewing method. Used
@@ -80,5 +87,128 @@ enum CaffeinePlugin: SectionPlugin {
       Matcha doesn't need a bean reference unless tracking source.
       """
     )
+  }
+}
+
+/// Common bean / source names. Additive only — pre-existing beans
+/// with matching names (case-insensitive) appear as "Already added".
+private struct CaffeineBeanStarter: Identifiable, Hashable {
+  let id: String
+  let name: String
+
+  static let all: [CaffeineBeanStarter] = [
+    .init(id: "starter-house-blend",  name: "House blend"),
+    .init(id: "starter-ethiopian",    name: "Ethiopian"),
+    .init(id: "starter-colombian",    name: "Colombian"),
+    .init(id: "starter-decaf",        name: "Decaf"),
+    .init(id: "starter-matcha-grade", name: "Ceremonial matcha"),
+    .init(id: "starter-cold-brew",    name: "Cold brew concentrate"),
+  ]
+}
+
+private struct CaffeineOnboardingView: View {
+  let complete: () -> Void
+  @Environment(SectionTheme.self) private var theme
+  @Environment(\.modelContext) private var modelContext
+  @State private var selected: Set<String> = []
+  @State private var existingNames: Set<String> = []
+
+  private var accent: Color { theme.color(for: "caffeine") }
+  private var mutator: CaffeineMutator { SeptenaServices.shared.caffeineMutator }
+
+  private func alreadyExists(_ s: CaffeineBeanStarter) -> Bool {
+    existingNames.contains(s.name.lowercased())
+  }
+
+  private func loadExisting() {
+    let rows = (try? modelContext.fetch(FetchDescriptor<CaffeineBeanEntity>())) ?? []
+    existingNames = Set(rows.map { $0.name.lowercased() })
+  }
+
+  var body: some View {
+    NavigationStack {
+      Form {
+        Section {
+          VStack(alignment: .leading, spacing: 8) {
+            Text("Caffeine logs coffee, matcha, and other sources. Pre-populate a few common bean sources so you can pick them when logging — you can add or rename them later.")
+              .foregroundStyle(.secondary)
+            Text("Bean sources are optional. You can also log caffeine without picking one.")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+          .padding(.vertical, 4)
+        }
+        Section("Beans / sources") {
+          ForEach(CaffeineBeanStarter.all) { starter in
+            starterRow(starter)
+          }
+        }
+      }
+      .formStyle(.grouped)
+      .navigationTitle("Set up Caffeine")
+      #if os(iOS)
+      .navigationBarTitleDisplayMode(.inline)
+      #endif
+      .safeAreaInset(edge: .bottom) {
+        bottomBar
+      }
+      .onAppear { loadExisting() }
+    }
+  }
+
+  @ViewBuilder
+  private func starterRow(_ s: CaffeineBeanStarter) -> some View {
+    let exists = alreadyExists(s)
+    let isSelected = selected.contains(s.id)
+    Button {
+      guard !exists else { return }
+      if isSelected { selected.remove(s.id) } else { selected.insert(s.id) }
+    } label: {
+      HStack(spacing: 12) {
+        Text(s.name)
+          .foregroundStyle(exists ? .secondary : .primary)
+          .strikethrough(exists, color: .secondary)
+        Spacer()
+        if exists {
+          Text("Already added")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        } else {
+          Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+            .foregroundStyle(isSelected ? accent : Color.secondary.opacity(0.6))
+            .font(.title3)
+        }
+      }
+    }
+    .buttonStyle(.plain)
+    .disabled(exists)
+  }
+
+  @ViewBuilder
+  private var bottomBar: some View {
+    HStack(spacing: 12) {
+      Button("Skip") { complete() }
+        .buttonStyle(.bordered)
+      Spacer()
+      Button(actionTitle) { addAndFinish() }
+        .buttonStyle(.borderedProminent)
+        .tint(accent)
+    }
+    .padding()
+    .background(.bar)
+  }
+
+  private var actionTitle: String {
+    selected.isEmpty ? "Done" : "Add \(selected.count) source\(selected.count == 1 ? "" : "s")"
+  }
+
+  private func addAndFinish() {
+    let toAdd = CaffeineBeanStarter.all.filter {
+      selected.contains($0.id) && !alreadyExists($0)
+    }
+    for s in toAdd {
+      _ = mutator.addBean(name: s.name)
+    }
+    complete()
   }
 }
