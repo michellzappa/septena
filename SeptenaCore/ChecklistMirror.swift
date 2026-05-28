@@ -1248,64 +1248,26 @@ enum ChecklistMirror {
                   loggedAt: e.loggedAt)
   }
 
-  // MARK: Suggested workout (ported from FastAPI)
+  // MARK: Suggested workout
   //
-  // Classify past days by which session-type they best match (≥3 strength
-  // exercises matching a type's catalog, or ≥30 min cardio with no strength).
-  // Track days-since per type; suggest the one longest unworked, respecting
-  // a 2-day rest from the most recent session.
+  // Each ExerciseEntry tags its own sessionType ("upper", "yoga", "cardio",
+  // …). A day "counts as" every distinct sessionType logged on it. Track
+  // days-since per type; suggest the one longest unworked, respecting a
+  // 2-day rest from the most recent session.
 
   static func loadSuggestedWorkout(context: ModelContext) -> SuggestedWorkoutResponse {
-    let MIN_STRENGTH = 3
-    let MIN_CARDIO_MIN = 30
-
     let entries = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(
       sortBy: [SortDescriptor(\.date)]
     ))) ?? []
     let types = (try? context.fetch(FetchDescriptor<SessionTypeEntity>(
       sortBy: [SortDescriptor(\.sortIndex)]
     ))) ?? []
-    let defs = (try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>())) ?? []
-
-    // All name-keyed dictionaries below are lowercased so the join survives
-    // casing drift between entry.exercise (the logged name) and def.name
-    // (the catalog display label). Duplicates can exist (e.g. a library-
-    // imported "Chest Press" alongside a RoutineSlugRepair stub with the
-    // same humanized name) — keep the first encountered so the dictionary
-    // builder doesn't trap.
-    let defByName = Dictionary(defs.map { ($0.name.lowercased(), $0) },
-                                uniquingKeysWith: { first, _ in first })
-    let cardioNames = Set(defs
-      .filter { $0.type == "cardio" || $0.type == "mobility" }
-      .map { $0.name.lowercased() })
-    let cardioTypeID = types.first { $0.id == "cardio" }?.id ?? "cardio"
 
     let entriesByDate = Dictionary(grouping: entries, by: \.date)
     let sortedDates = entriesByDate.keys.sorted(by: >)   // newest first
 
-    // For each day, decide which session-type IDs it counts as.
     func classify(_ rows: [ExerciseEntryEntity]) -> Set<String> {
-      var matched: Set<String> = []
-      let lowerNames = rows.map { $0.exercise.lowercased() }
-      let strengthNames = lowerNames.filter { !cardioNames.contains($0) }
-      // Strength-day: ≥MIN_STRENGTH exercises whose names appear in a type's
-      // canonical exercise list. SessionTypeEntity.exercises stores slugs;
-      // match case-insensitively against the entry name too.
-      for t in types where t.id != cardioTypeID {
-        let lowerList = Set(t.exercises.map { $0.lowercased() })
-        let hits = strengthNames.filter { lowerList.contains($0) }.count
-        if hits >= MIN_STRENGTH { matched.insert(t.id) }
-      }
-      // Cardio-day: ≥MIN_CARDIO_MIN of cardio with no strength session.
-      let cardioMin = rows.reduce(0.0) { acc, e in
-        let name = e.exercise.lowercased()
-        let isCardio = cardioNames.contains(name) || (defByName[name]?.type ?? "") == "cardio"
-        return acc + (isCardio ? (e.durationMin ?? 0) : 0)
-      }
-      if cardioMin >= Double(MIN_CARDIO_MIN), strengthNames.isEmpty {
-        matched.insert(cardioTypeID)
-      }
-      return matched
+      Set(rows.map(\.sessionType).filter { !$0.isEmpty })
     }
 
     let today = SeptenaDate.today
@@ -1501,6 +1463,15 @@ enum ChecklistMirror {
       if dayStr == today {
         yesterdayLastMeal = nutritionTimeStr(lastMealDate)
       }
+    }
+
+    // Fallback: if today had no meals yet, the loop above skipped today's
+    // window entirely. Pull yesterday's last meal directly so the live
+    // fasting tile can still anchor.
+    if yesterdayLastMeal == nil,
+       let yDate = cal.date(byAdding: .day, value: -1, to: todayDate),
+       let yLast = lastOfDay[dayKey(yDate)] {
+      yesterdayLastMeal = nutritionTimeStr(yLast)
     }
 
     let validFastHours = fasting.compactMap(\.hours).filter { $0 >= 6 && $0 <= 24 }

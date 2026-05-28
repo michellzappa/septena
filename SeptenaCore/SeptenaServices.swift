@@ -1243,6 +1243,8 @@ final class ChecklistMutator {
     guard let base = SeptenaDate.parse(date) else { return nil }
     let calendar = Calendar.current
     switch mode {
+    case "today":
+      return SeptenaDate.format(base)
     case "day":
       return calendar.date(byAdding: .day, value: 1, to: base).flatMap(SeptenaDate.format)
     case "weekend":
@@ -1353,6 +1355,35 @@ final class GoalMutator {
     commit(entity, op: "update")
   }
 
+  /// Attach (or clear) the optional measurement spec on a goal. Passing
+  /// `metricKey == nil` clears every metric field together — they are
+  /// always set or cleared as a unit. `baseline` is independent of
+  /// metric vs. no-metric (it's only meaningful when metricKey is set,
+  /// and is freely nullable for goals that don't need it).
+  func updateGoalMetric(id: String,
+                        metricKey: String?,
+                        window: String?,
+                        comparator: String?,
+                        target: Double?,
+                        baseline: Double?) {
+    guard let entity = fetchGoal(id: id) else { return }
+    if let metricKey {
+      entity.metricKey = metricKey
+      entity.metricWindow = window
+      entity.metricComparator = comparator
+      entity.metricTarget = target
+      entity.metricBaseline = baseline
+    } else {
+      entity.metricKey = nil
+      entity.metricWindow = nil
+      entity.metricComparator = nil
+      entity.metricTarget = nil
+      entity.metricBaseline = nil
+    }
+    entity.updatedAt = .now
+    commit(entity, op: "update metric")
+  }
+
   func deleteGoal(id: String) {
     guard let entity = fetchGoal(id: id) else { return }
     context.delete(entity)
@@ -1445,6 +1476,7 @@ final class GutMutator {
   }
 
   func updateEntry(id: String,
+                   date: String? = nil,
                    time: String? = nil,
                    bristol: Int? = nil,
                    blood: Int? = nil,
@@ -1454,6 +1486,7 @@ final class GutMutator {
                    discomfortEnd: String?? = nil,
                    note: String?? = nil) {
     guard let entity = fetch(id: id) else { return }
+    if let date { entity.date = date }
     if let time { entity.time = time }
     if let bristol { entity.bristol = bristol }
     if let blood { entity.blood = blood }
@@ -1544,12 +1577,14 @@ final class CaffeineMutator {
   }
 
   func updateEntry(id: String,
+                   date: String? = nil,
                    time: String? = nil,
                    method: String? = nil,
                    beans: String?? = nil,
                    grams: Double?? = nil,
                    note: String?? = nil) {
     guard let entity = fetchEntry(id: id) else { return }
+    if let date { entity.date = date }
     if let time { entity.time = time }
     if let method { entity.method = method }
     if let beans { entity.beans = beans }
@@ -1708,6 +1743,7 @@ final class CannabisMutator {
   }
 
   func updateEntry(id: String,
+                   date: String? = nil,
                    time: String? = nil,
                    method: String? = nil,
                    strain: String?? = nil,
@@ -1716,6 +1752,7 @@ final class CannabisMutator {
                    effect: String?? = nil,
                    note: String?? = nil) {
     guard let entity = fetchEntry(id: id) else { return }
+    if let date { entity.date = date }
     if let time { entity.time = time }
     if let method { entity.method = method }
     if let strain { entity.strain = strain }
@@ -2100,6 +2137,27 @@ final class TrainingMutator {
     postChanged()
   }
 
+  /// Bulk-set sessionType on every ExerciseEntry for the given date. Mirrors
+  /// the MCP gateway's `training_session_retag` — the data model has no
+  /// dedicated TrainingSession record, so a "session" is just the bucket of
+  /// entries sharing (date, sessionType). Used by the daily-list header menu
+  /// to retroactively mark a day as Upper/Lower/Cardio/Yoga/etc.
+  @discardableResult
+  func retagSession(date: String, to newSessionType: String) -> Int {
+    let entries = (try? context.fetch(
+      FetchDescriptor<ExerciseEntryEntity>(predicate: #Predicate { $0.date == date })
+    )) ?? []
+    guard !entries.isEmpty else { return 0 }
+    for entity in entries {
+      entity.sessionType = newSessionType
+      entity.updatedAt = .now
+      ckEngine?.noteExerciseEntryChange(id: entity.id)
+    }
+    saveContext("CK exercise session retag \(date) -> \(newSessionType)")
+    postChanged()
+    return entries.count
+  }
+
   // MARK: - Exercise definitions
 
   @discardableResult
@@ -2347,7 +2405,7 @@ final class NutritionMutator {
   }
 
   func updateEntry(id: String,
-                   pickedTime: Date? = nil,
+                   pickedAt: Date? = nil,
                    emoji: String? = nil,
                    foods: [String]? = nil,
                    note: String? = nil,
@@ -2367,17 +2425,9 @@ final class NutritionMutator {
                    photoAssetID: String?? = nil) {
     guard let entity = fetchEntry(id: id) else { return }
     let oldDay = dayID(from: entity.loggedAt)
-    if let pickedTime {
-      let cal = Calendar.current
-      let todayComponents = cal.dateComponents([.year, .month, .day], from: entity.loggedAt)
-      var timeComponents = cal.dateComponents([.hour, .minute], from: pickedTime)
-      timeComponents.year = todayComponents.year
-      timeComponents.month = todayComponents.month
-      timeComponents.day = todayComponents.day
-      if let merged = cal.date(from: timeComponents) {
-        entity.loggedAt = merged
-      }
-    }
+    // `pickedAt` carries both day and time-of-day; assign directly so the
+    // edit sheet's date picker can move an entry between days.
+    if let pickedAt { entity.loggedAt = pickedAt }
     if let emoji { entity.emoji = emoji }
     if let foods { entity.foods = foods.joined(separator: "\n") }
     if let note { entity.note = note }
@@ -2555,6 +2605,7 @@ final class MoodMutator {
   }
 
   func updateEntry(id: String,
+                   date: String? = nil,
                    time: String? = nil,
                    quadrant: String? = nil,
                    arousal: Int? = nil,
@@ -2562,6 +2613,7 @@ final class MoodMutator {
                    emotion: String? = nil,
                    note: String?? = nil) {
     guard let entity = fetch(id: id) else { return }
+    if let date { entity.date = date }
     if let time {
       entity.time = time
       entity.bucket = Self.bucket(for: time)

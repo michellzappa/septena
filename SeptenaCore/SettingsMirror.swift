@@ -22,7 +22,14 @@ enum SettingsMirror {
     let order = settings?.sectionOrder ?? []
     let rank = Dictionary(uniqueKeysWithValues: order.enumerated().map { ($0.element, $0.offset) })
 
+    // Drop SectionEntity rows whose key isn't in the current manifest.
+    // These are orphans from prior schemas (e.g. "brief", "next") that
+    // CloudKit still has lying around — the manifest is the source of
+    // truth for which sections the app surfaces today.
+    let knownKeys = Set(SectionManifest.byKey.keys)
+
     return rows
+      .filter { knownKeys.contains($0.id) }
       .sorted { lhs, rhs in
         let lhsRank = rank[lhs.id]
         let rhsRank = rank[rhs.id]

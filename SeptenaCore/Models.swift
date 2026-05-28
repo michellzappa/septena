@@ -583,7 +583,7 @@ struct ChoreHistoryResponse: Codable {
 /// implicit — multiple entries share the same `date` + `session` string.
 struct ExerciseEntry: Codable, Identifiable, Hashable {
   let date: String           // YYYY-MM-DD
-  let session: String        // e.g. "upper", "cardio"
+  var session: String        // e.g. "upper", "cardio"
   var exercise: String?
   var weight: Double?
   var sets: String?          // server returns int OR string ("AMRAP")
@@ -1613,6 +1613,13 @@ struct Goal: Identifiable, Codable, Hashable {
   var sections: [String]
   let created: String
   var updated: String
+  // Optional measurement attachment — when all four are set the UI renders
+  // progress against a target derived from logged data in other sections.
+  var metricKey: String? = nil
+  var metricWindow: String? = nil
+  var metricComparator: String? = nil
+  var metricTarget: Double? = nil
+  var metricBaseline: Double? = nil
 }
 
 // MARK: - Date helpers (Septena uses YYYY-MM-DD strings)
@@ -1907,8 +1914,12 @@ struct DraftEntry: Codable, Hashable, Identifiable {
       weight: mobility ? nil : last?.weight,
       sets: mobility ? nil : (last?.sets.flatMap { Int($0) } ?? (cardio ? nil : 3)),
       reps: mobility ? nil : (last?.reps ?? (cardio ? nil : "12")),
-      difficulty: last?.difficulty ?? "medium",
-      durationMin: mobility ? nil : last?.durationMin,
+      // Cardio entries have no difficulty UI, so don't seed a default
+      // value or it gets persisted on Done. Strength and mobility both
+      // collect difficulty, so they keep the "medium" fallback.
+      difficulty: cardio ? (last?.difficulty ?? "") : (last?.difficulty ?? "medium"),
+      // Mobility keeps duration (yoga = TIME) but not distance/level.
+      durationMin: last?.durationMin,
       distanceM: mobility ? nil : last?.distanceM,
       level: mobility ? nil : last?.level,
       isCardio: cardio,
@@ -1927,7 +1938,6 @@ struct DraftSession: Codable, Hashable {
   var date: String           // YYYY-MM-DD
   var time: String           // HH:MM (local)
   var sessionType: String    // "upper" etc.
-  var emoji: String?
   var label: String          // "Upper"
   var entries: [DraftEntry]
   var startedAt: String      // ISO8601

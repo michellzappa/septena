@@ -363,7 +363,17 @@ final class WithingsProvider {
       "client_secret": WithingsAppCredentials.clientSecret,
       "refresh_token": refresh,
     ]
-    try await postToken(body: body)
+    do {
+      try await postToken(body: body)
+    } catch WithingsError.apiStatus(let status, let msg) {
+      // Withings returned a definitive "this refresh token is dead"
+      // verdict (rotated, revoked, expired). Clear local tokens so the
+      // Settings status flips to "Not connected" and the user sees the
+      // Connect button instead of a stuck-green chip.
+      SeptenaLog.error("Withings refresh rejected (status=\(status)): \(msg) — clearing tokens", nil)
+      disconnect()
+      throw WithingsError.refreshRejected(status, msg)
+    }
   }
 
   private func postToken(body: [String: String]) async throws {
@@ -459,7 +469,14 @@ final class WithingsProvider {
     if httpCode >= 400 {
       throw SeptenaError.server(httpCode, String(data: data, encoding: .utf8) ?? "")
     }
-    let env = try JSONDecoder().decode(MeasureEnvelope.self, from: data)
+    let env: MeasureEnvelope
+    do {
+      env = try JSONDecoder().decode(MeasureEnvelope.self, from: data)
+    } catch {
+      let raw = String(data: data, encoding: .utf8) ?? "<non-utf8>"
+      SeptenaLog.error("Withings measure decode failed; body=\(raw)", error)
+      throw error
+    }
     if env.status == 0 { return env }
     // 401 / 100 / 102 / 200 ≈ "token expired or invalid" depending on
     // version. The cheapest disambiguator is "try refresh once."
@@ -541,7 +558,7 @@ final class WithingsProvider {
   }
   private struct MeasureBody: Decodable {
     let updatetime: Int?
-    let measuregrps: [MeasureGroup]
+    let measuregrps: [MeasureGroup]?
     let more: Int?
     let offset: Int?
   }
@@ -618,6 +635,7 @@ enum WithingsError: LocalizedError {
   case noAccessToken
   case noRefreshToken
   case apiStatus(Int, String)
+  case refreshRejected(Int, String)
 
   var errorDescription: String? {
     switch self {
@@ -630,6 +648,8 @@ enum WithingsError: LocalizedError {
     case .noAccessToken: return "No Withings access token; reconnect in Settings."
     case .noRefreshToken: return "No Withings refresh token; reconnect in Settings."
     case .apiStatus(let s, let msg): return "Withings API status \(s): \(msg)"
+    case .refreshRejected(let s, let msg):
+      return "Withings rejected the refresh token (status \(s): \(msg)). Please reconnect in Settings."
     }
   }
 }

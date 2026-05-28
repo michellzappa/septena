@@ -28,6 +28,15 @@ enum GoalCloudKitSchema {
     static let created = "created"     // YYYY-MM-DD
     static let sortIndex = "sortIndex"
 
+    // Optional measurement attachment. Nil on free-text goals; set together
+    // when the goal becomes measurable. Schema is CK auto-managed so adding
+    // these here is sufficient — no Dashboard touch required.
+    static let metricKey = "metricKey"
+    static let metricWindow = "metricWindow"
+    static let metricComparator = "metricComparator"
+    static let metricTarget = "metricTarget"
+    static let metricBaseline = "metricBaseline"
+
     // Reserved for foreseeable additions without bumping the record type.
     static let reservedString1 = "reservedString1"
     static let reservedString2 = "reservedString2"
@@ -63,6 +72,11 @@ extension GoalEntity {
     record[GoalCloudKitSchema.Field.sections] = sections as NSArray
     record[GoalCloudKitSchema.Field.created] = created
     record[GoalCloudKitSchema.Field.sortIndex] = sortIndex
+    record[GoalCloudKitSchema.Field.metricKey] = metricKey
+    record[GoalCloudKitSchema.Field.metricWindow] = metricWindow
+    record[GoalCloudKitSchema.Field.metricComparator] = metricComparator
+    record[GoalCloudKitSchema.Field.metricTarget] = metricTarget
+    record[GoalCloudKitSchema.Field.metricBaseline] = metricBaseline
     return record
   }
 }
@@ -75,6 +89,11 @@ extension GoalEntity {
     sections = record[GoalCloudKitSchema.Field.sections] as? [String] ?? []
     if let v = optionalGoalString(record[GoalCloudKitSchema.Field.created]) { created = v }
     if let v = record[GoalCloudKitSchema.Field.sortIndex] as? Int { sortIndex = v }
+    metricKey = optionalGoalString(record[GoalCloudKitSchema.Field.metricKey])
+    metricWindow = optionalGoalString(record[GoalCloudKitSchema.Field.metricWindow])
+    metricComparator = optionalGoalString(record[GoalCloudKitSchema.Field.metricComparator])
+    metricTarget = record[GoalCloudKitSchema.Field.metricTarget] as? Double
+    metricBaseline = record[GoalCloudKitSchema.Field.metricBaseline] as? Double
     updatedAt = .now
     captureCloudKitSystemFields(from: record)
   }

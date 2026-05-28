@@ -422,13 +422,34 @@ final class GoalEntity {
   /// CKRecord system-fields blob. Same contract as tasks/projects/areas.
   var cloudKitSystemFields: Data?
 
+  // Optional measurement attachment. When all four are non-nil, the goal
+  // becomes measurable: its UI renders progress against a target derived
+  // from data the user already logs in other sections. nil on every
+  // existing row (free-text goals stay free-text).
+  var metricKey: String?           // e.g. "training.session_count"
+  var metricWindow: String?        // e.g. "calendarWeek"
+  var metricComparator: String?    // "gte" | "lte"
+  var metricTarget: Double?
+  /// Optional starting value the user entered when the goal was created.
+  /// Used for "latest"-window metrics (body weight, body fat, muscle %) so
+  /// the progress bar can show distance-traveled from baseline toward
+  /// target rather than empty-until-crossed. nil for count/sum metrics
+  /// whose natural starting point is 0 (the window itself defines a
+  /// baseline).
+  var metricBaseline: Double?
+
   init(id: String,
        text: String,
        sections: [String] = [],
        created: String,
        sortIndex: Int = 0,
        updatedAt: Date = .now,
-       cloudKitSystemFields: Data? = nil) {
+       cloudKitSystemFields: Data? = nil,
+       metricKey: String? = nil,
+       metricWindow: String? = nil,
+       metricComparator: String? = nil,
+       metricTarget: Double? = nil,
+       metricBaseline: Double? = nil) {
     self.id = id
     self.text = text
     self.sections = sections
@@ -436,6 +457,11 @@ final class GoalEntity {
     self.sortIndex = sortIndex
     self.updatedAt = updatedAt
     self.cloudKitSystemFields = cloudKitSystemFields
+    self.metricKey = metricKey
+    self.metricWindow = metricWindow
+    self.metricComparator = metricComparator
+    self.metricTarget = metricTarget
+    self.metricBaseline = metricBaseline
   }
 }
 
@@ -1163,7 +1189,12 @@ extension Goal {
               text: e.text,
               sections: e.sections,
               created: e.created,
-              updated: fmt.string(from: e.updatedAt))
+              updated: fmt.string(from: e.updatedAt),
+              metricKey: e.metricKey,
+              metricWindow: e.metricWindow,
+              metricComparator: e.metricComparator,
+              metricTarget: e.metricTarget,
+              metricBaseline: e.metricBaseline)
   }
 }
 
