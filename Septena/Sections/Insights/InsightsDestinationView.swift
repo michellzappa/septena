@@ -2,351 +2,15 @@ import SwiftUI
 import SwiftData
 import Charts
 
-// Insights — full-page, dense, multi-section correlation explorer.
-//
-// Mirrors the septena-app /insights surface (curated + auto-derived
-// pairs, supplement-vs-sleep table, copy-report markdown export). All
-// math runs in CorrelationEngine, sourced from local SwiftData (the
-// CloudKit-mirrored cache) plus the existing /api/health/oura read.
-//
-// Sections, top-to-bottom:
-//   1. Header: window summary, filters, copy-report button
-//   2. Supplements → Sleep score (taken-vs-off Δ, only if any row)
-//   3. Trusted signals (|r|≥0.35, p<0.05, monotonic, no confound)
-//   4. Exploratory (n≥15 but didn't clear one of the trusted gates)
-//   5. Insufficient data (1 ≤ n < 15), collapsible
-struct InsightsDestinationView: View {
-  @Environment(\.dismiss) private var dismiss
-  @Environment(\.modelContext) private var modelContext
-  @Environment(SectionTheme.self) private var theme
-
-  #if os(iOS)
-  @Environment(\.horizontalSizeClass) private var hSize
-  #endif
-
-  @State private var result: CorrelationEngine.Result? = nil
-  @State private var loading = true
-  @State private var loadError: String? = nil
-  @State private var trustedOnly = false
-  @State private var sectionFilter: String = "all"
-  @AppStorage("insights.windowDays") private var windowDays: Int = 365
-  @State private var focused: CorrelationEngine.EvaluatedPair? = nil
-  @State private var insufficientExpanded = false
-
-  private var accent: Color { theme.color(for: "activity") }
-
-  private let sectionOptions: [(key: String, label: String)] = [
-    ("all",         "All"),
-    ("habits",      "Habits"),
-    ("supplements", "Supplements"),
-    ("training",    "Training"),
-    ("nutrition",   "Nutrition"),
-    ("caffeine",    "Caffeine"),
-    ("cannabis",    "Cannabis"),
-    ("air",         "Air"),
-    ("gut",         "Gut"),
-    ("sleep",       "Sleep"),
-  ]
-
-  private var columns: [GridItem] {
-    #if os(iOS)
-    let count = (hSize == .regular) ? 3 : 2
-    return Array(repeating: GridItem(.flexible(), spacing: 12), count: count)
-    #else
-    return [GridItem(.adaptive(minimum: 260), spacing: 12)]
-    #endif
-  }
-
-  var body: some View {
-    NavigationStack {
-      ScrollView {
-        VStack(alignment: .leading, spacing: 20) {
-          header
-          if loading && result == nil {
-            ProgressView("Crunching the last year of data…")
-              .frame(maxWidth: .infinity, minHeight: 240)
-          } else if let err = loadError {
-            Text(err)
-              .font(.footnote)
-              .foregroundStyle(.secondary)
-          } else if let r = result {
-            content(for: r)
-          }
-        }
-        .padding(.horizontal, Theme.hPadding)
-        .padding(.top, 8)
-        .padding(.bottom, 40)
-      }
-      .background(Theme.groupedBackground)
-      .navigationTitle("Insights")
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.large)
-      #endif
-      .toolbar { toolbarItems }
-      .tint(accent)
-      .task { await recompute() }
-      .sheet(item: $focused) { pair in
-        DetailSheet(pair: pair)
-          #if os(iOS)
-          .presentationDetents([.large])
-          .presentationDragIndicator(.visible)
-          #else
-          .frame(minWidth: 560, minHeight: 520)
-          #endif
-      }
-    }
-  }
-
-  @ToolbarContentBuilder
-  private var toolbarItems: some ToolbarContent {
-    ToolbarItem(placement: .cancellationAction) {
-      Button("Done") { dismiss() }
-    }
-    ToolbarItem(placement: .primaryAction) {
-      if let r = result {
-        ShareLink(item: CorrelationEngine.markdownReport(from: r),
-                  preview: SharePreview("Septena Insights")) {
-          Image(systemName: "square.and.arrow.up")
-        }
-        .accessibilityLabel("Copy report")
-      }
-    }
-    ToolbarItem(placement: .primaryAction) {
-      Button {
-        Task { await recompute() }
-      } label: {
-        Image(systemName: "arrow.clockwise")
-      }
-      .disabled(loading)
-      .accessibilityLabel("Recompute")
-    }
-  }
-
-  // MARK: - Header
-
-  private var header: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      Text(headerExplainer)
-        .font(.footnote)
-        .foregroundStyle(.secondary)
-      HStack(spacing: 12) {
-        Toggle("Trusted only", isOn: $trustedOnly)
-          .toggleStyle(.switch)
-          .font(.subheadline)
-          .fixedSize()
-        Spacer()
-        Picker("Window", selection: $windowDays) {
-          Text("30 days").tag(30)
-          Text("90 days").tag(90)
-          Text("6 months").tag(180)
-          Text("1 year").tag(365)
-          Text("2 years").tag(730)
-        }
-        .pickerStyle(.menu)
-        Picker("Section", selection: $sectionFilter) {
-          ForEach(sectionOptions, id: \.key) { Text($0.label).tag($0.key) }
-        }
-        .pickerStyle(.menu)
-      }
-      .onChange(of: windowDays) { _, _ in
-        Task { await recompute() }
-      }
-    }
-  }
-
-  private var headerExplainer: String {
-    let r = result
-    let covered = r?.coveredDays ?? 0
-    let range: String = {
-      guard let dr = r?.dateRange else { return "" }
-      return " · \(dr.lowerBound) → \(dr.upperBound)"
-    }()
-    let windowLabel: String = {
-      switch windowDays {
-      case 30:  return "30 days"
-      case 90:  return "90 days"
-      case 180: return "6 months"
-      case 365: return "1 year"
-      case 730: return "2 years"
-      default:  return "\(windowDays) days"
-      }
-    }()
-    return "Cross-section correlations over the past \(windowLabel)\(range) (\(covered) days with logged data). Each pair tested at lag 0/1/2 — best |r| wins. Trusted = |r| ≥ \(String(format: "%.2f", CorrelationEngine.strongR)), p < \(String(format: "%.2f", CorrelationEngine.strongP)), monotonic buckets, no physiology contradiction. Computed locally from your CloudKit data."
-  }
-
-  // MARK: - Content
-
-  @ViewBuilder
-  private func content(for r: CorrelationEngine.Result) -> some View {
-    let filtered = filter(r.evaluated)
-    let trusted = filtered.filter { $0.tier == .trusted }
-    let exploratory = filtered.filter { $0.tier == .exploratory }
-
-    if !r.supplementsTable.isEmpty && (sectionFilter == "all" || sectionFilter == "supplements" || sectionFilter == "sleep") {
-      supplementsSection(rows: r.supplementsTable)
-    }
-
-    if trusted.isEmpty && exploratory.isEmpty && r.insufficient.isEmpty {
-      VStack(alignment: .leading, spacing: 6) {
-        Text("No correlations match these filters yet.")
-          .font(.subheadline.weight(.medium))
-        Text("Keep logging — pairs unlock at n ≥ \(CorrelationEngine.minN) overlapping days.")
-          .font(.footnote)
-          .foregroundStyle(.secondary)
-      }
-    }
-
-    if !trusted.isEmpty {
-      sectionHeader("Trusted signals", subtitle: "n ≥ \(CorrelationEngine.minN), |r| ≥ \(String(format: "%.2f", CorrelationEngine.strongR)), p < 0.05, monotonic, sign matches physiology")
-      grid(trusted)
-    }
-    if !exploratory.isEmpty && !trustedOnly {
-      sectionHeader("Exploratory", subtitle: "n ≥ \(CorrelationEngine.minN) but weak r, non-monotonic, or contradicts physiology")
-      grid(exploratory)
-    }
-    if !r.insufficient.isEmpty && !trustedOnly {
-      insufficientSection(r.insufficient)
-    }
-  }
-
-  private func filter(_ rows: [CorrelationEngine.EvaluatedPair]) -> [CorrelationEngine.EvaluatedPair] {
-    rows.filter { e in
-      if sectionFilter != "all"
-        && e.spec.predictor.section != sectionFilter
-        && e.spec.target.section != sectionFilter {
-        return false
-      }
-      return true
-    }
-  }
-
-  // MARK: - Section header
-
-  private func sectionHeader(_ title: String, subtitle: String) -> some View {
-    VStack(alignment: .leading, spacing: 2) {
-      Text(title)
-        .font(.title3.weight(.semibold))
-      Text(subtitle)
-        .font(.caption)
-        .foregroundStyle(.secondary)
-    }
-    .padding(.top, 4)
-  }
-
-  // MARK: - Tile grid
-
-  private func grid(_ items: [CorrelationEngine.EvaluatedPair]) -> some View {
-    LazyVGrid(columns: columns, spacing: 12) {
-      ForEach(items) { e in
-        TileView(pair: e, color: theme.color(for: e.spec.predictor.section))
-          .contentShape(Rectangle())
-          .onTapGesture { focused = e }
-      }
-    }
-  }
-
-  // MARK: - Supplements section
-
-  private func supplementsSection(rows: [CorrelationEngine.SupplementSleepRow]) -> some View {
-    VStack(alignment: .leading, spacing: 6) {
-      sectionHeader("Supplements → Sleep score", subtitle: "Δ = taken mean − off mean. Above bar: |Δ| ≥ 3 with ≥10 days in each state.")
-      VStack(spacing: 0) {
-        ForEach(rows) { row in
-          HStack(spacing: 8) {
-            Circle()
-              .fill(supplementColor(row))
-              .frame(width: 8, height: 8)
-            Text("\(row.emoji.isEmpty ? "" : row.emoji + " ")\(row.label)")
-              .font(.subheadline)
-              .lineLimit(1)
-            Spacer()
-            Text("Δ \(row.delta >= 0 ? "+" : "")\(String(format: "%.1f", row.delta))")
-              .font(.caption.monospacedDigit().weight(.semibold))
-              .foregroundStyle(supplementColor(row))
-            Text("\(String(format: "%.1f", row.takenMean)) (\(row.takenN)d) vs \(String(format: "%.1f", row.offMean)) (\(row.offN)d)")
-              .font(.caption2.monospacedDigit())
-              .foregroundStyle(.secondary)
-            Text(row.strength)
-              .font(.caption2)
-              .padding(.horizontal, 5)
-              .padding(.vertical, 1)
-              .background(supplementColor(row).opacity(0.15), in: Capsule())
-              .foregroundStyle(supplementColor(row))
-          }
-          .padding(.vertical, 8)
-          .padding(.horizontal, 12)
-          if row.id != rows.last?.id {
-            Divider().padding(.leading, 28)
-          }
-        }
-      }
-      .background(
-        RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.cardSurface)
-      )
-    }
-  }
-
-  private func supplementColor(_ row: CorrelationEngine.SupplementSleepRow) -> Color {
-    if !row.meetsBar { return .gray }
-    return row.delta >= 0 ? .green : .red
-  }
-
-  // MARK: - Insufficient section
-
-  private func insufficientSection(_ items: [CorrelationEngine.InsufficientPair]) -> some View {
-    VStack(alignment: .leading, spacing: 6) {
-      DisclosureGroup(isExpanded: $insufficientExpanded) {
-        VStack(alignment: .leading, spacing: 4) {
-          ForEach(items) { i in
-            HStack {
-              Text(i.spec.title)
-                .font(.caption)
-                .lineLimit(1)
-              Spacer()
-              Text("n=\(i.n)")
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
-            }
-            .padding(.vertical, 2)
-          }
-        }
-        .padding(.top, 4)
-      } label: {
-        VStack(alignment: .leading, spacing: 2) {
-          Text("Not enough data yet (\(items.count))")
-            .font(.title3.weight(.semibold))
-          Text("n < \(CorrelationEngine.minN) — too noisy to plot")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-      }
-      .padding(.vertical, 4)
-    }
-  }
-
-  // MARK: - Loading
-
-  private func recompute() async {
-    loading = true
-    defer { loading = false }
-    let oura = (try? await OuraProvider.shared.fetchHistory(days: windowDays)) ?? []
-    let r = CorrelationEngine.runEverything(
-      context: modelContext,
-      ouraNights: oura,
-      days: windowDays
-    )
-    result = r
-    if r.evaluated.isEmpty && r.insufficient.isEmpty && r.supplementsTable.isEmpty {
-      loadError = "No logged data found in the last \(windowDays) days. Once you log training, sleep, or nutrition entries, pairs will appear here."
-    } else {
-      loadError = nil
-    }
-  }
-}
+// Correlation tile + drill-in detail sheet used by the
+// `.correlations` homepage layout mode. Was previously the
+// standalone `InsightsDestinationView` page; that surface has been
+// folded into the homepage. File kept under its original name for
+// pbxproj stability.
 
 // MARK: - Tile
 
-private struct TileView: View {
+struct TileView: View {
   let pair: CorrelationEngine.EvaluatedPair
   let color: Color
 
@@ -418,7 +82,7 @@ private struct TileView: View {
 
 // MARK: - Mini chart with bucket line
 
-private struct MiniChart: View {
+struct MiniChart: View {
   let pair: CorrelationEngine.EvaluatedPair
   let color: Color
 
@@ -470,7 +134,7 @@ private struct MiniChart: View {
 
 // MARK: - Tier badge
 
-private struct TierBadge: View {
+struct TierBadge: View {
   let pair: CorrelationEngine.EvaluatedPair
   var body: some View {
     let color: Color = {
@@ -490,7 +154,7 @@ private struct TierBadge: View {
 
 // MARK: - Detail sheet
 
-private struct DetailSheet: View {
+struct DetailSheet: View {
   @Environment(\.dismiss) private var dismiss
   @Environment(SectionTheme.self) private var theme
   let pair: CorrelationEngine.EvaluatedPair

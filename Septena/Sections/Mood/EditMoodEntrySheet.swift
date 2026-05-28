@@ -16,7 +16,10 @@ struct EditMoodEntrySheet: View {
 
   @State private var quadrant: MoodQuadrant
   @State private var selected: MoodEmotion
-  @State private var time: Date
+  // Single `Date` covering both day and time-of-day; split on save into
+  // the entity's "YYYY-MM-DD" + "HH:mm:ss" fields. Editing the date is
+  // how you backfill a forgotten check-in onto the right day.
+  @State private var when: Date
   @State private var note: String
 
   init(date: String, original: MoodEntry, onSave: @escaping () -> Void) {
@@ -29,8 +32,8 @@ struct EditMoodEntrySheet: View {
       $0.arousal == original.arousal && $0.valence == original.valence
     } ?? MoodCatalog.grid(for: q)[4]   // center cell fallback
     _selected = State(initialValue: initialEmotion)
-    let fmt = DateFormatter(); fmt.dateFormat = "HH:mm:ss"
-    _time = State(initialValue: fmt.date(from: original.time) ?? Date())
+    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd HH:mm:ss"
+    _when = State(initialValue: fmt.date(from: "\(date) \(original.time)") ?? Date())
     _note = State(initialValue: original.note ?? "")
   }
 
@@ -66,8 +69,8 @@ struct EditMoodEntrySheet: View {
           .padding(.vertical, 4)
         }
         Section("When") {
-          DatePicker("Time", selection: $time,
-                     displayedComponents: .hourAndMinute)
+          DatePicker("Date & time", selection: $when,
+                     displayedComponents: [.date, .hourAndMinute])
         }
         Section("Note") {
           TextField("Note", text: $note, axis: .vertical)
@@ -91,10 +94,13 @@ struct EditMoodEntrySheet: View {
   }
 
   private func save() {
-    let fmt = DateFormatter(); fmt.dateFormat = "HH:mm:ss"
-    let hhmmss = fmt.string(from: time)
+    let dayFmt = DateFormatter(); dayFmt.dateFormat = "yyyy-MM-dd"
+    let timeFmt = DateFormatter(); timeFmt.dateFormat = "HH:mm:ss"
+    let newDate = dayFmt.string(from: when)
+    let hhmmss = timeFmt.string(from: when)
     let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
     mood.updateEntry(id: original.id,
+                     date: newDate,
                      time: hhmmss,
                      quadrant: selected.quadrant.rawValue,
                      arousal: selected.arousal,

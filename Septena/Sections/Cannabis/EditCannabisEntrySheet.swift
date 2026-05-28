@@ -12,10 +12,21 @@ struct EditCannabisEntrySheet: View {
   private var cannabis: CannabisMutator { SeptenaServices.shared.cannabisMutator }
 
   let date: String
-  let original: CannabisEntry
+  /// `nil` puts the sheet in create mode — save calls `addEntry` and
+  /// onSave fires with the newly-minted entry. Non-nil edits in place.
+  let original: CannabisEntry?
+  /// In create mode, seed `method` with this preset (e.g. "vape",
+  /// "edible") so a quick-log action from `CannabisPlugin.logActions`
+  /// can skip the method picker. Ignored when `original` is non-nil.
+  var presetMethod: String? = nil
   let onSave: (CannabisEntry) -> Void
 
-  @State private var time: Date = Date()
+  private var isCreating: Bool { original == nil }
+
+  // Single `Date` covering both day and time-of-day; split on save into
+  // the entity's "YYYY-MM-DD" + "HH:mm" fields. Editing the date is how
+  // you backfill a forgotten log onto the right day.
+  @State private var when: Date = Date()
   @State private var method: String = "vape"
   @State private var strainChoice: String = ""
   @State private var strainFreeform: String = ""
@@ -33,9 +44,9 @@ struct EditCannabisEntrySheet: View {
     NavigationStack {
       Form {
         Section("When") {
-          DatePicker("Time",
-                     selection: $time,
-                     displayedComponents: .hourAndMinute)
+          DatePicker("Date & time",
+                     selection: $when,
+                     displayedComponents: [.date, .hourAndMinute])
         }
         Section("Method") {
           Picker("Method", selection: $method) {
@@ -75,7 +86,7 @@ struct EditCannabisEntrySheet: View {
             .lineLimit(1...4)
         }
       }
-      .navigationTitle("Edit cannabis entry")
+      .navigationTitle(isCreating ? "New cannabis entry" : "Edit cannabis entry")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif
@@ -92,6 +103,37 @@ struct EditCannabisEntrySheet: View {
   }
 
   private func seed() {
+    guard let original else {
+      // Create mode: pre-fill from preset, then smart-default strain +
+      // hit from the most recent entry of the same method so the common
+      // path is one tap. Effect/note stay empty — those are per-session.
+      method = presetMethod ?? "vape"
+      let lastSame = lastEntry(method: method)
+      if let last = lastSame, let s = last.strain, !s.isEmpty {
+        if strains.contains(where: { $0.name == s }) {
+          strainChoice = s
+        } else {
+          strainChoice = "__custom__"
+          strainFreeform = s
+        }
+      } else {
+        strainChoice = ""
+        strainFreeform = ""
+      }
+      hit = lastSame?.hit ?? 1
+      note = ""
+      effect = ""
+      let dayFmt = DateFormatter(); dayFmt.dateFormat = "yyyy-MM-dd"
+      let day = dayFmt.date(from: date) ?? Date()
+      let now = Date()
+      let cal = Calendar.current
+      let comps = cal.dateComponents([.hour, .minute], from: now)
+      when = cal.date(bySettingHour: comps.hour ?? 0,
+                      minute: comps.minute ?? 0,
+                      second: 0,
+                      of: day) ?? now
+      return
+    }
     method = original.method
     if let s = original.strain, !s.isEmpty {
       if strains.contains(where: { $0.name == s }) {
@@ -106,17 +148,39 @@ struct EditCannabisEntrySheet: View {
     hit = original.hit ?? 1
     note = original.note ?? ""
     effect = original.effect ?? ""
-    let fmt = DateFormatter(); fmt.dateFormat = "HH:mm"
-    time = fmt.date(from: original.time) ?? Date()
+    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd HH:mm"
+    when = fmt.date(from: "\(date) \(original.time)") ?? Date()
   }
 
   private func loadStrains() async {
     strains = ChecklistMirror.loadCannabisStrains(context: modelContext)
   }
 
+  /// Most recent cannabis event with the given method in the last 30
+  /// days — feeds the create sheet's smart defaults so "Log vape" with
+  /// the same strain you used yesterday is one tap.
+  private func lastEntry(method: String) -> CannabisEventEntity? {
+    let cutoff: String = {
+      let d = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+      let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+      return f.string(from: d)
+    }()
+    var descriptor = FetchDescriptor<CannabisEventEntity>(
+      predicate: #Predicate { $0.method == method && $0.date >= cutoff },
+      sortBy: [
+        SortDescriptor(\.date, order: .reverse),
+        SortDescriptor(\.time, order: .reverse),
+      ]
+    )
+    descriptor.fetchLimit = 1
+    return try? modelContext.fetch(descriptor).first
+  }
+
   private func save() {
-    let fmt = DateFormatter(); fmt.dateFormat = "HH:mm"
-    let hhmm = fmt.string(from: time)
+    let dayFmt = DateFormatter(); dayFmt.dateFormat = "yyyy-MM-dd"
+    let timeFmt = DateFormatter(); timeFmt.dateFormat = "HH:mm"
+    let newDate = dayFmt.string(from: when)
+    let hhmm = timeFmt.string(from: when)
     let strainValue: String? = {
       guard method == "vape" else { return nil }
       switch strainChoice {
@@ -143,23 +207,41 @@ struct EditCannabisEntrySheet: View {
     // grams; switching to vape stamps the constant 0.05g.
     let gramsValue: Double? = method == "vape" ? CannabisMutator.gramsPerVapeUse : nil
 
-    cannabis.updateEntry(id: original.id,
-                         time: hhmm,
-                         method: method,
-                         strain: .some(strainValue),
-                         hit: .some(hitValue),
-                         grams: .some(gramsValue),
-                         effect: .some(effectValue),
-                         note: .some(noteValue))
+    let savedID: String
+    let savedGrams: Double?
+    if let original {
+      cannabis.updateEntry(id: original.id,
+                           date: newDate,
+                           time: hhmm,
+                           method: method,
+                           strain: .some(strainValue),
+                           hit: .some(hitValue),
+                           grams: .some(gramsValue),
+                           effect: .some(effectValue),
+                           note: .some(noteValue))
+      savedID = original.id
+      savedGrams = method == "vape" ? original.grams : nil
+    } else {
+      let entity = cannabis.addEntry(date: newDate,
+                                     time: hhmm,
+                                     method: method,
+                                     strain: strainValue,
+                                     hit: hitValue,
+                                     grams: gramsValue,
+                                     effect: effectValue,
+                                     note: noteValue)
+      savedID = entity.id
+      savedGrams = entity.grams
+    }
     Haptics.tick()
 
     let rebuilt = CannabisEntry(
-      id: original.id,
+      id: savedID,
       time: hhmm,
       method: method,
       strain: strainValue,
       hit: method == "vape" ? hit : nil,
-      grams: method == "vape" ? original.grams : nil,
+      grams: method == "vape" ? savedGrams : nil,
       note: noteValue,
       effect: effectValue
     )

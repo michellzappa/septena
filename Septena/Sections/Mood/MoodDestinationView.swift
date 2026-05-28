@@ -23,29 +23,15 @@ struct MoodDestinationView: View {
   @State private var loading = true
 
   var body: some View {
-    List {
-      SectionGoalsStrip(sectionKey: "mood")
+    SectionDrawer(sectionKey: "mood",
+                  title: "Mood",
+                  onLog: { _ in addingNew = true }) {
       slotSection
       todaySection
       heatmapSection
       breakdownSection
     }
-    #if os(macOS)
-    .listStyle(.inset)
-    #else
-    .listStyle(.insetGrouped)
-    #endif
-    .background(Theme.groupedBackground)
-    .navigationTitle("Mood")
     .trackScreen("mood")
-    #if os(iOS)
-    .navigationBarTitleDisplayMode(.large)
-    #endif
-    .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        Button { addingNew = true } label: { Image(systemName: "plus") }
-      }
-    }
     .task { reload() }
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
       reload()
@@ -63,21 +49,25 @@ struct MoodDestinationView: View {
   // MARK: - Slot cards (morning / afternoon / evening)
 
   private var slotSection: some View {
-    Section {
-      ForEach(DayBucket.allCases) { bucket in
-        SlotCard(bucket: bucket,
-                 latest: today?.byBucket[bucket.rawValue],
-                 onTap: {
-                   if let entry = today?.byBucket[bucket.rawValue] {
-                     editing = entry
-                   } else {
-                     addingNew = true
-                   }
-                 })
-      }
-    } header: {
+    VStack(alignment: .leading, spacing: 8) {
       DayBucketHeader(bucket: DayBucket.current.rawValue,
                       trailing: "\(today?.logCount ?? 0)/3")
+        .padding(.horizontal, 16)
+      DrawerSection(spacing: 0, padding: .none) {
+        ForEach(DayBucket.allCases) { bucket in
+          SlotCard(bucket: bucket,
+                   latest: today?.byBucket[bucket.rawValue],
+                   onTap: {
+                     if let entry = today?.byBucket[bucket.rawValue] {
+                       editing = entry
+                     } else {
+                       addingNew = true
+                     }
+                   })
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+        }
+      }
     }
   }
 
@@ -86,28 +76,29 @@ struct MoodDestinationView: View {
   @ViewBuilder
   private var todaySection: some View {
     if let today, today.entries.count > 0 {
-      Section("All logs today") {
+      DrawerSection("All logs today") {
         ForEach(today.entries.reversed()) { entry in
-          Button { editing = entry } label: {
-            EntryRow(entry: entry)
-          }
-          .buttonStyle(.plain)
-          .contextMenu {
-            Button { editing = entry } label: {
-              Label("Edit", systemImage: "pencil")
+          Button { editing = entry } label: { EntryRow(entry: entry) }
+            .buttonStyle(.plain)
+            .contextMenu {
+              Button { editing = entry } label: {
+                Label("Edit", systemImage: "pencil")
+              }
+              Button(role: .destructive) {
+                SeptenaServices.shared.moodMutator.deleteEntry(id: entry.id)
+                Haptics.warning()
+                reload()
+              } label: {
+                Label("Delete", systemImage: "trash")
+              }
             }
-            Button(role: .destructive) {
-              SeptenaServices.shared.moodMutator.deleteEntry(id: entry.id)
-              Haptics.warning()
-              reload()
-            } label: {
-              Label("Delete", systemImage: "trash")
-            }
-          }
         }
       }
     } else if !loading {
-      Section { Text("No check-ins yet today.").foregroundStyle(.secondary) }
+      DrawerSection {
+        Text("No check-ins yet today.")
+          .foregroundStyle(.secondary)
+      }
     }
   }
 
@@ -116,9 +107,8 @@ struct MoodDestinationView: View {
   @ViewBuilder
   private var heatmapSection: some View {
     if !history.isEmpty {
-      Section("Past 30 days") {
+      DrawerSection("Past 30 days", padding: .tight) {
         MoodHeatmapView(history: Array(history.suffix(30)))
-          .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
       }
     }
   }
@@ -128,9 +118,8 @@ struct MoodDestinationView: View {
   @ViewBuilder
   private var breakdownSection: some View {
     if !monthEntries.isEmpty {
-      Section("Where you spent your time") {
+      DrawerSection("Where you spent your time") {
         QuadrantBreakdownView(entries: monthEntries)
-          .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 12, trailing: 12))
       }
     }
   }

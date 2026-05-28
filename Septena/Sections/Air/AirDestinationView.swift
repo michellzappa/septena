@@ -39,8 +39,7 @@ struct AirDestinationView: View {
   }
 
   var body: some View {
-    List {
-      SectionGoalsStrip(sectionKey: "air")
+    SectionDrawer(sectionKey: "air", title: "Air") {
       summarySection
       pollenSection
       co2Last24hChart
@@ -49,34 +48,22 @@ struct AirDestinationView: View {
       co2SevenDayMaxChart
       pollenHistoryChart
       if history.isEmpty && summary?.latest == nil {
-        Section {
-          ContentUnavailableView {
-            Label("No air data yet", systemImage: theme.icon(for: "air"))
-          } description: {
-            Text(emptyDescription)
-          } actions: {
-            if bridge.state == .idle ||
-               bridge.state == .disconnected ||
-               bridge.state == .bluetoothOff ||
-               bridge.state == .unauthorized {
-              Button("Connect Aranet") { bridge.start() }
-                .buttonStyle(.borderedProminent)
-            }
+        ContentUnavailableView {
+          Label("No air data yet", systemImage: theme.icon(for: "air"))
+        } description: {
+          Text(emptyDescription)
+        } actions: {
+          if bridge.state == .idle ||
+             bridge.state == .disconnected ||
+             bridge.state == .bluetoothOff ||
+             bridge.state == .unauthorized {
+            Button("Connect Aranet") { bridge.start() }
+              .buttonStyle(.borderedProminent)
           }
         }
       }
     }
-    #if os(macOS)
-    .listStyle(.inset)
-    #else
-    .listStyle(.insetGrouped)
-    #endif
-    .background(Theme.groupedBackground)
-    .navigationTitle("Air")
     .trackScreen("air")
-    #if os(iOS)
-    .navigationBarTitleDisplayMode(.large)
-    #endif
     .tint(accent)
     .onAppear {
       // Don't auto-start the bridge here — building CBCentralManager is
@@ -121,7 +108,7 @@ struct AirDestinationView: View {
   private var pollenSection: some View {
     switch pollen.state {
     case .denied:
-      Section {
+      DrawerSection("Pollen") {
         VStack(alignment: .leading, spacing: 4) {
           Text("Pollen needs location access")
             .font(.subheadline.weight(.medium))
@@ -129,40 +116,42 @@ struct AirDestinationView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         }
-      } header: { Text("Pollen") }
+      }
     case .failed(let msg):
-      Section {
-        Text(msg).font(.caption).foregroundStyle(.orange)
-      } header: { Text("Pollen") }
+      DrawerSection("Pollen") {
+        Text(msg)
+          .font(.caption)
+          .foregroundStyle(.orange)
+      }
     default:
       if let p = pollen.today {
-        Section {
-          // Three big stats — grass / tree / weed are the rollups
-          // a user actually cares about during allergy season. Birch
-          // and friends live inside `tree`; ragweed/mugwort in `weed`.
-          HStack(alignment: .top, spacing: 24) {
-            pollenStat("Grass", value: p.grassMax ?? p.grass, species: "grass")
-            pollenStat("Tree",  value: p.treeMax,             species: "tree")
-            pollenStat("Weed",  value: p.weedMax,             species: "weed")
-            Spacer()
-          }
-          // Overall band footer — single-glance "is today bad".
-          if let bandLabel = pollenBandLabel(p.overallBand) {
-            HStack(spacing: 6) {
-              Circle()
-                .fill(pollenBandColor(p.overallBand))
-                .frame(width: 6, height: 6)
-              Text("Overall: \(bandLabel)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-              Spacer()
+        VStack(alignment: .leading, spacing: 6) {
+          DrawerSection("Pollen") {
+            VStack(alignment: .leading, spacing: 6) {
+              HStack(alignment: .top, spacing: 24) {
+                pollenStat("Grass", value: p.grassMax ?? p.grass, species: "grass")
+                pollenStat("Tree",  value: p.treeMax,             species: "tree")
+                pollenStat("Weed",  value: p.weedMax,             species: "weed")
+                Spacer()
+              }
+              if let bandLabel = pollenBandLabel(p.overallBand) {
+                HStack(spacing: 6) {
+                  Circle()
+                    .fill(pollenBandColor(p.overallBand))
+                    .frame(width: 6, height: 6)
+                  Text("Overall: \(bandLabel)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                  Spacer()
+                }
+                .padding(.top, 4)
+              }
             }
-            .padding(.top, 4)
           }
-        } header: { Text("Pollen") } footer: {
           Text("Counts in grains/m³ from Open-Meteo. Cached for 6h.")
             .font(.caption2)
             .foregroundStyle(.secondary)
+            .padding(.horizontal, 16)
         }
       }
     }
@@ -221,31 +210,27 @@ struct AirDestinationView: View {
 
   @ViewBuilder
   private var summarySection: some View {
-    Section {
-      HStack(alignment: .top, spacing: 24) {
-        stat(value: summary?.latest?.co2Ppm.map { "\(Int($0))" } ?? "—",
-             label: "CO2 ppm",
-             tint: bandColor(summary?.co2Band))
-        stat(value: summary?.latest?.tempC.map { String(format: "%.1f", $0) } ?? "—",
-             label: "temp",
-             tint: .secondary,
-             unit: "°C")
-        stat(value: summary?.latest?.humidityPct.map { "\(Int($0))" } ?? "—",
-             label: "humidity",
-             tint: .secondary,
-             unit: "%")
-        Spacer()
-      }
-      if let s = summary {
-        HStack(spacing: 18) {
-          mini("Today avg", value: s.today.co2Avg.map { "\(Int($0))" })
-          mini("Today max", value: s.today.co2Max.map { "\(Int($0))" })
-          mini("Over 1000", value: "\(s.today.minutesOver1000)m")
-          Spacer()
+    DrawerSection {
+      VStack(alignment: .leading, spacing: 6) {
+        StatStrip(stats: [
+          Stat(value: summary?.latest?.co2Ppm.map { "\(Int($0))" } ?? "—",
+               label: "CO2 ppm", tint: bandColor(summary?.co2Band)),
+          Stat(value: summary?.latest?.tempC.map { String(format: "%.1f", $0) } ?? "—",
+               label: "temp", unit: "°C"),
+          Stat(value: summary?.latest?.humidityPct.map { "\(Int($0))" } ?? "—",
+               label: "humidity", unit: "%"),
+        ])
+        if let s = summary {
+          HStack(spacing: 18) {
+            mini("Today avg", value: s.today.co2Avg.map { "\(Int($0))" })
+            mini("Today max", value: s.today.co2Max.map { "\(Int($0))" })
+            mini("Over 1000", value: "\(s.today.minutesOver1000)m")
+            Spacer()
+          }
+          .padding(.top, 4)
         }
-        .padding(.top, 4)
+        connectionFooter
       }
-      connectionFooter
     }
   }
 
@@ -301,19 +286,6 @@ struct AirDestinationView: View {
       return "Allow Bluetooth in iOS Settings → Septena."
     default:
       return "Make sure your Aranet4 is nearby and powered on."
-    }
-  }
-
-  private func stat(value: String, label: String, tint: Color,
-                    unit: String? = nil) -> some View {
-    VStack(alignment: .leading, spacing: 2) {
-      HStack(alignment: .firstTextBaseline, spacing: 2) {
-        Text(value)
-          .font(.system(.title2, design: .rounded).weight(.semibold))
-          .foregroundStyle(tint)
-        if let unit { Text(unit).font(.subheadline).foregroundStyle(.secondary) }
-      }
-      Text(label).font(.caption).foregroundStyle(.secondary)
     }
   }
 
@@ -378,7 +350,7 @@ struct AirDestinationView: View {
   private var co2Last24hChart: some View {
     let pts = series24h.filter { $0.co2Ppm != nil }
     if pts.count >= 2 {
-      Section {
+      ChartCard(title: "CO₂ last 24h", detail: co2Last24hDetail) {
         Chart {
           // Health threshold rules — webapp uses these as ReferenceLines.
           // The colored band rectangles the webapp shows behind the
@@ -407,7 +379,7 @@ struct AirDestinationView: View {
         .chartXScale(domain: last24hWindow)
         .chartYScale(domain: .automatic(includesZero: false))
         .frame(height: 200)
-      } header: { chartHeader("CO₂ last 24h", detail: co2Last24hDetail) }
+      }
     }
   }
 
@@ -424,7 +396,7 @@ struct AirDestinationView: View {
   private var tempLast24hChart: some View {
     let pts = series24h.filter { $0.tempC != nil }
     if pts.count >= 2 {
-      Section {
+      ChartCard(title: "Temperature", detail: "last 24h") {
         Chart(pts) { p in
           LineMark(x: .value("Time", p.capturedAt),
                    y: .value("°C", p.tempC ?? 0))
@@ -438,7 +410,7 @@ struct AirDestinationView: View {
         .chartXScale(domain: last24hWindow)
         .chartYScale(domain: .automatic(includesZero: false))
         .frame(height: 140)
-      } header: { chartHeader("Temperature", detail: "last 24h") }
+      }
     }
   }
 
@@ -446,7 +418,7 @@ struct AirDestinationView: View {
   private var humidityLast24hChart: some View {
     let pts = series24h.filter { $0.humidityPct != nil }
     if pts.count >= 2 {
-      Section {
+      ChartCard(title: "Humidity", detail: "last 24h") {
         Chart {
           // 40-60% comfort band reference lines (matches webapp).
           RuleMark(y: .value("40%", 40))
@@ -469,7 +441,7 @@ struct AirDestinationView: View {
         .chartXScale(domain: last24hWindow)
         .chartYScale(domain: 0...100)
         .frame(height: 140)
-      } header: { chartHeader("Humidity", detail: "last 24h") }
+      }
     }
   }
 
@@ -479,7 +451,7 @@ struct AirDestinationView: View {
     // oldest→newest so the x-axis reads left to right naturally.
     let pts = history.filter { $0.co2Max != nil }
     if pts.count >= 2 {
-      Section {
+      ChartCard(title: "CO₂ 7-day max", detail: "daily peak") {
         Chart(pts, id: \.date) { p in
           LineMark(x: .value("Day", p.date),
                    y: .value("ppm", p.co2Max ?? 0))
@@ -502,7 +474,7 @@ struct AirDestinationView: View {
           }
         }
         .frame(height: 160)
-      } header: { chartHeader("CO₂ 7-day max", detail: "daily peak") }
+      }
     }
   }
 
@@ -510,7 +482,7 @@ struct AirDestinationView: View {
   private var pollenHistoryChart: some View {
     let pts = pollen.history.filter { $0.grassMax != nil }
     if pts.count >= 2 {
-      Section {
+      ChartCard(title: "Grass pollen 7 days", detail: "daily max") {
         Chart(pts) { p in
           BarMark(x: .value("Day", p.date),
                   y: .value("grains/m³", p.grassMax ?? 0))
@@ -529,15 +501,6 @@ struct AirDestinationView: View {
           }
         }
         .frame(height: 160)
-      } header: { chartHeader("Grass pollen 7 days", detail: "daily max") }
-    }
-  }
-
-  private func chartHeader(_ title: String, detail: String?) -> some View {
-    HStack(spacing: 6) {
-      Text(title)
-      if let detail {
-        Text(detail).font(.caption).foregroundStyle(.secondary)
       }
     }
   }

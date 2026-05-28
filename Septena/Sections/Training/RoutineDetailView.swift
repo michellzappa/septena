@@ -106,8 +106,11 @@ struct RoutineDetailView: View {
     .navigationTitle(isNew ? "New Routine" : label)
     // Edit mode is always-on so the drag handles for reordering /
     // swipe-to-delete on the Exercises section are visible without
-    // the user toggling an Edit button.
+    // the user toggling an Edit button. `editMode` only exists on
+    // iOS — on macOS the Form already supports drag-reorder.
+    #if os(iOS)
     .environment(\.editMode, .constant(.active))
+    #endif
     .toolbar {
       ToolbarItem(placement: .confirmationAction) {
         Button("Save") { save() }
@@ -145,13 +148,12 @@ struct RoutineDetailView: View {
     } else {
       id = TrainingConfigStore.slug(from: label)
     }
-    // Preserve any existing emoji on the entity — the UI no longer
-    // exposes it, but we don't want to silently null out historical
-    // values on save.
+    // Emoji is deprecated — SessionKind.icon replaces it. Clear any
+    // historical value on save so the CloudKit field drains naturally.
     TrainingConfigStore.upsertSessionType(
       id: id,
       label: label.trimmingCharacters(in: .whitespaces),
-      emoji: entity?.emoji,
+      emoji: nil,
       exercises: exercises,
       archived: archived,
       kind: kind,

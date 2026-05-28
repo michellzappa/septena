@@ -13,24 +13,25 @@ struct SupplementsDestinationView: View {
   @State private var editing: SupplementDayItem? = nil
   @State private var creating = false
   @State private var history: [SupplementHistoryPoint] = []
+  /// `.sheet(item:)` needs Identifiable; String isn't, so wrap.
+  private struct BackfillDate: Identifiable { let id: String }
+  @State private var backfillDate: BackfillDate? = nil
 
   private var accent: Color { theme.color(for: "supplements") }
 
   var body: some View {
-    List {
-      SectionGoalsStrip(sectionKey: "supplements")
+    SectionDrawer(sectionKey: "supplements",
+                  title: "Supplements",
+                  onLog: { _ in creating = true }) {
       summary
-      Section {
+      DrawerSection("Today", padding: .none) {
         ForEach(model.supplements) { supp in
           Button { editing = supp } label: {
             SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator, tint: accent,
                           onDelete: { delete(supp) })
           }
           .buttonStyle(.plain)
-          .listRowInsets(EdgeInsets())
         }
-      } header: {
-        Text("Today")
       }
       if model.hasLoaded && model.supplements.isEmpty {
         ContentUnavailableView("No supplements configured",
@@ -45,28 +46,13 @@ struct SupplementsDestinationView: View {
           daily: history,
           date: { $0.date },
           done: { $0.done },
-          total: { $0.total }
+          total: { $0.total },
+          onTapDay: { iso in backfillDate = BackfillDate(id: iso) }
         )
       }
     }
-    #if os(macOS)
-    .listStyle(.inset)
-    #else
-    .listStyle(.insetGrouped)
-    #endif
-    .background(Theme.groupedBackground)
-    .navigationTitle("Supplements")
     .trackScreen("supplements")
-    #if os(iOS)
-    .navigationBarTitleDisplayMode(.large)
-    #endif
     .tint(accent)
-    .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        Button { creating = true } label: { Image(systemName: "plus") }
-          .tint(accent)
-      }
-    }
     .task {
       model.paintFromCache()
       await model.load()
@@ -95,6 +81,13 @@ struct SupplementsDestinationView: View {
       .presentationDragIndicator(.visible)
       #endif
     }
+    .sheet(item: $backfillDate) { wrap in
+      BackfillSupplementsSheet(date: wrap.id)
+        #if os(iOS)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        #endif
+    }
   }
 
   private func delete(_ supp: SupplementDayItem) {
@@ -106,18 +99,10 @@ struct SupplementsDestinationView: View {
   private var summary: some View {
     let total = model.supplements.count
     let done = model.supplements.filter { $0.done }.count
-    return Section {
-      HStack {
-        VStack(alignment: .leading, spacing: 2) {
-          Text("\(done)/\(total)")
-            .font(.system(.title2, design: .rounded).weight(.semibold))
-            .foregroundStyle(accent)
-          Text("taken today")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-        Spacer()
-      }
+    return DrawerSection {
+      StatStrip(stats: [
+        Stat(value: "\(done)/\(total)", label: "taken today", tint: accent),
+      ])
     }
   }
 }

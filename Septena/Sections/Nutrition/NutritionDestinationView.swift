@@ -106,28 +106,13 @@ struct NutritionDestinationView: View {
   // MARK: - Body
 
   var body: some View {
-    ScrollView {
-      LazyVStack(spacing: 12) {
-        SectionGoalsStrip(sectionKey: "nutrition")
-        macroTilesGrid
-        entriesList
-      }
-      .padding(.horizontal, 12)
-      .padding(.vertical, 8)
+    SectionDrawer(sectionKey: "nutrition",
+                  title: "Nutrition",
+                  onLog: { _ in creating = true }) {
+      macroTilesGrid
+      entriesList
     }
-    .background(Theme.groupedBackground)
-    .navigationTitle("Nutrition")
     .trackScreen("nutrition")
-    #if os(iOS)
-    .navigationBarTitleDisplayMode(.large)
-    #endif
-    .tint(kcalColor)
-    .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        Button { creating = true } label: { Image(systemName: "plus") }
-          .tint(kcalColor)
-      }
-    }
     .task { reload() }
     // Day rollover: reload so the fasting row, today's totals, and the
     // "earlier days" grouping all reflect the new day's data.
@@ -534,7 +519,6 @@ struct NutritionDestinationView: View {
 
   private func mealRow(_ e: NutritionEntry) -> some View {
     HStack(alignment: .top, spacing: 10) {
-      Circle().fill(kcalColor).frame(width: 6, height: 6).padding(.top, 7)
       VStack(alignment: .leading, spacing: 2) {
         HStack(alignment: .firstTextBaseline) {
           if let emoji = e.emoji, !emoji.isEmpty {
@@ -543,15 +527,7 @@ struct NutritionDestinationView: View {
           Text(e.foods.first ?? "—")
             .font(.subheadline.weight(.medium))
             .lineLimit(1)
-          Spacer()
-          VStack(alignment: .trailing, spacing: 4) {
-            Text(e.time)
-              .font(.caption.monospacedDigit())
-              .foregroundStyle(.secondary)
-            if let pid = e.photoAssetID, !pid.isEmpty {
-              MealPhotoThumbnail(assetID: pid, size: 36)
-            }
-          }
+          Spacer(minLength: 0)
         }
         if e.foods.count > 1 {
           Text(e.foods.dropFirst().joined(separator: " · "))
@@ -581,6 +557,14 @@ struct NutritionDestinationView: View {
             Text("\(Int(e.kcal.rounded()))kcal").foregroundStyle(kcalColor)
           }
           .font(.caption.monospacedDigit().weight(.semibold))
+        }
+      }
+      VStack(alignment: .trailing, spacing: 4) {
+        Text(e.time)
+          .font(.caption.monospacedDigit())
+          .foregroundStyle(.secondary)
+        if let pid = e.photoAssetID, !pid.isEmpty {
+          MealPhotoThumbnail(assetID: pid, size: 36)
         }
       }
     }
@@ -664,7 +648,6 @@ struct NutritionDestinationView: View {
   private func liveFastingHours() -> Double? {
     _ = now  // tie to timer
     guard let stats else { return nil }
-    let target = macros?.fasting ?? MacroRange(min: 14, max: 16, unit: "h")
     let mealsToday = stats.todayMealCount ?? todayEntries.count
     guard mealsToday == 0 else { return nil }
     // Need yesterday's last meal to anchor the window.
@@ -673,8 +656,7 @@ struct NutritionDestinationView: View {
     let comps = cal.dateComponents([.hour, .minute], from: now)
     let nowH = Double(comps.hour ?? 0) + Double(comps.minute ?? 0) / 60.0
     let hours = (24 - lastH) + nowH
-    // Sanity gate — show only after we're at least halfway to the min target.
-    return hours >= target.min * 0.5 ? hours : nil
+    return hours >= 2 ? hours : nil
   }
 
   private func hoursFromHHMM(_ s: String) -> Double? {

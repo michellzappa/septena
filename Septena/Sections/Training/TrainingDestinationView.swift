@@ -54,48 +54,48 @@ struct TrainingDestinationView: View {
   }
 
   var body: some View {
-    List {
-      SectionGoalsStrip(sectionKey: "training")
+    SectionDrawer(sectionKey: "training",
+                  title: "Training",
+                  onLog: { _ in nav.showTrainingSession = true }) {
       if let d = draftStore.draft {
         activeSessionSection(d)
       }
       summary
       z2CardioSection
       strengthVolumeSection
+      volumeTrendSection
       consistencySection
       progressionSection
       ForEach(sessions, id: \.key) { block in
-        Section {
-          ForEach(block.entries) { entry in
-            Button {
-              guard entry.file != nil else { return }
-              editing = entry
-            } label: {
-              LogRow(
-                title: entry.exercise ?? "—",
-                detail: detailLine(entry),
-                trailing: entry.loggedAt.map(timeOnly),
-                accessory: glyphAccessory(for: entry)
-              )
-            }
-            .buttonStyle(.plain)
-            .listRowInsets(EdgeInsets())
-            .contextMenu {
-              if entry.file != nil {
-                Button(role: .destructive) {
-                  delete(entry)
-                } label: {
-                  Label("Delete", systemImage: "trash")
-                }
-              }
-            }
-          }
-        } header: {
+        VStack(alignment: .leading, spacing: 8) {
           HStack {
-            Text(block.session.capitalized.isEmpty ? "Session" : block.session.capitalized)
+            sessionTypeMenu(for: block)
             Spacer()
             Text(friendlyDate(block.date))
               .foregroundStyle(.secondary)
+          }
+          .font(.subheadline)
+          .padding(.horizontal, 16)
+          DrawerSection(padding: .none) {
+            ForEach(block.entries) { entry in
+              if entry.file != nil {
+                LogEntryRow(
+                  title: entry.exercise ?? "—",
+                  detail: detailLine(entry),
+                  trailing: entry.loggedAt.map(timeOnly),
+                  accessory: glyphAccessory(for: entry),
+                  onEdit: { editing = entry },
+                  onDelete: { delete(entry) }
+                )
+              } else {
+                LogEntryRow(
+                  title: entry.exercise ?? "—",
+                  detail: detailLine(entry),
+                  trailing: entry.loggedAt.map(timeOnly),
+                  accessory: glyphAccessory(for: entry)
+                )
+              }
+            }
           }
         }
       }
@@ -105,33 +105,12 @@ struct TrainingDestinationView: View {
                                description: Text("Log a session in the webapp to see it here."))
       }
     }
-    #if os(iOS)
-    .listStyle(.insetGrouped)
-    #endif
-    .background(Theme.groupedBackground)
-    .navigationTitle("Training")
     .trackScreen("training")
-    #if os(iOS)
-    .navigationBarTitleDisplayMode(.large)
-    #endif
     .tint(accent)
     .task {
       paintFromCache()
+      draftStore.refreshCatalog(context: modelContext)
       await load()
-    }
-    // Training's quick-add is the Start session sheet itself, so we
-    // don't route through `AddInfoSheet` (its training page is a v1
-    // no-op that just dismisses). Top-right icon stays the verb glyph
-    // — Training's verb is `.start`, not `.add`.
-    .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        Button {
-          nav.showTrainingSession = true
-        } label: {
-          Label("Start session", systemImage: "play.fill")
-        }
-        .tint(accent)
-      }
     }
     .sheet(item: $editing) { entry in
       EditExerciseEntrySheet(
@@ -145,6 +124,63 @@ struct TrainingDestinationView: View {
     guard let idx = entries.firstIndex(where: { $0.id == updated.id }) else { return }
     entries[idx] = updated
     ResponseCache.save(entries, forKey: CacheKey.entries)
+  }
+
+  /// Tappable session-type picker shown in each day's section header.
+  /// Picking a new value bulk-retags every entry on that date — both in
+  /// SwiftData (via `trainingMutator.retagSession`) and in the local
+  /// `entries` array so the chart and grouping refresh immediately.
+  @ViewBuilder
+  private func sessionTypeMenu(for block: SessionBlock) -> some View {
+    let current = block.session
+    let activeType = draftStore.sessionTypes.first { $0.id == current }
+    let label = activeType?.label ?? (current.isEmpty ? "Untagged" : current.capitalized)
+    let icon = activeType?.kind.icon ?? (current.isEmpty ? "questionmark.circle" : nil)
+    Menu {
+      // Use the routine catalog the user has configured (upper/lower/cardio/
+      // yoga/…), with a final "Untagged" option for clearing.
+      ForEach(draftStore.sessionTypes.filter { !$0.archived }, id: \.id) { st in
+        Button {
+          retag(date: block.date, to: st.id)
+        } label: {
+          // Show the routine's SF Symbol; SwiftUI Menus auto-render a
+          // trailing checkmark when the button is the active selection
+          // (no need to manually swap the systemImage).
+          Label(st.label, systemImage: st.kind.icon)
+        }
+      }
+      Divider()
+      Button {
+        retag(date: block.date, to: "")
+      } label: {
+        Label("Untagged", systemImage: "questionmark.circle")
+      }
+    } label: {
+      HStack(spacing: 4) {
+        if let icon { Image(systemName: icon) }
+        Text(label)
+        Image(systemName: "chevron.down")
+          .font(.caption2.weight(.semibold))
+          .foregroundStyle(.secondary)
+      }
+      .contentShape(Rectangle())
+    }
+    .menuStyle(.button)
+    .buttonStyle(.plain)
+    .tint(accent)
+  }
+
+  /// Apply a session-type change to every entry on `date`: SwiftData write
+  /// + CK sync via the mutator, plus an in-place patch of `entries` so the
+  /// daily list and chart series re-bucket without waiting for a reload.
+  private func retag(date: String, to newSessionType: String) {
+    let count = trainingMutator.retagSession(date: date, to: newSessionType)
+    guard count > 0 else { return }
+    for idx in entries.indices where entries[idx].date == date {
+      entries[idx].session = newSessionType
+    }
+    ResponseCache.save(entries, forKey: CacheKey.entries)
+    Haptics.tick()
   }
 
   private func delete(_ entry: ExerciseEntry) {
@@ -161,34 +197,41 @@ struct TrainingDestinationView: View {
     let sessionsThisWeek = uniqueSessionDates(thisWeek: true).count
     let z2 = Int(cardio?.daily.last?.rolling7d ?? 0)
     let target = cardio?.targetWeeklyMin ?? 150
-    return Section {
-      HStack(alignment: .top, spacing: 24) {
-        stat(value: "\(sessionsThisWeek)", label: "sessions", tint: accent)
-        stat(value: "\(z2)", label: "Z2 min", tint: accent, unit: "m")
-        Spacer()
-      }
-      VStack(alignment: .leading, spacing: 6) {
-        HStack {
-          Text("Z2 CARDIO")
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(.secondary)
-            .textCase(.uppercase)
-          Spacer()
-          Text("\(z2)/\(target)m").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+    return DrawerSection {
+      VStack(alignment: .leading, spacing: 8) {
+        StatStrip(stats: [
+          Stat(value: "\(sessionsThisWeek)", label: "sessions", tint: accent),
+          Stat(value: "\(z2)", label: "Z2 min", tint: accent, unit: "m"),
+        ])
+        VStack(alignment: .leading, spacing: 6) {
+          HStack {
+            Text("Z2 CARDIO")
+              .font(.caption2.weight(.semibold))
+              .foregroundStyle(.secondary)
+              .textCase(.uppercase)
+            Spacer()
+            Text("\(z2)/\(target)m").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+          }
+          ProgressView(value: Double(min(z2, target)),
+                       total: Double(max(target, 1)))
+            .tint(accent)
         }
-        ProgressView(value: Double(min(z2, target)),
-                     total: Double(max(target, 1)))
-          .tint(accent)
       }
     }
   }
 
   @ViewBuilder
   private func activeSessionSection(_ d: DraftSession) -> some View {
-    Section {
+    let kindIcon = draftStore.sessionTypes.first { $0.id == d.sessionType }?.kind.icon
+      ?? SessionKind.defaulted(for: d.sessionType).icon
+    DrawerSection("Active session") {
       HStack(spacing: 12) {
+        Image(systemName: kindIcon)
+          .font(.title3.weight(.medium))
+          .foregroundStyle(accent)
+          .frame(width: 28)
         VStack(alignment: .leading, spacing: 2) {
-          Text(d.label).font(.headline)
+          Text(d.label).font(.septenaCardTitle)
           Text("\(d.doneCount)/\(max(d.totalCount, 1)) done · started \(d.time)")
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -208,22 +251,6 @@ struct TrainingDestinationView: View {
         }
         .buttonStyle(.bordered)
       }
-    } header: {
-      Text("Active session")
-    }
-  }
-
-  private func stat(value: String, label: String, tint: Color, unit: String? = nil) -> some View {
-    VStack(alignment: .leading, spacing: 2) {
-      HStack(alignment: .firstTextBaseline, spacing: 2) {
-        Text(value)
-          .font(.system(.title2, design: .rounded).weight(.semibold))
-          .foregroundStyle(tint)
-        if let unit {
-          Text(unit).font(.subheadline).foregroundStyle(.secondary)
-        }
-      }
-      Text(label).font(.caption).foregroundStyle(.secondary)
     }
   }
 
@@ -282,7 +309,7 @@ struct TrainingDestinationView: View {
       let avg = series.isEmpty ? 0 : weekly / series.count
       let avgText = avg > 0 ? "Seven-day average \(avg) minutes." : ""
       let summary = "Zone 2 cardio chart. Weekly total \(weekly) minutes, target \(target). \(avgText)"
-      Section {
+      DrawerSection("Cardio") {
         VStack(alignment: .leading, spacing: 6) {
           HStack {
             Text("Zone 2 cardio").font(.subheadline.weight(.semibold))
@@ -353,8 +380,8 @@ struct TrainingDestinationView: View {
           .frame(height: 140)
         }
         .a11yCombineKeepingChildren(summary)
-      } header: {
-        Text("Cardio")
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
       }
     }
   }
@@ -398,7 +425,7 @@ struct TrainingDestinationView: View {
     let progress = min(raw, target) / target
     let overTarget = raw > target
     let overCeiling = raw > ceiling
-    Section {
+    DrawerSection {
       VStack(alignment: .leading, spacing: 6) {
         HStack {
           Text("Strength volume").font(.subheadline.weight(.semibold))
@@ -417,6 +444,233 @@ struct TrainingDestinationView: View {
           .font(.caption2)
           .foregroundStyle(.secondary)
       }
+    }
+  }
+
+  // MARK: - Volume / intensity trend (8 weeks)
+
+  /// Per-week aggregate of effective hard sets and mean difficulty over
+  /// the last 8 ISO weeks. Mean difficulty maps easy=1, moderate/medium=2,
+  /// hard=3, max=4 — same ladder the difficulty pills present, so the
+  /// sparkline reads as "average pill height per week."
+  private struct WeekVolumePoint: Identifiable {
+    let weekStart: Date
+    let hardSets: Double
+    let meanIntensity: Double?  // nil when no rated sets that week
+    var id: Date { weekStart }
+  }
+
+  private var weeklyVolumeTrend: [WeekVolumePoint] {
+    let cal = Calendar.current
+    let fmt = DateFormatter()
+    fmt.dateFormat = "yyyy-MM-dd"
+    // Anchor to this week's start (Monday-ish per user locale).
+    let comps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date())
+    guard let thisWeekStart = cal.date(from: comps) else { return [] }
+    var weeks: [Date] = []
+    for off in (0..<8).reversed() {
+      if let d = cal.date(byAdding: .weekOfYear, value: -off, to: thisWeekStart) {
+        weeks.append(d)
+      }
+    }
+    // Bucket entries into weeks once, then derive both series.
+    var setsByWeek: [Date: Double] = [:]
+    var intensityByWeek: [Date: (sum: Double, count: Int)] = [:]
+    for e in entries where isStrengthEntry(e) {
+      guard let day = fmt.date(from: e.date) else { continue }
+      let dComps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: day)
+      guard let wkStart = cal.date(from: dComps) else { continue }
+      if let s = e.sets.flatMap(Int.init), s > 0 {
+        let weight: Double
+        switch (e.difficulty ?? "").lowercased() {
+        case "hard", "max": weight = 1.0
+        case "moderate":    weight = 0.5
+        default:            weight = 0
+        }
+        setsByWeek[wkStart, default: 0] += Double(s) * weight
+      }
+      if let i = intensityScore(e.difficulty) {
+        let cur = intensityByWeek[wkStart] ?? (0, 0)
+        intensityByWeek[wkStart] = (cur.sum + i, cur.count + 1)
+      }
+    }
+    return weeks.map { w in
+      let agg = intensityByWeek[w]
+      let mean = agg.map { $0.sum / Double($0.count) }
+      return WeekVolumePoint(weekStart: w,
+                             hardSets: setsByWeek[w] ?? 0,
+                             meanIntensity: mean)
+    }
+  }
+
+  private func intensityScore(_ d: String?) -> Double? {
+    switch (d ?? "").lowercased() {
+    case "easy":              return 1
+    case "medium", "moderate": return 2
+    case "hard":              return 3
+    case "max":               return 4
+    default:                  return nil
+    }
+  }
+
+  /// 8-week trailing chart of weekly effective hard sets (bars) with the
+  /// 12-set target line and the 20-set ceiling shaded, and a thin mean-
+  /// intensity sparkline below. Reads as "am I trending up or coasting?"
+  /// — a temporal companion to `strengthVolumeSection`.
+  @ViewBuilder
+  private var volumeTrendSection: some View {
+    let series = weeklyVolumeTrend
+    let hasData = series.contains { $0.hardSets > 0 }
+    if hasData {
+      let target = Self.hardSetsTarget
+      let ceiling = Self.hardSetsCeiling
+      let maxBar = series.map(\.hardSets).max() ?? 0
+      let yMax = max(maxBar, ceiling) * 1.15
+      let lastWeek = series.last?.hardSets ?? 0
+      let prevWeek = series.dropLast().last?.hardSets ?? 0
+      let delta = lastWeek - prevWeek
+      let avgIntensity: Double = {
+        let vals = series.compactMap(\.meanIntensity)
+        return vals.isEmpty ? 0 : vals.reduce(0, +) / Double(vals.count)
+      }()
+      let weekFmt: (Date) -> String = { d in
+        let f = DateFormatter(); f.dateFormat = "MMM d"; return f.string(from: d)
+      }
+      let summary: String = {
+        let dir = delta >= 0 ? "up" : "down"
+        return "8-week volume trend. This week \(Int(lastWeek)) hard sets, \(dir) \(Int(abs(delta))) from last week. Average intensity \(String(format: "%.1f", avgIntensity)) out of 4."
+      }()
+      DrawerSection("Volume trend") {
+        VStack(alignment: .leading, spacing: 8) {
+          HStack {
+            Text("8-week volume").font(.subheadline.weight(.semibold))
+            Spacer()
+            Text(delta == 0
+                 ? "flat vs last week"
+                 : "\(delta > 0 ? "+" : "")\(Int(delta)) vs last week")
+              .font(.caption.monospacedDigit())
+              .foregroundStyle(.secondary)
+          }
+          Chart {
+            // Productive band — shaded between target and ceiling so the
+            // user can see at-a-glance which bars land "in the band."
+            RectangleMark(
+              xStart: .value("start", series.first?.weekStart ?? Date()),
+              xEnd: .value("end", series.last?.weekStart ?? Date()),
+              yStart: .value("target", target),
+              yEnd: .value("ceiling", ceiling)
+            )
+            .foregroundStyle(accent.opacity(0.08))
+            .accessibilityHidden(true)
+            ForEach(series) { w in
+              BarMark(
+                x: .value("Week", w.weekStart, unit: .weekOfYear),
+                y: .value("Hard sets", w.hardSets),
+                width: .ratio(0.6)
+              )
+              .foregroundStyle(w.hardSets == 0
+                               ? Color.secondary.opacity(0.2)
+                               : (w.hardSets >= target ? accent.opacity(0.9)
+                                                       : accent.opacity(0.5)))
+              .cornerRadius(2)
+              .accessibilityLabel(weekFmt(w.weekStart))
+              .accessibilityValue("\(Int(w.hardSets)) hard sets")
+            }
+            RuleMark(y: .value("target", target))
+              .foregroundStyle(accent.opacity(0.7))
+              .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+              .annotation(position: .top, alignment: .trailing) {
+                Text("\(Int(target)) target")
+                  .font(.caption2).foregroundStyle(.secondary)
+              }
+              .accessibilityHidden(true)
+          }
+          .chartYScale(domain: 0...yMax)
+          .chartYAxis {
+            AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { v in
+              AxisValueLabel { if let d = v.as(Double.self) { Text("\(Int(d))").font(.caption2) } }
+              AxisGridLine().foregroundStyle(Color.secondary.opacity(0.1))
+            }
+          }
+          .chartXAxis {
+            AxisMarks(values: series.map(\.weekStart)) { v in
+              AxisValueLabel {
+                if let d = v.as(Date.self) {
+                  Text(weekFmt(d)).font(.caption2)
+                }
+              }
+            }
+          }
+          .frame(height: 140)
+
+          // Intensity sparkline — tucked under the volume chart, same
+          // x-domain so weeks line up visually. Empty weeks (no rated
+          // sets) just leave a gap in the line.
+          intensitySparkline(series, avg: avgIntensity)
+        }
+        .a11yCombineKeepingChildren(summary)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func intensitySparkline(_ series: [WeekVolumePoint], avg: Double) -> some View {
+    let weekFmt: (Date) -> String = { d in
+      let f = DateFormatter(); f.dateFormat = "MMM d"; return f.string(from: d)
+    }
+    VStack(alignment: .leading, spacing: 4) {
+      HStack {
+        Text("Intensity").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+        Spacer()
+        Text("avg \(String(format: "%.1f", avg))/4")
+          .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+      }
+      Chart {
+        ForEach(series) { w in
+          if let v = w.meanIntensity {
+            LineMark(
+              x: .value("Week", w.weekStart, unit: .weekOfYear),
+              y: .value("Intensity", v)
+            )
+            .interpolationMethod(.monotone)
+            .foregroundStyle(accent)
+            .accessibilityLabel(weekFmt(w.weekStart))
+            .accessibilityValue("intensity \(String(format: "%.1f", v))")
+            PointMark(
+              x: .value("Week", w.weekStart, unit: .weekOfYear),
+              y: .value("Intensity", v)
+            )
+            .symbolSize(18)
+            .foregroundStyle(accent)
+            .accessibilityHidden(true)
+          }
+        }
+      }
+      .chartYScale(domain: 1...4)
+      .chartYAxis {
+        AxisMarks(position: .leading, values: [1, 2, 3, 4]) { v in
+          AxisValueLabel {
+            if let d = v.as(Int.self) {
+              Text(intensityRung(d)).font(.caption2)
+            }
+          }
+          AxisGridLine().foregroundStyle(Color.secondary.opacity(0.08))
+        }
+      }
+      .chartXAxis(.hidden)
+      .frame(height: 56)
+    }
+  }
+
+  private func intensityRung(_ i: Int) -> String {
+    switch i {
+    case 1: return "E"
+    case 2: return "M"
+    case 3: return "H"
+    case 4: return "X"
+    default: return ""
     }
   }
 
@@ -443,7 +697,7 @@ struct TrainingDestinationView: View {
     let firstDate = entries.map(\.date).min().flatMap(ConsistencyHeatmap.date(fromISO:))
     let end = Date()
     let activeDays = counts.values.filter { $0 > 0 }.count
-    return Section {
+    return DrawerSection {
       VStack(alignment: .leading, spacing: 10) {
         HStack {
           Text("Consistency").font(.subheadline.weight(.semibold))
@@ -485,7 +739,7 @@ struct TrainingDestinationView: View {
       : ""
     let summary = "\(MetaExercise.label(for: selectedExercise)) progression chart. \(chartSubtitle). \(avgText)"
 
-    return Section {
+    return DrawerSection("Progression") {
       VStack(alignment: .leading, spacing: 10) {
         HStack {
           Text(MetaExercise.label(for: selectedExercise))
@@ -513,24 +767,44 @@ struct TrainingDestinationView: View {
           Chart {
             ForEach(line) { p in
               if let v = p.value {
-                LineMark(
-                  x: .value("Date", p.day),
-                  y: .value("Metric", v)
-                )
-                .interpolationMethod(.linear)
-                .foregroundStyle(accent)
-                .accessibilityHidden(true)
-                PointMark(
-                  x: .value("Date", p.day),
-                  y: .value("Metric", v)
-                )
-                .symbolSize(28)
-                .foregroundStyle(accent)
-                .accessibilityLabel(weekdayFull(p.id))
-                .accessibilityValue(yLabel(v))
+                if let s = p.series {
+                  LineMark(
+                    x: .value("Date", p.day),
+                    y: .value("Metric", v),
+                    series: .value("Group", s)
+                  )
+                  .interpolationMethod(.linear)
+                  .foregroundStyle(by: .value("Group", s))
+                  .accessibilityHidden(true)
+                  PointMark(
+                    x: .value("Date", p.day),
+                    y: .value("Metric", v)
+                  )
+                  .symbolSize(28)
+                  .foregroundStyle(by: .value("Group", s))
+                  .accessibilityLabel(weekdayFull(p.id))
+                  .accessibilityValue("\(s), \(yLabel(v))")
+                } else {
+                  LineMark(
+                    x: .value("Date", p.day),
+                    y: .value("Metric", v)
+                  )
+                  .interpolationMethod(.linear)
+                  .foregroundStyle(accent)
+                  .accessibilityHidden(true)
+                  PointMark(
+                    x: .value("Date", p.day),
+                    y: .value("Metric", v)
+                  )
+                  .symbolSize(28)
+                  .foregroundStyle(accent)
+                  .accessibilityLabel(weekdayFull(p.id))
+                  .accessibilityValue(yLabel(v))
+                }
               }
             }
           }
+          .chartLegend(line.contains(where: { $0.series != nil }) ? .visible : .hidden)
           .chartYScale(domain: 0...yMax)
           .chartYAxis {
             AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { v in
@@ -561,8 +835,8 @@ struct TrainingDestinationView: View {
         }
       }
       .a11yCombineKeepingChildren(summary)
-    } header: {
-      Text("Progression")
+      .padding(.horizontal, 14)
+      .padding(.vertical, 12)
     }
     .onChange(of: selectedExercise, initial: false) { _, _ in
       Task { await loadProgression() }
@@ -608,6 +882,9 @@ struct TrainingDestinationView: View {
     let id: String
     let day: Date
     let value: Double?
+    /// Series label for split charts (e.g. "Upper", "Lower"). `nil` when the
+    /// chart is a single line.
+    var series: String? = nil
   }
 
   private struct PillItem: Identifiable {
@@ -628,15 +905,17 @@ struct TrainingDestinationView: View {
     let meta = MetaExercise.isMeta(selectedExercise)
     let kind = metricKind(for: selectedExercise)
 
+    // "All strength" splits each session-category ("upper", "lower", …) into
+    // its own connected line — without this the chart zig-zags between leg
+    // and arm days because their totals live on different magnitudes.
+    if meta && selectedExercise == MetaExercise.strength {
+      return splitStrengthLineData(cutoff: cutoff)
+    }
+
     if meta {
       for e in entries where e.date >= cutoff {
-        if selectedExercise == MetaExercise.strength {
-          guard isStrengthEntry(e), let v = volumeValue(e) else { continue }
-          byDate[e.date, default: []].append(v)
-        } else {
-          guard isCardioEntry(e), let d = e.durationMin else { continue }
-          byDate[e.date, default: []].append(d)
-        }
+        guard isCardioEntry(e), let d = e.durationMin else { continue }
+        byDate[e.date, default: []].append(d)
       }
     } else {
       for p in progression where p.date >= cutoff {
@@ -662,6 +941,29 @@ struct TrainingDestinationView: View {
       day = next
     }
     return out
+  }
+
+  /// "All strength" view, split per session category. Each session id gets
+  /// its own line; days without that category's data are simply omitted so
+  /// adjacent same-category sessions connect cleanly.
+  private func splitStrengthLineData(cutoff: String) -> [LinePoint] {
+    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+    var byKey: [String: [String: [Double]]] = [:]   // session -> iso -> [volume]
+    for e in entries where e.date >= cutoff {
+      guard isStrengthEntry(e), let v = volumeValue(e) else { continue }
+      let session = e.session.isEmpty ? "other" : e.session
+      byKey[session, default: [:]][e.date, default: []].append(v)
+    }
+    var out: [LinePoint] = []
+    for (session, perDay) in byKey {
+      let label = session.capitalized
+      for (iso, values) in perDay {
+        guard let date = fmt.date(from: iso) else { continue }
+        let total = values.reduce(0, +)
+        out.append(LinePoint(id: "\(session)-\(iso)", day: date, value: total, series: label))
+      }
+    }
+    return out.sorted { $0.day < $1.day }
   }
 
   private var pillOptions: (strength: [PillItem], cardio: [PillItem]) {
@@ -1030,16 +1332,20 @@ final class TrainingDraftStore {
         d.entries[i].isCardio = cardio
         d.entries[i].isMobility = mobility
         if mobility {
+          // Yoga: TIME + difficulty only. Keep durationMin; drop the
+          // strength + cardio-specific metrics.
           d.entries[i].weight = nil
           d.entries[i].sets = nil
           d.entries[i].reps = nil
-          d.entries[i].durationMin = nil
           d.entries[i].distanceM = nil
           d.entries[i].level = nil
         } else if cardio {
+          // Cardio has no difficulty UI — clear any leaked value so we
+          // don't persist a stale "medium" from a prior strength shape.
           d.entries[i].weight = nil
           d.entries[i].sets = nil
           d.entries[i].reps = nil
+          d.entries[i].difficulty = ""
         } else {
           d.entries[i].durationMin = nil
           d.entries[i].distanceM = nil
@@ -1054,16 +1360,16 @@ final class TrainingDraftStore {
       // cardio-shaped entry doesn't accidentally inherit a stray
       // historical weight value from when the exercise was logged
       // as strength.
-      if !d.entries[i].isMobility {
-        if d.entries[i].isCardio {
-          if d.entries[i].durationMin == nil, let v = l.durationMin { d.entries[i].durationMin = v }
-          if d.entries[i].distanceM == nil, let v = l.distanceM { d.entries[i].distanceM = v }
-          if d.entries[i].level == nil, let v = l.level { d.entries[i].level = v }
-        } else {
-          if d.entries[i].weight == nil, let v = l.weight { d.entries[i].weight = v }
-          if d.entries[i].sets == nil, let s = l.sets, let n = Int(s) { d.entries[i].sets = n }
-          if (d.entries[i].reps ?? "").isEmpty, let v = l.reps { d.entries[i].reps = v }
-        }
+      if d.entries[i].isMobility {
+        if d.entries[i].durationMin == nil, let v = l.durationMin { d.entries[i].durationMin = v }
+      } else if d.entries[i].isCardio {
+        if d.entries[i].durationMin == nil, let v = l.durationMin { d.entries[i].durationMin = v }
+        if d.entries[i].distanceM == nil, let v = l.distanceM { d.entries[i].distanceM = v }
+        if d.entries[i].level == nil, let v = l.level { d.entries[i].level = v }
+      } else {
+        if d.entries[i].weight == nil, let v = l.weight { d.entries[i].weight = v }
+        if d.entries[i].sets == nil, let s = l.sets, let n = Int(s) { d.entries[i].sets = n }
+        if (d.entries[i].reps ?? "").isEmpty, let v = l.reps { d.entries[i].reps = v }
       }
     }
     draft = d
@@ -1157,7 +1463,6 @@ final class TrainingDraftStore {
       date: SeptenaDate.today,
       time: timeF.string(from: now),
       sessionType: type.id,
-      emoji: type.emoji,
       label: type.label,
       entries: entries,
       startedAt: isoF.string(from: now),
@@ -1200,7 +1505,9 @@ final class TrainingDraftStore {
       weight: entry.weight,
       sets: entry.sets.map(String.init),
       reps: entry.reps,
-      difficulty: entry.difficulty.isEmpty ? nil : entry.difficulty,
+      // Cardio has no difficulty UI in the logger; never persist one even
+      // if a value lingers on the draft (legacy drafts, category switch).
+      difficulty: (entry.isCardio || entry.difficulty.isEmpty) ? nil : entry.difficulty,
       durationMin: entry.durationMin,
       distanceM: entry.distanceM,
       level: entry.level,
@@ -1329,6 +1636,10 @@ struct TrainingSessionView: View {
           ForEach(store.sessionTypes) { type in
             Button { start(type) } label: {
               HStack(spacing: 12) {
+                Image(systemName: type.kind.icon)
+                  .font(.body.weight(.medium))
+                  .foregroundStyle(Theme.inkSecondary)
+                  .frame(width: 24)
                 VStack(alignment: .leading, spacing: 2) {
                   Text(type.label).font(.septenaTaskTitle)
                     .foregroundStyle(Theme.inkPrimary)
@@ -1720,9 +2031,9 @@ struct TrainingExerciseCard: View {
     Divider().padding(.vertical, 10)
     recentSessionsTable
     if entry.isMobility {
-      // Yoga / mobility: no weight/reps, no duration/distance — just
-      // record difficulty + tap Done. The session's start `time` on
-      // the parent draft is the only timestamp we keep.
+      // Yoga / mobility: TIME + difficulty. No weight/reps, no distance
+      // or level — those don't apply to a flow-style session.
+      mobilityInputs
       difficultyPicker
     } else if entry.isCardio {
       cardioInputs
@@ -1835,6 +2146,22 @@ struct TrainingExerciseCard: View {
       .replacingOccurrences(of: "-", with: " ")
       .replacingOccurrences(of: "_", with: " ")
       .capitalized
+  }
+
+  // MARK: - Mobility fields
+
+  /// Yoga / mobility input row: a single Minutes field. Distance and
+  /// level don't apply to a flow-style session, and weight/reps are off
+  /// the table by definition for mobility work.
+  private var mobilityInputs: some View {
+    HStack(alignment: .top, spacing: 10) {
+      numberField(label: "Minutes",
+                  value: Binding(
+                    get: { entry.durationMin.map { fmt($0) } ?? "" },
+                    set: { setDuration($0) }
+                  ))
+      Spacer()
+    }
   }
 
   // MARK: - Cardio fields

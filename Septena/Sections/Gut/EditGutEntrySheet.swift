@@ -9,12 +9,19 @@ struct EditGutEntrySheet: View {
   @Environment(\.dismiss) private var dismiss
 
   let date: String
-  let original: GutEntry
+  /// `nil` puts the sheet in create mode — save calls `addEntry` and
+  /// onSave fires with the newly-minted entity. Non-nil edits in place.
+  let original: GutEntry?
   let onSave: (GutEntry) -> Void
+
+  private var isCreating: Bool { original == nil }
 
   private var gut: GutMutator { SeptenaServices.shared.gutMutator }
 
-  @State private var time: Date = Date()
+  // Single `Date` covering both day and time-of-day; split on save into
+  // the entity's "YYYY-MM-DD" + "HH:mm" fields. Editing the date is how
+  // you backfill a forgotten log onto the right day.
+  @State private var when: Date = Date()
   @State private var bristol: Int = 4
   @State private var blood: Int = 0
   @State private var volume: String = ""       // "" | small | medium | large
@@ -33,9 +40,9 @@ struct EditGutEntrySheet: View {
     NavigationStack {
       Form {
         Section("When") {
-          DatePicker("Time",
-                     selection: $time,
-                     displayedComponents: .hourAndMinute)
+          DatePicker("Date & time",
+                     selection: $when,
+                     displayedComponents: [.date, .hourAndMinute])
         }
         Section("Bristol") {
           // Bristol Stool Scale 1–7. `Stepper` is the standard SwiftUI
@@ -74,7 +81,7 @@ struct EditGutEntrySheet: View {
             .lineLimit(1...4)
         }
       }
-      .navigationTitle("Edit gut entry")
+      .navigationTitle(isCreating ? "New gut entry" : "Edit gut entry")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif
@@ -104,6 +111,27 @@ struct EditGutEntrySheet: View {
   }
 
   private func seed() {
+    guard let original else {
+      // Create mode: default Bristol 4 (smooth) at the current moment on
+      // the host's date. Everything else stays empty so the user can
+      // accept-and-go without confirming defaults they didn't pick.
+      bristol = 4
+      blood = 0
+      volume = ""
+      discomfortLevel = ""
+      discomfortHoursString = ""
+      note = ""
+      let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+      let day = fmt.date(from: date) ?? Date()
+      let now = Date()
+      let cal = Calendar.current
+      let comps = cal.dateComponents([.hour, .minute], from: now)
+      when = cal.date(bySettingHour: comps.hour ?? 0,
+                      minute: comps.minute ?? 0,
+                      second: 0,
+                      of: day) ?? now
+      return
+    }
     bristol = original.bristol
     blood = original.blood
     volume = original.volume ?? ""
@@ -112,13 +140,15 @@ struct EditGutEntrySheet: View {
       $0 == $0.rounded() ? String(Int($0)) : String(format: "%.1f", $0)
     } ?? ""
     note = original.note ?? ""
-    let fmt = DateFormatter(); fmt.dateFormat = "HH:mm"
-    time = fmt.date(from: original.time) ?? Date()
+    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd HH:mm"
+    when = fmt.date(from: "\(original.date) \(original.time)") ?? Date()
   }
 
   private func save() {
-    let fmt = DateFormatter(); fmt.dateFormat = "HH:mm"
-    let hhmm = fmt.string(from: time)
+    let dayFmt = DateFormatter(); dayFmt.dateFormat = "yyyy-MM-dd"
+    let timeFmt = DateFormatter(); timeFmt.dateFormat = "HH:mm"
+    let newDate = dayFmt.string(from: when)
+    let hhmm = timeFmt.string(from: when)
     let hoursValue: Double? = {
       let t = discomfortHoursString.trimmingCharacters(in: .whitespacesAndNewlines)
         .replacingOccurrences(of: ",", with: ".")
@@ -141,30 +171,48 @@ struct EditGutEntrySheet: View {
       calFmt.calendar = Calendar(identifier: .gregorian)
       calFmt.locale = Locale(identifier: "en_US_POSIX")
       calFmt.timeZone = TimeZone.current
-      if let start = calFmt.date(from: "\(original.date)T\(hhmm)") {
+      if let start = calFmt.date(from: "\(newDate)T\(hhmm)") {
         let end = start.addingTimeInterval(h * 3600)
         startISO = calFmt.string(from: start)
         endISO = calFmt.string(from: end)
       }
     }
 
-    gut.updateEntry(
-      id: original.id,
-      time: hhmm,
-      bristol: bristol,
-      blood: blood,
-      volume: .some(volumeValue),
-      discomfortLevel: .some(discomfortLvlValue),
-      discomfortStart: .some(startISO),
-      discomfortEnd: .some(endISO),
-      note: .some(noteValue)
-    )
+    let savedID: String
+    if let original {
+      gut.updateEntry(
+        id: original.id,
+        date: newDate,
+        time: hhmm,
+        bristol: bristol,
+        blood: blood,
+        volume: .some(volumeValue),
+        discomfortLevel: .some(discomfortLvlValue),
+        discomfortStart: .some(startISO),
+        discomfortEnd: .some(endISO),
+        note: .some(noteValue)
+      )
+      savedID = original.id
+    } else {
+      let entity = gut.addEntry(
+        date: newDate,
+        time: hhmm,
+        bristol: bristol,
+        blood: blood,
+        volume: volumeValue,
+        discomfortLevel: discomfortLvlValue,
+        discomfortStart: startISO,
+        discomfortEnd: endISO,
+        note: noteValue
+      )
+      savedID = entity.id
+    }
     GutBristolRecorder.record(bristol)
     Haptics.tick()
 
     let rebuilt = GutEntry(
-      id: original.id,
-      date: original.date,
+      id: savedID,
+      date: newDate,
       time: hhmm,
       bristol: bristol,
       blood: blood,

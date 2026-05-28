@@ -11,44 +11,39 @@ struct GutDestinationView: View {
   @State private var today: GutDayResponse? = nil
   @State private var loading = true
   @State private var editing: GutEntry? = nil
+  @State private var creating: Bool = false
   @State private var history: [GutHistoryPoint] = []
+  /// The day the drawer is viewing. Bound to `SectionDrawer`'s
+  /// `currentDate` slot so the user can step prev/next from the date
+  /// strip and `reload()` re-fetches for that day. Defaults to today.
+  @State private var viewingDate: String = SeptenaDate.today
 
   private var gut: GutMutator { SeptenaServices.shared.gutMutator }
 
   private var accent: Color { theme.color(for: "gut") }
 
   var body: some View {
-    List {
-      SectionGoalsStrip(sectionKey: "gut")
+    SectionDrawer(sectionKey: "gut",
+                  title: "Gut",
+                  onLog: { _ in creating = true },
+                  currentDate: $viewingDate) {
       summary
-      Section("Today") {
+      DrawerSection("Today", padding: .none) {
         if let today, !today.entries.isEmpty {
           ForEach(Array(today.entries.reversed())) { entry in
-            Button {
-              editing = entry
-            } label: {
-              LogRow(
-                title: bristolLabel(entry.bristol),
-                detail: detailLine(entry),
-                trailing: entry.time
-              )
-            }
-            .buttonStyle(.plain)
-            .listRowInsets(EdgeInsets())
-            .contextMenu {
-              Button { editing = entry } label: {
-                Label("Edit", systemImage: "pencil")
-              }
-              Button(role: .destructive) {
-                delete(entry)
-              } label: {
-                Label("Delete", systemImage: "trash")
-              }
-            }
+            LogEntryRow(
+              title: bristolLabel(entry.bristol),
+              detail: detailLine(entry),
+              trailing: entry.time,
+              onEdit: { editing = entry },
+              onDelete: { delete(entry) }
+            )
           }
         } else if !loading {
           Text("Nothing logged yet.")
             .foregroundStyle(.secondary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
         }
       }
       if !history.isEmpty {
@@ -72,32 +67,32 @@ struct GutDestinationView: View {
           },
           subtitleFor: { active, total, sum in
             "\(active) of \(total) days · \(Int(sum)) movements"
-          }
+          },
+          // Heatmap tap jumps the drawer's date strip to that day —
+          // no more BrowseGutDaySheet detour; the destination itself
+          // re-fetches and renders the picked day inline.
+          onTapDay: { iso in viewingDate = iso }
         )
       }
     }
-    #if os(macOS)
-    .listStyle(.inset)
-    #else
-    .listStyle(.insetGrouped)
-    #endif
-    .background(Theme.groupedBackground)
-    .navigationTitle("Gut")
     .trackScreen("gut")
-    #if os(iOS)
-    .navigationBarTitleDisplayMode(.large)
-    #endif
     .tint(accent)
-    .task {
-      reload()
-    }
+    .task { reload() }
+    .onChange(of: viewingDate) { _, _ in reload() }
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
       reload()
     }
     .sheet(item: $editing) { entry in
       EditGutEntrySheet(
-        date: today?.date ?? SeptenaDate.today,
+        date: viewingDate,
         original: entry,
+        onSave: { _ in reload() }
+      )
+    }
+    .sheet(isPresented: $creating) {
+      EditGutEntrySheet(
+        date: viewingDate,
+        original: nil,
         onSave: { _ in reload() }
       )
     }
@@ -110,44 +105,32 @@ struct GutDestinationView: View {
   }
 
   private var summary: some View {
-    Section {
-      HStack(alignment: .top, spacing: 24) {
-        stat(value: "\(today?.movementCount ?? 0)",
-             label: "today",
-             tint: accent)
-        if let avg = avgBristolToday {
-          stat(value: String(format: "%.1f", avg),
-               label: "avg Bristol",
-               tint: .secondary)
-        }
-        if let d = today?.totalDiscomfortH, d > 0 {
-          stat(value: String(format: "%.1f", d),
-               label: "discomfort",
-               tint: .orange,
-               unit: "h")
-        }
-        Spacer()
-      }
+    DrawerSection {
+      StatStrip(stats: summaryStats)
     }
+  }
+
+  private var summaryStats: [Stat] {
+    var out: [Stat] = [
+      Stat(value: "\(today?.movementCount ?? 0)", label: "today", tint: accent),
+    ]
+    if let avg = avgBristolToday {
+      out.append(Stat(value: String(format: "%.1f", avg),
+                      label: "avg Bristol"))
+    }
+    if let d = today?.totalDiscomfortH, d > 0 {
+      out.append(Stat(value: String(format: "%.1f", d),
+                      label: "discomfort",
+                      tint: .orange,
+                      unit: "h"))
+    }
+    return out
   }
 
   private var avgBristolToday: Double? {
     guard let entries = today?.entries, !entries.isEmpty else { return nil }
     let sum = entries.reduce(0) { $0 + Double($1.bristol) }
     return sum / Double(entries.count)
-  }
-
-  private func stat(value: String, label: String, tint: Color,
-                    unit: String? = nil) -> some View {
-    VStack(alignment: .leading, spacing: 2) {
-      HStack(alignment: .firstTextBaseline, spacing: 2) {
-        Text(value)
-          .font(.system(.title2, design: .rounded).weight(.semibold))
-          .foregroundStyle(tint)
-        if let unit { Text(unit).font(.subheadline).foregroundStyle(.secondary) }
-      }
-      Text(label).font(.caption).foregroundStyle(.secondary)
-    }
   }
 
   // Standard Bristol Stool Scale short forms — keep it clinical, not cute.
@@ -176,7 +159,7 @@ struct GutDestinationView: View {
   }
 
   private func reload() {
-    today = ChecklistMirror.loadGutDay(context: modelContext, date: SeptenaDate.today)
+    today = ChecklistMirror.loadGutDay(context: modelContext, date: viewingDate)
     history = ChecklistMirror.loadGutHistory(context: modelContext, days: 365).daily
     loading = false
   }

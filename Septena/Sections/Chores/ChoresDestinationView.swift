@@ -14,6 +14,9 @@ struct ChoresDestinationView: View {
   @State private var editing: ChoreItem? = nil
   @State private var creating = false
   @State private var history: [ChoreHistoryPoint] = []
+  /// `.sheet(item:)` needs Identifiable; String isn't, so wrap.
+  private struct BackfillDate: Identifiable { let id: String }
+  @State private var backfillDate: BackfillDate? = nil
 
   private var accent: Color { theme.color(for: "chores") }
 
@@ -41,17 +44,18 @@ struct ChoresDestinationView: View {
   }
 
   var body: some View {
-    List {
-      SectionGoalsStrip(sectionKey: "chores")
+    SectionDrawer(sectionKey: "chores",
+                  title: "Chores",
+                  onLog: { _ in creating = true }) {
       summary
       if !today.isEmpty {
-        Section("Today") { ForEach(today) { row(for: $0) } }
+        DrawerSection("Today", padding: .none) { ForEach(today) { row(for: $0) } }
       }
       if !doneToday.isEmpty {
-        Section("Done today") { ForEach(doneToday) { row(for: $0) } }
+        DrawerSection("Done today", padding: .none) { ForEach(doneToday) { row(for: $0) } }
       }
       if !later.isEmpty {
-        Section("Later") { ForEach(later) { row(for: $0) } }
+        DrawerSection("Later", padding: .none) { ForEach(later) { row(for: $0) } }
       }
       if !history.isEmpty {
         ChecklistHeatmapSection(
@@ -61,28 +65,13 @@ struct ChoresDestinationView: View {
           daily: history,
           date: { $0.date },
           done: { $0.completed },
-          total: { $0.total }
+          total: { $0.total },
+          onTapDay: { iso in backfillDate = BackfillDate(id: iso) }
         )
       }
     }
-    #if os(macOS)
-    .listStyle(.inset)
-    #else
-    .listStyle(.insetGrouped)
-    #endif
-    .background(Theme.groupedBackground)
-    .navigationTitle("Chores")
     .trackScreen("chores")
-    #if os(iOS)
-    .navigationBarTitleDisplayMode(.large)
-    #endif
     .tint(accent)
-    .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        Button { creating = true } label: { Image(systemName: "plus") }
-          .tint(accent)
-      }
-    }
     .task {
       model.paintFromCache()
       await model.load()
@@ -111,6 +100,13 @@ struct ChoresDestinationView: View {
       .presentationDragIndicator(.visible)
       #endif
     }
+    .sheet(item: $backfillDate) { wrap in
+      BackfillChoresSheet(date: wrap.id)
+        #if os(iOS)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        #endif
+    }
   }
 
   /// Single source of truth for chore rows in all three sections. Tap
@@ -123,7 +119,6 @@ struct ChoresDestinationView: View {
                onDelete: { delete(chore) })
     }
     .buttonStyle(.plain)
-    .listRowInsets(EdgeInsets())
   }
 
   private func delete(_ chore: ChoreItem) {
@@ -140,27 +135,14 @@ struct ChoresDestinationView: View {
       $0.daysOverdue == 0 && !model.completedChores.contains($0.id)
     }.count
     let doneCount = doneToday.count
-    return Section {
-      HStack(alignment: .top, spacing: 24) {
-        stat(value: "\(dueTodayCount)", label: "due today", tint: accent)
-        if overdueCount > 0 {
-          stat(value: "\(overdueCount)", label: "overdue", tint: Theme.overdueRed)
-        }
-        Spacer()
-        stat(value: "\(doneCount)", label: "done", tint: .secondary, alignment: .trailing)
-      }
+    var stats: [Stat] = [
+      Stat(value: "\(dueTodayCount)", label: "due today", tint: accent),
+    ]
+    if overdueCount > 0 {
+      stats.append(Stat(value: "\(overdueCount)", label: "overdue",
+                        tint: Theme.overdueRed))
     }
-  }
-
-  private func stat(value: String, label: String, tint: Color,
-                    alignment: HorizontalAlignment = .leading) -> some View {
-    VStack(alignment: alignment, spacing: 2) {
-      Text(value)
-        .font(.system(.title2, design: .rounded).weight(.semibold))
-        .foregroundStyle(tint)
-      Text(label)
-        .font(.caption)
-        .foregroundStyle(.secondary)
-    }
+    stats.append(Stat(value: "\(doneCount)", label: "done"))
+    return DrawerSection { StatStrip(stats: stats) }
   }
 }

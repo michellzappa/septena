@@ -13,7 +13,19 @@ struct CannabisDestinationView: View {
   @State private var loading = true
   @State private var editing: CannabisEntry? = nil
   @State private var managingTypes = false
+  /// Driven by `CannabisPlugin.logActions`: tapping "Log vape" / "Log
+  /// edible" sets this to the method id; the sheet opens in create mode
+  /// with `presetMethod` seeded.
+  @State private var loggingMethod: LoggingMethod? = nil
+  private struct LoggingMethod: Identifiable, Hashable {
+    let method: String
+    var id: String { method }
+  }
   @State private var history: [CannabisHistoryPoint] = []
+  /// Day the drawer is currently viewing — driven by the drawer's
+  /// `currentDate` date strip. Defaults to today; heatmap taps jump it
+  /// to the picked day.
+  @State private var viewingDate: String = SeptenaDate.today
 
   /// Capsule dot count for the legacy HitDots indicator.
   /// 3 uses × 0.05g = 0.15g per capsule (Storz & Bickel default).
@@ -24,37 +36,27 @@ struct CannabisDestinationView: View {
   private var accent: Color { theme.color(for: "cannabis") }
 
   var body: some View {
-    List {
-      SectionGoalsStrip(sectionKey: "cannabis")
+    SectionDrawer(sectionKey: "cannabis",
+                  title: "Cannabis",
+                  onLog: handleLogAction,
+                  currentDate: $viewingDate) {
       summary
-      Section("Today") {
+      DrawerSection("Today", padding: .none) {
         if let today, !today.entries.isEmpty {
           ForEach(Array(today.entries.reversed())) { entry in
-            Button {
-              editing = entry
-            } label: {
-              LogRow(
-                title: methodLabel(entry.method),
-                detail: detailLine(entry),
-                trailing: entry.time
-              )
-            }
-            .buttonStyle(.plain)
-            .listRowInsets(EdgeInsets())
-            .contextMenu {
-              Button { editing = entry } label: {
-                Label("Edit", systemImage: "pencil")
-              }
-              Button(role: .destructive) {
-                delete(entry)
-              } label: {
-                Label("Delete", systemImage: "trash")
-              }
-            }
+            LogEntryRow(
+              title: methodLabel(entry.method),
+              detail: detailLine(entry),
+              trailing: entry.time,
+              onEdit: { editing = entry },
+              onDelete: { delete(entry) }
+            )
           }
         } else if !loading {
           Text("Nothing logged yet.")
             .foregroundStyle(.secondary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
         }
       }
       if !history.isEmpty {
@@ -78,29 +80,15 @@ struct CannabisDestinationView: View {
           },
           subtitleFor: { active, total, sum in
             "\(active) of \(total) days · \(Int(sum)) sessions"
-          }
+          },
+          onTapDay: { iso in viewingDate = iso }
         )
       }
     }
-    #if os(macOS)
-    .listStyle(.inset)
-    #else
-    .listStyle(.insetGrouped)
-    #endif
-    .background(Theme.groupedBackground)
-    .navigationTitle("Cannabis")
     .trackScreen("cannabis")
-    #if os(iOS)
-    .navigationBarTitleDisplayMode(.large)
-    #endif
     .tint(accent)
-    .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        Button { managingTypes = true } label: { Image(systemName: "plus") }
-          .tint(accent)
-      }
-    }
     .task { reload() }
+    .onChange(of: viewingDate) { _, _ in reload() }
     .sheet(isPresented: $managingTypes) {
       CannabisTypeSheet()
         #if os(iOS)
@@ -110,8 +98,16 @@ struct CannabisDestinationView: View {
     }
     .sheet(item: $editing) { entry in
       EditCannabisEntrySheet(
-        date: today?.date ?? SeptenaDate.today,
+        date: viewingDate,
         original: entry,
+        onSave: { _ in reload() }
+      )
+    }
+    .sheet(item: $loggingMethod) { wrap in
+      EditCannabisEntrySheet(
+        date: viewingDate,
+        original: nil,
+        presetMethod: wrap.method,
         onSave: { _ in reload() }
       )
     }
@@ -126,34 +122,31 @@ struct CannabisDestinationView: View {
     Haptics.warning()
   }
 
-  private var summary: some View {
-    Section {
-      HStack(alignment: .top, spacing: 24) {
-        stat(value: "\(today?.sessionCount ?? 0)",
-             label: "today",
-             tint: accent)
-        if let g = today?.totalG, g > 0 {
-          stat(value: String(format: "%.2f", g),
-               label: "grams",
-               tint: accent,
-               unit: "g")
-        }
-        Spacer()
-      }
+  /// Dispatch table for `CannabisPlugin.logActions` ids.
+  private func handleLogAction(_ id: String) {
+    switch id {
+    case "log-vape":   loggingMethod = .init(method: "vape")
+    case "log-edible": loggingMethod = .init(method: "edible")
+    case "manage":     managingTypes = true
+    default:           loggingMethod = .init(method: "vape")
     }
   }
 
-  private func stat(value: String, label: String, tint: Color,
-                    unit: String? = nil) -> some View {
-    VStack(alignment: .leading, spacing: 2) {
-      HStack(alignment: .firstTextBaseline, spacing: 2) {
-        Text(value)
-          .font(.system(.title2, design: .rounded).weight(.semibold))
-          .foregroundStyle(tint)
-        if let unit { Text(unit).font(.subheadline).foregroundStyle(.secondary) }
-      }
-      Text(label).font(.caption).foregroundStyle(.secondary)
+  private var summary: some View {
+    DrawerSection {
+      StatStrip(stats: summaryStats)
     }
+  }
+
+  private var summaryStats: [Stat] {
+    var out: [Stat] = [
+      Stat(value: "\(today?.sessionCount ?? 0)", label: "today", tint: accent),
+    ]
+    if let g = today?.totalG, g > 0 {
+      out.append(Stat(value: String(format: "%.2f", g),
+                      label: "grams", tint: accent, unit: "g"))
+    }
+    return out
   }
 
   private func methodLabel(_ m: String) -> String {
@@ -179,7 +172,7 @@ struct CannabisDestinationView: View {
   }
 
   private func reload() {
-    today = ChecklistMirror.loadCannabisDay(context: modelContext, date: SeptenaDate.today)
+    today = ChecklistMirror.loadCannabisDay(context: modelContext, date: viewingDate)
     history = ChecklistMirror.loadCannabisHistory(context: modelContext, days: 365).daily
     loading = false
   }

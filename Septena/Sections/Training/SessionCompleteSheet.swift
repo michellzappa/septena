@@ -9,7 +9,6 @@ struct SessionStats: Identifiable {
   /// completions (rare, but defensive). Not a stable identity.
   let id = UUID()
   let routineLabel: String
-  let routineEmoji: String?
   let kind: SessionKind
   let startedAt: Date?
   let concludedAt: Date
@@ -41,7 +40,6 @@ struct SessionStats: Identifiable {
   /// so we'd need a separate sweep, not worth it for v1.
   init(from draft: DraftSession, kind: SessionKind) {
     self.routineLabel = draft.label
-    self.routineEmoji = draft.emoji
     self.kind = kind
     self.concludedAt = Date()
 
@@ -150,13 +148,9 @@ struct SessionCompleteSheet: View {
         .font(.caption.weight(.semibold))
         .tracking(2)
         .foregroundStyle(accent)
-      if let emoji = stats.routineEmoji, !emoji.isEmpty {
-        Text(emoji).font(.system(size: 56))
-      } else {
-        Image(systemName: stats.kind.icon)
-          .font(.system(size: 44, weight: .semibold))
-          .foregroundStyle(accent)
-      }
+      Image(systemName: stats.kind.icon)
+        .font(.system(size: 44, weight: .semibold))
+        .foregroundStyle(accent)
       Text("Nice work.")
         .font(.system(.title, design: .rounded).weight(.semibold))
       let skippedSuffix = stats.skippedCount > 0 ? ", \(stats.skippedCount) skipped" : ""

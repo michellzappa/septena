@@ -16,13 +16,26 @@ struct EditCaffeineEntrySheet: View {
   /// Day the entry belongs to (path query param). Caller passes the day
   /// from the surrounding `CaffeineDayResponse`.
   let date: String
-  let original: CaffeineEntry
+  /// `nil` puts the sheet in create mode — save calls `addEntry` and
+  /// onSave fires with the newly-minted entry. Non-nil edits in place.
+  let original: CaffeineEntry?
+  /// In create mode, seed `method` with this preset (e.g. "v60",
+  /// "matcha") so the per-method quick-log actions from
+  /// `CaffeinePlugin.logActions` skip a tap. Ignored when `original`
+  /// is non-nil (edit mode seeds from the original entry).
+  var presetMethod: String? = nil
   /// Invoked with the new entry shape so the destination view can swap it
   /// in optimistically; the server write rides the outbox.
   let onSave: (CaffeineEntry) -> Void
 
-  // Editable state — seeded from `original` on first appearance.
-  @State private var time: Date = Date()
+  private var isCreating: Bool { original == nil }
+
+  // Editable state — seeded from `original` on first appearance. The
+  // picker binds a single `Date` covering both day and time-of-day; on
+  // save we split it back into the entity's "YYYY-MM-DD" + "HH:mm"
+  // fields. Editing the date is how you backfill a forgotten log onto
+  // the right day.
+  @State private var when: Date = Date()
   @State private var method: String = "v60"
   @State private var beansChoice: String = "" // empty = "no preset"
   @State private var beansFreeform: String = ""
@@ -40,9 +53,9 @@ struct EditCaffeineEntrySheet: View {
     NavigationStack {
       Form {
         Section("When") {
-          DatePicker("Time",
-                     selection: $time,
-                     displayedComponents: .hourAndMinute)
+          DatePicker("Date & time",
+                     selection: $when,
+                     displayedComponents: [.date, .hourAndMinute])
         }
         Section("Method") {
           Picker("Method", selection: $method) {
@@ -77,7 +90,7 @@ struct EditCaffeineEntrySheet: View {
             .lineLimit(1...4)
         }
       }
-      .navigationTitle("Edit caffeine entry")
+      .navigationTitle(isCreating ? "New caffeine entry" : "Edit caffeine entry")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif
@@ -94,6 +107,39 @@ struct EditCaffeineEntrySheet: View {
   }
 
   private func seed() {
+    guard let original else {
+      // Create mode: pre-fill method from preset and smart-default the
+      // beans + grams from the most recent entry of that same method so
+      // the common "same as last time" path is one tap. The user can
+      // still override before save — no commit happens silently.
+      method = presetMethod ?? "v60"
+      let lastSame = lastEntry(method: method)
+      if let last = lastSame, let b = last.beans, !b.isEmpty {
+        if beans.contains(where: { $0.name == b }) {
+          beansChoice = b
+        } else {
+          beansChoice = "__custom__"
+          beansFreeform = b
+        }
+      } else {
+        beansChoice = ""
+        beansFreeform = ""
+      }
+      gramsString = lastSame?.grams.map {
+        $0 == $0.rounded() ? String(Int($0)) : String(format: "%.1f", $0)
+      } ?? ""
+      note = ""
+      let dayFmt = DateFormatter(); dayFmt.dateFormat = "yyyy-MM-dd"
+      let day = dayFmt.date(from: date) ?? Date()
+      let now = Date()
+      let cal = Calendar.current
+      let comps = cal.dateComponents([.hour, .minute], from: now)
+      when = cal.date(bySettingHour: comps.hour ?? 0,
+                      minute: comps.minute ?? 0,
+                      second: 0,
+                      of: day) ?? now
+      return
+    }
     method = original.method
     if let b = original.beans, !b.isEmpty {
       if beans.contains(where: { $0.name == b }) {
@@ -109,19 +155,47 @@ struct EditCaffeineEntrySheet: View {
       $0 == $0.rounded() ? String(Int($0)) : String(format: "%.1f", $0)
     } ?? ""
     note = original.note ?? ""
-    // Parse "HH:mm" into a Date anchored on today; only the time
-    // components are sent back to the server.
-    let fmt = DateFormatter(); fmt.dateFormat = "HH:mm"
-    time = fmt.date(from: original.time) ?? Date()
+    when = Self.combine(date: date, time: original.time) ?? Date()
+  }
+
+  /// Combine the entity's "YYYY-MM-DD" date and "HH:mm" time into a
+  /// single `Date` for the picker. Returns nil if either string is
+  /// malformed — caller falls back to `Date()`.
+  private static func combine(date: String, time: String) -> Date? {
+    let fmt = DateFormatter()
+    fmt.dateFormat = "yyyy-MM-dd HH:mm"
+    return fmt.date(from: "\(date) \(time)")
   }
 
   private func loadBeans() async {
     beans = ChecklistMirror.loadCaffeineBeans(context: modelContext)
   }
 
+  /// Most recent caffeine event with the given method, looking at the
+  /// last 30 days so the smart-default doesn't reach back to ancient
+  /// history when the user resumes a method after a long pause.
+  private func lastEntry(method: String) -> CaffeineEventEntity? {
+    let cutoff: String = {
+      let d = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+      let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+      return f.string(from: d)
+    }()
+    var descriptor = FetchDescriptor<CaffeineEventEntity>(
+      predicate: #Predicate { $0.method == method && $0.date >= cutoff },
+      sortBy: [
+        SortDescriptor(\.date, order: .reverse),
+        SortDescriptor(\.time, order: .reverse),
+      ]
+    )
+    descriptor.fetchLimit = 1
+    return try? modelContext.fetch(descriptor).first
+  }
+
   private func save() {
-    let fmt = DateFormatter(); fmt.dateFormat = "HH:mm"
-    let hhmm = fmt.string(from: time)
+    let dayFmt = DateFormatter(); dayFmt.dateFormat = "yyyy-MM-dd"
+    let timeFmt = DateFormatter(); timeFmt.dateFormat = "HH:mm"
+    let newDate = dayFmt.string(from: when)
+    let hhmm = timeFmt.string(from: when)
 
     let beansValue: String? = {
       switch beansChoice {
@@ -142,28 +216,34 @@ struct EditCaffeineEntrySheet: View {
       return t.isEmpty ? nil : t
     }()
 
-    caffeine.updateEntry(id: original.id,
-                         time: hhmm,
-                         method: method,
-                         beans: .some(beansValue),
-                         grams: .some(gramsValue),
-                         note: .some(noteValue))
+    let savedID: String
+    if let original {
+      caffeine.updateEntry(id: original.id,
+                           date: newDate,
+                           time: hhmm,
+                           method: method,
+                           beans: .some(beansValue),
+                           grams: .some(gramsValue),
+                           note: .some(noteValue))
+      savedID = original.id
+    } else {
+      let entity = caffeine.addEntry(date: newDate,
+                                     time: hhmm,
+                                     method: method,
+                                     beans: beansValue,
+                                     grams: gramsValue,
+                                     note: noteValue)
+      savedID = entity.id
+    }
     Haptics.tick()
 
-    var updated = original
-    updated.method = method
-    updated.beans  = beansValue
-    updated.grams  = gramsValue
-    updated.note   = noteValue
-    // `time` is a `let` on CaffeineEntry, so we can't mutate it directly;
-    // rebuild via the memberwise init.
     let rebuilt = CaffeineEntry(
-      id: updated.id,
+      id: savedID,
       time: hhmm,
-      method: updated.method,
-      beans: updated.beans,
-      grams: updated.grams,
-      note: updated.note
+      method: method,
+      beans: beansValue,
+      grams: gramsValue,
+      note: noteValue
     )
     onSave(rebuilt)
     dismiss()

@@ -14,14 +14,20 @@ struct HabitsDestinationView: View {
   @State private var editing: HabitDayItem? = nil
   @State private var creating = false
   @State private var history: [HabitHistoryPoint] = []
+  /// Wrapper so `.sheet(item:)` can drive the backfill sheet directly off
+  /// the picked ISO date. `String` isn't `Identifiable` and we don't want
+  /// to extend it globally.
+  private struct BackfillDate: Identifiable { let id: String }
+  @State private var backfillDate: BackfillDate? = nil
 
   /// Server section key; accent comes from the user's Septena config so the
   /// hue matches the webapp / sidebar / Next tab without hard-coding.
   private var accent: Color { theme.color(for: "habits") }
 
   var body: some View {
-    List {
-      SectionGoalsStrip(sectionKey: "habits")
+    SectionDrawer(sectionKey: "habits",
+                  title: "Habits",
+                  onLog: { _ in creating = true }) {
       summary
       ForEach(model.habitBuckets, id: \.self) { bucket in
         bucketSection(bucket)
@@ -34,28 +40,13 @@ struct HabitsDestinationView: View {
           daily: history,
           date: { $0.date },
           done: { $0.done },
-          total: { $0.total }
+          total: { $0.total },
+          onTapDay: { iso in backfillDate = BackfillDate(id: iso) }
         )
       }
     }
-    #if os(macOS)
-    .listStyle(.inset)
-    #else
-    .listStyle(.insetGrouped)
-    #endif
-    .background(Theme.groupedBackground)
-    .navigationTitle("Habits")
     .trackScreen("habits")
-    #if os(iOS)
-    .navigationBarTitleDisplayMode(.large)
-    #endif
     .tint(accent)
-    .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        Button { creating = true } label: { Image(systemName: "plus") }
-          .tint(accent)
-      }
-    }
     .task {
       model.paintFromCache()
       await model.load()
@@ -86,6 +77,13 @@ struct HabitsDestinationView: View {
       .presentationDragIndicator(.visible)
       #endif
     }
+    .sheet(item: $backfillDate) { wrap in
+      BackfillHabitsSheet(date: wrap.id)
+        #if os(iOS)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        #endif
+    }
   }
 
   private func delete(_ habit: HabitDayItem) {
@@ -100,29 +98,13 @@ struct HabitsDestinationView: View {
     let total = model.habits.count
     let done = model.habits.filter { $0.done }.count
     let skipped = model.habits.filter { $0.skipped }.count
-    return Section {
-      HStack {
-        VStack(alignment: .leading, spacing: 2) {
-          Text("\(done)/\(total)")
-            .font(.system(.title2, design: .rounded).weight(.semibold))
-            .foregroundStyle(accent)
-          Text("done today")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-        Spacer()
-        if skipped > 0 {
-          VStack(alignment: .trailing, spacing: 2) {
-            Text("\(skipped)")
-              .font(.system(.title3, design: .rounded).weight(.semibold))
-              .foregroundStyle(.secondary)
-            Text("skipped")
-              .font(.caption)
-              .foregroundStyle(.secondary)
-          }
-        }
-      }
+    var stats: [Stat] = [
+      Stat(value: "\(done)/\(total)", label: "done today", tint: accent),
+    ]
+    if skipped > 0 {
+      stats.append(Stat(value: "\(skipped)", label: "skipped"))
     }
+    return DrawerSection { StatStrip(stats: stats) }
   }
 
   @ViewBuilder
@@ -130,18 +112,19 @@ struct HabitsDestinationView: View {
     let items = model.habits.filter { $0.bucket == bucket }
     let doneCount = items.filter { $0.done }.count
     if !items.isEmpty {
-      Section {
-        ForEach(items) { habit in
-          Button { editing = habit } label: {
-            HabitRow(habit: habit, model: model, checklistMutator: checklistMutator, tint: accent,
-                     onDelete: { delete(habit) })
-          }
-          .buttonStyle(.plain)
-          .listRowInsets(EdgeInsets())
-        }
-      } header: {
+      VStack(alignment: .leading, spacing: 8) {
         DayBucketHeader(bucket: bucket,
                         trailing: "\(doneCount)/\(items.count)")
+          .padding(.horizontal, 16)
+        DrawerSection(padding: .none) {
+          ForEach(items) { habit in
+            Button { editing = habit } label: {
+              HabitRow(habit: habit, model: model, checklistMutator: checklistMutator, tint: accent,
+                       onDelete: { delete(habit) })
+            }
+            .buttonStyle(.plain)
+          }
+        }
       }
     }
   }

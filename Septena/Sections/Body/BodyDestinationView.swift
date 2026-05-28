@@ -31,18 +31,16 @@ struct BodyDestinationView: View {
   }
 
   var body: some View {
-    List {
-      SectionGoalsStrip(sectionKey: "body")
+    SectionDrawer(sectionKey: "body", title: "Body") {
       statsSection
       chartsSection
-      Section("Recent weigh-ins") {
+      DrawerSection("Recent weigh-ins", padding: .none) {
         ForEach(rows) { row in
           LogRow(
             title: friendlyDate(row.date),
             detail: detailLine(row),
             trailing: row.weightKg.map { String(format: "%.1f kg", $0) }
           )
-          .listRowInsets(EdgeInsets())
         }
       }
       if !loading && rows.isEmpty {
@@ -51,17 +49,7 @@ struct BodyDestinationView: View {
                                description: Text("Check your Withings sync in the webapp."))
       }
     }
-    #if os(macOS)
-    .listStyle(.inset)
-    #else
-    .listStyle(.insetGrouped)
-    #endif
-    .background(Theme.groupedBackground)
-    .navigationTitle("Body")
     .trackScreen("body")
-    #if os(iOS)
-    .navigationBarTitleDisplayMode(.large)
-    #endif
     .tint(accent)
     .task {
       paintFromCache()
@@ -72,8 +60,7 @@ struct BodyDestinationView: View {
   // MARK: - Stats
 
   private var statsSection: some View {
-    Section {
-      LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+    StatGrid(columns: 3) {
         statTile(label: "Weight",
                  value: latest(\.weightKg).map { String(format: "%.1f", $0) },
                  unit: "kg",
@@ -116,33 +103,29 @@ struct BodyDestinationView: View {
                    target: nil,
                    color: accent.opacity(0.5))
         }
-      }
-      .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
-      .listRowBackground(Color.clear)
     }
   }
 
   private func statTile(label: String, value: String?, unit: String,
                         target: String?, color: Color) -> some View {
-    VStack(spacing: 4) {
-      HStack(alignment: .firstTextBaseline, spacing: 2) {
-        Text(value ?? "—")
-          .font(.system(.title2, design: .rounded).weight(.semibold).monospacedDigit())
-          .foregroundStyle(color)
-        Text(unit)
-          .font(.caption2)
+    StatTile {
+      VStack(spacing: 4) {
+        HStack(alignment: .firstTextBaseline, spacing: 2) {
+          Text(value ?? "—")
+            .font(.system(.title2, design: .rounded).weight(.semibold).monospacedDigit())
+            .foregroundStyle(color)
+          Text(unit)
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+        }
+        Text(label)
+          .font(.caption)
           .foregroundStyle(.secondary)
+        Text(target ?? " ")
+          .font(.caption2)
+          .foregroundStyle(.secondary.opacity(0.7))
       }
-      Text(label)
-        .font(.caption)
-        .foregroundStyle(.secondary)
-      Text(target ?? " ")
-        .font(.caption2)
-        .foregroundStyle(.secondary.opacity(0.7))
     }
-    .frame(maxWidth: .infinity)
-    .padding(.vertical, 12)
-    .background(Theme.secondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 16))
   }
 
   private var weeklyDeltaTile: some View {
@@ -152,25 +135,24 @@ struct BodyDestinationView: View {
       return "\(sign)\(String(format: "%.1f", d))"
     }
     let color: Color = (delta ?? 0) <= 0 ? accent : .orange
-    return VStack(spacing: 4) {
-      HStack(alignment: .firstTextBaseline, spacing: 2) {
-        Text(formatted ?? "—")
-          .font(.system(.title2, design: .rounded).weight(.semibold).monospacedDigit())
-          .foregroundStyle(color)
-        Text("kg")
-          .font(.caption2)
+    return StatTile {
+      VStack(spacing: 4) {
+        HStack(alignment: .firstTextBaseline, spacing: 2) {
+          Text(formatted ?? "—")
+            .font(.system(.title2, design: .rounded).weight(.semibold).monospacedDigit())
+            .foregroundStyle(color)
+          Text("kg")
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+        }
+        Text("Weekly Δ")
+          .font(.caption)
           .foregroundStyle(.secondary)
+        Text("7d vs prior")
+          .font(.caption2)
+          .foregroundStyle(.secondary.opacity(0.7))
       }
-      Text("Weekly Δ")
-        .font(.caption)
-        .foregroundStyle(.secondary)
-      Text("7d vs prior")
-        .font(.caption2)
-        .foregroundStyle(.secondary.opacity(0.7))
     }
-    .frame(maxWidth: .infinity)
-    .padding(.vertical, 12)
-    .background(Theme.secondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 16))
   }
 
   /// Recent 7-day mean vs prior 7-day mean (kg). nil if either window
@@ -190,7 +172,7 @@ struct BodyDestinationView: View {
   @ViewBuilder
   private var chartsSection: some View {
     if !chronological.isEmpty {
-      Section {
+      VStack(spacing: 8) {
         trendChart(title: "Weight",
                    caption: targets.flatMap { t in
                      if let mn = t.weightMinKg, let mx = t.weightMaxKg {
@@ -245,22 +227,17 @@ struct BodyDestinationView: View {
       let summary = "\(title) trend chart. "
                   + "Window average \(String(format: "%.1f", avg)) \(unit). "
                   + projText
-      VStack(alignment: .leading, spacing: 8) {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-          Text(title)
-            .font(.subheadline.weight(.semibold))
-          if let caption {
-            Text(caption)
-              .font(.caption)
-              .foregroundStyle(.secondary)
-          }
-          Spacer()
+      ChartCard(
+        title: title,
+        detail: caption,
+        accessory: {
           if let p = projection {
             Text("→ \(String(format: "%.1f", p)) \(unit) in 7d")
               .font(.caption)
               .foregroundStyle(.secondary)
           }
         }
+      ) {
         Chart {
           ForEach(Array(points.enumerated()), id: \.offset) { idx, p in
             LineMark(x: .value("Day", idx),
@@ -291,10 +268,6 @@ struct BodyDestinationView: View {
         .chartYScale(domain: yDomain)
         .frame(height: 160)
       }
-      .padding(12)
-      .background(Theme.secondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 16))
-      .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 6, trailing: 12))
-      .listRowBackground(Color.clear)
       .a11yCombineKeepingChildren(summary)
     }
   }

@@ -63,56 +63,35 @@ struct GroceriesDestinationView: View {
   }
 
   var body: some View {
-    List {
-      SectionGoalsStrip(sectionKey: "groceries")
+    SectionDrawer(sectionKey: "groceries",
+                  title: "Groceries",
+                  onLog: { _ in creating = true }) {
       if !low.isEmpty {
-        Section {
-          ForEach(low) { item in
-            Button { editing = item } label: {
-              GroceryRow(item: item,
-                         categoryLabel: displayName(forCategory: item.category),
-                         pending: pending.contains(item.id),
-                         accent: accent,
-                         showCategory: true,
-                         onToggle: { toggle(item) })
-            }
-            .buttonStyle(.plain)
-            .listRowInsets(EdgeInsets())
-            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-              Button(role: .destructive) {
-                delete(item)
-              } label: {
-                Label("Delete", systemImage: "trash")
-              }
+        VStack(alignment: .leading, spacing: 8) {
+          HStack {
+            Text("Shopping list")
+            Spacer()
+            Text("\(low.count)").monospacedDigit()
+          }
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+          .padding(.horizontal, 16)
+          DrawerSection(padding: .none) {
+            ForEach(low) { item in
+              groceryButton(item: item,
+                            categoryLabel: displayName(forCategory: item.category),
+                            showCategory: true)
             }
           }
-        } header: {
-          HStack { Text("Shopping list"); Spacer(); Text("\(low.count)").monospacedDigit() }
         }
       }
       ForEach(stockedByCategory, id: \.category) { group in
-        Section {
+        DrawerSection(group.label, padding: .none) {
           ForEach(group.items) { item in
-            Button { editing = item } label: {
-              GroceryRow(item: item,
-                         categoryLabel: group.label,
-                         pending: pending.contains(item.id),
-                         accent: accent,
-                         showCategory: false,
-                         onToggle: { toggle(item) })
-            }
-            .buttonStyle(.plain)
-            .listRowInsets(EdgeInsets())
-            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-              Button(role: .destructive) {
-                delete(item)
-              } label: {
-                Label("Delete", systemImage: "trash")
-              }
-            }
+            groceryButton(item: item,
+                          categoryLabel: group.label,
+                          showCategory: false)
           }
-        } header: {
-          Text(group.label)
         }
       }
       if !loading && items.isEmpty {
@@ -121,24 +100,8 @@ struct GroceriesDestinationView: View {
                                description: Text("Set up your pantry in the webapp."))
       }
     }
-    #if os(macOS)
-    .listStyle(.inset)
-    #else
-    .listStyle(.insetGrouped)
-    #endif
-    .background(Theme.groupedBackground)
-    .navigationTitle("Groceries")
     .trackScreen("groceries")
-    #if os(iOS)
-    .navigationBarTitleDisplayMode(.large)
-    #endif
     .tint(accent)
-    .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        Button { creating = true } label: { Image(systemName: "plus") }
-          .tint(accent)
-      }
-    }
     .task { reload() }
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
       reload()
@@ -163,6 +126,34 @@ struct GroceriesDestinationView: View {
     }
   }
 
+
+  /// Standard grocery row button with edit-on-tap, long-press context
+  /// menu for delete. Replaces the prior `.swipeActions(.trailing)` per
+  /// the app convention "context menu on long-press, no swipes anywhere."
+  @ViewBuilder
+  private func groceryButton(item: GroceryItem,
+                             categoryLabel: String,
+                             showCategory: Bool) -> some View {
+    Button { editing = item } label: {
+      GroceryRow(item: item,
+                 categoryLabel: categoryLabel,
+                 pending: pending.contains(item.id),
+                 accent: accent,
+                 showCategory: showCategory,
+                 onToggle: { toggle(item) })
+    }
+    .buttonStyle(.plain)
+    .contextMenu {
+      Button { editing = item } label: {
+        Label("Edit", systemImage: "pencil")
+      }
+      Button(role: .destructive) {
+        delete(item)
+      } label: {
+        Label("Delete", systemImage: "trash")
+      }
+    }
+  }
 
   private func delete(_ item: GroceryItem) {
     grocery.deleteItem(id: item.id)

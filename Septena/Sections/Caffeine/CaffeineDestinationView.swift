@@ -12,44 +12,46 @@ struct CaffeineDestinationView: View {
   @State private var loading = true
   @State private var editing: CaffeineEntry? = nil
   @State private var managingTypes = false
+  /// Driven by `CaffeinePlugin.logActions`: tapping "Log V60" / "Log
+  /// Matcha" / "Log other" sets this to the method id; the sheet opens
+  /// in create mode with `presetMethod` seeded.
+  @State private var loggingMethod: LoggingMethod? = nil
+  private struct LoggingMethod: Identifiable, Hashable {
+    let method: String
+    var id: String { method }
+  }
   @State private var history: [CaffeineHistoryPoint] = []
+  /// Day the drawer is currently viewing — driven by the drawer's
+  /// `currentDate` date strip. Defaults to today; heatmap taps jump it
+  /// to the picked day.
+  @State private var viewingDate: String = SeptenaDate.today
 
   private var caffeine: CaffeineMutator { SeptenaServices.shared.caffeineMutator }
 
   private var accent: Color { theme.color(for: "caffeine") }
 
   var body: some View {
-    List {
-      SectionGoalsStrip(sectionKey: "caffeine")
+    SectionDrawer(sectionKey: "caffeine",
+                  title: "Caffeine",
+                  onLog: handleLogAction,
+                  currentDate: $viewingDate) {
       summary
-      Section("Today") {
+      DrawerSection("Today", padding: .none) {
         if let today, !today.entries.isEmpty {
           ForEach(Array(today.entries.reversed())) { entry in
-            Button {
-              editing = entry
-            } label: {
-              LogRow(
-                title: methodLabel(entry.method),
-                detail: detailLine(entry),
-                trailing: entry.time
-              )
-            }
-            .buttonStyle(.plain)
-            .listRowInsets(EdgeInsets())
-            .contextMenu {
-              Button { editing = entry } label: {
-                Label("Edit", systemImage: "pencil")
-              }
-              Button(role: .destructive) {
-                delete(entry)
-              } label: {
-                Label("Delete", systemImage: "trash")
-              }
-            }
+            LogEntryRow(
+              title: methodLabel(entry.method),
+              detail: detailLine(entry),
+              trailing: entry.time,
+              onEdit: { editing = entry },
+              onDelete: { delete(entry) }
+            )
           }
         } else if !loading {
           Text("Nothing logged yet.")
             .foregroundStyle(.secondary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
         }
       }
       if !history.isEmpty {
@@ -73,29 +75,15 @@ struct CaffeineDestinationView: View {
           },
           subtitleFor: { active, total, sum in
             "\(active) of \(total) days · \(Int(sum)) sessions"
-          }
+          },
+          onTapDay: { iso in viewingDate = iso }
         )
       }
     }
-    #if os(macOS)
-    .listStyle(.inset)
-    #else
-    .listStyle(.insetGrouped)
-    #endif
-    .background(Theme.groupedBackground)
-    .navigationTitle("Caffeine")
     .trackScreen("caffeine")
-    #if os(iOS)
-    .navigationBarTitleDisplayMode(.large)
-    #endif
     .tint(accent)
-    .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        Button { managingTypes = true } label: { Image(systemName: "plus") }
-          .tint(accent)
-      }
-    }
     .task { reload() }
+    .onChange(of: viewingDate) { _, _ in reload() }
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
       reload()
     }
@@ -108,8 +96,16 @@ struct CaffeineDestinationView: View {
     }
     .sheet(item: $editing) { entry in
       EditCaffeineEntrySheet(
-        date: today?.date ?? SeptenaDate.today,
+        date: viewingDate,
         original: entry,
+        onSave: { _ in reload() }
+      )
+    }
+    .sheet(item: $loggingMethod) { wrap in
+      EditCaffeineEntrySheet(
+        date: viewingDate,
+        original: nil,
+        presetMethod: wrap.method,
         onSave: { _ in reload() }
       )
     }
@@ -121,31 +117,26 @@ struct CaffeineDestinationView: View {
     Haptics.warning()
   }
 
-  private var summary: some View {
-    Section {
-      HStack(alignment: .top, spacing: 24) {
-        stat(value: "\(today?.sessionCount ?? 0)",
-             label: "today",
-             tint: accent)
-        stat(value: today?.totalG.map { String(format: "%.1f", $0) } ?? "—",
-             label: "grams",
-             tint: accent,
-             unit: "g")
-        Spacer()
-      }
+  /// Dispatch table for `CaffeinePlugin.logActions` ids. Keeping this
+  /// close to the destination so adding a new menu item is a two-touch
+  /// change (declare in the plugin + add a branch here).
+  private func handleLogAction(_ id: String) {
+    switch id {
+    case "log-v60":    loggingMethod = .init(method: "v60")
+    case "log-matcha": loggingMethod = .init(method: "matcha")
+    case "log-other":  loggingMethod = .init(method: "other")
+    case "manage":     managingTypes = true
+    default:           loggingMethod = .init(method: "v60")
     }
   }
 
-  private func stat(value: String, label: String, tint: Color,
-                    unit: String? = nil) -> some View {
-    VStack(alignment: .leading, spacing: 2) {
-      HStack(alignment: .firstTextBaseline, spacing: 2) {
-        Text(value)
-          .font(.system(.title2, design: .rounded).weight(.semibold))
-          .foregroundStyle(tint)
-        if let unit { Text(unit).font(.subheadline).foregroundStyle(.secondary) }
-      }
-      Text(label).font(.caption).foregroundStyle(.secondary)
+  private var summary: some View {
+    DrawerSection {
+      StatStrip(stats: [
+        Stat(value: "\(today?.sessionCount ?? 0)", label: "today", tint: accent),
+        Stat(value: today?.totalG.map { String(format: "%.1f", $0) } ?? "—",
+             label: "grams", tint: accent, unit: "g"),
+      ])
     }
   }
 
@@ -166,7 +157,7 @@ struct CaffeineDestinationView: View {
   }
 
   private func reload() {
-    today = ChecklistMirror.loadCaffeineDay(context: modelContext, date: SeptenaDate.today)
+    today = ChecklistMirror.loadCaffeineDay(context: modelContext, date: viewingDate)
     history = ChecklistMirror.loadCaffeineHistory(context: modelContext, days: 365).daily
     loading = false
   }

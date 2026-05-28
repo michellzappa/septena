@@ -48,9 +48,9 @@ struct EditNutritionEntrySheet: View {
     NavigationStack {
       Form {
         Section("When") {
-          DatePicker("Time",
+          DatePicker("Date & time",
                      selection: $time,
-                     displayedComponents: .hourAndMinute)
+                     displayedComponents: [.date, .hourAndMinute])
         }
         Section("Meal") {
           TextField("Emoji", text: $emoji)
@@ -174,8 +174,8 @@ struct EditNutritionEntrySheet: View {
       potassiumMg    = optString(original.potassiumMg)
       waterMl        = optString(original.waterMl)
       photoAssetID   = original.photoAssetID
-      let fmt = DateFormatter(); fmt.dateFormat = "HH:mm"
-      time = fmt.date(from: original.time) ?? Date()
+      let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd HH:mm"
+      time = fmt.date(from: "\(original.date) \(original.time)") ?? Date()
     } else {
       emoji = ""; foodsText = ""; ingredientsText = ""
       proteinG = ""; fatG = ""; saturatedFatG = ""
@@ -224,7 +224,7 @@ struct EditNutritionEntrySheet: View {
       let photoArg: String?? = photoEdited ? .some(photoAssetID) : nil
       mutator.updateEntry(
         id: original.file,
-        pickedTime: time,
+        pickedAt: time,
         emoji: emojiValue.isEmpty ? nil : emojiValue,
         foods: foods,
         proteinG: parseDouble(proteinG),

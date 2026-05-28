@@ -49,6 +49,7 @@ struct AddTrainingPage: View {
             AddInfoRow(
               title: type.label,
               subtitle: subtitle(for: type.id),
+              systemImage: type.kind.icon,
               tint: tint
             )
           }
