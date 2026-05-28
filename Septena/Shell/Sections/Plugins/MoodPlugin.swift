@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // Mood is the first section migrated to the `SectionPlugin` model.
 // Proof-of-concept: its Today event production now lives in one place
@@ -22,17 +23,21 @@ enum MoodPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(MoodDestinationView()) }
 
+  static var logActions: [LogAction] {
+    [LogAction(id: "log", title: "Log mood", systemImage: "plus")]
+  }
+
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(SectionExplainerView(
       sectionKey: "mood",
-      title: "Set up Mood",
-      intro: "Mood logs how you feel as a point on the affect circumplex — pleasant ↔ unpleasant on one axis, calm ↔ energetic on the other. Three check-ins a day is the suggested cadence; do more or fewer as you like.",
+      title: "Mood",
+      intro: "How you feel, plotted on the affect circumplex: pleasant ↔ unpleasant, calm ↔ energetic. Three check-ins a day is a good cadence — more or fewer is fine.",
       bullets: [
-        ("Tap or drag", "Pick a quadrant and pick a word that matches. Done."),
-        ("Three buckets", "Morning, afternoon, evening — but timestamps are exact, so log whenever it fits."),
-        ("Optional notes", "Add free-text context when something specific is shaping the feeling."),
+        .init("Tap a quadrant", "Pick the feeling that matches, then a word for it. That's the whole log.", icon: "hand.tap"),
+        .init("Morning / afternoon / evening", "Suggested buckets, but timestamps are exact — log whenever it fits.", icon: "clock"),
+        .init("Notes when useful", "Add free-text context when something specific is shaping the feeling.", icon: "text.bubble"),
       ],
-      actionLabel: "Got it",
+      primaryActionLabel: "Start logging",
       complete: complete
     ))
   }
@@ -52,6 +57,52 @@ enum MoodPlugin: SectionPlugin {
         detail: e.note,
         kind: .mood(e)
       )
+    }
+  }
+
+  // MARK: - Aim metrics
+
+  static var aimMetrics: [GoalMetric] {
+    [
+      GoalMetric(key: "mood.entry_count_today",
+                 label: "Mood check-ins (today)",
+                 sectionKey: "mood",
+                 window: "today",
+                 unitLabel: "entries"),
+      GoalMetric(key: "mood.entry_count_week",
+                 label: "Mood check-ins (this week)",
+                 sectionKey: "mood",
+                 window: "calendarWeek",
+                 unitLabel: "entries"),
+      GoalMetric(key: "mood.avg_valence_week",
+                 label: "Average valence (this week)",
+                 sectionKey: "mood",
+                 window: "calendarWeek",
+                 unitLabel: "1–3"),
+    ]
+  }
+
+  static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? {
+    guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window)
+    else { return 0 }
+    switch metric.key {
+    case "mood.entry_count_today", "mood.entry_count_week":
+      let descriptor = FetchDescriptor<MoodEventEntity>(
+        predicate: #Predicate { $0.date >= startStr && $0.date <= endStr }
+      )
+      return Double((try? context.fetch(descriptor).count) ?? 0)
+    case "mood.avg_valence_week":
+      // Valence is stored as 1…3 (higher = more pleasant). nil when no
+      // entries this week — the dispatcher hides the bar rather than
+      // rendering 0 (which would misleadingly read as "rock bottom").
+      let descriptor = FetchDescriptor<MoodEventEntity>(
+        predicate: #Predicate { $0.date >= startStr && $0.date <= endStr }
+      )
+      let rows = (try? context.fetch(descriptor)) ?? []
+      guard !rows.isEmpty else { return nil }
+      return Double(rows.reduce(0) { $0 + $1.valence }) / Double(rows.count)
+    default:
+      return nil
     }
   }
 }

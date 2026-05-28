@@ -19,13 +19,13 @@ enum SleepPlugin: SectionPlugin {
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(SectionExplainerView(
       sectionKey: "sleep",
-      title: "Set up Sleep",
-      intro: "Sleep mirrors data from HealthKit and Oura — bed time, wake time, duration, stages. Septena reads; it never writes to your sleep records.",
+      title: "Sleep",
+      intro: "Mirrors bed time, wake time, duration, and stages from HealthKit and Oura. Septena reads; it never writes back.",
       bullets: [
-        ("Source priority", "Oura wins when connected (richer detail). HealthKit fills in nights Oura missed."),
-        ("No manual entry", "Sleep is read-only here. Edit in Health.app or the Oura app."),
+        .init("Oura wins when connected", "Richer per-night detail. HealthKit fills in nights Oura missed.", icon: "moon.stars"),
+        .init("Read-only", "Edit nights in Apple Health or the Oura app — Septena reflects whatever's there.", icon: "lock"),
       ],
-      actionLabel: "Got it",
+      primaryActionLabel: "Open Sleep",
       complete: complete
     ))
   }

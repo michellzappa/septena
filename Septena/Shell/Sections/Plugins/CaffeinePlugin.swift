@@ -32,6 +32,18 @@ enum CaffeinePlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(CaffeineDestinationView()) }
 
+  // + menu surfaces the two quick-log brews on top, then the catalog
+  // editor below. Order matches the most common path: tap +, pick V60,
+  // accept the prefilled bean.
+  static var logActions: [LogAction] {
+    [
+      LogAction(id: "log-v60",    title: "Log V60",      systemImage: "cup.and.saucer"),
+      LogAction(id: "log-matcha", title: "Log Matcha",   systemImage: "leaf"),
+      LogAction(id: "log-other",  title: "Log other",    systemImage: "plus.circle"),
+      LogAction(id: "manage",     title: "Manage types", systemImage: "gearshape"),
+    ]
+  }
+
   static func detailPaneContent() -> AnyView? { AnyView(CaffeineDetailContent()) }
 
   // MARK: - Import/Export
@@ -119,6 +131,38 @@ enum CaffeinePlugin: SectionPlugin {
       """
     )
   }
+
+  // MARK: - Aim metrics
+
+  static var aimMetrics: [GoalMetric] {
+    [
+      GoalMetric(key: "caffeine.cup_count",
+                 label: "Caffeine drinks (today)",
+                 sectionKey: "caffeine",
+                 window: "today",
+                 unitLabel: "cups"),
+      GoalMetric(key: "caffeine.cup_count_week",
+                 label: "Caffeine drinks (this week)",
+                 sectionKey: "caffeine",
+                 window: "calendarWeek",
+                 unitLabel: "cups"),
+    ]
+  }
+
+  static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? {
+    switch metric.key {
+    case "caffeine.cup_count", "caffeine.cup_count_week":
+      // Each CaffeineEventEntity = one drink. Grams varies by method so
+      // we deliberately count drinks rather than convert to mg.
+      guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window) else { return 0 }
+      let descriptor = FetchDescriptor<CaffeineEventEntity>(
+        predicate: #Predicate { $0.date >= startStr && $0.date <= endStr }
+      )
+      return Double((try? context.fetch(descriptor).count) ?? 0)
+    default:
+      return nil
+    }
+  }
 }
 
 /// Section-specific content for the Settings detail pane. Read-only
@@ -191,14 +235,12 @@ private struct CaffeineOnboardingView: View {
     NavigationStack {
       Form {
         Section {
-          VStack(alignment: .leading, spacing: 8) {
-            Text("Caffeine logs coffee, matcha, and other sources. Pre-populate a few common bean sources so you can pick them when logging — you can add or rename them later.")
-              .foregroundStyle(.secondary)
-            Text("Bean sources are optional. You can also log caffeine without picking one.")
-              .font(.caption)
-              .foregroundStyle(.secondary)
-          }
-          .padding(.vertical, 4)
+          SectionOnboardingHero(
+            sectionKey: "caffeine",
+            title: "Caffeine",
+            intro: "Logs coffee, matcha, and other sources. Pick a few common beans below to start — you can rename or add more later."
+          )
+          .onboardingHeroSection()
         }
         Section("Beans / sources") {
           ForEach(CaffeineBeanStarter.all) { starter in
@@ -207,7 +249,6 @@ private struct CaffeineOnboardingView: View {
         }
       }
       .formStyle(.grouped)
-      .navigationTitle("Set up Caffeine")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif

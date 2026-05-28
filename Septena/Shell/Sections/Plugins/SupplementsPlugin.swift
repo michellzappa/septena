@@ -27,6 +27,10 @@ enum SupplementsPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(SupplementsDestinationView()) }
 
+  static var logActions: [LogAction] {
+    [LogAction(id: "new", title: "New supplement", systemImage: "plus")]
+  }
+
   static func detailPaneContent() -> AnyView? { AnyView(SupplementsDetailContent()) }
 
   static var exportContribution: SectionExportContribution? {
@@ -78,6 +82,50 @@ enum SupplementsPlugin: SectionPlugin {
       `supplements_toggle(id, done: false)` removes today's mark.
       """
     )
+  }
+
+  // MARK: - Aim metrics
+
+  static var aimMetrics: [GoalMetric] {
+    [
+      GoalMetric(key: "supplements.done_today",
+                 label: "Supplements taken (today)",
+                 sectionKey: "supplements",
+                 window: "today",
+                 unitLabel: "items"),
+      GoalMetric(key: "supplements.days_active_week",
+                 label: "Days with ≥1 supplement (this week)",
+                 sectionKey: "supplements",
+                 window: "calendarWeek",
+                 unitLabel: "days"),
+    ]
+  }
+
+  static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? {
+    guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window)
+    else { return 0 }
+    switch metric.key {
+    case "supplements.done_today":
+      let descriptor = FetchDescriptor<SupplementDayStateEntity>(
+        predicate: #Predicate {
+          $0.date >= startStr && $0.date <= endStr && $0.done == true
+        }
+      )
+      return Double((try? context.fetch(descriptor).count) ?? 0)
+    case "supplements.days_active_week":
+      // Distinct days with ≥1 supplement marked — counts adherence in
+      // day-shape, not pill-shape, so taking five pills one day still
+      // counts as one day.
+      let descriptor = FetchDescriptor<SupplementDayStateEntity>(
+        predicate: #Predicate {
+          $0.date >= startStr && $0.date <= endStr && $0.done == true
+        }
+      )
+      let rows = (try? context.fetch(descriptor)) ?? []
+      return Double(Set(rows.map { $0.date }).count)
+    default:
+      return nil
+    }
   }
 }
 
@@ -145,14 +193,12 @@ private struct SupplementsOnboardingView: View {
     NavigationStack {
       Form {
         Section {
-          VStack(alignment: .leading, spacing: 8) {
-            Text("Supplements logs the things you take daily. Pick a few common ones to start — you can edit or delete them anytime.")
-              .foregroundStyle(.secondary)
-            Text("Skip if you'd rather add your own.")
-              .font(.caption)
-              .foregroundStyle(.secondary)
-          }
-          .padding(.vertical, 4)
+          SectionOnboardingHero(
+            sectionKey: "supplements",
+            title: "Supplements",
+            intro: "Logs the things you take daily. Pick a few common ones to start — edit, delete, or add your own anytime."
+          )
+          .onboardingHeroSection()
         }
         Section {
           ForEach(SupplementStarter.all) { starter in
@@ -161,7 +207,6 @@ private struct SupplementsOnboardingView: View {
         }
       }
       .formStyle(.grouped)
-      .navigationTitle("Set up Supplements")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif

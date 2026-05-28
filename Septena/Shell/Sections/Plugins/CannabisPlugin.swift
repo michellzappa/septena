@@ -30,6 +30,14 @@ enum CannabisPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(CannabisDestinationView()) }
 
+  static var logActions: [LogAction] {
+    [
+      LogAction(id: "log-vape",   title: "Log vape",      systemImage: "wind"),
+      LogAction(id: "log-edible", title: "Log edible",    systemImage: "leaf.circle"),
+      LogAction(id: "manage",     title: "Manage strains", systemImage: "gearshape"),
+    ]
+  }
+
   static func detailPaneContent() -> AnyView? { AnyView(CannabisDetailContent()) }
 
   static var exportContribution: SectionExportContribution? {
@@ -98,6 +106,38 @@ enum CannabisPlugin: SectionPlugin {
       """
     )
   }
+
+  // MARK: - Aim metrics
+
+  static var aimMetrics: [GoalMetric] {
+    [
+      GoalMetric(key: "cannabis.event_count",
+                 label: "Cannabis sessions (today)",
+                 sectionKey: "cannabis",
+                 window: "today",
+                 unitLabel: "sessions"),
+      GoalMetric(key: "cannabis.event_count_week",
+                 label: "Cannabis sessions (this week)",
+                 sectionKey: "cannabis",
+                 window: "calendarWeek",
+                 unitLabel: "sessions"),
+    ]
+  }
+
+  static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? {
+    switch metric.key {
+    case "cannabis.event_count", "cannabis.event_count_week":
+      // Each CannabisEventEntity = one session. Grams + hit count vary so
+      // we count sessions rather than try to synthesise a dose number.
+      guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window) else { return 0 }
+      let descriptor = FetchDescriptor<CannabisEventEntity>(
+        predicate: #Predicate { $0.date >= startStr && $0.date <= endStr }
+      )
+      return Double((try? context.fetch(descriptor).count) ?? 0)
+    default:
+      return nil
+    }
+  }
 }
 
 private struct CannabisDetailContent: View {
@@ -163,14 +203,12 @@ private struct CannabisOnboardingView: View {
     NavigationStack {
       Form {
         Section {
-          VStack(alignment: .leading, spacing: 8) {
-            Text("Cannabis logs intake with strain and effect. Pre-populating a few generic strain placeholders lets you start logging immediately — rename them later as you identify specific strains.")
-              .foregroundStyle(.secondary)
-            Text("Skip to add your own strains by name.")
-              .font(.caption)
-              .foregroundStyle(.secondary)
-          }
-          .padding(.vertical, 4)
+          SectionOnboardingHero(
+            sectionKey: "cannabis",
+            title: "Cannabis",
+            intro: "Logs intake with strain and effect. Pick a few generic placeholders to start — rename them later as you identify specific strains, or skip and add your own."
+          )
+          .onboardingHeroSection()
         }
         Section("Strains") {
           ForEach(CannabisStrainStarter.all) { starter in
@@ -179,7 +217,6 @@ private struct CannabisOnboardingView: View {
         }
       }
       .formStyle(.grouped)
-      .navigationTitle("Set up Cannabis")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif

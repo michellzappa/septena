@@ -26,6 +26,10 @@ enum ChoresPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(ChoresDestinationView()) }
 
+  static var logActions: [LogAction] {
+    [LogAction(id: "new", title: "New chore", systemImage: "plus")]
+  }
+
   static func detailPaneContent() -> AnyView? { AnyView(ChoresDetailContent()) }
 
   static var exportContribution: SectionExportContribution? {
@@ -83,6 +87,37 @@ enum ChoresPlugin: SectionPlugin {
       chore is next due. Surface overdue items first.
       """
     )
+  }
+
+  // MARK: - Aim metrics
+
+  static var aimMetrics: [GoalMetric] {
+    [
+      GoalMetric(key: "chores.completed_week",
+                 label: "Chores completed (this week)",
+                 sectionKey: "chores",
+                 window: "calendarWeek",
+                 unitLabel: "chores"),
+    ]
+  }
+
+  static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? {
+    guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window)
+    else { return 0 }
+    switch metric.key {
+    case "chores.completed_week":
+      // ChoreEvent rows where action == "complete" — matches the
+      // sentinel written by `SeptenaServices.completeChore`. Defers
+      // and other actions don't count toward a completion goal.
+      let descriptor = FetchDescriptor<ChoreEventEntity>(
+        predicate: #Predicate {
+          $0.date >= startStr && $0.date <= endStr && $0.action == "complete"
+        }
+      )
+      return Double((try? context.fetch(descriptor).count) ?? 0)
+    default:
+      return nil
+    }
   }
 }
 
@@ -167,11 +202,12 @@ private struct ChoresOnboardingView: View {
     NavigationStack {
       Form {
         Section {
-          VStack(alignment: .leading, spacing: 8) {
-            Text("Chores tracks recurring household tasks with computed due dates. Pick the ones that apply — the cadence is just a starting point you can adjust later.")
-              .foregroundStyle(.secondary)
-          }
-          .padding(.vertical, 4)
+          SectionOnboardingHero(
+            sectionKey: "chores",
+            title: "Chores",
+            intro: "Recurring household tasks with computed due dates. Pick the ones that apply — cadences are a starting point you can adjust later."
+          )
+          .onboardingHeroSection()
         }
         Section {
           ForEach(ChoreStarter.all) { starter in
@@ -180,7 +216,6 @@ private struct ChoresOnboardingView: View {
         }
       }
       .formStyle(.grouped)
-      .navigationTitle("Set up Chores")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif

@@ -51,6 +51,10 @@ enum TrainingPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(TrainingDestinationView()) }
 
+  static var logActions: [LogAction] {
+    [LogAction(id: "start", title: "Start session", systemImage: "play.fill")]
+  }
+
   static func detailPaneContent() -> AnyView? { AnyView(TrainingDetailContent()) }
 
   static var exportContribution: SectionExportContribution? {
@@ -179,6 +183,35 @@ enum TrainingPlugin: SectionPlugin {
       """
     )
   }
+
+  // MARK: - Aim metrics
+
+  static var aimMetrics: [GoalMetric] {
+    [
+      GoalMetric(key: "training.session_count",
+                 label: "Training sessions (this week)",
+                 sectionKey: "training",
+                 window: "calendarWeek",
+                 unitLabel: "sessions"),
+    ]
+  }
+
+  static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? {
+    switch metric.key {
+    case "training.session_count":
+      // A "session" collapses to a distinct training day — multiple
+      // session types in one day still count as one training day from
+      // the user's perspective.
+      guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window) else { return 0 }
+      let descriptor = FetchDescriptor<ExerciseEntryEntity>(
+        predicate: #Predicate { $0.date >= startStr && $0.date <= endStr }
+      )
+      let entries = (try? context.fetch(descriptor)) ?? []
+      return Double(Set(entries.map { $0.date }).count)
+    default:
+      return nil
+    }
+  }
 }
 
 private struct TrainingDetailContent: View {
@@ -199,17 +232,16 @@ private struct TrainingDetailContent: View {
 private struct SessionStarter: Identifiable, Hashable {
   let id: String
   let label: String
-  let emoji: String
 
   static let all: [SessionStarter] = [
-    .init(id: "starter-upper",    label: "Upper",     emoji: "💪"),
-    .init(id: "starter-lower",    label: "Lower",     emoji: "🦵"),
-    .init(id: "starter-push",     label: "Push",      emoji: "⬆️"),
-    .init(id: "starter-pull",     label: "Pull",      emoji: "⬇️"),
-    .init(id: "starter-legs",     label: "Legs",      emoji: "🦵"),
-    .init(id: "starter-cardio",   label: "Cardio",    emoji: "🏃"),
-    .init(id: "starter-mobility", label: "Mobility",  emoji: "🧘"),
-    .init(id: "starter-full",     label: "Full body", emoji: "🏋️"),
+    .init(id: "starter-upper",    label: "Upper"),
+    .init(id: "starter-lower",    label: "Lower"),
+    .init(id: "starter-push",     label: "Push"),
+    .init(id: "starter-pull",     label: "Pull"),
+    .init(id: "starter-legs",     label: "Legs"),
+    .init(id: "starter-cardio",   label: "Cardio"),
+    .init(id: "starter-mobility", label: "Mobility"),
+    .init(id: "starter-full",     label: "Full body"),
   ]
 }
 
@@ -236,11 +268,12 @@ private struct TrainingOnboardingView: View {
     NavigationStack {
       Form {
         Section {
-          VStack(alignment: .leading, spacing: 8) {
-            Text("Training groups workouts into session templates like Upper, Lower, or Cardio. Pick the ones you'll use — you can add exercises to each later, or define your own templates.")
-              .foregroundStyle(.secondary)
-          }
-          .padding(.vertical, 4)
+          SectionOnboardingHero(
+            sectionKey: "training",
+            title: "Training",
+            intro: "Groups workouts into session templates like Upper, Lower, or Cardio. Pick the ones you'll use — add exercises to each later, or define your own templates."
+          )
+          .onboardingHeroSection()
         }
         Section("Session templates") {
           ForEach(SessionStarter.all) { starter in
@@ -249,7 +282,6 @@ private struct TrainingOnboardingView: View {
         }
       }
       .formStyle(.grouped)
-      .navigationTitle("Set up Training")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif
@@ -269,8 +301,6 @@ private struct TrainingOnboardingView: View {
       if isSelected { selected.remove(s.id) } else { selected.insert(s.id) }
     } label: {
       HStack(spacing: 12) {
-        Text(s.emoji).font(.title3)
-          .opacity(exists ? 0.4 : 1)
         Text(s.label)
           .foregroundStyle(exists ? .secondary : .primary)
           .strikethrough(exists, color: .secondary)
@@ -313,7 +343,7 @@ private struct TrainingOnboardingView: View {
       selected.contains($0.id) && !alreadyExists($0)
     }
     for s in toAdd {
-      _ = mutator.addSessionType(label: s.label, emoji: s.emoji, exercises: [])
+      _ = mutator.addSessionType(label: s.label, emoji: nil, exercises: [])
     }
     complete()
   }

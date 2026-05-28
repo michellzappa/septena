@@ -16,13 +16,13 @@ enum ActivityPlugin: SectionPlugin {
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(SectionExplainerView(
       sectionKey: "activity",
-      title: "Set up Activity",
-      intro: "Activity reads step counts and movement minutes from HealthKit so they sit alongside your other daily data.",
+      title: "Activity",
+      intro: "Step counts and movement minutes from HealthKit, alongside the rest of your daily data.",
       bullets: [
-        ("Read-only", "Septena observes HealthKit; never writes back."),
-        ("HealthKit permission", "Granted in iOS Settings → Privacy → Health → Septena. Without it the section stays empty."),
+        .init("Read-only", "Septena observes HealthKit; never writes back.", icon: "lock"),
+        .init("HealthKit permission", "Granted in iOS Settings → Privacy → Health → Septena. Without it the section stays empty.", icon: "heart.text.square"),
       ],
-      actionLabel: "Got it",
+      primaryActionLabel: "Open Activity",
       complete: complete
     ))
   }

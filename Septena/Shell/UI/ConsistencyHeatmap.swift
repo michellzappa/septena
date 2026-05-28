@@ -22,6 +22,14 @@ struct ConsistencyHeatmap: View {
   let firstDataDate: Date?
   let accent: Color
   let getDay: (String) -> HeatmapDay
+  /// Optional tap handler — receives the ISO date of the cell tapped.
+  /// When non-nil, cells within `tappableWindowDays` of `endDate` become
+  /// `Button`s; older cells stay visually identical but inert. The
+  /// caller drives the backfill sheet from this callback.
+  var onTap: ((String) -> Void)? = nil
+  /// How far back (inclusive) `onTap` fires. Defaults to 30 — matches the
+  /// scope chosen for event-stamped edit sheets.
+  var tappableWindowDays: Int = 30
 
   private let cell: CGFloat = 12
   private let gap: CGFloat = 3
@@ -70,7 +78,7 @@ struct ConsistencyHeatmap: View {
     if let date = date, date <= endDate {
       let iso = Self.iso(date)
       let day = getDay(iso)
-      ZStack {
+      let cellBody = ZStack {
         RoundedRectangle(cornerRadius: 2.5, style: .continuous)
           .fill(color(for: day.level))
         if differentiateWithoutColor && day.level > 0 {
@@ -78,11 +86,38 @@ struct ConsistencyHeatmap: View {
         }
       }
       .frame(width: cell, height: cell)
-      .accessibilityLabel(day.label)
-      .accessibilityValue(Self.levelDescription(for: day.level))
+
+      if let onTap, Self.isWithinTappableWindow(date: date,
+                                                endDate: endDate,
+                                                windowDays: tappableWindowDays) {
+        // Wrapping in a Button keeps the tap target the size of the cell
+        // (12pt — small but matches the heatmap's grain). `.plain` style
+        // strips the default tint so the color ramp stays untouched.
+        Button { onTap(iso) } label: { cellBody }
+          .buttonStyle(.plain)
+          .accessibilityLabel(day.label)
+          .accessibilityValue(Self.levelDescription(for: day.level))
+          .accessibilityAddTraits(.isButton)
+      } else {
+        cellBody
+          .accessibilityLabel(day.label)
+          .accessibilityValue(Self.levelDescription(for: day.level))
+      }
     } else {
       Color.clear.frame(width: cell, height: cell)
     }
+  }
+
+  /// `date` is within `windowDays` days of `endDate` (inclusive of both
+  /// endpoints) — i.e. today and the previous N-1 days are tappable.
+  private static func isWithinTappableWindow(date: Date,
+                                             endDate: Date,
+                                             windowDays: Int) -> Bool {
+    let cal = Calendar.current
+    let days = cal.dateComponents([.day],
+                                  from: cal.startOfDay(for: date),
+                                  to: cal.startOfDay(for: endDate)).day ?? Int.max
+    return days >= 0 && days < windowDays
   }
 
   /// Five-stop ramp matching the webapp: muted → faint accent → full accent.
@@ -208,6 +243,10 @@ struct ChecklistHeatmapSection<Point>: View where Point: Hashable {
   let date: (Point) -> String
   let done: (Point) -> Int
   let total: (Point) -> Int
+  /// Forwarded to the underlying heatmap. Non-nil enables the backfill
+  /// flow: tapping a cell within the last 30 days fires this with the
+  /// ISO date.
+  var onTapDay: ((String) -> Void)? = nil
 
   var body: some View {
     let end = Date()
@@ -218,24 +257,29 @@ struct ChecklistHeatmapSection<Point>: View where Point: Hashable {
       ? Int((Double(stats.activeDays) / Double(stats.totalDays) * 100).rounded())
       : 0
 
-    Section {
+    DrawerSection {
       VStack(alignment: .leading, spacing: 14) {
         header(activeDays: stats.activeDays, totalDays: stats.totalDays)
-        ConsistencyHeatmap(endDate: end, firstDataDate: first, accent: accent) { iso in
-          let bucket = stats.byDate[iso]
-          let d = bucket?.done ?? 0
-          let t = bucket?.total ?? 0
-          let level = Self.level(done: d, total: t)
-          let label = t > 0 ? "\(iso) · \(d)/\(t) \(noun)s" : "\(iso) · no \(noun)s"
-          return HeatmapDay(level: level, label: label)
-        }
+        ConsistencyHeatmap(
+          endDate: end,
+          firstDataDate: first,
+          accent: accent,
+          getDay: { iso in
+            let bucket = stats.byDate[iso]
+            let d = bucket?.done ?? 0
+            let t = bucket?.total ?? 0
+            let level = Self.level(done: d, total: t)
+            let label = t > 0 ? "\(iso) · \(d)/\(t) \(noun)s" : "\(iso) · no \(noun)s"
+            return HeatmapDay(level: level, label: label)
+          },
+          onTap: onTapDay
+        )
         .a11yCombineKeepingChildren(
           "\(title) heatmap, \(stats.activeDays) of \(stats.totalDays) days active, \(pct) percent. Current streak \(stats.currentStreak) days, best run \(stats.longestStreak)."
         )
         footer(totalDone: stats.totalDone, endISO: endISO)
         streakRow(current: stats.currentStreak, best: stats.longestStreak)
       }
-      .padding(.vertical, 4)
     }
   }
 
@@ -392,6 +436,11 @@ struct ActivityHeatmapSection<Point>: View where Point: Hashable {
   let labelFor: (Double) -> String
   /// Section subtitle, given (activeDays, totalDays, totalValue).
   let subtitleFor: (Int, Int, Double) -> String
+  /// Optional: tapping a cell within the last 30 days fires this with the
+  /// cell's ISO date. Used by event-stamped sections to open a per-day
+  /// browse sheet for recovery / correction. Empty cells are tappable too
+  /// — sometimes you've sent an entry to a quiet day and need to find it.
+  var onTapDay: ((String) -> Void)? = nil
 
   var body: some View {
     let end = Date()
@@ -401,7 +450,7 @@ struct ActivityHeatmapSection<Point>: View where Point: Hashable {
     let totalValue = byDate.values.reduce(0, +)
     let totalDays = totalDays(from: first, to: end)
 
-    Section {
+    DrawerSection {
       VStack(alignment: .leading, spacing: 10) {
         HStack(alignment: .top) {
           VStack(alignment: .leading, spacing: 2) {
@@ -413,17 +462,22 @@ struct ActivityHeatmapSection<Point>: View where Point: Hashable {
           }
           Spacer()
         }
-        ConsistencyHeatmap(endDate: end, firstDataDate: first, accent: accent) { iso in
-          let v = byDate[iso] ?? 0
-          let level = v > 0 ? levelFor(v) : 0
-          let label = v > 0 ? "\(iso) · \(labelFor(v))" : "\(iso) · —"
-          return HeatmapDay(level: level, label: label)
-        }
+        ConsistencyHeatmap(
+          endDate: end,
+          firstDataDate: first,
+          accent: accent,
+          getDay: { iso in
+            let v = byDate[iso] ?? 0
+            let level = v > 0 ? levelFor(v) : 0
+            let label = v > 0 ? "\(iso) · \(labelFor(v))" : "\(iso) · —"
+            return HeatmapDay(level: level, label: label)
+          },
+          onTap: onTapDay
+        )
         .a11yCombineKeepingChildren(
           "\(title) heatmap. \(subtitleFor(activeDays, totalDays, totalValue))"
         )
       }
-      .padding(.vertical, 4)
     }
   }
 

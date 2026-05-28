@@ -37,7 +37,7 @@ private struct TestOnboardingView: View {
       ScrollView {
         VStack(alignment: .leading, spacing: 16) {
           Text("Welcome to the Sandbox")
-            .font(.title2).bold()
+            .font(.septenaSectionTitle)
           Text("This is a throwaway section used to test how Septena turns sections on and off, runs first-time setup, and keeps data safe across toggles.")
             .foregroundStyle(.secondary)
           Text("Tapping **Get started** marks this section as onboarded — you won't see this screen again unless the underlying flag is reset.")

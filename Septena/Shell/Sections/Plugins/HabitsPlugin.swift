@@ -27,6 +27,10 @@ enum HabitsPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(HabitsDestinationView()) }
 
+  static var logActions: [LogAction] {
+    [LogAction(id: "new", title: "New habit", systemImage: "plus")]
+  }
+
   static var exportContribution: SectionExportContribution? {
     SectionExportContribution(
       tables: [
@@ -103,6 +107,53 @@ enum HabitsPlugin: SectionPlugin {
       """
     )
   }
+
+  // MARK: - Aim metrics
+
+  static var aimMetrics: [GoalMetric] {
+    [
+      GoalMetric(key: "habits.done_today",
+                 label: "Habits checked off (today)",
+                 sectionKey: "habits",
+                 window: "today",
+                 unitLabel: "habits"),
+      GoalMetric(key: "habits.days_active_week",
+                 label: "Days with ≥1 habit done (this week)",
+                 sectionKey: "habits",
+                 window: "calendarWeek",
+                 unitLabel: "days"),
+    ]
+  }
+
+  static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? {
+    guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window)
+    else { return 0 }
+    switch metric.key {
+    case "habits.done_today":
+      // Count HabitDayState rows for today where done=true. Each row is
+      // one (habit, day) check — counting them gives "how many habits
+      // did I tick today."
+      let descriptor = FetchDescriptor<HabitDayStateEntity>(
+        predicate: #Predicate {
+          $0.date >= startStr && $0.date <= endStr && $0.done == true
+        }
+      )
+      return Double((try? context.fetch(descriptor).count) ?? 0)
+    case "habits.days_active_week":
+      // Distinct dates where ≥1 habit was marked done — a "habit-active
+      // day." Better signal than total ticks for week-shape goals
+      // because it doesn't reward stacking ten habits on one day.
+      let descriptor = FetchDescriptor<HabitDayStateEntity>(
+        predicate: #Predicate {
+          $0.date >= startStr && $0.date <= endStr && $0.done == true
+        }
+      )
+      let rows = (try? context.fetch(descriptor)) ?? []
+      return Double(Set(rows.map { $0.date }).count)
+    default:
+      return nil
+    }
+  }
 }
 
 /// Starter habit suggestion — `name`, `emoji`, `bucket` mirror the fields
@@ -163,14 +214,12 @@ private struct HabitsOnboardingView: View {
     NavigationStack {
       Form {
         Section {
-          VStack(alignment: .leading, spacing: 8) {
-            Text("Habits track simple daily routines. Pick a few to get started — you can edit or delete them anytime.")
-              .foregroundStyle(.secondary)
-            Text("Skip this if you'd rather add your own from scratch.")
-              .font(.caption)
-              .foregroundStyle(.secondary)
-          }
-          .padding(.vertical, 4)
+          SectionOnboardingHero(
+            sectionKey: "habits",
+            title: "Habits",
+            intro: "Track simple daily routines. Pick a few to get started — edit or delete anytime, or skip and add your own."
+          )
+          .onboardingHeroSection()
         }
 
         ForEach(grouped, id: \.0) { bucket, starters in
@@ -182,7 +231,6 @@ private struct HabitsOnboardingView: View {
         }
       }
       .formStyle(.grouped)
-      .navigationTitle("Set up Habits")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif

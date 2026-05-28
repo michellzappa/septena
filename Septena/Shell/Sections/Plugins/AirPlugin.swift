@@ -17,14 +17,14 @@ enum AirPlugin: SectionPlugin {
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(SectionExplainerView(
       sectionKey: "air",
-      title: "Set up Air",
-      intro: "Air shows indoor CO₂, temperature, and humidity from an Aranet sensor, plus outdoor pollen and AQI.",
+      title: "Air",
+      intro: "Indoor CO₂, temperature, and humidity from an Aranet sensor — plus outdoor pollen and AQI.",
       bullets: [
-        ("Aranet (optional)", "Pair an Aranet4 once and Septena reads samples via Bluetooth whenever the app is open."),
-        ("Outdoor data", "Pollen and AQI come from your current-location lookup, no setup needed."),
-        ("Read-only", "Air observes; it never writes back to any sensor or service."),
+        .init("Aranet (optional)", "Pair an Aranet4 once; Septena reads samples via Bluetooth whenever the app is open.", icon: "sensor.tag.radiowaves.forward"),
+        .init("Outdoor data, no setup", "Pollen and AQI come from your current-location lookup automatically.", icon: "leaf"),
+        .init("Read-only", "Air observes; never writes back to any sensor or service.", icon: "lock"),
       ],
-      actionLabel: "Got it",
+      primaryActionLabel: "Open Air",
       complete: complete
     ))
   }

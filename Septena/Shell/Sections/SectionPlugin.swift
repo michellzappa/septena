@@ -1,5 +1,6 @@
 import SwiftUI
 import EventKit
+import SwiftData
 
 // Per-section "plugin" abstraction. Each section bundles its catalog
 // facts (manifest), its Today event production, and — over time —
@@ -71,6 +72,43 @@ protocol SectionPlugin {
   /// Return `nil` for sections that haven't migrated their skill yet
   /// (still in `SectionSkill.all`); `SectionSkill.byKey` falls through.
   static var mcpSkill: SectionSkill? { get }
+
+  /// Goal-measurement metrics this section exposes. A `GoalMetric` is a
+  /// queryable assertion over this section's logged data (e.g. "training
+  /// sessions this week", "caffeine drinks today") that a user can attach
+  /// to a Goal to turn it from a free-text intention into a measurable
+  /// target. Declared on the plugin so the section owns its catalog —
+  /// adding a section means adding its metrics in one place, not editing
+  /// a central registry. Default: `[]` (section has nothing measurable).
+  static var aimMetrics: [GoalMetric] { get }
+
+  /// Compute the current value of one of this section's `aimMetrics`.
+  /// Return `nil` for an unknown key — the dispatcher treats that as a
+  /// 0 reading rather than crashing. Implementations should switch on
+  /// the metric's key string.
+  static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double?
+
+  /// Quick-log entries surfaced by the SectionDrawer's "+" toolbar
+  /// button. Single action → tapping + fires it directly. Multiple →
+  /// + opens a menu. Empty → no + button rendered. The destination
+  /// view receives the tapped action's `id` via its drawer `onLog`
+  /// handler and decides what to present (sheet, navigation, etc.).
+  static var logActions: [LogAction] { get }
+}
+
+/// Description of one "+" toolbar action declared by a plugin. The
+/// view layer renders the affordance; the destination view performs
+/// the work keyed off `id`.
+struct LogAction: Identifiable, Hashable {
+  let id: String
+  let title: String
+  let systemImage: String?
+
+  init(id: String, title: String, systemImage: String? = nil) {
+    self.id = id
+    self.title = title
+    self.systemImage = systemImage
+  }
 }
 
 // MARK: - Shared detail-pane chrome
@@ -196,6 +234,18 @@ extension SectionPlugin {
   /// in the legacy `SectionSkill.all` list (sections not yet migrated)
   /// or no agent contract at all (sandbox / utility sections).
   static var mcpSkill: SectionSkill? { nil }
+
+  /// Default: no measurable aim metrics. Plugins opt in by declaring a
+  /// non-empty list and overriding `evaluateAim`.
+  static var aimMetrics: [GoalMetric] { [] }
+
+  /// Default: no evaluator. Pairs with the empty default `aimMetrics`.
+  static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? { nil }
+
+  /// Default: no quick-log actions. Sections opt in to surface a "+"
+  /// affordance in the drawer by overriding this with at least one
+  /// `LogAction` and wiring the destination view's `onLog` handler.
+  static var logActions: [LogAction] { [] }
 }
 
 /// Bag of pre-loaded data + helpers passed into `todayEvents`. Avoids

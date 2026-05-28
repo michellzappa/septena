@@ -13,6 +13,10 @@ enum NutritionPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(NutritionDestinationView()) }
 
+  static var logActions: [LogAction] {
+    [LogAction(id: "log", title: "Log meal", systemImage: "plus")]
+  }
+
   static func detailPaneContent() -> AnyView? { AnyView(NutritionDetailContent()) }
 
   static var exportContribution: SectionExportContribution? {
@@ -49,15 +53,15 @@ enum NutritionPlugin: SectionPlugin {
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(SectionExplainerView(
       sectionKey: "nutrition",
-      title: "Set up Nutrition",
-      intro: "Nutrition is a meal + macro log with auto-computed daily totals. Logging is fast — name the food, estimate macros, done.",
+      title: "Nutrition",
+      intro: "Meal + macro log with auto-computed daily totals. Name the food, estimate macros, done.",
       bullets: [
-        ("Foods", "Newline-separated list. \"chicken salad\", \"rice\", \"olive oil\" — one meal, three lines."),
-        ("Macros", "Protein, fat, carbs in grams. Calories auto-compute from 4P + 9F + 4C if you don't override."),
-        ("Meal type", "Breakfast / lunch / dinner / snack. Optional but useful for filtering daily summaries."),
-        ("Daily summary", "Totals roll up automatically — kcal, macros, micros. Nothing to write by hand."),
+        .init("Foods as a list", "One line per item: \"chicken salad\", \"rice\", \"olive oil\". A meal is just a few lines.", icon: "list.bullet"),
+        .init("Macros in grams", "Protein, fat, carbs. Calories auto-compute as 4P + 9F + 4C unless you override.", icon: "chart.bar"),
+        .init("Meal type optional", "Breakfast / lunch / dinner / snack — useful for filtering, not required.", icon: "fork.knife"),
+        .init("Daily totals roll up", "Kcal and macros sum automatically across every entry that day.", icon: "sum"),
       ],
-      actionLabel: "Got it",
+      primaryActionLabel: "Start logging",
       complete: complete
     ))
   }
@@ -151,6 +155,56 @@ enum NutritionPlugin: SectionPlugin {
       - Don't try to write a day summary — the app computes it automatically.
       """
     )
+  }
+
+  // MARK: - Aim metrics
+
+  static var aimMetrics: [GoalMetric] {
+    [
+      GoalMetric(key: "nutrition.protein_sum",
+                 label: "Protein (today)",
+                 sectionKey: "nutrition",
+                 window: "today",
+                 unitLabel: "g"),
+      GoalMetric(key: "nutrition.fiber_sum",
+                 label: "Fiber (today)",
+                 sectionKey: "nutrition",
+                 window: "today",
+                 unitLabel: "g"),
+      GoalMetric(key: "nutrition.kcal_sum",
+                 label: "Calories (today)",
+                 sectionKey: "nutrition",
+                 window: "today",
+                 unitLabel: "kcal"),
+      GoalMetric(key: "nutrition.water_sum",
+                 label: "Water (today)",
+                 sectionKey: "nutrition",
+                 window: "today",
+                 unitLabel: "ml"),
+    ]
+  }
+
+  static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? {
+    // Nutrition uses `loggedAt: Date` (not a string date column), so we
+    // filter with a Date range rather than the YYYY-MM-DD string helper.
+    guard let (start, end) = GoalMetricWindow.dateRange(for: metric.window)
+    else { return 0 }
+    let descriptor = FetchDescriptor<NutritionEntryEntity>(
+      predicate: #Predicate { $0.loggedAt >= start && $0.loggedAt < end }
+    )
+    let entries = (try? context.fetch(descriptor)) ?? []
+    switch metric.key {
+    case "nutrition.protein_sum":
+      return entries.reduce(0.0) { $0 + $1.proteinG }
+    case "nutrition.fiber_sum":
+      return entries.reduce(0.0) { $0 + ($1.fiberG ?? 0) }
+    case "nutrition.kcal_sum":
+      return entries.reduce(0.0) { $0 + ($1.kcal ?? 0) }
+    case "nutrition.water_sum":
+      return entries.reduce(0.0) { $0 + ($1.waterMl ?? 0) }
+    default:
+      return nil
+    }
   }
 }
 

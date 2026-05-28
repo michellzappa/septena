@@ -11,16 +11,20 @@ enum GoalsPlugin: SectionPlugin {
 
   static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] { [] }
 
+  static var logActions: [LogAction] {
+    [LogAction(id: "new", title: "New goal", systemImage: "plus")]
+  }
+
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(SectionExplainerView(
       sectionKey: "goals",
-      title: "Set up Goals",
-      intro: "Goals are short text intentions tagged with section keys. They surface inside the sections they relate to — your training goal shows up in Training, your nutrition goal in Nutrition.",
+      title: "Goals",
+      intro: "Short text intentions tagged with section keys. A training goal shows up inside Training, a nutrition goal inside Nutrition — wherever you're already looking.",
       bullets: [
-        ("Free-form text", "\"Swim twice a week\", \"Read 12 books this year.\" No deadlines, no progress bars — keep them readable."),
-        ("Tag by section", "Tag a goal with one or more section keys and it'll show up wherever the user is already looking."),
+        .init("Free-form text", "\"Swim twice a week\", \"Read 12 books this year.\" No deadlines, no progress bars — just readable intentions.", icon: "text.alignleft"),
+        .init("Tag by section", "One or more section keys per goal; they surface in the relevant destinations automatically.", icon: "tag"),
       ],
-      actionLabel: "Got it",
+      primaryActionLabel: "Add your first goal",
       complete: complete
     ))
   }

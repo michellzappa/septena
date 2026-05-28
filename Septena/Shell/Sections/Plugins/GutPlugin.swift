@@ -31,19 +31,25 @@ enum GutPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(GutDestinationView()) }
 
+  // MARK: - Quick-log actions
+
+  static var logActions: [LogAction] {
+    [LogAction(id: "movement", title: "Log movement", systemImage: "plus")]
+  }
+
   // MARK: - First-enable onboarding
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(SectionExplainerView(
       sectionKey: "gut",
-      title: "Set up Gut",
-      intro: "Gut is a private digestive event log. Useful when tracking down a food sensitivity, recovering from antibiotics, or just curious about patterns.",
+      title: "Gut",
+      intro: "A private digestive event log. Useful for tracking down a food sensitivity, recovering from antibiotics, or just spotting patterns.",
       bullets: [
-        ("Bristol Stool Scale", "1 = hard pellets, 7 = watery. Required for every entry."),
-        ("Volume + blood", "Small / medium / large; blood as a count. Both optional."),
-        ("Discomfort window", "Optional HH:MM start / end when cramping or pain matters."),
+        .init("Bristol Stool Scale", "1 = hard pellets, 7 = watery. Required for every entry.", icon: "ruler"),
+        .init("Volume + blood", "Small / medium / large; blood as a count. Both optional.", icon: "drop"),
+        .init("Discomfort window", "Optional HH:MM start / end when cramping or pain matters.", icon: "clock.badge.exclamationmark"),
       ],
-      actionLabel: "Got it",
+      primaryActionLabel: "Start logging",
       complete: complete
     ))
   }
@@ -110,6 +116,70 @@ enum GutPlugin: SectionPlugin {
       user describes cramping or pain.
       """
     )
+  }
+
+  // MARK: - Aim metrics
+
+  static var aimMetrics: [GoalMetric] {
+    [
+      GoalMetric(key: "gut.event_count",
+                 label: "Gut events (this week)",
+                 sectionKey: "gut",
+                 window: "calendarWeek",
+                 unitLabel: "events"),
+      GoalMetric(key: "gut.blood_count",
+                 label: "Gut events with blood (this week)",
+                 sectionKey: "gut",
+                 window: "calendarWeek",
+                 unitLabel: "events"),
+      GoalMetric(key: "gut.discomfort_count",
+                 label: "Gut events with discomfort (this week)",
+                 sectionKey: "gut",
+                 window: "calendarWeek",
+                 unitLabel: "events"),
+      GoalMetric(key: "gut.bristol_avg",
+                 label: "Average bristol score (this week)",
+                 sectionKey: "gut",
+                 window: "calendarWeek",
+                 unitLabel: "bristol"),
+    ]
+  }
+
+  static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? {
+    guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window)
+    else { return 0 }
+    switch metric.key {
+    case "gut.event_count":
+      let descriptor = FetchDescriptor<GutEventEntity>(
+        predicate: #Predicate { $0.date >= startStr && $0.date <= endStr }
+      )
+      return Double((try? context.fetch(descriptor).count) ?? 0)
+    case "gut.blood_count":
+      let descriptor = FetchDescriptor<GutEventEntity>(
+        predicate: #Predicate {
+          $0.date >= startStr && $0.date <= endStr && $0.blood > 0
+        }
+      )
+      return Double((try? context.fetch(descriptor).count) ?? 0)
+    case "gut.discomfort_count":
+      let descriptor = FetchDescriptor<GutEventEntity>(
+        predicate: #Predicate {
+          $0.date >= startStr && $0.date <= endStr && $0.discomfortLevel != nil
+        }
+      )
+      return Double((try? context.fetch(descriptor).count) ?? 0)
+    case "gut.bristol_avg":
+      // 0 when no events this week — reads as "no data" against any
+      // target rather than misleadingly perfect.
+      let descriptor = FetchDescriptor<GutEventEntity>(
+        predicate: #Predicate { $0.date >= startStr && $0.date <= endStr }
+      )
+      let entries = (try? context.fetch(descriptor)) ?? []
+      guard !entries.isEmpty else { return 0 }
+      return Double(entries.reduce(0) { $0 + $1.bristol }) / Double(entries.count)
+    default:
+      return nil
+    }
   }
 }
 

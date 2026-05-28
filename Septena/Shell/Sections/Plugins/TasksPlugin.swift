@@ -59,15 +59,15 @@ enum TasksPlugin: SectionPlugin {
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(SectionExplainerView(
       sectionKey: "tasks",
-      title: "Set up Tasks",
-      intro: "Tasks routes by intent, not by tags. A task's visibility depends on three fields — today, scheduled, and due — so it pays to understand the routing model up front.",
+      title: "Tasks",
+      intro: "Tasks route by intent, not by tags. Three fields decide visibility — today, scheduled, and due.",
       bullets: [
-        ("Inbox", "A task with no today/scheduled/due lands in Inbox only. That's the parking spot for anything not yet committed."),
-        ("Today", "Pinning to Today commits you to it for the day. Use it for what you'll actually do."),
-        ("Scheduled / due", "Scheduled puts it in Upcoming. Due adds a deadline without scheduling — both surface in Anytime."),
-        ("Areas & projects", "Tag for filtering. They're not routing fields — a project task with no view pin still sits in Inbox."),
+        .init("Inbox", "No today / scheduled / due → lands in Inbox. The parking spot for anything not yet committed.", icon: "tray"),
+        .init("Today", "Pin to Today to commit. Use it for what you'll actually do today.", icon: "sun.max"),
+        .init("Scheduled / due", "Scheduled puts it in Upcoming. Due adds a deadline without scheduling — both surface in Anytime.", icon: "calendar"),
+        .init("Areas & projects", "Tags for filtering only — not routing. A project task with no view pin still sits in Inbox.", icon: "folder"),
       ],
-      actionLabel: "Got it",
+      primaryActionLabel: "Add your first task",
       complete: complete
     ))
   }
@@ -183,8 +183,18 @@ private struct TasksDetailContent: View {
   @AppStorage(SettingsKey.badgeShowOverdue)   private var taskBadge: Bool = false
   @AppStorage(SettingsKey.todayShowCompleted) private var todayShowCompleted: Bool = true
   @AppStorage(SettingsKey.taskSort)           private var taskSortRaw: String = TaskSort.dateAdded.rawValue
+  @AppStorage(SettingsKey.tasksOpenIn)        private var tasksOpenInRaw: String = TasksOpenMode.drawer.rawValue
 
   var body: some View {
+    Section("Open in") {
+      Picker("Tasks open in", selection: $tasksOpenInRaw) {
+        ForEach(TasksOpenMode.allCases) { mode in
+          Text(mode.label).tag(mode.rawValue)
+        }
+      }
+      .pickerStyle(.inline)
+      .labelsHidden()
+    }
     Section("Badge") {
       Toggle("Show overdue indicator on app icon", isOn: $taskBadge)
     }

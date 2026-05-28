@@ -14,6 +14,10 @@ enum GroceriesPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(GroceriesDestinationView()) }
 
+  static var logActions: [LogAction] {
+    [LogAction(id: "new", title: "New item", systemImage: "plus")]
+  }
+
   static var exportContribution: SectionExportContribution? {
     SectionExportContribution(
       tables: [
@@ -145,11 +149,12 @@ private struct GroceriesOnboardingView: View {
     NavigationStack {
       Form {
         Section {
-          VStack(alignment: .leading, spacing: 8) {
-            Text("Groceries organizes items by category. Pick a few common categories — items themselves get added later as you go.")
-              .foregroundStyle(.secondary)
-          }
-          .padding(.vertical, 4)
+          SectionOnboardingHero(
+            sectionKey: "groceries",
+            title: "Groceries",
+            intro: "Organizes shopping items by category. Pick a few common categories to start — items themselves get added later as you go."
+          )
+          .onboardingHeroSection()
         }
         Section("Categories") {
           ForEach(GroceryCategoryStarter.all) { starter in
@@ -158,7 +163,6 @@ private struct GroceriesOnboardingView: View {
         }
       }
       .formStyle(.grouped)
-      .navigationTitle("Set up Groceries")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif
