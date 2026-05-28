@@ -256,7 +256,7 @@ struct DayTimelineView: View {
   private func dot(_ c: Cluster, width: CGFloat) -> some View {
     // Circle (not capsule) — width == height so multi-event clusters grow
     // in both dimensions instead of stretching horizontally into a pill.
-    let size = min(CGFloat(14), CGFloat(8 + (c.count - 1) * 2))
+    let size = min(CGFloat(8), CGFloat(5 + Double(c.count - 1) * 1))
     return Circle()
       .fill(c.color)
       .overlay(Circle().stroke(Theme.paperBackground, lineWidth: 1))

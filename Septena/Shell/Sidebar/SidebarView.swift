@@ -1107,6 +1107,11 @@ struct ColoredGlyph: View {
   let icon: String
   let color: Color
   let size: CGFloat
+  /// Inner SF Symbol size as a fraction of `size`. Default `0.58` matches
+  /// the original tight-glyph look used in compact sidebar rows. Settings
+  /// rows pass a smaller ratio so the tile reads iOS-Settings-sized while
+  /// the glyph stays at its natural ~16pt mark.
+  var glyphRatio: CGFloat = 0.58
   @Environment(\.colorScheme) private var colorScheme
 
   /// Slight desaturation in dark mode keeps the small filled square from
@@ -1120,7 +1125,7 @@ struct ColoredGlyph: View {
       RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
         .fill(adaptedFill)
       Image(systemName: icon)
-        .font(.system(size: size * 0.58, weight: .semibold))
+        .font(.system(size: size * glyphRatio, weight: .semibold))
         .foregroundStyle(.white)
     }
     .frame(width: size, height: size)

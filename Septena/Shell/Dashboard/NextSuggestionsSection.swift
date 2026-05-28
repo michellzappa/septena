@@ -33,6 +33,10 @@ struct NextSuggestion: Identifiable, Hashable {
   let kind: Kind
   let title: String
   let emoji: String?
+  /// SF Symbol name. When set, the row renders this instead of `emoji` —
+  /// training rows pass `SessionKind.icon` here so yoga shows
+  /// `figure.yoga` rather than the legacy `SessionTypeConfig.emoji`.
+  let symbol: String?
   let detail: String
   let score: Double
   /// Minutes since midnight of when this action is "due". Used for the
@@ -110,16 +114,17 @@ enum NextScoring {
 
 // MARK: - Session-type lookup
 
-/// Map a `SuggestedWorkout.type` (e.g. "upper") to display label + emoji.
-/// First consults the cached `[SessionTypeConfig]` (same cache the Settings /
-/// Training screens use); falls back to a humanized type string + 🏋️ when the
-/// cache is cold so the row still renders on first launch.
-private func trainingDisplay(for type: String) -> (label: String, emoji: String) {
+/// Map a `SuggestedWorkout.type` (e.g. "upper", "yoga") to display label +
+/// SF Symbol. Symbol comes from `SessionKind.icon` so mobility routines
+/// render as `figure.yoga`, cardio as `figure.run`, etc. Falls back to the
+/// id-based default when the routine cache is cold.
+private func trainingDisplay(for type: String) -> (label: String, symbol: String) {
   if let types = ResponseCache.load([SessionTypeConfig].self, forKey: "settings.sessionTypes"),
      let hit = types.first(where: { $0.id == type }) {
-    return (hit.label, hit.emoji ?? "🏋️")
+    return (hit.label, hit.kind.icon)
   }
-  return (type.prefix(1).uppercased() + type.dropFirst(), "🏋️")
+  let label = type.prefix(1).uppercased() + type.dropFirst()
+  return (label, SessionKind.defaulted(for: type).icon)
 }
 
 // MARK: - Model
@@ -260,6 +265,7 @@ final class NextSuggestionsModel {
         kind: .caffeine,
         title: "Log caffeine",
         emoji: "☕️",
+        symbol: nil,
         detail: "Usually \(NextScoring.relativeMinutes(target: usual, now: nowMinutes))",
         score: 34 + NextScoring.timingScore(usual: usual, nowMinutes: nowMinutes, isToday: isToday),
         proposedMinutes: usual
@@ -281,6 +287,7 @@ final class NextSuggestionsModel {
         kind: .cannabis,
         title: "Log cannabis",
         emoji: "🌿",
+        symbol: nil,
         detail: "Usually \(NextScoring.relativeMinutes(target: usual, now: nowMinutes))",
         score: 32 + NextScoring.timingScore(usual: usual, nowMinutes: nowMinutes, isToday: isToday),
         proposedMinutes: usual
@@ -322,7 +329,8 @@ final class NextSuggestionsModel {
           id: "training:suggested",
           kind: .training,
           title: display.label,
-          emoji: display.emoji,
+          emoji: nil,
+          symbol: display.symbol,
           detail: "Last \(lastLabel)",
           score: 78
             + NextScoring.trainingUrgency(daysAgo: suggestedGap)
@@ -354,6 +362,7 @@ final class NextSuggestionsModel {
         kind: .fastBreak,
         title: "Log meal",
         emoji: "🍽️",
+        symbol: nil,
         detail: detail,
         score: 38 + timing,
         proposedMinutes: breakMinutes
@@ -442,7 +451,13 @@ private struct NextSuggestionRow: View {
         // glyph reads as the row's verb at a glance.
         ZStack {
           Circle().fill(tint.opacity(0.18))
-          Text(suggestion.emoji ?? "•").font(.body)
+          if let symbol = suggestion.symbol {
+            Image(systemName: symbol)
+              .font(.system(size: 13, weight: .semibold))
+              .foregroundStyle(tint)
+          } else {
+            Text(suggestion.emoji ?? "•").font(.body)
+          }
         }
         .frame(width: 26, height: 26)
 

@@ -8,7 +8,7 @@ struct TaskDetailView: View {
 
   var body: some View {
     Form {
-      Section { Text(task.title).font(.title3) }
+      Section { Text(task.title).font(.septenaSectionTitle) }
       if let notes = task.notes, !notes.isEmpty {
         Section("Notes") { Text(notes) }
       }

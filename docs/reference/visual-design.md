@@ -34,18 +34,26 @@ Keep Area icons uniformly gray unless the user assigns a color. Project dots inh
 
 ## Typography
 
-Use **SF Pro** (system font). Things uses a slightly rounded weight in places, but we can use the standard system font.
+Three families, used intentionally per role. This is what separates Septena from a stock iOS app while keeping the OS feel where it matters.
 
-| Role | Size | Weight | Color |
-|---|---|---|---|
-| Screen title (e.g. "Today", "Inbox") | 28pt | Bold | primary |
-| Section header (Area name) | 17pt | Semibold | primary |
-| Task title | 16pt | Regular | primary |
-| Task metadata (dates, counts) | 13pt | Regular | secondary |
-| Sidebar row | 17pt | Regular | primary |
-| Sidebar count badge | 13pt | Semibold | varies |
-| Quick Find placeholder | 15pt | Regular | tertiary |
-| Button ("Done", "Hide later items") | 15pt | Regular | blue/secondary |
+- **SF Pro** (system) — all UI body, controls, labels, buttons, sidebar rows. Kept as the system font so nav bars and Dynamic Type stay native. Things-style rounded weight is not used.
+- **Fraunces** — editorial headings only (screen titles, section titles, card titles). Stylistic set `ss01` enabled, matching the webapp.
+- **Mono** (JetBrains Mono or equivalent) — numerics, units, timestamps, counts, tags. Use `.monospacedDigit()` where columns must align.
+
+Mirrors the webapp's three-font system (see septena-app `DESIGN.md`), with the deliberate substitution of SF Pro for Inter on iOS.
+
+| Role | Family | Size | Weight | Color |
+|---|---|---|---|---|
+| Screen title (e.g. "Today", "Inbox") | Fraunces | 28pt | Bold | primary |
+| Section header (Area name) | Fraunces | 17pt | Semibold | primary |
+| Card title | Fraunces | 17pt | Semibold | primary |
+| Task title | SF Pro | 16pt | Regular | primary |
+| Task metadata (dates, counts) | Mono | 13pt | Regular | secondary |
+| Sidebar row | SF Pro | 17pt | Regular | primary |
+| Sidebar count badge | Mono | 13pt | Semibold | varies |
+| Numeric metric / duration / timestamp | Mono (tabular) | varies | Regular | primary |
+| Quick Find placeholder | SF Pro | 15pt | Regular | tertiary |
+| Button ("Done", "Hide later items") | SF Pro | 15pt | Regular | blue/secondary |
 
 Notes:
 - Screen titles have a colored icon next to them at the same size (e.g. yellow star + "Today").

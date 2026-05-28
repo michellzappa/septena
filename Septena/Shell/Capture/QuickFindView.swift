@@ -241,7 +241,7 @@ struct QuickFindView: View {
           .padding(.bottom, 6)
         if let d = trainingDraft.draft {
           launcherRow(
-            emoji: d.emoji ?? "▶",
+            symbol: SessionKind.defaulted(for: d.sessionType).icon,
             title: "Resume \(d.label)",
             subtitle: "\(d.doneCount)/\(max(d.totalCount,1)) done",
             badge: nil,
@@ -263,7 +263,7 @@ struct QuickFindView: View {
           ForEach(types) { type in
             let days = trainingDraft.daysAgo[type.id]
             launcherRow(
-              emoji: type.emoji ?? "💪",
+              symbol: type.kind.icon,
               title: type.label,
               subtitle: days.map {
                 $0 == 0 ? "Today" :
@@ -281,7 +281,7 @@ struct QuickFindView: View {
     }
   }
 
-  private func launcherRow(emoji: String,
+  private func launcherRow(symbol: String,
                            title: String,
                            subtitle: String,
                            badge: String?,
@@ -289,7 +289,10 @@ struct QuickFindView: View {
                            action: @escaping () -> Void) -> some View {
     Button(action: action) {
       HStack(spacing: 12) {
-        Text(emoji).font(.title3).frame(width: 22)
+        Image(systemName: symbol)
+          .font(.system(size: 15, weight: .semibold))
+          .foregroundStyle(tint)
+          .frame(width: 22)
         VStack(alignment: .leading, spacing: 1) {
           Text(title)
             .font(.septenaTaskTitle)

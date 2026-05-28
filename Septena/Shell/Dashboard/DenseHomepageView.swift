@@ -226,10 +226,17 @@ private struct DomainSparkline: View {
         // match `.bars` (visual parity across domains). Secondary
         // stays line-only so the two series remain distinguishable
         // — filling both would muddy the overlap.
-        let pAligned = aligned(primary)
-        let sAligned = aligned(secondary)
-        let p = smooth ? rollingMean(pAligned) : pAligned
-        let s = smooth ? rollingMean(sAligned) : sAligned
+        // Smooth on the full upstream series *before* trimming to the
+        // display window, so the leftmost point already carries up to
+        // `window-1` days of prior history in its rolling mean. Doing
+        // it the other way around (align → smooth) made the first
+        // point average only itself — a rest day on the boundary
+        // would anchor the line at 0 instead of the real trailing
+        // average. Safe here because training's loader always
+        // provides ≥30 days; for shorter inputs `aligned` still pads
+        // with leading zeros after.
+        let p = aligned(smooth ? rollingMean(primary) : primary)
+        let s = aligned(smooth ? rollingMean(secondary) : secondary)
         ForEach(Array(p.enumerated()), id: \.offset) { idx, value in
           AreaMark(
             x: .value("Day", idx),

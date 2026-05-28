@@ -81,6 +81,42 @@ struct RootTabView: View {
       .onChange(of: nav.showAddInfo) { _, open in
         if !open { nav.addInfoRequestedSection = nil }
       }
+      // Home Screen Quick Action routing. Mounted at the tab-root so it
+      // fires regardless of which tab the user was last on (ContentView,
+      // the previous host, only ran while the Tasks tab was visible).
+      // Switching to Week here mounts WeekDashboardView, which observes
+      // `pendingSectionDest` and presents the section's sheet.
+      .onChange(of: nav.pendingShortcut) { _, action in
+        guard let action else { return }
+        switch action {
+        case .openSection(let key):
+          // Present the section sheet directly at the tab root. We
+          // deliberately do NOT switch tabs — the sheet covers whatever
+          // the user was last on, and dismissing returns them there.
+          nav.pendingSection = PendingSection(key: key)
+        }
+        nav.pendingShortcut = nil
+      }
+      // The section sheet for Home Screen Quick Actions. Hosted here so
+      // it works regardless of which tab is selected. Renders the
+      // plugin's destinationView() inside a NavigationStack so titles +
+      // toolbars present cleanly.
+      .sheet(item: $nav.pendingSection) { pending in
+        NavigationStack {
+          if let view = SectionRegistry.plugin(forKey: pending.key)?.destinationView() {
+            view
+          } else {
+            Text("Section unavailable.")
+              .padding()
+          }
+        }
+        #if os(iOS)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        #else
+        .frame(width: 560, height: 600)
+        #endif
+      }
       // Training session sheet — mounted at the tab root so ⌘K's "Start
       // training" rows present cleanly from any tab, and so the Start
       // button inside the Week tab's Training destination can stack a
@@ -94,19 +130,9 @@ struct RootTabView: View {
           .frame(minWidth: 560, minHeight: 600)
           #endif
       }
-      // Insights — mounted at the tab root so it covers the full screen
-      // (no detents, no peek-through to the dashboard underneath). On
-      // macOS this falls back to a large sheet sized to fill the window.
-      #if os(iOS)
-      .fullScreenCover(isPresented: $nav.showInsights) {
-        InsightsDestinationView()
-      }
-      #else
-      .sheet(isPresented: $nav.showInsights) {
-        InsightsDestinationView()
-          .frame(minWidth: 720, minHeight: 560)
-      }
-      #endif
+      // (Insights destination removed — the Correlations homepage
+      // layout now hosts the trusted + exploratory grids inline, with
+      // per-pair DetailSheet drill-in on tap.)
   }
 
   // Standard iOS 26 TabView with the system tab-bar minimize behavior

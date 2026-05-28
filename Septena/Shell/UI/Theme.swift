@@ -155,11 +155,12 @@ enum Theme {
 
   // MARK: - Shape & spacing
   //
-  // Reminders has near-zero corner radius on list rows and ~10pt on
-  // sheets / inline cards. Keeping the old token names; only the major
-  // radius drops from 18 → 10.
+  // Section drawer cards (and the goal strip's row) use a larger
+  // continuous corner radius — the iOS 26 "soft tile" feel rather than
+  // the tighter 10pt Reminders look. Small radius stays modest for
+  // chips and pills.
 
-  static let cornerRadius: CGFloat = 10
+  static let cornerRadius: CGFloat = 22
   static let cornerRadiusSmall: CGFloat = 6
 
   /// Tap-target width of the row checkbox. Reused by group-header icon
@@ -220,34 +221,83 @@ enum Theme {
   static let groupHeaderFontSize: CGFloat = 17
   #endif
 
-  /// Vertical padding inside a task row. Single source of truth so row
-  /// density stays coherent across platforms — Reminders-tight everywhere
-  /// rather than expanding on iOS to hit the 44pt tap target (the checkbox
-  /// has its own tap region; we don't need the row to do double duty).
-  static let rowVPadding: CGFloat = 3
+  /// Vertical padding inside a task / log row. Single source of truth so
+  /// row density stays coherent across platforms. iOS 26 drawer cards
+  /// want noticeably more air than the old Reminders-tight rows —
+  /// bumped from 3pt so LogRow / TaskRow / ChoreRow all settle into a
+  /// taller, easier-to-tap rhythm inside DrawerSection.
+  static let rowVPadding: CGFloat = 8
+
+  /// Spacing scale shared across drawer chrome (SectionDrawer,
+  /// DrawerSection, ChartCard, StatTile, StatStrip). Replaces the
+  /// magic-number sprinkle of 4 / 8 / 12 / 14 / 16 / 28 with named
+  /// tokens. Tune one place; the whole drawer system shifts in step.
+  enum Spacing {
+    /// 4pt — between adjacent rows inside a DrawerSection.
+    static let xs: CGFloat = 4
+    /// 8pt — between a section's header text and its card.
+    static let sm: CGFloat = 8
+    /// 12pt — vertical padding inside a DrawerSection card (.standard).
+    static let md: CGFloat = 12
+    /// 14pt — horizontal padding inside a DrawerSection card (.standard).
+    static let lg: CGFloat = 14
+    /// 16pt — horizontal indent of a section header text from screen edge.
+    static let xl: CGFloat = 16
+    /// 28pt — between adjacent DrawerSections in the drawer's LazyVStack.
+    static let xxl: CGFloat = 28
+  }
 }
 
 // MARK: - Typography
 //
-// Every font now resolves to a system text style so Dynamic Type and
-// accessibility sizes Just Work. The "screenTitle" is the one place we
-// keep a fixed look — Reminders' large list header — using SF Pro Rounded
-// Bold at largeTitle. The list-color tint is applied by the call site, not
-// here.
+// Three-family system (see docs/DesignSpec.md §5):
+//   - SF Pro (system)  → UI body, controls, labels, buttons, most titles
+//   - Fraunces (serif) → screen-level H1 only (septenaScreenTitle); rare by design
+//   - System mono      → numerics / metrics (tabular)
+//
+// Fraunces is registered via Info.plist `UIAppFonts` (iOS) and
+// `ATSApplicationFontsPath` (Mac). If the file isn't bundled, Font.custom
+// silently falls back to system — so the app stays buildable either way.
+//
+// Use `Font.custom(_, size:, relativeTo:)` so Dynamic Type still scales.
 
 extension Font {
-  /// Large list title — SF Pro Rounded Bold, tinted in list color by caller.
-  static let septenaScreenTitle  = Font.system(.largeTitle, weight: .bold)
-  /// Section header inside a list ("Today", "Scheduled") — uppercase footnote
-  /// in callers; this is the bare style.
-  static let septenaSectionTitle = Font.system(.title2, weight: .bold)
+  // Fraunces PostScript names registered by the bundled variable font.
+  // We address weights by name rather than via `.weight(...)` on a single
+  // base, because SwiftUI's weight modifier can't navigate this font's
+  // multi-axis design (opsz/SOFT/wght/WONK) and silently fails.
+  private static let frauncesRegular  = "Fraunces-9ptRegular"
+  private static let frauncesSemiBold = "Fraunces-9ptSemiBold"
+  private static let frauncesBold     = "Fraunces-9ptBold"
+
+  // MARK: Titles
+  // Fraunces is reserved for the screen-level H1 only — destination headers,
+  // homepage welcome, Tasks H1. Everything else (section, card, tile titles)
+  // uses SF Pro so the editorial face stays rare and meaningful.
+  /// Destination header — Fraunces SemiBold at largeTitle. The one Fraunces user.
+  static let septenaScreenTitle  = Font.custom(frauncesSemiBold, size: 34, relativeTo: .largeTitle)
+  /// Section header within a screen — SF Pro semibold at title2.
+  static let septenaSectionTitle = Font.system(.title2, weight: .semibold)
+  /// Card header — SF Pro at headline (already semibold by default).
   static let septenaCardTitle    = Font.system(.headline)
+  /// Dashboard tile header — slightly larger on iOS so it reads at a glance
+  /// in the Histogram layout; macOS keeps the denser headline size.
+  #if os(iOS)
+  static let septenaTileTitle    = Font.system(.title3, weight: .semibold)
+  #else
+  static let septenaTileTitle    = Font.system(.headline)
+  #endif
+
+  // MARK: UI body (SF Pro)
   static let septenaSidebarRow   = Font.system(.body)
   static let septenaTaskTitle    = Font.system(.body)
   static let septenaNotes        = Font.system(.subheadline)
   static let septenaButton       = Font.system(.subheadline, weight: .semibold)
   static let septenaLabel        = Font.system(.footnote, weight: .medium)
-  static let septenaMeta         = Font.system(.footnote)
-  static let septenaMetaStrong   = Font.system(.footnote, weight: .semibold)
   static let septenaBadge        = Font.system(.caption2, weight: .semibold)
+
+  // MARK: Metrics (mono, tabular)
+  static let septenaMeta         = Font.system(.footnote).monospacedDigit()
+  static let septenaMetaStrong   = Font.system(.footnote, weight: .semibold).monospacedDigit()
+  static let septenaMetric       = Font.system(.body, design: .monospaced).monospacedDigit()
 }

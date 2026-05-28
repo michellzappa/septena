@@ -30,14 +30,21 @@ enum HomepageLayoutMode: String, CaseIterable, Identifiable, Hashable {
   /// for "am I being consistent."
   case heatmap
 
+  /// Derived order: trusted cross-section correlations sorted by |r|.
+  /// Doesn't list every domain — only pairs that cleared the trusted
+  /// gate in CorrelationEngine. Tap a row to open the full Insights
+  /// detail sheet.
+  case correlations
+
   var id: String { rawValue }
 
   /// Title shown in Settings → General → Homepage layout.
   var title: String {
     switch self {
-    case .tiles:   return "Tiles"
-    case .dense:   return "Sparkline"
-    case .heatmap: return "Heatmap"
+    case .tiles:        return "Histogram"
+    case .dense:        return "Sparkline"
+    case .heatmap:      return "Heatmap"
+    case .correlations: return "Correlations"
     }
   }
 
@@ -45,18 +52,20 @@ enum HomepageLayoutMode: String, CaseIterable, Identifiable, Hashable {
   /// each mode optimizes for.
   var summary: String {
     switch self {
-    case .tiles:   return "Card grid. Quick-launch + ambient glance."
-    case .dense:   return "Rows with today's value + sparkline. Maximum signal per scroll."
-    case .heatmap: return "Rows with 90-day heatmap grid. Optimized for consistency."
+    case .tiles:        return "Card grid with 7-day histogram per tile. Quick-launch + ambient glance."
+    case .dense:        return "Rows with today's value + sparkline. Maximum signal per scroll."
+    case .heatmap:      return "Rows with 90-day heatmap grid. Optimized for consistency."
+    case .correlations: return "Trusted predictor → target pairs, sorted by strength."
     }
   }
 
   /// SF Symbol shown in the picker as a visual cue per mode.
   var icon: String {
     switch self {
-    case .tiles:   return "square.grid.2x2"
-    case .dense:   return "chart.xyaxis.line"
-    case .heatmap: return "square.grid.3x3.fill"
+    case .tiles:        return "square.grid.2x2"
+    case .dense:        return "waveform.path"
+    case .heatmap:      return "square.grid.3x3.fill"
+    case .correlations: return "chart.dots.scatter"
     }
   }
 
@@ -66,7 +75,7 @@ enum HomepageLayoutMode: String, CaseIterable, Identifiable, Hashable {
   /// button in `WeekDashboardView` without further wiring.
   var isImplemented: Bool {
     switch self {
-    case .tiles, .dense, .heatmap: return true
+    case .tiles, .dense, .heatmap, .correlations: return true
     }
   }
 }

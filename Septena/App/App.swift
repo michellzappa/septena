@@ -10,6 +10,23 @@ import AppKit
 
 @main
 struct SeptenaApp: App {
+  init() {
+    Self.registerFraunces()
+  }
+
+  /// Register the bundled Fraunces variable font with Core Text at process
+  /// scope. On iOS this is also wired via `UIAppFonts` in Info.plist; on
+  /// macOS `ATSApplicationFontsPath` doesn't reliably take effect, so this
+  /// runtime registration is the path that works on both platforms.
+  private static func registerFraunces() {
+    guard let url = Bundle.main.url(forResource: "Fraunces-Regular", withExtension: "ttf") else { return }
+    var errorRef: Unmanaged<CFError>?
+    _ = CTFontManagerRegisterFontsForURL(url as CFURL, .process, &errorRef)
+    // Ignore errors: code 105 (already registered via UIAppFonts) is the
+    // expected case on iOS, and other failures fall back silently to SF.
+    errorRef?.release()
+  }
+
   @State private var navigation = NavigationState()
   @State private var theme = SectionTheme()
   @State private var trainingDraft = TrainingDraftStore()
@@ -85,6 +102,10 @@ struct SeptenaApp: App {
             navigation.pendingShortcut = pending
           }
           AppDelegate.navigation = navigation
+          // Apply the user's Quick Actions selection to UIApplication's
+          // dynamic shortcut list so the Home Screen long-press menu
+          // matches what they picked in Settings.
+          QuickActionsApplier.apply()
           #endif
           // Diagnostic snapshot of the local store at launch. Surfaces
           // migration corruption / partial-state situations in the

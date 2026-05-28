@@ -1,5 +1,13 @@
 import SwiftUI
 
+/// Identifiable wrapper so a section key can drive `.sheet(item:)` at
+/// the tab-root. The key is the only payload; resolution to a view
+/// happens in the sheet builder.
+struct PendingSection: Identifiable, Hashable {
+  let key: String
+  var id: String { key }
+}
+
 enum Route: Hashable {
   case filter(TaskFilter)
   case next
@@ -23,6 +31,13 @@ final class NavigationState {
   /// flip, then resets this to nil. nil means "no pending shortcut".
   var pendingShortcut: ShortcutAction?
 
+  /// One-shot driver for the section sheet presented at RootTabView when
+  /// a Home Screen Quick Action resolves. Hosted at the tab-root (not
+  /// inside WeekDashboardView) so the sheet presents reliably regardless
+  /// of which tab the user was last on — switching tabs first and then
+  /// setting a sheet item raced with SwiftUI's tab swap.
+  var pendingSection: PendingSection?
+
   /// macOS sidebar visibility — toggled by Command-/. `.all` shows both columns,
   /// `.detailOnly` collapses the sidebar so detail content runs edge-to-edge.
   var sidebarVisibility: NavigationSplitViewVisibility = .all
@@ -31,12 +46,7 @@ final class NavigationState {
   /// and the macOS toolbar gear; the sheet closes via its own Done button.
   var showSettings = false
 
-  /// Drives the Insights full-screen page. Flipped from the dashboard "…"
-  /// menu. Mounted at the RootTabView level so it covers the whole tab
-  /// shell (not a section drawer like the other module destinations).
-  var showInsights = false
-
-  /// Drives the Quick Find palette (Command-Shift-F). A floating sheet over the
+/// Drives the Quick Find palette (Command-Shift-F). A floating sheet over the
   /// main window; selecting a result routes via `path` and dismisses itself.
   var showQuickFind = false
 

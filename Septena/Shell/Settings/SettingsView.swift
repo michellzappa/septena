@@ -11,7 +11,7 @@ import UIKit
 // One sheet, one store, one entry point (sidebar row + ⌘,).
 //
 // Layout (Apple-style: app-wide rows on top, per-section rows below):
-//   • General         — app-wide settings (currently empty, for future use)
+//   • Customize       — app-wide preferences (homepage layout, icon, quick actions)
 //   • Integrations    — Reminders / Calendar / HealthKit permissions
 //   • Sync            — server URL + manual sync
 //   • Privacy         — analytics consent
@@ -47,6 +47,23 @@ enum SettingsKey {
   /// Whether the day-timeline strip renders above the homepage layout.
   /// Default on; users who want a denser dashboard can hide it.
   static let homepageShowTodayTimeline = "septena.homepage.showTodayTimeline"
+  /// Whether the time-of-day welcome (greeting + subtitle) renders at the
+  /// very top of the homepage. Default on; mirrors the webapp's overview
+  /// dashboard header.
+  static let homepageShowWelcome = "septena.homepage.showWelcome"
+  /// Time window (in days) the Correlations homepage mode computes over.
+  /// Same key as the old Insights destination so prior preference carries
+  /// forward.
+  static let correlationsWindowDays = "insights.windowDays"
+  /// Section filter for the Correlations homepage mode. "all" or a
+  /// section key (e.g. "sleep").
+  static let correlationsSectionFilter = "septena.correlations.sectionFilter"
+  /// Whether to show the supplements → sleep score table above the
+  /// trusted-signals grid. Default on.
+  static let correlationsShowSupplements = "septena.correlations.showSupplements"
+  /// Whether to show the "Not enough data yet" collapsed section
+  /// below the exploratory grid. Default off.
+  static let correlationsShowInsufficient = "septena.correlations.showInsufficient"
   /// Master toggle for fasting tracking. When on, the nutrition tile
   /// morphs into a live fasting timer once the state machine detects a
   /// fasting window, and the nutrition heatmap may show fasting hours
@@ -57,6 +74,29 @@ enum SettingsKey {
   /// state-based — the heatmap is historical, so the choice doesn't
   /// flip with current fasting state.
   static let nutritionHeatmapMetric = "septena.nutrition.heatmapMetric"
+  /// User-selected Home Screen Quick Actions, stored as comma-separated
+  /// section keys (max 4). Applied to `UIApplication.shared.shortcutItems`
+  /// at launch and whenever the selection changes.
+  static let quickActionKeys = "septena.quickActions.keys"
+  /// Where the Tasks tile opens to from the homepage. Other section tiles
+  /// open as a bottom-sheet drawer; Tasks historically jumped straight to
+  /// the Tasks tab. Default `drawer` so Tasks matches the other sections;
+  /// users who prefer landing on the full Tasks tab can flip it.
+  static let tasksOpenIn      = "septena.tasks.openIn"
+}
+
+/// Where a homepage tap on the Tasks tile lands. `drawer` shows today's
+/// tasks as a bottom-sheet (matches every other section); `tab` switches
+/// the tab bar to the full Tasks surface.
+enum TasksOpenMode: String, CaseIterable, Identifiable {
+  case drawer, tab
+  var id: String { rawValue }
+  var label: String {
+    switch self {
+    case .drawer: return "Drawer"
+    case .tab:    return "Tasks tab"
+    }
+  }
 }
 
 enum NutritionHeatmapMetric: String, CaseIterable, Identifiable {
@@ -322,6 +362,10 @@ struct SettingsView: View {
   enum SettingsDestination: Hashable {
     case general, integrations, importExport, skills, privacy, about
     case manageSections
+    case quickActions
+    case appIcon
+    case layout
+    case correlations
     case section(String)
   }
 
@@ -434,7 +478,7 @@ struct SettingsView: View {
     Label {
       Text(title(for: dest))
     } icon: {
-      ColoredGlyph(icon: icon(for: dest), color: tint(for: dest), size: 22)
+      ColoredGlyph(icon: icon(for: dest), color: tint(for: dest), size: 29, glyphRatio: 0.38)
     }
   }
 
@@ -447,20 +491,23 @@ struct SettingsView: View {
       Text(entry.label)
         .foregroundStyle(entry.isEnabled ? .primary : .secondary)
     } icon: {
-      ColoredGlyph(icon: sectionIcon(for: entry.key), color: entry.accent, size: 22)
+      ColoredGlyph(icon: sectionIcon(for: entry.key), color: entry.accent, size: 29, glyphRatio: 0.38)
         .opacity(entry.isEnabled ? 1 : 0.4)
     }
   }
 
   private func sectionIcon(for key: String) -> String {
     if let m = SectionManifest.byKey[key] { return m.iconSymbol }
-    if key == "calendar" { return "calendar" }
     return "circle.fill"
   }
 
   private func title(for dest: SettingsDestination) -> String {
     switch dest {
-    case .general:      return "General"
+    case .general:      return "Customize"
+    case .quickActions: return "Quick Actions"
+    case .appIcon:      return "App Icon"
+    case .layout:       return "Layout"
+    case .correlations: return "Correlations"
     case .integrations: return "Integrations"
     case .importExport: return "Import & Export"
     case .skills:       return "Skills"
@@ -478,7 +525,11 @@ struct SettingsView: View {
   // section rows render their own color-dot label via `sectionRow`.
   private func icon(for dest: SettingsDestination) -> String {
     switch dest {
-    case .general:      return "gearshape"
+    case .general:      return "slider.horizontal.3"
+    case .quickActions: return "bolt"
+    case .appIcon:      return "app.badge"
+    case .layout:       return "square.grid.2x2"
+    case .correlations: return "chart.dots.scatter"
     case .integrations: return "app.connected.to.app.below.fill"
     case .importExport: return "square.and.arrow.up.on.square"
     case .skills:       return "sparkles"
@@ -492,6 +543,10 @@ struct SettingsView: View {
   private func tint(for dest: SettingsDestination) -> Color {
     switch dest {
     case .general:      return .gray
+    case .quickActions: return .yellow
+    case .appIcon:      return .blue
+    case .layout:       return .indigo
+    case .correlations: return .green
     case .integrations: return .indigo
     case .importExport: return .orange
     case .skills:       return .pink
@@ -506,6 +561,10 @@ struct SettingsView: View {
   private func pane(for dest: SettingsDestination) -> some View {
     switch dest {
     case .general:           GeneralSettingsPane()
+    case .quickActions:      QuickActionsSettingsPane()
+    case .appIcon:           AppIconSettingsPane()
+    case .layout:            LayoutSettingsPane()
+    case .correlations:      CorrelationsSettingsPane()
     case .integrations:      IntegrationsSettingsPane()
     case .importExport:      ImportExportSettingsPane()
     case .skills:            SkillsSettingsPane()
@@ -594,25 +653,199 @@ struct PrivacySettingsPane: View {
 // MARK: - General
 
 struct GeneralSettingsPane: View {
+  @AppStorage(SettingsKey.homepageShowTodayTimeline)
+  private var showTodayTimeline: Bool = true
+  @AppStorage(SettingsKey.homepageShowWelcome)
+  private var showWelcome: Bool = true
+
+  var body: some View {
+    Form {
+      Section {
+        NavigationLink(value: SettingsView.SettingsDestination.layout) {
+          Label("Layout", systemImage: "square.grid.2x2")
+        }
+        NavigationLink(value: SettingsView.SettingsDestination.correlations) {
+          Label("Correlations", systemImage: "chart.dots.scatter")
+        }
+      } footer: {
+        Text("Pick how the homepage renders — Histogram, Sparkline, Heatmap, or Correlations.")
+      }
+
+      homepageWelcomeSection
+      homepageTimelineSection
+
+      #if os(iOS)
+      Section {
+        NavigationLink(value: SettingsView.SettingsDestination.quickActions) {
+          Label("Quick Actions", systemImage: "bolt")
+        }
+      } footer: {
+        Text("Choose up to 4 sections to surface when you long-press the app icon on the Home Screen.")
+      }
+      #endif
+
+      Section {
+        NavigationLink(value: SettingsView.SettingsDestination.appIcon) {
+          Label("App Icon", systemImage: "app.badge")
+        }
+      }
+    }
+    .formStyle(.grouped)
+  }
+
+  @ViewBuilder
+  private var homepageTimelineSection: some View {
+    Section {
+      Toggle(isOn: $showTodayTimeline) {
+        Label("Show Today timeline", systemImage: "clock")
+      }
+    } footer: {
+      Text("Renders the day-timeline strip above the homepage layout.")
+    }
+  }
+
+  @ViewBuilder
+  private var homepageWelcomeSection: some View {
+    Section {
+      Toggle(isOn: $showWelcome) {
+        Label("Show welcome", systemImage: "sun.horizon")
+      }
+    } footer: {
+      Text("A centered time-of-day greeting at the top of the home tab.")
+    }
+  }
+
+}
+
+// MARK: - Layout submenu
+//
+// Picker for the homepage renderer, plus one generic example
+// (icon + label, no data) showing what the selected mode looks like.
+// Example is mode-styled — Tile card / Sparkline row / Heatmap row.
+
+struct LayoutSettingsPane: View {
+  @AppStorage(SettingsKey.homepageLayout)
+  private var homepageLayoutRaw: String = HomepageLayoutMode.tiles.rawValue
+
+  private var binding: Binding<HomepageLayoutMode> {
+    Binding(
+      get: { HomepageLayoutMode(rawValue: homepageLayoutRaw) ?? .tiles },
+      set: { homepageLayoutRaw = $0.rawValue }
+    )
+  }
+
+  var body: some View {
+    let current = binding.wrappedValue
+    Form {
+      Section {
+        Picker(selection: binding) {
+          ForEach(HomepageLayoutMode.allCases) { mode in
+            Label {
+              HStack {
+                Text(mode.title)
+                if !mode.isImplemented {
+                  Spacer()
+                  Text("Coming soon")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
+              }
+            } icon: {
+              Image(systemName: mode.icon)
+            }
+            .tag(mode)
+          }
+        } label: {
+          EmptyView()
+        }
+        .labelsHidden()
+        #if os(iOS)
+        .pickerStyle(.inline)
+        #endif
+      } footer: {
+        Text(current.summary)
+      }
+
+      Section {
+        LayoutPreviewExample(mode: current)
+          .listRowInsets(EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12))
+      } header: {
+        Text("Example")
+      }
+    }
+    .formStyle(.grouped)
+  }
+}
+
+// MARK: - Correlations submenu
+//
+// Controls the `.correlations` homepage layout mode — time window,
+// section filter, and which extra sections (supplements table /
+// insufficient-data fold-out) render below the trusted + exploratory
+// grids. Replaces the toolbar controls of the old Insights page.
+
+struct CorrelationsSettingsPane: View {
+  @AppStorage(SettingsKey.correlationsWindowDays)
+  private var windowDays: Int = 365
+  @AppStorage(SettingsKey.correlationsSectionFilter)
+  private var sectionFilter: String = "all"
+  @AppStorage(SettingsKey.correlationsShowSupplements)
+  private var showSupplements: Bool = true
+  @AppStorage(SettingsKey.correlationsShowInsufficient)
+  private var showInsufficient: Bool = false
+
+  private let sectionOptions: [(key: String, label: String)] = [
+    ("all",         "All"),
+    ("habits",      "Habits"),
+    ("supplements", "Supplements"),
+    ("training",    "Training"),
+    ("nutrition",   "Nutrition"),
+    ("caffeine",    "Caffeine"),
+    ("cannabis",    "Cannabis"),
+    ("air",         "Air"),
+    ("gut",         "Gut"),
+    ("sleep",       "Sleep"),
+  ]
+
+  var body: some View {
+    Form {
+      Section {
+        Picker("Time window", selection: $windowDays) {
+          Text("30 days").tag(30)
+          Text("90 days").tag(90)
+          Text("6 months").tag(180)
+          Text("1 year").tag(365)
+          Text("2 years").tag(730)
+        }
+        Picker("Section filter", selection: $sectionFilter) {
+          ForEach(sectionOptions, id: \.key) { Text($0.label).tag($0.key) }
+        }
+      } footer: {
+        Text("Window controls how far back CorrelationEngine pulls data. Section filter limits which predictor → target pairs render — pairs are kept if either side matches.")
+      }
+
+      Section {
+        Toggle("Show Supplements → Sleep table", isOn: $showSupplements)
+        Toggle("Show insufficient-data section", isOn: $showInsufficient)
+      } footer: {
+        Text("Insufficient pairs (1 ≤ n < \(CorrelationEngine.minN) overlapping days) are too noisy to chart but listed here so you can see what's almost ready.")
+      }
+    }
+    .formStyle(.grouped)
+  }
+}
+
+// MARK: - App Icon submenu
+
+struct AppIconSettingsPane: View {
   #if os(iOS)
   @State private var selectedIcon: AppIconOption = .current
   @State private var iconError: String? = nil
   @State private var iconChangeInFlight = false
   #endif
 
-  /// Persists the homepage renderer choice. Default `.tiles.rawValue`
-  /// matches the existing behaviour so users with no stored value see
-  /// no change after the layout-mode plumbing lands.
-  @AppStorage(SettingsKey.homepageLayout)
-  private var homepageLayoutRaw: String = HomepageLayoutMode.tiles.rawValue
-  @AppStorage(SettingsKey.homepageShowTodayTimeline)
-  private var showTodayTimeline: Bool = true
-
   var body: some View {
     Form {
-      homepageLayoutSection
-      homepageTimelineSection
-
       #if os(iOS)
       if UIApplication.shared.supportsAlternateIcons {
         appIconSection
@@ -645,64 +878,6 @@ struct GeneralSettingsPane: View {
     #endif
   }
 
-  /// Two-way binding for the homepage layout picker. Falls back to
-  /// `.tiles` if a future build ever writes an unknown raw value.
-  private var homepageLayoutBinding: Binding<HomepageLayoutMode> {
-    Binding(
-      get: { HomepageLayoutMode(rawValue: homepageLayoutRaw) ?? .tiles },
-      set: { homepageLayoutRaw = $0.rawValue }
-    )
-  }
-
-  /// Picker for which renderer the homepage uses. Same domain order
-  /// across every mode — only presentation varies. Modes that aren't
-  /// implemented yet are listed but tagged "Coming soon" in their
-  /// row so users can see what's planned without picking a dud.
-  @ViewBuilder
-  private var homepageLayoutSection: some View {
-    let current = homepageLayoutBinding.wrappedValue
-    Section {
-      Picker(selection: homepageLayoutBinding) {
-        ForEach(HomepageLayoutMode.allCases) { mode in
-          Label {
-            HStack {
-              Text(mode.title)
-              if !mode.isImplemented {
-                Spacer()
-                Text("Coming soon")
-                  .font(.caption2)
-                  .foregroundStyle(.secondary)
-              }
-            }
-          } icon: {
-            Image(systemName: mode.icon)
-          }
-          .tag(mode)
-        }
-      } label: {
-        Text("Layout")
-      }
-      #if os(iOS)
-      .pickerStyle(.navigationLink)
-      #endif
-    } header: {
-      Text("Homepage layout")
-    } footer: {
-      Text(current.summary)
-    }
-  }
-
-  @ViewBuilder
-  private var homepageTimelineSection: some View {
-    Section {
-      Toggle(isOn: $showTodayTimeline) {
-        Label("Show Today timeline", systemImage: "clock")
-      }
-    } footer: {
-      Text("Renders the day-timeline strip above the homepage layout.")
-    }
-  }
-
   #if os(iOS)
   private var appIconSection: some View {
     Section {
@@ -714,7 +889,7 @@ struct GeneralSettingsPane: View {
               .font(.caption)
               .foregroundStyle(.secondary)
             Text(selectedIcon.title)
-              .font(.headline)
+              .font(.septenaCardTitle)
             if selectedIcon == .default {
               Text("The original multicolor icon.")
                 .font(.subheadline)
@@ -743,8 +918,6 @@ struct GeneralSettingsPane: View {
         }
       }
       .padding(.vertical, 4)
-    } header: {
-      Text("App Icon")
     } footer: {
       Text("iOS shows a confirmation prompt each time you switch icons.")
     }
@@ -766,6 +939,130 @@ struct GeneralSettingsPane: View {
     }
   }
   #endif
+}
+
+// MARK: - Layout preview
+//
+// One generic example rendered with the real homepage components
+// (`ModuleTile`, `DenseHomepageView`, `HeatmapHomepageView`) populated
+// with deterministic fake data — so the preview matches what the
+// homepage actually draws, not a hand-rolled approximation.
+
+private enum LayoutPreviewSample {
+  /// Deterministic 90-day series shared by all three renderers — the
+  /// tile's 7-day histogram is just `bars90.suffix(7)`, the sparkline
+  /// and heatmap consume the full 90-day window. Values span 1…7 so
+  /// every day is visible (no all-zero gaps in the 7-day strip) while
+  /// still covering enough range for the heatmap to bucket into all
+  /// five levels.
+  static let bars90: [Int] = (0..<90).map { i in
+    let phase = Double(i) * 0.42
+    let v = 4.0 + 2.6 * sin(phase) + 1.2 * sin(phase * 0.31)
+    return max(1, Int(v.rounded()))
+  }
+
+  /// Trailing 7-day window of `bars90` — same source data, just sliced.
+  static let bars7: [Int] = Array(bars90.suffix(7))
+  static let accent: Color = .green
+
+  static let domainData = HomepageDomainData(
+    domain: .habits,
+    title: "Habits",
+    accent: accent,
+    headline: "5 of 7 today",
+    headlineStats: [
+      .init(label: "Today",   value: "5"),
+      .init(label: "Skipped", value: "1"),
+    ],
+    progress: .init(label: "Today's progress", current: 5, target: 7),
+    history: .bars(bars90),
+    tap: .openSheet(.habits)
+  )
+}
+
+private struct LayoutPreviewExample: View {
+  let mode: HomepageLayoutMode
+
+  var body: some View {
+    Group {
+      switch mode {
+      case .tiles:
+        ModuleTile(
+          title: "Habits",
+          accent: LayoutPreviewSample.accent,
+          stats: [
+            .init(label: "Today",   value: "5"),
+            .init(label: "Skipped", value: "1"),
+          ],
+          progress: .init(
+            label: "Today's progress",
+            current: 5,
+            target: 7
+          ),
+          history: .init(label: "7-day adherence", values: LayoutPreviewSample.bars7)
+        )
+      case .dense:
+        DenseHomepageView(
+          items: [LayoutPreviewSample.domainData],
+          onTap: { _ in },
+          menuContent: { _ in EmptyView() }
+        )
+      case .heatmap:
+        HeatmapHomepageView(
+          items: [LayoutPreviewSample.domainData],
+          onTap: { _ in },
+          menuContent: { _ in EmptyView() }
+        )
+      case .correlations:
+        CorrelationsPreviewExample()
+      }
+    }
+    .allowsHitTesting(false)
+  }
+}
+
+/// Static sample row for the `.correlations` mode preview — doesn't
+/// run CorrelationEngine, just shows what one trusted-pair row looks
+/// like so the settings example matches the live dashboard shape.
+private struct CorrelationsPreviewExample: View {
+  var body: some View {
+    VStack(spacing: 0) {
+      row(predictor: "Magnesium", target: "Sleep score", r: 0.42, lag: 1, n: 58, p: 0.014, color: .indigo, positive: true)
+      Divider().padding(.leading, 12)
+      row(predictor: "Caffeine after 2pm", target: "Sleep score", r: -0.31, lag: 0, n: 41, p: 0.038, color: .brown, positive: false)
+    }
+    .background(
+      RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.cardSurface)
+    )
+  }
+
+  private func row(predictor: String, target: String, r: Double, lag: Int, n: Int, p: Double, color: Color, positive: Bool) -> some View {
+    HStack(spacing: 10) {
+      Circle().fill(color).frame(width: 8, height: 8)
+      VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: 4) {
+          Text(predictor).font(.subheadline.weight(.medium)).lineLimit(1)
+          Image(systemName: "arrow.right").font(.caption2).foregroundStyle(.secondary)
+          Text(target).font(.subheadline.weight(.medium)).lineLimit(1)
+        }
+        Text("lag \(lag)d · n=\(n) · p=\(String(format: "%.3f", p))")
+          .font(.caption2.monospacedDigit())
+          .foregroundStyle(.secondary)
+      }
+      Spacer(minLength: 8)
+      Text(String(format: "%+.2f", r))
+        .font(.caption.monospacedDigit().weight(.semibold))
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background((positive ? Color.green : Color.red).opacity(0.18), in: Capsule())
+        .foregroundStyle(positive ? Color.green : Color.red)
+      Image(systemName: "chevron.right")
+        .font(.caption2.weight(.semibold))
+        .foregroundStyle(.tertiary)
+    }
+    .padding(.vertical, 10)
+    .padding(.horizontal, 12)
+  }
 }
 
 private struct AppIconPreview: View {
@@ -849,6 +1146,106 @@ private struct AppIconChoiceCard: View {
   }
 }
 #endif
+
+// MARK: - Quick Actions
+//
+// Multi-select pane (capped at 4) that picks which sections appear in the
+// Home Screen long-press menu. Persists as a comma-separated list of
+// section keys in UserDefaults; on every change, `QuickActionsApplier`
+// rebuilds `UIApplication.shared.shortcutItems` to match. Listing is
+// driven by `store.sections` filtered to enabled rows so disabled
+// sections can never be picked.
+
+struct QuickActionsSettingsPane: View {
+  @Environment(SettingsStore.self) private var store
+  @AppStorage(SettingsKey.quickActionKeys) private var stored: String = ""
+
+  private static let limit = 4
+
+  private var selected: [String] {
+    stored.split(separator: ",")
+      .map { String($0) }
+      .filter { !$0.isEmpty }
+  }
+
+  private var availableEntries: [(manifest: SectionManifest, accent: Color)] {
+    let order = store.serverSettings?.sectionOrder ?? store.sections.map(\.key)
+    let configByKey = Dictionary(uniqueKeysWithValues: store.sections.map { ($0.key, $0) })
+    return order.compactMap { key -> (SectionManifest, Color)? in
+      guard let manifest = SectionManifest.byKey[key],
+            let config = configByKey[key],
+            config.isEnabled,
+            manifest.supportsDashboard,
+            WeekDestination(rawValue: key) != nil else { return nil }
+      return (manifest, parseHexColor(config.color))
+    }
+  }
+
+  var body: some View {
+    Form {
+      Section {
+        ForEach(availableEntries, id: \.manifest.key) { entry in
+          row(for: entry.manifest, accent: entry.accent)
+        }
+      } header: {
+        HStack {
+          Text("Sections")
+          Spacer()
+          Text("\(selected.count) / \(Self.limit)")
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(.secondary)
+        }
+      } footer: {
+        Text("Pick up to \(Self.limit) sections. Each one becomes a shortcut in the Home Screen long-press menu, opening directly into that section.")
+      }
+    }
+    .formStyle(.grouped)
+  }
+
+  @ViewBuilder
+  private func row(for manifest: SectionManifest, accent: Color) -> some View {
+    let isSelected = selected.contains(manifest.key)
+    let isAtLimit = selected.count >= Self.limit
+    Button {
+      toggle(manifest.key)
+    } label: {
+      HStack(spacing: 12) {
+        ColoredGlyph(icon: manifest.iconSymbol, color: accent, size: 22)
+        VStack(alignment: .leading, spacing: 1) {
+          let serverLabel = store.sections.first(where: { $0.key == manifest.key })?.label ?? ""
+          Text(serverLabel.isEmpty ? manifest.defaultLabel : serverLabel)
+            .foregroundStyle(.primary)
+          if !manifest.shortDescription.isEmpty {
+            Text(manifest.shortDescription)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+        }
+        Spacer()
+        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+          .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+      }
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .disabled(!isSelected && isAtLimit)
+    .opacity(!isSelected && isAtLimit ? 0.5 : 1)
+  }
+
+  private func toggle(_ key: String) {
+    var current = selected
+    if let idx = current.firstIndex(of: key) {
+      current.remove(at: idx)
+    } else {
+      guard current.count < Self.limit else { return }
+      current.append(key)
+    }
+    stored = current.joined(separator: ",")
+    #if os(iOS)
+    QuickActionsApplier.apply()
+    #endif
+  }
+}
 
 // MARK: - Section detail
 //
@@ -1417,8 +1814,10 @@ struct MacroTilesEditor: View {
       Text("Drag to reorder. Toggle to show or hide a tile on the Nutrition dashboard. Tap a swatch to change its color.")
     }
     // Drag handles are off by default in a Form; flip edit mode on so the user
-    // can reorder without having to hunt for an Edit button.
+    // can reorder without having to hunt for an Edit button. iOS-only API.
+    #if os(iOS)
     .environment(\.editMode, .constant(.active))
+    #endif
   }
 
   private func persist() {
@@ -2462,7 +2861,7 @@ struct AboutSettingsPane: View {
             .padding(.top, 4)
           VStack(spacing: 4) {
             Text("Septena")
-              .font(.title2.bold())
+              .font(.septenaSectionTitle)
             Text("One app for several corners of personal health")
               .font(.subheadline)
               .foregroundStyle(.secondary)
@@ -2817,6 +3216,7 @@ private let exportableSectionKeys: [String] = [
 
 struct ImportExportSettingsPane: View {
   @Environment(SettingsStore.self) private var store
+  @Environment(CKEngine.self) private var ckEngine
   @State private var exportError: String? = nil
   @State private var importDoc: ImportExportEnvelope? = nil
   @State private var importMessage: String? = nil
@@ -2824,11 +3224,20 @@ struct ImportExportSettingsPane: View {
   @State private var showingPaste = false
   @State private var showingFilePicker = false
   @State private var pasteBuffer: String = ""
+  @State private var nutritionRepairState: RepairState = .idle
+
+  enum RepairState: Equatable {
+    case idle
+    case running
+    case success(entryCount: Int, summaryCount: Int)
+    case failure(message: String)
+  }
 
   var body: some View {
     Form {
       exportSection
       importSection
+      repairSection
       schemaPromptsSection
       formatSection
     }
@@ -3016,6 +3425,77 @@ struct ImportExportSettingsPane: View {
   // round-trips through this importer. The schema is generated from the
   // same field list the exporter uses, so the prompt is always in sync.
 
+  // MARK: Repair
+
+  // One-shot re-pull for record types whose history may be missing locally
+  // because CKSyncEngine's incremental fetch token advanced past records
+  // the device couldn't yet decode (e.g. nutrition records arrived while
+  // this Mac was running a build that didn't have the
+  // `case NutritionEntryCloudKitSchema.recordType` arm in
+  // `applyFetchedRecord`). `fetchAllRecords` does a fresh nil-token zone
+  // replay so historical records are redelivered regardless of the engine
+  // checkpoint.
+  @ViewBuilder
+  private var repairSection: some View {
+    Section {
+      Button {
+        Task { await repairNutritionFromCloudKit() }
+      } label: {
+        HStack {
+          Label("Repair nutrition from CloudKit", systemImage: "stethoscope")
+          Spacer()
+          switch nutritionRepairState {
+          case .idle:
+            EmptyView()
+          case .running:
+            ProgressView().controlSize(.small)
+          case .success(let entries, let summaries):
+            Text("\(entries) entries · \(summaries) days")
+              .font(.caption.monospacedDigit())
+              .foregroundStyle(.secondary)
+          case .failure:
+            Image(systemName: "exclamationmark.triangle")
+              .foregroundStyle(.orange)
+          }
+        }
+      }
+      .disabled(nutritionRepairState == .running)
+      if case .failure(let message) = nutritionRepairState {
+        Text(message)
+          .font(.caption)
+          .foregroundStyle(.red)
+      }
+    } header: {
+      Text("Repair")
+    } footer: {
+      Text("Re-pulls every nutrition entry and daily summary from CloudKit and merges them into the local store. Use if this device's protein/kcal history looks empty even though entries exist on another device.")
+    }
+  }
+
+  private func repairNutritionFromCloudKit() async {
+    nutritionRepairState = .running
+    do {
+      let records = try await ckEngine.fetchAllRecords(recordTypes: [
+        NutritionEntryCloudKitSchema.recordType,
+        NutritionDailySummaryCloudKitSchema.recordType,
+      ])
+      var entries = 0
+      var summaries = 0
+      for record in records {
+        ckEngine.applyFetchedRecord?(record)
+        if record.recordType == NutritionEntryCloudKitSchema.recordType {
+          entries += 1
+        } else if record.recordType == NutritionDailySummaryCloudKitSchema.recordType {
+          summaries += 1
+        }
+      }
+      ckEngine.applyDidFinishBatch?()
+      nutritionRepairState = .success(entryCount: entries, summaryCount: summaries)
+    } catch {
+      nutritionRepairState = .failure(message: error.localizedDescription)
+    }
+  }
+
   @ViewBuilder
   private var schemaPromptsSection: some View {
     Section {
@@ -3135,7 +3615,6 @@ struct ImportExportSettingsPane: View {
 
   private func sectionGlyph(for key: String) -> String {
     if let m = SectionManifest.byKey[key] { return m.iconSymbol }
-    if key == "calendar" { return "calendar" }
     return "circle.fill"
   }
 

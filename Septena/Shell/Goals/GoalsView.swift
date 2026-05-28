@@ -37,21 +37,13 @@ struct GoalsView: View {
 
   var body: some View {
     NavigationStack {
-      content
-        .navigationTitle("Goals")
-        .trackScreen("goals")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.large)
-        #endif
-        .background(Theme.groupedBackground)
-        .toolbar {
-          ToolbarItem(placement: .primaryAction) {
-            Button(action: addGoal) {
-              Image(systemName: "plus")
-            }
-          }
-        }
-        .task { await load() }
+      SectionDrawer(sectionKey: "goals",
+                    title: "Goals",
+                    onLog: { _ in addGoal() }) {
+        content
+      }
+      .trackScreen("goals")
+      .task { await load() }
         .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
           goals = LocalCache.goals(in: context)
         }
@@ -78,7 +70,7 @@ struct GoalsView: View {
   private var content: some View {
     if loading && goals.isEmpty {
       ProgressView()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, minHeight: 160)
     } else if goals.isEmpty {
       ContentUnavailableView {
         Label("No Goals Yet", systemImage: "target")
@@ -88,23 +80,18 @@ struct GoalsView: View {
         Button("Add First Goal", action: addGoal)
       }
     } else {
-      ScrollView {
-        LazyVGrid(columns: columns, spacing: 14) {
-          ForEach(goals) { goal in
-            Button { editing = goal } label: {
-              GoalTile(goal: goal, theme: theme)
-            }
-            .buttonStyle(.plain)
-            .contextMenu {
-              Button(role: .destructive) { deleteGoal(goal) } label: {
-                Label("Delete", systemImage: "trash")
-              }
+      LazyVGrid(columns: columns, spacing: 14) {
+        ForEach(goals) { goal in
+          Button { editing = goal } label: {
+            GoalTile(goal: goal, theme: theme)
+          }
+          .buttonStyle(.plain)
+          .contextMenu {
+            Button(role: .destructive) { deleteGoal(goal) } label: {
+              Label("Delete", systemImage: "trash")
             }
           }
         }
-        .padding(.horizontal, Theme.hPadding)
-        .padding(.top, 12)
-        .padding(.bottom, 80)
       }
     }
   }
@@ -142,6 +129,7 @@ struct GoalsView: View {
 // in <area>" at a glance.
 
 struct GoalTile: View {
+  @Environment(\.modelContext) private var context
   let goal: Goal
   let theme: SectionTheme
 
@@ -151,28 +139,35 @@ struct GoalTile: View {
 
   private var isPlaceholder: Bool { goal.text == "New goal" }
 
+  private var progress: GoalMetricProgress? {
+    GoalMetricEvaluator.evaluate(goal: goal, context: context)
+  }
+
   var body: some View {
-    HStack(spacing: 0) {
-      Rectangle()
-        .fill(accent)
-        .frame(width: 3)
-      VStack(alignment: .leading, spacing: 16) {
-        Text(isPlaceholder ? "New goal" : goal.text)
-          .font(.title3.weight(.semibold))
-          .foregroundStyle(isPlaceholder ? .secondary : .primary)
-          .multilineTextAlignment(.leading)
-          .frame(maxWidth: .infinity, alignment: .leading)
-        if !goal.sections.isEmpty {
-          sectionPills
-        }
+    VStack(alignment: .leading, spacing: 16) {
+      Text(isPlaceholder ? "New goal" : goal.text)
+        .font(.septenaTileTitle)
+        .foregroundStyle(isPlaceholder ? .secondary : .primary)
+        .multilineTextAlignment(.leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      if let progress {
+        GoalMetricProgressView(progress: progress, accent: accent)
       }
-      .padding(.horizontal, 16)
-      .padding(.vertical, 16)
-      .frame(maxWidth: .infinity, alignment: .leading)
+      Spacer(minLength: 0)
+      if !goal.sections.isEmpty {
+        sectionPills
+      }
     }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 16)
+    .frame(maxWidth: .infinity, minHeight: 170, alignment: .topLeading)
     .background(
       RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
         .fill(Theme.secondaryGroupedBackground)
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+        .strokeBorder(accent, lineWidth: 1.5)
     )
     .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
     .contentShape(Rectangle())
@@ -213,6 +208,17 @@ struct EditGoalSheet: View {
   @State private var selectedSections: Set<String>
   @State private var showDeleteConfirm = false
 
+  // Optional measurement attachment — UI state for the disclosure section.
+  // V1 ships a single metric (weekly training sessions); the picker is a
+  // segmented control so adding the next metric only needs a new case.
+  @State private var trackMetric: Bool
+  @State private var metricKey: String
+  @State private var metricComparator: String   // "gte" | "lte" | "eq"
+  @State private var metricTargetText: String
+  /// Optional starting value for the progress bar. Empty string = no
+  /// baseline; the bar falls back to the simple current/target math.
+  @State private var metricBaselineText: String
+
   init(goal: Goal,
        availableSections: [SectionConfig],
        theme: SectionTheme,
@@ -227,6 +233,21 @@ struct EditGoalSheet: View {
     self.onDelete = onDelete
     _text = State(initialValue: goal.text == "New goal" ? "" : goal.text)
     _selectedSections = State(initialValue: Set(goal.sections))
+    let hasMetric = goal.metricKey != nil
+    _trackMetric = State(initialValue: hasMetric)
+    // Default to the first metric in the catalog (currently training
+    // sessions) if the goal has no measurement yet. If the catalog is
+    // somehow empty, fall back to an empty key — picker will hide.
+    _metricKey = State(initialValue: goal.metricKey
+                       ?? GoalMetricCatalog.all.first?.key
+                       ?? "")
+    _metricComparator = State(initialValue: goal.metricComparator ?? "gte")
+    _metricTargetText = State(initialValue: goal.metricTarget.map { Self.formatTarget($0) } ?? "3")
+    _metricBaselineText = State(initialValue: goal.metricBaseline.map { Self.formatTarget($0) } ?? "")
+  }
+
+  private static func formatTarget(_ value: Double) -> String {
+    value == value.rounded() ? String(Int(value)) : String(value)
   }
 
   var body: some View {
@@ -261,6 +282,85 @@ struct EditGoalSheet: View {
               }
             }
             .padding(.vertical, 4)
+          }
+        }
+        Section {
+          Toggle("Track with a metric", isOn: $trackMetric)
+        } footer: {
+          Text("Attach a measurement so this goal shows live progress against a target.")
+        }
+        if trackMetric {
+          let availableMetrics = GoalMetricCatalog.metrics(for: selectedSections)
+          Section {
+            if availableMetrics.isEmpty {
+              // No metric matches the tagged sections — nudge the user to
+              // either tag a section that has metrics or pick from the
+              // full catalog. Keeping the disclosure honest beats silently
+              // showing irrelevant options.
+              Text("Tag a section above (Training, Caffeine, Gut, Nutrition…) to see metrics you can measure.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            } else {
+              Picker("Measure", selection: $metricKey) {
+                ForEach(availableMetrics) { metric in
+                  Text(metric.label).tag(metric.key)
+                }
+              }
+              Picker("Comparator", selection: $metricComparator) {
+                Text("At least").tag("gte")
+                Text("At most").tag("lte")
+                Text("Exactly").tag("eq")
+              }
+              .pickerStyle(.segmented)
+              HStack {
+                Text("Target")
+                Spacer()
+                TextField("3", text: $metricTargetText)
+                  #if os(iOS)
+                  .keyboardType(.decimalPad)
+                  #endif
+                  .multilineTextAlignment(.trailing)
+                  .frame(maxWidth: 80)
+                if let unit = GoalMetricCatalog.metric(for: metricKey)?.unitLabel {
+                  Text(unit)
+                    .foregroundStyle(.secondary)
+                }
+              }
+              HStack {
+                Text("Baseline")
+                Spacer()
+                TextField("optional", text: $metricBaselineText)
+                  #if os(iOS)
+                  .keyboardType(.decimalPad)
+                  #endif
+                  .multilineTextAlignment(.trailing)
+                  .frame(maxWidth: 80)
+                if let unit = GoalMetricCatalog.metric(for: metricKey)?.unitLabel {
+                  Text(unit)
+                    .foregroundStyle(.secondary)
+                }
+              }
+            }
+          } header: {
+            Text("Metric")
+          } footer: {
+            VStack(alignment: .leading, spacing: 4) {
+              if let implied = GoalMetricCatalog.sectionKey(for: metricKey),
+                 !selectedSections.contains(implied) {
+                Text("This goal will also appear in the \(implied.capitalized) section.")
+              }
+              Text("Baseline is where you started — the bar will show how much of the distance from baseline to target you've covered. Leave blank for count-style metrics that start at 0.")
+            }
+          }
+          .onChange(of: selectedSections) { _, newSet in
+            // If the user un-tags the section the current metric belongs
+            // to, snap to the first still-valid option so the picker stays
+            // consistent. No silent stash — the goal stays measurable.
+            let valid = GoalMetricCatalog.metrics(for: newSet)
+            if !valid.contains(where: { $0.key == metricKey }),
+               let first = valid.first {
+              metricKey = first.key
+            }
           }
         }
         Section {
@@ -300,10 +400,49 @@ struct EditGoalSheet: View {
     guard !clean.isEmpty else { return }
     let sections = Array(selectedSections)
     mutator.updateGoal(id: goal.id, text: clean, sections: sections)
+
+    // Metric: write only if the user toggled it on AND provided a valid
+    // target. Toggling off (or invalid target) clears all four fields.
+    let parsedTarget = Double(metricTargetText.replacingOccurrences(of: ",", with: "."))
+    // Target ≥ 0 is valid — "at most 0 blood events" and "no caffeine after
+    // 2pm" both need target = 0. Only reject negative or unparseable values.
+    let willTrack = trackMetric && (parsedTarget ?? -1) >= 0
+    // Window is baked into each catalog entry for v1, not user-picked.
+    let metricWindow = GoalMetricCatalog.metric(for: metricKey)?.window ?? "calendarWeek"
+    let parsedBaseline = Double(metricBaselineText.replacingOccurrences(of: ",", with: "."))
+    if willTrack, let target = parsedTarget {
+      mutator.updateGoalMetric(id: goal.id,
+                               metricKey: metricKey,
+                               window: metricWindow,
+                               comparator: metricComparator,
+                               target: target,
+                               baseline: parsedBaseline)
+    } else {
+      mutator.updateGoalMetric(id: goal.id,
+                               metricKey: nil,
+                               window: nil,
+                               comparator: nil,
+                               target: nil,
+                               baseline: nil)
+    }
+
     Haptics.tick()
     var updated = goal
     updated.text = clean
     updated.sections = sections
+    if willTrack, let target = parsedTarget {
+      updated.metricKey = metricKey
+      updated.metricWindow = metricWindow
+      updated.metricComparator = metricComparator
+      updated.metricTarget = target
+      updated.metricBaseline = parsedBaseline
+    } else {
+      updated.metricKey = nil
+      updated.metricWindow = nil
+      updated.metricComparator = nil
+      updated.metricTarget = nil
+      updated.metricBaseline = nil
+    }
     onUpdate(updated)
     dismiss()
   }

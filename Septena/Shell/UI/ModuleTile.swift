@@ -82,7 +82,7 @@ struct ModuleTile: View {
 
   private var header: some View {
     Text(title)
-      .font(.title3.weight(.semibold))
+      .font(.septenaTileTitle)
       .frame(maxWidth: .infinity, alignment: .leading)
   }
 
@@ -165,19 +165,31 @@ private struct HistoryView: View {
   let accent: Color
 
   var body: some View {
+    // Tile histograms always render 7 columns (last 7 days, oldest →
+    // newest). When the caller passes fewer values — e.g. a loader
+    // that returned a partial window — pad the leading days with 0 so
+    // missing days read as empty slots instead of collapsing the chart
+    // to a shorter row. Same treatment for `secondaryValues`.
+    let values = Self.padTo7(row.values)
+    let secondary = row.secondaryValues.map(Self.padTo7)
     VStack(alignment: .leading, spacing: 8) {
       Text(row.label)
         .font(.caption2.weight(.semibold))
         .foregroundStyle(.secondary)
         .textCase(.uppercase)
-      Histogram(values: row.values,
+      Histogram(values: values,
                 accent: accent,
-                emphasizedIndex: row.todayIndex ?? (row.values.count - 1),
-                dayLabels: row.showDayLabels ? Self.weekdayLabels(count: row.values.count) : nil,
+                emphasizedIndex: row.todayIndex ?? (values.count - 1),
+                dayLabels: row.showDayLabels ? Self.weekdayLabels(count: values.count) : nil,
                 ceiling: row.ceiling,
-                secondaryValues: row.secondaryValues)
+                secondaryValues: secondary)
         .frame(height: row.showDayLabels ? 72 : 56)
     }
+  }
+
+  private static func padTo7(_ values: [Int]) -> [Int] {
+    if values.count >= 7 { return Array(values.suffix(7)) }
+    return Array(repeating: 0, count: 7 - values.count) + values
   }
 
   /// Last N weekday initials ending at today — e.g. for 7 values it's
@@ -198,13 +210,18 @@ private struct CenteredHistoryView: View {
   let accent: Color
 
   var body: some View {
+    // Always render 7 columns; pad leading days with `nil` (missing) so
+    // a short series doesn't compress the chart to fewer bars.
+    let values: [Double?] = row.values.count >= 7
+      ? Array(row.values.suffix(7))
+      : Array(repeating: nil, count: 7 - row.values.count) + row.values
     VStack(alignment: .leading, spacing: 8) {
       Text(row.label)
         .font(.caption2.weight(.semibold))
         .foregroundStyle(.secondary)
         .textCase(.uppercase)
-      CenteredBarChart(values: row.values, accent: accent,
-                       dayLabels: weekdayLabels(count: row.values.count))
+      CenteredBarChart(values: values, accent: accent,
+                       dayLabels: weekdayLabels(count: values.count))
         .frame(height: 72)
     }
   }

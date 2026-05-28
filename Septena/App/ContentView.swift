@@ -22,17 +22,9 @@ struct ContentView: View {
         nav.path = [.filter(.inbox)]
         nav.shouldStartCreating = true
       }
-      .onChange(of: nav.pendingShortcut) { _, action in
-        guard let action else { return }
-        switch action {
-        case .newTodo:
-          nav.path = [.filter(.inbox)]
-          nav.shouldStartCreating = true
-        case .showToday:
-          nav.path = [.filter(.today)]
-        }
-        nav.pendingShortcut = nil
-      }
+      // Quick Action routing is hoisted to RootTabView — ContentView is
+      // only mounted inside the Tasks tab, so it can't reach sections
+      // hosted on the Week dashboard from here.
   }
 
   @ViewBuilder

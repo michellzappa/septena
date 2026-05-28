@@ -11,10 +11,15 @@ import EventKit
 
 enum WeekDestination: String, Hashable, Identifiable {
   case habits, chores, training, supplements, sleep, nutrition
-  case air, groceries, calendar, caffeine, cannabis, body, gut
+  case air, groceries, caffeine, cannabis, body, gut
   case mood
   case activity
   case today
+  /// Tasks-as-drawer. Mirrors every other section's bottom-sheet behaviour
+  /// for users who prefer not to lose the homepage when they peek at today.
+  /// The full Tasks tab is still reachable via the long-press menu and via
+  /// the Settings > Tasks > Open in picker.
+  case tasks
 
   var id: String { rawValue }
 }
@@ -50,6 +55,8 @@ struct WeekDashboardView: View {
   private var homepageLayoutRaw: String = HomepageLayoutMode.tiles.rawValue
   @AppStorage(SettingsKey.homepageShowTodayTimeline)
   private var showTodayTimeline: Bool = true
+  @AppStorage(SettingsKey.homepageShowWelcome)
+  private var showWelcome: Bool = true
   /// Fasting tracking master toggle + heatmap metric preference. When
   /// off, both the tile and the heatmap render protein like before;
   /// when on, the tile morphs based on the live `FastingState` and the
@@ -191,6 +198,7 @@ struct WeekDashboardView: View {
       toolbar: { homeToolbar }
     ) {
       VStack(spacing: 18) {
+        if showWelcome { WelcomeHeader(now: clock.now) }
         if showTodayTimeline { todayTimeline }
         layoutBody
       }
@@ -249,23 +257,17 @@ struct WeekDashboardView: View {
 
   private var homeMenu: some View {
     Menu {
-      ForEach(HomepageLayoutMode.allCases) { mode in
-        Button {
-          homepageLayoutRaw = mode.rawValue
-        } label: {
-          Label(mode.title, systemImage: mode == currentLayoutMode ? "checkmark" : mode.icon)
+      Picker(selection: Binding(
+        get: { currentLayoutMode },
+        set: { homepageLayoutRaw = $0.rawValue }
+      )) {
+        ForEach(HomepageLayoutMode.allCases) { mode in
+          Label(mode.title, systemImage: mode.icon).tag(mode)
         }
-      }
-      Divider()
-      Toggle(isOn: $showTodayTimeline) {
-        Label("Show Today", systemImage: "clock")
-      }
-      Divider()
-      Button {
-        nav.showInsights = true
       } label: {
-        Label("Insights", systemImage: "chart.dots.scatter")
+        Text("Dashboard")
       }
+      .pickerStyle(.inline)
       Divider()
       Button {
         nav.showSettings = true
@@ -294,13 +296,19 @@ struct WeekDashboardView: View {
     NavigationStack {
       // Plugin-driven destination first; the inline fallback now
       // handles only special destinations that aren't manifest
-      // sections — calendar (EventKit-backed) and today (the cross-
-      // section log).
+      // sections — today (the cross-section log) and the tasks
+      // drawer. Calendar is an integration, not a section — its data
+      // surfaces inline in Today/Next, no dedicated section view.
       if let view = SectionRegistry.plugin(forKey: dest.rawValue)?.destinationView() {
         view
       } else {
         switch dest {
-        case .calendar:    CalendarDestinationView()
+        case .tasks:
+          // Today's open tasks + the inline `+` from TaskListView's
+          // toolbar. Tapping a row toggles complete; the rest of the
+          // task surface (Inbox, Upcoming, Areas, Projects) is one tap
+          // away on the Tasks tab.
+          TaskListView(filter: .today)
         case .today:
           TodayLogView(
             date: clock.today,
@@ -843,6 +851,8 @@ struct WeekDashboardView: View {
         onTap: handleDomainTap,
         menuContent: { domain in quickAddMenu(for: domain) }
       )
+    case .correlations:
+      CorrelationsHomepageView()
     }
   }
 
@@ -860,10 +870,22 @@ struct WeekDashboardView: View {
   /// wires up inline.
   private func handleDomainTap(_ tap: DomainTapAction) {
     switch tap {
-    case .openSheet(let dest):
-      sheetDest = dest
-    case .switchToTasksTab:
-      tabSelection.current = .tasks
+    case .openSheet(let dest):     sheetDest = dest
+    case .switchToTasksTab:        openTasksFromTile()
+    }
+  }
+
+  /// Single entry point for "user tapped the Tasks tile on the homepage."
+  /// Every dashboard layout (Tiles direct tap, Dense + Heatmap via
+  /// `DomainTapAction.switchToTasksTab`) routes through here so the
+  /// Settings > Tasks > Open in picker is honoured uniformly. The
+  /// `tasksQuickAddMenu` long-press items intentionally bypass this —
+  /// they're explicit "jump to Inbox/Today filter" actions, not a
+  /// generic "open Tasks."
+  private func openTasksFromTile() {
+    switch TasksOpenMode(rawValue: tasksOpenInRaw) ?? .drawer {
+    case .drawer: sheetDest = .tasks
+    case .tab:    tabSelection.current = .tasks
     }
   }
 
@@ -1394,10 +1416,16 @@ struct WeekDashboardView: View {
     )
   }
 
+  /// Setting that decides whether tapping the Tasks tile drops a Today
+  /// drawer (sheet) or jumps to the full Tasks tab. Default `drawer` so
+  /// Tasks behaves like every other section tile.
+  @AppStorage(SettingsKey.tasksOpenIn)
+  private var tasksOpenInRaw: String = TasksOpenMode.drawer.rawValue
+
   // Tasks — live counts from /api/tasks/counts and per-day completion
-  // history from /api/tasks/history. Tapping the tile switches to the
-  // Tasks tab (the full task app); other tiles open a sheet, but Tasks
-  // has its own dedicated tab already.
+  // history from /api/tasks/history. Tap behaviour is user-configurable
+  // via Settings > Tasks > Open in: drawer (default, like other sections)
+  // or the Tasks tab.
   private var tasksTile: some View {
     let openToday = taskCounts.map { $0.todayCount + $0.reviewCount } ?? 0
     let inbox = taskCounts?.inboxCount ?? 0
@@ -1420,7 +1448,7 @@ struct WeekDashboardView: View {
       bars: bars
     )
     .contentShape(Rectangle())
-    .onTapGesture { tabSelection.current = .tasks }
+    .onTapGesture { openTasksFromTile() }
     .contextMenu { tasksQuickAddMenu }
   }
 
@@ -2246,7 +2274,7 @@ private struct ComingSoonLayoutPlaceholder: View {
         .font(.system(size: 44, weight: .regular))
         .foregroundStyle(.secondary)
       Text("\(mode.title) layout — coming soon")
-        .font(.headline)
+        .font(.septenaCardTitle)
       Text(mode.summary)
         .font(.subheadline)
         .foregroundStyle(.secondary)

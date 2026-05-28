@@ -372,6 +372,20 @@ final class NextItemsModel {
     mutator.deferChore(id: chore.id, mode: mode, from: today)
   }
 
+  /// Pull a future-dated chore into the Today bucket. Unlike `deferChore`,
+  /// the chore stays actionable — we set `daysOverdue = 0` so the row lands
+  /// in the active Today section instead of getting a strikethrough pill.
+  func bringChoreToToday(_ chore: ChoreItem, mutator: ChecklistMutator) {
+    Haptics.tick()
+    deferredChores.removeValue(forKey: chore.id)
+    completedChores.remove(chore.id)
+    if let i = chores.firstIndex(where: { $0.id == chore.id }) {
+      chores[i].dueDate = today
+      chores[i].daysOverdue = 0
+    }
+    mutator.deferChore(id: chore.id, mode: "today", from: today)
+  }
+
   func uncompleteChore(_ chore: ChoreItem, mutator: ChecklistMutator) {
     Haptics.tap()
     completedChores.remove(chore.id)
@@ -666,6 +680,13 @@ struct ChoreRow: View {
     .padding(.vertical, Theme.rowVPadding)
     .contextMenu {
       if !isDone && deferLabel == nil {
+        if chore.daysOverdue < 0 {
+          Button {
+            model.bringChoreToToday(chore, mutator: checklistMutator)
+          } label: {
+            Label("Bring to today", systemImage: "calendar.badge.exclamationmark")
+          }
+        }
         Button {
           model.deferChore(chore, mode: "day", label: "Tomorrow", mutator: checklistMutator)
         } label: {

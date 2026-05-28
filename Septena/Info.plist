@@ -20,38 +20,25 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleURLName</key>
-			<string>app.septena.oauth</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>septena</string>
-			</array>
-		</dict>
-	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
-	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Septena connects to your Aranet4 CO2 sensor over Bluetooth to read air quality readings while the app is open.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Septena shows upcoming events from your calendars on the Week dashboard.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>Septena shows upcoming events from your calendars on the Week dashboard.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Septena reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Septena lets you attach a photo from your library to a meal log. Only a reference is stored — the photo stays in your Photos library.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Septena looks up local pollen counts (grass, tree, weed) for your area on the Air page using Open-Meteo's free air quality API.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>Septena imports tasks from your Reminders lists into the Inbox.</string>
 	<key>NSRemindersUsageDescription</key>
 	<string>Septena imports tasks from your Reminders lists into the Inbox.</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Fraunces-Regular.ttf</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -61,25 +48,18 @@
 	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
-		<string>remote-notification</string>
 		<string>bluetooth-central</string>
-		<string>processing</string>
-		<string>fetch</string>
+		<string>remote-notification</string>
 	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
-	<key>UIStatusBarHidden</key>
-	<true/>
-	<key>UISupportedInterfaceOrientations</key>
+	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
-	<key>UISupportedInterfaceOrientations~ipad</key>
+	<key>UISupportedInterfaceOrientations~iphone</key>
 	<array>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 	</array>
 </dict>
 </plist>
