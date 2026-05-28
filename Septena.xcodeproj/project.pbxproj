@@ -8,183 +8,234 @@
 
 /* Begin PBXBuildFile section */
 		002C465DC1BF297DFED1A82A /* GroceriesQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04282C19B1BCFF16B61F4CA1 /* GroceriesQuickAddMenu.swift */; };
-		005BF9123878A73595F78F13 /* MoodPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6311231B3AABDB9BC4CBB69 /* MoodPlugin.swift */; };
 		0139A2BF409AD0CFD4AA7E80 /* SettingsMirror.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5439F75303F906465F9F2C6 /* SettingsMirror.swift */; };
 		01E672AE9CC6DC0BCC948870 /* NutritionDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42EB061D69FA656547DC171F /* NutritionDestinationView.swift */; };
+		027376E6E47C54E7A535D80C /* RoutineCatalogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21B54F8682AE8C22E352630E /* RoutineCatalogView.swift */; };
 		04112426A92819E814A6F66A /* QuickFindView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAB04CA79A9C3207CCE972F9 /* QuickFindView.swift */; };
 		0448F507E1F1600F9933AEED /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5ECFDA9128B73993023CB6 /* Models.swift */; };
+		0578243E033490DBAFABEEE2 /* CorrelationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F0DA5FA7D3E03C2DB1DE7C7 /* CorrelationEngine.swift */; };
 		06404AD63413258122570D58 /* RemindersImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A9CFE2B4EA160E84F58544 /* RemindersImportView.swift */; };
-		06688FE9D7768E81C23A2E8A /* ActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A88D173E289074F16F3B1028 /* ActivityPlugin.swift */; };
-		0676F36CEF04405B98DFCA29 /* SectionGoalsStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3C6FC55D78F4D958C517B00 /* SectionGoalsStrip.swift */; };
-		06CB84746E264F6A858A8F59 /* TrainingConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3433AE6FCB2549D390F9E43A /* TrainingConfigStore.swift */; };
+		067F9505CD3D50628A7F3C0B /* CaffeinePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7025C11CB78735C2F6354E4 /* CaffeinePlugin.swift */; };
+		06ADE13C31B283F59B6C5C9D /* ChoresPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D3C973F9983AB94CEB95337 /* ChoresPlugin.swift */; };
+		06C50FCE5222712BF80255FB /* BodyPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D7AE711DD74BE91E7EECA48 /* BodyPlugin.swift */; };
 		07B127F5FBCE0DE19AFCD387 /* SectionTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03DC46C772E45B60ECB7343 /* SectionTheme.swift */; };
 		07F54D0DB13468114771FD91 /* Outbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD295FAB7B881CAC43EE8C34 /* Outbox.swift */; };
-		08C1D850AC33EDFB75ADD93D /* MoodQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEF5AB60845609D46FB5790D /* MoodQuickAddMenu.swift */; };
-		092B2E981C4A35E2AFF06053 /* SectionExplainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1CEE126A22E14D793FDB9C4 /* SectionExplainer.swift */; };
+		0A5DA8A35CD6681085D55BCE /* NutritionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3478D00EF04684D27A69EECF /* NutritionPlugin.swift */; };
 		0A871A3A42EE54FEC6B17A0A /* AddInfoRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D3C4FD96F6113A7975BA394 /* AddInfoRouter.swift */; };
 		0BD73B4B6206D9A9878C1EA8 /* QuickFindView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAB04CA79A9C3207CCE972F9 /* QuickFindView.swift */; };
-		0C5C19796C2D4515B47D2690 /* AirStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23414685B03BA930E6C4D94 /* AirStore.swift */; };
+		0D300181405EA00722B8661A /* TodayEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAD85ECA85C1BC1569658CF2 /* TodayEvent.swift */; };
+		0D9E377F27B61E08EB23187E /* OuraProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 509271CE5A03BE4EC284151A /* OuraProvider.swift */; };
 		0ED02C4262546D720DCBE5DE /* AddChorePage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B241213EA8E591629280B7EE /* AddChorePage.swift */; };
 		0ED59BE06DEBD263BBFA0D91 /* BadgeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EC7C9D9CAC52C91AFE79AE7 /* BadgeManager.swift */; };
+		0FEC34A8DE1AC32545F489C4 /* HabitsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136C8433FB649CD81132B054 /* HabitsPlugin.swift */; };
 		1044DAF00212F1890D0BBCC3 /* AreaRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = C729259A5867D99CC64AA9C3 /* AreaRecord.swift */; };
 		10550EB285720325B123ED7E /* EditCaffeineEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFF7884F079CD77F2AA126F9 /* EditCaffeineEntrySheet.swift */; };
 		11091A62DB6744BDE8673415 /* EditSupplementSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F70E70D8BC6F8B767D06FF9 /* EditSupplementSheet.swift */; };
 		116F32431DCC98176BC52830 /* ChoresDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E31867A580D7D96DFB20391B /* ChoresDestinationView.swift */; };
-		127A379491C1416D94315098 /* TodayLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C9CE8558AC348E4855A6CA6 /* TodayLogView.swift */; };
 		14A026D5D1BAFF0B4943D0E0 /* GutBristolRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52B5EEA9B508AB5AAB6152F8 /* GutBristolRecorder.swift */; };
 		15B7B63A6FAFF96F8697F226 /* AirDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 841912A106FECA1706069D4A /* AirDestinationView.swift */; };
+		171C4DED1F4D6CF052F024ED /* BackfillChoresSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54F508173C5BD014AEB8830C /* BackfillChoresSheet.swift */; };
+		174606742D6D5BE5AFBFCA50 /* HeatmapHomepageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BD0C4383360CD1A06E2A546 /* HeatmapHomepageView.swift */; };
+		C0FE1A7E001C0FE1A7E00002 /* CorrelationsHomepageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FE1A7E001C0FE1A7E00001 /* CorrelationsHomepageView.swift */; };
+		C0FE1A7E001C0FE1A7E00003 /* CorrelationsHomepageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FE1A7E001C0FE1A7E00001 /* CorrelationsHomepageView.swift */; };
+		C0FE1A7E001C0FE1A7E00012 /* GoalMetricEvaluator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E1A001000000000A111111 /* GoalMetricEvaluator.swift */; };
+		C0FE1A7E001C0FE1A7E00013 /* GoalMetricEvaluator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E1A001000000000A111111 /* GoalMetricEvaluator.swift */; };
+		C0FE1A7E001C0FE1A7E00022 /* GoalMetricProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E1A002000000000A222222 /* GoalMetricProgressView.swift */; };
+		C0FE1A7E001C0FE1A7E00023 /* GoalMetricProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E1A002000000000A222222 /* GoalMetricProgressView.swift */; };
+		17ADAC551DA38D31B787D33C /* HomepageDomainData.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9E4B96D09624A89E4D87019 /* HomepageDomainData.swift */; };
 		183F34C5DC50F1B0DE238401 /* CannabisQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D82674F62302252DB1B8167 /* CannabisQuickAddMenu.swift */; };
 		187093B93D48863B5E1E1E37 /* RemindersBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561130AE996F0E92FE02767D /* RemindersBridge.swift */; };
 		1872D480184BC0A84068D022 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBA5CADFC4205866897E4F8C /* App.swift */; };
+		18AB932BA675C01456276CE7 /* GoalRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA64E4CD9F48DE7AFFA52D84 /* GoalRecord.swift */; };
+		19B7D6F5DBDB4E5C5F3C50AB /* Fasting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5835F104E8DFAA668ACCF9A5 /* Fasting.swift */; };
+		1A4835E11C2F50BF2B833164 /* CaffeineTypeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B65BF5C0096129915EFA26FC /* CaffeineTypeSheet.swift */; };
+		1A579BBFDFC67BB3FA2F7E6A /* InsightsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91BAA74D7BB0302A9AA70DE9 /* InsightsDestinationView.swift */; };
 		1B5C67C9AB68E1F9822472D3 /* EditCannabisEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E49712FC24D8C18675935DF /* EditCannabisEntrySheet.swift */; };
 		1B693725E48BCC5939FE1196 /* AddInfoRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD5AAD8DD0E25AF940E3237C /* AddInfoRow.swift */; };
 		1C507D0995C20ECA4DA6479F /* ChoresQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = F531676F7BCEFA46F3A7D827 /* ChoresQuickAddMenu.swift */; };
 		1CBF0222F73BAE3CDDB0E342 /* ProjectRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A7C4DF4E90BB39F4A0D23DE /* ProjectRecord.swift */; };
+		1D7A5FE67321DE601A4A975A /* CannabisTypeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 199460C317554A7D235979EB /* CannabisTypeSheet.swift */; };
 		1DCDA337088FC9FEA65F9F73 /* NextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47CA5EA5A9284AB449966DCC /* NextView.swift */; };
 		1DFCCAA759E4B23AC3D03C10 /* HealthKitBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F61B77A80F53A6EEEBBC90EA /* HealthKitBridge.swift */; };
 		1E695C8629B03CA4D8A8BA37 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F0BEBB91083B3194167B548E /* PrivacyInfo.xcprivacy */; };
-		1E83F8AD25AA4E38C44CDA45 /* ChoresPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 574B2E277922DA5E20E37466 /* ChoresPlugin.swift */; };
 		1EA4599B775EAD7A9E472565 /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F13269D0CDB1EB49B2351D6 /* TaskDetailView.swift */; };
+		1F42E5CB802628226D0D7E8D /* SectionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18F72C4FF8B470B7B889B00 /* SectionPlugin.swift */; };
+		A1B2C3D4E5F60718293A4B5D /* SectionDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5C /* SectionDrawer.swift */; };
+		A1B2C3D4E5F60718293A4B5E /* SectionDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5C /* SectionDrawer.swift */; };
+		A1B2C3D4E5F60718293A4B62 /* StatStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B60 /* StatStrip.swift */; };
+		A1B2C3D4E5F60718293A4B63 /* StatStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B60 /* StatStrip.swift */; };
+		A1B2C3D4E5F60718293A4B64 /* LogEntryRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B61 /* LogEntryRow.swift */; };
+		A1B2C3D4E5F60718293A4B65 /* LogEntryRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B61 /* LogEntryRow.swift */; };
+		A1B2C3D4E5F60718293A4B67 /* ChartCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B66 /* ChartCard.swift */; };
+		A1B2C3D4E5F60718293A4B68 /* ChartCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B66 /* ChartCard.swift */; };
+		A1B2C3D4E5F60718293A4B6A /* StatGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B69 /* StatGrid.swift */; };
+		A1B2C3D4E5F60718293A4B6B /* StatGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B69 /* StatGrid.swift */; };
+		A1B2C3D4E5F60718293A4B6D /* DrawerDateStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B6C /* DrawerDateStrip.swift */; };
+		A1B2C3D4E5F60718293A4B6E /* DrawerDateStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B6C /* DrawerDateStrip.swift */; };
+		2062DECFE8C3FA1BD4668E60 /* BackfillSupplementsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BE63017AAC0030D65CA758B /* BackfillSupplementsSheet.swift */; };
 		2173E7FE6EFC115273513DF4 /* TasksQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0B5F0D2E1B01AAEF2217FA4 /* TasksQuickAddMenu.swift */; };
 		2242B79D13554F2C937E85BD /* NutritionSearchSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 533ABAE12036AA623BE82B59 /* NutritionSearchSheet.swift */; };
 		226BFDEF2964B3BA661ACC67 /* DayTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 880B70E1267B3CAAFFBA9D65 /* DayTimelineView.swift */; };
-		23B9A19A17D09092B9017F87 /* ActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A88D173E289074F16F3B1028 /* ActivityPlugin.swift */; };
+		23D0E10A24B9D654D78B129F /* SupplementsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28AD8E60186F9AAF8C1E52A3 /* SupplementsPlugin.swift */; };
 		23E576367F520EA8ACA8C355 /* TaskComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41F8977A576F2BB747E8DBD7 /* TaskComponents.swift */; };
 		241E03A545CC2025FA858C82 /* TaskRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62BF9F7C16DF9595A999267D /* TaskRecord.swift */; };
 		248295C0B1F9318FB1841555 /* AddCaffeinePage.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEF5F3A2F7A70BEADFCF88CA /* AddCaffeinePage.swift */; };
-		257986ED236E9DD52F6B7066 /* TestPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC92C4A0EDB0032A8216157 /* TestPlugin.swift */; };
-		268900096F5401045252C735 /* CaffeinePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 480BE4F0B92D70D332E473FF /* CaffeinePlugin.swift */; };
+		262EF303D006D36A39042280 /* ExerciseCatalogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B55D56BF301C74DCB785773E /* ExerciseCatalogView.swift */; };
+		2781B65014FE7E1D52A10876 /* DayBucket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85942F0F6AEDE3D4607485D4 /* DayBucket.swift */; };
 		278B79903C86B144C437F5D7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 75A7338B84E54DF44893A020 /* Assets.xcassets */; };
 		27FAA27C1B4C0F8D3EC2A94B /* ChoresDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E31867A580D7D96DFB20391B /* ChoresDestinationView.swift */; };
-		2804B8EB5F36E3469B9CC898 /* GroceriesPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8717AC713A8CB083B56E69C /* GroceriesPlugin.swift */; };
 		28777ACD729D9C78846219C4 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */; };
 		2877A01512C66155EF4EEA54 /* NextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47CA5EA5A9284AB449966DCC /* NextView.swift */; };
 		288822C1F37C59515A97A967 /* SeptenaServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D227602C1039FA2206A539A /* SeptenaServices.swift */; };
 		2933A423AA89C0FC06C738DD /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBA5CADFC4205866897E4F8C /* App.swift */; };
+		29BCD4B4754BFB299B32292B /* SleepPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8FACD3A9FAD9509B187D281 /* SleepPlugin.swift */; };
 		2A5F1570FB36894B1FBE4364 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B0FAB25573797D6BF8C9482 /* ContentView.swift */; };
 		2C68F00EF16E552C12B176AE /* GutDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2AF70B89A0D3FC41DAFAFE9 /* GutDestinationView.swift */; };
 		2D0446FF68EAE29C3AEEC770 /* GutBristolRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52B5EEA9B508AB5AAB6152F8 /* GutBristolRecorder.swift */; };
-		2D82ED261C2EC1F7264E6220 /* MoodDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24A01E1D30D6A0F4E9BA740F /* MoodDestinationView.swift */; };
+		2D0A24C76D229B145825EFA4 /* CaffeineTypeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B65BF5C0096129915EFA26FC /* CaffeineTypeSheet.swift */; };
 		2DCD1163302ADF72541A9664 /* EditChoreSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25DD66C82573E23BF3CCA2F8 /* EditChoreSheet.swift */; };
 		2E71534FB75930353C9B6320 /* HabitsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D38FA671236F83BEFCB8EBE /* HabitsDestinationView.swift */; };
 		2ED32D83DAF70E51745C9183 /* GroceriesDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FA781FD1BD2DC0AA7388700 /* GroceriesDestinationView.swift */; };
+		2F4616E5D71C4AE3CB45B37F /* AranetBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAFB0D3BA97B1038047EE05D /* AranetBridge.swift */; };
+		3001B4A5B0285FA146B92FBD /* SessionCompleteSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F9F5509B06FAD96E79B08D4 /* SessionCompleteSheet.swift */; };
 		31F0427B242C90F3B3EF4B0B /* CaffeineDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACEBFC5E297AA01C582EE1A5 /* CaffeineDestinationView.swift */; };
 		3239E48846BD07983E8A8FCF /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB454D5630376DAFA9CBF9E1 /* TaskListView.swift */; };
-		327546AD074F462E906349A5 /* ExercisePickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F37F2CBF6D294C3B9BDB4504 /* ExercisePickerSheet.swift */; };
+		3292128871BF0E9AAEE59677 /* ExerciseLibrarySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A708921A7D5F315781CFCF71 /* ExerciseLibrarySheet.swift */; };
 		331439A1A265FAA64B5B02B6 /* ConsistencyHeatmap.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0E984505A489247AADAB293 /* ConsistencyHeatmap.swift */; };
 		352B532706902FA61068D9FB /* NutritionQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA8B3755DDC65DD48AF4C3E /* NutritionQuickAddMenu.swift */; };
 		36325B1E6E5A771C01028105 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 31313A0E804B33A3E43FC1F6 /* Info.plist */; };
 		369638577C3010B9CD3FB351 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 77BEB26345A68838167042D8 /* PrivacyInfo.xcprivacy */; };
-		36BC5FCDA2E2B9EACE232818 /* AddMoodPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2A4FE569EF0885271CCDBD9 /* AddMoodPage.swift */; };
 		3797CC96603DC088851E9CA3 /* TaskCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = A08DA8E8E77422BB9583A61C /* TaskCommands.swift */; };
-		37C637FA20354B02A5330048 /* ExerciseDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7961DD5158A64BE39F40AFCA /* ExerciseDetailView.swift */; };
+		37AAF50E966216CA0280610E /* TodayEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAD85ECA85C1BC1569658CF2 /* TodayEvent.swift */; };
 		38449958A37427F0F31973A9 /* TasksQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0B5F0D2E1B01AAEF2217FA4 /* TasksQuickAddMenu.swift */; };
-		39526C71869E762CDA805628 /* MoodCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 091DFAB6AC37AD70F740D1DC /* MoodCatalog.swift */; };
-		39DF76042915AEA3F266DB4E /* PollenClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 168F70A74A3AA9D2A0E234DB /* PollenClient.swift */; };
+		38D2BDDEB7410B6AC61B2A85 /* ExerciseCatalogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B55D56BF301C74DCB785773E /* ExerciseCatalogView.swift */; };
 		3AD2CBA0A9A2EF4ACE740C5D /* HabitsQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB960188319E54312A616C00 /* HabitsQuickAddMenu.swift */; };
+		3B2DFB76DAC929996E5BA87C /* TodayLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FDD011B1DE9C5ED0C49EB56 /* TodayLogView.swift */; };
+		3B562D83E368E6726F7462AF /* SyncIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF9E152DA345E00295EC4F58 /* SyncIndicator.swift */; };
+		3BF5EDE454800965DA74FD91 /* TestPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85C3D20CB39FA9973ECF1129 /* TestPlugin.swift */; };
 		3C51EABA92695B18A7853BC1 /* GroceriesDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FA781FD1BD2DC0AA7388700 /* GroceriesDestinationView.swift */; };
 		3C64ED1D0A9AC256265FE06B /* PlatformShims.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13011C553B04F0ACEFD189CD /* PlatformShims.swift */; };
+		3CF144837E54654FBB9195F0 /* AirStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9040E2C70604B773FAFB726 /* AirStore.swift */; };
 		3CF5A02B1EFE2628F8E3E243 /* AddTaskIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5961822BB83BCF87B27E11AD /* AddTaskIntent.swift */; };
 		3D19536CFB66987D6D5C7642 /* Info-Mac.plist in Resources */ = {isa = PBXBuildFile; fileRef = 5B49A0D20B2ECD672137900F /* Info-Mac.plist */; };
 		3D3A14FB3652E280CC1E091F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 23D4FD6096AAAF4FF35B1824 /* Assets.xcassets */; };
 		3D46571B9A58D75B1947368B /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB3DA6C707EA3988C90D573B /* SidebarView.swift */; };
+		3D7D10D1B1E3CCBB8D8ACD14 /* BackfillHabitsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55296A1310EF36E96DC73A4E /* BackfillHabitsSheet.swift */; };
+		3E0184DE60F06697D6F59120 /* RoutineDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71127DDB09DDF4AADA870825 /* RoutineDetailView.swift */; };
 		3E0EF1DA201030BB6F2A4019 /* NutritionRecommendations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CEAA5532CD1C1A47DB1BBAC /* NutritionRecommendations.swift */; };
 		3EEDE3247DF0EDB92F55843D /* IntensityGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7DF7DE41AF304A9324BC6E /* IntensityGlyph.swift */; };
-		3EF3A029B47A336732DD8286 /* SectionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8C2C5B8FB80880E4552FDF8 /* SectionPlugin.swift */; };
 		3EFD534FCC0E072DCACD3839 /* SectionRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B8CA0380F3FD3679CE4C676 /* SectionRecord.swift */; };
-		3F5383B2831F9B4E8FE49083 /* ChoresPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 574B2E277922DA5E20E37466 /* ChoresPlugin.swift */; };
 		403EE99D65456FD99F82D568 /* ActivityDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80D7DFAC856BBE635EBBC6E4 /* ActivityDestinationView.swift */; };
-		413F494FDF5623DCE2D06CA8 /* SleepPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72E856E09C93DC0F6F9DC00F /* SleepPlugin.swift */; };
+		4077525AE4794C36B68770F9 /* SectionExplainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CA2DD637D2CF49F03A211BB /* SectionExplainer.swift */; };
+		4082657062EBC11108916FAE /* CannabisPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 159121D1191175E510CD312F /* CannabisPlugin.swift */; };
+		40A0EE423552A4504E87DCC4 /* MoodDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12E14E48DFB87C5F1543BEA4 /* MoodDestinationView.swift */; };
 		424F6899E25CE8A32DF9C1A6 /* AddTaskIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5961822BB83BCF87B27E11AD /* AddTaskIntent.swift */; };
+		43C9357C3238780EE8C04378 /* SupplementTypeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F326D9758674AD8EA4DBB211 /* SupplementTypeSheet.swift */; };
+		441C65E63C8A41A3CAAE1770 /* AranetBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAFB0D3BA97B1038047EE05D /* AranetBridge.swift */; };
 		450F6EE8AD17A6935567940D /* DayClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFD8EA98B891BB43A0CE4640 /* DayClock.swift */; };
 		454D024E707CE7FF7C823FEA /* NutritionRecommendations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CEAA5532CD1C1A47DB1BBAC /* NutritionRecommendations.swift */; };
+		45CFCA5E661E722E12BCA92B /* BackfillChoresSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54F508173C5BD014AEB8830C /* BackfillChoresSheet.swift */; };
+		4864ED3E9586783879087215 /* HomepageLayoutMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0B811772EC1DF4C9130BECD /* HomepageLayoutMode.swift */; };
 		48B94D7C0B89E8D398A8226A /* NextComplicationViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16A2330C66B761049C702ED /* NextComplicationViews.swift */; };
 		490A398C3B11F900B233B2F3 /* AddInfoRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D3C4FD96F6113A7975BA394 /* AddInfoRouter.swift */; };
 		495AAB0A42EE740E0934012A /* EditGutEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BCB8601AE73D7F70536C902 /* EditGutEntrySheet.swift */; };
 		4961E3BE36AB89493898CF3F /* CaffeineQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3841DB555C39521C2A088942 /* CaffeineQuickAddMenu.swift */; };
+		497ECF175FD15339CA083270 /* MoodCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33EB22A93C55573C49CFB21B /* MoodCatalog.swift */; };
 		4A14A3B8F875A6E4CC374781 /* BodyDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68B6F4EE0E6882204B5E6088 /* BodyDestinationView.swift */; };
 		4A9BF2842C0AC601AF8B7099 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25DC8E705099DB99718A8596 /* Persistence.swift */; };
 		4BA5BEC17010A16EB46CA603 /* ModuleTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = F79D2478011E9353A0DF90AC /* ModuleTile.swift */; };
 		4C3D2F04A2E30D64F74B5B49 /* SupplementsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C15C11DB7FD7994318364996 /* SupplementsDestinationView.swift */; };
 		4C7EE421B5249E3E301C3211 /* TaskRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62BF9F7C16DF9595A999267D /* TaskRecord.swift */; };
-		4DE0513FA4C449F29A031F9ACE599643 /* CannabisTypeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71E25F55030941F7AEEDA98D55D4E363 /* CannabisTypeSheet.swift */; };
+		4E81F7D428FDB2E8DB6E105D /* SectionExplainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CA2DD637D2CF49F03A211BB /* SectionExplainer.swift */; };
 		4F942DCF79C5D8EB5F471949 /* WatchAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F05E01AB86D25931CD682001 /* WatchAppDelegate.swift */; };
-		50A243F9AEE8BCD4C3217645 /* GutPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 121905DB16B21A4039F8D4E5 /* GutPlugin.swift */; };
 		513C8B1D41E5BA85B785129C /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E25F81FE5AA4B6BBC056275 /* DateParser.swift */; };
-		51F49952A24052A15F61C088 /* HabitsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7F00C1EE6CF4290A2AF9DCF /* HabitsPlugin.swift */; };
-		5240EA8A1A8C2A6DF18CEA31 /* HydrationPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72E90E2386D62D611F5EA965 /* HydrationPlugin.swift */; };
+		51B5D785192F411E5AAF941B /* GoalRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA64E4CD9F48DE7AFFA52D84 /* GoalRecord.swift */; };
+		5211F3474CA946655E003F5C /* QuickActionsApplier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 460C571ECD796E1777AD12C1 /* QuickActionsApplier.swift */; };
+		52C96CCC82FFC910B23BF7E3 /* SectionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18F72C4FF8B470B7B889B00 /* SectionPlugin.swift */; };
 		5330AF71083A1F3514B862B8 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */; };
 		533D26E5CB13EAC2F2B088B2 /* TrainingQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F79B52B56CF74E2F11586CC /* TrainingQuickAddMenu.swift */; };
-		53AE9D35D13046BB9E02BECFF6041939 /* CaffeineTypeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 143AEA376AD3403C8B17AE863677999B /* CaffeineTypeSheet.swift */; };
-		5441C30D38B94A9CA289C527 /* TrainingConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3433AE6FCB2549D390F9E43A /* TrainingConfigStore.swift */; };
+		546CDD30A2DDC610E321A0C9 /* HydrationPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C19D6CEBE8804EB7CD5D0256 /* HydrationPlugin.swift */; };
+		5480C8D91B5B539C4728B321 /* GoalsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 207D112EFCEB89F2F0D1DBE5 /* GoalsPlugin.swift */; };
 		56E87EA383673A4ACE86F2CD /* BadgeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EC7C9D9CAC52C91AFE79AE7 /* BadgeManager.swift */; };
+		574B0FA4260C0E1EC95380AD /* DefaultExerciseLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC732C2F50FC1EC9308BA218 /* DefaultExerciseLibrary.swift */; };
 		57C60FD78BA0AE6412721809 /* NutritionSearchSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 533ABAE12036AA623BE82B59 /* NutritionSearchSheet.swift */; };
 		57CDC37DD71D40C12819E6C6 /* GutDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2AF70B89A0D3FC41DAFAFE9 /* GutDestinationView.swift */; };
+		586C9902583DE614A4366541 /* DenseHomepageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81E6CCEAE6C25B88290F0666 /* DenseHomepageView.swift */; };
 		58A703D6DD359B0ABC742AC6 /* SupplementsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C15C11DB7FD7994318364996 /* SupplementsDestinationView.swift */; };
 		58AFCBB034501ACEC2C5DEF7 /* Migration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64EB95DB6A86885B3FA483C1 /* Migration.swift */; };
-		58B73FC4098A408CACA04153C8637FB6 /* CannabisTypeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71E25F55030941F7AEEDA98D55D4E363 /* CannabisTypeSheet.swift */; };
 		58DC084B12BA54003373BF5F /* HabitsQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB960188319E54312A616C00 /* HabitsQuickAddMenu.swift */; };
-		58DD67805AA678ADFA0709BB /* CalendarDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931BDD3D7FDDD2214CD72E8D /* CalendarDestinationView.swift */; };
 		58FDA00BDC6BB4FBADB665A9 /* RemindersImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A9CFE2B4EA160E84F58544 /* RemindersImportView.swift */; };
-		59355DDCFE98973BD36D6D5E /* DayBucket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B00840EA214FF8B761A9131 /* DayBucket.swift */; };
+		58FFFE3DA7E30239D91AE021 /* SupplementsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28AD8E60186F9AAF8C1E52A3 /* SupplementsPlugin.swift */; };
+		59333A2540ABE31E381C30C7 /* MacroCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5B53F1EA33DC5B17A751664 /* MacroCatalog.swift */; };
 		59D1D3BB3E05AF32C782A9C7 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = E17D3542734AB0B32527C12C /* AppIcon.icns */; };
+		5A6DFBAB575054F0FBA4B916 /* MoodQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 089893F59A6C1D2025AD8A2C /* MoodQuickAddMenu.swift */; };
+		5B33966B1FD021C5BE96C2B9 /* MoodCommitAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1AB58A3A36A898E92890EBA /* MoodCommitAnimation.swift */; };
 		5C2CAF18F7F1BB26F040A597 /* CKEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3A43D786998D198C9BCA480 /* CKEngine.swift */; };
+		5DA39382E21BCFF219BD239D /* AddMoodPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A1880819394CCA40FDB923 /* AddMoodPage.swift */; };
+		5F8897309D37117C9DC8B47B /* BrowseCannabisDaySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 851E4304EF13EE92F1DD7FF1 /* BrowseCannabisDaySheet.swift */; };
 		5FC8B85066ABC219A5C9EC86 /* NextWatchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 851BE2CCE51793135E27E354 /* NextWatchView.swift */; };
+		60E5C5EA8C6ACE6DB86771E9 /* QuickActionsApplier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 460C571ECD796E1777AD12C1 /* QuickActionsApplier.swift */; };
 		616C90B23EBD22005C6BBBAB /* AddGutPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 804ACCAA2E1FE43802EA25AB /* AddGutPage.swift */; };
-		621E7AE4A735609BC4D52617 /* MoodCommitAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E066C599C555EA32681FD3B /* MoodCommitAnimation.swift */; };
+		62C5EE0FBB7F2050E09F8663 /* GroceriesPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B3AFBAC2D7BFC759ACA6108 /* GroceriesPlugin.swift */; };
+		637C82B79BB177B96BD557E1 /* SleepPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8FACD3A9FAD9509B187D281 /* SleepPlugin.swift */; };
 		64BB65F0683A560F5055BA6A /* NextItemsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A26475D9A9D19DC0840960D /* NextItemsSection.swift */; };
+		4360951B3296182CD19590E6 /* WelcomeHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8CC0D108B59E1EB67CD24D6 /* WelcomeHeader.swift */; };
 		6521E27B88444ACE53AE24BE /* ChecklistMirror.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9D2A0C223ECB0DAA0D3EB12 /* ChecklistMirror.swift */; };
 		65246BE2E94DD5324730533D /* Plausible.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CA646178F906B39ADA6689F /* Plausible.swift */; };
 		6599659F45F9B6EF50FC2C1B /* ServerInspectorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53E343B15A4B6F29FBF956B8 /* ServerInspectorSheet.swift */; };
 		6600263164A28E6F185190DA /* AddTrainingPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F955392D23BB02F27DD39CD9 /* AddTrainingPage.swift */; };
+		6639EDEDC2C4CCC132BD3202 /* DefaultExerciseLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC732C2F50FC1EC9308BA218 /* DefaultExerciseLibrary.swift */; };
+		67A8CA1C1F2E0C7FF38E82EC /* TestPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85C3D20CB39FA9973ECF1129 /* TestPlugin.swift */; };
 		688DF9C7BC0CB50A51BF1191 /* NutritionQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA8B3755DDC65DD48AF4C3E /* NutritionQuickAddMenu.swift */; };
 		68FEC658F37E69C0360A47D5 /* NextComplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = C27BE273FD1D064942278AD1 /* NextComplication.swift */; };
 		693B2845164FA3B7FC5828FE /* AddInfoSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C35D898846EB8A48B77811E /* AddInfoSheet.swift */; };
-		6B0182EEBF11267189607343 /* GutPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 121905DB16B21A4039F8D4E5 /* GutPlugin.swift */; };
+		6A6D73A24BF96F100C34D4E5 /* PollenClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43C61622FF3214AA0D70A6E7 /* PollenClient.swift */; };
 		6B3C51BC822675123EE51792 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ACB6256DD75D93215BDFD3C /* RootTabView.swift */; };
+		6BCCB12F09DCD746682BEB57 /* AirPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 546E6C4D1FEE1F69FAD2E514 /* AirPlugin.swift */; };
+		6C69EC098DA1B3FF1463B22B /* TodayLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FDD011B1DE9C5ED0C49EB56 /* TodayLogView.swift */; };
 		6D1BE00011E60EE3A490364D /* Migration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64EB95DB6A86885B3FA483C1 /* Migration.swift */; };
 		6DB169E3C4B6BC5BA8855D66 /* ResponseCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D6916E979E5B0D7497CAEF /* ResponseCache.swift */; };
 		6DEF721835395CBA52F670D4 /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB454D5630376DAFA9CBF9E1 /* TaskListView.swift */; };
+		6E613152F22C42599AE4AAEC /* Fraunces-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 486E060C50F1CDAEAFCE8E73 /* Fraunces-Regular.ttf */; };
 		6E8B2BF31D21E78F9DF58A14 /* WatchBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 757E2ED9D591D3EB6A07DF8A /* WatchBridge.swift */; };
-		6FB1988A2BCFEDD715358E83 /* SupplementsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 133C3DFB6771D681737DAB58 /* SupplementsPlugin.swift */; };
+		6F104C934A5BF6230CC8C1F9 /* MoodQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 089893F59A6C1D2025AD8A2C /* MoodQuickAddMenu.swift */; };
+		6F57829A6E98A79B04CCA884 /* BackfillHabitsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55296A1310EF36E96DC73A4E /* BackfillHabitsSheet.swift */; };
+		711BBE3777A1E22BE474BDF0 /* RoutineCatalogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21B54F8682AE8C22E352630E /* RoutineCatalogView.swift */; };
+		713762038CBF75DAC8A73954 /* SectionGoalsStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56A7117A7C0612C55CFF2CD2 /* SectionGoalsStrip.swift */; };
 		7397EB4533BA4D026F9F7662 /* CalendarBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7027B881D1D8B1B09B105034 /* CalendarBridge.swift */; };
-		745A9B191F9F4549AB7ECE8D /* SupplementTypeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B73D2010A0604DBEB34C0478 /* SupplementTypeSheet.swift */; };
+		73A70B780F096F7BDB0DA963 /* ConfettiBurst.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2CA5B9FC1BA7572CC27B4D5 /* ConfettiBurst.swift */; };
 		74E631E4D6B41796BBE7B3FA /* AreaRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = C729259A5867D99CC64AA9C3 /* AreaRecord.swift */; };
+		75F953C419493CAE4EC29A6E /* GoalsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 207D112EFCEB89F2F0D1DBE5 /* GoalsPlugin.swift */; };
 		76C049B6FAEBDE6471287104 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0365044C6EA062BBFCCA6B /* SettingsView.swift */; };
-		77E928D21CAF90C89193DF82 /* TrainingPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 392657C251E452BFEAEC6269 /* TrainingPlugin.swift */; };
+		77B186F9015710E0B19204AB /* MacroCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5B53F1EA33DC5B17A751664 /* MacroCatalog.swift */; };
+		781B94B6A0387DD5D7887DEF /* BrowseCaffeineDaySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BEAFA5D3DBFCEBEE2EA7FAC /* BrowseCaffeineDaySheet.swift */; };
+		78A010829ED331BCE4D95AEE /* SectionGoalsStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56A7117A7C0612C55CFF2CD2 /* SectionGoalsStrip.swift */; };
 		78A4E7FB3BB9AED6E920A21E /* EditCannabisEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E49712FC24D8C18675935DF /* EditCannabisEntrySheet.swift */; };
 		78C28CA0B3780E99EC30BC75 /* DayClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFD8EA98B891BB43A0CE4640 /* DayClock.swift */; };
-		7B0EB1B5087C2B93BB9892AF /* TasksPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0E36B524CE0AB7DCE4252B /* TasksPlugin.swift */; };
-		7B6E0700686F4161866A1A3E /* RoutineDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 300B15288763456C89D8AF5E /* RoutineDetailView.swift */; };
 		7BF180B58D52C2BD10BBC5AB /* MenuBarMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD90B8D1D8A0A978D1CE744C /* MenuBarMenu.swift */; };
-		7D2C93058A1B4CB99BBDFED1 /* ExerciseCatalogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A6ED461B2684D5994525988 /* ExerciseCatalogView.swift */; };
-		7DD6DCA0A66C144DA6686FF4 /* CalendarDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931BDD3D7FDDD2214CD72E8D /* CalendarDestinationView.swift */; };
 		7EACBD21879EB225D558CF78 /* SharedComplicationData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F191C9B4CF7C226C46AC330 /* SharedComplicationData.swift */; };
 		7F86986DFF10251984C6D58F /* EditGroceryItemSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4C5E5E15422EB17DB5D3960 /* EditGroceryItemSheet.swift */; };
 		7FE5815A1FDDD537C1337A6E /* AddInfoSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8762C7A4DFED340274D8BD37 /* AddInfoSection.swift */; };
 		7FFEA95721A7FACE74618002 /* ChecklistMirror.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9D2A0C223ECB0DAA0D3EB12 /* ChecklistMirror.swift */; };
 		829009F90CB9E37A6D1D9341 /* LogRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DDBCEACF8957679BD5E02F2 /* LogRow.swift */; };
 		82BBE632A990482C26C7BB0F /* QuickAddToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A926F2FA426ABCDD73F33BE /* QuickAddToolbar.swift */; };
-		82D56A83AF077D7035E38186 /* BodyPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 580F93EC39DB4D7876D3FC61 /* BodyPlugin.swift */; };
 		83D51A84E5045C1EC509EC83 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB3DA6C707EA3988C90D573B /* SidebarView.swift */; };
-		840B7914A69E461184CD9510 /* ExerciseDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7961DD5158A64BE39F40AFCA /* ExerciseDetailView.swift */; };
-		847CECE9D10903FA540FB129 /* MoodPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6311231B3AABDB9BC4CBB69 /* MoodPlugin.swift */; };
-		84F6757BD8B51515B8093A15 /* TodayEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB74A5AFBC9C70CD48B03DFB /* TodayEvent.swift */; };
-		858359D3B6CD430F9FDABC7A /* GoalRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43B06CF53AF54BE2BFCE87FF /* GoalRecord.swift */; };
-		885264F646BBDDDF349A3FC9 /* AddMoodPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2A4FE569EF0885271CCDBD9 /* AddMoodPage.swift */; };
+		87DDC3A29CBD5AA95BDA19E8 /* TrainingConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F68950F621AB4EC987ED06CC /* TrainingConfigStore.swift */; };
+		882529A4B2900274FC268325 /* AddMoodPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A1880819394CCA40FDB923 /* AddMoodPage.swift */; };
 		88D354F6ACC5B87602A1B731 /* ShortcutAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB6A01D91E7B3ED63B6BFDE /* ShortcutAction.swift */; };
 		88D6592312AB55D1A314C247 /* EditNutritionEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C79C561E59D69B3653B65047 /* EditNutritionEntrySheet.swift */; };
 		8920FD91C3706F090902F4A5 /* SettingsRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C93BF01E5F69A01E9E9302 /* SettingsRecord.swift */; };
 		892B9AF1DFB498BD9A0C0B67 /* AddNutritionPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB3A88C2CE6907A4D7BF34C2 /* AddNutritionPage.swift */; };
+		89D14499AF91285819719AE9 /* ActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B5BF16679C5BA62C066871C /* ActivityPlugin.swift */; };
 		8B2588E5DB7635580E73217D /* EditChoreSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25DD66C82573E23BF3CCA2F8 /* EditChoreSheet.swift */; };
 		8BB0BE46187F796D00BAB65A /* GroceriesQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04282C19B1BCFF16B61F4CA1 /* GroceriesQuickAddMenu.swift */; };
-		8C4887ED959A4AF899C9C4A7 /* TodayLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C9CE8558AC348E4855A6CA6 /* TodayLogView.swift */; };
 		8C4B8E2EEE2504ED9E24D5EA /* NavigationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C59B083F7F5C67ABE440868 /* NavigationState.swift */; };
 		8C64426276695251AE35D327 /* ChoresQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = F531676F7BCEFA46F3A7D827 /* ChoresQuickAddMenu.swift */; };
-		8C7C5923327E489EB368E41A /* ExerciseCatalogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A6ED461B2684D5994525988 /* ExerciseCatalogView.swift */; };
 		8D494DC3944E6DF820478280 /* AddGutPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 804ACCAA2E1FE43802EA25AB /* AddGutPage.swift */; };
+		8DA58FF2CBBFC76AF92A17BF /* GroceriesPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B3AFBAC2D7BFC759ACA6108 /* GroceriesPlugin.swift */; };
 		8F36E77E81D7EAC78F51D64A /* NewNutritionEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C180106D47D0477F75695A /* NewNutritionEntrySheet.swift */; };
-		90485134CFA0D4BA5126024D /* MoodCommitAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E066C599C555EA32681FD3B /* MoodCommitAnimation.swift */; };
+		9056B762F0365C38DEA0F888 /* CorrelationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F0DA5FA7D3E03C2DB1DE7C7 /* CorrelationEngine.swift */; };
+		916916787FA1E0BA3BDB64A0 /* DenseHomepageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81E6CCEAE6C25B88290F0666 /* DenseHomepageView.swift */; };
 		91693AEE32D3825C811733E8 /* AddTrainingPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F955392D23BB02F27DD39CD9 /* AddTrainingPage.swift */; };
 		91CF39EC64CE090D8FDB9C65 /* EditHabitSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4E0ADF5987E9D7E112126AB /* EditHabitSheet.swift */; };
 		92F25DBCB85C19C91F51ADB7 /* EditNutritionEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C79C561E59D69B3653B65047 /* EditNutritionEntrySheet.swift */; };
@@ -192,203 +243,186 @@
 		94702073666C4968D36B96C5 /* RemindersBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561130AE996F0E92FE02767D /* RemindersBridge.swift */; };
 		9487FE0DD2DC6FC6F602F4F8 /* AddInfoSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8762C7A4DFED340274D8BD37 /* AddInfoSection.swift */; };
 		94C72024A922FE15CD3B7DF0 /* AddCannabisPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1387A56A99DA78515CE7FA9F /* AddCannabisPage.swift */; };
+		94E29BB41F4A043B13DC2BF0 /* AirStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9040E2C70604B773FAFB726 /* AirStore.swift */; };
 		94E55C9AFE0C64704EB64CB3 /* NextDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8416FB0AD38638BF7038BF2A /* NextDashboardView.swift */; };
 		95FF3A61C542C9B1633050C3 /* SectionManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27161C741F9EC6CFC1F83CE0 /* SectionManifest.swift */; };
 		963652437C3079BD46CC1E83 /* NutritionDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42EB061D69FA656547DC171F /* NutritionDestinationView.swift */; };
-		97DBBEEC48CB1FEABE3E8629 /* BodyPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 580F93EC39DB4D7876D3FC61 /* BodyPlugin.swift */; };
-		99989A4D32EAED98F631DF0D /* EditMoodEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F23F5CB85029263FB4836E3 /* EditMoodEntrySheet.swift */; };
+		97056BA97DD06A5D8A5A0AE4 /* BrowseCaffeineDaySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BEAFA5D3DBFCEBEE2EA7FAC /* BrowseCaffeineDaySheet.swift */; };
 		99C5E0B4C1F96A710C71DFFC /* DayTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 880B70E1267B3CAAFFBA9D65 /* DayTimelineView.swift */; };
 		9A309102A56D669A431C6703 /* EditGroceryItemSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4C5E5E15422EB17DB5D3960 /* EditGroceryItemSheet.swift */; };
-		9A403F3BAF0087FD1583B6E3 /* AranetBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCA388A73616C38F7456E6BE /* AranetBridge.swift */; };
-		9BB49BD7F88671873926C153 /* HabitsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7F00C1EE6CF4290A2AF9DCF /* HabitsPlugin.swift */; };
 		9BB4EA54B6DB8B01A7CE8C19 /* AddTaskPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0EBCAFF8036A11B0BBEC06E /* AddTaskPage.swift */; };
-		9BD2367C11EE78F0C4970951 /* AirPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEFA831669F65CF778C6C38B /* AirPlugin.swift */; };
+		9D294C6FFD9CFE45F6E11B7D /* ChoresPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D3C973F9983AB94CEB95337 /* ChoresPlugin.swift */; };
+		9D795EF920A464F5F76EE2F6 /* AirPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 546E6C4D1FEE1F69FAD2E514 /* AirPlugin.swift */; };
 		9E8994F78DFE201A05147CE2 /* TrainingQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F79B52B56CF74E2F11586CC /* TrainingQuickAddMenu.swift */; };
 		9E8F15EC733A433E18D82362 /* SearchTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48D2DD3CC83AA08A30DA2938 /* SearchTabView.swift */; };
+		9EA68EE136C5016C9196136E /* BodyPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D7AE711DD74BE91E7EECA48 /* BodyPlugin.swift */; };
 		9EA753D4BE7912ACB670B69F /* ModuleTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = F79D2478011E9353A0DF90AC /* ModuleTile.swift */; };
-		A0989A011D4F4AD3A890BD6A /* ExercisePickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F37F2CBF6D294C3B9BDB4504 /* ExercisePickerSheet.swift */; };
-		A1039E0E7E67EBD3249D3115 /* PollenClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 168F70A74A3AA9D2A0E234DB /* PollenClient.swift */; };
+		A07317BD24F6EA572471222F /* CannabisTypeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 199460C317554A7D235979EB /* CannabisTypeSheet.swift */; };
 		A14B8DF03D6FC0799D8AA8C2 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = E17D3542734AB0B32527C12C /* AppIcon.icns */; };
-		A1B1C1D1E1F1020202020202 /* OuraProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B1C1D1E1F1010101010101 /* OuraProvider.swift */; };
-		A1B1C1D1E1F1030303030303 /* OuraProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B1C1D1E1F1010101010101 /* OuraProvider.swift */; };
-		A1B2C3D40000000000F10102 /* InsightsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000F10101 /* InsightsDestinationView.swift */; };
-		A1B2C3D40000000000F10103 /* InsightsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000F10101 /* InsightsDestinationView.swift */; };
-		A1B2C3D40000000000F10202 /* CorrelationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000F10201 /* CorrelationEngine.swift */; };
-		A1B2C3D40000000000F10203 /* CorrelationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000F10201 /* CorrelationEngine.swift */; };
 		A1C7525645EBE54B283DC0D9 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25DC8E705099DB99718A8596 /* Persistence.swift */; };
 		A1D4907004FD78EC3D6F7C6F /* ShortcutAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB6A01D91E7B3ED63B6BFDE /* ShortcutAction.swift */; };
-		A2656F10D275C4A2407A5283 /* CannabisPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 471562D540F368C2B008038B /* CannabisPlugin.swift */; };
+		A22130AF134CD3219A94BEBD /* WithingsProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF60A4EBE9BB351D23C913BE /* WithingsProvider.swift */; };
 		A34023762B95F32B5CC4D981 /* AreasProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44D44998956C28A061A4DBAE /* AreasProjectsView.swift */; };
 		A36B5F790EA56294CC9ADE5A /* AddNutritionPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB3A88C2CE6907A4D7BF34C2 /* AddNutritionPage.swift */; };
 		A4CE6F3B52A5191642AB9316 /* SharedComplicationData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F191C9B4CF7C226C46AC330 /* SharedComplicationData.swift */; };
+		A5A083B827BC6B45473A9F3A /* Fraunces-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 486E060C50F1CDAEAFCE8E73 /* Fraunces-Regular.ttf */; };
 		A5DBCDF52DE4E8E077C6451E /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */; };
+		A64695EB2E96AEA85444D310 /* Fasting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5835F104E8DFAA668ACCF9A5 /* Fasting.swift */; };
 		A656A1AAAD5DE20253D6ABB7 /* AreasProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44D44998956C28A061A4DBAE /* AreasProjectsView.swift */; };
 		A6D80B6B57734D9155888CC7 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B0FAB25573797D6BF8C9482 /* ContentView.swift */; };
 		A7F3580380663FA1FA645ED0 /* SectionManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27161C741F9EC6CFC1F83CE0 /* SectionManifest.swift */; };
 		A90F8338D53AE42BA5F3FA33 /* SleepDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9859683174B5C2A84764D99C /* SleepDestinationView.swift */; };
 		A97FAA9330439D1F0842F071 /* GoalsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40D9EAAB80FD7F9FAC57F20B /* GoalsView.swift */; };
 		AA0022D742A4E427536BC219 /* AddTaskPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0EBCAFF8036A11B0BBEC06E /* AddTaskPage.swift */; };
+		AA180D6CF5C6326D64004622 /* BrowseGutDaySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 624F4DB126AEF0811BFBF590 /* BrowseGutDaySheet.swift */; };
 		AA49332965231083B1AB9644 /* ProjectsBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FD1B7B2BAE523F2E4D3F99C /* ProjectsBackend.swift */; };
+		AA637C7BAA42F926C11A1854 /* HeatmapHomepageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BD0C4383360CD1A06E2A546 /* HeatmapHomepageView.swift */; };
+		AA7B23BB1EA2FA73771D0069 /* HomepageDomainData.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9E4B96D09624A89E4D87019 /* HomepageDomainData.swift */; };
 		AAA65F1D4EAAA763A7255B45 /* SeptenaWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 5122E5C1D750654468CDCE96 /* SeptenaWatch.app */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		AB3A2E8331E9943EDE433E44 /* TrainingPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 392657C251E452BFEAEC6269 /* TrainingPlugin.swift */; };
 		AB4D0CE5A8F8961949BC886D /* WeekDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4847155874CE3B82AD612728 /* WeekDashboardView.swift */; };
 		AB68497A7AF5F88ED33EAB79 /* EditSupplementSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F70E70D8BC6F8B767D06FF9 /* EditSupplementSheet.swift */; };
 		AB689CCEB13486AEB4AE05C8 /* IntensityGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7DF7DE41AF304A9324BC6E /* IntensityGlyph.swift */; };
 		AD6AB8AB9F61D39820850F23 /* SeptenaWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1130C3EBCF558AF0EFB27AB9 /* SeptenaWatchApp.swift */; };
 		AD8E6D6E9DFA518DBC2B50CA /* AddChorePage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B241213EA8E591629280B7EE /* AddChorePage.swift */; };
 		ADCA538CBFB1E75DCC416215 /* SettingsRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C93BF01E5F69A01E9E9302 /* SettingsRecord.swift */; };
+		AE037FEEBEC164AE695B6329 /* NutritionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3478D00EF04684D27A69EECF /* NutritionPlugin.swift */; };
 		AF5A77B5B730923A825F7C89 /* Outbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD295FAB7B881CAC43EE8C34 /* Outbox.swift */; };
+		AF64B18251F2EE3C868C7337 /* MoodPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4E90D21C382F9970E4AAF88 /* MoodPlugin.swift */; };
 		B09EA3455FBF702224C33616 /* CalendarBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7027B881D1D8B1B09B105034 /* CalendarBridge.swift */; };
 		B0DA42E828CAC0BD0B0E64B9 /* TrainingDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C8645572712693D81587B7C /* TrainingDestinationView.swift */; };
 		B1890C3913BBCEC6EFF39807 /* SearchTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48D2DD3CC83AA08A30DA2938 /* SearchTabView.swift */; };
-		B1C08A4AB831AA701C7BDC75 /* TestPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC92C4A0EDB0032A8216157 /* TestPlugin.swift */; };
 		B211B2678BDDD3B30FD9307D /* ResponseCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D6916E979E5B0D7497CAEF /* ResponseCache.swift */; };
 		B28E04772BF9921F6B165657 /* CannabisQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D82674F62302252DB1B8167 /* CannabisQuickAddMenu.swift */; };
-		B29CF73788726A5C55ABF071 /* AirStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23414685B03BA930E6C4D94 /* AirStore.swift */; };
-		B2C2D2E2F2A2020202020202 /* WithingsProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C2D2E2F2A2010101010101 /* WithingsProvider.swift */; };
-		B2C2D2E2F2A2030303030303 /* WithingsProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C2D2E2F2A2010101010101 /* WithingsProvider.swift */; };
-		B375D2E2DCB899AE313B477A /* EditMoodEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F23F5CB85029263FB4836E3 /* EditMoodEntrySheet.swift */; };
 		B45A3DCE0AC3B32856BA727C /* SettingsMirror.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5439F75303F906465F9F2C6 /* SettingsMirror.swift */; };
 		B4FF26A77957BACDB89050C5 /* WeekDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4847155874CE3B82AD612728 /* WeekDashboardView.swift */; };
 		B52F421956F45A0367348241 /* PlatformDelegates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1654FD32744DA1974DA1C1CE /* PlatformDelegates.swift */; };
-		B531EF9C7FB18B241FFC6B21 /* GoalsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC8C2483181BE09B32245F3 /* GoalsPlugin.swift */; };
 		B5C4876EC67FCD081FB3E0C5 /* WatchConnectivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A09644381782A9A298BDC709 /* WatchConnectivity.swift */; };
 		B60A9AE489FD7502DC0B83B8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0365044C6EA062BBFCCA6B /* SettingsView.swift */; };
+		B649C5BBC42172713718ACEE /* TrainingPRCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE7BD5841409D69626291279 /* TrainingPRCalculator.swift */; };
 		B717FF226A4C4E3CA00A8928 /* EditCaffeineEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFF7884F079CD77F2AA126F9 /* EditCaffeineEntrySheet.swift */; };
 		B96B17EC37A2CFD6C1F1E862 /* AddCaffeinePage.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEF5F3A2F7A70BEADFCF88CA /* AddCaffeinePage.swift */; };
 		B96C96E8E9B28590E7204C0C /* NextItemsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A26475D9A9D19DC0840960D /* NextItemsSection.swift */; };
-		B9A070171BFD45F3891526C4 /* SectionGoalsStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3C6FC55D78F4D958C517B00 /* SectionGoalsStrip.swift */; };
+		D24EEBED0F1BFDF200CC26DA /* WelcomeHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8CC0D108B59E1EB67CD24D6 /* WelcomeHeader.swift */; };
+		B97B4B6B0070C0E28FD67B5C /* HydrationPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C19D6CEBE8804EB7CD5D0256 /* HydrationPlugin.swift */; };
 		BA110C8B6611A56723B23E66 /* NextSuggestionsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6392DC43E2FE913972F42911 /* NextSuggestionsSection.swift */; };
 		BB19A2F7287FB286F1725A9C /* NextSuggestionsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6392DC43E2FE913972F42911 /* NextSuggestionsSection.swift */; };
-		BB6E0880C11C8581A0EFE7AC /* CaffeinePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 480BE4F0B92D70D332E473FF /* CaffeinePlugin.swift */; };
+		BBA737CEEE52190FE9486AA6 /* InsightsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91BAA74D7BB0302A9AA70DE9 /* InsightsDestinationView.swift */; };
+		BC0A7CBC554735ABF30A8001 /* SyncIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF9E152DA345E00295EC4F58 /* SyncIndicator.swift */; };
 		BD6E080D2682C87ACB9190DD /* AddInfoSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C35D898846EB8A48B77811E /* AddInfoSheet.swift */; };
-		BDA42CE92BCC3758D45ED76B /* CannabisPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 471562D540F368C2B008038B /* CannabisPlugin.swift */; };
+		BDD2EFA54C60BFF4059B9C61 /* TasksPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB380FE69F57820927B8BD3D /* TasksPlugin.swift */; };
+		BE7C64BB366E2EDDCFE60FF6 /* HomepageLayoutMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0B811772EC1DF4C9130BECD /* HomepageLayoutMode.swift */; };
 		BED02B3B08E74E921C1A15EF /* ActivityDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80D7DFAC856BBE635EBBC6E4 /* ActivityDestinationView.swift */; };
+		BEF2D6CEC537A8A230DCD142 /* WithingsProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF60A4EBE9BB351D23C913BE /* WithingsProvider.swift */; };
+		BF21A6B5BEFFC4F242D109B8 /* ExerciseDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA383A920BC6CB923009E20 /* ExerciseDetailView.swift */; };
+		BF8496432439A9FD8CFAE95E /* DayBucket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85942F0F6AEDE3D4607485D4 /* DayBucket.swift */; };
+		BFAFA1121DC35073F6D352F6 /* BrowseGutDaySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 624F4DB126AEF0811BFBF590 /* BrowseGutDaySheet.swift */; };
 		C0E093740769380C81FD31BA /* SupplementsQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = C62E8037BC8CBCE13C164828 /* SupplementsQuickAddMenu.swift */; };
 		C1F56FDF315938C5A58E8A98 /* PlatformShims.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13011C553B04F0ACEFD189CD /* PlatformShims.swift */; };
+		C219D784BF82706F81689818 /* ExercisePickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D3250962535171689FCDA30 /* ExercisePickerSheet.swift */; };
 		C24AEFBDA5239F683441612F /* EditHabitSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4E0ADF5987E9D7E112126AB /* EditHabitSheet.swift */; };
-		C2F0C7B6B510698BFF2B27C8 /* AranetBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCA388A73616C38F7456E6BE /* AranetBridge.swift */; };
 		C340BAAC69B40F5B9CD987BD /* GutQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6326F985506DA489D2B176A7 /* GutQuickAddMenu.swift */; };
 		C35D98E7CDEB7F082AB4F4DB /* NextDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8416FB0AD38638BF7038BF2A /* NextDashboardView.swift */; };
 		C3AC44E24947DE4D47DA8A42 /* ServerInspectorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53E343B15A4B6F29FBF956B8 /* ServerInspectorSheet.swift */; };
-		C3D3E3F3A3B3020202020202 /* Logging.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D3E3F3A3B3010101010101 /* Logging.swift */; };
-		C3D3E3F3A3B3030303030303 /* Logging.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D3E3F3A3B3010101010101 /* Logging.swift */; };
 		C4CDFDADFE30B34C6A81F2FC /* AddSupplementPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1122B52B5A42A03C8EECA08 /* AddSupplementPage.swift */; };
-		C53A421F2DE1BA6146A8A5B5 /* SectionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8C2C5B8FB80880E4552FDF8 /* SectionPlugin.swift */; };
 		C54E2FFB072378F72D591866 /* TaskReads.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CBF0DAD74F9392D507229CE /* TaskReads.swift */; };
-		C5808608A8784B4503C7EAFA /* MoodQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEF5AB60845609D46FB5790D /* MoodQuickAddMenu.swift */; };
+		C5990B6C94853325ABBD62C0 /* BrowseCannabisDaySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 851E4304EF13EE92F1DD7FF1 /* BrowseCannabisDaySheet.swift */; };
 		C64474C5F09E554A5EF98989 /* ProjectsBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FD1B7B2BAE523F2E4D3F99C /* ProjectsBackend.swift */; };
 		C65F6155BFC934F53BA47CA1 /* AddCannabisPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1387A56A99DA78515CE7FA9F /* AddCannabisPage.swift */; };
 		C67CA826A4F4DBC432F86CBC /* AddSupplementPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1122B52B5A42A03C8EECA08 /* AddSupplementPage.swift */; };
 		C69F364723C44FE9F240239A /* BodyDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68B6F4EE0E6882204B5E6088 /* BodyDestinationView.swift */; };
-		C79F278BD9774C3CA732ED85 /* RoutineCatalogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 081C200B1EF94461903CD614 /* RoutineCatalogView.swift */; };
+		C6EE3C372089D7A231497306 /* ExerciseLibrarySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A708921A7D5F315781CFCF71 /* ExerciseLibrarySheet.swift */; };
 		C7AC2E4E116DAB445A500573 /* AreasBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E598D0EF28BF638E97F3F22 /* AreasBackend.swift */; };
 		C8431A57209DF77F8D9F9E59 /* CannabisDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8426035C14708F9B19546DE /* CannabisDestinationView.swift */; };
 		C8F7E91227008E29DA40DB5C /* SectionRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B8CA0380F3FD3679CE4C676 /* SectionRecord.swift */; };
 		C9730A8D5FCB43EAC9A6C304 /* NewNutritionEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C180106D47D0477F75695A /* NewNutritionEntrySheet.swift */; };
 		C9A195F8FF0C63824E0A5BD8 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */; };
 		CAC1308955C25982A48369D8 /* NextComplicationBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FBFFB14069FB717EF02173A /* NextComplicationBundle.swift */; };
-		CAC9C6083B9C201AE12A4718 /* HydrationPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72E90E2386D62D611F5EA965 /* HydrationPlugin.swift */; };
+		CAC3D7882FBA4CC14C531FEE /* TasksPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB380FE69F57820927B8BD3D /* TasksPlugin.swift */; };
 		CB31EA476ED138FEC78FCE6B /* PlatformDelegates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1654FD32744DA1974DA1C1CE /* PlatformDelegates.swift */; };
 		CC39344C28C121004522CAB8 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ACB6256DD75D93215BDFD3C /* RootTabView.swift */; };
-		CC682C670CAA403DB4E9006B /* GoalRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43B06CF53AF54BE2BFCE87FF /* GoalRecord.swift */; };
 		CC74FC02CD22EC7F0A3AC8AF /* HabitsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D38FA671236F83BEFCB8EBE /* HabitsDestinationView.swift */; };
 		CE8853363A268EF8768114E7 /* EditGutEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BCB8601AE73D7F70536C902 /* EditGutEntrySheet.swift */; };
 		CF04EE095D677287C2041ACF /* ProjectRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A7C4DF4E90BB39F4A0D23DE /* ProjectRecord.swift */; };
 		CF2133D047172BAD081AFF40 /* TaskComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41F8977A576F2BB747E8DBD7 /* TaskComponents.swift */; };
-		CFB9EDEB897F8DF6D9AAA002 /* MoodDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24A01E1D30D6A0F4E9BA740F /* MoodDestinationView.swift */; };
 		D01136C3F62828F390C2ED45 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F911216C13CBFC7E330714A /* Theme.swift */; };
 		D0292E8244711012808180C5 /* WatchBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 757E2ED9D591D3EB6A07DF8A /* WatchBridge.swift */; };
-		D068D21F9ACA4BBC8B793E94 /* RoutineDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 300B15288763456C89D8AF5E /* RoutineDetailView.swift */; };
+		D057C45AB5852CC5800058D8 /* EditMoodEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 096FF0E177B6CFC4B5A6D912 /* EditMoodEntrySheet.swift */; };
 		D0C21C52489E6C861A6B0A13 /* EditExerciseEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5B59047A762635E5A4D89D0 /* EditExerciseEntrySheet.swift */; };
-		D1C1F87FC588486EB9213B3F /* SupplementTypeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B73D2010A0604DBEB34C0478 /* SupplementTypeSheet.swift */; };
 		D2ED87D701557BCC94446AC6 /* AddInfoRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD5AAD8DD0E25AF940E3237C /* AddInfoRow.swift */; };
 		D3D801AE0714FA3E8696508A /* SectionTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03DC46C772E45B60ECB7343 /* SectionTheme.swift */; };
 		D4B1495C0BDE3AF22A629505 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */; };
 		D4F38C66817C3036A92F03C7 /* Accessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26ED5AC7B6F2400A0A4B378C /* Accessibility.swift */; };
+		D68C4DF01907E23021C0EB16 /* MoodDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12E14E48DFB87C5F1543BEA4 /* MoodDestinationView.swift */; };
 		D70A3B473E3ACD222FD15870 /* SeptenaServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D227602C1039FA2206A539A /* SeptenaServices.swift */; };
 		D8337D72DCD514F36A6094B4 /* MenuBarMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD90B8D1D8A0A978D1CE744C /* MenuBarMenu.swift */; };
 		D84CE356C37CEBDDCCDF1B74 /* SeptenaWatchComplication.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B456DE05339EB2A12EB2A9BE /* SeptenaWatchComplication.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		D87619020A982717812E2C6C /* DayBucketHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32A70DB5FE3A7F04BE3E7BAC /* DayBucketHeader.swift */; };
 		D96F2922568F67A65AAA9AAC /* CaffeineDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACEBFC5E297AA01C582EE1A5 /* CaffeineDestinationView.swift */; };
+		D9723D91628B03674BBC00C4 /* BackfillSupplementsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BE63017AAC0030D65CA758B /* BackfillSupplementsSheet.swift */; };
+		D9E97578F42A8C84B5AE2611 /* SupplementTypeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F326D9758674AD8EA4DBB211 /* SupplementTypeSheet.swift */; };
 		DBD1584A15E7BCA54B072F50 /* TasksBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3882D64DF6517B0447F5F65C /* TasksBackend.swift */; };
 		DC86ECB869790C73F0A68948 /* TaskCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = A08DA8E8E77422BB9583A61C /* TaskCommands.swift */; };
+		DD0CAC0D298CB64B7B4BDAFF /* ConfettiBurst.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2CA5B9FC1BA7572CC27B4D5 /* ConfettiBurst.swift */; };
 		DD200EF411309E29B543963F /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5ECFDA9128B73993023CB6 /* Models.swift */; };
 		DD4C37A28620313CC2C805BE /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F13269D0CDB1EB49B2351D6 /* TaskDetailView.swift */; };
-		DE037C84144DB8873C4BB2B0 /* GoalsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC8C2483181BE09B32245F3 /* GoalsPlugin.swift */; };
+		DE0EC191FF3BE48A47465CBA /* Logging.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE89901CA806AA91E0441236 /* Logging.swift */; };
+		DE0F3ECD1EA2391814BE31F9 /* SessionCompleteSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F9F5509B06FAD96E79B08D4 /* SessionCompleteSheet.swift */; };
+		DE2DC97811EBF7E4B01C3261 /* HabitsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136C8433FB649CD81132B054 /* HabitsPlugin.swift */; };
 		DF016EF192B7891D2DBE3CB6 /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E25F81FE5AA4B6BBC056275 /* DateParser.swift */; };
+		E13166B735F6109781FB1178 /* GutPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E4B85E65CB1D53481420C4C /* GutPlugin.swift */; };
 		E180CC3F5D34C7CD682290A9 /* CannabisDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8426035C14708F9B19546DE /* CannabisDestinationView.swift */; };
 		E18A84E4ED0B805920276DF6 /* EditExerciseEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5B59047A762635E5A4D89D0 /* EditExerciseEntrySheet.swift */; };
-		E1F88CC1A2AACC627777FA7B /* MoodCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 091DFAB6AC37AD70F740D1DC /* MoodCatalog.swift */; };
+		E1CBA01ED10A916CD8BC355F /* MoodPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4E90D21C382F9970E4AAF88 /* MoodPlugin.swift */; };
 		E2BC0F421F2EC709BBA3B461 /* SupplementsQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = C62E8037BC8CBCE13C164828 /* SupplementsQuickAddMenu.swift */; };
 		E2C7D3735EDC3CA869460C3A /* QuickAddToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A926F2FA426ABCDD73F33BE /* QuickAddToolbar.swift */; };
-		E3321E1C5BE6BAD0D78EE852 /* DayBucketHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 271B2BA8FF41C1971E409786 /* DayBucketHeader.swift */; };
+		E473CB48403FA0B512BB22AC /* HomepageDomain.swift in Sources */ = {isa = PBXBuildFile; fileRef = F026D3432CFBCE4FE8412750 /* HomepageDomain.swift */; };
+		E4754057C57F0FB3CD34C2DC /* PollenClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43C61622FF3214AA0D70A6E7 /* PollenClient.swift */; };
+		E4C0B78E0CA62E12C45BD197 /* OuraProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 509271CE5A03BE4EC284151A /* OuraProvider.swift */; };
 		E515D9DFB7D4891875B26EF4 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 784D3E7D8D933961200812D6 /* PrivacyInfo.xcprivacy */; };
 		E5FA0F06A41B43E0225C90D4 /* RemindersInboxSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B24F662EF5D7717780A4F8D /* RemindersInboxSection.swift */; };
+		E6803B6BE06EA459F23BB499 /* TrainingPRCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE7BD5841409D69626291279 /* TrainingPRCalculator.swift */; };
 		E680A3EF175E9F47A1C8D641 /* GutQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6326F985506DA489D2B176A7 /* GutQuickAddMenu.swift */; };
 		E6C8DBF309966F7E6CF312CB /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F911216C13CBFC7E330714A /* Theme.swift */; };
-		E76B97014681B80397EF05BB /* DayBucket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B00840EA214FF8B761A9131 /* DayBucket.swift */; };
+		E7A21358615235C62A3149B5 /* TrainingPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA54AD462A4486F31EBBDFC4 /* TrainingPlugin.swift */; };
+		E7DC28B1ABC0A9F666FD6462 /* GutPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E4B85E65CB1D53481420C4C /* GutPlugin.swift */; };
 		E82FB8F3AA77028D2377FF0F /* RemindersInboxSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B24F662EF5D7717780A4F8D /* RemindersInboxSection.swift */; };
 		E8CE6D6CCE3418CBE815E85A /* AreasBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E598D0EF28BF638E97F3F22 /* AreasBackend.swift */; };
+		E91A92ABF2E5AB406CCBE63C /* TrainingConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F68950F621AB4EC987ED06CC /* TrainingConfigStore.swift */; };
 		E9970D5068FD243A6FF27686 /* GoalsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40D9EAAB80FD7F9FAC57F20B /* GoalsView.swift */; };
 		E9D604A78C243E8ED46607A4 /* TaskReads.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CBF0DAD74F9392D507229CE /* TaskReads.swift */; };
+		E9FE8C1F55C7F682DDC5E73B /* MoodCommitAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1AB58A3A36A898E92890EBA /* MoodCommitAnimation.swift */; };
 		EA56ADCFD84CE200C7CEF2A9 /* ConsistencyHeatmap.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0E984505A489247AADAB293 /* ConsistencyHeatmap.swift */; };
-		EBACFE355538C3B842F1DC74 /* GroceriesPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8717AC713A8CB083B56E69C /* GroceriesPlugin.swift */; };
-		EBC7FFA58086E91AA71EB01D /* NutritionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACE439E37CB04BBBC0C979CC /* NutritionPlugin.swift */; };
-		EC7046247C9EE5E65D11B2E0 /* TasksPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0E36B524CE0AB7DCE4252B /* TasksPlugin.swift */; };
+		EA65F0CD9A0BEE74119CF7F5 /* ExercisePickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D3250962535171689FCDA30 /* ExercisePickerSheet.swift */; };
 		EC80F6B72765AEF523B5A4E2 /* CKEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3A43D786998D198C9BCA480 /* CKEngine.swift */; };
-		ECE15135AA3F4C27B32FAF94318651FB /* CaffeineTypeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 143AEA376AD3403C8B17AE863677999B /* CaffeineTypeSheet.swift */; };
+		ECCC23D380E913723DB60222 /* Logging.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE89901CA806AA91E0441236 /* Logging.swift */; };
 		ED0AA58CABA5CF7F1EEA51BC /* AddGroceryPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50371A7532E006FCD529D414 /* AddGroceryPage.swift */; };
+		ED82759C6079C919DD635ED6 /* ExerciseDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA383A920BC6CB923009E20 /* ExerciseDetailView.swift */; };
 		EE902B419406F504517110B8 /* NavigationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C59B083F7F5C67ABE440868 /* NavigationState.swift */; };
 		EF6F6DC70A2A20577E2BDCBD /* HealthKitBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F61B77A80F53A6EEEBBC90EA /* HealthKitBridge.swift */; };
-		EF7583D50CCF908CDE925009 /* DayBucketHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 271B2BA8FF41C1971E409786 /* DayBucketHeader.swift */; };
 		EFE1FEDBA1BFF8D046A0261C /* SleepDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9859683174B5C2A84764D99C /* SleepDestinationView.swift */; };
-		F08229D90EDAE2BF53D1706B /* SupplementsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 133C3DFB6771D681737DAB58 /* SupplementsPlugin.swift */; };
-		F0F09026A367472BA79610F0 /* RoutineCatalogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 081C200B1EF94461903CD614 /* RoutineCatalogView.swift */; };
-		F1AB54A0F4A19BF1351C8B22 /* SleepPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72E856E09C93DC0F6F9DC00F /* SleepPlugin.swift */; };
-		F1D0AE0000000000000000A2 /* HomepageDomain.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D0AE0000000000000000A1 /* HomepageDomain.swift */; };
-		F1D0AE0000000000000000A3 /* HomepageDomain.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D0AE0000000000000000A1 /* HomepageDomain.swift */; };
-		F1D0AE0000000000000000B2 /* HomepageDomainData.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D0AE0000000000000000B1 /* HomepageDomainData.swift */; };
-		F1D0AE0000000000000000B3 /* HomepageDomainData.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D0AE0000000000000000B1 /* HomepageDomainData.swift */; };
-		F1D0AE0000000000000000C2 /* HomepageLayoutMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D0AE0000000000000000C1 /* HomepageLayoutMode.swift */; };
-		F1D0AE0000000000000000C3 /* HomepageLayoutMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D0AE0000000000000000C1 /* HomepageLayoutMode.swift */; };
-		F1D0AE0000000000000000D2 /* DenseHomepageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D0AE0000000000000000D1 /* DenseHomepageView.swift */; };
-		F1D0AE0000000000000000D3 /* DenseHomepageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D0AE0000000000000000D1 /* DenseHomepageView.swift */; };
-		F1D0AE0000000000000000E2 /* HeatmapHomepageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D0AE0000000000000000E1 /* HeatmapHomepageView.swift */; };
-		F1D0AE0000000000000000E3 /* HeatmapHomepageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D0AE0000000000000000E1 /* HeatmapHomepageView.swift */; };
-		F1D0AE0000000000000000F2 /* Fasting.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D0AE0000000000000000F1 /* Fasting.swift */; };
-		F1D0AE0000000000000000F3 /* Fasting.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D0AE0000000000000000F1 /* Fasting.swift */; };
-		F1D0AE000000000000000102 /* ConfettiBurst.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D0AE000000000000000101 /* ConfettiBurst.swift */; };
-		F1D0AE000000000000000103 /* ConfettiBurst.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D0AE000000000000000101 /* ConfettiBurst.swift */; };
-		F1D0AE000000000000000202 /* SessionCompleteSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D0AE000000000000000201 /* SessionCompleteSheet.swift */; };
-		F1D0AE000000000000000203 /* SessionCompleteSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D0AE000000000000000201 /* SessionCompleteSheet.swift */; };
-		F1D0AE000000000000000302 /* SyncIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D0AE000000000000000301 /* SyncIndicator.swift */; };
-		F1D0AE000000000000000303 /* SyncIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D0AE000000000000000301 /* SyncIndicator.swift */; };
+		F0C1672EFEBA715B2830BC62 /* TrainingPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA54AD462A4486F31EBBDFC4 /* TrainingPlugin.swift */; };
 		F21704F2D348D306CBC132AB /* SuggestionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6DD7C05D998EF1301A6410D /* SuggestionEngine.swift */; };
 		F2425F67935D5882EF56C171 /* TrainingDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C8645572712693D81587B7C /* TrainingDestinationView.swift */; };
-		F33A979522BADF2F89A74A75 /* TodayEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB74A5AFBC9C70CD48B03DFB /* TodayEvent.swift */; };
+		F3612FE5E541C9080CA1051F /* CaffeinePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7025C11CB78735C2F6354E4 /* CaffeinePlugin.swift */; };
 		F4251470458A2411D47FC255 /* WatchModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D19FFA7AF205D77FD446D409 /* WatchModels.swift */; };
 		F46ED9D5CAC9DA26811E4246 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 784D3E7D8D933961200812D6 /* PrivacyInfo.xcprivacy */; };
-		F553411F51C07D47D11B3A4F /* SectionExplainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1CEE126A22E14D793FDB9C4 /* SectionExplainer.swift */; };
-		F557E1F2F6F548E9E0082F10 /* NutritionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACE439E37CB04BBBC0C979CC /* NutritionPlugin.swift */; };
+		F46F4FF39CDE14DBD53605C8 /* ActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B5BF16679C5BA62C066871C /* ActivityPlugin.swift */; };
+		F47445E3B33F188B49D63233 /* CannabisPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 159121D1191175E510CD312F /* CannabisPlugin.swift */; };
 		F5B490D2166BAEB13EE3383A /* TasksBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3882D64DF6517B0447F5F65C /* TasksBackend.swift */; };
 		F7739072DE3EDDE989C4B9FB /* Accessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26ED5AC7B6F2400A0A4B378C /* Accessibility.swift */; };
 		F85E889C41CE2E31C1502315 /* AddHabitPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24E908729637004C14E5310 /* AddHabitPage.swift */; };
-		F8FBAFDB958F7D6CB3EDB99B /* AirPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEFA831669F65CF778C6C38B /* AirPlugin.swift */; };
+		F8FD2F1BF2020A03D3DF018D /* DayBucketHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32A70DB5FE3A7F04BE3E7BAC /* DayBucketHeader.swift */; };
 		F97689E39AD64A5101DB4296 /* AddHabitPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24E908729637004C14E5310 /* AddHabitPage.swift */; };
-		FAFAFAFA000000000000A002 /* DefaultExerciseLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAFAFAFA000000000000A001 /* DefaultExerciseLibrary.swift */; };
-		FAFAFAFA000000000000A003 /* DefaultExerciseLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAFAFAFA000000000000A001 /* DefaultExerciseLibrary.swift */; };
-		FAFAFAFA000000000000B002 /* ExerciseLibrarySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAFAFAFA000000000000B001 /* ExerciseLibrarySheet.swift */; };
-		FAFAFAFA000000000000B003 /* ExerciseLibrarySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAFAFAFA000000000000B001 /* ExerciseLibrarySheet.swift */; };
-		FAFAFAFA000000000000C002 /* TrainingPRCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAFAFAFA000000000000C001 /* TrainingPRCalculator.swift */; };
-		FAFAFAFA000000000000C003 /* TrainingPRCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAFAFAFA000000000000C001 /* TrainingPRCalculator.swift */; };
 		FB3FBF3FBFB09C7494211780 /* Plausible.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CA646178F906B39ADA6689F /* Plausible.swift */; };
 		FB79CB77D7DB4D47195A606D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */; };
+		FC4FF942C172ECE99D6CEFD8 /* HomepageDomain.swift in Sources */ = {isa = PBXBuildFile; fileRef = F026D3432CFBCE4FE8412750 /* HomepageDomain.swift */; };
 		FD00636369733E912BD26838 /* AirDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 841912A106FECA1706069D4A /* AirDestinationView.swift */; };
+		FD2D921637A390ABCEA55A9C /* RoutineDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71127DDB09DDF4AADA870825 /* RoutineDetailView.swift */; };
+		FD78F45875BF6FB39FBB90AF /* MoodCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33EB22A93C55573C49CFB21B /* MoodCatalog.swift */; };
 		FDD4E2807DBBB981F1F6C321 /* LogRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DDBCEACF8957679BD5E02F2 /* LogRow.swift */; };
 		FF12744271E9DF61BD2F557F /* SuggestionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6DD7C05D998EF1301A6410D /* SuggestionEngine.swift */; };
 		FF2FE71A29903E8E169673D1 /* CaffeineQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3841DB555C39521C2A088942 /* CaffeineQuickAddMenu.swift */; };
-		M4CR0CA7A1090000000000F2 /* MacroCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = M4CR0CA7A1090000000000F1 /* MacroCatalog.swift */; };
-		M4CR0CA7A1090000000000F3 /* MacroCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = M4CR0CA7A1090000000000F1 /* MacroCatalog.swift */; };
+		FF82CEDA629B023E377F342A /* EditMoodEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 096FF0E177B6CFC4B5A6D912 /* EditMoodEntrySheet.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -435,77 +469,88 @@
 
 /* Begin PBXFileReference section */
 		04282C19B1BCFF16B61F4CA1 /* GroceriesQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceriesQuickAddMenu.swift; sourceTree = "<group>"; };
-		081C200B1EF94461903CD614 /* RoutineCatalogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineCatalogView.swift; sourceTree = "<group>"; };
-		091DFAB6AC37AD70F740D1DC /* MoodCatalog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MoodCatalog.swift; sourceTree = "<group>"; };
+		089893F59A6C1D2025AD8A2C /* MoodQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodQuickAddMenu.swift; sourceTree = "<group>"; };
+		096FF0E177B6CFC4B5A6D912 /* EditMoodEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditMoodEntrySheet.swift; sourceTree = "<group>"; };
 		0B24F662EF5D7717780A4F8D /* RemindersInboxSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersInboxSection.swift; sourceTree = "<group>"; };
 		0BCB8601AE73D7F70536C902 /* EditGutEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditGutEntrySheet.swift; sourceTree = "<group>"; };
 		0C35D898846EB8A48B77811E /* AddInfoSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddInfoSheet.swift; sourceTree = "<group>"; };
-		0C9CE8558AC348E4855A6CA6 /* TodayLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayLogView.swift; sourceTree = "<group>"; };
+		0CA2DD637D2CF49F03A211BB /* SectionExplainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionExplainer.swift; sourceTree = "<group>"; };
 		0D0365044C6EA062BBFCCA6B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		0D3C4FD96F6113A7975BA394 /* AddInfoRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddInfoRouter.swift; sourceTree = "<group>"; };
 		1130C3EBCF558AF0EFB27AB9 /* SeptenaWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptenaWatchApp.swift; sourceTree = "<group>"; };
-		121905DB16B21A4039F8D4E5 /* GutPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GutPlugin.swift; sourceTree = "<group>"; };
+		12E14E48DFB87C5F1543BEA4 /* MoodDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodDestinationView.swift; sourceTree = "<group>"; };
 		13011C553B04F0ACEFD189CD /* PlatformShims.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformShims.swift; sourceTree = "<group>"; };
-		133C3DFB6771D681737DAB58 /* SupplementsPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SupplementsPlugin.swift; sourceTree = "<group>"; };
+		136C8433FB649CD81132B054 /* HabitsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitsPlugin.swift; sourceTree = "<group>"; };
 		1387A56A99DA78515CE7FA9F /* AddCannabisPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddCannabisPage.swift; sourceTree = "<group>"; };
-		143AEA376AD3403C8B17AE863677999B /* CaffeineTypeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaffeineTypeSheet.swift; sourceTree = "<group>"; };
+		159121D1191175E510CD312F /* CannabisPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CannabisPlugin.swift; sourceTree = "<group>"; };
 		1654FD32744DA1974DA1C1CE /* PlatformDelegates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformDelegates.swift; sourceTree = "<group>"; };
-		168F70A74A3AA9D2A0E234DB /* PollenClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PollenClient.swift; sourceTree = "<group>"; };
+		199460C317554A7D235979EB /* CannabisTypeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CannabisTypeSheet.swift; sourceTree = "<group>"; };
 		1A7C4DF4E90BB39F4A0D23DE /* ProjectRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRecord.swift; sourceTree = "<group>"; };
 		1B0FAB25573797D6BF8C9482 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		1B5BF16679C5BA62C066871C /* ActivityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityPlugin.swift; sourceTree = "<group>"; };
 		1CA646178F906B39ADA6689F /* Plausible.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plausible.swift; sourceTree = "<group>"; };
 		1CBF0DAD74F9392D507229CE /* TaskReads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskReads.swift; sourceTree = "<group>"; };
 		1D82674F62302252DB1B8167 /* CannabisQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CannabisQuickAddMenu.swift; sourceTree = "<group>"; };
-		1E066C599C555EA32681FD3B /* MoodCommitAnimation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MoodCommitAnimation.swift; sourceTree = "<group>"; };
 		1E25F81FE5AA4B6BBC056275 /* DateParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateParser.swift; sourceTree = "<group>"; };
 		1E49712FC24D8C18675935DF /* EditCannabisEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditCannabisEntrySheet.swift; sourceTree = "<group>"; };
 		1E598D0EF28BF638E97F3F22 /* AreasBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreasBackend.swift; sourceTree = "<group>"; };
 		1F13269D0CDB1EB49B2351D6 /* TaskDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
+		207D112EFCEB89F2F0D1DBE5 /* GoalsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsPlugin.swift; sourceTree = "<group>"; };
+		21B54F8682AE8C22E352630E /* RoutineCatalogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineCatalogView.swift; sourceTree = "<group>"; };
 		23D4FD6096AAAF4FF35B1824 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		24A01E1D30D6A0F4E9BA740F /* MoodDestinationView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MoodDestinationView.swift; sourceTree = "<group>"; };
 		25DC8E705099DB99718A8596 /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
 		25DD66C82573E23BF3CCA2F8 /* EditChoreSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditChoreSheet.swift; sourceTree = "<group>"; };
 		26ED5AC7B6F2400A0A4B378C /* Accessibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Accessibility.swift; sourceTree = "<group>"; };
 		27161C741F9EC6CFC1F83CE0 /* SectionManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionManifest.swift; sourceTree = "<group>"; };
-		271B2BA8FF41C1971E409786 /* DayBucketHeader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DayBucketHeader.swift; sourceTree = "<group>"; };
+		28AD8E60186F9AAF8C1E52A3 /* SupplementsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementsPlugin.swift; sourceTree = "<group>"; };
+		2B3AFBAC2D7BFC759ACA6108 /* GroceriesPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceriesPlugin.swift; sourceTree = "<group>"; };
+		2E4B85E65CB1D53481420C4C /* GutPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GutPlugin.swift; sourceTree = "<group>"; };
 		2F79B52B56CF74E2F11586CC /* TrainingQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingQuickAddMenu.swift; sourceTree = "<group>"; };
-		300B15288763456C89D8AF5E /* RoutineDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineDetailView.swift; sourceTree = "<group>"; };
 		31313A0E804B33A3E43FC1F6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		3433AE6FCB2549D390F9E43A /* TrainingConfigStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrainingConfigStore.swift; sourceTree = "<group>"; };
+		32A70DB5FE3A7F04BE3E7BAC /* DayBucketHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayBucketHeader.swift; sourceTree = "<group>"; };
+		33EB22A93C55573C49CFB21B /* MoodCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodCatalog.swift; sourceTree = "<group>"; };
+		3478D00EF04684D27A69EECF /* NutritionPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionPlugin.swift; sourceTree = "<group>"; };
 		3841DB555C39521C2A088942 /* CaffeineQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaffeineQuickAddMenu.swift; sourceTree = "<group>"; };
 		3882D64DF6517B0447F5F65C /* TasksBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksBackend.swift; sourceTree = "<group>"; };
-		392657C251E452BFEAEC6269 /* TrainingPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrainingPlugin.swift; sourceTree = "<group>"; };
-		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
+		3BE63017AAC0030D65CA758B /* BackfillSupplementsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackfillSupplementsSheet.swift; sourceTree = "<group>"; };
+		3BEAFA5D3DBFCEBEE2EA7FAC /* BrowseCaffeineDaySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseCaffeineDaySheet.swift; sourceTree = "<group>"; };
 		3C59B083F7F5C67ABE440868 /* NavigationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationState.swift; sourceTree = "<group>"; };
 		3C8645572712693D81587B7C /* TrainingDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingDestinationView.swift; sourceTree = "<group>"; };
-		3F23F5CB85029263FB4836E3 /* EditMoodEntrySheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditMoodEntrySheet.swift; sourceTree = "<group>"; };
 		40D9EAAB80FD7F9FAC57F20B /* GoalsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsView.swift; sourceTree = "<group>"; };
 		41F8977A576F2BB747E8DBD7 /* TaskComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskComponents.swift; sourceTree = "<group>"; };
 		42EB061D69FA656547DC171F /* NutritionDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionDestinationView.swift; sourceTree = "<group>"; };
-		43B06CF53AF54BE2BFCE87FF /* GoalRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalRecord.swift; sourceTree = "<group>"; };
+		43C61622FF3214AA0D70A6E7 /* PollenClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PollenClient.swift; sourceTree = "<group>"; };
 		44D44998956C28A061A4DBAE /* AreasProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreasProjectsView.swift; sourceTree = "<group>"; };
-		471562D540F368C2B008038B /* CannabisPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CannabisPlugin.swift; sourceTree = "<group>"; };
+		460C571ECD796E1777AD12C1 /* QuickActionsApplier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickActionsApplier.swift; sourceTree = "<group>"; };
 		47CA5EA5A9284AB449966DCC /* NextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextView.swift; sourceTree = "<group>"; };
-		480BE4F0B92D70D332E473FF /* CaffeinePlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CaffeinePlugin.swift; sourceTree = "<group>"; };
 		482D9E9FA333137B98A9DBE1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		4847155874CE3B82AD612728 /* WeekDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekDashboardView.swift; sourceTree = "<group>"; };
+		486E060C50F1CDAEAFCE8E73 /* Fraunces-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces-Regular.ttf"; sourceTree = "<group>"; };
 		48D2DD3CC83AA08A30DA2938 /* SearchTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchTabView.swift; sourceTree = "<group>"; };
 		4ACB6256DD75D93215BDFD3C /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
 		4D23858A1A44DB2F156B311E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		4D38FA671236F83BEFCB8EBE /* HabitsDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitsDestinationView.swift; sourceTree = "<group>"; };
 		4F191C9B4CF7C226C46AC330 /* SharedComplicationData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedComplicationData.swift; sourceTree = "<group>"; };
+		4F9F5509B06FAD96E79B08D4 /* SessionCompleteSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionCompleteSheet.swift; sourceTree = "<group>"; };
 		4FA781FD1BD2DC0AA7388700 /* GroceriesDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceriesDestinationView.swift; sourceTree = "<group>"; };
 		50371A7532E006FCD529D414 /* AddGroceryPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGroceryPage.swift; sourceTree = "<group>"; };
+		509271CE5A03BE4EC284151A /* OuraProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OuraProvider.swift; sourceTree = "<group>"; };
 		50C93BF01E5F69A01E9E9302 /* SettingsRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRecord.swift; sourceTree = "<group>"; };
 		5122E5C1D750654468CDCE96 /* SeptenaWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeptenaWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		52B5EEA9B508AB5AAB6152F8 /* GutBristolRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GutBristolRecorder.swift; sourceTree = "<group>"; };
 		533ABAE12036AA623BE82B59 /* NutritionSearchSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionSearchSheet.swift; sourceTree = "<group>"; };
 		53E343B15A4B6F29FBF956B8 /* ServerInspectorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerInspectorSheet.swift; sourceTree = "<group>"; };
 		53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
+		546E6C4D1FEE1F69FAD2E514 /* AirPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirPlugin.swift; sourceTree = "<group>"; };
+		54F508173C5BD014AEB8830C /* BackfillChoresSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackfillChoresSheet.swift; sourceTree = "<group>"; };
+		55296A1310EF36E96DC73A4E /* BackfillHabitsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackfillHabitsSheet.swift; sourceTree = "<group>"; };
 		561130AE996F0E92FE02767D /* RemindersBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersBridge.swift; sourceTree = "<group>"; };
-		574B2E277922DA5E20E37466 /* ChoresPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChoresPlugin.swift; sourceTree = "<group>"; };
-		580F93EC39DB4D7876D3FC61 /* BodyPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BodyPlugin.swift; sourceTree = "<group>"; };
+		56A7117A7C0612C55CFF2CD2 /* SectionGoalsStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionGoalsStrip.swift; sourceTree = "<group>"; };
+		F1E1A001000000000A111111 /* GoalMetricEvaluator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalMetricEvaluator.swift; sourceTree = "<group>"; };
+		F1E1A002000000000A222222 /* GoalMetricProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalMetricProgressView.swift; sourceTree = "<group>"; };
+		5835F104E8DFAA668ACCF9A5 /* Fasting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fasting.swift; sourceTree = "<group>"; };
 		59055370ABA84DB912D64D1E /* SeptenaMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeptenaMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5961822BB83BCF87B27E11AD /* AddTaskIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTaskIntent.swift; sourceTree = "<group>"; };
 		5B49A0D20B2ECD672137900F /* Info-Mac.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Info-Mac.plist"; sourceTree = "<group>"; };
@@ -513,6 +558,7 @@
 		5D227602C1039FA2206A539A /* SeptenaServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptenaServices.swift; sourceTree = "<group>"; };
 		5DDBCEACF8957679BD5E02F2 /* LogRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogRow.swift; sourceTree = "<group>"; };
 		5FBFFB14069FB717EF02173A /* NextComplicationBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextComplicationBundle.swift; sourceTree = "<group>"; };
+		624F4DB126AEF0811BFBF590 /* BrowseGutDaySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseGutDaySheet.swift; sourceTree = "<group>"; };
 		62BF9F7C16DF9595A999267D /* TaskRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskRecord.swift; sourceTree = "<group>"; };
 		6326F985506DA489D2B176A7 /* GutQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GutQuickAddMenu.swift; sourceTree = "<group>"; };
 		6392DC43E2FE913972F42911 /* NextSuggestionsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextSuggestionsSection.swift; sourceTree = "<group>"; };
@@ -520,123 +566,128 @@
 		68B6F4EE0E6882204B5E6088 /* BodyDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyDestinationView.swift; sourceTree = "<group>"; };
 		6B8CA0380F3FD3679CE4C676 /* SectionRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionRecord.swift; sourceTree = "<group>"; };
 		6CEAA5532CD1C1A47DB1BBAC /* NutritionRecommendations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionRecommendations.swift; sourceTree = "<group>"; };
+		6D3250962535171689FCDA30 /* ExercisePickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExercisePickerSheet.swift; sourceTree = "<group>"; };
+		6D3C973F9983AB94CEB95337 /* ChoresPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoresPlugin.swift; sourceTree = "<group>"; };
+		6FDD011B1DE9C5ED0C49EB56 /* TodayLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayLogView.swift; sourceTree = "<group>"; };
 		7027B881D1D8B1B09B105034 /* CalendarBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarBridge.swift; sourceTree = "<group>"; };
-		71E25F55030941F7AEEDA98D55D4E363 /* CannabisTypeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CannabisTypeSheet.swift; sourceTree = "<group>"; };
-		72E856E09C93DC0F6F9DC00F /* SleepPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SleepPlugin.swift; sourceTree = "<group>"; };
-		72E90E2386D62D611F5EA965 /* HydrationPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HydrationPlugin.swift; sourceTree = "<group>"; };
+		71127DDB09DDF4AADA870825 /* RoutineDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineDetailView.swift; sourceTree = "<group>"; };
 		757E2ED9D591D3EB6A07DF8A /* WatchBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchBridge.swift; sourceTree = "<group>"; };
 		75A7338B84E54DF44893A020 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		77BEB26345A68838167042D8 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		784D3E7D8D933961200812D6 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		7961DD5158A64BE39F40AFCA /* ExerciseDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseDetailView.swift; sourceTree = "<group>"; };
+		77BEB26345A68838167042D8 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		784D3E7D8D933961200812D6 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		79C180106D47D0477F75695A /* NewNutritionEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewNutritionEntrySheet.swift; sourceTree = "<group>"; };
-		7A6ED461B2684D5994525988 /* ExerciseCatalogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseCatalogView.swift; sourceTree = "<group>"; };
-		7B00840EA214FF8B761A9131 /* DayBucket.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DayBucket.swift; sourceTree = "<group>"; };
+		7BD0C4383360CD1A06E2A546 /* HeatmapHomepageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeatmapHomepageView.swift; sourceTree = "<group>"; };
+		C0FE1A7E001C0FE1A7E00001 /* CorrelationsHomepageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrelationsHomepageView.swift; sourceTree = "<group>"; };
 		7D5ECFDA9128B73993023CB6 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		7D7AE711DD74BE91E7EECA48 /* BodyPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyPlugin.swift; sourceTree = "<group>"; };
 		7F70E70D8BC6F8B767D06FF9 /* EditSupplementSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditSupplementSheet.swift; sourceTree = "<group>"; };
 		7F911216C13CBFC7E330714A /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		7FD1B7B2BAE523F2E4D3F99C /* ProjectsBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectsBackend.swift; sourceTree = "<group>"; };
 		804ACCAA2E1FE43802EA25AB /* AddGutPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGutPage.swift; sourceTree = "<group>"; };
 		80D7DFAC856BBE635EBBC6E4 /* ActivityDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityDestinationView.swift; sourceTree = "<group>"; };
+		81E6CCEAE6C25B88290F0666 /* DenseHomepageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DenseHomepageView.swift; sourceTree = "<group>"; };
 		8416FB0AD38638BF7038BF2A /* NextDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextDashboardView.swift; sourceTree = "<group>"; };
 		841912A106FECA1706069D4A /* AirDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirDestinationView.swift; sourceTree = "<group>"; };
 		851BE2CCE51793135E27E354 /* NextWatchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextWatchView.swift; sourceTree = "<group>"; };
+		851E4304EF13EE92F1DD7FF1 /* BrowseCannabisDaySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseCannabisDaySheet.swift; sourceTree = "<group>"; };
+		85942F0F6AEDE3D4607485D4 /* DayBucket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayBucket.swift; sourceTree = "<group>"; };
+		85C3D20CB39FA9973ECF1129 /* TestPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestPlugin.swift; sourceTree = "<group>"; };
 		8762C7A4DFED340274D8BD37 /* AddInfoSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddInfoSection.swift; sourceTree = "<group>"; };
 		880B70E1267B3CAAFFBA9D65 /* DayTimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayTimelineView.swift; sourceTree = "<group>"; };
 		8A926F2FA426ABCDD73F33BE /* QuickAddToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickAddToolbar.swift; sourceTree = "<group>"; };
 		8EC7C9D9CAC52C91AFE79AE7 /* BadgeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BadgeManager.swift; sourceTree = "<group>"; };
-		931BDD3D7FDDD2214CD72E8D /* CalendarDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarDestinationView.swift; sourceTree = "<group>"; };
+		8F0DA5FA7D3E03C2DB1DE7C7 /* CorrelationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrelationEngine.swift; sourceTree = "<group>"; };
+		91BAA74D7BB0302A9AA70DE9 /* InsightsDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsDestinationView.swift; sourceTree = "<group>"; };
 		9859683174B5C2A84764D99C /* SleepDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepDestinationView.swift; sourceTree = "<group>"; };
 		9A26475D9A9D19DC0840960D /* NextItemsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextItemsSection.swift; sourceTree = "<group>"; };
+		E8CC0D108B59E1EB67CD24D6 /* WelcomeHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeHeader.swift; sourceTree = "<group>"; };
 		A08DA8E8E77422BB9583A61C /* TaskCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskCommands.swift; sourceTree = "<group>"; };
 		A09644381782A9A298BDC709 /* WatchConnectivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchConnectivity.swift; sourceTree = "<group>"; };
 		A16A2330C66B761049C702ED /* NextComplicationViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextComplicationViews.swift; sourceTree = "<group>"; };
-		A1B1C1D1E1F1010101010101 /* OuraProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OuraProvider.swift; sourceTree = "<group>"; };
-		A1B2C3D40000000000F10101 /* InsightsDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsDestinationView.swift; sourceTree = "<group>"; };
-		A1B2C3D40000000000F10201 /* CorrelationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrelationEngine.swift; sourceTree = "<group>"; };
-		A2A4FE569EF0885271CCDBD9 /* AddMoodPage.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AddMoodPage.swift; sourceTree = "<group>"; };
 		A4C5E5E15422EB17DB5D3960 /* EditGroceryItemSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditGroceryItemSheet.swift; sourceTree = "<group>"; };
+		A708921A7D5F315781CFCF71 /* ExerciseLibrarySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseLibrarySheet.swift; sourceTree = "<group>"; };
 		A8426035C14708F9B19546DE /* CannabisDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CannabisDestinationView.swift; sourceTree = "<group>"; };
-		A8717AC713A8CB083B56E69C /* GroceriesPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GroceriesPlugin.swift; sourceTree = "<group>"; };
-		A88D173E289074F16F3B1028 /* ActivityPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActivityPlugin.swift; sourceTree = "<group>"; };
-		ACE439E37CB04BBBC0C979CC /* NutritionPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NutritionPlugin.swift; sourceTree = "<group>"; };
 		ACEBFC5E297AA01C582EE1A5 /* CaffeineDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaffeineDestinationView.swift; sourceTree = "<group>"; };
 		AD295FAB7B881CAC43EE8C34 /* Outbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Outbox.swift; sourceTree = "<group>"; };
+		AF9E152DA345E00295EC4F58 /* SyncIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncIndicator.swift; sourceTree = "<group>"; };
 		AFF7884F079CD77F2AA126F9 /* EditCaffeineEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditCaffeineEntrySheet.swift; sourceTree = "<group>"; };
 		B1122B52B5A42A03C8EECA08 /* AddSupplementPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddSupplementPage.swift; sourceTree = "<group>"; };
 		B241213EA8E591629280B7EE /* AddChorePage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddChorePage.swift; sourceTree = "<group>"; };
-		B2C2D2E2F2A2010101010101 /* WithingsProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WithingsProvider.swift; sourceTree = "<group>"; };
+		B2CA5B9FC1BA7572CC27B4D5 /* ConfettiBurst.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfettiBurst.swift; sourceTree = "<group>"; };
 		B456DE05339EB2A12EB2A9BE /* SeptenaWatchComplication.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SeptenaWatchComplication.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B55D56BF301C74DCB785773E /* ExerciseCatalogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseCatalogView.swift; sourceTree = "<group>"; };
+		B65BF5C0096129915EFA26FC /* CaffeineTypeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaffeineTypeSheet.swift; sourceTree = "<group>"; };
 		B6DD7C05D998EF1301A6410D /* SuggestionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestionEngine.swift; sourceTree = "<group>"; };
-		B73D2010A0604DBEB34C0478 /* SupplementTypeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementTypeSheet.swift; sourceTree = "<group>"; };
-		B7F00C1EE6CF4290A2AF9DCF /* HabitsPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HabitsPlugin.swift; sourceTree = "<group>"; };
-		BB0E36B524CE0AB7DCE4252B /* TasksPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TasksPlugin.swift; sourceTree = "<group>"; };
+		B7A1880819394CCA40FDB923 /* AddMoodPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddMoodPage.swift; sourceTree = "<group>"; };
+		B8FACD3A9FAD9509B187D281 /* SleepPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepPlugin.swift; sourceTree = "<group>"; };
+		BAD85ECA85C1BC1569658CF2 /* TodayEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayEvent.swift; sourceTree = "<group>"; };
 		BB3A88C2CE6907A4D7BF34C2 /* AddNutritionPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddNutritionPage.swift; sourceTree = "<group>"; };
 		BB454D5630376DAFA9CBF9E1 /* TaskListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskListView.swift; sourceTree = "<group>"; };
-		BB74A5AFBC9C70CD48B03DFB /* TodayEvent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TodayEvent.swift; sourceTree = "<group>"; };
-		BEF5AB60845609D46FB5790D /* MoodQuickAddMenu.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MoodQuickAddMenu.swift; sourceTree = "<group>"; };
+		BCA383A920BC6CB923009E20 /* ExerciseDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseDetailView.swift; sourceTree = "<group>"; };
 		C03DC46C772E45B60ECB7343 /* SectionTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionTheme.swift; sourceTree = "<group>"; };
 		C15C11DB7FD7994318364996 /* SupplementsDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementsDestinationView.swift; sourceTree = "<group>"; };
-		C23414685B03BA930E6C4D94 /* AirStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AirStore.swift; sourceTree = "<group>"; };
+		C19D6CEBE8804EB7CD5D0256 /* HydrationPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HydrationPlugin.swift; sourceTree = "<group>"; };
 		C27BE273FD1D064942278AD1 /* NextComplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextComplication.swift; sourceTree = "<group>"; };
 		C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		C3D3E3F3A3B3010101010101 /* Logging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logging.swift; sourceTree = "<group>"; };
 		C4E0ADF5987E9D7E112126AB /* EditHabitSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditHabitSheet.swift; sourceTree = "<group>"; };
 		C62E8037BC8CBCE13C164828 /* SupplementsQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementsQuickAddMenu.swift; sourceTree = "<group>"; };
-		C6311231B3AABDB9BC4CBB69 /* MoodPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MoodPlugin.swift; sourceTree = "<group>"; };
+		C7025C11CB78735C2F6354E4 /* CaffeinePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaffeinePlugin.swift; sourceTree = "<group>"; };
 		C729259A5867D99CC64AA9C3 /* AreaRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreaRecord.swift; sourceTree = "<group>"; };
 		C79C561E59D69B3653B65047 /* EditNutritionEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditNutritionEntrySheet.swift; sourceTree = "<group>"; };
+		C9040E2C70604B773FAFB726 /* AirStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirStore.swift; sourceTree = "<group>"; };
 		C9D6916E979E5B0D7497CAEF /* ResponseCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResponseCache.swift; sourceTree = "<group>"; };
 		CAB04CA79A9C3207CCE972F9 /* QuickFindView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickFindView.swift; sourceTree = "<group>"; };
-		CCA388A73616C38F7456E6BE /* AranetBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AranetBridge.swift; sourceTree = "<group>"; };
-		CDC8C2483181BE09B32245F3 /* GoalsPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GoalsPlugin.swift; sourceTree = "<group>"; };
 		CE7DF7DE41AF304A9324BC6E /* IntensityGlyph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntensityGlyph.swift; sourceTree = "<group>"; };
 		CEA8B3755DDC65DD48AF4C3E /* NutritionQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionQuickAddMenu.swift; sourceTree = "<group>"; };
 		D0EBCAFF8036A11B0BBEC06E /* AddTaskPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTaskPage.swift; sourceTree = "<group>"; };
 		D19FFA7AF205D77FD446D409 /* WatchModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchModels.swift; sourceTree = "<group>"; };
 		D2AF70B89A0D3FC41DAFAFE9 /* GutDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GutDestinationView.swift; sourceTree = "<group>"; };
 		D3A43D786998D198C9BCA480 /* CKEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CKEngine.swift; sourceTree = "<group>"; };
-		D3C6FC55D78F4D958C517B00 /* SectionGoalsStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionGoalsStrip.swift; sourceTree = "<group>"; };
 		D5B59047A762635E5A4D89D0 /* EditExerciseEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditExerciseEntrySheet.swift; sourceTree = "<group>"; };
 		D7A9CFE2B4EA160E84F58544 /* RemindersImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersImportView.swift; sourceTree = "<group>"; };
-		D8C2C5B8FB80880E4552FDF8 /* SectionPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SectionPlugin.swift; sourceTree = "<group>"; };
 		D9D2A0C223ECB0DAA0D3EB12 /* ChecklistMirror.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChecklistMirror.swift; sourceTree = "<group>"; };
+		DAFB0D3BA97B1038047EE05D /* AranetBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AranetBridge.swift; sourceTree = "<group>"; };
 		DB960188319E54312A616C00 /* HabitsQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitsQuickAddMenu.swift; sourceTree = "<group>"; };
-		DEC92C4A0EDB0032A8216157 /* TestPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TestPlugin.swift; sourceTree = "<group>"; };
-		DEFA831669F65CF778C6C38B /* AirPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AirPlugin.swift; sourceTree = "<group>"; };
+		DE7BD5841409D69626291279 /* TrainingPRCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingPRCalculator.swift; sourceTree = "<group>"; };
 		DFD8EA98B891BB43A0CE4640 /* DayClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayClock.swift; sourceTree = "<group>"; };
 		E0B5F0D2E1B01AAEF2217FA4 /* TasksQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksQuickAddMenu.swift; sourceTree = "<group>"; };
 		E0E984505A489247AADAB293 /* ConsistencyHeatmap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsistencyHeatmap.swift; sourceTree = "<group>"; };
 		E17D3542734AB0B32527C12C /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
-		E1CEE126A22E14D793FDB9C4 /* SectionExplainer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SectionExplainer.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B5C /* SectionDrawer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionDrawer.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B60 /* StatStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatStrip.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B61 /* LogEntryRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogEntryRow.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B66 /* ChartCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartCard.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B69 /* StatGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatGrid.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B6C /* DrawerDateStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawerDateStrip.swift; sourceTree = "<group>"; };
+		E18F72C4FF8B470B7B889B00 /* SectionPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionPlugin.swift; sourceTree = "<group>"; };
+		E1AB58A3A36A898E92890EBA /* MoodCommitAnimation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodCommitAnimation.swift; sourceTree = "<group>"; };
 		E31867A580D7D96DFB20391B /* ChoresDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoresDestinationView.swift; sourceTree = "<group>"; };
 		E5439F75303F906465F9F2C6 /* SettingsMirror.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsMirror.swift; sourceTree = "<group>"; };
+		EA64E4CD9F48DE7AFFA52D84 /* GoalRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalRecord.swift; sourceTree = "<group>"; };
 		EB3DA6C707EA3988C90D573B /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
+		EE89901CA806AA91E0441236 /* Logging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logging.swift; sourceTree = "<group>"; };
+		F026D3432CFBCE4FE8412750 /* HomepageDomain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomepageDomain.swift; sourceTree = "<group>"; };
 		F05E01AB86D25931CD682001 /* WatchAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchAppDelegate.swift; sourceTree = "<group>"; };
-		F0BEBB91083B3194167B548E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		F1D0AE0000000000000000A1 /* HomepageDomain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomepageDomain.swift; sourceTree = "<group>"; };
-		F1D0AE0000000000000000B1 /* HomepageDomainData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomepageDomainData.swift; sourceTree = "<group>"; };
-		F1D0AE0000000000000000C1 /* HomepageLayoutMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomepageLayoutMode.swift; sourceTree = "<group>"; };
-		F1D0AE0000000000000000D1 /* DenseHomepageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DenseHomepageView.swift; sourceTree = "<group>"; };
-		F1D0AE0000000000000000E1 /* HeatmapHomepageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeatmapHomepageView.swift; sourceTree = "<group>"; };
-		F1D0AE0000000000000000F1 /* Fasting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fasting.swift; sourceTree = "<group>"; };
-		F1D0AE000000000000000101 /* ConfettiBurst.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfettiBurst.swift; sourceTree = "<group>"; };
-		F1D0AE000000000000000201 /* SessionCompleteSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionCompleteSheet.swift; sourceTree = "<group>"; };
-		F1D0AE000000000000000301 /* SyncIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncIndicator.swift; sourceTree = "<group>"; };
+		F0B811772EC1DF4C9130BECD /* HomepageLayoutMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomepageLayoutMode.swift; sourceTree = "<group>"; };
+		F0BEBB91083B3194167B548E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		F24E908729637004C14E5310 /* AddHabitPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddHabitPage.swift; sourceTree = "<group>"; };
-		F37F2CBF6D294C3B9BDB4504 /* ExercisePickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExercisePickerSheet.swift; sourceTree = "<group>"; };
+		F326D9758674AD8EA4DBB211 /* SupplementTypeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementTypeSheet.swift; sourceTree = "<group>"; };
+		F4E90D21C382F9970E4AAF88 /* MoodPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodPlugin.swift; sourceTree = "<group>"; };
 		F531676F7BCEFA46F3A7D827 /* ChoresQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoresQuickAddMenu.swift; sourceTree = "<group>"; };
+		F5B53F1EA33DC5B17A751664 /* MacroCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroCatalog.swift; sourceTree = "<group>"; };
 		F61B77A80F53A6EEEBBC90EA /* HealthKitBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitBridge.swift; sourceTree = "<group>"; };
+		F68950F621AB4EC987ED06CC /* TrainingConfigStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingConfigStore.swift; sourceTree = "<group>"; };
 		F79D2478011E9353A0DF90AC /* ModuleTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleTile.swift; sourceTree = "<group>"; };
 		F955392D23BB02F27DD39CD9 /* AddTrainingPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTrainingPage.swift; sourceTree = "<group>"; };
-		FAFAFAFA000000000000A001 /* DefaultExerciseLibrary.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DefaultExerciseLibrary.swift; sourceTree = "<group>"; };
-		FAFAFAFA000000000000B001 /* ExerciseLibrarySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseLibrarySheet.swift; sourceTree = "<group>"; };
-		FAFAFAFA000000000000C001 /* TrainingPRCalculator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrainingPRCalculator.swift; sourceTree = "<group>"; };
+		F9E4B96D09624A89E4D87019 /* HomepageDomainData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomepageDomainData.swift; sourceTree = "<group>"; };
+		FA54AD462A4486F31EBBDFC4 /* TrainingPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingPlugin.swift; sourceTree = "<group>"; };
+		FB380FE69F57820927B8BD3D /* TasksPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksPlugin.swift; sourceTree = "<group>"; };
 		FBA5CADFC4205866897E4F8C /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
+		FC732C2F50FC1EC9308BA218 /* DefaultExerciseLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultExerciseLibrary.swift; sourceTree = "<group>"; };
 		FD5AAD8DD0E25AF940E3237C /* AddInfoRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddInfoRow.swift; sourceTree = "<group>"; };
 		FD90B8D1D8A0A978D1CE744C /* MenuBarMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarMenu.swift; sourceTree = "<group>"; };
 		FEF5F3A2F7A70BEADFCF88CA /* AddCaffeinePage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddCaffeinePage.swift; sourceTree = "<group>"; };
-		M4CR0CA7A1090000000000F1 /* MacroCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroCatalog.swift; sourceTree = "<group>"; };
+		FF60A4EBE9BB351D23C913BE /* WithingsProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WithingsProvider.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -644,7 +695,9 @@
 			isa = PBXGroup;
 			children = (
 				40D9EAAB80FD7F9FAC57F20B /* GoalsView.swift */,
-				D3C6FC55D78F4D958C517B00 /* SectionGoalsStrip.swift */,
+				F1E1A001000000000A111111 /* GoalMetricEvaluator.swift */,
+				F1E1A002000000000A222222 /* GoalMetricProgressView.swift */,
+				56A7117A7C0612C55CFF2CD2 /* SectionGoalsStrip.swift */,
 			);
 			path = Goals;
 			sourceTree = "<group>";
@@ -666,6 +719,7 @@
 			isa = PBXGroup;
 			children = (
 				B241213EA8E591629280B7EE /* AddChorePage.swift */,
+				54F508173C5BD014AEB8830C /* BackfillChoresSheet.swift */,
 				E31867A580D7D96DFB20391B /* ChoresDestinationView.swift */,
 				F531676F7BCEFA46F3A7D827 /* ChoresQuickAddMenu.swift */,
 				25DD66C82573E23BF3CCA2F8 /* EditChoreSheet.swift */,
@@ -677,10 +731,11 @@
 			isa = PBXGroup;
 			children = (
 				B1122B52B5A42A03C8EECA08 /* AddSupplementPage.swift */,
+				3BE63017AAC0030D65CA758B /* BackfillSupplementsSheet.swift */,
 				7F70E70D8BC6F8B767D06FF9 /* EditSupplementSheet.swift */,
-				B73D2010A0604DBEB34C0478 /* SupplementTypeSheet.swift */,
 				C15C11DB7FD7994318364996 /* SupplementsDestinationView.swift */,
 				C62E8037BC8CBCE13C164828 /* SupplementsQuickAddMenu.swift */,
+				F326D9758674AD8EA4DBB211 /* SupplementTypeSheet.swift */,
 			);
 			path = Supplements;
 			sourceTree = "<group>";
@@ -695,6 +750,7 @@
 				31313A0E804B33A3E43FC1F6 /* Info.plist */,
 				784D3E7D8D933961200812D6 /* PrivacyInfo.xcprivacy */,
 				64938CD07808787BDFD1780F /* App */,
+				E5651035008888FF03C82755 /* Resources */,
 				59B08D4759930317F4B0B9CB /* Sections */,
 				842F4255B425A42BBD476DDD /* Shell */,
 			);
@@ -705,6 +761,7 @@
 			isa = PBXGroup;
 			children = (
 				804ACCAA2E1FE43802EA25AB /* AddGutPage.swift */,
+				624F4DB126AEF0811BFBF590 /* BrowseGutDaySheet.swift */,
 				0BCB8601AE73D7F70536C902 /* EditGutEntrySheet.swift */,
 				52B5EEA9B508AB5AAB6152F8 /* GutBristolRecorder.swift */,
 				D2AF70B89A0D3FC41DAFAFE9 /* GutDestinationView.swift */,
@@ -717,21 +774,20 @@
 			isa = PBXGroup;
 			children = (
 				E2842020F4C7D0DA4F0DEEEC /* Activity */,
-				A1B2C3D40000000000F10104 /* Insights */,
 				C839738BC035042C03878E4B /* Air */,
 				A2B9CB102BFE92467D04B892 /* Body */,
 				9EBEDAEDFD33725E4A0C17A6 /* Caffeine */,
-				DB464C2338B287E70675AC7C /* Calendar */,
 				9F48D3DF4122B06942E19DC3 /* Cannabis */,
 				128F6D87D6443F0C36E0B853 /* Chores */,
 				7B495183D216750F1BD82CBA /* Groceries */,
 				28A91BD0B015A2A7B7E43A34 /* Gut */,
 				A3A24153AEDBBA2F0EF92BA3 /* Habits */,
+				788AF8156A5227746A49B6B8 /* Insights */,
+				E8AD9DEDEE0B960C8184DCA0 /* Mood */,
 				738BD7D0C8EBC4C69B8273B2 /* Nutrition */,
 				D3C660F4C6778649B74F4F19 /* Sleep */,
 				21B9B1EA0FA765C91D4DA073 /* Supplements */,
 				61A0945D0190B5959566C13E /* Training */,
-				DABEFFFBA6210272F4329E9D /* Mood */,
 			);
 			path = Sections;
 			sourceTree = "<group>";
@@ -741,15 +797,15 @@
 			children = (
 				F955392D23BB02F27DD39CD9 /* AddTrainingPage.swift */,
 				D5B59047A762635E5A4D89D0 /* EditExerciseEntrySheet.swift */,
+				B55D56BF301C74DCB785773E /* ExerciseCatalogView.swift */,
+				BCA383A920BC6CB923009E20 /* ExerciseDetailView.swift */,
+				A708921A7D5F315781CFCF71 /* ExerciseLibrarySheet.swift */,
+				6D3250962535171689FCDA30 /* ExercisePickerSheet.swift */,
+				21B54F8682AE8C22E352630E /* RoutineCatalogView.swift */,
+				71127DDB09DDF4AADA870825 /* RoutineDetailView.swift */,
+				4F9F5509B06FAD96E79B08D4 /* SessionCompleteSheet.swift */,
 				3C8645572712693D81587B7C /* TrainingDestinationView.swift */,
 				2F79B52B56CF74E2F11586CC /* TrainingQuickAddMenu.swift */,
-				F1D0AE000000000000000201 /* SessionCompleteSheet.swift */,
-				7A6ED461B2684D5994525988 /* ExerciseCatalogView.swift */,
-				7961DD5158A64BE39F40AFCA /* ExerciseDetailView.swift */,
-				081C200B1EF94461903CD614 /* RoutineCatalogView.swift */,
-				300B15288763456C89D8AF5E /* RoutineDetailView.swift */,
-				F37F2CBF6D294C3B9BDB4504 /* ExercisePickerSheet.swift */,
-				FAFAFAFA000000000000B001 /* ExerciseLibrarySheet.swift */,
 			);
 			path = Training;
 			sourceTree = "<group>";
@@ -763,21 +819,12 @@
 				FD90B8D1D8A0A978D1CE744C /* MenuBarMenu.swift */,
 				3C59B083F7F5C67ABE440868 /* NavigationState.swift */,
 				1654FD32744DA1974DA1C1CE /* PlatformDelegates.swift */,
+				460C571ECD796E1777AD12C1 /* QuickActionsApplier.swift */,
 				4ACB6256DD75D93215BDFD3C /* RootTabView.swift */,
 				5CB6A01D91E7B3ED63B6BFDE /* ShortcutAction.swift */,
 				757E2ED9D591D3EB6A07DF8A /* WatchBridge.swift */,
 			);
 			path = App;
-			sourceTree = "<group>";
-		};
-		65D329B41A3C614D34E9AAB1 /* Sections */ = {
-			isa = PBXGroup;
-			children = (
-				D370121B5406FD0544A3D701 /* Plugins */,
-				D8C2C5B8FB80880E4552FDF8 /* SectionPlugin.swift */,
-			);
-			name = Sections;
-			path = Sections;
 			sourceTree = "<group>";
 		};
 		6D68A1F0A14D187F52B0AB8E /* Settings */ = {
@@ -802,6 +849,41 @@
 				533ABAE12036AA623BE82B59 /* NutritionSearchSheet.swift */,
 			);
 			path = Nutrition;
+			sourceTree = "<group>";
+		};
+		768B9E6320023B301CF6BE92 /* Plugins */ = {
+			isa = PBXGroup;
+			children = (
+				1B5BF16679C5BA62C066871C /* ActivityPlugin.swift */,
+				546E6C4D1FEE1F69FAD2E514 /* AirPlugin.swift */,
+				7D7AE711DD74BE91E7EECA48 /* BodyPlugin.swift */,
+				C7025C11CB78735C2F6354E4 /* CaffeinePlugin.swift */,
+				159121D1191175E510CD312F /* CannabisPlugin.swift */,
+				6D3C973F9983AB94CEB95337 /* ChoresPlugin.swift */,
+				207D112EFCEB89F2F0D1DBE5 /* GoalsPlugin.swift */,
+				2B3AFBAC2D7BFC759ACA6108 /* GroceriesPlugin.swift */,
+				2E4B85E65CB1D53481420C4C /* GutPlugin.swift */,
+				136C8433FB649CD81132B054 /* HabitsPlugin.swift */,
+				C19D6CEBE8804EB7CD5D0256 /* HydrationPlugin.swift */,
+				F4E90D21C382F9970E4AAF88 /* MoodPlugin.swift */,
+				3478D00EF04684D27A69EECF /* NutritionPlugin.swift */,
+				0CA2DD637D2CF49F03A211BB /* SectionExplainer.swift */,
+				B8FACD3A9FAD9509B187D281 /* SleepPlugin.swift */,
+				28AD8E60186F9AAF8C1E52A3 /* SupplementsPlugin.swift */,
+				FB380FE69F57820927B8BD3D /* TasksPlugin.swift */,
+				85C3D20CB39FA9973ECF1129 /* TestPlugin.swift */,
+				FA54AD462A4486F31EBBDFC4 /* TrainingPlugin.swift */,
+			);
+			path = Plugins;
+			sourceTree = "<group>";
+		};
+		788AF8156A5227746A49B6B8 /* Insights */ = {
+			isa = PBXGroup;
+			children = (
+				8F0DA5FA7D3E03C2DB1DE7C7 /* CorrelationEngine.swift */,
+				91BAA74D7BB0302A9AA70DE9 /* InsightsDestinationView.swift */,
+			);
+			path = Insights;
 			sourceTree = "<group>";
 		};
 		78A50100C9C5B00654919FE5 /* SeptenaWatch */ = {
@@ -844,11 +926,11 @@
 				A887070249D62A5D48E14AC0 /* Capture */,
 				D040A92EAE3D0AB95A695CE5 /* Dashboard */,
 				03B5A38B75A9FBCDF905E644 /* Goals */,
+				9DCBFF2C71121CA320866A3F /* Sections */,
 				6D68A1F0A14D187F52B0AB8E /* Settings */,
 				87100EA2A5455E2B0A07163C /* Sidebar */,
 				AC3601086E54088A26CF492F /* Tasks */,
 				BCF085879C9767DF22181130 /* UI */,
-				65D329B41A3C614D34E9AAB1 /* Sections */,
 			);
 			path = Shell;
 			sourceTree = "<group>";
@@ -885,9 +967,9 @@
 			isa = PBXGroup;
 			children = (
 				C729259A5867D99CC64AA9C3 /* AreaRecord.swift */,
-				43B06CF53AF54BE2BFCE87FF /* GoalRecord.swift */,
 				1E598D0EF28BF638E97F3F22 /* AreasBackend.swift */,
 				D3A43D786998D198C9BCA480 /* CKEngine.swift */,
+				EA64E4CD9F48DE7AFFA52D84 /* GoalRecord.swift */,
 				64EB95DB6A86885B3FA483C1 /* Migration.swift */,
 				1A7C4DF4E90BB39F4A0D23DE /* ProjectRecord.swift */,
 				7FD1B7B2BAE523F2E4D3F99C /* ProjectsBackend.swift */,
@@ -900,13 +982,29 @@
 			path = CloudKit;
 			sourceTree = "<group>";
 		};
+		9DCBFF2C71121CA320866A3F /* Sections */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F60718293A4B66 /* ChartCard.swift */,
+				A1B2C3D4E5F60718293A4B6C /* DrawerDateStrip.swift */,
+				A1B2C3D4E5F60718293A4B61 /* LogEntryRow.swift */,
+				A1B2C3D4E5F60718293A4B5C /* SectionDrawer.swift */,
+				E18F72C4FF8B470B7B889B00 /* SectionPlugin.swift */,
+				A1B2C3D4E5F60718293A4B69 /* StatGrid.swift */,
+				A1B2C3D4E5F60718293A4B60 /* StatStrip.swift */,
+				768B9E6320023B301CF6BE92 /* Plugins */,
+			);
+			path = Sections;
+			sourceTree = "<group>";
+		};
 		9EBEDAEDFD33725E4A0C17A6 /* Caffeine */ = {
 			isa = PBXGroup;
 			children = (
 				FEF5F3A2F7A70BEADFCF88CA /* AddCaffeinePage.swift */,
+				3BEAFA5D3DBFCEBEE2EA7FAC /* BrowseCaffeineDaySheet.swift */,
 				ACEBFC5E297AA01C582EE1A5 /* CaffeineDestinationView.swift */,
 				3841DB555C39521C2A088942 /* CaffeineQuickAddMenu.swift */,
-				143AEA376AD3403C8B17AE863677999B /* CaffeineTypeSheet.swift */,
+				B65BF5C0096129915EFA26FC /* CaffeineTypeSheet.swift */,
 				AFF7884F079CD77F2AA126F9 /* EditCaffeineEntrySheet.swift */,
 			);
 			path = Caffeine;
@@ -916,21 +1014,13 @@
 			isa = PBXGroup;
 			children = (
 				1387A56A99DA78515CE7FA9F /* AddCannabisPage.swift */,
+				851E4304EF13EE92F1DD7FF1 /* BrowseCannabisDaySheet.swift */,
 				A8426035C14708F9B19546DE /* CannabisDestinationView.swift */,
 				1D82674F62302252DB1B8167 /* CannabisQuickAddMenu.swift */,
-				71E25F55030941F7AEEDA98D55D4E363 /* CannabisTypeSheet.swift */,
+				199460C317554A7D235979EB /* CannabisTypeSheet.swift */,
 				1E49712FC24D8C18675935DF /* EditCannabisEntrySheet.swift */,
 			);
 			path = Cannabis;
-			sourceTree = "<group>";
-		};
-		A1B2C3D40000000000F10104 /* Insights */ = {
-			isa = PBXGroup;
-			children = (
-				A1B2C3D40000000000F10101 /* InsightsDestinationView.swift */,
-				A1B2C3D40000000000F10201 /* CorrelationEngine.swift */,
-			);
-			path = Insights;
 			sourceTree = "<group>";
 		};
 		A2B9CB102BFE92467D04B892 /* Body */ = {
@@ -945,6 +1035,7 @@
 			isa = PBXGroup;
 			children = (
 				F24E908729637004C14E5310 /* AddHabitPage.swift */,
+				55296A1310EF36E96DC73A4E /* BackfillHabitsSheet.swift */,
 				C4E0ADF5987E9D7E112126AB /* EditHabitSheet.swift */,
 				4D38FA671236F83BEFCB8EBE /* HabitsDestinationView.swift */,
 				DB960188319E54312A616C00 /* HabitsQuickAddMenu.swift */,
@@ -992,15 +1083,15 @@
 			isa = PBXGroup;
 			children = (
 				26ED5AC7B6F2400A0A4B378C /* Accessibility.swift */,
+				B2CA5B9FC1BA7572CC27B4D5 /* ConfettiBurst.swift */,
 				E0E984505A489247AADAB293 /* ConsistencyHeatmap.swift */,
-				F1D0AE000000000000000101 /* ConfettiBurst.swift */,
-				F1D0AE000000000000000301 /* SyncIndicator.swift */,
+				32A70DB5FE3A7F04BE3E7BAC /* DayBucketHeader.swift */,
 				CE7DF7DE41AF304A9324BC6E /* IntensityGlyph.swift */,
 				5DDBCEACF8957679BD5E02F2 /* LogRow.swift */,
 				F79D2478011E9353A0DF90AC /* ModuleTile.swift */,
 				13011C553B04F0ACEFD189CD /* PlatformShims.swift */,
+				AF9E152DA345E00295EC4F58 /* SyncIndicator.swift */,
 				7F911216C13CBFC7E330714A /* Theme.swift */,
-				271B2BA8FF41C1971E409786 /* DayBucketHeader.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -1029,47 +1120,22 @@
 			isa = PBXGroup;
 			children = (
 				880B70E1267B3CAAFFBA9D65 /* DayTimelineView.swift */,
-				0C9CE8558AC348E4855A6CA6 /* TodayLogView.swift */,
+				C0FE1A7E001C0FE1A7E00001 /* CorrelationsHomepageView.swift */,
+				81E6CCEAE6C25B88290F0666 /* DenseHomepageView.swift */,
+				7BD0C4383360CD1A06E2A546 /* HeatmapHomepageView.swift */,
+				F026D3432CFBCE4FE8412750 /* HomepageDomain.swift */,
+				F9E4B96D09624A89E4D87019 /* HomepageDomainData.swift */,
+				F0B811772EC1DF4C9130BECD /* HomepageLayoutMode.swift */,
 				8416FB0AD38638BF7038BF2A /* NextDashboardView.swift */,
 				9A26475D9A9D19DC0840960D /* NextItemsSection.swift */,
 				6392DC43E2FE913972F42911 /* NextSuggestionsSection.swift */,
 				47CA5EA5A9284AB449966DCC /* NextView.swift */,
+				BAD85ECA85C1BC1569658CF2 /* TodayEvent.swift */,
+				6FDD011B1DE9C5ED0C49EB56 /* TodayLogView.swift */,
 				4847155874CE3B82AD612728 /* WeekDashboardView.swift */,
-				F1D0AE0000000000000000A1 /* HomepageDomain.swift */,
-				F1D0AE0000000000000000B1 /* HomepageDomainData.swift */,
-				F1D0AE0000000000000000C1 /* HomepageLayoutMode.swift */,
-				F1D0AE0000000000000000D1 /* DenseHomepageView.swift */,
-				F1D0AE0000000000000000E1 /* HeatmapHomepageView.swift */,
-				BB74A5AFBC9C70CD48B03DFB /* TodayEvent.swift */,
+				E8CC0D108B59E1EB67CD24D6 /* WelcomeHeader.swift */,
 			);
 			path = Dashboard;
-			sourceTree = "<group>";
-		};
-		D370121B5406FD0544A3D701 /* Plugins */ = {
-			isa = PBXGroup;
-			children = (
-				C6311231B3AABDB9BC4CBB69 /* MoodPlugin.swift */,
-				DEC92C4A0EDB0032A8216157 /* TestPlugin.swift */,
-				480BE4F0B92D70D332E473FF /* CaffeinePlugin.swift */,
-				471562D540F368C2B008038B /* CannabisPlugin.swift */,
-				121905DB16B21A4039F8D4E5 /* GutPlugin.swift */,
-				392657C251E452BFEAEC6269 /* TrainingPlugin.swift */,
-				ACE439E37CB04BBBC0C979CC /* NutritionPlugin.swift */,
-				B7F00C1EE6CF4290A2AF9DCF /* HabitsPlugin.swift */,
-				133C3DFB6771D681737DAB58 /* SupplementsPlugin.swift */,
-				574B2E277922DA5E20E37466 /* ChoresPlugin.swift */,
-				BB0E36B524CE0AB7DCE4252B /* TasksPlugin.swift */,
-				CDC8C2483181BE09B32245F3 /* GoalsPlugin.swift */,
-				A8717AC713A8CB083B56E69C /* GroceriesPlugin.swift */,
-				E1CEE126A22E14D793FDB9C4 /* SectionExplainer.swift */,
-				72E856E09C93DC0F6F9DC00F /* SleepPlugin.swift */,
-				580F93EC39DB4D7876D3FC61 /* BodyPlugin.swift */,
-				DEFA831669F65CF778C6C38B /* AirPlugin.swift */,
-				A88D173E289074F16F3B1028 /* ActivityPlugin.swift */,
-				72E90E2386D62D611F5EA965 /* HydrationPlugin.swift */,
-			);
-			name = Plugins;
-			path = Plugins;
 			sourceTree = "<group>";
 		};
 		D3C660F4C6778649B74F4F19 /* Sleep */ = {
@@ -1080,62 +1146,40 @@
 			path = Sleep;
 			sourceTree = "<group>";
 		};
-		DABEFFFBA6210272F4329E9D /* Mood */ = {
-			isa = PBXGroup;
-			children = (
-				091DFAB6AC37AD70F740D1DC /* MoodCatalog.swift */,
-				24A01E1D30D6A0F4E9BA740F /* MoodDestinationView.swift */,
-				A2A4FE569EF0885271CCDBD9 /* AddMoodPage.swift */,
-				3F23F5CB85029263FB4836E3 /* EditMoodEntrySheet.swift */,
-				BEF5AB60845609D46FB5790D /* MoodQuickAddMenu.swift */,
-				1E066C599C555EA32681FD3B /* MoodCommitAnimation.swift */,
-			);
-			name = Mood;
-			path = Mood;
-			sourceTree = "<group>";
-		};
-		DB464C2338B287E70675AC7C /* Calendar */ = {
-			isa = PBXGroup;
-			children = (
-				931BDD3D7FDDD2214CD72E8D /* CalendarDestinationView.swift */,
-			);
-			path = Calendar;
-			sourceTree = "<group>";
-		};
 		E129AEFF2C1B93C7B4789164 /* SeptenaCore */ = {
 			isa = PBXGroup;
 			children = (
+				C9040E2C70604B773FAFB726 /* AirStore.swift */,
+				DAFB0D3BA97B1038047EE05D /* AranetBridge.swift */,
 				8EC7C9D9CAC52C91AFE79AE7 /* BadgeManager.swift */,
 				7027B881D1D8B1B09B105034 /* CalendarBridge.swift */,
 				D9D2A0C223ECB0DAA0D3EB12 /* ChecklistMirror.swift */,
 				1E25F81FE5AA4B6BBC056275 /* DateParser.swift */,
+				85942F0F6AEDE3D4607485D4 /* DayBucket.swift */,
 				DFD8EA98B891BB43A0CE4640 /* DayClock.swift */,
+				FC732C2F50FC1EC9308BA218 /* DefaultExerciseLibrary.swift */,
+				5835F104E8DFAA668ACCF9A5 /* Fasting.swift */,
 				53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */,
 				F61B77A80F53A6EEEBBC90EA /* HealthKitBridge.swift */,
+				EE89901CA806AA91E0441236 /* Logging.swift */,
+				F5B53F1EA33DC5B17A751664 /* MacroCatalog.swift */,
 				7D5ECFDA9128B73993023CB6 /* Models.swift */,
+				509271CE5A03BE4EC284151A /* OuraProvider.swift */,
 				AD295FAB7B881CAC43EE8C34 /* Outbox.swift */,
 				25DC8E705099DB99718A8596 /* Persistence.swift */,
-				F1D0AE0000000000000000F1 /* Fasting.swift */,
-				M4CR0CA7A1090000000000F1 /* MacroCatalog.swift */,
 				1CA646178F906B39ADA6689F /* Plausible.swift */,
+				43C61622FF3214AA0D70A6E7 /* PollenClient.swift */,
 				561130AE996F0E92FE02767D /* RemindersBridge.swift */,
 				C9D6916E979E5B0D7497CAEF /* ResponseCache.swift */,
 				C03DC46C772E45B60ECB7343 /* SectionTheme.swift */,
 				5D227602C1039FA2206A539A /* SeptenaServices.swift */,
 				E5439F75303F906465F9F2C6 /* SettingsMirror.swift */,
 				B6DD7C05D998EF1301A6410D /* SuggestionEngine.swift */,
+				F68950F621AB4EC987ED06CC /* TrainingConfigStore.swift */,
+				DE7BD5841409D69626291279 /* TrainingPRCalculator.swift */,
+				FF60A4EBE9BB351D23C913BE /* WithingsProvider.swift */,
 				9C1C012D9D64C42D35820701 /* CloudKit */,
 				858259E63BAAEEF2BE43D00B /* Sections */,
-				CCA388A73616C38F7456E6BE /* AranetBridge.swift */,
-				C23414685B03BA930E6C4D94 /* AirStore.swift */,
-				3433AE6FCB2549D390F9E43A /* TrainingConfigStore.swift */,
-				FAFAFAFA000000000000C001 /* TrainingPRCalculator.swift */,
-				FAFAFAFA000000000000A001 /* DefaultExerciseLibrary.swift */,
-				168F70A74A3AA9D2A0E234DB /* PollenClient.swift */,
-				A1B1C1D1E1F1010101010101 /* OuraProvider.swift */,
-				B2C2D2E2F2A2010101010101 /* WithingsProvider.swift */,
-				C3D3E3F3A3B3010101010101 /* Logging.swift */,
-				7B00840EA214FF8B761A9131 /* DayBucket.swift */,
 			);
 			path = SeptenaCore;
 			sourceTree = "<group>";
@@ -1146,6 +1190,27 @@
 				80D7DFAC856BBE635EBBC6E4 /* ActivityDestinationView.swift */,
 			);
 			path = Activity;
+			sourceTree = "<group>";
+		};
+		E5651035008888FF03C82755 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				486E060C50F1CDAEAFCE8E73 /* Fraunces-Regular.ttf */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		E8AD9DEDEE0B960C8184DCA0 /* Mood */ = {
+			isa = PBXGroup;
+			children = (
+				B7A1880819394CCA40FDB923 /* AddMoodPage.swift */,
+				096FF0E177B6CFC4B5A6D912 /* EditMoodEntrySheet.swift */,
+				33EB22A93C55573C49CFB21B /* MoodCatalog.swift */,
+				E1AB58A3A36A898E92890EBA /* MoodCommitAnimation.swift */,
+				12E14E48DFB87C5F1543BEA4 /* MoodDestinationView.swift */,
+				089893F59A6C1D2025AD8A2C /* MoodQuickAddMenu.swift */,
+			);
+			path = Mood;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -1163,6 +1228,8 @@
 			dependencies = (
 			);
 			name = SeptenaMac;
+			packageProductDependencies = (
+			);
 			productName = SeptenaMac;
 			productReference = 59055370ABA84DB912D64D1E /* SeptenaMac.app */;
 			productType = "com.apple.product-type.application";
@@ -1179,6 +1246,8 @@
 			dependencies = (
 			);
 			name = SeptenaWatchComplication;
+			packageProductDependencies = (
+			);
 			productName = SeptenaWatchComplication;
 			productReference = B456DE05339EB2A12EB2A9BE /* SeptenaWatchComplication.appex */;
 			productType = "com.apple.product-type.app-extension";
@@ -1197,6 +1266,8 @@
 				E29C52EB1EE32E3365E24F79 /* PBXTargetDependency */,
 			);
 			name = SeptenaWatch;
+			packageProductDependencies = (
+			);
 			productName = SeptenaWatch;
 			productReference = 5122E5C1D750654468CDCE96 /* SeptenaWatch.app */;
 			productType = "com.apple.product-type.application";
@@ -1215,6 +1286,8 @@
 				E74ACA3F68450593E3B01286 /* PBXTargetDependency */,
 			);
 			name = Septena;
+			packageProductDependencies = (
+			);
 			productName = Septena;
 			productReference = 39E8BE393381A7D49657D3C0 /* Septena.app */;
 			productType = "com.apple.product-type.application";
@@ -1285,6 +1358,7 @@
 				59D1D3BB3E05AF32C782A9C7 /* AppIcon.icns in Resources */,
 				A5DBCDF52DE4E8E077C6451E /* AppIcon.icon in Resources */,
 				D4B1495C0BDE3AF22A629505 /* Assets.xcassets in Resources */,
+				6E613152F22C42599AE4AAEC /* Fraunces-Regular.ttf in Resources */,
 				36325B1E6E5A771C01028105 /* Info.plist in Resources */,
 				F46ED9D5CAC9DA26811E4246 /* PrivacyInfo.xcprivacy in Resources */,
 			);
@@ -1306,6 +1380,7 @@
 				A14B8DF03D6FC0799D8AA8C2 /* AppIcon.icns in Resources */,
 				C9A195F8FF0C63824E0A5BD8 /* AppIcon.icon in Resources */,
 				FB79CB77D7DB4D47195A606D /* Assets.xcassets in Resources */,
+				A5A083B827BC6B45473A9F3A /* Fraunces-Regular.ttf in Resources */,
 				3D19536CFB66987D6D5C7642 /* Info-Mac.plist in Resources */,
 				E515D9DFB7D4891875B26EF4 /* PrivacyInfo.xcprivacy in Resources */,
 			);
@@ -1320,8 +1395,7 @@
 			files = (
 				D4F38C66817C3036A92F03C7 /* Accessibility.swift in Sources */,
 				BED02B3B08E74E921C1A15EF /* ActivityDestinationView.swift in Sources */,
-				A1B2C3D40000000000F10102 /* InsightsDestinationView.swift in Sources */,
-				A1B2C3D40000000000F10202 /* CorrelationEngine.swift in Sources */,
+				F46F4FF39CDE14DBD53605C8 /* ActivityPlugin.swift in Sources */,
 				B96B17EC37A2CFD6C1F1E862 /* AddCaffeinePage.swift in Sources */,
 				94C72024A922FE15CD3B7DF0 /* AddCannabisPage.swift in Sources */,
 				0ED02C4262546D720DCBE5DE /* AddChorePage.swift in Sources */,
@@ -1332,85 +1406,128 @@
 				1B693725E48BCC5939FE1196 /* AddInfoRow.swift in Sources */,
 				9487FE0DD2DC6FC6F602F4F8 /* AddInfoSection.swift in Sources */,
 				693B2845164FA3B7FC5828FE /* AddInfoSheet.swift in Sources */,
+				882529A4B2900274FC268325 /* AddMoodPage.swift in Sources */,
 				892B9AF1DFB498BD9A0C0B67 /* AddNutritionPage.swift in Sources */,
 				C67CA826A4F4DBC432F86CBC /* AddSupplementPage.swift in Sources */,
 				3CF5A02B1EFE2628F8E3E243 /* AddTaskIntent.swift in Sources */,
 				9BB4EA54B6DB8B01A7CE8C19 /* AddTaskPage.swift in Sources */,
 				91693AEE32D3825C811733E8 /* AddTrainingPage.swift in Sources */,
 				15B7B63A6FAFF96F8697F226 /* AirDestinationView.swift in Sources */,
+				6BCCB12F09DCD746682BEB57 /* AirPlugin.swift in Sources */,
+				3CF144837E54654FBB9195F0 /* AirStore.swift in Sources */,
 				2933A423AA89C0FC06C738DD /* App.swift in Sources */,
+				2F4616E5D71C4AE3CB45B37F /* AranetBridge.swift in Sources */,
 				1044DAF00212F1890D0BBCC3 /* AreaRecord.swift in Sources */,
-				858359D3B6CD430F9FDABC7A /* GoalRecord.swift in Sources */,
 				E8CE6D6CCE3418CBE815E85A /* AreasBackend.swift in Sources */,
 				A34023762B95F32B5CC4D981 /* AreasProjectsView.swift in Sources */,
+				171C4DED1F4D6CF052F024ED /* BackfillChoresSheet.swift in Sources */,
+				6F57829A6E98A79B04CCA884 /* BackfillHabitsSheet.swift in Sources */,
+				D9723D91628B03674BBC00C4 /* BackfillSupplementsSheet.swift in Sources */,
 				0ED59BE06DEBD263BBFA0D91 /* BadgeManager.swift in Sources */,
 				C69F364723C44FE9F240239A /* BodyDestinationView.swift in Sources */,
+				9EA68EE136C5016C9196136E /* BodyPlugin.swift in Sources */,
+				97056BA97DD06A5D8A5A0AE4 /* BrowseCaffeineDaySheet.swift in Sources */,
+				C5990B6C94853325ABBD62C0 /* BrowseCannabisDaySheet.swift in Sources */,
+				AA180D6CF5C6326D64004622 /* BrowseGutDaySheet.swift in Sources */,
 				EC80F6B72765AEF523B5A4E2 /* CKEngine.swift in Sources */,
 				D96F2922568F67A65AAA9AAC /* CaffeineDestinationView.swift in Sources */,
+				F3612FE5E541C9080CA1051F /* CaffeinePlugin.swift in Sources */,
 				4961E3BE36AB89493898CF3F /* CaffeineQuickAddMenu.swift in Sources */,
+				2D0A24C76D229B145825EFA4 /* CaffeineTypeSheet.swift in Sources */,
 				7397EB4533BA4D026F9F7662 /* CalendarBridge.swift in Sources */,
-				58DD67805AA678ADFA0709BB /* CalendarDestinationView.swift in Sources */,
 				E180CC3F5D34C7CD682290A9 /* CannabisDestinationView.swift in Sources */,
+				F47445E3B33F188B49D63233 /* CannabisPlugin.swift in Sources */,
 				B28E04772BF9921F6B165657 /* CannabisQuickAddMenu.swift in Sources */,
+				1D7A5FE67321DE601A4A975A /* CannabisTypeSheet.swift in Sources */,
 				7FFEA95721A7FACE74618002 /* ChecklistMirror.swift in Sources */,
 				116F32431DCC98176BC52830 /* ChoresDestinationView.swift in Sources */,
+				9D294C6FFD9CFE45F6E11B7D /* ChoresPlugin.swift in Sources */,
 				8C64426276695251AE35D327 /* ChoresQuickAddMenu.swift in Sources */,
+				73A70B780F096F7BDB0DA963 /* ConfettiBurst.swift in Sources */,
 				331439A1A265FAA64B5B02B6 /* ConsistencyHeatmap.swift in Sources */,
-				F1D0AE000000000000000102 /* ConfettiBurst.swift in Sources */,
-				F1D0AE000000000000000302 /* SyncIndicator.swift in Sources */,
 				A6D80B6B57734D9155888CC7 /* ContentView.swift in Sources */,
+				9056B762F0365C38DEA0F888 /* CorrelationEngine.swift in Sources */,
 				DF016EF192B7891D2DBE3CB6 /* DateParser.swift in Sources */,
+				BF8496432439A9FD8CFAE95E /* DayBucket.swift in Sources */,
+				D87619020A982717812E2C6C /* DayBucketHeader.swift in Sources */,
 				450F6EE8AD17A6935567940D /* DayClock.swift in Sources */,
 				99C5E0B4C1F96A710C71DFFC /* DayTimelineView.swift in Sources */,
-				127A379491C1416D94315098 /* TodayLogView.swift in Sources */,
+				6639EDEDC2C4CCC132BD3202 /* DefaultExerciseLibrary.swift in Sources */,
+				916916787FA1E0BA3BDB64A0 /* DenseHomepageView.swift in Sources */,
 				10550EB285720325B123ED7E /* EditCaffeineEntrySheet.swift in Sources */,
-				ECE15135AA3F4C27B32FAF94318651FB /* CaffeineTypeSheet.swift in Sources */,
 				1B5C67C9AB68E1F9822472D3 /* EditCannabisEntrySheet.swift in Sources */,
-				58B73FC4098A408CACA04153C8637FB6 /* CannabisTypeSheet.swift in Sources */,
 				2DCD1163302ADF72541A9664 /* EditChoreSheet.swift in Sources */,
 				E18A84E4ED0B805920276DF6 /* EditExerciseEntrySheet.swift in Sources */,
 				7F86986DFF10251984C6D58F /* EditGroceryItemSheet.swift in Sources */,
 				CE8853363A268EF8768114E7 /* EditGutEntrySheet.swift in Sources */,
 				91CF39EC64CE090D8FDB9C65 /* EditHabitSheet.swift in Sources */,
+				FF82CEDA629B023E377F342A /* EditMoodEntrySheet.swift in Sources */,
 				92F25DBCB85C19C91F51ADB7 /* EditNutritionEntrySheet.swift in Sources */,
 				AB68497A7AF5F88ED33EAB79 /* EditSupplementSheet.swift in Sources */,
-				D1C1F87FC588486EB9213B3F /* SupplementTypeSheet.swift in Sources */,
+				38D2BDDEB7410B6AC61B2A85 /* ExerciseCatalogView.swift in Sources */,
+				ED82759C6079C919DD635ED6 /* ExerciseDetailView.swift in Sources */,
+				C6EE3C372089D7A231497306 /* ExerciseLibrarySheet.swift in Sources */,
+				EA65F0CD9A0BEE74119CF7F5 /* ExercisePickerSheet.swift in Sources */,
+				A64695EB2E96AEA85444D310 /* Fasting.swift in Sources */,
+				51B5D785192F411E5AAF941B /* GoalRecord.swift in Sources */,
+				5480C8D91B5B539C4728B321 /* GoalsPlugin.swift in Sources */,
 				A97FAA9330439D1F0842F071 /* GoalsView.swift in Sources */,
-				B9A070171BFD45F3891526C4 /* SectionGoalsStrip.swift in Sources */,
+				C0FE1A7E001C0FE1A7E00012 /* GoalMetricEvaluator.swift in Sources */,
+				C0FE1A7E001C0FE1A7E00022 /* GoalMetricProgressView.swift in Sources */,
 				3C51EABA92695B18A7853BC1 /* GroceriesDestinationView.swift in Sources */,
+				62C5EE0FBB7F2050E09F8663 /* GroceriesPlugin.swift in Sources */,
 				8BB0BE46187F796D00BAB65A /* GroceriesQuickAddMenu.swift in Sources */,
 				2D0446FF68EAE29C3AEEC770 /* GutBristolRecorder.swift in Sources */,
 				2C68F00EF16E552C12B176AE /* GutDestinationView.swift in Sources */,
+				E13166B735F6109781FB1178 /* GutPlugin.swift in Sources */,
 				C340BAAC69B40F5B9CD987BD /* GutQuickAddMenu.swift in Sources */,
 				CC74FC02CD22EC7F0A3AC8AF /* HabitsDestinationView.swift in Sources */,
+				0FEC34A8DE1AC32545F489C4 /* HabitsPlugin.swift in Sources */,
 				58DC084B12BA54003373BF5F /* HabitsQuickAddMenu.swift in Sources */,
 				5330AF71083A1F3514B862B8 /* Haptics.swift in Sources */,
 				EF6F6DC70A2A20577E2BDCBD /* HealthKitBridge.swift in Sources */,
+				AA637C7BAA42F926C11A1854 /* HeatmapHomepageView.swift in Sources */,
+				C0FE1A7E001C0FE1A7E00002 /* CorrelationsHomepageView.swift in Sources */,
+				E473CB48403FA0B512BB22AC /* HomepageDomain.swift in Sources */,
+				17ADAC551DA38D31B787D33C /* HomepageDomainData.swift in Sources */,
+				4864ED3E9586783879087215 /* HomepageLayoutMode.swift in Sources */,
+				546CDD30A2DDC610E321A0C9 /* HydrationPlugin.swift in Sources */,
+				1A579BBFDFC67BB3FA2F7E6A /* InsightsDestinationView.swift in Sources */,
 				3EEDE3247DF0EDB92F55843D /* IntensityGlyph.swift in Sources */,
 				829009F90CB9E37A6D1D9341 /* LogRow.swift in Sources */,
+				DE0EC191FF3BE48A47465CBA /* Logging.swift in Sources */,
+				77B186F9015710E0B19204AB /* MacroCatalog.swift in Sources */,
 				7BF180B58D52C2BD10BBC5AB /* MenuBarMenu.swift in Sources */,
 				58AFCBB034501ACEC2C5DEF7 /* Migration.swift in Sources */,
 				0448F507E1F1600F9933AEED /* Models.swift in Sources */,
 				9EA753D4BE7912ACB670B69F /* ModuleTile.swift in Sources */,
+				497ECF175FD15339CA083270 /* MoodCatalog.swift in Sources */,
+				E9FE8C1F55C7F682DDC5E73B /* MoodCommitAnimation.swift in Sources */,
+				D68C4DF01907E23021C0EB16 /* MoodDestinationView.swift in Sources */,
+				AF64B18251F2EE3C868C7337 /* MoodPlugin.swift in Sources */,
+				5A6DFBAB575054F0FBA4B916 /* MoodQuickAddMenu.swift in Sources */,
 				8C4B8E2EEE2504ED9E24D5EA /* NavigationState.swift in Sources */,
 				C9730A8D5FCB43EAC9A6C304 /* NewNutritionEntrySheet.swift in Sources */,
 				94E55C9AFE0C64704EB64CB3 /* NextDashboardView.swift in Sources */,
 				64BB65F0683A560F5055BA6A /* NextItemsSection.swift in Sources */,
+				4360951B3296182CD19590E6 /* WelcomeHeader.swift in Sources */,
 				BA110C8B6611A56723B23E66 /* NextSuggestionsSection.swift in Sources */,
 				1DCDA337088FC9FEA65F9F73 /* NextView.swift in Sources */,
 				963652437C3079BD46CC1E83 /* NutritionDestinationView.swift in Sources */,
+				0A5DA8A35CD6681085D55BCE /* NutritionPlugin.swift in Sources */,
 				688DF9C7BC0CB50A51BF1191 /* NutritionQuickAddMenu.swift in Sources */,
 				454D024E707CE7FF7C823FEA /* NutritionRecommendations.swift in Sources */,
 				2242B79D13554F2C937E85BD /* NutritionSearchSheet.swift in Sources */,
+				E4C0B78E0CA62E12C45BD197 /* OuraProvider.swift in Sources */,
 				AF5A77B5B730923A825F7C89 /* Outbox.swift in Sources */,
 				4A9BF2842C0AC601AF8B7099 /* Persistence.swift in Sources */,
-				F1D0AE0000000000000000F2 /* Fasting.swift in Sources */,
-				M4CR0CA7A1090000000000F2 /* MacroCatalog.swift in Sources */,
 				CB31EA476ED138FEC78FCE6B /* PlatformDelegates.swift in Sources */,
 				3C64ED1D0A9AC256265FE06B /* PlatformShims.swift in Sources */,
 				FB3FBF3FBFB09C7494211780 /* Plausible.swift in Sources */,
+				6A6D73A24BF96F100C34D4E5 /* PollenClient.swift in Sources */,
 				1CBF0222F73BAE3CDDB0E342 /* ProjectRecord.swift in Sources */,
 				C64474C5F09E554A5EF98989 /* ProjectsBackend.swift in Sources */,
+				60E5C5EA8C6ACE6DB86771E9 /* QuickActionsApplier.swift in Sources */,
 				E2C7D3735EDC3CA869460C3A /* QuickAddToolbar.swift in Sources */,
 				04112426A92819E814A6F66A /* QuickFindView.swift in Sources */,
 				187093B93D48863B5E1E1E37 /* RemindersBridge.swift in Sources */,
@@ -1418,24 +1535,37 @@
 				E5FA0F06A41B43E0225C90D4 /* RemindersInboxSection.swift in Sources */,
 				6DB169E3C4B6BC5BA8855D66 /* ResponseCache.swift in Sources */,
 				CC39344C28C121004522CAB8 /* RootTabView.swift in Sources */,
+				711BBE3777A1E22BE474BDF0 /* RoutineCatalogView.swift in Sources */,
+				FD2D921637A390ABCEA55A9C /* RoutineDetailView.swift in Sources */,
 				B1890C3913BBCEC6EFF39807 /* SearchTabView.swift in Sources */,
+				4E81F7D428FDB2E8DB6E105D /* SectionExplainer.swift in Sources */,
+				713762038CBF75DAC8A73954 /* SectionGoalsStrip.swift in Sources */,
 				A7F3580380663FA1FA645ED0 /* SectionManifest.swift in Sources */,
+				1F42E5CB802628226D0D7E8D /* SectionPlugin.swift in Sources */,
+				A1B2C3D4E5F60718293A4B5D /* SectionDrawer.swift in Sources */,
+				A1B2C3D4E5F60718293A4B62 /* StatStrip.swift in Sources */,
+				A1B2C3D4E5F60718293A4B64 /* LogEntryRow.swift in Sources */,
+				A1B2C3D4E5F60718293A4B67 /* ChartCard.swift in Sources */,
+				A1B2C3D4E5F60718293A4B6A /* StatGrid.swift in Sources */,
+				A1B2C3D4E5F60718293A4B6D /* DrawerDateStrip.swift in Sources */,
 				C8F7E91227008E29DA40DB5C /* SectionRecord.swift in Sources */,
 				07B127F5FBCE0DE19AFCD387 /* SectionTheme.swift in Sources */,
-				A1B1C1D1E1F1030303030303 /* OuraProvider.swift in Sources */,
-				B2C2D2E2F2A2030303030303 /* WithingsProvider.swift in Sources */,
-				C3D3E3F3A3B3030303030303 /* Logging.swift in Sources */,
 				288822C1F37C59515A97A967 /* SeptenaServices.swift in Sources */,
 				C3AC44E24947DE4D47DA8A42 /* ServerInspectorSheet.swift in Sources */,
+				3001B4A5B0285FA146B92FBD /* SessionCompleteSheet.swift in Sources */,
 				B45A3DCE0AC3B32856BA727C /* SettingsMirror.swift in Sources */,
 				ADCA538CBFB1E75DCC416215 /* SettingsRecord.swift in Sources */,
 				B60A9AE489FD7502DC0B83B8 /* SettingsView.swift in Sources */,
 				88D354F6ACC5B87602A1B731 /* ShortcutAction.swift in Sources */,
 				83D51A84E5045C1EC509EC83 /* SidebarView.swift in Sources */,
 				A90F8338D53AE42BA5F3FA33 /* SleepDestinationView.swift in Sources */,
+				29BCD4B4754BFB299B32292B /* SleepPlugin.swift in Sources */,
 				FF12744271E9DF61BD2F557F /* SuggestionEngine.swift in Sources */,
+				D9E97578F42A8C84B5AE2611 /* SupplementTypeSheet.swift in Sources */,
 				4C3D2F04A2E30D64F74B5B49 /* SupplementsDestinationView.swift in Sources */,
+				58FFFE3DA7E30239D91AE021 /* SupplementsPlugin.swift in Sources */,
 				C0E093740769380C81FD31BA /* SupplementsQuickAddMenu.swift in Sources */,
+				BC0A7CBC554735ABF30A8001 /* SyncIndicator.swift in Sources */,
 				3797CC96603DC088851E9CA3 /* TaskCommands.swift in Sources */,
 				23E576367F520EA8ACA8C355 /* TaskComponents.swift in Sources */,
 				DD4C37A28620313CC2C805BE /* TaskDetailView.swift in Sources */,
@@ -1443,59 +1573,20 @@
 				E9D604A78C243E8ED46607A4 /* TaskReads.swift in Sources */,
 				241E03A545CC2025FA858C82 /* TaskRecord.swift in Sources */,
 				F5B490D2166BAEB13EE3383A /* TasksBackend.swift in Sources */,
+				BDD2EFA54C60BFF4059B9C61 /* TasksPlugin.swift in Sources */,
 				38449958A37427F0F31973A9 /* TasksQuickAddMenu.swift in Sources */,
+				3BF5EDE454800965DA74FD91 /* TestPlugin.swift in Sources */,
 				D01136C3F62828F390C2ED45 /* Theme.swift in Sources */,
+				0D300181405EA00722B8661A /* TodayEvent.swift in Sources */,
+				6C69EC098DA1B3FF1463B22B /* TodayLogView.swift in Sources */,
+				87DDC3A29CBD5AA95BDA19E8 /* TrainingConfigStore.swift in Sources */,
 				F2425F67935D5882EF56C171 /* TrainingDestinationView.swift in Sources */,
+				E6803B6BE06EA459F23BB499 /* TrainingPRCalculator.swift in Sources */,
+				F0C1672EFEBA715B2830BC62 /* TrainingPlugin.swift in Sources */,
 				9E8994F78DFE201A05147CE2 /* TrainingQuickAddMenu.swift in Sources */,
-				F1D0AE000000000000000203 /* SessionCompleteSheet.swift in Sources */,
-				8C7C5923327E489EB368E41A /* ExerciseCatalogView.swift in Sources */,
-				840B7914A69E461184CD9510 /* ExerciseDetailView.swift in Sources */,
-				F0F09026A367472BA79610F0 /* RoutineCatalogView.swift in Sources */,
-				7B6E0700686F4161866A1A3E /* RoutineDetailView.swift in Sources */,
-				A0989A011D4F4AD3A890BD6A /* ExercisePickerSheet.swift in Sources */,
 				D0292E8244711012808180C5 /* WatchBridge.swift in Sources */,
 				AB4D0CE5A8F8961949BC886D /* WeekDashboardView.swift in Sources */,
-				F1D0AE0000000000000000A2 /* HomepageDomain.swift in Sources */,
-				F1D0AE0000000000000000B2 /* HomepageDomainData.swift in Sources */,
-				F1D0AE0000000000000000C2 /* HomepageLayoutMode.swift in Sources */,
-				F1D0AE0000000000000000D2 /* DenseHomepageView.swift in Sources */,
-				F1D0AE0000000000000000E2 /* HeatmapHomepageView.swift in Sources */,
-				9A403F3BAF0087FD1583B6E3 /* AranetBridge.swift in Sources */,
-				0C5C19796C2D4515B47D2690 /* AirStore.swift in Sources */,
-				5441C30D38B94A9CA289C527 /* TrainingConfigStore.swift in Sources */,
-				FAFAFAFA000000000000C002 /* TrainingPRCalculator.swift in Sources */,
-				FAFAFAFA000000000000A002 /* DefaultExerciseLibrary.swift in Sources */,
-				FAFAFAFA000000000000B002 /* ExerciseLibrarySheet.swift in Sources */,
-				39DF76042915AEA3F266DB4E /* PollenClient.swift in Sources */,
-				39526C71869E762CDA805628 /* MoodCatalog.swift in Sources */,
-				CFB9EDEB897F8DF6D9AAA002 /* MoodDestinationView.swift in Sources */,
-				36BC5FCDA2E2B9EACE232818 /* AddMoodPage.swift in Sources */,
-				99989A4D32EAED98F631DF0D /* EditMoodEntrySheet.swift in Sources */,
-				08C1D850AC33EDFB75ADD93D /* MoodQuickAddMenu.swift in Sources */,
-				E76B97014681B80397EF05BB /* DayBucket.swift in Sources */,
-				E3321E1C5BE6BAD0D78EE852 /* DayBucketHeader.swift in Sources */,
-				84F6757BD8B51515B8093A15 /* TodayEvent.swift in Sources */,
-				3EF3A029B47A336732DD8286 /* SectionPlugin.swift in Sources */,
-				847CECE9D10903FA540FB129 /* MoodPlugin.swift in Sources */,
-				621E7AE4A735609BC4D52617 /* MoodCommitAnimation.swift in Sources */,
-				257986ED236E9DD52F6B7066 /* TestPlugin.swift in Sources */,
-				BB6E0880C11C8581A0EFE7AC /* CaffeinePlugin.swift in Sources */,
-				BDA42CE92BCC3758D45ED76B /* CannabisPlugin.swift in Sources */,
-				50A243F9AEE8BCD4C3217645 /* GutPlugin.swift in Sources */,
-				AB3A2E8331E9943EDE433E44 /* TrainingPlugin.swift in Sources */,
-				EBC7FFA58086E91AA71EB01D /* NutritionPlugin.swift in Sources */,
-				9BB49BD7F88671873926C153 /* HabitsPlugin.swift in Sources */,
-				6FB1988A2BCFEDD715358E83 /* SupplementsPlugin.swift in Sources */,
-				1E83F8AD25AA4E38C44CDA45 /* ChoresPlugin.swift in Sources */,
-				7B0EB1B5087C2B93BB9892AF /* TasksPlugin.swift in Sources */,
-				B531EF9C7FB18B241FFC6B21 /* GoalsPlugin.swift in Sources */,
-				2804B8EB5F36E3469B9CC898 /* GroceriesPlugin.swift in Sources */,
-				F553411F51C07D47D11B3A4F /* SectionExplainer.swift in Sources */,
-				F1AB54A0F4A19BF1351C8B22 /* SleepPlugin.swift in Sources */,
-				82D56A83AF077D7035E38186 /* BodyPlugin.swift in Sources */,
-				F8FBAFDB958F7D6CB3EDB99B /* AirPlugin.swift in Sources */,
-				06688FE9D7768E81C23A2E8A /* ActivityPlugin.swift in Sources */,
-				5240EA8A1A8C2A6DF18CEA31 /* HydrationPlugin.swift in Sources */,
+				BEF2D6CEC537A8A230DCD142 /* WithingsProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1529,8 +1620,7 @@
 			files = (
 				F7739072DE3EDDE989C4B9FB /* Accessibility.swift in Sources */,
 				403EE99D65456FD99F82D568 /* ActivityDestinationView.swift in Sources */,
-				A1B2C3D40000000000F10103 /* InsightsDestinationView.swift in Sources */,
-				A1B2C3D40000000000F10203 /* CorrelationEngine.swift in Sources */,
+				89D14499AF91285819719AE9 /* ActivityPlugin.swift in Sources */,
 				248295C0B1F9318FB1841555 /* AddCaffeinePage.swift in Sources */,
 				C65F6155BFC934F53BA47CA1 /* AddCannabisPage.swift in Sources */,
 				AD8E6D6E9DFA518DBC2B50CA /* AddChorePage.swift in Sources */,
@@ -1541,85 +1631,128 @@
 				D2ED87D701557BCC94446AC6 /* AddInfoRow.swift in Sources */,
 				7FE5815A1FDDD537C1337A6E /* AddInfoSection.swift in Sources */,
 				BD6E080D2682C87ACB9190DD /* AddInfoSheet.swift in Sources */,
+				5DA39382E21BCFF219BD239D /* AddMoodPage.swift in Sources */,
 				A36B5F790EA56294CC9ADE5A /* AddNutritionPage.swift in Sources */,
 				C4CDFDADFE30B34C6A81F2FC /* AddSupplementPage.swift in Sources */,
 				424F6899E25CE8A32DF9C1A6 /* AddTaskIntent.swift in Sources */,
 				AA0022D742A4E427536BC219 /* AddTaskPage.swift in Sources */,
 				6600263164A28E6F185190DA /* AddTrainingPage.swift in Sources */,
 				FD00636369733E912BD26838 /* AirDestinationView.swift in Sources */,
+				9D795EF920A464F5F76EE2F6 /* AirPlugin.swift in Sources */,
+				94E29BB41F4A043B13DC2BF0 /* AirStore.swift in Sources */,
 				1872D480184BC0A84068D022 /* App.swift in Sources */,
+				441C65E63C8A41A3CAAE1770 /* AranetBridge.swift in Sources */,
 				74E631E4D6B41796BBE7B3FA /* AreaRecord.swift in Sources */,
-				CC682C670CAA403DB4E9006B /* GoalRecord.swift in Sources */,
 				C7AC2E4E116DAB445A500573 /* AreasBackend.swift in Sources */,
 				A656A1AAAD5DE20253D6ABB7 /* AreasProjectsView.swift in Sources */,
+				45CFCA5E661E722E12BCA92B /* BackfillChoresSheet.swift in Sources */,
+				3D7D10D1B1E3CCBB8D8ACD14 /* BackfillHabitsSheet.swift in Sources */,
+				2062DECFE8C3FA1BD4668E60 /* BackfillSupplementsSheet.swift in Sources */,
 				56E87EA383673A4ACE86F2CD /* BadgeManager.swift in Sources */,
 				4A14A3B8F875A6E4CC374781 /* BodyDestinationView.swift in Sources */,
+				06C50FCE5222712BF80255FB /* BodyPlugin.swift in Sources */,
+				781B94B6A0387DD5D7887DEF /* BrowseCaffeineDaySheet.swift in Sources */,
+				5F8897309D37117C9DC8B47B /* BrowseCannabisDaySheet.swift in Sources */,
+				BFAFA1121DC35073F6D352F6 /* BrowseGutDaySheet.swift in Sources */,
 				5C2CAF18F7F1BB26F040A597 /* CKEngine.swift in Sources */,
 				31F0427B242C90F3B3EF4B0B /* CaffeineDestinationView.swift in Sources */,
+				067F9505CD3D50628A7F3C0B /* CaffeinePlugin.swift in Sources */,
 				FF2FE71A29903E8E169673D1 /* CaffeineQuickAddMenu.swift in Sources */,
+				1A4835E11C2F50BF2B833164 /* CaffeineTypeSheet.swift in Sources */,
 				B09EA3455FBF702224C33616 /* CalendarBridge.swift in Sources */,
-				7DD6DCA0A66C144DA6686FF4 /* CalendarDestinationView.swift in Sources */,
 				C8431A57209DF77F8D9F9E59 /* CannabisDestinationView.swift in Sources */,
+				4082657062EBC11108916FAE /* CannabisPlugin.swift in Sources */,
 				183F34C5DC50F1B0DE238401 /* CannabisQuickAddMenu.swift in Sources */,
+				A07317BD24F6EA572471222F /* CannabisTypeSheet.swift in Sources */,
 				6521E27B88444ACE53AE24BE /* ChecklistMirror.swift in Sources */,
 				27FAA27C1B4C0F8D3EC2A94B /* ChoresDestinationView.swift in Sources */,
+				06ADE13C31B283F59B6C5C9D /* ChoresPlugin.swift in Sources */,
 				1C507D0995C20ECA4DA6479F /* ChoresQuickAddMenu.swift in Sources */,
+				DD0CAC0D298CB64B7B4BDAFF /* ConfettiBurst.swift in Sources */,
 				EA56ADCFD84CE200C7CEF2A9 /* ConsistencyHeatmap.swift in Sources */,
-				F1D0AE000000000000000103 /* ConfettiBurst.swift in Sources */,
-				F1D0AE000000000000000303 /* SyncIndicator.swift in Sources */,
 				2A5F1570FB36894B1FBE4364 /* ContentView.swift in Sources */,
+				0578243E033490DBAFABEEE2 /* CorrelationEngine.swift in Sources */,
 				513C8B1D41E5BA85B785129C /* DateParser.swift in Sources */,
+				2781B65014FE7E1D52A10876 /* DayBucket.swift in Sources */,
+				F8FD2F1BF2020A03D3DF018D /* DayBucketHeader.swift in Sources */,
 				78C28CA0B3780E99EC30BC75 /* DayClock.swift in Sources */,
 				226BFDEF2964B3BA661ACC67 /* DayTimelineView.swift in Sources */,
-				8C4887ED959A4AF899C9C4A7 /* TodayLogView.swift in Sources */,
+				574B0FA4260C0E1EC95380AD /* DefaultExerciseLibrary.swift in Sources */,
+				586C9902583DE614A4366541 /* DenseHomepageView.swift in Sources */,
 				B717FF226A4C4E3CA00A8928 /* EditCaffeineEntrySheet.swift in Sources */,
-				53AE9D35D13046BB9E02BECFF6041939 /* CaffeineTypeSheet.swift in Sources */,
 				78A4E7FB3BB9AED6E920A21E /* EditCannabisEntrySheet.swift in Sources */,
-				4DE0513FA4C449F29A031F9ACE599643 /* CannabisTypeSheet.swift in Sources */,
 				8B2588E5DB7635580E73217D /* EditChoreSheet.swift in Sources */,
 				D0C21C52489E6C861A6B0A13 /* EditExerciseEntrySheet.swift in Sources */,
 				9A309102A56D669A431C6703 /* EditGroceryItemSheet.swift in Sources */,
 				495AAB0A42EE740E0934012A /* EditGutEntrySheet.swift in Sources */,
 				C24AEFBDA5239F683441612F /* EditHabitSheet.swift in Sources */,
+				D057C45AB5852CC5800058D8 /* EditMoodEntrySheet.swift in Sources */,
 				88D6592312AB55D1A314C247 /* EditNutritionEntrySheet.swift in Sources */,
 				11091A62DB6744BDE8673415 /* EditSupplementSheet.swift in Sources */,
-				745A9B191F9F4549AB7ECE8D /* SupplementTypeSheet.swift in Sources */,
+				262EF303D006D36A39042280 /* ExerciseCatalogView.swift in Sources */,
+				BF21A6B5BEFFC4F242D109B8 /* ExerciseDetailView.swift in Sources */,
+				3292128871BF0E9AAEE59677 /* ExerciseLibrarySheet.swift in Sources */,
+				C219D784BF82706F81689818 /* ExercisePickerSheet.swift in Sources */,
+				19B7D6F5DBDB4E5C5F3C50AB /* Fasting.swift in Sources */,
+				18AB932BA675C01456276CE7 /* GoalRecord.swift in Sources */,
+				75F953C419493CAE4EC29A6E /* GoalsPlugin.swift in Sources */,
 				E9970D5068FD243A6FF27686 /* GoalsView.swift in Sources */,
-				0676F36CEF04405B98DFCA29 /* SectionGoalsStrip.swift in Sources */,
+				C0FE1A7E001C0FE1A7E00013 /* GoalMetricEvaluator.swift in Sources */,
+				C0FE1A7E001C0FE1A7E00023 /* GoalMetricProgressView.swift in Sources */,
 				2ED32D83DAF70E51745C9183 /* GroceriesDestinationView.swift in Sources */,
+				8DA58FF2CBBFC76AF92A17BF /* GroceriesPlugin.swift in Sources */,
 				002C465DC1BF297DFED1A82A /* GroceriesQuickAddMenu.swift in Sources */,
 				14A026D5D1BAFF0B4943D0E0 /* GutBristolRecorder.swift in Sources */,
 				57CDC37DD71D40C12819E6C6 /* GutDestinationView.swift in Sources */,
+				E7DC28B1ABC0A9F666FD6462 /* GutPlugin.swift in Sources */,
 				E680A3EF175E9F47A1C8D641 /* GutQuickAddMenu.swift in Sources */,
 				2E71534FB75930353C9B6320 /* HabitsDestinationView.swift in Sources */,
+				DE2DC97811EBF7E4B01C3261 /* HabitsPlugin.swift in Sources */,
 				3AD2CBA0A9A2EF4ACE740C5D /* HabitsQuickAddMenu.swift in Sources */,
 				28777ACD729D9C78846219C4 /* Haptics.swift in Sources */,
 				1DFCCAA759E4B23AC3D03C10 /* HealthKitBridge.swift in Sources */,
+				174606742D6D5BE5AFBFCA50 /* HeatmapHomepageView.swift in Sources */,
+				C0FE1A7E001C0FE1A7E00003 /* CorrelationsHomepageView.swift in Sources */,
+				FC4FF942C172ECE99D6CEFD8 /* HomepageDomain.swift in Sources */,
+				AA7B23BB1EA2FA73771D0069 /* HomepageDomainData.swift in Sources */,
+				BE7C64BB366E2EDDCFE60FF6 /* HomepageLayoutMode.swift in Sources */,
+				B97B4B6B0070C0E28FD67B5C /* HydrationPlugin.swift in Sources */,
+				BBA737CEEE52190FE9486AA6 /* InsightsDestinationView.swift in Sources */,
 				AB689CCEB13486AEB4AE05C8 /* IntensityGlyph.swift in Sources */,
 				FDD4E2807DBBB981F1F6C321 /* LogRow.swift in Sources */,
+				ECCC23D380E913723DB60222 /* Logging.swift in Sources */,
+				59333A2540ABE31E381C30C7 /* MacroCatalog.swift in Sources */,
 				D8337D72DCD514F36A6094B4 /* MenuBarMenu.swift in Sources */,
 				6D1BE00011E60EE3A490364D /* Migration.swift in Sources */,
 				DD200EF411309E29B543963F /* Models.swift in Sources */,
 				4BA5BEC17010A16EB46CA603 /* ModuleTile.swift in Sources */,
+				FD78F45875BF6FB39FBB90AF /* MoodCatalog.swift in Sources */,
+				5B33966B1FD021C5BE96C2B9 /* MoodCommitAnimation.swift in Sources */,
+				40A0EE423552A4504E87DCC4 /* MoodDestinationView.swift in Sources */,
+				E1CBA01ED10A916CD8BC355F /* MoodPlugin.swift in Sources */,
+				6F104C934A5BF6230CC8C1F9 /* MoodQuickAddMenu.swift in Sources */,
 				EE902B419406F504517110B8 /* NavigationState.swift in Sources */,
 				8F36E77E81D7EAC78F51D64A /* NewNutritionEntrySheet.swift in Sources */,
 				C35D98E7CDEB7F082AB4F4DB /* NextDashboardView.swift in Sources */,
 				B96C96E8E9B28590E7204C0C /* NextItemsSection.swift in Sources */,
+				D24EEBED0F1BFDF200CC26DA /* WelcomeHeader.swift in Sources */,
 				BB19A2F7287FB286F1725A9C /* NextSuggestionsSection.swift in Sources */,
 				2877A01512C66155EF4EEA54 /* NextView.swift in Sources */,
 				01E672AE9CC6DC0BCC948870 /* NutritionDestinationView.swift in Sources */,
+				AE037FEEBEC164AE695B6329 /* NutritionPlugin.swift in Sources */,
 				352B532706902FA61068D9FB /* NutritionQuickAddMenu.swift in Sources */,
 				3E0EF1DA201030BB6F2A4019 /* NutritionRecommendations.swift in Sources */,
 				57C60FD78BA0AE6412721809 /* NutritionSearchSheet.swift in Sources */,
+				0D9E377F27B61E08EB23187E /* OuraProvider.swift in Sources */,
 				07F54D0DB13468114771FD91 /* Outbox.swift in Sources */,
 				A1C7525645EBE54B283DC0D9 /* Persistence.swift in Sources */,
-				F1D0AE0000000000000000F3 /* Fasting.swift in Sources */,
-				M4CR0CA7A1090000000000F3 /* MacroCatalog.swift in Sources */,
 				B52F421956F45A0367348241 /* PlatformDelegates.swift in Sources */,
 				C1F56FDF315938C5A58E8A98 /* PlatformShims.swift in Sources */,
 				65246BE2E94DD5324730533D /* Plausible.swift in Sources */,
+				E4754057C57F0FB3CD34C2DC /* PollenClient.swift in Sources */,
 				CF04EE095D677287C2041ACF /* ProjectRecord.swift in Sources */,
 				AA49332965231083B1AB9644 /* ProjectsBackend.swift in Sources */,
+				5211F3474CA946655E003F5C /* QuickActionsApplier.swift in Sources */,
 				82BBE632A990482C26C7BB0F /* QuickAddToolbar.swift in Sources */,
 				0BD73B4B6206D9A9878C1EA8 /* QuickFindView.swift in Sources */,
 				94702073666C4968D36B96C5 /* RemindersBridge.swift in Sources */,
@@ -1627,24 +1760,37 @@
 				E82FB8F3AA77028D2377FF0F /* RemindersInboxSection.swift in Sources */,
 				B211B2678BDDD3B30FD9307D /* ResponseCache.swift in Sources */,
 				6B3C51BC822675123EE51792 /* RootTabView.swift in Sources */,
+				027376E6E47C54E7A535D80C /* RoutineCatalogView.swift in Sources */,
+				3E0184DE60F06697D6F59120 /* RoutineDetailView.swift in Sources */,
 				9E8F15EC733A433E18D82362 /* SearchTabView.swift in Sources */,
+				4077525AE4794C36B68770F9 /* SectionExplainer.swift in Sources */,
+				78A010829ED331BCE4D95AEE /* SectionGoalsStrip.swift in Sources */,
 				95FF3A61C542C9B1633050C3 /* SectionManifest.swift in Sources */,
+				52C96CCC82FFC910B23BF7E3 /* SectionPlugin.swift in Sources */,
+				A1B2C3D4E5F60718293A4B5E /* SectionDrawer.swift in Sources */,
+				A1B2C3D4E5F60718293A4B63 /* StatStrip.swift in Sources */,
+				A1B2C3D4E5F60718293A4B65 /* LogEntryRow.swift in Sources */,
+				A1B2C3D4E5F60718293A4B68 /* ChartCard.swift in Sources */,
+				A1B2C3D4E5F60718293A4B6B /* StatGrid.swift in Sources */,
+				A1B2C3D4E5F60718293A4B6E /* DrawerDateStrip.swift in Sources */,
 				3EFD534FCC0E072DCACD3839 /* SectionRecord.swift in Sources */,
 				D3D801AE0714FA3E8696508A /* SectionTheme.swift in Sources */,
-				A1B1C1D1E1F1020202020202 /* OuraProvider.swift in Sources */,
-				B2C2D2E2F2A2020202020202 /* WithingsProvider.swift in Sources */,
-				C3D3E3F3A3B3020202020202 /* Logging.swift in Sources */,
 				D70A3B473E3ACD222FD15870 /* SeptenaServices.swift in Sources */,
 				6599659F45F9B6EF50FC2C1B /* ServerInspectorSheet.swift in Sources */,
+				DE0F3ECD1EA2391814BE31F9 /* SessionCompleteSheet.swift in Sources */,
 				0139A2BF409AD0CFD4AA7E80 /* SettingsMirror.swift in Sources */,
 				8920FD91C3706F090902F4A5 /* SettingsRecord.swift in Sources */,
 				76C049B6FAEBDE6471287104 /* SettingsView.swift in Sources */,
 				A1D4907004FD78EC3D6F7C6F /* ShortcutAction.swift in Sources */,
 				3D46571B9A58D75B1947368B /* SidebarView.swift in Sources */,
 				EFE1FEDBA1BFF8D046A0261C /* SleepDestinationView.swift in Sources */,
+				637C82B79BB177B96BD557E1 /* SleepPlugin.swift in Sources */,
 				F21704F2D348D306CBC132AB /* SuggestionEngine.swift in Sources */,
+				43C9357C3238780EE8C04378 /* SupplementTypeSheet.swift in Sources */,
 				58A703D6DD359B0ABC742AC6 /* SupplementsDestinationView.swift in Sources */,
+				23D0E10A24B9D654D78B129F /* SupplementsPlugin.swift in Sources */,
 				E2BC0F421F2EC709BBA3B461 /* SupplementsQuickAddMenu.swift in Sources */,
+				3B562D83E368E6726F7462AF /* SyncIndicator.swift in Sources */,
 				DC86ECB869790C73F0A68948 /* TaskCommands.swift in Sources */,
 				CF2133D047172BAD081AFF40 /* TaskComponents.swift in Sources */,
 				1EA4599B775EAD7A9E472565 /* TaskDetailView.swift in Sources */,
@@ -1652,59 +1798,20 @@
 				C54E2FFB072378F72D591866 /* TaskReads.swift in Sources */,
 				4C7EE421B5249E3E301C3211 /* TaskRecord.swift in Sources */,
 				DBD1584A15E7BCA54B072F50 /* TasksBackend.swift in Sources */,
+				CAC3D7882FBA4CC14C531FEE /* TasksPlugin.swift in Sources */,
 				2173E7FE6EFC115273513DF4 /* TasksQuickAddMenu.swift in Sources */,
+				67A8CA1C1F2E0C7FF38E82EC /* TestPlugin.swift in Sources */,
 				E6C8DBF309966F7E6CF312CB /* Theme.swift in Sources */,
+				37AAF50E966216CA0280610E /* TodayEvent.swift in Sources */,
+				3B2DFB76DAC929996E5BA87C /* TodayLogView.swift in Sources */,
+				E91A92ABF2E5AB406CCBE63C /* TrainingConfigStore.swift in Sources */,
 				B0DA42E828CAC0BD0B0E64B9 /* TrainingDestinationView.swift in Sources */,
+				B649C5BBC42172713718ACEE /* TrainingPRCalculator.swift in Sources */,
+				E7A21358615235C62A3149B5 /* TrainingPlugin.swift in Sources */,
 				533D26E5CB13EAC2F2B088B2 /* TrainingQuickAddMenu.swift in Sources */,
-				F1D0AE000000000000000202 /* SessionCompleteSheet.swift in Sources */,
-				7D2C93058A1B4CB99BBDFED1 /* ExerciseCatalogView.swift in Sources */,
-				37C637FA20354B02A5330048 /* ExerciseDetailView.swift in Sources */,
-				C79F278BD9774C3CA732ED85 /* RoutineCatalogView.swift in Sources */,
-				D068D21F9ACA4BBC8B793E94 /* RoutineDetailView.swift in Sources */,
-				327546AD074F462E906349A5 /* ExercisePickerSheet.swift in Sources */,
 				6E8B2BF31D21E78F9DF58A14 /* WatchBridge.swift in Sources */,
 				B4FF26A77957BACDB89050C5 /* WeekDashboardView.swift in Sources */,
-				F1D0AE0000000000000000A3 /* HomepageDomain.swift in Sources */,
-				F1D0AE0000000000000000B3 /* HomepageDomainData.swift in Sources */,
-				F1D0AE0000000000000000C3 /* HomepageLayoutMode.swift in Sources */,
-				F1D0AE0000000000000000D3 /* DenseHomepageView.swift in Sources */,
-				F1D0AE0000000000000000E3 /* HeatmapHomepageView.swift in Sources */,
-				C2F0C7B6B510698BFF2B27C8 /* AranetBridge.swift in Sources */,
-				B29CF73788726A5C55ABF071 /* AirStore.swift in Sources */,
-				06CB84746E264F6A858A8F59 /* TrainingConfigStore.swift in Sources */,
-				FAFAFAFA000000000000C003 /* TrainingPRCalculator.swift in Sources */,
-				FAFAFAFA000000000000A003 /* DefaultExerciseLibrary.swift in Sources */,
-				FAFAFAFA000000000000B003 /* ExerciseLibrarySheet.swift in Sources */,
-				A1039E0E7E67EBD3249D3115 /* PollenClient.swift in Sources */,
-				E1F88CC1A2AACC627777FA7B /* MoodCatalog.swift in Sources */,
-				2D82ED261C2EC1F7264E6220 /* MoodDestinationView.swift in Sources */,
-				885264F646BBDDDF349A3FC9 /* AddMoodPage.swift in Sources */,
-				B375D2E2DCB899AE313B477A /* EditMoodEntrySheet.swift in Sources */,
-				C5808608A8784B4503C7EAFA /* MoodQuickAddMenu.swift in Sources */,
-				59355DDCFE98973BD36D6D5E /* DayBucket.swift in Sources */,
-				EF7583D50CCF908CDE925009 /* DayBucketHeader.swift in Sources */,
-				F33A979522BADF2F89A74A75 /* TodayEvent.swift in Sources */,
-				C53A421F2DE1BA6146A8A5B5 /* SectionPlugin.swift in Sources */,
-				005BF9123878A73595F78F13 /* MoodPlugin.swift in Sources */,
-				90485134CFA0D4BA5126024D /* MoodCommitAnimation.swift in Sources */,
-				B1C08A4AB831AA701C7BDC75 /* TestPlugin.swift in Sources */,
-				268900096F5401045252C735 /* CaffeinePlugin.swift in Sources */,
-				A2656F10D275C4A2407A5283 /* CannabisPlugin.swift in Sources */,
-				6B0182EEBF11267189607343 /* GutPlugin.swift in Sources */,
-				77E928D21CAF90C89193DF82 /* TrainingPlugin.swift in Sources */,
-				F557E1F2F6F548E9E0082F10 /* NutritionPlugin.swift in Sources */,
-				51F49952A24052A15F61C088 /* HabitsPlugin.swift in Sources */,
-				F08229D90EDAE2BF53D1706B /* SupplementsPlugin.swift in Sources */,
-				3F5383B2831F9B4E8FE49083 /* ChoresPlugin.swift in Sources */,
-				EC7046247C9EE5E65D11B2E0 /* TasksPlugin.swift in Sources */,
-				DE037C84144DB8873C4BB2B0 /* GoalsPlugin.swift in Sources */,
-				EBACFE355538C3B842F1DC74 /* GroceriesPlugin.swift in Sources */,
-				092B2E981C4A35E2AFF06053 /* SectionExplainer.swift in Sources */,
-				413F494FDF5623DCE2D06CA8 /* SleepPlugin.swift in Sources */,
-				97DBBEEC48CB1FEABE3E8629 /* BodyPlugin.swift in Sources */,
-				9BD2367C11EE78F0C4970951 /* AirPlugin.swift in Sources */,
-				23B9A19A17D09092B9017F87 /* ActivityPlugin.swift in Sources */,
-				CAC9C6083B9C201AE12A4718 /* HydrationPlugin.swift in Sources */,
+				A22130AF134CD3219A94BEBD /* WithingsProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1731,7 +1838,6 @@
 				CODE_SIGN_ENTITLEMENTS = SeptenaWatch/SeptenaWatch.entitlements;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SeptenaWatch/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Septena;
 				PRODUCT_BUNDLE_IDENTIFIER = com.septena.cloud.watchkitapp;
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
@@ -1749,19 +1855,12 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Septena/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Septena;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.septena.cloud;
 				SDKROOT = iphoneos;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
-				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
@@ -1817,8 +1916,8 @@
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 0.1.0;
@@ -1839,7 +1938,6 @@
 				CODE_SIGN_ENTITLEMENTS = SeptenaWatchComplication/SeptenaWatchComplication.entitlements;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SeptenaWatchComplication/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Septena;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1859,7 +1957,6 @@
 				CODE_SIGN_ENTITLEMENTS = SeptenaWatch/SeptenaWatch.entitlements;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SeptenaWatch/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Septena;
 				PRODUCT_BUNDLE_IDENTIFIER = com.septena.cloud.watchkitapp;
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
@@ -1876,8 +1973,6 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Septena/Info-Mac.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = Septena;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -1896,8 +1991,6 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Septena/Info-Mac.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = Septena;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -1913,7 +2006,6 @@
 				CODE_SIGN_ENTITLEMENTS = SeptenaWatchComplication/SeptenaWatchComplication.entitlements;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SeptenaWatchComplication/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Septena;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1936,19 +2028,12 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Septena/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Septena;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.septena.cloud;
 				SDKROOT = iphoneos;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
-				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -2010,8 +2095,8 @@
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 0.1.0;
