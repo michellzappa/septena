@@ -18,6 +18,12 @@ struct CorrelationsHomepageView: View {
   @State private var loadError: String? = nil
   @State private var focused: CorrelationEngine.EvaluatedPair? = nil
   @State private var insufficientExpanded = false
+  /// Habit + supplement signals are binary (taken/not, done/not) and
+  /// generate one tile per pair across many habits — they dominate the
+  /// grid visually while saying less per tile than a continuous dose-
+  /// response curve. Default collapsed; the user can pop them open when
+  /// they want to scan. Persisted so the choice sticks across launches.
+  @AppStorage("insights.binaryExpanded") private var binaryExpanded = false
 
   @AppStorage(SettingsKey.correlationsWindowDays)
   private var windowDays: Int = 365
@@ -74,10 +80,18 @@ struct CorrelationsHomepageView: View {
   @ViewBuilder
   private func content(for r: CorrelationEngine.Result) -> some View {
     let filtered = filter(r.evaluated)
-    let trusted = filtered.filter { $0.tier == .trusted }
-    let exploratory = filtered.filter { $0.tier == .exploratory }
+    // Split continuous (dose-response) from binary (taken/not, done/not)
+    // predictors — binary pairs read as noise in the main grid because
+    // their slope/r interpretation is qualitatively different from a
+    // gradient like "+10g fiber → +X sleep score". Binary pairs go into
+    // their own collapsed disclosure below the supplements→sleep table.
+    let continuous = filtered.filter { !$0.binary }
+    let binarySignals = filtered.filter { $0.binary }
+    let trusted = continuous.filter { $0.tier == .trusted }
+    let exploratory = continuous.filter { $0.tier == .exploratory }
 
-    if trusted.isEmpty && exploratory.isEmpty && (r.supplementsTable.isEmpty || !showSupplements) {
+    if trusted.isEmpty && exploratory.isEmpty && binarySignals.isEmpty
+       && (r.supplementsTable.isEmpty || !showSupplements) {
       emptyState(message: "No matching correlations yet — pairs unlock at n ≥ \(CorrelationEngine.minN).")
     }
 
@@ -94,9 +108,49 @@ struct CorrelationsHomepageView: View {
       sectionHeader("Exploratory", subtitle: "n ≥ \(CorrelationEngine.minN) but weak r, non-monotonic, or contradicts physiology")
       grid(exploratory)
     }
+    if !binarySignals.isEmpty {
+      binarySignalsSection(binarySignals)
+    }
     if showInsufficient && !r.insufficient.isEmpty {
       insufficientSection(r.insufficient)
     }
+  }
+
+  // MARK: - Binary signals disclosure
+
+  /// Collapsed-by-default group for habit + supplement (taken/not)
+  /// correlations. Keeps the main grid focused on continuous gradients
+  /// where the slope value is interpretable, while still giving the
+  /// user a way to scan binary signals when they want to.
+  private func binarySignalsSection(_ items: [CorrelationEngine.EvaluatedPair]) -> some View {
+    let trustedCount = items.filter { $0.tier == .trusted }.count
+    return DisclosureGroup(isExpanded: $binaryExpanded) {
+      VStack(alignment: .leading, spacing: 12) {
+        let trusted = items.filter { $0.tier == .trusted }
+        let exploratory = items.filter { $0.tier == .exploratory }
+        if !trusted.isEmpty {
+          Text("Trusted")
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.secondary)
+          grid(trusted)
+        }
+        if !exploratory.isEmpty {
+          Text("Exploratory")
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.secondary)
+          grid(exploratory)
+        }
+      }
+      .padding(.top, 8)
+    } label: {
+      VStack(alignment: .leading, spacing: 2) {
+        Text("Habits & supplements")
+          .font(.septenaSectionTitle)
+        Text("\(items.count) binary signals · \(trustedCount) trusted · tap to expand")
+          .font(.caption).foregroundStyle(.secondary)
+      }
+    }
+    .padding(.vertical, 4)
   }
 
   private func filter(_ rows: [CorrelationEngine.EvaluatedPair]) -> [CorrelationEngine.EvaluatedPair] {
