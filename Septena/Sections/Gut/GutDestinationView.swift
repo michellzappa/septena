@@ -22,12 +22,18 @@ struct GutDestinationView: View {
 
   private var accent: Color { theme.color(for: "gut") }
 
+  /// When the date strip is on a past day, hide the summary + heatmap
+  /// and show only the day's log entries.
+  private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
+
   var body: some View {
     SectionDrawer(sectionKey: "gut",
                   title: "Gut",
                   onLog: { _ in creating = true },
                   currentDate: $viewingDate) {
-      summary
+      if isViewingToday {
+        summary
+      }
       DrawerSection("Today", padding: .none) {
         if let today, !today.entries.isEmpty {
           ForEach(Array(today.entries.reversed())) { entry in
@@ -46,7 +52,7 @@ struct GutDestinationView: View {
             .padding(.vertical, 12)
         }
       }
-      if !history.isEmpty {
+      if isViewingToday && !history.isEmpty {
         ActivityHeatmapSection(
           title: "Movement days",
           accent: accent,

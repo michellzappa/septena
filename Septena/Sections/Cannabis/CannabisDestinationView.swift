@@ -35,12 +35,18 @@ struct CannabisDestinationView: View {
 
   private var accent: Color { theme.color(for: "cannabis") }
 
+  /// When the date strip is on a past day, hide the summary + heatmap
+  /// and show only the day's log entries.
+  private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
+
   var body: some View {
     SectionDrawer(sectionKey: "cannabis",
                   title: "Cannabis",
                   onLog: handleLogAction,
                   currentDate: $viewingDate) {
-      summary
+      if isViewingToday {
+        summary
+      }
       DrawerSection("Today", padding: .none) {
         if let today, !today.entries.isEmpty {
           ForEach(Array(today.entries.reversed())) { entry in
@@ -59,7 +65,7 @@ struct CannabisDestinationView: View {
             .padding(.vertical, 12)
         }
       }
-      if !history.isEmpty {
+      if isViewingToday && !history.isEmpty {
         ActivityHeatmapSection(
           title: "Cannabis days",
           accent: accent,

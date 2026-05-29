@@ -30,12 +30,19 @@ struct CaffeineDestinationView: View {
 
   private var accent: Color { theme.color(for: "caffeine") }
 
+  /// When the date strip is on a past day we want a read-only log
+  /// review — the summary tiles and heatmap are "today" affordances
+  /// and become noise when reviewing yesterday's caffeine.
+  private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
+
   var body: some View {
     SectionDrawer(sectionKey: "caffeine",
                   title: "Caffeine",
                   onLog: handleLogAction,
                   currentDate: $viewingDate) {
-      summary
+      if isViewingToday {
+        summary
+      }
       DrawerSection("Today", padding: .none) {
         if let today, !today.entries.isEmpty {
           ForEach(Array(today.entries.reversed())) { entry in
@@ -54,7 +61,7 @@ struct CaffeineDestinationView: View {
             .padding(.vertical, 12)
         }
       }
-      if !history.isEmpty {
+      if isViewingToday && !history.isEmpty {
         ActivityHeatmapSection(
           title: "Caffeine days",
           accent: accent,
