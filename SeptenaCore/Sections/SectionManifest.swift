@@ -84,6 +84,29 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
     SectionManifest.todayCapableKeys.contains(key)
   }
 
+  /// Sections whose destination supports "time travel" — i.e. a date
+  /// strip in the SectionDrawer that lets the user browse logs/events
+  /// on a past day. When the date strip is on a past day, the
+  /// destination drops its "today" affordances (goals strip, summary
+  /// tiles, heatmaps, infographics) and renders only that day's logs.
+  ///
+  /// Mirrors the `todayCapableKeys` pattern: kept as a static set so
+  /// the manifest init blocks stay terse, and so a section opts in
+  /// with a one-line edit here. The drawer + each opted-in destination
+  /// share the convention; sections not in this set never instantiate
+  /// the date strip.
+  public static let timeTravelCapableKeys: Set<String> = [
+    "caffeine", "cannabis", "gut", "nutrition",
+    "habits", "supplements", "mood",
+  ]
+
+  /// Whether this section's destination should render the date strip
+  /// and time-travel UI. Read by destinations to decide whether to
+  /// thread a `viewingDate` state through SectionDrawer.
+  public var supportsTimeTravel: Bool {
+    SectionManifest.timeTravelCapableKeys.contains(key)
+  }
+
   /// SF Symbol used by every surface that renders the section as a row
   /// or tile (Settings sidebar, Dense / Heatmap homepage, dashboard
   /// chrome). Lookup-by-key keeps the manifest init blocks terse;

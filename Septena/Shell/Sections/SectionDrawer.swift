@@ -69,6 +69,16 @@ struct SectionDrawer<Content: View>: View {
     SectionRegistry.plugin(forKey: sectionKey)?.logActions ?? []
   }
 
+  /// True when the destination has a date strip pointing at a past day.
+  /// Hides the goals strip and signals to destinations (via the shared
+  /// `SeptenaDate.today` comparison they can do themselves) that
+  /// histograms / heatmaps should also be hidden — past days are a
+  /// read-only log review, not a dashboard.
+  private var isTimeTraveling: Bool {
+    guard let currentDate else { return false }
+    return currentDate.wrappedValue != SeptenaDate.today
+  }
+
   var body: some View {
     ScrollView {
       // Spacing/margins tuned to match insetGrouped List: ~20pt screen
@@ -83,7 +93,9 @@ struct SectionDrawer<Content: View>: View {
         if let currentDate {
           DrawerDateStrip(date: currentDate)
         }
-        SectionGoalsStrip(sectionKey: sectionKey)
+        if !isTimeTraveling {
+          SectionGoalsStrip(sectionKey: sectionKey)
+        }
         if case .failed(let message) = loadState {
           failedView(message)
         } else {

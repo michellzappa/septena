@@ -14,17 +14,16 @@ struct SeptenaApp: App {
     Self.registerFraunces()
   }
 
-  /// Register the bundled Fraunces variable font with Core Text at process
-  /// scope. On iOS this is also wired via `UIAppFonts` in Info.plist; on
-  /// macOS `ATSApplicationFontsPath` doesn't reliably take effect, so this
-  /// runtime registration is the path that works on both platforms.
+  /// Register the bundled Fraunces variable font with Core Text. iOS picks
+  /// it up via `UIAppFonts` in Info.plist; macOS needs the runtime call
+  /// because `ATSApplicationFontsPath` doesn't reliably take effect.
   private static func registerFraunces() {
+    #if os(macOS)
     guard let url = Bundle.main.url(forResource: "Fraunces-Regular", withExtension: "ttf") else { return }
     var errorRef: Unmanaged<CFError>?
     _ = CTFontManagerRegisterFontsForURL(url as CFURL, .process, &errorRef)
-    // Ignore errors: code 105 (already registered via UIAppFonts) is the
-    // expected case on iOS, and other failures fall back silently to SF.
     errorRef?.release()
+    #endif
   }
 
   @State private var navigation = NavigationState()
