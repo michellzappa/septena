@@ -8,17 +8,24 @@ import SwiftUI
 
 struct HabitsDestinationView: View {
   @Environment(ChecklistMutator.self) private var checklistMutator
+  @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
 
   @State private var model = NextItemsModel()
   @State private var editing: HabitDayItem? = nil
   @State private var creating = false
   @State private var history: [HabitHistoryPoint] = []
-  /// Wrapper so `.sheet(item:)` can drive the backfill sheet directly off
-  /// the picked ISO date. `String` isn't `Identifiable` and we don't want
-  /// to extend it globally.
-  private struct BackfillDate: Identifiable { let id: String }
-  @State private var backfillDate: BackfillDate? = nil
+  /// Day the drawer's date strip is pointing at. Drives summary +
+  /// bucket list + heatmap hiding when on a past day. Heatmap tap
+  /// updates this instead of opening a modal backfill sheet —
+  /// time-travel mode IS the backfill UX.
+  @State private var viewingDate: String = SeptenaDate.today
+  /// Past-day habit state for `viewingDate`. Loaded when
+  /// `viewingDate != today` so we don't drag NextItemsModel off the
+  /// "today" track.
+  @State private var pastDay: HabitsDayResponse? = nil
+
+  private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
 
   /// Server section key; accent comes from the user's Septena config so the
   /// hue matches the webapp / sidebar / Next tab without hard-coding.
@@ -27,22 +34,29 @@ struct HabitsDestinationView: View {
   var body: some View {
     SectionDrawer(sectionKey: "habits",
                   title: "Habits",
-                  onLog: { _ in creating = true }) {
-      summary
-      ForEach(model.habitBuckets, id: \.self) { bucket in
-        bucketSection(bucket)
-      }
-      if !history.isEmpty {
-        ChecklistHeatmapSection(
-          title: "Habit consistency",
-          noun: "habit",
-          accent: accent,
-          daily: history,
-          date: { $0.date },
-          done: { $0.done },
-          total: { $0.total },
-          onTapDay: { iso in backfillDate = BackfillDate(id: iso) }
-        )
+                  onLog: { _ in creating = true },
+                  currentDate: $viewingDate) {
+      if isViewingToday {
+        summary
+        ForEach(model.habitBuckets, id: \.self) { bucket in
+          bucketSection(bucket)
+        }
+        if !history.isEmpty {
+          ChecklistHeatmapSection(
+            title: "Habit consistency",
+            noun: "habit",
+            accent: accent,
+            daily: history,
+            date: { $0.date },
+            done: { $0.done },
+            total: { $0.total },
+            // Heatmap tap now jumps the date strip rather than opening
+            // a modal — same pattern as Caffeine / Gut / Nutrition.
+            onTapDay: { iso in viewingDate = iso }
+          )
+        }
+      } else {
+        pastDaySection
       }
     }
     .trackScreen("habits")
@@ -54,6 +68,10 @@ struct HabitsDestinationView: View {
       let resp = ChecklistMirror.loadHabitsHistory(
         context: LocalStore.shared.container.mainContext, days: 365)
       history = resp.daily
+    }
+    .onChange(of: viewingDate) { _, _ in reloadPastDay() }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
+      reloadPastDay()
     }
     .sheet(item: $editing) { habit in
       EditHabitSheet(
@@ -77,13 +95,74 @@ struct HabitsDestinationView: View {
       .presentationDragIndicator(.visible)
       #endif
     }
-    .sheet(item: $backfillDate) { wrap in
-      BackfillHabitsSheet(date: wrap.id)
-        #if os(iOS)
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-        #endif
+  }
+
+  // MARK: - Past-day section
+  //
+  // Renders `loadHabitsDay(date:)` inline for `viewingDate`, mirroring
+  // the rows that BackfillHabitsSheet uses but without the modal
+  // chrome. Toggles write at `viewingDate` so the user can correct
+  // historical state directly from the drawer.
+
+  @ViewBuilder
+  private var pastDaySection: some View {
+    if let resp = pastDay {
+      let allItems = resp.buckets.flatMap { resp.grouped[$0] ?? [] }
+      if allItems.isEmpty {
+        DrawerSection {
+          Text("No habits defined.")
+            .foregroundStyle(.secondary)
+        }
+      } else {
+        ForEach(resp.buckets, id: \.self) { bucket in
+          let items = resp.grouped[bucket] ?? []
+          if !items.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+              DayBucketHeader(bucket: bucket,
+                              trailing: "\(items.filter(\.done).count)/\(items.count)")
+                .padding(.horizontal, 16)
+              DrawerSection(padding: .none) {
+                ForEach(items) { item in
+                  pastDayRow(item)
+                }
+              }
+            }
+          }
+        }
+      }
+    } else {
+      DrawerSection { ProgressView() }
     }
+  }
+
+  private func pastDayRow(_ item: HabitDayItem) -> some View {
+    Button {
+      let next = !item.done
+      checklistMutator.toggleHabit(id: item.id, date: viewingDate, done: next)
+      Haptics.tick()
+    } label: {
+      HStack(spacing: 12) {
+        Image(systemName: item.done ? "checkmark.circle.fill" : "circle")
+          .foregroundStyle(item.done ? accent : .secondary)
+          .font(.title3)
+        if let e = item.emoji, !e.isEmpty {
+          Text(e)
+        }
+        Text(item.name)
+          .foregroundStyle(.primary)
+          .strikethrough(item.done, color: .secondary)
+        Spacer()
+      }
+      .contentShape(Rectangle())
+      .padding(.horizontal, 14)
+      .padding(.vertical, 10)
+    }
+    .buttonStyle(.plain)
+  }
+
+  private func reloadPastDay() {
+    guard !isViewingToday else { pastDay = nil; return }
+    pastDay = ChecklistMirror.loadHabitsDay(context: modelContext, date: viewingDate)
   }
 
   private func delete(_ habit: HabitDayItem) {

@@ -7,48 +7,59 @@ import SwiftUI
 
 struct SupplementsDestinationView: View {
   @Environment(ChecklistMutator.self) private var checklistMutator
+  @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
 
   @State private var model = NextItemsModel()
   @State private var editing: SupplementDayItem? = nil
   @State private var creating = false
   @State private var history: [SupplementHistoryPoint] = []
-  /// `.sheet(item:)` needs Identifiable; String isn't, so wrap.
-  private struct BackfillDate: Identifiable { let id: String }
-  @State private var backfillDate: BackfillDate? = nil
+  /// Day the drawer's date strip is pointing at. Heatmap tap updates
+  /// this rather than opening a modal backfill sheet.
+  @State private var viewingDate: String = SeptenaDate.today
+  /// Past-day state for `viewingDate`. Loaded when not viewing today.
+  @State private var pastDay: SupplementsDayResponse? = nil
+
+  private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
 
   private var accent: Color { theme.color(for: "supplements") }
 
   var body: some View {
     SectionDrawer(sectionKey: "supplements",
                   title: "Supplements",
-                  onLog: { _ in creating = true }) {
-      summary
-      DrawerSection("Today", padding: .none) {
-        ForEach(model.supplements) { supp in
-          Button { editing = supp } label: {
-            SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator, tint: accent,
-                          onDelete: { delete(supp) })
+                  onLog: { _ in creating = true },
+                  currentDate: $viewingDate) {
+      if isViewingToday {
+        summary
+        DrawerSection("Today", padding: .none) {
+          ForEach(model.supplements) { supp in
+            Button { editing = supp } label: {
+              SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator, tint: accent,
+                            onDelete: { delete(supp) })
+            }
+            .buttonStyle(.plain)
           }
-          .buttonStyle(.plain)
         }
-      }
-      if model.hasLoaded && model.supplements.isEmpty {
-        ContentUnavailableView("No supplements configured",
-                               systemImage: theme.icon(for: "supplements"),
-                               description: Text("Add some in the webapp's Supplements settings."))
-      }
-      if !history.isEmpty {
-        ChecklistHeatmapSection(
-          title: "Supplement consistency",
-          noun: "supplement",
-          accent: accent,
-          daily: history,
-          date: { $0.date },
-          done: { $0.done },
-          total: { $0.total },
-          onTapDay: { iso in backfillDate = BackfillDate(id: iso) }
-        )
+        if model.hasLoaded && model.supplements.isEmpty {
+          ContentUnavailableView("No supplements configured",
+                                 systemImage: theme.icon(for: "supplements"),
+                                 description: Text("Add some in the webapp's Supplements settings."))
+        }
+        if !history.isEmpty {
+          ChecklistHeatmapSection(
+            title: "Supplement consistency",
+            noun: "supplement",
+            accent: accent,
+            daily: history,
+            date: { $0.date },
+            done: { $0.done },
+            total: { $0.total },
+            // Heatmap tap → date strip jump. Same pattern as Habits.
+            onTapDay: { iso in viewingDate = iso }
+          )
+        }
+      } else {
+        pastDaySection
       }
     }
     .trackScreen("supplements")
@@ -60,6 +71,10 @@ struct SupplementsDestinationView: View {
       let resp = ChecklistMirror.loadSupplementsHistory(
         context: LocalStore.shared.container.mainContext, days: 365)
       history = resp.daily
+    }
+    .onChange(of: viewingDate) { _, _ in reloadPastDay() }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
+      reloadPastDay()
     }
     .sheet(item: $editing) { supp in
       EditSupplementSheet(
@@ -81,13 +96,58 @@ struct SupplementsDestinationView: View {
       .presentationDragIndicator(.visible)
       #endif
     }
-    .sheet(item: $backfillDate) { wrap in
-      BackfillSupplementsSheet(date: wrap.id)
-        #if os(iOS)
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-        #endif
+  }
+
+  // MARK: - Past-day section
+
+  @ViewBuilder
+  private var pastDaySection: some View {
+    if let resp = pastDay {
+      if resp.items.isEmpty {
+        DrawerSection {
+          Text("No supplements configured.")
+            .foregroundStyle(.secondary)
+        }
+      } else {
+        DrawerSection(padding: .none) {
+          ForEach(resp.items) { item in
+            pastDayRow(item)
+          }
+        }
+      }
+    } else {
+      DrawerSection { ProgressView() }
     }
+  }
+
+  private func pastDayRow(_ item: SupplementDayItem) -> some View {
+    Button {
+      let next = !item.done
+      checklistMutator.toggleSupplement(id: item.id, date: viewingDate, done: next)
+      Haptics.tick()
+    } label: {
+      HStack(spacing: 12) {
+        Image(systemName: item.done ? "checkmark.circle.fill" : "circle")
+          .foregroundStyle(item.done ? accent : .secondary)
+          .font(.title3)
+        if let e = item.emoji, !e.isEmpty {
+          Text(e)
+        }
+        Text(item.name)
+          .foregroundStyle(.primary)
+          .strikethrough(item.done, color: .secondary)
+        Spacer()
+      }
+      .contentShape(Rectangle())
+      .padding(.horizontal, 14)
+      .padding(.vertical, 10)
+    }
+    .buttonStyle(.plain)
+  }
+
+  private func reloadPastDay() {
+    guard !isViewingToday else { pastDay = nil; return }
+    pastDay = ChecklistMirror.loadSupplementsDay(context: modelContext, date: viewingDate)
   }
 
   private func delete(_ supp: SupplementDayItem) {

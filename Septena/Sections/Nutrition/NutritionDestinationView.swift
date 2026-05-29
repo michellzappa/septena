@@ -24,6 +24,7 @@ import Charts
 
 struct NutritionDestinationView: View {
   @Environment(DayClock.self) private var clock
+  @Environment(SectionTheme.self) private var theme
   @Environment(\.modelContext) private var modelContext
 
   @State private var entries: [NutritionEntry] = []
@@ -33,6 +34,13 @@ struct NutritionDestinationView: View {
   @State private var loading = true
   @State private var editing: NutritionEntry? = nil
   @State private var creating = false
+  /// Day the drawer's date strip is pointing at. Drives the entries list
+  /// and the heatmap's selected cell. Defaults to today; heatmap taps
+  /// and the prev/next/calendar controls update it. The macro tiles +
+  /// 7-day charts stay anchored to *actual* today (live dashboard) —
+  /// browsing back through history is for reviewing logged meals, not
+  /// for retro-targeting macros.
+  @State private var viewingDate: String = SeptenaDate.today
 
   /// Live "now" for the fasting row + relative time labels. Sourced from
   /// the shared DayClock (single 60s tick app-wide) instead of a per-view
@@ -61,10 +69,32 @@ struct NutritionDestinationView: View {
 
   private var today: String { SeptenaDate.today }
 
+  private var isViewingToday: Bool { viewingDate == today }
+
+  private var accent: Color { theme.color(for: "nutrition") }
+
   // MARK: - Derived
 
   private var todayEntries: [NutritionEntry] {
     entries.filter { $0.date == today }.sorted { $0.time > $1.time }
+  }
+
+  /// Entries on the date the user is currently browsing via the date strip.
+  /// Same shape as `todayEntries` but anchored to `viewingDate`.
+  private var viewingEntries: [NutritionEntry] {
+    entries.filter { $0.date == viewingDate }.sorted { $0.time > $1.time }
+  }
+
+  /// Counts per day across the loaded window. Feeds the heatmap so the
+  /// user can see at a glance which days have logs and tap to jump.
+  /// Struct (not tuple) because `ActivityHeatmapSection` requires
+  /// `Hashable` Points.
+  struct DayCount: Hashable { let date: String; let count: Int }
+
+  private var entryCountsByDate: [DayCount] {
+    Dictionary(grouping: entries, by: \.date)
+      .map { DayCount(date: $0.key, count: $0.value.count) }
+      .sorted { $0.date < $1.date }
   }
 
   private struct DayTotals { var protein = 0.0; var fat = 0.0; var carbs = 0.0; var fiber = 0.0; var kcal = 0.0 }
@@ -108,15 +138,31 @@ struct NutritionDestinationView: View {
   var body: some View {
     SectionDrawer(sectionKey: "nutrition",
                   title: "Nutrition",
-                  onLog: { _ in creating = true }) {
-      macroTilesGrid
+                  onLog: { _ in creating = true },
+                  currentDate: $viewingDate) {
+      // Time-travel mode: when the date strip is on a past day we drop
+      // the macro tiles + heatmap and show just the day's logs. The
+      // macros tiles read "today" status (in range / over / left) so
+      // they're meaningless retro; the heatmap is a "where do I want
+      // to go" picker which the user already used to get here.
+      if isViewingToday {
+        macroTilesGrid
+      }
       entriesList
+      if isViewingToday {
+        heatmapSection
+      }
     }
     .trackScreen("nutrition")
     .task { reload() }
     // Day rollover: reload so the fasting row, today's totals, and the
     // "earlier days" grouping all reflect the new day's data.
-    .onChange(of: clock.today) { _, _ in reload() }
+    .onChange(of: clock.today) { _, newToday in
+      // Roll the viewing pointer forward only if the user was already
+      // looking at "today" — otherwise leave their selection alone.
+      if isViewingToday { viewingDate = newToday }
+      reload()
+    }
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
       reload()
     }
@@ -136,7 +182,11 @@ struct NutritionDestinationView: View {
 
   private func reload() {
     let ctx = modelContext
-    entries = ChecklistMirror.loadNutritionEntries(context: ctx, since: sinceDate(daysBack: 90))
+    // 365-day window — the heatmap and date-strip browsing need the
+    // historical archive (FastAPI backfill restored ~50 days; this
+    // covers a full year so the user can scroll back across season
+    // changes without per-day refetches).
+    entries = ChecklistMirror.loadNutritionEntries(context: ctx, since: sinceDate(daysBack: 365))
     stats = ChecklistMirror.buildNutritionStatsResponse(context: ctx, days: 90)
     macros = NutritionPrefs.loadMacrosConfig()
     let settingsRes = SettingsMirror.loadSettings(context: ctx)
@@ -470,7 +520,10 @@ struct NutritionDestinationView: View {
         Text("No entries yet").foregroundStyle(.secondary)
       }
       .frame(maxWidth: .infinity).padding(.vertical, 24)
-    } else {
+    } else if isViewingToday {
+      // Today view — the default: today's entries + a tail of recent days
+      // for at-a-glance context. Date strip / heatmap let the user dive
+      // deeper.
       VStack(alignment: .leading, spacing: 12) {
         VStack(spacing: 6) {
           dayHeader(date: today, totals: todayTotals)
@@ -490,6 +543,57 @@ struct NutritionDestinationView: View {
           dayGroup(date: day.date, items: day.items)
         }
       }
+    } else {
+      // History view — focused on `viewingDate`. Shows just that day's
+      // entries so the macros + fasting status read cleanly without the
+      // surrounding noise of "earlier days". The date strip handles
+      // prev/next; the heatmap below handles random-access jumps.
+      VStack(alignment: .leading, spacing: 6) {
+        dayHeader(date: viewingDate, totals: totalsByDate[viewingDate])
+        if viewingEntries.isEmpty {
+          Text("No entries logged on this day")
+            .font(.caption).foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, 8)
+            .padding(.vertical, 12)
+        } else {
+          ForEach(viewingEntries) { e in mealRow(e) }
+          if let f = fastingByDate[viewingDate] { fastingGapRow(f) }
+        }
+      }
+    }
+  }
+
+  /// Year-scale heatmap of logged-meal density. Tap any cell to jump
+  /// the date strip to that day. Empty cells are tappable too so the
+  /// user can intentionally pick a day they suspect they forgot to log
+  /// (and then add a backdated entry from the + menu).
+  @ViewBuilder
+  private var heatmapSection: some View {
+    if !entryCountsByDate.isEmpty {
+      ActivityHeatmapSection(
+        title: "Logged days",
+        accent: accent,
+        daily: entryCountsByDate,
+        date: { $0.date },
+        value: { Double($0.count) },
+        levelFor: { v in
+          let n = Int(v)
+          if n <= 0 { return 0 }
+          if n == 1 { return 1 }
+          if n == 2 { return 2 }
+          if n <= 4 { return 3 }
+          return 4
+        },
+        labelFor: { v in
+          let n = Int(v)
+          return "\(n) \(n == 1 ? "meal" : "meals")"
+        },
+        subtitleFor: { active, total, sum in
+          "\(active) of \(total) days · \(Int(sum)) meals"
+        },
+        onTapDay: { iso in viewingDate = iso }
+      )
     }
   }
 
