@@ -21,18 +21,30 @@ struct MoodDestinationView: View {
   @State private var addingNew = false
   @State private var editing: MoodEntry? = nil
   @State private var loading = true
+  /// Day the drawer's date strip is pointing at. Slot cards, heatmap,
+  /// and quadrant breakdown are "today" affordances and hide when
+  /// browsing the past — past view is just the day's check-in list.
+  @State private var viewingDate: String = SeptenaDate.today
+
+  private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
 
   var body: some View {
     SectionDrawer(sectionKey: "mood",
                   title: "Mood",
-                  onLog: { _ in addingNew = true }) {
-      slotSection
+                  onLog: { _ in addingNew = true },
+                  currentDate: $viewingDate) {
+      if isViewingToday {
+        slotSection
+      }
       todaySection
-      heatmapSection
-      breakdownSection
+      if isViewingToday {
+        heatmapSection
+        breakdownSection
+      }
     }
     .trackScreen("mood")
     .task { reload() }
+    .onChange(of: viewingDate) { _, _ in reload() }
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
       reload()
     }
@@ -40,7 +52,7 @@ struct MoodDestinationView: View {
       AddMoodPage(onLogged: { reload() })
     }
     .sheet(item: $editing) { entry in
-      EditMoodEntrySheet(date: today?.date ?? SeptenaDate.today,
+      EditMoodEntrySheet(date: viewingDate,
                          original: entry,
                          onSave: { reload() })
     }
@@ -76,7 +88,7 @@ struct MoodDestinationView: View {
   @ViewBuilder
   private var todaySection: some View {
     if let today, today.entries.count > 0 {
-      DrawerSection("All logs today") {
+      DrawerSection(isViewingToday ? "All logs today" : "Logs") {
         ForEach(today.entries.reversed()) { entry in
           Button { editing = entry } label: { EntryRow(entry: entry) }
             .buttonStyle(.plain)
@@ -96,7 +108,7 @@ struct MoodDestinationView: View {
       }
     } else if !loading {
       DrawerSection {
-        Text("No check-ins yet today.")
+        Text(isViewingToday ? "No check-ins yet today." : "No check-ins on this day.")
           .foregroundStyle(.secondary)
       }
     }
@@ -125,10 +137,13 @@ struct MoodDestinationView: View {
   }
 
   private func reload() {
-    let date = SeptenaDate.today
-    today = ChecklistMirror.loadMoodDay(context: modelContext, date: date)
-    history = ChecklistMirror.loadMoodHistory(context: modelContext, days: 30).daily
-    monthEntries = loadMonthEntries()
+    today = ChecklistMirror.loadMoodDay(context: modelContext, date: viewingDate)
+    // Heatmap + monthly breakdown render only when viewing today, so
+    // only refresh them in that mode — saves a fetch when time-travelling.
+    if isViewingToday {
+      history = ChecklistMirror.loadMoodHistory(context: modelContext, days: 30).daily
+      monthEntries = loadMonthEntries()
+    }
     loading = false
   }
 
