@@ -3,6 +3,13 @@ main = "src/index.ts"
 compatibility_date = "2024-12-15"
 compatibility_flags = ["nodejs_compat_v2"]
 
+# Retain structured logs (the logEvent JSON lines) so a lapse can be
+# investigated after the fact instead of only during a live `wrangler tail`.
+# Query in the dashboard (Workers → Observability) or via the API.
+[observability]
+enabled = true
+head_sampling_rate = 1
+
 # Allow importing .md files as text modules. Used by src/landing.ts to embed
 # the skill brief served at GET / and GET /skill.md without escaping the
 # markdown into a TS template literal.

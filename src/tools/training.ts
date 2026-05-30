@@ -1,4 +1,4 @@
-import type { CloudKitClient } from "../cloudkit.js";
+import { queryByDateRange, type CloudKitClient } from "../cloudkit.js";
 
 const SHORTID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 function newId(len = 6): string {
@@ -118,6 +118,15 @@ export const deleteTrainingEntryJsonSchema = {
   properties: { id: { type: "string", description: "ExerciseEntry id." } },
 } as const;
 
+export const retagTrainingSessionJsonSchema = {
+  type: "object",
+  required: ["date", "sessionType"],
+  properties: {
+    date:        { type: "string", description: "YYYY-MM-DD — every ExerciseEntry on this date will be retagged." },
+    sessionType: { type: "string", description: "New sessionType for all entries that day ('upper' | 'lower' | 'cardio' | 'yoga' | …). Pass '' to clear." },
+  },
+} as const;
+
 // ---- ExerciseDefinition (catalog) ----
 
 export const listExercisesJsonSchema = {
@@ -214,6 +223,7 @@ export interface LogTrainingEntryInput {
   note?: string; concludedAt?: string;
 }
 export interface UpdateTrainingEntryInput extends Partial<LogTrainingEntryInput> { id: string }
+export interface RetagTrainingSessionInput { date: string; sessionType: string }
 export interface ListExercisesInput { type?: string; archived?: boolean; limit?: number }
 export interface CreateExerciseInput {
   name: string; type: string; id?: string; subgroup?: string;
@@ -240,22 +250,18 @@ export async function listTrainingEntries(client: CloudKitClient, input: ListTra
   const from = input.date ?? input.from ?? ymdNDaysAgo(13);
   const to   = input.date ?? input.to   ?? todayYMD();
 
-  const filters: Array<{ fieldName: string; comparator: string; fieldValue: { value: unknown } }> = [
-    { fieldName: "date", comparator: "GREATER_THAN_OR_EQUALS", fieldValue: { value: from } },
-    { fieldName: "date", comparator: "LESS_THAN_OR_EQUALS",    fieldValue: { value: to } },
-  ];
-  if (input.exercise) {
-    filters.push({ fieldName: "exercise", comparator: "EQUALS", fieldValue: { value: input.exercise } });
-  }
-
-  const res = await client.queryRecords({
+  const records = await queryByDateRange(client, {
     recordType: "ExerciseEntry",
-    filterBy: filters as never,
-    sortBy: [{ fieldName: "date", ascending: false }, { fieldName: "time", ascending: false }],
+    from,
+    to,
+    extraFilters: input.exercise
+      ? [{ fieldName: "exercise", comparator: "EQUALS", fieldValue: { value: input.exercise } }]
+      : undefined,
+    timeField: "time",
     resultsLimit: input.limit ?? 200,
   });
 
-  const entries = res.records.map((r) => ({
+  const entries = records.map((r) => ({
     id:          r.recordName.replace(/^exercise-entry:/, ""),
     date:        optStr(r.fields.date?.value) ?? "",
     time:        optStr(r.fields.time?.value) ?? "",
@@ -324,7 +330,8 @@ export async function updateTrainingEntry(client: CloudKitClient, input: UpdateT
 
   if (input.date)        { fields.date        = { value: input.date }; updated.push("date"); }
   if (input.time)        { fields.time        = { value: input.time }; updated.push("time"); }
-  if (input.sessionType) { fields.sessionType = { value: input.sessionType }; updated.push("sessionType"); }
+  // sessionType: treat empty string as an explicit clear, not "field not provided".
+  if (input.sessionType !== undefined) { fields.sessionType = { value: input.sessionType }; updated.push("sessionType"); }
   if (input.exercise)    { fields.exercise    = { value: input.exercise };    updated.push("exercise"); }
   setOpt("weight", "weight");
   setOpt("sets", "sets");
@@ -345,6 +352,44 @@ export async function updateTrainingEntry(client: CloudKitClient, input: UpdateT
   const code = res.records[0]?.serverErrorCode;
   if (code) throw new Error(res.records[0]?.reason ?? code);
   return { id: input.id, updated };
+}
+
+/// Bulk-retag every ExerciseEntry on a given date. The data model has no
+/// dedicated TrainingSession record — a "session" is the logical bucket of
+/// entries sharing (date, sessionType). This tool lets callers operate at
+/// the session level without fanning out per-entry updates themselves.
+export async function retagTrainingSession(client: CloudKitClient, input: RetagTrainingSessionInput) {
+  // Query by `date EQUALS` directly. listTrainingEntries() uses a
+  // ___createTime match-all filter which isn't indexed on ExerciseEntry,
+  // and date GTE/LTE isn't allowed either — but EQUALS on the STRING
+  // date field works even with minimal indexing.
+  const res = await client.queryRecords({
+    recordType: "ExerciseEntry",
+    filterBy: [
+      { fieldName: "date", comparator: "EQUALS" as const, fieldValue: { value: input.date } },
+    ] as never,
+    resultsLimit: 200,
+  });
+  const ids = res.records.map((r) => r.recordName.replace(/^exercise-entry:/, ""));
+  if (!ids.length) return { date: input.date, sessionType: input.sessionType, updated: 0, ids: [] };
+
+  const ops = ids.map((rawId) => ({
+    operationType: "forceUpdate" as const,
+    record: {
+      recordType: "ExerciseEntry",
+      recordName: `exercise-entry:${rawId}`,
+      fields: { sessionType: { value: input.sessionType } },
+    },
+  }));
+  const modRes = await modify(client, ops);
+  const failed = modRes.records.filter((r) => r.serverErrorCode).map((r) => r.reason ?? r.serverErrorCode);
+  if (failed.length) throw new Error(`retag failed: ${failed.join("; ")}`);
+  return {
+    date: input.date,
+    sessionType: input.sessionType,
+    updated: ids.length,
+    ids,
+  };
 }
 
 export async function deleteTrainingEntry(client: CloudKitClient, input: { id: string }) {

@@ -1,4 +1,4 @@
-import type { CloudKitClient } from "../cloudkit.js";
+import { queryByDateRange, type CloudKitClient } from "../cloudkit.js";
 
 const SHORTID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 function newId(len = 4): string {
@@ -87,24 +87,18 @@ export interface LogGutEventInput {
 // ---- Implementations ----
 
 export async function listGutEvents(client: CloudKitClient, input: ListGutEventsInput) {
-  const filters = [];
-  if (input.date) {
-    filters.push({ fieldName: "date", comparator: "EQUALS" as const, fieldValue: { value: input.date } });
-  } else {
-    const to   = input.to   ?? todayYMD();
-    const from = input.from ?? (() => { const d = new Date(); d.setDate(d.getDate() - 6); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
-    filters.push({ fieldName: "date", comparator: "GREATER_THAN_OR_EQUALS" as const, fieldValue: { value: from } });
-    filters.push({ fieldName: "date", comparator: "LESS_THAN_OR_EQUALS" as const, fieldValue: { value: to } });
-  }
+  const from = input.date ?? input.from ?? (() => { const d = new Date(); d.setDate(d.getDate() - 6); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
+  const to   = input.date ?? input.to   ?? todayYMD();
 
-  const res = await client.queryRecords({
+  const records = await queryByDateRange(client, {
     recordType: "GutEvent",
-    filterBy: filters,
-    sortBy: [{ fieldName: "date", ascending: false }, { fieldName: "time", ascending: false }],
+    from,
+    to,
+    timeField: "time",
     resultsLimit: input.limit ?? 100,
   });
 
-  const events = res.records.map((r) => ({
+  const events = records.map((r) => ({
     id:              r.recordName.replace(/^gut-event:/, ""),
     date:            optStr(r.fields.date?.value)  ?? "",
     time:            optStr(r.fields.time?.value)  ?? "",

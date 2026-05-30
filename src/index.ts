@@ -46,6 +46,22 @@ app.get("/.well-known/oauth-authorization-server", (c) => {
   });
 });
 
+// OAuth 2.0 Protected Resource Metadata (RFC 9728). Required by the MCP
+// 2025-06 auth spec: the resource server advertises which authorization
+// server(s) can issue tokens for it. Claude's MCP client follows the
+// `resource_metadata` parameter we emit in `WWW-Authenticate` here, then
+// uses `authorization_servers[0]` to find the AS metadata above and
+// re-runs OAuth without bothering the user (assuming Apple's browser
+// session cookie is still alive).
+app.get("/.well-known/oauth-protected-resource", (c) => {
+  const base = c.env.PUBLIC_URL;
+  return c.json({
+    resource: base,
+    authorization_servers: [base],
+    bearer_methods_supported: ["header"],
+  });
+});
+
 app.post("/oauth/register", register);
 app.get("/oauth/authorize", authorize);
 app.post("/oauth/continue", continueAuth);

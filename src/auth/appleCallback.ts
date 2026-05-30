@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 import type { Env } from "../env.js";
 import { putCode, takeState } from "../storage.js";
-import { randomId, readCookie } from "../util.js";
+import { logEvent, randomId, readCookie } from "../util.js";
 
 // Apple redirects the user's browser here after sign-in, appending
 // ?ckWebAuthToken=<...>. We recover the in-flight OAuth state via the
@@ -28,6 +28,8 @@ export async function appleCallback(c: Context<{ Bindings: Env }>) {
     clientId: state.clientId,
     redirectUri: state.redirectUri,
   });
+
+  logEvent("apple_callback", { ok: true, clientId: state.clientId });
 
   const back = new URL(state.redirectUri);
   back.searchParams.set("code", code);

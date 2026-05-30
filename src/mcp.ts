@@ -2,6 +2,7 @@ import type { Context } from "hono";
 import type { Env } from "./env.js";
 import { CloudKitClient, CloudKitError } from "./cloudkit.js";
 import { getCkTokenForAccessToken } from "./storage.js";
+import { logEvent } from "./util.js";
 import { listTasks, listTasksJsonSchema, type ListTasksInput } from "./tools/listTasks.js";
 import { listProjects, listProjectsJsonSchema, type ListProjectsInput } from "./tools/listProjects.js";
 import { listAreas, listAreasJsonSchema, type ListAreasInput } from "./tools/listAreas.js";
@@ -84,6 +85,7 @@ import {
   logTrainingEntry, logTrainingEntryJsonSchema, type LogTrainingEntryInput,
   updateTrainingEntry, updateTrainingEntryJsonSchema, type UpdateTrainingEntryInput,
   deleteTrainingEntry, deleteTrainingEntryJsonSchema,
+  retagTrainingSession, retagTrainingSessionJsonSchema, type RetagTrainingSessionInput,
   listExercises, listExercisesJsonSchema, type ListExercisesInput,
   createExercise, createExerciseJsonSchema, type CreateExerciseInput,
   updateExercise, updateExerciseJsonSchema, type UpdateExerciseInput,
@@ -93,6 +95,11 @@ import {
   updateSessionType, updateSessionTypeJsonSchema, type UpdateSessionTypeInput,
   deleteSessionType, deleteSessionTypeJsonSchema,
 } from "./tools/training.js";
+import {
+  logHydration, logHydrationJsonSchema, type LogHydrationInput,
+  hydrationToday, hydrationTodayJsonSchema,
+  hydrationHistory, hydrationHistoryJsonSchema, type HydrationHistoryInput,
+} from "./tools/hydration.js";
 import {
   listGroceryItems, listGroceryItemsJsonSchema, type ListGroceryItemsInput,
   createGroceryItem, createGroceryItemJsonSchema, type CreateGroceryItemInput,
@@ -431,6 +438,11 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
       inputSchema: deleteTrainingEntryJsonSchema,
     },
     {
+      name: "training_session_retag",
+      description: "Bulk-set sessionType on every ExerciseEntry for one date. Use for session-level retagging (the data model has no separate session record — a session = entries sharing date+sessionType). Pass sessionType='' to clear.",
+      inputSchema: retagTrainingSessionJsonSchema,
+    },
+    {
       name: "training_exercises_list",
       description: "List exercise catalog (definitions). Filter by type (strength|cardio|mobility|core) or archived state.",
       inputSchema: listExercisesJsonSchema,
@@ -469,6 +481,23 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
       name: "training_session_delete",
       description: "Delete a session-type template.",
       inputSchema: deleteSessionTypeJsonSchema,
+    },
+  ],
+  hydration: [
+    {
+      name: "hydration_log",
+      description: "Log water intake in ml. Backed by Nutrition — writes a water-only NutritionEntry (foods=Water, all macros zero) so the day's nutrition summary sees it. Use this rather than nutrition_entry_log for plain water.",
+      inputSchema: logHydrationJsonSchema,
+    },
+    {
+      name: "hydration_today",
+      description: "Today's total water ml + the list of water-only entries. Total INCLUDES water recorded on real meal entries, so it matches the iOS Hydration view.",
+      inputSchema: hydrationTodayJsonSchema,
+    },
+    {
+      name: "hydration_history",
+      description: "Per-day water totals over a range. Defaults to last 7 days. Each day's total sums waterMl across all nutrition entries (water-only + meal-attached).",
+      inputSchema: hydrationHistoryJsonSchema,
     },
   ],
   groceries: [
@@ -528,11 +557,12 @@ function buildToolList(sectionOrder: string[] | null): Tool[] {
 export async function mcpHandler(c: Context<{ Bindings: Env }>) {
   const auth = c.req.header("Authorization") ?? "";
   const m = auth.match(/^Bearer\s+(.+)$/);
-  if (!m) return unauthorized();
+  if (!m) return unauthorized("missing Bearer header");
   const accessToken = m[1];
 
-  const ckWebAuthToken = await getCkTokenForAccessToken(c.env, accessToken);
-  if (!ckWebAuthToken) return unauthorized();
+  const tokenRec = await getCkTokenForAccessToken(c.env, accessToken);
+  if (!tokenRec) return unauthorized("access_token not found in KV");
+  const { ckWebAuthToken, createdAt } = tokenRec;
 
   const req = (await c.req.json().catch(() => null)) as JsonRpcRequest | null;
   if (!req || req.jsonrpc !== "2.0" || !req.method) {
@@ -576,7 +606,16 @@ export async function mcpHandler(c: Context<{ Bindings: Env }>) {
           : order.length > 0
             ? order.filter(k => enabledKeys.has(k))
             : Array.from(enabledKeys);
-        return rpcResult(req.id, { tools: buildToolList(filtered) });
+        const tools = buildToolList(filtered);
+        // Tool count + names per request: a partial manifest (e.g. task
+        // tools present, nutrition absent) shows up here directly.
+        logEvent("tools_list", {
+          count: tools.length,
+          sectionCount: sections.length,
+          enabled: Array.from(enabledKeys),
+          names: tools.map(t => t.name),
+        });
+        return rpcResult(req.id, { tools });
       }
       case "tools/call": {
         const params = (req.params ?? {}) as {
@@ -590,7 +629,18 @@ export async function mcpHandler(c: Context<{ Bindings: Env }>) {
     }
   } catch (err) {
     if (err instanceof CloudKitError && err.isAuthExpired) {
-      return unauthorized();
+      // This is the lapse event: the ckWebAuthToken behind the access
+      // token has expired. tokenAgeSeconds is the lifetime we care about
+      // (T1−T0) — logged directly so no manual diffing of two log lines.
+      // ~1800 ⇒ 30-min default token; ~1.2M ⇒ 2-week "keep me signed in".
+      const tokenAgeSeconds = Math.round((Date.now() - createdAt) / 1000);
+      logEvent("ck_auth_expired", {
+        method: req.method,
+        status: err.status,
+        tokenAgeSeconds,
+        tokenAgeMinutes: Math.round(tokenAgeSeconds / 60),
+      });
+      return unauthorized(`CloudKit auth expired (status=${err.status})`);
     }
     const msg = err instanceof Error ? err.message : String(err);
     return rpcError(req.id, -32603, msg);
@@ -837,6 +887,10 @@ async function callTool(
       const result = await deleteTrainingEntry(client, (params.arguments ?? {}) as unknown as { id: string });
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
+    case "training_session_retag": {
+      const result = await retagTrainingSession(client, (params.arguments ?? {}) as unknown as RetagTrainingSessionInput);
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
     case "training_exercises_list": {
       const result = await listExercises(client, (params.arguments ?? {}) as ListExercisesInput);
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
@@ -867,6 +921,19 @@ async function callTool(
     }
     case "training_session_delete": {
       const result = await deleteSessionType(client, (params.arguments ?? {}) as unknown as { id: string });
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    // ---- Hydration ----
+    case "hydration_log": {
+      const result = await logHydration(client, (params.arguments ?? {}) as unknown as LogHydrationInput);
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    case "hydration_today": {
+      const result = await hydrationToday(client);
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    case "hydration_history": {
+      const result = await hydrationHistory(client, (params.arguments ?? {}) as HydrationHistoryInput);
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
     // ---- Groceries ----
@@ -915,12 +982,21 @@ function rpcError(id: JsonRpcRequest["id"], code: number, message: string): Resp
   return Response.json({ jsonrpc: "2.0", id, error: { code, message } });
 }
 
-function unauthorized(): Response {
-  // MCP clients use the WWW-Authenticate header to discover the auth flow.
+function unauthorized(reason?: string): Response {
+  // RFC 9728 / MCP 2025-06: the `resource_metadata` parameter points clients
+  // at our /.well-known/oauth-protected-resource doc, from which they learn
+  // the authorization server. Without it, Claude's MCP client cannot
+  // discover where to re-run OAuth on a 401 and falls back to "user must
+  // reconnect manually" — the daily-disconnect symptom we're fixing.
+  const resourceMetadata = "https://mcp.septena.app/.well-known/oauth-protected-resource";
+  const params = [
+    'Bearer realm="septena-mcp"',
+    'error="invalid_token"',
+    `resource_metadata="${resourceMetadata}"`,
+  ];
+  if (reason) logEvent("unauthorized", { reason });
   return new Response("Unauthorized", {
     status: 401,
-    headers: {
-      "WWW-Authenticate": 'Bearer realm="septena-mcp"',
-    },
+    headers: { "WWW-Authenticate": params.join(", ") },
   });
 }

@@ -100,6 +100,85 @@ export class CloudKitClient {
   }
 }
 
+// ----------------------------------------------------------------------
+// queryByDateRange — unified STRING-date range query
+//
+// CloudKit's per-field Queryable/Sortable flags are auto-managed by the
+// iOS client. We can't depend on any given STRING field (`date`) being
+// range-indexed, and `___createTime` is not queryable on most record
+// types. Manually flipping flags in CK Dashboard is out of scope.
+//
+// So: match-all on the date STRING field with `BEGINS_WITH ""` (which
+// only requires the field to be queryable at all — true for every record
+// type that has a STRING date), then filter the YYYY-MM-DD window in JS.
+// YMD strings compare lexicographically, so `>=`/`<=` work directly.
+//
+// Use this for every *_list tool that takes from/to/date over a STRING
+// `date` field. TIMESTAMP fields (e.g. NutritionEntry.loggedAt) don't
+// have the same indexing issue and should keep their server-side range.
+export interface QueryByDateRangeArgs {
+  recordType: string;
+  /** STRING field holding YYYY-MM-DD. Defaults to "date". */
+  dateField?: string;
+  /** Inclusive lower bound, YYYY-MM-DD. */
+  from: string;
+  /** Inclusive upper bound, YYYY-MM-DD. */
+  to: string;
+  /** Extra EQUALS-style filters on indexed fields. */
+  extraFilters?: CKFilter[];
+  /** Max records to return *after* the client-side date filter. */
+  resultsLimit?: number;
+  /** Optional secondary sort field (e.g. "time" — applied client-side). */
+  timeField?: string;
+}
+
+export async function queryByDateRange(
+  client: CloudKitClient,
+  args: QueryByDateRangeArgs,
+): Promise<CKRecord[]> {
+  const dateField = args.dateField ?? "date";
+  const limit = args.resultsLimit ?? 200;
+
+  // BEGINS_WITH "" matches every record with a value in dateField — works
+  // without any range index on that field, and lets extraFilters narrow
+  // the result set server-side when those fields are indexed.
+  const filterBy: CKFilter[] = [
+    { fieldName: dateField, comparator: "BEGINS_WITH", fieldValue: { value: "" } },
+    ...(args.extraFilters ?? []),
+  ];
+
+  // No server-side sortBy — `date`/`time` aren't reliably marked Sortable.
+  // Pull a generous page (capped at the caller's limit times a small
+  // multiplier so a wide window can still return `limit` matches when the
+  // record type has lots of out-of-window history).
+  const fetchLimit = Math.max(limit, 200);
+  const res = await client.queryRecords({
+    recordType: args.recordType,
+    filterBy,
+    resultsLimit: fetchLimit,
+  });
+
+  const { from, to } = args;
+  const filtered = res.records.filter((r) => {
+    const v = r.fields[dateField]?.value;
+    return typeof v === "string" && v >= from && v <= to;
+  });
+
+  filtered.sort((a, b) => {
+    const ad = (a.fields[dateField]?.value as string) ?? "";
+    const bd = (b.fields[dateField]?.value as string) ?? "";
+    if (ad !== bd) return ad < bd ? 1 : -1;
+    if (args.timeField) {
+      const at = (a.fields[args.timeField]?.value as string) ?? "";
+      const bt = (b.fields[args.timeField]?.value as string) ?? "";
+      if (at !== bt) return at < bt ? 1 : -1;
+    }
+    return 0;
+  });
+
+  return filtered.slice(0, limit);
+}
+
 export class CloudKitError extends Error {
   constructor(public status: number, public body: string) {
     super(`CloudKit ${status}: ${body.slice(0, 200)}`);

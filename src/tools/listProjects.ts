@@ -31,9 +31,13 @@ export async function listProjects(
   const status = input.status ?? "active";
   const limit = input.limit ?? 200;
 
+  // CloudKit requires at least one filter or it rejects with "recordName
+  // is not marked queryable". ___createTime isn't queryable on every
+  // record type — match-all on `title BEGINS_WITH ""` is the proven
+  // pattern (also used by listAreas/listSections).
   const filterBy =
     status === "all"
-      ? [{ fieldName: "___createTime", comparator: "GREATER_THAN" as const, fieldValue: { value: 0 } }]
+      ? [{ fieldName: "title", comparator: "BEGINS_WITH" as const, fieldValue: { value: "" } }]
       : [{ fieldName: "status", comparator: "EQUALS" as const, fieldValue: { value: status } }];
 
   const res = await client.queryRecords({

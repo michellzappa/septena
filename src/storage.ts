@@ -90,11 +90,12 @@ export async function putAccessToken(
 export async function getCkTokenForAccessToken(
   env: Env,
   accessToken: string,
-): Promise<string | null> {
+): Promise<{ ckWebAuthToken: string; createdAt: number } | null> {
   const raw = await env.TOKENS.get(`token:${accessToken}`);
   if (!raw) return null;
   const rec = JSON.parse(raw) as AccessTokenRecord;
-  return decrypt(rec.ckWebAuthTokenEnc, env.TOKEN_ENC_KEY);
+  const ckWebAuthToken = await decrypt(rec.ckWebAuthTokenEnc, env.TOKEN_ENC_KEY);
+  return { ckWebAuthToken, createdAt: rec.createdAt };
 }
 
 // ---- Dynamic client registrations ----

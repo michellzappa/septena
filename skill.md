@@ -32,7 +32,8 @@ The tool list is **dynamic**: on `tools/list` the gateway reads the user's `Sett
 | `cannabis` | `cannabis_events_list`, `cannabis_event_log`, `cannabis_event_delete`, `cannabis_strains_list`, `cannabis_strain_create`, `cannabis_strain_delete` |
 | `gut` | `gut_events_list`, `gut_event_log`, `gut_event_delete` |
 | `nutrition` | `nutrition_entries_list`, `nutrition_entry_log`, `nutrition_entry_update`, `nutrition_entry_delete`, `nutrition_day_summary` |
-| `training` | `training_entries_list`, `training_entry_log`, `training_entry_update`, `training_entry_delete`, `training_exercises_list`, `training_exercise_create`, `training_exercise_update`, `training_exercise_delete`, `training_sessions_list`, `training_session_create`, `training_session_update`, `training_session_delete` |
+| `training` | `training_entries_list`, `training_entry_log`, `training_entry_update`, `training_entry_delete`, `training_session_retag`, `training_exercises_list`, `training_exercise_create`, `training_exercise_update`, `training_exercise_delete`, `training_sessions_list`, `training_session_create`, `training_session_update`, `training_session_delete` |
+| `hydration` | `hydration_log`, `hydration_today`, `hydration_history` |
 | `groceries` | `grocery_items_list`, `grocery_item_create`, `grocery_item_update`, `grocery_item_set_low`, `grocery_item_delete`, `grocery_categories_list`, `grocery_category_create`, `grocery_category_delete` |
 
 ## Conventions across all tools
@@ -134,6 +135,24 @@ training_entry_log(sessionType: "upper", exercise: "Chest press", weight: 80, se
 
 # "Ran 5k in 24 min"
 training_entry_log(sessionType: "cardio", exercise: "Run", durationMin: 24, distanceM: 5000)
+```
+
+### Hydration
+Hydration is a **UX layer over Nutrition** — every water log is stored as a `NutritionEntry` with `foods="Water"`, `waterMl > 0`, all macros at 0. There's no separate data model.
+
+- `hydration_log({ml})` → creates the water-only entry. Use this for plain water; don't reach for `nutrition_entry_log`.
+- `hydration_today()` → today's total ml + the list of water-only entries. The total **includes water recorded on real meals** (e.g. a salad entry with `waterMl: 250` counts toward the day), so it matches the iOS Hydration view.
+- `hydration_history({from, to, days})` → per-day totals over a range. Defaults to last 7 days.
+
+```
+# "I drank 500ml of water"
+hydration_log({ ml: 500 })
+
+# "How's my water today?"
+hydration_today()                       → { totalMl, entries: [...] }
+
+# "Last week"
+hydration_history({ days: 7 })
 ```
 
 ### Groceries

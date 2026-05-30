@@ -156,6 +156,9 @@ export async function listChores(client: CloudKitClient) {
   const [defsRes, eventsRes] = await Promise.all([
     client.queryRecords({
       recordType: "ChoreDefinition",
+      // CK requires at least one filter; `title BEGINS_WITH ""` matches
+      // every record without needing ___createTime to be queryable.
+      filterBy: [{ fieldName: "title", comparator: "BEGINS_WITH", fieldValue: { value: "" } }],
       sortBy: [{ fieldName: "sortIndex", ascending: true }],
       resultsLimit: 200,
     }),

@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 import type { Env } from "../env.js";
 import { getClient, putState } from "../storage.js";
-import { randomId } from "../util.js";
+import { logEvent, randomId } from "../util.js";
 
 // /oauth/authorize — claude.ai sends user's browser here.
 // We stash the PKCE+state in KV under a random id, set that id as a
@@ -18,9 +18,9 @@ import { randomId } from "../util.js";
 export async function authorize(c: Context<{ Bindings: Env }>) {
   const url = new URL(c.req.url);
 
-  // Preview mode: render the consent page with placeholder copy so you
-  // can eyeball styling without going through claude.ai's full flow.
-  // Clicking Continue 400s ("missing session") since no state cookie is set.
+  // Preview mode: render the CloudKit.js sign-in page with placeholder
+  // copy so you can eyeball styling without going through claude.ai's full
+  // flow. Signing in 400s ("missing session") since no state cookie is set.
   if (url.searchParams.get("preview") === "1") {
     return new Response(consentPage("claude.ai"), {
       status: 200,
@@ -59,10 +59,13 @@ export async function authorize(c: Context<{ Bindings: Env }>) {
     createdAt: Date.now(),
   });
 
+  // Raw redirect flow (known-good): render the consent page, which POSTs to
+  // /oauth/continue → Apple sign-in → /auth/apple/callback. Yields 30-min
+  // tokens, but it works. The CloudKit.js path (/oauth/signin) is still
+  // deployed for separate debugging but is no longer in the OAuth path.
   const clientName = escapeHtml(client.name ?? clientId);
-  const html = consentPage(clientName);
-
-  return new Response(html, {
+  logEvent("oauth_authorize", { clientId, path: "consent" });
+  return new Response(consentPage(clientName), {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
@@ -107,11 +110,13 @@ function consentPage(clientName: string): string {
     width: calc(100% - 32px);
     box-shadow: 0 10px 30px rgba(0,0,0,0.05);
   }
+  .logo-mark { display:block; width:60px; height:60px; margin:0 auto 10px; }
   .logo {
     font-size: 28px;
     font-weight: 700;
     letter-spacing: -0.02em;
     margin: 0 0 6px;
+    text-align: center;
   }
   h1 {
     font-size: 17px;
@@ -173,6 +178,15 @@ function consentPage(clientName: string): string {
 </head>
 <body>
   <main class="card">
+    <svg class="logo-mark" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <circle cx="256" cy="107" r="49" fill="#ef4444"/>
+      <circle cx="373" cy="162" r="49" fill="#f97316"/>
+      <circle cx="402" cy="290" r="49" fill="#eab308"/>
+      <circle cx="321" cy="391" r="49" fill="#22c55e"/>
+      <circle cx="191" cy="391" r="49" fill="#06b6d4"/>
+      <circle cx="110" cy="290" r="49" fill="#3b82f6"/>
+      <circle cx="139" cy="162" r="49" fill="#8b5cf6"/>
+    </svg>
     <div class="logo">Septena</div>
     <h1>${clientName} wants to access your data</h1>
     <p>To continue, sign in with your iCloud account on the next screen. Your iCloud password never reaches Septena or ${clientName} — Apple authenticates you directly.</p>

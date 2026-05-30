@@ -16,6 +16,17 @@ export async function sha256Base64Url(input: string): Promise<string> {
   return base64url(new Uint8Array(digest));
 }
 
+// Structured single-line log. One JSON object per event so `wrangler tail`
+// (and any log drain) can be grep'd/filtered by `evt`. Kept deliberately
+// terse — never log token values, only their shape/age.
+export function logEvent(evt: string, fields: Record<string, unknown> = {}): void {
+  try {
+    console.log(JSON.stringify({ evt, ...fields }));
+  } catch {
+    console.log(JSON.stringify({ evt, logError: "unserializable fields" }));
+  }
+}
+
 export function readCookie(req: Request, name: string): string | null {
   const header = req.headers.get("Cookie");
   if (!header) return null;
