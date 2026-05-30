@@ -5,13 +5,14 @@ import AppIntents
 // triggers an intent with the app cold-killed, iOS launches it in the
 // background just to run `perform()`. That cold-launch path may execute
 // before the SwiftUI scene's `.task` mounts, so we can't assume the
-// CKEngine has been bound. `SeptenaServices.shared.start()` is the
-// shared, idempotent entry point: both the scene and this intent call
-// it, the first one wires the stack, the second awaits the same task.
+// CKEngine has been bound. `prepareSection()` (→ `SeptenaServices.start()`)
+// is the shared, idempotent entry point: both the scene and this intent
+// call it, the first wires the stack, the second awaits the same task.
 // Once it returns, `taskMutator.create(...)` routes through the same
 // CloudKit-backed mutation stack as the main app.
 
-struct AddTaskIntent: AppIntent {
+struct AddTaskIntent: SectionLogIntent {
+  static let sectionKey = "tasks"
   static let title: LocalizedStringResource = "Add Task"
   static let description = IntentDescription("Add a new to-do to Septena.")
 
@@ -20,23 +21,23 @@ struct AddTaskIntent: AppIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult & ProvidesDialog {
-    await SeptenaServices.shared.start()
+    await prepareSection()
     _ = SeptenaServices.shared.taskMutator.create(title: taskTitle)
     return .result(dialog: "Added “\(taskTitle)” to Septena.")
   }
 }
 
-struct SeptenaShortcuts: AppShortcutsProvider {
-  static var appShortcuts: [AppShortcut] {
+// Tasks' contribution to the global `SeptenaShortcuts` provider (declared
+// in SectionLogIntent.swift). Kept here so the action lives with its intent.
+enum TaskShortcuts {
+  static var addTask: AppShortcut {
     AppShortcut(
       intent: AddTaskIntent(),
-      // AppShortcuts phrases must contain \(.applicationName); the leading
-      // "Hey Siri, " is implicit. iOS 26 restricts inline String parameter
-      // templating to AppEntity/AppEnum, so the title can't be captured
-      // directly from the phrase — once any phrase matches, Siri prompts
-      // "What's the task?" via the @Parameter's requestValueDialog. The
-      // wide variety here is so the user doesn't have to memorize one
-      // exact wording.
+      // Phrases must contain \(.applicationName); the leading "Hey Siri, "
+      // is implicit. iOS 26 restricts inline String parameter templating to
+      // AppEntity/AppEnum, so the title can't be captured from the phrase —
+      // once any phrase matches, Siri prompts via the @Parameter's
+      // requestValueDialog. The wide variety saves memorizing one wording.
       phrases: [
         "Add to \(.applicationName)",
         "Add task to \(.applicationName)",
@@ -61,7 +62,7 @@ struct SeptenaShortcuts: AppShortcutsProvider {
         "Using \(.applicationName) remind me",
       ],
       shortTitle: "Add Task",
-      systemImageName: "plus.circle"
+      systemImageName: "checklist"
     )
   }
 }

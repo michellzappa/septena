@@ -125,6 +125,45 @@ enum SettingsMirror {
     }
   }
 
+  /// Enable (or disable) a section by key, seeding the row from the
+  /// manifest if it doesn't exist yet. Enabling also flips `hasOnboarded`
+  /// so an intent-driven enable never tries to present a first-enable sheet
+  /// with no UI on screen. Upsert-only — never deletes (same guarantee as
+  /// `replaceSections`). Pushes through CKEngine. No-op when already in the
+  /// target state.
+  static func setSectionEnabled(_ key: String,
+                                _ enabled: Bool,
+                                context: ModelContext,
+                                engine: CKEngine? = nil) {
+    let descriptor = FetchDescriptor<SectionEntity>(
+      predicate: #Predicate { $0.id == key }
+    )
+    let entity: SectionEntity
+    if let existing = try? context.fetch(descriptor).first {
+      entity = existing
+    } else {
+      guard let manifest = SectionManifest.byKey[key] else { return }
+      entity = SectionEntity(id: manifest.key,
+                             title: manifest.defaultLabel,
+                             color: "")
+      context.insert(entity)
+    }
+    // Enabling implies onboarded (suppresses the first-enable sheet a
+    // headless intent can't present); disabling leaves the bit untouched.
+    let needsWrite = entity.isEnabled != enabled || (enabled && !entity.hasOnboarded)
+    guard needsWrite else { return }
+    entity.isEnabled = enabled
+    if enabled { entity.hasOnboarded = true }
+    entity.updatedAt = .now
+    do {
+      try context.save()
+      engine?.noteSectionChange(id: key)
+      NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+    } catch {
+      SeptenaLog.error("SettingsMirror.setSectionEnabled", error)
+    }
+  }
+
   static func upsert(settings: AppSettings,
                      context: ModelContext,
                      engine: CKEngine? = nil) {

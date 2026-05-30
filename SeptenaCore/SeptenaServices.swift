@@ -64,6 +64,19 @@ final class SeptenaServices {
     self.projectsMutator = ProjectsMutator(context: context)
   }
 
+  /// Idempotently enable a section as a side-effect of logging to it from
+  /// an App Intent. Logging is implicit consent to use the section, and a
+  /// disable never destroys data, so turning it back on is free and keeps
+  /// every Shortcut / Siri action working regardless of the user's current
+  /// section toggles. No-op when already enabled. Call from
+  /// `SectionLogIntent.prepareSection()`, after `start()`.
+  func ensureSectionEnabled(_ key: String) {
+    SettingsMirror.setSectionEnabled(
+      key, true,
+      context: LocalStore.shared.container.mainContext,
+      engine: ckEngine)
+  }
+
   /// Idempotent. First caller wires CKEngine's record provider / apply
   /// closures, binds the three mutators, and starts the engine.
   /// Subsequent callers await the same in-flight (or completed) work

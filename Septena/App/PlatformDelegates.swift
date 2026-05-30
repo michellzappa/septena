@@ -18,6 +18,20 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     return pending
   }
 
+  /// Single ingress for Quick Action delivery from any of the three
+  /// paths (cold-launch scene options, warm scene activation, legacy
+  /// UIApplicationDelegate fallback). If `navigation` is already alive
+  /// — meaning the SwiftUI scene has mounted and stashed it on us —
+  /// the action publishes immediately; otherwise it stays in `pending`
+  /// for App's `.task` to drain on first render.
+  static func dispatchShortcut(_ action: ShortcutAction) {
+    if let nav = navigation {
+      Task { @MainActor in nav.pendingShortcut = action }
+    } else {
+      pending = action
+    }
+  }
+
   func application(
     _ application: UIApplication,
     willFinishLaunchingWithOptions launchOptions:
@@ -41,12 +55,22 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     guard let action = ShortcutAction(rawValue: shortcutItem.type) else {
       completionHandler(false); return
     }
-    if let nav = Self.navigation {
-      Task { @MainActor in nav.pendingShortcut = action }
-    } else {
-      Self.pending = action
-    }
+    Self.dispatchShortcut(action)
     completionHandler(true)
+  }
+
+  /// Hand iOS a scene configuration that points at SeptenaSceneDelegate.
+  /// Required so scene-based shortcut delivery (`UIScene.ConnectionOptions
+  /// .shortcutItem` on cold launch; `windowScene(_:performActionFor:)` on
+  /// warm) actually fires — without an explicit delegate class, iOS uses
+  /// a no-op default and silently drops Home Screen Quick Actions.
+  func application(_ application: UIApplication,
+                   configurationForConnecting connectingSceneSession: UISceneSession,
+                   options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+    let config = UISceneConfiguration(name: "Default",
+                                       sessionRole: connectingSceneSession.role)
+    config.delegateClass = SeptenaSceneDelegate.self
+    return config
   }
 
   /// Silent CK pushes arrive here. CKSyncEngine's database subscription
