@@ -1,5 +1,7 @@
 import SwiftUI
 import Charts
+import PhotosUI
+import Photos
 
 // Nutrition mini-app — mirrors the webapp's NutritionDashboard.
 //
@@ -34,6 +36,9 @@ struct NutritionDestinationView: View {
   @State private var loading = true
   @State private var editing: NutritionEntry? = nil
   @State private var creating = false
+  @State private var photoPickerEntry: NutritionEntry? = nil
+  @State private var photoPickerItem: PhotosPickerItem? = nil
+  @State private var photoPickerPresented = false
   /// Day the drawer's date strip is pointing at. Drives the entries list
   /// and the heatmap's selected cell. Defaults to today; heatmap taps
   /// and the prev/next/calendar controls update it. The macro tiles +
@@ -176,6 +181,17 @@ struct NutritionDestinationView: View {
       .presentationDragIndicator(.visible)
       #endif
     }
+    .photosPicker(
+      isPresented: $photoPickerPresented,
+      selection: $photoPickerItem,
+      matching: .images,
+      photoLibrary: .shared()
+    )
+    .onChange(of: photoPickerItem) { _, new in
+      guard let new, let entry = photoPickerEntry else { return }
+      photoPickerEntry = nil
+      Task { await attachPhoto(new, to: entry) }
+    }
   }
 
   // MARK: - Edit / delete
@@ -237,6 +253,23 @@ struct NutritionDestinationView: View {
     SeptenaServices.shared.nutritionMutator.deleteEntry(id: entry.file)
     entries.removeAll { $0.file == entry.file }
     Haptics.warning()
+  }
+
+  private func attachPhoto(_ item: PhotosPickerItem, to entry: NutritionEntry) async {
+    let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+    if status == .notDetermined {
+      _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+    }
+    guard let assetID = item.itemIdentifier else { return }
+    await MainActor.run {
+      SeptenaServices.shared.nutritionMutator.updateEntry(
+        id: entry.file,
+        photoAssetID: .some(assetID)
+      )
+      photoPickerItem = nil
+      reload()
+      Haptics.tick()
+    }
   }
 
   // MARK: - Unified macro tiles
@@ -683,6 +716,10 @@ struct NutritionDestinationView: View {
     .onTapGesture { editing = e }
     .contextMenu {
       Button { editing = e } label: { Label("Edit", systemImage: "pencil") }
+      Button { photoPickerEntry = e; photoPickerPresented = true } label: {
+        Label(e.photoAssetID != nil ? "Change photo" : "Attach photo",
+              systemImage: "photo.badge.plus")
+      }
       Button { logAgainNow(e) } label: {
         Label("Log again now", systemImage: "arrow.clockwise")
       }
