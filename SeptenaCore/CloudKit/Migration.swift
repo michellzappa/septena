@@ -712,6 +712,124 @@ struct ReplaceLocalMirrorResult {
 }
 
 
+// MARK: - Event occurredAt backfill
+
+/// Combines a `yyyy-MM-dd` date string with an optional `HH:mm[:ss]` time
+/// string into a `Date` in the current time zone. Shared by the event
+/// mutators (new + UI-backfilled writes) and `OccurredAtBackfill` (historical
+/// rows) so `occurredAt` is derived identically everywhere.
+enum EventTimestamp {
+  private static func formatter(_ format: String) -> DateFormatter {
+    let f = DateFormatter()
+    f.calendar = Calendar(identifier: .iso8601)
+    f.locale = Locale(identifier: "en_US_POSIX")
+    f.timeZone = .current
+    f.dateFormat = format
+    return f
+  }
+  private static let withSeconds = formatter("yyyy-MM-dd HH:mm:ss")
+  private static let withMinutes = formatter("yyyy-MM-dd HH:mm")
+  private static let dayOnly = formatter("yyyy-MM-dd")
+
+  /// Best-effort instant for a logged event:
+  /// - `time` "HH:mm:ss" or "HH:mm" → combined with `date`.
+  /// - `time` nil/empty → local noon of `date` (day-granular rows have no real
+  ///   moment; noon keeps them in the correct local day under TZ shifts).
+  /// - unparseable → local start-of-day of `date`, else `.now`.
+  static func from(date: String, time: String?) -> Date {
+    let t = time?.trimmingCharacters(in: .whitespaces) ?? ""
+    if !t.isEmpty {
+      let stamp = "\(date) \(t)"
+      if let d = withSeconds.date(from: stamp) { return d }
+      if let d = withMinutes.date(from: stamp) { return d }
+    } else if let day = dayOnly.date(from: date) {
+      return Calendar.current.date(byAdding: .hour, value: 12, to: day) ?? day
+    }
+    return dayOnly.date(from: date) ?? .now
+  }
+}
+
+/// One-shot migration: derive `occurredAt` for every event row still at the
+/// `.distantPast` sentinel (created before the field existed) from its legacy
+/// `date`/`time` strings, then push each touched row through CloudKit so the
+/// value propagates. For Mood — newly CloudKit-backed in this release — this
+/// pass also first-uploads the historical entries to the cloud.
+@MainActor
+enum OccurredAtBackfill {
+  static let userDefaultsKey = "events.occurredAtBackfill.v1"
+
+  static func runIfNeeded(context: ModelContext) {
+    guard !UserDefaults.standard.bool(forKey: userDefaultsKey) else { return }
+    let ck = SeptenaServices.shared.ckEngine
+    var updated = 0
+
+    for e in (try? context.fetch(FetchDescriptor<CaffeineEventEntity>())) ?? []
+    where e.occurredAt == .distantPast {
+      e.occurredAt = EventTimestamp.from(date: e.date, time: e.time)
+      e.updatedAt = .now
+      ck.noteCaffeineEventChange(id: e.id)
+      updated += 1
+    }
+    for e in (try? context.fetch(FetchDescriptor<CannabisEventEntity>())) ?? []
+    where e.occurredAt == .distantPast {
+      e.occurredAt = EventTimestamp.from(date: e.date, time: e.time)
+      e.updatedAt = .now
+      ck.noteCannabisEventChange(id: e.id)
+      updated += 1
+    }
+    for e in (try? context.fetch(FetchDescriptor<GutEventEntity>())) ?? []
+    where e.occurredAt == .distantPast {
+      e.occurredAt = EventTimestamp.from(date: e.date, time: e.time)
+      e.updatedAt = .now
+      ck.noteGutEventChange(id: e.id)
+      updated += 1
+    }
+    for e in (try? context.fetch(FetchDescriptor<MoodEventEntity>())) ?? []
+    where e.occurredAt == .distantPast {
+      e.occurredAt = EventTimestamp.from(date: e.date, time: e.time)
+      e.updatedAt = .now
+      ck.noteMoodEventChange(id: e.id)
+      updated += 1
+    }
+    for e in (try? context.fetch(FetchDescriptor<ChoreEventEntity>())) ?? []
+    where e.occurredAt == .distantPast {
+      e.occurredAt = EventTimestamp.from(date: e.date, time: e.time)
+      e.updatedAt = .now
+      ck.noteChoreEventChange(id: e.id)
+      updated += 1
+    }
+    for e in (try? context.fetch(FetchDescriptor<HabitDayStateEntity>())) ?? []
+    where e.occurredAt == .distantPast {
+      e.occurredAt = EventTimestamp.from(date: e.date, time: e.time)
+      e.updatedAt = .now
+      ck.noteHabitEventChange(id: e.id)
+      updated += 1
+    }
+    for e in (try? context.fetch(FetchDescriptor<SupplementDayStateEntity>())) ?? []
+    where e.occurredAt == .distantPast {
+      e.occurredAt = EventTimestamp.from(date: e.date, time: e.time)
+      e.updatedAt = .now
+      ck.noteSupplementEventChange(id: e.id)
+      updated += 1
+    }
+    let iso = ISO8601DateFormatter()
+    for e in (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>())) ?? []
+    where e.occurredAt == .distantPast {
+      e.occurredAt = e.loggedAt.flatMap { iso.date(from: $0) }
+        ?? e.concludedAt.flatMap { iso.date(from: $0) }
+        ?? EventTimestamp.from(date: e.date, time: e.time)
+      e.updatedAt = .now
+      ck.noteExerciseEntryChange(id: e.id)
+      updated += 1
+    }
+
+    try? context.save()
+    UserDefaults.standard.set(true, forKey: userDefaultsKey)
+    SeptenaLog.info("[OccurredAtBackfill] derived occurredAt for \(updated) event rows")
+  }
+}
+
+
 // MARK: - Training muscle backfill
 
 /// One-shot migration: assign `primaryMuscle` to every ExerciseDefinitionEntity

@@ -42,19 +42,6 @@ final class SeptenaServices {
   let nutritionMutator: NutritionMutator
   let areasMutator: AreasMutator
   let projectsMutator: ProjectsMutator
-  /// Live Aranet4 CO2 sensor connection (CoreBluetooth). Single
-  /// process-wide instance so views, Settings, and the on-launch
-  /// auto-start path all read the same connection state.
-  let aranetBridge: AranetBridge
-  /// Local persistence + aggregation for air readings. Subscribes to
-  /// `aranetBridge.onSnapshot` in `start()` so every sample lands in
-  /// SwiftData without any view-side glue.
-  let airStore: AirStore
-  /// Pollen fetcher (Open-Meteo + Core Location). Single shared
-  /// instance so the cache survives view transitions and a refresh
-  /// triggered by Settings doesn't double-fetch with the Air tab.
-  let pollenClient: PollenClient
-
   /// Cached start task. Holds the work of wiring CKEngine + binding
   /// mutators; replays its result to any caller. Nil until first
   /// `start()`; non-nil thereafter so repeated calls coalesce.
@@ -75,9 +62,6 @@ final class SeptenaServices {
     self.nutritionMutator = NutritionMutator(context: context, ckEngine: nil)
     self.areasMutator = AreasMutator(context: context)
     self.projectsMutator = ProjectsMutator(context: context)
-    self.aranetBridge = AranetBridge()
-    self.airStore = AirStore(context: context)
-    self.pollenClient = PollenClient()
   }
 
   /// Idempotent. First caller wires CKEngine's record provider / apply
@@ -227,9 +211,9 @@ final class SeptenaServices {
           }
           return nil
         }
-        if recordName.hasPrefix("air-reading:") {
-          let id = AirReadingCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<AirReadingEntity>(
+        if recordName.hasPrefix("mood-event:") {
+          let id = MoodEventCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<MoodEventEntity>(
             predicate: #Predicate { $0.id == id }
           )).first {
             return entity.toCloudKitRecord()
@@ -500,15 +484,15 @@ final class SeptenaServices {
           } else {
             context.insert(GutEventEntity(cloudKit: record))
           }
-        case AirReadingCloudKitSchema.recordType:
+        case MoodEventCloudKitSchema.recordType:
           batchTouchedData = true
-          let id = AirReadingCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<AirReadingEntity>(
+          let id = MoodEventCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<MoodEventEntity>(
             predicate: #Predicate { $0.id == id }
           )).first {
             entity.apply(record)
           } else {
-            context.insert(AirReadingEntity(cloudKit: record))
+            context.insert(MoodEventEntity(cloudKit: record))
           }
         case OuraNightCloudKitSchema.recordType:
           batchTouchedData = true
@@ -753,10 +737,10 @@ final class SeptenaServices {
           )).first {
             context.delete(entity)
           }
-        case AirReadingCloudKitSchema.recordType:
+        case MoodEventCloudKitSchema.recordType:
           batchTouchedData = true
-          let id = AirReadingCloudKitSchema.entityID(from: recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<AirReadingEntity>(
+          let id = MoodEventCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<MoodEventEntity>(
             predicate: #Predicate { $0.id == id }
           )).first {
             context.delete(entity)
@@ -895,20 +879,10 @@ final class SeptenaServices {
       nutritionMutator.bind(ckEngine: ckEngine)
       areasMutator.bind(ckEngine: ckEngine)
       projectsMutator.bind(ckEngine: ckEngine)
-      airStore.bind(ckEngine: ckEngine)
       OuraStore.shared.bind(ckEngine: ckEngine)
       WithingsStore.shared.bind(ckEngine: ckEngine)
       ckEngine.start()
       try? await ckEngine.fetchChanges()
-      // Pipe Aranet snapshots into the local store. The bridge runs in
-      // the foreground only — the consumer (AirDestinationView /
-      // Settings) calls `aranetBridge.start()` when its view appears
-      // and `stop()` on disappear, so we don't hold a BLE scan open
-      // app-wide. Wiring the sink here is just so anyone who *does*
-      // start the bridge gets persistence for free.
-      aranetBridge.onSnapshot = { [airStore] snap in
-        airStore.ingest(snap)
-      }
     }
     startTask = task
     await task.value
@@ -1274,6 +1248,7 @@ final class ChecklistMutator {
   }
 
   private func commitHabitEvent(_ entity: HabitDayStateEntity, op: String) {
+    entity.occurredAt = EventTimestamp.from(date: entity.date, time: entity.time)
     saveContext("CK habit event \(op)")
     ckEngine?.noteHabitEventChange(id: entity.id)
     postChecklistChanged()
@@ -1286,6 +1261,7 @@ final class ChecklistMutator {
   }
 
   private func commitSupplementEvent(_ entity: SupplementDayStateEntity, op: String) {
+    entity.occurredAt = EventTimestamp.from(date: entity.date, time: entity.time)
     saveContext("CK supplement event \(op)")
     ckEngine?.noteSupplementEventChange(id: entity.id)
     postChecklistChanged()
@@ -1298,6 +1274,7 @@ final class ChecklistMutator {
   }
 
   private func commitChoreEvent(_ entity: ChoreEventEntity, op: String) {
+    entity.occurredAt = EventTimestamp.from(date: entity.date, time: entity.time)
     saveContext("CK chore event \(op)")
     ckEngine?.noteChoreEventChange(id: entity.id)
     postChecklistChanged()
@@ -1522,6 +1499,7 @@ final class GutMutator {
   }
 
   private func commit(_ entity: GutEventEntity, op: String) {
+    entity.occurredAt = EventTimestamp.from(date: entity.date, time: entity.time)
     saveContext("CK gut \(op)")
     ckEngine?.noteGutEventChange(id: entity.id)
     postChanged()
@@ -1573,6 +1551,10 @@ final class CaffeineMutator {
                                      note: note)
     context.insert(entity)
     commitEntry(entity, op: "create")
+    if let g = grams, g > 0 {
+      let ts = entity.occurredAt
+      Task { await HealthKitBridge.shared.writeCaffeine(grams: g, method: method, date: ts) }
+    }
     return entity
   }
 
@@ -1670,6 +1652,7 @@ final class CaffeineMutator {
   }
 
   private func commitEntry(_ entity: CaffeineEventEntity, op: String) {
+    entity.occurredAt = EventTimestamp.from(date: entity.date, time: entity.time)
     saveContext("CK caffeine \(op)")
     ckEngine?.noteCaffeineEventChange(id: entity.id)
     postChanged()
@@ -1840,6 +1823,7 @@ final class CannabisMutator {
   }
 
   private func commitEntry(_ entity: CannabisEventEntity, op: String) {
+    entity.occurredAt = EventTimestamp.from(date: entity.date, time: entity.time)
     saveContext("CK cannabis \(op)")
     ckEngine?.noteCannabisEventChange(id: entity.id)
     postChanged()
@@ -2104,6 +2088,17 @@ final class TrainingMutator {
       )
       saved.append(entity)
     }
+    // Mirror to HealthKit. Duration = sum of per-entry durationMin (cardio/
+    // mobility) or a 45-min estimate for strength (no per-set timer).
+    if !saved.isEmpty {
+      let totalMin = saved.compactMap(\.durationMin).reduce(0, +)
+      let durationMin = totalMin > 0 ? totalMin : 45.0
+      let ts = EventTimestamp.from(date: date, time: time)
+      Task {
+        await HealthKitBridge.shared.writeWorkout(
+          sessionType: sessionType, durationMin: durationMin, date: ts)
+      }
+    }
     return saved
   }
 
@@ -2291,6 +2286,7 @@ final class TrainingMutator {
   }
 
   private func commitEntry(_ entity: ExerciseEntryEntity, op: String) {
+    entity.occurredAt = EventTimestamp.from(date: entity.date, time: entity.time)
     saveContext("CK exercise entry \(op)")
     ckEngine?.noteExerciseEntryChange(id: entity.id)
     postChanged()
@@ -2401,6 +2397,14 @@ final class NutritionMutator {
     context.insert(entity)
     rebuildSummary(forDay: dayID(from: loggedAt))
     commitEntry(entity, op: "create")
+    let ts = loggedAt
+    Task {
+      await HealthKitBridge.shared.writeNutritionEntry(
+        kcal: kcal, proteinG: proteinG, fatG: fatG, carbsG: carbsG,
+        fiberG: fiberG, sugarG: sugarG,
+        sodiumMg: sodiumMg, cholesterolMg: cholesterolMg,
+        waterMl: waterMl, date: ts)
+    }
     return entity
   }
 
@@ -2598,9 +2602,20 @@ final class MoodMutator {
                                  valence: valence,
                                  emotion: emotion,
                                  note: (note?.isEmpty ?? true) ? nil : note)
+    entity.occurredAt = EventTimestamp.from(date: date, time: time)
     context.insert(entity)
     save("CK mood create")
+    SeptenaServices.shared.ckEngine.noteMoodEventChange(id: id)
     postChanged()
+    let ts = entity.occurredAt
+    Task {
+      let uuid = await HealthKitBridge.shared.writeMood(quadrant: quadrant,
+                                                        valence: valence, emotion: emotion, date: ts)
+      if let uuid {
+        entity.hkSampleID = uuid
+        self.save("HK mood uuid")
+      }
+    }
     return entity
   }
 
@@ -2613,6 +2628,8 @@ final class MoodMutator {
                    emotion: String? = nil,
                    note: String?? = nil) {
     guard let entity = fetch(id: id) else { return }
+    let needsHKSync = date != nil || time != nil || quadrant != nil || valence != nil || emotion != nil
+    let oldHKID = needsHKSync ? entity.hkSampleID : nil
     if let date { entity.date = date }
     if let time {
       entity.time = time
@@ -2623,16 +2640,42 @@ final class MoodMutator {
     if let valence { entity.valence = valence }
     if let emotion { entity.emotion = emotion }
     if let note { entity.note = (note?.isEmpty ?? true) ? nil : note }
+    entity.occurredAt = EventTimestamp.from(date: entity.date, time: entity.time)
     entity.updatedAt = .now
+    if needsHKSync {
+      entity.hkSampleID = nil
+      let ts = entity.occurredAt
+      let q = entity.quadrant
+      let v = entity.valence
+      let em = entity.emotion
+      Task {
+        if let oldID = oldHKID {
+          await HealthKitBridge.shared.deleteMoodSample(uuid: oldID)
+        }
+        let uuid = await HealthKitBridge.shared.writeMood(quadrant: q, valence: v, emotion: em, date: ts)
+        if let uuid {
+          entity.hkSampleID = uuid
+          self.save("HK mood uuid update")
+        }
+      }
+    }
     save("CK mood update")
+    SeptenaServices.shared.ckEngine.noteMoodEventChange(id: id)
     postChanged()
   }
 
   func deleteEntry(id: String) {
     guard let entity = fetch(id: id) else { return }
+    let hkID = entity.hkSampleID
     context.delete(entity)
     save("CK mood delete")
+    SeptenaServices.shared.ckEngine.noteMoodEventDeletion(id: id)
     postChanged()
+    if let hkID {
+      Task {
+        await HealthKitBridge.shared.deleteMoodSample(uuid: hkID)
+      }
+    }
   }
 
   private func fetch(id: String) -> MoodEventEntity? {

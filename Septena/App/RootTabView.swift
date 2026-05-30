@@ -82,17 +82,14 @@ struct RootTabView: View {
         if !open { nav.addInfoRequestedSection = nil }
       }
       // Home Screen Quick Action routing. Mounted at the tab-root so it
-      // fires regardless of which tab the user was last on (ContentView,
-      // the previous host, only ran while the Tasks tab was visible).
-      // Switching to Week here mounts WeekDashboardView, which observes
-      // `pendingSectionDest` and presents the section's sheet.
+      // fires regardless of which tab is selected — ContentView (the
+      // previous host) is only mounted while the Tasks tab is visible.
+      // We deliberately do NOT switch tabs; the sheet attached below
+      // covers the current tab and dismissing returns the user there.
       .onChange(of: nav.pendingShortcut) { _, action in
         guard let action else { return }
         switch action {
         case .openSection(let key):
-          // Present the section sheet directly at the tab root. We
-          // deliberately do NOT switch tabs — the sheet covers whatever
-          // the user was last on, and dismissing returns them there.
           nav.pendingSection = PendingSection(key: key)
         }
         nav.pendingShortcut = nil

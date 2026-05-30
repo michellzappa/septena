@@ -283,7 +283,6 @@ enum SectionRegistry {
     GroceriesPlugin.self,
     SleepPlugin.self,
     BodyPlugin.self,
-    AirPlugin.self,
     ActivityPlugin.self,
     MoodPlugin.self,
     CaffeinePlugin.self,

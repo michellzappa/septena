@@ -14,16 +14,11 @@ struct SeptenaApp: App {
     Self.registerFraunces()
   }
 
-  /// Register the bundled Fraunces variable font with Core Text. iOS picks
-  /// it up via `UIAppFonts` in Info.plist; macOS needs the runtime call
-  /// because `ATSApplicationFontsPath` doesn't reliably take effect.
   private static func registerFraunces() {
-    #if os(macOS)
     guard let url = Bundle.main.url(forResource: "Fraunces-Regular", withExtension: "ttf") else { return }
     var errorRef: Unmanaged<CFError>?
     _ = CTFontManagerRegisterFontsForURL(url as CFURL, .process, &errorRef)
     errorRef?.release()
-    #endif
   }
 
   @State private var navigation = NavigationState()
@@ -47,9 +42,6 @@ struct SeptenaApp: App {
   private var checklistMutator: ChecklistMutator { services.checklistMutator }
   private var areasMutator: AreasMutator { services.areasMutator }
   private var projectsMutator: ProjectsMutator { services.projectsMutator }
-  private var aranetBridge: AranetBridge { services.aranetBridge }
-  private var airStore: AirStore { services.airStore }
-  private var pollenClient: PollenClient { services.pollenClient }
   /// Drives drainer kicks on foreground / coming-back-online transitions.
   @Environment(\.scenePhase) private var scenePhase
   #if os(iOS)
@@ -73,9 +65,6 @@ struct SeptenaApp: App {
         .environment(projectsMutator)
         .environment(dayClock)
         .environment(ckEngine)
-        .environment(aranetBridge)
-        .environment(airStore)
-        .environment(pollenClient)
         .modelContainer(localStore.container)
         .onChange(of: scenePhase) { _, phase in
           // Foreground transitions are the best moment to flush any
@@ -142,6 +131,9 @@ struct SeptenaApp: App {
           // Run after RoutineSlugRepair so any stubs it created that
           // collide with library/manual entries get collapsed.
           DuplicateExerciseMerge.runIfNeeded(context: localStore.container.mainContext)
+          // Derive `occurredAt` for legacy event rows (and first-sync Mood)
+          // after the engine has fetched, so pushes carry the real timestamp.
+          OccurredAtBackfill.runIfNeeded(context: localStore.container.mainContext)
           await runRemindersAutoImport()
         }
         .onReceive(NotificationCenter.default

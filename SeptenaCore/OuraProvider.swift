@@ -131,9 +131,8 @@ final class OuraNightEntity {
 
 // MARK: - Store
 
-/// SwiftData-backed read/write surface for `OuraNightEntity`. Same shape
-/// as AirStore — late-binds to CKEngine in SeptenaServices.start() so
-/// every upsert also fans out to CloudKit.
+/// SwiftData-backed read/write surface for `OuraNightEntity`. Late-binds
+/// to CKEngine in SeptenaServices.start() so every upsert fans out to CloudKit.
 @MainActor
 @Observable
 final class OuraStore {

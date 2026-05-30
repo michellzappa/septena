@@ -35,10 +35,6 @@
 	<string>Septena imports tasks from your Reminders lists into the Inbox.</string>
 	<key>NSRemindersUsageDescription</key>
 	<string>Septena imports tasks from your Reminders lists into the Inbox.</string>
-	<key>UIAppFonts</key>
-	<array>
-		<string>Fraunces-Regular.ttf</string>
-	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -48,7 +44,6 @@
 	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
-		<string>bluetooth-central</string>
 		<string>remote-notification</string>
 	</array>
 	<key>UILaunchScreen</key>
@@ -56,10 +51,15 @@
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UISupportedInterfaceOrientations~iphone</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 </dict>
 </plist>

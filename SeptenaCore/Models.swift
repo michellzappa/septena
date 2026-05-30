@@ -957,77 +957,6 @@ enum NutritionPrefs {
   }
 }
 
-// MARK: - Air
-
-struct AirReading: Codable, Identifiable, Hashable {
-  let date: String
-  let time: String
-  var id_: String?
-  var co2Ppm: Double?
-  var tempC: Double?
-  var humidityPct: Double?
-
-  var id: String { id_ ?? "\(date) \(time)" }
-
-  enum CodingKeys: String, CodingKey {
-    case date, time
-    case id_ = "id"
-    case co2Ppm      = "co2_ppm"
-    case tempC       = "temp_c"
-    case humidityPct = "humidity_pct"
-  }
-}
-
-struct AirDayStats: Codable, Hashable {
-  let readings: Int
-  var co2Avg: Double?
-  var co2Max: Double?
-  var tempAvg: Double?
-  var humidityAvg: Double?
-  var minutesOver1000: Int
-
-  enum CodingKeys: String, CodingKey {
-    case readings
-    case co2Avg          = "co2_avg"
-    case co2Max          = "co2_max"
-    case tempAvg         = "temp_avg"
-    case humidityAvg     = "humidity_avg"
-    case minutesOver1000 = "minutes_over_1000"
-  }
-}
-
-struct AirSummary: Codable, Hashable {
-  let latest: AirReading?
-  let co2Band: String?     // "good" | "ok" | "poor" | "bad"
-  let today: AirDayStats
-  let last24h: AirDayStats
-
-  enum CodingKeys: String, CodingKey {
-    case latest, today
-    case co2Band = "co2_band"
-    case last24h = "last_24h"
-  }
-}
-
-struct AirHistoryPoint: Codable, Hashable {
-  let date: String
-  let readings: Int
-  var co2Avg: Double?
-  var co2Max: Double?
-  var minutesOver1000: Int
-
-  enum CodingKeys: String, CodingKey {
-    case date, readings
-    case co2Avg          = "co2_avg"
-    case co2Max          = "co2_max"
-    case minutesOver1000 = "minutes_over_1000"
-  }
-}
-
-struct AirHistoryResponse: Codable {
-  let daily: [AirHistoryPoint]
-}
-
 // MARK: - Groceries
 
 struct GroceryItem: Codable, Identifiable, Hashable {
@@ -1465,10 +1394,28 @@ struct AppSettings: Codable {
   var theme: String?        // "system" | "light" | "dark"
   var eink: Bool?
   var nutrition: NutritionSettings?
+  var hkSync: HKSyncSettings?
 
   enum CodingKeys: String, CodingKey {
     case sectionOrder = "section_order"
     case targets, units, time, theme, eink, nutrition
+    case hkSync = "hk_sync"
+  }
+}
+
+/// Per-section HealthKit write toggles. All default to `true` so existing
+/// users get full sync on upgrade without extra friction; they can opt out
+/// per-type in Settings → Integrations → Apple Health.
+struct HKSyncSettings: Codable {
+  var mood: Bool
+  var caffeine: Bool
+  var nutrition: Bool
+  var training: Bool
+
+  init(mood: Bool = true, caffeine: Bool = true,
+       nutrition: Bool = true, training: Bool = true) {
+    self.mood = mood; self.caffeine = caffeine
+    self.nutrition = nutrition; self.training = training
   }
 }
 

@@ -30,7 +30,6 @@ enum HomepageDomain: String, CaseIterable, Hashable, Identifiable {
   case supplements
   case sleep
   case nutrition
-  case air
   case groceries
   case caffeine
   case cannabis
@@ -60,7 +59,6 @@ enum HomepageDomain: String, CaseIterable, Hashable, Identifiable {
     .supplements,
     .sleep,
     .nutrition,
-    .air,
     .groceries,
     .caffeine,
     .cannabis,

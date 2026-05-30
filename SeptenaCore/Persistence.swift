@@ -324,6 +324,9 @@ final class HabitDefinitionEntity {
 @Model
 final class HabitDayStateEntity {
   @Attribute(.unique) var id: String
+  /// Canonical UTC instant of the event. `.distantPast` is the lightweight-
+  /// migration default for existing rows; `OccurredAtBackfill` fills it at launch.
+  var occurredAt: Date = Date.distantPast
   var date: String
   var habitID: String
   var done: Bool
@@ -383,6 +386,9 @@ final class SupplementDefinitionEntity {
 @Model
 final class SupplementDayStateEntity {
   @Attribute(.unique) var id: String
+  /// Canonical UTC instant of the event. `.distantPast` is the lightweight-
+  /// migration default for existing rows; `OccurredAtBackfill` fills it at launch.
+  var occurredAt: Date = Date.distantPast
   var date: String
   var supplementID: String
   var done: Bool
@@ -531,6 +537,9 @@ final class ChoreDefinitionEntity {
 @Model
 final class ChoreEventEntity {
   @Attribute(.unique) var id: String
+  /// Canonical UTC instant of the event. `.distantPast` is the lightweight-
+  /// migration default for existing rows; `OccurredAtBackfill` fills it at launch.
+  var occurredAt: Date = Date.distantPast
   var choreID: String
   var action: String
   var date: String
@@ -570,6 +579,9 @@ final class ChoreEventEntity {
 @Model
 final class GutEventEntity {
   @Attribute(.unique) var id: String
+  /// Canonical UTC instant of the event. `.distantPast` is the lightweight-
+  /// migration default for existing rows; `OccurredAtBackfill` fills it at launch.
+  var occurredAt: Date = Date.distantPast
   var date: String
   var time: String
   var bristol: Int
@@ -612,6 +624,9 @@ final class GutEventEntity {
 @Model
 final class MoodEventEntity {
   @Attribute(.unique) var id: String
+  /// Canonical UTC instant of the event. `.distantPast` is the lightweight-
+  /// migration default for existing rows; `OccurredAtBackfill` fills it at launch.
+  var occurredAt: Date = Date.distantPast
   /// `YYYY-MM-DD` of the logged moment, in local time. Indexed for fast
   /// day-scoped queries — mirrors CaffeineEventEntity.
   var date: String
@@ -633,6 +648,11 @@ final class MoodEventEntity {
   var note: String?
   var updatedAt: Date
   var cloudKitSystemFields: Data?
+  /// UUID string of the HKStateOfMind sample written to HealthKit when this
+  /// entry was logged. Nil for entries created before this field existed or
+  /// when HK is unavailable. Used to delete / replace the sample on
+  /// updateEntry / deleteEntry so Health.app doesn't accumulate orphans.
+  var hkSampleID: String?
 
   init(id: String,
        date: String,
@@ -662,6 +682,9 @@ final class MoodEventEntity {
 @Model
 final class CaffeineEventEntity {
   @Attribute(.unique) var id: String
+  /// Canonical UTC instant of the event. `.distantPast` is the lightweight-
+  /// migration default for existing rows; `OccurredAtBackfill` fills it at launch.
+  var occurredAt: Date = Date.distantPast
   var date: String
   var time: String
   var method: String   // "v60" | "matcha" | "other"
@@ -716,6 +739,9 @@ final class CaffeineBeanEntity {
 @Model
 final class CannabisEventEntity {
   @Attribute(.unique) var id: String
+  /// Canonical UTC instant of the event. `.distantPast` is the lightweight-
+  /// migration default for existing rows; `OccurredAtBackfill` fills it at launch.
+  var occurredAt: Date = Date.distantPast
   var date: String
   var time: String
   var method: String   // "vape" | "edible"
@@ -830,6 +856,9 @@ final class CannabisStrainEntity {
 @Model
 final class ExerciseEntryEntity {
   @Attribute(.unique) var id: String
+  /// Canonical UTC instant of the event. `.distantPast` is the lightweight-
+  /// migration default for existing rows; `OccurredAtBackfill` fills it at launch.
+  var occurredAt: Date = Date.distantPast
   var date: String           // YYYY-MM-DD
   var time: String           // HH:MM session start
   var sessionType: String    // upper|lower|cardio|yoga|...
@@ -1231,6 +1260,7 @@ enum HabitEventCloudKitSchema {
     static let skipped = "skipped"
     static let note = "note"
     static let time = "time"
+    static let occurredAt = "occurredAt"
   }
 
   static func recordName(for id: String) -> String { "habit-event:\(id)" }
@@ -1263,6 +1293,7 @@ enum SupplementEventCloudKitSchema {
     static let done = "done"
     static let note = "note"
     static let time = "time"
+    static let occurredAt = "occurredAt"
   }
 
   static func recordName(for id: String) -> String { "supplement-event:\(id)" }
@@ -1299,6 +1330,7 @@ enum ChoreEventCloudKitSchema {
     static let note = "note"
     static let time = "time"
     static let sortKey = "sortKey"
+    static let occurredAt = "occurredAt"
   }
 
   static func recordName(for id: String) -> String { "chore-event:\(id)" }
@@ -1320,6 +1352,7 @@ enum GutEventCloudKitSchema {
     static let discomfortStart = "discomfortStart"
     static let discomfortEnd = "discomfortEnd"
     static let note = "note"
+    static let occurredAt = "occurredAt"
   }
 
   static func recordName(for id: String) -> String { "gut-event:\(id)" }
@@ -1328,26 +1361,24 @@ enum GutEventCloudKitSchema {
   }
 }
 
-enum AirReadingCloudKitSchema {
-  /// CKRecord type. Must match what's published in the CloudKit
-  /// dashboard schema; if you change this string, push a new schema
-  /// version too or fetches will silently return zero rows.
-  static let recordType = "AirReading"
+enum MoodEventCloudKitSchema {
+  static let recordType = "MoodEvent"
 
   enum Field {
-    static let date        = "date"        // String "yyyy-MM-dd"
-    static let time        = "time"        // String "HH:mm:ss"
-    static let capturedAt  = "capturedAt"  // Date — authoritative timestamp
-    static let co2Ppm      = "co2Ppm"      // Int64?
-    static let tempC       = "tempC"       // Double?
-    static let humidityPct = "humidityPct" // Int64?
-    static let pressureHPa = "pressureHPa" // Double?
-    static let batteryPct  = "batteryPct"  // Int64?
+    static let date = "date"
+    static let time = "time"
+    static let bucket = "bucket"
+    static let quadrant = "quadrant"
+    static let arousal = "arousal"
+    static let valence = "valence"
+    static let emotion = "emotion"
+    static let note = "note"
+    static let occurredAt = "occurredAt"
   }
 
-  static func recordName(for id: String) -> String { "air-reading:\(id)" }
+  static func recordName(for id: String) -> String { "mood-event:\(id)" }
   static func entityID(from recordName: String) -> String {
-    String(recordName.dropFirst("air-reading:".count))
+    String(recordName.dropFirst("mood-event:".count))
   }
 }
 
@@ -1413,6 +1444,7 @@ enum CaffeineEventCloudKitSchema {
     static let beans = "beans"
     static let grams = "grams"
     static let note = "note"
+    static let occurredAt = "occurredAt"
   }
 
   static func recordName(for id: String) -> String { "caffeine-event:\(id)" }
@@ -1447,6 +1479,7 @@ enum CannabisEventCloudKitSchema {
     static let grams = "grams"
     static let effect = "effect"
     static let note = "note"
+    static let occurredAt = "occurredAt"
   }
 
   static func recordName(for id: String) -> String { "cannabis-event:\(id)" }
@@ -1519,6 +1552,7 @@ enum ExerciseEntryCloudKitSchema {
     static let note = "note"
     static let concludedAt = "concludedAt"
     static let loggedAt = "loggedAt"
+    static let occurredAt = "occurredAt"
   }
 
   static func recordName(for id: String) -> String { "exercise-entry:\(id)" }
@@ -1692,6 +1726,7 @@ extension HabitDayStateEntity: ChecklistCloudKitBackedEntity {
     record[HabitEventCloudKitSchema.Field.skipped] = skipped ? 1 : 0
     record[HabitEventCloudKitSchema.Field.note] = note
     record[HabitEventCloudKitSchema.Field.time] = time
+    record[HabitEventCloudKitSchema.Field.occurredAt] = occurredAt as NSDate
     return record
   }
 
@@ -1702,6 +1737,7 @@ extension HabitDayStateEntity: ChecklistCloudKitBackedEntity {
     if let value = record[HabitEventCloudKitSchema.Field.skipped] as? Int { skipped = value != 0 }
     note = optionalChecklistString(record[HabitEventCloudKitSchema.Field.note])
     time = optionalChecklistString(record[HabitEventCloudKitSchema.Field.time])
+    if let v = record[HabitEventCloudKitSchema.Field.occurredAt] as? Date { occurredAt = v }
     updatedAt = .now
     captureCloudKitSystemFields(from: record)
   }
@@ -1756,6 +1792,7 @@ extension SupplementDayStateEntity: ChecklistCloudKitBackedEntity {
     record[SupplementEventCloudKitSchema.Field.done] = done ? 1 : 0
     record[SupplementEventCloudKitSchema.Field.note] = note
     record[SupplementEventCloudKitSchema.Field.time] = time
+    record[SupplementEventCloudKitSchema.Field.occurredAt] = occurredAt as NSDate
     return record
   }
 
@@ -1765,6 +1802,7 @@ extension SupplementDayStateEntity: ChecklistCloudKitBackedEntity {
     if let value = record[SupplementEventCloudKitSchema.Field.done] as? Int { done = value != 0 }
     note = optionalChecklistString(record[SupplementEventCloudKitSchema.Field.note])
     time = optionalChecklistString(record[SupplementEventCloudKitSchema.Field.time])
+    if let v = record[SupplementEventCloudKitSchema.Field.occurredAt] as? Date { occurredAt = v }
     updatedAt = .now
     captureCloudKitSystemFields(from: record)
   }
@@ -1824,6 +1862,7 @@ extension ChoreEventEntity: ChecklistCloudKitBackedEntity {
     record[ChoreEventCloudKitSchema.Field.note] = note
     record[ChoreEventCloudKitSchema.Field.time] = time
     record[ChoreEventCloudKitSchema.Field.sortKey] = sortKey
+    record[ChoreEventCloudKitSchema.Field.occurredAt] = occurredAt as NSDate
     return record
   }
 
@@ -1836,6 +1875,7 @@ extension ChoreEventEntity: ChecklistCloudKitBackedEntity {
     note = optionalChecklistString(record[ChoreEventCloudKitSchema.Field.note])
     time = optionalChecklistString(record[ChoreEventCloudKitSchema.Field.time])
     if let value = record[ChoreEventCloudKitSchema.Field.sortKey] as? String { sortKey = value }
+    if let v = record[ChoreEventCloudKitSchema.Field.occurredAt] as? Date { occurredAt = v }
     updatedAt = .now
     captureCloudKitSystemFields(from: record)
   }
@@ -1866,6 +1906,7 @@ extension GutEventEntity: ChecklistCloudKitBackedEntity {
     record[GutEventCloudKitSchema.Field.discomfortStart] = discomfortStart
     record[GutEventCloudKitSchema.Field.discomfortEnd] = discomfortEnd
     record[GutEventCloudKitSchema.Field.note] = note
+    record[GutEventCloudKitSchema.Field.occurredAt] = occurredAt as NSDate
     return record
   }
 
@@ -1879,6 +1920,7 @@ extension GutEventEntity: ChecklistCloudKitBackedEntity {
     discomfortStart = optionalChecklistString(record[GutEventCloudKitSchema.Field.discomfortStart])
     discomfortEnd = optionalChecklistString(record[GutEventCloudKitSchema.Field.discomfortEnd])
     note = optionalChecklistString(record[GutEventCloudKitSchema.Field.note])
+    if let v = record[GutEventCloudKitSchema.Field.occurredAt] as? Date { occurredAt = v }
     updatedAt = .now
     captureCloudKitSystemFields(from: record)
   }
@@ -1890,43 +1932,43 @@ extension GutEventEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension AirReadingEntity: ChecklistCloudKitBackedEntity {
+extension MoodEventEntity: ChecklistCloudKitBackedEntity {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
-      recordType: AirReadingCloudKitSchema.recordType,
-      recordID: CKRecord.ID(recordName: AirReadingCloudKitSchema.recordName(for: id),
+      recordType: MoodEventCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: MoodEventCloudKitSchema.recordName(for: id),
                             zoneID: SeptenaCloudKit.zoneID)
     )
-    record[AirReadingCloudKitSchema.Field.date]        = date
-    record[AirReadingCloudKitSchema.Field.time]        = time
-    record[AirReadingCloudKitSchema.Field.capturedAt]  = capturedAt
-    record[AirReadingCloudKitSchema.Field.co2Ppm]      = co2Ppm.map { Int64($0) }
-    record[AirReadingCloudKitSchema.Field.tempC]       = tempC
-    record[AirReadingCloudKitSchema.Field.humidityPct] = humidityPct.map { Int64($0) }
-    record[AirReadingCloudKitSchema.Field.pressureHPa] = pressureHPa
-    record[AirReadingCloudKitSchema.Field.batteryPct]  = batteryPct.map { Int64($0) }
+    record[MoodEventCloudKitSchema.Field.date] = date
+    record[MoodEventCloudKitSchema.Field.time] = time
+    record[MoodEventCloudKitSchema.Field.bucket] = bucket
+    record[MoodEventCloudKitSchema.Field.quadrant] = quadrant
+    record[MoodEventCloudKitSchema.Field.arousal] = arousal
+    record[MoodEventCloudKitSchema.Field.valence] = valence
+    record[MoodEventCloudKitSchema.Field.emotion] = emotion
+    record[MoodEventCloudKitSchema.Field.note] = note
+    record[MoodEventCloudKitSchema.Field.occurredAt] = occurredAt as NSDate
     return record
   }
 
   func apply(_ record: CKRecord) {
-    if let value = record[AirReadingCloudKitSchema.Field.date] as? String { date = value }
-    if let value = record[AirReadingCloudKitSchema.Field.time] as? String { time = value }
-    if let value = record[AirReadingCloudKitSchema.Field.capturedAt] as? Date { capturedAt = value }
-    // CloudKit normalizes integers to Int64; SwiftData stores them as
-    // Int. Cast through Int64 first so a value of 0 doesn't get
-    // mis-decoded as nil under bridging.
-    co2Ppm      = (record[AirReadingCloudKitSchema.Field.co2Ppm]      as? Int64).map(Int.init)
-    tempC       =  record[AirReadingCloudKitSchema.Field.tempC]       as? Double
-    humidityPct = (record[AirReadingCloudKitSchema.Field.humidityPct] as? Int64).map(Int.init)
-    pressureHPa =  record[AirReadingCloudKitSchema.Field.pressureHPa] as? Double
-    batteryPct  = (record[AirReadingCloudKitSchema.Field.batteryPct]  as? Int64).map(Int.init)
+    if let value = record[MoodEventCloudKitSchema.Field.date] as? String { date = value }
+    if let value = record[MoodEventCloudKitSchema.Field.time] as? String { time = value }
+    if let value = record[MoodEventCloudKitSchema.Field.bucket] as? String { bucket = value }
+    if let value = record[MoodEventCloudKitSchema.Field.quadrant] as? String { quadrant = value }
+    if let value = record[MoodEventCloudKitSchema.Field.arousal] as? Int { arousal = value }
+    if let value = record[MoodEventCloudKitSchema.Field.valence] as? Int { valence = value }
+    if let value = record[MoodEventCloudKitSchema.Field.emotion] as? String { emotion = value }
+    note = optionalChecklistString(record[MoodEventCloudKitSchema.Field.note])
+    if let v = record[MoodEventCloudKitSchema.Field.occurredAt] as? Date { occurredAt = v }
     updatedAt = .now
     captureCloudKitSystemFields(from: record)
   }
 
   convenience init(cloudKit record: CKRecord) {
-    self.init(id: AirReadingCloudKitSchema.entityID(from: record.recordID.recordName),
-              date: "", time: "", capturedAt: .now)
+    self.init(id: MoodEventCloudKitSchema.entityID(from: record.recordID.recordName),
+              date: "", time: "", bucket: "morning",
+              quadrant: "lap", arousal: 2, valence: 2, emotion: "")
     apply(record)
   }
 }
@@ -2030,6 +2072,7 @@ extension CaffeineEventEntity: ChecklistCloudKitBackedEntity {
     record[CaffeineEventCloudKitSchema.Field.beans] = beans
     record[CaffeineEventCloudKitSchema.Field.grams] = grams
     record[CaffeineEventCloudKitSchema.Field.note] = note
+    record[CaffeineEventCloudKitSchema.Field.occurredAt] = occurredAt as NSDate
     return record
   }
 
@@ -2040,6 +2083,7 @@ extension CaffeineEventEntity: ChecklistCloudKitBackedEntity {
     beans = optionalChecklistString(record[CaffeineEventCloudKitSchema.Field.beans])
     grams = record[CaffeineEventCloudKitSchema.Field.grams] as? Double
     note = optionalChecklistString(record[CaffeineEventCloudKitSchema.Field.note])
+    if let v = record[CaffeineEventCloudKitSchema.Field.occurredAt] as? Date { occurredAt = v }
     updatedAt = .now
     captureCloudKitSystemFields(from: record)
   }
@@ -2091,6 +2135,7 @@ extension CannabisEventEntity: ChecklistCloudKitBackedEntity {
     record[CannabisEventCloudKitSchema.Field.grams] = grams
     record[CannabisEventCloudKitSchema.Field.effect] = effect
     record[CannabisEventCloudKitSchema.Field.note] = note
+    record[CannabisEventCloudKitSchema.Field.occurredAt] = occurredAt as NSDate
     return record
   }
 
@@ -2103,6 +2148,7 @@ extension CannabisEventEntity: ChecklistCloudKitBackedEntity {
     grams = record[CannabisEventCloudKitSchema.Field.grams] as? Double
     effect = optionalChecklistString(record[CannabisEventCloudKitSchema.Field.effect])
     note = optionalChecklistString(record[CannabisEventCloudKitSchema.Field.note])
+    if let v = record[CannabisEventCloudKitSchema.Field.occurredAt] as? Date { occurredAt = v }
     updatedAt = .now
     captureCloudKitSystemFields(from: record)
   }
@@ -2219,6 +2265,7 @@ extension ExerciseEntryEntity: ChecklistCloudKitBackedEntity {
     record[ExerciseEntryCloudKitSchema.Field.note] = note
     record[ExerciseEntryCloudKitSchema.Field.concludedAt] = concludedAt
     record[ExerciseEntryCloudKitSchema.Field.loggedAt] = loggedAt
+    record[ExerciseEntryCloudKitSchema.Field.occurredAt] = occurredAt as NSDate
     return record
   }
 
@@ -2237,6 +2284,7 @@ extension ExerciseEntryEntity: ChecklistCloudKitBackedEntity {
     note = optionalChecklistString(record[ExerciseEntryCloudKitSchema.Field.note])
     concludedAt = optionalChecklistString(record[ExerciseEntryCloudKitSchema.Field.concludedAt])
     loggedAt = optionalChecklistString(record[ExerciseEntryCloudKitSchema.Field.loggedAt])
+    if let v = record[ExerciseEntryCloudKitSchema.Field.occurredAt] as? Date { occurredAt = v }
     updatedAt = .now
     captureCloudKitSystemFields(from: record)
   }
@@ -2461,7 +2509,6 @@ final class LocalStore {
                          ExerciseEntryEntity.self, ExerciseDefinitionEntity.self,
                          SessionTypeEntity.self,
                          NutritionEntryEntity.self, NutritionDailySummaryEntity.self,
-                         AirReadingEntity.self,
                          OuraNightEntity.self,
                          WithingsRowEntity.self,
                          OutboxEntity.self])
@@ -2687,6 +2734,75 @@ enum LocalCache {
     let descriptor = FetchDescriptor<ProjectEntity>(sortBy: [SortDescriptor(\.title)])
     let rows = (try? context.fetch(descriptor)) ?? []
     return rows.map(Project.init)
+  }
+}
+
+// MARK: - LoggedEvent (cross-section read abstraction)
+
+/// Uniform read view over every logged "event" entity, keyed on the real
+/// `occurredAt` instant. Lets analysis, timelines, and the gateway iterate all
+/// sections without per-type code. Read-only projection — it does not change
+/// how rows are stored or written.
+protocol LoggedEvent {
+  var id: String { get }
+  var occurredAt: Date { get }
+  var sectionKey: String { get }
+}
+
+extension CaffeineEventEntity: LoggedEvent { var sectionKey: String { "caffeine" } }
+extension CannabisEventEntity: LoggedEvent { var sectionKey: String { "cannabis" } }
+extension GutEventEntity: LoggedEvent { var sectionKey: String { "gut" } }
+extension MoodEventEntity: LoggedEvent { var sectionKey: String { "mood" } }
+extension ChoreEventEntity: LoggedEvent { var sectionKey: String { "chores" } }
+extension HabitDayStateEntity: LoggedEvent { var sectionKey: String { "habits" } }
+extension SupplementDayStateEntity: LoggedEvent { var sectionKey: String { "supplements" } }
+extension ExerciseEntryEntity: LoggedEvent { var sectionKey: String { "training" } }
+
+/// Cross-section event queries powered by `occurredAt` — the payoff of the
+/// occurredAt migration: elapsed-time and unified-timeline questions the
+/// per-section `date`/`time` strings couldn't answer. Fetches the full event
+/// set and merges in memory; fine for personal-scale data (low thousands of
+/// rows). Narrow via `sectionKey` for hot paths if it ever matters.
+@MainActor
+enum LoggedEvents {
+  private static func all(in context: ModelContext) -> [any LoggedEvent] {
+    var out: [any LoggedEvent] = []
+    func add<E: PersistentModel & LoggedEvent>(_ type: E.Type) {
+      let rows = (try? context.fetch(FetchDescriptor<E>())) ?? []
+      out.append(contentsOf: rows.map { $0 as any LoggedEvent })
+    }
+    add(CaffeineEventEntity.self)
+    add(CannabisEventEntity.self)
+    add(GutEventEntity.self)
+    add(MoodEventEntity.self)
+    add(ChoreEventEntity.self)
+    add(HabitDayStateEntity.self)
+    add(SupplementDayStateEntity.self)
+    add(ExerciseEntryEntity.self)
+    return out
+  }
+
+  /// Every logged event, newest first, capped at `limit`.
+  static func recent(limit: Int = 50, in context: ModelContext) -> [any LoggedEvent] {
+    Array(all(in: context).sorted { $0.occurredAt > $1.occurredAt }.prefix(limit))
+  }
+
+  /// Events at or after `date`, newest first; optionally scoped to one section.
+  static func since(_ date: Date, sectionKey: String? = nil, in context: ModelContext) -> [any LoggedEvent] {
+    all(in: context)
+      .filter { $0.occurredAt >= date && (sectionKey == nil || $0.sectionKey == sectionKey) }
+      .sorted { $0.occurredAt > $1.occurredAt }
+  }
+
+  /// The most recent event in a section (e.g. last coffee), or nil.
+  static func mostRecent(sectionKey: String, in context: ModelContext) -> (any LoggedEvent)? {
+    all(in: context).filter { $0.sectionKey == sectionKey }.max { $0.occurredAt < $1.occurredAt }
+  }
+
+  /// Seconds since the last event in a section — the "how long since my last
+  /// coffee" primitive. nil if nothing is logged in that section.
+  static func timeSinceLast(sectionKey: String, in context: ModelContext, now: Date = Date()) -> TimeInterval? {
+    mostRecent(sectionKey: sectionKey, in: context).map { now.timeIntervalSince($0.occurredAt) }
   }
 }
 

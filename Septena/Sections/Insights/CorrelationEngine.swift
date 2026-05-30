@@ -471,33 +471,6 @@ struct CorrelationEngine {
       }
     }
 
-    // --- Air (CO2 avg / peak + bedroom temp)
-    if let readings = try? context.fetch(FetchDescriptor<AirReadingEntity>(
-      predicate: #Predicate { $0.date >= cutoffStr }
-    )) {
-      var byDay: [String: (co2Sum: Double, co2Count: Int, co2Peak: Double, tempSum: Double, tempCount: Int)] = [:]
-      for r in readings {
-        var agg = byDay[r.date] ?? (0, 0, 0, 0, 0)
-        if let co2 = r.co2Ppm {
-          agg.co2Sum += Double(co2); agg.co2Count += 1
-          agg.co2Peak = max(agg.co2Peak, Double(co2))
-        }
-        if let t = r.tempC { agg.tempSum += t; agg.tempCount += 1 }
-        byDay[r.date] = agg
-      }
-      for (date, agg) in byDay {
-        var f = bag[date] ?? DayFeatures()
-        if agg.co2Count > 0 {
-          f.values["co2_avg"]  = agg.co2Sum / Double(agg.co2Count)
-          f.values["co2_peak"] = agg.co2Peak
-        }
-        if agg.tempCount > 0 {
-          f.values["bedroom_temp"] = agg.tempSum / Double(agg.tempCount)
-        }
-        bag[date] = f
-      }
-    }
-
     // --- Gut (avg Bristol per day + movements count)
     if let events = try? context.fetch(FetchDescriptor<GutEventEntity>(
       predicate: #Predicate { $0.date >= cutoffStr }
@@ -550,9 +523,6 @@ struct CorrelationEngine {
     let caffLastH   = FeatureSpec(key: "last_caffeine_hour",label: "Last caffeine hour",section: "caffeine",  unit: "h",   binary: false)
     let cannSess    = FeatureSpec(key: "cannabis_sessions", label: "Cannabis sessions", section: "cannabis",  unit: "",    binary: false)
     let habitPct    = FeatureSpec(key: "habit_completion",  label: "Habit completion",  section: "habits",    unit: "%",   binary: false)
-    let co2Avg      = FeatureSpec(key: "co2_avg",           label: "Overnight CO₂",     section: "air",       unit: "ppm", binary: false)
-    let co2Peak     = FeatureSpec(key: "co2_peak",          label: "Overnight CO₂ peak",section: "air",       unit: "ppm", binary: false)
-    let bedTemp     = FeatureSpec(key: "bedroom_temp",      label: "Bedroom temp",      section: "air",       unit: "°C",  binary: false)
     let totalH      = FeatureSpec(key: "total_h",           label: "Sleep hours",       section: "sleep",     unit: "h",   binary: false)
     let sleepScore  = FeatureSpec(key: "sleep_score",       label: "Sleep score",       section: "sleep",     unit: "",    binary: false)
 
@@ -579,9 +549,6 @@ struct CorrelationEngine {
       P(fasting,     tReadiness,  0, .unknown),
       P(cardioMin,   tRHR,        0, .negative),
       P(lastMealH,   tSleepScore, 0, .negative),
-      P(co2Avg,      tSleepScore, 0, .negative),
-      P(co2Peak,     tHRV,        0, .negative),
-      P(bedTemp,     tSleepScore, 0, .unknown),
       P(habitPct,    tReadiness,  0, .positive),
       P(trainingVol, tSleepScore, 0, .positive, "Strength volume → Sleep score"),
       P(cardioMin,   tSleepScore, 0, .positive),

@@ -105,7 +105,7 @@ enum NutritionPrefsWriter {
                             engine: CKEngine?) {
     var settings = SettingsMirror.loadSettings(context: context)
       ?? AppSettings(sectionOrder: nil, targets: nil, units: nil,
-                     time: nil, theme: nil, eink: nil, nutrition: nil)
+                     time: nil, theme: nil, eink: nil, nutrition: nil, hkSync: nil)
     var nut = settings.nutrition
       ?? NutritionSettings(macroColors: nil, macroTiles: nil)
     nut.macroTiles = prefs

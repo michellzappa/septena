@@ -11,7 +11,7 @@ import EventKit
 
 enum WeekDestination: String, Hashable, Identifiable {
   case habits, chores, training, supplements, sleep, nutrition
-  case air, groceries, caffeine, cannabis, body, gut
+  case groceries, caffeine, cannabis, body, gut
   case mood
   case activity
   case today
@@ -34,7 +34,6 @@ enum NutritionSheet: Hashable, Identifiable {
 }
 
 struct WeekDashboardView: View {
-  @Environment(AirStore.self) private var airStore
   @Environment(\.modelContext) private var modelContext
   @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(TaskMutator.self) private var taskMutator
@@ -94,8 +93,6 @@ struct WeekDashboardView: View {
   @State private var nutritionHistory: [NutritionEntry] = []
   /// Which Nutrition sub-sheet is currently presented from the menu.
   @State private var nutritionSheet: NutritionSheet? = nil
-  @State private var airSummary: AirSummary? = nil
-  @State private var airHistory: [AirHistoryPoint] = []
   @State private var groceries: [GroceryItem] = []
   @State private var caffeineToday: CaffeineDayResponse? = nil
   @State private var caffeineHistory: [CaffeineHistoryPoint] = []
@@ -146,8 +143,6 @@ struct WeekDashboardView: View {
       _todayProteinSum = State(initialValue: v.reduce(0) { $0 + $1.proteinG })
       _todayKcalSum    = State(initialValue: v.reduce(0) { $0 + $1.kcal })
     }
-    if let v = ResponseCache.load(AirSummary.self, forKey: CacheKey.airSummary) { _airSummary = State(initialValue: v) }
-    if let v = ResponseCache.load([AirHistoryPoint].self, forKey: CacheKey.airHistory) { _airHistory = State(initialValue: v) }
     if let v = ResponseCache.load([GroceryItem].self, forKey: CacheKey.groceries) { _groceries = State(initialValue: v) }
     if let v = ResponseCache.load(CaffeineDayResponse.self, forKey: CacheKey.caffeineToday) { _caffeineToday = State(initialValue: v) }
     if let v = ResponseCache.load([CaffeineHistoryPoint].self, forKey: CacheKey.caffeineHistory) { _caffeineHistory = State(initialValue: v) }
@@ -294,21 +289,15 @@ struct WeekDashboardView: View {
   @ViewBuilder
   private func sheetContent(for dest: WeekDestination) -> some View {
     NavigationStack {
-      // Plugin-driven destination first; the inline fallback now
-      // handles only special destinations that aren't manifest
-      // sections — today (the cross-section log) and the tasks
-      // drawer. Calendar is an integration, not a section — its data
-      // surfaces inline in Today/Next, no dedicated section view.
+      // Plugin-driven destination first (Tasks now resolves here too via
+      // `TasksPlugin.destinationView()` → the shared SectionDrawer). The
+      // inline fallback handles only `today` (the cross-section log), which
+      // isn't a manifest section. Calendar is an integration, not a section
+      // — its data surfaces inline in Today/Next, no dedicated section view.
       if let view = SectionRegistry.plugin(forKey: dest.rawValue)?.destinationView() {
         view
       } else {
         switch dest {
-        case .tasks:
-          // Today's open tasks + the inline `+` from TaskListView's
-          // toolbar. Tapping a row toggles complete; the rest of the
-          // task surface (Inbox, Upcoming, Areas, Projects) is one tap
-          // away on the Tasks tab.
-          TaskListView(filter: .today)
         case .today:
           TodayLogView(
             date: clock.today,
@@ -354,8 +343,6 @@ struct WeekDashboardView: View {
     static let nutritionStats     = "week.nutritionStats"
     static let nutritionTarget    = "week.nutritionTarget"
     static let todayNutrition     = "week.todayNutrition"
-    static let airSummary         = "week.airSummary"
-    static let airHistory         = "week.airHistory"
     static let groceries          = "week.groceries"
     static let caffeineToday      = "week.caffeineToday"
     static let caffeineHistory    = "week.caffeineHistory"
@@ -391,8 +378,6 @@ struct WeekDashboardView: View {
       todayProteinSum = v.reduce(0) { $0 + $1.proteinG }
       todayKcalSum    = v.reduce(0) { $0 + $1.kcal }
     }
-    if let v = ResponseCache.load(AirSummary.self, forKey: CacheKey.airSummary) { airSummary = v }
-    if let v = ResponseCache.load([AirHistoryPoint].self, forKey: CacheKey.airHistory) { airHistory = v }
     if let v = ResponseCache.load([GroceryItem].self, forKey: CacheKey.groceries) { groceries = v }
     if let v = ResponseCache.load(CaffeineDayResponse.self, forKey: CacheKey.caffeineToday) { caffeineToday = v }
     if let v = ResponseCache.load([CaffeineHistoryPoint].self, forKey: CacheKey.caffeineHistory) { caffeineHistory = v }
@@ -441,24 +426,11 @@ struct WeekDashboardView: View {
     let ns: NutritionStatsResponse? = ChecklistMirror.buildNutritionStatsResponse(context: modelContext, days: 90)
     let ne: [NutritionEntry]? = ChecklistMirror.loadNutritionToday(context: modelContext)
     let nt: MacrosConfig? = NutritionPrefs.loadMacrosConfig()
-    // Air aggregates are computed locally from AirReadingEntity (CloudKit-
-    // mirrored). The legacy /api/air endpoints are gone — historical data
-    // lives entirely in SwiftData via AirStore.
-    let asRes: AirSummary? = airStore.summary()
-    let ahRes: AirHistoryResponse? = airStore.history(days: 90)
     let gRes: [GroceryItem]? = ChecklistMirror.loadGroceryItems(context: modelContext)
     let (t, o) = await (tc, on)
     if let colors = appSettings?.nutrition?.macroColors {
       macroColors = colors
       ResponseCache.save(colors, forKey: CacheKey.macroColors)
-    }
-    if let asRes {
-      airSummary = asRes
-      ResponseCache.save(asRes, forKey: CacheKey.airSummary)
-    }
-    if let ah = ahRes?.daily {
-      airHistory = ah
-      ResponseCache.save(ah, forKey: CacheKey.airHistory)
     }
     if let g = gRes {
       groceries = g
@@ -910,7 +882,7 @@ struct WeekDashboardView: View {
     case .cannabis:    cannabisQuickAddMenu
     case .gut:         gutQuickAddMenu
     case .mood:        moodQuickAddMenu
-    case .sleep, .air, .body, .activity:
+    case .sleep, .body, .activity:
       EmptyView()
     }
   }
@@ -952,7 +924,6 @@ struct WeekDashboardView: View {
     case .supplements: supplementsTile
     case .sleep:       sleepTile
     case .nutrition:   nutritionTile
-    case .air:         airTile
     case .groceries:   groceriesTile
     case .caffeine:    caffeineTile
     case .cannabis:    cannabisTile
@@ -983,7 +954,6 @@ struct WeekDashboardView: View {
     case .supplements: return supplementsDomainData()
     case .sleep:       return sleepDomainData()
     case .nutrition:   return nutritionDomainData()
-    case .air:         return airDomainData()
     case .groceries:   return groceriesDomainData()
     case .caffeine:    return caffeineDomainData()
     case .cannabis:    return cannabisDomainData()
@@ -1233,30 +1203,6 @@ struct WeekDashboardView: View {
                       unit: "g"),
       history: history,
       tap: .openSheet(.nutrition)
-    )
-  }
-
-  private func airDomainData() -> HomepageDomainData {
-    let latest = airSummary?.latest?.co2Ppm.map { Int($0) }
-    let todayOver = airSummary?.today.minutesOver1000 ?? 0
-    let bars = airHistory.map { Int($0.co2Avg ?? 0) }
-    let budget = 60
-    return HomepageDomainData(
-      domain: .air,
-      title: "Air",
-      accent: theme.color(for: "air"),
-      headline: latest.map { "\($0) ppm · \(todayOver)/\(budget) min" }
-        ?? "—",
-      headlineStats: [
-        .init(label: "CO₂", value: latest.map { "\($0)" } ?? "—", unit: "ppm"),
-        .init(label: "Over 1000", value: "\(todayOver)", unit: "min"),
-      ],
-      progress: .init(label: "Over 1000 ppm",
-                      current: Double(min(todayOver, budget)),
-                      target: Double(budget),
-                      unit: "min"),
-      history: .bars(bars),
-      tap: .openSheet(.air)
     )
   }
 
@@ -1712,24 +1658,6 @@ struct WeekDashboardView: View {
         lastHoursText: formatHoursShort(lastH),
         lastHours: lastH,
         score: score,
-        bars: bars
-      )
-    }
-    .buttonStyle(.plain)
-  }
-
-  // Air — latest CO2 with band-derived accent; 7-day CO2 average bars.
-  private var airTile: some View {
-    let latest = airSummary?.latest?.co2Ppm.map { Int($0) }
-    let todayOver = airSummary?.today.minutesOver1000 ?? 0
-    let bars = Array(airHistory.map { Int($0.co2Avg ?? 0) }.suffix(7))
-    let budget = 60
-    return Button { sheetDest = .air } label: {
-      WeekAirTile(
-        accent: theme.color(for: "air"),
-        latestCO2: latest,
-        todayOver: todayOver,
-        budget: budget,
         bars: bars
       )
     }
@@ -2555,35 +2483,6 @@ private struct WeekSleepTile: View {
         label: "7-day score",
         values: bars.isEmpty ? Array(repeating: 0, count: 90) : bars,
         ceiling: 100
-      )
-    )
-  }
-}
-
-private struct WeekAirTile: View {
-  let accent: Color
-  let latestCO2: Int?
-  let todayOver: Int
-  let budget: Int
-  let bars: [Int]
-
-  var body: some View {
-    ModuleTile(
-      title: "Air",
-      accent: accent,
-      stats: [
-        .init(label: "CO2", value: latestCO2.map { "\($0)" } ?? "—", unit: "ppm"),
-        .init(label: "Over 1000", value: "\(todayOver)", unit: "m")
-      ],
-      progress: .init(
-        label: "Bad-air budget",
-        current: Double(min(todayOver, budget)),
-        target: Double(budget),
-        unit: "m"
-      ),
-      history: .init(
-        label: "7-day CO2 avg",
-        values: bars.isEmpty ? Array(repeating: 0, count: 90) : bars
       )
     )
   }

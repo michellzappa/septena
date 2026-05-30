@@ -281,8 +281,10 @@ final class SettingsStore {
     let context = LocalStore.shared.container.mainContext
     if let v = SettingsMirror.loadSettings(context: context) {
       serverSettings = v
+      HealthKitBridge.shared.syncSettings = v.hkSync ?? HKSyncSettings()
     } else if let v = ResponseCache.load(AppSettings.self, forKey: CacheKey.serverSettings) {
       serverSettings = v
+      HealthKitBridge.shared.syncSettings = v.hkSync ?? HKSyncSettings()
     }
     let mirroredSections = SettingsMirror.loadSections(context: context)
     if !mirroredSections.isEmpty {
@@ -301,7 +303,8 @@ final class SettingsStore {
                     context: ModelContext, engine: CKEngine?) {
     sections.move(fromOffsets: fromOffsets, toOffset: toOffset)
     var s = serverSettings ?? AppSettings(sectionOrder: nil, targets: nil, units: nil,
-                                          time: nil, theme: nil, eink: nil, nutrition: nil)
+                                          time: nil, theme: nil, eink: nil, nutrition: nil,
+                                          hkSync: nil)
     s.sectionOrder = sections.map(\.key)
     serverSettings = s
     SettingsMirror.upsert(settings: s, context: context, engine: engine)
@@ -319,6 +322,7 @@ final class SettingsStore {
     if let mirroredSettings = SettingsMirror.loadSettings(context: context) {
       serverSettings = mirroredSettings
       ResponseCache.save(mirroredSettings, forKey: CacheKey.serverSettings)
+      HealthKitBridge.shared.syncSettings = mirroredSettings.hkSync ?? HKSyncSettings()
     }
     let mirroredSections = SettingsMirror.loadSections(context: context)
     if !mirroredSections.isEmpty {
@@ -1919,9 +1923,6 @@ struct IntegrationsSettingsPane: View {
   @State private var healthBridge = HealthKitBridge.shared
   @State private var ouraProvider = OuraProvider.shared
   @State private var withingsProvider = WithingsProvider.shared
-  @Environment(AranetBridge.self) private var aranetBridge
-  @Environment(PollenClient.self) private var pollenClient
-
   var body: some View {
     Form {
       Section {
@@ -1951,29 +1952,17 @@ struct IntegrationsSettingsPane: View {
                    isGranted: calendarBridge.access == .granted)
         }
 
-        grantButton(
-          title: "Apple Health",
-          systemImage: "heart.text.square",
-          state: healthAccessLabel,
-          isGranted: healthBridge.access == .granted,
-          canRequest: healthBridge.access == .notDetermined && healthBridge.isAvailable
-        ) {
-          Task { _ = await healthBridge.requestAccess() }
-        }
-
-        // Aranet4 CO2 sensor — replaces the legacy Mac-Mini-based polling
-        // path. Detail pane has scan/forget controls + live status.
         NavigationLink {
-          AranetIntegrationDetail()
-            .navigationTitle("Aranet")
+          AppleHealthDetail()
+            .navigationTitle("Apple Health")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
         } label: {
-          stateRow(title: "Aranet",
-                   systemImage: "sensor",
-                   state: aranetStateLabel,
-                   isGranted: aranetBridge.state == .connected)
+          stateRow(title: "Apple Health",
+                   systemImage: "heart.text.square",
+                   state: healthAccessLabel,
+                   isGranted: healthBridge.access == .granted)
         }
 
         // Oura — direct iOS client (Personal Access Token). Replaces the
@@ -2006,49 +1995,11 @@ struct IntegrationsSettingsPane: View {
                    isGranted: withingsProvider.hasTokens)
         }
 
-        // Pollen via Open-Meteo. Detail pane handles location auth
-        // + a manual refresh button. Status label tracks the bridge's
-        // state so the row is self-explanatory.
-        NavigationLink {
-          PollenIntegrationDetail()
-            .navigationTitle("Pollen")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-        } label: {
-          stateRow(title: "Pollen",
-                   systemImage: "leaf",
-                   state: pollenStateLabel,
-                   isGranted: pollenClient.state == .ready)
-        }
       } footer: {
         Text("Grant access here, or manage permissions in iOS Settings → Privacy.")
       }
     }
     .formStyle(.grouped)
-  }
-
-  private var aranetStateLabel: String {
-    switch aranetBridge.state {
-    case .connected:    return "Connected"
-    case .connecting:   return "Connecting"
-    case .scanning:     return "Scanning"
-    case .disconnected: return "Disconnected"
-    case .bluetoothOff: return "Bluetooth off"
-    case .unauthorized: return "Denied"
-    case .idle:         return "Not connected"
-    }
-  }
-
-  private var pollenStateLabel: String {
-    switch pollenClient.state {
-    case .ready:    return "Ready"
-    case .locating: return "Locating"
-    case .fetching: return "Fetching"
-    case .denied:   return "Denied"
-    case .failed:   return "Failed"
-    case .idle:     return "Grant"
-    }
   }
 
   private func stateRow(title: String,
@@ -2106,6 +2057,89 @@ struct IntegrationsSettingsPane: View {
     case .granted:       return "Granted"
     case .denied:        return "Denied"
     case .notDetermined: return "Grant"
+    }
+  }
+}
+
+// MARK: - Apple Health Detail
+
+/// Full-screen integration settings for Apple Health. Shown after tapping the
+/// Apple Health row in Integrations. Handles the initial grant request and
+/// per-section write toggles — each toggle syncs through CloudKit so the
+/// user's preference follows them across devices.
+struct AppleHealthDetail: View {
+  @Environment(\.modelContext)    private var modelContext
+  @Environment(CKEngine.self)     private var ckEngine
+  @Environment(SettingsStore.self) private var store
+  @State private var healthBridge = HealthKitBridge.shared
+
+  var body: some View {
+    Form {
+      // ── Connection ─────────────────────────────────────────────────────
+      Section {
+        if !healthBridge.isAvailable {
+          Label("Apple Health is not available on this device.",
+                systemImage: "heart.slash")
+            .foregroundStyle(.secondary)
+        } else if healthBridge.access == .granted {
+          Label("Connected", systemImage: "checkmark.circle.fill")
+            .foregroundStyle(.green)
+        } else {
+          Button {
+            Task { _ = await healthBridge.requestAccess() }
+          } label: {
+            Label(healthBridge.access == .denied
+                  ? "Open Health Settings"
+                  : "Connect Apple Health",
+                  systemImage: "heart.text.square")
+          }
+          .disabled(healthBridge.access == .denied)
+        }
+      } footer: {
+        Text("Septena writes your logged data to Apple Health so it appears alongside data from your other apps and devices.")
+      }
+
+      // ── Write Toggles (only shown once access is granted) ───────────────
+      if healthBridge.access == .granted {
+        Section {
+          Toggle(isOn: syncBinding(\.mood)) {
+            Label("Mood", systemImage: "face.smiling")
+          }
+          Toggle(isOn: syncBinding(\.caffeine)) {
+            Label("Caffeine", systemImage: "cup.and.saucer")
+          }
+          Toggle(isOn: syncBinding(\.nutrition)) {
+            Label("Nutrition & Hydration", systemImage: "fork.knife")
+          }
+          Toggle(isOn: syncBinding(\.training)) {
+            Label("Workouts", systemImage: "figure.strengthtraining.traditional")
+          }
+        } header: {
+          Text("Write to Health")
+        } footer: {
+          Text("New entries you log in Septena will be sent to Apple Health. Existing entries are not back-filled.")
+        }
+      }
+    }
+    .navigationTitle("Apple Health")
+  }
+
+  /// Binding that reads/writes one field of `HKSyncSettings` through the
+  /// CloudKit-backed `AppSettings`. Falls back to `true` (all-on default)
+  /// when no settings are stored yet.
+  private func syncBinding(_ keyPath: WritableKeyPath<HKSyncSettings, Bool>) -> Binding<Bool> {
+    Binding {
+      store.serverSettings?.hkSync?[keyPath: keyPath] ?? true
+    } set: { newValue in
+      var s = store.serverSettings ?? AppSettings(sectionOrder: nil, targets: nil,
+                                                  units: nil, time: nil, theme: nil,
+                                                  eink: nil, nutrition: nil, hkSync: nil)
+      var hk = s.hkSync ?? HKSyncSettings()
+      hk[keyPath: keyPath] = newValue
+      s.hkSync = hk
+      store.serverSettings = s
+      HealthKitBridge.shared.syncSettings = hk
+      SettingsMirror.upsert(settings: s, context: modelContext, engine: ckEngine)
     }
   }
 }
@@ -2334,156 +2368,6 @@ private struct CalendarDetail: View {
   }
 }
 
-// MARK: - Aranet detail
-//
-// Reached from Integrations → Aranet. Shows live connection state +
-// latest reading, scan/forget controls, and a short explanation of the
-// foreground-only model. The bridge handles all CoreBluetooth state;
-// this view is purely a control + status surface.
-
-private struct AranetIntegrationDetail: View {
-  @Environment(AranetBridge.self) private var bridge
-
-  var body: some View {
-    Form {
-      Section {
-        statusRow
-      } header: {
-        Text("Status")
-      } footer: {
-        Text("Septena connects to your Aranet4 directly over Bluetooth while the app is open. Readings live on this device only — no backend involved.")
-      }
-
-      if let snap = bridge.latest {
-        Section("Latest reading") {
-          readingRow("CO2", "\(snap.co2Ppm) ppm")
-          readingRow("Temperature", String(format: "%.1f °C", snap.tempC))
-          readingRow("Humidity", "\(snap.humidityPct)%")
-          readingRow("Pressure", String(format: "%.1f hPa", snap.pressureHPa))
-          readingRow("Battery", "\(snap.batteryPct)%")
-        }
-      }
-
-      Section {
-        switch bridge.state {
-        case .idle, .disconnected, .bluetoothOff, .unauthorized:
-          Button {
-            bridge.start()
-          } label: {
-            Label("Scan for Aranet", systemImage: "magnifyingglass")
-          }
-          .disabled(bridge.state == .bluetoothOff || bridge.state == .unauthorized)
-        case .scanning, .connecting:
-          HStack {
-            ProgressView()
-            Text(bridge.state == .scanning ? "Scanning…" : "Connecting…")
-              .foregroundStyle(.secondary)
-            Spacer()
-            Button("Cancel") { bridge.stop() }
-          }
-        case .connected:
-          Button(role: .destructive) {
-            bridge.stop()
-          } label: {
-            Label("Disconnect", systemImage: "stop.circle")
-          }
-        }
-
-        // "Forget device" clears the stored peripheral identifier so the
-        // next scan picks a different Aranet — useful if the user
-        // swapped hardware. Always available; cheap operation.
-        Button(role: .destructive) {
-          bridge.forget()
-        } label: {
-          Label("Forget device", systemImage: "trash")
-        }
-      } footer: {
-        if let err = bridge.lastError {
-          Text(err).font(.caption).foregroundStyle(.orange)
-        }
-      }
-
-      Section {
-        Toggle("Background capture (experimental)", isOn: Binding(
-          get: { bridge.backgroundCaptureEnabled },
-          set: { newValue in
-            bridge.backgroundCaptureEnabled = newValue
-            // Bouncing the bridge picks up the new filter mode +
-            // restore-identifier choice on the next scan.
-            if bridge.state != .idle { bridge.stop() }
-            if newValue { bridge.start() }
-          }
-        ))
-      } header: {
-        Text("Background")
-      } footer: {
-        VStack(alignment: .leading, spacing: 6) {
-          Text("When on, Septena keeps listening for Aranet broadcasts while the app is suspended. Resolution drops from one reading per minute (foreground) to roughly one reading every 15–30 minutes (iOS throttles background BLE scans), but you get overnight coverage for sleep × air quality analysis.")
-          Text("Works only if your Aranet4's ad packets include a service UUID. Open Console.app, filter on com.septena.cloud, and look for a `services=[…]` value on the discovery line — if that's empty, background capture won't deliver anything.")
-            .foregroundStyle(.secondary)
-        }
-        .font(.caption)
-      }
-    }
-    .formStyle(.grouped)
-  }
-
-  private var statusRow: some View {
-    HStack(spacing: 10) {
-      Circle().fill(statusColor).frame(width: 10, height: 10)
-      VStack(alignment: .leading, spacing: 2) {
-        Text(statusLabel).foregroundStyle(.primary)
-        if let name = bridge.deviceName {
-          Text(name).font(.caption).foregroundStyle(.secondary)
-        }
-      }
-      Spacer()
-    }
-  }
-
-  private func readingRow(_ label: String, _ value: String) -> some View {
-    HStack {
-      Text(label).foregroundStyle(.primary)
-      Spacer()
-      Text(value)
-        .font(.subheadline.monospacedDigit())
-        .foregroundStyle(.secondary)
-    }
-  }
-
-  private var statusColor: Color {
-    switch bridge.state {
-    case .connected:    return .green
-    case .connecting,
-         .scanning:     return .yellow
-    case .bluetoothOff,
-         .unauthorized: return .red
-    case .disconnected: return .orange
-    case .idle:         return .secondary
-    }
-  }
-
-  private var statusLabel: String {
-    switch bridge.state {
-    case .connected:    return "Connected"
-    case .connecting:   return "Connecting…"
-    case .scanning:     return "Scanning…"
-    case .disconnected: return "Disconnected"
-    case .bluetoothOff: return "Bluetooth is off"
-    case .unauthorized: return "Bluetooth permission denied"
-    case .idle:         return "Not connected"
-    }
-  }
-}
-
-// MARK: - Pollen detail
-//
-// Reached from Integrations → Pollen. Surfaces location auth + the
-// most-recent Open-Meteo fetch + a manual refresh control. No
-// per-species toggles or threshold tuning today — the species set
-// and band thresholds are pinned to match the webapp; if those need
-// to diverge, this is the right pane to grow.
-
 // Oura → Personal Access Token entry. The user pastes a token from
 // cloud.ouraring.com/personal-access-tokens; OuraProvider stores it in
 // Keychain. Test button does a 1-day fetchHistory round-trip so the
@@ -2678,167 +2562,6 @@ private struct WithingsIntegrationDetail: View {
       lastResult = "Backfill complete — \(rows.count) days, syncing to iCloud."
     } catch {
       lastResult = "Backfill failed: \(error.localizedDescription)"
-    }
-  }
-}
-
-private struct PollenIntegrationDetail: View {
-  @Environment(PollenClient.self) private var pollen
-  // Tick on a 30s timer so "Last fetched 2 minutes ago" stays honest
-  // while the user has the pane open. Cheap; the work is one
-  // RelativeDateTimeFormatter call.
-  @State private var ticker = Date()
-  private let tickTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
-
-  var body: some View {
-    Form {
-      Section {
-        statusRow
-        if let when = pollen.lastFetchedAt {
-          HStack {
-            Text("Last fetched")
-            Spacer()
-            Text(relativeDate(when))
-              .foregroundStyle(.secondary)
-              .font(.subheadline)
-          }
-        }
-      } header: {
-        Text("Status")
-      } footer: {
-        Text("Septena reads pollen counts from your current city using Open-Meteo's free air quality API. Cached for 6 hours; refreshes on the Air page or manually below.")
-      }
-
-      // Today's roll-up. Only shown once a fetch has succeeded so we
-      // don't render dashes when the user lands here on first launch.
-      if let p = pollen.today {
-        Section("Today (\(p.date))") {
-          row("Grass",   value: format(p.grassMax ?? p.grass))
-          row("Birch",   value: format(p.birchMax ?? p.birch))
-          row("Tree",    value: format(p.treeMax))
-          row("Weed",    value: format(p.weedMax))
-          row("Overall", value: bandLabel(p.overallBand))
-        }
-      }
-
-      Section {
-        // Permission gate. Three buttons across the auth states so
-        // the action always matches what iOS will actually let us do.
-        switch pollen.locationAuthorization {
-        case .notDetermined:
-          Button {
-            pollen.requestLocationPermission()
-            // Kick a refresh — auth callback will fire fetch when
-            // the user accepts; if they decline, refresh harmlessly
-            // flips state to .denied which the row above reflects.
-            Task { await pollen.refresh(force: true) }
-          } label: {
-            Label("Grant location access", systemImage: "location.fill")
-          }
-        case .denied, .restricted:
-          // Cannot re-prompt programmatically once denied — only
-          // iOS Settings can unblock. Open it directly via the
-          // standard openSettings URL.
-          #if canImport(UIKit)
-          Button {
-            if let url = URL(string: UIApplication.openSettingsURLString) {
-              UIApplication.shared.open(url)
-            }
-          } label: {
-            Label("Open iOS Settings", systemImage: "gear")
-          }
-          #else
-          Text("Enable Location in System Settings → Privacy → Location → Septena.")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-          #endif
-        default:
-          Button {
-            Task { await pollen.refresh(force: true) }
-          } label: {
-            Label(pollen.state == .fetching ? "Refreshing…" : "Refresh now",
-                  systemImage: "arrow.clockwise")
-          }
-          .disabled(pollen.state == .fetching || pollen.state == .locating)
-        }
-      }
-
-      Section {
-        Link(destination: URL(string: "https://open-meteo.com/en/docs/air-quality-api")!) {
-          HStack {
-            Text("Open-Meteo")
-            Spacer()
-            Image(systemName: "arrow.up.right.square")
-              .foregroundStyle(.secondary)
-          }
-        }
-      } header: {
-        Text("Source")
-      } footer: {
-        Text("Free, no API key required. Pollen species: grass, birch, alder, olive, ragweed, mugwort. Thresholds match the EAN/Open-Meteo conventions.")
-      }
-    }
-    .formStyle(.grouped)
-    .onReceive(tickTimer) { ticker = $0 }
-  }
-
-  private var statusRow: some View {
-    HStack(spacing: 10) {
-      Circle().fill(statusColor).frame(width: 10, height: 10)
-      Text(statusLabel).foregroundStyle(.primary)
-      Spacer()
-    }
-  }
-
-  private func row(_ label: String, value: String) -> some View {
-    HStack {
-      Text(label).foregroundStyle(.primary)
-      Spacer()
-      Text(value).font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
-    }
-  }
-
-  private func format(_ v: Double?) -> String {
-    guard let v else { return "—" }
-    return String(format: "%.0f grains/m³", v)
-  }
-
-  private func bandLabel(_ raw: String) -> String {
-    switch raw {
-    case "low":       return "Low"
-    case "medium":    return "Medium"
-    case "high":      return "High"
-    case "very_high": return "Very high"
-    default:          return "—"
-    }
-  }
-
-  private func relativeDate(_ d: Date) -> String {
-    _ = ticker  // touch the published tick so SwiftUI re-evaluates this string every 30s
-    let f = RelativeDateTimeFormatter()
-    f.unitsStyle = .short
-    return f.localizedString(for: d, relativeTo: Date())
-  }
-
-  private var statusColor: Color {
-    switch pollen.state {
-    case .ready:        return .green
-    case .locating,
-         .fetching:     return .yellow
-    case .denied:       return .red
-    case .failed:       return .orange
-    case .idle:         return .secondary
-    }
-  }
-
-  private var statusLabel: String {
-    switch pollen.state {
-    case .ready:        return "Ready"
-    case .locating:     return "Locating…"
-    case .fetching:     return "Fetching…"
-    case .denied:       return "Location denied"
-    case .failed(let m):return "Failed: \(m)"
-    case .idle:         return "Not yet fetched"
     }
   }
 }

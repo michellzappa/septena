@@ -23,25 +23,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     willFinishLaunchingWithOptions launchOptions:
       [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
-    // Touch SeptenaServices eagerly during launch. Two reasons:
-    //   1. When iOS wakes us in the background to deliver a CoreBluetooth
-    //      event, the CBCentralManager has to be reconstructed *before*
-    //      `willRestoreState` can fire. Without this touch the engines
-    //      stay un-init'd until SwiftUI mounts, which is too late.
-    //   2. If the user has the "Background capture" toggle on, we need
-    //      to immediately re-arm the BLE scan with the same restore
-    //      identifier so iOS pairs us back with the queued scan state.
-    //
-    // The MainActor hop is unfortunate — UIKit calls this method on
-    // the main thread but it's not declared @MainActor, so we have
-    // to context-switch explicitly. The Task is fire-and-forget;
-    // the willRestore deadline is generous (several seconds).
-    Task { @MainActor in
-      let services = SeptenaServices.shared
-      if services.aranetBridge.backgroundCaptureEnabled {
-        services.aranetBridge.start()
-      }
-    }
     if let item = launchOptions?[.shortcutItem] as? UIApplicationShortcutItem,
        let action = ShortcutAction(rawValue: item.type) {
       Self.pending = action
