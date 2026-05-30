@@ -75,7 +75,6 @@ final class SectionTheme {
     .init(key: "supplements", label: "Supplements", color: "#3b82f6"),
     .init(key: "sleep",       label: "Sleep",       color: "#6366f1"),
     .init(key: "nutrition",   label: "Nutrition",   color: "#f59e0b"),
-    .init(key: "air",         label: "Air",         color: "#14b8a6"),
     .init(key: "groceries",   label: "Groceries",   color: "#84cc16"),
     .init(key: "caffeine",    label: "Caffeine",    color: "#92400e"),
     .init(key: "cannabis",    label: "Cannabis",    color: "#65a30d"),

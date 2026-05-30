@@ -76,6 +76,84 @@ final class HealthKitBridge {
     #endif
   }
 
+  // MARK: - Write authorization
+  //
+  // Unlike read access (obscured for privacy — see `access` above), WRITE
+  // authorization IS reliably queryable per-type via `authorizationStatus`.
+  // The UI uses this so a user who denied a specific category's write in the
+  // permission sheet sees that toggle reflect reality instead of failing
+  // silently.
+
+  /// The sections Septena can write to HealthKit. Maps 1:1 to `HKSyncSettings`.
+  enum WritableKind: String, CaseIterable, Hashable {
+    case mood, caffeine, nutrition, training
+  }
+
+  enum ShareStatus: Equatable {
+    case authorized       // user allowed writes — toggle works
+    case denied           // user denied in the permission sheet / Health app
+    case notDetermined    // never asked — needs a connect/grant first
+    case unavailable      // no HealthKit, or type needs a newer OS (mood < iOS 18)
+  }
+
+  /// Observable cache of per-section write status. Refreshed by
+  /// `refreshShareStatuses()` after authorization and on settings appearance,
+  /// so SwiftUI views re-render when the user changes permissions and returns.
+  var shareStatuses: [WritableKind: ShareStatus] = [:]
+
+  /// Current write status for a section. Reads the cache (observable), falling
+  /// back to a live probe when the cache hasn't been populated yet.
+  func shareStatus(_ kind: WritableKind) -> ShareStatus {
+    shareStatuses[kind] ?? liveShareStatus(kind)
+  }
+
+  /// True once the user has made a decision (allow or deny) on at least one
+  /// writable type — i.e. they've been through the permission sheet at least
+  /// once. Drives the Settings headline (Connect vs. Connected).
+  var hasRequestedWrite: Bool {
+    WritableKind.allCases.contains {
+      let s = liveShareStatus($0)
+      return s == .authorized || s == .denied
+    }
+  }
+
+  /// Re-probe every writable type and publish into `shareStatuses`.
+  func refreshShareStatuses() {
+    var m: [WritableKind: ShareStatus] = [:]
+    for k in WritableKind.allCases { m[k] = liveShareStatus(k) }
+    shareStatuses = m
+  }
+
+  private func liveShareStatus(_ kind: WritableKind) -> ShareStatus {
+    #if canImport(HealthKit)
+    guard isAvailable, let type = Self.sampleType(for: kind) else { return .unavailable }
+    switch store.authorizationStatus(for: type) {
+    case .sharingAuthorized: return .authorized
+    case .sharingDenied:     return .denied
+    case .notDetermined:     return .notDetermined
+    @unknown default:        return .notDetermined
+    }
+    #else
+    return .unavailable
+    #endif
+  }
+
+  #if canImport(HealthKit)
+  /// Representative HK type per section — the one we probe for write status.
+  /// Nutrition uses dietary energy as a stand-in for the whole correlation set
+  /// (they're requested together, so status is uniform).
+  private static func sampleType(for kind: WritableKind) -> HKSampleType? {
+    switch kind {
+    case .mood:
+      if #available(iOS 18, *) { return HKObjectType.stateOfMindType() }
+      return nil
+    case .caffeine:  return HKQuantityType.quantityType(forIdentifier: .dietaryCaffeine)
+    case .nutrition: return HKQuantityType.quantityType(forIdentifier: .dietaryEnergyConsumed)
+    case .training:  return HKWorkoutType.workoutType()
+    }
+  }
+  #endif
+
   #if canImport(HealthKit)
   // Types we read. Add to this list when a new module needs more.
   private var readTypes: Set<HKObjectType> {
@@ -104,8 +182,8 @@ final class HealthKitBridge {
     // Caffeine
     if let t = HKQuantityType.quantityType(forIdentifier: .dietaryCaffeine) { s.insert(t) }
 
-    // Nutrition (food correlation + individual macros/micros)
-    if let t = HKCorrelationType.correlationType(forIdentifier: .food) { s.insert(t) }
+    // Nutrition — individual quantity types only. HKCorrelationType.food
+    // is restricted to Apple and cannot be requested by third-party apps.
     let nutritionIDs: [HKQuantityTypeIdentifier] = [
       .dietaryEnergyConsumed, .dietaryProtein, .dietaryFatTotal,
       .dietaryCarbohydrates, .dietaryFiber, .dietarySugar,
@@ -134,6 +212,7 @@ final class HealthKitBridge {
     do {
       try await store.requestAuthorization(toShare: writeTypes, read: readTypes)
       await refresh()
+      refreshShareStatuses()
       return true
     } catch {
       return false
@@ -281,6 +360,10 @@ final class HealthKitBridge {
   /// Write a meal as an HKCorrelation(.food) containing individual nutrient
   /// samples. Only non-nil, non-zero values are included so the Health app
   /// displays clean data rather than a row of zeros.
+  /// Write a meal's nutrition data as individual HKQuantitySamples. Apple
+  /// restricts HKCorrelationType.food to first-party apps, so we write each
+  /// nutrient as a standalone sample — they appear in Health's Nutrition tab
+  /// grouped by timestamp. Only non-nil, non-zero values are written.
   func writeNutritionEntry(kcal: Double?,
                            proteinG: Double?,
                            fatG: Double?,
@@ -293,36 +376,30 @@ final class HealthKitBridge {
                            date: Date) async {
     #if canImport(HealthKit)
     guard isAvailable, syncSettings.nutrition else { return }
-    guard let foodType = HKCorrelationType.correlationType(forIdentifier: .food) else { return }
 
-    var samples: Set<HKSample> = []
+    var samples: [HKSample] = []
 
     func addQty(_ id: HKQuantityTypeIdentifier, value: Double?, unit: HKUnit) {
       guard let v = value, v > 0,
             let type = HKQuantityType.quantityType(forIdentifier: id) else { return }
-      samples.insert(HKQuantitySample(type: type,
+      samples.append(HKQuantitySample(type: type,
                                       quantity: HKQuantity(unit: unit, doubleValue: v),
                                       start: date, end: date))
     }
 
-    addQty(.dietaryEnergyConsumed,  value: kcal,          unit: .kilocalorie())
-    addQty(.dietaryProtein,         value: proteinG,       unit: .gram())
-    addQty(.dietaryFatTotal,        value: fatG,           unit: .gram())
-    addQty(.dietaryCarbohydrates,   value: carbsG,         unit: .gram())
-    addQty(.dietaryFiber,           value: fiberG,         unit: .gram())
-    addQty(.dietarySugar,           value: sugarG,         unit: .gram())
-    addQty(.dietarySodium,          value: sodiumMg,       unit: .gramUnit(with: .milli))
-    addQty(.dietaryCholesterol,     value: cholesterolMg,  unit: .gramUnit(with: .milli))
-    addQty(.dietaryWater,           value: waterMl.map { $0 / 1000.0 }, // ml → L
-                                    unit: .liter())
+    addQty(.dietaryEnergyConsumed, value: kcal,                        unit: .kilocalorie())
+    addQty(.dietaryProtein,        value: proteinG,                     unit: .gram())
+    addQty(.dietaryFatTotal,       value: fatG,                         unit: .gram())
+    addQty(.dietaryCarbohydrates,  value: carbsG,                       unit: .gram())
+    addQty(.dietaryFiber,          value: fiberG,                       unit: .gram())
+    addQty(.dietarySugar,          value: sugarG,                       unit: .gram())
+    addQty(.dietarySodium,         value: sodiumMg,                     unit: .gramUnit(with: .milli))
+    addQty(.dietaryCholesterol,    value: cholesterolMg,                unit: .gramUnit(with: .milli))
+    addQty(.dietaryWater,          value: waterMl.map { $0 / 1000.0 }, unit: .liter())
 
     guard !samples.isEmpty else { return }
-
-    let correlation = HKCorrelation(type: foodType,
-                                    start: date, end: date,
-                                    objects: samples)
     do {
-      try await store.save(correlation)
+      try await store.save(samples)
     } catch {
       SeptenaLog.error("HK nutrition write", error)
     }
@@ -350,10 +427,11 @@ final class HealthKitBridge {
       let qty = HKQuantity(unit: .kilocalorie(), doubleValue: kcal)
       samples.append(HKQuantitySample(type: energyType, quantity: qty, start: start, end: end))
     }
+    let config = HKWorkoutConfiguration()
+    config.activityType = activityType
     let builder = HKWorkoutBuilder(healthStore: store,
-                                   configuration: HKWorkoutConfiguration(),
+                                   configuration: config,
                                    device: .local())
-    builder.workoutConfiguration.activityType = activityType
     do {
       try await builder.beginCollection(at: start)
       if !samples.isEmpty { try await builder.addSamples(samples) }
@@ -391,7 +469,7 @@ final class HealthKitBridge {
   func writeMood(quadrant: String, valence: Int,
                  emotion: String, date: Date) async -> String? {
     #if canImport(HealthKit)
-    guard isAvailable else { return nil }
+    guard isAvailable, syncSettings.mood else { return nil }
     if #available(iOS 18, *) {
       let hkValence = Self.hkValence(quadrant: quadrant, valence: valence)
       let labels    = Self.hkLabels(for: emotion)

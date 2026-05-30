@@ -120,7 +120,6 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
     "supplements": "pills",
     "sleep":       "bed.double",
     "nutrition":   "fork.knife",
-    "air":         "wind",
     "groceries":   "cart",
     "caffeine":    "cup.and.saucer",
     "cannabis":    "leaf",
@@ -322,16 +321,6 @@ public extension SectionManifest {
       settingsEditor: .none
     ),
     .init(
-      key: "air",
-      defaultLabel: "Air",
-      shortDescription: "Indoor and outdoor air quality",
-      activation: .optional,
-      onboarding: .optional,
-      supportsTab: false,
-      supportsDashboard: true,
-      settingsEditor: .none
-    ),
-    .init(
       key: "activity",
       defaultLabel: "Activity",
       shortDescription: "Steps and movement (HealthKit)",
@@ -407,7 +396,7 @@ public extension SectionManifest {
 // `~/.claude/skills/septena/SKILL.md` so models that don't read the in-app
 // page still get the brief. When MCP tools change, update both.
 //
-// Sections without MCP tools yet (sleep, groceries, body, air, activity,
+// Sections without MCP tools yet (sleep, groceries, body, activity,
 // calendar) deliberately have no entry. The UI will render a "no skill yet"
 // placeholder for them rather than fabricate content.
 

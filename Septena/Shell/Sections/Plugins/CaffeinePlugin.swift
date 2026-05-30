@@ -193,6 +193,9 @@ private struct CaffeineDetailContent: View {
         }
       }
     }
+    HKSyncSection(label: "Write to Apple Health",
+                  icon: "heart.text.square",
+                  kind: .caffeine)
   }
 }
 

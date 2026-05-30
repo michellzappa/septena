@@ -23,6 +23,8 @@ enum MoodPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(MoodDestinationView()) }
 
+  static func detailPaneContent() -> AnyView? { AnyView(MoodDetailContent()) }
+
   static var logActions: [LogAction] {
     [LogAction(id: "log", title: "Log mood", systemImage: "plus")]
   }
@@ -82,6 +84,8 @@ enum MoodPlugin: SectionPlugin {
     ]
   }
 
+  // MARK: - Settings detail pane
+
   static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? {
     guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window)
     else { return 0 }
@@ -104,5 +108,13 @@ enum MoodPlugin: SectionPlugin {
     default:
       return nil
     }
+  }
+}
+
+private struct MoodDetailContent: View {
+  var body: some View {
+    HKSyncSection(label: "Write to Apple Health",
+                  icon: "heart.text.square",
+                  kind: .mood)
   }
 }

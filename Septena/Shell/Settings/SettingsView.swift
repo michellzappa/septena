@@ -806,7 +806,6 @@ struct CorrelationsSettingsPane: View {
     ("nutrition",   "Nutrition"),
     ("caffeine",    "Caffeine"),
     ("cannabis",    "Cannabis"),
-    ("air",         "Air"),
     ("gut",         "Gut"),
     ("sleep",       "Sleep"),
   ]
@@ -2073,6 +2072,21 @@ struct AppleHealthDetail: View {
   @Environment(SettingsStore.self) private var store
   @State private var healthBridge = HealthKitBridge.shared
 
+  private var rows: [(label: String, icon: String, kind: HealthKitBridge.WritableKind)] {
+    [
+      ("Mood",                  "face.smiling",                          .mood),
+      ("Caffeine",              "cup.and.saucer",                        .caffeine),
+      ("Nutrition & Hydration", "fork.knife",                            .nutrition),
+      ("Workouts",              "figure.strengthtraining.traditional",   .training),
+    ]
+  }
+
+  /// True when at least one writable category was denied in the permission
+  /// sheet — drives the "some categories are off" advisory.
+  private var anyDenied: Bool {
+    rows.contains { healthBridge.shareStatus($0.kind) == .denied }
+  }
+
   var body: some View {
     Form {
       // ── Connection ─────────────────────────────────────────────────────
@@ -2081,54 +2095,87 @@ struct AppleHealthDetail: View {
           Label("Apple Health is not available on this device.",
                 systemImage: "heart.slash")
             .foregroundStyle(.secondary)
-        } else if healthBridge.access == .granted {
+        } else if healthBridge.hasRequestedWrite {
           Label("Connected", systemImage: "checkmark.circle.fill")
             .foregroundStyle(.green)
         } else {
           Button {
             Task { _ = await healthBridge.requestAccess() }
           } label: {
-            Label(healthBridge.access == .denied
-                  ? "Open Health Settings"
-                  : "Connect Apple Health",
-                  systemImage: "heart.text.square")
+            Label("Connect Apple Health", systemImage: "heart.text.square")
           }
-          .disabled(healthBridge.access == .denied)
         }
       } footer: {
         Text("Septena writes your logged data to Apple Health so it appears alongside data from your other apps and devices.")
       }
 
-      // ── Write Toggles (only shown once access is granted) ───────────────
-      if healthBridge.access == .granted {
+      // ── Write Toggles (shown once the user has been through the sheet) ───
+      if healthBridge.isAvailable && healthBridge.hasRequestedWrite {
         Section {
-          Toggle(isOn: syncBinding(\.mood)) {
-            Label("Mood", systemImage: "face.smiling")
-          }
-          Toggle(isOn: syncBinding(\.caffeine)) {
-            Label("Caffeine", systemImage: "cup.and.saucer")
-          }
-          Toggle(isOn: syncBinding(\.nutrition)) {
-            Label("Nutrition & Hydration", systemImage: "fork.knife")
-          }
-          Toggle(isOn: syncBinding(\.training)) {
-            Label("Workouts", systemImage: "figure.strengthtraining.traditional")
+          ForEach(rows, id: \.kind) { row in
+            toggleRow(row.label, row.icon, row.kind)
           }
         } header: {
           Text("Write to Health")
         } footer: {
-          Text("New entries you log in Septena will be sent to Apple Health. Existing entries are not back-filled.")
+          if anyDenied {
+            Text("Some categories are turned off in Apple Health. To allow them, open Health → Profile → Apps → Septena. New entries are sent going forward — existing ones aren't back-filled.")
+          } else {
+            Text("New entries you log in Septena will be sent to Apple Health. Existing entries are not back-filled.")
+          }
         }
       }
     }
     .navigationTitle("Apple Health")
+    // Re-request on every visit so any write types added since the user's
+    // last authorization are picked up immediately. HealthKit only shows a
+    // sheet for types not yet resolved — no-ops if everything is already
+    // decided. Always refresh status afterward so denials render correctly.
+    .task {
+      if healthBridge.isAvailable {
+        _ = await healthBridge.requestAccess()
+        healthBridge.refreshShareStatuses()
+      }
+    }
+  }
+
+  /// One row in the write-toggles section. Enabled when the category is
+  /// authorized; when denied, the toggle is disabled and a caption explains
+  /// that Apple Health is blocking it (so the failure is never silent).
+  @ViewBuilder
+  private func toggleRow(_ title: String, _ icon: String,
+                         _ kind: HealthKitBridge.WritableKind) -> some View {
+    let status = healthBridge.shareStatus(kind)
+    if status != .unavailable {
+      Toggle(isOn: syncBinding(kind)) {
+        VStack(alignment: .leading, spacing: 2) {
+          Label(title, systemImage: icon)
+          if status == .denied {
+            Text("Turned off in Apple Health")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+        }
+      }
+      .disabled(status != .authorized)
+    }
+  }
+
+  private func keyPath(for kind: HealthKitBridge.WritableKind) -> WritableKeyPath<HKSyncSettings, Bool> {
+    switch kind {
+    case .mood:      return \.mood
+    case .caffeine:  return \.caffeine
+    case .nutrition: return \.nutrition
+    case .training:  return \.training
+    }
   }
 
   /// Binding that reads/writes one field of `HKSyncSettings` through the
   /// CloudKit-backed `AppSettings`. Falls back to `true` (all-on default)
   /// when no settings are stored yet.
-  private func syncBinding(_ keyPath: WritableKeyPath<HKSyncSettings, Bool>) -> Binding<Bool> {
-    Binding {
+  private func syncBinding(_ kind: HealthKitBridge.WritableKind) -> Binding<Bool> {
+    let keyPath = keyPath(for: kind)
+    return Binding {
       store.serverSettings?.hkSync?[keyPath: keyPath] ?? true
     } set: { newValue in
       var s = store.serverSettings ?? AppSettings(sectionOrder: nil, targets: nil,
@@ -2684,7 +2731,7 @@ private func row(_ label: String, _ value: String) -> some View {
 //     }
 //   }
 //
-// Sections that aren't backed by exportable local entities (e.g. `air`,
+// Sections that aren't backed by exportable local entities (e.g.
 // `activity`, `sleep`) are skipped — Import/Export only lists what it
 // can actually produce.
 

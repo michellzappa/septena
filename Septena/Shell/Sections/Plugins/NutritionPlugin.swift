@@ -249,6 +249,9 @@ private struct NutritionDetailContent: View {
         .labelsHidden()
       }
     }
+    HKSyncSection(label: "Write to Apple Health",
+                  icon: "heart.text.square",
+                  kind: .nutrition)
   }
 }
 
