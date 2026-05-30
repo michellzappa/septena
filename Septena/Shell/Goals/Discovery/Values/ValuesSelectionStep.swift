@@ -9,7 +9,7 @@ struct ValuesSelectionStep: View {
 
   private var allCustomValues: [String] {
     customValues.filter { value in
-      !ValuesSuggestions.all.contains(value) && !selectedValues.contains(value)
+      !ValuesSuggestions.all.contains(value)
     }
   }
 
@@ -24,13 +24,6 @@ struct ValuesSelectionStep: View {
             .foregroundStyle(.secondary)
         }
 
-        DiscoverySelectedPills(
-          title: "Chosen",
-          items: Array(selectedValues).sorted(),
-          accent: ValuesMiniApp.accent,
-          onRemove: { selectedValues.remove($0) }
-        )
-
         ForEach(ValuesSuggestions.categories, id: \.key) { category in
           VStack(alignment: .leading, spacing: 10) {
             Label(category.title, systemImage: icon(for: category.key))
@@ -38,7 +31,7 @@ struct ValuesSelectionStep: View {
               .foregroundStyle(color(for: category.key))
 
             SelectablePillsView(
-              items: category.values.filter { !selectedValues.contains($0) },
+              items: category.values,
               selectedItems: $selectedValues,
               tint: color(for: category.key),
               maxSelections: 7

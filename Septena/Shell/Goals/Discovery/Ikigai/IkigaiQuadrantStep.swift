@@ -75,7 +75,7 @@ struct IkigaiQuadrantStep: View {
 
   private var visibleSuggestions: [String] {
     suggestions.filter { item in
-      !selectedItems.wrappedValue.contains(item) && !hiddenAfterExpansion.contains(item)
+      selectedItems.wrappedValue.contains(item) || !hiddenAfterExpansion.contains(item)
     }
   }
 
@@ -89,13 +89,6 @@ struct IkigaiQuadrantStep: View {
           .font(.subheadline)
           .foregroundStyle(.secondary)
       }
-
-      DiscoverySelectedPills(
-        title: "Chosen",
-        items: Array(selectedItems.wrappedValue).sorted(),
-        accent: quadrant.accent,
-        onRemove: { selectedItems.wrappedValue.remove($0) }
-      )
 
       SelectablePillsView(
         items: visibleSuggestions,
