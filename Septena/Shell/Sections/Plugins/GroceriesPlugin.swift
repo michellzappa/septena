@@ -10,8 +10,6 @@ enum GroceriesPlugin: SectionPlugin {
     SectionManifest.byKey["groceries"]!
   }
 
-  static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] { [] }
-
   static func destinationView() -> AnyView? { AnyView(GroceriesDestinationView()) }
 
   static var logActions: [LogAction] {

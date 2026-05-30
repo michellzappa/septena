@@ -35,26 +35,6 @@ enum HydrationPlugin: SectionPlugin {
       && entry.carbsG == 0
   }
 
-  // MARK: - Today timeline
-
-  static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] {
-    let accent = ctx.theme.color(for: "hydration")
-    return ctx.nutrition
-      .filter { $0.date == date && isHydrationOnly($0) }
-      .map { entry in
-        let ml = Int(entry.waterMl ?? 0)
-        return TodayEvent(
-          id: "hyd-\(entry.id)",
-          time: entry.time,
-          section: "hydration",
-          color: accent,
-          title: "💧 \(ml) ml",
-          detail: nil,
-          kind: .nutrition(entry)
-        )
-      }
-  }
-
   static func destinationView() -> AnyView? { AnyView(HydrationDestinationView()) }
 
   // MARK: - First-enable onboarding

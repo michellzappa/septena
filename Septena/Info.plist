@@ -16,6 +16,17 @@
 	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.septena.cloud</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>septena</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleShortVersionString</key>
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
@@ -31,10 +42,14 @@
 	<string>Septena shows upcoming events from your calendars on the Week dashboard.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Septena reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Septena attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>Septena imports tasks from your Reminders lists into the Inbox.</string>
 	<key>NSRemindersUsageDescription</key>
 	<string>Septena imports tasks from your Reminders lists into the Inbox.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

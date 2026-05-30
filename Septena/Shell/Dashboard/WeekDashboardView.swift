@@ -14,7 +14,6 @@ enum WeekDestination: String, Hashable, Identifiable {
   case groceries, caffeine, cannabis, body, gut
   case mood
   case activity
-  case today
   /// Tasks-as-drawer. Mirrors every other section's bottom-sheet behaviour
   /// for users who prefer not to lose the homepage when they peek at today.
   /// The full Tasks tab is still reachable via the long-press menu and via
@@ -289,32 +288,14 @@ struct WeekDashboardView: View {
   @ViewBuilder
   private func sheetContent(for dest: WeekDestination) -> some View {
     NavigationStack {
-      // Plugin-driven destination first (Tasks now resolves here too via
-      // `TasksPlugin.destinationView()` → the shared SectionDrawer). The
-      // inline fallback handles only `today` (the cross-section log), which
-      // isn't a manifest section. Calendar is an integration, not a section
-      // — its data surfaces inline in Today/Next, no dedicated section view.
+      // Plugin-driven destination. Every WeekDestination maps to a section
+      // plugin's `destinationView()` (Tasks included, via the shared
+      // SectionDrawer). Calendar is an integration, not a section — its data
+      // surfaces inline in Today/Next, so it has no dedicated view here.
       if let view = SectionRegistry.plugin(forKey: dest.rawValue)?.destinationView() {
         view
       } else {
-        switch dest {
-        case .today:
-          TodayLogView(
-            date: clock.today,
-            habits: dailies.habits,
-            supplements: dailies.supplements,
-            chores: dailies.chores,
-            tasks: completedTasks,
-            caffeine: caffeineToday?.entries ?? [],
-            cannabis: cannabisToday?.entries ?? [],
-            gut: gutToday?.entries ?? [],
-            nutrition: todayNutrition,
-            training: recentTraining,
-            calendar: dailies.calendarEvents,
-            mood: moodToday?.entries ?? []
-          )
-        default:           EmptyView()
-        }
+        EmptyView()
       }
     }
     #if os(iOS)
@@ -788,7 +769,15 @@ struct WeekDashboardView: View {
       calendar: dailies.calendarEvents,
       macroColors: macroColors
     )
-    .onTapGesture { sheetDest = .today }
+    // The timeline is the ambient, read-only glance at today; tapping it
+    // routes to Next — the single unified "today page" (things to do up
+    // top, things done at the bottom) — rather than a parallel log sheet.
+    .onTapGesture {
+      Haptics.tap()
+      tabSelection.current = .next
+    }
+    .accessibilityAddTraits(.isButton)
+    .accessibilityHint("Opens Next")
   }
 
   // MARK: - Layout mode dispatch

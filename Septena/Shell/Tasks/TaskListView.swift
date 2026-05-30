@@ -1,5 +1,8 @@
 import SwiftUI
 import SwiftData
+#if os(macOS)
+import AppKit
+#endif
 
 // One screen per filter (Today / Inbox / Upcoming / Anytime / Logbook / Project / Area).
 // Read-through cache: views render from SwiftData immediately, then refresh
@@ -59,7 +62,6 @@ struct TaskListView: View {
   /// target during a drag. All rows + header sharing the same key light
   /// up together, so the whole cluster reads as one landing zone — not
   /// just whatever row the pointer happens to be over.
-  @State private var hoveredDropGroupKey: String? = nil
 
   /// Filters we've successfully loaded from the network at least once.
   /// Gates the "Nothing here yet" empty state so it never flashes during
@@ -143,6 +145,11 @@ struct TaskListView: View {
   /// keys). On iOS it's populated by tapping rows while in `selectMode`.
   /// Replaces the former split `selectedTaskId` cursor + `multiSelection`.
   @State private var selection: Set<String> = []
+
+  /// Anchor row for ⇧-click range selection (macOS). Set on a plain click or
+  /// ⌘-click; a subsequent ⇧-click selects every row between it and the
+  /// clicked row in display order. Mirrors Finder / Mail behaviour.
+  @State private var selectionAnchor: String? = nil
 
   #if os(iOS)
   /// iOS multi-select mode, toggled by the toolbar "Select" button — the
@@ -350,7 +357,9 @@ struct TaskListView: View {
       onOpenWhen: openWhenForSelected,
       onOpenDeadline: openDeadlineForSelected,
       onDelete: deleteSelected,
-      onClearSchedule: clearScheduleForSelected
+      onClearSchedule: clearScheduleForSelected,
+      onMoveUp: { moveSelection(by: -1) },
+      onMoveDown: { moveSelection(by: 1) }
     ))
     // Only attach top-level nav chrome on the standalone tab versions.
     // Embedded uses (Project / Area detail wraps) inherit chrome from parent
@@ -411,29 +420,25 @@ struct TaskListView: View {
     }
   }
 
-  // macOS: bind List(selection:) so native click / ⌘-click / ⇧-click /
-  // ↑↓ / ⌫ work out of the box.
-  // iOS: plain List — List(selection:) intercepts the long-press that
-  // .draggable needs to start a drag. iOS selection is driven by our own
-  // handleRowTap + selectMode; the `selection` Set is still updated there,
-  // just not via the native binding.
-  // Extracted into a @ViewBuilder helper so the #if os() branches don't
-  // produce two concrete return types in a `some View` property.
+  // Selection is owned by us on both platforms (the `selection` Set), never
+  // bound to List. Clicks set it via the row tap gesture, arrows via the
+  // keyboard modifier, and `rowBackground` draws the only highlight. See the
+  // note inside `taskListContent` for why we don't hand `selection` to List.
   @ViewBuilder
   private var taskListContent: some View {
-    #if os(macOS)
-    List(selection: $selection) {
-      taskListHeader
-      taskListRows
-      taskListFooter
-    }
-    #else
+    // No `List(selection:)` binding on either platform: we own selection
+    // ourselves (click via the row's tap gesture, arrows via the keyboard
+    // modifier below) and draw our own accent-pill highlight in
+    // `rowBackground`. Binding `selection` to List would make AppKit paint
+    // its own full-width grey selection bar *on top* of our pill (two
+    // competing indicators) and install a row-drag handler that swallows
+    // our `.draggable`. The `.tag` on each row is kept only as a stable
+    // row identity.
     List {
       taskListHeader
       taskListRows
       taskListFooter
     }
-    #endif
   }
 
   @ViewBuilder
@@ -524,11 +529,11 @@ struct TaskListView: View {
   }
 
   private var reviewRows: some View {
-    ForEach(review) { task in row(task).asListRow() }
+    ForEach(review) { task in row(task).asTaskRow(id: task.id) }
   }
 
   private var visibleRows: some View {
-    ForEach(visibleItems) { task in row(task).asListRow() }
+    ForEach(visibleItems) { task in row(task).asTaskRow(id: task.id) }
   }
 
   /// Existing deadline for a target task, so the picker sheet can
@@ -602,6 +607,22 @@ struct TaskListView: View {
     guard let id = effectiveSelectionId(),
           let t = currentTask(id: id) else { return }
     startEdit(t)
+  }
+
+  /// ↑ / ↓ — move the selection one row in display order. Replaces the
+  /// native `List(selection:)` arrow handling we gave up to suppress the
+  /// duplicate AppKit selection bar. Empty selection seeds at the top
+  /// (↓) or bottom (↑) so the first arrow press always lands somewhere.
+  private func moveSelection(by delta: Int) {
+    let ids = keyboardOrderedTaskIds
+    guard !ids.isEmpty else { return }
+    guard let current = selection.first(where: { ids.contains($0) }),
+          let idx = ids.firstIndex(of: current) else {
+      selectOnly(delta > 0 ? ids[0] : ids[ids.count - 1])
+      return
+    }
+    let next = max(0, min(ids.count - 1, idx + delta))
+    selectOnly(ids[next])
   }
 
   private func toggleSelected() {
@@ -733,31 +754,33 @@ struct TaskListView: View {
 
   // MARK: - Row
 
-  /// `dropGroup` is intentionally NOT applied here — `.swipeActions` must
-  /// be the direct child of List, and wrapping with extra modifiers below
-  /// it can confuse List's row-cell discovery. Callers in
-  /// `groupedOpenItems` apply `.taskClusterDrop(...)` AFTER `.asListRow()`
-  /// so drag/drop sits on the outer list cell.
   @ViewBuilder
   private func row(_ task: SeptenaTask) -> some View {
     rowContent(task)
-      // Drag source — only when not editing the row inline, so the text
-      // field stays interactive. Dragging the row publishes its id so any
-      // group header (or sidebar item) can pick it up and re-home the task
-      // to a new area/project.
-      .modifier(TaskRowDraggable(taskId: task.id,
-                                 title: task.title,
-                                 enabled: editingTaskId != task.id))
-      // One shared highlight backplate covers both the closed-row and
-      // inline-editor branches, so the accent tint stays put when the
-      // row swaps state — no cross-fade needed.
       .background(rowBackground(for: task))
-      // SINGLE source of expand/collapse animation: an implicit animation
-      // tied to the editing flag. State is mutated plainly in
-      // startEdit/commitEdit/startDraft (no withAnimation), so the row's
-      // async keyboard-focus claim doesn't race an animation transaction —
-      // that race was the "mess of animation, nothing works" on tap-to-edit.
-      .a11yAnimation(Self.expandSpring, value: editingTaskId == task.id)
+      .a11yAnimation(Theme.Motion.expand, value: editingTaskId == task.id)
+      // Drag to a sidebar area/project to re-home the task. Payload is the
+      // task ID as plain text; `SidebarTaskDropTarget`'s
+      // `.dropDestination(for: String.self)` decodes it. We use `.onDrag`
+      // (NSItemProvider) rather than `.draggable` because the latter fails to
+      // initiate when the row also carries tap gestures — `.onDrag` coexists
+      // with them, which is exactly the row's situation (tap = select,
+      // double-tap = edit).
+      #if os(macOS)
+      .onDrag {
+        NSItemProvider(object: task.id as NSString)
+      } preview: {
+        // Compact title pill. Without an explicit preview, `.onDrag`
+        // snapshots the full-width row and scales it down into a tiny,
+        // ragged thumbnail under the cursor.
+        Text(task.title)
+          .font(.system(size: 13))
+          .lineLimit(1)
+          .padding(.horizontal, 10)
+          .padding(.vertical, 6)
+          .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+      }
+      #endif
       // Standard Reminders/Things swipe set, replacing the old
       // swipe-to-select (multi-select now lives behind the toolbar Select
       // button on iOS and native ⌘/⇧-click on macOS). Must live on the
@@ -835,12 +858,19 @@ struct TaskListView: View {
     )
     .transition(.identity)
     // Tap-to-edit only when this row isn't already the editor (the focused
-    // TextField owns taps while editing). iOS: single tap. macOS: double-
-    // click — single click is owned by `List(selection:)`.
+    // TextField owns taps while editing). iOS: single tap opens the editor.
+    // macOS: single click selects, double-click opens the editor.
     #if os(iOS)
     .onTapGesture { if !editing { handleRowTap(task) } }
     #else
+    // macOS: single click selects, double-click edits. Plain `.onTapGesture`
+    // (count 2 declared before count 1 so the disambiguation resolves) drives
+    // our own `selection` set, which `rowBackground` reads for the highlight.
+    // These coexist with the row's `.onDrag` — a drag (press + move) and a
+    // tap (press + release) never both complete. `.onTapGesture` can't report
+    // modifier keys, so we read the live ⌘/⇧ state from `NSEvent`.
     .onTapGesture(count: 2) { if !editing { startEdit(task) } }
+    .onTapGesture(count: 1) { if !editing { clickSelect(task.id) } }
     #endif
     // Right-click selects this row (unless already part of a multi-selection)
     // so the menu's target is unambiguous.
@@ -929,16 +959,40 @@ struct TaskListView: View {
 
   // MARK: - Selection
   //
-  // `selection` (a Set<String> bound to `List(selection:)`) is the single
-  // source of truth. macOS drives it natively (click / ⌘-click / ⇧-click);
-  // iOS drives it via row taps (select-first) + the Select button. Every
+  // `selection` (a Set<String>) is the single source of truth — we never bind
+  // it to List. macOS drives it via the row click handler (plain / ⌘ / ⇧) and
+  // arrow keys; iOS via row taps (select-first) + the Select button. Every
   // mutation funnels through these helpers so the platforms stay in lockstep
   // and `selectMode` can never desync from an empty selection.
 
   /// Replace the selection with exactly one row.
   private func selectOnly(_ id: String) {
     selection = [id]
+    selectionAnchor = id
   }
+
+  #if os(macOS)
+  /// macOS click selection, dispatched on the live modifier state:
+  ///   • plain  → select just this row (and set the range anchor)
+  ///   • ⌘-click → toggle this row's membership (set anchor)
+  ///   • ⇧-click → select the contiguous range from the anchor to this row
+  private func clickSelect(_ id: String) {
+    let mods = NSEvent.modifierFlags
+    if mods.contains(.command) {
+      if selection.contains(id) { selection.remove(id) }
+      else { selection.insert(id) }
+      selectionAnchor = id
+    } else if mods.contains(.shift), let anchor = selectionAnchor {
+      let ids = keyboardOrderedTaskIds
+      guard let from = ids.firstIndex(of: anchor),
+            let to = ids.firstIndex(of: id) else { selectOnly(id); return }
+      let range = from <= to ? from...to : to...from
+      selection = Set(ids[range])
+    } else {
+      selectOnly(id)
+    }
+  }
+  #endif
 
   /// Deselect everything and leave iOS multi-select mode — the single
   /// "clear selection" entry point used by every deselect path.
@@ -1180,8 +1234,6 @@ struct TaskListView: View {
   /// inline headers that push the corresponding sidebar destination.
   @ViewBuilder
   private var groupedOpenItems: some View {
-    // Today: fold "scheduled earlier" items into the same cluster grouping so
-    // a due-today task lands under its project/area like any other.
     let pool = (filter == .today) ? items + review : items
     let byProject = Dictionary(grouping: pool.filter { $0.project != nil },
                                by: { $0.project! })
@@ -1189,62 +1241,38 @@ struct TaskListView: View {
                             by: { $0.area! })
     let loose = pool.filter { $0.project == nil && $0.area == nil }
 
-    // 1. Loose first (no header) so uncategorized tasks aren't buried.
-    ForEach(loose) { task in row(task).asListRow() }
+    // Loose tasks first — uncategorized, no header.
+    ForEach(loose) { task in row(task).asTaskRow(id: task.id) }
 
-    // 2. Areas in sidebar order: direct-area tasks, then each project's tasks.
+    // Areas in sidebar order: direct-area tasks, then each project's tasks.
     ForEach(areas) { area in
       let areaTasks = byArea[area.id] ?? []
-      let areaDrop = TaskGroupDrop(key: "area:\(area.id)") { ids in
-        for id in ids { applyMove(id: id, areaId: area.id, projectId: nil) }
-      }
       if !areaTasks.isEmpty {
-        taskClusterDrop(
-          groupHeader(icon: "square.stack.3d.up.fill",
-                      title: area.title,
-                      onTap: { nav.path = [.area(area)] })
-            .asListRow(),
-          group: areaDrop
-        )
-        ForEach(areaTasks) { task in
-          taskClusterDrop(row(task).asListRow(), group: areaDrop)
-        }
+        groupHeader(icon: "square.stack.3d.up.fill",
+                    title: area.title,
+                    onTap: { nav.path = [.area(area)] })
+          .asListRow()
+        ForEach(areaTasks) { task in row(task).asTaskRow(id: task.id) }
       }
       ForEach(projects.filter { $0.area == area.id }) { project in
         if let tasks = byProject[project.id], !tasks.isEmpty {
-          let projectDrop = TaskGroupDrop(key: "project:\(project.id)") { ids in
-            for id in ids { applyMove(id: id, areaId: nil, projectId: project.id) }
-          }
-          taskClusterDrop(
-            groupHeader(icon: nil,
-                        title: project.title,
-                        onTap: { nav.path = [.project(project)] })
-              .asListRow(),
-            group: projectDrop
-          )
-          ForEach(tasks) { task in
-            taskClusterDrop(row(task).asListRow(), group: projectDrop)
-          }
+          groupHeader(icon: nil,
+                      title: project.title,
+                      onTap: { nav.path = [.project(project)] })
+            .asListRow()
+          ForEach(tasks) { task in row(task).asTaskRow(id: task.id) }
         }
       }
     }
 
-    // 3. Top-level projects (no area).
+    // Top-level projects (no area).
     ForEach(projects.filter { $0.area == nil }) { project in
       if let tasks = byProject[project.id], !tasks.isEmpty {
-        let projectDrop = TaskGroupDrop(key: "project:\(project.id)") { ids in
-          for id in ids { applyMove(id: id, areaId: nil, projectId: project.id) }
-        }
-        taskClusterDrop(
-          groupHeader(icon: nil,
-                      title: project.title,
-                      onTap: { nav.path = [.project(project)] })
-            .asListRow(),
-          group: projectDrop
-        )
-        ForEach(tasks) { task in
-          taskClusterDrop(row(task).asListRow(), group: projectDrop)
-        }
+        groupHeader(icon: nil,
+                    title: project.title,
+                    onTap: { nav.path = [.project(project)] })
+          .asListRow()
+        ForEach(tasks) { task in row(task).asTaskRow(id: task.id) }
       }
     }
   }
@@ -1333,18 +1361,6 @@ struct TaskListView: View {
     groupHeaderBody(icon: icon, title: title, onTap: onTap)
   }
 
-  /// Cluster-drop helper: wraps an outer list cell so the *whole row*
-  /// becomes a drop landing zone for the given project/area cluster.
-  /// Highlight binds to the parent-level `hoveredDropGroupKey` so the
-  /// entire cluster (header + every row) lights up as one band, not
-  /// just the hovered cell. Apply AFTER `.asListRow()`.
-  private func taskClusterDrop<V: View>(_ view: V,
-                                        group: TaskGroupDrop) -> some View {
-    view.modifier(ClusterDropTarget(groupKey: group.key,
-                                    hovered: $hoveredDropGroupKey,
-                                    onDrop: group.accept))
-  }
-
   private func groupHeaderBody(icon: String?, title: String, onTap: (() -> Void)? = nil) -> some View {
     // Same icon column width and same icon→text gap as task rows so
     // every icon sits at one X and every text starts at one X.
@@ -1405,7 +1421,7 @@ struct TaskListView: View {
     let buckets = upcomingBuckets()
     ForEach(buckets, id: \.key) { bucket in
       groupHeader(icon: "calendar", title: bucket.label).asListRow()
-      ForEach(bucket.tasks) { task in row(task).asListRow() }
+      ForEach(bucket.tasks) { task in row(task).asTaskRow(id: task.id) }
     }
   }
 
@@ -1528,11 +1544,6 @@ struct TaskListView: View {
   }
 
   // MARK: - Edit
-
-  /// Spring used for the row-expand / row-collapse transition. Snappy enough
-  /// to feel responsive on tap, soft enough to read as an expand rather than
-  /// a snap. Same shape on insert and dismiss for symmetry.
-  private static let expandSpring: Animation = .spring(response: 0.32, dampingFraction: 0.84)
 
   private func startEdit(_ task: SeptenaTask) {
     // If switching from another task, persist the prior draft inline
@@ -1987,7 +1998,6 @@ struct TaskListView: View {
   }
 
 }
-
 /// Compact tappable target for area / project section headers inside a list.
 /// Wraps just the title (and optional chevron) so the click target matches the
 /// visible text rather than the whole row width. Lights up with a subtle hover
@@ -2299,6 +2309,8 @@ private struct KeyboardNavigationModifier: ViewModifier {
   let onOpenDeadline: () -> Void
   let onDelete: () -> Void
   let onClearSchedule: () -> Void
+  let onMoveUp: () -> Void
+  let onMoveDown: () -> Void
 
   /// Auto-focus the list on appear so the arrow keys / space / enter work
   /// immediately, without the user having to click into the content first.
@@ -2340,6 +2352,24 @@ private struct KeyboardNavigationModifier: ViewModifier {
         onSpace()
         return .handled
       }
+      // Arrow-key row traversal. We dropped `List(selection:)` (it painted a
+      // duplicate AppKit selection bar and swallowed row drags), so the up/
+      // down handling it used to provide for free is reimplemented here over
+      // our own selection set. `.onKeyPress` fires reliably on this focused
+      // wrapper; `.onMoveCommand` did not (it lost the focus race with the
+      // List's own scroll view).
+      #if os(macOS)
+      .onKeyPress(.upArrow) {
+        guard !isInputMode else { return .ignored }
+        onMoveUp()
+        return .handled
+      }
+      .onKeyPress(.downArrow) {
+        guard !isInputMode else { return .ignored }
+        onMoveDown()
+        return .handled
+      }
+      #endif
   }
 
 }
@@ -2394,108 +2424,17 @@ extension View {
       .listRowInsets(EdgeInsets())
   }
 
+  func asTaskRow(id: String) -> some View {
+    self
+      .listRowSeparator(.hidden)
+      .listRowBackground(Color.clear)
+      .listRowInsets(EdgeInsets())
+      .tag(id)
+  }
+
   func plainListChrome() -> some View {
     listRowSeparator(.hidden)
       .listRowBackground(Color.clear)
       .listRowInsets(EdgeInsets())
-  }
-}
-
-// MARK: - Drag & drop
-
-/// Wraps a task row in a `.draggable` that publishes the task's id as a
-/// String payload. The preview is a compact title chip so the user can see
-/// what they're carrying without the whole row's metadata cluttering the
-/// drag image (matches Things' minimalist drag chip).
-private struct TaskRowDraggable: ViewModifier {
-  let taskId: String
-  let title: String
-  let enabled: Bool
-
-  func body(content: Content) -> some View {
-    if enabled {
-      content.draggable(taskId) {
-        Text(title)
-          .font(.system(size: 14, weight: .medium))
-          .foregroundStyle(Theme.inkPrimary)
-          .lineLimit(1)
-          .padding(.horizontal, 12)
-          .padding(.vertical, 8)
-          .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-              .fill(Theme.cardSurface)
-              .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
-          )
-      }
-    } else {
-      content
-    }
-  }
-}
-
-/// Bundle of (cluster identity, drop handler) handed to every row +
-/// header that lives inside the same project/area cluster. Header and
-/// rows share one key so the `ClusterDropTarget` modifier can light
-/// them all up together when any one of them is targeted by a drag.
-struct TaskGroupDrop {
-  let key: String
-  let accept: ([String]) -> Void
-}
-
-/// Drop target applied to every cell (header + rows) in a cluster. The
-/// `hovered` binding is owned by the parent `TaskListView`, so all
-/// cells with the same `groupKey` highlight in unison — the whole
-/// cluster reads as one landing band, not one cell. Tap-throughs still
-/// work because the highlight is purely a background fill.
-private struct ClusterDropTarget: ViewModifier {
-  let groupKey: String?
-  @Binding var hovered: String?
-  let onDrop: (([String]) -> Void)?
-
-  func body(content: Content) -> some View {
-    if let groupKey, let onDrop {
-      let isHot = (hovered == groupKey)
-      content
-        // contentShape makes the FULL row droppable, not just the
-        // 24pt content area. Without this, `.dropDestination` only
-        // fires when the pointer is exactly over rendered glyphs/text,
-        // which makes the drop target feel "dead" most of the time.
-        .contentShape(Rectangle())
-        // Overlay (not background) so the tint sits ON TOP of the
-        // row's own background fill — guarantees the highlight is
-        // visible regardless of the row's selection/edit state.
-        // 4pt leading bar + soft full-width wash, Things-style.
-        .overlay(alignment: .leading) {
-          if isHot {
-            Rectangle()
-              .fill(Theme.tasksAccent)
-              .frame(width: 3)
-              .allowsHitTesting(false)
-              .transition(.opacity)
-          }
-        }
-        .overlay {
-          Theme.tasksAccent
-            .opacity(isHot ? 0.18 : 0)
-            .allowsHitTesting(false)
-            .animation(.easeOut(duration: 0.12), value: isHot)
-        }
-        .dropDestination(for: String.self) { ids, _ in
-          guard !ids.isEmpty else { return false }
-          Haptics.tick()
-          onDrop(ids)
-          hovered = nil
-          return true
-        } isTargeted: { hovering in
-          if hovering {
-            if hovered != groupKey { Haptics.tick() }
-            hovered = groupKey
-          } else if hovered == groupKey {
-            hovered = nil
-          }
-        }
-    } else {
-      content
-    }
   }
 }

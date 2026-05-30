@@ -1,33 +1,16 @@
 import SwiftUI
 import SwiftData
 
-// First real-data section migration. Caffeine's Today block, its
-// display-label helper, and its full MCP/agent contract all live here.
-// Anyone reading or modifying caffeine behavior only edits this file —
-// the Today log, the Settings detail pane, and the MCP gateway all
-// consume from this single source of truth.
+// First real-data section migration. Caffeine's display-label helper
+// and its full MCP/agent contract all live here. Anyone reading or
+// modifying caffeine behavior only edits this file — the Settings
+// detail pane and the MCP gateway all consume from this single source
+// of truth.
 
 @MainActor
 enum CaffeinePlugin: SectionPlugin {
   static var manifest: SectionManifest {
     SectionManifest.byKey["caffeine"]!
-  }
-
-  // MARK: - Today timeline
-
-  static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] {
-    let accent = ctx.theme.color(for: "caffeine")
-    return ctx.caffeine.map { entry in
-      TodayEvent(
-        id: "caf-\(entry.id)",
-        time: entry.time,
-        section: "caffeine",
-        color: accent,
-        title: label(for: entry),
-        detail: entry.beans,
-        kind: .caffeine(entry)
-      )
-    }
   }
 
   static func destinationView() -> AnyView? { AnyView(CaffeineDestinationView()) }
@@ -80,10 +63,9 @@ enum CaffeinePlugin: SectionPlugin {
   }
 
   /// Human-readable label for a caffeine entry's brewing method. Used
-  /// both by the Today timeline (above) and by the in-flight edit
-  /// sheet in TodayLogView when the user changes an entry's method —
-  /// keeping the mapping in one place prevents the two surfaces from
-  /// drifting apart.
+  /// both by the Today timeline (above) and by the caffeine edit sheet
+  /// when the user changes an entry's method — keeping the mapping in one
+  /// place prevents the two surfaces from drifting apart.
   static func label(for entry: CaffeineEntry) -> String {
     switch entry.method {
     case "v60":       return "V60"

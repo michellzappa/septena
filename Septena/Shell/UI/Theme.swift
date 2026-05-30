@@ -246,6 +246,27 @@ enum Theme {
     /// 28pt — between adjacent DrawerSections in the drawer's LazyVStack.
     static let xxl: CGFloat = 28
   }
+
+  /// Motion tokens — named animation curves so timings live in one place
+  /// instead of being hand-typed per view. Reach for one of these rather
+  /// than inlining a `.spring(...)` / `.easeOut(duration:)` literal at a
+  /// call site; tune the curve here and the whole app shifts in step.
+  ///
+  /// These are *curves*, not gated animations — always apply them through
+  /// `.a11yAnimation(_:value:)` or `A11yMotion.run` so Reduce Motion still
+  /// suppresses the motion. (Decorative celebrations gate themselves; see
+  /// `ConfettiBurst` / `MoodCommitAnimation`.)
+  enum Motion {
+    /// Default UI transition — selection, content swaps, value tweens.
+    /// SwiftUI's `.snappy`: responsive with a touch of give.
+    static let standard: Animation = .snappy
+    /// Quick fade / dismiss / toggle — short and crisp.
+    static let quick: Animation = .easeOut(duration: 0.2)
+    /// Row expand / collapse. Snappy enough to feel responsive on tap,
+    /// soft enough to read as an expand rather than a snap. Symmetric on
+    /// insert and dismiss.
+    static let expand: Animation = .spring(response: 0.32, dampingFraction: 0.84)
+  }
 }
 
 // MARK: - Typography

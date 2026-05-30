@@ -1,24 +1,27 @@
 import Foundation
-import NaturalLanguage
 
-// Local semantic sorter for the Inbox.
+// On-device "where does this task go?" classifier for the Inbox.
 //
-// Why this design beats a naive "embed the project title" approach:
-//  • Contextual embeddings. NLContextualEmbedding (BERT-class, ships with
-//    macOS) gives per-token vectors we mean-pool — far stronger on short
-//    labels than NLEmbedding's static sentence model.
-//  • Each target's vector is a BLEND of its label and the centroid of its
-//    existing tasks. "Errands" stops being defined by the word "Errands"
-//    and starts being defined by {buy milk, pick up dry cleaning, …}.
-//    The user trains the model implicitly every time they assign a task —
-//    no extra signal needed.
-//  • Per-target rejection penalty. "Not this" on the chip stores the task
-//    text; on the next refresh we re-embed and subtract a fraction of the
-//    similarity from anything semantically close to that rejection. Tiny
-//    UserDefaults blob persists across launches.
+// Multinomial Naive Bayes over the user's own assignment history: each
+// area / project is a class, trained on the tokens of the tasks already
+// filed there (plus the target's own title). Two signals do the work:
+//   • Lexical likelihood  P(token | target) — the words you reuse inside a
+//     project ("milk", "eggs" → Groceries). This is the workhorse.
+//   • Frequency prior      P(target) ∝ how many tasks live there — captures
+//     that most inbox items get funneled into a few active projects.
 //
-// Engine is process-global. The vector cache survives filter swaps so
-// re-entering Inbox is free after the first refresh.
+// No embeddings, no Core ML / NaturalLanguage asset to download, no async
+// warmup — it's a handful of word-count dictionaries recomputed on each
+// Inbox refresh. Interpretable, and it learns the instant you file a task.
+//
+// A guess is only surfaced when there's REAL lexical evidence (the winning
+// target actually contains at least one of the task's words) AND it clearly
+// beats the runner-up. That gate is the whole point: silence beats a
+// confidently-wrong pick — and prevents "everything → your biggest project"
+// when a task has no recognizable words (which is just the prior talking).
+//
+// "Not this" rejections are stored per target and penalize any future task
+// that shares words with the rejected text.
 
 @MainActor
 @Observable
@@ -28,127 +31,142 @@ final class SuggestionEngine {
     let kind: Kind
     let id: String
     let title: String
+    /// Softmax posterior P(target | task), 0…1. Stored for display/sorting.
     let score: Double
   }
 
   static let shared = SuggestionEngine()
 
-  /// task.id → ranked suggestions (best first). Empty when nothing clears
-  /// the confidence floor; up to 3 entries when there's a real signal.
+  /// task.id → ranked suggestions (best first). The top entry is only present
+  /// when it clears the evidence + margin gate; up to two softer runners-up
+  /// follow for the context-menu "Suggested" section.
   private(set) var suggestions: [String: [Suggestion]] = [:]
 
-  /// task.id → embedding vector. Cached by content hash so unchanged tasks
-  /// don't re-embed across refreshes.
-  private var taskVectors: [String: [Double]] = [:]
-  private var taskTextHash: [String: Int] = [:]
+  // MARK: - Tuning knobs
+  //
+  // NB posteriors are peaked, so the absolute posterior isn't a great gate on
+  // its own — the real guards are `minMatchedTokens` (must be genuine lexical
+  // overlap, not just the frequency prior) and `marginFloor` (clear winner).
+  private let minMatchedTokens = 1     // winner must share ≥ this many words
+  private let marginFloor      = 0.15  // top posterior must beat #2 by this
+  private let altFloor         = 0.15  // runners-up shown above this posterior
+  private let rejectionPenalty = 4.0   // log-space, scaled by token overlap
 
-  /// "a:<id>" / "p:<id>" → blended (label + centroid of assigned tasks).
-  private var targetCentroids: [String: [Double]] = [:]
-
-  /// User-recorded "Not this" texts, keyed by target. Re-embedded on each
-  /// refresh and applied as a similarity-proximity penalty.
+  private let rejectionsKey = "septena.suggestion.rejections.v1"
+  /// "a:<id>" / "p:<id>" → raw "Not this" texts. Persisted so a normal app
+  /// upgrade keeps the learning; a clean reinstall loses it.
   private var rejectedTexts: [String: [String]] = [:]
-  private var rejectedVectors: [String: [[Double]]] = [:]
 
-  /// Contextual model. Loaded asynchronously the first time the app runs
-  /// (downloads the asset on first launch). Suggestions are suppressed
-  /// entirely until it's ready — better to show nothing than to show
-  /// confidently-wrong picks from a weaker model.
-  private var contextual: NLContextualEmbedding?
-
-  /// Cosine floor for surfacing a chip at all. Contextual embeddings tend
-  /// to score short-text pairs higher than the static sentence model, so
-  /// this is a touch above what NLEmbedding alone needed.
-  private let minScore: Double = 0.45
-  /// Blend weights — when a target has at least one assigned task, the
-  /// centroid of those tasks dominates the label. With no tasks the
-  /// centroid is empty and the label carries the full signal.
-  private let labelWeight: Double = 0.3
-  private let centroidWeight: Double = 0.7
-  /// Subtracted from a target's score, scaled by the inbox task's max
-  /// similarity to any rejected text for that target. 0.6 is strong enough
-  /// to flip a borderline pick off the chip after one rejection.
-  private let rejectionPenalty: Double = 0.6
-
-  private let rejectionsDefaultsKey = "septena.suggestion.rejections.v1"
-
-  private init() {
-    loadRejections()
-    Task { await prepareContextualModel() }
-  }
+  private init() { loadRejections() }
 
   // MARK: - Public API
 
-  /// Recompute suggestions. `allTasks` is needed because target centroids
-  /// are built from every task already assigned to a project / area —
-  /// that's the "auto-learning from your inputs" channel.
+  /// Recompute Inbox suggestions. `allTasks` (every assigned task, any status
+  /// except cancelled) is the training corpus; `inbox` are the items to
+  /// classify. Synchronous and cheap — call it on each Inbox load.
   func refresh(inbox: [SeptenaTask],
                allTasks: [SeptenaTask],
                projects: [Project],
                areas: [Area]) {
-    // 1. Make sure every task we'll touch has a cached embedding.
-    for t in inbox { embedIfNeeded(task: t) }
-    for t in allTasks where t.status != .cancelled { embedIfNeeded(task: t) }
+    // ── 1. Train: per-class token counts, class token totals, doc counts ──
+    var tokenCount: [String: [String: Int]] = [:]  // classKey → token → n
+    var classTokens: [String: Int] = [:]           // classKey → Σ token n
+    var docCount: [String: Int] = [:]              // classKey → #tasks
+    var labels: [String: (Suggestion.Kind, String)] = [:]
+    var vocab = Set<String>()
 
-    // 2. Bucket assigned tasks by target so we can build centroids.
-    var byTarget: [String: [String]] = [:]
-    for t in allTasks where t.status != .cancelled {
-      if let aid = t.area   { byTarget["a:\(aid)", default: []].append(t.id) }
-      if let pid = t.project { byTarget["p:\(pid)", default: []].append(t.id) }
+    func train(_ key: String, _ tokens: [String], isDoc: Bool) {
+      if isDoc { docCount[key, default: 0] += 1 }
+      for tok in tokens {
+        tokenCount[key, default: [:]][tok, default: 0] += 1
+        classTokens[key, default: 0] += 1
+        vocab.insert(tok)
+      }
     }
 
-    // 3. Compute target centroids = blended(label, mean(assigned-task vecs)).
-    var centroids: [String: [Double]] = [:]
-    var labels: [String: (Suggestion.Kind, String)] = [:]
+    // Seed every active target with its title so a brand-new project (no
+    // tasks yet) can still win on a title-word match alone.
     for a in areas {
       let key = "a:\(a.id)"
-      let labelVec = embed(text: composite(title: a.title, extras: [a.context])) ?? []
-      let taskVecs = (byTarget[key] ?? []).compactMap { taskVectors[$0] }
-      centroids[key] = blend(label: labelVec, taskVecs: taskVecs)
       labels[key] = (.area, a.title)
+      train(key, tokenize(a.title), isDoc: false)
     }
     for p in projects where p.status == .active {
       let key = "p:\(p.id)"
-      let labelVec = embed(text: composite(title: p.title,
-                                           extras: [p.context, p.notes])) ?? []
-      let taskVecs = (byTarget[key] ?? []).compactMap { taskVectors[$0] }
-      centroids[key] = blend(label: labelVec, taskVecs: taskVecs)
       labels[key] = (.project, p.title)
+      train(key, tokenize(composite(p.title, p.notes)), isDoc: false)
     }
-    targetCentroids = centroids
 
-    // 4. Re-embed rejection texts (cheap; few per target).
-    var rVecs: [String: [[Double]]] = [:]
+    for t in allTasks where t.status != .cancelled {
+      let toks = tokenize(composite(t.title, t.notes))
+      if let aid = t.area    { train("a:\(aid)", toks, isDoc: true) }
+      if let pid = t.project { train("p:\(pid)", toks, isDoc: true) }
+    }
+
+    let keys = Array(labels.keys)
+    guard !keys.isEmpty else { suggestions = [:]; return }
+    let vocabSize = max(vocab.count, 1)
+    let totalDocs = docCount.values.reduce(0, +)
+
+    // Pre-tokenize rejection texts into sets for overlap scoring.
+    var rejectedSets: [String: [Set<String>]] = [:]
     for (key, texts) in rejectedTexts {
-      rVecs[key] = texts.compactMap { embed(text: $0) }
+      rejectedSets[key] = texts.map { Set(tokenize($0)) }
     }
-    rejectedVectors = rVecs
 
-    // 5. Score each inbox task against every target, apply rejection
-    //    penalty, keep top-3 above the floor.
+    // ── 2. Classify each inbox task ──
     var next: [String: [Suggestion]] = [:]
     for t in inbox {
-      guard let tv = taskVectors[t.id], !tv.isEmpty else { continue }
-      var scored: [(key: String, score: Double)] = []
-      for (key, cv) in centroids where !cv.isEmpty && cv.count == tv.count {
-        var s = Self.cosine(tv, cv)
-        if let rvs = rejectedVectors[key], !rvs.isEmpty {
-          let maxRej = rvs.compactMap { $0.count == tv.count ? Self.cosine(tv, $0) : nil }
-            .max() ?? 0
-          s -= rejectionPenalty * maxRej
+      let taskTokens = tokenize(composite(t.title, t.notes))
+      guard !taskTokens.isEmpty else { continue }
+      let taskSet = Set(taskTokens)
+
+      var logScore: [String: Double] = [:]
+      var matched: [String: Int] = [:]
+      for key in keys {
+        let counts = tokenCount[key] ?? [:]
+        let denom = Double((classTokens[key] ?? 0) + vocabSize)
+        // Frequency prior, Laplace-smoothed.
+        var lp = log(Double((docCount[key] ?? 0) + 1) / Double(totalDocs + keys.count))
+        var hits = 0
+        for tok in taskTokens {
+          let c = counts[tok] ?? 0
+          if c > 0 { hits += 1 }
+          lp += log(Double(c + 1) / denom)   // Laplace smoothing
         }
-        scored.append((key, s))
+        // "Not this" penalty: shared words with a rejected text for this target.
+        if let rsets = rejectedSets[key], !rsets.isEmpty {
+          let overlap = rsets.map { jaccard(taskSet, $0) }.max() ?? 0
+          lp -= rejectionPenalty * overlap
+        }
+        logScore[key] = lp
+        matched[key] = hits
       }
-      scored.sort { $0.score > $1.score }
-      let top3 = scored.prefix(3).compactMap { entry -> Suggestion? in
-        guard entry.score >= minScore, let label = labels[entry.key] else { return nil }
-        let id = String(entry.key.dropFirst(2))
-        return Suggestion(kind: label.0,
-                          id: id,
-                          title: label.1,
-                          score: entry.score)
+
+      // Softmax → posteriors, best first.
+      let ordered = keys.sorted { logScore[$0]! > logScore[$1]! }
+      let ranked = Array(zip(ordered, softmax(ordered.map { logScore[$0]! })))
+
+      guard let (topKey, topP) = ranked.first, let topLabel = labels[topKey]
+      else { continue }
+
+      // Gate: genuine lexical evidence + a clear win over #2.
+      let secondP = ranked.count > 1 ? ranked[1].1 : 0
+      guard (matched[topKey] ?? 0) >= minMatchedTokens,
+            (topP - secondP) >= marginFloor
+      else { continue }
+
+      var out = [Suggestion(kind: topLabel.0,
+                            id: String(topKey.dropFirst(2)),
+                            title: topLabel.1,
+                            score: topP)]
+      for (key, p) in ranked.dropFirst() where p >= altFloor {
+        guard let l = labels[key] else { continue }
+        out.append(Suggestion(kind: l.0, id: String(key.dropFirst(2)),
+                              title: l.1, score: p))
+        if out.count >= 3 { break }
       }
-      if !top3.isEmpty { next[t.id] = Array(top3) }
+      next[t.id] = out
     }
     suggestions = next
   }
@@ -157,18 +175,11 @@ final class SuggestionEngine {
     suggestions[taskId]?.first
   }
 
-  /// Runners-up under the top pick — surfaced in the chip's right-click menu.
-  func alternatives(for taskId: String) -> [Suggestion] {
-    Array((suggestions[taskId] ?? []).dropFirst())
-  }
-
   func clearSuggestion(for taskId: String) {
     suggestions.removeValue(forKey: taskId)
   }
 
-  /// Persist a "this task does NOT belong here" signal. The text is stored
-  /// raw in UserDefaults so reinstalling-from-scratch loses it, but a normal
-  /// app upgrade keeps it. Bounded to 50 per target.
+  /// Persist a "this task does NOT belong here" signal (bounded to 50/target).
   func recordRejection(taskText: String,
                        targetKind: Suggestion.Kind,
                        targetId: String) {
@@ -180,112 +191,42 @@ final class SuggestionEngine {
     saveRejections()
   }
 
-  // MARK: - Embedding
+  // MARK: - Tokenize / math
 
-  private func embedIfNeeded(task: SeptenaTask) {
-    let text = composite(title: task.title, extras: [task.notes])
-    let h = text.hashValue
-    if taskTextHash[task.id] == h, taskVectors[task.id] != nil { return }
-    if let v = embed(text: text) {
-      taskVectors[task.id] = v
-      taskTextHash[task.id] = h
-    }
+  private static let stopwords: Set<String> = [
+    "the", "a", "an", "to", "of", "and", "or", "for", "in", "on", "at",
+    "with", "my", "me", "is", "be", "do", "this", "that", "it",
+  ]
+
+  private func tokenize(_ s: String) -> [String] {
+    s.lowercased()
+      .split { !$0.isLetter && !$0.isNumber }
+      .map(String.init)
+      .filter { $0.count > 1 && !Self.stopwords.contains($0) }
   }
 
-  private func embed(text: String) -> [Double]? {
-    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty, let m = contextual else { return nil }
-    return embedContextual(trimmed, model: m)
+  private func composite(_ title: String, _ notes: String?) -> String {
+    let n = notes?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    return n.isEmpty ? title : "\(title). \(n)"
   }
 
-  private func embedContextual(_ s: String,
-                               model: NLContextualEmbedding) -> [Double]? {
-    guard let result = try? model.embeddingResult(for: s, language: .english) else {
-      return nil
-    }
-    var sum = [Double](repeating: 0, count: model.dimension)
-    var count = 0
-    result.enumerateTokenVectors(in: s.startIndex..<s.endIndex) { vec, _ in
-      for i in 0..<min(vec.count, sum.count) { sum[i] += vec[i] }
-      count += 1
-      return true
-    }
-    guard count > 0 else { return nil }
-    return sum.map { $0 / Double(count) }
+  private func jaccard(_ a: Set<String>, _ b: Set<String>) -> Double {
+    guard !a.isEmpty, !b.isEmpty else { return 0 }
+    let union = a.union(b).count
+    return union == 0 ? 0 : Double(a.intersection(b).count) / Double(union)
   }
 
-  private func prepareContextualModel() async {
-    guard let m = try? NLContextualEmbedding(language: .english) else { return }
-    if !m.hasAvailableAssets {
-      // First launch downloads ~tens of MB from Apple's CDN. Best-effort —
-      // we keep using the fallback model until it lands.
-      _ = try? await m.requestAssets()
-    }
-    do {
-      try m.load()
-      contextual = m
-      SeptenaLog.info("SuggestionEngine: NLContextualEmbedding loaded (dim=\(m.dimension))")
-    } catch {
-      SeptenaLog.error("NLContextualEmbedding.load failed", error)
-    }
-  }
-
-  // MARK: - Math
-
-  /// Blend = α·normalize(label) + β·normalize(centroid). Both legs normalized
-  /// so a 5-word label can't out-magnitude a 50-task centroid (or vice
-  /// versa). Falls back gracefully when either leg is missing.
-  private func blend(label: [Double], taskVecs: [[Double]]) -> [Double] {
-    if taskVecs.isEmpty { return label }
-    let dim = taskVecs[0].count
-    var centroid = [Double](repeating: 0, count: dim)
-    for v in taskVecs where v.count == dim {
-      for i in 0..<dim { centroid[i] += v[i] / Double(taskVecs.count) }
-    }
-    guard !label.isEmpty, label.count == dim else { return centroid }
-    let nLabel = Self.normalize(label)
-    let nCent = Self.normalize(centroid)
-    var out = [Double](repeating: 0, count: dim)
-    for i in 0..<dim {
-      out[i] = labelWeight * nLabel[i] + centroidWeight * nCent[i]
-    }
-    return out
-  }
-
-  private static func normalize(_ v: [Double]) -> [Double] {
-    var sq = 0.0
-    for x in v { sq += x * x }
-    let norm = sq.squareRoot()
-    return norm == 0 ? v : v.map { $0 / norm }
-  }
-
-  private static func cosine(_ a: [Double], _ b: [Double]) -> Double {
-    guard a.count == b.count, !a.isEmpty else { return 0 }
-    var dot = 0.0, na = 0.0, nb = 0.0
-    for i in 0..<a.count {
-      dot += a[i] * b[i]
-      na += a[i] * a[i]
-      nb += b[i] * b[i]
-    }
-    let denom = na.squareRoot() * nb.squareRoot()
-    return denom == 0 ? 0 : dot / denom
-  }
-
-  // MARK: - Helpers
-
-  private func composite(title: String, extras: [String?]) -> String {
-    var parts = [title]
-    for e in extras {
-      let t = e?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-      if !t.isEmpty { parts.append(t) }
-    }
-    return parts.joined(separator: ". ")
+  private func softmax(_ xs: [Double]) -> [Double] {
+    guard let m = xs.max() else { return [] }
+    let exps = xs.map { exp($0 - m) }
+    let sum = exps.reduce(0, +)
+    return sum == 0 ? exps : exps.map { $0 / sum }
   }
 
   // MARK: - Rejection persistence
 
   private func loadRejections() {
-    guard let data = UserDefaults.standard.data(forKey: rejectionsDefaultsKey),
+    guard let data = UserDefaults.standard.data(forKey: rejectionsKey),
           let dict = try? JSONDecoder().decode([String: [String]].self, from: data)
     else { return }
     rejectedTexts = dict
@@ -293,6 +234,6 @@ final class SuggestionEngine {
 
   private func saveRejections() {
     guard let data = try? JSONEncoder().encode(rejectedTexts) else { return }
-    UserDefaults.standard.set(data, forKey: rejectionsDefaultsKey)
+    UserDefaults.standard.set(data, forKey: rejectionsKey)
   }
 }

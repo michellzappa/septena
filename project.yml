@@ -38,6 +38,10 @@ targets:
       - target: SeptenaWatch
         embed: true
         codeSign: true
+      - sdk: FoundationModels.framework
+      - target: SeptenaLiveActivitiesExtension
+        embed: true
+        codeSign: true
     info:
       path: Septena/Info.plist
       properties:
@@ -48,6 +52,11 @@ targets:
         UIApplicationSupportsIndirectInputEvents: true
         UIBackgroundModes:
           - remote-notification
+        NSSupportsLiveActivities: true
+        CFBundleURLTypes:
+          - CFBundleURLName: com.septena.cloud
+            CFBundleURLSchemes:
+              - septena
         UISupportedInterfaceOrientations~ipad:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationPortraitUpsideDown
@@ -64,6 +73,7 @@ targets:
         NSCalendarsFullAccessUsageDescription: Septena shows upcoming events from your calendars on the Week dashboard.
         NSCalendarsUsageDescription: Septena shows upcoming events from your calendars on the Week dashboard.
         NSHealthShareUsageDescription: Septena reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device.
+        NSPhotoLibraryUsageDescription: Septena attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud
@@ -103,12 +113,15 @@ targets:
         NSCalendarsFullAccessUsageDescription: Septena shows upcoming events from your calendars on the Week dashboard.
         NSCalendarsUsageDescription: Septena shows upcoming events from your calendars on the Week dashboard.
         NSHealthShareUsageDescription: Septena reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device.
+        NSPhotoLibraryUsageDescription: Septena attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.mac
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_ENTITLEMENTS: Septena/SeptenaMac.entitlements
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    dependencies:
+      - sdk: FoundationModels.framework
 
   SeptenaWatch:
     type: application
@@ -158,6 +171,26 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.watchkitapp.next
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_ENTITLEMENTS: SeptenaWatchComplication/SeptenaWatchComplication.entitlements
+
+  SeptenaLiveActivitiesExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: SeptenaLiveActivitiesExtension
+        excludes:
+          - "**/.DS_Store"
+          - "**/*.entitlements"
+      - path: SeptenaCore/TrainingLiveActivity.swift
+    info:
+      path: SeptenaLiveActivitiesExtension/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.liveactivities
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: SeptenaLiveActivitiesExtension/SeptenaLiveActivitiesExtension.entitlements
 
 schemes:
   Septena:

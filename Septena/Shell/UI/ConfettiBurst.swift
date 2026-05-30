@@ -36,6 +36,7 @@ struct ConfettiBurst: View {
   var duration: Double = 0.8
 
   @State private var particles: [Particle] = []
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
     ZStack {
@@ -50,6 +51,10 @@ struct ConfettiBurst: View {
     .allowsHitTesting(false)
     .task(id: trigger) {
       guard trigger > 0 else { return }
+      // Reduce Motion is a hard opt-out, not a hint: skip the burst
+      // entirely. The haptic + the data change still confirm the
+      // action, so nothing is lost beyond decorative motion.
+      guard !reduceMotion else { particles = []; return }
       // Spawn new particles at the anchor with random outward
       // velocities. Each one gets a unique target offset / rotation
       // so the burst never looks tiled.

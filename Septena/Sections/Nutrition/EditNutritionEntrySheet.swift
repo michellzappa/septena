@@ -313,6 +313,10 @@ struct MealPhotoThumbnail: View {
   private func load() async {
     image = nil
     guard let assetID, !assetID.isEmpty else { return }
+    // Photo-library reads require granted access; if it's unavailable
+    // (denied/restricted/not-yet-asked) silently skip — the placeholder shows.
+    let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+    guard status == .authorized || status == .limited else { return }
     let assets = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil)
     guard let asset = assets.firstObject else { return }
     let opts = PHImageRequestOptions()

@@ -13,42 +13,6 @@ enum TrainingPlugin: SectionPlugin {
     SectionManifest.byKey["training"]!
   }
 
-  // MARK: - Today timeline
-
-  static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] {
-    let accent = ctx.theme.color(for: "training")
-    return ctx.training
-      .filter { $0.date == date }
-      .compactMap { entry -> TodayEvent? in
-        guard let name = entry.exercise else { return nil }
-        let time = entry.concludedAt.map { String($0.dropFirst(11).prefix(5)) } ?? "00:00"
-        return TodayEvent(
-          id: "tr-\(entry.id)",
-          time: time,
-          section: "training",
-          color: accent,
-          title: name,
-          detail: detail(for: entry),
-          kind: .training(entry)
-        )
-      }
-  }
-
-  /// Compact secondary line: weight, sets×reps (or sets alone), duration,
-  /// distance. Returns nil when every field is empty so the row stays
-  /// single-line.
-  static func detail(for entry: ExerciseEntry) -> String? {
-    var parts: [String] = []
-    if let w = entry.weight { parts.append("\(Int(w))kg") }
-    if let s = entry.sets, let r = entry.reps { parts.append("\(s)×\(r)") }
-    else if let s = entry.sets { parts.append("\(s) sets") }
-    if let d = entry.durationMin { parts.append("\(Int(d)) min") }
-    if let dist = entry.distanceM, dist > 0 {
-      parts.append(String(format: "%.1f km", dist / 1000))
-    }
-    return parts.isEmpty ? nil : parts.joined(separator: " · ")
-  }
-
   static func destinationView() -> AnyView? { AnyView(TrainingDestinationView()) }
 
   static var logActions: [LogAction] {

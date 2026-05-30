@@ -9,8 +9,6 @@ enum ActivityPlugin: SectionPlugin {
     SectionManifest.byKey["activity"]!
   }
 
-  static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] { [] }
-
   static func destinationView() -> AnyView? { AnyView(ActivityDestinationView()) }
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {

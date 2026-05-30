@@ -136,7 +136,7 @@ struct RootTabView: View {
   // (Music's collapse-on-scroll pattern). The floating "+" bubble that
   // used to ride beside the bar was removed — it crowded the tab bar
   // on iPhone and overlapped tab labels. Add Info still triggers from
-  // ⌘K (menu bar) and from per-section quickAddToolbar buttons.
+  // ⌘K (menu bar) and each destination's own "+" button.
   @ViewBuilder
   private var rootTabView: some View {
     let tv = TabView(selection: Binding(get: { tabSelection.current },

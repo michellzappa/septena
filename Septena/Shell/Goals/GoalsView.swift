@@ -23,6 +23,7 @@ struct GoalsView: View {
   @State private var availableSections: [SectionConfig] = []
   @State private var loading = true
   @State private var editing: Goal? = nil
+  @State private var activeMiniApp: AnyDiscoveryMiniApp? = nil
 
   /// Mirrors WeekDashboardView's grid: iPhone compact = 1 col, iPad regular
   /// = 3 cols, macOS = adaptive ~280pt tiles.
@@ -63,6 +64,13 @@ struct GoalsView: View {
             }
           )
         }
+        .discoveryPresentation(activeMiniApp: $activeMiniApp) { drafts in
+          if !drafts.isEmpty {
+            saveDrafts(drafts)
+          }
+          activeMiniApp = nil
+          Task { await load() }
+        }
     }
   }
 
@@ -71,24 +79,36 @@ struct GoalsView: View {
     if loading && goals.isEmpty {
       ProgressView()
         .frame(maxWidth: .infinity, minHeight: 160)
-    } else if goals.isEmpty {
-      ContentUnavailableView {
-        Label("No Goals Yet", systemImage: "target")
-      } description: {
-        Text("Free-text intentions. Tag with sections so agents have context for what you're working toward.")
-      } actions: {
-        Button("Add First Goal", action: addGoal)
-      }
     } else {
-      LazyVGrid(columns: columns, spacing: 14) {
-        ForEach(goals) { goal in
-          Button { editing = goal } label: {
-            GoalTile(goal: goal, theme: theme)
+      VStack(alignment: .leading, spacing: 18) {
+        if OnDeviceAI.isAvailable {
+          DiscoveryShelf { app in
+            activeMiniApp = app
+            Haptics.tick()
           }
-          .buttonStyle(.plain)
-          .contextMenu {
-            Button(role: .destructive) { deleteGoal(goal) } label: {
-              Label("Delete", systemImage: "trash")
+        }
+
+        if goals.isEmpty {
+          ContentUnavailableView {
+            Label("No Goals Yet", systemImage: "target")
+          } description: {
+            Text("Free-text intentions. Tag with sections so agents have context for what you're working toward.")
+          } actions: {
+            Button("Add First Goal", action: addGoal)
+          }
+          .frame(maxWidth: .infinity, minHeight: 260)
+        } else {
+          LazyVGrid(columns: columns, spacing: 14) {
+            ForEach(goals) { goal in
+              Button { editing = goal } label: {
+                GoalTile(goal: goal, theme: theme)
+              }
+              .buttonStyle(.plain)
+              .contextMenu {
+                Button(role: .destructive) { deleteGoal(goal) } label: {
+                  Label("Delete", systemImage: "trash")
+                }
+              }
             }
           }
         }
@@ -116,6 +136,56 @@ struct GoalsView: View {
     goalMutator.deleteGoal(id: goal.id)
     goals.removeAll { $0.id == goal.id }
     Haptics.warning()
+  }
+
+  private func saveDrafts(_ drafts: [DraftGoal]) {
+    var created: [Goal] = []
+    for draft in drafts where draft.include {
+      let clean = draft.text.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !clean.isEmpty else { continue }
+
+      let goal = goalMutator.createGoal(text: clean)
+      goalMutator.updateGoal(id: goal.id, text: clean, sections: draft.sections)
+      if let metricKey = draft.metricKey {
+        goalMutator.updateGoalMetric(id: goal.id,
+                                     metricKey: metricKey,
+                                     window: draft.metricWindow,
+                                     comparator: draft.metricComparator,
+                                     target: draft.metricTarget,
+                                     baseline: draft.metricBaseline)
+      }
+
+      var updated = goal
+      updated.text = clean
+      updated.sections = draft.sections
+      updated.metricKey = draft.metricKey
+      updated.metricWindow = draft.metricWindow
+      updated.metricComparator = draft.metricComparator
+      updated.metricTarget = draft.metricTarget
+      updated.metricBaseline = draft.metricBaseline
+      created.append(updated)
+    }
+
+    if !created.isEmpty {
+      goals.insert(contentsOf: created, at: 0)
+      Haptics.success()
+    }
+  }
+}
+
+private extension View {
+  @ViewBuilder
+  func discoveryPresentation(activeMiniApp: Binding<AnyDiscoveryMiniApp?>,
+                             onFinish: @escaping ([DraftGoal]) -> Void) -> some View {
+    #if os(macOS)
+    sheet(item: activeMiniApp) { app in
+      app.descriptor.makeView(onFinish)
+    }
+    #else
+    fullScreenCover(item: activeMiniApp) { app in
+      app.descriptor.makeView(onFinish)
+    }
+    #endif
   }
 }
 

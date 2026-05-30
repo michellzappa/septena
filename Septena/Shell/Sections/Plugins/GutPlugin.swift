@@ -54,25 +54,8 @@ enum GutPlugin: SectionPlugin {
     ))
   }
 
-  // MARK: - Today timeline
-
-  static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] {
-    let accent = ctx.theme.color(for: "gut")
-    return ctx.gut.map { entry in
-      TodayEvent(
-        id: "gut-\(entry.id)",
-        time: entry.time,
-        section: "gut",
-        color: accent,
-        title: bristolLabel(entry.bristol),
-        detail: detail(for: entry),
-        kind: .gut(entry)
-      )
-    }
-  }
-
-  /// Bristol Stool Scale 1–7 → human label. Also used by TodayLogView's
-  /// edit sheet replacement so the displayed string stays in sync.
+  /// Bristol Stool Scale 1–7 → human label. Also used by the gut edit
+  /// sheet so the displayed string stays in sync.
   static func bristolLabel(_ n: Int) -> String {
     switch n {
     case 1: return "Type 1 — Separate lumps"
@@ -84,16 +67,6 @@ enum GutPlugin: SectionPlugin {
     case 7: return "Type 7 — Liquid"
     default: return "Bristol \(n)"
     }
-  }
-
-  /// Composite secondary line: volume · blood count · note. Returns nil
-  /// when every field is empty so the row renders a clean single-line.
-  static func detail(for entry: GutEntry) -> String? {
-    var parts: [String] = []
-    if let vol = entry.volume { parts.append(vol) }
-    if entry.blood > 0 { parts.append("blood \(entry.blood)") }
-    if let note = entry.note { parts.append(note) }
-    return parts.isEmpty ? nil : parts.joined(separator: " · ")
   }
 
   // MARK: - MCP / agent contract

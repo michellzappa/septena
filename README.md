@@ -1,10 +1,10 @@
 # Septena
 
-Septena is a private life operating system for Apple platforms. It brings tasks, goals, training, nutrition, hydration, sleep, mood, supplements, habits, chores, groceries, gut, caffeine, cannabis, air quality, activity, and body metrics into one CloudKit-backed app.
+Septena is a private life operating system for Apple platforms. It brings tasks, goals, training, nutrition, hydration, sleep, mood, supplements, habits, chores, groceries, gut, caffeine, cannabis, activity, and body metrics into one CloudKit-backed app.
 
 The product principle is simple: every life domain is a section, every section can be enabled or hidden without deleting data, and every write should land in the local SwiftData mirror first, then sync through CloudKit.
 
-> Status (2026-05-30): Septena is CloudKit-first. The general FastAPI client path has been removed from this repo; remaining FastAPI references are migration history, export DTO compatibility, or comments that still need cleanup. `MIGRATION_HANDOFF.md`, `TRAINING_MIGRATION_HANDOFF.md`, and `NUTRITION_MIGRATION_HANDOFF.md` are useful historical notes, but verify them against code before treating them as live truth.
+> Status (2026-05-30): Septena is CloudKit-first. The general FastAPI client path has been removed from this repo; remaining FastAPI references are migration history, export DTO compatibility, or comments that still need cleanup. `TRAINING_MIGRATION_HANDOFF.md` and `NUTRITION_MIGRATION_HANDOFF.md` are historical migration notes — verify them against code before treating them as live truth.
 
 ## Stack
 
@@ -12,7 +12,6 @@ The product principle is simple: every life domain is a section, every section c
 - **SwiftData** - local mirror, offline cache, and first-write surface
 - **CloudKit** (`CKSyncEngine`) - private iCloud database, custom zone `septena-v1`
 - **HealthKit, EventKit, WatchConnectivity, WidgetKit** - Apple platform integrations
-- **Core Bluetooth / Core Location** - air quality and pollen-related integrations where available
 - **App Intents** - Siri, Shortcuts, Spotlight, and section logging intents
 - **XcodeGen** - `project.yml` is the source of truth for the Xcode project
 - **Swift 5.10**, deployment target **iOS / macOS / watchOS 26.0**
@@ -54,7 +53,7 @@ There is no `.env` for the app. User-facing provider credentials and integration
 |   `-- Sections/                  # SectionManifest and MCP skill model
 |-- SeptenaWatch/                  # Watch companion app
 |-- SeptenaWatchComplication/      # WidgetKit complications
-|-- docs/                          # Design/reference notes
+|-- docs/                          # DesignSpec (design system) + backlog
 |-- project.yml                    # XcodeGen project definition
 `-- *_HANDOFF.md                   # Migration notes; verify against current code
 ```
@@ -106,8 +105,6 @@ Current sections:
 | **Mood** | Mood/energy check-ins and history. |
 | **Body** | Weight/body-composition rows, Withings integration. |
 | **Activity** | HealthKit movement/recovery metrics. |
-| **Air** | Indoor/outdoor air quality surfaces. |
-| **Sandbox** | Internal section-flow test plugin. Remove before release. |
 
 Important section rules:
 
@@ -193,11 +190,10 @@ From `project.yml` and entitlements:
 
 ## Useful Docs
 
-- `docs/DesignSpec.md` - current design-system intent; code should generally conform.
-- `docs/reference/` - older reference notes; useful for context, not necessarily current.
-- `MIGRATION_HANDOFF.md` - historical FastAPI to CloudKit notes.
-- `TRAINING_MIGRATION_HANDOFF.md` / `NUTRITION_MIGRATION_HANDOFF.md` - section migration notes; verify before acting.
-- `TODO.md`, `CHANGELOG.md`, `HANDOFF.md` - running project notes.
+- `docs/DesignSpec.md` - the canonical design system (typography, color, iconography, row anatomy, spacing, motion); code should conform.
+- `docs/BACKLOG.md` - tracked, non-urgent work.
+- `IDENTIFIERS.md` - the stable id/title model and wire contracts across the app, CloudKit, and the MCP gateway.
+- `TRAINING_MIGRATION_HANDOFF.md` / `NUTRITION_MIGRATION_HANDOFF.md` - historical section-migration notes; verify against code before acting.
 
 ## License
 

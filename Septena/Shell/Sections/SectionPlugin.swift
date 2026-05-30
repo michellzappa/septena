@@ -3,29 +3,22 @@ import EventKit
 import SwiftData
 
 // Per-section "plugin" abstraction. Each section bundles its catalog
-// facts (manifest), its Today event production, and — over time —
-// its dashboard tile, settings detail pane, and onboarding flow into
-// one declaration. Everything that iterates "the list of sections"
-// goes through `SectionRegistry` instead of switch statements scattered
-// across the UI.
+// facts (manifest) and — over time — its dashboard tile, settings
+// detail pane, and onboarding flow into one declaration. Everything
+// that iterates "the list of sections" goes through `SectionRegistry`
+// instead of switch statements scattered across the UI.
 //
-// This is the *narrow* first version: only `manifest` + `todayEvents`
-// are required. Other slots (`mcpSkill`, `dashboardTile`, `detailPane`,
+// This is the *narrow* first version: only `manifest` is required.
+// Other slots (`mcpSkill`, `dashboardTile`, `detailPane`,
 // `onboarding`) will be added as concrete migrations land.
 //
 // Plugins live in the app target (not SeptenaCore) because they
-// construct view-layer types (`TodayEvent`, eventually SwiftUI views).
-// SeptenaCore stays UI-free.
+// construct view-layer types (SwiftUI views). SeptenaCore stays UI-free.
 
 @MainActor
 protocol SectionPlugin {
   /// Catalog identity. Resolves to a row in `SectionManifest.all`.
   static var manifest: SectionManifest { get }
-
-  /// Contribute events to the Today log for the given date. Return `[]`
-  /// for sections that don't appear in Today (or implement only the
-  /// manifest and let `appearsInToday` gate them out).
-  static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent]
 
   /// First-enable setup flow. Return a view to present as a sheet when
   /// the user flips this section from off → on for the first time
@@ -218,8 +211,7 @@ extension SectionRegistry {
   ///   - `SectionSkill.preamble` — connection + universal conventions
   ///   - One H1 per section, in registry order, with summary + tools +
   ///     body (markdown) drawn from the plugin's `mcpSkill`.
-  /// Plugins without an `mcpSkill` (Sandbox, Sleep, Body, Activity)
-  /// are skipped.
+  /// Plugins without an `mcpSkill` (Sleep, Body, Activity) are skipped.
   @MainActor
   static func fullSkillMarkdown() -> String {
     var out = SectionSkill.preamble + "\n\n"
@@ -278,8 +270,9 @@ extension SectionPlugin {
   /// The section's primary destination view — the screen the user
   /// lands on when they tap into the section from the dashboard tile
   /// or sidebar. Default returns nil for sections without a dedicated
-  /// destination (e.g. utility plugins like Sandbox). Plugins that own
-  /// their destination wrap it in AnyView and return it here.
+  /// destination (e.g. utility plugins with no standalone screen).
+  /// Plugins that own their destination wrap it in AnyView and return
+  /// it here.
   static func destinationView() -> AnyView? { nil }
 
   /// Default: no detail-pane content beyond the identity row +
@@ -298,13 +291,13 @@ extension SectionPlugin {
 
   /// Default: onboarding shows once per user (gated on `hasOnboarded`).
   /// A plugin that overrides this to `true` re-presents the sheet on
-  /// every off → on transition — useful for the Sandbox plugin which
-  /// exists to exercise the flow, not commit to a real setup state.
+  /// every off → on transition — for a setup flow that should re-run
+  /// on each enable rather than commit to a one-time state.
   static var alwaysShowOnboarding: Bool { false }
 
   /// Default: no inline MCP brief — the section either has its entry
   /// in the legacy `SectionSkill.all` list (sections not yet migrated)
-  /// or no agent contract at all (sandbox / utility sections).
+  /// or no agent contract at all (utility sections).
   static var mcpSkill: SectionSkill? { nil }
 
   /// Default: no measurable aim metrics. Plugins opt in by declaring a
@@ -320,28 +313,8 @@ extension SectionPlugin {
   static var logActions: [LogAction] { [] }
 }
 
-/// Bag of pre-loaded data + helpers passed into `todayEvents`. Avoids
-/// the alternative of every plugin re-fetching from SwiftData on each
-/// build, and keeps the plugin signatures stable as new data arrays
-/// are added.
-@MainActor
-struct TodayContext {
-  let theme: SectionTheme
-  let habits: [HabitDayItem]
-  let supplements: [SupplementDayItem]
-  let chores: [ChoreItem]
-  let tasks: [SeptenaTask]
-  let caffeine: [CaffeineEntry]
-  let cannabis: [CannabisEntry]
-  let gut: [GutEntry]
-  let nutrition: [NutritionEntry]
-  let training: [ExerciseEntry]
-  let calendar: [EKEvent]
-  let mood: [MoodEntry]
-}
-
 /// Single source of truth for which plugins exist. Sections not in this
-/// list still work via their inline implementations in `TodayLogView`,
+/// list still work via their inline implementations in
 /// `WeekDashboardView`, etc. — the registry is additive during the
 /// migration.
 @MainActor
@@ -363,7 +336,6 @@ enum SectionRegistry {
     TrainingPlugin.self,
     NutritionPlugin.self,
     HydrationPlugin.self,
-    TestPlugin.self,
   ]
 
   static var byKey: [String: any SectionPlugin.Type] {

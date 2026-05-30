@@ -1,15 +1,13 @@
 import SwiftUI
 
 // Goals — free-text intentions tagged with section keys. Skill-only;
-// goals don't appear on the Today timeline so `todayEvents` returns [].
+// goals don't appear on the Today timeline.
 
 @MainActor
 enum GoalsPlugin: SectionPlugin {
   static var manifest: SectionManifest {
     SectionManifest.byKey["goals"]!
   }
-
-  static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] { [] }
 
   static var logActions: [LogAction] {
     [LogAction(id: "new", title: "New goal", systemImage: "plus")]

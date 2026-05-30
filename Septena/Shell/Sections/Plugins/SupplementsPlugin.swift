@@ -7,24 +7,6 @@ enum SupplementsPlugin: SectionPlugin {
     SectionManifest.byKey["supplements"]!
   }
 
-  static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] {
-    let accent = ctx.theme.color(for: "supplements")
-    return ctx.supplements
-      .filter { $0.done }
-      .compactMap { sup -> TodayEvent? in
-        guard let time = sup.time else { return nil }
-        return TodayEvent(
-          id: "supp-\(sup.id)",
-          time: time,
-          section: "supplements",
-          color: accent,
-          title: [sup.emoji, sup.name].compactMap { $0 }.joined(separator: " "),
-          detail: nil,
-          kind: .supplement(sup)
-        )
-      }
-  }
-
   static func destinationView() -> AnyView? { AnyView(SupplementsDestinationView()) }
 
   static var logActions: [LogAction] {
@@ -146,6 +128,11 @@ private struct SupplementsDetailContent: View {
       SupplementTypeSheet()
         .environment(SeptenaServices.shared.checklistMutator)
     }
+
+    // Contextual Siri tip — teaches the spoken phrase right where the user
+    // manages supplements. The canonical per-section pattern: one
+    // `sectionSiriTip(_:)` call with the section's primary log intent.
+    sectionSiriTip(MarkSupplementTakenIntent())
   }
 }
 

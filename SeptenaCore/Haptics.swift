@@ -1,4 +1,5 @@
 #if canImport(UIKit)
+import CoreHaptics
 import UIKit
 
 // Native UIKit haptics. Lightweight helpers — generators are pre-prepared so
@@ -12,6 +13,7 @@ enum Haptics {
   private static let mediumImpact = UIImpactFeedbackGenerator(style: .medium)
   private static let selection = UISelectionFeedbackGenerator()
   private static let notification = UINotificationFeedbackGenerator()
+  private static var coreEngine: CHHapticEngine?
 
   /// Generic light tap — Magic Plus, button presses, swipe-revealed action.
   static func tap() {
@@ -42,6 +44,46 @@ enum Haptics {
     notification.notificationOccurred(.warning)
     notification.prepare()
   }
+
+  /// AI generation — a short, low continuous pulse borrowed from NavigateWithin.
+  static func aiGeneration() {
+    guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else {
+      tick()
+      return
+    }
+
+    do {
+      let engine = try coreHapticEngine()
+      let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6)
+      let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.4)
+      let event = CHHapticEvent(
+        eventType: .hapticContinuous,
+        parameters: [intensity, sharpness],
+        relativeTime: 0,
+        duration: 1.0
+      )
+      let pattern = try CHHapticPattern(events: [event], parameters: [])
+      let player = try engine.makePlayer(with: pattern)
+      try player.start(atTime: 0)
+    } catch {
+      tick()
+    }
+  }
+
+  private static func coreHapticEngine() throws -> CHHapticEngine {
+    if let coreEngine { return coreEngine }
+
+    let engine = try CHHapticEngine()
+    engine.resetHandler = {
+      try? coreEngine?.start()
+    }
+    engine.stoppedHandler = { _ in
+      coreEngine = nil
+    }
+    try engine.start()
+    coreEngine = engine
+    return engine
+  }
 }
 
 #else
@@ -54,6 +96,7 @@ enum Haptics {
   static func pick() {}
   static func success() {}
   static func warning() {}
+  static func aiGeneration() {}
 }
 
 #endif

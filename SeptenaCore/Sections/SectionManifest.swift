@@ -129,7 +129,6 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
     "activity":    "figure.walk",
     "goals":       "target",
     "hydration":   "drop.fill",
-    "test":        "wand.and.stars",
   ]
 
   public var iconSymbol: String {
@@ -358,21 +357,6 @@ public extension SectionManifest {
       shortDescription: "Free-text intentions tagged with section keys",
       activation: .optional,
       onboarding: .hidden,
-      supportsTab: false,
-      supportsDashboard: false,
-      settingsEditor: .none
-    ),
-    // Sandbox section used to exercise the SectionPlugin + onboarding
-    // wiring without touching real user data. Hidden from Today and
-    // dashboard; only visible in Settings → Manage Sections. Delete
-    // this entry (and TestPlugin) before shipping to TestFlight /
-    // App Store.
-    .init(
-      key: "test",
-      defaultLabel: "Sandbox",
-      shortDescription: "Internal sandbox for trying out section flows",
-      activation: .optional,
-      onboarding: .optional,
       supportsTab: false,
       supportsDashboard: false,
       settingsEditor: .none

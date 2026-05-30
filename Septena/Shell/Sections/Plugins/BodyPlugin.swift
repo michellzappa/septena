@@ -11,8 +11,6 @@ enum BodyPlugin: SectionPlugin {
     SectionManifest.byKey["body"]!
   }
 
-  static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] { [] }
-
   static func destinationView() -> AnyView? { AnyView(BodyDestinationView()) }
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {

@@ -2,30 +2,13 @@ import SwiftUI
 import SwiftData
 
 // Cannabis log section. Same pattern as CaffeinePlugin: one file owns
-// the Today block, the display-label helper, and the full MCP contract,
-// so adding a new method or column updates everything in lock-step.
+// the display-label helper and the full MCP contract, so adding a new
+// method or column updates everything in lock-step.
 
 @MainActor
 enum CannabisPlugin: SectionPlugin {
   static var manifest: SectionManifest {
     SectionManifest.byKey["cannabis"]!
-  }
-
-  // MARK: - Today timeline
-
-  static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] {
-    let accent = ctx.theme.color(for: "cannabis")
-    return ctx.cannabis.map { entry in
-      TodayEvent(
-        id: "cnb-\(entry.id)",
-        time: entry.time,
-        section: "cannabis",
-        color: accent,
-        title: label(for: entry),
-        detail: entry.strain,
-        kind: .cannabis(entry)
-      )
-    }
   }
 
   static func destinationView() -> AnyView? { AnyView(CannabisDestinationView()) }
@@ -73,7 +56,7 @@ enum CannabisPlugin: SectionPlugin {
   }
 
   /// Human-readable label for an intake method. Used by both the Today
-  /// row and the edit sheet in TodayLogView — single source of truth.
+  /// timeline and the cannabis edit sheet — single source of truth.
   static func label(for entry: CannabisEntry) -> String {
     switch entry.method {
     case "vape":   return "Vape"

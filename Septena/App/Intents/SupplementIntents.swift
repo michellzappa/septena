@@ -5,15 +5,16 @@ import SwiftData
 // Supplements — the canonical section-intent template. To add a section,
 // copy this file and rename: (1) an AppEntity + EntityQuery exposing the
 // section's catalog to the picker, (2) thin intents that lean on
-// SectionLogIntent for boot + auto-enable, (3) literal AppShortcuts listed
-// from `SeptenaShortcuts`. The mutator + entity types come from SeptenaCore
-// (same module — no import needed).
+// SectionLogIntent for boot + auto-enable. The matching Siri phrases go in
+// `SeptenaShortcuts` (SectionLogIntent.swift) — the metadata processor needs
+// every AppShortcut literal inline there. Mutator + entity types come from
+// SeptenaCore (same module — no import needed).
 
 // MARK: - Catalog entity
 
-/// One of the user's supplements, surfaced to Siri / Shortcuts / Spotlight
-/// as a pickable value. Backed by `SupplementDefinitionEntity`; `id` is the
-/// stable definition id so the resolved value survives renames.
+/// One of the user's supplements, surfaced to Siri / Shortcuts / Spotlight as
+/// a pickable value. Backed by `SupplementDefinitionEntity`; `id` is the
+/// stable definition id so a resolved value survives renames.
 struct SupplementEntity: AppEntity {
   let id: String
   let title: String
@@ -30,8 +31,8 @@ struct SupplementEntity: AppEntity {
 }
 
 /// Resolves supplement parameters and supplies the picker list. Reads the
-/// live catalog from SwiftData, so the suggestions are always the user's
-/// actual supplements — the run-time surface that genuinely reflects data.
+/// live catalog from SwiftData, so suggestions are always the user's actual
+/// supplements — the run-time surface that genuinely reflects data.
 struct SupplementEntityQuery: EntityQuery {
   @MainActor
   func entities(for ids: [String]) async throws -> [SupplementEntity] {
@@ -94,40 +95,5 @@ struct AddSupplementIntent: SectionLogIntent {
     await prepareSection()
     _ = SeptenaServices.shared.checklistMutator.createSupplement(name: name)
     return .result(dialog: "Added \(name) to your supplements.")
-  }
-}
-
-// MARK: - Shortcuts
-
-/// Supplements' contribution to the global `SeptenaShortcuts` provider. One
-/// `AppShortcut` per action; `systemImageName` mirrors the manifest icon
-/// (`SectionManifest.iconByKey["supplements"]`). Phrases must contain
-/// \(.applicationName); entity templating (\(\.$supplement)) is allowed
-/// because SupplementEntity is an AppEntity.
-enum SupplementShortcuts {
-  static var markTaken: AppShortcut {
-    AppShortcut(
-      intent: MarkSupplementTakenIntent(),
-      phrases: [
-        "Log a supplement in \(.applicationName)",
-        "Mark a supplement taken in \(.applicationName)",
-        "Took a supplement in \(.applicationName)",
-        "Log \(\.$supplement) in \(.applicationName)",
-      ],
-      shortTitle: "Mark Supplement Taken",
-      systemImageName: "pills"
-    )
-  }
-
-  static var addNew: AppShortcut {
-    AppShortcut(
-      intent: AddSupplementIntent(),
-      phrases: [
-        "Add a supplement in \(.applicationName)",
-        "New supplement in \(.applicationName)",
-      ],
-      shortTitle: "Add Supplement",
-      systemImageName: "pills"
-    )
   }
 }

@@ -66,43 +66,6 @@ enum NutritionPlugin: SectionPlugin {
     ))
   }
 
-  // MARK: - Today timeline
-
-  static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] {
-    let accent = ctx.theme.color(for: "nutrition")
-    return ctx.nutrition
-      // Filter out water-only entries — those belong to the Hydration
-      // section's Today block, not here. A real meal that happens to
-      // record waterMl still shows under Nutrition (it's a meal).
-      .filter { $0.date == date && !HydrationPlugin.isHydrationOnly($0) }
-      .map { entry in
-        TodayEvent(
-          id: "nut-\(entry.id)",
-          time: entry.time,
-          section: "nutrition",
-          color: accent,
-          title: title(for: entry),
-          detail: detail(for: entry),
-          kind: .nutrition(entry)
-        )
-      }
-  }
-
-  /// "🥗 chicken salad +2" — emoji prefix (if any) + first food + count of
-  /// remaining foods. Empty `foods` falls back to literal "Meal".
-  static func title(for entry: NutritionEntry) -> String {
-    let name = entry.foods.first ?? "Meal"
-    let prefix = entry.emoji.map { "\($0) " } ?? ""
-    let more = entry.foods.count > 1 ? " +\(entry.foods.count - 1)" : ""
-    return "\(prefix)\(name)\(more)"
-  }
-
-  /// Protein + kcal headline — the two numbers people glance at on the
-  /// timeline. Full macro breakdown lives on the entry detail screen.
-  static func detail(for entry: NutritionEntry) -> String? {
-    "\(Int(entry.proteinG))g protein · \(Int(entry.kcal)) kcal"
-  }
-
   // MARK: - MCP / agent contract
 
   static var mcpSkill: SectionSkill? {

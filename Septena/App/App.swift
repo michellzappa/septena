@@ -82,6 +82,9 @@ struct SeptenaApp: App {
             }
           }
         }
+        .onOpenURL { url in
+          handleDeepLink(url)
+        }
         .task {
           #if os(iOS)
           // Drain any shortcut captured during cold launch — the
@@ -134,6 +137,9 @@ struct SeptenaApp: App {
           // Derive `occurredAt` for legacy event rows (and first-sync Mood)
           // after the engine has fetched, so pushes carry the real timestamp.
           OccurredAtBackfill.runIfNeeded(context: localStore.container.mainContext)
+          #if os(iOS)
+          TrainingLiveActivityCoordinator.shared.reconcile(with: trainingDraft.draft)
+          #endif
           await runRemindersAutoImport()
         }
         .onReceive(NotificationCenter.default
@@ -229,6 +235,13 @@ struct SeptenaApp: App {
     }
     .menuBarExtraStyle(.menu)
     #endif
+  }
+
+  private func handleDeepLink(_ url: URL) {
+    guard url.scheme == "septena" else { return }
+    if url.host == "training", url.path == "/active" {
+      navigation.showTrainingSession = true
+    }
   }
 
   /// Drains the Reminders source list into Septena when the user has opted

@@ -7,24 +7,6 @@ enum HabitsPlugin: SectionPlugin {
     SectionManifest.byKey["habits"]!
   }
 
-  static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] {
-    let accent = ctx.theme.color(for: "habits")
-    return ctx.habits
-      .filter { $0.done }
-      .compactMap { habit -> TodayEvent? in
-        guard let time = habit.time else { return nil }
-        return TodayEvent(
-          id: "habit-\(habit.id)",
-          time: time,
-          section: "habits",
-          color: accent,
-          title: [habit.emoji, habit.name].compactMap { $0 }.joined(separator: " "),
-          detail: nil,
-          kind: .habit(habit)
-        )
-      }
-  }
-
   static func destinationView() -> AnyView? { AnyView(HabitsDestinationView()) }
 
   static var logActions: [LogAction] {

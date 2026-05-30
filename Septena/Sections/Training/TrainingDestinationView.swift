@@ -1472,9 +1472,19 @@ final class TrainingDraftStore {
       recentByExercise: recents
     )
     persist()
+    #if os(iOS)
+    if let draft {
+      TrainingLiveActivityCoordinator.shared.start(for: draft)
+    }
+    #endif
   }
 
-  func discard() {
+  func discard(endLiveActivity: Bool = true) {
+    #if os(iOS)
+    if endLiveActivity {
+      TrainingLiveActivityCoordinator.shared.end(from: draft, immediate: true)
+    }
+    #endif
     draft = nil
     persist()
   }
@@ -1489,6 +1499,9 @@ final class TrainingDraftStore {
     d.updatedAt = isoF.string(from: Date())
     draft = d
     persist()
+    #if os(iOS)
+    TrainingLiveActivityCoordinator.shared.update(from: d)
+    #endif
   }
 
   /// Save one entry locally via CloudKit-backed TrainingMutator. Flips the
@@ -1524,6 +1537,15 @@ final class TrainingDraftStore {
     update {
       guard $0.entries.indices.contains(index) else { return }
       $0.entries[index].status = .skipped
+    }
+  }
+
+  /// Return a skipped entry to the pending pool (menu "Unskip").
+  func unskip(index: Int) {
+    update {
+      guard $0.entries.indices.contains(index),
+            $0.entries[index].status == .skipped else { return }
+      $0.entries[index].status = .pending
     }
   }
 
@@ -1870,8 +1892,11 @@ struct TrainingSessionView: View {
       let routineKind = store.sessionTypes
         .first(where: { $0.id == d.sessionType })?.kind ?? .mixed
       completionStats = SessionStats(from: d, kind: routineKind)
+      #if os(iOS)
+      TrainingLiveActivityCoordinator.shared.end(from: d, immediate: false)
+      #endif
     }
-    store.discard()
+    store.discard(endLiveActivity: false)
     // Don't dismiss yet — sheet's onDone handles that, otherwise the
     // celebration vanishes the same beat it appears.
   }
@@ -1980,6 +2005,26 @@ struct TrainingExerciseCard: View {
         } label: {
           Label("Switch exercise", systemImage: "arrow.triangle.2.circlepath")
         }
+        // Skip lives here now (not in the footer) so the footer is a
+        // single primary action. Toggles to "Unskip" once skipped; hidden
+        // for already-logged entries (nothing to skip).
+        if entry.status == .skipped {
+          Button {
+            store.unskip(index: index)
+            Haptics.tick()
+          } label: {
+            Label("Unskip", systemImage: "arrow.uturn.left")
+          }
+        } else if entry.status != .done && entry.status != .saving {
+          Button {
+            store.markSkipped(index: index)
+            expanded = false
+            Haptics.tick()
+          } label: {
+            Label("Skip", systemImage: "forward.end")
+          }
+        }
+        Divider()
         Button(role: .destructive) {
           store.removeEntry(at: index)
           Haptics.warning()
@@ -2187,33 +2232,29 @@ struct TrainingExerciseCard: View {
       strengthInputs
       difficultyPicker
     }
-    HStack(spacing: 8) {
-      Button("Skip") {
-        store.markSkipped(index: index)
-        expanded = false
+    // Single full-width primary action. Skip moved to the ⋯ menu, so the
+    // footer reads as one obvious "log this" target — easy thumb-reach at
+    // the gym.
+    Button(entry.status == .failed ? "Retry"
+           : entry.status == .done ? "Update" : "Done") {
+      let wasDone = (entry.status == .done)
+      store.markDone(index: index, mutator: trainingMutator)
+      // Celebrate only on first completion, not re-saves of an
+      // already-done entry. Success haptic + confetti + status-icon
+      // bounce — small enough to fit the "you did a set" cadence.
+      if !wasDone {
+        Haptics.success()
+        celebrate += 1
       }
-      .buttonStyle(.bordered)
-      .tint(.secondary)
-      Spacer()
-      Button(entry.status == .failed ? "Retry"
-             : entry.status == .done ? "Update" : "Done") {
-        let wasDone = (entry.status == .done)
-        store.markDone(index: index, mutator: trainingMutator)
-        // Celebrate only on first completion, not re-saves of an
-        // already-done entry. Success haptic + confetti + status-icon
-        // bounce — small enough to fit the "you did a set" cadence.
-        if !wasDone {
-          Haptics.success()
-          celebrate += 1
-        }
-        if entry.status != .failed { expanded = false }
-      }
-      .buttonStyle(.borderedProminent)
-      .tint(accent)
-      .disabled(entry.status == .saving)
-      .overlay(alignment: .center) {
-        ConfettiBurst(trigger: celebrate, accent: accent)
-      }
+      if entry.status != .failed { expanded = false }
+    }
+    .buttonStyle(.borderedProminent)
+    .controlSize(.large)
+    .frame(maxWidth: .infinity)
+    .tint(accent)
+    .disabled(entry.status == .saving)
+    .overlay(alignment: .center) {
+      ConfettiBurst(trigger: celebrate, accent: accent)
     }
     .padding(.top, 12)
   }
@@ -2221,22 +2262,22 @@ struct TrainingExerciseCard: View {
   // MARK: - Strength fields
 
   private var strengthInputs: some View {
-    HStack(spacing: 10) {
-      numberField(label: "Weight", unit: "kg",
-                  value: Binding(
-                    get: { entry.weight.map { fmt($0) } ?? "" },
-                    set: { setWeight($0) }
-                  ))
-      numberField(label: "Sets",
-                  value: Binding(
-                    get: { entry.sets.map(String.init) ?? "" },
-                    set: { setSets(Int($0)) }
-                  ))
-      numberField(label: "Reps",
-                  value: Binding(
-                    get: { entry.reps ?? "" },
-                    set: { setReps($0) }
-                  ))
+    HStack(spacing: 8) {
+      steppedField(label: "Weight", unit: "kg", step: 2.5,
+                   value: Binding(
+                     get: { entry.weight.map { fmt($0) } ?? "" },
+                     set: { setWeight($0) }
+                   ))
+      steppedField(label: "Sets", step: 1,
+                   value: Binding(
+                     get: { entry.sets.map(String.init) ?? "" },
+                     set: { setSets(Int($0)) }
+                   ))
+      steppedField(label: "Reps", step: 1,
+                   value: Binding(
+                     get: { entry.reps ?? "" },
+                     set: { setReps($0) }
+                   ))
     }
   }
 
@@ -2336,6 +2377,70 @@ struct TrainingExerciseCard: View {
   }
 
   // MARK: - Field helpers
+
+  /// Numeric input with big −/＋ targets flanking the value, so weight /
+  /// sets / reps can be bumped without summoning the keyboard mid-set —
+  /// the centered field still accepts direct entry for arbitrary numbers.
+  private func steppedField(label: String,
+                            unit: String? = nil,
+                            step: Double,
+                            value: Binding<String>) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Text(label.uppercased())
+        .font(.caption2.weight(.semibold))
+        .foregroundStyle(.secondary)
+      HStack(spacing: 4) {
+        stepButton("minus") { bump(value, by: -step) }
+        HStack(spacing: 2) {
+          TextField("", text: value)
+            #if os(iOS)
+            .keyboardType(.decimalPad)
+            #endif
+            .multilineTextAlignment(.center)
+            .textFieldStyle(.plain)
+            .font(.system(.title3, design: .rounded).weight(.medium))
+          if let unit {
+            Text(unit).font(.caption2).foregroundStyle(.secondary)
+          }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 9)
+        .background(Theme.mutedSurface,
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        stepButton("plus") { bump(value, by: step) }
+      }
+    }
+  }
+
+  private func stepButton(_ systemName: String, action: @escaping () -> Void) -> some View {
+    Button {
+      action()
+      Haptics.tick()
+    } label: {
+      Image(systemName: systemName)
+        .font(.system(size: 13, weight: .bold))
+        .frame(width: 30, height: 40)
+        .background(accent.opacity(0.14),
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .foregroundStyle(accent)
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+  }
+
+  /// Parse → clamp at zero → re-write the bound string. Non-numeric values
+  /// (e.g. "AMRAP") are left untouched so the steppers can't clobber them;
+  /// an empty field starts from the step.
+  private func bump(_ value: Binding<String>, by delta: Double) {
+    let raw = value.wrappedValue
+      .trimmingCharacters(in: .whitespaces)
+      .replacingOccurrences(of: ",", with: ".")
+    if !raw.isEmpty, Double(raw) == nil { return }
+    let next = max(0, (Double(raw) ?? 0) + delta)
+    value.wrappedValue = next.truncatingRemainder(dividingBy: 1) == 0
+      ? String(Int(next))
+      : String(format: "%.1f", next)
+  }
 
   private func numberField(label: String,
                            unit: String? = nil,

@@ -101,7 +101,7 @@ struct ModuleTile: View {
               // Quick-add updates the value; .numericText() tween the
               // digit transition (5 → 6, 14 → 15) instead of a hard cut.
               .contentTransition(.numericText())
-              .a11yAnimation(.snappy, value: stat.value)
+              .a11yAnimation(Theme.Motion.standard, value: stat.value)
             if let unit = stat.unit {
               Text(unit)
                 .font(.subheadline)
@@ -146,7 +146,7 @@ private struct ProgressRow: View {
             .frame(width: safeW * frac)
             // Tween the bar width when current/target change — quick-add
             // commits a new value, the bar slides instead of snapping.
-            .a11yAnimation(.snappy, value: frac)
+            .a11yAnimation(Theme.Motion.standard, value: frac)
         }
       }
       .frame(height: 6)
@@ -394,8 +394,8 @@ struct Histogram: View {
         // quick-add bumps today's bar (the last one), which slides up
         // smoothly instead of jumping. Stacked modifiers because SwiftUI's
         // `.animation(_:value:)` watches one value each.
-        .a11yAnimation(.snappy, value: values)
-        .a11yAnimation(.snappy, value: secondaryValues)
+        .a11yAnimation(Theme.Motion.standard, value: values)
+        .a11yAnimation(Theme.Motion.standard, value: secondaryValues)
         if let dayLabels {
           HStack(spacing: gap) {
             ForEach(Array(dayLabels.enumerated()), id: \.offset) { idx, lbl in

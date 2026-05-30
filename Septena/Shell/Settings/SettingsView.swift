@@ -364,7 +364,7 @@ struct SettingsView: View {
   /// for per-section rows resolved against `SectionManifest` + the live
   /// `store.sections` list.
   enum SettingsDestination: Hashable {
-    case general, integrations, importExport, skills, privacy, about
+    case general, integrations, importExport, skills, siriShortcuts, privacy, about
     case manageSections
     case quickActions
     case appIcon
@@ -460,7 +460,7 @@ struct SettingsView: View {
   #endif
 
   private var staticDestinations: [SettingsDestination] {
-    [.general, .integrations, .importExport, .skills, .manageSections, .privacy, .about]
+    [.general, .integrations, .importExport, .skills, .siriShortcuts, .manageSections, .privacy, .about]
   }
 
   /// Per-section sidebar rows, ordered by the user's saved `sectionOrder`
@@ -515,6 +515,7 @@ struct SettingsView: View {
     case .integrations: return "Integrations"
     case .importExport: return "Import & Export"
     case .skills:       return "Skills"
+    case .siriShortcuts: return "Siri & Shortcuts"
     case .privacy:      return "Privacy"
     case .about:        return "About"
     case .manageSections: return "Manage Sections"
@@ -537,6 +538,7 @@ struct SettingsView: View {
     case .integrations: return "app.connected.to.app.below.fill"
     case .importExport: return "square.and.arrow.up.on.square"
     case .skills:       return "sparkles"
+    case .siriShortcuts: return "mic"
     case .privacy:      return "hand.raised"
     case .about:        return "info.circle"
     case .manageSections: return "square.grid.2x2"
@@ -554,6 +556,7 @@ struct SettingsView: View {
     case .integrations: return .indigo
     case .importExport: return .orange
     case .skills:       return .pink
+    case .siriShortcuts: return .blue
     case .privacy:      return .teal
     case .about:        return .purple
     case .manageSections: return .blue
@@ -572,6 +575,7 @@ struct SettingsView: View {
     case .integrations:      IntegrationsSettingsPane()
     case .importExport:      ImportExportSettingsPane()
     case .skills:            SkillsSettingsPane()
+    case .siriShortcuts:     SiriShortcutsSettingsPane()
     case .privacy:           PrivacySettingsPane()
     case .about:             AboutSettingsPane()
     case .manageSections:    ManageSectionsPane()
@@ -1482,7 +1486,7 @@ struct ManageSectionsPane: View {
   private func setEnabled(_ key: String, _ enabled: Bool) {
     // Off → on transition: if the section has a plugin onboarding flow
     // and either hasn't been onboarded yet OR the plugin opts into
-    // re-presenting on every enable (Sandbox), route through the sheet
+    // re-presenting on every enable, route through the sheet
     // instead of enabling directly. The sheet's completion handler
     // does the enable + hasOnboarded write.
     if enabled,
@@ -1910,11 +1914,11 @@ private func parseHexColor(_ s: String) -> Color {
 
 // MARK: - Integrations
 //
-// Native iOS access states for the three frameworks Septena reaches
-// outside the FastAPI proxy: Reminders + Calendar (EventKit) and Apple
-// Health (HealthKit). The Reminders row pushes to a detail screen
-// with source-list picker + auto-import controls when access is granted;
-// Calendar and Health are state-only rows (no per-integration config yet).
+// Native iOS access states for the frameworks Septena reaches outside the
+// FastAPI proxy: Reminders + Calendar (EventKit), Apple Health (HealthKit),
+// and Photos (PhotoKit). The Reminders row pushes to a detail screen with
+// source-list picker + auto-import controls when access is granted; the
+// others push to a detail screen showing access state and a grant/fix path.
 
 struct IntegrationsSettingsPane: View {
   @State private var remindersBridge = RemindersBridge.shared
@@ -1922,6 +1926,7 @@ struct IntegrationsSettingsPane: View {
   @State private var healthBridge = HealthKitBridge.shared
   @State private var ouraProvider = OuraProvider.shared
   @State private var withingsProvider = WithingsProvider.shared
+  @State private var photosBridge = PhotosBridge.shared
   var body: some View {
     Form {
       Section {
@@ -1962,6 +1967,22 @@ struct IntegrationsSettingsPane: View {
                    systemImage: "heart.text.square",
                    state: healthAccessLabel,
                    isGranted: healthBridge.access == .granted)
+        }
+
+        // Photos — used to attach thumbnails to nutrition (meal) entries.
+        // Access is requested lazily by the picker too, but surfacing it
+        // here gives denied users a fix path (and a way to grant up front).
+        NavigationLink {
+          PhotosDetail()
+            .navigationTitle("Photos")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+        } label: {
+          stateRow(title: "Photos",
+                   systemImage: "photo",
+                   state: photosAccessLabel,
+                   isGranted: photosBridge.access == .granted)
         }
 
         // Oura — direct iOS client (Personal Access Token). Replaces the
@@ -2053,6 +2074,14 @@ struct IntegrationsSettingsPane: View {
   private var healthAccessLabel: String {
     guard healthBridge.isAvailable else { return "Not available" }
     switch healthBridge.access {
+    case .granted:       return "Granted"
+    case .denied:        return "Denied"
+    case .notDetermined: return "Grant"
+    }
+  }
+
+  private var photosAccessLabel: String {
+    switch photosBridge.access {
     case .granted:       return "Granted"
     case .denied:        return "Denied"
     case .notDetermined: return "Grant"
@@ -2412,6 +2441,54 @@ private struct CalendarDetail: View {
     if access == .granted {
       calendars = bridge.allCalendars()
     }
+  }
+}
+
+// MARK: - Photos Detail
+//
+// Photo access is used to attach thumbnails to nutrition (meal) entries.
+// When access is denied, meal thumbnails silently fall back to a
+// placeholder — this screen explains why and points to iOS Settings.
+private struct PhotosDetail: View {
+  @State private var bridge = PhotosBridge.shared
+  @State private var access: PhotosBridge.Access = .notDetermined
+
+  var body: some View {
+    Form {
+      Section {
+        Text("Septena attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device.")
+          .font(.callout)
+          .foregroundStyle(.secondary)
+      }
+
+      switch access {
+      case .notDetermined:
+        Section {
+          Button("Grant Access to Photos") {
+            Task {
+              _ = await bridge.requestAccess()
+              refresh()
+            }
+          }
+        }
+      case .denied:
+        Section {
+          Text("Photo access is denied. Enable it in Settings → Privacy → Photos. Meal thumbnails won't show until then.")
+            .font(.callout)
+        }
+      case .granted:
+        Section {
+          Label("Connected", systemImage: "checkmark.circle.fill")
+            .foregroundStyle(.green)
+        }
+      }
+    }
+    .formStyle(.grouped)
+    .onAppear(perform: refresh)
+  }
+
+  private func refresh() {
+    access = bridge.access
   }
 }
 

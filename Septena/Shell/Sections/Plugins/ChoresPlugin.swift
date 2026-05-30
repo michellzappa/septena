@@ -7,23 +7,6 @@ enum ChoresPlugin: SectionPlugin {
     SectionManifest.byKey["chores"]!
   }
 
-  static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] {
-    let accent = ctx.theme.color(for: "chores")
-    return ctx.chores
-      .filter { $0.lastCompleted == date }
-      .map { chore in
-        TodayEvent(
-          id: "chore-\(chore.id)",
-          time: chore.lastCompletedTime ?? "00:00",
-          section: "chores",
-          color: accent,
-          title: [chore.emoji, chore.name].compactMap { $0 }.joined(separator: " "),
-          detail: nil,
-          kind: .chore(chore)
-        )
-      }
-  }
-
   static func destinationView() -> AnyView? { AnyView(ChoresDestinationView()) }
 
   static var logActions: [LogAction] {

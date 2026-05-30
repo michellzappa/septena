@@ -17,13 +17,23 @@ struct MoodCommitAnimation: View {
   /// — `.task(id:)` watches it and replays on each increment.
   let trigger: Int
 
+  // Reduce Motion suppresses the whole flourish. These are post-commit
+  // decorations — the success haptic and the page dismissing already
+  // confirm the log — so honoring the opt-out costs nothing. Gating here
+  // (rather than inside each quadrant) is what keeps the HAN screen-flash
+  // from ever rendering: a full-screen luminance flash is seizure-adjacent
+  // and must never fire when the user has asked for reduced motion.
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
   var body: some View {
     ZStack {
-      switch quadrant {
-      case .hap: HAPBurst(color: quadrant.color, trigger: trigger)
-      case .han: HANPulse(color: quadrant.color, trigger: trigger)
-      case .lap: LAPBloom(color: quadrant.color, trigger: trigger)
-      case .lan: LANSink(color: quadrant.color, trigger: trigger)
+      if !reduceMotion {
+        switch quadrant {
+        case .hap: HAPBurst(color: quadrant.color, trigger: trigger)
+        case .han: HANPulse(color: quadrant.color, trigger: trigger)
+        case .lap: LAPBloom(color: quadrant.color, trigger: trigger)
+        case .lan: LANSink(color: quadrant.color, trigger: trigger)
+        }
       }
     }
     .allowsHitTesting(false)

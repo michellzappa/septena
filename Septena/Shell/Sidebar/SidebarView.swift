@@ -5,31 +5,6 @@ import UniformTypeIdentifiers
 // compact homepage on iPhone: the root screen IS the sidebar.
 // QuickFind + smart lists + areas/projects + Settings. See docs/reference/navigation.md.
 
-// MARK: - Sidebar drag identifier
-
-/// Single Transferable type for all sidebar drags. The `kind` discriminator
-/// lets the drop handler reject mismatches (an area dropped on a project
-/// row, a top-level project dropped inside an area, etc.) without relying
-/// on registered UTTypes. `parent` is the area id for projects-in-area, nil
-/// for top-level projects, and ignored for areas — drop handlers use it to
-/// scope reorders to the same group.
-struct SidebarDragID: Codable, Hashable, Transferable {
-  enum Kind: String, Codable, Hashable { case area, project }
-  let kind: Kind
-  let id: String
-  let parent: String?
-
-  static var transferRepresentation: some TransferRepresentation {
-    CodableRepresentation(contentType: .data)
-  }
-
-  static func area(_ id: String) -> SidebarDragID {
-    SidebarDragID(kind: .area, id: id, parent: nil)
-  }
-  static func project(_ id: String, parent: String?) -> SidebarDragID {
-    SidebarDragID(kind: .project, id: id, parent: parent)
-  }
-}
 
 struct SidebarRootView: View {
   @Environment(NavigationState.self) private var nav
@@ -42,6 +17,11 @@ struct SidebarRootView: View {
   @State private var areas: [Area]
   @State private var projects: [Project]
   @State private var counts: TasksCounts? = nil
+
+  // Persisted sidebar order — arrays of IDs in display order.
+  // Written on every Move Up/Down; applied when loading from cache/server.
+  @AppStorage("sidebar.areaOrder")    private var areaOrderData: Data = Data()
+  @AppStorage("sidebar.projectOrder") private var projectOrderData: Data = Data()
 
   // Seed sidebar lists from cache before first render so the sidebar isn't
   // ever blank — areas/projects barely change, so this is effectively the
@@ -434,7 +414,6 @@ struct SidebarRootView: View {
         // which read as "the sidebar lifts" on tap. The selected fill is
         // the only feedback we want — InertButtonStyle strips the rest.
         .buttonStyle(InertButtonStyle())
-        .modifier(SmartListTaskDrop(route: spec.route, mutator: taskMutator))
       }
     }
     .padding(.horizontal, Theme.hPadding)
@@ -528,19 +507,6 @@ struct SidebarRootView: View {
       ForEach(areas) { area in
         areaSection(area)
       }
-      #if os(macOS)
-      // Trailing area drop zone for "drop at end of areas".
-      if !areas.isEmpty {
-        Color.clear
-          .frame(height: 18)
-          .contentShape(Rectangle())
-          .dropDestination(for: SidebarDragID.self) { items, _ in
-            guard let drag = items.first, drag.kind == .area else { return false }
-            reorderArea(drag.id, toEnd: true)
-            return true
-          }
-      }
-      #endif
     }
   }
 
@@ -550,10 +516,9 @@ struct SidebarRootView: View {
   private var topLevelProjectsSection: some View {
     sectionCard {
       ForEach(Array(topLevelProjects.enumerated()), id: \.element.id) { idx, project in
-        projectRowDraggable(project, parent: nil)
+        projectRow(project, parent: nil)
         if idx < topLevelProjects.count - 1 { inCardDivider }
       }
-      endOfGroupDropZone(parent: nil)
     }
   }
 
@@ -569,40 +534,25 @@ struct SidebarRootView: View {
       sidebarButton(.area(area)) {
         SidebarAreaRow(name: area.title, count: areaOpenCount[area.id] ?? 0)
       }
-      .contextMenu { areaMenu(area) }
-      // Drop a dragged task (payload: task id String) onto this area
-      // row to re-home it. Independent of the SidebarDragID dropDest
-      // below — SwiftUI dispatches by payload type.
-      .modifier(SidebarTaskDropTarget(kind: .area(area.id), mutator: taskMutator))
-      #if os(macOS)
-      // Drag-to-reorder is macOS-only. On iPadOS, attaching `.draggable`
-      // to a tappable row plays a "lift" preview on every tap that reads
-      // as the whole sidebar briefly shifting.
-      .draggable(SidebarDragID.area(area.id)) {
-        Text(area.title)
-          .font(.system(size: Theme.sidebarAreaTitleSize, weight: .semibold))
-          .foregroundStyle(Theme.inkPrimary)
-          .padding(.horizontal, 12).padding(.vertical, 6)
+      #if os(iOS)
+      .contextMenu {
+        areaMenu(area)
+      } preview: {
+        SidebarAreaRow(name: area.title, count: areaOpenCount[area.id] ?? 0)
+          .padding(.horizontal, 14).padding(.vertical, 6)
           .background(Theme.cardSurface)
-          .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall))
-          .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
       }
-      .dropDestination(for: SidebarDragID.self) { items, _ in
-        guard let drag = items.first,
-              drag.kind == .area,
-              drag.id != area.id else { return false }
-        reorderArea(drag.id, before: area.id)
-        return true
-      }
+      #else
+      .contextMenu { areaMenu(area) }
+      .modifier(SidebarTaskDrop(kind: .area(area.id), mutator: taskMutator))
       #endif
 
       if !projectsInArea.isEmpty {
         inCardDivider
         ForEach(Array(projectsInArea.enumerated()), id: \.element.id) { idx, project in
-          projectRowDraggable(project, parent: area.id)
+          projectRow(project, parent: area.id)
           if idx < projectsInArea.count - 1 { inCardDivider }
         }
-        endOfGroupDropZone(parent: area.id)
       }
     }
   }
@@ -635,56 +585,26 @@ struct SidebarRootView: View {
   private var sectionCardHPad: CGFloat { Theme.hPadding }
   #endif
 
-  /// Project row in either top-level or within-area context. `parent`
-  /// scopes drag-drop so projects can only be reordered within the same
-  /// group; cross-group drops (top-level ↔ area) are rejected.
   @ViewBuilder
-  private func projectRowDraggable(_ project: Project, parent: String?) -> some View {
+  private func projectRow(_ project: Project, parent: String?) -> some View {
     sidebarButton(.project(project)) {
       SidebarProjectRow(name: project.title,
                         progress: projectProgress[project.id] ?? 0,
                         count: projectOpenCount[project.id] ?? 0)
     }
-    .contextMenu { projectMenu(project) }
-    .modifier(SidebarTaskDropTarget(kind: .project(project.id), mutator: taskMutator))
-    #if os(macOS)
-    .draggable(SidebarDragID.project(project.id, parent: parent)) {
-      Text(project.title)
-        .font(.system(size: Theme.sidebarTitleSize, weight: Theme.sidebarTitleWeight))
-        .foregroundStyle(Theme.inkPrimary)
-        .padding(.horizontal, 12).padding(.vertical, 6)
+    #if os(iOS)
+    .contextMenu {
+      projectMenu(project)
+    } preview: {
+      SidebarProjectRow(name: project.title,
+                        progress: projectProgress[project.id] ?? 0,
+                        count: projectOpenCount[project.id] ?? 0)
+        .padding(.horizontal, 14).padding(.vertical, 6)
         .background(Theme.cardSurface)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall))
-        .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
     }
-    .dropDestination(for: SidebarDragID.self) { items, _ in
-      guard let drag = items.first,
-            drag.kind == .project,
-            drag.parent == parent,           // same group only
-            drag.id != project.id else { return false }
-      reorderProject(drag.id, before: project.id, parent: parent)
-      return true
-    }
-    #endif
-  }
-
-  /// Trailing drop zone for "put at the end of this project group". Sized
-  /// generously so the user doesn't have to aim at a hairline.
-  @ViewBuilder
-  private func endOfGroupDropZone(parent: String?) -> some View {
-    #if os(macOS)
-    Color.clear
-      .frame(height: 6)
-      .contentShape(Rectangle())
-      .dropDestination(for: SidebarDragID.self) { items, _ in
-        guard let drag = items.first,
-              drag.kind == .project,
-              drag.parent == parent else { return false }
-        reorderProject(drag.id, toEnd: true, parent: parent)
-        return true
-      }
     #else
-    EmptyView()
+    .contextMenu { projectMenu(project) }
+    .modifier(SidebarTaskDrop(kind: .project(project.id), mutator: taskMutator))
     #endif
   }
 
@@ -697,6 +617,23 @@ struct SidebarRootView: View {
       renameProjectTarget = project
     } label: {
       Label("Rename", systemImage: "pencil")
+    }
+    let siblings = projects.filter { $0.area == project.area && $0.status == .active }
+    if let idx = siblings.firstIndex(where: { $0.id == project.id }) {
+      Divider()
+      Button {
+        reorderProject(project.id, before: siblings[idx - 1].id, parent: project.area)
+      } label: {
+        Label("Move Up", systemImage: "chevron.up")
+      }
+      .disabled(idx == 0)
+      Button {
+        let next = siblings[idx + 1]
+        reorderProject(next.id, before: project.id, parent: project.area)
+      } label: {
+        Label("Move Down", systemImage: "chevron.down")
+      }
+      .disabled(idx == siblings.count - 1)
     }
     Divider()
     Button(role: .destructive) {
@@ -719,6 +656,22 @@ struct SidebarRootView: View {
       showingNewProject = true
     } label: {
       Label("New Project", systemImage: "plus.square")
+    }
+    if let idx = areas.firstIndex(where: { $0.id == area.id }) {
+      Divider()
+      Button {
+        reorderArea(area.id, before: areas[idx - 1].id)
+      } label: {
+        Label("Move Up", systemImage: "chevron.up")
+      }
+      .disabled(idx == 0)
+      Button {
+        let next = areas[idx + 1]
+        reorderArea(next.id, before: area.id)
+      } label: {
+        Label("Move Down", systemImage: "chevron.down")
+      }
+      .disabled(idx == areas.count - 1)
     }
     Divider()
     Button(role: .destructive) {
@@ -760,23 +713,10 @@ struct SidebarRootView: View {
     commitAreaOrder(next)
   }
 
-  /// Move the area with id `movedId` to the end of the areas list.
-  private func reorderArea(_ movedId: String, toEnd: Bool) {
-    guard toEnd, let from = areas.firstIndex(where: { $0.id == movedId }),
-          from != areas.count - 1 else { return }
-    var next = areas
-    let item = next.remove(at: from)
-    next.append(item)
-    commitAreaOrder(next)
-  }
-
   private func commitAreaOrder(_ next: [Area]) {
     Haptics.tick()
     areas = next
-    // CloudKit mode: no server-side ordering yet — each AreaRecord is
-    // standalone. The visual reorder sticks until the next load() reads
-    // back alphabetical order from LocalCache. Phase 6+: add a sortIndex
-    // field to AreaRecord if persistent ordering becomes a requirement.
+    areaOrderData = (try? JSONEncoder().encode(next.map(\.id))) ?? Data()
   }
 
   /// Reorder a project within its parent group (top-level when parent is
@@ -791,18 +731,6 @@ struct SidebarRootView: View {
       let item = next.remove(at: from)
       let insertAt = (from < to) ? to - 1 : to
       next.insert(item, at: insertAt)
-      return next
-    }
-  }
-
-  private func reorderProject(_ movedId: String, toEnd: Bool, parent: String?) {
-    guard toEnd else { return }
-    commitProjectOrder(parent: parent) { siblings in
-      guard let from = siblings.firstIndex(where: { $0.id == movedId }),
-            from != siblings.count - 1 else { return nil }
-      var next = siblings
-      let item = next.remove(at: from)
-      next.append(item)
       return next
     }
   }
@@ -838,7 +766,7 @@ struct SidebarRootView: View {
 
     Haptics.tick()
     projects = next
-    // CloudKit mode: ordering isn't persisted — same note as commitAreaOrder.
+    projectOrderData = (try? JSONEncoder().encode(next.map(\.id))) ?? Data()
   }
 
   private var topLevelProjects: [Project] {
@@ -851,8 +779,8 @@ struct SidebarRootView: View {
     // Paint sidebar from cache immediately — areas / projects rarely change,
     // and tile counts can be rebuilt from the SwiftData task cache without a
     // round-trip. The server response overwrites both below.
-    let cachedAreas = LocalCache.areas(in: modelContext)
-    let cachedProjects = LocalCache.projects(in: modelContext)
+    let cachedAreas = applyStoredOrder(to: LocalCache.areas(in: modelContext))
+    let cachedProjects = applyStoredProjectOrder(to: LocalCache.projects(in: modelContext))
     if !cachedAreas.isEmpty { areas = cachedAreas }
     if !cachedProjects.isEmpty { projects = cachedProjects }
     let cachedTasks = LocalCache.allTasks(in: modelContext)
@@ -861,8 +789,8 @@ struct SidebarRootView: View {
     // CKSyncEngine keeps SwiftData fresh.
     async let c = TaskReads.counts(context: modelContext)
     async let all = TaskReads.list(view: "all", context: modelContext)
-    areas = LocalCache.areas(in: modelContext)
-    projects = LocalCache.projects(in: modelContext)
+    areas = applyStoredOrder(to: LocalCache.areas(in: modelContext))
+    projects = applyStoredProjectOrder(to: LocalCache.projects(in: modelContext))
     let serverCounts = await c
     // 'Next' is the chores / habits / supplements ritual. Merged
     // locally from the CloudKit-mirrored SwiftData store — no FastAPI
@@ -947,8 +875,25 @@ struct SidebarRootView: View {
     projectOpenCount = agg.projectOpenCount
     areaOpenCount = agg.areaOpenCount
   }
-}
 
+  private func applyStoredOrder(to loaded: [Area]) -> [Area] {
+    guard let ids = try? JSONDecoder().decode([String].self, from: areaOrderData),
+          !ids.isEmpty else { return loaded }
+    let byId = Dictionary(uniqueKeysWithValues: loaded.map { ($0.id, $0) })
+    let ordered = ids.compactMap { byId[$0] }
+    let new = loaded.filter { !ids.contains($0.id) }
+    return ordered + new
+  }
+
+  private func applyStoredProjectOrder(to loaded: [Project]) -> [Project] {
+    guard let ids = try? JSONDecoder().decode([String].self, from: projectOrderData),
+          !ids.isEmpty else { return loaded }
+    let byId = Dictionary(uniqueKeysWithValues: loaded.map { ($0.id, $0) })
+    let ordered = ids.compactMap { byId[$0] }
+    let new = loaded.filter { !ids.contains($0.id) }
+    return ordered + new
+  }
+}
 // MARK: - Sidebar primitives
 
 struct SmartListRow: View {
@@ -1424,13 +1369,17 @@ private struct SidebarSheets: ViewModifier {
   }
 }
 
-// MARK: - Task drop into sidebar
+// MARK: - Task drop into sidebar (macOS)
 
-/// Drop target for tasks dragged from a TaskListView onto a sidebar
-/// area / project row. Payload is the task id string. On drop we
-/// re-home the task via `TaskMutator.moveToArea` / `moveToProject`;
-/// the list view's next load picks up the change.
-private struct SidebarTaskDropTarget: ViewModifier {
+#if os(macOS)
+/// Drop target for a task dragged from `TaskListView` (which publishes its
+/// id via `.onDrag { NSItemProvider(object: id as NSString) }`) onto a
+/// sidebar area / project / smart-list row. We use the `.onDrop` /
+/// `NSItemProvider` API rather than `.dropDestination(for: String.self)`
+/// because it pairs cleanly with the `.onDrag` source — the modern
+/// Transferable drop fails to negotiate the plain-text item the legacy
+/// drag emits.
+private struct SidebarTaskDrop: ViewModifier {
   enum Kind {
     case area(String)
     case project(String)
@@ -1438,9 +1387,8 @@ private struct SidebarTaskDropTarget: ViewModifier {
     case inbox
     case someday
 
-    /// Maps a sidebar smart-list route to a drop action, or nil for routes
-    /// with no single unambiguous "move here" meaning (Upcoming, Anytime,
-    /// Logbook) so they don't become misleading drop targets.
+    /// Maps a smart-list route to a drop action, or nil for routes with no
+    /// single unambiguous "move here" meaning (Upcoming, Anytime, Logbook).
     init?(route: Route) {
       switch route {
       case .filter(.today):   self = .today
@@ -1462,47 +1410,50 @@ private struct SidebarTaskDropTarget: ViewModifier {
           .fill(Theme.tasksAccent.opacity(isTargeted ? 0.18 : 0))
           .animation(.easeOut(duration: 0.12), value: isTargeted)
       )
-      .dropDestination(for: String.self) { ids, _ in
-        guard !ids.isEmpty else { return false }
-        Haptics.tick()
-        for id in ids {
-          switch kind {
-          case .area(let areaId):
-            mutator.moveToArea(id: id, area: areaId)
-            mutator.moveToProject(id: id, project: nil)
-          case .project(let projectId):
-            mutator.moveToProject(id: id, project: projectId)
-          case .today:
-            mutator.moveToToday(id: id, today: true)
-          case .someday:
-            mutator.moveToSomeday(id: id)
-          case .inbox:
-            // Inbox = no routing at all: clear today, schedule, area, project.
-            mutator.moveToToday(id: id, today: false)
-            mutator.schedule(id: id, date: nil)
-            mutator.moveToArea(id: id, area: nil)
-            mutator.moveToProject(id: id, project: nil)
-          }
+      .onDrop(of: [.text], isTargeted: $isTargeted) { providers in
+        guard let provider = providers.first else { return false }
+        provider.loadObject(ofClass: NSString.self) { object, _ in
+          guard let id = object as? String else { return }
+          DispatchQueue.main.async { rehome(id) }
         }
         return true
-      } isTargeted: { hovering in
-        if hovering && !isTargeted { Haptics.tick() }
-        isTargeted = hovering
       }
+  }
+
+  private func rehome(_ id: String) {
+    Haptics.tick()
+    switch kind {
+    case .area(let areaId):
+      mutator.moveToArea(id: id, area: areaId)
+      mutator.moveToProject(id: id, project: nil)
+    case .project(let projectId):
+      mutator.moveToProject(id: id, project: projectId)
+    case .today:
+      mutator.moveToToday(id: id, today: true)
+    case .someday:
+      mutator.moveToSomeday(id: id)
+    case .inbox:
+      // Inbox = no routing at all: clear today, schedule, area, project.
+      mutator.moveToToday(id: id, today: false)
+      mutator.schedule(id: id, date: nil)
+      mutator.moveToArea(id: id, area: nil)
+      mutator.moveToProject(id: id, project: nil)
+    }
   }
 }
 
-/// Installs `SidebarTaskDropTarget` on a smart-list row only when the route
-/// has a meaningful drop action (Today / Inbox / Someday); other routes pass
+/// Installs `SidebarTaskDrop` on a smart-list row only when the route has a
+/// meaningful drop action (Today / Inbox / Someday); other routes pass
 /// through so they don't show a misleading drop highlight.
 private struct SmartListTaskDrop: ViewModifier {
   let route: Route
   let mutator: TaskMutator
   func body(content: Content) -> some View {
-    if let kind = SidebarTaskDropTarget.Kind(route: route) {
-      content.modifier(SidebarTaskDropTarget(kind: kind, mutator: mutator))
+    if let kind = SidebarTaskDrop.Kind(route: route) {
+      content.modifier(SidebarTaskDrop(kind: kind, mutator: mutator))
     } else {
       content
     }
   }
 }
+#endif

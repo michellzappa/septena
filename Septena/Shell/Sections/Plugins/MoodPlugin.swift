@@ -2,8 +2,6 @@ import SwiftUI
 import SwiftData
 
 // Mood is the first section migrated to the `SectionPlugin` model.
-// Proof-of-concept: its Today event production now lives in one place
-// instead of being inlined in `TodayLogView.buildEvents`.
 //
 // Future slots that will land in subsequent commits (one section per
 // commit, per the staged migration plan):
@@ -42,24 +40,6 @@ enum MoodPlugin: SectionPlugin {
       primaryActionLabel: "Start logging",
       complete: complete
     ))
-  }
-
-  static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] {
-    ctx.mood.map { e in
-      // Use the quadrant color rather than the section accent — the
-      // affective dimension is the whole point of a mood log; a single
-      // section-wide color would erase it.
-      let quadColor = MoodQuadrant(rawValue: e.quadrant)?.color ?? .gray
-      return TodayEvent(
-        id: "mood-\(e.id)",
-        time: String(e.time.prefix(5)),
-        section: "mood",
-        color: quadColor,
-        title: e.emotion,
-        detail: e.note,
-        kind: .mood(e)
-      )
-    }
   }
 
   // MARK: - Aim metrics

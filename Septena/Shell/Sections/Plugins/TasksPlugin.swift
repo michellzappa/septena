@@ -77,25 +77,6 @@ enum TasksPlugin: SectionPlugin {
     ))
   }
 
-  static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] {
-    let accent = ctx.theme.color(for: "tasks")
-    return ctx.tasks
-      .filter { $0.status == .done }
-      .compactMap { task -> TodayEvent? in
-        guard let ts = task.completedAt, ts.hasPrefix(date), ts.count >= 16 else { return nil }
-        let hhmm = String(ts.dropFirst(11).prefix(5))
-        return TodayEvent(
-          id: "task-\(task.id)",
-          time: hhmm,
-          section: "tasks",
-          color: accent,
-          title: task.title,
-          detail: nil,
-          kind: .task(task)
-        )
-      }
-  }
-
   static var mcpSkill: SectionSkill? {
     SectionSkill(
       key: "tasks",

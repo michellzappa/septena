@@ -12,8 +12,6 @@ enum SleepPlugin: SectionPlugin {
     SectionManifest.byKey["sleep"]!
   }
 
-  static func todayEvents(date: String, ctx: TodayContext) -> [TodayEvent] { [] }
-
   static func destinationView() -> AnyView? { AnyView(SleepDestinationView()) }
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {

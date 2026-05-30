@@ -930,11 +930,9 @@ struct MacrosConfig: Codable, Hashable {
 enum NutritionPrefs {
   private static let kvsKey = "nutrition.macrosConfig"
 
-  /// Reads from UserDefaults.standard. NSUbiquitousKeyValueStore would be
-  /// nicer for cross-device sync of macro targets but the app doesn't
-  /// declare the ubiquity-kvstore-identifier entitlement, so KVS calls
-  /// silently no-op. Falls back to KVS in case the entitlement is added
-  /// later, so historical writes aren't lost.
+  /// Reads from UserDefaults.standard first for fast local access, then
+  /// falls back to NSUbiquitousKeyValueStore so macro targets can sync
+  /// across signed-in Apple devices via the shared iCloud KVS store.
   static func loadMacrosConfig() -> MacrosConfig? {
     if let data = UserDefaults.standard.data(forKey: kvsKey),
        let config = try? JSONDecoder().decode(MacrosConfig.self, from: data) {
@@ -950,8 +948,6 @@ enum NutritionPrefs {
   static func saveMacrosConfig(_ config: MacrosConfig) {
     guard let data = try? JSONEncoder().encode(config) else { return }
     UserDefaults.standard.set(data, forKey: kvsKey)
-    // Write to KVS too in case the ubiquity entitlement gets added later —
-    // call is a no-op without it but doesn't crash.
     NSUbiquitousKeyValueStore.default.set(data, forKey: kvsKey)
     NSUbiquitousKeyValueStore.default.synchronize()
   }
