@@ -68,6 +68,75 @@ struct TaskCheckbox: View {
   }
 }
 
+// MARK: - Shared task row
+//
+// Canonical closed (non-editing) task row: checkbox + title + optional
+// subtitle/notes glyph + trailing date. Used by the Tasks drawer
+// (`TasksDestinationView`) and intended to become the single row the deep
+// `TaskListView` surface renders too, so both surfaces stay visually
+// identical. Carries its own h/v padding so it drops straight into a
+// `DrawerSection(padding: .none)` the same way `LogEntryRow` does.
+
+struct TaskRow: View {
+  let task: SeptenaTask
+  var accent: Color
+  /// Show the "promoted to Today" sun glyph in the checkbox. Pass `false`
+  /// inside the Today list itself (where every row is already today, so
+  /// the indicator is noise) and `true` elsewhere.
+  var showsTodayIndicator: Bool = false
+  /// Optional trailing text (e.g. a deadline like "May 30"). Rendered in
+  /// `trailingTint` when set, otherwise secondary ink.
+  var trailing: String? = nil
+  var trailingTint: Color? = nil
+  let onToggle: () -> Void
+  var onTap: (() -> Void)? = nil
+
+  private var isInactive: Bool {
+    task.status == .done || task.status == .cancelled
+  }
+  private var hasNotes: Bool {
+    !(task.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
+  var body: some View {
+    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
+      TaskCheckbox(
+        tint: accent,
+        isDone: task.status == .done,
+        isToday: task.today && showsTodayIndicator,
+        isSomeday: task.status == .someday,
+        onToggle: onToggle
+      )
+      .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+
+      Text(task.title)
+        .font(.septenaTaskTitle)
+        .foregroundStyle(isInactive ? Theme.inkSecondary : Theme.inkPrimary)
+        .strikethrough(isInactive)
+        .opacity(isInactive ? 0.5 : 1)
+        .lineLimit(1)
+        .truncationMode(.tail)
+        .frame(maxWidth: .infinity, alignment: .leading)
+
+      if hasNotes {
+        Image(systemName: "text.alignleft")
+          .font(.system(size: 12))
+          .foregroundStyle(Theme.inkSecondary)
+      }
+
+      if let trailing {
+        Text(trailing)
+          .font(.caption)
+          .foregroundStyle(trailingTint ?? Theme.inkSecondary)
+      }
+    }
+    .padding(.horizontal, Theme.hPadding)
+    .padding(.vertical, Theme.rowVPadding)
+    .contentShape(Rectangle())
+    .onTapGesture { onTap?() }
+  }
+}
+
 // MARK: - Screen title
 
 struct ScreenTitle: View {
@@ -100,149 +169,184 @@ struct ScreenTitle: View {
 // the `info.circle` button on the trailing edge, which opens the
 // TaskDetailsSheet. This replaces the prior Things-style expanding card.
 
-struct InlineEditTaskRow: View {
+// One unified row — the title is ALWAYS a `TextField`, so opening the editor
+// is pure focus, never a Text↔TextField swap (the swap is what used to nudge
+// the title sideways). Notes + the info button appear only while editing; the
+// meta line + trailing date show otherwise. When the row isn't being edited
+// the title field is `.allowsHitTesting(false)` so it reads as plain text and
+// taps fall through to the row's selection / tap-to-edit. Done / cancelled
+// tasks render a strikethrough `Text` (a TextField can't strike) — but those
+// are never edited, so the edit path itself still has zero swap.
+struct TaskRowView<MetaLine: View, TrailingDate: View>: View {
   @Environment(SectionTheme.self) private var theme
   @Environment(\.scenePhase) private var scenePhase
-  @Binding var title: String
-  @Binding var notes: String
-  let isDone: Bool
-  /// Whether to render the sun-in-checkbox glyph. Driven by the caller
-  /// so it can suppress the indicator on the Today filter (where every
-  /// row carries it implicitly).
-  var isToday: Bool = false
-  var isSomeday: Bool = false
-  /// Auto-focus the title field on appear. True when the row was just
-  /// created via ⌘N / + (so the user can start typing immediately);
-  /// false for editing an existing task (user explicitly taps the
-  /// field to start editing).
-  var autoFocus: Bool = false
-  var onToggleDone: () -> Void
-  var onCommit: () -> Void
-  var onCancel: () -> Void
-  var onOpenDetails: () -> Void
+
+  let task: SeptenaTask
+  let filter: TaskFilter
+  /// True when this row is the one being edited (the parent owns
+  /// `editingTaskId`). Drives focus, the notes field, and the info button.
+  let isEditing: Bool
+  let inMultiSelect: Bool
+  let isSelected: Bool
+  let accent: Color
+  /// Scratch buffers owned by the parent; bound only while `isEditing`.
+  @Binding var editingTitle: String
+  @Binding var editingNotes: String
+  @ViewBuilder let metaLine: () -> MetaLine
+  @ViewBuilder let trailingDate: () -> TrailingDate
+  let onToggle: () -> Void
+  let onCommit: () -> Void
+  let onCancel: () -> Void
+  let onOpenDetails: () -> Void
 
   @FocusState private var focused: Field?
-  /// Set true the moment the user cancels, so the onChange(focused) blur
-  /// handler doesn't race in and auto-commit before the editor tears down.
+  /// Set true the moment the user cancels, so the blur handler doesn't race
+  /// in and auto-commit before the parent tears the editor down.
   @State private var cancelling = false
 
   enum Field { case title, notes }
+
+  private var isInactive: Bool { task.status == .done || task.status == .cancelled }
+  private var hasNotes: Bool {
+    !(task.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
 
   private func handleCancel() {
     cancelling = true
     onCancel()
   }
 
+  /// Claim title focus one tick after edit begins — assigning FocusState in
+  /// the same frame the row enables races UIKit's input-session setup and the
+  /// field silently fails to become first responder.
+  private func claimFocus() {
+    Task {
+      try? await Task.sleep(for: .milliseconds(50))
+      focused = .title
+    }
+  }
+
   var body: some View {
     HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
-      TaskCheckbox(isDone: isDone, isToday: isToday, isSomeday: isSomeday, onToggle: onToggleDone)
-        .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+      TaskCheckbox(
+        tint: accent,
+        isDone: task.status == .done,
+        isToday: task.today && filter != .today,
+        isSomeday: task.status == .someday && filter != .someday,
+        onToggle: onToggle
+      )
+      .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 
       VStack(alignment: .leading, spacing: 4) {
-        // Single-line on purpose: a multi-line (`axis: .vertical`)
-        // TextField makes iOS inject a system Done bar above the
-        // keyboard, which fights our floating glass accessory. Long
-        // titles still truncate cleanly in the closed row.
-        //
-        // `.fixedSize(vertical: true)` clamps the TextField to its
-        // intrinsic text height — without it, plain-style TextField
-        // adds a few pixels of internal padding that shifts the
-        // baseline up vs the closed-row `Text`. The result: title
-        // stays put on tap; notes grows the row downward.
-        TextField("Title", text: $title)
-          .textFieldStyle(.plain)
-          .focusEffectDisabled()
-          .font(.septenaTaskTitle)
-          .focused($focused, equals: .title)
-          .submitLabel(.return)
-          .onSubmit {
-            SeptenaLog.info("[Edit] TextField onSubmit (Enter) title=\"\(title)\"")
-            onCommit()
-          }
-          .fixedSize(horizontal: false, vertical: true)
-        // Notes — always rendered with a "Notes" placeholder so the row's
-        // expanded height is fixed the instant edit mode opens. Reminders-
-        // style: one stable layout, no toggle button that shifts the row
-        // when the user reaches for notes.
-        TextField("Notes", text: $notes, axis: .vertical)
-          .textFieldStyle(.plain)
-          .focusEffectDisabled()
-          .font(.septenaNotes)
-          .foregroundStyle(.secondary)
-          .focused($focused, equals: .notes)
-          .lineLimit(1...8)
-          .fixedSize(horizontal: false, vertical: true)
+        titleView
+        if isEditing {
+          // Notes — only while editing. Reminders-style placeholder so the
+          // expanded height is stable the instant the editor opens.
+          TextField("Notes", text: $editingNotes, axis: .vertical)
+            .textFieldStyle(.plain)
+            .focusEffectDisabled()
+            .font(.septenaNotes)
+            .foregroundStyle(.secondary)
+            .focused($focused, equals: .notes)
+            .lineLimit(1...8)
+            .fixedSize(horizontal: false, vertical: true)
+        } else {
+          metaLine()
+        }
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
 
-      // Info button — Reminders' "i" affordance, always visible while
-      // editing. Opens the consolidated details pane for every other
-      // field (when, deadline, repeat, list, delete).
-      Button(action: { Haptics.pick(); onOpenDetails() }) {
-        Image(systemName: "info.circle")
-          .font(.title3)
-          .foregroundStyle(theme.accent)
-          .frame(width: 28, height: 28)
-          .contentShape(Rectangle())
+      if isEditing {
+        // Info button — opens the consolidated details pane (when, deadline,
+        // repeat, list, delete).
+        Button(action: { Haptics.pick(); onOpenDetails() }) {
+          Image(systemName: "info.circle")
+            .font(.title3)
+            .foregroundStyle(theme.accent)
+            .frame(width: 28, height: 28)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+        .accessibilityLabel("Task details")
+      } else {
+        if hasNotes {
+          Image(systemName: "text.alignleft")
+            .font(.system(size: 12))
+            .foregroundStyle(Theme.inkSecondary)
+        }
+        trailingDate()
+        if inMultiSelect {
+          Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+            .font(.system(size: 20))
+            .foregroundStyle(isSelected ? accent : Theme.inkSecondary.opacity(0.5))
+            .padding(.leading, 4)
+            .accessibilityLabel(isSelected ? "Selected" : "Not selected")
+        }
       }
-      .buttonStyle(.plain)
-      .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
-      .accessibilityLabel("Task details")
     }
     .padding(.horizontal, Theme.hPadding)
     .padding(.vertical, Theme.rowVPadding)
-    // The row mounts mid-expand-animation; assigning FocusState immediately
-    // races UIKit's input-session setup and the field silently fails to
-    // become first responder (logs "performInputOperation requires a valid
-    // sessionID"). Sleeping one tick lets the row settle before we claim
-    // focus — the difference between "Enter saves the title" and "Enter
-    // saves an empty draft."
-    .task {
-      if autoFocus {
-        try? await Task.sleep(for: .milliseconds(50))
-        focused = .title
-        SeptenaLog.info("[Edit] InlineEditTaskRow autoFocus claimed title field (title=\"\(title)\")")
-      }
-    }
-    // Save-on-blur safety net: if the row vanishes for any reason (parent
-    // tore it down, navigation, sheet presented over it, list reload)
-    // and the user *didn't* explicitly cancel, commit the draft.
-    // onCommit is idempotent — its guard returns immediately if the
-    // parent has already cleared editingTaskId.
-    .onDisappear {
-      if !cancelling {
-        SeptenaLog.info("[Edit] InlineEditTaskRow onDisappear → onCommit (title=\"\(title)\")")
-        onCommit()
-      } else {
-        SeptenaLog.info("[Edit] InlineEditTaskRow onDisappear (cancelling) — skipping commit")
-      }
-    }
-    .background(commitShortcut)
-    .background(cancelShortcut)
-    // Absorb taps inside the editor so the parent's "tap empty area to
-    // dismiss" gesture doesn't fire when tapping our own padding.
     .contentShape(Rectangle())
-    .onTapGesture { /* swallow */ }
-    .septenaOnEscape { handleCancel() }
-    .onKeyPress(.escape) { handleCancel(); return .handled }
-    // Save-on-blur — fires when focus moves out of *both* fields
-    // (intra-row focus shifts go field → field without hitting nil,
-    // so the editor stays open while the user moves between
-    // title/notes; the commit only triggers when keyboard goes away).
-    .onChange(of: focused) { old, new in
-      SeptenaLog.info("[Edit] focus change \(String(describing: old)) → \(String(describing: new)) title=\"\(title)\"")
-      guard new == nil, !cancelling else { return }
-      if title.trimmingCharacters(in: .whitespaces).isEmpty {
-        SeptenaLog.info("[Edit] blur with empty title → onCancel")
+    // Edit shortcuts only while this row is the editor, so every row doesn't
+    // register a duplicate scene-wide ⌘K / Esc.
+    .background { if isEditing { commitShortcut } }
+    .background { if isEditing { cancelShortcut } }
+    .onKeyPress(.escape) {
+      guard isEditing else { return .ignored }
+      handleCancel()
+      return .handled
+    }
+    // Focus lifecycle: claim on edit-start, resign on edit-end.
+    .onChange(of: isEditing) { _, editing in
+      if editing { cancelling = false; claimFocus() }
+      else { focused = nil }
+    }
+    .onAppear { if isEditing { claimFocus() } }
+    // Save-on-blur — focus left both fields while editing. Empty title on a
+    // fresh draft cancels (deletes the placeholder); otherwise commits.
+    .onChange(of: focused) { _, new in
+      guard new == nil, isEditing, !cancelling else { return }
+      if editingTitle.trimmingCharacters(in: .whitespaces).isEmpty {
         onCancel()
       } else {
-        SeptenaLog.info("[Edit] blur with title → onCommit")
         onCommit()
       }
     }
-    // App backgrounded mid-edit — iOS may yank the keyboard without
-    // routing focus through nil first, so cover this path explicitly.
+    // App backgrounded mid-edit — iOS may yank the keyboard without routing
+    // focus through nil first.
     .onChange(of: scenePhase) { _, new in
-      if new != .active && !cancelling { onCommit() }
+      if new != .active && isEditing && !cancelling { onCommit() }
+    }
+    // Editor torn down by a parent reload / navigation while still editing.
+    .onDisappear {
+      if isEditing && !cancelling { onCommit() }
+    }
+  }
+
+  @ViewBuilder private var titleView: some View {
+    if isInactive && !isEditing {
+      Text(task.title)
+        .font(.septenaTaskTitle)
+        .foregroundStyle(Theme.inkSecondary)
+        .strikethrough()
+        .opacity(0.5)
+        .lineLimit(1)
+        .truncationMode(.tail)
+    } else {
+      // Always a TextField (open rows) — `.allowsHitTesting(isEditing)` lets a
+      // non-editing row read as text while taps fall through to the row.
+      TextField("Title", text: isEditing ? $editingTitle : .constant(task.title))
+        .textFieldStyle(.plain)
+        .focusEffectDisabled()
+        .font(.septenaTaskTitle)
+        .foregroundStyle(Theme.inkPrimary)
+        .lineLimit(1)
+        .focused($focused, equals: .title)
+        .submitLabel(.return)
+        .onSubmit { onCommit() }
+        .allowsHitTesting(isEditing)
+        .fixedSize(horizontal: false, vertical: true)
     }
   }
 

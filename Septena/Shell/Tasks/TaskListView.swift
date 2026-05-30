@@ -144,9 +144,20 @@ struct TaskListView: View {
   /// rows visible until the user navigates away (matches the reference design).
   @State private var sessionDoneIds: Set<String> = []
 
-  /// Keyboard cursor — which row is highlighted by arrow-key navigation.
-  /// Separate from `editingTaskId`: a row can be selected without being open.
-  @State private var selectedTaskId: String?
+  /// Unified selection — the single source of truth for both the click /
+  /// keyboard cursor and multi-select batch operations. On macOS it's bound
+  /// straight to `List(selection:)` (native click, ⌘/⇧-click, ⌫, arrow
+  /// keys). On iOS it's populated by tapping rows while in `selectMode`.
+  /// Replaces the former split `selectedTaskId` cursor + `multiSelection`.
+  @State private var selection: Set<String> = []
+
+  #if os(iOS)
+  /// iOS multi-select mode, toggled by the toolbar "Select" button — the
+  /// standardized replacement for the old swipe-to-select gesture. While
+  /// active, tapping a row toggles its `selection` membership instead of
+  /// opening the inline editor.
+  @State private var selectMode = false
+  #endif
 
   // Inline new-task entry
   /// Tracks a task created via ⌘N (or the toolbar + button) so that
@@ -183,11 +194,17 @@ struct TaskListView: View {
   @State private var showingRepeatSheet = false
   @State private var repeatTargetId: String?
 
-  // Multi-select. Swipe-to-select on a row inserts its id; while non-empty,
-  // tap toggles instead of opening the inline editor and the bottom action
-  // bar surfaces batch versions of the per-row context-menu actions.
-  @State private var multiSelection: Set<String> = []
-  private var inMultiSelect: Bool { !multiSelection.isEmpty }
+  /// True when a row tap should toggle selection rather than open the inline
+  /// editor. iOS: the explicit Select mode. macOS: always false — there,
+  /// `List(selection:)` owns single-clicks for selection and the editor
+  /// opens on double-click / Return instead.
+  private var inMultiSelect: Bool {
+    #if os(iOS)
+    return selectMode
+    #else
+    return false
+    #endif
+  }
 
   // Bulk-mode sheet routing. Lives alongside `whenSheet` / `showingMoveSheet`
   // (which are single-target) so the single-target sheets don't need to know
@@ -224,10 +241,10 @@ struct TaskListView: View {
     }
   }
 
-  // Details pane is driven by its own state, NOT by `selectedTaskId`.
-  // Selection is a keyboard-cursor highlight; the pane is opened only
+  // Details pane is driven by its own state, NOT by `selection`.
+  // Selection is a click / multi-select highlight; the pane is opened only
   // by the (i) button on the inline editor. Decoupling them prevents
-  // the pane from popping up as a side effect of tapping / arrowing.
+  // the pane from popping up as a side effect of tapping / selecting.
   @State private var paneTaskId: String?
   private var detailsPaneIsOpen: Binding<Bool> {
     Binding(
@@ -332,12 +349,12 @@ struct TaskListView: View {
         applyWhen: applyWhen,
         applyMove: applyMove,
         applyRecurrence: applyRecurrence,
-        multiSelectionIDs: { Array(multiSelection) }
+        multiSelectionIDs: { Array(selection) }
       ))
   }
 
   private var taskList: some View {
-    List {
+    List(selection: $selection) {
       taskListHeader
       taskListRows
       taskListFooter
@@ -356,6 +373,20 @@ struct TaskListView: View {
         }
         .accessibilityLabel("New Task")
       }
+      // iOS multi-select entry — the standardized replacement for the old
+      // swipe-to-select. macOS uses native click / ⌘-click selection, so it
+      // needs no button. Hidden when embedded (Project / Area detail) so it
+      // doesn't crowd the parent toolbar.
+      #if os(iOS)
+      if !embedded {
+        ToolbarItem(placement: .topBarTrailing) {
+          Button(selectMode ? "Done" : "Select") {
+            selectMode.toggle()
+            if !selectMode { selection.removeAll() }
+          }
+        }
+      }
+      #endif
     }
     // Primary-action `+` flips `shouldStartCreating`, identical to ⌘N and
     // the sidebar Menu's "New To-Do" — opens the inline draft row instead of
@@ -370,24 +401,20 @@ struct TaskListView: View {
     .safeAreaInset(edge: .bottom, spacing: 0) {
       if let id = editingTaskId, let task = currentTask(id: id) {
         editorKeyboardAccessory(for: task)
-      } else if inMultiSelect {
+      } else if !selection.isEmpty {
         batchActionBar
       }
     }
     #else
     .safeAreaInset(edge: .bottom, spacing: 0) {
-      if inMultiSelect { batchActionBar }
+      if !selection.isEmpty { batchActionBar }
     }
     #endif
     .modifier(KeyboardNavigationModifier(
       isInputMode: editingTaskId != nil,
-      hasSelection: selectedTaskId != nil,
-      onArrow: { delta, jump in
-        if jump { jumpSelection(toFirst: delta < 0) }
-        else    { moveSelection(delta) }
-      },
+      hasSelection: !selection.isEmpty,
       onReturn: openSelectedForEdit,
-      onEscape: { selectedTaskId = nil },
+      onEscape: { selection.removeAll() },
       onSpace: toggleSelected,
       onNewTask: startDraft,
       onToggleToday: toggleTodayForSelected,
@@ -428,11 +455,13 @@ struct TaskListView: View {
     // session-scoped state and re-trigger the network refresh.
     .onChange(of: filter) { _, _ in
       sessionDoneIds = []
-      selectedTaskId = nil
+      selection.removeAll()
       editingTaskId = nil
       paneTaskId = nil
       newlyCreatedTaskId = nil
-      multiSelection.removeAll()
+      #if os(iOS)
+      selectMode = false
+      #endif
       Task { await load() }
     }
     // Consume the global "start a new task" trigger from the sidebar
@@ -491,9 +520,13 @@ struct TaskListView: View {
     }
   }
 
+  // Bottom breathing room + a tap-to-dismiss target for empty space. The
+  // floating keyboard accessory / batch bar are `.safeAreaInset`s, so the
+  // scroll content already insets for them while editing — this is just a
+  // tidy end-of-list margin, not the 240pt dead-zone it used to be.
   private var taskListFooter: some View {
     Color.clear
-      .frame(minHeight: 240)
+      .frame(minHeight: 96)
       .contentShape(Rectangle())
       .onTapGesture { dismissInlineEdit() }
       .asListRow()
@@ -615,42 +648,26 @@ struct TaskListView: View {
     return ids
   }
 
-  private func moveSelection(_ delta: Int) {
-    let ids = keyboardOrderedTaskIds
-    guard !ids.isEmpty else { return }
-    if let current = selectedTaskId, let idx = ids.firstIndex(of: current) {
-      let next = min(max(idx + delta, 0), ids.count - 1)
-      selectedTaskId = ids[next]
-    } else {
-      selectedTaskId = delta > 0 ? ids.first : ids.last
-    }
-  }
-
-  private func jumpSelection(toFirst: Bool) {
-    let ids = keyboardOrderedTaskIds
-    selectedTaskId = toFirst ? ids.first : ids.last
-  }
-
   private func openSelectedForEdit() {
-    guard let id = selectedTaskId,
+    guard let id = effectiveSelectionId(),
           let t = currentTask(id: id) else { return }
     startEdit(t)
   }
 
   private func toggleSelected() {
-    guard let id = selectedTaskId,
+    guard let id = effectiveSelectionId(),
           let t = currentTask(id: id) else { return }
     toggle(t)
   }
 
-  /// Resolve the row a keyboard shortcut should act on. Falls back to the
-  /// first row in the list when nothing is explicitly selected — otherwise
-  /// the first ⌘T after launch is a silent no-op, which reads as "broken".
-  /// Sets `selectedTaskId` as a side effect so the selection pill follows.
+  /// Resolve the row a single-target keyboard shortcut should act on: a
+  /// selected row when there is one, otherwise the first row in the list
+  /// (so the first ⌘T after launch isn't a silent no-op). Sets `selection`
+  /// as a side effect so the highlight follows.
   private func effectiveSelectionId() -> String? {
-    if let id = selectedTaskId, currentTask(id: id) != nil { return id }
+    if let id = selection.first(where: { currentTask(id: $0) != nil }) { return id }
     guard let first = keyboardOrderedTaskIds.first else { return nil }
-    selectedTaskId = first
+    selection = [first]
     return first
   }
 
@@ -676,17 +693,21 @@ struct TaskListView: View {
     whenSheet = WhenSheet(taskId: id, kind: .due)
   }
 
-  /// ⌘⌫ — delete the focused row.
+  /// ⌘⌫ — delete every selected row (or the effective single row).
   private func deleteSelected() {
-    guard let id = selectedTaskId, currentTask(id: id) != nil else { return }
+    let ids = selection.isEmpty ? [effectiveSelectionId()].compactMap { $0 } : Array(selection)
+    guard !ids.isEmpty else { return }
     Haptics.warning()
-    selectedTaskId = nil
-    applyDelete(id)
+    selection.removeAll()
+    #if os(iOS)
+    selectMode = false
+    #endif
+    for id in ids { applyDelete(id) }
   }
 
   /// ⌘. — clear schedule + today, sending the row back to Anytime.
   private func clearScheduleForSelected() {
-    guard let id = selectedTaskId, currentTask(id: id) != nil else { return }
+    guard let id = effectiveSelectionId() else { return }
     applyWhen(id: id, kind: .scheduled, date: nil)
   }
 
@@ -797,98 +818,89 @@ struct TaskListView: View {
       // NOT use a transition that fades content in/out, since the
       // two branches share the same checkbox + title layout.
       .a11yAnimation(Self.expandSpring, value: editingTaskId == task.id)
-      // Leading swipe → enter multi-select with this row pre-selected.
-      // Mirrors Things' swipe-to-reveal radio: the swiped row starts
-      // selected; user then taps additional rows to add them, taps Done
-      // (or swipes away) when finished. Must live on the outer row view
-      // (the direct child of List) — List walks one level deep to find
-      // swipe actions and skips deeper modifiers.
-      .swipeActions(edge: .leading, allowsFullSwipe: false) {
+      // Standard Reminders/Things swipe set, replacing the old
+      // swipe-to-select (multi-select now lives behind the toolbar Select
+      // button on iOS and native ⌘/⇧-click on macOS). Must live on the
+      // outer row view (the direct child of List) — List only walks one
+      // level deep to find swipe actions.
+      // Leading, full-swipe: complete / uncomplete.
+      .swipeActions(edge: .leading, allowsFullSwipe: true) {
         Button {
-          if editingTaskId != nil { commitEdit() }
-          multiSelection.insert(task.id)
-          Haptics.tick()
+          toggle(task)
         } label: {
-          Label("Select", systemImage: "checkmark.circle")
+          Label(task.status == .done ? "Uncomplete" : "Complete",
+                systemImage: task.status == .done ? "arrow.uturn.left" : "checkmark")
         }
-        .tint(theme.accent)
+        .tint(.green)
+      }
+      // Trailing, no full-swipe (so a long drag can't delete by accident):
+      // delete + toggle Today.
+      .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+        Button(role: .destructive) {
+          Haptics.warning()
+          applyDelete(task.id)
+        } label: {
+          Label("Delete", systemImage: "trash")
+        }
+        Button {
+          Haptics.tick()
+          mutator.moveToToday(id: task.id, today: !task.today)
+          Task { await load() }
+        } label: {
+          Label(task.today ? "Remove from Today" : "Today",
+                systemImage: task.today ? "sun.max.fill" : "sun.max")
+        }
+        .tint(Theme.todayAccent)
       }
   }
 
-  @ViewBuilder
   private func rowContent(_ task: SeptenaTask) -> some View {
-    if editingTaskId == task.id {
-      InlineEditTaskRow(
-        title: $editingTitle,
-        notes: $editingNotes,
-        isDone: task.status == .done,
-        isToday: task.today && filter != .today,
-        isSomeday: task.status == .someday && filter != .someday,
-        // Tap-to-edit and ⌘N both want the keyboard up immediately —
-        // any time the inline editor mounts, it should claim focus.
-        autoFocus: true,
-        onToggleDone: { toggle(task) },
-        onCommit: { commitEdit() },
-        onCancel: {
-          let id = editingTaskId
-          let title = editingTitle.trimmingCharacters(in: .whitespaces)
-          let wasNew = (id != nil && id == newlyCreatedTaskId)
-          motion.run(Self.expandSpring) { editingTaskId = nil }
-          newlyCreatedTaskId = nil
-          // If the user hit Esc on a fresh ⌘N task with an empty title,
-          // delete it so we don't leave a stub in the list.
-          if wasNew && title.isEmpty, let id {
-            mutator.delete(id: id)
-            removeLocally(id: id)
-          }
-        },
-        onOpenDetails: {
-          // Commit current draft, then open the Details pane (info
-          // button is the only path to the pane).
-          commitEdit()
-          paneTaskId = task.id
+    let editing = editingTaskId == task.id
+    return TaskRowView(
+      task: task,
+      filter: filter,
+      isEditing: editing,
+      inMultiSelect: inMultiSelect,
+      isSelected: selection.contains(task.id),
+      accent: theme.accent,
+      editingTitle: $editingTitle,
+      editingNotes: $editingNotes,
+      metaLine: { metaLine(task) },
+      trailingDate: { trailingDate(task) },
+      onToggle: { toggle(task) },
+      onCommit: { commitEdit() },
+      onCancel: {
+        let id = editingTaskId
+        let title = editingTitle.trimmingCharacters(in: .whitespaces)
+        let wasNew = (id != nil && id == newlyCreatedTaskId)
+        motion.run(Self.expandSpring) { editingTaskId = nil }
+        newlyCreatedTaskId = nil
+        // Esc on a fresh ⌘N task with an empty title → delete the stub.
+        if wasNew && title.isEmpty, let id {
+          mutator.delete(id: id)
+          removeLocally(id: id)
         }
-      )
-      // No cross-fade between display and edit modes — that fade was the
-      // source of the "title + checkmark flicker on open". The checkbox /
-      // title sit at the same position in both branches; an instant swap
-      // is imperceptible. The expand spring on the parent still animates
-      // the row's height as the editor pane unfolds below.
-      .transition(.identity)
-    } else {
-      TaskListDisplayRow(
-        task: task,
-        filter: filter,
-        inMultiSelect: inMultiSelect,
-        isSelected: multiSelection.contains(task.id),
-        accent: theme.accent,
-        metaLine: { metaLine(task) },
-        trailingDate: { trailingDate(task) },
-        onToggle: { toggle(task) },
-        onTap: {
-          if inMultiSelect {
-            toggleMultiSelection(for: task.id)
-          } else {
-            startEdit(task)
-          }
-        }
-      )
-        .transition(.identity)
-        // Right-click should make it visually clear which row the menu
-        // refers to — flip the selection cursor onto this task before the
-        // menu opens. iOS gets natural press feedback from long-press, so
-        // the shim is a no-op there.
-        .septenaOnRightClick { selectedTaskId = task.id }
-        // Long-press (iOS) / right-click (macOS) context menu. Shares the
-        // exact same Buttons as the trailing ellipsis Menu on the row so
-        // both entry points stay in lockstep.
-        .contextMenu {
-          // In multi-select mode the long-press / right-click menu acts on
-          // the whole selection (auto-including this row if it wasn't yet),
-          // so the user can right-click any row to apply the batch action.
-          taskContextMenu(for: task)
-        }
+      },
+      onOpenDetails: {
+        commitEdit()
+        paneTaskId = task.id
+      }
+    )
+    .transition(.identity)
+    // Tap-to-edit only when this row isn't already the editor (the focused
+    // TextField owns taps while editing). iOS: single tap. macOS: double-
+    // click — single click is owned by `List(selection:)`.
+    #if os(iOS)
+    .onTapGesture { if !editing { handleRowTap(task) } }
+    #else
+    .onTapGesture(count: 2) { if !editing { startEdit(task) } }
+    #endif
+    // Right-click selects this row (unless already part of a multi-selection)
+    // so the menu's target is unambiguous.
+    .septenaOnRightClick {
+      if !selection.contains(task.id) { selection = [task.id] }
     }
+    .contextMenu { taskContextMenu(for: task) }
   }
 
   /// Single source of truth for per-row actions. Used by the per-row
@@ -903,7 +915,10 @@ struct TaskListView: View {
       rankedSuggestions: rankedSuggestions(for: target),
       onSelectSingle: { task in
         if editingTaskId != nil { commitEdit() }
-        multiSelection.insert(task.id)
+        #if os(iOS)
+        selectMode = true
+        #endif
+        selection.insert(task.id)
         Haptics.tick()
       },
       onApplySuggestion: applySuggestion,
@@ -946,15 +961,22 @@ struct TaskListView: View {
       onDelete: { target in
         Haptics.warning()
         for id in target.ids { applyDelete(id) }
-        if target.isBulk { multiSelection.removeAll() }
+        if target.isBulk {
+          selection.removeAll()
+          #if os(iOS)
+          selectMode = false
+          #endif
+        }
       }
     )
   }
 
   @ViewBuilder
   private func taskContextMenu(for task: SeptenaTask) -> some View {
-    if inMultiSelect {
-      rowActionsMenu(target: .bulk(multiSelection.union([task.id])))
+    // Bulk when this row is part of a multi-selection (works on both
+    // platforms: macOS ⌘/⇧-click, iOS Select mode); single otherwise.
+    if selection.count > 1 && selection.contains(task.id) {
+      rowActionsMenu(target: .bulk(selection))
     } else {
       rowActionsMenu(target: .single(task))
     }
@@ -970,13 +992,26 @@ struct TaskListView: View {
     return suggestionEngine.suggestions[task.id] ?? [top]
   }
 
-  private func toggleMultiSelection(for id: String) {
-    if multiSelection.contains(id) {
-      multiSelection.remove(id)
+  #if os(iOS)
+  private func toggleSelection(for id: String) {
+    if selection.contains(id) {
+      selection.remove(id)
     } else {
-      multiSelection.insert(id)
+      selection.insert(id)
     }
   }
+
+  /// Row tap handler (iOS only). In Select mode a tap toggles membership;
+  /// otherwise it opens the inline editor. macOS never calls this — there a
+  /// single click selects natively and a double-click opens the editor.
+  private func handleRowTap(_ task: SeptenaTask) {
+    if selectMode {
+      toggleSelection(for: task.id)
+    } else {
+      startEdit(task)
+    }
+  }
+  #endif
 
   /// Highlight backplate. Two states:
   ///   • editing — stronger accent fill so the active row reads as
@@ -988,31 +1023,23 @@ struct TaskListView: View {
   ///     straight to edit, matching Reminders / Mail.
   /// Animation is scoped to the fill so we don't re-layout every visible
   /// row on each selection change (the old macOS click-lag source).
+  /// Selection / editing highlight backplate. The editing row gets a
+  /// stronger accent fill; selected rows (macOS click / ⌘-click, or iOS
+  /// Select mode) get a lighter one. We draw our own rather than relying on
+  /// `List`'s native selection fill so the look is identical on both
+  /// platforms and survives the `.listRowBackground(.clear)` chrome.
   @ViewBuilder
   private func rowBackground(for task: SeptenaTask) -> some View {
-    let isEditing = editingTaskId == task.id
-    let isCursor  = selectedTaskId == task.id && !isEditing && showsCursorPill
+    let isEditing  = editingTaskId == task.id
+    let isSelected = selection.contains(task.id) && !isEditing
     let fill: Color = {
-      if isEditing { return theme.accent.opacity(0.18) }
-      if isCursor  { return theme.accent.opacity(0.10) }
+      if isEditing  { return theme.accent.opacity(0.18) }
+      if isSelected { return theme.accent.opacity(0.12) }
       return .clear
     }()
     RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
       .fill(fill)
       .padding(.horizontal, Theme.hPadding - 6)
-  }
-
-  /// Whether the keyboard-cursor accent pill should render. On macOS and
-  /// iPad regular width a hardware keyboard typically drives arrow-key
-  /// navigation, so the pill is a useful focus indicator. On iPhone
-  /// (compact) it's just a non-standard third state with no way to enter
-  /// or exit it via touch.
-  private var showsCursorPill: Bool {
-    #if os(macOS)
-    return true
-    #else
-    return horizontalSizeClass == .regular
-    #endif
   }
 
   private func applySuggestion(task: SeptenaTask,
@@ -1500,19 +1527,22 @@ struct TaskListView: View {
   @ViewBuilder
   private var batchActionBar: some View {
     HStack(spacing: 16) {
-      Text("\(multiSelection.count) selected")
+      Text("\(selection.count) selected")
         .font(.subheadline.weight(.medium))
         .foregroundStyle(Theme.inkPrimary)
       Spacer(minLength: 8)
       Menu {
-        rowActionsMenu(target: .bulk(multiSelection))
+        rowActionsMenu(target: .bulk(selection))
       } label: {
         Label("Actions", systemImage: "ellipsis.circle")
           .labelStyle(.iconOnly)
           .font(.title3)
       }
       Button("Done") {
-        multiSelection.removeAll()
+        selection.removeAll()
+        #if os(iOS)
+        selectMode = false
+        #endif
       }
       .font(.subheadline.weight(.semibold))
     }
@@ -1604,7 +1634,7 @@ struct TaskListView: View {
   /// user clicks empty space.
   private func dismissInlineEdit() {
     if editingTaskId != nil { commitEdit() }
-    selectedTaskId = nil
+    selection.removeAll()
   }
 
   // MARK: - Create
@@ -2186,73 +2216,6 @@ private struct TaskListModalPresenter<DetailsContent: View>: ViewModifier {
   }
 }
 
-private struct TaskListDisplayRow<MetaLine: View, TrailingDate: View>: View {
-  let task: SeptenaTask
-  let filter: TaskFilter
-  let inMultiSelect: Bool
-  let isSelected: Bool
-  let accent: Color
-  @ViewBuilder let metaLine: () -> MetaLine
-  @ViewBuilder let trailingDate: () -> TrailingDate
-  let onToggle: () -> Void
-  let onTap: () -> Void
-
-  var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
-      TaskCheckbox(
-        tint: accent,
-        isDone: task.status == .done,
-        isToday: task.today && filter != .today,
-        isSomeday: task.status == .someday && filter != .someday,
-        onToggle: onToggle
-      )
-      .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
-
-      VStack(alignment: .leading, spacing: 4) {
-        Text(task.title)
-          .font(.septenaTaskTitle)
-          .foregroundStyle(isInactive ? Theme.inkSecondary : Theme.inkPrimary)
-          .strikethrough(isInactive)
-          .opacity(isInactive ? 0.5 : 1)
-          .lineLimit(1)
-          .truncationMode(.tail)
-          .multilineTextAlignment(.leading)
-
-        metaLine()
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-
-      if hasNotes {
-        Image(systemName: "text.alignleft")
-          .font(.system(size: 12))
-          .foregroundStyle(Theme.inkSecondary)
-      }
-
-      trailingDate()
-
-      if inMultiSelect {
-        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-          .font(.system(size: 20))
-          .foregroundStyle(isSelected ? accent : Theme.inkSecondary.opacity(0.5))
-          .padding(.leading, 4)
-          .accessibilityLabel(isSelected ? "Selected" : "Not selected")
-      }
-    }
-    .padding(.horizontal, Theme.hPadding)
-    .padding(.vertical, Theme.rowVPadding)
-    .contentShape(Rectangle())
-    .onTapGesture(perform: onTap)
-  }
-
-  private var isInactive: Bool {
-    task.status == .done || task.status == .cancelled
-  }
-
-  private var hasNotes: Bool {
-    !(task.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-  }
-}
-
 private struct TaskListRowContextMenu: View {
   let target: TaskListView.ActionTarget
   let filter: TaskFilter
@@ -2389,8 +2352,6 @@ private struct KeyboardNavigationModifier: ViewModifier {
   /// input mode, all row-navigation keys forward to the active TextField.
   let isInputMode: Bool
   let hasSelection: Bool
-  /// `delta` is -1/+1; `jump` true → move to first/last instead of stepping.
-  let onArrow: (_ delta: Int, _ jump: Bool) -> Void
   let onReturn: () -> Void
   let onEscape: () -> Void
   let onSpace: () -> Void
@@ -2426,16 +2387,6 @@ private struct KeyboardNavigationModifier: ViewModifier {
       // selection pill on the focused row is indicator enough.
       .focusEffectDisabled()
       .onAppear { listFocused = true }
-      .onKeyPress(keys: [.upArrow]) { press in
-        guard !isInputMode else { return .ignored }
-        onArrow(-1, press.modifiers.contains(.command))
-        return .handled
-      }
-      .onKeyPress(keys: [.downArrow]) { press in
-        guard !isInputMode else { return .ignored }
-        onArrow(1, press.modifiers.contains(.command))
-        return .handled
-      }
       .onKeyPress(.return) {
         guard !isInputMode, hasSelection else { return .ignored }
         onReturn()

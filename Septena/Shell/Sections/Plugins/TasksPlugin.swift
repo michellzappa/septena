@@ -7,11 +7,16 @@ enum TasksPlugin: SectionPlugin {
     SectionManifest.byKey["tasks"]!
   }
 
-  // Tasks doesn't have a dedicated DestinationView — the homepage tile
-  // routes into TaskListView with view parameters, not a single root.
-  // Leaving destinationView at the default-nil; the dashboard switch
-  // still handles tasks specially. When the full tile migration lands,
-  // this slot will return the tile's destination instead.
+  // The homepage Tasks tile opens this light drawer — today's tasks +
+  // inline capture, on the shared `SectionDrawer` chrome — exactly like
+  // every other section. The deep areas / projects / scheduling surface
+  // stays on the Tasks tab (`TaskListView`); the "Open in" setting lets a
+  // user route the tile straight there instead.
+  static func destinationView() -> AnyView? { AnyView(TasksDestinationView()) }
+
+  static var logActions: [LogAction] {
+    [LogAction(id: "new", title: "New task", systemImage: "plus")]
+  }
 
   static func detailPaneContent() -> AnyView? { AnyView(TasksDetailContent()) }
 
