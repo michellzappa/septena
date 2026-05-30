@@ -1622,6 +1622,23 @@ final class TrainingDraftStore {
       $0.entries.remove(at: index)
     }
   }
+
+  /// Mean pace (metres per minute) across this exercise's history where
+  /// both distance and duration are recorded — the user's "cadence". Drives
+  /// the cardio duration→distance auto-preset. Returns nil when there's no
+  /// usable history, so we never invent a distance.
+  func cardioAvgPace(for exercise: String, context: ModelContext) -> Double? {
+    let key = exerciseKey(exercise)
+    let all = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>())) ?? []
+    let paces: [Double] = all.compactMap { e in
+      guard exerciseKey(e.exercise) == key,
+            let d = e.distanceM, d > 0,
+            let m = e.durationMin, m > 0 else { return nil }
+      return d / m
+    }
+    guard !paces.isEmpty else { return nil }
+    return paces.reduce(0, +) / Double(paces.count)
+  }
 }
 
 // MARK: - Session logger UI
@@ -1650,6 +1667,8 @@ struct TrainingSessionView: View {
   @State private var completionStats: SessionStats?
   /// Presents the catalog picker to add extra exercises to the session.
   @State private var showAdd = false
+  /// The one expanded card (single-open accordion). Keyed by exercise name.
+  @State private var openExercise: String? = nil
 
   private var accent: Color { theme.color(for: "training") }
 
@@ -1788,7 +1807,8 @@ struct TrainingSessionView: View {
             TrainingExerciseCard(
               index: idx,
               entry: e,
-              accent: accent
+              accent: accent,
+              openExercise: $openExercise
             )
             .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
           }
@@ -1925,14 +1945,22 @@ struct TrainingExerciseCard: View {
   let index: Int
   let entry: DraftEntry
   let accent: Color
+  /// Which exercise's card is open, lifted to the parent so only one
+  /// drawer is expanded at a time — opening one closes the others.
+  @Binding var openExercise: String?
 
-  @State private var expanded = false
   /// Presents the catalog picker to swap this slot's exercise.
   @State private var showSwitch = false
+  /// Mean pace (m/min) from this exercise's history — seeds the cardio
+  /// duration→distance auto-preset. Computed on appear for cardio cards.
+  @State private var avgPace: Double? = nil
   /// Bump on a successful Done tap to fire `ConfettiBurst` + a
   /// `symbolEffect` bounce on the status check. Subtle celebration —
   /// no banner, no sound, just the row briefly confirming the rep.
   @State private var celebrate = 0
+
+  /// True when this card is the open one in the single-open accordion.
+  private var expanded: Bool { openExercise == entry.exercise }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -1955,8 +1983,14 @@ struct TrainingExerciseCard: View {
     .contentShape(Rectangle())
     .onTapGesture {
       // No animation on expand/collapse — at the gym you want the
-      // editor to be there or not, no in-between motion.
-      expanded.toggle()
+      // editor to be there or not, no in-between motion. Opening this
+      // card closes whichever other one was open.
+      openExercise = expanded ? nil : entry.exercise
+    }
+    .onAppear {
+      if entry.isCardio, avgPace == nil {
+        avgPace = store.cardioAvgPace(for: entry.exercise, context: modelContext)
+      }
     }
     .sheet(isPresented: $showSwitch) {
       ExercisePickerSheet(
@@ -2005,9 +2039,9 @@ struct TrainingExerciseCard: View {
         } label: {
           Label("Switch exercise", systemImage: "arrow.triangle.2.circlepath")
         }
-        // Skip lives here now (not in the footer) so the footer is a
-        // single primary action. Toggles to "Unskip" once skipped; hidden
-        // for already-logged entries (nothing to skip).
+        // Skip (toggles to Unskip), hidden for already-logged entries.
+        // Remove is intentionally absent — in a routine session you skip
+        // an exercise (keep it greyed on the list), you don't delete it.
         if entry.status == .skipped {
           Button {
             store.unskip(index: index)
@@ -2018,18 +2052,11 @@ struct TrainingExerciseCard: View {
         } else if entry.status != .done && entry.status != .saving {
           Button {
             store.markSkipped(index: index)
-            expanded = false
+            openExercise = nil
             Haptics.tick()
           } label: {
             Label("Skip", systemImage: "forward.end")
           }
-        }
-        Divider()
-        Button(role: .destructive) {
-          store.removeEntry(at: index)
-          Haptics.warning()
-        } label: {
-          Label("Remove", systemImage: "trash")
         }
       } label: {
         Image(systemName: "ellipsis")
@@ -2232,29 +2259,30 @@ struct TrainingExerciseCard: View {
       strengthInputs
       difficultyPicker
     }
-    // Single full-width primary action. Skip moved to the ⋯ menu, so the
-    // footer reads as one obvious "log this" target — easy thumb-reach at
-    // the gym.
-    Button(entry.status == .failed ? "Retry"
-           : entry.status == .done ? "Update" : "Done") {
-      let wasDone = (entry.status == .done)
-      store.markDone(index: index, mutator: trainingMutator)
-      // Celebrate only on first completion, not re-saves of an
-      // already-done entry. Success haptic + confetti + status-icon
-      // bounce — small enough to fit the "you did a set" cadence.
-      if !wasDone {
-        Haptics.success()
-        celebrate += 1
+    // Primary action, trailing-aligned (right corner). Skip lives in the
+    // ⋯ menu, so the footer is just "log this".
+    HStack {
+      Spacer()
+      Button(entry.status == .failed ? "Retry"
+             : entry.status == .done ? "Update" : "Done") {
+        let wasDone = (entry.status == .done)
+        store.markDone(index: index, mutator: trainingMutator)
+        // Celebrate only on first completion, not re-saves of an
+        // already-done entry. Success haptic + confetti + status-icon
+        // bounce — small enough to fit the "you did a set" cadence.
+        if !wasDone {
+          Haptics.success()
+          celebrate += 1
+        }
+        if entry.status != .failed { openExercise = nil }
       }
-      if entry.status != .failed { expanded = false }
-    }
-    .buttonStyle(.borderedProminent)
-    .controlSize(.large)
-    .frame(maxWidth: .infinity)
-    .tint(accent)
-    .disabled(entry.status == .saving)
-    .overlay(alignment: .center) {
-      ConfettiBurst(trigger: celebrate, accent: accent)
+      .buttonStyle(.borderedProminent)
+      .controlSize(.large)
+      .tint(accent)
+      .disabled(entry.status == .saving)
+      .overlay(alignment: .center) {
+        ConfettiBurst(trigger: celebrate, accent: accent)
+      }
     }
     .padding(.top, 12)
   }
@@ -2262,22 +2290,28 @@ struct TrainingExerciseCard: View {
   // MARK: - Strength fields
 
   private var strengthInputs: some View {
-    HStack(spacing: 8) {
+    VStack(spacing: 10) {
+      // Weight gets its own full-width row — it's the value you nudge
+      // between sets, so it earns the space (and "27.5 kg" no longer
+      // truncates the way it did three-across). Sets/reps, which rarely
+      // change, sit two-across below.
       steppedField(label: "Weight", unit: "kg", step: 2.5,
                    value: Binding(
                      get: { entry.weight.map { fmt($0) } ?? "" },
                      set: { setWeight($0) }
                    ))
-      steppedField(label: "Sets", step: 1,
-                   value: Binding(
-                     get: { entry.sets.map(String.init) ?? "" },
-                     set: { setSets(Int($0)) }
-                   ))
-      steppedField(label: "Reps", step: 1,
-                   value: Binding(
-                     get: { entry.reps ?? "" },
-                     set: { setReps($0) }
-                   ))
+      HStack(spacing: 8) {
+        steppedField(label: "Sets", step: 1,
+                     value: Binding(
+                       get: { entry.sets.map(String.init) ?? "" },
+                       set: { setSets(Int($0)) }
+                     ))
+        steppedField(label: "Reps", step: 1,
+                     value: Binding(
+                       get: { entry.reps ?? "" },
+                       set: { setReps($0) }
+                     ))
+      }
     }
   }
 
@@ -2341,14 +2375,11 @@ struct TrainingExerciseCard: View {
   /// level don't apply to a flow-style session, and weight/reps are off
   /// the table by definition for mobility work.
   private var mobilityInputs: some View {
-    HStack(alignment: .top, spacing: 10) {
-      numberField(label: "Minutes",
-                  value: Binding(
-                    get: { entry.durationMin.map { fmt($0) } ?? "" },
-                    set: { setDuration($0) }
-                  ))
-      Spacer()
-    }
+    steppedField(label: "Minutes", step: 1,
+                 value: Binding(
+                   get: { entry.durationMin.map { fmt($0) } ?? "" },
+                   set: { setDuration($0) }
+                 ))
   }
 
   // MARK: - Cardio fields
@@ -2357,23 +2388,44 @@ struct TrainingExerciseCard: View {
   /// (`app/(app)/septena/training/session/active/page.tsx`) which uses
   /// the same three fields in the same order for cardio entries.
   private var cardioInputs: some View {
-    HStack(alignment: .top, spacing: 10) {
-      numberField(label: "Minutes",
-                  value: Binding(
-                    get: { entry.durationMin.map { fmt($0) } ?? "" },
-                    set: { setDuration($0) }
-                  ))
-      numberField(label: "Distance", unit: "m",
-                  value: Binding(
-                    get: { entry.distanceM.map { fmt($0) } ?? "" },
-                    set: { setDistance($0) }
-                  ))
-      numberField(label: "Level",
-                  value: Binding(
-                    get: { entry.level.map { fmt($0) } ?? "" },
-                    set: { setLevel($0) }
-                  ))
+    VStack(spacing: 10) {
+      // Minutes is the value you set first; on change we preset distance to
+      // your average pace for that exercise ("you know my cadence"). So it
+      // gets the full-width hero row, with distance/level two-across below.
+      steppedField(label: "Minutes", step: 1,
+                   value: Binding(
+                     get: { entry.durationMin.map { fmt($0) } ?? "" },
+                     set: { newVal in
+                       setDuration(newVal)
+                       presetDistanceFromDuration(newVal)
+                     }
+                   ))
+      HStack(spacing: 8) {
+        steppedField(label: "Distance", unit: "m", step: 50,
+                     value: Binding(
+                       get: { entry.distanceM.map { fmt($0) } ?? "" },
+                       set: { setDistance($0) }
+                     ))
+        steppedField(label: "Level", step: 1,
+                     value: Binding(
+                       get: { entry.level.map { fmt($0) } ?? "" },
+                       set: { setLevel($0) }
+                     ))
+      }
     }
+  }
+
+  /// Preset distance from the just-entered duration using the exercise's
+  /// historical average pace (m/min). Rounds to the nearest 10 m. No-op
+  /// when there's no pace history — we don't invent a distance. Runs on
+  /// every minutes edit/stepper tap; tweak the result with distance's own
+  /// ± buttons afterward.
+  private func presetDistanceFromDuration(_ durationStr: String) {
+    guard let pace = avgPace,
+          let mins = Double(durationStr.replacingOccurrences(of: ",", with: ".")),
+          mins > 0 else { return }
+    let meters = ((pace * mins) / 10).rounded() * 10
+    setDistance(String(Int(meters)))
   }
 
   // MARK: - Field helpers
@@ -2405,7 +2457,10 @@ struct TrainingExerciseCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 9)
-        .background(Theme.mutedSurface,
+        // Card-surface (white in light mode, dark-mode safe) so the field
+        // pops against the expanded tile's accent-tinted background — the
+        // grey muted surface washed out against the accent.
+        .background(Theme.cardSurface,
                     in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         stepButton("plus") { bump(value, by: step) }
       }

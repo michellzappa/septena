@@ -10,6 +10,11 @@ struct HabitsDestinationView: View {
   @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
+  // Optional: this view is also hosted inside the Home-Screen-Quick-Action
+  // sheet (RootTabView's `pendingSection`), which doesn't inherit the root
+  // environment. A missing center degrades to "no celebration", never a
+  // crash. The toggle + haptic always run.
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
   @State private var model = NextItemsModel()
   @State private var editing: HabitDayItem? = nil
@@ -138,8 +143,9 @@ struct HabitsDestinationView: View {
   private func pastDayRow(_ item: HabitDayItem) -> some View {
     Button {
       let next = !item.done
-      checklistMutator.toggleHabit(id: item.id, date: viewingDate, done: next)
-      Haptics.tick()
+      completeHabit(id: item.id, date: viewingDate, done: next,
+                    checklist: checklistMutator, context: modelContext,
+                    theme: theme, logCommit: logCommit)
     } label: {
       HStack(spacing: 12) {
         Image(systemName: item.done ? "checkmark.circle.fill" : "circle")

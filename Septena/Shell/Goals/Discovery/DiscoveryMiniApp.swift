@@ -64,5 +64,6 @@ struct AnyDiscoveryMiniApp: Identifiable {
 enum DiscoveryRegistry {
   static let all: [DiscoveryMiniAppDescriptor] = [
     IkigaiMiniApp.descriptor,
+    ValuesMiniApp.descriptor,
   ]
 }

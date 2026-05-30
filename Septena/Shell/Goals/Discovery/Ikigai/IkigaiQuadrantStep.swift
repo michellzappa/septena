@@ -75,7 +75,7 @@ struct IkigaiQuadrantStep: View {
 
   private var visibleSuggestions: [String] {
     suggestions.filter { item in
-      selectedItems.wrappedValue.contains(item) || !hiddenAfterExpansion.contains(item)
+      !selectedItems.wrappedValue.contains(item) && !hiddenAfterExpansion.contains(item)
     }
   }
 
@@ -85,26 +85,31 @@ struct IkigaiQuadrantStep: View {
         Label(quadrant.title, systemImage: quadrant.symbol)
           .font(.title2.weight(.semibold))
           .foregroundStyle(quadrant.accent)
-        Text(quadrant.subtitle)
+        Text("\(quadrant.subtitle) Choose 2-4.")
           .font(.subheadline)
           .foregroundStyle(.secondary)
       }
 
+      DiscoverySelectedPills(
+        title: "Chosen",
+        items: Array(selectedItems.wrappedValue).sorted(),
+        accent: quadrant.accent,
+        onRemove: { selectedItems.wrappedValue.remove($0) }
+      )
+
       SelectablePillsView(
         items: visibleSuggestions,
         selectedItems: selectedItems,
-        tint: quadrant.accent
+        tint: quadrant.accent,
+        maxSelections: 4
       ) { _ in
         Haptics.tick()
       }
 
-      HStack(spacing: 10) {
-        TextField("Add your own", text: $customText)
-          .textFieldStyle(.roundedBorder)
-          .onSubmit(addCustom)
-        Button("Add", action: addCustom)
-          .disabled(customText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-      }
+      DiscoveryPillTextInput(placeholder: "Add your own",
+                             text: $customText,
+                             accent: quadrant.accent,
+                             onSubmit: addCustom)
 
       Button {
         Task {
@@ -116,14 +121,28 @@ struct IkigaiQuadrantStep: View {
           suggesting = false
         }
       } label: {
-        if suggesting {
-          ProgressView()
-        } else {
-          Label("Suggest more", systemImage: "sparkles")
+        HStack(spacing: 8) {
+          if suggesting {
+            ProgressView()
+              .controlSize(.small)
+          } else {
+            Image(systemName: "wand.and.stars")
+          }
+          Text(suggesting ? "Suggesting..." : "Suggest More")
+            .font(.subheadline.weight(.semibold))
         }
+        .frame(maxWidth: .infinity)
+        .frame(height: 44)
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
       }
-      .buttonStyle(.bordered)
-      .tint(quadrant.accent)
+      .buttonStyle(.plain)
+      .foregroundStyle(suggesting ? .secondary : quadrant.accent)
+      .background(quadrant.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+      .overlay {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+          .strokeBorder(quadrant.accent.opacity(0.28), lineWidth: 1)
+      }
+      .disabled(suggesting)
 
       Spacer(minLength: 0)
     }
@@ -131,6 +150,11 @@ struct IkigaiQuadrantStep: View {
   }
 
   private func addCustom() {
+    guard selectedItems.wrappedValue.count < 4 else {
+      Haptics.warning()
+      customText = ""
+      return
+    }
     onAddCustom(customText)
     customText = ""
     Haptics.tick()

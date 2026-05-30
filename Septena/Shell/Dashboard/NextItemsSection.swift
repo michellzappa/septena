@@ -541,6 +541,11 @@ struct HabitRow: View {
   let checklistMutator: ChecklistMutator
   let tint: Color
   var onDelete: (() -> Void)? = nil
+  @Environment(\.modelContext) private var modelContext
+  @Environment(SectionTheme.self) private var theme
+  // Optional — HabitRow renders in multiple hosts (Next tab, Habits sheet);
+  // not all inherit the root env. nil → celebration no-ops, toggle still runs.
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
   var body: some View {
     let inactive = habit.done || habit.skipped
@@ -548,7 +553,22 @@ struct HabitRow: View {
       TaskCheckbox(
         tint: habit.skipped && !habit.done ? Theme.inkSecondary : tint,
         isDone: inactive
-      ) { model.toggleHabit(habit, mutator: checklistMutator) }
+      ) {
+        // The optimistic flip + write lives on NextItemsModel; layer the
+        // streak celebration on top here (the View can reach the environment;
+        // the model can't). `done` is the value being written.
+        let done = !habit.done
+        model.toggleHabit(habit, mutator: checklistMutator)
+        let streak = ChecklistMirror.habitStreak(context: modelContext, habitId: habit.id, asOf: SeptenaDate.today)
+        if done, let m = StreakMilestones.reached(streak), HabitMilestoneStore.lastCelebrated(habit.id) < m {
+          HabitMilestoneStore.setCelebrated(habit.id, m)
+          Haptics.success()
+          logCommit?.fire(.ignition(accent: theme.color(for: "habits"), streak: streak))
+          A11y.announce("\(streak) day streak!")
+        } else if !done {
+          HabitMilestoneStore.reconcile(habit.id, currentStreak: streak)
+        }
+      }
 
       Text(habit.emoji ?? "•").font(.body)
       Text(habit.name)

@@ -18,6 +18,7 @@ final class IkigaiViewModel {
   var suggestions: [String: [String]]
   var phase: Phase = .collecting
   var drafts: [DraftGoal] = []
+  var generationMessage: String?
 
   private let service: PurposePromptService
 
@@ -87,9 +88,11 @@ final class IkigaiViewModel {
   func generateDrafts(availableSections: [SectionConfig] = []) async {
     guard canGenerate else { return }
     phase = .generating
+    generationMessage = "Finding the through-line..."
 
     do {
       let purpose = try await service.generatePurposeTitleAndDescription(inputs: inputs)
+      generationMessage = "Drafting commitments..."
       let commitments = try await service.generateCommitments(
         purpose: "\(purpose.title): \(purpose.content)"
       )
@@ -107,12 +110,15 @@ final class IkigaiViewModel {
         )
       })
 
+      generationMessage = "Tagging sections..."
       nextDrafts = await draftsWithSectionSelections(nextDrafts, availableSections: availableSections)
       drafts = nextDrafts
+      generationMessage = nil
       phase = .ready
       Haptics.success()
     } catch {
       drafts = fallbackDrafts(availableSections: availableSections)
+      generationMessage = nil
       phase = .failed("The on-device model could not finish this generation. You can still review a local fallback draft.")
       Haptics.warning()
     }

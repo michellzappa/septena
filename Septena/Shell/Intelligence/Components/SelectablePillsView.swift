@@ -26,19 +26,32 @@ struct SelectablePillsView: View {
           toggleItem(item)
         } label: {
           HStack(spacing: 6) {
-            Image(systemName: selectedItems.contains(item) ? "checkmark.circle.fill" : "circle")
+            if selectedItems.contains(item) {
+              Image(systemName: "checkmark.circle.fill")
+                .font(.caption.weight(.semibold))
+            }
             Text(item)
-              .font(.callout)
+              .font(.callout.weight(selectedItems.contains(item) ? .semibold : .regular))
           }
-          .padding(.horizontal, 10)
-          .padding(.vertical, 4)
+          .padding(.horizontal, 12)
+          .padding(.vertical, 8)
+          .foregroundStyle(selectedItems.contains(item) ? tint : .primary)
+          .background(selectedItems.contains(item) ? tint.opacity(0.15) : Color.secondary.opacity(0.10), in: Capsule())
+          .overlay {
+            Capsule()
+              .strokeBorder(selectedItems.contains(item) ? tint.opacity(0.38) : Color.secondary.opacity(0.16), lineWidth: 1)
+          }
         }
-        .buttonStyle(.bordered)
-        .tint(selectedItems.contains(item) ? tint : .secondary)
-        .disabled(maxSelections != nil && selectedItems.count >= maxSelections! && !selectedItems.contains(item))
+        .buttonStyle(.plain)
+        .opacity(isDisabled(item) ? 0.38 : 1)
+        .disabled(isDisabled(item))
       }
     }
     .animation(.easeInOut(duration: 0.2), value: selectedItems)
+  }
+
+  private func isDisabled(_ item: String) -> Bool {
+    maxSelections != nil && selectedItems.count >= maxSelections! && !selectedItems.contains(item)
   }
 
   private func toggleItem(_ item: String) {

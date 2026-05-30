@@ -197,6 +197,27 @@ enum ChecklistMirror {
     return HabitHistoryResponse(daily: daily, total: grandTotal)
   }
 
+  /// Consecutive-day completion streak for a single habit, counting back
+  /// from `todayISO`. Returns 0 if the habit isn't marked done on `todayISO`.
+  /// Pure read — no writes, no side effects.
+  static func habitStreak(context: ModelContext, habitId: String, asOf todayISO: String) -> Int {
+    let states = (try? context.fetch(FetchDescriptor<HabitDayStateEntity>(
+      predicate: #Predicate { $0.habitID == habitId && $0.done == true }
+    ))) ?? []
+    let doneDates = Set(states.map(\.date))
+
+    var streak = 0
+    var cursor = todayISO
+    while doneDates.contains(cursor) {
+      streak += 1
+      guard let base = SeptenaDate.parse(cursor),
+            let prev = Calendar.current.date(byAdding: .day, value: -1, to: base),
+            let prevStr = SeptenaDate.format(prev) else { break }
+      cursor = prevStr
+    }
+    return streak
+  }
+
   static func loadSupplementsHistory(context: ModelContext, days: Int) -> SupplementHistoryResponse {
     let today = SeptenaDate.today
     guard let todayDate = SeptenaDate.parse(today) else {

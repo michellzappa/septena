@@ -25,6 +25,9 @@ struct SeptenaApp: App {
   @State private var theme = SectionTheme()
   @State private var trainingDraft = TrainingDraftStore()
   @State private var settingsStore = SettingsStore()
+  /// App-wide celebration layer. Fired by foreground log actions (habit
+  /// streaks today; consumables next), played by a single LogCommitOverlay.
+  @State private var logCommit = LogCommitCenter()
   /// App-wide "what day / what time is it" clock. Views read `today`/`now`
   /// from this instead of calling `SeptenaDate.today` or `Date()` so they
   /// re-render on midnight rollover and on each minute tick uniformly.
@@ -55,6 +58,13 @@ struct SeptenaApp: App {
   var body: some Scene {
     WindowGroup {
       RootTabView()
+        // Single app-wide celebration layer. Mounted INNERMOST (before the
+        // .environment chain) so the overlay is a descendant of every
+        // environment below — including `logCommit` itself, which it reads.
+        // (`.overlay` applied *after* `.environment` would place the overlay
+        // OUTSIDE that scope and crash on the first frame.) Presented sheets
+        // still render above it, so sheet-based logs fire after dismissal.
+        .overlay { LogCommitOverlay() }
         .environment(navigation)
         .environment(theme)
         .environment(trainingDraft)
@@ -65,6 +75,7 @@ struct SeptenaApp: App {
         .environment(projectsMutator)
         .environment(dayClock)
         .environment(ckEngine)
+        .environment(logCommit)
         .modelContainer(localStore.container)
         .onChange(of: scenePhase) { _, phase in
           // Foreground transitions are the best moment to flush any
