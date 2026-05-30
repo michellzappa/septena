@@ -414,6 +414,7 @@ struct SidebarRootView: View {
                        title: spec.title,
                        count: spec.count)
         }
+        .modifier(SmartListTaskDrop(route: spec.route, mutator: taskMutator))
       }
     }
     .padding(.horizontal, Theme.hPadding)
@@ -433,6 +434,7 @@ struct SidebarRootView: View {
         // which read as "the sidebar lifts" on tap. The selected fill is
         // the only feedback we want — InertButtonStyle strips the rest.
         .buttonStyle(InertButtonStyle())
+        .modifier(SmartListTaskDrop(route: spec.route, mutator: taskMutator))
       }
     }
     .padding(.horizontal, Theme.hPadding)
@@ -1432,6 +1434,21 @@ private struct SidebarTaskDropTarget: ViewModifier {
   enum Kind {
     case area(String)
     case project(String)
+    case today
+    case inbox
+    case someday
+
+    /// Maps a sidebar smart-list route to a drop action, or nil for routes
+    /// with no single unambiguous "move here" meaning (Upcoming, Anytime,
+    /// Logbook) so they don't become misleading drop targets.
+    init?(route: Route) {
+      switch route {
+      case .filter(.today):   self = .today
+      case .filter(.inbox):   self = .inbox
+      case .filter(.someday): self = .someday
+      default:                return nil
+      }
+    }
   }
 
   let kind: Kind
@@ -1455,6 +1472,16 @@ private struct SidebarTaskDropTarget: ViewModifier {
             mutator.moveToProject(id: id, project: nil)
           case .project(let projectId):
             mutator.moveToProject(id: id, project: projectId)
+          case .today:
+            mutator.moveToToday(id: id, today: true)
+          case .someday:
+            mutator.moveToSomeday(id: id)
+          case .inbox:
+            // Inbox = no routing at all: clear today, schedule, area, project.
+            mutator.moveToToday(id: id, today: false)
+            mutator.schedule(id: id, date: nil)
+            mutator.moveToArea(id: id, area: nil)
+            mutator.moveToProject(id: id, project: nil)
           }
         }
         return true
@@ -1462,5 +1489,20 @@ private struct SidebarTaskDropTarget: ViewModifier {
         if hovering && !isTargeted { Haptics.tick() }
         isTargeted = hovering
       }
+  }
+}
+
+/// Installs `SidebarTaskDropTarget` on a smart-list row only when the route
+/// has a meaningful drop action (Today / Inbox / Someday); other routes pass
+/// through so they don't show a misleading drop highlight.
+private struct SmartListTaskDrop: ViewModifier {
+  let route: Route
+  let mutator: TaskMutator
+  func body(content: Content) -> some View {
+    if let kind = SidebarTaskDropTarget.Kind(route: route) {
+      content.modifier(SidebarTaskDropTarget(kind: kind, mutator: mutator))
+    } else {
+      content
+    }
   }
 }

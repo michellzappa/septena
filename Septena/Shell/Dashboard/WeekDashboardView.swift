@@ -864,7 +864,7 @@ struct WeekDashboardView: View {
   /// Per-domain quickadd menu, surfaced as a `.contextMenu` on the
   /// Dense and Heatmap rows. Mirrors the same menus the Tiles renderer
   /// attaches inline (`habitsQuickAddMenu`, `caffeineQuickAddMenu`,
-  /// etc.). Domains without a quickadd affordance (sleep, air, body,
+  /// etc.). Domains without a quickadd affordance (sleep, body,
   /// activity) return `EmptyView`, which SwiftUI silently suppresses
   /// — so those rows show no menu on long-press / right-click rather
   /// than an empty popover.

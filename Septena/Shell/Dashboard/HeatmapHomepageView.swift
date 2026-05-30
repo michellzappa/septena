@@ -26,7 +26,7 @@ struct HeatmapHomepageView<MenuContent: View>: View {
   let onTap: (DomainTapAction) -> Void
   /// Long-press / right-click quickadd menu per domain — same plumbing
   /// as `DenseHomepageView`. Caller hands back `EmptyView` for domains
-  /// without a menu (sleep, air, body, activity).
+  /// without a menu (sleep, body, activity).
   @ViewBuilder let menuContent: (HomepageDomain) -> MenuContent
 
   /// Measured at render time via a 0-height probe in the VStack below.

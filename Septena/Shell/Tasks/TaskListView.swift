@@ -18,13 +18,6 @@ struct TaskListView: View {
   @Environment(SectionTheme.self) private var theme
   @Environment(\.modelContext) private var modelContext
   @Environment(\.a11yMotion) private var motion
-  #if os(iOS)
-  /// Drives the Details surface choice: `.sheet` on iPhone compact,
-  /// `.inspector` on iPad regular. `.inspector` adapts poorly to iPhone
-  /// (renders as a blank near-fullscreen panel), so we route there
-  /// only when the trailing column actually has room.
-  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-  #endif
 
   let filter: TaskFilter
   /// True when this view is laid out *inside* another detail screen
@@ -241,62 +234,6 @@ struct TaskListView: View {
     }
   }
 
-  // Details pane is driven by its own state, NOT by `selection`.
-  // Selection is a click / multi-select highlight; the pane is opened only
-  // by the (i) button on the inline editor. Decoupling them prevents
-  // the pane from popping up as a side effect of tapping / selecting.
-  @State private var paneTaskId: String?
-  private var detailsPaneIsOpen: Binding<Bool> {
-    Binding(
-      get: { paneTaskId != nil && currentTask(id: paneTaskId) != nil },
-      set: { isOpen in if !isOpen { paneTaskId = nil } }
-    )
-  }
-
-  /// True on iPad regular width and macOS — wide enough for a real
-  /// trailing inspector column. False on iPhone compact, where we
-  /// present Details as a `.sheet` instead.
-  private var useInspectorForDetails: Bool {
-    #if os(macOS)
-    return true
-    #else
-    return horizontalSizeClass == .regular
-    #endif
-  }
-
-  /// Shared content for the Details surface — used by both the
-  /// `.sheet` (iPhone) and `.inspector` (iPad/Mac) presenters.
-  @ViewBuilder
-  private var detailsPaneContent: some View {
-    if let id = paneTaskId, let target = currentTask(id: id) {
-      TaskDetailsSheet(
-        task: target,
-        projectTitle: target.project.flatMap { pid in projects.first(where: { $0.id == pid })?.title },
-        areaTitle:    target.area.flatMap    { aid in areas.first(where:    { $0.id == aid })?.title },
-        onSaveTitleNotes: { newTitle, newNotes in
-          applyTitleNotes(id: target.id, title: newTitle, notes: newNotes)
-        },
-        onOpenWhen: {
-          whenSheet = WhenSheet(taskId: target.id, kind: .scheduled)
-        },
-        onOpenDeadline: {
-          whenSheet = WhenSheet(taskId: target.id, kind: .due)
-        },
-        onOpenRepeat: {
-          repeatTargetId = target.id; showingRepeatSheet = true
-        },
-        onOpenMove: {
-          moveTargetId = target.id; showingMoveSheet = true
-        },
-        onDelete: {
-          applyDelete(target.id)
-          paneTaskId = nil
-        },
-        onDone: { paneTaskId = nil }
-      )
-      .id(id)
-    }
-  }
 
   // Local semantic sorter — populates a "→ Suggested" chip on Inbox rows.
   @State private var suggestionEngine = SuggestionEngine.shared
@@ -343,9 +280,6 @@ struct TaskListView: View {
         currentScheduled: currentScheduled,
         currentDeadline: currentDeadline,
         currentRecurrence: currentRecurrence,
-        useInspectorForDetails: useInspectorForDetails,
-        detailsPaneIsOpen: detailsPaneIsOpen,
-        detailsPaneContent: { detailsPaneContent },
         applyWhen: applyWhen,
         applyMove: applyMove,
         applyRecurrence: applyRecurrence,
@@ -354,11 +288,7 @@ struct TaskListView: View {
   }
 
   private var taskList: some View {
-    List(selection: $selection) {
-      taskListHeader
-      taskListRows
-      taskListFooter
-    }
+    taskListContent
     .listStyle(.plain)
     .scrollContentBackground(.hidden)
     .background(Theme.paperBackground)
@@ -381,8 +311,7 @@ struct TaskListView: View {
       if !embedded {
         ToolbarItem(placement: .topBarTrailing) {
           Button(selectMode ? "Done" : "Select") {
-            selectMode.toggle()
-            if !selectMode { selection.removeAll() }
+            if selectMode { clearSelection() } else { selectMode = true }
           }
         }
       }
@@ -414,7 +343,7 @@ struct TaskListView: View {
       isInputMode: editingTaskId != nil,
       hasSelection: !selection.isEmpty,
       onReturn: openSelectedForEdit,
-      onEscape: { selection.removeAll() },
+      onEscape: { clearSelection() },
       onSpace: toggleSelected,
       onNewTask: startDraft,
       onToggleToday: toggleTodayForSelected,
@@ -455,13 +384,9 @@ struct TaskListView: View {
     // session-scoped state and re-trigger the network refresh.
     .onChange(of: filter) { _, _ in
       sessionDoneIds = []
-      selection.removeAll()
+      clearSelection()
       editingTaskId = nil
-      paneTaskId = nil
       newlyCreatedTaskId = nil
-      #if os(iOS)
-      selectMode = false
-      #endif
       Task { await load() }
     }
     // Consume the global "start a new task" trigger from the sidebar
@@ -484,6 +409,31 @@ struct TaskListView: View {
         startDraft()
       }
     }
+  }
+
+  // macOS: bind List(selection:) so native click / ⌘-click / ⇧-click /
+  // ↑↓ / ⌫ work out of the box.
+  // iOS: plain List — List(selection:) intercepts the long-press that
+  // .draggable needs to start a drag. iOS selection is driven by our own
+  // handleRowTap + selectMode; the `selection` Set is still updated there,
+  // just not via the native binding.
+  // Extracted into a @ViewBuilder helper so the #if os() branches don't
+  // produce two concrete return types in a `some View` property.
+  @ViewBuilder
+  private var taskListContent: some View {
+    #if os(macOS)
+    List(selection: $selection) {
+      taskListHeader
+      taskListRows
+      taskListFooter
+    }
+    #else
+    List {
+      taskListHeader
+      taskListRows
+      taskListFooter
+    }
+    #endif
   }
 
   @ViewBuilder
@@ -667,7 +617,7 @@ struct TaskListView: View {
   private func effectiveSelectionId() -> String? {
     if let id = selection.first(where: { currentTask(id: $0) != nil }) { return id }
     guard let first = keyboardOrderedTaskIds.first else { return nil }
-    selection = [first]
+    selectOnly(first)
     return first
   }
 
@@ -698,10 +648,7 @@ struct TaskListView: View {
     let ids = selection.isEmpty ? [effectiveSelectionId()].compactMap { $0 } : Array(selection)
     guard !ids.isEmpty else { return }
     Haptics.warning()
-    selection.removeAll()
-    #if os(iOS)
-    selectMode = false
-    #endif
+    clearSelection()
     for id in ids { applyDelete(id) }
   }
 
@@ -764,15 +711,6 @@ struct TaskListView: View {
     Task { await load() }
   }
 
-  /// Open the Details pane for a task. Only the (i) button on the
-  /// inline editor calls this — tapping a row does NOT open the pane.
-  /// Commits any in-flight inline draft first so the pane reads fresh
-  /// state.
-  private func openDetails(for task: SeptenaTask) {
-    if editingTaskId != nil { commitEdit() }
-    paneTaskId = task.id
-  }
-
   private func applyMove(id: String, areaId: String?, projectId: String?) {
     Haptics.tick()
     if let task = currentTask(id: id) {
@@ -814,43 +752,51 @@ struct TaskListView: View {
       // inline-editor branches, so the accent tint stays put when the
       // row swaps state — no cross-fade needed.
       .background(rowBackground(for: task))
-      // Spring drives the row's height change; we intentionally do
-      // NOT use a transition that fades content in/out, since the
-      // two branches share the same checkbox + title layout.
+      // SINGLE source of expand/collapse animation: an implicit animation
+      // tied to the editing flag. State is mutated plainly in
+      // startEdit/commitEdit/startDraft (no withAnimation), so the row's
+      // async keyboard-focus claim doesn't race an animation transaction —
+      // that race was the "mess of animation, nothing works" on tap-to-edit.
       .a11yAnimation(Self.expandSpring, value: editingTaskId == task.id)
       // Standard Reminders/Things swipe set, replacing the old
       // swipe-to-select (multi-select now lives behind the toolbar Select
       // button on iOS and native ⌘/⇧-click on macOS). Must live on the
       // outer row view (the direct child of List) — List only walks one
       // level deep to find swipe actions.
-      // Leading, full-swipe: complete / uncomplete.
+      // Leading, full-swipe: in the Today list this completes the task
+      // (swipe-right-to-done); in every other list it promotes the task into
+      // Today instead — "complete" is ambiguous for a row that isn't yet a
+      // today commitment.
       .swipeActions(edge: .leading, allowsFullSwipe: true) {
-        Button {
-          toggle(task)
-        } label: {
-          Label(task.status == .done ? "Uncomplete" : "Complete",
-                systemImage: task.status == .done ? "arrow.uturn.left" : "checkmark")
+        if filter == .today {
+          Button {
+            toggle(task)
+          } label: {
+            Label(task.status == .done ? "Uncomplete" : "Complete",
+                  systemImage: task.status == .done ? "arrow.uturn.left" : "checkmark")
+          }
+          .tint(.green)
+        } else {
+          Button {
+            Haptics.tick()
+            mutator.moveToToday(id: task.id, today: true)
+            Task { await load() }
+          } label: {
+            Label("Today", systemImage: "sun.max")
+          }
+          .tint(Theme.todayAccent)
         }
-        .tint(.green)
       }
-      // Trailing, no full-swipe (so a long drag can't delete by accident):
-      // delete + toggle Today.
-      .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-        Button(role: .destructive) {
-          Haptics.warning()
-          applyDelete(task.id)
-        } label: {
-          Label("Delete", systemImage: "trash")
-        }
+      // Trailing, full-swipe: Select (enter multi-select; haptics fire in
+      // beginSelecting). Delete lives in the context menu + batch bar so a
+      // stray swipe can't destroy a task.
+      .swipeActions(edge: .trailing, allowsFullSwipe: true) {
         Button {
-          Haptics.tick()
-          mutator.moveToToday(id: task.id, today: !task.today)
-          Task { await load() }
+          beginSelecting(task.id)
         } label: {
-          Label(task.today ? "Remove from Today" : "Today",
-                systemImage: task.today ? "sun.max.fill" : "sun.max")
+          Label("Select", systemImage: "checkmark.circle")
         }
-        .tint(Theme.todayAccent)
+        .tint(theme.accent)
       }
   }
 
@@ -873,7 +819,7 @@ struct TaskListView: View {
         let id = editingTaskId
         let title = editingTitle.trimmingCharacters(in: .whitespaces)
         let wasNew = (id != nil && id == newlyCreatedTaskId)
-        motion.run(Self.expandSpring) { editingTaskId = nil }
+        editingTaskId = nil
         newlyCreatedTaskId = nil
         // Esc on a fresh ⌘N task with an empty title → delete the stub.
         if wasNew && title.isEmpty, let id {
@@ -881,10 +827,11 @@ struct TaskListView: View {
           removeLocally(id: id)
         }
       },
-      onOpenDetails: {
-        commitEdit()
-        paneTaskId = task.id
-      }
+      onOpenWhen: { whenSheet = WhenSheet(taskId: task.id, kind: .scheduled) },
+      onOpenDeadline: { whenSheet = WhenSheet(taskId: task.id, kind: .due) },
+      onOpenRepeat: { repeatTargetId = task.id; showingRepeatSheet = true },
+      onOpenMove: { moveTargetId = task.id; showingMoveSheet = true },
+      onDelete: { Haptics.warning(); applyDelete(task.id) }
     )
     .transition(.identity)
     // Tap-to-edit only when this row isn't already the editor (the focused
@@ -898,7 +845,7 @@ struct TaskListView: View {
     // Right-click selects this row (unless already part of a multi-selection)
     // so the menu's target is unambiguous.
     .septenaOnRightClick {
-      if !selection.contains(task.id) { selection = [task.id] }
+      if !selection.contains(task.id) { selectOnly(task.id) }
     }
     .contextMenu { taskContextMenu(for: task) }
   }
@@ -913,14 +860,7 @@ struct TaskListView: View {
       target: target,
       filter: filter,
       rankedSuggestions: rankedSuggestions(for: target),
-      onSelectSingle: { task in
-        if editingTaskId != nil { commitEdit() }
-        #if os(iOS)
-        selectMode = true
-        #endif
-        selection.insert(task.id)
-        Haptics.tick()
-      },
+      onSelectSingle: { task in beginSelecting(task.id) },
       onApplySuggestion: applySuggestion,
       onMoveToToday: { ids, today in
         Haptics.tick()
@@ -961,12 +901,7 @@ struct TaskListView: View {
       onDelete: { target in
         Haptics.warning()
         for id in target.ids { applyDelete(id) }
-        if target.isBulk {
-          selection.removeAll()
-          #if os(iOS)
-          selectMode = false
-          #endif
-        }
+        if target.isBulk { clearSelection() }
       }
     )
   }
@@ -992,6 +927,39 @@ struct TaskListView: View {
     return suggestionEngine.suggestions[task.id] ?? [top]
   }
 
+  // MARK: - Selection
+  //
+  // `selection` (a Set<String> bound to `List(selection:)`) is the single
+  // source of truth. macOS drives it natively (click / ⌘-click / ⇧-click);
+  // iOS drives it via row taps (select-first) + the Select button. Every
+  // mutation funnels through these helpers so the platforms stay in lockstep
+  // and `selectMode` can never desync from an empty selection.
+
+  /// Replace the selection with exactly one row.
+  private func selectOnly(_ id: String) {
+    selection = [id]
+  }
+
+  /// Deselect everything and leave iOS multi-select mode — the single
+  /// "clear selection" entry point used by every deselect path.
+  private func clearSelection() {
+    selection.removeAll()
+    #if os(iOS)
+    selectMode = false
+    #endif
+  }
+
+  /// Enter multi-select seeded with one row — used by the swipe action and
+  /// the context-menu "Select". Commits any inline edit first.
+  private func beginSelecting(_ id: String) {
+    if editingTaskId != nil { commitEdit() }
+    #if os(iOS)
+    selectMode = true
+    #endif
+    selection.insert(id)
+    Haptics.tick()
+  }
+
   #if os(iOS)
   private func toggleSelection(for id: String) {
     if selection.contains(id) {
@@ -1001,14 +969,21 @@ struct TaskListView: View {
     }
   }
 
-  /// Row tap handler (iOS only). In Select mode a tap toggles membership;
-  /// otherwise it opens the inline editor. macOS never calls this — there a
-  /// single click selects natively and a double-click opens the editor.
+  /// Row tap handler (iOS only). Matches macOS: first tap selects, second tap
+  /// (on the already-selected row) edits. In Select mode a tap toggles
+  /// membership instead. macOS never calls this — there a single click
+  /// selects natively and a double-click opens the editor.
   private func handleRowTap(_ task: SeptenaTask) {
     if selectMode {
       toggleSelection(for: task.id)
-    } else {
+    } else if selection.count == 1 && selection.contains(task.id) {
+      // Second tap on the sole selected row → edit.
       startEdit(task)
+    } else {
+      // First tap selects this row. Commit any in-flight edit first.
+      if editingTaskId != nil { commitEdit() }
+      selectOnly(task.id)
+      Haptics.tick()
     }
   }
   #endif
@@ -1538,12 +1513,7 @@ struct TaskListView: View {
           .labelStyle(.iconOnly)
           .font(.title3)
       }
-      Button("Done") {
-        selection.removeAll()
-        #if os(iOS)
-        selectMode = false
-        #endif
-      }
+      Button("Done") { clearSelection() }
       .font(.subheadline.weight(.semibold))
     }
     .padding(.horizontal, 20)
@@ -1586,11 +1556,14 @@ struct TaskListView: View {
       }
       newlyCreatedTaskId = nil
     }
-    motion.run(Self.expandSpring) {
-      editingTitle = task.title
-      editingNotes = task.notes ?? ""
-      editingTaskId = task.id
-    }
+    // Set state PLAINLY — not wrapped in withAnimation. The visual expand is
+    // animated by the row's implicit `.a11yAnimation(value: editingTaskId==…)`.
+    // Wrapping the mutation in an animation transaction while the row then
+    // asynchronously claims keyboard focus races the two, which flickered the
+    // editor open/closed and dropped the keyboard.
+    editingTitle = task.title
+    editingNotes = task.notes ?? ""
+    editingTaskId = task.id
   }
 
   private func commitEdit() {
@@ -1601,9 +1574,7 @@ struct TaskListView: View {
     let t = editingTitle.trimmingCharacters(in: .whitespaces)
     let wasNew = (newlyCreatedTaskId == id)
     SeptenaLog.info("[Edit] commitEdit id=\(id) wasNew=\(wasNew)")
-    motion.run(Self.expandSpring) {
-      editingTaskId = nil
-    }
+    editingTaskId = nil   // plain; collapse animates via the row's .a11yAnimation
     newlyCreatedTaskId = nil
     if t.isEmpty {
       // Empty title: delete the task if it was a fresh ⌘N draft;
@@ -1634,7 +1605,7 @@ struct TaskListView: View {
   /// user clicks empty space.
   private func dismissInlineEdit() {
     if editingTaskId != nil { commitEdit() }
-    selection.removeAll()
+    clearSelection()
   }
 
   // MARK: - Create
@@ -1679,7 +1650,7 @@ struct TaskListView: View {
     editingTitle = ""
     editingNotes = ""
     newlyCreatedTaskId = created.id
-    motion.run(Self.expandSpring) { editingTaskId = created.id }
+    editingTaskId = created.id   // plain; expand animates via the row's .a11yAnimation
     SeptenaLog.info("[Create] editingTaskId set id=\(created.id) — inline editor opens")
   }
 
@@ -2067,33 +2038,8 @@ private struct TopLevelChromeModifier: ViewModifier {
   }
 }
 
-/// Routes the Details surface to `.inspector` (iPad regular / macOS)
-/// or `.sheet` (iPhone compact). `.inspector` adapts poorly to compact
-/// width — renders as a near-fullscreen blank panel — so we present
-/// a real bottom sheet there instead.
-private struct TaskDetailsPresenter<C: View>: ViewModifier {
-  let isOpen: Binding<Bool>
-  let useInspector: Bool
-  @ViewBuilder let content: () -> C
 
-  func body(content base: Content) -> some View {
-    if useInspector {
-      base.inspector(isPresented: isOpen) {
-        content()
-          .inspectorColumnWidth(min: 320, ideal: 380, max: 560)
-      }
-    } else {
-      base.sheet(isPresented: isOpen) {
-        content()
-          .presentationDetents([.medium, .large])
-          .presentationBackground(.thinMaterial)
-          .presentationCornerRadius(Theme.cornerRadius)
-      }
-    }
-  }
-}
-
-private struct TaskListModalPresenter<DetailsContent: View>: ViewModifier {
+private struct TaskListModalPresenter: ViewModifier {
   @Binding var whenSheet: TaskListView.WhenSheet?
   @Binding var showingMoveSheet: Bool
   @Binding var moveTargetId: String?
@@ -2107,9 +2053,6 @@ private struct TaskListModalPresenter<DetailsContent: View>: ViewModifier {
   let currentScheduled: (String?) -> Date?
   let currentDeadline: (String?) -> Date?
   let currentRecurrence: (String?) -> Recurrence?
-  let useInspectorForDetails: Bool
-  let detailsPaneIsOpen: Binding<Bool>
-  @ViewBuilder let detailsPaneContent: () -> DetailsContent
   let applyWhen: (String, TaskListView.WhenKind, Date?) -> Void
   let applyMove: (String, String?, String?) -> Void
   let applyRecurrence: (String, Recurrence?) -> Void
@@ -2208,11 +2151,6 @@ private struct TaskListModalPresenter<DetailsContent: View>: ViewModifier {
         .presentationBackground(.thinMaterial)
         .presentationCornerRadius(Theme.cornerRadius)
       }
-      .modifier(TaskDetailsPresenter(
-        isOpen: detailsPaneIsOpen,
-        useInspector: useInspectorForDetails,
-        content: detailsPaneContent
-      ))
   }
 }
 

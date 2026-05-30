@@ -161,13 +161,7 @@ struct ScreenTitle: View {
 }
 
 
-// MARK: - Inline edit task row
-//
-// Reminders-style inline editor. No card chrome, no embedded action icons
-// — the row stays a row. The user edits title (and optionally notes)
-// in place; everything else (dates, repeat, list, delete) lives behind
-// the `info.circle` button on the trailing edge, which opens the
-// TaskDetailsSheet. This replaces the prior Things-style expanding card.
+// MARK: - Task row
 
 // One unified row — the title is ALWAYS a `TextField`, so opening the editor
 // is pure focus, never a Text↔TextField swap (the swap is what used to nudge
@@ -197,7 +191,12 @@ struct TaskRowView<MetaLine: View, TrailingDate: View>: View {
   let onToggle: () -> Void
   let onCommit: () -> Void
   let onCancel: () -> Void
-  let onOpenDetails: () -> Void
+  // Inline edit-mode actions (the Things-style icon bar under the notes).
+  let onOpenWhen: () -> Void
+  let onOpenDeadline: () -> Void
+  let onOpenRepeat: () -> Void
+  let onOpenMove: () -> Void
+  let onDelete: () -> Void
 
   @FocusState private var focused: Field?
   /// Set true the moment the user cancels, so the blur handler doesn't race
@@ -226,6 +225,35 @@ struct TaskRowView<MetaLine: View, TrailingDate: View>: View {
     }
   }
 
+  /// Things-style inline controls shown under the notes while editing. Each
+  /// opens the relevant existing picker; the icon tints with `accent` when
+  /// that field is set, so the row shows its state at a glance.
+  private var editActionBar: some View {
+    HStack(spacing: 2) {
+      editAction("calendar", "Schedule", set: task.scheduled != nil, onOpenWhen)
+      editAction("flag", "Deadline", set: task.deadline != nil, onOpenDeadline)
+      editAction("repeat", "Repeat", set: task.recurrence != nil, onOpenRepeat)
+      editAction("folder", "List", set: task.project != nil || task.area != nil, onOpenMove)
+      Spacer(minLength: 0)
+      editAction("trash", "Delete", set: false, role: .destructive, onDelete)
+    }
+    .padding(.top, 6)
+  }
+
+  @ViewBuilder
+  private func editAction(_ systemImage: String, _ label: String, set: Bool,
+                          role: ButtonRole? = nil, _ action: @escaping () -> Void) -> some View {
+    Button(role: role) { Haptics.pick(); action() } label: {
+      Image(systemName: systemImage)
+        .font(.system(size: 16))
+        .foregroundStyle(role == .destructive ? Theme.overdueRed : (set ? accent : Theme.inkSecondary))
+        .frame(width: 40, height: 30)
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(label)
+  }
+
   var body: some View {
     HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
       TaskCheckbox(
@@ -250,26 +278,18 @@ struct TaskRowView<MetaLine: View, TrailingDate: View>: View {
             .focused($focused, equals: .notes)
             .lineLimit(1...8)
             .fixedSize(horizontal: false, vertical: true)
+          // Things-style inline controls under the notes — everything the
+          // task needs, with no separate (i) detour.
+          editActionBar
         } else {
           metaLine()
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
 
-      if isEditing {
-        // Info button — opens the consolidated details pane (when, deadline,
-        // repeat, list, delete).
-        Button(action: { Haptics.pick(); onOpenDetails() }) {
-          Image(systemName: "info.circle")
-            .font(.title3)
-            .foregroundStyle(theme.accent)
-            .frame(width: 28, height: 28)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
-        .accessibilityLabel("Task details")
-      } else {
+      // Trailing accessories — display mode only. While editing, the actions
+      // live in `editActionBar` under the notes (no trailing (i) button).
+      if !isEditing {
         if hasNotes {
           Image(systemName: "text.alignleft")
             .font(.system(size: 12))
@@ -369,213 +389,6 @@ struct TaskRowView<MetaLine: View, TrailingDate: View>: View {
       .accessibilityHidden(true)
   }
 
-}
-
-// MARK: - Task details sheet
-//
-// One sheet, every secondary attribute. Each row shows the current value
-// and opens the relevant existing picker (When / Deadline / Repeat /
-// Move) on tap. Mirrors Reminders' Details sheet — a single jumping-off
-// point instead of four separate icon affordances inside the row.
-
-struct TaskDetailsSheet: View {
-  @Environment(SectionTheme.self) private var theme
-  @Environment(\.dismiss) private var dismiss
-
-  let task: SeptenaTask
-  let projectTitle: String?
-  let areaTitle: String?
-  /// Saves edited title + notes back to the parent. Called on dismiss and
-  /// when the sheet hands off to a sub-picker, so in-flight edits aren't
-  /// lost when the user opens (say) the When picker from inside Details.
-  let onSaveTitleNotes: (_ title: String, _ notes: String) -> Void
-  let onOpenWhen: () -> Void
-  let onOpenDeadline: () -> Void
-  let onOpenRepeat: () -> Void
-  let onOpenMove: () -> Void
-  let onDelete: () -> Void
-  /// Closes the pane from inside (Done button). Parent clears
-  /// `selectedTaskId`, which retracts the inspector binding.
-  let onDone: () -> Void
-
-  @State private var titleDraft: String = ""
-  @State private var notesDraft: String = ""
-  @FocusState private var focused: Field?
-  enum Field { case title, notes }
-
-  private func save() {
-    onSaveTitleNotes(titleDraft, notesDraft)
-  }
-
-  var body: some View {
-    NavigationStack {
-      List {
-        // Title + notes live at the top of the pane so the sheet feels
-        // like the task itself, not just a metadata picker.
-        Section {
-          TextField("Title", text: $titleDraft, axis: .vertical)
-            .textFieldStyle(.plain)
-            .focusEffectDisabled()
-            .font(.septenaTaskTitle)
-            .focused($focused, equals: .title)
-            .lineLimit(1...5)
-
-          TextField("Notes", text: $notesDraft, axis: .vertical)
-            .textFieldStyle(.plain)
-            .focusEffectDisabled()
-            .font(.septenaNotes)
-            .foregroundStyle(.secondary)
-            .focused($focused, equals: .notes)
-            .lineLimit(1...12)
-        }
-
-        Section {
-          detailRow(
-            icon: whenIcon, tint: whenTint,
-            title: "When", value: whenLabel
-          ) { save(); onOpenWhen() }
-
-          detailRow(
-            icon: "flag", tint: deadlineTint,
-            title: "Deadline", value: deadlineLabel
-          ) { save(); onOpenDeadline() }
-
-          detailRow(
-            icon: "arrow.triangle.2.circlepath",
-            tint: task.recurrence == nil ? Theme.inkSecondary : Theme.inkPrimary,
-            title: "Repeat", value: repeatLabel
-          ) { save(); onOpenRepeat() }
-        }
-
-        Section {
-          detailRow(
-            icon: moveIcon,
-            tint: (projectTitle != nil || areaTitle != nil) ? Theme.inkPrimary : Theme.inkSecondary,
-            title: "List", value: moveLabel
-          ) { save(); onOpenMove() }
-        }
-
-        Section {
-          Button(role: .destructive) {
-            Haptics.warning()
-            onDelete()
-          } label: {
-            Label("Delete Task", systemImage: "trash")
-              .foregroundStyle(Theme.overdueRed)
-          }
-        }
-      }
-      #if os(macOS)
-      .listStyle(.inset)
-      #else
-      .listStyle(.insetGrouped)
-      #endif
-      .scrollContentBackground(.hidden)
-      .background(Theme.paperBackground)
-      .navigationTitle("Details")
-      .septenaInlineTitle()
-      .toolbar {
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Done") { save(); onDone() }
-        }
-      }
-      .onAppear {
-        titleDraft = task.title
-        notesDraft = task.notes ?? ""
-      }
-      .onDisappear { save() }
-    }
-  }
-
-  // MARK: - Row primitive
-
-  @ViewBuilder
-  private func detailRow(icon: String, tint: Color, title: String,
-                         value: String, action: @escaping () -> Void) -> some View {
-    Button(action: { Haptics.pick(); action() }) {
-      HStack(spacing: 14) {
-        Image(systemName: icon)
-          .font(.system(size: 17))
-          .foregroundStyle(tint)
-          .frame(width: 24)
-        Text(title)
-          .font(.septenaSidebarRow)
-          .foregroundStyle(Theme.inkPrimary)
-        Spacer()
-        Text(value)
-          .font(.septenaMeta)
-          .foregroundStyle(Theme.inkSecondary)
-        Image(systemName: "chevron.right")
-          .font(.system(size: 12, weight: .semibold))
-          .foregroundStyle(Theme.inkSecondary.opacity(0.5))
-      }
-      .contentShape(Rectangle())
-    }
-    .buttonStyle(.plain)
-  }
-
-  // MARK: - Labels
-
-  private var whenIcon: String {
-    guard let d = task.scheduled.flatMap(SeptenaDate.parse) else { return "calendar" }
-    let cal = Calendar.current
-    if cal.isDateInToday(d)    { return "sun.max.fill" }
-    if cal.isDateInTomorrow(d) { return "sunrise.fill" }
-    return "calendar"
-  }
-  private var whenTint: Color {
-    guard let d = task.scheduled.flatMap(SeptenaDate.parse) else { return Theme.inkSecondary }
-    return Calendar.current.isDateInToday(d) ? .yellow : Theme.inkPrimary
-  }
-  private var whenLabel: String {
-    guard let d = task.scheduled.flatMap(SeptenaDate.parse) else { return "None" }
-    return shortDate(d)
-  }
-
-  private var deadlineTint: Color {
-    guard let d = task.due.flatMap(SeptenaDate.parse) else { return Theme.inkSecondary }
-    let today = Calendar.current.startOfDay(for: Date())
-    return Calendar.current.startOfDay(for: d) <= today ? Theme.overdueRed : Theme.inkPrimary
-  }
-  private var deadlineLabel: String {
-    guard let d = task.due.flatMap(SeptenaDate.parse) else { return "None" }
-    return shortDate(d)
-  }
-
-  private var repeatLabel: String {
-    guard let r = task.recurrence else { return "Never" }
-    let unit: String = {
-      switch r.unit {
-      case .day:   return r.interval == 1 ? "day"   : "\(r.interval) days"
-      case .week:  return r.interval == 1 ? "week"  : "\(r.interval) weeks"
-      case .month: return r.interval == 1 ? "month" : "\(r.interval) months"
-      }
-    }()
-    let base = "Every \(unit)"
-    // Server stamps `next_occurrence` on open recurring tasks — show it so the
-    // user sees when the next instance will land without doing the math.
-    if let next = task.nextOccurrence.flatMap(SeptenaDate.parse) {
-      return "\(base) · next \(shortDate(next))"
-    }
-    return base
-  }
-
-  private var moveIcon: String {
-    if projectTitle != nil { return "number" }
-    if areaTitle    != nil { return "folder" }
-    return "tray"
-  }
-  private var moveLabel: String {
-    projectTitle ?? areaTitle ?? "Inbox"
-  }
-
-  private func shortDate(_ d: Date) -> String {
-    let cal = Calendar.current
-    if cal.isDateInToday(d)    { return "Today" }
-    if cal.isDateInTomorrow(d) { return "Tomorrow" }
-    let f = DateFormatter(); f.dateFormat = "MMM d"
-    return f.string(from: d)
-  }
 }
 
 // MARK: - Week strip

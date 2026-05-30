@@ -1526,6 +1526,80 @@ final class TrainingDraftStore {
       $0.entries[index].status = .skipped
     }
   }
+
+  // MARK: - Mid-session edits (switch / add / remove)
+  //
+  // Swapping the machine that's taken, or throwing in an extra exercise,
+  // without leaving the logger. Each new entry is pre-filled from history
+  // exactly like the ones `start(type:)` seeds — same last-entry / PR /
+  // recents snapshots, same per-exercise category resolution.
+
+  /// Build a fully pre-filled entry for `name` and fold its history
+  /// snapshots (last-entry, PR baseline, recents) into `d`, keyed by
+  /// `exerciseKey`. Category comes from the catalog (strength / cardio /
+  /// mobility), falling back to the routine's kind for orphan slugs —
+  /// the same resolution `start(type:)` uses, applied to one exercise.
+  private func makePrefilledEntry(_ name: String,
+                                  into d: inout DraftSession,
+                                  context: ModelContext) -> DraftEntry {
+    let last = ChecklistMirror.loadLastEntries(context: context, exercises: [name])
+    let routineKind = sessionTypes.first { $0.id == d.sessionType }?.kind ?? .mixed
+    let kind = exerciseKinds(for: [name], fallback: routineKind, context: context)[name] ?? routineKind
+    let key = exerciseKey(name)
+    if let v = last[name] { d.lastByExercise[key] = v }
+    for (k, v) in TrainingPRCalculator.baselines(for: [name], in: context) { d.prBaselines[k] = v }
+    for (k, v) in TrainingPRCalculator.recents(for: [name], in: context, limit: 3) { d.recentByExercise[k] = v }
+    return DraftEntry.from(exercise: name,
+                           last: last[name],
+                           cardioOverride: kind == .cardio,
+                           mobilityOverride: kind == .mobility)
+  }
+
+  /// Replace the exercise at `index` with `name`, pre-filled from history.
+  /// No-op if another slot already holds that exercise — two entries with
+  /// the same name would collide on `DraftEntry.id`.
+  func switchExercise(at index: Int, to name: String, context: ModelContext) {
+    update {
+      guard $0.entries.indices.contains(index) else { return }
+      let key = exerciseKey(name)
+      let clash = $0.entries.enumerated().contains { i, e in
+        i != index && exerciseKey(e.exercise) == key
+      }
+      guard !clash else { return }
+      $0.entries[index] = makePrefilledEntry(name, into: &$0, context: context)
+    }
+  }
+
+  /// Append `name` as a new pre-filled entry. No-op if it's already present.
+  func addExercise(_ name: String, context: ModelContext) {
+    update {
+      let key = exerciseKey(name)
+      guard !$0.entries.contains(where: { exerciseKey($0.exercise) == key }) else { return }
+      $0.entries.append(makePrefilledEntry(name, into: &$0, context: context))
+    }
+  }
+
+  /// Add several catalog exercises by definition id. Ids resolve to
+  /// canonical names so the cards render and save like any other entry.
+  func addExercises(catalogIDs ids: [String], context: ModelContext) {
+    guard !ids.isEmpty else { return }
+    let defs = (try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>())) ?? []
+    let nameByID = Dictionary(defs.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
+    for id in ids {
+      guard let name = nameByID[id] else { continue }
+      addExercise(name, context: context)
+    }
+  }
+
+  /// Drop the entry at `index` from the in-progress session. An entry
+  /// already marked Done keeps its logged history — this only removes the
+  /// card; deleting saved history is the history pane's job.
+  func removeEntry(at index: Int) {
+    update {
+      guard $0.entries.indices.contains(index) else { return }
+      $0.entries.remove(at: index)
+    }
+  }
 }
 
 // MARK: - Session logger UI
@@ -1552,6 +1626,8 @@ struct TrainingSessionView: View {
   /// just before `discard()`. Driving `SessionCompleteSheet` off
   /// `.sheet(item:)` so the celebration outlives the draft.
   @State private var completionStats: SessionStats?
+  /// Presents the catalog picker to add extra exercises to the session.
+  @State private var showAdd = false
 
   private var accent: Color { theme.color(for: "training") }
 
@@ -1695,6 +1771,17 @@ struct TrainingSessionView: View {
             .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
           }
         }
+        Section {
+          Button {
+            showAdd = true
+          } label: {
+            Label("Add exercise", systemImage: "plus.circle.fill")
+              .font(.septenaCardTitle)
+              .foregroundStyle(accent)
+          }
+          .buttonStyle(.plain)
+          .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+        }
       }
       #if os(iOS)
       .listStyle(.insetGrouped)
@@ -1702,6 +1789,17 @@ struct TrainingSessionView: View {
       .listStyle(.inset)
       #endif
       .onAppear { tick = Date() }
+      .sheet(isPresented: $showAdd) {
+        if let current = store.draft {
+          ExercisePickerSheet(
+            disabledNames: Set(current.entries.map(\.exercise)),
+            onDone: { ids in
+              store.addExercises(catalogIDs: ids, context: modelContext)
+              Haptics.tick()
+            }
+          )
+        }
+      }
     }
   }
 
@@ -1797,12 +1895,15 @@ struct TrainingExerciseCard: View {
   private var trainingMutator: TrainingMutator { SeptenaServices.shared.trainingMutator }
   @Environment(TrainingDraftStore.self) private var store
   @Environment(\.a11yMotion) private var motion
+  @Environment(\.modelContext) private var modelContext
 
   let index: Int
   let entry: DraftEntry
   let accent: Color
 
   @State private var expanded = false
+  /// Presents the catalog picker to swap this slot's exercise.
+  @State private var showSwitch = false
   /// Bump on a successful Done tap to fire `ConfettiBurst` + a
   /// `symbolEffect` bounce on the status check. Subtle celebration —
   /// no banner, no sound, just the row briefly confirming the rep.
@@ -1832,6 +1933,26 @@ struct TrainingExerciseCard: View {
       // editor to be there or not, no in-between motion.
       expanded.toggle()
     }
+    .sheet(isPresented: $showSwitch) {
+      ExercisePickerSheet(
+        selectionMode: .single,
+        disabledNames: otherSessionNames,
+        alternativesTo: entry.exercise,
+        onPick: { def in
+          store.switchExercise(at: index, to: def.name, context: modelContext)
+          Haptics.tick()
+        }
+      )
+    }
+  }
+
+  /// Exercise names in the session other than this slot's — disabled in
+  /// the switch picker so a swap can't create a duplicate entry.
+  private var otherSessionNames: Set<String> {
+    guard let entries = store.draft?.entries else { return [] }
+    return Set(entries.enumerated()
+      .filter { $0.offset != index }
+      .map { $0.element.exercise })
   }
 
   // MARK: - Header
@@ -1849,6 +1970,31 @@ struct TrainingExerciseCard: View {
         if isPR { prPill }
       }
       Spacer()
+      // ⋯ menu — switch this slot for a different exercise, or drop it.
+      // Lives in the header so it's reachable before expanding the card
+      // (the "machine's taken" case). The Menu consumes its own taps, so
+      // it doesn't toggle the card's expand gesture.
+      Menu {
+        Button {
+          showSwitch = true
+        } label: {
+          Label("Switch exercise", systemImage: "arrow.triangle.2.circlepath")
+        }
+        Button(role: .destructive) {
+          store.removeEntry(at: index)
+          Haptics.warning()
+        } label: {
+          Label("Remove", systemImage: "trash")
+        }
+      } label: {
+        Image(systemName: "ellipsis")
+          .font(.system(size: 15, weight: .semibold))
+          .foregroundStyle(Theme.inkSecondary)
+          .frame(width: 30, height: 30)
+          .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel("Exercise options")
       Image(systemName: expanded ? "chevron.up" : "chevron.down")
         .font(.system(size: 12, weight: .semibold))
         .foregroundStyle(Theme.inkSecondary)

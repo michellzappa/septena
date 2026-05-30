@@ -6,7 +6,7 @@ import SwiftUI
 ///
 ///   * `.bars`     — single-series N-day count. The default. Used by
 ///                   habits, chores, supplements, sleep score, nutrition
-///                   protein, caffeine/cannabis sessions, air CO₂,
+///                   protein, caffeine/cannabis sessions,
 ///                   groceries bought-per-day, gut movements, activity
 ///                   steps, tasks completed.
 ///   * `.stackedBars` — two parallel series rendered together. Today
@@ -29,7 +29,7 @@ struct DomainStat {
 }
 
 /// Optional progress indicator (done-of-total, today-vs-target, etc.).
-/// Domains without a meaningful progress concept (sleep, body, air,
+/// Domains without a meaningful progress concept (sleep, body,
 /// groceries) leave this `nil` on `HomepageDomainData`.
 struct DomainProgress {
   let label: String

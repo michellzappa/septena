@@ -19,7 +19,7 @@ struct DenseHomepageView<MenuContent: View>: View {
   /// Long-press / right-click contextual actions per domain — the same
   /// quickadd menus the Tiles renderer attaches via `.contextMenu`.
   /// Caller hands back `EmptyView` for domains with no menu (sleep,
-  /// air, body, activity) and the menu is silently suppressed.
+  /// body, activity) and the menu is silently suppressed.
   @ViewBuilder let menuContent: (HomepageDomain) -> MenuContent
 
   var body: some View {

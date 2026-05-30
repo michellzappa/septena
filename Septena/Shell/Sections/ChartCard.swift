@@ -2,7 +2,7 @@ import SwiftUI
 
 // One chart inside a section drawer, with a small editorial header
 // rendered above the card. Replaces the local `chartCard(...)` helpers
-// that Air, Sleep (and the inline pattern in other destinations) were
+// that Sleep (and the inline pattern in other destinations) were
 // re-rolling. Same shape as `DrawerSection("Title", padding: .tight)`,
 // but with an optional secondary `detail` string next to the title
 // (e.g. "avg 800 · max 1200 ppm", "↑ 85+", "last 24h").
