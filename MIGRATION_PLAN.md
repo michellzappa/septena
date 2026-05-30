@@ -83,7 +83,6 @@ Before adding more domains, keep iOS and MCP task behavior aligned:
 | Cannabis | `/api/cannabis/config`, `/day/{date}`, `/history`, `/entries`, `/entry`, `/strains`, `/capsule/*` | `Cannabis/cannabis-config.json`, `Cannabis/Log/*.json`, `_capsules.json` | `CannabisEntry`, `CannabisStrain`, `CannabisCapsuleState` | Derive counts from entries; capsule state as current state | `cannabis_list`, `cannabis_log`, `cannabis_capsule` |
 | Gut | `/api/gut/config`, `/day/{date}`, `/history`, `/entry/{id}` | `Gut/gut-config.json`, `Gut/Log/*.json` | `GutEntry`, `GutSettings` | Derive daily movement metrics from entries | `gut_list`, `gut_log`, `gut_update` |
 | Training | `/api/training/entries`, `/sessions`, `/last-entries`, `/session-types`, `/summary`, `/progression/{exercise}`, `/cardio-history`, `/suggested-workout` | `Training/training-config.json`, `Training/Log/*.json` | `TrainingEntry`, `TrainingSessionType`, `ExerciseDefinition` | Derive progression, summary, cardio history, suggestions from entries | `training_entries`, `training_log`, `training_last_entries`, `training_summary` |
-| Air | `/api/air/summary`, `/history` | `Air/Log/*.json`, cache state | `AirReading` or keep integration-derived | Derive summary/history from readings | Defer unless agent writes air data |
 | Sleep | `/api/health/oura`, `/summary`, `/combined`, `/cache` | external Oura + optional cached snapshots | Defer; maybe `SleepNight` snapshots | Derived from imported nights | Read-only later |
 | Body | `/api/health/withings` | external Withings + optional body logs | Defer; maybe `BodyMeasurement` snapshots | Derived from measurements | Read-only later |
 | Apple Health / Activity | native HealthKit in iOS; FastAPI has `/api/health/apple` | Health Auto Export JSON | Keep device-local unless cloud backup is required | Derived locally | Defer |
@@ -138,7 +137,7 @@ Move nutrition, caffeine, cannabis, gut, and training.
 
 Only after user-authored data is moved:
 
-- Decide whether Oura/Withings/Air snapshots should be stored in CK or remain
+- Decide whether Oura/Withings snapshots should be stored in CK or remain
   integration-backed read-through caches.
 - Keep Apple Health primarily on-device unless there is a specific cross-device
   backup requirement.

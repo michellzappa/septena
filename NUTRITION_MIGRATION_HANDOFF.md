@@ -15,7 +15,7 @@ gut/caffeine/cannabis, groceries, training). This doc covers what's
 
 ## Why this is the right time
 
-Six sections live on CloudKit; nutrition + sleep + body + air are still
+Six sections live on CloudKit; nutrition + sleep + body are still
 on FastAPI. Nutrition is the next biggest write surface and has no
 external-integration entanglement (unlike sleep/body which depend on
 HealthKit/Oura/Withings) — so it's the natural next move.
@@ -398,7 +398,5 @@ section:
 - **Sleep / Body** depend on HealthKit / Oura / Withings —
   separate conversation about whether to keep external pulls
   server-side or move them client-side.
-- **Air** is Bluetooth (Aranet4 BLE), different model entirely;
-  partial CK sync already exists per commit 0cc4422.
 
 — end of handoff —

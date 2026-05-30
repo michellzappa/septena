@@ -2,9 +2,11 @@
 
 The de-facto design system, written down. Derived from what the app already does — not aspirational. When something here conflicts with code, the code is wrong, not the spec.
 
+_Last verified against code: 2026-05-30._
+
 ## 1. Section model
 
-A **section** is the unit of vertical scope: Tasks, Training, Nutrition, Sleep, Habits, Chores, Supplements, Groceries, Caffeine, Cannabis, Gut, Hydration, Mood, Air, Activity, Body, Goals.
+A **section** is the unit of vertical scope: Tasks, Training, Nutrition, Sleep, Habits, Chores, Supplements, Groceries, Caffeine, Cannabis, Gut, Hydration, Mood, Activity, Body, Goals.
 
 Each section's identity is declared once in [SectionManifest.swift](../SeptenaCore/Sections/SectionManifest.swift):
 
@@ -62,29 +64,31 @@ Read-only historical entries use `LogRow` ([LogRow.swift](../Septena/Shell/UI/Lo
 
 All section accents live in [SectionTheme.swift](../SeptenaCore/SectionTheme.swift) `defaultPalette`. Per-section tint is applied with `.tint(theme.color(for: key))`. No hardcoded `Color(...)` literals in views.
 
-Unknown sections fall back to `inkSecondary`. The user's Tasks-section color is the global app accent.
+Unknown sections fall back to a neutral gray (`SectionTheme.color(for:)`). The user's Tasks-section color is the global app accent (`SectionTheme.accent`).
 
 ## 5. Typography
 
-Three-family system, mirroring the webapp's editorial identity but keeping SF Pro for native UI feel:
+Three families, used by role:
 
-- **SF Pro** (system) — all UI body, controls, labels, sidebar rows, task titles, buttons. Stays the system font so nav bars, alerts, and Dynamic Type behave natively.
-- **Fraunces** — editorial headings only (screen titles, section titles, card titles). Stylistic set `ss01` on, matching the webapp.
-- **Mono (JetBrains Mono or equivalent)** — numerics, units, timestamps, tags. Tabular figures (`.monospacedDigit()`) where columns of numbers need to align.
+- **SF Pro** (system) — all UI body, controls, labels, buttons, and almost every title (section, card, and tile titles included). Stays the system font so nav bars, alerts, and Dynamic Type behave natively.
+- **Fraunces** (serif) — the screen-level H1 *only* (`septenaScreenTitle`). Rare by design: it's the single editorial face in the app, so it stays meaningful. Bundled as a variable font and registered via Info.plist (`UIAppFonts` on iOS, `ATSApplicationFontsPath` on Mac); if the file isn't bundled, `Font.custom` falls back to the system font silently, so the app stays buildable either way.
+- **SF Mono** (system monospaced, `Font.system(design: .monospaced)`) — numerics, units, timestamps, counts, metrics. Tabular figures (`.monospacedDigit()`) so columns of numbers align.
 
-The serif + mono pairing is what carries the brand; SF Pro carries the OS feel. Do not replace SF Pro for UI body — it regresses accessibility and creates inconsistency with system chrome.
+Fraunces-as-accent plus mono-for-numbers is what carries the brand; SF Pro carries the OS feel. Don't replace SF Pro for UI body — it regresses accessibility and breaks consistency with system chrome. Don't reach for Fraunces beyond the screen title.
 
-Use the named styles in [Theme.swift](../Septena/Shell/UI/Theme.swift). No raw `.font(.title)` calls, no fixed point sizes outside of these styles. All styles are built on `Font.custom(_, size:, relativeTo:)` so Dynamic Type still scales.
+Use the named styles in [Theme.swift](../Septena/Shell/UI/Theme.swift). No raw `.font(.title)` calls, no fixed point sizes outside these styles. Every style is built on a system text style (or, for Fraunces, `Font.custom(_, size:, relativeTo:)`) so Dynamic Type scales.
 
-- `.septenaScreenTitle` — destination header (Fraunces, `largeTitle.bold`)
-- `.septenaSectionTitle` — section header within a screen (Fraunces, `title2.bold`)
-- `.septenaCardTitle` — card header (Fraunces, `headline`)
-- `.septenaTaskTitle` / `.septenaSidebarRow` / `.septenaNotes` — UI body (SF Pro)
+- `.septenaScreenTitle` — destination header (Fraunces SemiBold, ~`largeTitle`). The only Fraunces user.
+- `.septenaSectionTitle` — section header within a screen (SF Pro semibold, `title2`)
+- `.septenaCardTitle` — card header (SF Pro, `headline`)
+- `.septenaTileTitle` — dashboard tile header (SF Pro; `title3` on iOS, `headline` on macOS)
+- `.septenaTaskTitle` / `.septenaSidebarRow` — UI body (SF Pro, `body`)
+- `.septenaNotes` — secondary body (SF Pro, `subheadline`)
 - `.septenaButton` — action labels (SF Pro, `subheadline.semibold`)
 - `.septenaLabel` — small labels (SF Pro, `footnote.medium`)
-- `.septenaMeta` / `.septenaMetaStrong` — timestamps, metadata (Mono, `footnote`)
-- `.septenaMetric` — numeric values, counts, durations (Mono, tabular)
 - `.septenaBadge` — status pills (SF Pro, `caption2.semibold`)
+- `.septenaMeta` / `.septenaMetaStrong` — timestamps, metadata (SF Mono, `footnote`, tabular)
+- `.septenaMetric` — numeric values, counts, durations (SF Mono, `body`, tabular)
 
 ## 6. Empty, loading, and error states
 
@@ -109,3 +113,18 @@ Shape shared across `EditCaffeineEntrySheet`, `EditCannabisEntrySheet`, `EditNut
 Anything that would otherwise drift across sections — colors, fonts, section identity, glyph choice, row anatomy — has exactly one definition. New plugins consume the central definitions; they don't re-declare them.
 
 When in doubt: if a reviewer can ask "where is this defined?" and get two answers, it's a bug.
+
+## 9. Spacing & motion
+
+Shape and motion tokens live alongside the type and color tokens — like color, each has exactly one definition. Don't sprinkle magic numbers.
+
+- **Spacing scale** — `Theme.Spacing.xs/sm/md/lg/xl/xxl` (4 / 8 / 12 / 14 / 16 / 28pt). Drawer chrome (`SectionDrawer`, `DrawerSection`, `ChartCard`, `StatStrip`) consumes these; tune one place and the whole drawer system shifts in step.
+- **Corner radius** — `Theme.cornerRadius` (22pt, the iOS-26 "soft tile") and `Theme.cornerRadiusSmall` (6pt, chips and pills).
+- **Row rhythm** — `Theme.rowVPadding`, `iconTextGap`, `checkboxTap`, and the per-platform row/sidebar heights keep the icon column and text baseline aligned across every row type.
+
+**Motion is gated for accessibility, centrally.** Use the helpers in [Accessibility.swift](../Septena/Shell/UI/Accessibility.swift), not raw `withAnimation`:
+
+- `.a11yAnimation(_:value:)` — declarative; collapses to no animation under Reduce Motion.
+- `A11yMotion.run { … }` — the imperative analogue for state toggles.
+
+Any animation a user can trigger repeatedly — and every celebratory flourish (confetti, the mood-commit animation, symbol bounces) — must route through these so Reduce Motion is honored. A screen flash or a `repeatForever` that ignores Reduce Motion is a bug.

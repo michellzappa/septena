@@ -363,6 +363,5 @@ mental model, update this doc's status, and pick the next one:
 - **Sleep / Body** depend on external integrations (HealthKit / Oura
   / Withings) — separate conversation about whether to keep those
   server-side or pull client-side.
-- **Air** is Bluetooth, different model entirely.
 
 — end of handoff —

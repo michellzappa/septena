@@ -1,24 +1,28 @@
 # Septena
 
-A personal life-OS for iOS, macOS, and watchOS. One app for tasks, projects, goals, training, nutrition, sleep, mood, supplements, habits, chores, gut, caffeine, cannabis, air quality, and activity — built on CloudKit, with Apple Watch and a menu-bar companion on Mac.
+Septena is a private life operating system for Apple platforms. It brings tasks, goals, training, nutrition, hydration, sleep, mood, supplements, habits, chores, groceries, gut, caffeine, cannabis, air quality, activity, and body metrics into one CloudKit-backed app.
 
-> **Status (2026-05-25):** Mid-migration from a FastAPI backend to CloudKit. Tasks, Areas, Projects, Settings, and Section visibility are CloudKit-native today; the remaining sections still read/write through the legacy API while their CloudKit records are wired up. See [MIGRATION_HANDOFF.md](MIGRATION_HANDOFF.md) for the live status.
+The product principle is simple: every life domain is a section, every section can be enabled or hidden without deleting data, and every write should land in the local SwiftData mirror first, then sync through CloudKit.
+
+> Status (2026-05-30): Septena is CloudKit-first. The general FastAPI client path has been removed from this repo; remaining FastAPI references are migration history, export DTO compatibility, or comments that still need cleanup. `MIGRATION_HANDOFF.md`, `TRAINING_MIGRATION_HANDOFF.md`, and `NUTRITION_MIGRATION_HANDOFF.md` are useful historical notes, but verify them against code before treating them as live truth.
 
 ## Stack
 
-- **SwiftUI** — single codebase across iOS / macOS / watchOS
-- **SwiftData** — local persistence and offline cache
-- **CloudKit** (`CKSyncEngine`) — primary backend, private database
-- **HealthKit, EventKit (Reminders + Calendar), Core Bluetooth** — system integrations
-- **XcodeGen** — `project.yml` is the source of truth for the Xcode project
+- **SwiftUI** - shared app code for iOS and macOS, plus a watchOS companion
+- **SwiftData** - local mirror, offline cache, and first-write surface
+- **CloudKit** (`CKSyncEngine`) - private iCloud database, custom zone `septena-v1`
+- **HealthKit, EventKit, WatchConnectivity, WidgetKit** - Apple platform integrations
+- **Core Bluetooth / Core Location** - air quality and pollen-related integrations where available
+- **App Intents** - Siri, Shortcuts, Spotlight, and section logging intents
+- **XcodeGen** - `project.yml` is the source of truth for the Xcode project
 - **Swift 5.10**, deployment target **iOS / macOS / watchOS 26.0**
 
-## Quick start
+## Quick Start
 
 ```bash
 git clone <repo> septena-cloud
 cd septena-cloud
-brew install xcodegen   # if you don't have it
+brew install xcodegen   # if needed
 xcodegen generate
 open Septena.xcodeproj
 ```
@@ -26,144 +30,175 @@ open Septena.xcodeproj
 Schemes:
 
 | Scheme | Target | Platform |
-|---|---|---|
-| `Septena` | iOS app (embeds Watch) | iOS 26+ |
+| --- | --- | --- |
+| `Septena` | iOS app, embeds Watch app | iOS 26+ |
 | `SeptenaMac` | macOS app | macOS 26+ |
 | `SeptenaWatch` | watchOS app | watchOS 26+ |
 
-CloudKit container is `iCloud.com.septena.cloud`. You need to be signed into iCloud on the simulator/device; first launch creates the private zone and runs the initial sync.
+CloudKit container: `iCloud.com.septena.cloud`.
 
-There is **no `.env`** — third-party provider keys (Oura, Withings) are entered inside the app under Settings.
+You need to be signed into iCloud on the simulator or device. First launch creates the private zone, starts `CKSyncEngine`, seeds missing section rows from `SectionManifest`, fetches remote changes, refreshes settings/theme mirrors, and runs local backfills.
 
-## Repository layout
+There is no `.env` for the app. User-facing provider credentials and integration state live in Settings or the local keychain/user defaults as appropriate.
 
-```
+## Repository Layout
+
+```text
 .
-├── Septena/                       # iOS + macOS app (shared sources)
-│   ├── App/                       # Entry point, root shell, navigation, menu bar
-│   ├── Shell/                     # Dashboard, sidebar, tasks, settings, shared UI
-│   └── Sections/                  # One folder per life-domain section
-├── SeptenaCore/                   # Shared models, persistence, CloudKit, mutators
-│   └── CloudKit/                  # CKSyncEngine, per-record mappers, backends, migration
-├── SeptenaWatch/                  # watchOS companion app
-├── SeptenaWatchComplication/      # WidgetKit complications for the watch face
-├── docs/                          # Reference notes (some stale — read with care)
-├── project.yml                    # XcodeGen project definition (source of truth)
-└── *_HANDOFF.md, MIGRATION_*.md   # Live notes on in-flight migrations
+|-- Septena/                       # iOS + macOS app sources
+|   |-- App/                       # App entry, root tabs, intents, shortcuts, watch bridge
+|   |-- Shell/                     # Dashboards, settings, sections, tasks, shared UI
+|   `-- Sections/                  # Section destination views and sheets
+|-- SeptenaCore/                   # Models, SwiftData, CloudKit, providers, mutators
+|   |-- CloudKit/                  # CKSyncEngine plus task/area/project/settings records
+|   `-- Sections/                  # SectionManifest and MCP skill model
+|-- SeptenaWatch/                  # Watch companion app
+|-- SeptenaWatchComplication/      # WidgetKit complications
+|-- docs/                          # Design/reference notes
+|-- project.yml                    # XcodeGen project definition
+`-- *_HANDOFF.md                   # Migration notes; verify against current code
 ```
 
-## App shell
+## App Shell
 
-Entry point is `Septena/App/App.swift`. On launch it stands up the `SeptenaServices` singleton (mutators + `CKEngine`), the app-wide `DayClock` (single ticker that drives midnight rollover for every view), `NavigationState`, and the theme. On foreground it triggers a CloudKit fetch and a Reminders auto-import.
+Entry point: `Septena/App/App.swift`.
 
-The UI is structured as:
+On launch the app creates the process-wide `SeptenaServices` singleton, binds mutators to `CKEngine`, injects shared environment state, and starts the sync stack. The shared runtime objects are:
 
-- **iOS** — four-tab `RootTabView`: **Week**, **Next**, **Tasks**, **Goals**.
-- **macOS** — sidebar + detail, plus a menu-bar quick-add popover (`MenuBarMenu.swift`).
-- **watchOS** — single `NextWatchView` screen driven by `WatchConnectivity`, plus complications.
+- `SeptenaServices` - owns `CKEngine` plus all mutators so App Intents can write while the app is background-launched.
+- `DayClock` - the app-wide date/minute ticker. Views should read this instead of calling `Date()` directly.
+- `NavigationState` - paths, sheets, quick add/find, pending shortcuts, and section presentation.
+- `SectionTheme` / `SettingsStore` - local mirrors of CloudKit-backed section and settings state.
+- `TrainingDraftStore` - active training-session draft state.
 
-`NavigationState` is the single source of truth for navigation paths, sheets, sidebar visibility, and the quick-add / quick-find modals.
+The primary iOS shell is `RootTabView`:
 
-## Dashboards (`Septena/Shell/Dashboard/`)
+| Tab | Purpose |
+| --- | --- |
+| **Week** | Synthesizing dashboard across enabled sections. |
+| **Next** | Next 24h checklist and suggestions, mirrored to Watch. |
+| **Tasks** | Full task manager with inbox, today, upcoming, projects, and areas. |
+| **Goals** | Free-text and metric-backed goals tagged to sections. |
 
-| View | What it does |
-|---|---|
-| `WeekDashboardView` | Synthesizing 7-day hub. One tile per enabled section with theme color, collapse, quick-actions. |
-| `DayTimelineView` | Today's chronological view — tasks and every logged entry (food, training, mood…) interleaved. |
-| `NextDashboardView` | "What's next" checklist for the next 24h. Mirrors to Watch. |
-| `TodayLogView` | Inline quick-log surface (mood, caffeine, etc.). |
-| `HeatmapHomepageView` / `DenseHomepageView` | Alternative compact layouts. |
+macOS uses the same app sources with a sidebar/detail shell, keyboard commands, Preferences routing to the Settings sheet, and a menu-bar quick-add entry point. watchOS has a focused `NextWatchView` plus complications fed through shared data.
 
-## Sections (`Septena/Sections/`)
+## Sections
 
-Each section is self-contained and can be toggled on/off in Settings → Sections (backed by `SectionEntity.isEnabled`, synced via CloudKit).
+Sections are the unit of product architecture. `SectionManifest` declares catalog identity; `SectionPlugin` declares behavior.
+
+Current sections:
 
 | Section | What it covers |
-|---|---|
-| **Activity** | HealthKit: steps, exercise minutes, VO2max, HRV, resting HR. |
-| **Air** | Aranet4 CO2 sensor over Bluetooth + Open-Meteo pollen. |
-| **Body** | Biometric snapshots (weight, measurements). |
-| **Caffeine** | Coffee / matcha / tea logging, half-life countdown. |
-| **Calendar** | Read-only view of upcoming events from device calendars. |
-| **Cannabis** | Strain, form, dose, timestamp. |
-| **Chores** | Recurring chore definitions + completion log. |
-| **Groceries** | Categorised shopping list. |
-| **Gut** | Digestive events. |
-| **Habits** | Daily habit grid, streaks, history. |
-| **Insights** | Aggregated cross-section analytics. |
-| **Mood** | Mood + energy entries, mood catalog grid. |
-| **Nutrition** | Meals, macros (carb/protein/fat targets), fasting windows. |
-| **Sleep** | Oura nights with HealthKit fallback. |
-| **Supplements** | Supplement library + per-day logging. |
-| **Training** | Exercise library, routines, strength + cardio sessions, PRs. |
+| --- | --- |
+| **Tasks** | Inbox, Today, Upcoming, Someday, areas, projects, recurrence. |
+| **Goals** | Intentions tagged to sections, with optional measurable metrics. |
+| **Training** | Exercise library, session types, strength/cardio entries, routines, PRs. |
+| **Nutrition** | Meals, macros, water on meals, fasting preferences, daily summaries. |
+| **Hydration** | Water-only UX over nutrition entries. No separate data model. |
+| **Sleep** | Oura nights and sleep summaries. |
+| **Habits** | Daily routines, buckets, skips, notes, streak/history inputs. |
+| **Chores** | Recurring household tasks, completions, deferrals. |
+| **Supplements** | Supplement definitions and daily state. |
+| **Groceries** | Shopping items and categories. |
+| **Caffeine** | Drink entries, beans/config, half-life style tracking. |
+| **Cannabis** | Strains, methods, dose/use entries. |
+| **Gut** | Digestive events and Bristol-style logging. |
+| **Mood** | Mood/energy check-ins and history. |
+| **Body** | Weight/body-composition rows, Withings integration. |
+| **Activity** | HealthKit movement/recovery metrics. |
+| **Air** | Indoor/outdoor air quality surfaces. |
+| **Sandbox** | Internal section-flow test plugin. Remove before release. |
 
-## Data layer
+Important section rules:
 
-The split between local cache and cloud:
+- `SectionManifest.all` is the catalog. Add new section identity there first.
+- `SectionRegistry.all` is the app-side plugin registry. Register section behavior there.
+- `SectionEntity` is the user/account mirror: title override, color, enabled state, Today visibility, onboarding state.
+- Disabling a section hides surfaces; it must not delete user data.
+- MCP skill briefs, onboarding, import/export schema, quick-log actions, goal metrics, and destination views belong with the section plugin when that section owns them.
 
-- **`SeptenaCore/Models.swift`** — value-type DTOs used throughout the UI (`SeptenaTask`, `Project`, `Area`, `MoodEntry`, `NutritionEntry`, `CaffeineEntry`, `OuraNight`, `AirReading`, …).
-- **`SeptenaCore/Persistence.swift`** — SwiftData `@Model` entities (`TaskEntity`, `AreaEntity`, `ProjectEntity`, `SectionEntity`, etc.) with sync watermarks (`lastSyncedAt`, `pendingSync`, `deletedAt`).
-- **`SeptenaCore/Outbox.swift`** — per-domain *Mutators* (TaskMutator, MoodMutator, …) that apply optimistic local writes and queue CloudKit sync.
-- **`SeptenaCore/CloudKit/CKEngine.swift`** — owns `CKSyncEngine`, the private database, and the single zone; per-record mappers live alongside (`TaskRecord.swift`, `AreaRecord.swift`, `ProjectRecord.swift`, `SettingsRecord.swift`, `SectionRecord.swift`).
+## Data Layer
 
-### Backend status by domain
+The app is local-first:
 
-| CloudKit-native | Hybrid (CloudKit mutations, legacy reads) | Still FastAPI |
-|---|---|---|
-| Tasks, Areas, Projects, Settings, Sections | Habits, Supplements, Chores | Goals, Groceries, Nutrition, Caffeine, Cannabis, Gut, Training |
+- `SeptenaCore/Models.swift` - value DTOs used by views and compatibility loaders.
+- `SeptenaCore/Persistence.swift` - SwiftData entities and most section CloudKit schemas.
+- `SeptenaCore/CloudKit/CKEngine.swift` - `CKSyncEngine` owner, private database, custom zone, change queue, fetch/apply hooks.
+- `SeptenaCore/SeptenaServices.swift` - process-wide binding between `CKEngine`, SwiftData, and mutators.
+- `SeptenaCore/Outbox.swift` - task mutator and legacy schema compatibility surface.
+- `SeptenaCore/ChecklistMirror.swift` - local reconstruction helpers for habit/supplement/chore/next-style data.
 
-Sync happens via silent push (`remote-notification` background mode) plus an explicit `fetchChanges()` on foreground, because APNs delivery isn't guaranteed.
+Current CloudKit record coverage includes tasks, areas, projects, settings, sections, goals, habits, supplements, chores, gut, mood, Oura, Withings, caffeine, cannabis, groceries, training, and nutrition. Hydration writes through nutrition records.
+
+Mutators are the write boundary. Views and intents should not write SwiftData entities directly when a mutator exists, because the mutator performs the optimistic local update, queues the CloudKit change, saves context, and posts the right app notifications.
 
 ## Integrations
 
-| File | Source |
-|---|---|
-| `HealthKitBridge.swift` | Apple Health — steps, exercise, VO2, HRV, resting HR. |
-| `OuraProvider.swift` | Oura Ring — sleep, HRV, recovery (API key in Settings). |
-| `WithingsProvider.swift` | Withings — weight, body composition. |
-| `AranetBridge.swift` + `AirStore.swift` | Aranet4 CO2 sensor over Core Bluetooth. |
-| `PollenClient.swift` | Open-Meteo + Core Location. |
-| `RemindersBridge.swift` | EventKit — auto-imports Reminders lists into Inbox on foreground. |
-| `CalendarBridge.swift` | EventKit — read-only event view. |
-| `AddTaskIntent.swift` | App Intents — "Add to Septena" from Siri and Shortcuts. |
+| File | Integration |
+| --- | --- |
+| `HealthKitBridge.swift` | Apple Health reads and selected writes. |
+| `OuraProvider.swift` | Oura sleep/recovery import direct from Oura API. |
+| `WithingsProvider.swift` | Withings OAuth and measurement import. |
+| `RemindersBridge.swift` | EventKit Reminders import into tasks. |
+| `CalendarBridge.swift` | EventKit calendar events for dashboards/Next. |
+| `WatchBridge.swift` | iOS to watch checklist sync and watch mutations. |
+| `AddTaskIntent.swift`, `App/Intents/` | App Intents for tasks and section logging. |
+| `Plausible.swift` | Optional anonymous aggregate analytics. |
 
-A hosted MCP gateway at **mcp.septena.app** exposes the user's data to AI agents over the Model Context Protocol — the App-Store-friendly distribution surface for AI access (no CLI client).
+The hosted MCP gateway is `https://mcp.septena.app/mcp`. The app mirrors the section skill briefs in Settings so the LLM-facing tool catalog and the in-app section definitions can stay aligned.
+
+## Settings And Import/Export
+
+`SettingsView` is the app control plane:
+
+- General customization: homepage layout, Today timeline, welcome header, alternate app icons, Home Screen Quick Actions.
+- Integrations: Reminders, Calendar, Apple Health, Oura, Withings.
+- Import & Export: JSON envelope export/import for participating section plugins, plus schema prompts for model-assisted conversion.
+- Skills: MCP preamble and per-section briefs.
+- Manage Sections: enable/disable sections, onboarding, identity, section-specific detail panes.
+- Privacy/About: analytics consent and product links.
+
+Import/export is plugin-driven through `SectionExportContribution`. Unsupported sections are intentionally skipped rather than represented with partial data.
 
 ## Watch
 
-- **`SeptenaWatch/`** — minimal watchOS app. Single screen, `NextWatchView`, fed by `WatchConnectivity` from the iOS app. State is shared via `SharedComplicationData`.
-- **`SeptenaWatchComplication/`** — WidgetKit complications: next-item, task count, mood, caffeine, activity tiles for the watch face. Refreshed via WidgetKit timelines from the shared App Group.
+- `SeptenaWatch/` - watchOS app, centered on `NextWatchView`.
+- `SeptenaWatchComplication/` - WidgetKit complication bundle.
+- `WatchBridge` routes watch actions back through the same CloudKit-backed mutation stack as the phone app.
 
-## Capabilities & entitlements
+## Capabilities
 
-iOS target (see `project.yml`):
+From `project.yml` and entitlements:
 
-- HealthKit (read activity + recovery)
-- CloudKit (`iCloud.com.septena.cloud`, private DB)
-- Background mode: `remote-notification`
-- App Group (Watch ↔ iOS shared container)
-- Reminders (full access) and Calendars (full access)
-- Embeds `SeptenaWatch`
+- CloudKit private database: `iCloud.com.septena.cloud`
+- Background remote notifications for CloudKit change pushes
+- App Group for iOS/watch shared data
+- HealthKit read/write categories as implemented by `HealthKitBridge`
+- Reminders and Calendars full-access usage descriptions
+- Alternate iOS app icons
+- watchOS app and WidgetKit complication embedding
+- macOS menu-bar extra
 
-macOS target adds the menu-bar status item; watchOS target embeds `SeptenaWatchComplication`.
+## Conventions Worth Knowing
 
-## Conventions worth knowing
+- Use `project.yml` for project changes, then run `xcodegen generate`. Do not hand-edit generated project structure unless you intend to preserve a generated diff.
+- Read `DayClock.today` / `DayClock.now` in views that care about day rollover.
+- Route writes through mutators (`TaskMutator`, `ChecklistMutator`, `GoalMutator`, `NutritionMutator`, etc.).
+- Section identity belongs in `SectionManifest`; section behavior belongs in `SectionPlugin`.
+- Section colors and enabled state are user/account data, not hardcoded catalog facts.
+- `SectionTheme` is the color access point for UI surfaces.
+- App Intents must call `await SeptenaServices.shared.start()` before mutating.
+- CloudKit push is not enough; foreground fetch remains the reliable refresh path.
+- Historical docs can be wrong. Prefer code, then `docs/DesignSpec.md`, then handoff docs.
 
-- **Read `DayClock.today`, not `Date()`** in views — it's the single ticker that handles midnight rollover. Direct `Date()` calls in dashboard code are a bug.
-- **All mutations go through a Mutator** — never write to SwiftData directly from a view. Mutators handle optimistic write + CloudKit queue + outbox.
-- **`SeptenaServices` is process-wide** so App Intents (Siri, Shortcuts, widget actions) can mutate during background launch.
-- **Sections are togglable.** A section being present in `Septena/Sections/` doesn't mean it's visible — check `SettingsView` → Sections, which writes through `SectionEntity.isEnabled`.
-- **Section themes** live in `SectionTheme`; tiles, accents, and detail screens pull color from there.
-- **No Xcode project edits.** Change `project.yml`, run `xcodegen generate`.
+## Useful Docs
 
-## Live docs
-
-- [MIGRATION_HANDOFF.md](MIGRATION_HANDOFF.md) — current state of the FastAPI → CloudKit migration. Read this first if you're touching the data layer.
-- [TRAINING_MIGRATION_HANDOFF.md](TRAINING_MIGRATION_HANDOFF.md), [NUTRITION_MIGRATION_HANDOFF.md](NUTRITION_MIGRATION_HANDOFF.md) — section-specific migration notes.
-- [CHANGELOG.md](CHANGELOG.md) — release notes.
-- [TODO.md](TODO.md) — running list of in-flight work.
-- `SPEC.md` and `docs/reference/` exist but predate the CloudKit move — treat as historical.
+- `docs/DesignSpec.md` - current design-system intent; code should generally conform.
+- `docs/reference/` - older reference notes; useful for context, not necessarily current.
+- `MIGRATION_HANDOFF.md` - historical FastAPI to CloudKit notes.
+- `TRAINING_MIGRATION_HANDOFF.md` / `NUTRITION_MIGRATION_HANDOFF.md` - section migration notes; verify before acting.
+- `TODO.md`, `CHANGELOG.md`, `HANDOFF.md` - running project notes.
 
 ## License
 
-Private — Michell Zappa.
+Private - Michell Zappa.
