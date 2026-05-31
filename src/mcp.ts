@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 import type { Env } from "./env.js";
 import { CloudKitClient, CloudKitError } from "./cloudkit.js";
-import { getCkTokenForAccessToken, touchAccessToken } from "./storage.js";
+import { getCkTokenForAccessToken, touchAccessToken, getCurrentCkToken } from "./storage.js";
 import { logEvent } from "./util.js";
 
 // Throttle lastUsedAt writes: at most one KV write per token per interval.
@@ -565,7 +565,14 @@ export async function mcpHandler(c: Context<{ Bindings: Env }>) {
 
   const tokenRec = await getCkTokenForAccessToken(c.env, accessToken);
   if (!tokenRec) return unauthorized("access_token not found in KV");
-  const { ckWebAuthToken, createdAt, lastUsedAt } = tokenRec;
+  const { createdAt, lastUsedAt } = tokenRec;
+
+  // Prefer the app-brokered current token (kept fresh by the iOS app) over
+  // the token frozen into this access-token record at OAuth time. This is
+  // what makes expiry invisible: as long as the app keeps pushing, the
+  // gateway always has live CloudKit auth behind Claude's permanent bearer.
+  const current = await getCurrentCkToken(c.env);
+  const ckWebAuthToken = current?.ckWebAuthToken ?? tokenRec.ckWebAuthToken;
 
   // Bump lastUsedAt (throttled, non-blocking) so the cleanup cron can tell
   // this token is alive. One KV write per TOUCH_INTERVAL_MS at most.
@@ -659,7 +666,21 @@ export async function mcpHandler(c: Context<{ Bindings: Env }>) {
           name?: string;
           arguments?: Record<string, unknown>;
         };
-        return await callTool(client, req.id, params);
+        const startedAt = Date.now();
+        try {
+          const res = await callTool(client, req.id, params);
+          logEvent("tool_call", { name: params.name ?? "?", ok: true, ms: Date.now() - startedAt });
+          return res;
+        } catch (err) {
+          logEvent("tool_call", {
+            name: params.name ?? "?",
+            ok: false,
+            ms: Date.now() - startedAt,
+            status: err instanceof CloudKitError ? err.status : undefined,
+            error: err instanceof Error ? err.message.slice(0, 200) : String(err),
+          });
+          throw err; // outer catch classifies auth-expiry vs generic error
+        }
       }
       default:
         return rpcError(req.id, -32601, `Method not found: ${req.method}`);
@@ -676,8 +697,17 @@ export async function mcpHandler(c: Context<{ Bindings: Env }>) {
         status: err.status,
         tokenAgeSeconds,
         tokenAgeMinutes: Math.round(tokenAgeSeconds / 60),
+        // ORIGIN signal: the raw CloudKit response. Distinguishes a genuine
+        // auth expiry (AUTHENTICATION_REQUIRED/FAILED) from a transient 421
+        // Misdirected we may be misclassifying as expiry.
+        ckBody: err.body.slice(0, 300),
       });
       return unauthorized(`CloudKit auth expired (status=${err.status})`);
+    }
+    // Non-auth CloudKit failure — capture status + body so a transient error
+    // that should NOT disconnect (but currently surfaces as -32603) is visible.
+    if (err instanceof CloudKitError) {
+      logEvent("cloudkit_error", { method: req.method, status: err.status, ckBody: err.body.slice(0, 300) });
     }
     const msg = err instanceof Error ? err.message : String(err);
     return rpcError(req.id, -32603, msg);

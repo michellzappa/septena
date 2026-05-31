@@ -10,6 +10,11 @@ export interface Env {
   // Secrets (set via `wrangler secret put`)
   CK_API_TOKEN: string;
   TOKEN_ENC_KEY: string;
+  // Shared secret the iOS app presents when pushing a freshly-minted
+  // ckWebAuthToken to POST /internal/ck-token. The app holds durable native
+  // CloudKit auth, so it re-mints web tokens (CKFetchWebAuthTokenOperation)
+  // and keeps the gateway supplied — making expiry invisible to the user.
+  APP_INGEST_SECRET: string;
 
   // KV namespaces
   STATE: KVNamespace;    // mid-OAuth state, short TTL

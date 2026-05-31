@@ -119,6 +119,7 @@ export async function cleanupAccessTokens(env: Env, maxIdleMs: number): Promise<
   do {
     const list = await env.TOKENS.list({ cursor });
     for (const k of list.keys) {
+      if (!k.name.startsWith("token:")) continue; // skip ck:current etc.
       const raw = await env.TOKENS.get(k.name);
       if (!raw) continue;
       try {
@@ -137,6 +138,34 @@ export async function cleanupAccessTokens(env: Env, maxIdleMs: number): Promise<
     cursor = list.list_complete ? undefined : list.cursor;
   } while (cursor);
   return deleted;
+}
+
+// ---- Current CloudKit web-auth token (app-brokered) ----
+// The iOS app pushes freshly-minted ckWebAuthTokens here via
+// /internal/ck-token. This is the single source of truth the MCP handler
+// prefers over the (frozen) token baked into each access-token record at
+// OAuth time. Decoupling them means the app can keep CloudKit auth alive
+// indefinitely without the user ever reconnecting Claude.
+
+interface CurrentCkTokenRecord {
+  ckWebAuthTokenEnc: string;
+  updatedAt: number;
+}
+
+export async function putCurrentCkToken(env: Env, ckWebAuthToken: string): Promise<void> {
+  const enc = await encrypt(ckWebAuthToken, env.TOKEN_ENC_KEY);
+  const rec: CurrentCkTokenRecord = { ckWebAuthTokenEnc: enc, updatedAt: Date.now() };
+  await env.TOKENS.put("ck:current", JSON.stringify(rec));
+}
+
+export async function getCurrentCkToken(
+  env: Env,
+): Promise<{ ckWebAuthToken: string; updatedAt: number } | null> {
+  const raw = await env.TOKENS.get("ck:current");
+  if (!raw) return null;
+  const rec = JSON.parse(raw) as CurrentCkTokenRecord;
+  const ckWebAuthToken = await decrypt(rec.ckWebAuthTokenEnc, env.TOKEN_ENC_KEY);
+  return { ckWebAuthToken, updatedAt: rec.updatedAt };
 }
 
 // ---- Dynamic client registrations ----
