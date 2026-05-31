@@ -124,6 +124,12 @@ struct TaskRow: View {
           .foregroundStyle(Theme.inkSecondary)
       }
 
+      if task.recurrence != nil {
+        Image(systemName: "arrow.triangle.2.circlepath")
+          .font(.system(size: 12))
+          .foregroundStyle(Theme.inkSecondary)
+      }
+
       if let trailing {
         Text(trailing)
           .font(.caption)
@@ -180,8 +186,6 @@ struct TaskRowView<MetaLine: View, TrailingDate: View>: View {
   /// True when this row is the one being edited (the parent owns
   /// `editingTaskId`). Drives focus, the notes field, and the info button.
   let isEditing: Bool
-  let inMultiSelect: Bool
-  let isSelected: Bool
   let accent: Color
   /// Scratch buffers owned by the parent; bound only while `isEditing`.
   @Binding var editingTitle: String
@@ -296,13 +300,8 @@ struct TaskRowView<MetaLine: View, TrailingDate: View>: View {
             .foregroundStyle(Theme.inkSecondary)
         }
         trailingDate()
-        if inMultiSelect {
-          Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-            .font(.system(size: 20))
-            .foregroundStyle(isSelected ? accent : Theme.inkSecondary.opacity(0.5))
-            .padding(.leading, 4)
-            .accessibilityLabel(isSelected ? "Selected" : "Not selected")
-        }
+        // Multi-select indicator is the native edit-mode circle (iOS) /
+        // selection highlight (macOS) — no custom checkmark needed.
       }
     }
     .padding(.horizontal, Theme.hPadding)

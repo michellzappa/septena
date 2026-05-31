@@ -1,8 +1,5 @@
 import SwiftUI
 import SwiftData
-#if os(macOS)
-import AppKit
-#endif
 
 // One screen per filter (Today / Inbox / Upcoming / Anytime / Logbook / Project / Area).
 // Read-through cache: views render from SwiftData immediately, then refresh
@@ -139,24 +136,18 @@ struct TaskListView: View {
   /// rows visible until the user navigates away (matches the reference design).
   @State private var sessionDoneIds: Set<String> = []
 
-  /// Unified selection — the single source of truth for both the click /
-  /// keyboard cursor and multi-select batch operations. On macOS it's bound
-  /// straight to `List(selection:)` (native click, ⌘/⇧-click, ⌫, arrow
-  /// keys). On iOS it's populated by tapping rows while in `selectMode`.
-  /// Replaces the former split `selectedTaskId` cursor + `multiSelection`.
+  /// Unified selection — the single source of truth for the keyboard cursor
+  /// and multi-select batch operations, bound straight to `List(selection:)`
+  /// on both platforms. macOS: native click / ⌘-click / ⇧-click / ↑↓.
+  /// iOS: native edit-mode multi-select (the `EditButton` drives `editMode`,
+  /// and tapping rows toggles the native selection circles).
   @State private var selection: Set<String> = []
 
-  /// Anchor row for ⇧-click range selection (macOS). Set on a plain click or
-  /// ⌘-click; a subsequent ⇧-click selects every row between it and the
-  /// clicked row in display order. Mirrors Finder / Mail behaviour.
-  @State private var selectionAnchor: String? = nil
-
   #if os(iOS)
-  /// iOS multi-select mode, toggled by the toolbar "Select" button — the
-  /// standardized replacement for the old swipe-to-select gesture. While
-  /// active, tapping a row toggles its `selection` membership instead of
-  /// opening the inline editor.
-  @State private var selectMode = false
+  /// iOS edit mode, toggled by the toolbar `EditButton`. While active, rows
+  /// show native selection circles and taps toggle membership instead of
+  /// opening the inline editor. The environment key is unavailable on macOS.
+  @Environment(\.editMode) private var editMode
   #endif
 
   // Inline new-task entry
@@ -194,13 +185,12 @@ struct TaskListView: View {
   @State private var showingRepeatSheet = false
   @State private var repeatTargetId: String?
 
-  /// True when a row tap should toggle selection rather than open the inline
-  /// editor. iOS: the explicit Select mode. macOS: always false — there,
-  /// `List(selection:)` owns single-clicks for selection and the editor
-  /// opens on double-click / Return instead.
-  private var inMultiSelect: Bool {
+  /// True while iOS edit mode is active — rows show native selection circles
+  /// and a tap toggles membership instead of opening the editor. Always false
+  /// on macOS (no edit mode; click selection is direct).
+  private var isEditMode: Bool {
     #if os(iOS)
-    return selectMode
+    return editMode?.wrappedValue.isEditing ?? false
     #else
     return false
     #endif
@@ -310,17 +300,13 @@ struct TaskListView: View {
         }
         .accessibilityLabel("New Task")
       }
-      // iOS multi-select entry — the standardized replacement for the old
-      // swipe-to-select. macOS uses native click / ⌘-click selection, so it
+      // iOS multi-select entry — native EditButton drives the edit-mode
+      // selection circles. macOS uses native click / ⌘-click selection, so it
       // needs no button. Hidden when embedded (Project / Area detail) so it
       // doesn't crowd the parent toolbar.
       #if os(iOS)
       if !embedded {
-        ToolbarItem(placement: .topBarTrailing) {
-          Button(selectMode ? "Done" : "Select") {
-            if selectMode { clearSelection() } else { selectMode = true }
-          }
-        }
+        ToolbarItem(placement: .topBarTrailing) { EditButton() }
       }
       #endif
     }
@@ -357,9 +343,7 @@ struct TaskListView: View {
       onOpenWhen: openWhenForSelected,
       onOpenDeadline: openDeadlineForSelected,
       onDelete: deleteSelected,
-      onClearSchedule: clearScheduleForSelected,
-      onMoveUp: { moveSelection(by: -1) },
-      onMoveDown: { moveSelection(by: 1) }
+      onClearSchedule: clearScheduleForSelected
     ))
     // Only attach top-level nav chrome on the standalone tab versions.
     // Embedded uses (Project / Area detail wraps) inherit chrome from parent
@@ -398,6 +382,11 @@ struct TaskListView: View {
       newlyCreatedTaskId = nil
       Task { await load() }
     }
+    // Leaving iOS edit mode drops the selection so a stale set doesn't keep
+    // the batch bar up after the user taps Done.
+    .onChange(of: isEditMode) { _, editing in
+      if !editing { selection.removeAll() }
+    }
     // Consume the global "start a new task" trigger from the sidebar
     // Menu or detail toolbar so the new-task flow stays inline (same
     // as ⌘N) instead of opening a modal sheet.
@@ -420,21 +409,17 @@ struct TaskListView: View {
     }
   }
 
-  // Selection is owned by us on both platforms (the `selection` Set), never
-  // bound to List. Clicks set it via the row tap gesture, arrows via the
-  // keyboard modifier, and `rowBackground` draws the only highlight. See the
-  // note inside `taskListContent` for why we don't hand `selection` to List.
-  @ViewBuilder
   private var taskListContent: some View {
-    // No `List(selection:)` binding on either platform: we own selection
-    // ourselves (click via the row's tap gesture, arrows via the keyboard
-    // modifier below) and draw our own accent-pill highlight in
-    // `rowBackground`. Binding `selection` to List would make AppKit paint
-    // its own full-width grey selection bar *on top* of our pill (two
-    // competing indicators) and install a row-drag handler that swallows
-    // our `.draggable`. The `.tag` on each row is kept only as a stable
-    // row identity.
-    List {
+    // `selection` is bound to List on both platforms; rows carry `.tag(id)` so
+    // List can map a row to a selection value. The native selection highlight
+    // is the single indicator — on macOS it doubles as the context-menu
+    // target, on iOS the edit-mode circle shows membership. We never draw our
+    // own selection background (see `rowBackground`).
+    //   • macOS: single-click select, ⌘/⇧-click, ↑↓ — all native.
+    //   • iOS: a Set selection only engages in edit mode, so outside edit mode
+    //     taps fall through to our single-tap-to-edit gesture; inside it, taps
+    //     toggle the native circles.
+    List(selection: $selection) {
       taskListHeader
       taskListRows
       taskListFooter
@@ -609,22 +594,6 @@ struct TaskListView: View {
     startEdit(t)
   }
 
-  /// ↑ / ↓ — move the selection one row in display order. Replaces the
-  /// native `List(selection:)` arrow handling we gave up to suppress the
-  /// duplicate AppKit selection bar. Empty selection seeds at the top
-  /// (↓) or bottom (↑) so the first arrow press always lands somewhere.
-  private func moveSelection(by delta: Int) {
-    let ids = keyboardOrderedTaskIds
-    guard !ids.isEmpty else { return }
-    guard let current = selection.first(where: { ids.contains($0) }),
-          let idx = ids.firstIndex(of: current) else {
-      selectOnly(delta > 0 ? ids[0] : ids[ids.count - 1])
-      return
-    }
-    let next = max(0, min(ids.count - 1, idx + delta))
-    selectOnly(ids[next])
-  }
-
   private func toggleSelected() {
     guard let id = effectiveSelectionId(),
           let t = currentTask(id: id) else { return }
@@ -759,20 +728,13 @@ struct TaskListView: View {
     rowContent(task)
       .background(rowBackground(for: task))
       .a11yAnimation(Theme.Motion.expand, value: editingTaskId == task.id)
-      // Drag to a sidebar area/project to re-home the task. Payload is the
-      // task ID as plain text; `SidebarTaskDropTarget`'s
-      // `.dropDestination(for: String.self)` decodes it. We use `.onDrag`
-      // (NSItemProvider) rather than `.draggable` because the latter fails to
-      // initiate when the row also carries tap gestures — `.onDrag` coexists
-      // with them, which is exactly the row's situation (tap = select,
-      // double-tap = edit).
+      // Drag a row (or the whole selection) to a sidebar area/project to
+      // re-home it. `.draggable` pairs with the sidebar's
+      // `.dropDestination(for: String.self)`; the explicit preview is a
+      // compact title pill (the default snapshots the full-width row and
+      // scales it into a ragged thumbnail).
       #if os(macOS)
-      .onDrag {
-        NSItemProvider(object: task.id as NSString)
-      } preview: {
-        // Compact title pill. Without an explicit preview, `.onDrag`
-        // snapshots the full-width row and scales it down into a tiny,
-        // ragged thumbnail under the cursor.
+      .draggable(task.id) {
         Text(task.title)
           .font(.system(size: 13))
           .lineLimit(1)
@@ -829,8 +791,6 @@ struct TaskListView: View {
       task: task,
       filter: filter,
       isEditing: editing,
-      inMultiSelect: inMultiSelect,
-      isSelected: selection.contains(task.id),
       accent: theme.accent,
       editingTitle: $editingTitle,
       editingNotes: $editingNotes,
@@ -857,20 +817,21 @@ struct TaskListView: View {
       onDelete: { Haptics.warning(); applyDelete(task.id) }
     )
     .transition(.identity)
-    // Tap-to-edit only when this row isn't already the editor (the focused
-    // TextField owns taps while editing). iOS: single tap opens the editor.
-    // macOS: single click selects, double-click opens the editor.
+    // iOS: a single tap opens the editor (Things-style). In edit mode the tap
+    // must instead toggle the native selection circle, so we no-op there and
+    // use `simultaneousGesture` so the tap also reaches List's edit-mode
+    // selection handling.
+    // macOS: List owns single-click selection, ⌘/⇧-click, and arrows. We add
+    // ONLY double-click-to-edit, via `simultaneousGesture` so the gesture
+    // doesn't consume the single click List needs for selection.
     #if os(iOS)
-    .onTapGesture { if !editing { handleRowTap(task) } }
+    .simultaneousGesture(TapGesture().onEnded {
+      if !editing && !isEditMode { startEdit(task) }
+    })
     #else
-    // macOS: single click selects, double-click edits. Plain `.onTapGesture`
-    // (count 2 declared before count 1 so the disambiguation resolves) drives
-    // our own `selection` set, which `rowBackground` reads for the highlight.
-    // These coexist with the row's `.onDrag` — a drag (press + move) and a
-    // tap (press + release) never both complete. `.onTapGesture` can't report
-    // modifier keys, so we read the live ⌘/⇧ state from `NSEvent`.
-    .onTapGesture(count: 2) { if !editing { startEdit(task) } }
-    .onTapGesture(count: 1) { if !editing { clickSelect(task.id) } }
+    .simultaneousGesture(TapGesture(count: 2).onEnded {
+      if !editing { startEdit(task) }
+    })
     #endif
     // Right-click selects this row (unless already part of a multi-selection)
     // so the menu's target is unambiguous.
@@ -959,115 +920,48 @@ struct TaskListView: View {
 
   // MARK: - Selection
   //
-  // `selection` (a Set<String>) is the single source of truth — we never bind
-  // it to List. macOS drives it via the row click handler (plain / ⌘ / ⇧) and
-  // arrow keys; iOS via row taps (select-first) + the Select button. Every
-  // mutation funnels through these helpers so the platforms stay in lockstep
-  // and `selectMode` can never desync from an empty selection.
+  // `selection` (a Set<String>) is bound to `List(selection:)` on both
+  // platforms and is the single source of truth. macOS drives it natively
+  // (click / ⌘ / ⇧ / arrows); iOS via native edit mode (EditButton). Every
+  // deselect path funnels through `clearSelection` so iOS edit mode can never
+  // desync from an empty selection.
 
   /// Replace the selection with exactly one row.
   private func selectOnly(_ id: String) {
     selection = [id]
-    selectionAnchor = id
   }
 
-  #if os(macOS)
-  /// macOS click selection, dispatched on the live modifier state:
-  ///   • plain  → select just this row (and set the range anchor)
-  ///   • ⌘-click → toggle this row's membership (set anchor)
-  ///   • ⇧-click → select the contiguous range from the anchor to this row
-  private func clickSelect(_ id: String) {
-    let mods = NSEvent.modifierFlags
-    if mods.contains(.command) {
-      if selection.contains(id) { selection.remove(id) }
-      else { selection.insert(id) }
-      selectionAnchor = id
-    } else if mods.contains(.shift), let anchor = selectionAnchor {
-      let ids = keyboardOrderedTaskIds
-      guard let from = ids.firstIndex(of: anchor),
-            let to = ids.firstIndex(of: id) else { selectOnly(id); return }
-      let range = from <= to ? from...to : to...from
-      selection = Set(ids[range])
-    } else {
-      selectOnly(id)
-    }
-  }
-  #endif
-
-  /// Deselect everything and leave iOS multi-select mode — the single
-  /// "clear selection" entry point used by every deselect path.
+  /// Deselect everything and leave iOS edit mode — the single "clear
+  /// selection" entry point used by every deselect path.
   private func clearSelection() {
     selection.removeAll()
     #if os(iOS)
-    selectMode = false
+    editMode?.wrappedValue = .inactive
     #endif
   }
 
   /// Enter multi-select seeded with one row — used by the swipe action and
-  /// the context-menu "Select". Commits any inline edit first.
+  /// the context-menu "Select". Commits any inline edit first; on iOS this
+  /// flips into native edit mode so the selection circles appear.
   private func beginSelecting(_ id: String) {
     if editingTaskId != nil { commitEdit() }
     #if os(iOS)
-    selectMode = true
+    editMode?.wrappedValue = .active
     #endif
     selection.insert(id)
     Haptics.tick()
   }
 
-  #if os(iOS)
-  private func toggleSelection(for id: String) {
-    if selection.contains(id) {
-      selection.remove(id)
-    } else {
-      selection.insert(id)
-    }
-  }
-
-  /// Row tap handler (iOS only). Matches macOS: first tap selects, second tap
-  /// (on the already-selected row) edits. In Select mode a tap toggles
-  /// membership instead. macOS never calls this — there a single click
-  /// selects natively and a double-click opens the editor.
-  private func handleRowTap(_ task: SeptenaTask) {
-    if selectMode {
-      toggleSelection(for: task.id)
-    } else if selection.count == 1 && selection.contains(task.id) {
-      // Second tap on the sole selected row → edit.
-      startEdit(task)
-    } else {
-      // First tap selects this row. Commit any in-flight edit first.
-      if editingTaskId != nil { commitEdit() }
-      selectOnly(task.id)
-      Haptics.tick()
-    }
-  }
-  #endif
-
-  /// Highlight backplate. Two states:
-  ///   • editing — stronger accent fill so the active row reads as
-  ///     "open" while the inline editor is up and the keyboard accessory
-  ///     is acting on this task.
-  ///   • keyboard cursor — light accent tint when arrowed-to but not
-  ///     actively edited. Suppressed on iPhone compact width: touch users
-  ///     never see a "selected but not editing" third state — tap goes
-  ///     straight to edit, matching Reminders / Mail.
-  /// Animation is scoped to the fill so we don't re-layout every visible
-  /// row on each selection change (the old macOS click-lag source).
-  /// Selection / editing highlight backplate. The editing row gets a
-  /// stronger accent fill; selected rows (macOS click / ⌘-click, or iOS
-  /// Select mode) get a lighter one. We draw our own rather than relying on
-  /// `List`'s native selection fill so the look is identical on both
-  /// platforms and survives the `.listRowBackground(.clear)` chrome.
+  /// Editing-state backplate — a stronger accent fill so the row being
+  /// inline-edited reads as "open" while the keyboard accessory acts on it.
+  /// Selection is NOT drawn here on either platform: macOS uses List's native
+  /// selection highlight, iOS the native edit-mode circles. Drawing our own
+  /// would double up on both.
   @ViewBuilder
   private func rowBackground(for task: SeptenaTask) -> some View {
-    let isEditing  = editingTaskId == task.id
-    let isSelected = selection.contains(task.id) && !isEditing
-    let fill: Color = {
-      if isEditing  { return theme.accent.opacity(0.18) }
-      if isSelected { return theme.accent.opacity(0.12) }
-      return .clear
-    }()
+    let isEditing = editingTaskId == task.id
     RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
-      .fill(fill)
+      .fill(isEditing ? theme.accent.opacity(0.18) : .clear)
       .padding(.horizontal, Theme.hPadding - 6)
   }
 
@@ -2309,8 +2203,6 @@ private struct KeyboardNavigationModifier: ViewModifier {
   let onOpenDeadline: () -> Void
   let onDelete: () -> Void
   let onClearSchedule: () -> Void
-  let onMoveUp: () -> Void
-  let onMoveDown: () -> Void
 
   /// Auto-focus the list on appear so the arrow keys / space / enter work
   /// immediately, without the user having to click into the content first.
@@ -2352,24 +2244,8 @@ private struct KeyboardNavigationModifier: ViewModifier {
         onSpace()
         return .handled
       }
-      // Arrow-key row traversal. We dropped `List(selection:)` (it painted a
-      // duplicate AppKit selection bar and swallowed row drags), so the up/
-      // down handling it used to provide for free is reimplemented here over
-      // our own selection set. `.onKeyPress` fires reliably on this focused
-      // wrapper; `.onMoveCommand` did not (it lost the focus race with the
-      // List's own scroll view).
-      #if os(macOS)
-      .onKeyPress(.upArrow) {
-        guard !isInputMode else { return .ignored }
-        onMoveUp()
-        return .handled
-      }
-      .onKeyPress(.downArrow) {
-        guard !isInputMode else { return .ignored }
-        onMoveDown()
-        return .handled
-      }
-      #endif
+      // ↑↓ row traversal is handled natively by `List(selection:)` on macOS —
+      // no custom key handling needed.
   }
 
 }

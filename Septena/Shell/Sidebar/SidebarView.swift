@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import UniformTypeIdentifiers
 
 // compact homepage on iPhone: the root screen IS the sidebar.
 // QuickFind + smart lists + areas/projects + Settings. See docs/reference/navigation.md.
@@ -1373,12 +1372,8 @@ private struct SidebarSheets: ViewModifier {
 
 #if os(macOS)
 /// Drop target for a task dragged from `TaskListView` (which publishes its
-/// id via `.onDrag { NSItemProvider(object: id as NSString) }`) onto a
-/// sidebar area / project / smart-list row. We use the `.onDrop` /
-/// `NSItemProvider` API rather than `.dropDestination(for: String.self)`
-/// because it pairs cleanly with the `.onDrag` source — the modern
-/// Transferable drop fails to negotiate the plain-text item the legacy
-/// drag emits.
+/// id via `.draggable(task.id)`) onto a sidebar area / project / smart-list
+/// row. Pairs with the source via the Transferable `String` payload.
 private struct SidebarTaskDrop: ViewModifier {
   enum Kind {
     case area(String)
@@ -1410,14 +1405,11 @@ private struct SidebarTaskDrop: ViewModifier {
           .fill(Theme.tasksAccent.opacity(isTargeted ? 0.18 : 0))
           .animation(.easeOut(duration: 0.12), value: isTargeted)
       )
-      .onDrop(of: [.text], isTargeted: $isTargeted) { providers in
-        guard let provider = providers.first else { return false }
-        provider.loadObject(ofClass: NSString.self) { object, _ in
-          guard let id = object as? String else { return }
-          DispatchQueue.main.async { rehome(id) }
-        }
+      .dropDestination(for: String.self) { ids, _ in
+        guard !ids.isEmpty else { return false }
+        for id in ids { rehome(id) }
         return true
-      }
+      } isTargeted: { isTargeted = $0 }
   }
 
   private func rehome(_ id: String) {
