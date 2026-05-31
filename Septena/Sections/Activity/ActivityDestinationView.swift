@@ -63,13 +63,13 @@ struct ActivityDestinationView: View {
         if !bridge.isAvailable {
           Text("HealthKit isn't available on this device")
             .font(.septenaCardTitle)
-          Text("Activity tracking runs on iPhone / iPad. Open Septena Cloud there to see steps and recovery metrics.")
+          Text("Activity tracking runs on iPhone / iPad. Open Septena there to see steps and recovery metrics.")
             .font(.subheadline)
             .foregroundStyle(.secondary)
         } else {
           Text("Health access denied")
             .font(.septenaCardTitle)
-          Text("Re-enable in Settings → Health → Data Access & Devices → Septena Cloud.")
+          Text("Re-enable in Settings → Health → Data Access & Devices → Septena.")
             .font(.subheadline)
             .foregroundStyle(.secondary)
         }

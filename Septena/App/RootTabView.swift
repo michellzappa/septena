@@ -1,6 +1,6 @@
 import SwiftUI
 
-// Top-level shell for Septena Cloud — three peer tabs, each a self-contained
+// Top-level shell for Septena — three peer tabs, each a self-contained
 // module. Week is the synthesizing dashboard, Next is the merged daily
 // checklist, Tasks is the existing iOS task app embedded verbatim.
 // Engage-app's `ContentView` (sidebar + task list) lives inside the Tasks
