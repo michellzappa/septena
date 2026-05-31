@@ -1,5 +1,6 @@
 import type { Env } from "./env.js";
 import { decrypt, encrypt } from "./crypto.js";
+import { sha256Base64Url } from "./util.js";
 
 // KV-backed records. All keys are random IDs (not deterministic from user
 // data) so a KV listing leak doesn't reveal anything about who has signed up.
@@ -61,17 +62,42 @@ export async function takeCode(env: Env, code: string): Promise<AuthCode | null>
   return JSON.parse(raw) as AuthCode;
 }
 
-// ---- Access tokens ----
-// Long-lived. CKWebAuthToken is encrypted with TOKEN_ENC_KEY.
+// ---- Access tokens (bearer → user) ----
+// A bearer binds Claude's permanent access token to a USER identity. It no
+// longer carries the CloudKit token itself — that lives in a per-user slot
+// (below), kept fresh by the user's app. `ckWebAuthTokenEnc` is retained
+// only for backward compatibility: bearers minted before the multi-user
+// refactor have no userId and fall back to their baked token until the
+// user reconnects.
 
 export interface AccessTokenRecord {
-  ckWebAuthTokenEnc: string;   // AES-GCM envelope
+  userId?: string;             // multi-user identity this bearer belongs to
+  ckWebAuthTokenEnc?: string;  // legacy bootstrap (pre-userId bearers)
   clientId: string;
   createdAt: number;
   lastUsedAt: number;
 }
 
-export async function putAccessToken(
+export async function putAccessTokenForUser(
+  env: Env,
+  accessToken: string,
+  userId: string,
+  clientId: string,
+): Promise<void> {
+  const rec: AccessTokenRecord = {
+    userId,
+    clientId,
+    createdAt: Date.now(),
+    lastUsedAt: Date.now(),
+  };
+  await env.TOKENS.put(`token:${accessToken}`, JSON.stringify(rec));
+}
+
+/// Legacy fallback: bake the token into the bearer when we couldn't resolve
+/// a user identity at OAuth time. Ensures connect never hard-fails; such
+/// bearers use the daily-expiry path until identity resolution succeeds on a
+/// later reconnect.
+export async function putLegacyAccessToken(
   env: Env,
   accessToken: string,
   ckWebAuthToken: string,
@@ -87,15 +113,27 @@ export async function putAccessToken(
   await env.TOKENS.put(`token:${accessToken}`, JSON.stringify(rec));
 }
 
-export async function getCkTokenForAccessToken(
+/// Resolve the live ckWebAuthToken for a bearer. New-shape bearers read the
+/// per-user slot (kept fresh by the app); legacy bearers fall back to their
+/// baked token. Returns null when neither is available (caller → 401, which
+/// prompts the client to reconnect).
+export async function resolveCkToken(
   env: Env,
   accessToken: string,
-): Promise<{ ckWebAuthToken: string; createdAt: number; lastUsedAt: number } | null> {
+): Promise<{ ckWebAuthToken: string; userId?: string; createdAt: number; lastUsedAt: number } | null> {
   const raw = await env.TOKENS.get(`token:${accessToken}`);
   if (!raw) return null;
   const rec = JSON.parse(raw) as AccessTokenRecord;
-  const ckWebAuthToken = await decrypt(rec.ckWebAuthTokenEnc, env.TOKEN_ENC_KEY);
-  return { ckWebAuthToken, createdAt: rec.createdAt, lastUsedAt: rec.lastUsedAt };
+  let ckWebAuthToken: string | null = null;
+  if (rec.userId) {
+    const slot = await getUserCkToken(env, rec.userId);
+    if (slot) ckWebAuthToken = slot.ckWebAuthToken;
+  }
+  if (!ckWebAuthToken && rec.ckWebAuthTokenEnc) {
+    ckWebAuthToken = await decrypt(rec.ckWebAuthTokenEnc, env.TOKEN_ENC_KEY);
+  }
+  if (!ckWebAuthToken) return null;
+  return { ckWebAuthToken, userId: rec.userId, createdAt: rec.createdAt, lastUsedAt: rec.lastUsedAt };
 }
 
 /// Refresh lastUsedAt so the cleanup cron can tell live tokens from dead
@@ -140,30 +178,36 @@ export async function cleanupAccessTokens(env: Env, maxIdleMs: number): Promise<
   return deleted;
 }
 
-// ---- Current CloudKit web-auth token (app-brokered) ----
-// The iOS app pushes freshly-minted ckWebAuthTokens here via
-// /internal/ck-token. This is the single source of truth the MCP handler
-// prefers over the (frozen) token baked into each access-token record at
-// OAuth time. Decoupling them means the app can keep CloudKit auth alive
-// indefinitely without the user ever reconnecting Claude.
+// ---- Per-user CloudKit web-auth token (app-brokered) ----
+// The user's app mints fresh ckWebAuthTokens (CKFetchWebAuthTokenOperation)
+// and pushes them to /internal/ck-token. The gateway validates each token
+// against CloudKit, derives the owner's userId, and stores it here. The MCP
+// handler reads this per-user slot, so each user's Claude connector always
+// has live CloudKit auth and never needs reconnecting. Keyed by a hash of
+// the userId so a KV listing leak reveals no identities.
 
-interface CurrentCkTokenRecord {
+interface UserCkTokenRecord {
   ckWebAuthTokenEnc: string;
   updatedAt: number;
 }
 
-export async function putCurrentCkToken(env: Env, ckWebAuthToken: string): Promise<void> {
-  const enc = await encrypt(ckWebAuthToken, env.TOKEN_ENC_KEY);
-  const rec: CurrentCkTokenRecord = { ckWebAuthTokenEnc: enc, updatedAt: Date.now() };
-  await env.TOKENS.put("ck:current", JSON.stringify(rec));
+async function userSlotKey(userId: string): Promise<string> {
+  return `ckuser:${await sha256Base64Url(userId)}`;
 }
 
-export async function getCurrentCkToken(
+export async function putUserCkToken(env: Env, userId: string, ckWebAuthToken: string): Promise<void> {
+  const enc = await encrypt(ckWebAuthToken, env.TOKEN_ENC_KEY);
+  const rec: UserCkTokenRecord = { ckWebAuthTokenEnc: enc, updatedAt: Date.now() };
+  await env.TOKENS.put(await userSlotKey(userId), JSON.stringify(rec));
+}
+
+export async function getUserCkToken(
   env: Env,
+  userId: string,
 ): Promise<{ ckWebAuthToken: string; updatedAt: number } | null> {
-  const raw = await env.TOKENS.get("ck:current");
+  const raw = await env.TOKENS.get(await userSlotKey(userId));
   if (!raw) return null;
-  const rec = JSON.parse(raw) as CurrentCkTokenRecord;
+  const rec = JSON.parse(raw) as UserCkTokenRecord;
   const ckWebAuthToken = await decrypt(rec.ckWebAuthTokenEnc, env.TOKEN_ENC_KEY);
   return { ckWebAuthToken, updatedAt: rec.updatedAt };
 }

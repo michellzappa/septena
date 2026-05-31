@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 import type { Env } from "../env.js";
-import { putAccessToken, takeCode } from "../storage.js";
+import { putAccessTokenForUser, putUserCkToken, putLegacyAccessToken, takeCode } from "../storage.js";
+import { fetchUserRecordName } from "../cloudkit.js";
 import { logEvent, randomId, sha256Base64Url } from "../util.js";
 
 // /oauth/token — claude.ai posts here with the code we issued. Validate
@@ -43,12 +44,26 @@ export async function token(c: Context<{ Bindings: Env }>) {
     return c.json({ error: "invalid_grant", reason: "pkce" }, 400);
   }
 
+  // Resolve the user identity from the ckWebAuthToken (multi-user anchor):
+  // ask CloudKit who this token belongs to, bind the bearer to that userId,
+  // and seed the per-user slot so the user's app can keep it fresh.
+  const userId = await fetchUserRecordName(c.env, stored.ckWebAuthToken);
   const accessToken = randomId(40);
-  await putAccessToken(c.env, accessToken, stored.ckWebAuthToken, clientId);
+  if (userId) {
+    await putUserCkToken(c.env, userId, stored.ckWebAuthToken);
+    await putAccessTokenForUser(c.env, accessToken, userId, clientId);
+  } else {
+    // Resilience: identity resolution failed — don't lock the user out.
+    // Fall back to a legacy (baked-token) bearer; they'll move onto the
+    // multi-user path on a later reconnect when resolution succeeds.
+    await putLegacyAccessToken(c.env, accessToken, stored.ckWebAuthToken, clientId);
+  }
 
-  // refreshIssued/expiresIn logged explicitly so the lapse investigation can
-  // confirm the gateway issues a non-expiring access token and no refresh.
-  logEvent("oauth_token", { ok: true, grantType, clientId, refreshIssued: false, expiresIn: null });
+  logEvent("oauth_token", {
+    ok: true, grantType, clientId,
+    mode: userId ? "multiuser" : "legacy",
+    refreshIssued: false, expiresIn: null,
+  });
   return c.json({
     access_token: accessToken,
     token_type: "Bearer",

@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 import type { Env } from "./env.js";
 import { CloudKitClient, CloudKitError } from "./cloudkit.js";
-import { getCkTokenForAccessToken, touchAccessToken, getCurrentCkToken } from "./storage.js";
+import { resolveCkToken, touchAccessToken } from "./storage.js";
 import { logEvent } from "./util.js";
 
 // Throttle lastUsedAt writes: at most one KV write per token per interval.
@@ -563,16 +563,12 @@ export async function mcpHandler(c: Context<{ Bindings: Env }>) {
   if (!m) return unauthorized("missing Bearer header");
   const accessToken = m[1];
 
-  const tokenRec = await getCkTokenForAccessToken(c.env, accessToken);
-  if (!tokenRec) return unauthorized("access_token not found in KV");
-  const { createdAt, lastUsedAt } = tokenRec;
-
-  // Prefer the app-brokered current token (kept fresh by the iOS app) over
-  // the token frozen into this access-token record at OAuth time. This is
-  // what makes expiry invisible: as long as the app keeps pushing, the
-  // gateway always has live CloudKit auth behind Claude's permanent bearer.
-  const current = await getCurrentCkToken(c.env);
-  const ckWebAuthToken = current?.ckWebAuthToken ?? tokenRec.ckWebAuthToken;
+  // Resolve the live CloudKit token for this bearer: new-shape bearers read
+  // their user's app-maintained slot (so expiry is invisible); legacy
+  // bearers fall back to their baked token until the user reconnects.
+  const resolved = await resolveCkToken(c.env, accessToken);
+  if (!resolved) return unauthorized("no live CloudKit token for this bearer");
+  const { ckWebAuthToken, createdAt, lastUsedAt } = resolved;
 
   // Bump lastUsedAt (throttled, non-blocking) so the cleanup cron can tell
   // this token is alive. One KV write per TOUCH_INTERVAL_MS at most.
