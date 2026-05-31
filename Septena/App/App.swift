@@ -87,6 +87,9 @@ struct SeptenaApp: App {
           // refresh path independent of push delivery.
           if phase == .active {
             dayClock.refreshIfNeeded()
+            // Keep the MCP gateway supplied with a fresh CloudKit web-auth
+            // token so Claude's connector never lapses. Fire-and-forget.
+            ckEngine.refreshWebAuthToken()
             Task {
               await ckEngine.refreshAccountStatus()
               try? await ckEngine.fetchChanges()
