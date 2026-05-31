@@ -1256,6 +1256,10 @@ final class TrainingDraftStore {
   /// Currently active draft. Nil when no session is in flight.
   var draft: DraftSession?
 
+  /// Ephemeral rest-timer end time — not persisted; cleared on Skip or
+  /// timeout. nil when no rest is running.
+  var restEndsAt: Date? = nil
+
   init() {
     if let data = UserDefaults.standard.data(forKey: Self.key),
        let decoded = try? JSONDecoder().decode(DraftSession.self, from: data) {
@@ -1639,6 +1643,24 @@ final class TrainingDraftStore {
     guard !paces.isEmpty else { return nil }
     return paces.reduce(0, +) / Double(paces.count)
   }
+
+  // MARK: - Rest timer (ephemeral)
+
+  private static let defaultRestSeconds: TimeInterval = 90
+
+  /// Begin a rest countdown. Stored as an absolute end-time so it stays
+  /// accurate across backgrounding (the bar recomputes from the clock).
+  func startRest(seconds: TimeInterval = TrainingDraftStore.defaultRestSeconds) {
+    restEndsAt = Date().addingTimeInterval(seconds)
+  }
+
+  /// Nudge the running rest up/down, clamped so it can't go negative.
+  func adjustRest(by delta: TimeInterval) {
+    guard let end = restEndsAt else { return }
+    restEndsAt = max(end.addingTimeInterval(delta), Date())
+  }
+
+  func skipRest() { restEndsAt = nil }
 }
 
 // MARK: - Session logger UI
@@ -1800,46 +1822,81 @@ struct TrainingSessionView: View {
   @ViewBuilder
   private var logger: some View {
     if let d = store.draft {
-      List {
-        statsHeader(d)
-        Section {
-          ForEach(Array(d.entries.enumerated()), id: \.element.exercise) { idx, e in
-            TrainingExerciseCard(
-              index: idx,
-              entry: e,
-              accent: accent,
-              openExercise: $openExercise
-            )
-            .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
-          }
-        }
-        Section {
-          Button {
-            showAdd = true
-          } label: {
-            Label("Add exercise", systemImage: "plus.circle.fill")
-              .font(.septenaCardTitle)
-              .foregroundStyle(accent)
-          }
-          .buttonStyle(.plain)
-          .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
-        }
-      }
-      #if os(iOS)
-      .listStyle(.insetGrouped)
-      #else
-      .listStyle(.inset)
-      #endif
-      .onAppear { tick = Date() }
-      .sheet(isPresented: $showAdd) {
-        if let current = store.draft {
-          ExercisePickerSheet(
-            disabledNames: Set(current.entries.map(\.exercise)),
-            onDone: { ids in
-              store.addExercises(catalogIDs: ids, context: modelContext)
-              Haptics.tick()
+      ScrollViewReader { proxy in
+        List {
+          statsHeader(d)
+          Section {
+            ForEach(Array(d.entries.enumerated()), id: \.element.exercise) { idx, e in
+              TrainingExerciseCard(
+                index: idx,
+                entry: e,
+                accent: accent,
+                openExercise: $openExercise,
+                onAdvance: { target in
+                  // Auto-advance: open the next pending card and bring it
+                  // into view. Done here (not on every openExercise change)
+                  // so a manual tap doesn't yank the list around.
+                  openExercise = target
+                  if let target {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                      proxy.scrollTo(target, anchor: .top)
+                    }
+                  }
+                }
+              )
+              .id(e.exercise)
+              .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
             }
-          )
+          }
+          Section {
+            Button {
+              showAdd = true
+            } label: {
+              Label("Add exercise", systemImage: "plus.circle.fill")
+                .font(.septenaCardTitle)
+                .foregroundStyle(accent)
+            }
+            .buttonStyle(.plain)
+            .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+          }
+        }
+        #if os(iOS)
+        .listStyle(.insetGrouped)
+        #else
+        .listStyle(.inset)
+        #endif
+        .onAppear { tick = Date() }
+        #if os(iOS)
+        .toolbar {
+          // Decimal pad has no return key — give it a Done to dismiss.
+          ToolbarItemGroup(placement: .keyboard) {
+            Spacer()
+            Button("Done") { dismissKeyboard() }
+          }
+        }
+        #endif
+        .safeAreaInset(edge: .bottom) {
+          if let end = store.restEndsAt {
+            RestTimerBar(
+              endsAt: end,
+              accent: accent,
+              onAdjust: { store.adjustRest(by: $0) },
+              onSkip: { store.skipRest() }
+            )
+            .padding(.horizontal, 12)
+            .padding(.bottom, 6)
+          }
+        }
+        .sheet(isPresented: $showAdd) {
+          if let current = store.draft {
+            ExercisePickerSheet(
+              disabledNames: Set(current.entries.map(\.exercise)),
+              onDone: { ids in
+                store.addExercises(catalogIDs: ids, context: modelContext)
+                Haptics.tick()
+              }
+            )
+          }
         }
       }
     }
@@ -1929,6 +1986,78 @@ struct TrainingSessionView: View {
     guard let start = f.date(from: iso) else { return 0 }
     return max(0, Int(Date().timeIntervalSince(start) / 60))
   }
+
+  #if os(iOS)
+  private func dismissKeyboard() {
+    UIApplication.shared.sendAction(
+      #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+  }
+  #endif
+}
+
+// MARK: - Rest timer bar
+
+/// Pinned-bottom rest countdown that appears after a resistance set is
+/// logged. Drives off an absolute end-time so backgrounding doesn't drift
+/// it; a success haptic fires and the bar clears itself at zero. ±15s and
+/// Skip give quick manual control.
+private struct RestTimerBar: View {
+  let endsAt: Date
+  let accent: Color
+  let onAdjust: (TimeInterval) -> Void
+  let onSkip: () -> Void
+
+  var body: some View {
+    TimelineView(.periodic(from: .now, by: 1)) { ctx in
+      let remaining = max(0, endsAt.timeIntervalSince(ctx.date))
+      HStack(spacing: 12) {
+        Image(systemName: "timer")
+          .font(.system(size: 15, weight: .semibold))
+          .foregroundStyle(accent)
+        Text(timeString(remaining))
+          .font(.system(.title3, design: .rounded).weight(.bold))
+          .monospacedDigit()
+          .foregroundStyle(Theme.inkPrimary)
+        Spacer()
+        adjustButton("−15") { onAdjust(-15) }
+        adjustButton("+15") { onAdjust(15) }
+        Button(action: onSkip) {
+          Text("Skip").font(.subheadline.weight(.semibold))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(accent)
+      }
+      .padding(.horizontal, 16)
+      .padding(.vertical, 10)
+      .background(Theme.cardSurface, in: Capsule())
+      .overlay(Capsule().stroke(accent.opacity(0.3), lineWidth: 1))
+      .shadow(color: .black.opacity(0.10), radius: 6, y: 2)
+      .onChange(of: remaining <= 0) { _, done in
+        if done {
+          Haptics.success()
+          onSkip()
+        }
+      }
+    }
+  }
+
+  private func adjustButton(_ label: String, action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+      Text(label)
+        .font(.caption.weight(.bold))
+        .monospacedDigit()
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(accent.opacity(0.14), in: Capsule())
+        .foregroundStyle(accent)
+    }
+    .buttonStyle(.plain)
+  }
+
+  private func timeString(_ t: TimeInterval) -> String {
+    let s = Int(t.rounded())
+    return String(format: "%d:%02d", s / 60, s % 60)
+  }
 }
 
 // MARK: - Exercise card
@@ -1948,6 +2077,9 @@ struct TrainingExerciseCard: View {
   /// Which exercise's card is open, lifted to the parent so only one
   /// drawer is expanded at a time — opening one closes the others.
   @Binding var openExercise: String?
+  /// Called after this card logs — hands the next pending exercise name
+  /// (or nil) up so the parent can open + scroll to it.
+  var onAdvance: ((String?) -> Void)? = nil
 
   /// Presents the catalog picker to swap this slot's exercise.
   @State private var showSwitch = false
@@ -2014,6 +2146,39 @@ struct TrainingExerciseCard: View {
       .map { $0.element.exercise })
   }
 
+  /// Hand the next still-pending exercise to the parent (which opens +
+  /// scrolls to it). nil when everything's logged.
+  private func advanceToNextPending() {
+    if let nextIdx = store.draft?.nextPendingIndex,
+       let next = store.draft?.entries[nextIdx] {
+      onAdvance?(next.exercise)
+    } else {
+      onAdvance?(nil)
+    }
+  }
+
+  /// One-line plan/result shown on the collapsed header so the whole
+  /// session is scannable without expanding each card. Adapts to the
+  /// entry's shape (strength weight·sets×reps, cardio min·dist·level,
+  /// mobility minutes).
+  private var plannedSummary: String? {
+    var parts: [String] = []
+    if entry.isMobility {
+      if let d = entry.durationMin, d > 0 { parts.append("\(Int(d)) min") }
+    } else if entry.isCardio {
+      if let d = entry.durationMin, d > 0 { parts.append("\(Int(d)) min") }
+      if let m = entry.distanceM, m > 0 {
+        parts.append(m >= 1000 ? String(format: "%.1f km", m / 1000) : "\(Int(m)) m")
+      }
+      if let l = entry.level, l > 0 { parts.append("L\(fmt(l))") }
+    } else {
+      if let w = entry.weight, w > 0 { parts.append("\(fmt(w)) kg") }
+      if let s = entry.sets, let r = entry.reps { parts.append("\(s)×\(r)") }
+      else if let s = entry.sets { parts.append("\(s) sets") }
+    }
+    return parts.isEmpty ? nil : parts.joined(separator: " · ")
+  }
+
   // MARK: - Header
 
   private var header: some View {
@@ -2022,11 +2187,21 @@ struct TrainingExerciseCard: View {
         .foregroundStyle(statusTint)
         .font(.system(size: 18, weight: .regular))
         .frame(width: 22)
-      HStack(spacing: 6) {
-        Text(displayName(entry.exercise))
-          .font(.septenaCardTitle)
-          .foregroundStyle(Theme.inkPrimary)
-        if isPR { prPill }
+      VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: 6) {
+          Text(displayName(entry.exercise))
+            .font(.septenaCardTitle)
+            .foregroundStyle(Theme.inkPrimary)
+          if isPR { prPill }
+        }
+        // Collapsed: show the planned (or logged) numbers so the whole
+        // session is scannable at a glance. Hidden when expanded — the
+        // inputs below already show them.
+        if !expanded, let summary = plannedSummary {
+          Text(summary)
+            .font(.caption)
+            .foregroundStyle(Theme.inkSecondary)
+        }
       }
       Spacer()
       // ⋯ menu — switch this slot for a different exercise, or drop it.
@@ -2273,8 +2448,17 @@ struct TrainingExerciseCard: View {
         if !wasDone {
           Haptics.success()
           celebrate += 1
+          // Rest timer only for resistance work — a single cardio block
+          // has nothing to rest between.
+          if !entry.isCardio && !entry.isMobility {
+            store.startRest()
+          }
         }
-        if entry.status != .failed { openExercise = nil }
+        if entry.status != .failed {
+          // First completion advances to the next pending exercise;
+          // re-saving an already-done one just collapses.
+          if wasDone { openExercise = nil } else { advanceToNextPending() }
+        }
       }
       .buttonStyle(.borderedProminent)
       .controlSize(.large)
