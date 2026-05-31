@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 import type { Env } from "./env.js";
 import { CloudKitClient, CloudKitError } from "./cloudkit.js";
-import { resolveCkToken, touchAccessToken } from "./storage.js";
+import { getCkTokenForAccessToken, touchAccessToken } from "./storage.js";
 import { logEvent } from "./util.js";
 
 // Throttle lastUsedAt writes: at most one KV write per token per interval.
@@ -563,12 +563,9 @@ export async function mcpHandler(c: Context<{ Bindings: Env }>) {
   if (!m) return unauthorized("missing Bearer header");
   const accessToken = m[1];
 
-  // Resolve the live CloudKit token for this bearer: new-shape bearers read
-  // their user's app-maintained slot (so expiry is invisible); legacy
-  // bearers fall back to their baked token until the user reconnects.
-  const resolved = await resolveCkToken(c.env, accessToken);
-  if (!resolved) return unauthorized("no live CloudKit token for this bearer");
-  const { ckWebAuthToken, createdAt, lastUsedAt } = resolved;
+  const tokenRec = await getCkTokenForAccessToken(c.env, accessToken);
+  if (!tokenRec) return unauthorized("access_token not found in KV");
+  const { ckWebAuthToken, createdAt, lastUsedAt } = tokenRec;
 
   // Bump lastUsedAt (throttled, non-blocking) so the cleanup cron can tell
   // this token is alive. One KV write per TOUCH_INTERVAL_MS at most.

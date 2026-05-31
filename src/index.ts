@@ -7,7 +7,6 @@ import { continueAuth } from "./oauth/continue.js";
 import { token } from "./oauth/token.js";
 import { appleCallback } from "./auth/appleCallback.js";
 import { mcpHandler } from "./mcp.js";
-import { ingestCkToken } from "./ingest.js";
 import { landingHTML, SKILL_MARKDOWN } from "./landing.js";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -72,9 +71,6 @@ app.post("/oauth/token", token);
 app.get("/auth/apple/callback", appleCallback);
 
 app.post("/mcp", mcpHandler);
-
-// iOS app pushes freshly-minted CloudKit web-auth tokens here.
-app.post("/internal/ck-token", ingestCkToken);
 
 // Access tokens never expire in KV (the CloudKit token inside them does),
 // so prune records idle longer than this to avoid unbounded accumulation

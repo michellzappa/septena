@@ -100,23 +100,6 @@ export class CloudKitClient {
   }
 }
 
-/// Resolve the CloudKit userRecordName for a ckWebAuthToken via the
-/// authenticated users/current endpoint. The multi-user identity anchor:
-/// only a device signed into that iCloud account can mint a token for it,
-/// and CloudKit tells us whose it is. Returns null if the token is
-/// invalid/expired — callers reject rather than bind to an unknown user.
-export async function fetchUserRecordName(env: Env, ckWebAuthToken: string): Promise<string | null> {
-  const url = new URL(
-    `${HOST}/database/1/${env.CK_CONTAINER}/${env.CK_ENVIRONMENT}/private/users/current`,
-  );
-  url.searchParams.set("ckAPIToken", env.CK_API_TOKEN);
-  url.searchParams.set("ckWebAuthToken", ckWebAuthToken);
-  const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
-  if (!res.ok) return null;
-  const body = (await res.json().catch(() => null)) as { userRecordName?: string } | null;
-  return body?.userRecordName ?? null;
-}
-
 // ----------------------------------------------------------------------
 // queryByDateRange — unified STRING-date range query
 //
