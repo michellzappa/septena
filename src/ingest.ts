@@ -9,27 +9,23 @@ import { logEvent } from "./util.js";
 // durable native CloudKit auth, so it re-mints on launch/foreground/
 // background and keeps the gateway supplied — making expiry invisible.
 //
-// Multi-user identity: we do NOT trust the caller to say who they are. We
-// validate the pushed token against CloudKit and DERIVE the owner's userId
-// from the response, then store it in that user's slot. A push can only
-// ever affect the account that minted the token.
+// SECURITY: no embedded app secret. The endpoint is self-securing because we
+// VALIDATE the pushed token against CloudKit and DERIVE the owner's userId
+// from the response. A push can therefore only ever update the slot of the
+// account that minted the token — writing someone else's slot would require
+// their valid ckWebAuthToken (i.e. their iCloud auth). An embedded shared
+// secret would add nothing to that guarantee.
 //
-// APP_INGEST_SECRET is a coarse, app-wide gate (embedded in every app
-// build) to throttle abuse — it is NOT the per-user identity gate. The
-// real binding is the CloudKit validation below.
+// ABUSE: validation costs one CloudKit round-trip, so guard against spam
+// with (a) a cheap length pre-check below and (b) a Cloudflare rate-limit
+// rule on this path (configured in the dashboard, not in code).
 
 export async function ingestCkToken(c: Context<{ Bindings: Env }>) {
-  const auth = c.req.header("Authorization") ?? "";
-  const m = auth.match(/^Bearer\s+(.+)$/);
-  if (!m || m[1] !== c.env.APP_INGEST_SECRET) {
-    logEvent("ingest_ck_token", { ok: false, reason: "bad app key" });
-    return c.json({ error: "unauthorized" }, 401);
-  }
-
   const body = (await c.req.json().catch(() => null)) as { ckWebAuthToken?: string } | null;
   const ckWebAuthToken = body?.ckWebAuthToken;
-  if (!ckWebAuthToken || typeof ckWebAuthToken !== "string") {
-    return c.json({ error: "missing ckWebAuthToken" }, 400);
+  // Cheap reject of obvious junk before paying for CloudKit validation.
+  if (!ckWebAuthToken || typeof ckWebAuthToken !== "string" || ckWebAuthToken.length < 20) {
+    return c.json({ error: "missing or malformed ckWebAuthToken" }, 400);
   }
 
   // Validate + derive identity from CloudKit. Rejects expired/invalid tokens
