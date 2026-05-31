@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { Env } from "./env.js";
+import { cleanupAccessTokens } from "./storage.js";
 import { register } from "./oauth/register.js";
 import { authorize } from "./oauth/authorize.js";
 import { continueAuth } from "./oauth/continue.js";
@@ -71,4 +72,19 @@ app.get("/auth/apple/callback", appleCallback);
 
 app.post("/mcp", mcpHandler);
 
-export default app;
+// Access tokens never expire in KV (the CloudKit token inside them does),
+// so prune records idle longer than this to avoid unbounded accumulation
+// and zombie health-check traffic. CloudKit tokens die within hours, so a
+// week of idleness means definitely dead.
+const TOKEN_MAX_IDLE_MS = 7 * 24 * 60 * 60 * 1000;
+
+export default {
+  fetch: app.fetch,
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(
+      cleanupAccessTokens(env, TOKEN_MAX_IDLE_MS).then((n) =>
+        console.log(JSON.stringify({ evt: "token_cleanup", deleted: n })),
+      ),
+    );
+  },
+};

@@ -10,6 +10,10 @@ compatibility_flags = ["nodejs_compat_v2"]
 enabled = true
 head_sampling_rate = 1
 
+# Daily prune of dead access-token records (see scheduled handler).
+[triggers]
+crons = ["0 3 * * *"]
+
 # Allow importing .md files as text modules. Used by src/landing.ts to embed
 # the skill brief served at GET / and GET /skill.md without escaping the
 # markdown into a TS template literal.

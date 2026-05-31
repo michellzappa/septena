@@ -90,12 +90,53 @@ export async function putAccessToken(
 export async function getCkTokenForAccessToken(
   env: Env,
   accessToken: string,
-): Promise<{ ckWebAuthToken: string; createdAt: number } | null> {
+): Promise<{ ckWebAuthToken: string; createdAt: number; lastUsedAt: number } | null> {
   const raw = await env.TOKENS.get(`token:${accessToken}`);
   if (!raw) return null;
   const rec = JSON.parse(raw) as AccessTokenRecord;
   const ckWebAuthToken = await decrypt(rec.ckWebAuthTokenEnc, env.TOKEN_ENC_KEY);
-  return { ckWebAuthToken, createdAt: rec.createdAt };
+  return { ckWebAuthToken, createdAt: rec.createdAt, lastUsedAt: rec.lastUsedAt };
+}
+
+/// Refresh lastUsedAt so the cleanup cron can tell live tokens from dead
+/// ones. Preserves the encrypted CloudKit token; only bumps the timestamp.
+/// Call behind a throttle (see TOUCH_INTERVAL_MS) and via waitUntil so it
+/// never blocks the request.
+export async function touchAccessToken(env: Env, accessToken: string): Promise<void> {
+  const raw = await env.TOKENS.get(`token:${accessToken}`);
+  if (!raw) return;
+  const rec = JSON.parse(raw) as AccessTokenRecord;
+  rec.lastUsedAt = Date.now();
+  await env.TOKENS.put(`token:${accessToken}`, JSON.stringify(rec));
+}
+
+/// Delete access-token records idle longer than maxIdleMs. The underlying
+/// ckWebAuthToken dies within hours, so anything unused for days is dead
+/// weight (and a source of zombie health-check traffic). Returns count.
+export async function cleanupAccessTokens(env: Env, maxIdleMs: number): Promise<number> {
+  let deleted = 0;
+  let cursor: string | undefined;
+  do {
+    const list = await env.TOKENS.list({ cursor });
+    for (const k of list.keys) {
+      const raw = await env.TOKENS.get(k.name);
+      if (!raw) continue;
+      try {
+        const rec = JSON.parse(raw) as AccessTokenRecord;
+        const idle = Date.now() - (rec.lastUsedAt ?? rec.createdAt);
+        if (idle > maxIdleMs) {
+          await env.TOKENS.delete(k.name);
+          deleted++;
+        }
+      } catch {
+        // Unparseable record — remove it.
+        await env.TOKENS.delete(k.name);
+        deleted++;
+      }
+    }
+    cursor = list.list_complete ? undefined : list.cursor;
+  } while (cursor);
+  return deleted;
 }
 
 // ---- Dynamic client registrations ----

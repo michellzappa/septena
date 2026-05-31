@@ -1,8 +1,11 @@
 import type { Context } from "hono";
 import type { Env } from "./env.js";
 import { CloudKitClient, CloudKitError } from "./cloudkit.js";
-import { getCkTokenForAccessToken } from "./storage.js";
+import { getCkTokenForAccessToken, touchAccessToken } from "./storage.js";
 import { logEvent } from "./util.js";
+
+// Throttle lastUsedAt writes: at most one KV write per token per interval.
+const TOUCH_INTERVAL_MS = 5 * 60 * 1000;
 import { listTasks, listTasksJsonSchema, type ListTasksInput } from "./tools/listTasks.js";
 import { listProjects, listProjectsJsonSchema, type ListProjectsInput } from "./tools/listProjects.js";
 import { listAreas, listAreasJsonSchema, type ListAreasInput } from "./tools/listAreas.js";
@@ -562,23 +565,45 @@ export async function mcpHandler(c: Context<{ Bindings: Env }>) {
 
   const tokenRec = await getCkTokenForAccessToken(c.env, accessToken);
   if (!tokenRec) return unauthorized("access_token not found in KV");
-  const { ckWebAuthToken, createdAt } = tokenRec;
+  const { ckWebAuthToken, createdAt, lastUsedAt } = tokenRec;
+
+  // Bump lastUsedAt (throttled, non-blocking) so the cleanup cron can tell
+  // this token is alive. One KV write per TOUCH_INTERVAL_MS at most.
+  if (Date.now() - lastUsedAt > TOUCH_INTERVAL_MS) {
+    c.executionCtx.waitUntil(touchAccessToken(c.env, accessToken));
+  }
 
   const req = (await c.req.json().catch(() => null)) as JsonRpcRequest | null;
   if (!req || req.jsonrpc !== "2.0" || !req.method) {
     return rpcError(req?.id ?? null, -32600, "Invalid Request");
   }
 
+  // JSON-RPC notifications carry no id; per spec the server must not reply.
+  // MCP clients send notifications/initialized after the handshake — answer
+  // with a bare 202 instead of a "Method not found" error.
+  if (req.id === undefined || req.id === null || req.method.startsWith("notifications/")) {
+    return new Response(null, { status: 202 });
+  }
+
   const client = new CloudKitClient(c.env, ckWebAuthToken);
 
   try {
     switch (req.method) {
-      case "initialize":
+      case "initialize": {
+        // Echo the client's requested protocol version when present so we
+        // stay forward-compatible as the MCP spec advances.
+        const requested = (req.params as { protocolVersion?: unknown } | undefined)?.protocolVersion;
+        const protocolVersion = typeof requested === "string" ? requested : "2024-11-05";
         return rpcResult(req.id, {
-          protocolVersion: "2024-11-05",
+          protocolVersion,
           capabilities: { tools: {} },
-          serverInfo: { name: "septena-mcp-gateway", version: "0.0.2" },
+          serverInfo: { name: "septena-mcp-gateway", version: "0.0.3" },
         });
+      }
+      case "ping":
+        // Liveness/health probe — must be a fast empty result and never
+        // touches CloudKit, or clients may judge the connector unhealthy.
+        return rpcResult(req.id, {});
       case "tools/list": {
         // Source of truth for "which sections this user has enabled" is
         // the per-section `Section.isEnabled` flag the iOS app writes.
@@ -587,31 +612,43 @@ export async function mcpHandler(c: Context<{ Bindings: Env }>) {
         // sufficient — it has to be enabled too. Section records from
         // pre-isEnabled builds default to true so legacy users see all
         // their tools.
-        const [{ sections }, { settings }] = await Promise.all([
-          listSections(client, {}),
-          getSettings(client),
-        ]);
-        const enabledKeys = new Set(
-          sections.filter(s => s.isEnabled).map(s => s.key),
-        );
-        const order = Array.isArray(settings.section_order)
-          ? (settings.section_order as unknown[]).filter((v): v is string => typeof v === "string")
-          : [];
-        // Order-aware filter: only keys both ordered and enabled.
-        // If no sections exist yet (brand-new user before iOS seeds),
-        // fall through to the buildToolList null path so all tools
-        // are exposed.
-        const filtered = sections.length === 0
-          ? null
-          : order.length > 0
-            ? order.filter(k => enabledKeys.has(k))
-            : Array.from(enabledKeys);
+        let filtered: string[] | null = null;
+        let sectionCount = 0;
+        let enabledKeys = new Set<string>();
+        try {
+          const [{ sections }, { settings }] = await Promise.all([
+            listSections(client, {}),
+            getSettings(client),
+          ]);
+          sectionCount = sections.length;
+          enabledKeys = new Set(sections.filter(s => s.isEnabled).map(s => s.key));
+          const order = Array.isArray(settings.section_order)
+            ? (settings.section_order as unknown[]).filter((v): v is string => typeof v === "string")
+            : [];
+          // Order-aware filter: only keys both ordered and enabled. If no
+          // sections exist yet (brand-new user before iOS seeds), null →
+          // buildToolList exposes everything.
+          filtered = sections.length === 0
+            ? null
+            : order.length > 0
+              ? order.filter(k => enabledKeys.has(k))
+              : Array.from(enabledKeys);
+        } catch (err) {
+          // Auth expiry must still surface as 401 so the client re-auths.
+          if (err instanceof CloudKitError && err.isAuthExpired) throw err;
+          // Any other CloudKit hiccup: degrade to the FULL tool set rather
+          // than returning zero tools (which looks like a dead connector).
+          logEvent("tools_list_degraded", {
+            error: err instanceof Error ? err.message : String(err),
+          });
+          filtered = null;
+        }
         const tools = buildToolList(filtered);
         // Tool count + names per request: a partial manifest (e.g. task
         // tools present, nutrition absent) shows up here directly.
         logEvent("tools_list", {
           count: tools.length,
-          sectionCount: sections.length,
+          sectionCount,
           enabled: Array.from(enabledKeys),
           names: tools.map(t => t.name),
         });
