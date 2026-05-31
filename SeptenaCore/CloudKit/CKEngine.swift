@@ -125,49 +125,6 @@ init() {
     }
   }
 
-  /// App-brokered token sync. We hold durable, native iCloud auth, so we
-  /// can mint a CloudKit *web-services* auth token on demand and push it to
-  /// the MCP gateway. The gateway stores it as the live token behind
-  /// Claude's (permanent) bearer — so Claude's connector never has to be
-  /// reconnected even though the web token itself expires. Safe to call on
-  /// every foreground; cheap and fire-and-forget.
-  ///
-  /// Config is read from Info.plist (wire via an xcconfig build setting so
-  /// the secret never lands in source/git):
-  ///   • SeptenaCKAPIToken           — CloudKit web-services API token
-  ///   • SeptenaGatewayIngestSecret  — shared secret for POST /internal/ck-token
-  func refreshWebAuthToken() {
-    let info = Bundle.main.infoDictionary
-    guard
-      let apiToken = info?["SeptenaCKAPIToken"] as? String, !apiToken.isEmpty,
-      let secret = info?["SeptenaGatewayIngestSecret"] as? String, !secret.isEmpty,
-      let url = URL(string: "https://mcp.septena.app/internal/ck-token")
-    else {
-      logger.warning("web-auth token sync skipped: missing SeptenaCKAPIToken / SeptenaGatewayIngestSecret in Info.plist")
-      return
-    }
-    let op = CKFetchWebAuthTokenOperation(apiToken: apiToken)
-    op.fetchWebAuthTokenCompletionBlock = { [logger] token, error in
-      guard let token else {
-        logger.error("CKFetchWebAuthTokenOperation failed: \(error?.localizedDescription ?? "nil token", privacy: .public)")
-        return
-      }
-      var req = URLRequest(url: url)
-      req.httpMethod = "POST"
-      req.setValue("Bearer \(secret)", forHTTPHeaderField: "Authorization")
-      req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-      req.httpBody = try? JSONSerialization.data(withJSONObject: ["ckWebAuthToken": token])
-      URLSession.shared.dataTask(with: req) { [logger] _, resp, err in
-        if let err {
-          logger.error("gateway token push failed: \(err.localizedDescription, privacy: .public)")
-        } else {
-          logger.info("gateway token push status: \((resp as? HTTPURLResponse)?.statusCode ?? -1)")
-        }
-      }.resume()
-    }
-    container.add(op)
-  }
-
   /// Boots the sync engine. Idempotent — safe to call repeatedly. No-op
   /// when called pre-Phase-1 (CKSyncEngine creation hits the network for
   /// account status; we don't want to pay that cost until we're ready
