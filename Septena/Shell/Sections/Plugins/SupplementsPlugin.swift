@@ -128,11 +128,9 @@ private struct SupplementsDetailContent: View {
       SupplementTypeSheet()
         .environment(SeptenaServices.shared.checklistMutator)
     }
-
-    // Contextual Siri tip — teaches the spoken phrase right where the user
-    // manages supplements. The canonical per-section pattern: one
-    // `sectionSiriTip(_:)` call with the section's primary log intent.
-    sectionSiriTip(MarkSupplementTakenIntent())
+    // Note: the contextual "Ask Siri" tip is rendered centrally by
+    // SectionDetailPane via sectionSiriTip(forKey:), so every section gets one
+    // without a per-plugin call here.
   }
 }
 

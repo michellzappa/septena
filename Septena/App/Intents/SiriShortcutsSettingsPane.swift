@@ -54,6 +54,34 @@ func sectionSiriTip<I: AppIntent>(_ intent: I) -> some View {
   #endif
 }
 
+/// Section-key → primary log intent, rendered as a contextual Siri tip. This
+/// is the ONE place that maps a section to "the action you'd voice-trigger,"
+/// called once from `SectionDetailPane` so every section's tip appears in its
+/// Settings page without editing 13 plugins. The switch is unavoidable — Siri
+/// tips need a concrete intent type, which Swift can't derive from the key
+/// string (the same reason `SeptenaShortcuts` lists concrete intents). Keys
+/// match `SectionManifest.key`. Sections with no loggable action (sleep, body,
+/// activity) fall through to nothing. iOS-only via `sectionSiriTip`.
+@MainActor @ViewBuilder
+func sectionSiriTip(forKey key: String) -> some View {
+  switch key {
+  case "tasks":       sectionSiriTip(AddTaskIntent())
+  case "supplements": sectionSiriTip(MarkSupplementTakenIntent())
+  case "habits":      sectionSiriTip(MarkHabitDoneIntent())
+  case "chores":      sectionSiriTip(CompleteChoreIntent())
+  case "hydration":   sectionSiriTip(LogWaterIntent())
+  case "caffeine":    sectionSiriTip(LogCaffeineIntent())
+  case "cannabis":    sectionSiriTip(LogCannabisIntent())
+  case "nutrition":   sectionSiriTip(LogMealIntent())
+  case "training":    sectionSiriTip(LogTrainingIntent())
+  case "mood":        sectionSiriTip(LogMoodIntent())
+  case "gut":         sectionSiriTip(LogGutEntryIntent())
+  case "groceries":   sectionSiriTip(MarkGroceryLowIntent())
+  case "goals":       sectionSiriTip(AddGoalIntent())
+  default:            EmptyView()
+  }
+}
+
 struct SiriShortcutsSettingsPane: View {
   var body: some View {
     Form {
