@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 import type { Env } from "../env.js";
-import { putAccessToken, takeCode } from "../storage.js";
+import { putAccessToken, putUserCkToken, takeCode } from "../storage.js";
+import { fetchUserRecordName } from "../cloudkit.js";
 import { logEvent, randomId, sha256Base64Url } from "../util.js";
 
 // /oauth/token — claude.ai posts here with the code we issued. Validate
@@ -44,9 +45,25 @@ export async function token(c: Context<{ Bindings: Env }>) {
   }
 
   const accessToken = randomId(40);
-  await putAccessToken(c.env, accessToken, stored.ckWebAuthToken, clientId);
 
-  logEvent("oauth_token", { ok: true, grantType, clientId, refreshIssued: false, expiresIn: null });
+  // Bind this bearer to the CloudKit user so it tracks the app-refreshed
+  // token, rather than freezing the one captured at sign-in. Also seed the
+  // per-user store with this token so it works immediately, before the
+  // app's first push. Best-effort: if whoami fails we still store the
+  // captured token directly on the bearer (legacy path) so connect works.
+  let userRecordName: string | null = null;
+  try {
+    userRecordName = await fetchUserRecordName(c.env, stored.ckWebAuthToken);
+    if (userRecordName) {
+      await putUserCkToken(c.env, userRecordName, stored.ckWebAuthToken);
+    }
+  } catch (e) {
+    logEvent("oauth_token_whoami", { ok: false, error: e instanceof Error ? e.message : String(e) });
+  }
+
+  await putAccessToken(c.env, accessToken, stored.ckWebAuthToken, clientId, userRecordName ?? undefined);
+
+  logEvent("oauth_token", { ok: true, grantType, clientId, bound: !!userRecordName, refreshIssued: false, expiresIn: null });
   return c.json({
     access_token: accessToken,
     token_type: "Bearer",

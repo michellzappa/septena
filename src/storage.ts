@@ -61,13 +61,52 @@ export async function takeCode(env: Env, code: string): Promise<AuthCode | null>
   return JSON.parse(raw) as AuthCode;
 }
 
+// ---- Per-user CloudKit token ----
+// The app mints a fresh ckWebAuthToken (CKContainer.fetchWebAuthToken)
+// and pushes it to /ingest/ck-token on a schedule. We store the latest
+// one keyed by the CloudKit user it belongs to. Bearers bound to that
+// user resolve through here, so the gateway always serves the freshest
+// app-pushed token — the ~8h CloudKit token rotating no longer forces a
+// reconnect. This holds only a short-lived *credential*, never user data.
+
+const USER_TOKEN_PREFIX = "cktoken:";
+
+interface UserCkTokenRecord {
+  ckWebAuthTokenEnc: string;
+  refreshedAt: number;
+}
+
+export async function putUserCkToken(
+  env: Env,
+  userRecordName: string,
+  ckWebAuthToken: string,
+): Promise<void> {
+  const enc = await encrypt(ckWebAuthToken, env.TOKEN_ENC_KEY);
+  const rec: UserCkTokenRecord = { ckWebAuthTokenEnc: enc, refreshedAt: Date.now() };
+  await env.TOKENS.put(`${USER_TOKEN_PREFIX}${userRecordName}`, JSON.stringify(rec));
+}
+
+export async function getUserCkToken(
+  env: Env,
+  userRecordName: string,
+): Promise<{ ckWebAuthToken: string; refreshedAt: number } | null> {
+  const raw = await env.TOKENS.get(`${USER_TOKEN_PREFIX}${userRecordName}`);
+  if (!raw) return null;
+  const rec = JSON.parse(raw) as UserCkTokenRecord;
+  const ckWebAuthToken = await decrypt(rec.ckWebAuthTokenEnc, env.TOKEN_ENC_KEY);
+  return { ckWebAuthToken, refreshedAt: rec.refreshedAt };
+}
+
 // ---- Access tokens ----
-// Long-lived. The ckWebAuthToken is encrypted with TOKEN_ENC_KEY. Each
-// bearer carries its own user's token, so the gateway is multi-user by
-// construction: one bearer per user connection, no shared state.
+// A bearer binds to a CloudKit user (`userRecordName`) and resolves to
+// that user's latest app-pushed token. `ckWebAuthTokenEnc` is kept as a
+// bootstrap/fallback: the token captured at connect time, used until the
+// app's first push arrives (and for legacy bearers issued before the
+// identity binding existed).
 
 export interface AccessTokenRecord {
-  ckWebAuthTokenEnc: string;
+  userRecordName?: string;     // preferred: track the app-refreshed token
+  ckWebAuthTokenEnc?: string;  // bootstrap/legacy fallback
   clientId: string;
   createdAt: number;
   lastUsedAt: number;
@@ -78,9 +117,11 @@ export async function putAccessToken(
   accessToken: string,
   ckWebAuthToken: string,
   clientId: string,
+  userRecordName?: string,
 ): Promise<void> {
   const enc = await encrypt(ckWebAuthToken, env.TOKEN_ENC_KEY);
   const rec: AccessTokenRecord = {
+    userRecordName,
     ckWebAuthTokenEnc: enc,
     clientId,
     createdAt: Date.now(),
@@ -96,9 +137,19 @@ export async function getCkTokenForAccessToken(
   const raw = await env.TOKENS.get(`token:${accessToken}`);
   if (!raw) return null;
   const rec = JSON.parse(raw) as AccessTokenRecord;
-  if (!rec.ckWebAuthTokenEnc) return null; // stale multi-user bearer → reconnect
-  const ckWebAuthToken = await decrypt(rec.ckWebAuthTokenEnc, env.TOKEN_ENC_KEY);
-  return { ckWebAuthToken, createdAt: rec.createdAt, lastUsedAt: rec.lastUsedAt };
+  // Preferred: serve the freshest token the app has pushed for this user.
+  if (rec.userRecordName) {
+    const user = await getUserCkToken(env, rec.userRecordName);
+    if (user) {
+      return { ckWebAuthToken: user.ckWebAuthToken, createdAt: rec.createdAt, lastUsedAt: rec.lastUsedAt };
+    }
+    // App hasn't pushed yet — fall through to the bootstrap token below.
+  }
+  if (rec.ckWebAuthTokenEnc) {
+    const ckWebAuthToken = await decrypt(rec.ckWebAuthTokenEnc, env.TOKEN_ENC_KEY);
+    return { ckWebAuthToken, createdAt: rec.createdAt, lastUsedAt: rec.lastUsedAt };
+  }
+  return null; // stale bearer with no usable token → reconnect
 }
 
 /// Refresh lastUsedAt so the cleanup cron can tell live tokens from dead
@@ -122,12 +173,16 @@ export async function cleanupAccessTokens(env: Env, maxIdleMs: number): Promise<
   do {
     const list = await env.TOKENS.list({ cursor });
     for (const k of list.keys) {
-      if (!k.name.startsWith("token:")) continue; // only access-token records
+      const isAccess = k.name.startsWith("token:");
+      const isUserToken = k.name.startsWith(USER_TOKEN_PREFIX);
+      if (!isAccess && !isUserToken) continue;
       const raw = await env.TOKENS.get(k.name);
       if (!raw) continue;
       try {
-        const rec = JSON.parse(raw) as AccessTokenRecord;
-        const idle = Date.now() - (rec.lastUsedAt ?? rec.createdAt);
+        const rec = JSON.parse(raw) as AccessTokenRecord & UserCkTokenRecord;
+        // Access tokens age on lastUsedAt; per-user tokens on refreshedAt.
+        const stamp = isUserToken ? rec.refreshedAt : (rec.lastUsedAt ?? rec.createdAt);
+        const idle = Date.now() - stamp;
         if (idle > maxIdleMs) {
           await env.TOKENS.delete(k.name);
           deleted++;

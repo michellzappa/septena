@@ -6,6 +6,7 @@ import { authorize } from "./oauth/authorize.js";
 import { continueAuth } from "./oauth/continue.js";
 import { token } from "./oauth/token.js";
 import { appleCallback } from "./auth/appleCallback.js";
+import { ingestCkToken } from "./ingest/ckToken.js";
 import { mcpHandler } from "./mcp.js";
 import { landingHTML, SKILL_MARKDOWN } from "./landing.js";
 
@@ -71,6 +72,11 @@ app.post("/oauth/token", token);
 app.get("/auth/apple/callback", appleCallback);
 
 app.post("/mcp", mcpHandler);
+
+// The app pushes freshly-minted ckWebAuthTokens here so bearers serve a
+// live token without the user re-authing every ~8h. Self-securing: the
+// pushed token is validated against CloudKit's users/current.
+app.post("/ingest/ck-token", ingestCkToken);
 
 // Access tokens never expire in KV (the CloudKit token inside them does),
 // so prune records idle longer than this to avoid unbounded accumulation

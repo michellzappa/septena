@@ -179,6 +179,33 @@ export async function queryByDateRange(
   return filtered.slice(0, limit);
 }
 
+// ----------------------------------------------------------------------
+// whoami — resolve the CloudKit user a web-auth token belongs to.
+//
+// Calls the authenticated `users/current` endpoint. Doubles as token
+// validation: an unauthenticated token gets a `redirectURL` (Apple
+// sign-in) instead of a record, and an expired one errors — either way
+// there's no `userRecordName`, so a null return means "not a valid,
+// signed-in token". Used by the token-ingest endpoint (to key the
+// pushed token by user) and at OAuth time (to bind a bearer to its
+// user identity instead of freezing one short-lived token).
+export async function fetchUserRecordName(
+  env: Env,
+  ckWebAuthToken: string,
+): Promise<string | null> {
+  const u = new URL(
+    `${HOST}/database/1/${env.CK_CONTAINER}/${env.CK_ENVIRONMENT}/private/users/current`,
+  );
+  u.searchParams.set("ckAPIToken", env.CK_API_TOKEN);
+  u.searchParams.set("ckWebAuthToken", ckWebAuthToken);
+  const res = await fetch(u.toString(), { headers: { Accept: "application/json" } });
+  const body = (await res.json().catch(() => null)) as
+    | { userRecordName?: string; redirectURL?: string }
+    | null;
+  if (!res.ok || !body?.userRecordName) return null;
+  return body.userRecordName;
+}
+
 export class CloudKitError extends Error {
   constructor(public status: number, public body: string) {
     super(`CloudKit ${status}: ${body.slice(0, 200)}`);
