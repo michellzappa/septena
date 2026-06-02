@@ -1,6 +1,6 @@
 {
   "name": "@septena/mcp-gateway",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Hosted MCP server bridging Claude.ai to Septena's CloudKit data.",
   "private": true,
   "type": "module",

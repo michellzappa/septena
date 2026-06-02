@@ -1,5 +1,10 @@
 import type { Context } from "hono";
+import pkg from "../package.json";
 import type { Env } from "./env.js";
+
+// Single source of truth for the server version — the MCP `serverInfo.version`
+// must always match package.json so a deployed Worker maps to a tagged release.
+const SERVER_VERSION = pkg.version;
 import { CloudKitClient, CloudKitError } from "./cloudkit.js";
 import { getCkTokenForAccessToken, touchAccessToken } from "./storage.js";
 import { logEvent } from "./util.js";
@@ -190,11 +195,6 @@ const GLOBAL_TOOLS: Tool[] = [
     inputSchema: updateGoalJsonSchema,
   },
   {
-    name: "goals_delete",
-    description: "Delete a Septena goal.",
-    inputSchema: deleteGoalJsonSchema,
-  },
-  {
     name: "settings_get",
     description: "Read Septena app settings from CloudKit.",
     inputSchema: getSettingsJsonSchema,
@@ -218,7 +218,8 @@ const GLOBAL_TOOLS: Tool[] = [
 
 // Exposed only when the matching key appears in settings.section_order.
 // Keys must match the canonical section keys stored in CloudKit (see SECTION_KEY_ALIASES in writeSettings.ts).
-// When section_order is absent or empty (new/unconfigured user), all section tools are shown.
+// A section's tools are exposed only when its key is both enabled and present
+// in the filtered list; when that list is empty, only GLOBAL_TOOLS are shown.
 const SECTION_TOOLS: Record<string, Tool[]> = {
   habits: [
     {
@@ -230,16 +231,6 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
       name: "habits_create",
       description: "Create a new habit definition.",
       inputSchema: createHabitJsonSchema,
-    },
-    {
-      name: "habits_update",
-      description: "Update a habit definition's title, bucket, or emoji.",
-      inputSchema: updateHabitJsonSchema,
-    },
-    {
-      name: "habits_delete",
-      description: "Delete a habit definition and all its events.",
-      inputSchema: deleteHabitJsonSchema,
     },
     {
       name: "habits_toggle",
@@ -259,16 +250,6 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
       inputSchema: createSupplementJsonSchema,
     },
     {
-      name: "supplements_update",
-      description: "Update a supplement definition's title or emoji.",
-      inputSchema: updateSupplementJsonSchema,
-    },
-    {
-      name: "supplements_delete",
-      description: "Delete a supplement definition and all its events.",
-      inputSchema: deleteSupplementJsonSchema,
-    },
-    {
       name: "supplements_toggle",
       description: "Mark a supplement taken (done=true) or untaken (done=false) for a date.",
       inputSchema: toggleSupplementJsonSchema,
@@ -286,24 +267,9 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
       inputSchema: createChoreJsonSchema,
     },
     {
-      name: "chores_update",
-      description: "Update a chore definition's title, cadence, or emoji.",
-      inputSchema: updateChoreJsonSchema,
-    },
-    {
-      name: "chores_delete",
-      description: "Delete a chore definition and all its events.",
-      inputSchema: deleteChoreJsonSchema,
-    },
-    {
       name: "chores_complete",
       description: "Mark a chore as completed for today (or a given date).",
       inputSchema: completeChoreJsonSchema,
-    },
-    {
-      name: "chores_defer",
-      description: "Defer a chore to tomorrow ('day') or next Saturday ('weekend').",
-      inputSchema: deferChoreJsonSchema,
     },
     {
       name: "chores_uncomplete",
@@ -322,26 +288,6 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
       description: "Log a new caffeine intake event (v60, matcha, or other).",
       inputSchema: logCaffeineEventJsonSchema,
     },
-    {
-      name: "caffeine_event_delete",
-      description: "Delete a caffeine event by id.",
-      inputSchema: deleteCaffeineEventJsonSchema,
-    },
-    {
-      name: "caffeine_beans_list",
-      description: "List the caffeine bean / source catalog.",
-      inputSchema: listCaffeineBeansJsonSchema,
-    },
-    {
-      name: "caffeine_bean_create",
-      description: "Add a new bean or caffeine source to the catalog.",
-      inputSchema: createCaffeineBeanJsonSchema,
-    },
-    {
-      name: "caffeine_bean_delete",
-      description: "Remove a bean from the catalog.",
-      inputSchema: deleteCaffeineBeanJsonSchema,
-    },
   ],
   cannabis: [
     {
@@ -354,26 +300,6 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
       description: "Log a new cannabis intake event (vape or edible).",
       inputSchema: logCannabisEventJsonSchema,
     },
-    {
-      name: "cannabis_event_delete",
-      description: "Delete a cannabis event by id.",
-      inputSchema: deleteCannabisEventJsonSchema,
-    },
-    {
-      name: "cannabis_strains_list",
-      description: "List the cannabis strain catalog.",
-      inputSchema: listCannabisStrainJsonSchema,
-    },
-    {
-      name: "cannabis_strain_create",
-      description: "Add a new strain to the catalog.",
-      inputSchema: createCannabisStrainJsonSchema,
-    },
-    {
-      name: "cannabis_strain_delete",
-      description: "Remove a strain from the catalog.",
-      inputSchema: deleteCannabisStrainJsonSchema,
-    },
   ],
   gut: [
     {
@@ -385,11 +311,6 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
       name: "gut_event_log",
       description: "Log a new gut event with Bristol Stool Scale type and optional discomfort details.",
       inputSchema: logGutEventJsonSchema,
-    },
-    {
-      name: "gut_event_delete",
-      description: "Delete a gut event by id.",
-      inputSchema: deleteGutEventJsonSchema,
     },
   ],
   nutrition: [
@@ -407,11 +328,6 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
       name: "nutrition_entry_update",
       description: "Update fields on an existing nutrition entry. Any subset of foods, loggedAt, mealType, macros, or micros.",
       inputSchema: updateNutritionEntryJsonSchema,
-    },
-    {
-      name: "nutrition_entry_delete",
-      description: "Delete a nutrition entry by id.",
-      inputSchema: deleteNutritionEntryJsonSchema,
     },
     {
       name: "nutrition_day_summary",
@@ -436,54 +352,9 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
       inputSchema: updateTrainingEntryJsonSchema,
     },
     {
-      name: "training_entry_delete",
-      description: "Delete an exercise entry by id.",
-      inputSchema: deleteTrainingEntryJsonSchema,
-    },
-    {
-      name: "training_session_retag",
-      description: "Bulk-set sessionType on every ExerciseEntry for one date. Use for session-level retagging (the data model has no separate session record — a session = entries sharing date+sessionType). Pass sessionType='' to clear.",
-      inputSchema: retagTrainingSessionJsonSchema,
-    },
-    {
       name: "training_exercises_list",
       description: "List exercise catalog (definitions). Filter by type (strength|cardio|mobility|core) or archived state.",
       inputSchema: listExercisesJsonSchema,
-    },
-    {
-      name: "training_exercise_create",
-      description: "Add a new exercise definition. id defaults to slugified name.",
-      inputSchema: createExerciseJsonSchema,
-    },
-    {
-      name: "training_exercise_update",
-      description: "Update an exercise definition.",
-      inputSchema: updateExerciseJsonSchema,
-    },
-    {
-      name: "training_exercise_delete",
-      description: "Delete an exercise definition.",
-      inputSchema: deleteExerciseJsonSchema,
-    },
-    {
-      name: "training_sessions_list",
-      description: "List session-type templates (routines: 'upper', 'lower', 'cardio', etc.).",
-      inputSchema: listSessionTypesJsonSchema,
-    },
-    {
-      name: "training_session_create",
-      description: "Create a session-type template. id is the canonical key (lowercase, e.g. 'upper').",
-      inputSchema: createSessionTypeJsonSchema,
-    },
-    {
-      name: "training_session_update",
-      description: "Update a session-type template.",
-      inputSchema: updateSessionTypeJsonSchema,
-    },
-    {
-      name: "training_session_delete",
-      description: "Delete a session-type template.",
-      inputSchema: deleteSessionTypeJsonSchema,
     },
   ],
   hydration: [
@@ -511,49 +382,24 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
     },
     {
       name: "grocery_item_create",
-      description: "Add a new grocery item. category is a GroceryCategory id (resolve via grocery_categories_list).",
+      description: "Add a new grocery item. category is an optional GroceryCategory id.",
       inputSchema: createGroceryItemJsonSchema,
-    },
-    {
-      name: "grocery_item_update",
-      description: "Update a grocery item (name, category, emoji, low, lastBought).",
-      inputSchema: updateGroceryItemJsonSchema,
     },
     {
       name: "grocery_item_set_low",
       description: "Mark a grocery item as low/restocked. low=true means out/running low; low=false clears the flag and stamps lastBought=today.",
       inputSchema: setGroceryLowJsonSchema,
     },
-    {
-      name: "grocery_item_delete",
-      description: "Delete a grocery item by id.",
-      inputSchema: deleteGroceryItemJsonSchema,
-    },
-    {
-      name: "grocery_categories_list",
-      description: "List grocery categories.",
-      inputSchema: listGroceryCategoriesJsonSchema,
-    },
-    {
-      name: "grocery_category_create",
-      description: "Add a new grocery category.",
-      inputSchema: createGroceryCategoryJsonSchema,
-    },
-    {
-      name: "grocery_category_delete",
-      description: "Delete a grocery category by id.",
-      inputSchema: deleteGroceryCategoryJsonSchema,
-    },
   ],
 };
 
 function buildToolList(sectionOrder: string[] | null): Tool[] {
-  // No section_order configured → show everything (new or unconfigured user).
-  if (!sectionOrder || sectionOrder.length === 0) {
-    return [...GLOBAL_TOOLS, ...Object.values(SECTION_TOOLS).flat()];
-  }
-  // Return global tools + section tools for each active section, preserving section_order sequence.
-  const sectionTools = sectionOrder.flatMap(key => SECTION_TOOLS[key] ?? []);
+  // Globals are always exposed. Section tools are opt-in: a section's tools
+  // appear ONLY when its key is in the (enabled-gated) list. null/empty →
+  // globals only, never the full set. We never expose every section's tools
+  // as a fallback — that would leak tools for sections the user disabled.
+  const keys = sectionOrder ?? [];
+  const sectionTools = keys.flatMap(key => SECTION_TOOLS[key] ?? []);
   return [...GLOBAL_TOOLS, ...sectionTools];
 }
 
@@ -597,7 +443,7 @@ export async function mcpHandler(c: Context<{ Bindings: Env }>) {
         return rpcResult(req.id, {
           protocolVersion,
           capabilities: { tools: {} },
-          serverInfo: { name: "septena-mcp-gateway", version: "0.0.3" },
+          serverInfo: { name: "septena-mcp-gateway", version: SERVER_VERSION },
         });
       }
       case "ping":
@@ -626,22 +472,23 @@ export async function mcpHandler(c: Context<{ Bindings: Env }>) {
             ? (settings.section_order as unknown[]).filter((v): v is string => typeof v === "string")
             : [];
           // Order-aware filter: only keys both ordered and enabled. If no
-          // sections exist yet (brand-new user before iOS seeds), null →
-          // buildToolList exposes everything.
+          // sections exist yet (brand-new user before iOS seeds), [] →
+          // buildToolList exposes globals only, never every section's tools.
           filtered = sections.length === 0
-            ? null
+            ? []
             : order.length > 0
               ? order.filter(k => enabledKeys.has(k))
               : Array.from(enabledKeys);
         } catch (err) {
           // Auth expiry must still surface as 401 so the client re-auths.
           if (err instanceof CloudKitError && err.isAuthExpired) throw err;
-          // Any other CloudKit hiccup: degrade to the FULL tool set rather
-          // than returning zero tools (which looks like a dead connector).
+          // Any other CloudKit hiccup: degrade to globals only. Still a
+          // non-empty manifest (so the connector doesn't look dead), but we
+          // never leak section tools when we can't confirm what's enabled.
           logEvent("tools_list_degraded", {
             error: err instanceof Error ? err.message : String(err),
           });
-          filtered = null;
+          filtered = [];
         }
         const tools = buildToolList(filtered);
         // Tool count + names per request: a partial manifest (e.g. task
