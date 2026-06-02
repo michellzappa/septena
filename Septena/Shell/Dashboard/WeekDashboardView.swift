@@ -2153,18 +2153,24 @@ struct WeekDashboardView: View {
 
   /// Duplicate a meal at the current time via NutritionMutator.
   private func commitNutritionDuplicate(_ entry: NutritionEntry) {
-    SeptenaServices.shared.nutritionMutator.addEntry(
-      loggedAt: Date.now,
-      emoji: entry.emoji,
-      foods: entry.foods,
-      proteinG: entry.proteinG,
-      fatG: entry.fatG,
-      carbsG: entry.carbsG,
-      fiberG: entry.fiberG,
-      kcal: entry.kcal
-    )
-    AddInfoSection.nutrition.notifyTilesChanged()
-    Haptics.tick()
+    SectionLog.newLog(
+      section: "nutrition",
+      accent: theme.color(for: "nutrition"),
+      announce: "Logged \(entry.foods.first ?? "meal").",
+      logCommit: logCommit
+    ) {
+      SeptenaServices.shared.nutritionMutator.addEntry(
+        loggedAt: Date.now,
+        emoji: entry.emoji,
+        foods: entry.foods,
+        proteinG: entry.proteinG,
+        fatG: entry.fatG,
+        carbsG: entry.carbsG,
+        fiberG: entry.fiberG,
+        kcal: entry.kcal
+      )
+      AddInfoSection.nutrition.notifyTilesChanged()
+    }
   }
 
   // MARK: - Mood

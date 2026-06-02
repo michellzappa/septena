@@ -15,6 +15,9 @@ import AppKit
 // Mutations go through NutritionMutator (local SwiftData + CKEngine queue).
 
 struct EditNutritionEntrySheet: View {
+  @Environment(SectionTheme.self) private var theme
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
+
   let original: NutritionEntry?
   let onDone: () -> Void
 
@@ -209,51 +212,63 @@ struct EditNutritionEntrySheet: View {
     let emojiValue = emoji.trimmingCharacters(in: .whitespacesAndNewlines)
 
     let mutator = SeptenaServices.shared.nutritionMutator
+    // Edit = quiet correction; new meal = a warm bloom. Both funnel through
+    // SectionLog; dismissal is owned by AdaptiveEditScaffold.
     if let original {
       // Double-optional: pass `.some(photoAssetID)` only when the user
       // touched the picker this session; otherwise leave nil so the mutator
       // doesn't clobber the existing value.
       let photoArg: String?? = photoEdited ? .some(photoAssetID) : nil
-      mutator.updateEntry(
-        id: original.file,
-        pickedAt: time,
-        emoji: emojiValue.isEmpty ? nil : emojiValue,
-        foods: foods,
-        proteinG: parseDouble(proteinG),
-        fatG: parseDouble(fatG),
-        carbsG: parseDouble(carbsG),
-        fiberG: parseOpt(fiberG),
-        sugarG: parseOpt(sugarG),
-        saturatedFatG: parseOpt(saturatedFatG),
-        alcoholG: parseOpt(alcoholG),
-        kcal: parseOpt(kcal),
-        sodiumMg: parseOpt(sodiumMg),
-        cholesterolMg: parseOpt(cholesterolMg),
-        potassiumMg: parseOpt(potassiumMg),
-        waterMl: parseOpt(waterMl),
-        photoAssetID: photoArg
-      )
+      SectionLog.edit {
+        mutator.updateEntry(
+          id: original.file,
+          pickedAt: time,
+          emoji: emojiValue.isEmpty ? nil : emojiValue,
+          foods: foods,
+          proteinG: parseDouble(proteinG),
+          fatG: parseDouble(fatG),
+          carbsG: parseDouble(carbsG),
+          fiberG: parseOpt(fiberG),
+          sugarG: parseOpt(sugarG),
+          saturatedFatG: parseOpt(saturatedFatG),
+          alcoholG: parseOpt(alcoholG),
+          kcal: parseOpt(kcal),
+          sodiumMg: parseOpt(sodiumMg),
+          cholesterolMg: parseOpt(cholesterolMg),
+          potassiumMg: parseOpt(potassiumMg),
+          waterMl: parseOpt(waterMl),
+          photoAssetID: photoArg
+        )
+        AddInfoSection.nutrition.notifyTilesChanged()
+      }
     } else {
-      mutator.addEntry(
-        loggedAt: time,
-        emoji: emojiValue.isEmpty ? nil : emojiValue,
-        foods: foods,
-        proteinG: parseDouble(proteinG),
-        fatG: parseDouble(fatG),
-        carbsG: parseDouble(carbsG),
-        fiberG: parseOpt(fiberG),
-        sugarG: parseOpt(sugarG),
-        saturatedFatG: parseOpt(saturatedFatG),
-        alcoholG: parseOpt(alcoholG),
-        kcal: parseOpt(kcal),
-        sodiumMg: parseOpt(sodiumMg),
-        cholesterolMg: parseOpt(cholesterolMg),
-        potassiumMg: parseOpt(potassiumMg),
-        waterMl: parseOpt(waterMl),
-        photoAssetID: photoAssetID
-      )
+      SectionLog.newLog(
+        section: "nutrition",
+        accent: theme.color(for: "nutrition"),
+        announce: "Logged \(foods.first ?? "meal").",
+        logCommit: logCommit
+      ) {
+        mutator.addEntry(
+          loggedAt: time,
+          emoji: emojiValue.isEmpty ? nil : emojiValue,
+          foods: foods,
+          proteinG: parseDouble(proteinG),
+          fatG: parseDouble(fatG),
+          carbsG: parseDouble(carbsG),
+          fiberG: parseOpt(fiberG),
+          sugarG: parseOpt(sugarG),
+          saturatedFatG: parseOpt(saturatedFatG),
+          alcoholG: parseOpt(alcoholG),
+          kcal: parseOpt(kcal),
+          sodiumMg: parseOpt(sodiumMg),
+          cholesterolMg: parseOpt(cholesterolMg),
+          potassiumMg: parseOpt(potassiumMg),
+          waterMl: parseOpt(waterMl),
+          photoAssetID: photoAssetID
+        )
+        AddInfoSection.nutrition.notifyTilesChanged()
+      }
     }
-    Haptics.tick()
     onDone()
   }
 }

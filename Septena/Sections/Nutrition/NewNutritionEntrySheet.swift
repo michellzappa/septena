@@ -8,6 +8,8 @@ import Photos
 // from the Nutrition QuickAdd menu's "New meal…" item.
 
 struct NewNutritionEntrySheet: View {
+  @Environment(SectionTheme.self) private var theme
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
   @State private var time: Date = Date()
   @State private var emoji: String = ""
   @State private var foodsText: String = ""
@@ -138,25 +140,31 @@ struct NewNutritionEntrySheet: View {
     guard !foods.isEmpty else { return }
     let emojiValue = emoji.trimmingCharacters(in: .whitespacesAndNewlines)
 
-    SeptenaServices.shared.nutritionMutator.addEntry(
-      loggedAt: time,
-      emoji: emojiValue.isEmpty ? nil : emojiValue,
-      foods: foods,
-      proteinG: parseDouble(proteinG),
-      fatG: parseDouble(fatG),
-      carbsG: parseDouble(carbsG),
-      fiberG: parseOpt(fiberG),
-      sugarG: parseOpt(sugarG),
-      saturatedFatG: parseOpt(saturatedFatG),
-      alcoholG: parseOpt(alcoholG),
-      kcal: parseOpt(kcal),
-      sodiumMg: parseOpt(sodiumMg),
-      cholesterolMg: parseOpt(cholesterolMg),
-      potassiumMg: parseOpt(potassiumMg),
-      waterMl: parseOpt(waterMl),
-      photoAssetID: photoAssetID
-    )
-    AddInfoSection.nutrition.notifyTilesChanged()
-    Haptics.tick()
+    SectionLog.newLog(
+      section: "nutrition",
+      accent: theme.color(for: "nutrition"),
+      announce: "Logged \(foods.first ?? "meal").",
+      logCommit: logCommit
+    ) {
+      SeptenaServices.shared.nutritionMutator.addEntry(
+        loggedAt: time,
+        emoji: emojiValue.isEmpty ? nil : emojiValue,
+        foods: foods,
+        proteinG: parseDouble(proteinG),
+        fatG: parseDouble(fatG),
+        carbsG: parseDouble(carbsG),
+        fiberG: parseOpt(fiberG),
+        sugarG: parseOpt(sugarG),
+        saturatedFatG: parseOpt(saturatedFatG),
+        alcoholG: parseOpt(alcoholG),
+        kcal: parseOpt(kcal),
+        sodiumMg: parseOpt(sodiumMg),
+        cholesterolMg: parseOpt(cholesterolMg),
+        potassiumMg: parseOpt(potassiumMg),
+        waterMl: parseOpt(waterMl),
+        photoAssetID: photoAssetID
+      )
+      AddInfoSection.nutrition.notifyTilesChanged()
+    }
   }
 }

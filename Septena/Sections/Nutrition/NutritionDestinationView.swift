@@ -28,6 +28,7 @@ struct NutritionDestinationView: View {
   @Environment(DayClock.self) private var clock
   @Environment(SectionTheme.self) private var theme
   @Environment(\.modelContext) private var modelContext
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
   @State private var entries: [NutritionEntry] = []
   @State private var stats: NutritionStatsResponse? = nil
@@ -225,24 +226,31 @@ struct NutritionDestinationView: View {
 
   /// Re-log an existing meal at the current moment.
   private func logAgainNow(_ entry: NutritionEntry) {
-    SeptenaServices.shared.nutritionMutator.addEntry(
-      loggedAt: Date.now,
-      emoji: entry.emoji,
-      foods: entry.foods,
-      proteinG: entry.proteinG,
-      fatG: entry.fatG,
-      carbsG: entry.carbsG,
-      fiberG: entry.fiberG,
-      sugarG: entry.sugarG,
-      saturatedFatG: entry.saturatedFatG,
-      alcoholG: entry.alcoholG,
-      kcal: entry.kcal == 0 ? nil : entry.kcal,
-      sodiumMg: entry.sodiumMg,
-      cholesterolMg: entry.cholesterolMg,
-      potassiumMg: entry.potassiumMg,
-      waterMl: entry.waterMl
-    )
-    Haptics.success()
+    SectionLog.newLog(
+      section: "nutrition",
+      accent: accent,
+      announce: "Logged \(entry.foods.first ?? "meal").",
+      logCommit: logCommit
+    ) {
+      SeptenaServices.shared.nutritionMutator.addEntry(
+        loggedAt: Date.now,
+        emoji: entry.emoji,
+        foods: entry.foods,
+        proteinG: entry.proteinG,
+        fatG: entry.fatG,
+        carbsG: entry.carbsG,
+        fiberG: entry.fiberG,
+        sugarG: entry.sugarG,
+        saturatedFatG: entry.saturatedFatG,
+        alcoholG: entry.alcoholG,
+        kcal: entry.kcal == 0 ? nil : entry.kcal,
+        sodiumMg: entry.sodiumMg,
+        cholesterolMg: entry.cholesterolMg,
+        potassiumMg: entry.potassiumMg,
+        waterMl: entry.waterMl
+      )
+      AddInfoSection.nutrition.notifyTilesChanged()
+    }
   }
 
   private func delete(_ entry: NutritionEntry) {

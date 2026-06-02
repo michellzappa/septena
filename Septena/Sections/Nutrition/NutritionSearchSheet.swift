@@ -15,6 +15,7 @@ import SwiftUI
 struct NutritionSearchSheet: View {
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
   let entries: [NutritionEntry]
   @State private var query: String = ""
@@ -123,18 +124,24 @@ struct NutritionSearchSheet: View {
 
   /// Duplicate a historical meal, logging it at the current time.
   private func duplicate(_ entry: NutritionEntry) {
-    SeptenaServices.shared.nutritionMutator.addEntry(
-      loggedAt: Date.now,
-      emoji: entry.emoji,
-      foods: entry.foods,
-      proteinG: entry.proteinG,
-      fatG: entry.fatG,
-      carbsG: entry.carbsG,
-      fiberG: entry.fiberG,
-      kcal: entry.kcal
-    )
-    AddInfoSection.nutrition.notifyTilesChanged()
-    Haptics.tick()
+    SectionLog.newLog(
+      section: "nutrition",
+      accent: AddInfoSection.nutrition.accent(theme: theme),
+      announce: "Logged \(entry.foods.first ?? "meal").",
+      logCommit: logCommit
+    ) {
+      SeptenaServices.shared.nutritionMutator.addEntry(
+        loggedAt: Date.now,
+        emoji: entry.emoji,
+        foods: entry.foods,
+        proteinG: entry.proteinG,
+        fatG: entry.fatG,
+        carbsG: entry.carbsG,
+        fiberG: entry.fiberG,
+        kcal: entry.kcal
+      )
+      AddInfoSection.nutrition.notifyTilesChanged()
+    }
     dismiss()
   }
 }
