@@ -2186,7 +2186,6 @@ struct AppleHealthDetail: View {
       ("Mood",                  "face.smiling",                          .mood),
       ("Caffeine",              "cup.and.saucer",                        .caffeine),
       ("Nutrition & Hydration", "fork.knife",                            .nutrition),
-      ("Workouts",              "figure.strengthtraining.traditional",   .training),
     ]
   }
 
@@ -2275,7 +2274,6 @@ struct AppleHealthDetail: View {
     case .mood:      return \.mood
     case .caffeine:  return \.caffeine
     case .nutrition: return \.nutrition
-    case .training:  return \.training
     }
   }
 

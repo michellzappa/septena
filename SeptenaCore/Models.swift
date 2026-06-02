@@ -107,6 +107,20 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     return d <= SeptenaDate.today
   }
 
+  /// Whether this open task is on the Today list — the DTO mirror of
+  /// `TaskEntity.isOnToday`. Today is a union of three signals: an explicit
+  /// `today` pin, a scheduled ("When") date that has arrived, or a deadline
+  /// that has arrived. UI surfaces (the Today toggle, indicators) must read
+  /// this rather than the raw `today` flag, or a scheduled-today task looks
+  /// like it isn't in Today. Keep in lockstep with `TaskEntity.isOnToday`.
+  var isOnToday: Bool {
+    guard status == .open else { return false }
+    if today { return true }
+    if let s = scheduled, s <= SeptenaDate.today { return true }
+    if let d = deadline, d <= SeptenaDate.today { return true }
+    return false
+  }
+
   enum CodingKeys: String, CodingKey {
     case id, title, status, created, scheduled, deadline, today
     case todaySetOn = "today_set_on"
@@ -1458,12 +1472,11 @@ struct HKSyncSettings: Codable {
   var mood: Bool
   var caffeine: Bool
   var nutrition: Bool
-  var training: Bool
 
   init(mood: Bool = true, caffeine: Bool = true,
-       nutrition: Bool = true, training: Bool = true) {
+       nutrition: Bool = true) {
     self.mood = mood; self.caffeine = caffeine
-    self.nutrition = nutrition; self.training = training
+    self.nutrition = nutrition
   }
 }
 

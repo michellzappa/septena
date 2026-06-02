@@ -173,7 +173,6 @@ struct HKSyncSection: View {
     case .mood:      return \.mood
     case .caffeine:  return \.caffeine
     case .nutrition: return \.nutrition
-    case .training:  return \.training
     }
   }
 

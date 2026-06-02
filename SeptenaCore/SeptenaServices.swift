@@ -2013,17 +2013,6 @@ final class TrainingMutator {
       )
       saved.append(entity)
     }
-    // Mirror to HealthKit. Duration = sum of per-entry durationMin (cardio/
-    // mobility) or a 45-min estimate for strength (no per-set timer).
-    if !saved.isEmpty {
-      let totalMin = saved.compactMap(\.durationMin).reduce(0, +)
-      let durationMin = totalMin > 0 ? totalMin : 45.0
-      let ts = EventTimestamp.from(date: date, time: time)
-      Task {
-        await HealthKitBridge.shared.writeWorkout(
-          sessionType: sessionType, durationMin: durationMin, date: ts)
-      }
-    }
     return saved
   }
 

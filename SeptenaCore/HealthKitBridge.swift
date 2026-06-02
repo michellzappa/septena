@@ -86,7 +86,7 @@ final class HealthKitBridge {
 
   /// The sections Septena can write to HealthKit. Maps 1:1 to `HKSyncSettings`.
   enum WritableKind: String, CaseIterable, Hashable {
-    case mood, caffeine, nutrition, training
+    case mood, caffeine, nutrition
   }
 
   enum ShareStatus: Equatable {
@@ -149,7 +149,6 @@ final class HealthKitBridge {
       return nil
     case .caffeine:  return HKQuantityType.quantityType(forIdentifier: .dietaryCaffeine)
     case .nutrition: return HKQuantityType.quantityType(forIdentifier: .dietaryEnergyConsumed)
-    case .training:  return HKWorkoutType.workoutType()
     }
   }
   #endif
@@ -192,9 +191,6 @@ final class HealthKitBridge {
     for id in nutritionIDs {
       if let t = HKQuantityType.quantityType(forIdentifier: id) { s.insert(t) }
     }
-
-    // Training
-    s.insert(HKWorkoutType.workoutType())
 
     return s
   }
@@ -405,59 +401,6 @@ final class HealthKitBridge {
     }
     #endif
   }
-
-  // MARK: - Training
-
-  /// Write a completed workout session. sessionType drives the HK activity
-  /// type; durationMin is used for the start→end window. Active calories are
-  /// best-effort: if nil, HK leaves them blank (still valid).
-  func writeWorkout(sessionType: String,
-                    durationMin: Double,
-                    activeKcal: Double? = nil,
-                    date: Date) async {
-    #if canImport(HealthKit)
-    guard isAvailable, syncSettings.training else { return }
-    let activityType = Self.hkActivityType(for: sessionType)
-    let duration     = max(durationMin, 1) * 60          // clamp to ≥1 min, in seconds
-    let start        = date.addingTimeInterval(-duration)
-    let end          = date
-    var samples: [HKSample] = []
-    if let kcal = activeKcal, kcal > 0,
-       let energyType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) {
-      let qty = HKQuantity(unit: .kilocalorie(), doubleValue: kcal)
-      samples.append(HKQuantitySample(type: energyType, quantity: qty, start: start, end: end))
-    }
-    let config = HKWorkoutConfiguration()
-    config.activityType = activityType
-    let builder = HKWorkoutBuilder(healthStore: store,
-                                   configuration: config,
-                                   device: .local())
-    do {
-      try await builder.beginCollection(at: start)
-      if !samples.isEmpty { try await builder.addSamples(samples) }
-      try await builder.endCollection(at: end)
-      try await builder.finishWorkout()
-    } catch {
-      SeptenaLog.error("HK workout write", error)
-    }
-    #endif
-  }
-
-  #if canImport(HealthKit)
-  private static func hkActivityType(for sessionType: String) -> HKWorkoutActivityType {
-    let s = sessionType.lowercased()
-    if s.contains("run")                            { return .running }
-    if s.contains("cycl") || s.contains("bike")     { return .cycling }
-    if s.contains("swim")                           { return .swimming }
-    if s.contains("row")                            { return .rowing }
-    if s.contains("cardio")                         { return .other }
-    if s.contains("hiit") || s.contains("circuit")  { return .highIntensityIntervalTraining }
-    if s.contains("mobil") || s.contains("stretch")
-       || s.contains("flex") || s.contains("yoga")  { return .flexibility }
-    // upper, lower, push, pull, legs, full, strength, etc.
-    return .traditionalStrengthTraining
-  }
-  #endif
 
   // MARK: - Mood (HKStateOfMind, iOS 18+)
 

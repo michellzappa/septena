@@ -188,9 +188,6 @@ private struct TrainingDetailContent: View {
         RoutineCatalogView()
       } label: { Label("Routines", systemImage: "list.bullet.rectangle") }
     }
-    HKSyncSection(label: "Write to Apple Health",
-                  icon: "heart.text.square",
-                  kind: .training)
   }
 }
 
