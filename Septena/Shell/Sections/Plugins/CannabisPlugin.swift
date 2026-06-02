@@ -13,6 +13,10 @@ enum CannabisPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(CannabisDestinationView()) }
 
+  // A mellow settle — the slow outward bloom. Single motion, no
+  // time/dose dynamism (a cannabis log has no meaningful magnitude axis).
+  static var logFlourish: LogFlourish? { LogFlourish(motion: .bloom) }
+
   static var logActions: [LogAction] {
     [
       LogAction(id: "log-vape",   title: "Log vape",      systemImage: "wind"),

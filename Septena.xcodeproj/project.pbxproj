@@ -37,6 +37,7 @@
 		107A0C1EE25FD0FA14A1581E /* ReviewAndSaveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9769DD4F4BB2D266390D9AE /* ReviewAndSaveView.swift */; };
 		11091A62DB6744BDE8673415 /* EditSupplementSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F70E70D8BC6F8B767D06FF9 /* EditSupplementSheet.swift */; };
 		116F32431DCC98176BC52830 /* ChoresDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E31867A580D7D96DFB20391B /* ChoresDestinationView.swift */; };
+		1418ABD39D3C3BF52077A9A6 /* CommitMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B6D3C89DD47424084AE32D1 /* CommitMotion.swift */; };
 		14A026D5D1BAFF0B4943D0E0 /* GutBristolRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52B5EEA9B508AB5AAB6152F8 /* GutBristolRecorder.swift */; };
 		14AEC1B28FF545504CFC66C4 /* TrainingLiveActivityCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D97027452B1A57DBEAF13DE /* TrainingLiveActivityCoordinator.swift */; };
 		15EE3B56B18381CC683C9E5F /* ValuesPromptService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D8254C1AF91828DE8F75D78 /* ValuesPromptService.swift */; };
@@ -126,6 +127,7 @@
 		3EEDE3247DF0EDB92F55843D /* IntensityGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7DF7DE41AF304A9324BC6E /* IntensityGlyph.swift */; };
 		3EFD534FCC0E072DCACD3839 /* SectionRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B8CA0380F3FD3679CE4C676 /* SectionRecord.swift */; };
 		3F551F42D378A536BCFECB01 /* TasksDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40B5D7C95F12FB9F9E53565E /* TasksDestinationView.swift */; };
+		3FE7AEAC8F018966C5592413 /* CaffeineCommit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40EC4A3BEF564998AEF7B95F /* CaffeineCommit.swift */; };
 		403EE99D65456FD99F82D568 /* ActivityDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80D7DFAC856BBE635EBBC6E4 /* ActivityDestinationView.swift */; };
 		4077525AE4794C36B68770F9 /* SectionExplainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CA2DD637D2CF49F03A211BB /* SectionExplainer.swift */; };
 		4082657062EBC11108916FAE /* CannabisPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 159121D1191175E510CD312F /* CannabisPlugin.swift */; };
@@ -158,6 +160,7 @@
 		513C8B1D41E5BA85B785129C /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E25F81FE5AA4B6BBC056275 /* DateParser.swift */; };
 		51B5D785192F411E5AAF941B /* GoalRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA64E4CD9F48DE7AFFA52D84 /* GoalRecord.swift */; };
 		5211F3474CA946655E003F5C /* QuickActionsApplier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 460C571ECD796E1777AD12C1 /* QuickActionsApplier.swift */; };
+		52883300FBE8C0D226A43368 /* CommitMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B6D3C89DD47424084AE32D1 /* CommitMotion.swift */; };
 		52C96CCC82FFC910B23BF7E3 /* SectionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18F72C4FF8B470B7B889B00 /* SectionPlugin.swift */; };
 		52F20E3902FD8D231EFAD145 /* LogCommit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B5E07B2C36076D991E0F0C1 /* LogCommit.swift */; };
 		5330AF71083A1F3514B862B8 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */; };
@@ -221,11 +224,11 @@
 		72CC45D5A8CEC1C0A3B6EA39 /* MoodIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 675F31A4511CBADB2FB97B81 /* MoodIntents.swift */; };
 		7397EB4533BA4D026F9F7662 /* CalendarBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7027B881D1D8B1B09B105034 /* CalendarBridge.swift */; };
 		73A70B780F096F7BDB0DA963 /* ConfettiBurst.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2CA5B9FC1BA7572CC27B4D5 /* ConfettiBurst.swift */; };
-		C0FFEE00000000000000FB01 /* CommitMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE00000000000000FA01 /* CommitMotion.swift */; };
 		7435B6913FC111EAE946DBBB /* ValuesMiniApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABBBBE8B556E5C9946CFB630 /* ValuesMiniApp.swift */; };
 		74E631E4D6B41796BBE7B3FA /* AreaRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = C729259A5867D99CC64AA9C3 /* AreaRecord.swift */; };
 		75F953C419493CAE4EC29A6E /* GoalsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 207D112EFCEB89F2F0D1DBE5 /* GoalsPlugin.swift */; };
 		76C049B6FAEBDE6471287104 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0365044C6EA062BBFCCA6B /* SettingsView.swift */; };
+		7781C89E657A77D3F8F942FC /* CaffeineCommit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40EC4A3BEF564998AEF7B95F /* CaffeineCommit.swift */; };
 		77B186F9015710E0B19204AB /* MacroCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5B53F1EA33DC5B17A751664 /* MacroCatalog.swift */; };
 		77FD11E4F8A499F922BFC230 /* TrainingLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2A2AA1777B672AFC02F29BF /* TrainingLiveActivity.swift */; };
 		781B94B6A0387DD5D7887DEF /* BrowseCaffeineDaySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BEAFA5D3DBFCEBEE2EA7FAC /* BrowseCaffeineDaySheet.swift */; };
@@ -409,7 +412,6 @@
 		D68C4DF01907E23021C0EB16 /* MoodDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12E14E48DFB87C5F1543BEA4 /* MoodDestinationView.swift */; };
 		D70A3B473E3ACD222FD15870 /* SeptenaServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D227602C1039FA2206A539A /* SeptenaServices.swift */; };
 		D8337D72DCD514F36A6094B4 /* MenuBarMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD90B8D1D8A0A978D1CE744C /* MenuBarMenu.swift */; };
-		D84CE356C37CEBDDCCDF1B74 /* SeptenaWatchComplication.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B456DE05339EB2A12EB2A9BE /* SeptenaWatchComplication.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		D87619020A982717812E2C6C /* DayBucketHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32A70DB5FE3A7F04BE3E7BAC /* DayBucketHeader.swift */; };
 		D96F2922568F67A65AAA9AAC /* CaffeineDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACEBFC5E297AA01C582EE1A5 /* CaffeineDestinationView.swift */; };
 		D9723D91628B03674BBC00C4 /* BackfillSupplementsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BE63017AAC0030D65CA758B /* BackfillSupplementsSheet.swift */; };
@@ -419,7 +421,6 @@
 		DCDA3588548FB4D80137D355 /* ChartCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6677D4008D68908591E4937 /* ChartCard.swift */; };
 		DD040A040CBF13BC05DF5CB3 /* TrainingLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2A2AA1777B672AFC02F29BF /* TrainingLiveActivity.swift */; };
 		DD0CAC0D298CB64B7B4BDAFF /* ConfettiBurst.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2CA5B9FC1BA7572CC27B4D5 /* ConfettiBurst.swift */; };
-		C0FFEE00000000000000FB02 /* CommitMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE00000000000000FA01 /* CommitMotion.swift */; };
 		DD200EF411309E29B543963F /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5ECFDA9128B73993023CB6 /* Models.swift */; };
 		DD4C37A28620313CC2C805BE /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F13269D0CDB1EB49B2351D6 /* TaskDetailView.swift */; };
 		DD51381780B1556223B6960A /* IkigaiMiniApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB16726C9C1C5A2A1CDEDD3 /* IkigaiMiniApp.swift */; };
@@ -498,13 +499,6 @@
 			remoteGlobalIDString = C99314A0CFDF9A8B0AEB409A;
 			remoteInfo = SeptenaWatch;
 		};
-		BB4D2394D960247B9F5662B4 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 3A81108521AE358318C77A50 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = C4055CC2A1451D2304DA1AD5;
-			remoteInfo = SeptenaWatchComplication;
-		};
 		DA083821C527A4F9B58FDD02 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 3A81108521AE358318C77A50 /* Project object */;
@@ -522,17 +516,6 @@
 			dstSubfolderSpec = 13;
 			files = (
 				8AF84843863B8AD9242182B7 /* SeptenaLiveActivitiesExtension.appex in Embed Foundation Extensions */,
-			);
-			name = "Embed Foundation Extensions";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		6E5E17825D233E760C43FB43 /* Embed Foundation Extensions */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 13;
-			files = (
-				D84CE356C37CEBDDCCDF1B74 /* SeptenaWatchComplication.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -602,7 +585,7 @@
 		356B3BA1FD42A9CB75318D25 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		3841DB555C39521C2A088942 /* CaffeineQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaffeineQuickAddMenu.swift; sourceTree = "<group>"; };
 		3882D64DF6517B0447F5F65C /* TasksBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksBackend.swift; sourceTree = "<group>"; };
-		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		3BE63017AAC0030D65CA758B /* BackfillSupplementsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackfillSupplementsSheet.swift; sourceTree = "<group>"; };
 		3BEAFA5D3DBFCEBEE2EA7FAC /* BrowseCaffeineDaySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseCaffeineDaySheet.swift; sourceTree = "<group>"; };
@@ -611,6 +594,7 @@
 		3D97027452B1A57DBEAF13DE /* TrainingLiveActivityCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingLiveActivityCoordinator.swift; sourceTree = "<group>"; };
 		40B5D7C95F12FB9F9E53565E /* TasksDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksDestinationView.swift; sourceTree = "<group>"; };
 		40D9EAAB80FD7F9FAC57F20B /* GoalsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsView.swift; sourceTree = "<group>"; };
+		40EC4A3BEF564998AEF7B95F /* CaffeineCommit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaffeineCommit.swift; sourceTree = "<group>"; };
 		41F8977A576F2BB747E8DBD7 /* TaskComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskComponents.swift; sourceTree = "<group>"; };
 		42EB061D69FA656547DC171F /* NutritionDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionDestinationView.swift; sourceTree = "<group>"; };
 		44AF7AFAC799CE9882271F8A /* ValuesSuggestions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValuesSuggestions.swift; sourceTree = "<group>"; };
@@ -666,8 +650,8 @@
 		71127DDB09DDF4AADA870825 /* RoutineDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineDetailView.swift; sourceTree = "<group>"; };
 		757E2ED9D591D3EB6A07DF8A /* WatchBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchBridge.swift; sourceTree = "<group>"; };
 		75A7338B84E54DF44893A020 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		77BEB26345A68838167042D8 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		784D3E7D8D933961200812D6 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		77BEB26345A68838167042D8 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		784D3E7D8D933961200812D6 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		78C110FEAA290C71AE8A57A4 /* SupplementIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementIntents.swift; sourceTree = "<group>"; };
 		79C180106D47D0477F75695A /* NewNutritionEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewNutritionEntrySheet.swift; sourceTree = "<group>"; };
 		7BD0C4383360CD1A06E2A546 /* HeatmapHomepageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeatmapHomepageView.swift; sourceTree = "<group>"; };
@@ -705,6 +689,7 @@
 		9A3030188F50F856913FBC4E /* SectionLogIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionLogIntent.swift; sourceTree = "<group>"; };
 		9AB16726C9C1C5A2A1CDEDD3 /* IkigaiMiniApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IkigaiMiniApp.swift; sourceTree = "<group>"; };
 		9B41585BA876C731272F49A1 /* ValuesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValuesViewModel.swift; sourceTree = "<group>"; };
+		9B6D3C89DD47424084AE32D1 /* CommitMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommitMotion.swift; sourceTree = "<group>"; };
 		9C416C1BB08DEB2D6277BAB1 /* FlowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowLayout.swift; sourceTree = "<group>"; };
 		9E48AFEC976A22FEF321AE70 /* FoundationModels.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = FoundationModels.framework; path = System/Library/Frameworks/FoundationModels.framework; sourceTree = SDKROOT; };
 		9EFFFB78909D8812C2A1C7D0 /* SelectablePillsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectablePillsView.swift; sourceTree = "<group>"; };
@@ -723,7 +708,6 @@
 		B1E7DE045967372A515DB48B /* IkigaiFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IkigaiFlowView.swift; sourceTree = "<group>"; };
 		B241213EA8E591629280B7EE /* AddChorePage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddChorePage.swift; sourceTree = "<group>"; };
 		B2CA5B9FC1BA7572CC27B4D5 /* ConfettiBurst.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfettiBurst.swift; sourceTree = "<group>"; };
-		C0FFEE00000000000000FA01 /* CommitMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommitMotion.swift; sourceTree = "<group>"; };
 		B456DE05339EB2A12EB2A9BE /* SeptenaWatchComplication.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SeptenaWatchComplication.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B55D56BF301C74DCB785773E /* ExerciseCatalogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseCatalogView.swift; sourceTree = "<group>"; };
 		B65BF5C0096129915EFA26FC /* CaffeineTypeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaffeineTypeSheet.swift; sourceTree = "<group>"; };
@@ -782,7 +766,7 @@
 		F026D3432CFBCE4FE8412750 /* HomepageDomain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomepageDomain.swift; sourceTree = "<group>"; };
 		F05E01AB86D25931CD682001 /* WatchAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchAppDelegate.swift; sourceTree = "<group>"; };
 		F0B811772EC1DF4C9130BECD /* HomepageLayoutMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomepageLayoutMode.swift; sourceTree = "<group>"; };
-		F0BEBB91083B3194167B548E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		F0BEBB91083B3194167B548E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		F24E908729637004C14E5310 /* AddHabitPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddHabitPage.swift; sourceTree = "<group>"; };
 		F326D9758674AD8EA4DBB211 /* SupplementTypeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementTypeSheet.swift; sourceTree = "<group>"; };
 		F44D5D94AD1AD13F2D0AC6F7 /* GutIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GutIntents.swift; sourceTree = "<group>"; };
@@ -1218,6 +1202,7 @@
 			children = (
 				FEF5F3A2F7A70BEADFCF88CA /* AddCaffeinePage.swift */,
 				3BEAFA5D3DBFCEBEE2EA7FAC /* BrowseCaffeineDaySheet.swift */,
+				40EC4A3BEF564998AEF7B95F /* CaffeineCommit.swift */,
 				ACEBFC5E297AA01C582EE1A5 /* CaffeineDestinationView.swift */,
 				3841DB555C39521C2A088942 /* CaffeineQuickAddMenu.swift */,
 				B65BF5C0096129915EFA26FC /* CaffeineTypeSheet.swift */,
@@ -1306,8 +1291,8 @@
 			isa = PBXGroup;
 			children = (
 				26ED5AC7B6F2400A0A4B378C /* Accessibility.swift */,
+				9B6D3C89DD47424084AE32D1 /* CommitMotion.swift */,
 				B2CA5B9FC1BA7572CC27B4D5 /* ConfettiBurst.swift */,
-				C0FFEE00000000000000FA01 /* CommitMotion.swift */,
 				E0E984505A489247AADAB293 /* ConsistencyHeatmap.swift */,
 				32A70DB5FE3A7F04BE3E7BAC /* DayBucketHeader.swift */,
 				CE7DF7DE41AF304A9324BC6E /* IntensityGlyph.swift */,
@@ -1485,12 +1470,10 @@
 			buildPhases = (
 				DB1CB4DEA916E392A643915C /* Sources */,
 				7B79024AFC3338563917CB13 /* Resources */,
-				6E5E17825D233E760C43FB43 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				E29C52EB1EE32E3365E24F79 /* PBXTargetDependency */,
 			);
 			name = SeptenaWatch;
 			packageProductDependencies = (
@@ -1678,6 +1661,7 @@
 				C5990B6C94853325ABBD62C0 /* BrowseCannabisDaySheet.swift in Sources */,
 				AA180D6CF5C6326D64004622 /* BrowseGutDaySheet.swift in Sources */,
 				EC80F6B72765AEF523B5A4E2 /* CKEngine.swift in Sources */,
+				7781C89E657A77D3F8F942FC /* CaffeineCommit.swift in Sources */,
 				D96F2922568F67A65AAA9AAC /* CaffeineDestinationView.swift in Sources */,
 				A30946F4DE23C9F128F0995D /* CaffeineIntents.swift in Sources */,
 				F3612FE5E541C9080CA1051F /* CaffeinePlugin.swift in Sources */,
@@ -1695,8 +1679,8 @@
 				9D294C6FFD9CFE45F6E11B7D /* ChoresPlugin.swift in Sources */,
 				8C64426276695251AE35D327 /* ChoresQuickAddMenu.swift in Sources */,
 				2BE2D64D96CCF32360AB94A6 /* ClaudeGatewayProvider.swift in Sources */,
+				1418ABD39D3C3BF52077A9A6 /* CommitMotion.swift in Sources */,
 				73A70B780F096F7BDB0DA963 /* ConfettiBurst.swift in Sources */,
-				C0FFEE00000000000000FB01 /* CommitMotion.swift in Sources */,
 				331439A1A265FAA64B5B02B6 /* ConsistencyHeatmap.swift in Sources */,
 				A6D80B6B57734D9155888CC7 /* ContentView.swift in Sources */,
 				9056B762F0365C38DEA0F888 /* CorrelationEngine.swift in Sources */,
@@ -1942,6 +1926,7 @@
 				5F8897309D37117C9DC8B47B /* BrowseCannabisDaySheet.swift in Sources */,
 				BFAFA1121DC35073F6D352F6 /* BrowseGutDaySheet.swift in Sources */,
 				5C2CAF18F7F1BB26F040A597 /* CKEngine.swift in Sources */,
+				3FE7AEAC8F018966C5592413 /* CaffeineCommit.swift in Sources */,
 				31F0427B242C90F3B3EF4B0B /* CaffeineDestinationView.swift in Sources */,
 				6B51547273727DE06D98D4E3 /* CaffeineIntents.swift in Sources */,
 				067F9505CD3D50628A7F3C0B /* CaffeinePlugin.swift in Sources */,
@@ -1959,8 +1944,8 @@
 				06ADE13C31B283F59B6C5C9D /* ChoresPlugin.swift in Sources */,
 				1C507D0995C20ECA4DA6479F /* ChoresQuickAddMenu.swift in Sources */,
 				5913FEDDD567597FD292D6B2 /* ClaudeGatewayProvider.swift in Sources */,
+				52883300FBE8C0D226A43368 /* CommitMotion.swift in Sources */,
 				DD0CAC0D298CB64B7B4BDAFF /* ConfettiBurst.swift in Sources */,
-				C0FFEE00000000000000FB02 /* CommitMotion.swift in Sources */,
 				EA56ADCFD84CE200C7CEF2A9 /* ConsistencyHeatmap.swift in Sources */,
 				2A5F1570FB36894B1FBE4364 /* ContentView.swift in Sources */,
 				0578243E033490DBAFABEEE2 /* CorrelationEngine.swift in Sources */,
@@ -2144,11 +2129,6 @@
 			target = FA39C23110542023235A82C8 /* SeptenaLiveActivitiesExtension */;
 			targetProxy = DA083821C527A4F9B58FDD02 /* PBXContainerItemProxy */;
 		};
-		E29C52EB1EE32E3365E24F79 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = C4055CC2A1451D2304DA1AD5 /* SeptenaWatchComplication */;
-			targetProxy = BB4D2394D960247B9F5662B4 /* PBXContainerItemProxy */;
-		};
 		E74ACA3F68450593E3B01286 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = C99314A0CFDF9A8B0AEB409A /* SeptenaWatch */;
@@ -2161,7 +2141,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = SeptenaWatch/SeptenaWatch.entitlements;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SeptenaWatch/Info.plist;
 				PRODUCT_BUNDLE_IDENTIFIER = com.septena.cloud.watchkitapp;
@@ -2181,12 +2160,10 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Septena/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Septena;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.7.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.septena.cloud;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -2282,7 +2259,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = SeptenaWatch/SeptenaWatch.entitlements;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SeptenaWatch/Info.plist;
 				PRODUCT_BUNDLE_IDENTIFIER = com.septena.cloud.watchkitapp;
@@ -2390,12 +2366,10 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Septena/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Septena;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.7.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.septena.cloud;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";

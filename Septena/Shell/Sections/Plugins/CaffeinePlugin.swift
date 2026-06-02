@@ -15,6 +15,10 @@ enum CaffeinePlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(CaffeineDestinationView()) }
 
+  // A coffee is a warm cup → a gentle bloom by default. CaffeineCommit
+  // overrides to a quiet sink for late-night logs (see motion(forTime:)).
+  static var logFlourish: LogFlourish? { LogFlourish(motion: .bloom) }
+
   // + menu surfaces the two quick-log brews on top, then the catalog
   // editor below. Order matches the most common path: tap +, pick V60,
   // accept the prefilled bean.

@@ -9,8 +9,8 @@ import SwiftData
 
 struct EditCaffeineEntrySheet: View {
   @Environment(\.modelContext) private var modelContext
-
-  private var caffeine: CaffeineMutator { SeptenaServices.shared.caffeineMutator }
+  @Environment(SectionTheme.self) private var theme
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
   /// Day the entry belongs to (path query param). Caller passes the day
   /// from the surrounding `CaffeineDayResponse`.
@@ -210,26 +210,23 @@ struct EditCaffeineEntrySheet: View {
       return t.isEmpty ? nil : t
     }()
 
+    // Both branches funnel through CaffeineCommit so the write + haptic +
+    // tile refresh stay identical to every other caffeine log site. A new
+    // entry celebrates (affect-matched flourish); an edit is a quiet
+    // correction. Dismissal is owned by AdaptiveEditScaffold — neither
+    // branch dismisses here.
     let savedID: String
     if let original {
-      caffeine.updateEntry(id: original.id,
-                           date: newDate,
-                           time: hhmm,
-                           method: method,
-                           beans: .some(beansValue),
-                           grams: .some(gramsValue),
-                           note: .some(noteValue))
+      CaffeineCommit.update(id: original.id, date: newDate, time: hhmm,
+                            method: method, beans: beansValue,
+                            grams: gramsValue, note: noteValue)
       savedID = original.id
     } else {
-      let entity = caffeine.addEntry(date: newDate,
-                                     time: hhmm,
-                                     method: method,
-                                     beans: beansValue,
-                                     grams: gramsValue,
-                                     note: noteValue)
-      savedID = entity.id
+      savedID = CaffeineCommit.logNew(
+        date: newDate, time: hhmm, method: method,
+        beans: beansValue, grams: gramsValue, note: noteValue,
+        accent: theme.color(for: "caffeine"), logCommit: logCommit)
     }
-    Haptics.tick()
 
     let rebuilt = CaffeineEntry(
       id: savedID,

@@ -37,6 +37,9 @@ struct WeekDashboardView: View {
   @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(TaskMutator.self) private var taskMutator
   @Environment(SectionTheme.self) private var theme
+  // Optional: lets the tile quick-add fire the commit flourish over the
+  // dashboard. nil-safe (skips the visual) for hosts without the root env.
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
   @Environment(TabSelection.self) private var tabSelection
   @Environment(NavigationState.self) private var nav
   @Environment(SettingsStore.self) private var settingsStore
@@ -1798,11 +1801,10 @@ struct WeekDashboardView: View {
   }
 
   private func commitCaffeine(method: String, beans: String?, grams: Double?) {
-    SeptenaServices.shared.caffeineMutator.addEntry(
-      date: SeptenaDate.today, time: nowHHMM(),
-      method: method, beans: beans, grams: grams)
-    AddInfoSection.caffeine.notifyTilesChanged()
-    Haptics.tick()
+    CaffeineCommit.logNew(
+      method: method, beans: beans, grams: grams,
+      accent: theme.color(for: "caffeine"),
+      logCommit: logCommit)
   }
 
   // Cannabis — same shape as caffeine.
@@ -1854,15 +1856,21 @@ struct WeekDashboardView: View {
   }
 
   private func commitCannabis(method: String, hit: Int?) {
-    SeptenaServices.shared.cannabisMutator.addEntry(
-      date: SeptenaDate.today, time: nowHHMM(),
-      method: method, hit: hit)
-    // Refresh tile state from the freshly-mutated SwiftData store so the
-    // "Continue · Hit N" counter advances immediately.
-    cannabisToday = ChecklistMirror.loadCannabisDay(context: modelContext, date: SeptenaDate.today)
-    ResponseCache.save(cannabisToday, forKey: CacheKey.cannabisToday)
-    AddInfoSection.cannabis.notifyTilesChanged()
-    Haptics.tick()
+    SectionLog.newLog(
+      section: "cannabis",
+      accent: theme.color(for: "cannabis"),
+      announce: "Logged \(method == "edible" ? "edible" : "vape").",
+      logCommit: logCommit
+    ) {
+      SeptenaServices.shared.cannabisMutator.addEntry(
+        date: SeptenaDate.today, time: nowHHMM(),
+        method: method, hit: hit)
+      // Refresh tile state from the freshly-mutated SwiftData store so the
+      // "Continue · Hit N" counter advances immediately.
+      cannabisToday = ChecklistMirror.loadCannabisDay(context: modelContext, date: SeptenaDate.today)
+      ResponseCache.save(cannabisToday, forKey: CacheKey.cannabisToday)
+      AddInfoSection.cannabis.notifyTilesChanged()
+    }
   }
 
   // Body — latest Withings weigh-in + bidirectional weight chart.

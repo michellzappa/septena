@@ -7,6 +7,8 @@ import SwiftData
 
 struct EditCannabisEntrySheet: View {
   @Environment(\.modelContext) private var modelContext
+  @Environment(SectionTheme.self) private var theme
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
   private var cannabis: CannabisMutator { SeptenaServices.shared.cannabisMutator }
 
@@ -144,31 +146,48 @@ struct EditCannabisEntrySheet: View {
     // grams; switching to vape stamps the constant 0.05g.
     let gramsValue: Double? = method == "vape" ? CannabisMutator.gramsPerVapeUse : nil
 
+    // Both branches funnel through SectionLog so the haptic + tile refresh
+    // stay identical to every other cannabis log site. A new entry
+    // celebrates (the section's mellow bloom); an edit is a quiet
+    // correction. Dismissal is owned by AdaptiveEditScaffold.
     let savedID: String
     let savedGrams: Double?
     if let original {
-      cannabis.updateEntry(id: original.id,
-                           date: newDate,
-                           time: hhmm,
-                           method: method,
-                           hit: .some(hitValue),
-                           grams: .some(gramsValue),
-                           effect: .some(effectValue),
-                           note: .some(noteValue))
+      SectionLog.edit {
+        cannabis.updateEntry(id: original.id,
+                             date: newDate,
+                             time: hhmm,
+                             method: method,
+                             hit: .some(hitValue),
+                             grams: .some(gramsValue),
+                             effect: .some(effectValue),
+                             note: .some(noteValue))
+        AddInfoSection.cannabis.notifyTilesChanged()
+      }
       savedID = original.id
       savedGrams = method == "vape" ? original.grams : nil
     } else {
-      let entity = cannabis.addEntry(date: newDate,
-                                     time: hhmm,
-                                     method: method,
-                                     hit: hitValue,
-                                     grams: gramsValue,
-                                     effect: effectValue,
-                                     note: noteValue)
-      savedID = entity.id
-      savedGrams = entity.grams
+      var newID = ""
+      var newGrams: Double? = nil
+      SectionLog.newLog(
+        section: "cannabis",
+        accent: theme.color(for: "cannabis"),
+        logCommit: logCommit
+      ) {
+        let entity = cannabis.addEntry(date: newDate,
+                                       time: hhmm,
+                                       method: method,
+                                       hit: hitValue,
+                                       grams: gramsValue,
+                                       effect: effectValue,
+                                       note: noteValue)
+        newID = entity.id
+        newGrams = entity.grams
+        AddInfoSection.cannabis.notifyTilesChanged()
+      }
+      savedID = newID
+      savedGrams = newGrams
     }
-    Haptics.tick()
 
     let rebuilt = CannabisEntry(
       id: savedID,

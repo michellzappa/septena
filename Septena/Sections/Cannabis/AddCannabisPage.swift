@@ -16,6 +16,9 @@ struct AddCannabisPage: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
+  // Optional: lets the commit flourish play. nil-safe for hosts without
+  // the root environment (the visual is then simply skipped).
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
   @Bindable var router: AddInfoRouter
   @State private var entries: [CannabisEntry] = []
   @State private var working = false
@@ -88,10 +91,18 @@ struct AddCannabisPage: View {
   }
 
   private func commit(method: String, hit: Int?) {
-    cannabis.addEntry(date: SeptenaDate.today, time: nowHHMM(),
-                      method: method, hit: hit)
-    AddInfoSection.cannabis.notifyTilesChanged()
-    Haptics.tick()
+    // Motion (a mellow bloom) comes from CannabisPlugin.logFlourish via the
+    // shared funnel — no per-section commit file needed.
+    SectionLog.newLog(
+      section: "cannabis",
+      accent: AddInfoSection.cannabis.accent(theme: theme),
+      announce: "Logged \(method == "edible" ? "edible" : "vape").",
+      logCommit: logCommit
+    ) {
+      cannabis.addEntry(date: SeptenaDate.today, time: nowHHMM(),
+                        method: method, hit: hit)
+      AddInfoSection.cannabis.notifyTilesChanged()
+    }
     dismiss()
   }
 
