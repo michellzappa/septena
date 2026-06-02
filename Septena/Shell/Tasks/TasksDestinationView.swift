@@ -215,7 +215,9 @@ private struct TaskQuickEditSheet: View {
     self.onDone = onDone
     _title = State(initialValue: task.title)
     _notes = State(initialValue: task.notes ?? "")
-    _isToday = State(initialValue: task.today)
+    // Reflect Today *membership*, not just the explicit pin — a task scheduled
+    // for today (or with a deadline today) is in Today without being pinned.
+    _isToday = State(initialValue: task.isOnToday)
   }
 
   var body: some View {
@@ -266,8 +268,19 @@ private struct TaskQuickEditSheet: View {
                      title: titleChanged ? trimmed : nil,
                      notes: notesChanged ? notes : nil)
     }
-    if isToday != task.today {
-      mutator.moveToToday(id: task.id, today: isToday)
+    if isToday != task.isOnToday {
+      if isToday {
+        // Wasn't in Today → pin it.
+        mutator.moveToToday(id: task.id, today: true)
+      } else {
+        // Remove from Today: drop the pin and clear a planning date that's
+        // landing it here. A live deadline (due ≤ today) is a commitment we
+        // won't silently erase from this toggle — such a task stays in Today.
+        mutator.moveToToday(id: task.id, today: false)
+        if let s = task.scheduled, s <= SeptenaDate.today {
+          mutator.schedule(id: task.id, date: nil)
+        }
+      }
     }
     onDone()
     dismiss()
