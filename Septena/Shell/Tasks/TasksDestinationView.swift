@@ -164,10 +164,9 @@ struct TasksDestinationView: View {
   // MARK: - Row meta
 
   private func isOverdue(_ task: SeptenaTask) -> Bool {
-    let today = SeptenaDate.today
-    if let s = task.scheduled, s < today { return true }
-    if let d = task.deadline, d < today { return true }
-    return false
+    // Deadline-only, Things-style: a past *scheduled* date is just a plan that
+    // rolled into Today, not an overdue task. See `SeptenaTask.isOverdue`.
+    task.isOverdue
   }
 
   /// Trailing chip: the task's deadline rendered as "MMM d", or nil.

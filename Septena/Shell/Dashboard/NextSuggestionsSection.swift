@@ -453,7 +453,7 @@ private struct NextSuggestionRow: View {
           Circle().fill(tint.opacity(0.18))
           if let symbol = suggestion.symbol {
             Image(systemName: symbol)
-              .font(.system(size: 13, weight: .semibold))
+              .scaledFont(size: 13, weight: .semibold)
               .foregroundStyle(tint)
           } else {
             Text(suggestion.emoji ?? "•").font(.body)

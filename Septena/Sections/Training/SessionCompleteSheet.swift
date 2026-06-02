@@ -149,7 +149,7 @@ struct SessionCompleteSheet: View {
         .tracking(2)
         .foregroundStyle(accent)
       Image(systemName: stats.kind.icon)
-        .font(.system(size: 44, weight: .semibold))
+        .scaledFont(size: 44, weight: .semibold, relativeTo: .largeTitle)
         .foregroundStyle(accent)
       Text("Nice work.")
         .font(.system(.title, design: .rounded).weight(.semibold))

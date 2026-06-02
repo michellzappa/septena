@@ -7,19 +7,13 @@ import SwiftUI
 // Designed to answer "what's the next step right now?" rather than
 // enumerate options. One context-aware vape row (Continue when the
 // current capsule has room, New capsule when it doesn't) + Edible.
-// Strain-picking lives in the sheet — the menu only commits the smart
-// default. Keeps the menu to 3-4 items even with Edit last + Cannabis…
+// Keeps the menu to 3-4 items even with Edit last + Cannabis…
 
 struct CannabisQuickAddMenu: View {
   let lastVape: CannabisEntry?
   let usesPerCapsule: Int
-  let onCommit: (_ method: String, _ strain: String?, _ hit: Int?) -> Void
+  let onCommit: (_ method: String, _ hit: Int?) -> Void
   let onEditLast: (() -> Void)?
-
-  private var lastStrain: String? {
-    guard let s = lastVape?.strain, !s.isEmpty else { return nil }
-    return s
-  }
 
   /// True when the current capsule has room — i.e. there's a last vape
   /// today and the next hit fits under the capsule cap. Drives whether
@@ -34,9 +28,8 @@ struct CannabisQuickAddMenu: View {
   }
 
   private var smartLabel: String {
-    let strainSuffix = lastStrain.map { " · \($0)" } ?? ""
-    if hasActiveCapsule { return "Continue\(strainSuffix) (Hit \(smartHit))" }
-    return "New capsule\(strainSuffix)"
+    if hasActiveCapsule { return "Continue (Hit \(smartHit))" }
+    return "New capsule"
   }
 
   private var smartIcon: String {
@@ -45,16 +38,13 @@ struct CannabisQuickAddMenu: View {
 
   var body: some View {
     Button {
-      // Continue keeps the last strain; new capsule also reuses it (we
-      // assume same physical product unless the user picks otherwise via
-      // the sheet). nil strain only when nothing was logged previously.
-      onCommit("vape", lastStrain, smartHit)
+      onCommit("vape", smartHit)
     } label: {
       Label(smartLabel, systemImage: smartIcon)
     }
 
     Button {
-      onCommit("edible", nil, nil)
+      onCommit("edible", nil)
     } label: {
       Label("Edible", systemImage: "circle.fill")
     }

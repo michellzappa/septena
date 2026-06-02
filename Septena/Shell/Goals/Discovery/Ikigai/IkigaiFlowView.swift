@@ -127,7 +127,7 @@ struct IkigaiFlowView: View {
           .offset(y: 128)
 
         Image(systemName: "flame.fill")
-          .font(.system(size: 34, weight: .semibold))
+          .scaledFont(size: 34, weight: .semibold, relativeTo: .largeTitle)
           .foregroundStyle(IkigaiMiniApp.accent)
       }
       .frame(height: 300)
@@ -143,7 +143,7 @@ struct IkigaiFlowView: View {
 
     private func symbol(_ name: String, color: Color) -> some View {
       Image(systemName: name)
-        .font(.system(size: 30, weight: .semibold))
+        .scaledFont(size: 30, weight: .semibold, relativeTo: .largeTitle)
         .foregroundStyle(color)
     }
   }

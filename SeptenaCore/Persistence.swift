@@ -145,6 +145,22 @@ final class TaskEntity {
     set { statusRaw = newValue.rawValue }
   }
 
+  /// Single definition of "is this open task on the Today list."
+  ///
+  /// Today is currently a *union* of three signals: an explicit `today` pin,
+  /// a scheduled ("When") date that has arrived, or a deadline that has
+  /// arrived. Step 4 of the due/when simplification will collapse this to
+  /// just `scheduled == today` and retire the `today` flag — at which point
+  /// only the body of this one property changes. Centralized here so the
+  /// `.today` filter (and anything else) reads from a single source.
+  var isOnToday: Bool {
+    guard status == .open else { return false }
+    if today { return true }
+    if let s = scheduled, s <= SeptenaDate.today { return true }
+    if let d = due, d <= SeptenaDate.today { return true }
+    return false
+  }
+
   var recurrence: Recurrence? {
     get {
       guard let unit = recurrenceUnit.flatMap(Recurrence.Unit.init(rawValue:)) else { return nil }
@@ -859,27 +875,6 @@ final class GroceryCategoryEntity {
 }
 
 @Model
-final class CannabisStrainEntity {
-  @Attribute(.unique) var id: String
-  var name: String
-  var sortIndex: Int
-  var updatedAt: Date
-  var cloudKitSystemFields: Data?
-
-  init(id: String,
-       name: String,
-       sortIndex: Int = 0,
-       updatedAt: Date = .now,
-       cloudKitSystemFields: Data? = nil) {
-    self.id = id
-    self.name = name
-    self.sortIndex = sortIndex
-    self.updatedAt = updatedAt
-    self.cloudKitSystemFields = cloudKitSystemFields
-  }
-}
-
-@Model
 final class ExerciseEntryEntity {
   @Attribute(.unique) var id: String
   /// Canonical UTC instant of the event. `.distantPast` is the lightweight-
@@ -1549,20 +1544,6 @@ enum GroceryCategoryCloudKitSchema {
   static func recordName(for id: String) -> String { "grocery-cat:\(id)" }
   static func entityID(from recordName: String) -> String {
     String(recordName.dropFirst("grocery-cat:".count))
-  }
-}
-
-enum CannabisStrainCloudKitSchema {
-  static let recordType = "CannabisStrain"
-
-  enum Field {
-    static let name = "name"
-    static let sortIndex = "sortIndex"
-  }
-
-  static func recordName(for id: String) -> String { "cannabis-strain:\(id)" }
-  static func entityID(from recordName: String) -> String {
-    String(recordName.dropFirst("cannabis-strain:".count))
   }
 }
 
@@ -2251,31 +2232,6 @@ extension GroceryCategoryEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension CannabisStrainEntity: ChecklistCloudKitBackedEntity {
-  func toCloudKitRecord() -> CKRecord {
-    let record = decodedCloudKitRecord() ?? CKRecord(
-      recordType: CannabisStrainCloudKitSchema.recordType,
-      recordID: CKRecord.ID(recordName: CannabisStrainCloudKitSchema.recordName(for: id),
-                            zoneID: SeptenaCloudKit.zoneID)
-    )
-    record[CannabisStrainCloudKitSchema.Field.name] = name
-    record[CannabisStrainCloudKitSchema.Field.sortIndex] = sortIndex
-    return record
-  }
-
-  func apply(_ record: CKRecord) {
-    if let value = record[CannabisStrainCloudKitSchema.Field.name] as? String { name = value }
-    if let value = record[CannabisStrainCloudKitSchema.Field.sortIndex] as? Int { sortIndex = value }
-    updatedAt = .now
-    captureCloudKitSystemFields(from: record)
-  }
-
-  convenience init(cloudKit record: CKRecord) {
-    self.init(id: CannabisStrainCloudKitSchema.entityID(from: record.recordID.recordName), name: "")
-    apply(record)
-  }
-}
-
 extension ExerciseEntryEntity: ChecklistCloudKitBackedEntity {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
@@ -2536,7 +2492,7 @@ final class LocalStore {
                          GutEventEntity.self,
                          MoodEventEntity.self,
                          CaffeineEventEntity.self, CaffeineBeanEntity.self,
-                         CannabisEventEntity.self, CannabisStrainEntity.self,
+                         CannabisEventEntity.self,
                          GroceryItemEntity.self, GroceryCategoryEntity.self,
                          ExerciseEntryEntity.self, ExerciseDefinitionEntity.self,
                          SessionTypeEntity.self,
@@ -2625,11 +2581,8 @@ enum LocalCache {
       if e.pendingDeletion { return nil }
       switch filter {
       case .today:
-        guard e.status == .open else { return nil }
-        if e.today { return SeptenaTask(e) }
-        if let s = e.scheduled, s <= today { return SeptenaTask(e) }
-        if let d = e.due, d <= today { return SeptenaTask(e) }
-        return nil
+        // Single source of truth — see `TaskEntity.isOnToday`.
+        return e.isOnToday ? SeptenaTask(e) : nil
       case .inbox:
         guard e.status == .open,
               e.project == nil, e.area == nil,
@@ -2736,6 +2689,9 @@ enum LocalCache {
   /// is residence, not lateness).
   @MainActor
   static func overdueCount(in context: ModelContext) -> Int {
+    // Must match `SeptenaTask.isOverdue` exactly: open + deadline <= today
+    // (a deadline of today counts as overdue), and scheduled dates never
+    // count. Keep these two definitions in lockstep.
     let today = SeptenaDate.today
     let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
     return rows.reduce(0) { acc, e in

@@ -46,7 +46,7 @@ struct BodyDestinationView: View {
       if !loading && rows.isEmpty {
         ContentUnavailableView("No Withings data",
                                systemImage: theme.icon(for: "body"),
-                               description: Text("Check your Withings sync in the webapp."))
+                               description: Text("Connect Withings in Settings › Integrations."))
       }
     }
     .trackScreen("body")

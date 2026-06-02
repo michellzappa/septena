@@ -88,14 +88,16 @@ struct GutDestinationView: View {
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
       reload()
     }
-    .sheet(item: $editing) { entry in
+    // Adaptive: sheet on iPhone, docked inspector on iPad/macOS so editing
+    // a logged entry keeps the day's log visible alongside it.
+    .adaptiveDetail(item: $editing) { entry in
       EditGutEntrySheet(
         date: viewingDate,
         original: entry,
         onSave: { _ in reload() }
       )
     }
-    .sheet(isPresented: $creating) {
+    .adaptiveDetail(isPresented: $creating) {
       EditGutEntrySheet(
         date: viewingDate,
         original: nil,

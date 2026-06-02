@@ -97,6 +97,16 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     set { deadline = newValue }
   }
 
+  /// Canonical "overdue" test — Things-style: ONLY a hard `deadline` can make
+  /// a task overdue. A scheduled ("When") date in the past is just a plan that
+  /// rolled into Today; it never turns red. A deadline of *today or earlier*
+  /// counts as overdue (red + badged). Shared by row styling and the
+  /// badge/sidebar count so they never drift.
+  var isOverdue: Bool {
+    guard status == .open, let d = deadline else { return false }
+    return d <= SeptenaDate.today
+  }
+
   enum CodingKeys: String, CodingKey {
     case id, title, status, created, scheduled, deadline, today
     case todaySetOn = "today_set_on"
@@ -1247,7 +1257,6 @@ struct CannabisExportEntry: Codable, Hashable {
 
 struct CannabisExportResponse: Codable {
   let entries: [CannabisExportEntry]
-  let strains: [CannabisStrain]
 }
 
 /// One exercise in the user-editable catalog. Drives the logger's
@@ -1518,41 +1527,19 @@ struct CaffeineConfig: Codable, Hashable {
   enum CodingKeys: String, CodingKey { case beans, methods }
 }
 
-struct CannabisStrain: Codable, Identifiable, Hashable {
-  let id: String
-  var name: String
-
-  init(id: String, name: String) {
-    self.id = id
-    self.name = name
-  }
-
-  init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    id = try c.decode(String.self, forKey: .id)
-    name = try c.decodeIfPresent(String.self, forKey: .name) ?? id
-  }
-
-  enum CodingKeys: String, CodingKey { case id, name }
-}
-
 struct CannabisConfig: Codable, Hashable {
-  var strains: [CannabisStrain]
   var usesPerCapsule: Int
 
-  init(strains: [CannabisStrain], usesPerCapsule: Int) {
-    self.strains = strains
+  init(usesPerCapsule: Int) {
     self.usesPerCapsule = usesPerCapsule
   }
 
   init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
-    strains = (try? c.decode([CannabisStrain].self, forKey: .strains)) ?? []
     usesPerCapsule = (try? c.decode(Int.self, forKey: .usesPerCapsule)) ?? 3
   }
 
   enum CodingKeys: String, CodingKey {
-    case strains
     case usesPerCapsule = "uses_per_capsule"
   }
 }

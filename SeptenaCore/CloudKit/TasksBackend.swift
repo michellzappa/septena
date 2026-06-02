@@ -264,11 +264,12 @@ final class CloudKitTasksBackend: TasksBackend {
 
   func setDue(id: String, date: Date?) {
     guard let entity = fetch(id: id) else { return }
+    // Deadline is rendering-only (Things-style): the Today filter unions
+    // `due <= today` rows at view time, so a deadline-today task already shows
+    // in Today without mutating `today`. We intentionally do NOT auto-pin here
+    // — pinning made inclusion sticky, so pushing the deadline back out later
+    // left a stale row stranded in Today. See `LocalCache.tasks(.today)`.
     entity.due = SeptenaDate.format(date)
-    if let d = entity.due, d <= SeptenaDate.today, !entity.today {
-      entity.today = true
-      entity.todaySetOn = SeptenaDate.today
-    }
     entity.pendingSync = true
     commitAndPush(entity, op: "setDue")
   }

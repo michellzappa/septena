@@ -6,7 +6,7 @@ import SwiftData
 // sections: items currently marked low (shopping list) above the full
 // stocked pantry, with stocked items grouped by user-defined category in
 // the user's chosen order. Tap a row to toggle low ↔ in-stock; tap the
-// emoji/name to edit. Category management lives in the webapp.
+// emoji/name to edit.
 
 struct GroceriesDestinationView: View {
   @Environment(\.modelContext) private var modelContext
@@ -16,7 +16,6 @@ struct GroceriesDestinationView: View {
 
   @State private var items: [GroceryItem] = []
   @State private var categories: [GroceryCategory] = DEFAULT_GROCERY_CATEGORIES
-  @State private var pending: Set<String> = []
   @State private var loading = true
   @State private var editing: GroceryItem? = nil
   @State private var creating = false
@@ -34,9 +33,21 @@ struct GroceriesDestinationView: View {
     return id.isEmpty ? "In stock" : id.capitalized
   }
 
+  /// Position of each category in the user-defined order, for sorting.
+  /// Unknown categories sort to the end.
+  private var categoryRank: [String: Int] {
+    Dictionary(uniqueKeysWithValues: categories.enumerated().map { ($1.id, $0) })
+  }
+
+  /// Shopping list — low items grouped in the same aisle order as the
+  /// stocked pantry, so you shop top-to-bottom the way the list reads.
   private var low: [GroceryItem] {
-    items.filter { $0.low }.sorted {
-      ($0.category, $0.name) < ($1.category, $1.name)
+    let rank = categoryRank
+    return items.filter { $0.low }.sorted {
+      let lr = rank[$0.category] ?? Int.max
+      let rr = rank[$1.category] ?? Int.max
+      if lr != rr { return lr < rr }
+      return $0.name < $1.name
     }
   }
 
@@ -71,6 +82,9 @@ struct GroceriesDestinationView: View {
           HStack {
             Text("Shopping list")
             Spacer()
+            Button("Mark all bought") { markAllBought() }
+              .font(.subheadline.weight(.medium))
+              .foregroundStyle(accent)
             Text("\(low.count)").monospacedDigit()
           }
           .font(.subheadline)
@@ -95,9 +109,14 @@ struct GroceriesDestinationView: View {
         }
       }
       if !loading && items.isEmpty {
-        ContentUnavailableView("No groceries yet",
-                               systemImage: "basket",
-                               description: Text("Set up your pantry in the webapp."))
+        ContentUnavailableView {
+          Label("No groceries yet", systemImage: "basket")
+        } description: {
+          Text("Add items to build your pantry and shopping list.")
+        } actions: {
+          Button("Add item") { creating = true }
+            .buttonStyle(.borderedProminent)
+        }
       }
     }
     .trackScreen("groceries")
@@ -137,7 +156,6 @@ struct GroceriesDestinationView: View {
     Button { editing = item } label: {
       GroceryRow(item: item,
                  categoryLabel: categoryLabel,
-                 pending: pending.contains(item.id),
                  accent: accent,
                  showCategory: showCategory,
                  onToggle: { toggle(item) })
@@ -169,6 +187,19 @@ struct GroceriesDestinationView: View {
     Haptics.tap()
   }
 
+  /// Clear the whole shopping list in one shot — marks every low item
+  /// back in-stock (each stamps `lastBought` to today). For the
+  /// post-shop "I bought everything" moment.
+  private func markAllBought() {
+    let lowItems = items.filter { $0.low }
+    guard !lowItems.isEmpty else { return }
+    for item in lowItems {
+      grocery.setLow(id: item.id, low: false)
+    }
+    reload()
+    Haptics.success()
+  }
+
   private func reload() {
     items = ChecklistMirror.loadGroceryItems(context: modelContext)
     let cats = ChecklistMirror.loadGroceryCategories(context: modelContext)
@@ -180,7 +211,6 @@ struct GroceriesDestinationView: View {
 private struct GroceryRow: View {
   let item: GroceryItem
   let categoryLabel: String
-  let pending: Bool
   let accent: Color
   let showCategory: Bool
   let onToggle: () -> Void
@@ -195,12 +225,14 @@ private struct GroceryRow: View {
       }
       .buttonStyle(.plain)
 
+      // Low items lead with full-ink prominence — they need action.
+      // Stocked items stay calm/secondary but fully legible: the filled
+      // accent checkmark already signals "in stock," so no strikethrough
+      // (which would read as disabled/unavailable — the opposite of true).
       VStack(alignment: .leading, spacing: 2) {
         Text(item.name)
           .font(.septenaTaskTitle)
           .foregroundStyle(item.low ? Theme.inkPrimary : Theme.inkSecondary)
-          .strikethrough(!item.low)
-          .opacity(item.low ? 1 : 0.55)
         if showCategory, !item.category.isEmpty {
           Text(categoryLabel)
             .font(.septenaMeta)
@@ -208,9 +240,6 @@ private struct GroceryRow: View {
         }
       }
       Spacer()
-      if pending {
-        ProgressView().scaleEffect(0.7)
-      }
     }
     .padding(.horizontal, Theme.hPadding)
     .padding(.vertical, Theme.rowVPadding + 2)

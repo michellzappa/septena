@@ -206,7 +206,7 @@ struct AreaDetailView: View {
         .font(.septenaTaskTitle.weight(.semibold))
         .foregroundStyle(Theme.inkPrimary)
       Image(systemName: "chevron.right")
-        .font(.system(size: 10, weight: .semibold))
+        .scaledFont(size: 10, weight: .semibold)
         .foregroundStyle(Theme.iconMuted)
       Spacer()
     }
@@ -573,7 +573,7 @@ struct RepoEditorSheet: View {
       VStack {
         HStack(spacing: 6) {
           Image(systemName: "chevron.left.forwardslash.chevron.right")
-            .font(.system(size: 11, weight: .medium))
+            .scaledFont(size: 11, weight: .medium)
             .foregroundStyle(Theme.inkSecondary)
           TextField("owner/repo", text: $repo)
             .textFieldStyle(.plain)
@@ -646,7 +646,7 @@ struct AreaPickerSheet: View {
           .frame(width: 22)
       } else {
         Image(systemName: icon)
-          .font(.system(size: 15))
+          .scaledFont(size: 15)
           .foregroundStyle(Theme.iconMuted)
           .frame(width: 22)
       }
@@ -654,7 +654,7 @@ struct AreaPickerSheet: View {
       Spacer()
       if selected {
         Image(systemName: "checkmark")
-          .font(.system(size: 13, weight: .semibold))
+          .scaledFont(size: 13, weight: .semibold)
           .foregroundStyle(Theme.inkSecondary)
       }
     }

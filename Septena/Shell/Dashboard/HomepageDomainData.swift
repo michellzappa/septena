@@ -88,4 +88,12 @@ struct HomepageDomainData {
   /// The Heatmap renderer keeps it so the date map anchors to today;
   /// the Sparkline renderer drops it so the line doesn't dive to 0.
   var trailingTodayPending: Bool = false
+  /// Scale the Dense-mode `.bars` sparkline's Y-axis to the window's
+  /// actual min…max instead of the default 0…max. For domains whose
+  /// values live in a narrow band well above zero (sleep score, which
+  /// sits in the 70–95 range) the 0-anchored scale flattens the line
+  /// into a near-straight bar; min/max framing restores the day-to-day
+  /// variation. Count-based domains (tasks, habits) keep the default
+  /// 0-anchored scale where "zero" is meaningful.
+  var autoscaleSparkline: Bool = false
 }

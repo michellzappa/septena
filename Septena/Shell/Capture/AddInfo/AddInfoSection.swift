@@ -59,7 +59,7 @@ enum AddInfoSection: String, CaseIterable, Identifiable, Hashable {
     case .training:    return "Search sessions…"
     case .nutrition:   return "Search meals…"
     case .caffeine:    return "Search beans…"
-    case .cannabis:    return "Search strains…"
+    case .cannabis:    return "Cannabis…"
     case .habits:      return "Search or add habit…"
     case .supplements: return "Search supplements…"
     case .chores:      return "Search or add chore…"

@@ -22,6 +22,7 @@ import SwiftUI
 
 struct AddMoodPage: View {
   @Environment(\.dismiss) private var dismiss
+  @Environment(\.a11yMotion) private var motion
 
   var anchorTime: Date = Date()
   var date: String = SeptenaDate.today
@@ -81,10 +82,11 @@ struct AddMoodPage: View {
             Button("Cancel") { dismiss() }
           } else {
             Button {
-              withAnimation(quadrant?.expandSpring ?? .spring) {
+              motion.run(quadrant?.expandSpring ?? .spring) {
                 emotion = nil
                 quadrant = nil
               }
+              A11y.screenChanged(focused: "How do you feel right now?")
             } label: {
               Label("Back", systemImage: "chevron.left")
             }
@@ -171,14 +173,22 @@ struct AddMoodPage: View {
                  quadrant: quadrant,
                  selectedEmotion: emotion,
                  onPickQuadrant: { picked in
-                   withAnimation(picked.expandSpring) {
+                   motion.run(picked.expandSpring) {
                      quadrant = picked
                    }
                    Haptics.tick()
+                   // VoiceOver can't see the expand transition or the
+                   // emotion grid blooming in — announce the new step so
+                   // the user knows refinement (or Log) is now available.
+                   A11y.screenChanged(
+                     focused: "\(picked.title). Choose a feeling, or Log to record the quadrant.")
                  },
                  onPickEmotion: { picked in
                    emotion = picked
                    Haptics.tick()
+                   // The header updates to "I'm feeling X" visually; mirror
+                   // that for VoiceOver, which can't perceive the pop-in.
+                   A11y.announce("\(picked.word). Log to save.")
                  })
         .frame(width: geo.size.width, height: geo.size.height)
     }
@@ -344,6 +354,45 @@ private struct MoodCanvas: View {
     .frame(width: side, height: side)
     .contentShape(Rectangle())
     .gesture(canvasGesture)
+    // The canvas is one custom DragGesture over hit-test-disabled visuals,
+    // so VoiceOver, Voice Control, Full Keyboard Access, and Switch Control
+    // would otherwise find nothing here. Replace it with a real control
+    // tree — same `onPick*` callbacks, so there's no behavioral fork
+    // between the touch path and the assistive-tech path.
+    .accessibilityRepresentation { accessibleControls }
+  }
+
+  // MARK: - Assistive-tech representation
+  //
+  // Mirrors the two-step flow as standard buttons:
+  //   • Step 1 → four quadrant buttons (tap zooms in, or Log records the
+  //     quadrant alone — same as the touch affordance).
+  //   • Step 2 → the nine emotion words as buttons, the committed one
+  //     marked selected.
+  // Reading order matches the on-screen layout (top-left → bottom-right).
+
+  @ViewBuilder
+  private var accessibleControls: some View {
+    if let q = quadrant {
+      VStack(alignment: .leading, spacing: 0) {
+        ForEach(MoodCatalog.grid(for: q)) { emotion in
+          Button { onPickEmotion(emotion) } label: { Text(emotion.word) }
+            .accessibilityLabel(emotion.word)
+            .accessibilityHint("Feeling in \(q.title). Then Log to save.")
+            .accessibilityAddTraits(emotion == selectedEmotion ? .isSelected : [])
+        }
+      }
+      .accessibilityLabel("Refine your feeling")
+    } else {
+      VStack(alignment: .leading, spacing: 0) {
+        ForEach(Self.quadrants) { q in
+          Button { onPickQuadrant(q) } label: { Text(q.title) }
+            .accessibilityLabel(q.title)
+            .accessibilityHint("\(q.blurb). Opens specific feelings, or Log to record just this.")
+        }
+      }
+      .accessibilityLabel("How do you feel right now?")
+    }
   }
 
   // MARK: - The unified gesture

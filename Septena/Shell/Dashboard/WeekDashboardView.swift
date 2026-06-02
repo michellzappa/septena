@@ -270,7 +270,10 @@ struct WeekDashboardView: View {
         Label("Settings", systemImage: "gearshape")
       }
     } label: {
-      Image(systemName: "ellipsis.circle")
+      // Bare glyph (not `ellipsis.circle`) so it sits on the system's
+      // gray toolbar circle exactly like the search button — no double
+      // ring.
+      Image(systemName: "ellipsis")
     }
     .accessibilityLabel("More")
   }
@@ -1132,7 +1135,8 @@ struct WeekDashboardView: View {
       progress: nil,
       history: .bars(bars),
       tap: .openSheet(.sleep),
-      trailingTodayPending: true
+      trailingTodayPending: true,
+      autoscaleSparkline: true
     )
   }
 
@@ -1199,8 +1203,7 @@ struct WeekDashboardView: View {
   private func groceriesDomainData() -> HomepageDomainData {
     let lowCount = groceries.filter { $0.low }.count
     let stocked = groceries.count - lowCount
-    let boughtPerDay = groceriesBoughtPerDay()
-    let totalBought7d = boughtPerDay.reduce(0, +)
+    let missingPerDay = groceriesMissingPerDay()
     return HomepageDomainData(
       domain: .groceries,
       title: "Groceries",
@@ -1211,10 +1214,14 @@ struct WeekDashboardView: View {
       headlineStats: [
         .init(label: "Low", value: "\(lowCount)"),
         .init(label: "Stocked", value: "\(stocked)"),
-        .init(label: "Bought 7d", value: "\(totalBought7d)"),
+        .init(label: "Items", value: "\(groceries.count)"),
       ],
-      progress: nil,
-      history: .bars(boughtPerDay),
+      progress: groceries.isEmpty ? nil : DomainProgress(
+        label: "Stocked",
+        current: Double(stocked),
+        target: Double(groceries.count)
+      ),
+      history: .bars(missingPerDay),
       tap: .openSheet(.groceries)
     )
   }
@@ -1654,20 +1661,17 @@ struct WeekDashboardView: View {
     .buttonStyle(.plain)
   }
 
-  // Groceries — shopping-list size as the headline stat.
+  // Groceries — what's running low, as the headline stat.
   private var groceriesTile: some View {
     let lowCount = groceries.filter { $0.low }.count
     let stocked = groceries.count - lowCount
-    let boughtPerDayFull = groceriesBoughtPerDay()
-    let boughtPerDay = Array(boughtPerDayFull.suffix(7))
-    let totalBought7d = boughtPerDay.reduce(0, +)
+    let missingPerDay = groceriesMissingPerDay()
     return WeekGroceriesTile(
       accent: theme.color(for: "groceries"),
       lowCount: lowCount,
-      totalBought7d: totalBought7d,
       stocked: stocked,
       totalItems: groceries.count,
-      boughtPerDay: boughtPerDay
+      missingPerDay: missingPerDay
     )
     .contentShape(Rectangle())
     .onTapGesture { sheetDest = .groceries }
@@ -1693,17 +1697,17 @@ struct WeekDashboardView: View {
   /// Items bought per day for the last 30 days (oldest → newest, today
   /// last), derived from each item's `lastBought` date. Bumped from 7
   /// → 30 in Phase 4b for the Heatmap mode strip.
-  private func groceriesBoughtPerDay() -> [Int] {
-    let cal = Calendar.current
-    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
-    let today = cal.startOfDay(for: Date())
-    var counts = Array(repeating: 0, count: 90)
-    for item in groceries {
-      guard let lb = item.lastBought, let d = fmt.date(from: lb) else { continue }
-      let diff = cal.dateComponents([.day], from: cal.startOfDay(for: d), to: today).day ?? Int.max
-      if diff >= 0 && diff < 30 { counts[29 - diff] += 1 }
-    }
-    return counts
+  /// Trailing 30-day series of "items missing (low) per day."
+  ///
+  /// Stock level is state, not a daily event, so there's nothing to
+  /// reconstruct from the current snapshot. Instead we stamp today's
+  /// missing count into `GroceryStockHistory` on each load and read the
+  /// accumulated series back — the strip fills in going forward and
+  /// today's bar is always exact.
+  private func groceriesMissingPerDay() -> [Int] {
+    let missingToday = groceries.filter { $0.low }.count
+    GroceryStockHistory.record(missing: missingToday)
+    return GroceryStockHistory.series(days: 30)
   }
 
   // Caffeine — today's session count + grams; 7-day session histogram.
@@ -1791,17 +1795,17 @@ struct WeekDashboardView: View {
     CannabisQuickAddMenu(
       lastVape: lastCannabisVape,
       usesPerCapsule: cannabisUsesPerCapsule,
-      onCommit: { method, strain, hit in
-        commitCannabis(method: method, strain: strain, hit: hit)
+      onCommit: { method, hit in
+        commitCannabis(method: method, hit: hit)
       },
       onEditLast: lastCannabisVape == nil ? nil : { sheetDest = .cannabis }
     )
   }
 
-  private func commitCannabis(method: String, strain: String?, hit: Int?) {
+  private func commitCannabis(method: String, hit: Int?) {
     SeptenaServices.shared.cannabisMutator.addEntry(
       date: SeptenaDate.today, time: nowHHMM(),
-      method: method, strain: strain, hit: hit)
+      method: method, hit: hit)
     // Refresh tile state from the freshly-mutated SwiftData store so the
     // "Continue · Hit N" counter advances immediately.
     cannabisToday = ChecklistMirror.loadCannabisDay(context: modelContext, date: SeptenaDate.today)
@@ -2189,7 +2193,7 @@ private struct ComingSoonLayoutPlaceholder: View {
   var body: some View {
     VStack(spacing: 12) {
       Image(systemName: mode.icon)
-        .font(.system(size: 44, weight: .regular))
+        .scaledFont(size: 44, weight: .regular, relativeTo: .largeTitle)
         .foregroundStyle(.secondary)
       Text("\(mode.title) layout — coming soon")
         .font(.septenaCardTitle)
@@ -2481,25 +2485,100 @@ private struct WeekSleepTile: View {
 private struct WeekGroceriesTile: View {
   let accent: Color
   let lowCount: Int
-  let totalBought7d: Int
   let stocked: Int
   let totalItems: Int
-  let boughtPerDay: [Int]
+  /// Trailing 30-day "items missing per day" series.
+  let missingPerDay: [Int]
 
   var body: some View {
     ModuleTile(
       title: "Groceries",
       accent: accent,
       stats: [
-        .init(label: "Need", value: "\(lowCount)"),
-        .init(label: "7-day buys", value: "\(totalBought7d)")
+        .init(label: "Low", value: "\(lowCount)"),
+        .init(label: "Stocked", value: "\(stocked)")
       ],
       progress: totalItems == 0 ? nil : .init(
         label: "Stocked",
         current: Double(stocked),
         target: Double(max(totalItems, 1))
       ),
-      history: .init(label: "Bought (90d)", values: boughtPerDay)
+      history: .init(label: "Missing (30d)", values: missingPerDay)
     )
+  }
+}
+
+/// Daily snapshot store for grocery stock level.
+///
+/// A grocery item's `low` flag is *state*, not an event — there is no
+/// per-day activity to plot the way there is for caffeine sessions or
+/// tasks completed. So the only honest day-based series is "how many
+/// items were missing (low) on day D." We can't reconstruct that from
+/// the current snapshot alone (we'd need every low↔stocked transition
+/// date, which isn't stored), so instead we record today's count each
+/// time the dashboard loads and let the series fill in going forward.
+///
+/// Gaps (days the app wasn't opened) carry forward the last known
+/// count rather than collapsing to 0 — stock level persists whether or
+/// not you looked at it, so a quiet day is "same as yesterday," not
+/// "suddenly nothing missing."
+enum GroceryStockHistory {
+  private static let key = "groceries.missingHistory.v1"
+  private static let retentionDays = 120
+
+  private static let fmt: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd"
+    f.locale = Locale(identifier: "en_US_POSIX")
+    return f
+  }()
+
+  private static func load() -> [String: Int] {
+    UserDefaults.standard.dictionary(forKey: key) as? [String: Int] ?? [:]
+  }
+
+  private static func save(_ map: [String: Int]) {
+    UserDefaults.standard.set(map, forKey: key)
+  }
+
+  /// Stamp today's missing count. Cheap and idempotent — only writes
+  /// when the value actually changes, so calling it on every render is
+  /// fine. Prunes entries older than `retentionDays`.
+  static func record(missing: Int, on date: Date = Date()) {
+    let today = fmt.string(from: Calendar.current.startOfDay(for: date))
+    var map = load()
+    if map[today] == missing { return }
+    map[today] = missing
+
+    if let cutoff = Calendar.current.date(byAdding: .day, value: -retentionDays, to: date) {
+      let cutoffKey = fmt.string(from: Calendar.current.startOfDay(for: cutoff))
+      map = map.filter { $0.key >= cutoffKey }
+    }
+    save(map)
+  }
+
+  /// Trailing `days`-long series of missing counts, oldest-first, last
+  /// element = today. Gaps carry forward the most recent prior count;
+  /// days before the first-ever snapshot read as 0 (we genuinely have
+  /// no data, and don't fabricate it).
+  static func series(days: Int, asOf date: Date = Date()) -> [Int] {
+    let map = load()
+    let cal = Calendar.current
+    let today = cal.startOfDay(for: date)
+    var last = 0
+    var started = false
+    var out: [Int] = []
+    out.reserveCapacity(days)
+    for back in stride(from: days - 1, through: 0, by: -1) {
+      guard let d = cal.date(byAdding: .day, value: -back, to: today) else { continue }
+      if let v = map[fmt.string(from: d)] {
+        last = v
+        started = true
+        out.append(v)
+      } else {
+        out.append(started ? last : 0)
+      }
+    }
+    return out
   }
 }

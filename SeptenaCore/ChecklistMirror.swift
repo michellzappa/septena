@@ -808,20 +808,6 @@ enum ChecklistMirror {
     for entity in existingEntries where !seenEntries.contains(entity.id) {
       context.delete(entity)
     }
-    let existingStrains = (try? context.fetch(FetchDescriptor<CannabisStrainEntity>())) ?? []
-    let strainsByID = Dictionary(uniqueKeysWithValues: existingStrains.map { ($0.id, $0) })
-    var seenStrains = Set<String>()
-    for (idx, strain) in response.strains.enumerated() {
-      seenStrains.insert(strain.id)
-      let entity = strainsByID[strain.id] ?? CannabisStrainEntity(id: strain.id, name: strain.name, sortIndex: idx)
-      entity.name = strain.name
-      entity.sortIndex = idx
-      entity.updatedAt = .now
-      if entity.modelContext == nil { context.insert(entity) }
-    }
-    for entity in existingStrains where !seenStrains.contains(entity.id) {
-      context.delete(entity)
-    }
     try? context.save()
   }
 
@@ -864,13 +850,6 @@ enum ChecklistMirror {
                                         totalG: totalG > 0 ? totalG : nil))
     }
     return CannabisHistoryResponse(daily: daily)
-  }
-
-  static func loadCannabisStrains(context: ModelContext) -> [CannabisStrain] {
-    let entities = (try? context.fetch(FetchDescriptor<CannabisStrainEntity>(
-      sortBy: [SortDescriptor(\.sortIndex), SortDescriptor(\.name)]
-    ))) ?? []
-    return entities.map { CannabisStrain(id: $0.id, name: $0.name) }
   }
 
   static func loadSupplementDefinitions(context: ModelContext) -> [SupplementDefinition] {

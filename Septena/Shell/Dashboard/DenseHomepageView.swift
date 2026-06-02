@@ -50,14 +50,8 @@ private struct DenseDomainRow: View {
 
   var body: some View {
     HStack(spacing: 12) {
-      RoundedRectangle(cornerRadius: 7, style: .continuous)
-        .fill(data.accent.opacity(0.18))
-        .frame(width: 28, height: 28)
-        .overlay {
-          Image(systemName: SectionManifest.byKey[data.domain.rawValue]?.iconSymbol ?? "circle.fill")
-            .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(data.accent)
-        }
+      SectionGlyph(icon: SectionManifest.byKey[data.domain.rawValue]?.iconSymbol ?? "circle.fill",
+                   accent: data.accent)
 
       VStack(alignment: .leading, spacing: 2) {
         Text(data.title)
@@ -74,7 +68,8 @@ private struct DenseDomainRow: View {
       DomainSparkline(history: data.history,
                       accent: data.accent,
                       smooth: data.smoothSparkline,
-                      dropTrailingTodayPending: data.trailingTodayPending)
+                      dropTrailingTodayPending: data.trailingTodayPending,
+                      autoscale: data.autoscaleSparkline)
         .frame(width: 84, height: 28)
 
       Image(systemName: "chevron.right")
@@ -106,6 +101,10 @@ private struct DomainSparkline: View {
   /// underlying value is kept in `HomepageDomainData.history` so the
   /// Heatmap renderer can still anchor its date map to today.
   var dropTrailingTodayPending: Bool = false
+  /// When true, scale a `.bars` series to its window's actual min…max
+  /// instead of the default 0…max. See
+  /// `HomepageDomainData.autoscaleSparkline`.
+  var autoscale: Bool = false
 
   /// Trailing-N-day rolling mean. The first `window-1` points
   /// average whatever's available so the line starts plotting
@@ -157,9 +156,24 @@ private struct DomainSparkline: View {
   /// for other history shapes — those keep SwiftUI Charts' default
   /// auto-scaling.
   private var explicitYDomain: ClosedRange<Double>? {
-    guard case .centered(let values, let baseline) = history else { return nil }
-    let absolute = values.compactMap { $0.map { $0 + baseline } }
-    return centeredYBounds(absolute)
+    switch history {
+    case .centered(let values, let baseline):
+      let absolute = values.compactMap { $0.map { $0 + baseline } }
+      return centeredYBounds(absolute)
+    case .bars(let values) where autoscale:
+      // Mirror the transform styledChart applies before plotting, then
+      // frame the Y-axis on the real (non-zero) values. Leading padding
+      // zeros from `aligned` and the dropped pending-today slot must be
+      // excluded or `min` collapses the floor back to 0.
+      let trimmed = dropTrailingTodayPending && !values.isEmpty
+        ? Array(values.dropLast())
+        : values
+      let raw = aligned(trimmed.map(Double.init))
+      let smoothed = smooth ? rollingMean(raw) : raw
+      return centeredYBounds(smoothed.filter { $0 != 0 })
+    default:
+      return nil
+    }
   }
 
   @ViewBuilder
@@ -196,10 +210,16 @@ private struct DomainSparkline: View {
         let raw = aligned(trimmed.map(Double.init))
         let smoothed = smooth ? rollingMean(raw) : raw
         if let series = nonEmpty(smoothed) {
+          // When autoscaled, the Y-domain starts well above 0, so anchor
+          // the area's floor to the domain's lower bound (like `.centered`
+          // does). Leaving the default y=0 anchor fills from far below the
+          // visible plot and overflows the row's frame.
+          let areaFloor = autoscale ? explicitYDomain?.lowerBound : nil
           ForEach(Array(series.enumerated()), id: \.offset) { idx, value in
             AreaMark(
               x: .value("Day", idx),
-              y: .value("Value", value)
+              yStart: .value("Floor", areaFloor ?? 0),
+              yEnd: .value("Value", value)
             )
             .foregroundStyle(accent.opacity(0.22))
             .interpolationMethod(.monotone)

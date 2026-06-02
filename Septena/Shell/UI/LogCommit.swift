@@ -20,8 +20,11 @@ import SwiftData
 /// `LogCommitOverlay`) when a domain wants its own "feel". Each carries the
 /// section accent so the celebration reads as native to the surface.
 enum LogCommitStyle: Equatable {
-  /// Upward confetti fan — generic positive ("logged", training, etc.).
-  case burst(accent: Color)
+  /// A section's commit flourish — the motion matches what was logged.
+  /// The `motion` is chosen at the call site from the section's data axis
+  /// (see `CommitMotion`); the accent makes it read as native to the
+  /// surface. This is the generalized form of the Mood-meter idea.
+  case flourish(motion: CommitMotion, accent: Color)
   /// Habit-streak milestone — radiating rings with the streak number
   /// popping in. Fired when a streak crosses 7 / 30 / 100 / 365.
   case ignition(accent: Color, streak: Int)
@@ -62,9 +65,8 @@ struct LogCommitOverlay: View {
     ZStack {
       if !reduceMotion, let style = center.style {
         switch style {
-        case .burst(let accent):
-          ConfettiBurst(trigger: center.trigger, accent: accent,
-                        count: 22, duration: 1.0)
+        case .flourish(let motion, let accent):
+          CommitFlourish(motion: motion, accent: accent, trigger: center.trigger)
         case .ignition(let accent, let streak):
           IgnitionView(accent: accent, streak: streak, trigger: center.trigger)
         }
@@ -178,7 +180,7 @@ private struct IgnitionView: View {
       }
       VStack(spacing: 2) {
         Text("\(streak)")
-          .font(.system(size: 64, weight: .bold, design: .rounded))
+          .scaledFont(size: 64, weight: .bold, design: .rounded, relativeTo: .largeTitle)
           .monospacedDigit()
           .foregroundStyle(accent)
           .contentTransition(.numericText())

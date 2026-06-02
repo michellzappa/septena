@@ -267,7 +267,7 @@ private struct MoodHeatmapView: View {
       ForEach(DayBucket.allCases) { bucket in
         HStack(spacing: 3) {
           Image(systemName: bucket.icon)
-            .font(.system(size: 10))
+            .scaledFont(size: 10)
             .foregroundStyle(.secondary)
             .frame(width: 36, alignment: .leading)
           ForEach(Array(dates.enumerated()), id: \.offset) { _, date in
@@ -280,7 +280,7 @@ private struct MoodHeatmapView: View {
         ForEach(Array(dates.enumerated()), id: \.offset) { idx, date in
           if idx % 5 == 0 {
             Text(String(date.suffix(2)))
-              .font(.system(size: 8))
+              .scaledFont(size: 8)
               .foregroundStyle(.secondary)
               .frame(minWidth: 8)
           } else {

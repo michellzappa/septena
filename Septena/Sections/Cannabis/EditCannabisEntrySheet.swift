@@ -28,12 +28,9 @@ struct EditCannabisEntrySheet: View {
   // you backfill a forgotten log onto the right day.
   @State private var when: Date = Date()
   @State private var method: String = "vape"
-  @State private var strainChoice: String = ""
-  @State private var strainFreeform: String = ""
   @State private var hit: Int = 1
   @State private var note: String = ""
   @State private var effect: String = ""
-  @State private var strains: [CannabisStrain] = []
 
   private static let methods: [(String, String)] = [
     ("vape", "Vape"),
@@ -57,20 +54,6 @@ struct EditCannabisEntrySheet: View {
           .pickerStyle(.segmented)
         }
         if method == "vape" {
-          Section("Strain") {
-            if !strains.isEmpty {
-              Picker("Strain", selection: $strainChoice) {
-                Text("None").tag("")
-                ForEach(strains) { s in
-                  Text(s.name).tag(s.name)
-                }
-                Text("Custom…").tag("__custom__")
-              }
-            }
-            if strainChoice == "__custom__" || strains.isEmpty {
-              TextField("Strain name", text: $strainFreeform)
-            }
-          }
           Section("Hit") {
             Stepper(value: $hit, in: 1...10) {
               Text("\(hit)")
@@ -98,28 +81,17 @@ struct EditCannabisEntrySheet: View {
           Button("Save") { save() }
         }
       }
-      .task { await loadStrains(); seed() }
+      .task { seed() }
     }
   }
 
   private func seed() {
     guard let original else {
-      // Create mode: pre-fill from preset, then smart-default strain +
-      // hit from the most recent entry of the same method so the common
-      // path is one tap. Effect/note stay empty — those are per-session.
+      // Create mode: pre-fill from preset, then smart-default hit from the
+      // most recent entry of the same method so the common path is one tap.
+      // Effect/note stay empty — those are per-session.
       method = presetMethod ?? "vape"
       let lastSame = lastEntry(method: method)
-      if let last = lastSame, let s = last.strain, !s.isEmpty {
-        if strains.contains(where: { $0.name == s }) {
-          strainChoice = s
-        } else {
-          strainChoice = "__custom__"
-          strainFreeform = s
-        }
-      } else {
-        strainChoice = ""
-        strainFreeform = ""
-      }
       hit = lastSame?.hit ?? 1
       note = ""
       effect = ""
@@ -135,25 +107,11 @@ struct EditCannabisEntrySheet: View {
       return
     }
     method = original.method
-    if let s = original.strain, !s.isEmpty {
-      if strains.contains(where: { $0.name == s }) {
-        strainChoice = s
-      } else {
-        strainChoice = "__custom__"
-        strainFreeform = s
-      }
-    } else {
-      strainChoice = ""
-    }
     hit = original.hit ?? 1
     note = original.note ?? ""
     effect = original.effect ?? ""
     let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd HH:mm"
     when = fmt.date(from: "\(date) \(original.time)") ?? Date()
-  }
-
-  private func loadStrains() async {
-    strains = ChecklistMirror.loadCannabisStrains(context: modelContext)
   }
 
   /// Most recent cannabis event with the given method in the last 30
@@ -181,18 +139,6 @@ struct EditCannabisEntrySheet: View {
     let timeFmt = DateFormatter(); timeFmt.dateFormat = "HH:mm"
     let newDate = dayFmt.string(from: when)
     let hhmm = timeFmt.string(from: when)
-    let strainValue: String? = {
-      guard method == "vape" else { return nil }
-      switch strainChoice {
-      case "":
-        return nil
-      case "__custom__":
-        let t = strainFreeform.trimmingCharacters(in: .whitespacesAndNewlines)
-        return t.isEmpty ? nil : t
-      default:
-        return strainChoice
-      }
-    }()
     let noteValue: String? = {
       let t = note.trimmingCharacters(in: .whitespacesAndNewlines)
       return t.isEmpty ? nil : t
@@ -214,7 +160,6 @@ struct EditCannabisEntrySheet: View {
                            date: newDate,
                            time: hhmm,
                            method: method,
-                           strain: .some(strainValue),
                            hit: .some(hitValue),
                            grams: .some(gramsValue),
                            effect: .some(effectValue),
@@ -225,7 +170,6 @@ struct EditCannabisEntrySheet: View {
       let entity = cannabis.addEntry(date: newDate,
                                      time: hhmm,
                                      method: method,
-                                     strain: strainValue,
                                      hit: hitValue,
                                      grams: gramsValue,
                                      effect: effectValue,
@@ -239,7 +183,7 @@ struct EditCannabisEntrySheet: View {
       id: savedID,
       time: hhmm,
       method: method,
-      strain: strainValue,
+      strain: original?.strain,
       hit: method == "vape" ? hit : nil,
       grams: method == "vape" ? savedGrams : nil,
       note: noteValue,

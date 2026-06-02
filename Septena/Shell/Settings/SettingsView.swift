@@ -3,6 +3,7 @@ import SwiftData
 import EventKit
 import CloudKit
 import CoreLocation
+import WebKit
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -337,10 +338,7 @@ final class SettingsStore {
       let beans = ChecklistMirror.loadCaffeineBeans(context: context)
       return CaffeineConfig(beans: beans)
     }()
-    let cn: CannabisConfig = {
-      let strains = ChecklistMirror.loadCannabisStrains(context: context)
-      return CannabisConfig(strains: strains, usesPerCapsule: 3)
-    }()
+    let cn = CannabisConfig(usesPerCapsule: 3)
     caffeine = cf; ResponseCache.save(cf, forKey: CacheKey.caffeine)
     cannabis = cn; ResponseCache.save(cn, forKey: CacheKey.cannabis)
     if let macs { macros = macs; ResponseCache.save(macs, forKey: CacheKey.macros) }
@@ -460,7 +458,7 @@ struct SettingsView: View {
   #endif
 
   private var staticDestinations: [SettingsDestination] {
-    [.general, .integrations, .importExport, .skills, .siriShortcuts, .manageSections, .privacy, .about]
+    [.general, .integrations, .importExport, .skills, .manageSections, .privacy, .about]
   }
 
   /// Per-section sidebar rows, ordered by the user's saved `sectionOrder`
@@ -487,15 +485,16 @@ struct SettingsView: View {
   }
 
   private func sectionRow(_ entry: SectionEntry) -> some View {
-    // Reuse the homepage's per-section SF Symbol so the same glyph
-    // identifies a section in Dense/Heatmap tiles and the Settings
-    // sidebar. `calendar` isn't a homepage domain — fall back to its
-    // own symbol; anything else unknown falls back to a neutral dot.
+    // Reuse the homepage's per-section glyph *and its tinted treatment*
+    // (`SectionGlyph`) so a section's icon reads identically in the
+    // Dense/Heatmap tiles and here in the Settings sidebar. `calendar`
+    // isn't a homepage domain — fall back to its own symbol; anything
+    // else unknown falls back to a neutral dot.
     Label {
       Text(entry.label)
         .foregroundStyle(entry.isEnabled ? .primary : .secondary)
     } icon: {
-      ColoredGlyph(icon: sectionIcon(for: entry.key), color: entry.accent, size: 29, glyphRatio: 0.38)
+      SectionGlyph(icon: sectionIcon(for: entry.key), accent: entry.accent, size: 29, glyphRatio: 0.38)
         .opacity(entry.isEnabled ? 1 : 0.4)
     }
   }
@@ -546,22 +545,23 @@ struct SettingsView: View {
     }
   }
 
+  /// The app's 7 accent colors — the Septena app-icon rainbow (same set
+  /// as `AppIconOption`'s discs). The app-wide settings rows cycle
+  /// through these in `staticDestinations` order instead of carrying
+  /// ad-hoc per-row tints, so the palette stays on-brand and consistent.
+  private static let accentPalette: [Color] = [
+    parseHexColor("#ef4444"), // red
+    parseHexColor("#f97316"), // orange
+    parseHexColor("#eab308"), // yellow
+    parseHexColor("#22c55e"), // green
+    parseHexColor("#06b6d4"), // cyan
+    parseHexColor("#3b82f6"), // blue
+    parseHexColor("#8b5cf6"), // purple
+  ]
+
   private func tint(for dest: SettingsDestination) -> Color {
-    switch dest {
-    case .general:      return .gray
-    case .quickActions: return .yellow
-    case .appIcon:      return .blue
-    case .layout:       return .indigo
-    case .correlations: return .green
-    case .integrations: return .indigo
-    case .importExport: return .orange
-    case .skills:       return .pink
-    case .siriShortcuts: return .blue
-    case .privacy:      return .teal
-    case .about:        return .purple
-    case .manageSections: return .blue
-    case .section:      return .gray  // unreachable; see above
-    }
+    guard let idx = staticDestinations.firstIndex(of: dest) else { return .gray }
+    return Self.accentPalette[idx % Self.accentPalette.count]
   }
 
   @ViewBuilder
@@ -1120,7 +1120,7 @@ private struct AppIconChoiceCard: View {
         AppIconPreview(option: option, size: 64)
         if isSelected {
           Image(systemName: "checkmark.circle.fill")
-            .font(.system(size: 18, weight: .semibold))
+            .scaledFont(size: 18, weight: .semibold)
             .foregroundStyle(.white, .green)
             .shadow(color: .black.opacity(0.16), radius: 4, y: 1)
             .offset(x: 5, y: -5)
@@ -1545,6 +1545,17 @@ struct SectionDetailPane: View {
     parseHexColor(server?.color ?? "")
   }
 
+  /// Background of a grouped-form row — used as the gap color between the
+  /// swatch's rainbow ring and its colored center, so the ring stays
+  /// visually detached on both platforms.
+  private var rowBackgroundColor: Color {
+    #if canImport(UIKit)
+    Color(uiColor: .secondarySystemGroupedBackground)
+    #else
+    Color(nsColor: .windowBackgroundColor)
+    #endif
+  }
+
   var body: some View {
     Form {
       identitySection
@@ -1629,22 +1640,33 @@ struct SectionDetailPane: View {
     }
   }
 
-  /// Trailing-aligned, circular color swatch — reads as "tappable
-  /// settings affordance" the way iOS-native pickers (Lists app, Reminders
-  /// list color) do: a circle with a hairline border, a subtle pencil
-  /// glyph on hover/press to reinforce it can be changed.
+  /// Trailing-aligned, circular color swatch wrapped in the conic
+  /// rainbow ring iOS's system `ColorPicker` well uses — the
+  /// unmistakable "tap to change the color" affordance. The current
+  /// section color fills the center; a thin gap in the row's background
+  /// separates it from the ring so the ring reads as a ring, not a
+  /// border. (We keep our own curated palette popover rather than the
+  /// system picker, so the ring is hand-rolled.)
   @ViewBuilder
   private var colorSwatchButton: some View {
     Button {
       showingColorPicker.toggle()
     } label: {
-      Circle()
-        .fill(accent)
-        .overlay(
-          Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 0.5)
-        )
-        .frame(width: 26, height: 26)
-        .contentShape(Circle())
+      ZStack {
+        Circle()
+          .fill(AngularGradient(
+            gradient: Gradient(colors: [.red, .orange, .yellow, .green,
+                                        .cyan, .blue, .purple, .red]),
+            center: .center))
+        Circle()
+          .fill(rowBackgroundColor)
+          .padding(2)
+        Circle()
+          .fill(accent)
+          .padding(4)
+      }
+      .frame(width: 26, height: 26)
+      .contentShape(Circle())
     }
     .buttonStyle(.plain)
     .accessibilityLabel("Section color")
@@ -1990,6 +2012,26 @@ struct IntegrationsSettingsPane: View {
                    isGranted: photosBridge.access == .granted)
         }
 
+        // Siri & Shortcuts — Apple system integration; grouped here with
+        // the other Apple ones rather than as a top-level Settings row.
+        NavigationLink {
+          SiriShortcutsSettingsPane()
+            .navigationTitle("Siri & Shortcuts")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+        } label: {
+          Label("Siri & Shortcuts", systemImage: "mic")
+            .foregroundStyle(.primary)
+        }
+
+      } header: {
+        Text("Apple")
+      } footer: {
+        Text("Grant access here, or manage permissions in iOS Settings → Privacy.")
+      }
+
+      Section {
         // Oura — direct iOS client (Personal Access Token). Replaces the
         // old FastAPI proxy at /api/health/oura.
         NavigationLink {
@@ -2020,8 +2062,8 @@ struct IntegrationsSettingsPane: View {
                    isGranted: withingsProvider.hasTokens)
         }
 
-      } footer: {
-        Text("Grant access here, or manage permissions in iOS Settings → Privacy.")
+      } header: {
+        Text("Services")
       }
 
       // Claude — keeps the Septena MCP gateway supplied with a live
@@ -2036,10 +2078,22 @@ struct IntegrationsSettingsPane: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
         } label: {
-          stateRow(title: "Claude",
-                   systemImage: "sparkles",
-                   state: claudeProvider.isEnabled ? "Connected" : "Connect",
-                   isGranted: claudeProvider.isEnabled)
+          HStack {
+            Label {
+              Text("Claude")
+            } icon: {
+              Image("ClaudeMark")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 20, height: 20)
+            }
+            .foregroundStyle(.primary)
+            Spacer()
+            Text(claudeProvider.isEnabled ? "Connected" : "Connect")
+              .font(.subheadline)
+              .foregroundStyle(claudeProvider.isEnabled ? Color.green : .secondary)
+          }
         }
       } footer: {
         Text("Let Claude read and write your Septena data at mcp.septena.app.")
@@ -2366,7 +2420,7 @@ private struct RemindersInboxDetail: View {
         Spacer()
         if selectedID == id {
           Image(systemName: "checkmark")
-            .font(.system(size: 13, weight: .semibold))
+            .scaledFont(size: 13, weight: .semibold)
             .foregroundStyle(.tint)
         }
       }
@@ -2655,8 +2709,8 @@ private struct ClaudeGatewayDetail: View {
           HStack {
             Label("Status", systemImage: "sparkles")
             Spacer()
-            Text(provider.lastError == nil ? "Connected" : "Needs attention")
-              .foregroundStyle(provider.lastError == nil ? .green : .orange)
+            Text(provider.needsReauth ? "Tap Reauthenticate" : (provider.lastError == nil ? "Connected" : "Needs attention"))
+              .foregroundStyle(provider.needsReauth || provider.lastError != nil ? .orange : .green)
           }
           HStack {
             Label("Last authenticated", systemImage: "clock.arrow.circlepath")
@@ -2684,8 +2738,35 @@ private struct ClaudeGatewayDetail: View {
       }
     }
     .formStyle(.grouped)
+    // Interactive Apple sign-in — only shown when a silent re-mint fails
+    // (session lapsed) and the user explicitly reauthenticates.
+    .sheet(isPresented: Binding(
+      get: { provider.showingInteractiveAuth },
+      set: { if !$0 { provider.cancelInteractiveAuth() } }
+    )) {
+      if let web = provider.interactiveWebView {
+        ClaudeAuthWebView(webView: web).ignoresSafeArea()
+      }
+    }
   }
 }
+
+// Hosts the provider's WKWebView for interactive idmsa sign-in. The view
+// captures the ckWebAuthToken via its navigation delegate (set by the
+// provider), so this wrapper just displays it.
+#if os(iOS)
+private struct ClaudeAuthWebView: UIViewRepresentable {
+  let webView: WKWebView
+  func makeUIView(context: Context) -> WKWebView { webView }
+  func updateUIView(_ uiView: WKWebView, context: Context) {}
+}
+#elseif os(macOS)
+private struct ClaudeAuthWebView: NSViewRepresentable {
+  let webView: WKWebView
+  func makeNSView(context: Context) -> WKWebView { webView }
+  func updateNSView(_ nsView: WKWebView, context: Context) {}
+}
+#endif
 
 // Withings → OAuth2 connect / backfill / disconnect. "Connect" opens
 // ASWebAuthenticationSession against account.withings.com; the returned
@@ -3269,7 +3350,7 @@ struct ImportExportSettingsPane: View {
     } header: {
       Text("Import")
     } footer: {
-      Text("Provide JSON in the Septena export format. Records are merged by id — existing rows update in place, new rows are inserted. Definition tables (habits, supplements, chores, beans, strains, grocery items) apply now; event/log tables preview only in this build.")
+      Text("Provide JSON in the Septena export format. Records are merged by id — existing rows update in place, new rows are inserted. Definition tables (habits, supplements, chores, beans, grocery items) apply now; event/log tables preview only in this build.")
     }
   }
 
@@ -3824,8 +3905,6 @@ enum ImportExportService {
         for r in rows { try upsertChoreDefinition(r, ctx: ctx, engine: engine); applied += 1 }
       case "caffeineBean":
         for r in rows { try upsertCaffeineBean(r, ctx: ctx, engine: engine); applied += 1 }
-      case "cannabisStrain":
-        for r in rows { try upsertCannabisStrain(r, ctx: ctx, engine: engine); applied += 1 }
       case "groceryCategory":
         for r in rows { try upsertGroceryCategory(r, ctx: ctx, engine: engine); applied += 1 }
       case "groceryItem":
@@ -3932,22 +4011,6 @@ private func upsertCaffeineBean(_ r: [String: Any],
   e.sortIndex = r["sortIndex"] as? Int ?? 0
   e.updatedAt = .now
   engine.noteCaffeineBeanChange(id: id)
-}
-
-@MainActor
-private func upsertCannabisStrain(_ r: [String: Any],
-                                  ctx: ModelContext,
-                                  engine: CKEngine) throws {
-  guard let id = r["id"] as? String, let name = r["name"] as? String
-  else { throw ImportExportService.ImportError.malformed("cannabisStrain row missing id/name") }
-  let existing = try ctx.fetch(FetchDescriptor<CannabisStrainEntity>(
-    predicate: #Predicate { $0.id == id })).first
-  let e = existing ?? CannabisStrainEntity(id: id, name: name)
-  if existing == nil { ctx.insert(e) }
-  e.name = name
-  e.sortIndex = r["sortIndex"] as? Int ?? 0
-  e.updatedAt = .now
-  engine.noteCannabisStrainChange(id: id)
 }
 
 @MainActor

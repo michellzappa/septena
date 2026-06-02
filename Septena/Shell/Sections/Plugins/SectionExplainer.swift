@@ -43,7 +43,7 @@ struct SectionOnboardingHero: View {
           .fill(accent.opacity(0.15))
           .frame(width: 72, height: 72)
         Image(systemName: heroSymbol)
-          .font(.system(size: 32, weight: .semibold))
+          .scaledFont(size: 32, weight: .semibold, relativeTo: .largeTitle)
           .foregroundStyle(accent)
       }
       .accessibilityHidden(true)

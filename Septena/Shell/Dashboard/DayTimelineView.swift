@@ -267,7 +267,7 @@ struct DayTimelineView: View {
   private func marker(_ symbol: String, at hour: Double, width: CGFloat,
                       opacity: Double = 1) -> some View {
     Image(systemName: symbol)
-      .font(.system(size: 11))
+      .scaledFont(size: 11)
       .opacity(opacity)
       .position(x: pct(hour) * width / 100, y: 14)
   }
@@ -289,7 +289,7 @@ struct DayTimelineView: View {
       ZStack(alignment: .leading) {
         ForEach(hourMarks(width: w), id: \.self) { h in
           Text("\(h)")
-            .font(.system(size: 9))
+            .scaledFont(size: 9)
             .monospacedDigit()
             .foregroundStyle(.secondary)
             .position(x: pct(Double(h)) * w / 100, y: 6)

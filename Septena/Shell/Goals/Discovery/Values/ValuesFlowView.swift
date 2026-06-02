@@ -217,7 +217,7 @@ private struct ValuesSplashGraphic: View {
           .frame(width: 112, height: 74)
           .overlay {
             Image(systemName: symbol(for: index))
-              .font(.system(size: 24, weight: .semibold))
+              .scaledFont(size: 24, weight: .semibold)
               .foregroundStyle(color(for: index))
           }
           .offset(x: 72 * cos(angle * .pi / 180),
@@ -225,7 +225,7 @@ private struct ValuesSplashGraphic: View {
       }
 
       Image(systemName: "star.circle.fill")
-        .font(.system(size: 36, weight: .semibold))
+        .scaledFont(size: 36, weight: .semibold, relativeTo: .largeTitle)
         .foregroundStyle(ValuesMiniApp.accent)
         .frame(width: 76, height: 76)
         .background(.regularMaterial, in: Circle())

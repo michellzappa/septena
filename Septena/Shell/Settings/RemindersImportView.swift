@@ -110,7 +110,7 @@ struct RemindersImportView: View {
         Spacer()
         if selectedID == id {
           Image(systemName: "checkmark")
-            .font(.system(size: 13, weight: .semibold))
+            .scaledFont(size: 13, weight: .semibold)
             .foregroundStyle(theme.accent)
         }
       }

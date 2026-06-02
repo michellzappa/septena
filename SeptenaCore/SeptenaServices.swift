@@ -278,15 +278,6 @@ final class SeptenaServices {
           }
           return nil
         }
-        if recordName.hasPrefix("cannabis-strain:") {
-          let id = CannabisStrainCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<CannabisStrainEntity>(
-            predicate: #Predicate { $0.id == id }
-          )).first {
-            return entity.toCloudKitRecord()
-          }
-          return nil
-        }
         if recordName.hasPrefix("grocery-item:") {
           let id = GroceryItemCloudKitSchema.entityID(from: recordName)
           if let entity = try? context.fetch(FetchDescriptor<GroceryItemEntity>(
@@ -559,16 +550,6 @@ final class SeptenaServices {
           } else {
             context.insert(CannabisEventEntity(cloudKit: record))
           }
-        case CannabisStrainCloudKitSchema.recordType:
-          batchTouchedData = true
-          let id = CannabisStrainCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<CannabisStrainEntity>(
-            predicate: #Predicate { $0.id == id }
-          )).first {
-            entity.apply(record)
-          } else {
-            context.insert(CannabisStrainEntity(cloudKit: record))
-          }
         case GroceryItemCloudKitSchema.recordType:
           batchTouchedData = true
           let id = GroceryItemCloudKitSchema.entityID(from: record.recordID.recordName)
@@ -794,14 +775,6 @@ final class SeptenaServices {
           batchTouchedData = true
           let id = CannabisEventCloudKitSchema.entityID(from: recordID.recordName)
           if let entity = try? context.fetch(FetchDescriptor<CannabisEventEntity>(
-            predicate: #Predicate { $0.id == id }
-          )).first {
-            context.delete(entity)
-          }
-        case CannabisStrainCloudKitSchema.recordType:
-          batchTouchedData = true
-          let id = CannabisStrainCloudKitSchema.entityID(from: recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<CannabisStrainEntity>(
             predicate: #Predicate { $0.id == id }
           )).first {
             context.delete(entity)
@@ -1714,7 +1687,6 @@ final class CannabisMutator {
   func addEntry(date: String,
                 time: String,
                 method: String,
-                strain: String? = nil,
                 hit: Int? = nil,
                 grams: Double? = nil,
                 // Free-form text defaults to "" so the field registers with
@@ -1728,7 +1700,6 @@ final class CannabisMutator {
                                      date: date,
                                      time: time,
                                      method: method,
-                                     strain: strain,
                                      hit: hit,
                                      grams: resolvedGrams,
                                      effect: effect,
@@ -1742,7 +1713,6 @@ final class CannabisMutator {
                    date: String? = nil,
                    time: String? = nil,
                    method: String? = nil,
-                   strain: String?? = nil,
                    hit: Int?? = nil,
                    grams: Double?? = nil,
                    effect: String?? = nil,
@@ -1751,7 +1721,6 @@ final class CannabisMutator {
     if let date { entity.date = date }
     if let time { entity.time = time }
     if let method { entity.method = method }
-    if let strain { entity.strain = strain }
     if let hit { entity.hit = hit }
     if let grams { entity.grams = grams }
     if let effect { entity.effect = effect }
@@ -1768,42 +1737,10 @@ final class CannabisMutator {
     postChanged()
   }
 
-  // MARK: - Strains catalog
-
-  @discardableResult
-  func addStrain(name: String) -> CannabisStrainEntity {
-    let id = uniqueStrainID(for: name)
-    let entity = CannabisStrainEntity(id: id, name: name, sortIndex: nextStrainSortIndex())
-    context.insert(entity)
-    commitStrain(entity, op: "create")
-    return entity
-  }
-
-  func updateStrain(id: String, name: String) {
-    guard let entity = fetchStrain(id: id) else { return }
-    entity.name = name
-    entity.updatedAt = .now
-    commitStrain(entity, op: "update")
-  }
-
-  func deleteStrain(id: String) {
-    guard let entity = fetchStrain(id: id) else { return }
-    context.delete(entity)
-    saveContext("CK cannabis-strain delete")
-    ckEngine?.noteCannabisStrainDeletion(id: id)
-    postChanged()
-  }
-
   // MARK: - Helpers
 
   private func fetchEntry(id: String) -> CannabisEventEntity? {
     try? context.fetch(FetchDescriptor<CannabisEventEntity>(
-      predicate: #Predicate { $0.id == id }
-    )).first
-  }
-
-  private func fetchStrain(id: String) -> CannabisStrainEntity? {
-    try? context.fetch(FetchDescriptor<CannabisStrainEntity>(
       predicate: #Predicate { $0.id == id }
     )).first
   }
@@ -1816,35 +1753,10 @@ final class CannabisMutator {
     return attempt
   }
 
-  private func uniqueStrainID(for name: String) -> String {
-    let base = name.lowercased()
-      .replacingOccurrences(of: " ", with: "-")
-      .filter { $0.isLetter || $0.isNumber || $0 == "-" }
-    var attempt = base.isEmpty ? IDShortcode.generate(length: 4) : base
-    var n = 2
-    while fetchStrain(id: attempt) != nil {
-      attempt = "\(base)-\(n)"
-      n += 1
-    }
-    return attempt
-  }
-
-  private func nextStrainSortIndex() -> Int {
-    ((try? context.fetch(FetchDescriptor<CannabisStrainEntity>(
-      sortBy: [SortDescriptor(\.sortIndex, order: .reverse)]
-    )).first?.sortIndex) ?? -1) + 1
-  }
-
   private func commitEntry(_ entity: CannabisEventEntity, op: String) {
     entity.occurredAt = EventTimestamp.from(date: entity.date, time: entity.time)
     saveContext("CK cannabis \(op)")
     ckEngine?.noteCannabisEventChange(id: entity.id)
-    postChanged()
-  }
-
-  private func commitStrain(_ entity: CannabisStrainEntity, op: String) {
-    saveContext("CK cannabis-strain \(op)")
-    ckEngine?.noteCannabisStrainChange(id: entity.id)
     postChanged()
   }
 

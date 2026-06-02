@@ -242,6 +242,57 @@ extension View {
   }
 }
 
+// MARK: - Scaled system font
+//
+// A fixed-point `Font.system(size:)` does NOT participate in Dynamic Type —
+// it renders at the same pt size regardless of the user's text-size setting,
+// which is the single biggest Dynamic Type gap in this app. This modifier is
+// a drop-in replacement: the argument labels mirror `.system(size:weight:
+// design:)` exactly, so migrating a call site is purely swapping
+// `.font(.system(...))` for `.scaledFont(...)`.
+//
+// The size is anchored with `@ScaledMetric` so it keeps its exact value at
+// the default text size and grows/shrinks proportionally from there. Pass
+// `relativeTo:` to pick which text style sets the scaling curve — default
+// `.body` suits most UI text; use `.largeTitle` for big display numerals so
+// they don't balloon disproportionately at AX5.
+
+private struct ScaledSystemFontModifier: ViewModifier {
+  @ScaledMetric private var size: CGFloat
+  let weight: Font.Weight?
+  let design: Font.Design?
+
+  init(size: CGFloat,
+       relativeTo textStyle: Font.TextStyle,
+       weight: Font.Weight?,
+       design: Font.Design?) {
+    self._size = ScaledMetric(wrappedValue: size, relativeTo: textStyle)
+    self.weight = weight
+    self.design = design
+  }
+
+  func body(content: Content) -> some View {
+    content.font(.system(size: size,
+                         weight: weight ?? .regular,
+                         design: design ?? .default))
+  }
+}
+
+extension View {
+
+  /// Dynamic-Type-aware replacement for `.scaledFont(size:weight:design:)`.
+  /// Renders at `size` pt at the default text setting and scales from there.
+  func scaledFont(size: CGFloat,
+                  weight: Font.Weight? = nil,
+                  design: Font.Design? = nil,
+                  relativeTo textStyle: Font.TextStyle = .body) -> some View {
+    modifier(ScaledSystemFontModifier(size: size,
+                                      relativeTo: textStyle,
+                                      weight: weight,
+                                      design: design))
+  }
+}
+
 // MARK: - Semantic trait shortcuts
 //
 // These are thin wrappers over the built-in modifiers, kept here so call

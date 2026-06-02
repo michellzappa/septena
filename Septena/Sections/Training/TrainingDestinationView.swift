@@ -102,7 +102,7 @@ struct TrainingDestinationView: View {
       if !loading && entries.isEmpty {
         ContentUnavailableView("No entries yet",
                                systemImage: theme.icon(for: "training"),
-                               description: Text("Log a session in the webapp to see it here."))
+                               description: Text("Tap + to log a session."))
       }
     }
     .trackScreen("training")
@@ -2012,7 +2012,7 @@ private struct RestTimerBar: View {
       let remaining = max(0, endsAt.timeIntervalSince(ctx.date))
       HStack(spacing: 12) {
         Image(systemName: "timer")
-          .font(.system(size: 15, weight: .semibold))
+          .scaledFont(size: 15, weight: .semibold)
           .foregroundStyle(accent)
         Text(timeString(remaining))
           .font(.system(.title3, design: .rounded).weight(.bold))
@@ -2185,7 +2185,7 @@ struct TrainingExerciseCard: View {
     HStack(spacing: 12) {
       statusIcon
         .foregroundStyle(statusTint)
-        .font(.system(size: 18, weight: .regular))
+        .scaledFont(size: 18, weight: .regular)
         .frame(width: 22)
       VStack(alignment: .leading, spacing: 2) {
         HStack(spacing: 6) {
@@ -2235,7 +2235,7 @@ struct TrainingExerciseCard: View {
         }
       } label: {
         Image(systemName: "ellipsis")
-          .font(.system(size: 15, weight: .semibold))
+          .scaledFont(size: 15, weight: .semibold)
           .foregroundStyle(Theme.inkSecondary)
           .frame(width: 30, height: 30)
           .contentShape(Rectangle())
@@ -2243,7 +2243,7 @@ struct TrainingExerciseCard: View {
       .buttonStyle(.plain)
       .accessibilityLabel("Exercise options")
       Image(systemName: expanded ? "chevron.up" : "chevron.down")
-        .font(.system(size: 12, weight: .semibold))
+        .scaledFont(size: 12, weight: .semibold)
         .foregroundStyle(Theme.inkSecondary)
     }
   }
@@ -2657,7 +2657,7 @@ struct TrainingExerciseCard: View {
       Haptics.tick()
     } label: {
       Image(systemName: systemName)
-        .font(.system(size: 13, weight: .bold))
+        .scaledFont(size: 13, weight: .bold)
         .frame(width: 30, height: 40)
         .background(accent.opacity(0.14),
                     in: RoundedRectangle(cornerRadius: 8, style: .continuous))

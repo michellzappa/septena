@@ -7,6 +7,12 @@ import SwiftUI
 
 struct EditGutEntrySheet: View {
   @Environment(\.dismiss) private var dismiss
+  // Set when hosted by `.adaptiveDetail` (docked inspector on regular
+  // width), where `dismiss()` is a no-op. Falls back to `dismiss()` when
+  // the form is presented as a plain sheet.
+  @Environment(\.adaptiveDetailClose) private var adaptiveClose
+
+  private func close() { (adaptiveClose ?? { dismiss() })() }
 
   let date: String
   /// `nil` puts the sheet in create mode — save calls `addEntry` and
@@ -87,7 +93,7 @@ struct EditGutEntrySheet: View {
       #endif
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
+          Button("Cancel") { close() }
         }
         ToolbarItem(placement: .confirmationAction) {
           Button("Save") { save() }
@@ -224,6 +230,6 @@ struct EditGutEntrySheet: View {
       note: noteValue
     )
     onSave(rebuilt)
-    dismiss()
+    close()
   }
 }

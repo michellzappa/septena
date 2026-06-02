@@ -97,7 +97,7 @@ struct RemindersInboxSection: View {
   private func ctaRow(icon: String, title: String, subtitle: String) -> some View {
     HStack(alignment: .top, spacing: 12) {
       Image(systemName: icon)
-        .font(.system(size: 14, weight: .semibold))
+        .scaledFont(size: 14, weight: .semibold)
         .foregroundStyle(theme.accent)
         .frame(width: 18)
       VStack(alignment: .leading, spacing: 2) {
@@ -128,7 +128,7 @@ struct RemindersInboxSection: View {
   private var header: some View {
     HStack {
       Text("From Reminders")
-        .font(.system(size: 15, weight: .semibold))
+        .scaledFont(size: 15, weight: .semibold)
         .foregroundStyle(Theme.inkPrimary)
       Spacer()
       Button {
@@ -139,10 +139,10 @@ struct RemindersInboxSection: View {
             ProgressView().scaleEffect(0.6)
           } else {
             Image(systemName: "arrow.down")
-              .font(.system(size: 11, weight: .semibold))
+              .scaledFont(size: 11, weight: .semibold)
           }
           Text(bulkImporting ? "Importing…" : "Import All")
-            .font(.system(size: 13, weight: .semibold))
+            .scaledFont(size: 13, weight: .semibold)
         }
         .foregroundStyle(Color.accentColor)
       }
@@ -165,7 +165,7 @@ struct RemindersInboxSection: View {
           ProgressView().scaleEffect(0.5).frame(width: 16, height: 16)
         } else {
           Image(systemName: "arrow.down")
-            .font(.system(size: 12, weight: .semibold))
+            .scaledFont(size: 12, weight: .semibold)
             .foregroundStyle(Theme.iconMuted)
             .frame(width: 16, height: 16)
         }

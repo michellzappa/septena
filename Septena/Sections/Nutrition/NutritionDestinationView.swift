@@ -460,7 +460,7 @@ struct NutritionDestinationView: View {
           AxisValueLabel {
             if let iso = v.as(String.self) {
               Text(verbatim: weekdayInitial(iso))
-                .font(.system(size: 9))
+                .scaledFont(size: 9)
                 .foregroundStyle(iso == today ? color : .secondary)
             }
           }

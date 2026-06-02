@@ -53,7 +53,7 @@ struct TaskCheckbox: View {
             .fill(boxFillColor)
             .frame(width: Self.boxSize, height: Self.boxSize)
           Image(systemName: "checkmark")
-            .font(.system(size: Self.checkSize, weight: .bold))
+            .scaledFont(size: Self.checkSize, weight: .bold)
             .foregroundStyle(.white)
         } else {
           RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
@@ -140,13 +140,13 @@ struct TaskRow: View {
 
       if hasNotes {
         Image(systemName: "text.alignleft")
-          .font(.system(size: 12))
+          .scaledFont(size: 12)
           .foregroundStyle(Theme.inkSecondary)
       }
 
       if task.recurrence != nil {
         Image(systemName: "arrow.triangle.2.circlepath")
-          .font(.system(size: 12))
+          .scaledFont(size: 12)
           .foregroundStyle(Theme.inkSecondary)
       }
 
@@ -269,7 +269,7 @@ struct TaskRowView<MetaLine: View, TrailingDate: View>: View {
                           role: ButtonRole? = nil, _ action: @escaping () -> Void) -> some View {
     Button(role: role) { Haptics.pick(); action() } label: {
       Image(systemName: systemImage)
-        .font(.system(size: 16))
+        .scaledFont(size: 16)
         .foregroundStyle(role == .destructive ? Theme.overdueRed : (set ? accent : Theme.inkSecondary))
         .frame(width: 40, height: 30)
         .contentShape(Rectangle())
@@ -323,7 +323,7 @@ struct TaskRowView<MetaLine: View, TrailingDate: View>: View {
       if !isEditing {
         if hasNotes {
           Image(systemName: "text.alignleft")
-            .font(.system(size: 12))
+            .scaledFont(size: 12)
             .foregroundStyle(Theme.inkSecondary)
         }
         trailingDate()
@@ -450,10 +450,10 @@ struct WeekStrip: View {
         } label: {
           VStack(spacing: 2) {
             Text(Self.weekdayFmt.string(from: d))
-              .font(.system(size: 11, weight: .medium))
+              .scaledFont(size: 11, weight: .medium)
               .foregroundStyle(isSelected ? Color.white : Theme.inkSecondary)
             Text("\(Self.cal.component(.day, from: d))")
-              .font(.system(size: 17, weight: .semibold, design: .rounded))
+              .scaledFont(size: 17, weight: .semibold, design: .rounded)
               .foregroundStyle(isSelected ? Color.white
                                : (isToday ? theme.accent : Theme.inkPrimary))
           }
@@ -480,8 +480,8 @@ struct WeekStrip: View {
 // MARK: - Date picker sheet
 
 /// Shared picker for both "When" (scheduled) and "Deadline" (due). 7-day
-/// strip up top for the common case; "Pick a Date…" reveals the graphical
-/// calendar for anything further out. Only the title, button labels, and
+/// strip up top for the common case; "Pick a Date…" reveals a compact
+/// date field for anything further out. Only the title, button labels, and
 /// clear semantics differ between the two — layout is identical.
 struct DatePickerSheet: View {
   @Environment(SectionTheme.self) private var theme
@@ -495,6 +495,11 @@ struct DatePickerSheet: View {
   @Environment(\.a11yMotion) private var motion
   @State private var date: Date
   @State private var showingCalendar: Bool
+
+  /// Fitted sheet height. Content is fixed (the "Pick a Date…" row and the
+  /// compact-field row share a height), so the sheet need not open half-screen.
+  /// `.large` stays available as a drag-up fallback for big Dynamic Type.
+  static let sheetHeight: CGFloat = 320
 
   init(
     title: String,
@@ -537,16 +542,32 @@ struct DatePickerSheet: View {
         Hairline()
 
         if showingCalendar {
-          DatePicker(title, selection: $date, displayedComponents: [.date])
-            .datePickerStyle(.graphical)
-            .padding(.horizontal, Theme.hPadding)
+          // Compact field: a tidy row that pops Apple's native calendar
+          // overlay. Fits the medium detent without the graphical grid's
+          // clipping/scroll fight, and picks up the accent tint.
+          HStack(spacing: 14) {
+            Image(systemName: "calendar")
+              .scaledFont(size: 18)
+              .foregroundStyle(Theme.inkSecondary)
+              .frame(width: 24)
+            Text("Date")
+              .font(.septenaSidebarRow)
+              .foregroundStyle(.primary)
+            Spacer()
+            DatePicker("", selection: $date, displayedComponents: [.date])
+              .labelsHidden()
+              .datePickerStyle(.compact)
+              .tint(theme.accent)
+          }
+          .padding(.horizontal, Theme.hPadding)
+          .frame(height: Theme.sidebarRowHeight)
         } else {
           Button {
             motion.run(.easeInOut(duration: 0.18)) { showingCalendar = true }
           } label: {
             HStack(spacing: 14) {
               Image(systemName: "calendar")
-                .font(.system(size: 18))
+                .scaledFont(size: 18)
                 .foregroundStyle(Theme.inkSecondary)
                 .frame(width: 24)
               Text("Pick a Date…")
@@ -569,7 +590,7 @@ struct DatePickerSheet: View {
             dismiss()
           } label: {
             Text(initialDate == nil ? setLabel : updateLabel)
-              .font(.system(size: 16, weight: .semibold))
+              .scaledFont(size: 16, weight: .semibold)
               .foregroundStyle(.white)
               .frame(maxWidth: .infinity)
               .padding(.vertical, 12)
@@ -584,7 +605,7 @@ struct DatePickerSheet: View {
             dismiss()
           } label: {
             Text(clearLabel)
-              .font(.system(size: 15, weight: .medium))
+              .scaledFont(size: 15, weight: .medium)
               .foregroundStyle(initialDate == nil ? Theme.inkSecondary : Theme.overdueRed)
               .frame(maxWidth: .infinity)
               .padding(.vertical, 8)
@@ -686,7 +707,7 @@ struct RecurrencePickerSheet: View {
             dismiss()
           } label: {
             Text(initial == nil ? "Set Repeat" : "Update Repeat")
-              .font(.system(size: 16, weight: .semibold))
+              .scaledFont(size: 16, weight: .semibold)
               .foregroundStyle(.white)
               .frame(maxWidth: .infinity)
               .padding(.vertical, 14)
@@ -702,7 +723,7 @@ struct RecurrencePickerSheet: View {
               dismiss()
             } label: {
               Text("Don't Repeat")
-                .font(.system(size: 15, weight: .medium))
+                .scaledFont(size: 15, weight: .medium)
                 .foregroundStyle(Theme.overdueRed)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
@@ -826,12 +847,12 @@ struct MovePickerSheet: View {
         icon(for: kind)
           .frame(width: 24, alignment: .center)
         Text(title)
-          .font(.system(size: 16, weight: kind == .area ? .semibold : .regular))
+          .scaledFont(size: 16, weight: kind == .area ? .semibold : .regular)
           .foregroundStyle(Theme.inkPrimary)
         Spacer()
         if selected {
           Image(systemName: "checkmark")
-            .font(.system(size: 14, weight: .semibold))
+            .scaledFont(size: 14, weight: .semibold)
             .foregroundStyle(Theme.inkSecondary)
         }
       }
@@ -849,7 +870,7 @@ struct MovePickerSheet: View {
     switch kind {
     case .inbox:
       Image(systemName: "tray.fill")
-        .font(.system(size: 16))
+        .scaledFont(size: 16)
         .foregroundStyle(Theme.iconMuted)
     case .area:
       AreaIcon(diameter: 14, lineWidth: 1.5)
@@ -904,7 +925,7 @@ struct ActionSheet: View {
         } label: {
           HStack(spacing: 14) {
             Image(systemName: action.icon)
-              .font(.system(size: 16))
+              .scaledFont(size: 16)
               .foregroundStyle(action.role == .destructive ? Theme.overdueRed : Theme.inkSecondary)
               .frame(width: 22)
             Text(action.title)
@@ -913,7 +934,7 @@ struct ActionSheet: View {
             Spacer()
             if action.selected {
               Image(systemName: "checkmark")
-                .font(.system(size: 14, weight: .semibold))
+                .scaledFont(size: 14, weight: .semibold)
                 .foregroundStyle(theme.accent)
             }
           }

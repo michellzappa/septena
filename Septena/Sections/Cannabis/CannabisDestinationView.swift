@@ -12,7 +12,6 @@ struct CannabisDestinationView: View {
   @State private var today: CannabisDayResponse? = nil
   @State private var loading = true
   @State private var editing: CannabisEntry? = nil
-  @State private var managingTypes = false
   /// Driven by `CannabisPlugin.logActions`: tapping "Log vape" / "Log
   /// edible" sets this to the method id; the sheet opens in create mode
   /// with `presetMethod` seeded.
@@ -95,13 +94,6 @@ struct CannabisDestinationView: View {
     .tint(accent)
     .task { reload() }
     .onChange(of: viewingDate) { _, _ in reload() }
-    .sheet(isPresented: $managingTypes) {
-      CannabisTypeSheet()
-        #if os(iOS)
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-        #endif
-    }
     .sheet(item: $editing) { entry in
       EditCannabisEntrySheet(
         date: viewingDate,
@@ -133,7 +125,6 @@ struct CannabisDestinationView: View {
     switch id {
     case "log-vape":   loggingMethod = .init(method: "vape")
     case "log-edible": loggingMethod = .init(method: "edible")
-    case "manage":     managingTypes = true
     default:           loggingMethod = .init(method: "vape")
     }
   }
@@ -161,7 +152,6 @@ struct CannabisDestinationView: View {
 
   private func detailLine(_ e: CannabisEntry) -> String? {
     var parts: [String] = []
-    if let s = e.strain, !s.isEmpty { parts.append(s) }
     if let hit = e.hit { parts.append(hitDots(hit: hit)) }
     if let g = e.grams, g > 0 { parts.append(String(format: "%.2fg", g)) }
     if let eff = e.effect, !eff.isEmpty { parts.append(eff) }

@@ -234,6 +234,156 @@ private struct OptionalSearchable: ViewModifier {
   }
 }
 
+// MARK: - Adaptive detail presentation
+//
+// One primitive for "open a record's detail / edit form" that resolves to
+// the right idiom per surface:
+//
+//   • compact width (iPhone)        → modal `.sheet` (unchanged native idiom)
+//   • regular width (iPad / macOS)  → docked `.inspector` trailing pane, so
+//     the list/log stays visible and editing a record never covers the
+//     context the user was just looking at.
+//
+// Convert a section's `.sheet(item:)` / `.sheet(isPresented:)` to the
+// matching `.adaptiveDetail(...)` and it inherits coherent behavior on all
+// three surfaces — no per-section size-class branching.
+//
+// Dismissal: a docked inspector is NOT a "presentation," so the inner
+// form's `@Environment(\.dismiss)` is a no-op there. The primitive injects
+// `\.adaptiveDetailClose`; edit forms should close through that (it falls
+// back to `dismiss()` when absent, so a form still works if presented as a
+// plain sheet elsewhere). See `EditGutEntrySheet` for the reference adoption.
+
+private struct AdaptiveDetailCloseKey: EnvironmentKey {
+  static let defaultValue: (() -> Void)? = nil
+}
+
+extension EnvironmentValues {
+  /// Closes the enclosing adaptive detail presentation (sheet or docked
+  /// inspector). `nil` when the view isn't hosted by `.adaptiveDetail` —
+  /// callers should fall back to `@Environment(\.dismiss)`.
+  var adaptiveDetailClose: (() -> Void)? {
+    get { self[AdaptiveDetailCloseKey.self] }
+    set { self[AdaptiveDetailCloseKey.self] = newValue }
+  }
+}
+
+extension View {
+  /// Item-driven adaptive detail. Drop-in replacement for `.sheet(item:)`.
+  func adaptiveDetail<Item: Identifiable, DetailContent: View>(
+    item: Binding<Item?>,
+    onDismiss: (() -> Void)? = nil,
+    @ViewBuilder content: @escaping (Item) -> DetailContent
+  ) -> some View {
+    modifier(AdaptiveDetailItem(item: item, onDismiss: onDismiss, detail: content))
+  }
+
+  /// Flag-driven adaptive detail. Drop-in replacement for
+  /// `.sheet(isPresented:)`.
+  func adaptiveDetail<DetailContent: View>(
+    isPresented: Binding<Bool>,
+    onDismiss: (() -> Void)? = nil,
+    @ViewBuilder content: @escaping () -> DetailContent
+  ) -> some View {
+    modifier(AdaptiveDetailFlag(isPresented: isPresented, onDismiss: onDismiss, detail: content))
+  }
+}
+
+/// True when detail content should dock as an inspector rather than present
+/// as a sheet. macOS always docks; on iOS we follow the horizontal size
+/// class so iPad multitasking (a compact-width window) correctly falls back
+/// to a sheet.
+private func adaptiveUseInspector(hSizeIsRegular: Bool) -> Bool {
+  #if os(macOS)
+  return true
+  #else
+  return hSizeIsRegular
+  #endif
+}
+
+private struct AdaptiveDetailItem<Item: Identifiable, DetailContent: View>: ViewModifier {
+  @Binding var item: Item?
+  let onDismiss: (() -> Void)?
+  @ViewBuilder let detail: (Item) -> DetailContent
+
+  #if os(iOS)
+  @Environment(\.horizontalSizeClass) private var hSize
+  #endif
+
+  private var useInspector: Bool {
+    #if os(iOS)
+    return adaptiveUseInspector(hSizeIsRegular: hSize == .regular)
+    #else
+    return adaptiveUseInspector(hSizeIsRegular: true)
+    #endif
+  }
+
+  func body(content: Content) -> some View {
+    if useInspector {
+      content.inspector(isPresented: presented) {
+        // `item` may briefly be nil during dismissal animation; guard so
+        // the inspector empties cleanly instead of force-unwrapping.
+        if let item {
+          detail(item)
+            .environment(\.adaptiveDetailClose, close)
+            .inspectorColumnWidth(min: 320, ideal: 380, max: 480)
+        }
+      }
+    } else {
+      content.sheet(item: $item, onDismiss: onDismiss, content: detail)
+    }
+  }
+
+  /// Bridges the optional item to the inspector's `isPresented` binding.
+  /// Clearing it (swipe-away / toolbar toggle) routes through `close` so
+  /// `onDismiss` fires exactly once on every dismissal path.
+  private var presented: Binding<Bool> {
+    Binding(get: { item != nil }, set: { if !$0 { close() } })
+  }
+
+  private func close() {
+    item = nil
+    onDismiss?()
+  }
+}
+
+private struct AdaptiveDetailFlag<DetailContent: View>: ViewModifier {
+  @Binding var isPresented: Bool
+  let onDismiss: (() -> Void)?
+  @ViewBuilder let detail: () -> DetailContent
+
+  #if os(iOS)
+  @Environment(\.horizontalSizeClass) private var hSize
+  #endif
+
+  private var useInspector: Bool {
+    #if os(iOS)
+    return adaptiveUseInspector(hSizeIsRegular: hSize == .regular)
+    #else
+    return adaptiveUseInspector(hSizeIsRegular: true)
+    #endif
+  }
+
+  func body(content: Content) -> some View {
+    if useInspector {
+      content
+        .inspector(isPresented: $isPresented) {
+          detail()
+            .environment(\.adaptiveDetailClose, close)
+            .inspectorColumnWidth(min: 320, ideal: 380, max: 480)
+        }
+        // Fire onDismiss when the inspector is toggled shut by the system.
+        .onChange(of: isPresented) { _, now in if !now { onDismiss?() } }
+    } else {
+      content.sheet(isPresented: $isPresented, onDismiss: onDismiss, content: detail)
+    }
+  }
+
+  private func close() {
+    isPresented = false
+  }
+}
+
 // DrawerSection — titled, rounded, grouped block. Visual analogue of an
 // insetGrouped List `Section("Title")`: secondary-grouped fill, rounded
 // corners, an uppercase footnote header. Content is laid out as a VStack;

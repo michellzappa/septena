@@ -59,7 +59,6 @@
 		1C66407AC9157A11987CE3DB /* WelcomeHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD1B703F4A00C0E46140FEC1 /* WelcomeHeader.swift */; };
 		1CBF0222F73BAE3CDDB0E342 /* ProjectRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A7C4DF4E90BB39F4A0D23DE /* ProjectRecord.swift */; };
 		1D075925DFF88985F673FD7F /* SiriShortcutsSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15B234E4AED39B8EF15DD9A6 /* SiriShortcutsSettingsPane.swift */; };
-		1D7A5FE67321DE601A4A975A /* CannabisTypeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 199460C317554A7D235979EB /* CannabisTypeSheet.swift */; };
 		1DCDA337088FC9FEA65F9F73 /* NextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47CA5EA5A9284AB449966DCC /* NextView.swift */; };
 		1DFCCAA759E4B23AC3D03C10 /* HealthKitBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F61B77A80F53A6EEEBBC90EA /* HealthKitBridge.swift */; };
 		1E695C8629B03CA4D8A8BA37 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F0BEBB91083B3194167B548E /* PrivacyInfo.xcprivacy */; };
@@ -222,6 +221,7 @@
 		72CC45D5A8CEC1C0A3B6EA39 /* MoodIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 675F31A4511CBADB2FB97B81 /* MoodIntents.swift */; };
 		7397EB4533BA4D026F9F7662 /* CalendarBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7027B881D1D8B1B09B105034 /* CalendarBridge.swift */; };
 		73A70B780F096F7BDB0DA963 /* ConfettiBurst.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2CA5B9FC1BA7572CC27B4D5 /* ConfettiBurst.swift */; };
+		C0FFEE00000000000000FB01 /* CommitMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE00000000000000FA01 /* CommitMotion.swift */; };
 		7435B6913FC111EAE946DBBB /* ValuesMiniApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABBBBE8B556E5C9946CFB630 /* ValuesMiniApp.swift */; };
 		74E631E4D6B41796BBE7B3FA /* AreaRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = C729259A5867D99CC64AA9C3 /* AreaRecord.swift */; };
 		75F953C419493CAE4EC29A6E /* GoalsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 207D112EFCEB89F2F0D1DBE5 /* GoalsPlugin.swift */; };
@@ -291,7 +291,6 @@
 		9E8994F78DFE201A05147CE2 /* TrainingQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F79B52B56CF74E2F11586CC /* TrainingQuickAddMenu.swift */; };
 		9EA68EE136C5016C9196136E /* BodyPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D7AE711DD74BE91E7EECA48 /* BodyPlugin.swift */; };
 		9EA753D4BE7912ACB670B69F /* ModuleTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = F79D2478011E9353A0DF90AC /* ModuleTile.swift */; };
-		A07317BD24F6EA572471222F /* CannabisTypeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 199460C317554A7D235979EB /* CannabisTypeSheet.swift */; };
 		A14B8DF03D6FC0799D8AA8C2 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = E17D3542734AB0B32527C12C /* AppIcon.icns */; };
 		A1C7525645EBE54B283DC0D9 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25DC8E705099DB99718A8596 /* Persistence.swift */; };
 		A1D4907004FD78EC3D6F7C6F /* ShortcutAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB6A01D91E7B3ED63B6BFDE /* ShortcutAction.swift */; };
@@ -420,6 +419,7 @@
 		DCDA3588548FB4D80137D355 /* ChartCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6677D4008D68908591E4937 /* ChartCard.swift */; };
 		DD040A040CBF13BC05DF5CB3 /* TrainingLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2A2AA1777B672AFC02F29BF /* TrainingLiveActivity.swift */; };
 		DD0CAC0D298CB64B7B4BDAFF /* ConfettiBurst.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2CA5B9FC1BA7572CC27B4D5 /* ConfettiBurst.swift */; };
+		C0FFEE00000000000000FB02 /* CommitMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE00000000000000FA01 /* CommitMotion.swift */; };
 		DD200EF411309E29B543963F /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5ECFDA9128B73993023CB6 /* Models.swift */; };
 		DD4C37A28620313CC2C805BE /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F13269D0CDB1EB49B2351D6 /* TaskDetailView.swift */; };
 		DD51381780B1556223B6960A /* IkigaiMiniApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB16726C9C1C5A2A1CDEDD3 /* IkigaiMiniApp.swift */; };
@@ -570,7 +570,6 @@
 		15B234E4AED39B8EF15DD9A6 /* SiriShortcutsSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiriShortcutsSettingsPane.swift; sourceTree = "<group>"; };
 		1654FD32744DA1974DA1C1CE /* PlatformDelegates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformDelegates.swift; sourceTree = "<group>"; };
 		185686A2A4BF9FA8CE915F91 /* TrainingIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingIntents.swift; sourceTree = "<group>"; };
-		199460C317554A7D235979EB /* CannabisTypeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CannabisTypeSheet.swift; sourceTree = "<group>"; };
 		1A7C4DF4E90BB39F4A0D23DE /* ProjectRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRecord.swift; sourceTree = "<group>"; };
 		1B0FAB25573797D6BF8C9482 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		1B5BF16679C5BA62C066871C /* ActivityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityPlugin.swift; sourceTree = "<group>"; };
@@ -724,6 +723,7 @@
 		B1E7DE045967372A515DB48B /* IkigaiFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IkigaiFlowView.swift; sourceTree = "<group>"; };
 		B241213EA8E591629280B7EE /* AddChorePage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddChorePage.swift; sourceTree = "<group>"; };
 		B2CA5B9FC1BA7572CC27B4D5 /* ConfettiBurst.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfettiBurst.swift; sourceTree = "<group>"; };
+		C0FFEE00000000000000FA01 /* CommitMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommitMotion.swift; sourceTree = "<group>"; };
 		B456DE05339EB2A12EB2A9BE /* SeptenaWatchComplication.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SeptenaWatchComplication.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B55D56BF301C74DCB785773E /* ExerciseCatalogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseCatalogView.swift; sourceTree = "<group>"; };
 		B65BF5C0096129915EFA26FC /* CaffeineTypeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaffeineTypeSheet.swift; sourceTree = "<group>"; };
@@ -1233,7 +1233,6 @@
 				851E4304EF13EE92F1DD7FF1 /* BrowseCannabisDaySheet.swift */,
 				A8426035C14708F9B19546DE /* CannabisDestinationView.swift */,
 				1D82674F62302252DB1B8167 /* CannabisQuickAddMenu.swift */,
-				199460C317554A7D235979EB /* CannabisTypeSheet.swift */,
 				1E49712FC24D8C18675935DF /* EditCannabisEntrySheet.swift */,
 			);
 			path = Cannabis;
@@ -1308,6 +1307,7 @@
 			children = (
 				26ED5AC7B6F2400A0A4B378C /* Accessibility.swift */,
 				B2CA5B9FC1BA7572CC27B4D5 /* ConfettiBurst.swift */,
+				C0FFEE00000000000000FA01 /* CommitMotion.swift */,
 				E0E984505A489247AADAB293 /* ConsistencyHeatmap.swift */,
 				32A70DB5FE3A7F04BE3E7BAC /* DayBucketHeader.swift */,
 				CE7DF7DE41AF304A9324BC6E /* IntensityGlyph.swift */,
@@ -1688,7 +1688,6 @@
 				39B3EF9EF9C9A561E015C1A9 /* CannabisIntents.swift in Sources */,
 				F47445E3B33F188B49D63233 /* CannabisPlugin.swift in Sources */,
 				B28E04772BF9921F6B165657 /* CannabisQuickAddMenu.swift in Sources */,
-				1D7A5FE67321DE601A4A975A /* CannabisTypeSheet.swift in Sources */,
 				99277F861EF959F986D7589B /* ChartCard.swift in Sources */,
 				7FFEA95721A7FACE74618002 /* ChecklistMirror.swift in Sources */,
 				40A92682CA803F799D00CC2D /* ChoreIntents.swift in Sources */,
@@ -1697,6 +1696,7 @@
 				8C64426276695251AE35D327 /* ChoresQuickAddMenu.swift in Sources */,
 				2BE2D64D96CCF32360AB94A6 /* ClaudeGatewayProvider.swift in Sources */,
 				73A70B780F096F7BDB0DA963 /* ConfettiBurst.swift in Sources */,
+				C0FFEE00000000000000FB01 /* CommitMotion.swift in Sources */,
 				331439A1A265FAA64B5B02B6 /* ConsistencyHeatmap.swift in Sources */,
 				A6D80B6B57734D9155888CC7 /* ContentView.swift in Sources */,
 				9056B762F0365C38DEA0F888 /* CorrelationEngine.swift in Sources */,
@@ -1952,7 +1952,6 @@
 				E4180FED71DD1EE81CA5012E /* CannabisIntents.swift in Sources */,
 				4082657062EBC11108916FAE /* CannabisPlugin.swift in Sources */,
 				183F34C5DC50F1B0DE238401 /* CannabisQuickAddMenu.swift in Sources */,
-				A07317BD24F6EA572471222F /* CannabisTypeSheet.swift in Sources */,
 				DCDA3588548FB4D80137D355 /* ChartCard.swift in Sources */,
 				6521E27B88444ACE53AE24BE /* ChecklistMirror.swift in Sources */,
 				37A2D98F281B03FBEE6B6C75 /* ChoreIntents.swift in Sources */,
@@ -1961,6 +1960,7 @@
 				1C507D0995C20ECA4DA6479F /* ChoresQuickAddMenu.swift in Sources */,
 				5913FEDDD567597FD292D6B2 /* ClaudeGatewayProvider.swift in Sources */,
 				DD0CAC0D298CB64B7B4BDAFF /* ConfettiBurst.swift in Sources */,
+				C0FFEE00000000000000FB02 /* CommitMotion.swift in Sources */,
 				EA56ADCFD84CE200C7CEF2A9 /* ConsistencyHeatmap.swift in Sources */,
 				2A5F1570FB36894B1FBE4364 /* ContentView.swift in Sources */,
 				0578243E033490DBAFABEEE2 /* CorrelationEngine.swift in Sources */,

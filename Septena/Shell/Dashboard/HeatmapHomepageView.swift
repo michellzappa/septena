@@ -109,14 +109,8 @@ private struct HeatmapDomainCard: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
       HStack(spacing: 8) {
-        RoundedRectangle(cornerRadius: 7, style: .continuous)
-          .fill(data.accent.opacity(0.18))
-          .frame(width: 28, height: 28)
-          .overlay {
-            Image(systemName: SectionManifest.byKey[data.domain.rawValue]?.iconSymbol ?? "circle.fill")
-              .font(.system(size: 14, weight: .semibold))
-              .foregroundStyle(data.accent)
-          }
+        SectionGlyph(icon: SectionManifest.byKey[data.domain.rawValue]?.iconSymbol ?? "circle.fill",
+                     accent: data.accent)
         Text(data.title)
           .font(.subheadline.weight(.semibold))
           .foregroundStyle(.primary)
@@ -195,14 +189,8 @@ private struct HeatmapDomainRow: View {
   private var identityColumn: some View {
     VStack(alignment: .leading, spacing: 6) {
       HStack(spacing: 8) {
-        RoundedRectangle(cornerRadius: 7, style: .continuous)
-          .fill(data.accent.opacity(0.18))
-          .frame(width: 28, height: 28)
-          .overlay {
-            Image(systemName: SectionManifest.byKey[data.domain.rawValue]?.iconSymbol ?? "circle.fill")
-              .font(.system(size: 14, weight: .semibold))
-              .foregroundStyle(data.accent)
-          }
+        SectionGlyph(icon: SectionManifest.byKey[data.domain.rawValue]?.iconSymbol ?? "circle.fill",
+                     accent: data.accent)
         Text(data.title)
           .font(.subheadline.weight(.semibold))
           .foregroundStyle(.primary)

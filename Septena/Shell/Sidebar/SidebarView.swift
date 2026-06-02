@@ -1011,7 +1011,7 @@ struct SmartListTile: View {
         ZStack {
           Circle().fill(iconColor)
           Image(systemName: icon)
-            .font(.system(size: 14, weight: .semibold))
+            .scaledFont(size: 14, weight: .semibold)
             .foregroundStyle(.white)
         }
         .frame(width: 26, height: 26)
@@ -1020,7 +1020,7 @@ struct SmartListTile: View {
       }
       Spacer(minLength: 6)
       Text(title)
-        .font(.system(size: 15, weight: .regular))
+        .scaledFont(size: 15, weight: .regular)
         .foregroundStyle(.primary)
         .lineLimit(1)
     }
@@ -1040,7 +1040,7 @@ struct SmartListTile: View {
   private var countCluster: some View {
     if let n = count {
       Text("\(n)")
-        .font(.system(size: 26, weight: .bold))
+        .scaledFont(size: 26, weight: .bold)
         .foregroundStyle(.primary)
         .monospacedDigit()
     }
@@ -1071,10 +1071,36 @@ struct ColoredGlyph: View {
       RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
         .fill(adaptedFill)
       Image(systemName: icon)
-        .font(.system(size: size * glyphRatio, weight: .semibold))
+        .scaledFont(size: size * glyphRatio, weight: .semibold)
         .foregroundStyle(.white)
     }
     .frame(width: size, height: size)
+  }
+}
+
+/// Soft tinted section icon — the homepage treatment: an accent-tinted
+/// rounded square with the SF Symbol drawn *in the accent color* (not a
+/// white glyph on a saturated fill, which is `ColoredGlyph`). Shared by
+/// the Dense/Heatmap homepage rows and the Settings section rows so the
+/// same section reads identically in both places. Defaults match the
+/// homepage exactly (28pt square, 7pt corner, 14pt semibold glyph).
+struct SectionGlyph: View {
+  let icon: String
+  let accent: Color
+  var size: CGFloat = 28
+  /// Inner SF Symbol size as a fraction of `size`. Default `0.5` is the
+  /// homepage's 14-on-28 glyph.
+  var glyphRatio: CGFloat = 0.5
+
+  var body: some View {
+    RoundedRectangle(cornerRadius: size * 0.25, style: .continuous)
+      .fill(accent.opacity(0.18))
+      .frame(width: size, height: size)
+      .overlay {
+        Image(systemName: icon)
+          .scaledFont(size: size * glyphRatio, weight: .semibold)
+          .foregroundStyle(accent)
+      }
   }
 }
 
@@ -1088,12 +1114,12 @@ struct SidebarAreaRow: View {
       AreaIcon()
         .frame(width: Theme.sidebarIconSize + 4, alignment: .center)
       Text(name)
-        .font(.system(size: Theme.sidebarAreaTitleSize, weight: .semibold))
+        .scaledFont(size: Theme.sidebarAreaTitleSize, weight: .semibold)
         .foregroundStyle(Theme.inkPrimary)
       Spacer()
       if count > 0 {
         Text("\(count)")
-          .font(.system(size: 12, weight: .regular))
+          .scaledFont(size: 12, weight: .regular)
           .foregroundStyle(Theme.inkSecondary.opacity(0.6))
       }
       SidebarRowChevron()
@@ -1138,12 +1164,12 @@ struct SidebarProjectRow: View {
       ProjectProgressIcon(progress: progress, tint: tint)
         .frame(width: Theme.sidebarIconSize + 4, alignment: .center)
       Text(name)
-        .font(.system(size: Theme.sidebarTitleSize, weight: Theme.sidebarTitleWeight))
+        .scaledFont(size: Theme.sidebarTitleSize, weight: Theme.sidebarTitleWeight)
         .foregroundStyle(Theme.inkPrimary)
       Spacer()
       if count > 0 {
         Text("\(count)")
-          .font(.system(size: 12, weight: .regular))
+          .scaledFont(size: 12, weight: .regular)
           .foregroundStyle(Theme.inkSecondary.opacity(0.6))
       }
       SidebarRowChevron()
@@ -1163,7 +1189,7 @@ struct SidebarRowChevron: View {
   var body: some View {
     #if os(iOS)
     Image(systemName: "chevron.right")
-      .font(.system(size: 12, weight: .semibold))
+      .scaledFont(size: 12, weight: .semibold)
       .foregroundStyle(.tertiary)
     #else
     EmptyView()

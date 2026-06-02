@@ -59,7 +59,7 @@ struct SupplementsDestinationView: View {
         if model.hasLoaded && model.supplements.isEmpty {
           ContentUnavailableView("No supplements configured",
                                  systemImage: theme.icon(for: "supplements"),
-                                 description: Text("Add some in the webapp's Supplements settings."))
+                                 description: Text("Tap + to add a supplement."))
         }
         if !history.isEmpty {
           ChecklistHeatmapSection(

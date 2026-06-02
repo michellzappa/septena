@@ -1,5 +1,5 @@
-import AuthenticationServices
 import Foundation
+import WebKit
 import os
 #if os(iOS)
 import UIKit
@@ -10,26 +10,20 @@ import AppKit
 // MARK: - ClaudeGatewayProvider
 //
 // Keeps the Septena MCP gateway (mcp.septena.app) supplied with a live
-// CloudKit Web Services token so Claude can read/write the user's data
-// without the user re-authorizing on claude.ai every ~8 hours.
+// CloudKit Web Services token so Claude can read/write the user's data.
 //
-// Why a web sign-in and not a native mint: Apple issues no server-side
-// refresh for ckWebAuthTokens, and the only *native* minting API
-// (CKFetchWebAuthTokenOperation) returns a PUBLIC-database-only token —
-// verified empirically: it gets ACCESS_DENIED on the private DB. The sole
-// way to obtain a PRIVATE-scoped token is the idmsa web sign-in flow. So
-// this app drives that flow itself via ASWebAuthenticationSession, captures
-// the ckWebAuthToken from the gateway's HTTPS callback, and pushes it to
-// the gateway. The gateway stores only this rotating credential — never
-// user data — and serves it to the bound claude.ai bearer.
+// Apple gives no server-side refresh for ckWebAuthTokens, and the native
+// mint (CKFetchWebAuthTokenOperation) is public-DB only. The sole way to a
+// PRIVATE-scoped token is the idmsa web sign-in. So we drive that sign-in
+// in an app-owned WKWebView whose cookie store PERSISTS — meaning after one
+// interactive sign-in, every later re-mint is SILENT (the live Apple
+// session cookie auto-authenticates and idmsa redirects straight to our
+// callback). We capture the ckWebAuthToken from that redirect in the
+// navigation delegate — no ASWebAuthenticationSession, no Associated
+// Domains / AASA needed. The user only re-authenticates when the Apple
+// session cookie itself lapses (weeks), not every ~8h.
 //
-// The HTTPS callback (/auth/apple/callback) is captured in-app via
-// ASWebAuthenticationSession's `.https` callback, which requires the app
-// to claim mcp.septena.app through the Associated Domains `webcredentials`
-// service (see Septena.entitlements + the gateway's AASA file).
-//
-// Refresh is foreground-only (ASWebAuthenticationSession needs UI). With a
-// live Apple session it's quick; the system may still show a brief sheet.
+// Still foreground-only: a WKWebView can't run while the app is suspended.
 @MainActor
 @Observable
 public final class ClaudeGatewayProvider {
@@ -38,51 +32,52 @@ public final class ClaudeGatewayProvider {
   private let logger = Logger(subsystem: "com.septena.cloud", category: "ClaudeGateway")
 
   // MARK: Configuration
-
-  /// Gateway base + the host/path of the OAuth callback the API token
-  /// redirects to after sign-in (must match the gateway's API token config).
   private static let gatewayBaseURL = "https://mcp.septena.app"
   private static let callbackHost = "mcp.septena.app"
   private static let callbackPath = "/auth/apple/callback"
 
-  /// CloudKit Web Services API token. MUST match the gateway's
-  /// `CK_API_TOKEN` secret — a ckWebAuthToken is scoped to the API token
-  /// it was minted with — and that token's sign-in callback URL must be
-  /// `https://mcp.septena.app/auth/apple/callback`.
+  /// CloudKit Web Services API token — MUST match the gateway's CK_API_TOKEN,
+  /// and that token's sign-in callback URL must be the one above.
   private static let webServicesAPIToken = "REDACTED-CLOUDKIT-API-TOKEN"
 
-  /// CloudKit environment for the Web Services REST path. Must match the
-  /// gateway's CK_ENVIRONMENT. NOTE: a TestFlight/App Store build talks to
-  /// the *production* CloudKit environment — flip this (and the gateway)
-  /// to "production" when shipping.
+  /// CloudKit env for the REST path. Must match the gateway's CK_ENVIRONMENT.
+  /// Flip to "production" (with the gateway) for TestFlight/App Store builds.
   private static let ckEnvironment = "development"
 
-  /// Re-mint if the last successful push is older than this. Set close to
-  /// the ~8h token lifetime so the (foreground, possibly-visible) sign-in
-  /// sheet appears at most about once per token, not on every app open.
-  private static let refreshInterval: TimeInterval = 7 * 60 * 60
+  /// Re-mint when the last push is older than this. Silent now, so we can
+  /// keep it comfortably under the ~8h token lifetime.
+  private static let refreshInterval: TimeInterval = 6 * 60 * 60
+
+  /// How long a silent (hidden) attempt waits before declaring the session
+  /// lapsed and requiring interactive sign-in.
+  private static let silentTimeout: TimeInterval = 12
 
   // MARK: Persisted state
-
   private static let enabledKey = "septena.claudeGateway.enabled"
   private static let lastRefreshKey = "septena.claudeGateway.lastRefreshAt"
 
-  /// User has connected Claude. When false we never mint or push.
   public var isEnabled: Bool {
     didSet { UserDefaults.standard.set(isEnabled, forKey: Self.enabledKey) }
   }
 
   // MARK: Observable status (for Settings UI)
-
   public private(set) var lastRefreshAt: Date?
   public private(set) var lastError: String?
   public private(set) var isRefreshing = false
+  /// Silent refresh failed (session lapsed) — Settings should offer an
+  /// explicit "Reauthenticate". We never pop UI from the auto path.
+  public private(set) var needsReauth = false
+
+  /// Drives the interactive sign-in sheet. The SwiftUI layer presents
+  /// `interactiveWebView` while `showingInteractiveAuth` is true.
+  public private(set) var showingInteractiveAuth = false
+  public private(set) var interactiveWebView: WKWebView?
 
   private let session: URLSession
-  // Retained for the duration of a sign-in (ASWebAuthenticationSession and
-  // its context provider must outlive the call).
-  private var authSession: ASWebAuthenticationSession?
-  private var anchorProvider: AuthAnchorProvider?
+  private var authContinuation: CheckedContinuation<URL, Error>?
+  private var navDelegate: WebNavDelegate?
+  private var hiddenWebView: WKWebView?
+  private var timeoutTask: Task<Void, Never>?
 
   private init() {
     let cfg = URLSessionConfiguration.default
@@ -96,57 +91,84 @@ public final class ClaudeGatewayProvider {
 
   // MARK: API
 
-  /// Mint a fresh token and push it, unless we pushed recently. Safe to
-  /// call on every foreground; skips when the last push is still inside
-  /// token lifetime. `force` bypasses the interval (user tapped Connect).
+  /// Auto path (foreground). Silent only — never pops UI. On a lapsed
+  /// session it sets `needsReauth` and the user reauthenticates explicitly.
   public func refreshIfNeeded(force: Bool = false) async {
     guard isEnabled else { return }
     if !force, let last = lastRefreshAt, Date().timeIntervalSince(last) < Self.refreshInterval {
       return
     }
-    await refreshNow()
+    await refresh(interactiveAllowed: false)
   }
 
-  /// Mint a token and push it now. Updates observable status either way.
+  /// User-initiated (Reauthenticate). If we already know the session lapsed,
+  /// skip the silent attempt and go straight to the sheet.
   public func refreshNow() async {
     guard isEnabled else { return }
+    await refresh(interactiveAllowed: true, skipSilent: needsReauth)
+  }
+
+  /// First connect — no session cookie yet, so present the sheet directly.
+  public func connect() async {
+    isEnabled = true
+    await refresh(interactiveAllowed: true, skipSilent: true)
+  }
+
+  public func disconnect() {
+    isEnabled = false
+    lastError = nil
+    needsReauth = false
+  }
+
+  /// Called by the sheet if the user dismisses sign-in without finishing.
+  public func cancelInteractiveAuth() {
+    failAuth(AuthError.cancelled)
+  }
+
+  // MARK: Refresh
+
+  private func refresh(interactiveAllowed: Bool, skipSilent: Bool = false) async {
     guard !isRefreshing else { return }
     isRefreshing = true
     defer { isRefreshing = false }
-
     do {
-      let token = try await mintWebAuthToken()
+      let token = try await mintWebAuthToken(interactiveAllowed: interactiveAllowed, skipSilent: skipSilent)
       try await push(ckWebAuthToken: token)
       lastError = nil
+      needsReauth = false
       lastRefreshAt = Date()
       UserDefaults.standard.set(lastRefreshAt!.timeIntervalSince1970, forKey: Self.lastRefreshKey)
-      logger.info("Claude gateway token refreshed")
+      logger.info("Claude gateway token refreshed (\(interactiveAllowed ? "interactive-ok" : "silent", privacy: .public))")
+    } catch AuthError.needsInteractive {
+      // Silent attempt on the auto path failed: surface, don't pop UI.
+      needsReauth = true
+      logger.info("Claude gateway needs reauthentication")
+    } catch AuthError.cancelled {
+      // User dismissed the sheet — leave state as-is.
     } catch {
       lastError = error.localizedDescription
       logger.error("Claude gateway refresh failed: \(error.localizedDescription, privacy: .public)")
     }
   }
 
-  /// Turn the integration on and immediately seed a token (user-initiated,
-  /// so the sign-in sheet is expected here).
-  public func connect() async {
-    isEnabled = true
-    await refreshNow()
-  }
+  // MARK: Token minting (silent → interactive)
 
-  /// Turn the integration off. Gateway tokens age out on its idle-cleanup
-  /// cron; we simply stop refreshing.
-  public func disconnect() {
-    isEnabled = false
-    lastError = nil
-  }
-
-  // MARK: Internals
-
-  /// Drive the idmsa web sign-in and return a PRIVATE-scoped ckWebAuthToken.
-  private func mintWebAuthToken() async throws -> String {
+  private func mintWebAuthToken(interactiveAllowed: Bool, skipSilent: Bool) async throws -> String {
     let signInURL = try await fetchSignInRedirectURL()
-    let callbackURL = try await runWebAuth(startURL: signInURL)
+
+    let callbackURL: URL
+    if skipSilent && interactiveAllowed {
+      // No live session expected — present the sheet directly.
+      callbackURL = try await loadForCallback(signInURL, interactive: true, timeout: 300)
+    } else {
+      do {
+        callbackURL = try await loadForCallback(signInURL, interactive: false, timeout: Self.silentTimeout)
+      } catch AuthError.needsInteractive, AuthError.timeout {
+        guard interactiveAllowed else { throw AuthError.needsInteractive }
+        callbackURL = try await loadForCallback(signInURL, interactive: true, timeout: 300)
+      }
+    }
+
     guard
       let token = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?
         .queryItems?.first(where: { $0.name == "ckWebAuthToken" })?.value,
@@ -157,8 +179,6 @@ public final class ClaudeGatewayProvider {
     return token
   }
 
-  /// Ask CloudKit (unauthenticated) for the Apple sign-in URL. The token's
-  /// configured callback brings us back to mcp.septena.app/auth/apple/callback.
   private func fetchSignInRedirectURL() async throws -> URL {
     var comps = URLComponents(
       string: "https://api.apple-cloudkit.com/database/1/\(SeptenaCloudKit.containerIdentifier)/\(Self.ckEnvironment)/private/users/current"
@@ -177,40 +197,86 @@ public final class ClaudeGatewayProvider {
     return url
   }
 
-  /// Present the sign-in and capture the HTTPS callback URL.
-  private func runWebAuth(startURL: URL) async throws -> URL {
-    try await withCheckedThrowingContinuation { (cont: CheckedContinuation<URL, Error>) in
-      let provider = AuthAnchorProvider()
-      let webAuth = ASWebAuthenticationSession(
-        url: startURL,
-        callback: .https(host: Self.callbackHost, path: Self.callbackPath)
-      ) { [weak self] callbackURL, error in
-        self?.authSession = nil
-        self?.anchorProvider = nil
-        if let callbackURL {
-          cont.resume(returning: callbackURL)
-        } else {
-          cont.resume(throwing: error ?? GatewayError.server(0, "sign-in cancelled"))
+  /// Load `startURL` in a WKWebView (shared persistent cookie store) and
+  /// resolve with the callback URL once idmsa redirects to it. Silent =
+  /// offscreen hidden view + short timeout→needsInteractive. Interactive =
+  /// presented via the sheet so the user can sign in.
+  private func loadForCallback(_ startURL: URL, interactive: Bool, timeout: TimeInterval) async throws -> URL {
+    guard authContinuation == nil else { throw AuthError.alreadyRunning }
+
+    let config = WKWebViewConfiguration()
+    config.websiteDataStore = .default() // persistent — the reason this is silent
+    let web = WKWebView(frame: CGRect(x: 0, y: 0, width: 1, height: 1), configuration: config)
+    let delegate = WebNavDelegate(callbackHost: Self.callbackHost, callbackPath: Self.callbackPath) { [weak self] url in
+      self?.finishAuth(url)
+    }
+    web.navigationDelegate = delegate
+    self.navDelegate = delegate
+
+    if interactive {
+      interactiveWebView = web
+      showingInteractiveAuth = true   // SwiftUI presents the sheet
+    } else {
+      attachHidden(web)               // offscreen so it executes
+      hiddenWebView = web
+    }
+
+    return try await withCheckedThrowingContinuation { cont in
+      self.authContinuation = cont
+      web.load(URLRequest(url: startURL))
+      timeoutTask = Task { [weak self] in
+        try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+        await MainActor.run {
+          self?.failAuth(interactive ? AuthError.timeout : AuthError.needsInteractive)
         }
-      }
-      webAuth.presentationContextProvider = provider
-      // Reuse the system Apple session so renewals are quieter.
-      webAuth.prefersEphemeralWebBrowserSession = false
-      self.anchorProvider = provider
-      self.authSession = webAuth
-      // start() returns false when it can't present (e.g. the Associated
-      // Domains capability isn't active, or no window). Surface that instead
-      // of hanging the continuation forever.
-      if !webAuth.start() {
-        self.authSession = nil
-        self.anchorProvider = nil
-        cont.resume(throwing: GatewayError.server(
-          0,
-          "couldn’t start sign-in — check the Associated Domains capability is enabled for com.septena.cloud and the AASA is reachable"
-        ))
       }
     }
   }
+
+  private func finishAuth(_ url: URL) {
+    guard let cont = authContinuation else { return }
+    authContinuation = nil
+    teardownAuth()
+    cont.resume(returning: url)
+  }
+
+  private func failAuth(_ error: Error) {
+    guard let cont = authContinuation else { return }
+    authContinuation = nil
+    teardownAuth()
+    cont.resume(throwing: error)
+  }
+
+  private func teardownAuth() {
+    timeoutTask?.cancel(); timeoutTask = nil
+    hiddenWebView?.removeFromSuperview()
+    hiddenWebView = nil
+    navDelegate = nil
+    interactiveWebView = nil
+    showingInteractiveAuth = false
+  }
+
+  private func attachHidden(_ web: WKWebView) {
+    // A WKWebView must be in a window to actually run/redirect, so attach it
+    // invisibly rather than truly detached.
+    #if os(iOS)
+    let window = UIApplication.shared.connectedScenes
+      .compactMap { $0 as? UIWindowScene }
+      .flatMap { $0.windows }
+      .first { $0.isKeyWindow }
+    web.alpha = 0.01
+    web.isUserInteractionEnabled = false
+    window?.addSubview(web)
+    window?.sendSubviewToBack(web)
+    #elseif os(macOS)
+    if let content = (NSApplication.shared.keyWindow ?? NSApplication.shared.windows.first)?.contentView {
+      web.alphaValue = 0.01
+      content.addSubview(web)
+    }
+    #endif
+  }
+
+  // MARK: Push
 
   private func push(ckWebAuthToken: String) async throws {
     guard let url = URL(string: "\(Self.gatewayBaseURL)/ingest/ck-token") else {
@@ -220,7 +286,6 @@ public final class ClaudeGatewayProvider {
     req.httpMethod = "POST"
     req.setValue("application/json", forHTTPHeaderField: "Content-Type")
     req.httpBody = try JSONSerialization.data(withJSONObject: ["ckWebAuthToken": ckWebAuthToken])
-
     let (data, resp) = try await session.data(for: req)
     let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
     guard (200...299).contains(code) else {
@@ -229,10 +294,11 @@ public final class ClaudeGatewayProvider {
     }
   }
 
+  enum AuthError: Error { case needsInteractive, timeout, cancelled, alreadyRunning }
+
   enum GatewayError: LocalizedError {
     case badURL
     case server(Int, String)
-
     var errorDescription: String? {
       switch self {
       case .badURL: return "Invalid gateway URL"
@@ -242,20 +308,27 @@ public final class ClaudeGatewayProvider {
   }
 }
 
-// Supplies the window ASWebAuthenticationSession presents over.
-private final class AuthAnchorProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
-  func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-    #if os(iOS)
-    let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-    let windows = scenes.flatMap { $0.windows }
-    return windows.first { $0.isKeyWindow }
-      ?? scenes.first { $0.activationState == .foregroundActive }?.windows.first
-      ?? windows.first
-      ?? ASPresentationAnchor()
-    #elseif os(macOS)
-    return NSApplication.shared.keyWindow ?? NSApplication.shared.windows.first ?? ASPresentationAnchor()
-    #else
-    return ASPresentationAnchor()
-    #endif
+// Watches navigation for the idmsa → callback redirect and hands the URL back.
+private final class WebNavDelegate: NSObject, WKNavigationDelegate {
+  private let callbackHost: String
+  private let callbackPath: String
+  private let onCallback: (URL) -> Void
+
+  init(callbackHost: String, callbackPath: String, onCallback: @escaping (URL) -> Void) {
+    self.callbackHost = callbackHost
+    self.callbackPath = callbackPath
+    self.onCallback = onCallback
+  }
+
+  func webView(_ webView: WKWebView,
+               decidePolicyFor navigationAction: WKNavigationAction,
+               decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+    if let url = navigationAction.request.url,
+       url.host == callbackHost, url.path == callbackPath {
+      decisionHandler(.cancel)
+      onCallback(url)
+      return
+    }
+    decisionHandler(.allow)
   }
 }

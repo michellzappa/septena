@@ -742,7 +742,7 @@ struct TaskListView: View {
       #if os(macOS)
       .draggable(task.id) {
         Text(task.title)
-          .font(.system(size: 13))
+          .scaledFont(size: 13)
           .lineLimit(1)
           .padding(.horizontal, 10)
           .padding(.vertical, 6)
@@ -1028,10 +1028,10 @@ struct TaskListView: View {
   }
 
   /// A task with a due date that's today or in the past — surfaces a flag.
+  /// Delegates to the canonical `SeptenaTask.isOverdue` so row styling, the
+  /// deep list, and the app badge can never drift apart.
   private func isOverdue(_ task: SeptenaTask) -> Bool {
-    guard let due = task.due.flatMap(SeptenaDate.parse) else { return false }
-    let today = Calendar.current.startOfDay(for: Date())
-    return Calendar.current.startOfDay(for: due) <= today
+    task.isOverdue
   }
 
   /// Trailing date / status indicator. Red only ever means **deadline
@@ -1056,7 +1056,7 @@ struct TaskListView: View {
           .padding(.top, 3)
       } else {
         HStack(spacing: 4) {
-          Image(systemName: "flag.fill").font(.system(size: 12))
+          Image(systemName: "flag.fill").scaledFont(size: 12)
           Text(shortDate(due)).font(.septenaMeta)
         }
         .foregroundStyle(Theme.inkSecondary)
@@ -1064,7 +1064,7 @@ struct TaskListView: View {
       }
     } else if filter != .today, let scheduled = task.scheduled.flatMap(SeptenaDate.parse) {
       HStack(spacing: 4) {
-        Image(systemName: "calendar").font(.system(size: 11))
+        Image(systemName: "calendar").scaledFont(size: 11)
         Text(shortDate(scheduled)).font(.septenaMeta)
       }
       .foregroundStyle(Theme.inkSecondary)
@@ -1305,7 +1305,7 @@ struct TaskListView: View {
             .frame(width: Theme.checkboxTap, alignment: .center)
         } else if icon != nil {
           Image(systemName: icon!)
-            .font(.system(size: 16))
+            .scaledFont(size: 16)
             .foregroundStyle(Theme.iconMuted)
             .frame(width: Theme.checkboxTap, alignment: .center)
         } else {
@@ -1320,7 +1320,7 @@ struct TaskListView: View {
             .padding(.leading, -6)
         } else {
           Text(title)
-            .font(.system(size: Theme.groupHeaderFontSize, weight: .semibold))
+            .scaledFont(size: Theme.groupHeaderFontSize, weight: .semibold)
             .foregroundStyle(Theme.inkPrimary)
         }
         Spacer()
@@ -1438,7 +1438,7 @@ struct TaskListView: View {
       action()
     } label: {
       Image(systemName: systemName)
-        .font(.system(size: 20, weight: .regular))
+        .scaledFont(size: 20, weight: .regular)
         .foregroundStyle(tint ?? Theme.inkPrimary)
         .frame(width: 36, height: 36)
         .contentShape(Rectangle())
@@ -1770,7 +1770,7 @@ struct TaskListView: View {
     } label: {
       HStack(spacing: 6) {
         Image(systemName: showLogged ? "chevron.down" : "chevron.right")
-          .font(.system(size: 11, weight: .semibold))
+          .scaledFont(size: 11, weight: .semibold)
           .foregroundStyle(Theme.iconMuted)
         Text(showLogged
              ? "Hide logged items"
@@ -1891,7 +1891,7 @@ struct TaskListView: View {
         Text("\(count)").fontWeight(.bold)
         Text(count == 1 ? " new to-do" : " new to-dos")
       }
-      .font(.system(size: 14))
+      .scaledFont(size: 14)
       .foregroundStyle(.primary)
       Spacer()
       Button {
@@ -1900,7 +1900,7 @@ struct TaskListView: View {
         motion.run(.easeOut(duration: 0.2)) { newTodosDismissed = true }
       } label: {
         Text("OK")
-          .font(.system(size: 13, weight: .semibold))
+          .scaledFont(size: 13, weight: .semibold)
           .foregroundStyle(.primary)
           .padding(.horizontal, 14)
           .padding(.vertical, 6)
@@ -1958,11 +1958,11 @@ private struct GroupHeaderLabel: View {
     Button(action: action) {
       HStack(spacing: 4) {
         Text(title)
-          .font(.system(size: Theme.groupHeaderFontSize, weight: .semibold))
+          .scaledFont(size: Theme.groupHeaderFontSize, weight: .semibold)
           .foregroundStyle(Theme.inkPrimary)
         if hasChevron {
           Image(systemName: "chevron.right")
-            .font(.system(size: Theme.groupHeaderFontSize - 6, weight: .semibold))
+            .scaledFont(size: Theme.groupHeaderFontSize - 6, weight: .semibold)
             .foregroundStyle(Theme.iconMuted)
         }
       }
@@ -2028,7 +2028,7 @@ private struct TaskListModalPresenter: ViewModifier {
           ) { date in
             applyWhen(sheet.taskId, .scheduled, date)
           }
-          .presentationDetents([.medium, .large])
+          .presentationDetents([.height(DatePickerSheet.sheetHeight), .large])
           .presentationBackground(.thinMaterial)
           .presentationCornerRadius(Theme.cornerRadius)
         case .due:
@@ -2041,7 +2041,7 @@ private struct TaskListModalPresenter: ViewModifier {
           ) { date in
             applyWhen(sheet.taskId, .due, date)
           }
-          .presentationDetents([.medium, .large])
+          .presentationDetents([.height(DatePickerSheet.sheetHeight), .large])
           .presentationBackground(.thinMaterial)
           .presentationCornerRadius(Theme.cornerRadius)
         }
@@ -2077,7 +2077,7 @@ private struct TaskListModalPresenter: ViewModifier {
               applyWhen(id, kind, date)
             }
           }
-          .presentationDetents([.medium, .large])
+          .presentationDetents([.height(DatePickerSheet.sheetHeight), .large])
           .presentationBackground(.thinMaterial)
           .presentationCornerRadius(Theme.cornerRadius)
         case .move:

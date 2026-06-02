@@ -290,7 +290,7 @@ struct QuickFindView: View {
     Button(action: action) {
       HStack(spacing: 12) {
         Image(systemName: symbol)
-          .font(.system(size: 15, weight: .semibold))
+          .scaledFont(size: 15, weight: .semibold)
           .foregroundStyle(tint)
           .frame(width: 22)
         VStack(alignment: .leading, spacing: 1) {
@@ -381,13 +381,13 @@ private struct QuickFindRow: View {
     case .task(let done, let today):
       Image(systemName: done ? "checkmark.square"
                               : today ? "sun.max" : "square")
-        .font(.system(size: 14, weight: .regular))
+        .scaledFont(size: 14, weight: .regular)
     case .project:
       Image(systemName: "circle.dashed")
-        .font(.system(size: 14, weight: .regular))
+        .scaledFont(size: 14, weight: .regular)
     case .area:
       Image(systemName: "square.stack")
-        .font(.system(size: 14, weight: .regular))
+        .scaledFont(size: 14, weight: .regular)
     }
   }
 

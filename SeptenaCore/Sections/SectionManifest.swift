@@ -282,7 +282,7 @@ public extension SectionManifest {
     .init(
       key: "cannabis",
       defaultLabel: "Cannabis",
-      shortDescription: "Strain log and dosing",
+      shortDescription: "Intake log and dosing",
       activation: .optional,
       onboarding: .optional,
       supportsTab: true,
