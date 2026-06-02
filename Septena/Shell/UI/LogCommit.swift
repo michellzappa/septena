@@ -22,9 +22,10 @@ import SwiftData
 enum LogCommitStyle: Equatable {
   /// A section's commit flourish — the motion matches what was logged.
   /// The `motion` is chosen at the call site from the section's data axis
-  /// (see `CommitMotion`); the accent makes it read as native to the
-  /// surface. This is the generalized form of the Mood-meter idea.
-  case flourish(motion: CommitMotion, accent: Color)
+  /// (see `CommitMotion`); `accent` makes it read as native to the surface;
+  /// `intensity` scales loudness by the log's magnitude. This is the
+  /// generalized form of the Mood-meter idea.
+  case flourish(motion: CommitMotion, accent: Color, intensity: Double)
   /// Habit-streak milestone — radiating rings with the streak number
   /// popping in. Fired when a streak crosses 7 / 30 / 100 / 365.
   case ignition(accent: Color, streak: Int)
@@ -65,8 +66,9 @@ struct LogCommitOverlay: View {
     ZStack {
       if !reduceMotion, let style = center.style {
         switch style {
-        case .flourish(let motion, let accent):
-          CommitFlourish(motion: motion, accent: accent, trigger: center.trigger)
+        case .flourish(let motion, let accent, let intensity):
+          CommitFlourish(motion: motion, accent: accent,
+                         intensity: intensity, trigger: center.trigger)
         case .ignition(let accent, let streak):
           IgnitionView(accent: accent, streak: streak, trigger: center.trigger)
         }

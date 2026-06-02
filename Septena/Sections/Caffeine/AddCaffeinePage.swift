@@ -17,6 +17,9 @@ struct AddCaffeinePage: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
+  // Optional: present in the in-app capture flow, nil from hosts that don't
+  // inherit the root environment (the flourish is then simply skipped).
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
   @Bindable var router: AddInfoRouter
   @State private var beans: [CaffeineBean] = []
   @State private var lastEntry: (method: String, beans: String?, grams: Double?, date: String)? = nil
@@ -105,10 +108,29 @@ struct AddCaffeinePage: View {
   }
 
   private func commit(method: String, beans: String?, grams: Double?) {
-    caffeine.addEntry(date: SeptenaDate.today, time: nowHHMM(),
-                      method: method, beans: beans, grams: grams)
-    AddInfoSection.caffeine.notifyTilesChanged()
-    Haptics.tick()
+    // Affect axis: a caffeine log is a warm cup, so daytime gets a gentle
+    // bloom in the caffeine accent — its reach scales with the dose. Late
+    // at night a stimulant log gets a quiet sink instead: acknowledged,
+    // not celebrated. (No `.snap` here — its screen flash is too loud for
+    // something logged several times a day.)
+    let hour = Calendar.current.component(.hour, from: Date())
+    let isLate = hour >= 21 || hour < 5
+    let motion: CommitMotion = isLate ? .sink : .bloom
+    // Dose → loudness. ~18g (a typical pour) is the calibrated 1.0; clamped
+    // so a small cup still reads and a big brew can't overpower.
+    let intensity = min(1.3, max(0.7, (grams ?? 16) / 18))
+
+    CommitFeedback.commit(
+      motion: motion,
+      accent: AddInfoSection.caffeine.accent(theme: theme),
+      intensity: intensity,
+      announce: "Logged \(beans ?? method.uppercased()).",
+      logCommit: logCommit
+    ) {
+      caffeine.addEntry(date: SeptenaDate.today, time: nowHHMM(),
+                        method: method, beans: beans, grams: grams)
+      AddInfoSection.caffeine.notifyTilesChanged()
+    }
     dismiss()
   }
 

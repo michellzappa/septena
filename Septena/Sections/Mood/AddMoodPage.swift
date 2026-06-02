@@ -17,8 +17,8 @@ import SwiftUI
 // • Press-shrink feedback before the expand starts.
 // • Staggered emotion-chip cascade from center outward.
 // • Header word pop-in when the selected emotion changes.
-// • Per-quadrant Log animation (MoodCommitAnimation) plays as the page
-//   dismisses.
+// • Per-quadrant Log flourish (.commitFlourish, motion from
+//   MoodQuadrant.commitMotion) plays as the page dismisses.
 
 struct AddMoodPage: View {
   @Environment(\.dismiss) private var dismiss
@@ -33,8 +33,8 @@ struct AddMoodPage: View {
   @State private var time: Date
   @State private var note: String = ""
   @State private var editingTime = false
-  /// Bumped on save to drive MoodCommitAnimation. The animation runs
-  /// during the dismiss tail so the user sees the affirmation before
+  /// Bumped on save to drive the `.commitFlourish` modifier. The flourish
+  /// runs during the dismiss tail so the user sees the affirmation before
   /// the sheet goes away.
   @State private var commitTrigger: Int = 0
   /// Quadrant frozen at commit time so the in-flight animation outlives
@@ -98,13 +98,13 @@ struct AddMoodPage: View {
         }
       }
       .tint(quadrant?.color ?? .accentColor)
-      // Commit animation overlay — sits above everything, runs during
-      // the brief delay between Log-tap and dismiss().
-      .overlay {
-        if let q = committingQuadrant {
-          MoodCommitAnimation(quadrant: q, trigger: commitTrigger)
-            .transition(.opacity)
-        }
+      // Blocking commit flourish: plays in-sheet during the brief delay
+      // before dismiss. The motion matches the logged affect — see
+      // MoodQuadrant.commitMotion. Inert until commitTrigger is bumped.
+      .commitFlourish(motion: committingQuadrant?.commitMotion ?? .burst,
+                      accent: committingQuadrant?.color ?? .accentColor,
+                      trigger: commitTrigger) {
+        dismiss()
       }
     }
   }
@@ -269,18 +269,12 @@ struct AddMoodPage: View {
     Haptics.success()
     onLogged()
 
-    // Fire the per-quadrant commit animation.
+    // Freeze the affect and bump the trigger. The `.commitFlourish`
+    // modifier plays the matching motion in-sheet, then dismisses — the
+    // play-then-dismiss timing lives there, shared with every blocking
+    // log site.
     committingQuadrant = s.quadrant
     commitTrigger &+= 1
-
-    // Dismiss after the animation has played long enough to read. The
-    // per-quadrant commit animations all complete within ~0.85s; the
-    // extra buffer lets the final frame settle before the sheet slides
-    // away. Total perceived time tap → dismiss: ~1.15s.
-    Task {
-      try? await Task.sleep(nanoseconds: 1_150_000_000)
-      dismiss()
-    }
   }
 }
 
