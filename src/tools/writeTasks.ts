@@ -1,4 +1,5 @@
 import type { CloudKitClient } from "../cloudkit.js";
+import { logEvent } from "../util.js";
 
 // Mutators for Task records. Uses CKWS records/modify with forceUpdate.
 // Identity for new tasks: base32-6 shortid per identifiers.md.
@@ -126,7 +127,10 @@ export async function createTask(client: CloudKitClient, input: CreateTaskInput)
   const fields: Record<string, { value: unknown }> = {
     title: { value: input.title },
     status: { value: "open" },
-    created: { value: todayYMD() },
+    created: { value: todayYMD() },         // legacy YYYY-MM-DD string (app still reads it)
+    createdAt: { value: Date.now() },       // epoch ms → CloudKit TIMESTAMP (NSDate), matches nutrition.loggedAt
+    source: { value: "mcp" },               // provenance: created via the MCP gateway
+    sourceClient: { value: "Claude" },      // only Claude connects today; plumb clientId through later
     today: { value: input.today ? 1 : 0 },
   };
   if (input.today) fields.todaySetOn = { value: todayYMD() };
@@ -135,9 +139,25 @@ export async function createTask(client: CloudKitClient, input: CreateTaskInput)
   if (input.area) fields.area = { value: input.area };
   if (input.project) fields.project = { value: input.project };
 
-  await modifyRecords(client, [
-    { operationType: "create", record: { recordType: "Task", recordName: id, fields } },
-  ]);
+  // createWithFieldFallback drops unknown fields and retries, so this is safe
+  // to ship before the CloudKit prod schema learns source/sourceClient/createdAt
+  // — those are intentionally NOT protected, so creates keep succeeding (fields
+  // silently dropped) until the schema catches up, then provenance sticks
+  // automatically. It also inspects serverErrorCode, unlike the old raw
+  // modifyRecords path which reported success even when CloudKit rejected the create.
+  const { droppedFields } = await client.createWithFieldFallback({
+    recordType: "Task",
+    recordName: id,
+    fields,
+    protectedFields: ["title", "status", "created"],
+  });
+
+  // Signals exactly when the prod schema catches up: a non-empty list here
+  // (containing source/sourceClient/createdAt) means provenance isn't sticking yet.
+  if (droppedFields.length > 0) {
+    logEvent("task_create_dropped_fields", { id, droppedFields });
+    return { id, title: input.title, droppedFields };
+  }
   return { id, title: input.title };
 }
 
