@@ -1949,11 +1949,13 @@ struct WeekDashboardView: View {
   }
 
   private func commitGut(bristol: Int) {
-    SeptenaServices.shared.gutMutator.addEntry(
-      date: SeptenaDate.today, time: nowHHMM(), bristol: bristol)
-    GutBristolRecorder.record(bristol)
-    AddInfoSection.gut.notifyTilesChanged()
-    Haptics.tick()
+    SectionLog.newLog(section: "gut", accent: theme.color(for: "gut"),
+                      logCommit: logCommit) {
+      SeptenaServices.shared.gutMutator.addEntry(
+        date: SeptenaDate.today, time: nowHHMM(), bristol: bristol)
+      GutBristolRecorder.record(bristol)
+      AddInfoSection.gut.notifyTilesChanged()
+    }
   }
 
   // Activity — Apple Health, on-device. Skips entirely when HealthKit

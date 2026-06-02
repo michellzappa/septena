@@ -6,6 +6,9 @@ import SwiftUI
 // through HTTPOutbox.
 
 struct EditGutEntrySheet: View {
+  @Environment(SectionTheme.self) private var theme
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
+
   let date: String
   /// `nil` puts the sheet in create mode — save calls `addEntry` and
   /// onSave fires with the newly-minted entity. Non-nil edits in place.
@@ -169,37 +172,48 @@ struct EditGutEntrySheet: View {
       }
     }
 
+    // Both branches funnel through SectionLog (quiet edit, restrained sink
+    // for a new log). Dismissal is owned by AdaptiveEditScaffold.
     let savedID: String
     if let original {
-      gut.updateEntry(
-        id: original.id,
-        date: newDate,
-        time: hhmm,
-        bristol: bristol,
-        blood: blood,
-        volume: .some(volumeValue),
-        discomfortLevel: .some(discomfortLvlValue),
-        discomfortStart: .some(startISO),
-        discomfortEnd: .some(endISO),
-        note: .some(noteValue)
-      )
+      SectionLog.edit {
+        gut.updateEntry(
+          id: original.id,
+          date: newDate,
+          time: hhmm,
+          bristol: bristol,
+          blood: blood,
+          volume: .some(volumeValue),
+          discomfortLevel: .some(discomfortLvlValue),
+          discomfortStart: .some(startISO),
+          discomfortEnd: .some(endISO),
+          note: .some(noteValue)
+        )
+        GutBristolRecorder.record(bristol)
+        AddInfoSection.gut.notifyTilesChanged()
+      }
       savedID = original.id
     } else {
-      let entity = gut.addEntry(
-        date: newDate,
-        time: hhmm,
-        bristol: bristol,
-        blood: blood,
-        volume: volumeValue,
-        discomfortLevel: discomfortLvlValue,
-        discomfortStart: startISO,
-        discomfortEnd: endISO,
-        note: noteValue
-      )
-      savedID = entity.id
+      var newID = ""
+      SectionLog.newLog(section: "gut", accent: theme.color(for: "gut"),
+                        logCommit: logCommit) {
+        let entity = gut.addEntry(
+          date: newDate,
+          time: hhmm,
+          bristol: bristol,
+          blood: blood,
+          volume: volumeValue,
+          discomfortLevel: discomfortLvlValue,
+          discomfortStart: startISO,
+          discomfortEnd: endISO,
+          note: noteValue
+        )
+        newID = entity.id
+        GutBristolRecorder.record(bristol)
+        AddInfoSection.gut.notifyTilesChanged()
+      }
+      savedID = newID
     }
-    GutBristolRecorder.record(bristol)
-    Haptics.tick()
 
     let rebuilt = GutEntry(
       id: savedID,

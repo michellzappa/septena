@@ -37,6 +37,10 @@ enum HydrationPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(HydrationDestinationView()) }
 
+  // A refreshing glass → a gentle bloom; its reach scales with the amount
+  // (see HydrationDestinationView.commit, intensity from ml).
+  static var logFlourish: LogFlourish? { LogFlourish(motion: .bloom) }
+
   // MARK: - First-enable onboarding
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
@@ -88,6 +92,7 @@ enum HydrationPlugin: SectionPlugin {
 private struct HydrationDestinationView: View {
   @Environment(SectionTheme.self) private var theme
   @Environment(\.modelContext) private var modelContext
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
   @AppStorage("hydration.dailyTargetMl") private var targetMl: Int = 2000
   @State private var todayMl: Int = 0
   @State private var entries: [NutritionEntryEntity] = []
@@ -227,16 +232,26 @@ private struct HydrationDestinationView: View {
   // MARK: Logic
 
   private func commit(ml: Int) {
-    _ = mutator.addEntry(
-      loggedAt: .now,
-      emoji: "💧",
-      foods: HydrationPlugin.waterFoodsMarker,
-      mealType: nil,
-      source: "manual",
-      waterMl: Double(ml)
-    )
-    Haptics.tick()
-    reload()
+    // Bloom reach scales with the amount — a 500ml glass is the calibrated
+    // 1.0; clamped so a sip still reads and a big bottle can't overpower.
+    let intensity = min(1.4, max(0.6, Double(ml) / 500))
+    SectionLog.newLog(
+      section: "hydration",
+      accent: accent,
+      intensity: intensity,
+      announce: "Logged \(ml) ml of water.",
+      logCommit: logCommit
+    ) {
+      _ = mutator.addEntry(
+        loggedAt: .now,
+        emoji: "💧",
+        foods: HydrationPlugin.waterFoodsMarker,
+        mealType: nil,
+        source: "manual",
+        waterMl: Double(ml)
+      )
+      reload()
+    }
   }
 
   private func delete(_ e: NutritionEntryEntity) {

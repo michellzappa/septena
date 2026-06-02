@@ -23,6 +23,7 @@ private let bristolScale: [BristolEntry] = [
 struct AddGutPage: View {
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
   @Bindable var router: AddInfoRouter
   @State private var working = false
 
@@ -56,10 +57,16 @@ struct AddGutPage: View {
   }
 
   private func log(_ item: BristolEntry) {
-    gut.addEntry(date: SeptenaDate.today, time: nowHHMM(), bristol: item.id)
-    GutBristolRecorder.record(item.id)
-    AddInfoSection.gut.notifyTilesChanged()
-    Haptics.tick()
+    SectionLog.newLog(
+      section: "gut",
+      accent: AddInfoSection.gut.accent(theme: theme),
+      announce: "Logged type \(item.id).",
+      logCommit: logCommit
+    ) {
+      gut.addEntry(date: SeptenaDate.today, time: nowHHMM(), bristol: item.id)
+      GutBristolRecorder.record(item.id)
+      AddInfoSection.gut.notifyTilesChanged()
+    }
     dismiss()
   }
 }
