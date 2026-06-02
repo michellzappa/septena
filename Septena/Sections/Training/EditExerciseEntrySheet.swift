@@ -1,14 +1,14 @@
 import SwiftUI
 
-// Edit sheet for a logged training entry. Standard SwiftUI `Form` in a
-// `NavigationStack` presented via `.sheet(item:)`. Save enqueues
+// Edit sheet for a logged training entry. A SwiftUI `Form` hosted by the
+// shared `AdaptiveEditScaffold` and presented via `.adaptiveDetail(item:)`.
+// Save enqueues
 // `PUT /api/training/entries` through HTTPOutbox. The server identifies
 // the entry by its filename (`file` field in the JSON body) and
 // branches on cardio vs strength fields based on exercise type.
 
 struct EditExerciseEntrySheet: View {
   private var trainingMutator: TrainingMutator { SeptenaServices.shared.trainingMutator }
-  @Environment(\.dismiss) private var dismiss
 
   let original: ExerciseEntry
   let onSave: (ExerciseEntry) -> Void
@@ -40,8 +40,13 @@ struct EditExerciseEntrySheet: View {
   ]
 
   var body: some View {
-    NavigationStack {
-      Form {
+    AdaptiveEditScaffold(title: "Edit entry", canSave: original.file != nil, onSave: save) {
+      formBody.onAppear { seed() }
+    }
+  }
+
+  @ViewBuilder private var formBody: some View {
+    Form {
         Section(original.exercise ?? "Exercise") {
           Text(original.session.capitalized.isEmpty ? "Session" : original.session.capitalized)
             .foregroundStyle(.secondary)
@@ -70,21 +75,6 @@ struct EditExerciseEntrySheet: View {
             .lineLimit(1...4)
         }
       }
-      .navigationTitle("Edit entry")
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
-        }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Save") { save() }
-            .disabled(original.file == nil)
-        }
-      }
-      .onAppear { seed() }
-    }
   }
 
   private func numberRow(_ label: String, text: Binding<String>) -> some View {
@@ -177,6 +167,5 @@ struct EditExerciseEntrySheet: View {
       loggedAt: original.loggedAt
     )
     onSave(updated)
-    dismiss()
   }
 }

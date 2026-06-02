@@ -6,7 +6,6 @@ import SwiftUI
 
 struct EditSupplementSheet: View {
   @Environment(ChecklistMutator.self) private var checklistMutator
-  @Environment(\.dismiss) private var dismiss
 
   let original: SupplementDayItem?
   let onDone: (SupplementDayItem?) -> Void
@@ -15,28 +14,22 @@ struct EditSupplementSheet: View {
   @State private var emoji: String = ""
 
   var body: some View {
-    NavigationStack {
-      Form {
-        Section("Supplement") {
-          TextField("Name", text: $name)
-        }
-      }
-      .navigationTitle(original == nil ? "New Supplement" : "Edit Supplement")
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
-        }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Save") { save() }
-            .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-        }
-      }
-      .onAppear {
+    AdaptiveEditScaffold(
+      title: original == nil ? "New Supplement" : "Edit Supplement",
+      canSave: !name.trimmingCharacters(in: .whitespaces).isEmpty,
+      onSave: save
+    ) {
+      formBody.onAppear {
         name = original?.name ?? ""
         emoji = original?.emoji ?? ""
+      }
+    }
+  }
+
+  @ViewBuilder private var formBody: some View {
+    Form {
+      Section("Supplement") {
+        TextField("Name", text: $name)
       }
     }
   }
@@ -56,6 +49,5 @@ struct EditSupplementSheet: View {
       Haptics.tick()
       onDone(nil)
     }
-    dismiss()
   }
 }

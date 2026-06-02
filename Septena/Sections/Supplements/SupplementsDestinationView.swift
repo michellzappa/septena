@@ -92,7 +92,7 @@ struct SupplementsDestinationView: View {
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
       reloadPastDay()
     }
-    .sheet(item: $editing) { supp in
+    .adaptiveDetail(item: $editing) { supp in
       EditSupplementSheet(
         original: supp,
         onDone: { updated in
@@ -102,15 +102,11 @@ struct SupplementsDestinationView: View {
         }
       )
     }
-    .sheet(isPresented: $creating) {
+    .adaptiveDetail(isPresented: $creating) {
       EditSupplementSheet(
         original: nil,
         onDone: { _ in Task { await model.load() } }
       )
-      #if os(iOS)
-      .presentationDetents([.medium, .large])
-      .presentationDragIndicator(.visible)
-      #endif
     }
   }
 

@@ -289,10 +289,112 @@ extension View {
   }
 }
 
+// MARK: - AdaptiveEditScaffold
+//
+// The standard chrome for an edit/create form hosted by `.adaptiveDetail`.
+// Absorbs the two cross-surface rules so no individual form repeats them:
+//
+//   1. Close through `\.adaptiveDetailClose` (docked inspector) with a
+//      `dismiss()` fallback (plain sheet). Save closes after the action runs.
+//   2. Pick chrome by host: a docked inspector gets an inline header (a
+//      nested NavigationStack would double-render its toolbar in the macOS
+//      title bar); a bottom sheet gets a NavigationStack + nav-bar toolbar.
+//
+// A form supplies only what's genuinely its own — a title, the save action,
+// optional labels / save-enabled flag — and its fields via the trailing
+// closure. There are no per-form layout constants to copy.
+//
+//   var body: some View {
+//     AdaptiveEditScaffold(title: navTitle, onSave: save) {
+//       Form { … }.onAppear { seed() }
+//     }
+//   }
+struct AdaptiveEditScaffold<FormContent: View>: View {
+  let title: String
+  /// Confirmation label. Defaults to "Save"; pass "Add", "Done", etc.
+  var saveTitle: String = "Save"
+  var cancelTitle: String = "Cancel"
+  /// Disables the confirmation control (e.g. while a required field is
+  /// empty). The form owns the validation; the scaffold owns the affordance.
+  var canSave: Bool = true
+  /// The save action. The scaffold runs it, then closes — forms must NOT
+  /// call dismiss/close themselves (that's what produced the double-close
+  /// and dismiss-no-op bugs the inspector exposed).
+  let onSave: () -> Void
+  @ViewBuilder var content: () -> FormContent
+
+  @Environment(\.dismiss) private var dismiss
+  @Environment(\.adaptiveDetailClose) private var adaptiveClose
+
+  private var isInspector: Bool { adaptiveClose != nil }
+  private func close() { (adaptiveClose ?? { dismiss() })() }
+  private func confirm() { onSave(); close() }
+
+  var body: some View {
+    if isInspector {
+      content()
+        .safeAreaInset(edge: .top, spacing: 0) {
+          AdaptiveEditHeader(
+            title: title,
+            cancelTitle: cancelTitle,
+            saveTitle: saveTitle,
+            canSave: canSave,
+            onCancel: close,
+            onSave: confirm
+          )
+        }
+    } else {
+      NavigationStack {
+        content()
+          .navigationTitle(title)
+          #if os(iOS)
+          .navigationBarTitleDisplayMode(.inline)
+          #endif
+          .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+              Button(cancelTitle, action: close)
+            }
+            ToolbarItem(placement: .confirmationAction) {
+              Button(saveTitle, action: confirm).disabled(!canSave)
+            }
+          }
+      }
+    }
+  }
+}
+
+/// The inline header used by `AdaptiveEditScaffold` in its docked-inspector
+/// mode: Cancel · title · Save, on a material bar. Kept private — forms only
+/// ever go through the scaffold.
+private struct AdaptiveEditHeader: View {
+  let title: String
+  let cancelTitle: String
+  let saveTitle: String
+  let canSave: Bool
+  let onCancel: () -> Void
+  let onSave: () -> Void
+
+  var body: some View {
+    HStack {
+      Button(cancelTitle, action: onCancel)
+      Spacer()
+      Text(title).font(.headline)
+      Spacer()
+      Button(saveTitle, action: onSave)
+        .fontWeight(.semibold)
+        .disabled(!canSave)
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 10)
+    .background(.bar)
+  }
+}
+
 /// True when detail content should dock as an inspector rather than present
-/// as a sheet. macOS always docks; on iOS we follow the horizontal size
-/// class so iPad multitasking (a compact-width window) correctly falls back
-/// to a sheet.
+/// as a sheet. On regular width a section opens as a pushed full pane
+/// (WeekDashboardView.usesPushNavigation), so an inspector has room to dock
+/// and a nav bar to host its close affordance. On compact the section is a
+/// bottom sheet, so edits stay sheets too.
 private func adaptiveUseInspector(hSizeIsRegular: Bool) -> Bool {
   #if os(macOS)
   return true

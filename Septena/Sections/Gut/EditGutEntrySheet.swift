@@ -6,14 +6,6 @@ import SwiftUI
 // through HTTPOutbox.
 
 struct EditGutEntrySheet: View {
-  @Environment(\.dismiss) private var dismiss
-  // Set when hosted by `.adaptiveDetail` (docked inspector on regular
-  // width), where `dismiss()` is a no-op. Falls back to `dismiss()` when
-  // the form is presented as a plain sheet.
-  @Environment(\.adaptiveDetailClose) private var adaptiveClose
-
-  private func close() { (adaptiveClose ?? { dismiss() })() }
-
   let date: String
   /// `nil` puts the sheet in create mode — save calls `addEntry` and
   /// onSave fires with the newly-minted entity. Non-nil edits in place.
@@ -42,9 +34,16 @@ struct EditGutEntrySheet: View {
     ("", "—"), ("low", "Low"), ("med", "Med"), ("high", "High"),
   ]
 
+  private var navTitle: String { isCreating ? "New gut entry" : "Edit gut entry" }
+
   var body: some View {
-    NavigationStack {
-      Form {
+    AdaptiveEditScaffold(title: navTitle, onSave: save) {
+      formBody.onAppear { seed() }
+    }
+  }
+
+  @ViewBuilder private var formBody: some View {
+    Form {
         Section("When") {
           DatePicker("Date & time",
                      selection: $when,
@@ -87,20 +86,6 @@ struct EditGutEntrySheet: View {
             .lineLimit(1...4)
         }
       }
-      .navigationTitle(isCreating ? "New gut entry" : "Edit gut entry")
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { close() }
-        }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Save") { save() }
-        }
-      }
-      .onAppear { seed() }
-    }
   }
 
   private func bristolShort(_ b: Int) -> String {
@@ -230,6 +215,5 @@ struct EditGutEntrySheet: View {
       note: noteValue
     )
     onSave(rebuilt)
-    close()
   }
 }

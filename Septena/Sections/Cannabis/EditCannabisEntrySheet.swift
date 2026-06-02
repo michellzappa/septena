@@ -1,13 +1,12 @@
 import SwiftUI
 import SwiftData
 
-// Edit sheet for a logged cannabis session. Standard SwiftUI `Form` in a
-// `NavigationStack` presented via `.sheet(item:)`. Writes go through
-// CannabisMutator (SwiftData + CloudKit).
+// Edit sheet for a logged cannabis session. Standard SwiftUI `Form` hosted by
+// `AdaptiveEditScaffold`, presented via `.adaptiveDetail(item:)`. Writes go
+// through CannabisMutator (SwiftData + CloudKit).
 
 struct EditCannabisEntrySheet: View {
   @Environment(\.modelContext) private var modelContext
-  @Environment(\.dismiss) private var dismiss
 
   private var cannabis: CannabisMutator { SeptenaServices.shared.cannabisMutator }
 
@@ -38,50 +37,42 @@ struct EditCannabisEntrySheet: View {
   ]
 
   var body: some View {
-    NavigationStack {
-      Form {
-        Section("When") {
-          DatePicker("Date & time",
-                     selection: $when,
-                     displayedComponents: [.date, .hourAndMinute])
-        }
-        Section("Method") {
-          Picker("Method", selection: $method) {
-            ForEach(Self.methods, id: \.0) { m in
-              Text(m.1).tag(m.0)
-            }
-          }
-          .pickerStyle(.segmented)
-        }
-        if method == "vape" {
-          Section("Hit") {
-            Stepper(value: $hit, in: 1...10) {
-              Text("\(hit)")
-            }
+    AdaptiveEditScaffold(title: isCreating ? "New cannabis entry" : "Edit cannabis entry",
+                         onSave: save) {
+      formBody.onAppear { seed() }
+    }
+  }
+
+  @ViewBuilder private var formBody: some View {
+    Form {
+      Section("When") {
+        DatePicker("Date & time",
+                   selection: $when,
+                   displayedComponents: [.date, .hourAndMinute])
+      }
+      Section("Method") {
+        Picker("Method", selection: $method) {
+          ForEach(Self.methods, id: \.0) { m in
+            Text(m.1).tag(m.0)
           }
         }
-        Section("Note") {
-          TextField("Note", text: $note, axis: .vertical)
-            .lineLimit(1...4)
-        }
-        Section("Effect") {
-          TextField("Effect", text: $effect, axis: .vertical)
-            .lineLimit(1...4)
+        .pickerStyle(.segmented)
+      }
+      if method == "vape" {
+        Section("Hit") {
+          Stepper(value: $hit, in: 1...10) {
+            Text("\(hit)")
+          }
         }
       }
-      .navigationTitle(isCreating ? "New cannabis entry" : "Edit cannabis entry")
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
-        }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Save") { save() }
-        }
+      Section("Note") {
+        TextField("Note", text: $note, axis: .vertical)
+          .lineLimit(1...4)
       }
-      .task { seed() }
+      Section("Effect") {
+        TextField("Effect", text: $effect, axis: .vertical)
+          .lineLimit(1...4)
+      }
     }
   }
 
@@ -190,6 +181,5 @@ struct EditCannabisEntrySheet: View {
       effect: effectValue
     )
     onSave(rebuilt)
-    dismiss()
   }
 }

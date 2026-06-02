@@ -9,7 +9,6 @@ import SwiftData
 
 struct EditCaffeineEntrySheet: View {
   @Environment(\.modelContext) private var modelContext
-  @Environment(\.dismiss) private var dismiss
 
   private var caffeine: CaffeineMutator { SeptenaServices.shared.caffeineMutator }
 
@@ -49,8 +48,17 @@ struct EditCaffeineEntrySheet: View {
     ("other", "Other"),
   ]
 
+  private var navTitle: String {
+    isCreating ? "New caffeine entry" : "Edit caffeine entry"
+  }
+
   var body: some View {
-    NavigationStack {
+    AdaptiveEditScaffold(title: navTitle, onSave: save) {
+      formBody.task { await loadBeans(); seed() }
+    }
+  }
+
+  @ViewBuilder private var formBody: some View {
       Form {
         Section("When") {
           DatePicker("Date & time",
@@ -90,20 +98,6 @@ struct EditCaffeineEntrySheet: View {
             .lineLimit(1...4)
         }
       }
-      .navigationTitle(isCreating ? "New caffeine entry" : "Edit caffeine entry")
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
-        }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Save") { save() }
-        }
-      }
-      .task { await loadBeans(); seed() }
-    }
   }
 
   private func seed() {
@@ -246,6 +240,5 @@ struct EditCaffeineEntrySheet: View {
       note: noteValue
     )
     onSave(rebuilt)
-    dismiss()
   }
 }

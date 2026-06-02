@@ -101,7 +101,7 @@ struct CaffeineDestinationView: View {
         .presentationDragIndicator(.visible)
         #endif
     }
-    .sheet(item: $editing) { entry in
+    .adaptiveDetail(item: $editing) { entry in
       EditCaffeineEntrySheet(
         date: viewingDate,
         original: entry,

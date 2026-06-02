@@ -8,14 +8,13 @@ import UIKit
 import AppKit
 #endif
 
-// Edit/create sheet for a logged nutrition entry. Standard SwiftUI `Form` in a
-// `NavigationStack` presented via `.sheet(item:)` (edit) or
-// `.sheet(isPresented:)` (create). Mutations go through NutritionMutator
-// (local SwiftData + CKEngine queue).
+// Edit/create sheet for a logged nutrition entry. A SwiftUI `Form` wrapped in
+// `AdaptiveEditScaffold` (which supplies the chrome — inline header in a docked
+// inspector, NavigationStack + toolbar in a bottom sheet) and presented via
+// `.adaptiveDetail(item:)` (edit) or `.adaptiveDetail(isPresented:)` (create).
+// Mutations go through NutritionMutator (local SwiftData + CKEngine queue).
 
 struct EditNutritionEntrySheet: View {
-  @Environment(\.dismiss) private var dismiss
-
   let original: NutritionEntry?
   let onDone: () -> Void
 
@@ -45,7 +44,21 @@ struct EditNutritionEntrySheet: View {
   @State private var photoEdited: Bool = false
 
   var body: some View {
-    NavigationStack {
+    AdaptiveEditScaffold(title: original == nil ? "New Meal" : "Edit Meal",
+                         onSave: save) {
+      formBody
+        .onAppear { seed() }
+        .onChange(of: photoItem) { _, new in
+          // PhotosPicker hands us a PhotosPickerItem; the local identifier is
+          // present when we have Photos library read access. Request it lazily
+          // — the user only sees the prompt after their first pick.
+          guard let new else { return }
+          Task { await capturePickedIdentifier(new) }
+        }
+    }
+  }
+
+  @ViewBuilder private var formBody: some View {
       Form {
         Section("When") {
           DatePicker("Date & time",
@@ -83,27 +96,6 @@ struct EditNutritionEntrySheet: View {
           macroField("Water (ml)", text: $waterMl)
         }
       }
-      .navigationTitle(original == nil ? "New Meal" : "Edit Meal")
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
-        }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Save") { save() }
-        }
-      }
-      .onAppear { seed() }
-      .onChange(of: photoItem) { _, new in
-        // PhotosPicker hands us a PhotosPickerItem; the local identifier is
-        // present when we have Photos library read access. Request it lazily
-        // — the user only sees the prompt after their first pick.
-        guard let new else { return }
-        Task { await capturePickedIdentifier(new) }
-      }
-    }
   }
 
   @ViewBuilder
@@ -263,7 +255,6 @@ struct EditNutritionEntrySheet: View {
     }
     Haptics.tick()
     onDone()
-    dismiss()
   }
 }
 

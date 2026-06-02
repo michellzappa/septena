@@ -94,7 +94,7 @@ struct CannabisDestinationView: View {
     .tint(accent)
     .task { reload() }
     .onChange(of: viewingDate) { _, _ in reload() }
-    .sheet(item: $editing) { entry in
+    .adaptiveDetail(item: $editing) { entry in
       EditCannabisEntrySheet(
         date: viewingDate,
         original: entry,

@@ -6,7 +6,6 @@ import SwiftUI
 
 struct EditChoreSheet: View {
   @Environment(ChecklistMutator.self) private var checklistMutator
-  @Environment(\.dismiss) private var dismiss
 
   let original: ChoreItem?
   let onDone: (ChoreItem?) -> Void
@@ -28,7 +27,16 @@ struct EditChoreSheet: View {
   ]
 
   var body: some View {
-    NavigationStack {
+    AdaptiveEditScaffold(
+      title: original == nil ? "New Chore" : "Edit Chore",
+      canSave: !name.trimmingCharacters(in: .whitespaces).isEmpty,
+      onSave: save
+    ) {
+      formBody.onAppear { seed() }
+    }
+  }
+
+  @ViewBuilder private var formBody: some View {
       Form {
         Section("Chore") {
           TextField("Name", text: $name)
@@ -56,21 +64,6 @@ struct EditChoreSheet: View {
           }
         }
       }
-      .navigationTitle(original == nil ? "New Chore" : "Edit Chore")
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
-        }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Save") { save() }
-            .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-        }
-      }
-      .onAppear { seed() }
-    }
   }
 
   private func seed() {
@@ -96,6 +89,5 @@ struct EditChoreSheet: View {
       Haptics.tick()
       onDone(nil)
     }
-    dismiss()
   }
 }

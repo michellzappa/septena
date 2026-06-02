@@ -86,7 +86,7 @@ struct ChoresDestinationView: View {
         context: LocalStore.shared.container.mainContext, days: 365)
       history = resp.daily
     }
-    .sheet(item: $editing) { chore in
+    .adaptiveDetail(item: $editing) { chore in
       EditChoreSheet(
         original: chore,
         onDone: { updated in
@@ -96,15 +96,11 @@ struct ChoresDestinationView: View {
         }
       )
     }
-    .sheet(isPresented: $creating) {
+    .adaptiveDetail(isPresented: $creating) {
       EditChoreSheet(
         original: nil,
         onDone: { _ in Task { await model.load() } }
       )
-      #if os(iOS)
-      .presentationDetents([.medium, .large])
-      .presentationDragIndicator(.visible)
-      #endif
     }
     .sheet(item: $backfillDate) { wrap in
       BackfillChoresSheet(date: wrap.id)

@@ -1,13 +1,16 @@
 import SwiftUI
 
-// Edit/create sheet for a habit definition. Standard SwiftUI `Form` in a
-// `NavigationStack` presented via `.sheet(item:)` (edit) or
-// `.sheet(isPresented:)` (create). Edit enqueues `PUT /api/habits/update`
-// through HTTPOutbox; create enqueues `POST /api/habits/new`.
+// Edit/create sheet for a habit definition. A standard SwiftUI `Form`
+// wrapped in `AdaptiveEditScaffold`, which supplies all chrome (inline
+// header when docked as an inspector on regular width; NavigationStack +
+// Cancel/Save toolbar when presented as a bottom sheet) and closes after
+// save/cancel. Presented via `.adaptiveDetail(item:)` (edit) or
+// `.adaptiveDetail(isPresented:)` (create). Edit enqueues
+// `PUT /api/habits/update` through HTTPOutbox; create enqueues
+// `POST /api/habits/new`.
 
 struct EditHabitSheet: View {
   @Environment(ChecklistMutator.self) private var checklistMutator
-  @Environment(\.dismiss) private var dismiss
 
   let original: HabitDayItem?
   /// Allowed buckets for this app/server (e.g. ["morning","afternoon","evening"]).
@@ -18,35 +21,29 @@ struct EditHabitSheet: View {
   @State private var emoji: String = ""
   @State private var bucket: String = "morning"
 
+  private var navTitle: String { original == nil ? "New Habit" : "Edit Habit" }
+
   var body: some View {
-    NavigationStack {
-      Form {
-        Section("Habit") {
-          TextField("Name", text: $name)
-        }
-        Section("Bucket") {
-          Picker("Bucket", selection: $bucket) {
-            ForEach(buckets, id: \.self) { b in
-              Text(b.capitalized).tag(b)
-            }
+    AdaptiveEditScaffold(title: navTitle,
+                         canSave: !name.trimmingCharacters(in: .whitespaces).isEmpty,
+                         onSave: save) {
+      formBody.onAppear { seed() }
+    }
+  }
+
+  @ViewBuilder private var formBody: some View {
+    Form {
+      Section("Habit") {
+        TextField("Name", text: $name)
+      }
+      Section("Bucket") {
+        Picker("Bucket", selection: $bucket) {
+          ForEach(buckets, id: \.self) { b in
+            Text(b.capitalized).tag(b)
           }
-          .pickerStyle(.segmented)
         }
+        .pickerStyle(.segmented)
       }
-      .navigationTitle(original == nil ? "New Habit" : "Edit Habit")
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
-        }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Save") { save() }
-            .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-        }
-      }
-      .onAppear { seed() }
     }
   }
 
@@ -72,6 +69,5 @@ struct EditHabitSheet: View {
       Haptics.tick()
       onDone(nil)
     }
-    dismiss()
   }
 }

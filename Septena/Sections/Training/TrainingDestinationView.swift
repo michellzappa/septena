@@ -112,7 +112,7 @@ struct TrainingDestinationView: View {
       draftStore.refreshCatalog(context: modelContext)
       await load()
     }
-    .sheet(item: $editing) { entry in
+    .adaptiveDetail(item: $editing) { entry in
       EditExerciseEntrySheet(
         original: entry,
         onSave: { updated in applyLocalUpdate(updated) }

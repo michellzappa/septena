@@ -171,15 +171,11 @@ struct NutritionDestinationView: View {
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
       reload()
     }
-    .sheet(item: $editing) { entry in
+    .adaptiveDetail(item: $editing) { entry in
       EditNutritionEntrySheet(original: entry, onDone: { })
     }
-    .sheet(isPresented: $creating) {
+    .adaptiveDetail(isPresented: $creating) {
       EditNutritionEntrySheet(original: nil, onDone: { })
-      #if os(iOS)
-      .presentationDetents([.medium, .large])
-      .presentationDragIndicator(.visible)
-      #endif
     }
     .photosPicker(
       isPresented: $photoPickerPresented,

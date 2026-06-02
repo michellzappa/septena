@@ -7,8 +7,6 @@ import SwiftUI
 // `POST /api/groceries/item`.
 
 struct EditGroceryItemSheet: View {
-  @Environment(\.dismiss) private var dismiss
-
   private var grocery: GroceryMutator { SeptenaServices.shared.groceryMutator }
 
   let original: GroceryItem?
@@ -24,31 +22,25 @@ struct EditGroceryItemSheet: View {
   }
 
   var body: some View {
-    NavigationStack {
-      Form {
-        Section("Item") {
-          TextField("Name", text: $name)
-          Picker("Category", selection: $category) {
-            ForEach(categories) { cat in
-              Text(cat.name).tag(cat.id)
-            }
+    AdaptiveEditScaffold(
+      title: original == nil ? "New Item" : "Edit Item",
+      canSave: !name.trimmingCharacters(in: .whitespaces).isEmpty,
+      onSave: save
+    ) {
+      formBody.onAppear { seed() }
+    }
+  }
+
+  @ViewBuilder private var formBody: some View {
+    Form {
+      Section("Item") {
+        TextField("Name", text: $name)
+        Picker("Category", selection: $category) {
+          ForEach(categories) { cat in
+            Text(cat.name).tag(cat.id)
           }
         }
       }
-      .navigationTitle(original == nil ? "New Item" : "Edit Item")
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
-        }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Save") { save() }
-            .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-        }
-      }
-      .onAppear { seed() }
     }
   }
 
@@ -80,6 +72,5 @@ struct EditGroceryItemSheet: View {
       Haptics.tick()
       onDone(nil)
     }
-    dismiss()
   }
 }

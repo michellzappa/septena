@@ -6,8 +6,6 @@ import SwiftUI
 // (arousal, valence) coordinates in the new quadrant if it exists.
 
 struct EditMoodEntrySheet: View {
-  @Environment(\.dismiss) private var dismiss
-
   let date: String
   let original: MoodEntry
   let onSave: () -> Void
@@ -38,8 +36,13 @@ struct EditMoodEntrySheet: View {
   }
 
   var body: some View {
-    NavigationStack {
-      Form {
+    AdaptiveEditScaffold(title: "Edit check-in", onSave: save) {
+      formBody
+    }
+  }
+
+  @ViewBuilder private var formBody: some View {
+    Form {
         Section("Quadrant") {
           Picker("", selection: $quadrant) {
             ForEach(MoodQuadrant.allCases) { q in
@@ -77,20 +80,7 @@ struct EditMoodEntrySheet: View {
             .lineLimit(1...4)
         }
       }
-      .navigationTitle("Edit check-in")
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
-        }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Save") { save() }
-        }
-      }
       .tint(quadrant.color)
-    }
   }
 
   private func save() {
@@ -109,7 +99,6 @@ struct EditMoodEntrySheet: View {
                      note: .some(trimmed.isEmpty ? nil : trimmed))
     Haptics.tick()
     onSave()
-    dismiss()
   }
 }
 

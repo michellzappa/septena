@@ -200,10 +200,16 @@ struct WeekDashboardView: View {
       .padding(.horizontal, Theme.hPadding)
       .padding(.top, 12)
       .padding(.bottom, 80)
+      // Regular width (iPad / macOS): a section opens as a pushed full
+      // pane *inside* the dashboard's NavigationStack — a real screen with
+      // a back button, not a floating modal drawer. `pushDest` is nil on
+      // compact, so only the bottom-sheet path below fires there.
+      .navigationDestination(item: pushDest) { dest in
+        pushedContent(for: dest)
+      }
     }
-    // Sheets, not pushes — iPhone navigation into module destinations
-    // is a bottom-sheet slide-over so the dashboard stays visually
-    // present underneath. iPad / Mac render this just as well.
+    // Compact (iPhone): navigation into a module is a bottom-sheet slide-
+    // over so the dashboard stays visually present underneath.
     //
     // Attached OUTSIDE the NavigationStack on purpose: `.refreshable`
     // inside publishes `\.refresh` into the env, and SwiftUI sheet
@@ -212,7 +218,7 @@ struct WeekDashboardView: View {
     // beside `.refreshable`) keeps the sheet's attachment point outside
     // the refreshable's scope, so drawers don't inherit a pull-to-
     // refresh gesture that re-runs Week's loader.
-    .sheet(item: $sheetDest) { dest in
+    .sheet(item: sheetDestBinding) { dest in
       sheetContent(for: dest)
     }
     .sheet(item: $nutritionSheet) { sheet in
@@ -283,6 +289,51 @@ struct WeekDashboardView: View {
       Image(systemName: "magnifyingglass")
     }
     .accessibilityLabel("Search")
+  }
+
+  /// True when sections should open as a pushed full pane rather than a
+  /// modal bottom sheet — i.e. anywhere with room for it. macOS always;
+  /// iOS only at regular width (iPad full-screen / large multitasking),
+  /// so a compact iPad window correctly falls back to the bottom sheet.
+  private var usesPushNavigation: Bool {
+    #if os(macOS)
+    return true
+    #else
+    return hSize == .regular
+    #endif
+  }
+
+  /// Drives the `.navigationDestination` push. Mirrors `sheetDest` only
+  /// when pushing, and stays nil otherwise so the sheet path owns
+  /// presentation on compact. Every `sheetDest = .foo` tap site flows
+  /// through whichever of these two bindings is currently active.
+  private var pushDest: Binding<WeekDestination?> {
+    Binding(
+      get: { usesPushNavigation ? sheetDest : nil },
+      set: { if usesPushNavigation { sheetDest = $0 } }
+    )
+  }
+
+  /// Drives the bottom-sheet. The inverse of `pushDest`.
+  private var sheetDestBinding: Binding<WeekDestination?> {
+    Binding(
+      get: { usesPushNavigation ? nil : sheetDest },
+      set: { if !usesPushNavigation { sheetDest = $0 } }
+    )
+  }
+
+  /// Pushed-pane content: the plugin destination rendered *bare*, with no
+  /// extra `NavigationStack` or fixed frame — the dashboard's own stack
+  /// hosts it, supplying the back button, and the section's `SectionDrawer`
+  /// supplies its title + "+" toolbar. This is what turns "floating drawer"
+  /// into "real screen" on iPad / macOS.
+  @ViewBuilder
+  private func pushedContent(for dest: WeekDestination) -> some View {
+    if let view = SectionRegistry.plugin(forKey: dest.rawValue)?.destinationView() {
+      view
+    } else {
+      EmptyView()
+    }
   }
 
   /// Each module's destination wrapped in its own NavigationStack so

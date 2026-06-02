@@ -125,23 +125,19 @@ struct GroceriesDestinationView: View {
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
       reload()
     }
-    .sheet(item: $editing) { item in
+    .adaptiveDetail(item: $editing) { item in
       EditGroceryItemSheet(
         original: item,
         categories: categories,
         onDone: { _ in reload() }
       )
     }
-    .sheet(isPresented: $creating) {
+    .adaptiveDetail(isPresented: $creating) {
       EditGroceryItemSheet(
         original: nil,
         categories: categories,
         onDone: { _ in reload() }
       )
-      #if os(iOS)
-      .presentationDetents([.medium, .large])
-      .presentationDragIndicator(.visible)
-      #endif
     }
   }
 

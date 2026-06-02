@@ -8,8 +8,6 @@ import Photos
 // from the Nutrition QuickAdd menu's "New meal…" item.
 
 struct NewNutritionEntrySheet: View {
-  @Environment(\.dismiss) private var dismiss
-
   @State private var time: Date = Date()
   @State private var emoji: String = ""
   @State private var foodsText: String = ""
@@ -31,7 +29,26 @@ struct NewNutritionEntrySheet: View {
   @State private var photoAssetID: String? = nil
 
   var body: some View {
-    NavigationStack {
+    AdaptiveEditScaffold(
+      title: "New meal",
+      canSave: !foodsText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+      onSave: save
+    ) {
+      formBody
+        .onChange(of: photoItem) { _, new in
+          guard let new else { return }
+          Task {
+            let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+            if status == .notDetermined {
+              _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+            }
+            await MainActor.run { photoAssetID = new.itemIdentifier }
+          }
+        }
+    }
+  }
+
+  @ViewBuilder private var formBody: some View {
       Form {
         Section("When") {
           DatePicker("Time",
@@ -85,30 +102,6 @@ struct NewNutritionEntrySheet: View {
           macroField("Water (ml)", text: $waterMl)
         }
       }
-      .navigationTitle("New meal")
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
-        }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Save") { save() }
-            .disabled(foodsText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        }
-      }
-      .onChange(of: photoItem) { _, new in
-        guard let new else { return }
-        Task {
-          let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-          if status == .notDetermined {
-            _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
-          }
-          await MainActor.run { photoAssetID = new.itemIdentifier }
-        }
-      }
-    }
   }
 
   private func macroField(_ label: String, text: Binding<String>) -> some View {
@@ -165,6 +158,5 @@ struct NewNutritionEntrySheet: View {
     )
     AddInfoSection.nutrition.notifyTilesChanged()
     Haptics.tick()
-    dismiss()
   }
 }

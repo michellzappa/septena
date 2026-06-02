@@ -79,7 +79,7 @@ struct HabitsDestinationView: View {
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
       reloadPastDay()
     }
-    .sheet(item: $editing) { habit in
+    .adaptiveDetail(item: $editing) { habit in
       EditHabitSheet(
         original: habit,
         buckets: model.habitBuckets,
@@ -90,16 +90,12 @@ struct HabitsDestinationView: View {
         }
       )
     }
-    .sheet(isPresented: $creating) {
+    .adaptiveDetail(isPresented: $creating) {
       EditHabitSheet(
         original: nil,
         buckets: model.habitBuckets,
         onDone: { _ in Task { await model.load() } }
       )
-      #if os(iOS)
-      .presentationDetents([.medium, .large])
-      .presentationDragIndicator(.visible)
-      #endif
     }
   }
 

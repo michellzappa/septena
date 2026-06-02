@@ -48,10 +48,10 @@ struct MoodDestinationView: View {
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
       reload()
     }
-    .sheet(isPresented: $addingNew) {
+    .adaptiveDetail(isPresented: $addingNew) {
       AddMoodPage(onLogged: { reload() })
     }
-    .sheet(item: $editing) { entry in
+    .adaptiveDetail(item: $editing) { entry in
       EditMoodEntrySheet(date: viewingDate,
                          original: entry,
                          onSave: { reload() })
