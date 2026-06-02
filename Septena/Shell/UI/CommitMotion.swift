@@ -236,6 +236,53 @@ enum CommitFeedback {
   }
 }
 
+// MARK: - SectionLog — the manifest-driven commit funnel
+//
+// Every section's log/edit write routes through here so the haptic +
+// VoiceOver + motion language stays identical app-wide. The *motion* a new
+// log plays is declared per-section on the plugin (`SectionPlugin.logFlourish`)
+// — the "manifest" — so adding a section means declaring its feel in one
+// place, not hand-writing a commit funnel. Sections whose motion varies with
+// the entry (e.g. caffeine time-of-day) pass a `motion:` override.
+
+/// A section's commit-flourish declaration: how a *new* log celebrates.
+/// Lives on the section plugin (the app-layer manifest). `nil` there = no
+/// flourish (utility sections).
+struct LogFlourish: Sendable {
+  /// Default motion for a new log in this section. Sections with a dynamic
+  /// rule override per-call via `SectionLog.newLog(motion:)`.
+  var motion: CommitMotion
+}
+
+@MainActor
+enum SectionLog {
+  /// Non-blocking commit of a NEW entry: runs `write` (persist + tile
+  /// refresh), the success haptic, the announce, then fires the flourish at
+  /// the app root. Motion resolves from the section plugin's `logFlourish`
+  /// unless overridden. `accent` is the section's theme color (resolved by
+  /// the caller); `logCommit` is nil-safe (skips only the visual).
+  static func newLog(section sectionKey: String,
+                     accent: Color,
+                     motion: CommitMotion? = nil,
+                     intensity: Double = 1,
+                     announce: String? = nil,
+                     logCommit: LogCommitCenter?,
+                     write: () -> Void) {
+    let resolved = motion
+      ?? SectionRegistry.plugin(forKey: sectionKey)?.logFlourish?.motion
+      ?? .burst
+    CommitFeedback.commit(motion: resolved, accent: accent, intensity: intensity,
+                          announce: announce, logCommit: logCommit, write: write)
+  }
+
+  /// Commit an EDIT: a correction, not a fresh log — quiet haptic, no
+  /// flourish. `write` does the update + tile refresh.
+  static func edit(write: () -> Void) {
+    write()
+    Haptics.tick()
+  }
+}
+
 extension View {
   /// In-sheet (blocking) commit flourish. Renders a `CommitFlourish`
   /// overlay keyed to `trigger`; on each bump it plays for the standard
