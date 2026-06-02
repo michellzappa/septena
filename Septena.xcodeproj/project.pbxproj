@@ -412,6 +412,7 @@
 		D68C4DF01907E23021C0EB16 /* MoodDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12E14E48DFB87C5F1543BEA4 /* MoodDestinationView.swift */; };
 		D70A3B473E3ACD222FD15870 /* SeptenaServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D227602C1039FA2206A539A /* SeptenaServices.swift */; };
 		D8337D72DCD514F36A6094B4 /* MenuBarMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD90B8D1D8A0A978D1CE744C /* MenuBarMenu.swift */; };
+		D84CE356C37CEBDDCCDF1B74 /* SeptenaWatchComplication.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B456DE05339EB2A12EB2A9BE /* SeptenaWatchComplication.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		D87619020A982717812E2C6C /* DayBucketHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32A70DB5FE3A7F04BE3E7BAC /* DayBucketHeader.swift */; };
 		D96F2922568F67A65AAA9AAC /* CaffeineDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACEBFC5E297AA01C582EE1A5 /* CaffeineDestinationView.swift */; };
 		D9723D91628B03674BBC00C4 /* BackfillSupplementsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BE63017AAC0030D65CA758B /* BackfillSupplementsSheet.swift */; };
@@ -499,6 +500,13 @@
 			remoteGlobalIDString = C99314A0CFDF9A8B0AEB409A;
 			remoteInfo = SeptenaWatch;
 		};
+		BB4D2394D960247B9F5662B4 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3A81108521AE358318C77A50 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C4055CC2A1451D2304DA1AD5;
+			remoteInfo = SeptenaWatchComplication;
+		};
 		DA083821C527A4F9B58FDD02 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 3A81108521AE358318C77A50 /* Project object */;
@@ -516,6 +524,17 @@
 			dstSubfolderSpec = 13;
 			files = (
 				8AF84843863B8AD9242182B7 /* SeptenaLiveActivitiesExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6E5E17825D233E760C43FB43 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				D84CE356C37CEBDDCCDF1B74 /* SeptenaWatchComplication.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1470,10 +1489,12 @@
 			buildPhases = (
 				DB1CB4DEA916E392A643915C /* Sources */,
 				7B79024AFC3338563917CB13 /* Resources */,
+				6E5E17825D233E760C43FB43 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				E29C52EB1EE32E3365E24F79 /* PBXTargetDependency */,
 			);
 			name = SeptenaWatch;
 			packageProductDependencies = (
@@ -2129,6 +2150,11 @@
 			target = FA39C23110542023235A82C8 /* SeptenaLiveActivitiesExtension */;
 			targetProxy = DA083821C527A4F9B58FDD02 /* PBXContainerItemProxy */;
 		};
+		E29C52EB1EE32E3365E24F79 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C4055CC2A1451D2304DA1AD5 /* SeptenaWatchComplication */;
+			targetProxy = BB4D2394D960247B9F5662B4 /* PBXContainerItemProxy */;
+		};
 		E74ACA3F68450593E3B01286 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = C99314A0CFDF9A8B0AEB409A /* SeptenaWatch */;
@@ -2141,6 +2167,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = SeptenaWatch/SeptenaWatch.entitlements;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SeptenaWatch/Info.plist;
 				PRODUCT_BUNDLE_IDENTIFIER = com.septena.cloud.watchkitapp;
@@ -2259,6 +2286,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = SeptenaWatch/SeptenaWatch.entitlements;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = SeptenaWatch/Info.plist;
 				PRODUCT_BUNDLE_IDENTIFIER = com.septena.cloud.watchkitapp;
