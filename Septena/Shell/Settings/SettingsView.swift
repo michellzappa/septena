@@ -3,7 +3,6 @@ import SwiftData
 import EventKit
 import CloudKit
 import CoreLocation
-import WebKit
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -2707,8 +2706,8 @@ private struct ClaudeGatewayDetail: View {
           HStack {
             Label("Status", systemImage: "sparkles")
             Spacer()
-            Text(provider.needsReauth ? "Tap Reauthenticate" : (provider.lastError == nil ? "Connected" : "Needs attention"))
-              .foregroundStyle(provider.needsReauth || provider.lastError != nil ? .orange : .green)
+            Text(provider.lastError == nil ? "Connected" : "Needs attention")
+              .foregroundStyle(provider.lastError == nil ? .green : .orange)
           }
           HStack {
             Label("Last authenticated", systemImage: "clock.arrow.circlepath")
@@ -2736,35 +2735,8 @@ private struct ClaudeGatewayDetail: View {
       }
     }
     .formStyle(.grouped)
-    // Interactive Apple sign-in — only shown when a silent re-mint fails
-    // (session lapsed) and the user explicitly reauthenticates.
-    .sheet(isPresented: Binding(
-      get: { provider.showingInteractiveAuth },
-      set: { if !$0 { provider.cancelInteractiveAuth() } }
-    )) {
-      if let web = provider.interactiveWebView {
-        ClaudeAuthWebView(webView: web).ignoresSafeArea()
-      }
-    }
   }
 }
-
-// Hosts the provider's WKWebView for interactive idmsa sign-in. The view
-// captures the ckWebAuthToken via its navigation delegate (set by the
-// provider), so this wrapper just displays it.
-#if os(iOS)
-private struct ClaudeAuthWebView: UIViewRepresentable {
-  let webView: WKWebView
-  func makeUIView(context: Context) -> WKWebView { webView }
-  func updateUIView(_ uiView: WKWebView, context: Context) {}
-}
-#elseif os(macOS)
-private struct ClaudeAuthWebView: NSViewRepresentable {
-  let webView: WKWebView
-  func makeNSView(context: Context) -> WKWebView { webView }
-  func updateNSView(_ nsView: WKWebView, context: Context) {}
-}
-#endif
 
 // Withings → OAuth2 connect / backfill / disconnect. "Connect" opens
 // ASWebAuthenticationSession against account.withings.com; the returned
