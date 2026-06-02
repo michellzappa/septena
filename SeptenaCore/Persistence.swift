@@ -67,6 +67,24 @@ final class TaskEntity {
   /// engine drained). The CloudKit path on `TaskRecord` reads / writes
   /// this transparently — call sites don't need to think about it.
   var cloudKitSystemFields: Data?
+  /// Provenance — what created this row. `nil`/`"user"`/`"manual"` = human;
+  /// `"mcp"` = authored by the MCP gateway (Claude). PERMANENT: an audit
+  /// trail, never cleared. Set by the gateway at create time; the app reads
+  /// it off the fetched record and preserves it on re-save.
+  var source: String?
+  /// Friendly label for `source` (e.g. "Claude"). Permanent, optional.
+  var sourceClient: String?
+  /// Transient freshness cue. `nil` until the user engages with an
+  /// agent-created row (open / complete / edit / "Mark seen"); stamped
+  /// then so the cue clears and — being synced — stays cleared on every
+  /// device. Distinct from `source`, which never clears.
+  var acknowledgedAt: Date?
+  /// Canonical creation instant. `Date` (UTC; NSDate in CloudKit) to match
+  /// the app-wide convention (`occurredAt`, `loggedAt`). `.distantPast` is
+  /// the lightweight-migration default; `TaskCreatedAtBackfill` fills it
+  /// from the legacy `created` YYYY-MM-DD string at launch. Drives the
+  /// agent-cue decay window.
+  var createdAt: Date = Date.distantPast
 
   init(id: String,
        title: String,
@@ -89,7 +107,11 @@ final class TaskEntity {
        pendingDeletion: Bool = false,
        updatedAt: String? = nil,
        deletedAt: String? = nil,
-       cloudKitSystemFields: Data? = nil) {
+       cloudKitSystemFields: Data? = nil,
+       source: String? = nil,
+       sourceClient: String? = nil,
+       acknowledgedAt: Date? = nil,
+       createdAt: Date = Date.distantPast) {
     self.id = id
     self.title = title
     self.statusRaw = statusRaw
@@ -112,6 +134,10 @@ final class TaskEntity {
     self.updatedAt = updatedAt
     self.deletedAt = deletedAt
     self.cloudKitSystemFields = cloudKitSystemFields
+    self.source = source
+    self.sourceClient = sourceClient
+    self.acknowledgedAt = acknowledgedAt
+    self.createdAt = createdAt
   }
 
   var status: TaskStatus {
@@ -1171,6 +1197,12 @@ extension SeptenaTask {
     ]
     let data = try! JSONSerialization.data(withJSONObject: payload.compactMapValues { $0 })
     self = try! JSONDecoder().decode(SeptenaTask.self, from: data)
+    // Provenance + cue fields ride alongside the entity, not the wire — set
+    // them directly (the JSON path above is the legacy network shape).
+    source = e.source
+    sourceClient = e.sourceClient
+    acknowledgedAt = e.acknowledgedAt
+    createdAt = e.createdAt
   }
 }
 

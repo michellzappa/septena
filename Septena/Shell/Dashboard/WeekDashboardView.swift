@@ -63,6 +63,7 @@ struct WeekDashboardView: View {
   private var nutritionTrackFasting: Bool = false
   @AppStorage(SettingsKey.nutritionHeatmapMetric)
   private var nutritionHeatmapMetricRaw: String = NutritionHeatmapMetric.protein.rawValue
+  @Environment(\.a11yMotion) private var motion
   #if os(iOS)
   @Environment(\.horizontalSizeClass) private var hSize
   #endif
@@ -1456,7 +1457,7 @@ struct WeekDashboardView: View {
 
 
   private func commitHabitToggle(_ item: HabitDayItem) {
-    dailies.toggleHabit(item, mutator: checklistMutator)
+    dailies.toggleHabit(item, mutator: checklistMutator, motion: motion)
     AddInfoSection.habits.notifyTilesChanged()
     Haptics.tick()
   }
@@ -1600,7 +1601,7 @@ struct WeekDashboardView: View {
   }
 
   private func commitChoreComplete(_ chore: ChoreItem) {
-    dailies.completeChore(chore, mutator: checklistMutator)
+    dailies.completeChore(chore, mutator: checklistMutator, motion: motion)
     AddInfoSection.chores.notifyTilesChanged()
     Haptics.tick()
   }
@@ -1628,7 +1629,7 @@ struct WeekDashboardView: View {
   }
 
   private func commitSupplementToggle(_ item: SupplementDayItem) {
-    dailies.toggleSupplement(item, mutator: checklistMutator)
+    dailies.toggleSupplement(item, mutator: checklistMutator, motion: motion)
     AddInfoSection.supplements.notifyTilesChanged()
     Haptics.tick()
   }

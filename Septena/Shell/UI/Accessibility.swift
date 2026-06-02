@@ -113,6 +113,69 @@ extension EnvironmentValues {
   }
 }
 
+// MARK: - Settle
+//
+// One place owns the "confirm → linger → fade" timing the whole app uses for
+// completing checklist-style items (tasks, habits, supplements, chores).
+//
+// The pattern: when you check something off it should NOT vanish under your
+// finger. It stays in place, struck through, for a beat — long enough to read
+// as "done" — then animates out of the open list (rows below slide up) and
+// lands in the Done section. Re-checking within that window cancels the
+// fade-out (you changed your mind).
+//
+// `SettleStore` is the cancellable timer behind that beat. It owns *only* the
+// scheduling; callers supply the `finalize` closure that does the actual state
+// mutation, wrapped in their own motion-gated animation (`A11yMotion.run`) so
+// Reduce Motion drops the fade while keeping the delayed removal. The
+// `settling` set lets a view keep a just-completed row visible during the
+// window (e.g. `TaskListView.visibleItems`, which otherwise filters done tasks).
+
+@MainActor
+@Observable
+final class SettleStore {
+  /// How long a checked item lingers, struck through, before it fades out.
+  static let delay: Duration = .milliseconds(2000)
+
+  /// Ids currently lingering (checked, not yet faded). Read by views that need
+  /// to keep a just-completed row on screen during the window.
+  private(set) var settling: Set<String> = []
+
+  private var pending: [String: Task<Void, Never>] = [:]
+
+  func isSettling(_ id: String) -> Bool { settling.contains(id) }
+
+  /// Keep `id` lingering, then run `finalize` after the delay. The caller
+  /// wraps its own state mutation in the right (motion-gated) animation.
+  /// Re-scheduling the same id restarts the clock.
+  func schedule(_ id: String, finalize: @escaping () -> Void) {
+    pending[id]?.cancel()
+    settling.insert(id)
+    pending[id] = Task { [weak self] in
+      try? await Task.sleep(for: SettleStore.delay)
+      guard !Task.isCancelled, let self else { return }
+      self.settling.remove(id)
+      self.pending[id] = nil
+      finalize()
+    }
+  }
+
+  /// User un-checked within the window → abort the fade-out.
+  func cancel(_ id: String) {
+    pending[id]?.cancel()
+    pending[id] = nil
+    settling.remove(id)
+  }
+
+  /// Drop every pending settle (e.g. on a full reload or filter swap) so no
+  /// orphaned timer fires against stale state.
+  func cancelAll() {
+    for task in pending.values { task.cancel() }
+    pending.removeAll()
+    settling.removeAll()
+  }
+}
+
 // MARK: - Dynamic-Type-aware tap targets
 //
 // Apple HIG asks for 44×44 pt minimums on iOS and ~24 pt on macOS. WCAG 2.2

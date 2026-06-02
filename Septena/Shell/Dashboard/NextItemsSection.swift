@@ -20,6 +20,8 @@ final class TodayTasksModel {
   /// (struck through) so the row doesn't hop the moment you check it.
   var actedTasks: Set<String> = []
   var hasLoaded: Bool = false
+  /// Drives the "linger → fade" beat after a check (see `SettleStore`).
+  let settle = SettleStore()
 
   func paintFromCache() {
     refreshFromCache()
@@ -27,8 +29,22 @@ final class TodayTasksModel {
   }
 
   func refreshFromCache() {
-    tasks = LocalCache.tasks(in: LocalStore.shared.container.mainContext,
-                             filter: .today)
+    let fresh = LocalCache.tasks(in: LocalStore.shared.container.mainContext,
+                                 filter: .today)
+    // The `.today` query excludes done tasks, so a plain re-read would yank a
+    // just-completed row out from under the settle beat — and this runs on
+    // every `.septenaTasksChanged` (see NextView), which a completion posts.
+    // Preserve session-acted rows the query now hides, in their current
+    // position, so they linger struck through then fade rather than hop/vanish.
+    let freshByID = Dictionary(fresh.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+    var merged = tasks.compactMap { old -> SeptenaTask? in
+      if let f = freshByID[old.id] { return f }        // still open → refreshed copy
+      if actedTasks.contains(old.id) { return old }    // lingering → keep in place
+      return nil                                       // gone
+    }
+    let kept = Set(merged.map(\.id))
+    merged.append(contentsOf: fresh.filter { !kept.contains($0.id) })  // newly arrived
+    tasks = merged
   }
 
   func load() async {
@@ -36,8 +52,11 @@ final class TodayTasksModel {
     // CloudKit-mode read: TaskReads.list returns LocalCache directly,
     // so we just need to ensure the mirror is fresh, then repaint.
     _ = await TaskReads.list(view: "today", context: context)
-    refreshFromCache()
+    // Clear session state BEFORE repainting so the merge in refreshFromCache
+    // doesn't preserve now-stale lingering rows — load() is authoritative.
     actedTasks = []
+    settle.cancelAll()
+    refreshFromCache()
     hasLoaded = true
   }
 
@@ -47,16 +66,30 @@ final class TodayTasksModel {
     tasks.filter { actedTasks.contains($0.id) || $0.status == .open }
   }
 
-  func toggle(_ task: SeptenaTask, mutator: TaskMutator) {
+  func toggle(_ task: SeptenaTask, mutator: TaskMutator, motion: A11yMotion) {
+    // Flip status IN PLACE rather than re-reading from the cache: the Today
+    // cache query excludes done tasks (Persistence `LocalCache.tasks(.today)`),
+    // so a `refreshFromCache()` here would drop the just-completed row before
+    // it could linger. Keeping it in `tasks` (struck through, held visible by
+    // `actedTasks`) is what lets it settle then fade.
+    guard let i = tasks.firstIndex(where: { $0.id == task.id }) else { return }
     if task.status == .done {
       Haptics.tap()
       mutator.uncomplete(id: task.id)
+      settle.cancel(task.id)
+      tasks[i].status = .open
+      actedTasks.insert(task.id)
     } else {
       Haptics.success()
       mutator.complete(id: task.id)
+      tasks[i].status = .done
+      actedTasks.insert(task.id)
+      // Linger struck through, then fade out of the open list. Next has no
+      // tasks-done section, so a settled task simply drifts away.
+      settle.schedule(task.id) { [weak self] in
+        motion.run(Theme.Motion.settle) { _ = self?.actedTasks.remove(task.id) }
+      }
     }
-    actedTasks.insert(task.id)
-    refreshFromCache()
   }
 }
 
@@ -73,6 +106,7 @@ struct TodayTasksSection: View {
         ForEach(tasks) { task in
           TodayTaskRow(task: task, model: model, mutator: mutator,
                        tint: theme.color(for: "tasks"))
+            .transition(.opacity)
         }
       }
     }
@@ -84,13 +118,15 @@ struct TodayTaskRow: View {
   var model: TodayTasksModel
   let mutator: TaskMutator
   let tint: Color
+  @Environment(\.a11yMotion) private var motion
 
   var body: some View {
     let isDone = task.status == .done
-    HStack(spacing: 12) {
+    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
       TaskCheckbox(tint: tint, isDone: isDone) {
-        model.toggle(task, mutator: mutator)
+        model.toggle(task, mutator: mutator, motion: motion)
       }
+      .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
       Text(task.title)
         .font(.septenaTaskTitle)
         .foregroundStyle(isDone ? Theme.inkSecondary : Theme.inkPrimary)
@@ -149,7 +185,9 @@ final class NextItemsModel {
   var chores: [ChoreItem] = []
   /// Chores deferred this session — kept visible (with badge) until reload.
   var deferredChores: [String: String] = [:]
-  /// Chores marked done this session — same treatment.
+  /// Chores marked done this session — the "is completed" flag the row reads.
+  /// Distinct from `actedChores` (the linger set): completion must survive the
+  /// settle beat, or the chore would un-complete as it fades.
   var completedChores: Set<String> = []
   /// Habits the user toggled/skipped this session. Keeps them rendered in
   /// the open list (struck through) so the row doesn't hop to the bottom
@@ -157,10 +195,16 @@ final class NextItemsModel {
   var actedHabits: Set<String> = []
   /// Same idea for supplements.
   var actedSupplements: Set<String> = []
+  /// Same idea for chores — the linger set, separate from `completedChores`
+  /// so the settle beat moves the row to Done without un-completing it.
+  var actedChores: Set<String> = []
   /// Today's calendar events — surfaced inline in Next instead of as a
   /// separate dashboard tile (matches the webapp's `/api/calendar/day`
   /// integration into the Next list).
   var calendarEvents: [EKEvent] = []
+  /// Drives the "linger → fade" beat after a check (see `SettleStore`). One
+  /// store covers habits / supplements / chores — ids never collide.
+  let settle = SettleStore()
 
   /// Flips true after the first network response (success or failure) so the
   /// empty state never flashes during the initial load.
@@ -199,23 +243,27 @@ final class NextItemsModel {
     }
   }
 
-  /// Chores due today or overdue. Linger in the open list after completion
-  /// (struck through) so the row doesn't vanish under the user's finger —
-  /// same treatment as habits/supplements. Deferred chores hide because
-  /// "defer" rescheduled them to a future day.
+  /// Chores due today or overdue. A just-acted chore lingers in the open list
+  /// (struck through) for the settle beat so it doesn't vanish under the
+  /// finger; once the beat clears `actedChores` it drops into `doneChores` —
+  /// same treatment as habits/supplements.
   var openChores: [ChoreItem] {
     chores
       .filter { $0.daysOverdue >= 0 }
       .filter { c in
-        completedChores.contains(c.id) || deferredChores[c.id] == nil
+        actedChores.contains(c.id)
+          || (!completedChores.contains(c.id) && deferredChores[c.id] == nil)
       }
       .sorted { ($0.daysOverdue, $0.name) > ($1.daysOverdue, $1.name) }
   }
 
-  /// Deferred-this-session chores only. Completed chores stay in the open
-  /// list (lingering) to match the habit / supplement pattern.
+  /// Completed- or deferred-this-session chores that have finished lingering
+  /// (no longer in `actedChores`) — they show in the Done strip.
   var doneChores: [ChoreItem] {
-    chores.filter { !completedChores.contains($0.id) && deferredChores[$0.id] != nil }
+    chores.filter { c in
+      !actedChores.contains(c.id)
+        && (completedChores.contains(c.id) || deferredChores[c.id] != nil)
+    }
   }
 
   /// Calendar events still ahead today (or currently happening). Past
@@ -313,12 +361,14 @@ final class NextItemsModel {
     completedChores = []
     actedHabits = []
     actedSupplements = []
+    actedChores = []
+    settle.cancelAll()
     hasLoaded = true
   }
 
   // MARK: - Mutations (optimistic local flips, server-side write)
 
-  func toggleHabit(_ habit: HabitDayItem, mutator: ChecklistMutator) {
+  func toggleHabit(_ habit: HabitDayItem, mutator: ChecklistMutator, motion: A11yMotion) {
     let next = !habit.done
     if next { Haptics.success() } else { Haptics.tap() }
     if let i = habits.firstIndex(where: { $0.id == habit.id }) {
@@ -328,9 +378,10 @@ final class NextItemsModel {
     }
     actedHabits.insert(habit.id)
     mutator.toggleHabit(id: habit.id, date: today, done: next)
+    settleActed(habit.id, in: \.actedHabits, done: next, motion: motion)
   }
 
-  func skipHabit(_ habit: HabitDayItem, skipped: Bool, mutator: ChecklistMutator) {
+  func skipHabit(_ habit: HabitDayItem, skipped: Bool, mutator: ChecklistMutator, motion: A11yMotion) {
     Haptics.tick()
     if let i = habits.firstIndex(where: { $0.id == habit.id }) {
       habits[i].skipped = skipped
@@ -341,9 +392,11 @@ final class NextItemsModel {
     }
     actedHabits.insert(habit.id)
     mutator.skipHabit(id: habit.id, date: today, skipped: skipped)
+    // A skip drifts into Done the same way a completion does; un-skip keeps it.
+    settleActed(habit.id, in: \.actedHabits, done: skipped, motion: motion)
   }
 
-  func toggleSupplement(_ supp: SupplementDayItem, mutator: ChecklistMutator) {
+  func toggleSupplement(_ supp: SupplementDayItem, mutator: ChecklistMutator, motion: A11yMotion) {
     let next = !supp.done
     if next { Haptics.success() } else { Haptics.tap() }
     if let i = supplements.firstIndex(where: { $0.id == supp.id }) {
@@ -352,17 +405,39 @@ final class NextItemsModel {
     }
     actedSupplements.insert(supp.id)
     mutator.toggleSupplement(id: supp.id, date: today, done: next)
+    settleActed(supp.id, in: \.actedSupplements, done: next, motion: motion)
   }
 
-  func completeChore(_ chore: ChoreItem, mutator: ChecklistMutator) {
+  func completeChore(_ chore: ChoreItem, mutator: ChecklistMutator, motion: A11yMotion) {
     Haptics.success()
     completedChores.insert(chore.id)
+    actedChores.insert(chore.id)
     deferredChores.removeValue(forKey: chore.id)
     if let i = chores.firstIndex(where: { $0.id == chore.id }) {
       chores[i].lastCompleted = today
       chores[i].lastCompletedTime = currentTimeString()
     }
     mutator.completeChore(id: chore.id, date: today)
+    // Linger struck through, then fade into Done. We clear `actedChores` (the
+    // linger set) — NOT `completedChores` — so the chore stays *completed* as
+    // it moves from the open list to the Done strip.
+    settle.schedule(chore.id) { [weak self] in
+      motion.run(Theme.Motion.settle) { _ = self?.actedChores.remove(chore.id) }
+    }
+  }
+
+  /// Shared "linger → fade" wiring for the acted-set rows (habits / supplements).
+  /// When `done`, schedule the id to drop out of the acted set after the beat
+  /// (which moves it from the open split into the done split); otherwise cancel
+  /// any pending fade so an un-check stays put.
+  private func settleActed(_ id: String,
+                           in keyPath: ReferenceWritableKeyPath<NextItemsModel, Set<String>>,
+                           done: Bool, motion: A11yMotion) {
+    guard done else { settle.cancel(id); return }
+    settle.schedule(id) { [weak self] in
+      guard let self else { return }
+      motion.run(Theme.Motion.settle) { _ = self[keyPath: keyPath].remove(id) }
+    }
   }
 
   func deferChore(_ chore: ChoreItem, mode: String, label: String, mutator: ChecklistMutator) {
@@ -388,7 +463,9 @@ final class NextItemsModel {
 
   func uncompleteChore(_ chore: ChoreItem, mutator: ChecklistMutator) {
     Haptics.tap()
+    settle.cancel(chore.id)
     completedChores.remove(chore.id)
+    actedChores.remove(chore.id)
     if let i = chores.firstIndex(where: { $0.id == chore.id }) {
       chores[i].lastCompleted = nil
       chores[i].lastCompletedTime = nil
@@ -451,6 +528,7 @@ struct NextOpenSection: View {
         ForEach(chores) { chore in
           ChoreRow(chore: chore, model: model, checklistMutator: checklistMutator,
                    tint: theme.color(for: "chores"))
+            .transition(.opacity)
         }
       }
 
@@ -461,6 +539,7 @@ struct NextOpenSection: View {
         ForEach(habits) { habit in
           HabitRow(habit: habit, model: model, checklistMutator: checklistMutator,
                    tint: theme.color(for: "habits"))
+            .transition(.opacity)
         }
       }
 
@@ -472,6 +551,7 @@ struct NextOpenSection: View {
         ForEach(supplements) { supp in
           SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator,
                         tint: theme.color(for: "supplements"))
+            .transition(.opacity)
         }
       }
     }
@@ -543,13 +623,14 @@ struct HabitRow: View {
   var onDelete: (() -> Void)? = nil
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
+  @Environment(\.a11yMotion) private var motion
   // Optional — HabitRow renders in multiple hosts (Next tab, Habits sheet);
   // not all inherit the root env. nil → celebration no-ops, toggle still runs.
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
   var body: some View {
     let inactive = habit.done || habit.skipped
-    HStack(spacing: 12) {
+    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
       TaskCheckbox(
         tint: habit.skipped && !habit.done ? Theme.inkSecondary : tint,
         isDone: inactive
@@ -558,7 +639,7 @@ struct HabitRow: View {
         // streak celebration on top here (the View can reach the environment;
         // the model can't). `done` is the value being written.
         let done = !habit.done
-        model.toggleHabit(habit, mutator: checklistMutator)
+        model.toggleHabit(habit, mutator: checklistMutator, motion: motion)
         let streak = ChecklistMirror.habitStreak(context: modelContext, habitId: habit.id, asOf: SeptenaDate.today)
         if done, let m = StreakMilestones.reached(streak), HabitMilestoneStore.lastCelebrated(habit.id) < m {
           HabitMilestoneStore.setCelebrated(habit.id, m)
@@ -569,6 +650,7 @@ struct HabitRow: View {
           HabitMilestoneStore.reconcile(habit.id, currentStreak: streak)
         }
       }
+      .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 
       Text(habit.emoji ?? "•").font(.body)
       Text(habit.name)
@@ -587,7 +669,7 @@ struct HabitRow: View {
     .padding(.vertical, Theme.rowVPadding)
     .contextMenu {
       Button {
-        model.skipHabit(habit, skipped: !habit.skipped, mutator: checklistMutator)
+        model.skipHabit(habit, skipped: !habit.skipped, mutator: checklistMutator, motion: motion)
       } label: {
         Label(habit.skipped ? "Unskip" : "Skip today",
               systemImage: habit.skipped ? "arrow.uturn.left" : "forward.end")
@@ -611,12 +693,14 @@ struct SupplementRow: View {
   let checklistMutator: ChecklistMutator
   let tint: Color
   var onDelete: (() -> Void)? = nil
+  @Environment(\.a11yMotion) private var motion
 
   var body: some View {
-    HStack(spacing: 12) {
+    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
       TaskCheckbox(tint: tint, isDone: supplement.done) {
-        model.toggleSupplement(supplement, mutator: checklistMutator)
+        model.toggleSupplement(supplement, mutator: checklistMutator, motion: motion)
       }
+      .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
       Text(supplement.emoji ?? "•").font(.body)
       Text(supplement.name)
         .font(.septenaTaskTitle)
@@ -630,27 +714,22 @@ struct SupplementRow: View {
     }
     .padding(.horizontal, Theme.hPadding)
     .padding(.vertical, Theme.rowVPadding)
-    // Only attach a context menu when there's actually an action to
-    // show — Next view passes no `onDelete`, and SwiftUI's long-press
-    // preview still triggers for an empty menu, which feels broken.
-    .modifier(SupplementRowContextMenu(onDelete: onDelete))
-  }
-}
-
-/// Conditional `.contextMenu` for `SupplementRow`. Lifted out so the
-/// row's body stays a single expression and we don't apply the modifier
-/// when there are no items to show.
-private struct SupplementRowContextMenu: ViewModifier {
-  let onDelete: (() -> Void)?
-  func body(content: Content) -> some View {
-    if let onDelete {
-      content.contextMenu {
+    // Consistent with the other Next rows: long-press always offers a menu.
+    // Mark taken/not-taken mirrors the checkbox for discoverability; Delete
+    // shows only where a host owns the record (the Supplements mini-app).
+    .contextMenu {
+      Button {
+        model.toggleSupplement(supplement, mutator: checklistMutator, motion: motion)
+      } label: {
+        Label(supplement.done ? "Mark not taken" : "Mark taken",
+              systemImage: supplement.done ? "arrow.uturn.left" : "checkmark")
+      }
+      if let onDelete {
+        Divider()
         Button(role: .destructive) { onDelete() } label: {
           Label("Delete", systemImage: "trash")
         }
       }
-    } else {
-      content
     }
   }
 }
@@ -664,13 +743,14 @@ struct ChoreRow: View {
   let checklistMutator: ChecklistMutator
   let tint: Color
   var onDelete: (() -> Void)? = nil
+  @Environment(\.a11yMotion) private var motion
 
   var body: some View {
     let isDone = model.completedChores.contains(chore.id)
     let deferLabel = model.deferredChores[chore.id]
     let inactive = isDone || deferLabel != nil
 
-    HStack(spacing: 12) {
+    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
       TaskCheckbox(
         tint: deferLabel != nil ? Theme.inkSecondary : tint,
         isDone: inactive
@@ -678,9 +758,10 @@ struct ChoreRow: View {
         if isDone {
           model.uncompleteChore(chore, mutator: checklistMutator)
         } else {
-          model.completeChore(chore, mutator: checklistMutator)
+          model.completeChore(chore, mutator: checklistMutator, motion: motion)
         }
       }
+      .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
       Text(chore.emoji ?? "•").font(.body)
       Text(chore.name)
         .font(.septenaTaskTitle)

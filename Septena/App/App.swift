@@ -91,6 +91,10 @@ struct SeptenaApp: App {
               await ckEngine.refreshAccountStatus()
               try? await ckEngine.fetchChanges()
             }
+            // Keep the Claude gateway's CloudKit token fresh. No-op unless
+            // the user connected Claude, and skips the network when the
+            // last push is still well within token lifetime.
+            Task { await ClaudeGatewayProvider.shared.refreshIfNeeded() }
           }
         }
         .onOpenURL { url in
@@ -135,6 +139,9 @@ struct SeptenaApp: App {
           try? await ckEngine.fetchChanges()
           await theme.refresh()
           await settingsStore.refresh()
+          // Seed the Claude gateway token on cold launch (no-op if Claude
+          // isn't connected or a recent token is still valid).
+          await ClaudeGatewayProvider.shared.refreshIfNeeded()
           BadgeManager.shared.start(context: localStore.container.mainContext)
           TrainingMuscleBackfill.runIfNeeded(context: localStore.container.mainContext)
           TrainingLibraryEnrichment.runIfNeeded(context: localStore.container.mainContext)
@@ -148,6 +155,9 @@ struct SeptenaApp: App {
           // Derive `occurredAt` for legacy event rows (and first-sync Mood)
           // after the engine has fetched, so pushes carry the real timestamp.
           OccurredAtBackfill.runIfNeeded(context: localStore.container.mainContext)
+          // Derive `createdAt` for legacy task rows from their `created`
+          // string so the agent-cue decay window has a real instant to read.
+          TaskCreatedAtBackfill.runIfNeeded(context: localStore.container.mainContext)
           #if os(iOS)
           TrainingLiveActivityCoordinator.shared.reconcile(with: trainingDraft.draft)
           #endif

@@ -15,7 +15,11 @@ struct TasksDestinationView: View {
   @Environment(TaskMutator.self) private var mutator
   @Environment(SectionTheme.self) private var theme
   @Environment(\.modelContext) private var modelContext
+  @Environment(\.a11yMotion) private var motion
   @AppStorage(SettingsKey.todayShowCompleted) private var showCompleted: Bool = true
+
+  /// Drives the "linger → fade" beat after a check (see `SettleStore`).
+  @State private var settle = SettleStore()
 
   /// Open tasks routed into Today (pinned, or scheduled / deadline ≤ today).
   /// Mirrors `LocalCache.tasks(in:filter:.today)`; held in @State so we can
@@ -43,6 +47,7 @@ struct TasksDestinationView: View {
                     trailingTint: isOverdue(task) ? Theme.overdueRed : nil,
                     onToggle: { toggle(task) },
                     onTap: { editing = task })
+              .transition(.opacity)
           }
         }
       }
@@ -101,6 +106,7 @@ struct TasksDestinationView: View {
   // MARK: - Data
 
   private func reload() {
+    settle.cancelAll()
     openTasks = LocalCache.tasks(in: modelContext, filter: .today)
     guard showCompleted else { doneTasks = []; return }
     let today = SeptenaDate.today
@@ -109,29 +115,50 @@ struct TasksDestinationView: View {
       .sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
   }
 
-  /// Optimistic toggle — moves the row between buckets immediately, then
-  /// routes through the mutator (outbox + CloudKit). We deliberately don't
-  /// `reload()` here: the local store write isn't guaranteed synchronous,
-  /// so the in-session arrays are the source of truth until the next appear.
+  /// Optimistic toggle — routes through the mutator (outbox + CloudKit) and
+  /// keeps the in-session arrays as the source of truth until the next appear
+  /// (the local store write isn't guaranteed synchronous, so we don't reload).
+  ///
+  /// On complete the row doesn't vanish: it flips struck-through in place,
+  /// lingers for the settle beat, then fades out of Today and lands at the top
+  /// of Done (see `SettleStore`). Re-checking within the window cancels the
+  /// fade. Reduce Motion drops the fade but keeps the delayed move.
   private func toggle(_ task: SeptenaTask) {
+    Haptics.tick()
     if task.status == .done {
+      // Uncomplete — abort any in-flight fade and restore to the open list,
+      // whether the row is still settling in Today or already sitting in Done.
       mutator.uncomplete(id: task.id)
-      doneTasks.removeAll { $0.id == task.id }
+      settle.cancel(task.id)
       var reopened = task
       reopened.status = .open
       reopened.completedAt = nil
-      openTasks.append(reopened)
+      motion.run(Theme.Motion.settle) {
+        doneTasks.removeAll { $0.id == task.id }
+        if let i = openTasks.firstIndex(where: { $0.id == task.id }) {
+          openTasks[i] = reopened
+        } else {
+          openTasks.append(reopened)
+        }
+      }
     } else {
+      // Complete — flip in place so the checkbox fills and the title strikes,
+      // then schedule the fade-out into Done.
       mutator.complete(id: task.id)
-      openTasks.removeAll { $0.id == task.id }
-      if showCompleted {
-        var done = task
-        done.status = .done
-        done.completedAt = SeptenaDate.today + "T00:00:00"
-        doneTasks.insert(done, at: 0)
+      motion.run(Theme.Motion.settle) {
+        if let i = openTasks.firstIndex(where: { $0.id == task.id }) {
+          openTasks[i].status = .done
+          openTasks[i].completedAt = SeptenaDate.today + "T00:00:00"
+        }
+      }
+      settle.schedule(task.id) {
+        motion.run(Theme.Motion.settle) {
+          guard let i = openTasks.firstIndex(where: { $0.id == task.id }) else { return }
+          let done = openTasks.remove(at: i)
+          if showCompleted { doneTasks.insert(done, at: 0) }
+        }
       }
     }
-    Haptics.tick()
   }
 
   // MARK: - Row meta

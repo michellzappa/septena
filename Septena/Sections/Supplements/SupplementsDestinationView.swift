@@ -31,13 +31,29 @@ struct SupplementsDestinationView: View {
                   currentDate: $viewingDate) {
       if isViewingToday {
         summary
-        DrawerSection("Today", padding: .none) {
-          ForEach(model.supplements) { supp in
-            Button { editing = supp } label: {
-              SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator, tint: accent,
-                            onDelete: { delete(supp) })
+        // Open list — a just-taken supplement lingers here (struck through)
+        // for the settle beat, then fades down into "Done".
+        if !model.openSupplements.isEmpty {
+          DrawerSection("Today", padding: .none) {
+            ForEach(model.openSupplements) { supp in
+              Button { editing = supp } label: {
+                SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator, tint: accent,
+                              onDelete: { delete(supp) })
+              }
+              .buttonStyle(.plain)
+              .transition(.opacity)
             }
-            .buttonStyle(.plain)
+          }
+        }
+        if !model.doneSupplements.isEmpty {
+          DrawerSection("Done", padding: .none) {
+            ForEach(model.doneSupplements) { supp in
+              Button { editing = supp } label: {
+                SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator, tint: accent,
+                              onDelete: { delete(supp) })
+              }
+              .buttonStyle(.plain)
+            }
           }
         }
         if model.hasLoaded && model.supplements.isEmpty {
@@ -120,29 +136,27 @@ struct SupplementsDestinationView: View {
     }
   }
 
+  // Mirrors `SupplementRow` (today) exactly: shared `TaskCheckbox` glyph, same
+  // fonts/padding/strikethrough treatment, checkbox-only tap target. Only the
+  // write target differs — it commits to `viewingDate`, not today.
   private func pastDayRow(_ item: SupplementDayItem) -> some View {
-    Button {
-      let next = !item.done
-      checklistMutator.toggleSupplement(id: item.id, date: viewingDate, done: next)
-      Haptics.tick()
-    } label: {
-      HStack(spacing: 12) {
-        Image(systemName: item.done ? "checkmark.circle.fill" : "circle")
-          .foregroundStyle(item.done ? accent : .secondary)
-          .font(.title3)
-        if let e = item.emoji, !e.isEmpty {
-          Text(e)
-        }
-        Text(item.name)
-          .foregroundStyle(.primary)
-          .strikethrough(item.done, color: .secondary)
-        Spacer()
+    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
+      TaskCheckbox(tint: accent, isDone: item.done) {
+        let next = !item.done
+        checklistMutator.toggleSupplement(id: item.id, date: viewingDate, done: next)
+        if next { Haptics.success() } else { Haptics.tap() }
       }
-      .contentShape(Rectangle())
-      .padding(.horizontal, 14)
-      .padding(.vertical, 10)
+      .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+      Text(item.emoji ?? "•").font(.body)
+      Text(item.name)
+        .font(.septenaTaskTitle)
+        .foregroundStyle(item.done ? Theme.inkSecondary : Theme.inkPrimary)
+        .strikethrough(item.done)
+        .opacity(item.done ? 0.5 : 1)
+      Spacer()
     }
-    .buttonStyle(.plain)
+    .padding(.horizontal, Theme.hPadding)
+    .padding(.vertical, Theme.rowVPadding)
   }
 
   private func reloadPastDay() {

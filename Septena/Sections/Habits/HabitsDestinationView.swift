@@ -46,6 +46,7 @@ struct HabitsDestinationView: View {
         ForEach(model.habitBuckets, id: \.self) { bucket in
           bucketSection(bucket)
         }
+        doneSection
         if !history.isEmpty {
           ChecklistHeatmapSection(
             title: "Habit consistency",
@@ -140,30 +141,31 @@ struct HabitsDestinationView: View {
     }
   }
 
+  // Mirrors `HabitRow` (today) exactly: shared `TaskCheckbox` glyph, same
+  // fonts/padding/strikethrough treatment, checkbox-only tap target. Only the
+  // write target differs — it commits to `viewingDate`, not today.
   private func pastDayRow(_ item: HabitDayItem) -> some View {
-    Button {
-      let next = !item.done
-      completeHabit(id: item.id, date: viewingDate, done: next,
-                    checklist: checklistMutator, context: modelContext,
-                    theme: theme, logCommit: logCommit)
-    } label: {
-      HStack(spacing: 12) {
-        Image(systemName: item.done ? "checkmark.circle.fill" : "circle")
-          .foregroundStyle(item.done ? accent : .secondary)
-          .font(.title3)
-        if let e = item.emoji, !e.isEmpty {
-          Text(e)
-        }
-        Text(item.name)
-          .foregroundStyle(.primary)
-          .strikethrough(item.done, color: .secondary)
-        Spacer()
+    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
+      TaskCheckbox(tint: accent, isDone: item.done) {
+        // `viewingDate` is never today here (past-day rows only render when
+        // not viewing today), so the streak-milestone path in `completeHabit`
+        // is unreachable — write directly and use the canonical done/undone
+        // haptic, matching today rows and the supplements past-day row.
+        let next = !item.done
+        checklistMutator.toggleHabit(id: item.id, date: viewingDate, done: next)
+        if next { Haptics.success() } else { Haptics.tap() }
       }
-      .contentShape(Rectangle())
-      .padding(.horizontal, 14)
-      .padding(.vertical, 10)
+      .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+      Text(item.emoji ?? "•").font(.body)
+      Text(item.name)
+        .font(.septenaTaskTitle)
+        .foregroundStyle(item.done ? Theme.inkSecondary : Theme.inkPrimary)
+        .strikethrough(item.done)
+        .opacity(item.done ? 0.5 : 1)
+      Spacer()
     }
-    .buttonStyle(.plain)
+    .padding(.horizontal, Theme.hPadding)
+    .padding(.vertical, Theme.rowVPadding)
   }
 
   private func reloadPastDay() {
@@ -194,15 +196,42 @@ struct HabitsDestinationView: View {
 
   @ViewBuilder
   private func bucketSection(_ bucket: String) -> some View {
-    let items = model.habits.filter { $0.bucket == bucket }
-    let doneCount = items.filter { $0.done }.count
-    if !items.isEmpty {
+    let all = model.habits.filter { $0.bucket == bucket }
+    // Open rows only — a just-completed/skipped habit lingers here (via the
+    // model's `actedHabits` set) for the settle beat, then fades into the
+    // shared "Done" section below. Count in the header still reflects all.
+    let open = model.openHabits.filter { $0.bucket == bucket }
+    let doneCount = all.filter { $0.done }.count
+    if !open.isEmpty {
       VStack(alignment: .leading, spacing: 8) {
         DayBucketHeader(bucket: bucket,
-                        trailing: "\(doneCount)/\(items.count)")
+                        trailing: "\(doneCount)/\(all.count)")
           .padding(.horizontal, 16)
         DrawerSection(padding: .none) {
-          ForEach(items) { habit in
+          ForEach(open) { habit in
+            Button { editing = habit } label: {
+              HabitRow(habit: habit, model: model, checklistMutator: checklistMutator, tint: accent,
+                       onDelete: { delete(habit) })
+            }
+            .buttonStyle(.plain)
+            .transition(.opacity)
+          }
+        }
+      }
+    }
+  }
+
+  /// Completed / skipped habits that have finished lingering — collected in
+  /// one quiet "Done" section at the bottom, matching the Next tab.
+  @ViewBuilder
+  private var doneSection: some View {
+    let done = model.doneHabits
+    if !done.isEmpty {
+      VStack(alignment: .leading, spacing: 8) {
+        DayBucketHeader(bucket: "Done", trailing: "\(done.count)")
+          .padding(.horizontal, 16)
+        DrawerSection(padding: .none) {
+          ForEach(done) { habit in
             Button { editing = habit } label: {
               HabitRow(habit: habit, model: model, checklistMutator: checklistMutator, tint: accent,
                        onDelete: { delete(habit) })

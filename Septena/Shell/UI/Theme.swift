@@ -266,6 +266,10 @@ enum Theme {
     /// soft enough to read as an expand rather than a snap. Symmetric on
     /// insert and dismiss.
     static let expand: Animation = .spring(response: 0.32, dampingFraction: 0.84)
+    /// Settle: a checked item fades out of the open list after lingering
+    /// (see `SettleStore`). Gentle enough to read as "drifting away", not a
+    /// snap. Paired with `.transition(.opacity)` on the open-list rows.
+    static let settle: Animation = .easeInOut(duration: 0.35)
   }
 }
 

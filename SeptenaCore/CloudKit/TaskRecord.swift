@@ -41,6 +41,16 @@ static let recurrenceUnit = "recurrenceUnit"
 static let recurrenceInterval = "recurrenceInterval"
 static let recurrenceAfterCompletion = "recurrenceAfterCompletion"
 
+    // Provenance + freshness cue. `source`/`sourceClient` are STRING and
+    // permanent; the MCP gateway sets them at create (source="mcp"). The
+    // app preserves them on re-save and never authors source="mcp" itself.
+    // `createdAt`/`acknowledgedAt` are TIMESTAMP (NSDate), matching the
+    // app-wide instant convention (occurredAt, loggedAt).
+static let source = "source"
+static let sourceClient = "sourceClient"
+static let acknowledgedAt = "acknowledgedAt"
+static let createdAt = "createdAt"
+
     // Over-provisioned for schema flexibility post-Production deploy.
     // Adding fields later is allowed but slow to roll out; renaming /
     // retyping is impossible. Reserve a few slots now so we can absorb
@@ -105,6 +115,17 @@ extension TaskEntity {
     // write a STRING there fails even after a zone reset.
     record[TaskCloudKitSchema.Field.notesText] = notes
 
+    // Provenance + cue. `source`/`sourceClient` round-trip the gateway's
+    // stamp (nil for human-authored rows). `createdAt` only writes once it
+    // holds a real value — never clobber a server timestamp with the
+    // `.distantPast` migration sentinel before the backfill has run.
+    record[TaskCloudKitSchema.Field.source] = source
+    record[TaskCloudKitSchema.Field.sourceClient] = sourceClient
+    record[TaskCloudKitSchema.Field.acknowledgedAt] = acknowledgedAt as NSDate?
+    if createdAt != .distantPast {
+      record[TaskCloudKitSchema.Field.createdAt] = createdAt as NSDate
+    }
+
     return record
   }
 }
@@ -136,6 +157,14 @@ func apply(_ record: CKRecord) {
     // that haven't been re-saved since the plaintext switch.
     notes = optionalTaskString(record[TaskCloudKitSchema.Field.notesText])
       ?? optionalTaskString(record.encryptedValues[TaskCloudKitSchema.Field.encryptedNotes])
+
+    // Provenance + cue. Tolerant of absence (records authored before the
+    // schema learned these fields, or human rows that never set source).
+    source = optionalTaskString(record[TaskCloudKitSchema.Field.source])
+    sourceClient = optionalTaskString(record[TaskCloudKitSchema.Field.sourceClient])
+    acknowledgedAt = record[TaskCloudKitSchema.Field.acknowledgedAt] as? Date
+    if let v = record[TaskCloudKitSchema.Field.createdAt] as? Date { createdAt = v }
+
     captureCloudKitSystemFields(from: record)
   }
 

@@ -830,6 +830,37 @@ enum OccurredAtBackfill {
 }
 
 
+// MARK: - Task createdAt backfill
+
+/// One-shot migration: derive `createdAt: Date` for every task still at the
+/// `.distantPast` sentinel (created before the field existed) from its legacy
+/// `created` YYYY-MM-DD string, then push each touched row through CloudKit so
+/// the value propagates. Mirrors `OccurredAtBackfill`; gated by its OWN
+/// UserDefaults key so installs that already ran the event backfill still run
+/// this one. Tasks with no `created` fall back to `.now`.
+@MainActor
+enum TaskCreatedAtBackfill {
+  static let userDefaultsKey = "tasks.createdAtBackfill.v1"
+
+  static func runIfNeeded(context: ModelContext) {
+    guard !UserDefaults.standard.bool(forKey: userDefaultsKey) else { return }
+    let ck = SeptenaServices.shared.ckEngine
+    var updated = 0
+
+    for t in (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
+    where t.createdAt == .distantPast {
+      t.createdAt = t.created.map { EventTimestamp.from(date: $0, time: nil) } ?? .now
+      ck.noteTaskChange(id: t.id)
+      updated += 1
+    }
+
+    try? context.save()
+    UserDefaults.standard.set(true, forKey: userDefaultsKey)
+    SeptenaLog.info("[TaskCreatedAtBackfill] derived createdAt for \(updated) task rows")
+  }
+}
+
+
 // MARK: - Training muscle backfill
 
 /// One-shot migration: assign `primaryMuscle` to every ExerciseDefinitionEntity

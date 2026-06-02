@@ -27,6 +27,8 @@ protocol TasksBackend: AnyObject {
               deferPush: Bool) -> SeptenaTask
 
   func update(id: String, title: String?, notes: String?)
+  /// Mark an agent-created row as seen (clears the freshness cue). Idempotent.
+  func acknowledge(id: String)
   func complete(id: String)
   func uncomplete(id: String)
   func cancel(id: String)
@@ -53,6 +55,20 @@ private let ckTimestampFormatter: DateFormatter = {
   return f
 }()
 private func ckServerTimestamp() -> String { ckTimestampFormatter.string(from: Date()) }
+
+/// Friendly `sourceClient` label for app-authored writes — the native
+/// counterpart to the gateway's "Claude". Identifies which surface created
+/// the row; also the value that registers the `sourceClient` CloudKit field
+/// in dev via a native write.
+private var currentAppClientLabel: String {
+  #if os(macOS)
+  return "Septena Mac"
+  #elseif os(watchOS)
+  return "Septena Watch"
+  #else
+  return "Septena iOS"
+  #endif
+}
 
 @MainActor
 final class CloudKitTasksBackend: TasksBackend {
@@ -127,7 +143,10 @@ final class CloudKitTasksBackend: TasksBackend {
       area: effectiveArea,
       project: project,
       notes: (notes?.isEmpty == false) ? notes : nil,
-      pendingSync: true
+      pendingSync: true,
+      source: TaskSource.app,            // positive provenance for app-authored rows
+      sourceClient: currentAppClientLabel,
+      createdAt: Date()
     )
     context.insert(entity)
     // deferPush is used for inline-editor drafts: skip the engine push
@@ -153,6 +172,17 @@ final class CloudKitTasksBackend: TasksBackend {
     if let notes { entity.notes = notes.isEmpty ? nil : notes }
     entity.pendingSync = true
     commitAndPush(entity, op: "update")
+  }
+
+  /// Stamp `acknowledgedAt` so the agent-cue clears (and stays cleared on
+  /// other devices via sync). No-op when there's nothing to acknowledge —
+  /// not an agent row, or already seen — so engagement never churns writes.
+  func acknowledge(id: String) {
+    guard let entity = fetch(id: id) else { return }
+    guard entity.source == TaskSource.mcp, entity.acknowledgedAt == nil else { return }
+    entity.acknowledgedAt = Date()
+    entity.pendingSync = true
+    commitAndPush(entity, op: "acknowledge")
   }
 
   func complete(id: String) {

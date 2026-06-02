@@ -11,6 +11,27 @@ enum TaskStatus: String, Codable, Hashable {
   case someday
 }
 
+/// Provenance values stamped on a row's `source` field — what authored it.
+/// Permanent / immutable; an audit trail, never cleared. Legacy rows predate
+/// the field and read as nil (treated as human-authored, no cue). Writing an
+/// explicit value on every native app create also means the app self-registers
+/// the `source`/`sourceClient` CloudKit fields in dev — the gateway's Web
+/// Services writes can't (they get rejected, not auto-extended).
+public enum TaskSource {
+  /// Authored in the Septena app on one of the user's devices.
+  public static let app = "app"
+  /// Authored by the MCP gateway (Claude).
+  public static let mcp = "mcp"
+}
+
+/// Tunables for the "agent created this" freshness cue. Provenance is
+/// permanent; the cue is transient and decays so a long-ignored agent row
+/// stops glowing even if never explicitly acknowledged.
+public enum AgentCue {
+  /// How long after `createdAt` an unacknowledged agent row keeps glowing.
+  public static let decayWindow: TimeInterval = 7 * 24 * 60 * 60   // 7 days
+}
+
 struct SeptenaTask: Identifiable, Codable, Hashable {
   let id: String
   var title: String
@@ -45,6 +66,28 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// pull) can purge accordingly. The Septena views filter rows where
   /// `deletedAt != nil` out of every read.
   var deletedAt: String?
+
+  // MARK: Provenance + freshness cue
+  // Populated from `TaskEntity` (not the wire — see `init(_:)`), so these
+  // are intentionally excluded from `CodingKeys` and default to nil/.distantPast.
+  /// `"mcp"` when authored by the MCP gateway (Claude); nil/"user"/"manual"
+  /// for human-created. Permanent.
+  var source: String? = nil
+  /// Friendly label for `source` (e.g. "Claude"). Permanent.
+  var sourceClient: String? = nil
+  /// Set once the user engages an agent-created row; clears the cue. Transient.
+  var acknowledgedAt: Date? = nil
+  /// Canonical creation instant. Drives the cue decay window.
+  var createdAt: Date = .distantPast
+
+  /// True while this row should glow as a freshly agent-created item the
+  /// user hasn't engaged yet. Provenance (`source`) is permanent; this cue
+  /// is transient — it clears on `acknowledgedAt` and auto-decays after
+  /// `AgentCue.decayWindow` so a long-ignored row stops glowing.
+  func showsAgentCue(now: Date = Date()) -> Bool {
+    guard source == TaskSource.mcp, acknowledgedAt == nil, createdAt != .distantPast else { return false }
+    return now.timeIntervalSince(createdAt) < AgentCue.decayWindow
+  }
 
   /// Transitional read-only alias so older call sites compile during the
   /// rename. Prefer `deadline` for new code; remove the alias once nothing

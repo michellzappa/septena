@@ -24,12 +24,18 @@ struct ChoresDestinationView: View {
   /// "Today" includes overdue (daysOverdue > 0) and due-today (== 0).
   private var today: [ChoreItem] {
     model.chores
-      .filter { $0.daysOverdue >= 0 && !model.completedChores.contains($0.id) }
+      // A just-completed chore lingers here (struck through) for the settle
+      // beat before it fades into "Done today" — same as the Next page. The
+      // `actedChores` clause keeps it; the beat clears that set.
+      .filter { $0.daysOverdue >= 0
+        && (model.actedChores.contains($0.id) || !model.completedChores.contains($0.id)) }
       .sorted { ($0.daysOverdue, $0.name) > ($1.daysOverdue, $1.name) }
   }
 
   private var doneToday: [ChoreItem] {
-    model.chores.filter { model.completedChores.contains($0.id) }
+    model.chores.filter {
+      model.completedChores.contains($0.id) && !model.actedChores.contains($0.id)
+    }
   }
 
   /// Soonest first (least-negative `daysOverdue`) → furthest away last, so
@@ -119,6 +125,7 @@ struct ChoresDestinationView: View {
                onDelete: { delete(chore) })
     }
     .buttonStyle(.plain)
+    .transition(.opacity)
   }
 
   private func delete(_ chore: ChoreItem) {

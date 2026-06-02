@@ -203,4 +203,14 @@ final class TaskMutator {
     }
     cloudBackend.update(id: id, title: title, notes: notes)
   }
+
+  /// Clear the agent-created freshness cue on engagement. Idempotent and
+  /// cheap — the backend no-ops for non-agent or already-seen rows.
+  func acknowledge(id: String) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] acknowledge called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.acknowledge(id: id)
+  }
 }

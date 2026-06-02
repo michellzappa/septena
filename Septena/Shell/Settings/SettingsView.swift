@@ -1931,6 +1931,7 @@ struct IntegrationsSettingsPane: View {
   @State private var ouraProvider = OuraProvider.shared
   @State private var withingsProvider = WithingsProvider.shared
   @State private var photosBridge = PhotosBridge.shared
+  @State private var claudeProvider = ClaudeGatewayProvider.shared
   var body: some View {
     Form {
       Section {
@@ -2021,6 +2022,27 @@ struct IntegrationsSettingsPane: View {
 
       } footer: {
         Text("Grant access here, or manage permissions in iOS Settings → Privacy.")
+      }
+
+      // Claude — keeps the Septena MCP gateway supplied with a live
+      // CloudKit token so Claude can read/write your data without you
+      // re-authorizing every few hours. The gateway stores only the
+      // rotating token, never your data.
+      Section {
+        NavigationLink {
+          ClaudeGatewayDetail()
+            .navigationTitle("Claude")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+        } label: {
+          stateRow(title: "Claude",
+                   systemImage: "sparkles",
+                   state: claudeProvider.isEnabled ? "Connected" : "Connect",
+                   isGranted: claudeProvider.isEnabled)
+        }
+      } footer: {
+        Text("Let Claude read and write your Septena data at mcp.septena.app.")
       }
     }
     .formStyle(.grouped)
@@ -2594,6 +2616,74 @@ private struct OuraIntegrationDetail: View {
     } catch {
       lastResult = "Backfill failed: \(error.localizedDescription)"
     }
+  }
+}
+
+// MARK: - Claude Gateway Detail
+
+/// Connect / status / disconnect for the Septena MCP gateway. "Connect"
+/// mints a CloudKit Web Services token and pushes it to mcp.septena.app;
+/// the app then re-mints on foreground so Claude keeps working without
+/// the user re-authorizing every ~8h. The gateway holds only the rotating
+/// token, never the user's data.
+private struct ClaudeGatewayDetail: View {
+  @State private var provider = ClaudeGatewayProvider.shared
+
+  private var lastRefreshLabel: String {
+    guard let at = provider.lastRefreshAt else { return "Never" }
+    return at.formatted(.relative(presentation: .named))
+  }
+
+  var body: some View {
+    Form {
+      Section {
+        if provider.isEnabled {
+          Button("Disconnect", role: .destructive) {
+            provider.disconnect()
+          }
+        } else {
+          Button("Connect Claude") {
+            Task { await provider.connect() }
+          }
+        }
+      } footer: {
+        Text("Connecting lets Claude (at claude.ai or in the Claude app) read and write your Septena data via the MCP connector. Your data stays in iCloud — the gateway only relays a short-lived access token, which this app refreshes automatically. Add the connector in Claude using mcp.septena.app.")
+      }
+
+      if provider.isEnabled {
+        Section {
+          HStack {
+            Label("Status", systemImage: "sparkles")
+            Spacer()
+            Text(provider.lastError == nil ? "Connected" : "Needs attention")
+              .foregroundStyle(provider.lastError == nil ? .green : .orange)
+          }
+          HStack {
+            Label("Last authenticated", systemImage: "clock.arrow.circlepath")
+            Spacer()
+            Text(lastRefreshLabel).foregroundStyle(.secondary)
+          }
+          Button {
+            Task { await provider.refreshNow() }
+          } label: {
+            HStack {
+              Label("Reauthenticate", systemImage: "lock.rotation")
+              Spacer()
+              if provider.isRefreshing { ProgressView().controlSize(.small) }
+            }
+          }
+          .disabled(provider.isRefreshing)
+          if let err = provider.lastError {
+            Text(err)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+        } header: {
+          Text("Connection")
+        }
+      }
+    }
+    .formStyle(.grouped)
   }
 }
 

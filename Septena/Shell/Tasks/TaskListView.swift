@@ -136,6 +136,11 @@ struct TaskListView: View {
   /// rows visible until the user navigates away (matches the reference design).
   @State private var sessionDoneIds: Set<String> = []
 
+  /// Drives the "linger → fade" beat after a check (see `SettleStore`). Keeps
+  /// a just-completed row in place for a moment, then animates it out into the
+  /// logged footer instead of yanking it the instant you tap.
+  @State private var settle = SettleStore()
+
   /// Unified selection — the single source of truth for the keyboard cursor
   /// and multi-select batch operations, bound straight to `List(selection:)`
   /// on both platforms. macOS: native click / ⌘-click / ⇧-click / ↑↓.
@@ -377,6 +382,7 @@ struct TaskListView: View {
     // session-scoped state and re-trigger the network refresh.
     .onChange(of: filter) { _, _ in
       sessionDoneIds = []
+      settle.cancelAll()
       clearSelection()
       editingTaskId = nil
       newlyCreatedTaskId = nil
@@ -782,6 +788,18 @@ struct TaskListView: View {
           Label("Select", systemImage: "checkmark.circle")
         }
         .tint(theme.accent)
+        // Explicit acknowledge for agent-created rows — dismiss the cue
+        // without otherwise touching the task. Only offered while it glows.
+        if task.showsAgentCue() {
+          Button {
+            Haptics.tick()
+            mutator.acknowledge(id: task.id)
+            Task { await load() }
+          } label: {
+            Label("Mark seen", systemImage: "eye")
+          }
+          .tint(Theme.inkSecondary)
+        }
       }
   }
 
@@ -816,7 +834,10 @@ struct TaskListView: View {
       onOpenMove: { moveTargetId = task.id; showingMoveSheet = true },
       onDelete: { Haptics.warning(); applyDelete(task.id) }
     )
-    .transition(.identity)
+    // Fade on insert/removal. The fade only plays inside an animated
+    // transaction; every settle-driven removal runs through `motion.run`, so
+    // Reduce Motion still gets an instant (un-animated) drop.
+    .transition(.opacity)
     // iOS: a single tap opens the editor (Things-style). In edit mode the tap
     // must instead toggle the native selection circle, so we no-op there and
     // use `simultaneousGesture` so the tap also reaches List's edit-mode
@@ -825,8 +846,14 @@ struct TaskListView: View {
     // ONLY double-click-to-edit, via `simultaneousGesture` so the gesture
     // doesn't consume the single click List needs for selection.
     #if os(iOS)
-    .simultaneousGesture(TapGesture().onEnded {
-      if !editing && !isEditMode { startEdit(task) }
+    .simultaneousGesture(SpatialTapGesture().onEnded { value in
+      guard !editing && !isEditMode else { return }
+      // A tap on the leading checkbox is a completion toggle, NOT an edit —
+      // the checkbox Button handles it. Because this gesture is simultaneous
+      // it would otherwise also fire and pop the editor open on every check.
+      // Skip the checkbox hit region (leading hPadding + tap target).
+      if value.location.x < Theme.hPadding + Theme.checkboxTap { return }
+      startEdit(task)
     })
     #else
     .simultaneousGesture(TapGesture(count: 2).onEnded {
@@ -1128,7 +1155,11 @@ struct TaskListView: View {
   /// inline headers that push the corresponding sidebar destination.
   @ViewBuilder
   private var groupedOpenItems: some View {
-    let pool = (filter == .today) ? items + review : items
+    let base = (filter == .today) ? items + review : items
+    // Drop completed rows except those still settling (just checked), so a
+    // finished task lingers for the beat then fades — instead of sitting
+    // struck through until the next reload.
+    let pool = base.filter { $0.status != .done || settle.isSettling($0.id) }
     let byProject = Dictionary(grouping: pool.filter { $0.project != nil },
                                by: { $0.project! })
     let byArea = Dictionary(grouping: pool.filter { $0.project == nil && $0.area != nil },
@@ -1181,7 +1212,10 @@ struct TaskListView: View {
     var result = items
     if excludeProjectedTasks { result = result.filter { $0.project == nil } }
     if hideHistoricalDone {
-      result = result.filter { $0.status != .done }
+      // Keep a just-checked row visible while it settles, so it lingers in
+      // place then fades out (rather than vanishing under the finger). The
+      // settle timer drops the id, after which this filter hides the row.
+      result = result.filter { $0.status != .done || settle.isSettling($0.id) }
     }
     // Apply the global sort only on project/area pages — those are the
     // surfaces with no inherent ordering of their own.
@@ -1239,10 +1273,13 @@ struct TaskListView: View {
 
   private var hideHistoricalDone: Bool {
     switch filter {
-    case .project, .area, .unscheduled, .upcoming: return true
+    // Every open-work list hides done tasks (a just-completed one lingers via
+    // the settle exception in `visibleItems`, then fades). Only the Logbook —
+    // whose whole job is showing completed tasks — keeps them.
+    case .project, .area, .unscheduled, .upcoming, .inbox, .someday: return true
     case .today:
       return !todayShowCompleted
-    default:                                        return false
+    case .logbook: return false
     }
   }
 
@@ -1329,6 +1366,10 @@ struct TaskListView: View {
     var order: [String] = []
     var grouped: [String: [SeptenaTask]] = [:]
     for task in items {
+      // Drop completed rows except those still settling, so a just-checked
+      // upcoming task lingers for the beat then fades (matches every other
+      // open-work list).
+      if task.status == .done && !settle.isSettling(task.id) { continue }
       let key = task.scheduled ?? task.due ?? ""
       guard !key.isEmpty else { continue }
       if grouped[key] == nil { order.append(key) }
@@ -1469,6 +1510,8 @@ struct TaskListView: View {
     editingTitle = task.title
     editingNotes = task.notes ?? ""
     editingTaskId = task.id
+    // Opening the editor counts as engagement — clear the agent cue.
+    mutator.acknowledge(id: task.id)
   }
 
   private func commitEdit() {
@@ -1600,25 +1643,25 @@ struct TaskListView: View {
     let newStatus: TaskStatus = task.status == .done ? .open : .done
     if newStatus == .done { Haptics.success() } else { Haptics.tap() }
 
-    flipStatus(id: task.id, to: newStatus)
+    motion.run(Theme.Motion.settle) { flipStatus(id: task.id, to: newStatus) }
     if newStatus == .done { sessionDoneIds.insert(task.id) }
     else                  { sessionDoneIds.remove(task.id) }
 
-    // Keep the "Show logged" footer in sync with the optimistic flip so a
-    // just-completed task drops out of the main list and reappears under
-    // the footer without waiting for the next reload. The reverse path
-    // (uncomplete from the footer) needs to re-seed `items` for any task
-    // that wasn't in the open list to begin with.
-    if showsLoggedSection && loggedFilter == filter {
-      if newStatus == .done {
-        var completed = task
-        completed.status = .done
-        completed.completedAt = ISO8601DateFormatter().string(from: Date())
-        if filterLogged([completed]).first != nil,
-           !loggedItemsStorage.contains(where: { $0.id == completed.id }) {
-          loggedItemsStorage.append(completed)
-        }
-      } else {
+    // On completion the row must NOT vanish under the finger. We always open a
+    // settle window: `settle.isSettling(id)` keeps the row visible (see
+    // `visibleItems` and the grouped pool) and — crucially — `load()` preserves
+    // settling rows, so the `.septenaTasksChanged` that this very completion
+    // posts can't yank it. After the beat the settle clears and the row simply
+    // fades out IN PLACE — no relocation into a "Logged" group. The empty
+    // animated transaction is what lets the settle-clear removal play
+    // `.transition(.opacity)`. Uncomplete cancels the pending fade and restores it.
+    if newStatus == .done {
+      settle.schedule(task.id) {
+        motion.run(Theme.Motion.settle) { }
+      }
+    } else {
+      settle.cancel(task.id)
+      if showsLoggedSection && loggedFilter == filter {
         loggedItemsStorage.removeAll { $0.id == task.id }
         if !items.contains(where: { $0.id == task.id }) {
           var reopened = task
@@ -1634,6 +1677,9 @@ struct TaskListView: View {
     } else {
       mutator.uncomplete(id: task.id)
     }
+    // Toggling status is engagement — clear the agent cue. No-ops for
+    // non-agent / already-seen rows, so this is safe to call unconditionally.
+    mutator.acknowledge(id: task.id)
   }
 
   /// Mutate the matching task in any of the visible buckets so the row
@@ -1787,11 +1833,17 @@ struct TaskListView: View {
     // we're still inside applyDidFinishBatch — CKSyncEngine asserts.
     // The mirror is already up to date by the time the notification
     // fires, so a plain re-read is correct.
+    let prior = items
     let local = LocalCache.tasks(in: modelContext, filter: filter)
-    // Plain assignments — the fade is driven by .animation(_:value:)
-    // attached to the List, which observes the visible id set. That
-    // approach survives the async/await context that load() runs in.
-    items = local
+    // Preserve rows that are mid-settle (just checked, lingering for the fade)
+    // but which this fresh read drops — the Today/Inbox queries exclude done
+    // tasks, and completing one posts `.septenaTasksChanged`, which reloads us.
+    // Without this, a completion would yank its own row before it could fade.
+    // The settle timer (or a genuine reload/filter swap, which cancels it)
+    // clears these out. We do NOT cancelAll() here for the same reason.
+    let freshIDs = Set(local.map(\.id))
+    let lingering = prior.filter { settle.isSettling($0.id) && !freshIDs.contains($0.id) }
+    items = local + lingering
     review = []
     doneToday = []
     loadedFilters.insert(filter)

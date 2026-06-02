@@ -8,10 +8,10 @@ struct TaskCheckbox: View {
   /// to wear their section accent. `nil` means inherit list tint.
   var tint: Color? = nil
   let isDone: Bool
-  /// When true (and not done), the checkbox renders as a sun-in-circle
-  /// instead of a plain circle. Used by closed task rows to signal
-  /// 'promoted to Today' — moves the today indicator into the same spot
-  /// as completion so it no longer sits inline with the title.
+  /// When true (and not done), the checkbox stroke/fill switch to
+  /// `Theme.todayAccent` to signal a task 'promoted to Today' — folding the
+  /// today indicator into the checkbox itself, so it no longer sits as a
+  /// separate glyph inline with the title.
   var isToday: Bool = false
   /// When true (and not done and not today), the checkbox stroke switches to
   /// `Theme.somedayAccent` (muted indigo) to signal a parked/deferred task.
@@ -77,6 +77,21 @@ struct TaskCheckbox: View {
 // identical. Carries its own h/v padding so it drops straight into a
 // `DrawerSection(padding: .none)` the same way `LogEntryRow` does.
 
+/// Leading provenance cue for an MCP/Claude-created row the user hasn't
+/// engaged yet. Calm and peripheral (Things-style): it clears on contact via
+/// `TaskMutator.acknowledge` and auto-decays after `AgentCue.decayWindow`.
+/// Deliberately NOT a sparkle — a small accent dot reads as an unread marker.
+/// To change the glyph, swap the `Circle()` for an `Image(systemName:)` here.
+struct AgentCueMarker: View {
+  var tint: Color
+  var body: some View {
+    Circle()
+      .fill(tint)
+      .frame(width: 6, height: 6)
+      .accessibilityLabel(Text("Added by Claude, not yet seen"))
+  }
+}
+
 struct TaskRow: View {
   let task: SeptenaTask
   var accent: Color
@@ -108,6 +123,11 @@ struct TaskRow: View {
         onToggle: onToggle
       )
       .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+
+      if task.showsAgentCue() {
+        AgentCueMarker(tint: accent)
+          .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+      }
 
       Text(task.title)
         .font(.septenaTaskTitle)
@@ -268,6 +288,13 @@ struct TaskRowView<MetaLine: View, TrailingDate: View>: View {
         onToggle: onToggle
       )
       .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+
+      // Agent-created cue — display mode only; opening the editor (which sets
+      // isEditing) is itself an acknowledgment, so the marker shouldn't linger.
+      if !isEditing && task.showsAgentCue() {
+        AgentCueMarker(tint: accent)
+          .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+      }
 
       VStack(alignment: .leading, spacing: 4) {
         titleView
