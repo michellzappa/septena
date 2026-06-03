@@ -7,6 +7,7 @@ import SwiftData
 struct CaffeineDestinationView: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
   @State private var today: CaffeineDayResponse? = nil
   @State private var loading = true
@@ -39,6 +40,7 @@ struct CaffeineDestinationView: View {
     SectionDrawer(sectionKey: "caffeine",
                   title: "Caffeine",
                   onLog: handleLogAction,
+                  leadingLogActions: leadingLogActions,
                   currentDate: $viewingDate) {
       if isViewingToday {
         summary
@@ -124,11 +126,28 @@ struct CaffeineDestinationView: View {
     Haptics.warning()
   }
 
-  /// Dispatch table for `CaffeinePlugin.logActions` ids. Keeping this
-  /// close to the destination so adding a new menu item is a two-touch
-  /// change (declare in the plugin + add a branch here).
+  /// Smart "Repeat" row injected above the plugin's log actions in the "+"
+  /// menu — mirrors the dashboard tile's quick-add so both surfaces show the
+  /// same options. Only on today (a past-day repeat is odd) and only when
+  /// there's an entry to repeat. Logs directly (the fast path); the static
+  /// "Log V60/Matcha/other" items below it open the create sheet for detail.
+  private var leadingLogActions: [LogAction] {
+    guard isViewingToday, let last = today?.entries.last else { return [] }
+    return [LogAction(id: "repeat",
+                      title: "Repeat: \(last.beans ?? methodLabel(last.method))",
+                      systemImage: "arrow.clockwise")]
+  }
+
+  /// Dispatch table for `CaffeinePlugin.logActions` ids (plus the dynamic
+  /// "repeat" leading action). Keeping this close to the destination so
+  /// adding a new menu item is a two-touch change.
   private func handleLogAction(_ id: String) {
     switch id {
+    case "repeat":
+      if let last = today?.entries.last {
+        CaffeineCommit.logNew(method: last.method, beans: last.beans,
+                              grams: last.grams, accent: accent, logCommit: logCommit)
+      }
     case "log-v60":    loggingMethod = .init(method: "v60")
     case "log-matcha": loggingMethod = .init(method: "matcha")
     case "log-other":  loggingMethod = .init(method: "other")

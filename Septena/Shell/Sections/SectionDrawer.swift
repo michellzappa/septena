@@ -36,6 +36,11 @@ struct SectionDrawer<Content: View>: View {
   /// affordance fires. Required for + to appear — if `nil`, no button
   /// is rendered even if the plugin declares `logActions`.
   var onLog: ((String) -> Void)? = nil
+  /// Dynamic, destination-supplied quick-log actions rendered *above* the
+  /// plugin's static `logActions` in the "+" menu — e.g. a smart
+  /// "Repeat: <bean>" or "Continue · Hit N" row that depends on the current
+  /// day's entries. Dispatched through the same `onLog(id)`. Empty by default.
+  var leadingLogActions: [LogAction] = []
   /// Drawer-level load lifecycle. `.idle` is the no-op default. When
   /// the destination knows about its own fetch state, surface it here
   /// so the toolbar spinner / failure-state UI stays consistent.
@@ -61,12 +66,17 @@ struct SectionDrawer<Content: View>: View {
 
   @Environment(SectionTheme.self) private var theme
 
+  /// Whether the goals strip is currently revealed. Collapsed by default —
+  /// the goals live behind the `target` toolbar toggle and appear on cue,
+  /// so the daily logging content owns the top of the drawer.
+  @State private var goalsExpanded = false
+
   private var resolvedAccent: Color {
     accent ?? theme.color(for: sectionKey)
   }
 
   private var actions: [LogAction] {
-    SectionRegistry.plugin(forKey: sectionKey)?.logActions ?? []
+    leadingLogActions + (SectionRegistry.plugin(forKey: sectionKey)?.logActions ?? [])
   }
 
   /// True when the destination has a date strip pointing at a past day.
@@ -93,8 +103,9 @@ struct SectionDrawer<Content: View>: View {
         if let currentDate {
           DrawerDateStrip(date: currentDate)
         }
-        if !isTimeTraveling {
+        if !isTimeTraveling && goalsExpanded {
           SectionGoalsStrip(sectionKey: sectionKey)
+            .transition(.move(edge: .top).combined(with: .opacity))
         }
         if case .failed(let message) = loadState {
           failedView(message)
@@ -133,6 +144,18 @@ struct SectionDrawer<Content: View>: View {
         ToolbarItem(placement: .primaryAction) {
           ProgressView()
             .controlSize(.small)
+        }
+      }
+      // Goals toggle sits just left of the "+" affordance. Hidden while
+      // time-traveling (the strip itself is suppressed on past days) and
+      // when the section has no tagged goals (the button view self-hides).
+      if !isTimeTraveling {
+        ToolbarItem(placement: .primaryAction) {
+          SectionGoalsToggleButton(
+            sectionKey: sectionKey,
+            isExpanded: $goalsExpanded,
+            accent: resolvedAccent
+          )
         }
       }
       if let onLog, !actions.isEmpty {

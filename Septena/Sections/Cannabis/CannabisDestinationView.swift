@@ -8,6 +8,7 @@ import SwiftData
 struct CannabisDestinationView: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
   @State private var today: CannabisDayResponse? = nil
   @State private var loading = true
@@ -42,6 +43,7 @@ struct CannabisDestinationView: View {
     SectionDrawer(sectionKey: "cannabis",
                   title: "Cannabis",
                   onLog: handleLogAction,
+                  leadingLogActions: leadingLogActions,
                   currentDate: $viewingDate) {
       if isViewingToday {
         summary
@@ -120,9 +122,38 @@ struct CannabisDestinationView: View {
     Haptics.warning()
   }
 
-  /// Dispatch table for `CannabisPlugin.logActions` ids.
+  // Most recent vape today — drives the smart "Continue / New capsule" row,
+  // same logic as AddCannabisPage and the dashboard tile menu.
+  private var lastVape: CannabisEntry? {
+    today?.entries.reversed().first { $0.method == "vape" }
+  }
+  private var hasActiveCapsule: Bool {
+    guard let h = lastVape?.hit else { return false }
+    return h >= 1 && h < usesPerCapsule
+  }
+  private var smartHit: Int { hasActiveCapsule ? (lastVape!.hit! + 1) : 1 }
+
+  /// Smart vape row injected above the plugin's log actions in the "+" menu —
+  /// "Continue · Hit N" while a capsule has room, else "New capsule". Mirrors
+  /// the dashboard tile and logs directly (the fast path). Today only.
+  private var leadingLogActions: [LogAction] {
+    guard isViewingToday else { return [] }
+    return [LogAction(id: "continue",
+                      title: hasActiveCapsule ? "Continue · Hit \(smartHit)" : "New capsule",
+                      systemImage: hasActiveCapsule ? "arrow.clockwise" : "plus.circle")]
+  }
+
+  /// Dispatch table for `CannabisPlugin.logActions` ids (plus the dynamic
+  /// "continue" leading action).
   private func handleLogAction(_ id: String) {
     switch id {
+    case "continue":
+      SectionLog.newLog(section: "cannabis", accent: accent,
+                        announce: "Logged vape.", logCommit: logCommit) {
+        cannabis.addEntry(date: SeptenaDate.today, time: nowHHMM(),
+                          method: "vape", hit: smartHit)
+        AddInfoSection.cannabis.notifyTilesChanged()
+      }
     case "log-vape":   loggingMethod = .init(method: "vape")
     case "log-edible": loggingMethod = .init(method: "edible")
     default:           loggingMethod = .init(method: "vape")
