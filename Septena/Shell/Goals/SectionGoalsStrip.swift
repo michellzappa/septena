@@ -32,18 +32,22 @@ struct SectionGoalsStrip: View {
 
   private var goals: [Goal] {
     allGoals
-      .filter { entity in
-        // Explicit tag, OR the goal has a measurement whose metric lives
-        // in this section. The metric implies a home section so the user
-        // doesn't have to double-tag.
-        if entity.sections.contains(sectionKey) { return true }
-        if let key = entity.metricKey,
-           GoalMetricCatalog.sectionKey(for: key) == sectionKey {
-          return true
-        }
-        return false
-      }
+      .filter { SectionGoalsStrip.matches($0, sectionKey: sectionKey) }
       .map(Goal.init)
+  }
+
+  /// Shared membership test for "does this goal belong to `sectionKey`":
+  /// an explicit section tag, OR a measurement whose metric's home section
+  /// is this one (the metric implies a section so the user needn't
+  /// double-tag). Kept static so the drawer's goals toolbar toggle can gate
+  /// its visibility on the exact same rule the strip renders by.
+  static func matches(_ entity: GoalEntity, sectionKey: String) -> Bool {
+    if entity.sections.contains(sectionKey) { return true }
+    if let key = entity.metricKey,
+       GoalMetricCatalog.sectionKey(for: key) == sectionKey {
+      return true
+    }
+    return false
   }
 
   var body: some View {
@@ -79,6 +83,38 @@ struct SectionGoalsStrip: View {
         .filter { $0.key != "goals" }
     }
     editing = goal
+  }
+}
+
+// MARK: - Toolbar toggle
+
+/// The `target` toolbar affordance that reveals/hides `SectionGoalsStrip`.
+/// Lives next to the drawer's "+" button (just to its left). Renders
+/// nothing when the host section has no tagged goals, so a section without
+/// goals shows no button at all — matching the strip's own empty behavior.
+/// Runs its own lightweight `@Query` so the host `SectionDrawer` stays
+/// SwiftData-agnostic and the visibility stays reactive to goal edits.
+struct SectionGoalsToggleButton: View {
+  let sectionKey: String
+  @Binding var isExpanded: Bool
+  let accent: Color
+
+  @Query private var allGoals: [GoalEntity]
+
+  private var hasGoals: Bool {
+    allGoals.contains { SectionGoalsStrip.matches($0, sectionKey: sectionKey) }
+  }
+
+  var body: some View {
+    if hasGoals {
+      Button {
+        withAnimation(.snappy) { isExpanded.toggle() }
+      } label: {
+        Image(systemName: "target")
+      }
+      .tint(accent)
+      .accessibilityLabel(isExpanded ? "Hide goals" : "Show goals")
+    }
   }
 }
 

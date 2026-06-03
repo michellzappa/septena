@@ -102,7 +102,7 @@
 		3239E48846BD07983E8A8FCF /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB454D5630376DAFA9CBF9E1 /* TaskListView.swift */; };
 		3292128871BF0E9AAEE59677 /* ExerciseLibrarySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A708921A7D5F315781CFCF71 /* ExerciseLibrarySheet.swift */; };
 		331439A1A265FAA64B5B02B6 /* ConsistencyHeatmap.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0E984505A489247AADAB293 /* ConsistencyHeatmap.swift */; };
-		34A7FE0A0686AC8853E763FF /* DrawerDateStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BB1C25CE2574C5B40FE4BF3 /* DrawerDateStrip.swift */; };
+		34A7FE0A0686AC8853E763FF /* TimeTravelSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BB1C25CE2574C5B40FE4BF3 /* TimeTravelSheet.swift */; };
 		352B532706902FA61068D9FB /* NutritionQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA8B3755DDC65DD48AF4C3E /* NutritionQuickAddMenu.swift */; };
 		36325B1E6E5A771C01028105 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 31313A0E804B33A3E43FC1F6 /* Info.plist */; };
 		369638577C3010B9CD3FB351 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 77BEB26345A68838167042D8 /* PrivacyInfo.xcprivacy */; };
@@ -330,7 +330,7 @@
 		AD8E6D6E9DFA518DBC2B50CA /* AddChorePage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B241213EA8E591629280B7EE /* AddChorePage.swift */; };
 		ADCA538CBFB1E75DCC416215 /* SettingsRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C93BF01E5F69A01E9E9302 /* SettingsRecord.swift */; };
 		AE037FEEBEC164AE695B6329 /* NutritionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3478D00EF04684D27A69EECF /* NutritionPlugin.swift */; };
-		AE32502215C6947A24F3769C /* DrawerDateStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BB1C25CE2574C5B40FE4BF3 /* DrawerDateStrip.swift */; };
+		AE32502215C6947A24F3769C /* TimeTravelSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BB1C25CE2574C5B40FE4BF3 /* TimeTravelSheet.swift */; };
 		AF5A77B5B730923A825F7C89 /* Outbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD295FAB7B881CAC43EE8C34 /* Outbox.swift */; };
 		AF64B18251F2EE3C868C7337 /* MoodPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4E90D21C382F9970E4AAF88 /* MoodPlugin.swift */; };
 		B09EA3455FBF702224C33616 /* CalendarBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7027B881D1D8B1B09B105034 /* CalendarBridge.swift */; };
@@ -664,7 +664,7 @@
 		68B6F4EE0E6882204B5E6088 /* BodyDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyDestinationView.swift; sourceTree = "<group>"; };
 		6B5E07B2C36076D991E0F0C1 /* LogCommit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogCommit.swift; sourceTree = "<group>"; };
 		6B8CA0380F3FD3679CE4C676 /* SectionRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionRecord.swift; sourceTree = "<group>"; };
-		6BB1C25CE2574C5B40FE4BF3 /* DrawerDateStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawerDateStrip.swift; sourceTree = "<group>"; };
+		6BB1C25CE2574C5B40FE4BF3 /* TimeTravelSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeTravelSheet.swift; sourceTree = "<group>"; };
 		6CEAA5532CD1C1A47DB1BBAC /* NutritionRecommendations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionRecommendations.swift; sourceTree = "<group>"; };
 		6D3250962535171689FCDA30 /* ExercisePickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExercisePickerSheet.swift; sourceTree = "<group>"; };
 		6D3C973F9983AB94CEB95337 /* ChoresPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoresPlugin.swift; sourceTree = "<group>"; };
@@ -1208,7 +1208,7 @@
 			isa = PBXGroup;
 			children = (
 				B6677D4008D68908591E4937 /* ChartCard.swift */,
-				6BB1C25CE2574C5B40FE4BF3 /* DrawerDateStrip.swift */,
+				6BB1C25CE2574C5B40FE4BF3 /* TimeTravelSheet.swift */,
 				1C0951A6C8EB5FC40A37EE51 /* LogEntryRow.swift */,
 				E67995E99B0CD2E0D1A07BE2 /* SectionDrawer.swift */,
 				E18F72C4FF8B470B7B889B00 /* SectionPlugin.swift */,
@@ -1720,7 +1720,7 @@
 				28DCA6603BF044C883FE1D64 /* DiscoveryFlowChrome.swift in Sources */,
 				3D56072E439AE5A23E27501A /* DiscoveryMiniApp.swift in Sources */,
 				0C1BBCA2769FBAAE81988C25 /* DiscoveryShelf.swift in Sources */,
-				34A7FE0A0686AC8853E763FF /* DrawerDateStrip.swift in Sources */,
+				34A7FE0A0686AC8853E763FF /* TimeTravelSheet.swift in Sources */,
 				10550EB285720325B123ED7E /* EditCaffeineEntrySheet.swift in Sources */,
 				1B5C67C9AB68E1F9822472D3 /* EditCannabisEntrySheet.swift in Sources */,
 				2DCD1163302ADF72541A9664 /* EditChoreSheet.swift in Sources */,
@@ -1986,7 +1986,7 @@
 				C9CE47DECCE06EDE9E42B1D6 /* DiscoveryFlowChrome.swift in Sources */,
 				BD8D840AF166C2001860803F /* DiscoveryMiniApp.swift in Sources */,
 				89B1A0CC4C6B564CD8A01C40 /* DiscoveryShelf.swift in Sources */,
-				AE32502215C6947A24F3769C /* DrawerDateStrip.swift in Sources */,
+				AE32502215C6947A24F3769C /* TimeTravelSheet.swift in Sources */,
 				B717FF226A4C4E3CA00A8928 /* EditCaffeineEntrySheet.swift in Sources */,
 				78A4E7FB3BB9AED6E920A21E /* EditCannabisEntrySheet.swift in Sources */,
 				8B2588E5DB7635580E73217D /* EditChoreSheet.swift in Sources */,

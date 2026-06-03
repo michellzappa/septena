@@ -23,10 +23,8 @@ enum DrawerLoadState: Equatable {
 
 struct SectionDrawer<Content: View>: View {
   let sectionKey: String
-  /// Editorial title rendered left-aligned at the top of the drawer body
-  /// (Fraunces, ~34pt). The system nav bar title is suppressed so the
-  /// drawer owns the page's identity. Pass an empty string to skip it
-  /// (utility drawers that don't need a heading).
+  /// Section name shown as the inline nav-bar title. Pass an empty string
+  /// to skip it (utility drawers that don't need a heading).
   let title: String
   /// Tint used for the "+" toolbar affordance (and inherited by sheets
   /// presented from this drawer). Defaults to the section's theme color
@@ -56,11 +54,12 @@ struct SectionDrawer<Content: View>: View {
   /// Optional search-field placeholder. Defaults to "Search".
   var searchPrompt: String = "Search"
   /// Binding to the YYYY-MM-DD date the destination is currently
-  /// viewing. Non-nil installs the `DrawerDateStrip` under the title so
-  /// the user can step prev/next, jump to today, or open a date picker
-  /// without leaving the drawer. The destination reads the same binding
-  /// to fetch its day-scoped data, replacing per-section
-  /// `BrowseXDaySheet` detours.
+  /// viewing. Non-nil installs a calendar "time travel" button in the
+  /// toolbar (and a context pill under the title while viewing a past
+  /// day) so the user can open the `TimeTravelSheet` picker, jump to a
+  /// recent day, or pick an older date without leaving the drawer. The
+  /// destination reads the same binding to fetch its day-scoped data,
+  /// replacing per-section `BrowseXDaySheet` detours.
   var currentDate: Binding<String>? = nil
   @ViewBuilder var content: () -> Content
 
@@ -70,6 +69,12 @@ struct SectionDrawer<Content: View>: View {
   /// the goals live behind the `target` toolbar toggle and appear on cue,
   /// so the daily logging content owns the top of the drawer.
   @State private var goalsExpanded = false
+
+  /// Whether the time-travel date picker sheet is open. The picker lives
+  /// behind a calendar toolbar button (mirroring the goals + log buttons)
+  /// rather than an always-visible strip, so today's logging owns the top
+  /// of the drawer.
+  @State private var showingTimeTravel = false
 
   private var resolvedAccent: Color {
     accent ?? theme.color(for: sectionKey)
@@ -95,13 +100,12 @@ struct SectionDrawer<Content: View>: View {
       // inset and ~28pt between sections so the page breathes the same
       // way the old List did.
       LazyVStack(spacing: Theme.Spacing.xxl) {
-        if !title.isEmpty {
-          Text(title)
-            .font(.septenaScreenTitle)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        if let currentDate {
-          DrawerDateStrip(date: currentDate)
+        // While viewing a past day, surface a slim pill under the title so
+        // the time-travel context is never invisible — tap it to reopen the
+        // picker or jump back to today. On today the drawer stays clean and
+        // the calendar lives only in the toolbar.
+        if isTimeTraveling, let currentDate {
+          TimeTravelPill(date: currentDate.wrappedValue) { showingTimeTravel = true }
         }
         if !isTimeTraveling && goalsExpanded {
           SectionGoalsStrip(sectionKey: sectionKey)
@@ -118,24 +122,23 @@ struct SectionDrawer<Content: View>: View {
       .padding(.bottom, 24)
     }
     .background(Theme.groupedBackground)
+    // Time-travel picker. Attached to the body (not the toolbar item) so
+    // presentation is stable on iOS; gated on `currentDate` so non
+    // day-scoped drawers never build it.
+    .modifier(TimeTravelPresenter(isPresented: $showingTimeTravel, date: currentDate))
     // Conditional `.searchable` — present only when the destination
     // passes a binding so non-search drawers don't render an empty
     // input. We use a switch over the Optional so SwiftUI's view
     // identity stays stable per branch.
     .modifier(OptionalSearchable(text: searchText, prompt: searchPrompt))
-    // Inline title display so the section name sits on the same row as
-    // the toolbar's + button — keeps the drawer top compact.
+    // The section name lives in the nav bar (inline) rather than as a big
+    // editorial heading inside the scroll body — keeps the drawer top
+    // compact while still labelling the page.
+    .navigationTitle(title)
     #if os(iOS)
     .navigationBarTitleDisplayMode(.inline)
     #endif
     .tint(resolvedAccent)
-    // Suppress the centered nav-bar title — the drawer renders its own
-    // left-aligned editorial heading inside the scroll content.
-    #if os(iOS)
-    .toolbar {
-      ToolbarItem(placement: .principal) { EmptyView() }
-    }
-    #endif
     .toolbar {
       if loadState == .loading {
         // Subtle inline activity indicator next to the title slot so
@@ -144,6 +147,21 @@ struct SectionDrawer<Content: View>: View {
         ToolbarItem(placement: .primaryAction) {
           ProgressView()
             .controlSize(.small)
+        }
+      }
+      // Calendar / time-travel button — leftmost of the trailing cluster,
+      // present only when the destination is day-scoped. Tints accent and
+      // gains a clock badge while viewing a past day so its active state
+      // reads at a glance.
+      if currentDate != nil {
+        ToolbarItem(placement: .primaryAction) {
+          Button {
+            showingTimeTravel = true
+          } label: {
+            Label("Time Travel",
+                  systemImage: isTimeTraveling ? "calendar.badge.clock" : "calendar")
+          }
+          .tint(isTimeTraveling ? resolvedAccent : nil)
         }
       }
       // Goals toggle sits just left of the "+" affordance. Hidden while
@@ -253,6 +271,73 @@ private struct OptionalSearchable: ViewModifier {
       content.searchable(text: text, prompt: prompt)
     } else {
       content
+    }
+  }
+}
+
+/// Presents the `TimeTravelSheet` only when the drawer is day-scoped.
+/// Branches once at composition time (like `OptionalSearchable`) so view
+/// identity stays stable and non-dated drawers never build the sheet.
+private struct TimeTravelPresenter: ViewModifier {
+  @Binding var isPresented: Bool
+  let date: Binding<String>?
+
+  func body(content: Content) -> some View {
+    if let date {
+      content.sheet(isPresented: $isPresented) {
+        TimeTravelSheet(date: date)
+          .presentationDetents([.height(TimeTravelSheet.sheetHeight), .large])
+          .presentationDragIndicator(.visible)
+      }
+    } else {
+      content
+    }
+  }
+}
+
+/// Slim "you're viewing a past day" pill rendered under the drawer title
+/// while time-traveling. Tapping reopens the picker. Mirrors the muted
+/// capsule look of the former `DrawerDateStrip` date label.
+private struct TimeTravelPill: View {
+  /// The viewed day as YYYY-MM-DD.
+  let date: String
+  let onTap: () -> Void
+
+  private static let isoFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd"
+    f.calendar = Calendar(identifier: .iso8601)
+    f.locale = Locale(identifier: "en_US_POSIX")
+    f.timeZone = .current
+    return f
+  }()
+
+  private var label: String {
+    let cal = Calendar.current
+    let day = Self.isoFormatter.date(from: date) ?? .now
+    if cal.isDateInYesterday(day) { return "Viewing Yesterday" }
+    let days = cal.dateComponents([.day], from: day, to: .now).day ?? 0
+    let f = DateFormatter()
+    f.dateFormat = days < 7 ? "EEEE" : "EEEE · MMM d"
+    return "Viewing \(f.string(from: day))"
+  }
+
+  var body: some View {
+    HStack {
+      Button(action: onTap) {
+        HStack(spacing: 6) {
+          Image(systemName: "calendar.badge.clock")
+            .font(.caption)
+          Text(label)
+            .font(.subheadline.weight(.medium))
+        }
+        .foregroundStyle(Theme.inkPrimary)
+        .padding(.horizontal, Theme.Spacing.md)
+        .padding(.vertical, 6)
+        .background(Theme.secondaryGroupedBackground, in: Capsule())
+      }
+      .buttonStyle(.plain)
+      Spacer()
     }
   }
 }

@@ -419,6 +419,15 @@ struct TaskRowView<MetaLine: View, TrailingDate: View>: View {
 
 // MARK: - Week strip
 
+/// Which 7-day window a `WeekStrip` covers.
+enum WeekStripRange {
+  /// Today + the next 6 days. The scheduling default (When / Deadline).
+  case upcoming
+  /// The previous 6 days + today, with today rightmost. Used by the
+  /// drawer time-travel picker, where you look *back* at past logs.
+  case recent
+}
+
 /// Lean 7-day strip: today + next 6 days as Reminders-style chips
 /// (weekday letter on top, day number below). One tap = one pick.
 /// Used by both the When and Deadline pickers so quick scheduling
@@ -427,6 +436,9 @@ struct WeekStrip: View {
   @Environment(SectionTheme.self) private var theme
   /// Currently-selected day (start-of-day), or nil for none.
   let selected: Date?
+  /// Window the strip spans. Defaults to `.upcoming` so existing
+  /// scheduling callers are unaffected.
+  var range: WeekStripRange = .upcoming
   let onPick: (Date) -> Void
 
   private static let cal = Calendar.current
@@ -435,8 +447,13 @@ struct WeekStrip: View {
   }()
 
   private var days: [Date] {
-    let start = Self.cal.startOfDay(for: Date())
-    return (0..<7).compactMap { Self.cal.date(byAdding: .day, value: $0, to: start) }
+    let today = Self.cal.startOfDay(for: Date())
+    switch range {
+    case .upcoming:
+      return (0..<7).compactMap { Self.cal.date(byAdding: .day, value: $0, to: today) }
+    case .recent:
+      return (-6...0).compactMap { Self.cal.date(byAdding: .day, value: $0, to: today) }
+    }
   }
 
   var body: some View {
