@@ -1288,21 +1288,6 @@ enum ChecklistMirror {
       }
     }
 
-    // Most-recent session date across any type — for the 2-day rest gate.
-    var lastSession: Date? = nil
-    for dateStr in sortedDates {
-      if !classify(entriesByDate[dateStr] ?? []).isEmpty {
-        lastSession = SeptenaDate.parse(dateStr)
-        break
-      }
-    }
-    if let last = lastSession {
-      let comps = Calendar.current.dateComponents([.day], from: last, to: todayDate)
-      if (comps.day ?? 99) < 2 {
-        return SuggestedWorkoutResponse.make(suggested: nil, daysAgo: daysAgo)
-      }
-    }
-
     // Pick the type with the largest days-ago. Types never trained get
     // priority (treat missing as +infinity).
     let candidates = types.filter { !$0.id.isEmpty }
@@ -1310,6 +1295,15 @@ enum ChecklistMirror {
       (daysAgo[a.id] ?? Int.max) < (daysAgo[b.id] ?? Int.max)
     }
     guard let suggestion = pick else {
+      return SuggestedWorkoutResponse.make(suggested: nil, daysAgo: daysAgo)
+    }
+
+    // Per-type rest gate: suppress only when the *most-neglected* type was
+    // itself trained < 2 days ago — i.e. every type is freshly done, so today
+    // is a genuine rest day. A recent session of one type (yesterday's cardio)
+    // must not block a different, long-neglected type (lower 9 days ago). A
+    // never-trained type has no gap and is always due.
+    if let gap = daysAgo[suggestion.id], gap < 2 {
       return SuggestedWorkoutResponse.make(suggested: nil, daysAgo: daysAgo)
     }
     let reason: String? = daysAgo[suggestion.id].map { "\($0) days since last \(suggestion.label)" }
