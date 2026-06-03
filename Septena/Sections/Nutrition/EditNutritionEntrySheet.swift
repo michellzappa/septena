@@ -169,8 +169,7 @@ struct EditNutritionEntrySheet: View {
       potassiumMg    = optString(original.potassiumMg)
       waterMl        = optString(original.waterMl)
       photoAssetID   = original.photoAssetID
-      let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd HH:mm"
-      time = fmt.date(from: "\(original.date) \(original.time)") ?? Date()
+      time = EventTimestamp.from(date: original.date, time: original.time)
     } else {
       emoji = ""; foodsText = ""; ingredientsText = ""
       proteinG = ""; fatG = ""; saturatedFatG = ""

@@ -42,7 +42,7 @@ struct BackfillSupplementsSheet: View {
       #if os(iOS)
       .listStyle(.insetGrouped)
       #endif
-      .navigationTitle(friendlyTitle(date))
+      .navigationTitle(SeptenaDate.friendlyLabel(date))
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif
@@ -84,22 +84,5 @@ struct BackfillSupplementsSheet: View {
 
   private func reload() {
     response = ChecklistMirror.loadSupplementsDay(context: modelContext, date: date)
-  }
-
-  private func friendlyTitle(_ iso: String) -> String {
-    let fmt = DateFormatter()
-    fmt.dateFormat = "yyyy-MM-dd"
-    fmt.timeZone = .current
-    guard let d = fmt.date(from: iso) else { return iso }
-    let cal = Calendar.current
-    if cal.isDateInToday(d)     { return "Today" }
-    if cal.isDateInYesterday(d) { return "Yesterday" }
-    let days = cal.dateComponents([.day], from: d, to: Date()).day ?? 0
-    if days < 7 {
-      let f = DateFormatter(); f.dateFormat = "EEEE"
-      return f.string(from: d)
-    }
-    let f = DateFormatter(); f.dateFormat = "MMM d"
-    return f.string(from: d)
   }
 }

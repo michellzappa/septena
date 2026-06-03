@@ -106,7 +106,7 @@ struct AddCannabisPage: View {
       announce: "Logged \(method == "edible" ? "edible" : "vape").",
       logCommit: logCommit
     ) {
-      cannabis.addEntry(date: SeptenaDate.today, time: nowHHMM(),
+      cannabis.addEntry(date: SeptenaDate.today, time: SeptenaDate.nowHHMM,
                         method: method, hit: hit)
       AddInfoSection.cannabis.notifyTilesChanged()
     }

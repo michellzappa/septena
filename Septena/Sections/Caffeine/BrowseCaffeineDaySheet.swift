@@ -31,7 +31,7 @@ struct BrowseCaffeineDaySheet: View {
             // Empty-cell case is intentional: user may have sent an entry
             // here and not know it. Sheet still opens and reports honestly.
             ContentUnavailableView(
-              "Nothing logged on \(friendlyTitle(date))",
+              "Nothing logged on \(SeptenaDate.friendlyLabel(date))",
               systemImage: theme.icon(for: "caffeine"),
               description: Text("If you think an entry got moved here by mistake, check nearby days too.")
             )
@@ -67,7 +67,7 @@ struct BrowseCaffeineDaySheet: View {
       #if os(iOS)
       .listStyle(.insetGrouped)
       #endif
-      .navigationTitle(friendlyTitle(date))
+      .navigationTitle(SeptenaDate.friendlyLabel(date))
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif
@@ -115,22 +115,5 @@ struct BrowseCaffeineDaySheet: View {
     if let g = e.grams { parts.append(String(format: "%.1fg", g)) }
     if let n = e.note, !n.isEmpty { parts.append(n) }
     return parts.isEmpty ? nil : parts.joined(separator: " · ")
-  }
-
-  private func friendlyTitle(_ iso: String) -> String {
-    let fmt = DateFormatter()
-    fmt.dateFormat = "yyyy-MM-dd"
-    fmt.timeZone = .current
-    guard let d = fmt.date(from: iso) else { return iso }
-    let cal = Calendar.current
-    if cal.isDateInToday(d)     { return "Today" }
-    if cal.isDateInYesterday(d) { return "Yesterday" }
-    let days = cal.dateComponents([.day], from: d, to: Date()).day ?? 0
-    if days < 7 {
-      let f = DateFormatter(); f.dateFormat = "EEEE"
-      return f.string(from: d)
-    }
-    let f = DateFormatter(); f.dateFormat = "MMM d"
-    return f.string(from: d)
   }
 }

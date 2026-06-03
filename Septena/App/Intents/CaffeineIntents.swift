@@ -118,7 +118,7 @@ struct LogCaffeineIntent: SectionLogIntent {
     // resolution across renames.
     SeptenaServices.shared.caffeineMutator.addEntry(
       date: SeptenaDate.today,
-      time: nowHHMM(),
+      time: SeptenaDate.nowHHMM,
       method: method.rawValue,
       beans: bean?.name,
       grams: grams)

@@ -134,8 +134,7 @@ struct EditGutEntrySheet: View {
       $0 == $0.rounded() ? String(Int($0)) : String(format: "%.1f", $0)
     } ?? ""
     note = original.note ?? ""
-    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd HH:mm"
-    when = fmt.date(from: "\(original.date) \(original.time)") ?? Date()
+    when = EventTimestamp.from(date: original.date, time: original.time)
   }
 
   private func save() {

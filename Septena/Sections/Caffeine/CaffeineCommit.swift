@@ -43,7 +43,7 @@ enum CaffeineCommit {
   /// pass nil and simply skip the visual; the write + haptic still confirm.
   @discardableResult
   static func logNew(date: String = SeptenaDate.today,
-                     time: String = nowHHMM(),
+                     time: String = SeptenaDate.nowHHMM,
                      method: String,
                      beans: String?,
                      grams: Double?,

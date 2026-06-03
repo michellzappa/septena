@@ -103,8 +103,7 @@ struct EditCannabisEntrySheet: View {
     hit = original.hit ?? 1
     note = original.note ?? ""
     effect = original.effect ?? ""
-    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd HH:mm"
-    when = fmt.date(from: "\(date) \(original.time)") ?? Date()
+    when = EventTimestamp.from(date: date, time: original.time)
   }
 
   /// Most recent cannabis event with the given method in the last 30

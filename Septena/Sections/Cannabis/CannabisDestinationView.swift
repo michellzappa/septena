@@ -166,7 +166,7 @@ struct CannabisDestinationView: View {
   private func logVape(hit: Int) {
     SectionLog.newLog(section: "cannabis", accent: accent,
                       announce: "Logged vape.", logCommit: logCommit) {
-      cannabis.addEntry(date: SeptenaDate.today, time: nowHHMM(),
+      cannabis.addEntry(date: SeptenaDate.today, time: SeptenaDate.nowHHMM,
                         method: "vape", hit: hit)
       AddInfoSection.cannabis.notifyTilesChanged()
     }

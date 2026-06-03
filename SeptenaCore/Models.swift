@@ -1619,6 +1619,30 @@ enum SeptenaDate {
     return f
   }()
 
+  /// Wall-clock "HH:mm" formatter. The one true source for the time-of-day
+  /// stamp written on logged events; call sites used to each spin up their
+  /// own `currentTimeString()` / `nowHHMM()` with the same config.
+  private static let timeFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.calendar = Calendar(identifier: .gregorian)
+    f.locale = Locale(identifier: "en_US_POSIX")
+    f.timeZone = TimeZone.current
+    f.dateFormat = "HH:mm"
+    return f
+  }()
+
+  private static let weekdayFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "EEEE"
+    return f
+  }()
+
+  private static let monthDayFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "MMM d"
+    return f
+  }()
+
   static func parse(_ s: String?) -> Date? {
     guard let s, !s.isEmpty else { return nil }
     return formatter.date(from: String(s.prefix(10)))
@@ -1630,6 +1654,23 @@ enum SeptenaDate {
   }
 
   static var today: String { formatter.string(from: Date()) }
+
+  /// Wall-clock "HH:mm" right now.
+  static var nowHHMM: String { timeFormatter.string(from: Date()) }
+
+  /// Human label for a "yyyy-MM-dd" string: "Today", "Yesterday", the
+  /// weekday name within the last week, else "MMM d". Returns the raw
+  /// string unchanged if it can't be parsed. Single home for the
+  /// browse/backfill sheet titles that each carried a copy of this.
+  static func friendlyLabel(_ iso: String) -> String {
+    guard let d = parse(iso) else { return iso }
+    let cal = Calendar.current
+    if cal.isDateInToday(d)     { return "Today" }
+    if cal.isDateInYesterday(d) { return "Yesterday" }
+    let days = cal.dateComponents([.day], from: d, to: Date()).day ?? 0
+    if days < 7 { return weekdayFormatter.string(from: d) }
+    return monthDayFormatter.string(from: d)
+  }
 }
 
 // MARK: - Training: session types + draft

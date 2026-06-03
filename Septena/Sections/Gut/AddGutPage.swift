@@ -63,7 +63,7 @@ struct AddGutPage: View {
       announce: "Logged type \(item.id).",
       logCommit: logCommit
     ) {
-      gut.addEntry(date: SeptenaDate.today, time: nowHHMM(), bristol: item.id)
+      gut.addEntry(date: SeptenaDate.today, time: SeptenaDate.nowHHMM, bristol: item.id)
       GutBristolRecorder.record(item.id)
       AddInfoSection.gut.notifyTilesChanged()
     }

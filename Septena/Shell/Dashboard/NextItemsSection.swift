@@ -344,7 +344,7 @@ final class NextItemsModel {
     if let i = habits.firstIndex(where: { $0.id == habit.id }) {
       habits[i].done = next
       if next { habits[i].skipped = false }
-      habits[i].time = next ? currentTimeString() : nil
+      habits[i].time = next ? SeptenaDate.nowHHMM : nil
     }
     actedHabits.insert(habit.id)
     mutator.toggleHabit(id: habit.id, date: today, done: next)
@@ -371,7 +371,7 @@ final class NextItemsModel {
     if next { Haptics.success() } else { Haptics.tap() }
     if let i = supplements.firstIndex(where: { $0.id == supp.id }) {
       supplements[i].done = next
-      supplements[i].time = next ? currentTimeString() : nil
+      supplements[i].time = next ? SeptenaDate.nowHHMM : nil
     }
     actedSupplements.insert(supp.id)
     mutator.toggleSupplement(id: supp.id, date: today, done: next)
@@ -385,7 +385,7 @@ final class NextItemsModel {
     deferredChores.removeValue(forKey: chore.id)
     if let i = chores.firstIndex(where: { $0.id == chore.id }) {
       chores[i].lastCompleted = today
-      chores[i].lastCompletedTime = currentTimeString()
+      chores[i].lastCompletedTime = SeptenaDate.nowHHMM
     }
     mutator.completeChore(id: chore.id, date: today)
     // Linger struck through, then fade into Done. We clear `actedChores` (the
@@ -441,14 +441,6 @@ final class NextItemsModel {
       chores[i].lastCompletedTime = nil
     }
     mutator.uncompleteChore(id: chore.id, date: today)
-  }
-
-  private func currentTimeString() -> String {
-    let formatter = DateFormatter()
-    formatter.calendar = Calendar(identifier: .gregorian)
-    formatter.locale = Locale(identifier: "en_US_POSIX")
-    formatter.dateFormat = "HH:mm"
-    return formatter.string(from: .now)
   }
 }
 

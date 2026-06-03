@@ -75,7 +75,7 @@ struct LogCannabisIntent: SectionLogIntent {
     let resolvedHit = method == .vape ? (hits ?? 1) : hits
     SeptenaServices.shared.cannabisMutator.addEntry(
       date: SeptenaDate.today,
-      time: nowHHMM(),
+      time: SeptenaDate.nowHHMM,
       method: method.rawValue,
       hit: resolvedHit,
       grams: grams)

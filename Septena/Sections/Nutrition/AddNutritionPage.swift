@@ -134,10 +134,3 @@ private func ymd(daysAgo: Int) -> String {
   let d = Calendar.current.date(byAdding: .day, value: -daysAgo, to: .now) ?? .now
   return SeptenaDate.format(d) ?? SeptenaDate.today
 }
-
-func nowHHMM() -> String {
-  let f = DateFormatter()
-  f.dateFormat = "HH:mm"
-  f.locale = Locale(identifier: "en_US_POSIX")
-  return f.string(from: .now)
-}

@@ -929,7 +929,7 @@ final class ChecklistMutator {
 
   func toggleHabit(id: String, date: String, done: Bool) {
     setHabitState(id: id, date: date, done: done, skipped: false,
-                  note: nil, time: done ? currentTimeString() : nil)
+                  note: nil, time: done ? SeptenaDate.nowHHMM : nil)
   }
 
   func skipHabit(id: String, date: String, skipped: Bool) {
@@ -995,7 +995,7 @@ final class ChecklistMutator {
     // CloudKit on first toggle. Display code already treats "" the same
     // as nil (both render as "no note").
     state.note = ""
-    state.time = currentTimeString()
+    state.time = SeptenaDate.nowHHMM
     state.updatedAt = .now
     if state.modelContext == nil { context.insert(state) }
     commitSupplementEvent(state, op: "toggle")
@@ -1051,7 +1051,7 @@ final class ChecklistMutator {
                                  date: date,
                                  reason: "",
                                  note: "",
-                                 time: currentTimeString(),
+                                 time: SeptenaDate.nowHHMM,
                                  sortKey: sortKey(for: date))
     context.insert(event)
     commitChoreEvent(event, op: "complete")
@@ -1189,14 +1189,6 @@ final class ChecklistMutator {
     ((try? context.fetch(FetchDescriptor<ChoreDefinitionEntity>(
       sortBy: [SortDescriptor(\.sortIndex, order: .reverse)]
     )).first?.sortIndex) ?? -1) + 1
-  }
-
-  private func currentTimeString() -> String {
-    let formatter = DateFormatter()
-    formatter.calendar = Calendar(identifier: .gregorian)
-    formatter.locale = Locale(identifier: "en_US_POSIX")
-    formatter.dateFormat = "HH:mm"
-    return formatter.string(from: .now)
   }
 
   private func deferredDueDate(mode: String, from date: String) -> String? {

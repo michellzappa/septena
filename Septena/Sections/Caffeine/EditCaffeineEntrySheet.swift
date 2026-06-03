@@ -149,16 +149,7 @@ struct EditCaffeineEntrySheet: View {
       $0 == $0.rounded() ? String(Int($0)) : String(format: "%.1f", $0)
     } ?? ""
     note = original.note ?? ""
-    when = Self.combine(date: date, time: original.time) ?? Date()
-  }
-
-  /// Combine the entity's "YYYY-MM-DD" date and "HH:mm" time into a
-  /// single `Date` for the picker. Returns nil if either string is
-  /// malformed — caller falls back to `Date()`.
-  private static func combine(date: String, time: String) -> Date? {
-    let fmt = DateFormatter()
-    fmt.dateFormat = "yyyy-MM-dd HH:mm"
-    return fmt.date(from: "\(date) \(time)")
+    when = EventTimestamp.from(date: date, time: original.time)
   }
 
   private func loadBeans() async {

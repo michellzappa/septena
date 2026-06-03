@@ -1893,7 +1893,7 @@ struct WeekDashboardView: View {
       logCommit: logCommit
     ) {
       SeptenaServices.shared.cannabisMutator.addEntry(
-        date: SeptenaDate.today, time: nowHHMM(),
+        date: SeptenaDate.today, time: SeptenaDate.nowHHMM,
         method: method, hit: hit)
       // Refresh tile state from the freshly-mutated SwiftData store so the
       // "Continue · Hit N" counter advances immediately.
@@ -1982,7 +1982,7 @@ struct WeekDashboardView: View {
     SectionLog.newLog(section: "gut", accent: theme.color(for: "gut"),
                       logCommit: logCommit) {
       SeptenaServices.shared.gutMutator.addEntry(
-        date: SeptenaDate.today, time: nowHHMM(), bristol: bristol)
+        date: SeptenaDate.today, time: SeptenaDate.nowHHMM, bristol: bristol)
       GutBristolRecorder.record(bristol)
       AddInfoSection.gut.notifyTilesChanged()
     }
