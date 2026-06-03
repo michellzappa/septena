@@ -201,7 +201,9 @@ enum Theme {
   static let listLeadingInset: CGFloat = 20
   static let cardVerticalPadding: CGFloat = 6
   static let cardActionIconSize: CGFloat = 14
-  static let groupHeaderFontSize: CGFloat = 13
+  // Matches `title2` (= septenaSectionTitle, the Next feed's section titles)
+  // so Today/Tasks group headers read at the same size as Next.
+  static let groupHeaderFontSize: CGFloat = 17
   #else
   static let hPadding: CGFloat = 20
   static let rowHeight: CGFloat = 36
@@ -218,7 +220,9 @@ enum Theme {
   static let listLeadingInset: CGFloat = 0
   static let cardVerticalPadding: CGFloat = 10
   static let cardActionIconSize: CGFloat = 18
-  static let groupHeaderFontSize: CGFloat = 17
+  // Matches `title2` (= septenaSectionTitle, the Next feed's section titles)
+  // so Today/Tasks group headers read at the same size as Next.
+  static let groupHeaderFontSize: CGFloat = 22
   #endif
 
   /// Vertical padding inside a task / log row. Single source of truth so
@@ -277,7 +281,7 @@ enum Theme {
 //
 // Three-family system (see docs/DesignSpec.md §5):
 //   - SF Pro (system)  → UI body, controls, labels, buttons, most titles
-//   - Fraunces (serif) → screen-level H1 only (septenaScreenTitle); rare by design
+//   - Fraunces (serif) → Dashboard welcome only (septenaWelcomeTitle); rare by design
 //   - System mono      → numerics / metrics (tabular)
 //
 // Fraunces is registered via Info.plist `UIAppFonts` (iOS) and
@@ -296,11 +300,14 @@ extension Font {
   private static let frauncesBold     = "Fraunces-9ptBold"
 
   // MARK: Titles
-  // Fraunces is reserved for the screen-level H1 only — destination headers,
-  // homepage welcome, Tasks H1. Everything else (section, card, tile titles)
-  // uses SF Pro so the editorial face stays rare and meaningful.
-  /// Destination header — Fraunces SemiBold at largeTitle. The one Fraunces user.
-  static let septenaScreenTitle  = Font.custom(frauncesSemiBold, size: 34, relativeTo: .largeTitle)
+  // Fraunces is reserved for the Dashboard welcome only (septenaWelcomeTitle) —
+  // the app's front door and the home of the (soon AI-infused) one-liner.
+  // Interior destination headers use SF Pro so arriving at the editorial face
+  // stays a moment, not a frame you can't escape.
+  /// Destination header — SF Pro semibold at largeTitle. Neutral interior H1.
+  static let septenaScreenTitle  = Font.system(.largeTitle, weight: .semibold)
+  /// Dashboard welcome greeting — Fraunces SemiBold. The one Fraunces user.
+  static let septenaWelcomeTitle = Font.custom(frauncesSemiBold, size: 34, relativeTo: .largeTitle)
   /// Section header within a screen — SF Pro semibold at title2.
   static let septenaSectionTitle = Font.system(.title2, weight: .semibold)
   /// Card header — SF Pro at headline (already semibold by default).

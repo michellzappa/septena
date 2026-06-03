@@ -17,7 +17,7 @@ struct WelcomeHeader: View {
   var body: some View {
     VStack(spacing: 4) {
       Text(phase.greeting)
-        .font(.septenaScreenTitle)
+        .font(.septenaWelcomeTitle)
         .multilineTextAlignment(.center)
       Text(subtitle)
         .font(.subheadline)
