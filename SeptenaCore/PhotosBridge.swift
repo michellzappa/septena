@@ -42,4 +42,15 @@ final class PhotosBridge {
     default:                    return false
     }
   }
+
+  /// Prompt only if the user hasn't decided yet, then report whether reads are
+  /// possible. The single entry point callers should use before touching a
+  /// picked asset's `itemIdentifier` or thumbnail — so authorization never
+  /// gets requested or read straight from `PHPhotoLibrary`, bypassing this
+  /// bridge's view of the state.
+  @discardableResult
+  func ensureAccess() async -> Bool {
+    if access == .notDetermined { _ = await requestAccess() }
+    return canRead
+  }
 }

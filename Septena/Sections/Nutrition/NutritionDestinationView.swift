@@ -1,7 +1,6 @@
 import SwiftUI
 import Charts
 import PhotosUI
-import Photos
 
 // Nutrition mini-app — mirrors the webapp's NutritionDashboard.
 //
@@ -260,10 +259,7 @@ struct NutritionDestinationView: View {
   }
 
   private func attachPhoto(_ item: PhotosPickerItem, to entry: NutritionEntry) async {
-    let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-    if status == .notDetermined {
-      _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
-    }
+    await PhotosBridge.shared.ensureAccess()
     guard let assetID = item.itemIdentifier else { return }
     await MainActor.run {
       SeptenaServices.shared.nutritionMutator.updateEntry(

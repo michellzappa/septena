@@ -134,7 +134,22 @@ final class RemindersBridge {
                                           error: error.localizedDescription))
       }
     }
-    if !imported.isEmpty { try? delete(imported) }
+    // Removing the originals is what makes dedupe work — a reminder that
+    // imports but isn't deleted will re-import on the next pass. So a delete
+    // failure is surfaced in the log, never swallowed.
+    if !imported.isEmpty {
+      do {
+        try delete(imported)
+      } catch {
+        SeptenaLog.error("Reminders auto-import delete", error)
+        let n = imported.count
+        entries.append(AutoImportLogEntry(
+          title: "Couldn’t remove \(n) imported reminder\(n == 1 ? "" : "s") from Reminders",
+          importedAt: Date(),
+          succeeded: false,
+          error: error.localizedDescription))
+      }
+    }
     if !entries.isEmpty {
       // Newest first; trim to cap.
       recentImports = Array((entries.reversed() + recentImports).prefix(Self.logCap))
@@ -148,15 +163,35 @@ final class RemindersBridge {
       .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
   }
 
+  /// Hard ceiling on a single `fetchReminders` call. EventKit's completion
+  /// handler is not contractually guaranteed to fire, so we bound the wait and
+  /// cancel the request rather than leak a suspended task forever.
+  private static let fetchTimeout: Duration = .seconds(10)
+
   /// Incomplete reminders from `calendar`, in the order Reminders returns them.
   /// Uses `predicateForReminders(in:)` and filters in-process — the
   /// `predicateForIncompleteReminders(withDueDateStarting:ending:…)` variant
   /// inconsistently drops items without a due date across OS versions.
+  ///
+  /// `fetchReminders` is an old-style callback API with no error channel and no
+  /// guaranteed completion. We resume exactly once — whichever fires first, the
+  /// EventKit callback or a timeout that cancels the in-flight request — so a
+  /// store that never calls back can't strand this continuation.
   func pendingReminders(in calendar: EKCalendar) async -> [EKReminder] {
     let predicate = store.predicateForReminders(in: [calendar])
     return await withCheckedContinuation { cont in
-      store.fetchReminders(matching: predicate) { results in
+      let resume = ResumeOnce()
+      let request = store.fetchReminders(matching: predicate) { results in
+        guard resume.claim() else { return }
         cont.resume(returning: (results ?? []).filter { !$0.isCompleted })
+      }
+      Task { [store, request] in
+        try? await Task.sleep(for: Self.fetchTimeout)
+        guard resume.claim() else { return }
+        store.cancelFetchRequest(request)
+        SeptenaLog.error("Reminders fetch timed out",
+                         RemindersError.fetchTimedOut)
+        cont.resume(returning: [])
       }
     }
   }
@@ -170,6 +205,27 @@ final class RemindersBridge {
     }
     try store.commit()
   }
+}
+
+// MARK: - Single-resume latch
+
+/// Thread-safe one-shot guard. `claim()` returns true to exactly one caller;
+/// every later caller gets false. Used to race a callback against a timeout
+/// without ever resuming a continuation twice. The callback and the timeout
+/// task run on different executors, so the latch must be lock-backed.
+private final class ResumeOnce: @unchecked Sendable {
+  private let lock = NSLock()
+  private var claimed = false
+  func claim() -> Bool {
+    lock.lock(); defer { lock.unlock() }
+    if claimed { return false }
+    claimed = true
+    return true
+  }
+}
+
+enum RemindersError: Error {
+  case fetchTimedOut
 }
 
 // MARK: - View-model snapshot

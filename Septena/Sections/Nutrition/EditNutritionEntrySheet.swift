@@ -128,10 +128,7 @@ struct EditNutritionEntrySheet: View {
 
   private func capturePickedIdentifier(_ item: PhotosPickerItem) async {
     // Photos read access is needed for `itemIdentifier` to be non-nil.
-    let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-    if status == .notDetermined {
-      _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
-    }
+    await PhotosBridge.shared.ensureAccess()
     await MainActor.run {
       photoAssetID = item.itemIdentifier
       photoEdited = true
@@ -320,8 +317,7 @@ struct MealPhotoThumbnail: View {
     guard let assetID, !assetID.isEmpty else { return }
     // Photo-library reads require granted access; if it's unavailable
     // (denied/restricted/not-yet-asked) silently skip — the placeholder shows.
-    let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-    guard status == .authorized || status == .limited else { return }
+    guard PhotosBridge.shared.canRead else { return }
     let assets = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil)
     guard let asset = assets.firstObject else { return }
     let opts = PHImageRequestOptions()

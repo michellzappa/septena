@@ -1,6 +1,5 @@
 import SwiftUI
 import PhotosUI
-import Photos
 
 // New-entry sheet for a fresh meal. Same `Form` shape as
 // `EditNutritionEntrySheet` so the UI feels identical, but POSTs to
@@ -40,10 +39,7 @@ struct NewNutritionEntrySheet: View {
         .onChange(of: photoItem) { _, new in
           guard let new else { return }
           Task {
-            let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-            if status == .notDetermined {
-              _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
-            }
+            await PhotosBridge.shared.ensureAccess()
             await MainActor.run { photoAssetID = new.itemIdentifier }
           }
         }
