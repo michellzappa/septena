@@ -1,7 +1,8 @@
 #if canImport(UIKit)
 import UIKit
+import UserNotifications
 
-final class AppDelegate: NSObject, UIApplicationDelegate {
+final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
   /// Captured at cold launch before NavigationState exists. The app's
   /// `.task` drains this on first render.
   private static var pending: ShortcutAction?
@@ -16,6 +17,68 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
   static func consumePendingShortcut() -> ShortcutAction? {
     defer { pending = nil }
     return pending
+  }
+
+  /// Become the notification delegate so inline action taps route here.
+  func application(
+    _ application: UIApplication,
+    didFinishLaunchingWithOptions launchOptions:
+      [UIApplication.LaunchOptionsKey: Any]? = nil
+  ) -> Bool {
+    UNUserNotificationCenter.current().delegate = self
+    return true
+  }
+
+  // MARK: - Local-notification actions
+  //
+  // "Mark what you did" without opening the app. Each inline action id maps to
+  // an existing mutator (which routes the write to CloudKit), then re-arms the
+  // schedule so the just-handled nudge withdraws.
+
+  /// Show banners even while the app is foregrounded — useful in testing and
+  /// honest (the nudge is still relevant if you're not on the right screen).
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    willPresent notification: UNNotification,
+    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+  ) {
+    completionHandler([.banner, .sound])
+  }
+
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    didReceive response: UNNotificationResponse,
+    withCompletionHandler completionHandler: @escaping () -> Void
+  ) {
+    let actionID = response.actionIdentifier
+    let userInfo = response.notification.request.content.userInfo
+    Task { @MainActor in
+      // Idempotent — binds the mutators' CKEngine if a background launch
+      // raced ahead of the scene's `.task`.
+      await SeptenaServices.shared.start()
+      let services = SeptenaServices.shared
+      let today = SeptenaDate.today
+
+      switch actionID {
+      case NotificationActionID.choreComplete:
+        if let choreID = userInfo[NotificationUserInfoKey.choreID] as? String {
+          services.checklistMutator.completeChore(id: choreID, date: today)
+        }
+      case NotificationActionID.hydrationAdd250:
+        _ = services.nutritionMutator.addEntry(
+          loggedAt: .now, emoji: "💧",
+          foods: HydrationPlugin.waterFoodsMarker, source: "manual", waterMl: 250)
+      case NotificationActionID.hydrationAdd500:
+        _ = services.nutritionMutator.addEntry(
+          loggedAt: .now, emoji: "💧",
+          foods: HydrationPlugin.waterFoodsMarker, source: "manual", waterMl: 500)
+      default:
+        break   // default tap (opens the app) — nothing to mutate here
+      }
+
+      LocalNotificationScheduler.shared.reconcile()
+      completionHandler()
+    }
   }
 
   /// Single ingress for Quick Action delivery from any of the three
