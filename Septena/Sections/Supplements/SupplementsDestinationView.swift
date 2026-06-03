@@ -30,11 +30,12 @@ struct SupplementsDestinationView: View {
                   onLog: { _ in creating = true },
                   currentDate: $viewingDate) {
       if isViewingToday {
-        // Open list — a just-taken supplement lingers here (struck through)
-        // for the settle beat, then fades out in place (no "Done" strip).
-        if !model.openSupplements.isEmpty {
+        // Full day's stack — taken supplements stay in place (struck through)
+        // for the rest of today rather than fading out, so the drawer always
+        // shows what was logged. (The homepage Next feed still hides done.)
+        if !model.supplements.isEmpty {
           DrawerSection("Today", padding: .none) {
-            ForEach(model.openSupplements) { supp in
+            ForEach(model.supplements) { supp in
               Button { editing = supp } label: {
                 SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator, tint: accent,
                               onDelete: { delete(supp) })

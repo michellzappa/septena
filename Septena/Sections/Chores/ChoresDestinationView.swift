@@ -24,18 +24,11 @@ struct ChoresDestinationView: View {
   /// "Today" includes overdue (daysOverdue > 0) and due-today (== 0).
   private var today: [ChoreItem] {
     model.chores
-      // A just-completed chore lingers here (struck through) for the settle
-      // beat, then fades out in place — same as the Next page. The
-      // `actedChores` clause keeps it; the beat clears that set.
-      .filter { $0.daysOverdue >= 0
-        && (model.actedChores.contains($0.id) || !model.completedChores.contains($0.id)) }
+      // A completed chore stays here (struck through) for the rest of today
+      // rather than fading out, so the drawer always shows what was done.
+      // (The homepage Next feed still hides done.)
+      .filter { $0.daysOverdue >= 0 }
       .sorted { ($0.daysOverdue, $0.name) > ($1.daysOverdue, $1.name) }
-  }
-
-  private var doneToday: [ChoreItem] {
-    model.chores.filter {
-      model.completedChores.contains($0.id) && !model.actedChores.contains($0.id)
-    }
   }
 
   /// Soonest first (least-negative `daysOverdue`) → furthest away last, so

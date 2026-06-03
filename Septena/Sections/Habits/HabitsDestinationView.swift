@@ -177,19 +177,18 @@ struct HabitsDestinationView: View {
 
   @ViewBuilder
   private func bucketSection(_ bucket: String) -> some View {
+    // Full bucket — completed/skipped habits stay in place (struck through)
+    // for the rest of today rather than fading out, so the drawer always
+    // shows what was logged. (The homepage Next feed still hides done.)
     let all = model.habits.filter { $0.bucket == bucket }
-    // Open rows only — a just-completed/skipped habit lingers here (via the
-    // model's `actedHabits` set) for the settle beat, then fades into the
-    // shared "Done" section below. Count in the header still reflects all.
-    let open = model.openHabits.filter { $0.bucket == bucket }
     let doneCount = all.filter { $0.done }.count
-    if !open.isEmpty {
+    if !all.isEmpty {
       VStack(alignment: .leading, spacing: 8) {
         DayBucketHeader(bucket: bucket,
                         trailing: "\(doneCount)/\(all.count)")
           .padding(.horizontal, 16)
         DrawerSection(padding: .none) {
-          ForEach(open) { habit in
+          ForEach(all) { habit in
             Button { editing = habit } label: {
               HabitRow(habit: habit, model: model, checklistMutator: checklistMutator, tint: accent,
                        onDelete: { delete(habit) })
