@@ -168,7 +168,6 @@ enum TasksPlugin: SectionPlugin {
 private struct TasksDetailContent: View {
   @AppStorage(SettingsKey.badgeShowOverdue)   private var taskBadge: Bool = false
   @AppStorage(SettingsKey.todayShowCompleted) private var todayShowCompleted: Bool = true
-  @AppStorage(SettingsKey.taskSort)           private var taskSortRaw: String = TaskSort.dateAdded.rawValue
   @AppStorage(SettingsKey.tasksOpenIn)        private var tasksOpenInRaw: String = TasksOpenMode.drawer.rawValue
 
   var body: some View {
@@ -186,15 +185,6 @@ private struct TasksDetailContent: View {
     }
     Section("Today") {
       Toggle("Show completed tasks in Today", isOn: $todayShowCompleted)
-    }
-    Section("Task sort") {
-      Picker("Sort tasks by", selection: $taskSortRaw) {
-        ForEach(TaskSort.allCases) { s in
-          Label(s.label, systemImage: s.icon).tag(s.rawValue)
-        }
-      }
-      .pickerStyle(.inline)
-      .labelsHidden()
     }
     Section {
       Text("Areas and projects are managed in the Tasks tab.")

@@ -204,6 +204,14 @@ final class TaskMutator {
     cloudBackend.moveToProject(id: id, project: project)
   }
 
+  func reorder(id: String, toPosition position: Double) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] reorder called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.reorder(id: id, toPosition: position)
+  }
+
   func update(id: String, title: String? = nil, notes: String? = nil) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] update called before CK bound — dropping", nil)

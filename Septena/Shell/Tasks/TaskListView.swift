@@ -33,11 +33,6 @@ struct TaskListView: View {
   /// the header scrolls away with the rows instead of pinning at the top.
   let embeddedHeader: () -> AnyView
 
-  /// Global sort applied when this list is showing a project or area — name
-  /// or earliest-due first. Other filters (Today, Upcoming, etc.) have their
-  /// own ordering that's part of the screen's meaning, so this is ignored
-  /// outside `.project` / `.area`.
-  @AppStorage(SettingsKey.taskSort) private var taskSortRaw: String = TaskSort.dateAdded.rawValue
   @AppStorage(SettingsKey.todayShowCompleted) private var todayShowCompleted: Bool = true
 
   // Items/review/doneToday are filter-scoped. We store them alongside the
@@ -140,6 +135,7 @@ struct TaskListView: View {
   /// a just-completed row in place for a moment, then animates it out into the
   /// logged footer instead of yanking it the instant you tap.
   @State private var settle = SettleStore()
+
 
   /// Unified selection — the single source of truth for the keyboard cursor
   /// and multi-select batch operations, bound straight to `List(selection:)`
@@ -524,7 +520,20 @@ struct TaskListView: View {
   }
 
   private var visibleRows: some View {
-    ForEach(visibleItems) { task in row(task).asTaskRow(id: task.id) }
+    // Standard SwiftUI drag-and-drop for manual reorder. `.draggable` +
+    // `.dropDestination` coexist with the row's `.contextMenu`: a stationary
+    // long-press opens the menu, a long-press-and-move lifts the row to drag.
+    // No edit mode, no custom menu. (Flat lists only — the grouped Today /
+    // Upcoming views render in a different order than `visibleItems`.)
+    ForEach(visibleItems) { task in
+      row(task)
+        .draggable(task.id)
+        .dropDestination(for: String.self) { dropped, _ in
+          guard let draggedId = dropped.first else { return false }
+          return moveTask(draggedId, onto: task.id)
+        }
+        .asTaskRow(id: task.id)
+    }
   }
 
   /// Existing deadline for a target task, so the picker sheet can
@@ -1213,68 +1222,17 @@ struct TaskListView: View {
   ///   instead — including just-completed rows, which the optimistic
   ///   `toggle()` mirrors directly into `loggedItemsStorage`.
   private var visibleItems: [SeptenaTask] {
+    // `items` already arrives in manual order (LocalCache orders by
+    // `TaskOrder.key`), so we never re-sort here — a task stays exactly where
+    // the user dragged it. We only filter: optionally hide project-bucketed
+    // rows, and hide historical completions (keeping a just-checked row
+    // visible while it settles so it fades in place rather than vanishing).
     var result = items
     if excludeProjectedTasks { result = result.filter { $0.project == nil } }
     if hideHistoricalDone {
-      // Keep a just-checked row visible while it settles, so it lingers in
-      // place then fades out (rather than vanishing under the finger). The
-      // settle timer drops the id, after which this filter hides the row.
       result = result.filter { $0.status != .done || settle.isSettling($0.id) }
     }
-    // Apply the global sort only on project/area pages — those are the
-    // surfaces with no inherent ordering of their own.
-    switch filter {
-    case .project, .area:
-      let sort = TaskSort(rawValue: taskSortRaw) ?? .dateAdded
-      result.sort(by: taskSortComparator(sort))
-    default:
-      break
-    }
     return result
-  }
-
-  /// Total ordering for `visibleItems`. Today tasks float to the top;
-  /// Someday tasks sink to the bottom. Within each band the chosen sort
-  /// applies. For due-date sort, tasks without a `due` sink within their
-  /// band; ties fall back to case-insensitive title for stability.
-  private func taskSortComparator(_ sort: TaskSort) -> (SeptenaTask, SeptenaTask) -> Bool {
-    let base: (SeptenaTask, SeptenaTask) -> Bool
-    switch sort {
-    case .alphabetical:
-      base = { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-    case .dueDate:
-      base = { a, b in
-        switch (a.due, b.due) {
-        case let (la?, lb?) where la != lb: return la < lb
-        case (_?, nil):                     return true
-        case (nil, _?):                     return false
-        default:
-          return a.title.localizedCaseInsensitiveCompare(b.title) == .orderedAscending
-        }
-      }
-    case .dateAdded:
-      // Oldest first → newest sinks to the bottom (matches the "newest at
-      // the end of the list" feel of most task apps). Tasks missing
-      // `created` (legacy rows) fall through to title for stability.
-      base = { a, b in
-        switch (a.created, b.created) {
-        case let (la?, lb?) where la != lb: return la < lb
-        case (_?, nil):                     return true
-        case (nil, _?):                     return false
-        default:
-          return a.title.localizedCaseInsensitiveCompare(b.title) == .orderedAscending
-        }
-      }
-    }
-    return { a, b in
-      // Float tasks that are on Today (pin OR arrived scheduled/deadline),
-      // matching how membership is defined everywhere else — not just the pin.
-      let aToday = a.isOnToday, bToday = b.isOnToday
-      if aToday != bToday { return aToday }
-      let aSomeday = a.status == .someday, bSomeday = b.status == .someday
-      if aSomeday != bSomeday { return !aSomeday }
-      return base(a, b)
-    }
   }
 
   private var hideHistoricalDone: Bool {
@@ -1730,6 +1688,64 @@ struct TaskListView: View {
       }
     }
     apply(&items); apply(&review); apply(&doneToday)
+  }
+
+  // MARK: - Manual reorder (drag-and-drop)
+
+  /// Drop `draggedId` relative to `targetId` in the visible order. Directional:
+  /// dragging a row downward lands it just below the target, upward just above
+  /// — which also lets a downward drag onto the last row reach the bottom.
+  @discardableResult
+  private func moveTask(_ draggedId: String, onto targetId: String) -> Bool {
+    guard draggedId != targetId else { return false }
+    let ids = visibleItems.map(\.id)
+    guard let from = ids.firstIndex(of: draggedId),
+          let to = ids.firstIndex(of: targetId) else { return false }
+    var newIds = ids
+    newIds.remove(at: from)
+    let insertAt: Int
+    if from < to {
+      insertAt = (newIds.firstIndex(of: targetId).map { $0 + 1 }) ?? newIds.count
+    } else {
+      insertAt = newIds.firstIndex(of: targetId) ?? 0
+    }
+    newIds.insert(draggedId, at: min(insertAt, newIds.count))
+    applyManualOrder(draggedId: draggedId, orderedIds: newIds)
+    return true
+  }
+
+  /// Compute the dragged row's new `position` as the midpoint of its new
+  /// neighbours' order keys, update the list optimistically (animated), and
+  /// persist via the reorder mutation (which syncs through CloudKit).
+  private func applyManualOrder(draggedId: String, orderedIds: [String]) {
+    guard let i = orderedIds.firstIndex(of: draggedId) else { return }
+    func key(_ id: String) -> Double? { visibleItems.first { $0.id == id }?.orderKey }
+    let above = i > 0 ? key(orderedIds[i - 1]) : nil
+    let below = i < orderedIds.count - 1 ? key(orderedIds[i + 1]) : nil
+
+    let newPos: Double
+    switch (above, below) {
+    case let (a?, b?):
+      // No room left between neighbours (gaps exhausted by repeated inserts)
+      // — fall back to nudging just past the upper neighbour. Rare on the
+      // creation-instant scale these keys live on.
+      newPos = (b - a) > .ulpOfOne ? a + (b - a) / 2 : a + TaskOrder.gap
+    case let (a?, nil): newPos = a + TaskOrder.gap     // dropped at the bottom
+    case let (nil, b?): newPos = b - TaskOrder.gap     // dropped at the top
+    case (nil, nil):    return
+    }
+
+    Haptics.tick()
+    // Optimistic local reorder so the row animates into place immediately;
+    // the reorder mutation posts `.septenaTasksChanged`, and the reload lands
+    // on this same order.
+    if let idx = items.firstIndex(where: { $0.id == draggedId }) {
+      items[idx].position = newPos
+      withAnimation(.easeInOut(duration: 0.2)) {
+        items.sort { $0.orderKey != $1.orderKey ? $0.orderKey < $1.orderKey : $0.id < $1.id }
+      }
+    }
+    mutator.reorder(id: draggedId, toPosition: newPos)
   }
 
   // MARK: - Logged items section

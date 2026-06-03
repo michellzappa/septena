@@ -1,25 +1,6 @@
 import SwiftUI
 import SwiftData
 
-// MARK: - Sort menu items shared by Area / Project "…" menu
-
-/// The sort rows that prefix the project/area `…` menu — one per
-/// `TaskSort` case. Tapping one writes through to the global `taskSort`
-/// setting; the currently active mode renders with a leading checkmark
-/// (system `Menu` styling). Lives at file scope so both detail views share
-/// the same list.
-@ViewBuilder
-func sortMenuItems(taskSortRaw: Binding<String>) -> some View {
-  let current = TaskSort(rawValue: taskSortRaw.wrappedValue) ?? .dateAdded
-  ForEach(TaskSort.allCases) { mode in
-    Button {
-      taskSortRaw.wrappedValue = mode.rawValue
-    } label: {
-      Label(mode.label, systemImage: mode == current ? "checkmark" : mode.icon)
-    }
-  }
-}
-
 // MARK: - Notes field shared by Area / Project detail
 
 /// Multi-line notes editor with inline markdown preview when blurred.
@@ -108,7 +89,6 @@ struct AreaDetailView: View {
   @FocusState private var notesFocused: Bool
   /// Global task sort — read/written here so flipping it from this menu
   /// re-renders the embedded TaskListView, which reads the same key.
-  @AppStorage(SettingsKey.taskSort) private var taskSortRaw: String = TaskSort.dateAdded.rawValue
 
   init(area: Area) {
     self.area = area
@@ -164,15 +144,6 @@ struct AreaDetailView: View {
     }
     .background(Theme.paperBackground)
     .septenaInlineTitle()
-    .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        Menu {
-          sortMenuItems(taskSortRaw: $taskSortRaw)
-        } label: {
-          Image(systemName: "ellipsis.circle").foregroundStyle(Theme.inkSecondary)
-        }
-      }
-    }
     .alert("Error", isPresented: Binding(
       get: { errorMessage != nil },
       set: { if !$0 { errorMessage = nil } }
@@ -310,7 +281,6 @@ struct ProjectDetailView: View {
   /// Global task sort — kept in sync via @AppStorage so flipping it from
   /// this menu instantly re-renders the embedded TaskListView (which reads
   /// the same key).
-  @AppStorage(SettingsKey.taskSort) private var taskSortRaw: String = TaskSort.dateAdded.rawValue
 
   init(project: Project) {
     self.project = project
@@ -354,8 +324,6 @@ struct ProjectDetailView: View {
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         Menu {
-          sortMenuItems(taskSortRaw: $taskSortRaw)
-          Divider()
           Button {
             showingRepoEditor = true
           } label: {

@@ -41,6 +41,10 @@ protocol TasksBackend: AnyObject {
   func setRecurrence(id: String, recurrence: Recurrence?)
   func moveToArea(id: String, area: String?)
   func moveToProject(id: String, project: String?)
+  /// Set a task's manual order position (Things-style drag-to-reorder). The
+  /// caller computes the value as the midpoint of the new neighbours' order
+  /// keys; we just persist + sync it.
+  func reorder(id: String, toPosition position: Double)
 }
 
 // MARK: - CloudKit backend
@@ -132,6 +136,9 @@ final class CloudKitTasksBackend: TasksBackend {
     let id = uniqueTaskID()
     let todayIso = SeptenaDate.today
     let effectiveArea = project != nil ? nil : area
+    // New tasks land at the top of the list. An explicit position (synced)
+    // rather than relying on the createdAt fallback, so other devices place
+    // it at the top too instead of at the bottom (newest createdAt).
     let entity = TaskEntity(
       id: id,
       title: title,
@@ -144,6 +151,7 @@ final class CloudKitTasksBackend: TasksBackend {
       area: effectiveArea,
       project: project,
       notes: (notes?.isEmpty == false) ? notes : nil,
+      position: TaskOrder.topPosition(in: context),
       pendingSync: true,
       source: TaskSource.app,            // positive provenance for app-authored rows
       sourceClient: currentAppClientLabel,
@@ -331,5 +339,12 @@ final class CloudKitTasksBackend: TasksBackend {
     if project != nil { entity.area = nil }
     entity.pendingSync = true
     commitAndPush(entity, op: "moveToProject")
+  }
+
+  func reorder(id: String, toPosition position: Double) {
+    guard let entity = fetch(id: id) else { return }
+    entity.position = position
+    entity.pendingSync = true
+    commitAndPush(entity, op: "reorder")
   }
 }

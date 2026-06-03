@@ -35,11 +35,6 @@ enum SettingsKey {
   /// Same key string is referenced by `PlausibleClient.consentKey` so the
   /// guard inside the actor and the @AppStorage binding stay in sync.
   static let shareUsageData   = "septena.privacy.shareUsageData"
-  /// Global sort applied to task lists inside a project or area. Stored as
-  /// the raw value of `TaskSort`. Lives in UserDefaults rather than per-list
-  /// state — there's no per-project manual order in this app, so one global
-  /// choice is the whole sort surface.
-  static let taskSort         = "septena.task.sort"
   /// Which renderer the homepage uses. Raw value of `HomepageLayoutMode`.
   /// Default (`tiles`) preserves the existing card-grid behaviour, so
   /// users with no setting see no change.
@@ -209,30 +204,6 @@ enum AppIconOption: String, CaseIterable, Identifiable {
     return AppIconOption(rawValue: name) ?? .default
   }
   #endif
-}
-
-/// Sort modes for tasks within a project or area detail view. Areas and
-/// projects in the sidebar have manual drag-reorder, but tasks inside them
-/// do not — so these two derived orderings are the entire sort surface.
-enum TaskSort: String, CaseIterable, Identifiable {
-  case dateAdded
-  case alphabetical
-  case dueDate
-  var id: String { rawValue }
-  var label: String {
-    switch self {
-    case .dateAdded:    return "Sort by Date Added"
-    case .alphabetical: return "Sort by Name"
-    case .dueDate:      return "Sort by Due Date"
-    }
-  }
-  var icon: String {
-    switch self {
-    case .dateAdded:    return "clock"
-    case .alphabetical: return "textformat"
-    case .dueDate:      return "calendar"
-    }
-  }
 }
 
 // MARK: - Store

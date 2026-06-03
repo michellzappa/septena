@@ -79,6 +79,10 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   var acknowledgedAt: Date? = nil
   /// Canonical creation instant. Drives the cue decay window.
   var createdAt: Date = .distantPast
+  /// User-controlled manual order (see `TaskEntity.position` / `TaskOrder`).
+  /// Rides alongside the entity, not the wire — set in `init(_:)`. `0` = never
+  /// dragged (order falls back to `createdAt`).
+  var position: Double = 0
 
   /// True while this row should glow as a freshly agent-created item the
   /// user hasn't engaged yet. Provenance (`source`) is permanent; this cue

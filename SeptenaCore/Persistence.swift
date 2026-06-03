@@ -36,10 +36,16 @@ final class TaskEntity {
   /// Bumped every time we apply a server payload. Lets the syncer detect
   /// rows that the latest pull didn't touch (= server-side deletions).
   var lastSyncedAt: Date
-  /// Position in the most recent server response. Cache reads sort by this
-  /// so the painted-from-cache order matches what the network refresh will
-  /// produce — otherwise rows visibly reshuffle on every cold open.
+  /// Legacy server-response position. Superseded by `position` for ordering;
+  /// kept so older code/migrations still compile. No longer drives list order.
   var sortIndex: Int
+  /// User-controlled manual order (Things-style). The single source of truth
+  /// for how tasks are arranged in every list — lists render strictly by this
+  /// (ascending), so nothing re-sorts on its own. A `Double` so a drag can
+  /// insert at the midpoint of its two neighbours without renumbering the
+  /// rest; `TaskOrder.normalize` re-spaces and backfills (0 = unset) and is
+  /// synced via CloudKit so the order matches across devices.
+  var position: Double = 0
   /// True while one or more `OutboxEntity` rows reference this task. The
   /// Syncer will not overwrite local fields on a row with `pendingSync ==
   /// true` — we don't want a server snapshot taken before the user's
@@ -103,6 +109,7 @@ final class TaskEntity {
        recurrenceAfterCompletion: Bool = true,
        lastSyncedAt: Date = .distantPast,
        sortIndex: Int = 0,
+       position: Double = 0,
        pendingSync: Bool = false,
        pendingDeletion: Bool = false,
        updatedAt: String? = nil,
@@ -129,6 +136,7 @@ final class TaskEntity {
     self.recurrenceAfterCompletion = recurrenceAfterCompletion
     self.lastSyncedAt = lastSyncedAt
     self.sortIndex = sortIndex
+    self.position = position
     self.pendingSync = pendingSync
     self.pendingDeletion = pendingDeletion
     self.updatedAt = updatedAt
@@ -1198,6 +1206,45 @@ extension SeptenaTask {
     sourceClient = e.sourceClient
     acknowledgedAt = e.acknowledgedAt
     createdAt = e.createdAt
+    position = e.position
+  }
+
+  /// Manual-order sort key — see `TaskOrder.key`.
+  var orderKey: Double { TaskOrder.key(position: position, createdAt: createdAt) }
+}
+
+/// Manual task ordering (Things-style). Lists render strictly by `key`, so a
+/// task only moves when the user drags it. We deliberately avoid a synced
+/// position backfill: an un-dragged task derives its key from `createdAt`,
+/// which every device already agrees on, so the baseline order is consistent
+/// without writing anything. Only an explicit drag (or a new task's top
+/// placement) stores a `position`, which then syncs via CloudKit.
+enum TaskOrder {
+  /// Default spacing between manual positions. Large relative to nothing in
+  /// particular — `Double` precision means midpoint inserts effectively never
+  /// run out of room on the creation-instant scale these keys live on.
+  static let gap: Double = 1024
+
+  /// Order key: the explicit `position` once set (non-zero), otherwise the
+  /// creation instant. `0` is the "never dragged" sentinel — no real task is
+  /// created at the reference date, so this never collides with a live value.
+  static func key(position: Double, createdAt: Date) -> Double {
+    position != 0 ? position : createdAt.timeIntervalSinceReferenceDate
+  }
+  static func key(_ e: TaskEntity) -> Double {
+    key(position: e.position, createdAt: e.createdAt)
+  }
+
+  /// A position that sorts above every live task, so a freshly created task
+  /// lands at the top of the list (matching the existing insert-at-top feel).
+  @MainActor
+  static func topPosition(in context: ModelContext) -> Double {
+    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
+    let minKey = rows
+      .filter { !$0.pendingDeletion && $0.deletedAt == nil }
+      .map { key($0) }
+      .min()
+    return (minKey ?? 0) - gap
   }
 }
 
@@ -2569,12 +2616,19 @@ enum LocalCache {
   @MainActor
   static func tasks(in context: ModelContext,
                     filter: TaskFilter) -> [SeptenaTask] {
-    let descriptor = FetchDescriptor<TaskEntity>(
-      sortBy: [SortDescriptor(\.sortIndex), SortDescriptor(\.id)]
-    )
-    guard let rows = try? context.fetch(descriptor) else { return [] }
+    // Manual order is the single source of truth (Things-style): order by
+    // `TaskOrder.key` — the explicit `position` once a row has been dragged,
+    // otherwise its creation instant. Nothing re-sorts by status, name, or
+    // date, so a task stays exactly where the user put it. Sorted in memory
+    // (not the FetchDescriptor) because the key is computed, and `id` is the
+    // stable tie-break for rows that share a key.
+    guard let rows = try? context.fetch(FetchDescriptor<TaskEntity>()) else { return [] }
+    let ordered = rows.sorted { a, b in
+      let ka = TaskOrder.key(a), kb = TaskOrder.key(b)
+      return ka != kb ? ka < kb : a.id < b.id
+    }
     let today = SeptenaDate.today
-    return rows.compactMap { e -> SeptenaTask? in
+    return ordered.compactMap { e -> SeptenaTask? in
       // Hide rows the user has deleted locally; the outbox drainer will
       // either confirm the deletion (row removed) or resurrect them if
       // the server rejects.

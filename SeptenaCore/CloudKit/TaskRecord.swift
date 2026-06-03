@@ -50,6 +50,11 @@ static let source = "source"
 static let sourceClient = "sourceClient"
 static let acknowledgedAt = "acknowledgedAt"
 static let createdAt = "createdAt"
+    /// User-controlled manual order (Things-style drag-to-reorder). DOUBLE.
+    /// Only written once a task has been explicitly placed (dragged, or a new
+    /// task's top placement); un-dragged rows order by `createdAt` and leave
+    /// this absent. See `TaskOrder`.
+static let position = "position"
 
     // Over-provisioned for schema flexibility post-Production deploy.
     // Adding fields later is allowed but slow to roll out; renaming /
@@ -126,6 +131,13 @@ extension TaskEntity {
       record[TaskCloudKitSchema.Field.createdAt] = createdAt as NSDate
     }
 
+    // Manual order. Only write an explicit position (0 = never dragged, which
+    // orders by createdAt instead) so we don't author a meaningless 0 onto
+    // every record.
+    if position != 0 {
+      record[TaskCloudKitSchema.Field.position] = position
+    }
+
     return record
   }
 }
@@ -164,6 +176,9 @@ func apply(_ record: CKRecord) {
     sourceClient = optionalTaskString(record[TaskCloudKitSchema.Field.sourceClient])
     acknowledgedAt = record[TaskCloudKitSchema.Field.acknowledgedAt] as? Date
     if let v = record[TaskCloudKitSchema.Field.createdAt] as? Date { createdAt = v }
+    // Manual order. Absent on un-dragged rows (and gateway-authored ones) →
+    // leave at 0 so the createdAt fallback orders them.
+    if let v = record[TaskCloudKitSchema.Field.position] as? Double { position = v }
 
     captureCloudKitSystemFields(from: record)
   }
