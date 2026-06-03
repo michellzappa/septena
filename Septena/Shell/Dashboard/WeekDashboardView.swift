@@ -11,6 +11,7 @@ import EventKit
 
 enum WeekDestination: String, Hashable, Identifiable {
   case habits, chores, training, supplements, sleep, nutrition
+  case hydration
   case groceries, caffeine, cannabis, body, gut
   case mood
   case activity
@@ -113,6 +114,14 @@ struct WeekDashboardView: View {
   /// standalone sheet (separate from `sheetDest` because Mood needs both
   /// the destination route and the standalone check-in flow).
   @State private var presentingMoodCheckin = false
+  /// Hydration tile state. Today's total ml + a 90-day daily series
+  /// (oldest→newest). Derived from Nutrition's water entries — Hydration
+  /// owns no entity (see HydrationPlugin / ChecklistMirror.loadHydrationDailyMl).
+  @State private var hydrationToday: Int = 0
+  @State private var hydrationHistory: [Int] = []
+  /// Daily target shared with HydrationDestinationView via the same
+  /// AppStorage key, so the tile's progress matches the section's.
+  @AppStorage("hydration.dailyTargetMl") private var hydrationTargetMl: Int = 2000
   @State private var sheetDest: WeekDestination? = nil
   /// Today-scoped collections kept in state so DayTimelineView can read
   /// them. NextItemsModel already covers habits/supplements/chores and
@@ -156,6 +165,10 @@ struct WeekDashboardView: View {
     if let v = ResponseCache.load([GutHistoryPoint].self, forKey: CacheKey.gutHistory) { _gutHistory = State(initialValue: v) }
     if let v = ResponseCache.load(MoodDayResponse.self, forKey: CacheKey.moodToday) { _moodToday = State(initialValue: v) }
     if let v = ResponseCache.load([MoodHistoryPoint].self, forKey: CacheKey.moodHistory) { _moodHistory = State(initialValue: v) }
+    if let v = ResponseCache.load([Int].self, forKey: CacheKey.hydrationHistory) {
+      _hydrationHistory = State(initialValue: v)
+      _hydrationToday = State(initialValue: v.last ?? 0)
+    }
     if let v = ResponseCache.load([ExerciseEntry].self, forKey: CacheKey.recentTraining) { _recentTraining = State(initialValue: v) }
     if let v = ResponseCache.load(MacroColors.self, forKey: CacheKey.macroColors) { _macroColors = State(initialValue: v) }
   }
@@ -393,6 +406,7 @@ struct WeekDashboardView: View {
     static let gutHistory         = "week.gutHistory"
     static let moodToday          = "week.moodToday"
     static let moodHistory        = "week.moodHistory"
+    static let hydrationHistory   = "week.hydrationHistory"
     static let recentTraining     = "week.recentTraining"
     static let macroColors        = "week.macroColors"
   }
@@ -428,6 +442,10 @@ struct WeekDashboardView: View {
     if let v = ResponseCache.load([GutHistoryPoint].self, forKey: CacheKey.gutHistory) { gutHistory = v }
     if let v = ResponseCache.load(MoodDayResponse.self, forKey: CacheKey.moodToday) { moodToday = v }
     if let v = ResponseCache.load([MoodHistoryPoint].self, forKey: CacheKey.moodHistory) { moodHistory = v }
+    if let v = ResponseCache.load([Int].self, forKey: CacheKey.hydrationHistory) {
+      hydrationHistory = v
+      hydrationToday = v.last ?? 0
+    }
     if let v = ResponseCache.load([ExerciseEntry].self, forKey: CacheKey.recentTraining) { recentTraining = v }
     if let v = ResponseCache.load(MacroColors.self, forKey: CacheKey.macroColors) { macroColors = v }
   }
@@ -617,6 +635,10 @@ struct WeekDashboardView: View {
     ResponseCache.save(mT, forKey: CacheKey.moodToday)
     moodHistory = mH.daily
     ResponseCache.save(mH.daily, forKey: CacheKey.moodHistory)
+    let hydration = ChecklistMirror.loadHydrationDailyMl(context: modelContext, days: 90)
+    hydrationHistory = hydration
+    hydrationToday = hydration.last ?? 0
+    ResponseCache.save(hydration, forKey: CacheKey.hydrationHistory)
     let wR = await wRows
     if let wR {
       let sorted = wR.sorted { $0.date > $1.date }
@@ -792,6 +814,10 @@ struct WeekDashboardView: View {
     for section in AddInfoSection.allCases where section != .tasks {
       await refresh(section: section)
     }
+    // Hydration isn't an AddInfoSection (it writes through Nutrition), so
+    // it's refreshed explicitly after the loop — otherwise water logged on
+    // another device would never repaint the tile.
+    await refreshHydration()
   }
 
   private func sinceDate(daysBack: Int) -> String {
@@ -925,6 +951,7 @@ struct WeekDashboardView: View {
     case .chores:      choresQuickAddMenu
     case .supplements: supplementsQuickAddMenu
     case .nutrition:   nutritionQuickAddMenu
+    case .hydration:   hydrationQuickAddMenu
     case .groceries:   groceriesQuickAddMenu
     case .caffeine:    caffeineQuickAddMenu
     case .cannabis:    cannabisQuickAddMenu
@@ -972,6 +999,7 @@ struct WeekDashboardView: View {
     case .supplements: supplementsTile
     case .sleep:       sleepTile
     case .nutrition:   nutritionTile
+    case .hydration:   hydrationTile
     case .groceries:   groceriesTile
     case .caffeine:    caffeineTile
     case .cannabis:    cannabisTile
@@ -1002,6 +1030,7 @@ struct WeekDashboardView: View {
     case .supplements: return supplementsDomainData()
     case .sleep:       return sleepDomainData()
     case .nutrition:   return nutritionDomainData()
+    case .hydration:   return hydrationDomainData()
     case .groceries:   return groceriesDomainData()
     case .caffeine:    return caffeineDomainData()
     case .cannabis:    return cannabisDomainData()
@@ -2246,6 +2275,103 @@ struct WeekDashboardView: View {
     let h = ChecklistMirror.loadMoodHistory(context: modelContext, days: 90).daily
     moodHistory = h
     ResponseCache.save(h, forKey: CacheKey.moodHistory)
+  }
+
+  // MARK: - Hydration
+
+  // Hydration — today's water total vs the daily target + a 7-day intake
+  // histogram. Backed by Nutrition's water entries (no entity of its own),
+  // so like Mood it routes around `AddInfoSection` and refreshes itself
+  // after a quick-add commit.
+  private var hydrationTile: some View {
+    let accent = theme.color(for: "hydration")
+    let bars = Array(hydrationHistory.suffix(7))
+    return ModuleTile(
+      title: "Hydration",
+      accent: accent,
+      stats: [
+        .init(label: "Today",  value: "\(hydrationToday)", unit: "ml"),
+        .init(label: "Target", value: "\(hydrationTargetMl)", unit: "ml"),
+      ],
+      progress: .init(label: "Today / target",
+                      current: Double(min(hydrationToday, hydrationTargetMl)),
+                      target: Double(max(hydrationTargetMl, 1)),
+                      unit: "ml"),
+      history: .init(label: "7-day intake",
+                     values: bars.isEmpty
+                       ? Array(repeating: 0, count: 7) : bars)
+    )
+    .contentShape(Rectangle())
+    .onTapGesture { sheetDest = .hydration }
+    .contextMenu { hydrationQuickAddMenu }
+  }
+
+  /// Preset glasses commit a water-only Nutrition entry at the current
+  /// time. Custom amounts live in the destination view's sheet — the
+  /// menu keeps to the three calibrated presets for one-tap logging.
+  @ViewBuilder private var hydrationQuickAddMenu: some View {
+    ForEach([250, 330, 500], id: \.self) { ml in
+      Button {
+        commitHydration(ml: ml)
+      } label: {
+        Label("Add \(ml) ml", systemImage: "drop.fill")
+      }
+    }
+  }
+
+  private func hydrationDomainData() -> HomepageDomainData {
+    HomepageDomainData(
+      domain: .hydration,
+      title: "Hydration",
+      accent: theme.color(for: "hydration"),
+      headline: "\(hydrationToday) of \(hydrationTargetMl) ml",
+      headlineStats: [
+        .init(label: "Today",  value: "\(hydrationToday)", unit: "ml"),
+        .init(label: "Target", value: "\(hydrationTargetMl)", unit: "ml"),
+      ],
+      progress: .init(label: "Today / target",
+                      current: Double(min(hydrationToday, hydrationTargetMl)),
+                      target: Double(max(hydrationTargetMl, 1)),
+                      unit: "ml"),
+      history: .bars(hydrationHistory.isEmpty
+                       ? Array(repeating: 0, count: 90) : hydrationHistory),
+      tap: .openSheet(.hydration)
+    )
+  }
+
+  /// Log a glass from the tile's quick-add menu. Mirrors the destination
+  /// view's commit (water-only Nutrition entry + bloom flourish scaled to
+  /// the amount), then self-refreshes the tile.
+  private func commitHydration(ml: Int) {
+    let accent = theme.color(for: "hydration")
+    let intensity = min(1.4, max(0.6, Double(ml) / 500))
+    SectionLog.newLog(
+      section: "hydration",
+      accent: accent,
+      intensity: intensity,
+      announce: "Logged \(ml) ml of water.",
+      logCommit: logCommit
+    ) {
+      _ = SeptenaServices.shared.nutritionMutator.addEntry(
+        loggedAt: .now,
+        emoji: "💧",
+        foods: HydrationPlugin.waterFoodsMarker,
+        mealType: nil,
+        source: "manual",
+        waterMl: Double(ml)
+      )
+      Task { await refreshHydration() }
+    }
+  }
+
+  /// Reload hydration state after an in-app commit. Hydration doesn't
+  /// route through `AddInfoSection.notifyTilesChanged`, so — like Mood —
+  /// it refreshes itself from the Nutrition mirror.
+  private func refreshHydration() async {
+    let series = ChecklistMirror.loadHydrationDailyMl(context: modelContext, days: 90)
+    hydrationHistory = series
+    hydrationToday = series.last ?? 0
+    ResponseCache.save(series, forKey: CacheKey.hydrationHistory)
   }
 }
 

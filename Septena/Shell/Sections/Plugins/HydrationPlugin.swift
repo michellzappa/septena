@@ -93,31 +93,57 @@ private struct HydrationDestinationView: View {
   @Environment(SectionTheme.self) private var theme
   @Environment(\.modelContext) private var modelContext
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
+  @Environment(DayClock.self) private var clock
   @AppStorage("hydration.dailyTargetMl") private var targetMl: Int = 2000
-  @State private var todayMl: Int = 0
+  /// Total ml on the currently-viewed day (today, or a past day reached
+  /// via the drawer's time-travel strip). Includes water recorded on
+  /// meals, matching the daily-total convention.
+  @State private var dayMl: Int = 0
   @State private var entries: [NutritionEntryEntity] = []
   @State private var showCustom = false
+  /// The day the drawer is viewing. Bound to `SectionDrawer.currentDate`
+  /// so the user can step prev/next through past days; `reload()`
+  /// re-fetches for the selected day. Defaults to today.
+  @State private var viewingDate: String = SeptenaDate.today
 
   private var accent: Color { theme.color(for: "hydration") }
   private var mutator: NutritionMutator { SeptenaServices.shared.nutritionMutator }
 
+  /// On a past day the quick-add presets, the live progress summary, and
+  /// the target stepper are suppressed — those are "today" affordances.
+  /// A past day is a read-only review of that day's logged glasses.
+  private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
+
   private var progressFraction: Double {
     guard targetMl > 0 else { return 0 }
-    return min(1, Double(todayMl) / Double(targetMl))
+    return min(1, Double(dayMl) / Double(targetMl))
   }
 
   var body: some View {
-    List {
-      summary
-      quickAdd
-      log
-      preferences
+    SectionDrawer(sectionKey: "hydration",
+                  title: "Hydration",
+                  currentDate: $viewingDate) {
+      if isViewingToday {
+        summaryCard
+        quickAddCard
+      } else {
+        pastDayHeader
+      }
+      logCard
+      if isViewingToday {
+        preferencesCard
+      }
     }
-    .navigationTitle("Hydration")
-    #if os(iOS)
-    .navigationBarTitleDisplayMode(.large)
-    #endif
+    .trackScreen("hydration")
+    .tint(accent)
     .task { reload() }
+    .onChange(of: viewingDate) { _, _ in reload() }
+    // Roll the viewing pointer forward at midnight only if the user was
+    // already on "today"; otherwise leave their selection put.
+    .onChange(of: clock.today) { _, newToday in
+      if isViewingToday { viewingDate = newToday }
+      reload()
+    }
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in reload() }
     .sheet(isPresented: $showCustom) {
       CustomAmountSheet(accent: accent) { ml in
@@ -129,11 +155,11 @@ private struct HydrationDestinationView: View {
   // MARK: Summary
 
   @ViewBuilder
-  private var summary: some View {
-    Section {
+  private var summaryCard: some View {
+    DrawerSection("Today") {
       VStack(alignment: .leading, spacing: 10) {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-          Text("\(todayMl)").font(.system(.largeTitle, design: .rounded).weight(.semibold))
+          Text("\(dayMl)").font(.system(.largeTitle, design: .rounded).weight(.semibold))
           Text("ml").font(.body).foregroundStyle(.secondary)
           Spacer()
           Text("of \(targetMl)")
@@ -144,9 +170,23 @@ private struct HydrationDestinationView: View {
         ProgressView(value: progressFraction)
           .tint(accent)
       }
-      .padding(.vertical, 4)
-    } header: {
-      Text("Today")
+    }
+  }
+
+  /// Compact total shown at the top of a past day (no progress vs target —
+  /// the target is a "today" goal, meaningless retro).
+  @ViewBuilder
+  private var pastDayHeader: some View {
+    DrawerSection {
+      HStack(alignment: .firstTextBaseline, spacing: 6) {
+        Text("\(dayMl)").font(.system(.title, design: .rounded).weight(.semibold))
+        Text("ml").font(.body).foregroundStyle(.secondary)
+        Spacer()
+        Text(viewingDate)
+          .font(.callout)
+          .foregroundStyle(.secondary)
+          .monospacedDigit()
+      }
     }
   }
 
@@ -155,8 +195,8 @@ private struct HydrationDestinationView: View {
   private let presets: [Int] = [250, 330, 500]
 
   @ViewBuilder
-  private var quickAdd: some View {
-    Section("Quick add") {
+  private var quickAddCard: some View {
+    DrawerSection("Quick add") {
       HStack(spacing: 10) {
         ForEach(presets, id: \.self) { ml in
           Button { commit(ml: ml) } label: {
@@ -185,28 +225,20 @@ private struct HydrationDestinationView: View {
   // MARK: Log
 
   @ViewBuilder
-  private var log: some View {
-    Section("Log") {
+  private var logCard: some View {
+    DrawerSection(isViewingToday ? "Log" : nil, padding: .none) {
       if entries.isEmpty {
-        Text("No water logged yet today.")
+        Text(isViewingToday ? "No water logged yet today." : "No water logged on this day.")
           .foregroundStyle(.secondary)
+          .padding(.horizontal, 14)
+          .padding(.vertical, 12)
       } else {
         ForEach(entries) { e in
-          HStack {
-            Text("💧 \(Int(e.waterMl ?? 0)) ml")
-              .monospacedDigit()
-            Spacer()
-            Text(timeString(e.loggedAt))
-              .font(.caption.monospacedDigit())
-              .foregroundStyle(.secondary)
-          }
-          .swipeActions(edge: .trailing) {
-            Button(role: .destructive) {
-              delete(e)
-            } label: {
-              Label("Delete", systemImage: "trash")
-            }
-          }
+          LogEntryRow(
+            title: "💧 \(Int(e.waterMl ?? 0)) ml",
+            trailing: timeString(e.loggedAt),
+            onDelete: { delete(e) }
+          )
         }
       }
     }
@@ -215,8 +247,8 @@ private struct HydrationDestinationView: View {
   // MARK: Preferences
 
   @ViewBuilder
-  private var preferences: some View {
-    Section("Daily target") {
+  private var preferencesCard: some View {
+    DrawerSection("Daily target") {
       Stepper(value: $targetMl, in: 500...5000, step: 250) {
         HStack {
           Text("Target")
@@ -261,14 +293,13 @@ private struct HydrationDestinationView: View {
   }
 
   private func reload() {
-    let today = SeptenaDate.today
     let descriptor = FetchDescriptor<NutritionEntryEntity>(
       sortBy: [SortDescriptor(\.loggedAt, order: .reverse)]
     )
     let all = (try? modelContext.fetch(descriptor)) ?? []
-    let dayEntries = all.filter { dayString($0.loggedAt) == today }
-    // Today's total includes ALL water (water-only logs + meal-attached water)
-    todayMl = dayEntries.reduce(0) { $0 + Int($1.waterMl ?? 0) }
+    let dayEntries = all.filter { dayString($0.loggedAt) == viewingDate }
+    // The day's total includes ALL water (water-only logs + meal-attached water)
+    dayMl = dayEntries.reduce(0) { $0 + Int($1.waterMl ?? 0) }
     // Log shows only water-only entries — the meals already appear in Nutrition
     entries = dayEntries.filter { isHydrationOnly($0) }
   }

@@ -28,6 +28,28 @@ import SwiftUI
 // user has a `SectionEntity` for the key. Until proper install UX
 // lands, newly-shipped sections (e.g. `mood`) are backfilled by
 // `SettingsMirror.seedManifestSectionIfMissing` at `SeptenaServices.start`.
+//
+// ─────────────────────────────────────────────────────────────────────
+// A manifest row is only the FIRST of several surfaces a section spans.
+// Adding a row here makes the section appear in Settings and (if
+// `supportsDashboard`) reserves it a slot — but the dashboard TILE,
+// quick-add, Today timeline, and time travel are each wired separately.
+// See `docs/ADDING_A_SECTION.md` for the full surface checklist and the
+// "is this section fully fleshed out?" audit grid. Quick map:
+//
+//   • Catalog row + icon ............ here (`SectionManifest.all`, `iconByKey`)
+//   • Behaviour (view, skill, …) .... `Septena/Shell/Sections/Plugins/<X>Plugin.swift`
+//                                     + register in `SectionRegistry.all`
+//   • Dashboard tile ................ `HomepageDomain` case + `defaultOrder`,
+//                                     then `WeekDashboardView` (tile, domainData,
+//                                     quickAddMenu, state, cache, loadAll)
+//   • Settings + ordering ........... automatic once the row is seeded
+//   • Today timeline ................ opt in via `todayCapableKeys` (below)
+//   • Time travel ................... opt in via `timeTravelCapableKeys` (below)
+//                                     AND thread `SectionDrawer(currentDate:)`
+//
+// The classic gap: a row + destination but NO `HomepageDomain` case —
+// the section is reachable from Settings yet never renders a tile.
 
 public struct SectionManifest: Sendable, Hashable, Identifiable {
   /// Stable key. Matches the webapp's `sections/manifest.json` and the
@@ -97,7 +119,7 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
   /// the date strip.
   public static let timeTravelCapableKeys: Set<String> = [
     "caffeine", "cannabis", "gut", "nutrition",
-    "habits", "supplements", "mood",
+    "habits", "supplements", "mood", "hydration",
   ]
 
   /// Whether this section's destination should render the date strip
@@ -332,10 +354,11 @@ public extension SectionManifest {
     // Hydration — water-only log. UX over existing nutrition data:
     // every entry is a NutritionEntryEntity with `foods: ["Water"]`,
     // `waterMl > 0`, and macros at 0. Logged via the hydration quick-
-    // add affordances; surfaces in Hydration's destination view and
-    // Today timeline. The same waterMl field on a real meal entry
-    // still counts toward the daily total without showing as a
-    // separate hydration row.
+    // add affordances; fully fleshed out across surfaces — dashboard
+    // tile (today ml vs target + 7-day intake), tile context-menu
+    // quick-add, time-travel destination, Today timeline. The same
+    // waterMl field on a real meal entry still counts toward the daily
+    // total without showing as a separate hydration row.
     .init(
       key: "hydration",
       defaultLabel: "Hydration",

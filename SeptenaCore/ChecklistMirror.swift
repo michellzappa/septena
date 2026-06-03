@@ -1383,6 +1383,37 @@ enum ChecklistMirror {
     loadNutritionEntries(context: context, since: SeptenaDate.today)
   }
 
+  /// Daily water totals (ml) for the trailing `days`, oldest → newest,
+  /// one bucket per calendar day (length == `days`, today is the last
+  /// element). Days with no water logged read 0.
+  ///
+  /// Hydration has no entity of its own — it's a UX layer over Nutrition
+  /// (see `HydrationPlugin`). The total here intentionally sums `waterMl`
+  /// across *every* nutrition entry, so water recorded on a real meal
+  /// counts toward the day's hydration without showing as a separate
+  /// hydration row. Computed directly off `NutritionEntryEntity` (not the
+  /// day-summary cache) so a freshly-bootstrapped device still reports.
+  static func loadHydrationDailyMl(context: ModelContext, days: Int) -> [Int] {
+    let today = SeptenaDate.today
+    guard days > 0, let todayDate = SeptenaDate.parse(today) else { return [] }
+    let cal = Calendar.current
+    // Oldest → newest list of ISO day strings spanning the window.
+    var dayKeys: [String] = []
+    for offset in stride(from: days - 1, through: 0, by: -1) {
+      if let d = cal.date(byAdding: .day, value: -offset, to: todayDate),
+         let s = SeptenaDate.format(d) {
+        dayKeys.append(s)
+      }
+    }
+    let startStr = dayKeys.first ?? today
+    let entries = loadNutritionEntries(context: context, since: startStr)
+    var mlByDate: [String: Int] = [:]
+    for e in entries {
+      if let w = e.waterMl, w > 0 { mlByDate[e.date, default: 0] += Int(w) }
+    }
+    return dayKeys.map { mlByDate[$0] ?? 0 }
+  }
+
   static func loadNutritionSummaries(context: ModelContext, days: Int) -> [NutritionDailySummaryEntity] {
     let today = SeptenaDate.today
     guard let todayDate = SeptenaDate.parse(today) else { return [] }
