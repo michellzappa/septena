@@ -291,8 +291,9 @@ private struct NewTaskSheet: View {
     NavigationStack {
       Form {
         Section {
-          TextField("Title", text: $title, axis: .vertical)
+          TextField("Title", text: $title)
             .focused($titleFocused)
+            .submitLabel(.done)
             .onSubmit(add)
         }
         Section {
