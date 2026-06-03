@@ -37,7 +37,6 @@ struct TasksDestinationView: View {
     SectionDrawer(sectionKey: "tasks",
                   title: "Tasks",
                   onLog: { _ in creating = true }) {
-      summary
       if !openTasks.isEmpty {
         DrawerSection("Today", padding: .none) {
           ForEach(openTasks) { task in
@@ -89,18 +88,6 @@ struct TasksDestinationView: View {
         .presentationDragIndicator(.visible)
         #endif
     }
-  }
-
-  // MARK: - Header
-
-  private var summary: some View {
-    let overdue = openTasks.filter(isOverdue).count
-    var stats: [Stat] = [Stat(value: "\(openTasks.count)", label: "to do", tint: accent)]
-    if overdue > 0 {
-      stats.append(Stat(value: "\(overdue)", label: "overdue", tint: Theme.overdueRed))
-    }
-    stats.append(Stat(value: "\(doneTasks.count)", label: "done"))
-    return DrawerSection { StatStrip(stats: stats) }
   }
 
   // MARK: - Data

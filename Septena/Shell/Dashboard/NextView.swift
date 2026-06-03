@@ -16,7 +16,7 @@ struct NextView: View {
       VStack(alignment: .leading, spacing: 0) {
         // Title removed — the tab bar already labels this view.
 
-        if model.hasLoaded && !model.hasAnyOpen && !model.hasAnyDone
+        if model.hasLoaded && !model.hasAnyOpen
             && tasksModel.openTasks.isEmpty
             && suggestionsModel.suggestions.isEmpty {
           Text("Nothing here yet")
@@ -32,15 +32,9 @@ struct NextView: View {
 
         NextOpenSection(model: model)
 
-        if model.hasAnyDone {
-          Text("Done Today")
-            .font(.septenaSectionTitle)
-            .foregroundStyle(Theme.inkPrimary)
-            .padding(.horizontal, Theme.hPadding)
-            .padding(.top, Theme.sectionSpacing)
-            .padding(.bottom, 6)
-          NextDoneSection(model: model)
-        }
+        // Completed chores/habits/supplements fade out in place after the
+        // settle beat (no "Done" strip to slide down into) — same vanish
+        // behaviour as today's tasks above.
 
         Spacer(minLength: 140)
       }

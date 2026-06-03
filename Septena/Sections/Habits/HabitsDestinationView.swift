@@ -42,11 +42,9 @@ struct HabitsDestinationView: View {
                   onLog: { _ in creating = true },
                   currentDate: $viewingDate) {
       if isViewingToday {
-        summary
         ForEach(model.habitBuckets, id: \.self) { bucket in
           bucketSection(bucket)
         }
-        doneSection
         if !history.isEmpty {
           ChecklistHeatmapSection(
             title: "Habit consistency",
@@ -177,19 +175,6 @@ struct HabitsDestinationView: View {
 
   // MARK: - Sections
 
-  private var summary: some View {
-    let total = model.habits.count
-    let done = model.habits.filter { $0.done }.count
-    let skipped = model.habits.filter { $0.skipped }.count
-    var stats: [Stat] = [
-      Stat(value: "\(done)/\(total)", label: "done today", tint: accent),
-    ]
-    if skipped > 0 {
-      stats.append(Stat(value: "\(skipped)", label: "skipped"))
-    }
-    return DrawerSection { StatStrip(stats: stats) }
-  }
-
   @ViewBuilder
   private func bucketSection(_ bucket: String) -> some View {
     let all = model.habits.filter { $0.bucket == bucket }
@@ -211,28 +196,6 @@ struct HabitsDestinationView: View {
             }
             .buttonStyle(.plain)
             .transition(.opacity)
-          }
-        }
-      }
-    }
-  }
-
-  /// Completed / skipped habits that have finished lingering — collected in
-  /// one quiet "Done" section at the bottom, matching the Next tab.
-  @ViewBuilder
-  private var doneSection: some View {
-    let done = model.doneHabits
-    if !done.isEmpty {
-      VStack(alignment: .leading, spacing: 8) {
-        DayBucketHeader(bucket: "Done", trailing: "\(done.count)")
-          .padding(.horizontal, 16)
-        DrawerSection(padding: .none) {
-          ForEach(done) { habit in
-            Button { editing = habit } label: {
-              HabitRow(habit: habit, model: model, checklistMutator: checklistMutator, tint: accent,
-                       onDelete: { delete(habit) })
-            }
-            .buttonStyle(.plain)
           }
         }
       }

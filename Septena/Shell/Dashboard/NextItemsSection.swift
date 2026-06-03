@@ -2,8 +2,9 @@ import SwiftUI
 import EventKit
 
 // Today-screen "everything else" rendering: chores, habits, supplements.
-// Split into two views (open / done) so the parent can place all open items
-// above tasks-done. Shared state lives in NextItemsModel.
+// One open list — a completed item lingers struck through for the settle
+// beat, then fades out in place (there's no "done" strip to slide into).
+// Shared state lives in NextItemsModel.
 
 // MARK: - Today tasks (inline on Next)
 //
@@ -215,19 +216,19 @@ final class NextItemsModel {
   // `.onChange(of: clock.today)` to refetch day-scoped data on rollover.
   private var today: String { SeptenaDate.today }
 
-  // MARK: - Open / Done splits (the source of truth for both subviews)
+  // MARK: - Open split (the source of truth for the open list)
+  //
+  // No "done" split: a completed/skipped item lingers in the open list
+  // (struck through) for the settle beat, then fades out in place and is
+  // gone — it never collects in a Done section. `completedChores` etc. still
+  // track session state so the row reads as done while it lingers.
 
   /// Show an item in the open list if it's still pending OR if the user
-  /// just acted on it this session (keeps it from jumping to "done").
+  /// just acted on it this session (keeps it from jumping out from under
+  /// the finger before it fades).
   var openHabits: [HabitDayItem] {
     habits.filter { h in
       actedHabits.contains(h.id) || (!h.done && !h.skipped)
-    }
-  }
-
-  var doneHabits: [HabitDayItem] {
-    habits.filter { h in
-      !actedHabits.contains(h.id) && (h.done || h.skipped)
     }
   }
 
@@ -237,16 +238,9 @@ final class NextItemsModel {
     }
   }
 
-  var doneSupplements: [SupplementDayItem] {
-    supplements.filter { s in
-      !actedSupplements.contains(s.id) && s.done
-    }
-  }
-
   /// Chores due today or overdue. A just-acted chore lingers in the open list
   /// (struck through) for the settle beat so it doesn't vanish under the
-  /// finger; once the beat clears `actedChores` it drops into `doneChores` —
-  /// same treatment as habits/supplements.
+  /// finger; once the beat clears `actedChores` it fades out in place.
   var openChores: [ChoreItem] {
     chores
       .filter { $0.daysOverdue >= 0 }
@@ -257,33 +251,15 @@ final class NextItemsModel {
       .sorted { ($0.daysOverdue, $0.name) > ($1.daysOverdue, $1.name) }
   }
 
-  /// Completed- or deferred-this-session chores that have finished lingering
-  /// (no longer in `actedChores`) — they show in the Done strip.
-  var doneChores: [ChoreItem] {
-    chores.filter { c in
-      !actedChores.contains(c.id)
-        && (completedChores.contains(c.id) || deferredChores[c.id] != nil)
-    }
-  }
-
   /// Calendar events still ahead today (or currently happening). Past
-  /// events drop into `doneCalendarEvents`.
+  /// events simply drop out of the list.
   var openCalendarEvents: [EKEvent] {
     calendarEvents.filter { $0.endDate > Date() }
-  }
-
-  var doneCalendarEvents: [EKEvent] {
-    calendarEvents.filter { $0.endDate <= Date() }
   }
 
   var hasAnyOpen: Bool {
     !openHabits.isEmpty || !openSupplements.isEmpty || !openChores.isEmpty
       || !openCalendarEvents.isEmpty
-  }
-
-  var hasAnyDone: Bool {
-    !doneHabits.isEmpty || !doneSupplements.isEmpty || !doneChores.isEmpty
-      || !doneCalendarEvents.isEmpty
   }
 
   // MARK: - Loading
@@ -552,57 +528,6 @@ struct NextOpenSection: View {
           SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator,
                         tint: theme.color(for: "supplements"))
             .transition(.opacity)
-        }
-      }
-    }
-  }
-}
-
-// MARK: - Done subview (rendered after tasks-done)
-
-struct NextDoneSection: View {
-  var model: NextItemsModel
-  @Environment(ChecklistMutator.self) private var checklistMutator
-  @Environment(SectionTheme.self) private var theme
-
-  var body: some View {
-    let chores = model.doneChores
-    let habits = model.doneHabits
-    let supplements = model.doneSupplements
-    let events = model.doneCalendarEvents
-
-    VStack(alignment: .leading, spacing: 0) {
-      // No section headers in the done strip — keep it visually quiet.
-      // Items still wear their section accent on the (filled) check. One
-      // hairline between adjacent kinds rather than between every row.
-      if !events.isEmpty {
-        ForEach(events, id: \.eventIdentifier) { event in
-          CalendarEventRow(event: event,
-                           tint: theme.color(for: "calendar"),
-                           inactive: true)
-        }
-      }
-      if !chores.isEmpty {
-        if !events.isEmpty { Hairline().padding(.top, 8) }
-        ForEach(chores) { chore in
-          ChoreRow(chore: chore, model: model, checklistMutator: checklistMutator,
-                   tint: theme.color(for: "chores"))
-        }
-      }
-      if !habits.isEmpty {
-        if !events.isEmpty || !chores.isEmpty { Hairline().padding(.top, 8) }
-        ForEach(habits) { habit in
-          HabitRow(habit: habit, model: model, checklistMutator: checklistMutator,
-                   tint: theme.color(for: "habits"))
-        }
-      }
-      if !supplements.isEmpty {
-        if !events.isEmpty || !chores.isEmpty || !habits.isEmpty {
-          Hairline().padding(.top, 8)
-        }
-        ForEach(supplements) { supp in
-          SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator,
-                        tint: theme.color(for: "supplements"))
         }
       }
     }

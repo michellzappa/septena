@@ -1,7 +1,7 @@
 import SwiftUI
 
-// Chores mini-app — full chore list split into Today (due or overdue),
-// Done today, and Later (future-dated). Reached from the Week dashboard's
+// Chores mini-app — full chore list split into Today (due or overdue)
+// and Later (future-dated). Reached from the Week dashboard's
 // Chores tile. Reuses NextItemsModel for loading + optimistic mutations
 // and ChoreRow for row UI; tap edits, long-press exposes defer / delete
 // (the app-wide list-row menu pattern — no swipe actions anywhere).
@@ -25,7 +25,7 @@ struct ChoresDestinationView: View {
   private var today: [ChoreItem] {
     model.chores
       // A just-completed chore lingers here (struck through) for the settle
-      // beat before it fades into "Done today" — same as the Next page. The
+      // beat, then fades out in place — same as the Next page. The
       // `actedChores` clause keeps it; the beat clears that set.
       .filter { $0.daysOverdue >= 0
         && (model.actedChores.contains($0.id) || !model.completedChores.contains($0.id)) }
@@ -53,12 +53,8 @@ struct ChoresDestinationView: View {
     SectionDrawer(sectionKey: "chores",
                   title: "Chores",
                   onLog: { _ in creating = true }) {
-      summary
       if !today.isEmpty {
         DrawerSection("Today", padding: .none) { ForEach(today) { row(for: $0) } }
-      }
-      if !doneToday.isEmpty {
-        DrawerSection("Done today", padding: .none) { ForEach(doneToday) { row(for: $0) } }
       }
       if !later.isEmpty {
         DrawerSection("Later", padding: .none) { ForEach(later) { row(for: $0) } }
@@ -130,22 +126,4 @@ struct ChoresDestinationView: View {
     Haptics.warning()
   }
 
-  private var summary: some View {
-    let overdueCount = model.chores.filter {
-      $0.daysOverdue > 0 && !model.completedChores.contains($0.id)
-    }.count
-    let dueTodayCount = model.chores.filter {
-      $0.daysOverdue == 0 && !model.completedChores.contains($0.id)
-    }.count
-    let doneCount = doneToday.count
-    var stats: [Stat] = [
-      Stat(value: "\(dueTodayCount)", label: "due today", tint: accent),
-    ]
-    if overdueCount > 0 {
-      stats.append(Stat(value: "\(overdueCount)", label: "overdue",
-                        tint: Theme.overdueRed))
-    }
-    stats.append(Stat(value: "\(doneCount)", label: "done"))
-    return DrawerSection { StatStrip(stats: stats) }
-  }
 }

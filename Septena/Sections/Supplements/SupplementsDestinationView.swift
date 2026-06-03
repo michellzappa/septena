@@ -30,9 +30,8 @@ struct SupplementsDestinationView: View {
                   onLog: { _ in creating = true },
                   currentDate: $viewingDate) {
       if isViewingToday {
-        summary
         // Open list — a just-taken supplement lingers here (struck through)
-        // for the settle beat, then fades down into "Done".
+        // for the settle beat, then fades out in place (no "Done" strip).
         if !model.openSupplements.isEmpty {
           DrawerSection("Today", padding: .none) {
             ForEach(model.openSupplements) { supp in
@@ -42,17 +41,6 @@ struct SupplementsDestinationView: View {
               }
               .buttonStyle(.plain)
               .transition(.opacity)
-            }
-          }
-        }
-        if !model.doneSupplements.isEmpty {
-          DrawerSection("Done", padding: .none) {
-            ForEach(model.doneSupplements) { supp in
-              Button { editing = supp } label: {
-                SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator, tint: accent,
-                              onDelete: { delete(supp) })
-              }
-              .buttonStyle(.plain)
             }
           }
         }
@@ -166,13 +154,4 @@ struct SupplementsDestinationView: View {
     Haptics.warning()
   }
 
-  private var summary: some View {
-    let total = model.supplements.count
-    let done = model.supplements.filter { $0.done }.count
-    return DrawerSection {
-      StatStrip(stats: [
-        Stat(value: "\(done)/\(total)", label: "taken today", tint: accent),
-      ])
-    }
-  }
 }

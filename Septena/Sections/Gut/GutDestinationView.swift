@@ -22,8 +22,8 @@ struct GutDestinationView: View {
 
   private var accent: Color { theme.color(for: "gut") }
 
-  /// When the date strip is on a past day, hide the summary + heatmap
-  /// and show only the day's log entries.
+  /// When the date strip is on a past day, hide the heatmap and show
+  /// only the day's log entries.
   private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
 
   var body: some View {
@@ -31,9 +31,6 @@ struct GutDestinationView: View {
                   title: "Gut",
                   onLog: { _ in creating = true },
                   currentDate: $viewingDate) {
-      if isViewingToday {
-        summary
-      }
       DrawerSection("Today", padding: .none) {
         if let today, !today.entries.isEmpty {
           ForEach(Array(today.entries.reversed())) { entry in
@@ -110,35 +107,6 @@ struct GutDestinationView: View {
     gut.deleteEntry(id: entry.id)
     reload()
     Haptics.warning()
-  }
-
-  private var summary: some View {
-    DrawerSection {
-      StatStrip(stats: summaryStats)
-    }
-  }
-
-  private var summaryStats: [Stat] {
-    var out: [Stat] = [
-      Stat(value: "\(today?.movementCount ?? 0)", label: "today", tint: accent),
-    ]
-    if let avg = avgBristolToday {
-      out.append(Stat(value: String(format: "%.1f", avg),
-                      label: "avg Bristol"))
-    }
-    if let d = today?.totalDiscomfortH, d > 0 {
-      out.append(Stat(value: String(format: "%.1f", d),
-                      label: "discomfort",
-                      tint: .orange,
-                      unit: "h"))
-    }
-    return out
-  }
-
-  private var avgBristolToday: Double? {
-    guard let entries = today?.entries, !entries.isEmpty else { return nil }
-    let sum = entries.reduce(0) { $0 + Double($1.bristol) }
-    return sum / Double(entries.count)
   }
 
   // Standard Bristol Stool Scale short forms — keep it clinical, not cute.

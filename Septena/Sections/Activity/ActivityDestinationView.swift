@@ -29,7 +29,6 @@ struct ActivityDestinationView: View {
 
   @ViewBuilder
   private var grantedBody: some View {
-    summary
     vitals
     DrawerSection("Last 7 days · steps", padding: .none) {
       ForEach(Array(zip(weekdayLabels, bridge.stepsHistory).enumerated()), id: \.offset) { _, pair in
@@ -78,18 +77,6 @@ struct ActivityDestinationView: View {
   }
 
   // MARK: - Sections
-
-  private var summary: some View {
-    DrawerSection {
-      StatStrip(stats: [
-        Stat(value: "\(bridge.stepsToday)", label: "steps", tint: accent),
-        Stat(value: "\(Int(bridge.activeKcalToday))",
-             label: "active", tint: accent, unit: "kcal"),
-        Stat(value: "\(bridge.exerciseMinutesToday)",
-             label: "exercise", tint: accent, unit: "m"),
-      ])
-    }
-  }
 
   @ViewBuilder
   private var vitals: some View {
