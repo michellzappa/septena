@@ -341,7 +341,7 @@ extension Font {
 }
 
 extension Color {
-  /// Anthropic's brand accent (the "Claude" terracotta, #D97757). Used to tint
-  /// Claude-specific surfaces like the reconnect banner.
-  static let claudeAccent = Color(red: 0xD9 / 255, green: 0x77 / 255, blue: 0x57 / 255)
+  /// Anthropic's "Claude" coral/salmon (#F5856B). Used to tint Claude-specific
+  /// surfaces like the reconnect banner.
+  static let claudeAccent = Color(red: 0xF5 / 255, green: 0x85 / 255, blue: 0x6B / 255)
 }
