@@ -1,6 +1,11 @@
 import SwiftUI
 import SwiftData
 import Charts
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 // Training mini-app — historical log of exercise entries grouped by
 // session (date + session-type pair). Uses the new LogRow since entries
@@ -25,9 +30,37 @@ struct TrainingDestinationView: View {
   @State private var selectedExercise: String = MetaExercise.strength
   @State private var progression: [ProgressionPoint] = []
   @State private var progressionLoading = false
-  @State private var windowDays: Int = 30
+  @State private var windowDays: Int = 90
+
+  /// Day the drawer's time-travel control is pointing at. On today (the
+  /// default) the drawer shows the charts + this week's sessions; on a past
+  /// day it drops the dashboard and shows just that day's session log.
+  /// Mirrors `NutritionDestinationView.viewingDate`.
+  @State private var viewingDate: String = SeptenaDate.today
 
   private var accent: Color { theme.color(for: "training") }
+
+  private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
+
+  /// How many trailing days of sessions the default view shows. A rolling
+  /// 14-day window (not the calendar week) so last week's sessions stay
+  /// visible early in a new week instead of vanishing the moment Monday
+  /// ticks over. Older history is reachable through the time-travel control.
+  private static let defaultWindowDays = 14
+
+  /// Sessions shown in the default (today) view: the trailing
+  /// `defaultWindowDays`, newest first. Falls back to the single most recent
+  /// session when the window is empty so the list never goes blank.
+  private var defaultSessions: [SessionBlock] {
+    let cutoff = sinceDate(daysBack: Self.defaultWindowDays)
+    let recent = sessions.filter { $0.date >= cutoff }
+    return recent.isEmpty ? Array(sessions.prefix(1)) : recent
+  }
+
+  /// Sessions on the time-traveled day.
+  private var viewingSessions: [SessionBlock] {
+    sessions.filter { $0.date == viewingDate }
+  }
 
   /// Group entries by (date, session), newest first. Sessions sort by
   /// `date` desc; entries within a session sort by `loggedAt` desc (or
@@ -56,52 +89,41 @@ struct TrainingDestinationView: View {
   var body: some View {
     SectionDrawer(sectionKey: "training",
                   title: "Training",
-                  onLog: { _ in nav.showTrainingSession = true }) {
-      if let d = draftStore.draft {
-        activeSessionSection(d)
-      }
-      summary
-      z2CardioSection
-      strengthVolumeSection
-      volumeTrendSection
-      progressionSection
-      ForEach(sessions, id: \.key) { block in
-        VStack(alignment: .leading, spacing: 8) {
-          HStack {
-            sessionTypeMenu(for: block)
-            Spacer()
-            Text(friendlyDate(block.date))
-              .foregroundStyle(.secondary)
-          }
-          .font(.subheadline)
-          .padding(.horizontal, 16)
-          DrawerSection(padding: .none) {
-            ForEach(block.entries) { entry in
-              if entry.file != nil {
-                LogEntryRow(
-                  title: entry.exercise ?? "—",
-                  detail: detailLine(entry),
-                  trailing: entry.loggedAt.map(timeOnly),
-                  accessory: glyphAccessory(for: entry),
-                  onEdit: { editing = entry },
-                  onDelete: { delete(entry) }
-                )
-              } else {
-                LogEntryRow(
-                  title: entry.exercise ?? "—",
-                  detail: detailLine(entry),
-                  trailing: entry.loggedAt.map(timeOnly),
-                  accessory: glyphAccessory(for: entry)
-                )
-              }
-            }
+                  onLog: { _ in nav.showTrainingSession = true },
+                  currentDate: $viewingDate) {
+      if isViewingToday {
+        // Default view: active draft + the dashboard charts (the overview
+        // for any deeper history) + just this week's session log. Older
+        // sessions live behind the time-travel control, not dumped inline.
+        if let d = draftStore.draft {
+          activeSessionSection(d)
+        }
+        z2CardioSection
+        strengthVolumeSection   // merged headline + 8-week trend in one card
+        progressionSection
+        ForEach(defaultSessions, id: \.key) { block in
+          sessionBlockView(block)
+        }
+        if !loading && entries.isEmpty {
+          ContentUnavailableView("No entries yet",
+                                 systemImage: theme.icon(for: "training"),
+                                 description: Text("Tap + to log a session."))
+        }
+      } else {
+        // Time-travel view: just the picked day's sessions, no dashboard —
+        // a past day is a read-only log review, the charts already covered
+        // the trend.
+        if viewingSessions.isEmpty {
+          Text("No sessions logged on this day")
+            .font(.caption).foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+        } else {
+          ForEach(viewingSessions, id: \.key) { block in
+            sessionBlockView(block)
           }
         }
-      }
-      if !loading && entries.isEmpty {
-        ContentUnavailableView("No entries yet",
-                               systemImage: theme.icon(for: "training"),
-                               description: Text("Tap + to log a session."))
       }
     }
     .trackScreen("training")
@@ -116,6 +138,44 @@ struct TrainingDestinationView: View {
         original: entry,
         onSave: { updated in applyLocalUpdate(updated) }
       )
+    }
+  }
+
+  /// One day+session block: a tappable session-type header with the
+  /// friendly date, then the session's exercise rows. Shared by the default
+  /// (this-week) and time-travel (single-day) branches of the body.
+  @ViewBuilder
+  private func sessionBlockView(_ block: SessionBlock) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack {
+        sessionTypeMenu(for: block)
+        Spacer()
+        Text(friendlyDate(block.date))
+          .foregroundStyle(.secondary)
+      }
+      .font(.subheadline)
+      .padding(.horizontal, 16)
+      DrawerSection(padding: .none) {
+        ForEach(block.entries) { entry in
+          if entry.file != nil {
+            LogEntryRow(
+              title: entry.exercise ?? "—",
+              detail: detailLine(entry),
+              trailing: entry.loggedAt.map(timeOnly),
+              accessory: glyphAccessory(for: entry),
+              onEdit: { editing = entry },
+              onDelete: { delete(entry) }
+            )
+          } else {
+            LogEntryRow(
+              title: entry.exercise ?? "—",
+              detail: detailLine(entry),
+              trailing: entry.loggedAt.map(timeOnly),
+              accessory: glyphAccessory(for: entry)
+            )
+          }
+        }
+      }
     }
   }
 
@@ -188,35 +248,6 @@ struct TrainingDestinationView: View {
     entries.removeAll { $0.file == id }
     ResponseCache.save(entries, forKey: CacheKey.entries)
     Haptics.warning()
-  }
-
-  // MARK: - Summary
-
-  private var summary: some View {
-    let sessionsThisWeek = uniqueSessionDates(thisWeek: true).count
-    let z2 = Int(cardio?.daily.last?.rolling7d ?? 0)
-    let target = cardio?.targetWeeklyMin ?? 150
-    return DrawerSection {
-      VStack(alignment: .leading, spacing: 8) {
-        StatStrip(stats: [
-          Stat(value: "\(sessionsThisWeek)", label: "sessions", tint: accent),
-          Stat(value: "\(z2)", label: "Z2 min", tint: accent, unit: "m"),
-        ])
-        VStack(alignment: .leading, spacing: 6) {
-          HStack {
-            Text("Z2 CARDIO")
-              .font(.caption2.weight(.semibold))
-              .foregroundStyle(.secondary)
-              .textCase(.uppercase)
-            Spacer()
-            Text("\(z2)/\(target)m").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-          }
-          ProgressView(value: Double(min(z2, target)),
-                       total: Double(max(target, 1)))
-            .tint(accent)
-        }
-      }
-    }
   }
 
   @ViewBuilder
@@ -410,38 +441,125 @@ struct TrainingDestinationView: View {
     return total
   }
 
-  /// Strength-volume card — trailing 7-day effective hard sets vs target.
-  /// Sibling to `z2CardioSection`; both answer "am I doing enough to drive
-  /// adaptation this week." See `effectiveHardSets(in:)` for the math.
+  /// Strength-volume card — one widget that answers both "enough this week?"
+  /// and "trending up or coasting?". The header carries this week's effective
+  /// hard sets vs target (trailing 7 days) plus the productive-band guidance;
+  /// below it an 8-week trailing trend (bars + target line + shaded ceiling
+  /// band) and a mean-intensity sparkline. Replaces the former split of a
+  /// progress-bar card + a separate trend card. See `effectiveHardSets(in:)`.
   @ViewBuilder
   private var strengthVolumeSection: some View {
-    let raw = effectiveHardSets(in: 7)
-    let value = Int(raw.rounded())
-    let target = Self.hardSetsTarget
-    let ceiling = Self.hardSetsCeiling
-    // Progress fills toward the target; once past target, color shifts to
-    // signal "in the productive band" until the ceiling.
-    let progress = min(raw, target) / target
-    let overTarget = raw > target
-    let overCeiling = raw > ceiling
-    DrawerSection {
-      VStack(alignment: .leading, spacing: 6) {
-        HStack {
-          Text("Strength volume").font(.subheadline.weight(.semibold))
-          Spacer()
-          Text("\(value)/\(Int(target)) hard sets")
-            .font(.caption.monospacedDigit())
-            .foregroundStyle(.secondary)
+    let series = weeklyVolumeTrend
+    let thisWeekRaw = effectiveHardSets(in: 7)
+    let hasData = series.contains { $0.hardSets > 0 } || thisWeekRaw > 0
+    if hasData {
+      let target = Self.hardSetsTarget
+      let ceiling = Self.hardSetsCeiling
+      // Live "this week" = trailing 7 days (app-wide week convention), not the
+      // last calendar-week bar of the trend.
+      let thisWeekValue = Int(thisWeekRaw.rounded())
+      let overTarget = thisWeekRaw > target
+      let overCeiling = thisWeekRaw > ceiling
+      let bandText = overCeiling
+        ? "Past the 20-set ceiling — consider a deload."
+        : overTarget
+          ? "In the productive 12–20 hard-set band."
+          : "Target \(Int(target)) hard sets/week to drive hypertrophy."
+
+      let maxBar = series.map(\.hardSets).max() ?? 0
+      let yMax = max(maxBar, ceiling) * 1.15
+      let lastWeek = series.last?.hardSets ?? 0
+      let prevWeek = series.dropLast().last?.hardSets ?? 0
+      let delta = lastWeek - prevWeek
+      let deltaText = delta == 0
+        ? "flat vs last week"
+        : "\(delta > 0 ? "+" : "")\(Int(delta)) vs last week"
+      let avgIntensity: Double = {
+        let vals = series.compactMap(\.meanIntensity)
+        return vals.isEmpty ? 0 : vals.reduce(0, +) / Double(vals.count)
+      }()
+      let weekFmt: (Date) -> String = { d in
+        let f = DateFormatter(); f.dateFormat = "MMM d"; return f.string(from: d)
+      }
+      let summary = "Strength volume. This week \(thisWeekValue) hard sets, target \(Int(target)). \(bandText) 8-week trend \(deltaText). Average intensity \(String(format: "%.1f", avgIntensity)) out of 4."
+
+      DrawerSection("Strength") {
+        VStack(alignment: .leading, spacing: 8) {
+          HStack {
+            Text("Strength volume").font(.subheadline.weight(.semibold))
+            Spacer()
+            Text("\(thisWeekValue)/\(Int(target)) hard sets")
+              .font(.caption.monospacedDigit())
+              .foregroundStyle(.secondary)
+          }
+          HStack(alignment: .firstTextBaseline) {
+            Text(bandText).font(.caption2).foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            Text(deltaText)
+              .font(.caption2.monospacedDigit())
+              .foregroundStyle(.secondary)
+              .layoutPriority(1)
+          }
+          Chart {
+            // Productive band — shaded between target and ceiling so the
+            // user can see at-a-glance which bars land "in the band."
+            RectangleMark(
+              xStart: .value("start", series.first?.weekStart ?? Date()),
+              xEnd: .value("end", series.last?.weekStart ?? Date()),
+              yStart: .value("target", target),
+              yEnd: .value("ceiling", ceiling)
+            )
+            .foregroundStyle(accent.opacity(0.08))
+            .accessibilityHidden(true)
+            ForEach(series) { w in
+              BarMark(
+                x: .value("Week", w.weekStart, unit: .weekOfYear),
+                y: .value("Hard sets", w.hardSets),
+                width: .ratio(0.6)
+              )
+              .foregroundStyle(w.hardSets == 0
+                               ? Color.secondary.opacity(0.2)
+                               : (w.hardSets >= target ? accent.opacity(0.9)
+                                                       : accent.opacity(0.5)))
+              .cornerRadius(2)
+              .accessibilityLabel(weekFmt(w.weekStart))
+              .accessibilityValue("\(Int(w.hardSets)) hard sets")
+            }
+            RuleMark(y: .value("target", target))
+              .foregroundStyle(accent.opacity(0.7))
+              .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+              .annotation(position: .top, alignment: .trailing) {
+                Text("\(Int(target)) target")
+                  .font(.caption2).foregroundStyle(.secondary)
+              }
+              .accessibilityHidden(true)
+          }
+          .chartYScale(domain: 0...yMax)
+          .chartYAxis {
+            AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { v in
+              AxisValueLabel { if let d = v.as(Double.self) { Text("\(Int(d))").font(.caption2) } }
+              AxisGridLine().foregroundStyle(Color.secondary.opacity(0.1))
+            }
+          }
+          .chartXAxis {
+            AxisMarks(values: series.map(\.weekStart)) { v in
+              AxisValueLabel {
+                if let d = v.as(Date.self) {
+                  Text(weekFmt(d)).font(.caption2)
+                }
+              }
+            }
+          }
+          .frame(height: 140)
+
+          // Intensity sparkline — tucked under the volume chart, same
+          // x-domain so weeks line up visually. Empty weeks (no rated
+          // sets) just leave a gap in the line.
+          intensitySparkline(series, avg: avgIntensity)
         }
-        ProgressView(value: progress)
-          .tint(accent)
-        Text(overCeiling
-             ? "Past the 20-set ceiling — consider a deload."
-             : overTarget
-               ? "In the productive 12–20 hard-set band."
-               : "Target \(Int(target)) hard sets/week to drive hypertrophy.")
-          .font(.caption2)
-          .foregroundStyle(.secondary)
+        .a11yCombineKeepingChildren(summary)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
       }
     }
   }
@@ -509,108 +627,6 @@ struct TrainingDestinationView: View {
     case "hard":              return 3
     case "max":               return 4
     default:                  return nil
-    }
-  }
-
-  /// 8-week trailing chart of weekly effective hard sets (bars) with the
-  /// 12-set target line and the 20-set ceiling shaded, and a thin mean-
-  /// intensity sparkline below. Reads as "am I trending up or coasting?"
-  /// — a temporal companion to `strengthVolumeSection`.
-  @ViewBuilder
-  private var volumeTrendSection: some View {
-    let series = weeklyVolumeTrend
-    let hasData = series.contains { $0.hardSets > 0 }
-    if hasData {
-      let target = Self.hardSetsTarget
-      let ceiling = Self.hardSetsCeiling
-      let maxBar = series.map(\.hardSets).max() ?? 0
-      let yMax = max(maxBar, ceiling) * 1.15
-      let lastWeek = series.last?.hardSets ?? 0
-      let prevWeek = series.dropLast().last?.hardSets ?? 0
-      let delta = lastWeek - prevWeek
-      let avgIntensity: Double = {
-        let vals = series.compactMap(\.meanIntensity)
-        return vals.isEmpty ? 0 : vals.reduce(0, +) / Double(vals.count)
-      }()
-      let weekFmt: (Date) -> String = { d in
-        let f = DateFormatter(); f.dateFormat = "MMM d"; return f.string(from: d)
-      }
-      let summary: String = {
-        let dir = delta >= 0 ? "up" : "down"
-        return "8-week volume trend. This week \(Int(lastWeek)) hard sets, \(dir) \(Int(abs(delta))) from last week. Average intensity \(String(format: "%.1f", avgIntensity)) out of 4."
-      }()
-      DrawerSection("Volume trend") {
-        VStack(alignment: .leading, spacing: 8) {
-          HStack {
-            Text("8-week volume").font(.subheadline.weight(.semibold))
-            Spacer()
-            Text(delta == 0
-                 ? "flat vs last week"
-                 : "\(delta > 0 ? "+" : "")\(Int(delta)) vs last week")
-              .font(.caption.monospacedDigit())
-              .foregroundStyle(.secondary)
-          }
-          Chart {
-            // Productive band — shaded between target and ceiling so the
-            // user can see at-a-glance which bars land "in the band."
-            RectangleMark(
-              xStart: .value("start", series.first?.weekStart ?? Date()),
-              xEnd: .value("end", series.last?.weekStart ?? Date()),
-              yStart: .value("target", target),
-              yEnd: .value("ceiling", ceiling)
-            )
-            .foregroundStyle(accent.opacity(0.08))
-            .accessibilityHidden(true)
-            ForEach(series) { w in
-              BarMark(
-                x: .value("Week", w.weekStart, unit: .weekOfYear),
-                y: .value("Hard sets", w.hardSets),
-                width: .ratio(0.6)
-              )
-              .foregroundStyle(w.hardSets == 0
-                               ? Color.secondary.opacity(0.2)
-                               : (w.hardSets >= target ? accent.opacity(0.9)
-                                                       : accent.opacity(0.5)))
-              .cornerRadius(2)
-              .accessibilityLabel(weekFmt(w.weekStart))
-              .accessibilityValue("\(Int(w.hardSets)) hard sets")
-            }
-            RuleMark(y: .value("target", target))
-              .foregroundStyle(accent.opacity(0.7))
-              .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-              .annotation(position: .top, alignment: .trailing) {
-                Text("\(Int(target)) target")
-                  .font(.caption2).foregroundStyle(.secondary)
-              }
-              .accessibilityHidden(true)
-          }
-          .chartYScale(domain: 0...yMax)
-          .chartYAxis {
-            AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { v in
-              AxisValueLabel { if let d = v.as(Double.self) { Text("\(Int(d))").font(.caption2) } }
-              AxisGridLine().foregroundStyle(Color.secondary.opacity(0.1))
-            }
-          }
-          .chartXAxis {
-            AxisMarks(values: series.map(\.weekStart)) { v in
-              AxisValueLabel {
-                if let d = v.as(Date.self) {
-                  Text(weekFmt(d)).font(.caption2)
-                }
-              }
-            }
-          }
-          .frame(height: 140)
-
-          // Intensity sparkline — tucked under the volume chart, same
-          // x-domain so weeks line up visually. Empty weeks (no rated
-          // sets) just leave a gap in the line.
-          intensitySparkline(series, avg: avgIntensity)
-        }
-        .a11yCombineKeepingChildren(summary)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-      }
     }
   }
 
@@ -767,6 +783,8 @@ struct TrainingDestinationView: View {
               }
             }
           }
+          .chartForegroundStyleScale(domain: strengthSeriesScale.domain,
+                                     range: strengthSeriesScale.range)
           .chartLegend(line.contains(where: { $0.series != nil }) ? .visible : .hidden)
           .chartYScale(domain: 0...yMax)
           .chartYAxis {
@@ -837,6 +855,56 @@ struct TrainingDestinationView: View {
         }
       }
     }
+  }
+
+  // MARK: - Strength series color scale
+  //
+  // The split "All strength" chart draws one line per session category
+  // (Upper, Lower, …). Two rules the user cares about:
+  //   1. A category keeps the SAME color and the SAME legend position no
+  //      matter which window (30/60/90) is selected — so the domain is built
+  //      from ALL loaded entries (not the windowed subset) and sorted, then
+  //      pinned via `chartForegroundStyleScale`.
+  //   2. Colors are DERIVED from the section accent, not SwiftUI's guessed
+  //      default palette — each series is a deterministic hue-rotated shade of
+  //      the accent (see `seriesColor`).
+
+  /// All strength session-category labels across loaded history, stably
+  /// sorted. Independent of `windowDays`, so colors/positions never reshuffle.
+  private var strengthSeriesDomain: [String] {
+    var set = Set<String>()
+    for e in entries where isStrengthEntry(e) && volumeValue(e) != nil {
+      set.insert((e.session.isEmpty ? "other" : e.session).capitalized)
+    }
+    return set.sorted()
+  }
+
+  /// Fixed (domain, range) for the chart's foreground-style scale: each
+  /// series name mapped to its accent-derived color by stable index.
+  private var strengthSeriesScale: (domain: [String], range: [Color]) {
+    let domain = strengthSeriesDomain
+    return (domain, domain.indices.map { seriesColor($0) })
+  }
+
+  /// Accent-derived series color — a monochromatic ramp, NOT a hue rotation.
+  /// Every series keeps the accent's hue and only its brightness/saturation
+  /// step, so lines read as clear shades of the section color (accent, a
+  /// lighter tint, a deeper shade) rather than unrelated colors. Index 0 is
+  /// the accent itself. Deterministic per index.
+  private func seriesColor(_ index: Int) -> Color {
+    let base = accent.hsbComponents
+    let steps: [(s: Double, b: Double)] = [
+      (1.00, 1.00),   // accent as-is
+      (0.48, 1.24),   // lighter, softer tint
+      (1.00, 0.68),   // deeper shade
+      (0.34, 1.42),   // pale
+      (0.85, 0.52),   // darkest
+      (0.62, 1.32),
+    ]
+    let i = index % steps.count
+    let s = min(1.0, max(0.0, base.s * steps[i].s))
+    let b = min(1.0, max(0.12, base.b * steps[i].b))
+    return Color(hue: base.h, saturation: s, brightness: b)
   }
 
   // MARK: - Chart data
@@ -1159,18 +1227,6 @@ struct TrainingDestinationView: View {
     return fmt.string(from: d)
   }
 
-  /// Unique YYYY-MM-DD dates among entries, optionally restricted to the
-  /// current calendar week.
-  private func uniqueSessionDates(thisWeek: Bool) -> Set<String> {
-    guard thisWeek else { return Set(entries.map(\.date)) }
-    let cal = Calendar.current
-    let weekStart = cal.date(from: cal.dateComponents([.yearForWeekOfYear, .weekOfYear],
-                                                      from: Date())) ?? Date()
-    let fmt = DateFormatter()
-    fmt.dateFormat = "yyyy-MM-dd"
-    let cutoff = fmt.string(from: weekStart)
-    return Set(entries.map(\.date).filter { $0 >= cutoff })
-  }
 }
 
 // MARK: - Meta exercise tokens
@@ -1192,6 +1248,24 @@ enum MetaExercise {
     case cardio:   return "All cardio"
     default:       return name.capitalized
     }
+  }
+}
+
+// MARK: - Accent → HSB (cross-platform)
+
+private extension Color {
+  /// Hue/saturation/brightness components, used to derive the strength
+  /// series palette from the section accent. Resolves through the platform
+  /// color type so it works on both iOS and macOS.
+  var hsbComponents: (h: Double, s: Double, b: Double) {
+    var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+    #if canImport(UIKit)
+    UIColor(self).getHue(&h, saturation: &s, brightness: &b, alpha: &a)
+    #elseif canImport(AppKit)
+    let ns = NSColor(self).usingColorSpace(.sRGB) ?? NSColor(self)
+    ns.getHue(&h, saturation: &s, brightness: &b, alpha: &a)
+    #endif
+    return (Double(h), Double(s), Double(b))
   }
 }
 
