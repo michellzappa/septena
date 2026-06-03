@@ -179,7 +179,6 @@ struct HKSyncSection: View {
   private var keyPath: WritableKeyPath<HKSyncSettings, Bool> {
     switch kind {
     case .mood:      return \.mood
-    case .caffeine:  return \.caffeine
     case .nutrition: return \.nutrition
     }
   }

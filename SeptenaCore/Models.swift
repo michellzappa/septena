@@ -1470,12 +1470,10 @@ struct AppSettings: Codable {
 /// per-type in Settings → Integrations → Apple Health.
 struct HKSyncSettings: Codable {
   var mood: Bool
-  var caffeine: Bool
   var nutrition: Bool
 
-  init(mood: Bool = true, caffeine: Bool = true,
-       nutrition: Bool = true) {
-    self.mood = mood; self.caffeine = caffeine
+  init(mood: Bool = true, nutrition: Bool = true) {
+    self.mood = mood
     self.nutrition = nutrition
   }
 }

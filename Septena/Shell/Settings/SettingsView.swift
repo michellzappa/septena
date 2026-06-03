@@ -2183,7 +2183,6 @@ struct AppleHealthDetail: View {
   private var rows: [(label: String, icon: String, kind: HealthKitBridge.WritableKind)] {
     [
       ("Mood",                  "face.smiling",                          .mood),
-      ("Caffeine",              "cup.and.saucer",                        .caffeine),
       ("Nutrition & Hydration", "fork.knife",                            .nutrition),
     ]
   }
@@ -2271,7 +2270,6 @@ struct AppleHealthDetail: View {
   private func keyPath(for kind: HealthKitBridge.WritableKind) -> WritableKeyPath<HKSyncSettings, Bool> {
     switch kind {
     case .mood:      return \.mood
-    case .caffeine:  return \.caffeine
     case .nutrition: return \.nutrition
     }
   }

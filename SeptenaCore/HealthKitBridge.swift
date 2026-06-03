@@ -86,7 +86,7 @@ final class HealthKitBridge {
 
   /// The sections Septena can write to HealthKit. Maps 1:1 to `HKSyncSettings`.
   enum WritableKind: String, CaseIterable, Hashable {
-    case mood, caffeine, nutrition
+    case mood, nutrition
   }
 
   enum ShareStatus: Equatable {
@@ -147,7 +147,6 @@ final class HealthKitBridge {
     case .mood:
       if #available(iOS 18, *) { return HKObjectType.stateOfMindType() }
       return nil
-    case .caffeine:  return HKQuantityType.quantityType(forIdentifier: .dietaryCaffeine)
     case .nutrition: return HKQuantityType.quantityType(forIdentifier: .dietaryEnergyConsumed)
     }
   }
@@ -177,9 +176,6 @@ final class HealthKitBridge {
     if #available(iOS 18, *) {
       s.insert(HKObjectType.stateOfMindType())
     }
-
-    // Caffeine
-    if let t = HKQuantityType.quantityType(forIdentifier: .dietaryCaffeine) { s.insert(t) }
 
     // Nutrition — individual quantity types only. HKCorrelationType.food
     // is restricted to Apple and cannot be requested by third-party apps.
@@ -319,37 +315,6 @@ final class HealthKitBridge {
     }
   }
   #endif
-
-  // MARK: - Caffeine
-
-  /// Write a caffeine intake event. Converts grams of coffee/matcha →
-  /// milligrams of caffeine using per-method ratios from published data:
-  ///   v60 / pour-over: ~12 mg/g dry grounds
-  ///   espresso:        ~10 mg/g (less extraction than filter)
-  ///   matcha:          ~17.5 mg/g powder (35 mg per standard 2 g serving)
-  ///   other:           ~12 mg/g (conservative filter estimate)
-  func writeCaffeine(grams: Double, method: String, date: Date) async {
-    #if canImport(HealthKit)
-    guard isAvailable, syncSettings.caffeine else { return }
-    guard let type = HKQuantityType.quantityType(forIdentifier: .dietaryCaffeine) else { return }
-    let mgPerGram: Double = {
-      switch method.lowercased() {
-      case "matcha":          return 17.5
-      case "espresso":        return 10.0
-      default:                return 12.0   // v60, filter, other
-      }
-    }()
-    let mg = grams * mgPerGram
-    guard mg > 0 else { return }
-    let qty    = HKQuantity(unit: .gramUnit(with: .milli), doubleValue: mg)
-    let sample = HKQuantitySample(type: type, quantity: qty, start: date, end: date)
-    do {
-      try await store.save(sample)
-    } catch {
-      SeptenaLog.error("HK caffeine write", error)
-    }
-    #endif
-  }
 
   // MARK: - Nutrition
 

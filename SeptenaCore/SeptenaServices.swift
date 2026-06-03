@@ -1532,10 +1532,6 @@ final class CaffeineMutator {
                                      note: note)
     context.insert(entity)
     commitEntry(entity, op: "create")
-    if let g = grams, g > 0 {
-      let ts = entity.occurredAt
-      Task { await HealthKitBridge.shared.writeCaffeine(grams: g, method: method, date: ts) }
-    }
     return entity
   }
 
