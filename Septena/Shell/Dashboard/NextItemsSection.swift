@@ -608,9 +608,12 @@ struct HabitRow: View {
             logCommit?.fire(.ignition(accent: accent, streak: streak))
             A11y.announce("\(streak) day streak!")
           } else {
-            // Everyday completion — continuity, not celebration: a mark joins
-            // the row. Longer streaks show a fuller row (more priors).
-            let intensity = min(2.0, max(0.6, Double(streak) / 5.0))
+            // Everyday completion — quantity-aware continuity: the tally row
+            // grows as you get further through *this bucket* of the day. Count
+            // includes the just-completed habit (model flipped it above), so
+            // each tick within a bucket adds a mark; a new bucket starts fresh.
+            let doneInBucket = model.habits.filter { $0.bucket == habit.bucket && $0.done }.count
+            let intensity = min(2.0, Double(doneInBucket) / 4.0)
             Haptics.play(CommitMotion.tally.hapticSpec(intensity: intensity))
             logCommit?.fire(.flourish(motion: .tally, accent: accent, intensity: intensity))
           }

@@ -13,10 +13,10 @@ enum NutritionPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(NutritionDestinationView()) }
 
-  // A meal is satisfying → a warm bloom. Fixed intensity: kcal is often
-  // unknown at log time (quick re-logs, search), so there's no reliable
-  // magnitude axis to scale by.
-  static var logFlourish: LogFlourish? { LogFlourish(motion: .bloom) }
+  // A meal toward your daily macros → a full-page fill. Fixed intensity:
+  // kcal is often unknown at log time (quick re-logs, search), so there's
+  // no reliable magnitude axis to scale the level by.
+  static var logFlourish: LogFlourish? { LogFlourish(motion: .fill) }
 
   static var logActions: [LogAction] {
     [LogAction(id: "log", title: "Log meal", systemImage: "plus")]

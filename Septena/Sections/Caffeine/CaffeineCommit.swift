@@ -17,17 +17,6 @@ import SwiftUI
 enum CaffeineCommit {
   private static var mutator: CaffeineMutator { SeptenaServices.shared.caffeineMutator }
 
-  /// Affect axis: a caffeine log is a warm cup, so daytime gets a gentle
-  /// bloom; late at night a stimulant log gets a quiet sink instead —
-  /// acknowledged, not celebrated. Keyed off the hour the entry is logged
-  /// *for* (parsed from `time`), so a backfilled 11pm log still reads as
-  /// late. No `.snap`: its full-screen flash is too loud for a drink logged
-  /// several times a day.
-  static func motion(forTime time: String) -> CommitMotion {
-    let hour = Int(time.prefix(2)) ?? 12
-    return (hour >= 21 || hour < 5) ? .sink : .bloom
-  }
-
   /// Dose → loudness. ~18g (a typical pour) is the calibrated 1.0; clamped
   /// so a small cup still reads and a big brew can't overpower.
   static func intensity(grams: Double?) -> Double {
@@ -51,13 +40,12 @@ enum CaffeineCommit {
                      accent: Color,
                      logCommit: LogCommitCenter?) -> String {
     var id = ""
-    // Routes through the shared SectionLog funnel. Caffeine's default motion
-    // (.bloom) lives in CaffeinePlugin.logFlourish; we override per-call with
-    // the time-of-day rule (late-night → sink) and the dose-scaled intensity.
+    // Routes through the shared SectionLog funnel. Motion is the section
+    // default (.bloom, from CaffeinePlugin.logFlourish) — not time-aware;
+    // only loudness varies, by dose.
     SectionLog.newLog(
       section: "caffeine",
       accent: accent,
-      motion: motion(forTime: time),
       intensity: intensity(grams: grams),
       announce: "Logged \(beans ?? method.uppercased()).",
       logCommit: logCommit

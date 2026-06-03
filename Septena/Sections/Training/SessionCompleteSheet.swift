@@ -145,8 +145,9 @@ struct SessionCompleteSheet: View {
   /// Did any logged entry break a personal record this session?
   private var hasPR: Bool { stats.prFlags.values.contains { $0.any } }
 
-  /// Burst on a PR; otherwise a settling bloom.
-  private var completionMotion: CommitMotion { hasPR ? .burst : .bloom }
+  /// Full-screen ripple on a PR — a big payoff for a rare milestone;
+  /// otherwise a settling bloom.
+  private var completionMotion: CommitMotion { hasPR ? .ripple : .bloom }
 
   /// PR sessions get louder with each record broken; non-PR sessions scale
   /// by total volume moved (a hard leg day blooms wider than a light one;
