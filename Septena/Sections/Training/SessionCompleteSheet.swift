@@ -101,8 +101,8 @@ struct SessionCompleteSheet: View {
   let accent: Color
   let onDone: () -> Void
 
-  /// Bumped on appear → fires `ConfettiBurst`. One celebration per
-  /// presentation; no looping.
+  /// Bumped on appear → fires the completion flourish. One celebration
+  /// per presentation; no looping.
   @State private var celebrate = 0
 
   var body: some View {
@@ -126,18 +126,37 @@ struct SessionCompleteSheet: View {
       .padding(20)
     }
     .background(Theme.groupedBackground)
-    .overlay(alignment: .top) {
-      // Bigger burst than the per-rep one — celebration scaled to the
-      // moment but still single-tone, still bounded duration.
-      ConfettiBurst(trigger: celebrate, accent: accent,
-                    count: 28, duration: 1.4)
-        .frame(height: 1)            // anchor only; particles fan from here
-        .offset(y: 80)
+    .overlay {
+      // The celebration matches the session: a confetti burst when a PR
+      // fell (the moment that earns it), otherwise a calm bloom whose reach
+      // scales with the total volume moved. Same motion vocabulary as every
+      // other section's commit flourish.
+      CommitFlourish(motion: completionMotion,
+                     accent: accent,
+                     intensity: completionIntensity,
+                     trigger: celebrate)
     }
     .onAppear {
       Haptics.success()
       celebrate += 1
     }
+  }
+
+  /// Did any logged entry break a personal record this session?
+  private var hasPR: Bool { stats.prFlags.values.contains { $0.any } }
+
+  /// Burst on a PR; otherwise a settling bloom.
+  private var completionMotion: CommitMotion { hasPR ? .burst : .bloom }
+
+  /// PR sessions get louder with each record broken; non-PR sessions scale
+  /// by total volume moved (a hard leg day blooms wider than a light one;
+  /// cardio sessions, volume 0, settle to the gentle floor).
+  private var completionIntensity: Double {
+    if hasPR {
+      let prCount = stats.prFlags.values.filter { $0.any }.count
+      return min(1.5, 1.0 + 0.15 * Double(prCount))
+    }
+    return min(1.3, max(0.7, stats.totalVolumeKg / 3000))
   }
 
   // MARK: - Header
