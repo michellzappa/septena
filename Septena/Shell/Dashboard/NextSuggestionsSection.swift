@@ -101,6 +101,23 @@ enum NextScoring {
     return Array(earliest.values)
   }
 
+  /// Latest entry-time per day across `items`, excluding `today` — the mirror
+  /// of `firstDailyTimes`. Feeds the learned "curfew": the time of day past
+  /// which you typically stop, so cadence suggestions don't nag into the night.
+  static func lastDailyTimes(dateTimes: [(date: String, time: String)],
+                             beforeDay today: String) -> [Int] {
+    var latest: [String: Int] = [:]
+    for entry in dateTimes where entry.date < today {
+      guard let mins = parseHHMM(entry.time) else { continue }
+      if let existing = latest[entry.date] {
+        if mins > existing { latest[entry.date] = mins }
+      } else {
+        latest[entry.date] = mins
+      }
+    }
+    return Array(latest.values)
+  }
+
   static func relativeMinutes(target: Int, now: Int) -> String {
     let diff = target - now
     let abs = Swift.abs(diff)
@@ -109,6 +126,77 @@ enum NextScoring {
     let m = abs % 60
     let label = h == 0 ? "\(m)m" : (m == 0 ? "\(h)h" : "\(h)h \(m)m")
     return diff > 0 ? "in \(label)" : "\(label) ago"
+  }
+}
+
+// MARK: - Cadence (pure, unit-agnostic)
+
+/// Learned rhythm of a repeating action: the median interval between
+/// consecutive occurrences plus the typical number per cycle. Deliberately
+/// unit-agnostic — caffeine feeds it **minutes within a day** (gap between
+/// cups), a future chore path feeds it **days between completions**. The same
+/// predictor, `next(after:)`, serves both; only the unit of `medianGap`
+/// changes. Built from history via `withinDay` / `acrossDays`.
+struct Cadence: Hashable {
+  /// Median gap between consecutive occurrences, in the caller's unit
+  /// (minutes for within-day, days for across-day).
+  let medianGap: Int
+  /// Typical occurrences per cycle — cups/day for caffeine, 1 for a chore
+  /// (it completes once per cycle). Used as the count ceiling.
+  let typicalCount: Int
+  /// Number of gaps observed. A confidence proxy: a single coincidental pair
+  /// shouldn't drive a suggestion.
+  let sampleSize: Int
+
+  /// True once we've seen enough repeats to trust the rhythm.
+  var isConfident: Bool { sampleSize >= 3 }
+
+  /// Predicted next occurrence given the most recent one, same unit as `last`.
+  func next(after last: Int) -> Int { last + medianGap }
+
+  /// Within-day rhythm: gap between consecutive same-day events (minutes) and
+  /// the typical event count per active day. `today` is excluded so the model
+  /// learns only from settled days.
+  static func withinDay(dateTimes: [(date: String, time: String)],
+                        before today: String) -> Cadence? {
+    var perDay: [String: [Int]] = [:]
+    for e in dateTimes where e.date < today {
+      guard let m = NextScoring.parseHHMM(e.time) else { continue }
+      perDay[e.date, default: []].append(m)
+    }
+    guard !perDay.isEmpty else { return nil }
+
+    var gaps: [Int] = []
+    for mins in perDay.values {
+      let sorted = mins.sorted()
+      guard sorted.count >= 2 else { continue }
+      for i in 1..<sorted.count { gaps.append(sorted[i] - sorted[i - 1]) }
+    }
+    guard let gap = NextScoring.median(gaps), gap > 0 else { return nil }
+    let count = NextScoring.median(perDay.values.map(\.count)) ?? 1
+    return Cadence(medianGap: gap, typicalCount: max(count, 1), sampleSize: gaps.count)
+  }
+
+  /// Across-day rhythm: gap in **days** between consecutive completion dates.
+  /// `typicalCount` is 1 — a chore fires once per cycle. This is the seam for
+  /// a future cadence-learned chore suggestion (resurface ~N days after the
+  /// last completion); it is intentionally not yet wired into `compute`.
+  static func acrossDays(dates: [String]) -> Cadence? {
+    let ordinals = Array(Set(dates.compactMap(dayOrdinal))).sorted()
+    guard ordinals.count >= 2 else { return nil }
+    var gaps: [Int] = []
+    for i in 1..<ordinals.count { gaps.append(ordinals[i] - ordinals[i - 1]) }
+    guard let gap = NextScoring.median(gaps), gap > 0 else { return nil }
+    return Cadence(medianGap: gap, typicalCount: 1, sampleSize: gaps.count)
+  }
+
+  /// "YYYY-MM-DD" → a serial day number via era-day ordinality (DST-safe).
+  static func dayOrdinal(_ iso: String) -> Int? {
+    let p = iso.split(separator: "-")
+    guard p.count == 3, let y = Int(p[0]), let m = Int(p[1]), let d = Int(p[2]) else { return nil }
+    var c = DateComponents(); c.year = y; c.month = m; c.day = d
+    guard let date = Calendar.current.date(from: c) else { return nil }
+    return Calendar.current.ordinality(of: .day, in: .era, for: date)
   }
 }
 
@@ -146,12 +234,20 @@ final class NextSuggestionsModel {
   }
 
   func load() async {
-    let today = self.today
-    let since14 = Self.daysAgoISO(14)
-    let since30 = Self.daysAgoISO(30)
     let ctx = LocalStore.shared.container.mainContext
+    suggestions = Self.computeAll(context: ctx, now: Date())
+    skipped = Self.loadSkips(date: today)
+    hasLoaded = true
+  }
 
-    // Caffeine/cannabis now read from CK-synced SwiftData (no network hop).
+  /// Gather ~14–30 days of history + today's state from the local mirror and
+  /// run the pure scorer. Shared by the Next view and the watch snapshot
+  /// publisher so both surface the identical suggestions.
+  static func computeAll(context ctx: ModelContext, now: Date = Date()) -> [NextSuggestion] {
+    let today = SeptenaDate.today
+    let since14 = daysAgoISO(14)
+    let since30 = daysAgoISO(30)
+
     let cafEntries = (try? ctx.fetch(FetchDescriptor<CaffeineEventEntity>(
       predicate: #Predicate { $0.date >= since14 }
     ))) ?? []
@@ -161,10 +257,8 @@ final class NextSuggestionsModel {
     ))) ?? []
     let canToday = ChecklistMirror.loadCannabisDay(context: ctx, date: today)
     let nut = ChecklistMirror.loadNutritionEntries(context: ctx, since: since14)
-    // Training lives in CloudKit — local mirror reads, no network.
     let tr: [ExerciseEntry]? = ChecklistMirror.loadTrainingEntries(context: ctx, since: since30)
     let sw: SuggestedWorkoutResponse? = ChecklistMirror.loadSuggestedWorkout(context: ctx)
-    // Settings live in CloudKit — read from the local mirror, not FastAPI.
     let st: AppSettings? = SettingsMirror.loadSettings(context: ctx)
 
     let cafTimePoints: [CaffeineTimePoint] = cafEntries.compactMap { e in
@@ -184,7 +278,7 @@ final class NextSuggestionsModel {
                                method: e.method, strain: e.strain, hit: e.hit)
     }
 
-    suggestions = Self.compute(
+    return compute(
       today: today,
       isToday: true,
       caffeineHistory: cafTimePoints,
@@ -196,10 +290,14 @@ final class NextSuggestionsModel {
       workout: sw?.suggested,
       workoutDaysAgo: sw?.daysAgo ?? [:],
       fastingTargetH: st?.targets?.fastingMaxH ?? 18,
-      now: Date()
+      now: now
     )
-    skipped = Self.loadSkips(date: today)
-    hasLoaded = true
+  }
+
+  /// Suggestions minus the ones the user skipped today — what actually renders.
+  static func visibleSuggestions(context ctx: ModelContext, now: Date = Date()) -> [NextSuggestion] {
+    let skips = loadSkips(date: SeptenaDate.today)
+    return computeAll(context: ctx, now: now).filter { !skips.contains($0.id) }
   }
 
   func toggleSkip(_ id: String) {
@@ -270,6 +368,42 @@ final class NextSuggestionsModel {
         score: 34 + NextScoring.timingScore(usual: usual, nowMinutes: nowMinutes, isToday: isToday),
         proposedMinutes: usual
       ))
+    }
+
+    // Caffeine — next cup. Once the first cup is logged, the first-cup rule
+    // goes quiet; the learned within-day rhythm takes over. Suggest cup N+1 a
+    // median-gap after the last one, but stop at two learned ceilings: the
+    // typical cups/day count, and the typical "last cup" time (curfew) so we
+    // never nudge an evening coffee.
+    let caffeineCadence = Cadence.withinDay(
+      dateTimes: caffeineHistory.map { (date: $0.date, time: $0.time) },
+      before: today
+    )
+    let caffeineCurfew = NextScoring.median(
+      NextScoring.lastDailyTimes(
+        dateTimes: caffeineHistory.map { (date: $0.date, time: $0.time) },
+        beforeDay: today
+      )
+    )
+    let lastCupToday = caffeineToday.compactMap { NextScoring.parseHHMM($0.time) }.max()
+    if !caffeineToday.isEmpty, isToday,
+       let cadence = caffeineCadence, cadence.isConfident,
+       caffeineToday.count < cadence.typicalCount,
+       let lastCup = lastCupToday {
+      let nextCup = cadence.next(after: lastCup)
+      let beforeCurfew = caffeineCurfew.map { nextCup <= $0 } ?? true
+      if beforeCurfew, nowMinutes >= nextCup - 45 {
+        out.append(NextSuggestion(
+          id: "caffeine:next",
+          kind: .caffeine,
+          title: "Log caffeine",
+          emoji: "☕️",
+          symbol: nil,
+          detail: "Cup \(caffeineToday.count + 1) · usually \(NextScoring.relativeMinutes(target: nextCup, now: nowMinutes))",
+          score: 30 + NextScoring.timingScore(usual: nextCup, nowMinutes: nowMinutes, isToday: isToday),
+          proposedMinutes: nextCup
+        ))
+      }
     }
 
     // Cannabis — first session
