@@ -6,7 +6,8 @@
   so the symbol renderer treats it as one monochrome glyph. Artwork sized
   so the discs read at the same visual weight as `arrow.right` /
   `checkmark` in the tab bar (~25% larger than the original fit-inside-
-  body version); viewBox is correspondingly larger to contain the splay.
+  body version, then a further 10% on top); viewBox is correspondingly
+  larger to contain the splay.
 
   Provides only the canonical Regular-M variant — Xcode synthesises the
   rest from this glyph and its bracketing Baseline / Capline guides.
@@ -26,7 +27,7 @@
 
   <g id="Symbols">
     <g id="Regular-M">
-      <path d="M387.5,177.5 a112.5,112.5 0 1,0 225,0 a112.5,112.5 0 1,0 -225,0 z M653.75,302.5 a112.5,112.5 0 1,0 225,0 a112.5,112.5 0 1,0 -225,0 z M720,595 a112.5,112.5 0 1,0 225,0 a112.5,112.5 0 1,0 -225,0 z M536.25,825 a112.5,112.5 0 1,0 225,0 a112.5,112.5 0 1,0 -225,0 z M238.75,825 a112.5,112.5 0 1,0 225,0 a112.5,112.5 0 1,0 -225,0 z M55,595 a112.5,112.5 0 1,0 225,0 a112.5,112.5 0 1,0 -225,0 z M121.25,302.5 a112.5,112.5 0 1,0 225,0 a112.5,112.5 0 1,0 -225,0 z"/>
+      <path d="M376.25,143.5 a123.75,123.75 0 1,0 247.5,0 a123.75,123.75 0 1,0 -247.5,0 z M669.125,281 a123.75,123.75 0 1,0 247.5,0 a123.75,123.75 0 1,0 -247.5,0 z M742,602.75 a123.75,123.75 0 1,0 247.5,0 a123.75,123.75 0 1,0 -247.5,0 z M539.875,855.75 a123.75,123.75 0 1,0 247.5,0 a123.75,123.75 0 1,0 -247.5,0 z M212.625,855.75 a123.75,123.75 0 1,0 247.5,0 a123.75,123.75 0 1,0 -247.5,0 z M10.5,602.75 a123.75,123.75 0 1,0 247.5,0 a123.75,123.75 0 1,0 -247.5,0 z M83.375,281 a123.75,123.75 0 1,0 247.5,0 a123.75,123.75 0 1,0 -247.5,0 z"/>
     </g>
   </g>
 </svg>

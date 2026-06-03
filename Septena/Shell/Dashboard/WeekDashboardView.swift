@@ -2805,7 +2805,7 @@ private struct ClaudeReconnectBanner: View {
             Text("Reconnect").font(.subheadline.weight(.semibold))
           }
         }
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Color.claudeAccent.opacity(0.5))
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
         .frame(maxWidth: .infinity)
