@@ -3101,8 +3101,8 @@ struct AboutSettingsPane: View {
             .padding(.top, 4)
           VStack(spacing: 4) {
             Text("Septena")
-              .font(.septenaSectionTitle)
-            Text("One app for several corners of personal health")
+              .font(.septenaWordmark)
+            Text("One app for every corner of your life")
               .font(.subheadline)
               .foregroundStyle(.secondary)
               .multilineTextAlignment(.center)
@@ -3117,7 +3117,7 @@ struct AboutSettingsPane: View {
       }
 
       Section {
-        Text("Track training, nutrition, habits, sleep, supplements, caffeine, chores, and more — all in one place, synced across your devices with iCloud.")
+        Text("The small signals of a whole life, gathered in one calm place. Septena keeps them with you and in step across your devices through iCloud, and yours alone.")
           .font(.callout)
           .foregroundStyle(.secondary)
       }

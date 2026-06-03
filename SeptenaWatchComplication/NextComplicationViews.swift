@@ -52,10 +52,10 @@ private struct CircularView: View {
   let data: NextComplicationData
 
   var body: some View {
-    Image("DiscsMark")
+    Image("DiscsColor")
       .resizable()
       .scaledToFit()
-      .padding(6)
+      .padding(2)
   }
 }
 

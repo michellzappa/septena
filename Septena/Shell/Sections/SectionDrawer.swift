@@ -131,9 +131,9 @@ struct SectionDrawer<Content: View>: View {
     // input. We use a switch over the Optional so SwiftUI's view
     // identity stays stable per branch.
     .modifier(OptionalSearchable(text: searchText, prompt: searchPrompt))
-    // The section name lives in the nav bar (inline) rather than as a big
-    // editorial heading inside the scroll body — keeps the drawer top
-    // compact while still labelling the page.
+    // The section name is the standard inline nav-bar title — plain text in
+    // the system's default place, identical on every drawer. Kept inline
+    // (not a big editorial heading) so the drawer top stays compact.
     .navigationTitle(title)
     #if os(iOS)
     .navigationBarTitleDisplayMode(.inline)
