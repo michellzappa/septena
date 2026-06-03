@@ -51,6 +51,12 @@ enum SettingsKey {
   /// very top of the homepage. Default on; mirrors the webapp's overview
   /// dashboard header.
   static let homepageShowWelcome = "septena.homepage.showWelcome"
+  /// Optional first name used to personalise the homepage welcome greeting.
+  /// Local-only (@AppStorage); not synced to CloudKit.
+  static let welcomeName = "septena.homepage.welcomeName"
+  /// Today's on-device generated welcome lines, JSON-encoded and keyed by
+  /// phase. Reset whenever the day or `welcomeName` changes.
+  static let welcomeCache = "septena.homepage.welcomeCache"
   /// Time window (in days) the Correlations homepage mode computes over.
   /// Same key as the old Insights destination so prior preference carries
   /// forward.

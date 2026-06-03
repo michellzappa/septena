@@ -104,11 +104,14 @@ struct TodayTasksSection: View {
     if !tasks.isEmpty {
       VStack(alignment: .leading, spacing: 0) {
         sectionHeader("Tasks", tint: theme.color(for: "tasks"))
-        ForEach(tasks) { task in
-          TodayTaskRow(task: task, model: model, mutator: mutator,
-                       tint: theme.color(for: "tasks"))
-            .transition(.opacity)
+        VStack(spacing: 0) {
+          ForEach(tasks) { task in
+            TodayTaskRow(task: task, model: model, mutator: mutator,
+                         tint: theme.color(for: "tasks"))
+              .transition(.opacity)
+          }
         }
+        .nextSectionCard()
       }
     }
   }
@@ -497,9 +500,11 @@ struct NextOpenSection: View {
 
   var body: some View {
     let visible = orderedKeys.filter { !isEmpty($0) }
+    // Each block is a tinted header above its own rounded "pill" card (see
+    // `nextSectionCard`); the cards + the header's top inset separate the
+    // sections, so there's no hairline between them anymore.
     VStack(alignment: .leading, spacing: 0) {
-      ForEach(Array(visible.enumerated()), id: \.element) { index, key in
-        if index > 0 { Hairline().padding(.top, 8) }
+      ForEach(Array(visible.enumerated()), id: \.element) { _, key in
         block(for: key)
       }
     }
@@ -509,32 +514,47 @@ struct NextOpenSection: View {
   private func block(for key: String) -> some View {
     switch key {
     case "tasks":
-      // TodayTasksSection renders its own "Tasks" header + rows.
+      // TodayTasksSection renders its own "Tasks" header + pill card.
       TodayTasksSection(model: tasksModel)
 
     case "chores":
-      sectionHeader("Chores", tint: theme.color(for: "chores"))
-      ForEach(model.openChores) { chore in
-        ChoreRow(chore: chore, model: model, checklistMutator: checklistMutator,
-                 tint: theme.color(for: "chores"))
-          .transition(.opacity)
+      VStack(alignment: .leading, spacing: 0) {
+        sectionHeader("Chores", tint: theme.color(for: "chores"))
+        VStack(spacing: 0) {
+          ForEach(model.openChores) { chore in
+            ChoreRow(chore: chore, model: model, checklistMutator: checklistMutator,
+                     tint: theme.color(for: "chores"))
+              .transition(.opacity)
+          }
+        }
+        .nextSectionCard()
       }
 
     case "habits":
-      habitBucketHeader(bucket: currentHabitBucket,
-                        tint: theme.color(for: "habits"))
-      ForEach(habitsNow) { habit in
-        HabitRow(habit: habit, model: model, checklistMutator: checklistMutator,
-                 tint: theme.color(for: "habits"))
-          .transition(.opacity)
+      VStack(alignment: .leading, spacing: 0) {
+        habitBucketHeader(bucket: currentHabitBucket,
+                          tint: theme.color(for: "habits"))
+        VStack(spacing: 0) {
+          ForEach(habitsNow) { habit in
+            HabitRow(habit: habit, model: model, checklistMutator: checklistMutator,
+                     tint: theme.color(for: "habits"))
+              .transition(.opacity)
+          }
+        }
+        .nextSectionCard()
       }
 
     case "supplements":
-      sectionHeader("Supplements", tint: theme.color(for: "supplements"))
-      ForEach(model.openSupplements) { supp in
-        SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator,
-                      tint: theme.color(for: "supplements"))
-          .transition(.opacity)
+      VStack(alignment: .leading, spacing: 0) {
+        sectionHeader("Supplements", tint: theme.color(for: "supplements"))
+        VStack(spacing: 0) {
+          ForEach(model.openSupplements) { supp in
+            SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator,
+                          tint: theme.color(for: "supplements"))
+              .transition(.opacity)
+          }
+        }
+        .nextSectionCard()
       }
 
     default:
@@ -800,6 +820,24 @@ struct ChoreRow: View {
 }
 
 // MARK: - Shared chrome
+
+extension View {
+  /// Wraps a stack of Next rows in the same rounded "pill" card that the
+  /// Tasks / Goals drawers use (`DrawerSection`): a secondary-grouped fill
+  /// with 22pt continuous corners. Lets the Next screen read as grouped
+  /// cards on the light page background instead of a full-bleed list, so it
+  /// matches Week / Tasks / Goals. The section's tinted header sits *above*
+  /// this card (not inside), mirroring the drawer convention.
+  func nextSectionCard() -> some View {
+    self
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(
+        RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+          .fill(Theme.secondaryGroupedBackground)
+      )
+      .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+  }
+}
 
 // Reused across HabitRow / SupplementRow / ChoreRow for "Done" / "Skipped"
 // / defer-label pills. Pulled out of private scope so the chores mini-app

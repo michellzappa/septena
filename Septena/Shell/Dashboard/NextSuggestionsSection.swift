@@ -597,14 +597,17 @@ struct NextSuggestionsSection: View {
           .padding(.horizontal, Theme.hPadding)
           .padding(.top, Theme.sectionSpacing)
           .padding(.bottom, 6)
-        ForEach(items) { suggestion in
-          NextSuggestionRow(
-            suggestion: suggestion,
-            model: model,
-            nav: nav,
-            tint: theme.color(for: suggestion.kind.sectionKey)
-          )
+        VStack(spacing: 0) {
+          ForEach(items) { suggestion in
+            NextSuggestionRow(
+              suggestion: suggestion,
+              model: model,
+              nav: nav,
+              tint: theme.color(for: suggestion.kind.sectionKey)
+            )
+          }
         }
+        .nextSectionCard()
       }
     }
   }

@@ -19,11 +19,17 @@ struct NextView: View {
         if model.hasLoaded && !model.hasAnyOpen
             && tasksModel.openTasks.isEmpty
             && suggestionsModel.suggestions.isEmpty {
+          // Match the other drawers' empty state: the message lives in a
+          // rounded "pill" card (see `nextSectionCard`) rather than floating
+          // bare on the grouped background.
           Text("Nothing here yet")
-            .font(.septenaMeta)
+            .font(.callout)
             .foregroundStyle(.secondary)
-            .padding(.horizontal, Theme.hPadding)
-            .padding(.top, 40)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Theme.Spacing.lg)
+            .padding(.vertical, Theme.Spacing.md)
+            .nextSectionCard()
+            .padding(.top, Theme.sectionSpacing)
         }
 
         NextSuggestionsSection(model: suggestionsModel)
@@ -39,8 +45,12 @@ struct NextView: View {
 
         Spacer(minLength: 140)
       }
+      // Match the Tasks / Goals drawers: ~20pt page inset so the rounded
+      // section "pills" (see `nextSectionCard`) breathe against the light
+      // grouped background instead of touching the screen edges.
+      .padding(.horizontal, 20)
     }
-    .background(Theme.paperBackground)
+    .background(Theme.groupedBackground)
     .septenaInlineTitle()
     .task {
       model.paintFromCache()

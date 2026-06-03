@@ -308,6 +308,12 @@ extension Font {
   static let septenaScreenTitle  = Font.system(.largeTitle, weight: .semibold)
   /// Dashboard welcome greeting — Fraunces SemiBold. The one Fraunces user.
   static let septenaWelcomeTitle = Font.custom(frauncesSemiBold, size: 34, relativeTo: .largeTitle)
+  /// App wordmark — Fraunces SemiBold, used where the name *is* the brand
+  /// (the About pane). Shares the editorial face of the Dashboard welcome.
+  static let septenaWordmark     = Font.custom(frauncesSemiBold, size: 28, relativeTo: .title)
+  /// Goal card title — Fraunces SemiBold. A goal's first line is its name,
+  /// so it gets the editorial face; the rest of the text reads as body.
+  static let septenaGoalTitle    = Font.custom(frauncesSemiBold, size: 22, relativeTo: .title3)
   /// Section header within a screen — SF Pro semibold at title2.
   static let septenaSectionTitle = Font.system(.title2, weight: .semibold)
   /// Card header — SF Pro at headline (already semibold by default).
@@ -332,4 +338,10 @@ extension Font {
   static let septenaMeta         = Font.system(.footnote).monospacedDigit()
   static let septenaMetaStrong   = Font.system(.footnote, weight: .semibold).monospacedDigit()
   static let septenaMetric       = Font.system(.body, design: .monospaced).monospacedDigit()
+}
+
+extension Color {
+  /// Anthropic's brand accent (the "Claude" terracotta, #D97757). Used to tint
+  /// Claude-specific surfaces like the reconnect banner.
+  static let claudeAccent = Color(red: 0xD9 / 255, green: 0x77 / 255, blue: 0x57 / 255)
 }

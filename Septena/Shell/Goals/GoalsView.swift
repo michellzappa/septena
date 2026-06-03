@@ -209,17 +209,36 @@ struct GoalTile: View {
 
   private var isPlaceholder: Bool { goal.text == "New goal" }
 
+  /// First line is the goal's title; everything after is its description.
+  private var titleAndBody: (title: String, body: String) {
+    let lines = goal.text.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
+    let title = lines.first.map(String.init) ?? goal.text
+    let body = lines.count > 1
+      ? String(lines[1]).trimmingCharacters(in: .whitespacesAndNewlines)
+      : ""
+    return (title, body)
+  }
+
   private var progress: GoalMetricProgress? {
     GoalMetricEvaluator.evaluate(goal: goal, context: context)
   }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
-      Text(isPlaceholder ? "New goal" : goal.text)
-        .font(.septenaTileTitle)
-        .foregroundStyle(isPlaceholder ? .secondary : .primary)
-        .multilineTextAlignment(.leading)
-        .frame(maxWidth: .infinity, alignment: .leading)
+      VStack(alignment: .leading, spacing: 6) {
+        Text(isPlaceholder ? "New goal" : titleAndBody.title)
+          .font(.septenaGoalTitle)
+          .foregroundStyle(isPlaceholder ? .secondary : .primary)
+          .multilineTextAlignment(.leading)
+          .frame(maxWidth: .infinity, alignment: .leading)
+        if !isPlaceholder, !titleAndBody.body.isEmpty {
+          Text(titleAndBody.body)
+            .font(.septenaNotes)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+      }
       if let progress {
         GoalMetricProgressView(progress: progress, accent: accent)
       }
@@ -237,7 +256,7 @@ struct GoalTile: View {
     )
     .overlay(
       RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-        .strokeBorder(accent, lineWidth: 1.5)
+        .strokeBorder(accent.opacity(0.5), lineWidth: 1.5)
     )
     .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
     .contentShape(Rectangle())
@@ -249,14 +268,19 @@ struct GoalTile: View {
     return LazyVGrid(columns: columns, alignment: .leading, spacing: 6) {
       ForEach(goal.sections, id: \.self) { key in
         let color = theme.color(for: key)
-        Text(key.capitalized)
-          .font(.caption2.weight(.medium))
-          .lineLimit(1)
-          .padding(.horizontal, 8)
-          .padding(.vertical, 3)
-          .background(color.opacity(0.15))
-          .foregroundStyle(color)
-          .clipShape(Capsule())
+        Label {
+          Text(key.capitalized)
+        } icon: {
+          Image(systemName: theme.icon(for: key))
+        }
+        .labelStyle(.titleAndIcon)
+        .font(.caption2.weight(.medium))
+        .lineLimit(1)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(color.opacity(0.15))
+        .foregroundStyle(color)
+        .clipShape(Capsule())
       }
     }
   }
