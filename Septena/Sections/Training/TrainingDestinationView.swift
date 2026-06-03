@@ -1970,7 +1970,11 @@ struct TrainingSessionView: View {
         .first(where: { $0.id == d.sessionType })?.kind ?? .mixed
       completionStats = SessionStats(from: d, kind: routineKind)
       #if os(iOS)
-      TrainingLiveActivityCoordinator.shared.end(from: d, immediate: false)
+      // Concluding the session must clear the Live Activity, not leave it
+      // frozen on the Lock Screen / Dynamic Island. `.default` would linger
+      // up to 4h; the in-app completion sheet already shows the final stats,
+      // so dismiss immediately.
+      TrainingLiveActivityCoordinator.shared.end(from: d, immediate: true)
       #endif
     }
     store.discard(endLiveActivity: false)
