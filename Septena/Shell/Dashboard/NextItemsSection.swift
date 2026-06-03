@@ -340,7 +340,10 @@ final class NextItemsModel {
 
   func toggleHabit(_ habit: HabitDayItem, mutator: ChecklistMutator, motion: A11yMotion) {
     let next = !habit.done
-    if next { Haptics.success() } else { Haptics.tap() }
+    // Done-side haptic + flourish is owned by the caller (HabitRow), which
+    // can reach the environment and branch milestone (.ignition) vs everyday
+    // (.tally). Undo stays a light tap here so every host feels the un-check.
+    if !next { Haptics.tap() }
     if let i = habits.firstIndex(where: { $0.id == habit.id }) {
       habits[i].done = next
       if next { habits[i].skipped = false }
@@ -368,7 +371,9 @@ final class NextItemsModel {
 
   func toggleSupplement(_ supp: SupplementDayItem, mutator: ChecklistMutator, motion: A11yMotion) {
     let next = !supp.done
-    if next { Haptics.success() } else { Haptics.tap() }
+    // Taken-side haptic + flourish is owned by the caller (SupplementRow);
+    // undo stays a light tap here.
+    if !next { Haptics.tap() }
     if let i = supplements.firstIndex(where: { $0.id == supp.id }) {
       supplements[i].done = next
       supplements[i].time = next ? SeptenaDate.nowHHMM : nil
@@ -379,7 +384,7 @@ final class NextItemsModel {
   }
 
   func completeChore(_ chore: ChoreItem, mutator: ChecklistMutator, motion: A11yMotion) {
-    Haptics.success()
+    // Completion haptic + flourish (.settle) is owned by the caller (ChoreRow).
     completedChores.insert(chore.id)
     actedChores.insert(chore.id)
     deferredChores.removeValue(forKey: chore.id)
@@ -574,12 +579,22 @@ struct HabitRow: View {
         let done = !habit.done
         model.toggleHabit(habit, mutator: checklistMutator, motion: motion)
         let streak = ChecklistMirror.habitStreak(context: modelContext, habitId: habit.id, asOf: SeptenaDate.today)
-        if done, let m = StreakMilestones.reached(streak), HabitMilestoneStore.lastCelebrated(habit.id) < m {
-          HabitMilestoneStore.setCelebrated(habit.id, m)
-          Haptics.success()
-          logCommit?.fire(.ignition(accent: theme.color(for: "habits"), streak: streak))
-          A11y.announce("\(streak) day streak!")
-        } else if !done {
+        let accent = theme.color(for: "habits")
+        if done {
+          if let m = StreakMilestones.reached(streak), HabitMilestoneStore.lastCelebrated(habit.id) < m {
+            // Milestone — the loud version: rings + streak number.
+            HabitMilestoneStore.setCelebrated(habit.id, m)
+            Haptics.success()
+            logCommit?.fire(.ignition(accent: accent, streak: streak))
+            A11y.announce("\(streak) day streak!")
+          } else {
+            // Everyday completion — continuity, not celebration: a mark joins
+            // the row. Longer streaks show a fuller row (more priors).
+            let intensity = min(2.0, max(0.6, Double(streak) / 5.0))
+            Haptics.play(CommitMotion.tally.hapticSpec(intensity: intensity))
+            logCommit?.fire(.flourish(motion: .tally, accent: accent, intensity: intensity))
+          }
+        } else {
           HabitMilestoneStore.reconcile(habit.id, currentStreak: streak)
         }
       }
@@ -627,11 +642,28 @@ struct SupplementRow: View {
   let tint: Color
   var onDelete: (() -> Void)? = nil
   @Environment(\.a11yMotion) private var motion
+  @Environment(SectionTheme.self) private var theme
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
+
+  /// Toggle + (on taken) the `.cascade` celebration: marks dropping in
+  /// sequence, scaled by how many supplements are now taken today. Undo's
+  /// light tap is handled inside the model.
+  private func commitToggle() {
+    let taken = !supplement.done
+    model.toggleSupplement(supplement, mutator: checklistMutator, motion: motion)
+    guard taken else { return }
+    let count = model.supplements.filter { $0.done }.count
+    let intensity = min(1.5, max(0.7, Double(count) / 4.0))
+    Haptics.play(CommitMotion.cascade.hapticSpec(intensity: intensity))
+    logCommit?.fire(.flourish(motion: .cascade,
+                              accent: theme.color(for: "supplements"),
+                              intensity: intensity))
+  }
 
   var body: some View {
     HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
       TaskCheckbox(tint: tint, isDone: supplement.done) {
-        model.toggleSupplement(supplement, mutator: checklistMutator, motion: motion)
+        commitToggle()
       }
       .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
       Text(supplement.emoji ?? "•").font(.body)
@@ -652,7 +684,7 @@ struct SupplementRow: View {
     // shows only where a host owns the record (the Supplements mini-app).
     .contextMenu {
       Button {
-        model.toggleSupplement(supplement, mutator: checklistMutator, motion: motion)
+        commitToggle()
       } label: {
         Label(supplement.done ? "Mark not taken" : "Mark taken",
               systemImage: supplement.done ? "arrow.uturn.left" : "checkmark")
@@ -677,6 +709,8 @@ struct ChoreRow: View {
   let tint: Color
   var onDelete: (() -> Void)? = nil
   @Environment(\.a11yMotion) private var motion
+  @Environment(SectionTheme.self) private var theme
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
   var body: some View {
     let isDone = model.completedChores.contains(chore.id)
@@ -692,6 +726,11 @@ struct ChoreRow: View {
           model.uncompleteChore(chore, mutator: checklistMutator)
         } else {
           model.completeChore(chore, mutator: checklistMutator, motion: motion)
+          // Filed onto the done pile. Settle ignores intensity (done is binary).
+          Haptics.play(CommitMotion.settle.hapticSpec(intensity: 1))
+          logCommit?.fire(.flourish(motion: .settle,
+                                    accent: theme.color(for: "chores"),
+                                    intensity: 1))
         }
       }
       .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }

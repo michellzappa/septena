@@ -11,7 +11,7 @@ import SwiftData
 // Reduce Motion is honored centrally in `LogCommitOverlay`: when it's on,
 // the visual is skipped entirely and only the call site's haptic +
 // `A11y.announce(...)` carry the confirmation. Decorative motion is a hard
-// opt-out, not a hint — same contract as `ConfettiBurst` /
+// opt-out, not a hint — same contract as `CommitFlourish` /
 // `MoodCommitAnimation`.
 
 // MARK: - Style catalog
@@ -40,7 +40,7 @@ enum LogCommitStyle: Equatable {
 final class LogCommitCenter {
   /// The style to play on the next trigger bump.
   private(set) var style: LogCommitStyle?
-  /// Replay counter — same contract as `ConfettiBurst.trigger`.
+  /// Replay counter — same contract as `CommitFlourish`'s `trigger`.
   private(set) var trigger: Int = 0
 
   /// Fire a celebration. Safe to call from any foreground user-log site;
@@ -161,7 +161,7 @@ func completeHabit(id: String, date: String, done: Bool,
 
 /// Radiating rings + the streak number springing in. The "your streak
 /// crossed a milestone" moment the dashboard advertised but never paid off.
-private struct IgnitionView: View {
+struct IgnitionView: View {
   let accent: Color
   let streak: Int
   let trigger: Int

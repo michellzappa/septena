@@ -1,3 +1,30 @@
+// MARK: - Composable haptic patterns (motion-agnostic)
+//
+// A `HapticPatternSpec` is a sequence of beats plus a non-CoreHaptics
+// fallback. It carries no app-layer concepts (kept that way so this file
+// can stay a member of every target — Watch, Widgets — that has no notion
+// of CommitMotion). The CommitMotion→spec mapping lives in the app layer.
+
+/// One beat in a composed haptic: a sharp tap (`.transient`) or a swell
+/// (`.continuous`, which uses `duration`). Intensity/sharpness are the
+/// CoreHaptics 0…1 parameters.
+struct HapticBeat {
+  enum Kind { case transient, continuous }
+  var kind: Kind
+  var time: Double          // seconds from the pattern start
+  var duration: Double = 0  // continuous only; ignored for transient
+  var intensity: Float
+  var sharpness: Float
+}
+
+/// A composed commit haptic plus the simple generator to fall back to when
+/// CoreHaptics is unavailable (older hardware) or fails.
+struct HapticPatternSpec {
+  enum Fallback { case tap, tick, success }
+  var beats: [HapticBeat]
+  var fallback: Fallback
+}
+
 #if canImport(UIKit)
 import CoreHaptics
 import UIKit
@@ -70,6 +97,46 @@ enum Haptics {
     }
   }
 
+  /// Play a composed pattern. Falls back to the spec's simple generator if
+  /// the hardware has no CoreHaptics or pattern playback throws.
+  static func play(_ spec: HapticPatternSpec) {
+    guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else {
+      runFallback(spec.fallback)
+      return
+    }
+    do {
+      let engine = try coreHapticEngine()
+      let events = spec.beats.map { beat -> CHHapticEvent in
+        let params = [
+          CHHapticEventParameter(parameterID: .hapticIntensity, value: beat.intensity),
+          CHHapticEventParameter(parameterID: .hapticSharpness, value: beat.sharpness),
+        ]
+        switch beat.kind {
+        case .transient:
+          return CHHapticEvent(eventType: .hapticTransient,
+                               parameters: params, relativeTime: beat.time)
+        case .continuous:
+          return CHHapticEvent(eventType: .hapticContinuous,
+                               parameters: params, relativeTime: beat.time,
+                               duration: beat.duration)
+        }
+      }
+      let pattern = try CHHapticPattern(events: events, parameters: [])
+      let player = try engine.makePlayer(with: pattern)
+      try player.start(atTime: 0)
+    } catch {
+      runFallback(spec.fallback)
+    }
+  }
+
+  private static func runFallback(_ fallback: HapticPatternSpec.Fallback) {
+    switch fallback {
+    case .tap:     tap()
+    case .tick:    tick()
+    case .success: success()
+    }
+  }
+
   private static func coreHapticEngine() throws -> CHHapticEngine {
     if let coreEngine { return coreEngine }
 
@@ -97,6 +164,7 @@ enum Haptics {
   static func success() {}
   static func warning() {}
   static func aiGeneration() {}
+  static func play(_ spec: HapticPatternSpec) {}
 }
 
 #endif

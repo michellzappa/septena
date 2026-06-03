@@ -2090,7 +2090,7 @@ struct TrainingExerciseCard: View {
   /// Mean pace (m/min) from this exercise's history — seeds the cardio
   /// duration→distance auto-preset. Computed on appear for cardio cards.
   @State private var avgPace: Double? = nil
-  /// Bump on a successful Done tap to fire `ConfettiBurst` + a
+  /// Bump on a successful Done tap to fire the `.burst` flourish + a
   /// `symbolEffect` bounce on the status check. Subtle celebration —
   /// no banner, no sound, just the row briefly confirming the rep.
   @State private var celebrate = 0
@@ -2469,7 +2469,9 @@ struct TrainingExerciseCard: View {
       .tint(accent)
       .disabled(entry.status == .saving)
       .overlay(alignment: .center) {
-        ConfettiBurst(trigger: celebrate, accent: accent)
+        // Per-set confirm — the shared `.burst`, kept restrained (low
+        // intensity) since it fires on every set.
+        CommitFlourish(motion: .burst, accent: accent, intensity: 0.5, trigger: celebrate)
       }
     }
     .padding(.top, 12)

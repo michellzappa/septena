@@ -343,6 +343,7 @@ struct SettingsView: View {
     case appIcon
     case layout
     case correlations
+    case motionGallery
     case section(String)
   }
 
@@ -433,7 +434,7 @@ struct SettingsView: View {
   #endif
 
   private var staticDestinations: [SettingsDestination] {
-    [.general, .integrations, .importExport, .skills, .manageSections, .privacy, .about]
+    [.general, .integrations, .importExport, .skills, .manageSections, .motionGallery, .privacy, .about]
   }
 
   /// Per-section sidebar rows, ordered by the user's saved `sectionOrder`
@@ -492,6 +493,7 @@ struct SettingsView: View {
     case .siriShortcuts: return "Siri & Shortcuts"
     case .privacy:      return "Privacy"
     case .about:        return "About"
+    case .motionGallery: return "Motion Gallery"
     case .manageSections: return "Manage Sections"
     case .section(let key):
       return store.sections.first(where: { $0.key == key })?.label
@@ -515,6 +517,7 @@ struct SettingsView: View {
     case .siriShortcuts: return "mic"
     case .privacy:      return "hand.raised"
     case .about:        return "info.circle"
+    case .motionGallery: return "wand.and.rays"
     case .manageSections: return "square.grid.2x2"
     case .section:      return ""  // unreachable; sectionRow handles section dests
     }
@@ -553,6 +556,7 @@ struct SettingsView: View {
     case .siriShortcuts:     SiriShortcutsSettingsPane()
     case .privacy:           PrivacySettingsPane()
     case .about:             AboutSettingsPane()
+    case .motionGallery:     MotionGalleryPane()
     case .manageSections:    ManageSectionsPane()
     case .section(let key):  SectionDetailPane(sectionKey: key)
     }
@@ -1249,6 +1253,194 @@ struct QuickActionsSettingsPane: View {
     #if os(iOS)
     QuickActionsApplier.apply()
     #endif
+  }
+}
+
+// MARK: - Motion Gallery
+//
+// A test surface for the commit-motion vocabulary: fire every log
+// flourish (and its matched haptic) on demand, tune intensity / accent,
+// and feel how each primitive reads. Uses the SAME renderers and haptics
+// a real log site plays (`CommitFlourish` / `IgnitionView` /
+// `CommitMotion.hapticSpec`) — so what you feel here is what ships.
+// Reduce Motion still suppresses the visual centrally; the haptic fires.
+
+struct MotionGalleryPane: View {
+  @State private var intensity: Double = 1.0
+  @State private var accentID: String = MotionGalleryPane.accents[0].id
+  @State private var streak: Int = 30
+  @State private var current: Demo = .burst
+  @State private var trigger: Int = 0
+
+  private var accent: Color {
+    Self.accents.first { $0.id == accentID }?.color ?? .green
+  }
+
+  /// One row per thing the gallery can fire: the seven `CommitMotion`
+  /// primitives plus `.ignition` (a sibling `LogCommitStyle`, not a
+  /// CommitMotion — the habit-streak milestone).
+  private enum Demo: String, CaseIterable, Identifiable {
+    case burst, snap, bloom, sink, cascade, tally, settle, ignition
+    case ripple, arc, fill, streak
+    var id: String { rawValue }
+
+    /// The CommitMotion this row plays, or nil for `.ignition`.
+    var motion: CommitMotion? {
+      switch self {
+      case .burst:    return .burst
+      case .snap:     return .snap
+      case .bloom:    return .bloom
+      case .sink:     return .sink
+      case .cascade:  return .cascade
+      case .tally:    return .tally
+      case .settle:   return .settle
+      case .ignition: return nil
+      case .ripple:   return .ripple
+      case .arc:      return .arc
+      case .fill:     return .fill
+      case .streak:   return .streak
+      }
+    }
+
+    var title: String {
+      switch self {
+      case .burst:    return "Burst"
+      case .snap:     return "Snap"
+      case .bloom:    return "Bloom"
+      case .sink:     return "Sink"
+      case .cascade:  return "Cascade"
+      case .tally:    return "Tally"
+      case .settle:   return "Settle"
+      case .ignition: return "Ignition"
+      case .ripple:   return "Ripple"
+      case .arc:      return "Arc"
+      case .fill:     return "Fill"
+      case .streak:   return "Streak"
+      }
+    }
+
+    var subtitle: String {
+      switch self {
+      case .burst:    return "Confetti — celebratory (Mood HAP, groceries)"
+      case .snap:     return "Ring + flash — releasing tension (Mood HAN)"
+      case .bloom:    return "Soft swell — settling (caffeine, nutrition)"
+      case .sink:     return "Quiet dot — acknowledgment (gut, late-night)"
+      case .cascade:  return "Marks drop in sequence — quantity (supplements)"
+      case .tally:    return "A mark joins the row — continuity (habits)"
+      case .settle:   return "Row files onto the pile — done (chores)"
+      case .ignition: return "Rings + streak number — milestone (7/30/100/365)"
+      case .ripple:   return "Experimental · full-screen sonar rings"
+      case .arc:      return "Experimental · big glowing comet arc — toward a target"
+      case .fill:     return "Experimental · full-page flood bottom→top (intensity)"
+      case .streak:   return "Experimental · full-screen glowing comet sweep"
+      }
+    }
+  }
+
+  private struct AccentChoice: Identifiable {
+    let id: String
+    let color: Color
+  }
+  private static let accents: [AccentChoice] = [
+    .init(id: "green",  color: parseHexColor("#22c55e")),
+    .init(id: "blue",   color: parseHexColor("#3b82f6")),
+    .init(id: "orange", color: parseHexColor("#f97316")),
+    .init(id: "purple", color: parseHexColor("#8b5cf6")),
+    .init(id: "red",    color: parseHexColor("#ef4444")),
+    .init(id: "cyan",   color: parseHexColor("#06b6d4")),
+  ]
+
+  var body: some View {
+    Form {
+      Section {
+        ForEach(Demo.allCases) { demo in
+          Button { fire(demo) } label: { row(demo) }
+            .buttonStyle(.plain)
+        }
+      } header: {
+        Text("Tap to play")
+      } footer: {
+        Text("Each row fires the same renderer and haptic a real log uses. Under Reduce Motion the visual is suppressed (by design) — you'll still feel the haptic.")
+      }
+
+      Section("Accent") {
+        HStack(spacing: 12) {
+          ForEach(Self.accents) { choice in
+            Button {
+              accentID = choice.id
+              fire(current)
+            } label: {
+              Circle()
+                .fill(choice.color)
+                .frame(width: 28, height: 28)
+                .overlay(
+                  Circle()
+                    .strokeBorder(Color.primary.opacity(accentID == choice.id ? 0.9 : 0), lineWidth: 2)
+                    .padding(-3)
+                )
+            }
+            .buttonStyle(.plain)
+          }
+          Spacer()
+        }
+        .padding(.vertical, 2)
+      }
+
+      Section {
+        VStack(alignment: .leading, spacing: 4) {
+          HStack {
+            Text("Intensity")
+            Spacer()
+            Text(String(format: "%.2f", intensity))
+              .font(.callout.monospacedDigit())
+              .foregroundStyle(.secondary)
+          }
+          Slider(value: $intensity, in: 0.5...1.5)
+        }
+        Stepper("Streak: \(streak) days", value: $streak, in: 1...365)
+      } header: {
+        Text("Parameters")
+      } footer: {
+        Text("Intensity scales burst / snap / bloom / cascade / tally loudness — sink and settle ignore it. Streak drives the Ignition milestone number.")
+      }
+    }
+    .formStyle(.grouped)
+    .overlay { flourishOverlay }
+  }
+
+  @ViewBuilder
+  private var flourishOverlay: some View {
+    if current == .ignition {
+      IgnitionView(accent: accent, streak: streak, trigger: trigger)
+        .allowsHitTesting(false)
+    } else if let motion = current.motion {
+      CommitFlourish(motion: motion, accent: accent, intensity: intensity, trigger: trigger)
+    }
+  }
+
+  private func row(_ demo: Demo) -> some View {
+    HStack(spacing: 12) {
+      Circle()
+        .fill(accent.opacity(0.18))
+        .frame(width: 30, height: 30)
+        .overlay(Image(systemName: "play.fill").font(.caption).foregroundStyle(accent))
+      VStack(alignment: .leading, spacing: 2) {
+        Text(demo.title).foregroundStyle(.primary)
+        Text(demo.subtitle).font(.caption).foregroundStyle(.secondary)
+      }
+      Spacer()
+    }
+    .contentShape(Rectangle())
+  }
+
+  private func fire(_ demo: Demo) {
+    current = demo
+    if let motion = demo.motion {
+      Haptics.play(motion.hapticSpec(intensity: intensity))
+    } else {
+      Haptics.success()  // ignition keeps the milestone success haptic
+    }
+    trigger += 1
   }
 }
 

@@ -259,7 +259,7 @@ enum Theme {
   /// These are *curves*, not gated animations — always apply them through
   /// `.a11yAnimation(_:value:)` or `A11yMotion.run` so Reduce Motion still
   /// suppresses the motion. (Decorative celebrations gate themselves; see
-  /// `ConfettiBurst` / `MoodCommitAnimation`.)
+  /// `CommitFlourish` / `MoodCommitAnimation`.)
   enum Motion {
     /// Default UI transition — selection, content swaps, value tweens.
     /// SwiftUI's `.snappy`: responsive with a touch of give.
