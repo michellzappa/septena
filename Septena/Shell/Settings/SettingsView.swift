@@ -2706,8 +2706,8 @@ private struct ClaudeGatewayDetail: View {
           HStack {
             Label("Status", systemImage: "sparkles")
             Spacer()
-            Text(provider.lastError == nil ? "Connected" : "Needs attention")
-              .foregroundStyle(provider.lastError == nil ? .green : .orange)
+            Text(provider.needsReauth ? "Reconnect needed" : (provider.lastError == nil ? "Connected" : "Needs attention"))
+              .foregroundStyle(provider.needsReauth || provider.lastError != nil ? .orange : .green)
           }
           HStack {
             Label("Last authenticated", systemImage: "clock.arrow.circlepath")

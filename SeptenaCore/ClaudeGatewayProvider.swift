@@ -65,6 +65,11 @@ public final class ClaudeGatewayProvider {
   public private(set) var lastRefreshAt: Date?
   public private(set) var lastError: String?
   public private(set) var isRefreshing = false
+  /// Token is (presumed) stale and needs an interactive re-mint. Set on
+  /// foreground when the last refresh is older than the token lifetime —
+  /// the UI surfaces a subtle "reconnect" cue rather than auto-popping the
+  /// sign-in. Cleared on a successful refresh.
+  public private(set) var needsReauth = false
 
   private let session: URLSession
   // Retained for the duration of a sign-in.
@@ -83,13 +88,21 @@ public final class ClaudeGatewayProvider {
 
   // MARK: API
 
-  /// Auto path (foreground), throttled. Re-mints the token if it's stale.
+  /// Auto path (foreground). NEVER presents UI — a sign-in sheet can only
+  /// be shown from an explicit user action. Here we just decide whether the
+  /// token is stale and set `needsReauth` so the homepage can show a subtle
+  /// reconnect cue. `force` (a user action) does present and re-mint.
   public func refreshIfNeeded(force: Bool = false) async {
     guard isEnabled else { return }
-    if !force, let last = lastRefreshAt, Date().timeIntervalSince(last) < Self.refreshInterval {
+    if force {
+      await refreshNow()
       return
     }
-    await refreshNow()
+    if let last = lastRefreshAt, Date().timeIntervalSince(last) < Self.refreshInterval {
+      needsReauth = false
+    } else {
+      needsReauth = true // stale (or never authed) — flag, don't pop UI
+    }
   }
 
   /// Mint a token and push it now. Updates observable status either way.
@@ -102,6 +115,7 @@ public final class ClaudeGatewayProvider {
       let token = try await mintWebAuthToken()
       try await push(ckWebAuthToken: token)
       lastError = nil
+      needsReauth = false
       lastRefreshAt = Date()
       UserDefaults.standard.set(lastRefreshAt!.timeIntervalSince1970, forKey: Self.lastRefreshKey)
       logger.info("Claude gateway token refreshed")
@@ -119,6 +133,7 @@ public final class ClaudeGatewayProvider {
   public func disconnect() {
     isEnabled = false
     lastError = nil
+    needsReauth = false
   }
 
   // MARK: Internals

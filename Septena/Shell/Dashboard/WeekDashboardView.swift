@@ -196,6 +196,7 @@ struct WeekDashboardView: View {
       toolbar: { homeToolbar }
     ) {
       VStack(spacing: 18) {
+        ClaudeReconnectBanner()
         if showWelcome { WelcomeHeader(now: clock.now) }
         if showTodayTimeline { todayTimeline }
         layoutBody
@@ -2647,5 +2648,44 @@ enum GroceryStockHistory {
       }
     }
     return out
+  }
+}
+
+// MARK: - Claude reconnect banner
+//
+// Subtle, non-modal cue on the homepage shown only when the Claude gateway
+// token has gone stale (the app never auto-pops the Apple sign-in). Tapping
+// it is an explicit user action, so presenting the sign-in here is expected.
+private struct ClaudeReconnectBanner: View {
+  @State private var provider = ClaudeGatewayProvider.shared
+
+  var body: some View {
+    if provider.isEnabled && provider.needsReauth {
+      Button {
+        Task { await provider.refreshNow() }
+      } label: {
+        HStack(spacing: 8) {
+          Image("ClaudeMark")
+            .renderingMode(.template)
+            .resizable()
+            .scaledToFit()
+            .frame(width: 15, height: 15)
+          Text("Claude needs to reconnect")
+            .font(.subheadline)
+          Spacer()
+          if provider.isRefreshing {
+            ProgressView().controlSize(.small)
+          } else {
+            Text("Reconnect").font(.subheadline.weight(.semibold))
+          }
+        }
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
+      }
+      .buttonStyle(.plain)
+    }
   }
 }
