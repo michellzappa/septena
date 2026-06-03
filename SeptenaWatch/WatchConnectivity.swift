@@ -1,5 +1,6 @@
 import CloudKit
 import WidgetKit
+import WatchKit
 
 // MARK: - CloudKit constants (must match SeptenaCloudKit in the iOS target)
 
@@ -13,9 +14,9 @@ private let ckZoneID      = CKRecordZone.ID(
 // MARK: - WatchConnectivity
 
 /// CloudKit-backed data source for the watch's Next view.
-/// Reads HabitDefinition/Event, SupplementDefinition/Event, and
-/// ChoreDefinition/Event directly from the private CK database —
-/// no WCSession or FastAPI dependency.
+/// Reads one precomputed `WatchSnapshot` record (written by the iPhone) for the
+/// list, and writes completion events straight to the `septena-v1` zone — no
+/// WCSession or FastAPI dependency.
 @Observable
 final class WatchConnectivity {
   static let shared = WatchConnectivity()
@@ -24,11 +25,33 @@ final class WatchConnectivity {
   var bucket: String = ""
   var isLoading = false
   var errorMessage: String?
+  /// Items tapped this session — held visible (struck through) for a beat
+  /// before they fade, mirroring the iPhone's Next behaviour.
+  var completedIDs: Set<String> = []
 
   private let db: CKDatabase
+  /// The iPhone writes the snapshot to the default private zone.
+  private let snapshotRecordID = CKRecord.ID(recordName: "watch-next-snapshot")
 
   private init() {
     db = CKContainer(identifier: ckContainerID).privateCloudDatabase
+  }
+
+  // MARK: - Local "done today" (sticky until the phone republishes)
+
+  private let doneStore = UserDefaults.standard
+  private func localDoneIDs(date: String) -> Set<String> {
+    guard doneStore.string(forKey: "doneLocalDate") == date else { return [] }
+    return Set(doneStore.stringArray(forKey: "doneLocalIDs") ?? [])
+  }
+  private func markDoneLocally(id: String, date: String) {
+    if doneStore.string(forKey: "doneLocalDate") != date {
+      doneStore.set(date, forKey: "doneLocalDate")
+      doneStore.set([String](), forKey: "doneLocalIDs")
+    }
+    var ids = doneStore.stringArray(forKey: "doneLocalIDs") ?? []
+    if !ids.contains(id) { ids.append(id) }
+    doneStore.set(ids, forKey: "doneLocalIDs")
   }
 
   // MARK: - Date helpers
@@ -68,90 +91,52 @@ final class WatchConnectivity {
     errorMessage = nil
 
     do {
-      let date = today
-      let bkt  = currentBucket()
+      let bkt = currentBucket()
 
-      // One zone replay covers every record type — avoids per-type
-      // CKQuery, which would require a Queryable index on `recordName`.
-      let byType = try await fetchAllByType(recordTypes: [
-        "HabitDefinition", "HabitEvent",
-        "SupplementDefinition", "SupplementEvent",
-        "ChoreDefinition", "ChoreEvent",
-      ])
-      let habitDefRecs   = byType["HabitDefinition", default: []]
-      let habitEventRecs = byType["HabitEvent", default: []]
-      let suppDefRecs    = byType["SupplementDefinition", default: []]
-      let suppEventRecs  = byType["SupplementEvent", default: []]
-      let choreDefRecs   = byType["ChoreDefinition", default: []]
-      let choreEventRecs = byType["ChoreEvent", default: []]
-
-      // Decode into lightweight value types.
-      let habitDefs = habitDefRecs.map(HabitDef.init)
-        .sorted { $0.sortIndex < $1.sortIndex }
-      let doneHabitIDs = Set(
-        habitEventRecs
-          .compactMap { HabitEventRec($0) }
-          .filter { $0.date == date && $0.done }
-          .map(\.habitID)
-      )
-
-      let suppDefs = suppDefRecs.map(SuppDef.init)
-        .sorted { $0.sortIndex < $1.sortIndex }
-      let doneSupplementIDs = Set(
-        suppEventRecs
-          .compactMap { SuppEventRec($0) }
-          .filter { $0.date == date && $0.done }
-          .map(\.supplementID)
-      )
-
-      let choreDefs = choreDefRecs.map(ChoreDef.init)
-        .sorted { $0.sortIndex < $1.sortIndex }
-      let choreEvents = choreEventRecs.compactMap(ChoreEventRec.init)
-        .sorted { $0.sortKey < $1.sortKey }
-      let eventsByChore = Dictionary(grouping: choreEvents, by: \.choreID)
-
-      // Build the items list.
-      var result: [NextItem] = []
-      var sortKey = 0
-
-      // 1. Habits in the current bucket that are not yet done today.
-      for h in habitDefs where h.bucket == bkt && !doneHabitIDs.contains(h.id) {
-        result.append(NextItem(
-          id: h.id, kind: "habit",
-          title: [h.emoji, h.title].compactMap { $0 }.joined(separator: " "),
-          subtitle: nil, trailing: nil, overdue: false, sortKey: sortKey
-        ))
-        sortKey += 1
+      // Confirm CloudKit has a usable account first — otherwise the read can
+      // block indefinitely with no feedback.
+      let container = CKContainer(identifier: ckContainerID)
+      let status = try await container.accountStatus()
+      guard status == .available else {
+        errorMessage = "iCloud not available on watch (status: \(accountStatusLabel(status)))"
+        isLoading = false
+        return
       }
 
-      // 2. Supplements not yet done today.
-      for s in suppDefs where !doneSupplementIDs.contains(s.id) {
-        result.append(NextItem(
-          id: s.id, kind: "supplement",
-          title: [s.emoji, s.title].compactMap { $0 }.joined(separator: " "),
-          subtitle: nil, trailing: nil, overdue: false, sortKey: sortKey
-        ))
-        sortKey += 1
+      // One O(1) read: the iPhone precomputes the whole day's open checklist
+      // into a single `WatchSnapshot` record (default zone). No zone replay.
+      // Timed out so a stall surfaces as an error, never an endless spinner.
+      let record = try await withTimeout(seconds: 15) { [self] in
+        try await db.record(for: snapshotRecordID)
+      }
+      guard
+        let payload  = record["payload"] as? Data,
+        let response = try? JSONDecoder().decode(NextItemsResponse.self, from: payload)
+      else {
+        errorMessage = "Couldn't read the watch snapshot. Open Septena on your iPhone."
+        isLoading = false
+        return
       }
 
-      // 3. Chores due today or overdue (mirrors ChecklistMirror.choreItem logic).
-      for chore in choreDefs {
-        let dueDate     = computeDueDate(chore: chore, events: eventsByChore[chore.id] ?? [])
-        let daysOverdue = daysBetween(start: dueDate, end: date)
-        guard daysOverdue >= 0 else { continue }
-        let trail = daysOverdue > 0 ? "\(daysOverdue)d overdue" : nil
-        result.append(NextItem(
-          id: chore.id, kind: "chore",
-          title: [chore.emoji, chore.title].compactMap { $0 }.joined(separator: " "),
-          subtitle: nil, trailing: trail, overdue: daysOverdue > 0, sortKey: sortKey
-        ))
-        sortKey += 1
+      // Habits are tagged with their bucket in `subtitle`; keep only the
+      // current time-of-day bucket. Chores and supplements always apply.
+      // Locally-completed items stay hidden until the phone republishes.
+      let doneLocal = localDoneIDs(date: today)
+      let filtered: [NextItem] = response.items.compactMap { item in
+        if doneLocal.contains(item.id) { return nil }
+        guard item.kind == "habit" else { return item }
+        guard item.subtitle == bkt else { return nil }
+        var habit = item
+        habit.subtitle = nil          // bucket is implicit on the watch
+        return habit
       }
 
-      self.items  = result
+      self.items  = filtered
       self.bucket = bkt
       updateComplication()
       scheduleNextRefresh()
+    } catch let ckError as CKError where ckError.code == .unknownItem {
+      errorMessage = "No data yet. Open Septena on your iPhone to sync your watch."
     } catch {
       errorMessage = error.localizedDescription
     }
@@ -159,16 +144,67 @@ final class WatchConnectivity {
     isLoading = false
   }
 
+  // MARK: - Helpers
+
+  private func accountStatusLabel(_ status: CKAccountStatus) -> String {
+    switch status {
+    case .available:                    return "available"
+    case .noAccount:                    return "no iCloud account"
+    case .restricted:                   return "restricted"
+    case .couldNotDetermine:            return "could not determine"
+    case .temporarilyUnavailable:       return "temporarily unavailable"
+    @unknown default:                   return "unknown (\(status.rawValue))"
+    }
+  }
+
+  /// Races an async operation against a timeout so a hung CloudKit call
+  /// surfaces as a visible error instead of an infinite spinner.
+  private func withTimeout<T: Sendable>(
+    seconds: Double,
+    _ operation: @escaping @Sendable () async throws -> T
+  ) async throws -> T {
+    try await withThrowingTaskGroup(of: T.self) { group in
+      group.addTask { try await operation() }
+      group.addTask {
+        try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+        throw NSError(
+          domain: "SeptenaWatch", code: -1000,
+          userInfo: [NSLocalizedDescriptionKey:
+            "Timed out after \(Int(seconds))s — CloudKit didn't respond"]
+        )
+      }
+      guard let result = try await group.next() else {
+        throw CancellationError()
+      }
+      group.cancelAll()
+      return result
+    }
+  }
+
   // MARK: - Mutations
 
   func complete(_ item: NextItem) {
-    items.removeAll { $0.id == item.id }
+    guard item.kind != "suggestion" else { return }         // read-only nudge
+    guard !completedIDs.contains(item.id) else { return }   // ignore double taps
+    let date = today
+
+    // Confirm with a success haptic, mark it done, and keep it on screen
+    // (struck through) for a moment before it fades out.
+    WKInterfaceDevice.current().play(.success)
+    completedIDs.insert(item.id)
+    markDoneLocally(id: item.id, date: date)   // stays hidden across refreshes
     updateComplication()
 
-    let date = today
+    Task { @MainActor in
+      try? await Task.sleep(nanoseconds: 1_100_000_000)
+      items.removeAll { $0.id == item.id }
+      completedIDs.remove(item.id)
+    }
+
     Task {
       do {
         switch item.kind {
+        case "task":       try await saveTaskCompletion(taskID: item.id)
         case "habit":      try await saveHabitEvent(habitID: item.id, date: date)
         case "supplement": try await saveSupplementEvent(supplementID: item.id, date: date)
         case "chore":      try await saveChoreEvent(choreID: item.id, date: date)
@@ -218,41 +254,23 @@ final class WatchConnectivity {
     try await db.save(record)
   }
 
-  // MARK: - CloudKit read helper
-
-  /// Full-zone replay grouped by record type. Mirrors the iOS-side
-  /// `CKEngine.fetchAllRecords` pattern: zone-change pages from a nil
-  /// token return every live record without needing Queryable indexes
-  /// on the system `recordName` field.
-  private func fetchAllByType(
-    recordTypes: [CKRecord.RecordType]
-  ) async throws -> [CKRecord.RecordType: [CKRecord]] {
-    let accepted = Set(recordTypes)
-    var token: CKServerChangeToken?
-    var moreComing = true
-    var recordsByID: [CKRecord.ID: CKRecord] = [:]
-
-    while moreComing {
-      let page = try await db.recordZoneChanges(
-        inZoneWith: ckZoneID,
-        since: token,
-        desiredKeys: nil,
-        resultsLimit: nil
-      )
-      for (recordID, result) in page.modificationResultsByID {
-        if case .success(let modification) = result {
-          let record = modification.record
-          if accepted.contains(record.recordType) {
-            recordsByID[recordID] = record
-          }
-        }
-      }
-      token = page.changeToken
-      moreComing = page.moreComing
-    }
-
-    return Dictionary(grouping: recordsByID.values, by: \.recordType)
+  /// Completes a task by mutating its `Task` record in place — mirrors
+  /// `TasksBackend.complete`: status → done, stamp completedAt, clear today.
+  private func saveTaskCompletion(taskID: String) async throws {
+    let recordID = CKRecord.ID(recordName: taskID, zoneID: ckZoneID)
+    guard let record = try? await db.record(for: recordID) else { return }
+    record["status"]      = "done"
+    record["completedAt"] = Self.tsFmt.string(from: Date())
+    record["today"]       = 0
+    try await db.save(record)
   }
+
+  private static let tsFmt: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+    f.locale = Locale(identifier: "en_US_POSIX")
+    return f
+  }()
 
   // MARK: - Complication
 
@@ -264,133 +282,5 @@ final class WatchConnectivity {
       updatedAt: Date()
     ).save()
     WidgetCenter.shared.reloadTimelines(ofKind: "SeptenaNext")
-  }
-
-  // MARK: - Chore due-date logic (mirrors ChecklistMirror.choreItem on iOS)
-
-  private func computeDueDate(chore: ChoreDef, events: [ChoreEventRec]) -> String {
-    var dueDate = today
-    for event in events {
-      switch event.action {
-      case "complete":
-        if let cadence = chore.cadenceDays,
-           let next    = shiftDate(event.date, byDays: cadence) {
-          dueDate = next
-        }
-      case "defer":
-        if let newDue = event.newDueDate { dueDate = newDue }
-      default:
-        break
-      }
-    }
-    return dueDate
-  }
-
-  private func shiftDate(_ dateStr: String, byDays days: Int) -> String? {
-    guard let base    = Self.dateFmt.date(from: dateStr),
-          let shifted = Calendar.current.date(byAdding: .day, value: days, to: base)
-    else { return nil }
-    return Self.dateFmt.string(from: shifted)
-  }
-
-  private func daysBetween(start: String, end: String) -> Int {
-    guard let s = Self.dateFmt.date(from: start),
-          let e = Self.dateFmt.date(from: end) else { return 0 }
-    return Calendar.current.dateComponents([.day], from: s, to: e).day ?? 0
-  }
-}
-
-// MARK: - Lightweight record decoders
-
-private struct HabitDef {
-  let id: String
-  let title: String
-  let emoji: String?
-  let bucket: String
-  let sortIndex: Int
-
-  init(_ r: CKRecord) {
-    id        = String(r.recordID.recordName.dropFirst("habit-def:".count))
-    title     = r["title"] as? String ?? ""
-    emoji     = r["emoji"] as? String
-    bucket    = r["bucket"] as? String ?? "morning"
-    sortIndex = r["sortIndex"] as? Int ?? 0
-  }
-}
-
-private struct SuppDef {
-  let id: String
-  let title: String
-  let emoji: String?
-  let sortIndex: Int
-
-  init(_ r: CKRecord) {
-    id        = String(r.recordID.recordName.dropFirst("supplement-def:".count))
-    title     = r["title"] as? String ?? ""
-    emoji     = r["emoji"] as? String
-    sortIndex = r["sortIndex"] as? Int ?? 0
-  }
-}
-
-private struct ChoreDef {
-  let id: String
-  let title: String
-  let emoji: String?
-  let cadenceDays: Int?
-  let sortIndex: Int
-
-  init(_ r: CKRecord) {
-    id          = String(r.recordID.recordName.dropFirst("chore-def:".count))
-    title       = r["title"] as? String ?? ""
-    emoji       = r["emoji"] as? String
-    cadenceDays = r["cadenceDays"] as? Int
-    sortIndex   = r["sortIndex"] as? Int ?? 0
-  }
-}
-
-private struct HabitEventRec {
-  let habitID: String
-  let date: String
-  let done: Bool
-
-  init?(_ r: CKRecord) {
-    guard let hid = r["habitID"] as? String,
-          let d   = r["date"]    as? String else { return nil }
-    habitID = hid
-    date    = d
-    done    = (r["done"] as? Int ?? 0) != 0
-  }
-}
-
-private struct SuppEventRec {
-  let supplementID: String
-  let date: String
-  let done: Bool
-
-  init?(_ r: CKRecord) {
-    guard let sid = r["supplementID"] as? String,
-          let d   = r["date"]         as? String else { return nil }
-    supplementID = sid
-    date         = d
-    done         = (r["done"] as? Int ?? 0) != 0
-  }
-}
-
-private struct ChoreEventRec {
-  let choreID: String
-  let action: String
-  let date: String
-  let sortKey: String
-  let newDueDate: String?
-
-  init?(_ r: CKRecord) {
-    guard let cid = r["choreID"] as? String,
-          let act = r["action"]  as? String,
-          let d   = r["date"]    as? String else { return nil }
-    choreID    = cid
-    action     = act
-    date       = d
-    sortKey    = r["sortKey"] as? String ?? d
-    newDueDate = r["newDueDate"] as? String
   }
 }

@@ -42,48 +42,78 @@ struct NextWatchView: View {
       }
     } else {
       List(conn.items) { item in
-        NextItemRow(item: item) { conn.complete(item) }
+        NextItemRow(item: item, done: conn.completedIDs.contains(item.id)) {
+          conn.complete(item)
+        }
+        .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
       }
-      .listStyle(.carousel)
+      .listStyle(.plain)
+      .environment(\.defaultMinListRowHeight, 0)
+      .animation(.default, value: conn.items)
     }
   }
 }
 
 struct NextItemRow: View {
   let item: NextItem
+  let done: Bool
   let onComplete: () -> Void
 
+  private var isSuggestion: Bool { item.kind == "suggestion" }
+
   var body: some View {
-    Button(action: onComplete) {
-      HStack(spacing: 10) {
-        Image(systemName: kindIcon)
-          .foregroundStyle(item.overdue ? .red : .secondary)
-          .frame(width: 18)
+    // Suggestions are read-only nudges (no logging UI on the watch); the rest
+    // are tappable to complete.
+    if isSuggestion {
+      rowBody
+    } else {
+      Button(action: onComplete) { rowBody }
+        .buttonStyle(.plain)
+    }
+  }
 
-        VStack(alignment: .leading, spacing: 2) {
-          Text(item.title)
-            .font(.body)
-            .lineLimit(2)
-          if let sub = item.subtitle {
-            Text(sub)
-              .font(.caption2)
-              .foregroundStyle(.secondary)
-          }
-        }
+  private var rowBody: some View {
+    HStack(spacing: 9) {
+      Image(systemName: done ? "checkmark.circle.fill" : kindIcon)
+        .font(.body)
+        .foregroundStyle(iconColor)
+        .frame(width: 18)
 
-        if let trail = item.trailing {
-          Spacer(minLength: 0)
-          Text(trail)
+      VStack(alignment: .leading, spacing: 1) {
+        Text(item.title)
+          .font(.body)
+          .lineLimit(1)
+          .strikethrough(done)
+          .foregroundStyle(done ? .secondary : .primary)
+        if let sub = item.subtitle, !sub.isEmpty {
+          Text(sub)
             .font(.caption2)
-            .foregroundStyle(.tertiary)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
         }
       }
+
+      // Overdue shown as a compact icon (not text) to free up label space.
+      if item.overdue && !done {
+        Spacer(minLength: 0)
+        Image(systemName: "exclamationmark.circle.fill")
+          .font(.caption2)
+          .foregroundStyle(.red)
+      }
     }
-    .buttonStyle(.plain)
+    .padding(.vertical, 1)
+  }
+
+  private var iconColor: Color {
+    if done { return .green }
+    if isSuggestion { return .orange }
+    return item.overdue ? .red : .secondary
   }
 
   private var kindIcon: String {
     switch item.kind {
+    case "suggestion": return "lightbulb"
+    case "task":       return "circle"
     case "habit":      return "repeat.circle"
     case "supplement": return "pill"
     case "chore":      return "house"

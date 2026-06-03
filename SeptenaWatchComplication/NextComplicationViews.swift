@@ -7,12 +7,42 @@ struct NextComplicationView: View {
   @Environment(\.widgetFamily) private var family
 
   var body: some View {
+    content
+      // Required by WidgetKit (watchOS 10+): without it the widget host
+      // refuses to render the view. Circular gets the dark accessory disc;
+      // the others are transparent.
+      .containerBackground(for: .widget) {
+        if family == .accessoryCircular {
+          AccessoryWidgetBackground()
+        } else {
+          Color.clear
+        }
+      }
+  }
+
+  @ViewBuilder
+  private var content: some View {
     switch family {
     case .accessoryCircular:  CircularView(data: entry.data)
     case .accessoryRectangular: RectangularView(data: entry.data)
     case .accessoryInline:    InlineView(data: entry.data)
+    case .accessoryCorner:    CornerView(data: entry.data)
     default:                  CircularView(data: entry.data)
     }
+  }
+}
+
+// MARK: - Corner: glyph shortcut + count along the bezel
+
+private struct CornerView: View {
+  let data: NextComplicationData
+
+  var body: some View {
+    Image("DiscsMark")
+      .font(.title2)
+      .widgetLabel {
+        Text(data.remaining == 0 ? "All done" : "\(data.remaining) left")
+      }
   }
 }
 
@@ -22,22 +52,10 @@ private struct CircularView: View {
   let data: NextComplicationData
 
   var body: some View {
-    ZStack {
-      AccessoryWidgetBackground()
-      if data.remaining == 0 {
-        Image(systemName: "checkmark")
-          .font(.title3.bold())
-          .foregroundStyle(.green)
-      } else {
-        VStack(spacing: 0) {
-          Text("\(data.remaining)")
-            .font(.title3.bold())
-          Text(data.bucket.prefix(3).uppercased())
-            .font(.system(size: 8, weight: .medium))
-            .foregroundStyle(.secondary)
-        }
-      }
-    }
+    Image("DiscsMark")
+      .resizable()
+      .scaledToFit()
+      .padding(6)
   }
 }
 

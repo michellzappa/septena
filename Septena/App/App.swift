@@ -90,6 +90,11 @@ struct SeptenaApp: App {
             Task {
               await ckEngine.refreshAccountStatus()
               try? await ckEngine.fetchChanges()
+              // Republish the watch snapshot after pulling — this is also how
+              // watch-originated completions get reflected back to the watch.
+              await MainActor.run {
+                WatchSnapshotPublisher.publish(context: localStore.container.mainContext)
+              }
             }
             // Keep the Claude gateway's CloudKit token fresh. No-op unless
             // the user connected Claude, and skips the network when the

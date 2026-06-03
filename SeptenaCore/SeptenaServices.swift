@@ -1276,6 +1276,9 @@ final class ChecklistMutator {
 
   private func postChecklistChanged() {
     NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    // Keep the watch's one-shot snapshot in sync with every checklist edit.
+    let ctx = context
+    Task { @MainActor in WatchSnapshotPublisher.publish(context: ctx) }
   }
 }
 

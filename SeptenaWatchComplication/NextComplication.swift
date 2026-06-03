@@ -40,6 +40,7 @@ struct NextComplication: Widget {
       .accessoryCircular,
       .accessoryRectangular,
       .accessoryInline,
+      .accessoryCorner,
     ])
   }
 }
