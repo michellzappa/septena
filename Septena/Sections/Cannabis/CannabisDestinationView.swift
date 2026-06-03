@@ -35,8 +35,8 @@ struct CannabisDestinationView: View {
 
   private var accent: Color { theme.color(for: "cannabis") }
 
-  /// When the date strip is on a past day, hide the summary + heatmap
-  /// and show only the day's log entries.
+  /// When the date strip is on a past day, hide the heatmap and show
+  /// only the day's log entries.
   private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
 
   var body: some View {
@@ -45,9 +45,6 @@ struct CannabisDestinationView: View {
                   onLog: handleLogAction,
                   leadingLogActions: leadingLogActions,
                   currentDate: $viewingDate) {
-      if isViewingToday {
-        summary
-      }
       DrawerSection("Today", padding: .none) {
         if let today, !today.entries.isEmpty {
           ForEach(Array(today.entries.reversed())) { entry in
@@ -133,48 +130,46 @@ struct CannabisDestinationView: View {
   }
   private var smartHit: Int { hasActiveCapsule ? (lastVape!.hit! + 1) : 1 }
 
-  /// Smart vape row injected above the plugin's log actions in the "+" menu —
-  /// "Continue · Hit N" while a capsule has room, else "New capsule". Mirrors
-  /// the dashboard tile and logs directly (the fast path). Today only.
+  /// Smart vape rows injected above the plugin's log actions in the "+" menu.
+  /// While a capsule has room we offer *both* "Continue · Hit N" and "New
+  /// capsule"; once the last hit filled the capsule we never suggest hit+1 —
+  /// only "New capsule". Mirrors the dashboard tile and logs directly (the
+  /// fast path). Today only.
   private var leadingLogActions: [LogAction] {
     guard isViewingToday else { return [] }
-    return [LogAction(id: "continue",
-                      title: hasActiveCapsule ? "Continue · Hit \(smartHit)" : "New capsule",
-                      systemImage: hasActiveCapsule ? "arrow.clockwise" : "plus.circle")]
+    var out: [LogAction] = []
+    if hasActiveCapsule {
+      out.append(LogAction(id: "continue",
+                           title: "Continue · Hit \(smartHit)",
+                           systemImage: "arrow.clockwise"))
+    }
+    out.append(LogAction(id: "new-capsule",
+                         title: "New capsule",
+                         systemImage: "plus.circle"))
+    return out
   }
 
   /// Dispatch table for `CannabisPlugin.logActions` ids (plus the dynamic
-  /// "continue" leading action).
+  /// "continue" / "new-capsule" leading actions).
   private func handleLogAction(_ id: String) {
     switch id {
     case "continue":
-      SectionLog.newLog(section: "cannabis", accent: accent,
-                        announce: "Logged vape.", logCommit: logCommit) {
-        cannabis.addEntry(date: SeptenaDate.today, time: nowHHMM(),
-                          method: "vape", hit: smartHit)
-        AddInfoSection.cannabis.notifyTilesChanged()
-      }
+      logVape(hit: smartHit)
+    case "new-capsule":
+      logVape(hit: 1)
     case "log-vape":   loggingMethod = .init(method: "vape")
     case "log-edible": loggingMethod = .init(method: "edible")
     default:           loggingMethod = .init(method: "vape")
     }
   }
 
-  private var summary: some View {
-    DrawerSection {
-      StatStrip(stats: summaryStats)
+  private func logVape(hit: Int) {
+    SectionLog.newLog(section: "cannabis", accent: accent,
+                      announce: "Logged vape.", logCommit: logCommit) {
+      cannabis.addEntry(date: SeptenaDate.today, time: nowHHMM(),
+                        method: "vape", hit: hit)
+      AddInfoSection.cannabis.notifyTilesChanged()
     }
-  }
-
-  private var summaryStats: [Stat] {
-    var out: [Stat] = [
-      Stat(value: "\(today?.sessionCount ?? 0)", label: "today", tint: accent),
-    ]
-    if let g = today?.totalG, g > 0 {
-      out.append(Stat(value: String(format: "%.2f", g),
-                      label: "grams", tint: accent, unit: "g"))
-    }
-    return out
   }
 
   private func methodLabel(_ m: String) -> String {

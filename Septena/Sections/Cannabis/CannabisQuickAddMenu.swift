@@ -5,9 +5,10 @@ import SwiftUI
 // `.contextMenu` (opens on long-press / right-click).
 //
 // Designed to answer "what's the next step right now?" rather than
-// enumerate options. One context-aware vape row (Continue when the
-// current capsule has room, New capsule when it doesn't) + Edible.
-// Keeps the menu to 3-4 items even with Edit last + Cannabis…
+// enumerate options. When the current capsule has room we offer *both*
+// Continue (next hit) and New capsule; once the last vape filled the
+// capsule (hit == cap) we never suggest hit+1 — only New capsule. + Edible.
+// Keeps the menu to 3-5 items even with Edit last + Cannabis…
 
 struct CannabisQuickAddMenu: View {
   let lastVape: CannabisEntry?
@@ -16,31 +17,29 @@ struct CannabisQuickAddMenu: View {
   let onEditLast: (() -> Void)?
 
   /// True when the current capsule has room — i.e. there's a last vape
-  /// today and the next hit fits under the capsule cap. Drives whether
-  /// the smart row reads "Continue" or "New capsule".
+  /// today and the next hit fits under the capsule cap. When false (no
+  /// vape yet, or the last hit filled the capsule) we only offer New capsule.
   private var hasActiveCapsule: Bool {
     guard let h = lastVape?.hit else { return false }
     return h >= 1 && h < usesPerCapsule
   }
 
-  private var smartHit: Int {
-    hasActiveCapsule ? (lastVape!.hit! + 1) : 1
-  }
-
-  private var smartLabel: String {
-    if hasActiveCapsule { return "Continue (Hit \(smartHit))" }
-    return "New capsule"
-  }
-
-  private var smartIcon: String {
-    hasActiveCapsule ? "arrow.clockwise" : "plus.circle"
-  }
+  /// Next hit within the current capsule (only meaningful when active).
+  private var continueHit: Int { (lastVape?.hit ?? 0) + 1 }
 
   var body: some View {
+    if hasActiveCapsule {
+      Button {
+        onCommit("vape", continueHit)
+      } label: {
+        Label("Continue (Hit \(continueHit))", systemImage: "arrow.clockwise")
+      }
+    }
+
     Button {
-      onCommit("vape", smartHit)
+      onCommit("vape", 1)
     } label: {
-      Label(smartLabel, systemImage: smartIcon)
+      Label("New capsule", systemImage: "plus.circle")
     }
 
     Button {

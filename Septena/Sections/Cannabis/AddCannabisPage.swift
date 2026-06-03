@@ -3,11 +3,11 @@ import SwiftData
 
 // Cannabis palette. Rows, in order:
 //
-//   1. Start new capsule  → vape, hit 1
-//   2. Continue · Hit N   → vape, next hit. "Continue" advances
-//      hit = lastHit+1 against the last *vape* entry; wraps to 1 at the
-//      configured cap.
-//   3. Edible → edible, no hit
+//   1. Continue · Hit N   → vape, next hit. Only shown while the current
+//      capsule has room (last vape hit < cap); once the last hit filled
+//      the capsule we never suggest hit+1.
+//   2. New capsule        → vape, hit 1. Always available.
+//   3. Edible             → edible, no hit
 //
 // The tracker is about quantity and capsule containment — strain is not
 // tracked.
@@ -34,32 +34,39 @@ struct AddCannabisPage: View {
     entries.reversed().first { $0.method == "vape" }
   }
 
-  private var suggestedHit: Int {
-    guard let h = lastVape?.hit else { return 1 }
-    return (h >= 1 && h < usesPerCapsule) ? h + 1 : 1
+  /// True when the last vape left room in the capsule — drives whether the
+  /// Continue row appears at all. When the last hit filled the capsule we
+  /// never suggest hit+1; only New capsule remains.
+  private var hasActiveCapsule: Bool {
+    guard let h = lastVape?.hit else { return false }
+    return h >= 1 && h < usesPerCapsule
   }
+
+  private var suggestedHit: Int { hasActiveCapsule ? (lastVape!.hit! + 1) : 1 }
 
   var body: some View {
     let tint = AddInfoSection.cannabis.accent(theme: theme)
 
     List {
       Section {
+        if hasActiveCapsule {
+          Button { continueCapsule() } label: {
+            AddInfoRow(
+              title: "Continue · Hit \(suggestedHit)",
+              subtitle: "Keep current capsule · log hit \(suggestedHit)",
+              systemImage: "arrow.clockwise",
+              tint: tint
+            )
+          }
+          .buttonStyle(.plain)
+          .disabled(working)
+        }
+
         Button { commit(method: "vape", hit: 1) } label: {
           AddInfoRow(
-            title: "Start new capsule",
+            title: "New capsule",
             subtitle: "Hit 1",
             systemImage: "plus.circle",
-            tint: tint
-          )
-        }
-        .buttonStyle(.plain)
-        .disabled(working)
-
-        Button { continueCapsule() } label: {
-          AddInfoRow(
-            title: "Continue · Hit \(suggestedHit)",
-            subtitle: "Keep current capsule · log hit \(suggestedHit)",
-            systemImage: "arrow.clockwise",
             tint: tint
           )
         }
