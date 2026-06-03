@@ -260,13 +260,10 @@ private struct TaskQuickEditSheet: View {
         // Wasn't in Today → pin it.
         mutator.moveToToday(id: task.id, today: true)
       } else {
-        // Remove from Today: drop the pin and clear a planning date that's
-        // landing it here. A live deadline (due ≤ today) is a commitment we
-        // won't silently erase from this toggle — such a task stays in Today.
-        mutator.moveToToday(id: task.id, today: false)
-        if let s = task.scheduled, s <= SeptenaDate.today {
-          mutator.schedule(id: task.id, date: nil)
-        }
+        // Shared "remove from Today": drops the pin and clears an arrived
+        // planning date, while leaving a live deadline intact. See
+        // `CloudKitTasksBackend.removeFromToday`.
+        mutator.removeFromToday(id: task.id)
       }
     }
     onDone()

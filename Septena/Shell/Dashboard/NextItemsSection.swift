@@ -143,10 +143,10 @@ struct TodayTaskRow: View {
     // exist on the Next surface; here we surface the subset that works
     // standalone (Today toggle, Cancel, Delete).
     .contextMenu {
-      if task.today {
+      if task.isOnToday {
         Button {
           Haptics.tick()
-          mutator.moveToToday(id: task.id, today: false)
+          mutator.removeFromToday(id: task.id)
         } label: {
           Label("Remove from Today", systemImage: "sun.min")
         }

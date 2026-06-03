@@ -178,10 +178,7 @@ struct QuickFindView: View {
     if let aid = t.area, let a = areas.first(where: { $0.id == aid }) {
       return .area(Area(a))
     }
-    let today = SeptenaDate.today
-    if t.today { return .filter(.today) }
-    if let s = t.scheduled, s <= today { return .filter(.today) }
-    if let d = t.due, d <= today { return .filter(.today) }
+    if t.isOnToday { return .filter(.today) }
     if t.scheduled != nil || t.due != nil { return .filter(.upcoming) }
     if t.status == .done { return .filter(.logbook) }
     return .filter(.inbox)
@@ -195,7 +192,7 @@ struct QuickFindView: View {
       return a.title
     }
     if t.status == .done { return "Logbook" }
-    if t.today { return "Today" }
+    if t.isOnToday { return "Today" }
     return nil
   }
 

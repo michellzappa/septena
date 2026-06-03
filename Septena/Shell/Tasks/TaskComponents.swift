@@ -118,7 +118,7 @@ struct TaskRow: View {
       TaskCheckbox(
         tint: accent,
         isDone: task.status == .done,
-        isToday: task.today && showsTodayIndicator,
+        isToday: task.isOnToday && showsTodayIndicator,
         isSomeday: task.status == .someday,
         onToggle: onToggle
       )
@@ -283,7 +283,7 @@ struct TaskRowView<MetaLine: View, TrailingDate: View>: View {
       TaskCheckbox(
         tint: accent,
         isDone: task.status == .done,
-        isToday: task.today && filter != .today,
+        isToday: task.isOnToday && filter != .today,
         isSomeday: task.status == .someday && filter != .someday,
         onToggle: onToggle
       )

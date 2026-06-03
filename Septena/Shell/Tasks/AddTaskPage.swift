@@ -88,7 +88,7 @@ struct AddTaskPage: View {
               AddInfoRow(
                 title: task.title,
                 subtitle: task.area ?? "Today",
-                systemImage: task.today ? "circle.inset.filled" : "circle",
+                systemImage: task.isOnToday ? "circle.inset.filled" : "circle",
                 tint: tint
               )
             }
@@ -133,7 +133,7 @@ struct AddTaskPage: View {
   }
 
   private func pull(_ task: SeptenaTask) {
-    if task.today {
+    if task.isOnToday {
       mutator.complete(id: task.id)
     } else {
       mutator.moveToToday(id: task.id)

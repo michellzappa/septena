@@ -623,7 +623,8 @@ struct TaskListView: View {
     guard let id = effectiveSelectionId(),
           let t = currentTask(id: id) else { return }
     Haptics.tick()
-    mutator.moveToToday(id: t.id, today: !t.today)
+    if t.isOnToday { mutator.removeFromToday(id: t.id) }
+    else { mutator.moveToToday(id: t.id, today: true) }
     Task { await load() }
   }
 
@@ -882,7 +883,10 @@ struct TaskListView: View {
       onApplySuggestion: applySuggestion,
       onMoveToToday: { ids, today in
         Haptics.tick()
-        for id in ids { mutator.moveToToday(id: id, today: today) }
+        for id in ids {
+          if today { mutator.moveToToday(id: id, today: true) }
+          else { mutator.removeFromToday(id: id) }
+        }
         Task { await load() }
       },
       onOpenWhen: { target in
@@ -1263,7 +1267,9 @@ struct TaskListView: View {
       }
     }
     return { a, b in
-      let aToday = a.today, bToday = b.today
+      // Float tasks that are on Today (pin OR arrived scheduled/deadline),
+      // matching how membership is defined everywhere else — not just the pin.
+      let aToday = a.isOnToday, bToday = b.isOnToday
       if aToday != bToday { return aToday }
       let aSomeday = a.status == .someday, bSomeday = b.status == .someday
       if aSomeday != bSomeday { return !aSomeday }
@@ -1407,10 +1413,11 @@ struct TaskListView: View {
       accessoryChip(systemName: "calendar") {
         whenSheet = WhenSheet(taskId: task.id, kind: .scheduled)
       }
-      accessoryChip(systemName: task.today ? "sun.max.fill" : "sun.max",
-                    tint: task.today ? .orange : nil) {
+      accessoryChip(systemName: task.isOnToday ? "sun.max.fill" : "sun.max",
+                    tint: task.isOnToday ? .orange : nil) {
         Haptics.tick()
-        mutator.moveToToday(id: task.id, today: !task.today)
+        if task.isOnToday { mutator.removeFromToday(id: task.id) }
+        else { mutator.moveToToday(id: task.id, today: true) }
         Task { await load() }
       }
       accessoryChip(systemName: "number") {
@@ -2226,8 +2233,12 @@ private struct TaskListRowContextMenu: View {
     }
   }
 
+  // Drives the "Move to / Remove from Today" label. Reads `isOnToday`, not the
+  // raw `today` pin, so a task that's in Today via a scheduled/deadline date
+  // (unpinned) is correctly offered "Remove from Today" rather than a no-op
+  // "Move to Today."
   private var singleTodayFlag: Bool? {
-    if case let .single(task) = target { return task.today }
+    if case let .single(task) = target { return task.isOnToday }
     return nil
   }
 

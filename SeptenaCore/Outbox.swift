@@ -148,6 +148,14 @@ final class TaskMutator {
     cloudBackend.moveToToday(id: id, today: today)
   }
 
+  func removeFromToday(id: String) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] removeFromToday called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.removeFromToday(id: id)
+  }
+
   func moveToSomeday(id: String) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] moveToSomeday called before CK bound — dropping", nil)

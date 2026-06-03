@@ -812,10 +812,11 @@ struct SidebarRootView: View {
     // Area count = direct-in-area tasks ONLY. Nested projects render as
     // their own rows, so rolling them up would double-count.
     var areaDirectOpen: [String: Int] = [:]
-    var inbox = 0, todayN = 0, upcoming = 0, unscheduled = 0, open = 0
+    var inbox = 0, todayN = 0, upcoming = 0, unscheduled = 0, open = 0, someday = 0
     let today = SeptenaDate.today
     for t in tasks {
       if t.status == .open { open += 1 }
+      if t.status == .someday { someday += 1 }
       if let pid = t.project {
         switch t.status {
         case .done:                 done[pid, default: 0] += 1; total[pid, default: 0] += 1
@@ -850,7 +851,8 @@ struct SidebarRootView: View {
       counts: TasksCounts(today: today,
                           todayCount: todayN, reviewCount: 0,
                           inboxCount: inbox, upcomingCount: upcoming,
-                          unscheduledCount: unscheduled, openCount: open),
+                          unscheduledCount: unscheduled,
+                          somedayCount: someday, openCount: open),
       projectProgress: progress,
       projectOpenCount: projOpen,
       areaOpenCount: areaDirectOpen)
@@ -1439,11 +1441,16 @@ private struct SidebarTaskDrop: ViewModifier {
     case .someday:
       mutator.moveToSomeday(id: id)
     case .inbox:
-      // Inbox = no routing at all: clear today, schedule, area, project.
-      mutator.moveToToday(id: id, today: false)
+      // Inbox = no routing at all: clear schedule, deadline, area, project, and
+      // the Today pin. A leftover deadline would keep the task out of Inbox
+      // (the filter requires due == nil) and stuck in Today, so we clear it too.
+      // Drop the pin LAST: `setDue(nil)` re-pins a still-Today row, so ending on
+      // `moveToToday(false)` guarantees the task actually lands in Inbox.
       mutator.schedule(id: id, date: nil)
+      mutator.setDue(id: id, date: nil)
       mutator.moveToArea(id: id, area: nil)
       mutator.moveToProject(id: id, project: nil)
+      mutator.moveToToday(id: id, today: false)
     }
   }
 }
