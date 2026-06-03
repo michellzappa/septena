@@ -79,6 +79,9 @@
 		262EF303D006D36A39042280 /* ExerciseCatalogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B55D56BF301C74DCB785773E /* ExerciseCatalogView.swift */; };
 		2781B65014FE7E1D52A10876 /* DayBucket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85942F0F6AEDE3D4607485D4 /* DayBucket.swift */; };
 		7E1234567890ABCDEFBB4444 /* DayBucket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85942F0F6AEDE3D4607485D4 /* DayBucket.swift */; };
+		7E1234567890ABCDEFAA2222 /* NextBlocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1234567890ABCDEFAA1111 /* NextBlocks.swift */; };
+		7E1234567890ABCDEFAA3333 /* NextBlocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1234567890ABCDEFAA1111 /* NextBlocks.swift */; };
+		7E1234567890ABCDEFAA4444 /* NextBlocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1234567890ABCDEFAA1111 /* NextBlocks.swift */; };
 		278B79903C86B144C437F5D7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 75A7338B84E54DF44893A020 /* Assets.xcassets */; };
 		27FAA27C1B4C0F8D3EC2A94B /* ChoresDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E31867A580D7D96DFB20391B /* ChoresDestinationView.swift */; };
 		28777ACD729D9C78846219C4 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */; };
@@ -696,6 +699,7 @@
 		851E4304EF13EE92F1DD7FF1 /* BrowseCannabisDaySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseCannabisDaySheet.swift; sourceTree = "<group>"; };
 		8568DA09F8C5545EBB0A2596 /* IkigaiQuadrantStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IkigaiQuadrantStep.swift; sourceTree = "<group>"; };
 		85942F0F6AEDE3D4607485D4 /* DayBucket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayBucket.swift; sourceTree = "<group>"; };
+		7E1234567890ABCDEFAA1111 /* NextBlocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextBlocks.swift; sourceTree = "<group>"; };
 		8762C7A4DFED340274D8BD37 /* AddInfoSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddInfoSection.swift; sourceTree = "<group>"; };
 		87FAF7FBE617575AF2437A61 /* GroceryIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryIntents.swift; sourceTree = "<group>"; };
 		880B70E1267B3CAAFFBA9D65 /* DayTimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayTimelineView.swift; sourceTree = "<group>"; };
@@ -1377,6 +1381,7 @@
 				8B1AC82A051DFA765B575639 /* ClaudeGatewayProvider.swift */,
 				1E25F81FE5AA4B6BBC056275 /* DateParser.swift */,
 				85942F0F6AEDE3D4607485D4 /* DayBucket.swift */,
+				7E1234567890ABCDEFAA1111 /* NextBlocks.swift */,
 				DFD8EA98B891BB43A0CE4640 /* DayClock.swift */,
 				FC732C2F50FC1EC9308BA218 /* DefaultExerciseLibrary.swift */,
 				5835F104E8DFAA668ACCF9A5 /* Fasting.swift */,
@@ -1713,6 +1718,7 @@
 				BFA5390E06045DBE733EE2BA /* CorrelationsHomepageView.swift in Sources */,
 				DF016EF192B7891D2DBE3CB6 /* DateParser.swift in Sources */,
 				BF8496432439A9FD8CFAE95E /* DayBucket.swift in Sources */,
+				7E1234567890ABCDEFAA2222 /* NextBlocks.swift in Sources */,
 				D87619020A982717812E2C6C /* DayBucketHeader.swift in Sources */,
 				450F6EE8AD17A6935567940D /* DayClock.swift in Sources */,
 				99C5E0B4C1F96A710C71DFFC /* DayTimelineView.swift in Sources */,
@@ -1909,6 +1915,7 @@
 			files = (
 				5FC8B85066ABC219A5C9EC86 /* NextWatchView.swift in Sources */,
 				7E1234567890ABCDEFBB4444 /* DayBucket.swift in Sources */,
+				7E1234567890ABCDEFAA4444 /* NextBlocks.swift in Sources */,
 				AD6AB8AB9F61D39820850F23 /* SeptenaWatchApp.swift in Sources */,
 				A4CE6F3B52A5191642AB9316 /* SharedComplicationData.swift in Sources */,
 				4F942DCF79C5D8EB5F471949 /* WatchAppDelegate.swift in Sources */,
@@ -1980,6 +1987,7 @@
 				1EEF01356485CDA24BA9787E /* CorrelationsHomepageView.swift in Sources */,
 				513C8B1D41E5BA85B785129C /* DateParser.swift in Sources */,
 				2781B65014FE7E1D52A10876 /* DayBucket.swift in Sources */,
+				7E1234567890ABCDEFAA3333 /* NextBlocks.swift in Sources */,
 				F8FD2F1BF2020A03D3DF018D /* DayBucketHeader.swift in Sources */,
 				78C28CA0B3780E99EC30BC75 /* DayClock.swift in Sources */,
 				226BFDEF2964B3BA661ACC67 /* DayTimelineView.swift in Sources */,

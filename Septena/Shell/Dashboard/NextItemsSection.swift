@@ -481,7 +481,12 @@ struct NextOpenSection: View {
     case "chores":      return model.openChores.isEmpty
     case "habits":      return habitsNow.isEmpty
     case "supplements": return model.openSupplements.isEmpty
-    default:            return true
+    default:
+      // `orderedKeys` only ever yields `NextBlocks` members, so a key with
+      // no case here means a row was added to the table without a render
+      // case. Fail loudly in debug; hide it in release rather than crash.
+      assertionFailure("NextOpenSection has no case for Next block '\(key)'")
+      return true
     }
   }
 
@@ -528,6 +533,10 @@ struct NextOpenSection: View {
       }
 
     default:
+      // Unreachable: `isEmpty(_:)` already hides (and asserts on) any
+      // member key without a case. Kept exhaustive so a new `NextBlocks`
+      // row fails loudly here too rather than silently rendering nothing.
+      let _ = { assertionFailure("NextOpenSection.block(for:) has no case for '\(key)'") }()
       EmptyView()
     }
   }
@@ -694,7 +703,14 @@ struct ChoreRow: View {
         .opacity(inactive ? 0.5 : 1)
       Spacer()
       if isDone {
-        StatusBadge(text: "Done")
+        // Show when it was completed (persisted via the chore's complete
+        // event), matching the time treatment on habit / supplement rows.
+        // Falls back to a "Done" badge if no time was recorded.
+        if let t = chore.lastCompletedTime, !t.isEmpty {
+          Text(t).font(.septenaMeta).foregroundStyle(Theme.inkSecondary)
+        } else {
+          StatusBadge(text: "Done")
+        }
       } else if let label = deferLabel {
         StatusBadge(text: label)
       } else {
@@ -813,16 +829,11 @@ private struct BucketTimeLeft: View {
   private func cutoff() -> Date {
     let cal = Calendar.current
     let now = Date()
-    let hour: Int
-    switch bucket {
-    case "morning":   hour = 12
-    case "afternoon": hour = 17
-    default:          hour = 24  // end of day → tomorrow 00:00
-    }
-    if hour == 24 {
-      let startOfTomorrow = cal.date(byAdding: .day, value: 1,
-                                     to: cal.startOfDay(for: now))!
-      return startOfTomorrow
+    // Window boundary comes from DayBucket so it can't drift from the
+    // morning/afternoon/evening cutoffs the rest of the app uses.
+    let hour = (DayBucket(rawValue: bucket) ?? .evening).endHour
+    if hour >= 24 {
+      return cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: now))!
     }
     return cal.date(bySettingHour: hour, minute: 0, second: 0, of: now) ?? now
   }

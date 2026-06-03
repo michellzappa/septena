@@ -179,7 +179,10 @@ final class WatchConnectivity {
   // MARK: - Mutations
 
   func complete(_ item: NextItem) {
-    guard item.kind != "suggestion" else { return }         // read-only nudge
+    // Completable kinds are defined once in `NextBlocks` (shared with the
+    // phone). This naturally excludes read-only suggestions and anything
+    // that isn't a Next member.
+    guard NextBlocks.isCompletable(kind: item.kind) else { return }
     guard !completedIDs.contains(item.id) else { return }   // ignore double taps
     let date = today
 
@@ -198,16 +201,34 @@ final class WatchConnectivity {
 
     Task {
       do {
-        switch item.kind {
-        case "task":       try await saveTaskCompletion(taskID: item.id)
-        case "habit":      try await saveHabitEvent(habitID: item.id, date: date)
-        case "supplement": try await saveSupplementEvent(supplementID: item.id, date: date)
-        case "chore":      try await saveChoreEvent(choreID: item.id, date: date)
-        default: break
+        // Route off the shared `NextBlocks` descriptor: it declares the
+        // completion strategy per member, so the *set* of completable kinds
+        // lives in one place. The per-record writers stay bespoke (each
+        // event record has different fields).
+        guard let block = NextBlocks.byItemKind[item.kind] else { return }
+        switch block.completion {
+        case .recordStatus:
+          try await saveTaskCompletion(taskID: item.id)
+        case .event(let recordType):
+          try await saveEvent(recordType: recordType, itemID: item.id, date: date)
         }
       } catch {
         // Fire-and-forget: the iOS CKSyncEngine reconciles on next open.
       }
+    }
+  }
+
+  /// Maps a `NextBlocks`-declared event record type to its CloudKit writer.
+  /// The writers stay separate because each event record has different
+  /// fields; this only routes, so adding a member is a `NextBlocks` row plus
+  /// (when it's a new record type) one writer here.
+  private func saveEvent(recordType: String, itemID: String, date: String) async throws {
+    switch recordType {
+    case "HabitEvent":      try await saveHabitEvent(habitID: itemID, date: date)
+    case "SupplementEvent": try await saveSupplementEvent(supplementID: itemID, date: date)
+    case "ChoreEvent":      try await saveChoreEvent(choreID: itemID, date: date)
+    default:
+      assertionFailure("No watch writer for NextBlocks record type '\(recordType)'")
     }
   }
 
@@ -219,10 +240,13 @@ final class WatchConnectivity {
     let recordID   = CKRecord.ID(recordName: "habit-event:\(entityID)", zoneID: ckZoneID)
     let existing   = try? await db.record(for: recordID)
     let record     = existing ?? CKRecord(recordType: "HabitEvent", recordID: recordID)
-    record["date"]    = date
-    record["habitID"] = habitID
-    record["done"]    = 1
-    record["skipped"] = 0
+    let now = Date()
+    record["date"]       = date
+    record["habitID"]    = habitID
+    record["done"]       = 1
+    record["skipped"]    = 0
+    record["time"]       = Self.timeFmt.string(from: now)
+    record["occurredAt"] = now
     try await db.save(record)
   }
 
@@ -231,9 +255,12 @@ final class WatchConnectivity {
     let recordID = CKRecord.ID(recordName: "supplement-event:\(entityID)", zoneID: ckZoneID)
     let existing = try? await db.record(for: recordID)
     let record   = existing ?? CKRecord(recordType: "SupplementEvent", recordID: recordID)
+    let now = Date()
     record["date"]         = date
     record["supplementID"] = supplementID
     record["done"]         = 1
+    record["time"]         = Self.timeFmt.string(from: now)
+    record["occurredAt"]   = now
     try await db.save(record)
   }
 
@@ -242,10 +269,13 @@ final class WatchConnectivity {
     let eventID  = UUID().uuidString
     let recordID = CKRecord.ID(recordName: "chore-event:\(eventID)", zoneID: ckZoneID)
     let record   = CKRecord(recordType: "ChoreEvent", recordID: recordID)
-    record["choreID"] = choreID
-    record["action"]  = "complete"
-    record["date"]    = date
-    record["sortKey"] = "\(date)::\(eventID)"
+    let now = Date()
+    record["choreID"]    = choreID
+    record["action"]     = "complete"
+    record["date"]       = date
+    record["time"]       = Self.timeFmt.string(from: now)
+    record["occurredAt"] = now
+    record["sortKey"]    = "\(date)::\(eventID)"
     try await db.save(record)
   }
 
@@ -263,6 +293,17 @@ final class WatchConnectivity {
   private static let tsFmt: DateFormatter = {
     let f = DateFormatter()
     f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+    f.locale = Locale(identifier: "en_US_POSIX")
+    return f
+  }()
+
+  /// Wall-clock "HH:mm" of the completion, mirroring `currentTimeString()` in
+  /// the iOS `ChecklistMutator` so a watch-logged item carries the same
+  /// time-of-day the phone would have written.
+  private static let timeFmt: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "HH:mm"
+    f.calendar = Calendar(identifier: .gregorian)
     f.locale = Locale(identifier: "en_US_POSIX")
     return f
   }()

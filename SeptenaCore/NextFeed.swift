@@ -21,17 +21,18 @@ import SwiftData
 /// SwiftData-backed rows from its per-type models, while the watch shows a
 /// read-only list off this flat snapshot. Only the *composition* is shared.
 enum NextFeed {
-  /// The section blocks Next can render, in fallback order. Calendar is
-  /// intentionally absent — it no longer surfaces in Next.
-  static let sectionKeys = ["tasks", "chores", "habits", "supplements"]
+  /// The section blocks Next can render, in fallback order. Sourced from the
+  /// shared `NextBlocks` table — the single source of truth this feed, the
+  /// iOS list, and the watch completion dispatch all derive from.
+  static var sectionKeys: [String] { NextBlocks.sectionKeys }
 
   /// The Next section blocks in the user's saved order, filtered to those the
-  /// user has enabled. Falls back to `sectionKeys` when the caller has no
-  /// enabled keys yet (cold launch before the settings mirror hydrates), so
-  /// Next never paints blank.
+  /// user has enabled. Thin forward to `NextBlocks.orderedSectionKeys`, kept
+  /// as a `NextFeed` seam because the iOS list and watch snapshot call it
+  /// here. Falls back to the full set on a cold launch so Next never paints
+  /// blank.
   static func orderedSectionKeys(enabledKeys: [String]) -> [String] {
-    let ranked = enabledKeys.filter { sectionKeys.contains($0) }
-    return ranked.isEmpty ? sectionKeys : ranked
+    NextBlocks.orderedSectionKeys(enabledKeys: enabledKeys)
   }
 
   /// The complete Next feed as a flat, serializable list: read-only
@@ -62,14 +63,18 @@ enum NextFeed {
       }
 
     // Chores / habits (all buckets) / supplements — already formatted by the
-    // ritual builder; bucket by kind so they re-emit in section order.
+    // ritual builder; bucket each Next block by its declared kind so they
+    // re-emit in section order. Driven by `NextBlocks` so a new member needs
+    // no edit here: Tasks have a bespoke source (project/area subtitles);
+    // every other member is ritual-backed and filtered by its `itemKind`.
     let ritual = ChecklistMirror.loadNextItems(context: context, date: date, bucket: nil).items
-    let blocksByKey: [String: [NextEntry]] = [
-      "tasks":       taskEntries,
-      "chores":      ritual.filter { $0.kind == "chore" }.map(NextEntry.ritual),
-      "habits":      ritual.filter { $0.kind == "habit" }.map(NextEntry.ritual),
-      "supplements": ritual.filter { $0.kind == "supplement" }.map(NextEntry.ritual),
-    ]
+    let blocksByKey: [String: [NextEntry]] = Dictionary(
+      uniqueKeysWithValues: NextBlocks.all.map { block in
+        let entries: [NextEntry] = block.itemKind == "task"
+          ? taskEntries
+          : ritual.filter { $0.kind == block.itemKind }.map(NextEntry.ritual)
+        return (block.sectionKey, entries)
+      })
 
     let enabled = SettingsMirror.loadSections(context: context)
       .filter(\.isEnabled).map(\.key)

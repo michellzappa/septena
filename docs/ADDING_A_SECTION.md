@@ -147,11 +147,34 @@ Route writes through `SectionLog.newLog` to fire it.
 
 `exportContribution` — schema tables + a collect closure. Skipped if nil.
 
-### 14. Watch app — **optional, currently bespoke**
+### 14. Next feed membership — **optional**
+
+Whether the section appears in the "Next" feed (the Today checklist of
+tasks / chores / habits / supplements) is declared **once** in
+`SeptenaCore/NextBlocks.swift` — add a `Block` row to `NextBlocks.all` with the
+`sectionKey`, the `itemKind` it emits, and a `completion` strategy
+(`.recordStatus` for in-place record edits, `.event(recordType:)` for per-day
+event records). That single row drives:
+
+- `NextFeed.flat` / `NextFeed.orderedSectionKeys` — feed composition + order;
+- iOS `NextOpenSection` — membership/order (its `isEmpty(_:)` + `block(for:)`
+  switches still need an interactive-row case, guarded by `assertionFailure`);
+- the watch's completion dispatch in `WatchConnectivity.complete`.
+
+`NextBlocks` is dependency-free and compiled into the iOS, watch, and mac
+targets (like `DayBucket`). A new ritual-backed member needs only the row + the
+iOS render case; a new CloudKit record type also needs a writer in the watch's
+`saveEvent(recordType:)`. Read-only suggestions (caffeine / cannabis / training
+/ fast-break) are **not** members — they're nudges prepended by `NextFeed` and
+never complete.
+
+### 15. Watch app — **optional, currently bespoke**
 
 `SeptenaWatch/` + `SeptenaWatchComplication/` do not read the manifest; each
 surfaced section is hand-wired there. Treat watch presence as an explicit,
-separate decision per section, not a manifest-driven default.
+separate decision per section, not a manifest-driven default. (The Next *feed*
+the watch renders is the exception — its membership is shared via `NextBlocks`,
+surface 14.)
 
 ---
 
@@ -173,6 +196,7 @@ separate decision per section, not a manifest-driven default.
 | Aim metrics | ▫️ | plugin `aimMetrics` / `evaluateAim` |
 | Flourish | ▫️ | plugin `logFlourish` + `SectionLog` |
 | Import/Export | ▫️ | plugin `exportContribution` |
+| Next feed | ▫️ | `NextBlocks.all` (+ iOS render case, watch writer) |
 | Watch | ▫️ bespoke | `SeptenaWatch/` |
 
 The classic gap is a section that has a manifest row + destination (so it shows

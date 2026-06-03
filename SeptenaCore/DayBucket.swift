@@ -56,4 +56,16 @@ public enum DayBucket: String, CaseIterable, Identifiable, Hashable, Sendable {
 
   /// The bucket the user is currently in, by wall-clock.
   public static var current: DayBucket { from(date: .now) }
+
+  /// Exclusive end-of-window hour (local) for this bucket — the same
+  /// cutoffs `from(date:)` uses, exposed so countdown UIs derive the
+  /// window boundary here instead of re-hardcoding 12 / 17. Evening runs
+  /// to the day boundary (24 → next 00:00).
+  public var endHour: Int {
+    switch self {
+    case .morning:   return 12
+    case .afternoon: return 17
+    case .evening:   return 24
+    }
+  }
 }
