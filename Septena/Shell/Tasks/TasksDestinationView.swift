@@ -28,6 +28,11 @@ struct TasksDestinationView: View {
   /// Tasks completed today, newest first. Gated on the "Show completed in
   /// Today" preference (shared with the Today log + Settings).
   @State private var doneTasks: [SeptenaTask] = []
+  /// Areas / projects backing the edit sheet's "List" picker. Loaded once
+  /// alongside the task lists so the modal can resolve and reassign a task's
+  /// home the same way the full Tasks surface does.
+  @State private var areas: [Area] = []
+  @State private var projects: [Project] = []
   @State private var editing: SeptenaTask? = nil
   @State private var creating = false
 
@@ -73,7 +78,8 @@ struct TasksDestinationView: View {
     .tint(accent)
     .task { reload() }
     .sheet(item: $editing) { task in
-      TaskQuickEditSheet(task: task, accent: accent, onDone: { reload() })
+      TaskQuickEditSheet(task: task, accent: accent, areas: areas, projects: projects,
+                         onDone: { reload() })
         #if os(iOS)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
@@ -94,6 +100,8 @@ struct TasksDestinationView: View {
 
   private func reload() {
     settle.cancelAll()
+    areas = LocalCache.areas(in: modelContext)
+    projects = LocalCache.projects(in: modelContext)
     openTasks = LocalCache.tasks(in: modelContext, filter: .today)
     guard showCompleted else { doneTasks = []; return }
     let today = SeptenaDate.today
@@ -181,30 +189,52 @@ struct TasksDestinationView: View {
 
 // MARK: - Quick edit
 
-/// Compact task editor presented from a drawer row tap. Edits the same
-/// title + notes the deep surface's inline editor exposes, plus the Today
-/// pin — the high-frequency fields. Scheduling, deadlines, repeat, and
-/// area/project assignment remain in the full Tasks surface.
+/// Compact task editor presented from a drawer row tap. Exposes the same
+/// fields the full Tasks surface does — title, notes, schedule (When),
+/// deadline, repeat, and area/project (List) — behind the canonical task
+/// icons, so a task edits identically wherever it's opened. Changes are held
+/// locally and committed on Done (Cancel discards), matching the modal's
+/// Cancel/Done contract.
 private struct TaskQuickEditSheet: View {
   let task: SeptenaTask
   let accent: Color
+  let areas: [Area]
+  let projects: [Project]
   let onDone: () -> Void
 
   @Environment(TaskMutator.self) private var mutator
   @Environment(\.dismiss) private var dismiss
   @State private var title: String
   @State private var notes: String
-  @State private var isToday: Bool
+  // Local edit buffers for the meta fields, seeded from the task and committed
+  // on Done. `scheduled` mirrors the full surface: a task pinned to Today (no
+  // explicit date) shows no scheduled date here — picking "Today" re-pins it.
+  @State private var scheduled: Date?
+  @State private var deadline: Date?
+  @State private var recurrence: Recurrence?
+  @State private var areaId: String?
+  @State private var projectId: String?
+  @State private var picker: EditPicker?
 
-  init(task: SeptenaTask, accent: Color, onDone: @escaping () -> Void) {
+  private enum EditPicker: Int, Identifiable {
+    case when, deadline, repeatRule, move
+    var id: Int { rawValue }
+  }
+
+  init(task: SeptenaTask, accent: Color, areas: [Area], projects: [Project],
+       onDone: @escaping () -> Void) {
     self.task = task
     self.accent = accent
+    self.areas = areas
+    self.projects = projects
     self.onDone = onDone
     _title = State(initialValue: task.title)
     _notes = State(initialValue: task.notes ?? "")
-    // Reflect Today *membership*, not just the explicit pin — a task scheduled
-    // for today (or with a deadline today) is in Today without being pinned.
-    _isToday = State(initialValue: task.isOnToday)
+    _scheduled = State(initialValue: SeptenaDate.parse(task.scheduled))
+    _deadline = State(initialValue: SeptenaDate.parse(task.deadline))
+    _recurrence = State(initialValue: task.recurrence)
+    _areaId = State(initialValue: task.area)
+    _projectId = State(initialValue: task.project)
   }
 
   var body: some View {
@@ -216,8 +246,16 @@ private struct TaskQuickEditSheet: View {
             .lineLimit(1...6)
             .foregroundStyle(.secondary)
         }
+        // Standard task meta — same icons + pickers as the full Tasks surface.
         Section {
-          Toggle("Today", isOn: $isToday)
+          metaRow("calendar", "When", value: scheduledLabel,
+                  set: scheduled != nil) { picker = .when }
+          metaRow("flag", "Deadline", value: deadlineLabel,
+                  set: deadline != nil) { picker = .deadline }
+          metaRow("repeat", "Repeat", value: recurrence?.shortLabel ?? "Never",
+                  set: recurrence != nil) { picker = .repeatRule }
+          metaRow("folder", "List", value: listLabel,
+                  set: areaId != nil || projectId != nil) { picker = .move }
         }
         Section {
           Button(role: .destructive) {
@@ -243,8 +281,97 @@ private struct TaskQuickEditSheet: View {
         }
       }
       .tint(accent)
+      .sheet(item: $picker) { which in
+        editPicker(which)
+      }
     }
   }
+
+  // MARK: - Meta row
+
+  /// A tappable Form row: leading task icon (tinted accent when the field is
+  /// set), the field name, and its current value. Opens the matching picker.
+  @ViewBuilder
+  private func metaRow(_ icon: String, _ label: String, value: String,
+                       set: Bool, _ action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+      HStack(spacing: 12) {
+        Image(systemName: icon)
+          .scaledFont(size: 16)
+          .foregroundStyle(set ? accent : Theme.inkSecondary)
+          .frame(width: 24)
+        Text(label)
+          .foregroundStyle(Theme.inkPrimary)
+        Spacer()
+        Text(value)
+          .foregroundStyle(.secondary)
+      }
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+  }
+
+  @ViewBuilder
+  private func editPicker(_ which: EditPicker) -> some View {
+    switch which {
+    case .when:
+      DatePickerSheet(title: "When", initialDate: scheduled,
+                      setLabel: "Set Date", updateLabel: "Update Date",
+                      clearLabel: "No Date") { scheduled = $0 }
+        #if os(iOS)
+        .presentationDetents([.height(DatePickerSheet.sheetHeight), .large])
+        #endif
+    case .deadline:
+      DatePickerSheet(title: "Deadline", initialDate: deadline,
+                      setLabel: "Set Deadline", updateLabel: "Update Deadline",
+                      clearLabel: "Remove Deadline") { deadline = $0 }
+        #if os(iOS)
+        .presentationDetents([.height(DatePickerSheet.sheetHeight), .large])
+        #endif
+    case .repeatRule:
+      RecurrencePickerSheet(initial: recurrence) { recurrence = $0 }
+        #if os(iOS)
+        .presentationDetents([.medium, .large])
+        #endif
+    case .move:
+      MovePickerSheet(areas: areas, projects: projects,
+                      currentAreaId: areaId, currentProjectId: projectId) { a, p in
+        areaId = a; projectId = p
+      }
+        #if os(iOS)
+        .presentationDetents([.medium, .large])
+        #endif
+    }
+  }
+
+  // MARK: - Value labels
+
+  private var scheduledLabel: String {
+    guard let scheduled else { return "None" }
+    if Calendar.current.isDateInToday(scheduled) { return "Today" }
+    return Self.shortFormatter.string(from: scheduled)
+  }
+  private var deadlineLabel: String {
+    guard let deadline else { return "None" }
+    return Self.shortFormatter.string(from: deadline)
+  }
+  private var listLabel: String {
+    if let projectId, let p = projects.first(where: { $0.id == projectId }) {
+      return p.title
+    }
+    if let areaId, let a = areas.first(where: { $0.id == areaId }) {
+      return a.title
+    }
+    return "Inbox"
+  }
+
+  private static let shortFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "MMM d"
+    return f
+  }()
+
+  // MARK: - Commit
 
   private func save() {
     let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -255,17 +382,43 @@ private struct TaskQuickEditSheet: View {
                      title: titleChanged ? trimmed : nil,
                      notes: notesChanged ? notes : nil)
     }
-    if isToday != task.isOnToday {
-      if isToday {
-        // Wasn't in Today → pin it.
-        mutator.moveToToday(id: task.id, today: true)
+
+    // Schedule — Things-style mapping, mirroring `TaskListView.applyWhen`:
+    // a "Today" pick pins to Today and clears any planning date; a future
+    // date schedules it (server surfaces it on Today when it arrives); nil
+    // clears both. Only fire when the picked date actually changed.
+    if scheduled != SeptenaDate.parse(task.scheduled) {
+      if let d = scheduled {
+        if Calendar.current.isDateInToday(d) {
+          mutator.schedule(id: task.id, date: nil)
+          mutator.moveToToday(id: task.id, today: true)
+        } else {
+          mutator.moveToToday(id: task.id, today: false)
+          mutator.schedule(id: task.id, date: d)
+        }
       } else {
-        // Shared "remove from Today": drops the pin and clears an arrived
-        // planning date, while leaving a live deadline intact. See
-        // `CloudKitTasksBackend.removeFromToday`.
-        mutator.removeFromToday(id: task.id)
+        mutator.schedule(id: task.id, date: nil)
+        mutator.moveToToday(id: task.id, today: false)
       }
     }
+
+    if deadline != SeptenaDate.parse(task.deadline) {
+      mutator.setDue(id: task.id, date: deadline)
+    }
+    if recurrence != task.recurrence {
+      mutator.setRecurrence(id: task.id, recurrence: recurrence)
+    }
+
+    // List — project wins; Septena derives the area from the project on save.
+    if areaId != task.area || projectId != task.project {
+      if projectId != nil {
+        mutator.moveToProject(id: task.id, project: projectId)
+      } else {
+        mutator.moveToArea(id: task.id, area: areaId)
+        mutator.moveToProject(id: task.id, project: nil)
+      }
+    }
+
     onDone()
     dismiss()
   }
