@@ -49,7 +49,6 @@ struct SeptenaApp: App {
   @Environment(\.scenePhase) private var scenePhase
   #if os(iOS)
   @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-  private let watchBridge = WatchBridge.shared
   #endif
   #if os(macOS)
   @NSApplicationDelegateAdaptor(MacAppDelegate.self) private var macAppDelegate

@@ -19,48 +19,10 @@ enum WatchSnapshotPublisher {
   /// a failed write is retried by the next mutation / foreground.
   @MainActor
   static func publish(context: ModelContext, date: String = SeptenaDate.today) {
-    var items: [NextItem] = []
-
-    // Suggested first — mirrors the app's Next ordering (Suggested → Tasks → …).
-    for s in NextSuggestionsModel.visibleSuggestions(context: context) {
-      items.append(NextItem(
-        id: s.id,
-        kind: "suggestion",
-        title: s.emoji.map { "\($0) \(s.title)" } ?? s.title,
-        subtitle: s.detail,
-        trailing: nil,
-        overdue: false,
-        sortKey: items.count
-      ))
-    }
-
-    // Today's open tasks next, tagged with their project/area under the title.
-    let areaTitle = Dictionary(LocalCache.areas(in: context).map { ($0.id, $0.title) },
-                               uniquingKeysWith: { a, _ in a })
-    let projectTitle = Dictionary(LocalCache.projects(in: context).map { ($0.id, $0.title) },
-                                  uniquingKeysWith: { a, _ in a })
-    for task in LocalCache.tasks(in: context, filter: .today) where task.status == .open {
-      let list = task.project.flatMap { projectTitle[$0] } ?? task.area.flatMap { areaTitle[$0] }
-      items.append(NextItem(
-        id: task.id,
-        kind: "task",
-        title: task.title,
-        subtitle: list,
-        trailing: nil,
-        overdue: task.isOverdue,
-        sortKey: items.count
-      ))
-    }
-
-    // Then chores / habits (all buckets, tagged in subtitle) / supplements.
-    for item in ChecklistMirror.loadNextItems(context: context, date: date, bucket: nil).items {
-      items.append(NextItem(
-        id: item.id, kind: item.kind, title: item.title,
-        subtitle: item.subtitle, trailing: item.trailing,
-        overdue: item.overdue, sortKey: items.count
-      ))
-    }
-
+    // The full Next feed (suggestions + tasks/chores/habits/supplements in the
+    // user's saved section order) comes from the one shared builder, so the
+    // watch snapshot can never diverge from the app's Next list.
+    let items = NextFeed.flat(context: context, date: date)
     let response = NextItemsResponse(date: date, bucket: "", items: items)
     guard let payload = try? JSONEncoder().encode(response) else { return }
     Task.detached(priority: .utility) {

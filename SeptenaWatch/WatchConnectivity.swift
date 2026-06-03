@@ -66,14 +66,9 @@ final class WatchConnectivity {
 
   private var today: String { Self.dateFmt.string(from: Date()) }
 
-  private func currentBucket() -> String {
-    let hour = Calendar.current.component(.hour, from: Date())
-    switch hour {
-    case 5..<12:  return "morning"
-    case 12..<17: return "afternoon"
-    default:      return "evening"
-    }
-  }
+  // Bucket selection is shared with the phone via `DayBucket` so the two
+  // never disagree about which habits are due now.
+  private func currentBucket() -> String { DayBucket.current.rawValue }
 
   // MARK: - Foreground fetch
 

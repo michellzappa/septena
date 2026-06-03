@@ -199,9 +199,10 @@ final class NextItemsModel {
   /// Same idea for chores — the linger set, separate from `completedChores`
   /// so the settle beat moves the row to Done without un-completing it.
   var actedChores: Set<String> = []
-  /// Today's calendar events — surfaced inline in Next instead of as a
-  /// separate dashboard tile (matches the webapp's `/api/calendar/day`
-  /// integration into the Next list).
+  /// Today's calendar events. No longer rendered in the Next *list* (calendar
+  /// was removed from Next) — kept only to feed the homepage today-timeline
+  /// card (`WeekDashboardTimelineCard`, via `WeekDashboardView.todayTimeline`),
+  /// which is a separate ambient glance surface.
   var calendarEvents: [EKEvent] = []
   /// Drives the "linger → fade" beat after a check (see `SettleStore`). One
   /// store covers habits / supplements / chores — ids never collide.
@@ -251,15 +252,8 @@ final class NextItemsModel {
       .sorted { ($0.daysOverdue, $0.name) > ($1.daysOverdue, $1.name) }
   }
 
-  /// Calendar events still ahead today (or currently happening). Past
-  /// events simply drop out of the list.
-  var openCalendarEvents: [EKEvent] {
-    calendarEvents.filter { $0.endDate > Date() }
-  }
-
   var hasAnyOpen: Bool {
     !openHabits.isEmpty || !openSupplements.isEmpty || !openChores.isEmpty
-      || !openCalendarEvents.isEmpty
   }
 
   // MARK: - Loading
@@ -328,8 +322,8 @@ final class NextItemsModel {
       ResponseCache.save(mirroredChores, forKey: CacheKey.chores)
     }
 
-    // Local EventKit fetch — no network. Returns [] when access isn't
-    // granted yet; the user grants in Calendar destination view / Settings.
+    // Local EventKit fetch — no network. Feeds the homepage today-timeline
+    // card only; the Next list no longer renders calendar.
     calendarEvents = CalendarBridge.shared.todayEvents()
     // Reload clears the per-session "kept visible" buckets — server is now
     // the source of truth.
@@ -462,74 +456,87 @@ final class NextItemsModel {
 
 struct NextOpenSection: View {
   var model: NextItemsModel
+  var tasksModel: TodayTasksModel
   @Environment(ChecklistMutator.self) private var checklistMutator
+  @Environment(SettingsStore.self) private var settingsStore
   @Environment(SectionTheme.self) private var theme
+
+  /// The Next blocks in the user's saved section order, via the shared
+  /// `NextFeed` ordering rule (the same one the watch snapshot uses) so the
+  /// list never diverges from the watch. Reads the reactive `SettingsStore`
+  /// so reordering in Settings updates the list live.
+  private var orderedKeys: [String] {
+    NextFeed.orderedSectionKeys(
+      enabledKeys: settingsStore.sections.filter(\.isEnabled).map(\.key))
+  }
 
   /// Habits are bucketed by time-of-day on the server ("morning" / "afternoon"
   /// / "evening"). The Next screen only shows the habits for *now* — earlier
   /// buckets shouldn't linger as catch-up debt, and later buckets shouldn't
   /// surface ahead of time. One-bucket-at-a-time keeps the screen focused.
-  private var currentHabitBucket: String {
-    let hour = Calendar.current.component(.hour, from: Date())
-    switch hour {
-    case ..<12:  return "morning"
-    case 12..<17: return "afternoon"
-    default:      return "evening"
-    }
-  }
+  /// Bucket selection is shared with the watch via `DayBucket` so they
+  /// never disagree about which habits are due now.
+  private var currentHabitBucket: String { DayBucket.current.rawValue }
 
   private var habitsNow: [HabitDayItem] {
     let bucket = currentHabitBucket
     return model.openHabits.filter { $0.bucket == bucket }
   }
 
+  private func isEmpty(_ key: String) -> Bool {
+    switch key {
+    case "tasks":       return tasksModel.openTasks.isEmpty
+    case "chores":      return model.openChores.isEmpty
+    case "habits":      return habitsNow.isEmpty
+    case "supplements": return model.openSupplements.isEmpty
+    default:            return true
+    }
+  }
+
   var body: some View {
-    let chores = model.openChores
-    let habits = habitsNow
-    let supplements = model.openSupplements
-    let events = model.openCalendarEvents
-
+    let visible = orderedKeys.filter { !isEmpty($0) }
     VStack(alignment: .leading, spacing: 0) {
-      if !events.isEmpty {
-        sectionHeader("Calendar", tint: theme.color(for: "calendar"))
-        ForEach(events, id: \.eventIdentifier) { event in
-          CalendarEventRow(event: event,
-                           tint: theme.color(for: "calendar"))
-        }
+      ForEach(Array(visible.enumerated()), id: \.element) { index, key in
+        if index > 0 { Hairline().padding(.top, 8) }
+        block(for: key)
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func block(for key: String) -> some View {
+    switch key {
+    case "tasks":
+      // TodayTasksSection renders its own "Tasks" header + rows.
+      TodayTasksSection(model: tasksModel)
+
+    case "chores":
+      sectionHeader("Chores", tint: theme.color(for: "chores"))
+      ForEach(model.openChores) { chore in
+        ChoreRow(chore: chore, model: model, checklistMutator: checklistMutator,
+                 tint: theme.color(for: "chores"))
+          .transition(.opacity)
       }
 
-      if !chores.isEmpty {
-        if !events.isEmpty { Hairline().padding(.top, 8) }
-        sectionHeader("Chores", tint: theme.color(for: "chores"))
-        ForEach(chores) { chore in
-          ChoreRow(chore: chore, model: model, checklistMutator: checklistMutator,
-                   tint: theme.color(for: "chores"))
-            .transition(.opacity)
-        }
+    case "habits":
+      habitBucketHeader(bucket: currentHabitBucket,
+                        tint: theme.color(for: "habits"))
+      ForEach(habitsNow) { habit in
+        HabitRow(habit: habit, model: model, checklistMutator: checklistMutator,
+                 tint: theme.color(for: "habits"))
+          .transition(.opacity)
       }
 
-      if !habits.isEmpty {
-        if !events.isEmpty || !chores.isEmpty { Hairline().padding(.top, 8) }
-        habitBucketHeader(bucket: currentHabitBucket,
-                          tint: theme.color(for: "habits"))
-        ForEach(habits) { habit in
-          HabitRow(habit: habit, model: model, checklistMutator: checklistMutator,
-                   tint: theme.color(for: "habits"))
-            .transition(.opacity)
-        }
+    case "supplements":
+      sectionHeader("Supplements", tint: theme.color(for: "supplements"))
+      ForEach(model.openSupplements) { supp in
+        SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator,
+                      tint: theme.color(for: "supplements"))
+          .transition(.opacity)
       }
 
-      if !supplements.isEmpty {
-        if !events.isEmpty || !chores.isEmpty || !habits.isEmpty {
-          Hairline().padding(.top, 8)
-        }
-        sectionHeader("Supplements", tint: theme.color(for: "supplements"))
-        ForEach(supplements) { supp in
-          SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator,
-                        tint: theme.color(for: "supplements"))
-            .transition(.opacity)
-        }
-      }
+    default:
+      EmptyView()
     }
   }
 }
@@ -742,50 +749,6 @@ struct ChoreRow: View {
     } else {
       Text("\(-days)d").font(.septenaMeta).foregroundStyle(Theme.inkSecondary)
     }
-  }
-}
-
-// Read-only row for a calendar event in the Next list. Mirrors the webapp,
-// which folds /api/calendar/day events into the Next feed instead of
-// surfacing them as a separate widget. No checkbox — events come from the
-// system calendar and aren't actionable from here.
-struct CalendarEventRow: View {
-  let event: EKEvent
-  let tint: Color
-  var inactive: Bool = false
-
-  var body: some View {
-    HStack(spacing: 12) {
-      // Source-calendar color dot so multi-calendar users can still tell
-      // events apart; falls back to the section tint when EventKit gives
-      // us no color (rare).
-      Circle()
-        .fill(eventColor)
-        .frame(width: 10, height: 10)
-        .padding(.leading, 2)
-      Text(event.title?.isEmpty == false ? event.title! : "(Untitled)")
-        .font(.septenaTaskTitle)
-        .foregroundStyle(inactive ? Theme.inkSecondary : Theme.inkPrimary)
-        .strikethrough(inactive)
-        .opacity(inactive ? 0.5 : 1)
-      Spacer()
-      if let trailing = timeRange {
-        Text(trailing).font(.septenaMeta).foregroundStyle(Theme.inkSecondary)
-      }
-    }
-    .padding(.horizontal, Theme.hPadding)
-    .padding(.vertical, Theme.rowVPadding)
-  }
-
-  private var eventColor: Color {
-    if let cg = event.calendar?.cgColor { return Color(cgColor: cg) }
-    return tint
-  }
-
-  private var timeRange: String? {
-    if event.isAllDay { return "all-day" }
-    let f = DateFormatter(); f.dateFormat = "HH:mm"
-    return "\(f.string(from: event.startDate))–\(f.string(from: event.endDate))"
   }
 }
 

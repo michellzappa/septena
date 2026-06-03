@@ -32,7 +32,6 @@ struct SidebarRootView: View {
     let cachedTasks = LocalCache.allTasks(in: ctx)
     let agg = Self.aggregate(tasks: cachedTasks)
     _counts = State(initialValue: agg.counts)
-    _nextCount = State(initialValue: nil)
     _projectProgress = State(initialValue: agg.projectProgress)
     _projectOpenCount = State(initialValue: agg.projectOpenCount)
     _areaOpenCount = State(initialValue: agg.areaOpenCount)
@@ -46,10 +45,6 @@ struct SidebarRootView: View {
   /// Open task count per area, rolling up loose-in-area + tasks in that
   /// area's projects.
   @State private var areaOpenCount: [String: Int] = [:]
-  /// Open task count for the "Next" smart list — habits + supplements +
-  /// chores merged server-side via `/api/next/items`.
-  @State private var nextCount: Int? = nil
-  /// Count of open tasks with a missed `due` deadline (`due ≤ today`).
   @State private var errorMessage: String?
 
 
@@ -791,13 +786,6 @@ struct SidebarRootView: View {
     areas = applyStoredOrder(to: LocalCache.areas(in: modelContext))
     projects = applyStoredProjectOrder(to: LocalCache.projects(in: modelContext))
     let serverCounts = await c
-    // 'Next' is the chores / habits / supplements ritual. Merged
-    // locally from the CloudKit-mirrored SwiftData store — no FastAPI
-    // round-trip for the badge count.
-    let next = ChecklistMirror.loadNextItems(context: modelContext,
-                                             date: SeptenaDate.today)
-    nextCount = next.items.count
-
     let items = await all.items
     var agg = Self.aggregate(tasks: items)
     // Per-smart-list counts come from LocalCache via TaskReads.counts.

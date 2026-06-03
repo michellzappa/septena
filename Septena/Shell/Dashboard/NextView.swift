@@ -28,9 +28,10 @@ struct NextView: View {
 
         NextSuggestionsSection(model: suggestionsModel)
 
-        TodayTasksSection(model: tasksModel)
-
-        NextOpenSection(model: model)
+        // Tasks / chores / habits / supplements render in the user's saved
+        // section order (one order, shared with the homepage) — see
+        // NextOpenSection.orderedKeys.
+        NextOpenSection(model: model, tasksModel: tasksModel)
 
         // Completed chores/habits/supplements fade out in place after the
         // settle beat (no "Done" strip to slide down into) — same vanish
