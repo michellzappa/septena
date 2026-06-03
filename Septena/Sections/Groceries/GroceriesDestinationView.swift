@@ -11,6 +11,7 @@ import SwiftData
 struct GroceriesDestinationView: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
   private var grocery: GroceryMutator { SeptenaServices.shared.groceryMutator }
 
@@ -189,11 +190,21 @@ struct GroceriesDestinationView: View {
   private func markAllBought() {
     let lowItems = items.filter { $0.low }
     guard !lowItems.isEmpty else { return }
-    for item in lowItems {
-      grocery.setLow(id: item.id, low: false)
+    // The one grocery moment worth celebrating — a burst that grows with the
+    // size of the shop you just cleared.
+    SectionLog.newLog(
+      section: "groceries",
+      accent: accent,
+      intensity: min(1.5, max(0.8, Double(lowItems.count) / 8)),
+      announce: "Marked \(lowItems.count) items bought.",
+      logCommit: logCommit
+    ) {
+      for item in lowItems {
+        grocery.setLow(id: item.id, low: false)
+      }
+      reload()
+      AddInfoSection.groceries.notifyTilesChanged()
     }
-    reload()
-    Haptics.success()
   }
 
   private func reload() {

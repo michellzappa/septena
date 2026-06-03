@@ -12,6 +12,11 @@ enum GroceriesPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(GroceriesDestinationView()) }
 
+  // Groceries celebrates only the satisfying moment — finishing the shop
+  // ("mark all bought") — with a burst. Adding/marking-needed is mundane
+  // list-keeping and stays silent.
+  static var logFlourish: LogFlourish? { LogFlourish(motion: .burst) }
+
   static var logActions: [LogAction] {
     [LogAction(id: "new", title: "New item", systemImage: "plus")]
   }
