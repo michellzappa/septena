@@ -13,9 +13,8 @@ struct SupplementsDestinationView: View {
   @State private var model = NextItemsModel()
   @State private var editing: SupplementDayItem? = nil
   @State private var creating = false
-  @State private var history: [SupplementHistoryPoint] = []
-  /// Day the drawer's date strip is pointing at. Heatmap tap updates
-  /// this rather than opening a modal backfill sheet.
+  /// Day the drawer's date strip is pointing at; toggles write to this
+  /// day when browsing the past via the date strip.
   @State private var viewingDate: String = SeptenaDate.today
   /// Past-day state for `viewingDate`. Loaded when not viewing today.
   @State private var pastDay: SupplementsDayResponse? = nil
@@ -50,19 +49,6 @@ struct SupplementsDestinationView: View {
                                  systemImage: theme.icon(for: "supplements"),
                                  description: Text("Tap + to add a supplement."))
         }
-        if !history.isEmpty {
-          ChecklistHeatmapSection(
-            title: "Supplement consistency",
-            noun: "supplement",
-            accent: accent,
-            daily: history,
-            date: { $0.date },
-            done: { $0.done },
-            total: { $0.total },
-            // Heatmap tap → date strip jump. Same pattern as Habits.
-            onTapDay: { iso in viewingDate = iso }
-          )
-        }
       } else {
         pastDaySection
       }
@@ -72,10 +58,6 @@ struct SupplementsDestinationView: View {
     .task {
       model.paintFromCache()
       await model.load()
-      // History is computed locally from the CloudKit-backed mirror.
-      let resp = ChecklistMirror.loadSupplementsHistory(
-        context: LocalStore.shared.container.mainContext, days: 365)
-      history = resp.daily
     }
     .onChange(of: viewingDate) { _, _ in reloadPastDay() }
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in

@@ -41,27 +41,6 @@ struct SleepDestinationView: View {
           )
         }
       }
-      if nights.count > 14 {
-        ActivityHeatmapSection(
-          title: "Sleep score",
-          accent: accent,
-          daily: nights,
-          date: { $0.date },
-          value: { Double($0.sleepScore ?? 0) },
-          levelFor: { v in
-            let s = Int(v)
-            if s <= 0 { return 0 }
-            if s >= 85 { return 4 }
-            if s >= 75 { return 3 }
-            if s >= 65 { return 2 }
-            return 1
-          },
-          labelFor: { v in "score \(Int(v))" },
-          subtitleFor: { active, total, _ in
-            "\(active) of \(total) nights logged"
-          }
-        )
-      }
       if !loading && nights.isEmpty {
         ContentUnavailableView("No Oura data",
                                systemImage: theme.icon(for: "sleep"),

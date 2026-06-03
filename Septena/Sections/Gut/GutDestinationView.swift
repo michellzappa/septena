@@ -12,7 +12,6 @@ struct GutDestinationView: View {
   @State private var loading = true
   @State private var editing: GutEntry? = nil
   @State private var creating: Bool = false
-  @State private var history: [GutHistoryPoint] = []
   /// The day the drawer is viewing. Bound to `SectionDrawer`'s
   /// `currentDate` slot so the user can step prev/next from the date
   /// strip and `reload()` re-fetches for that day. Defaults to today.
@@ -21,10 +20,6 @@ struct GutDestinationView: View {
   private var gut: GutMutator { SeptenaServices.shared.gutMutator }
 
   private var accent: Color { theme.color(for: "gut") }
-
-  /// When the date strip is on a past day, hide the heatmap and show
-  /// only the day's log entries.
-  private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
 
   var body: some View {
     SectionDrawer(sectionKey: "gut",
@@ -48,34 +43,6 @@ struct GutDestinationView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
         }
-      }
-      if isViewingToday && !history.isEmpty {
-        ActivityHeatmapSection(
-          title: "Movement days",
-          accent: accent,
-          daily: history,
-          date: { $0.date },
-          value: { Double($0.movements) },
-          levelFor: { v in
-            let n = Int(v)
-            if n <= 0 { return 0 }
-            if n == 1 { return 1 }
-            if n == 2 { return 2 }
-            if n == 3 { return 3 }
-            return 4
-          },
-          labelFor: { v in
-            let n = Int(v)
-            return "\(n) \(n == 1 ? "movement" : "movements")"
-          },
-          subtitleFor: { active, total, sum in
-            "\(active) of \(total) days · \(Int(sum)) movements"
-          },
-          // Heatmap tap jumps the drawer's date strip to that day —
-          // no more BrowseGutDaySheet detour; the destination itself
-          // re-fetches and renders the picked day inline.
-          onTapDay: { iso in viewingDate = iso }
-        )
       }
     }
     .trackScreen("gut")
@@ -136,7 +103,6 @@ struct GutDestinationView: View {
 
   private func reload() {
     today = ChecklistMirror.loadGutDay(context: modelContext, date: viewingDate)
-    history = ChecklistMirror.loadGutHistory(context: modelContext, days: 365).daily
     loading = false
   }
 }

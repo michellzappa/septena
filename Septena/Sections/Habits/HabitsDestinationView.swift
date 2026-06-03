@@ -19,11 +19,9 @@ struct HabitsDestinationView: View {
   @State private var model = NextItemsModel()
   @State private var editing: HabitDayItem? = nil
   @State private var creating = false
-  @State private var history: [HabitHistoryPoint] = []
   /// Day the drawer's date strip is pointing at. Drives summary +
-  /// bucket list + heatmap hiding when on a past day. Heatmap tap
-  /// updates this instead of opening a modal backfill sheet —
-  /// time-travel mode IS the backfill UX.
+  /// bucket list, and which day toggles write to when browsing the past
+  /// via the date strip — time-travel mode IS the backfill UX.
   @State private var viewingDate: String = SeptenaDate.today
   /// Past-day habit state for `viewingDate`. Loaded when
   /// `viewingDate != today` so we don't drag NextItemsModel off the
@@ -45,20 +43,6 @@ struct HabitsDestinationView: View {
         ForEach(model.habitBuckets, id: \.self) { bucket in
           bucketSection(bucket)
         }
-        if !history.isEmpty {
-          ChecklistHeatmapSection(
-            title: "Habit consistency",
-            noun: "habit",
-            accent: accent,
-            daily: history,
-            date: { $0.date },
-            done: { $0.done },
-            total: { $0.total },
-            // Heatmap tap now jumps the date strip rather than opening
-            // a modal — same pattern as Caffeine / Gut / Nutrition.
-            onTapDay: { iso in viewingDate = iso }
-          )
-        }
       } else {
         pastDaySection
       }
@@ -68,10 +52,6 @@ struct HabitsDestinationView: View {
     .task {
       model.paintFromCache()
       await model.load()
-      // History is computed locally from the CloudKit-backed mirror.
-      let resp = ChecklistMirror.loadHabitsHistory(
-        context: LocalStore.shared.container.mainContext, days: 365)
-      history = resp.daily
     }
     .onChange(of: viewingDate) { _, _ in reloadPastDay() }
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in

@@ -13,10 +13,6 @@ struct ChoresDestinationView: View {
   @State private var model = NextItemsModel()
   @State private var editing: ChoreItem? = nil
   @State private var creating = false
-  @State private var history: [ChoreHistoryPoint] = []
-  /// `.sheet(item:)` needs Identifiable; String isn't, so wrap.
-  private struct BackfillDate: Identifiable { let id: String }
-  @State private var backfillDate: BackfillDate? = nil
 
   private var accent: Color { theme.color(for: "chores") }
 
@@ -52,28 +48,12 @@ struct ChoresDestinationView: View {
       if !later.isEmpty {
         DrawerSection("Later", padding: .none) { ForEach(later) { row(for: $0) } }
       }
-      if !history.isEmpty {
-        ChecklistHeatmapSection(
-          title: "Chore consistency",
-          noun: "chore",
-          accent: accent,
-          daily: history,
-          date: { $0.date },
-          done: { $0.completed },
-          total: { $0.total },
-          onTapDay: { iso in backfillDate = BackfillDate(id: iso) }
-        )
-      }
     }
     .trackScreen("chores")
     .tint(accent)
     .task {
       model.paintFromCache()
       await model.load()
-      // History is computed locally from the CloudKit-backed mirror.
-      let resp = ChecklistMirror.loadChoresHistory(
-        context: LocalStore.shared.container.mainContext, days: 365)
-      history = resp.daily
     }
     .adaptiveDetail(item: $editing) { chore in
       EditChoreSheet(
@@ -90,13 +70,6 @@ struct ChoresDestinationView: View {
         original: nil,
         onDone: { _ in Task { await model.load() } }
       )
-    }
-    .sheet(item: $backfillDate) { wrap in
-      BackfillChoresSheet(date: wrap.id)
-        #if os(iOS)
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-        #endif
     }
   }
 

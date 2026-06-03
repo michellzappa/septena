@@ -64,7 +64,6 @@ struct TrainingDestinationView: View {
       z2CardioSection
       strengthVolumeSection
       volumeTrendSection
-      consistencySection
       progressionSection
       ForEach(sessions, id: \.key) { block in
         VStack(alignment: .leading, spacing: 8) {
@@ -683,42 +682,6 @@ struct TrainingDestinationView: View {
     let cal = Calendar.current
     return (0..<7).reversed().compactMap { off in
       cal.date(byAdding: .day, value: -off, to: Date()).map(fmt.string(from:))
-    }
-  }
-
-  /// Consistency heatmap — one cell per day, intensity from entry count.
-  /// Anchors to today's week on the right and fills as many week columns
-  /// as the row width allows, clamped to the earliest logged entry so we
-  /// don't render dead history. Uses the shared `ConsistencyHeatmap`.
-  private var consistencySection: some View {
-    // Tally entries per date.
-    var counts: [String: Int] = [:]
-    for e in entries { counts[e.date, default: 0] += 1 }
-    let firstDate = entries.map(\.date).min().flatMap(ConsistencyHeatmap.date(fromISO:))
-    let end = Date()
-    let activeDays = counts.values.filter { $0 > 0 }.count
-    return DrawerSection {
-      VStack(alignment: .leading, spacing: 10) {
-        HStack {
-          Text("Consistency").font(.subheadline.weight(.semibold))
-          Spacer()
-          Text("\(activeDays) active days")
-            .font(.caption.monospacedDigit())
-            .foregroundStyle(.secondary)
-        }
-        ConsistencyHeatmap(endDate: end, firstDataDate: firstDate, accent: accent) { iso in
-          let c = counts[iso] ?? 0
-          let level: Int = {
-            if c <= 0 { return 0 }
-            if c == 1 { return 1 }
-            if c == 2 { return 2 }
-            if c == 3 { return 3 }
-            return 4
-          }()
-          let label = c > 0 ? "\(iso) · \(c) \(c == 1 ? "entry" : "entries")" : "\(iso) · rest"
-          return HeatmapDay(level: level, label: label)
-        }
-      }
     }
   }
 

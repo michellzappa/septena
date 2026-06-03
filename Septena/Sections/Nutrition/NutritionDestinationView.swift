@@ -90,18 +90,6 @@ struct NutritionDestinationView: View {
     entries.filter { $0.date == viewingDate }.sorted { $0.time > $1.time }
   }
 
-  /// Counts per day across the loaded window. Feeds the heatmap so the
-  /// user can see at a glance which days have logs and tap to jump.
-  /// Struct (not tuple) because `ActivityHeatmapSection` requires
-  /// `Hashable` Points.
-  struct DayCount: Hashable { let date: String; let count: Int }
-
-  private var entryCountsByDate: [DayCount] {
-    Dictionary(grouping: entries, by: \.date)
-      .map { DayCount(date: $0.key, count: $0.value.count) }
-      .sorted { $0.date < $1.date }
-  }
-
   private struct DayTotals { var protein = 0.0; var fat = 0.0; var carbs = 0.0; var fiber = 0.0; var kcal = 0.0 }
 
   private var todayTotals: DayTotals {
@@ -154,9 +142,6 @@ struct NutritionDestinationView: View {
         macroTilesGrid
       }
       entriesList
-      if isViewingToday {
-        heatmapSection
-      }
     }
     .trackScreen("nutrition")
     .task { reload() }
@@ -594,39 +579,6 @@ struct NutritionDestinationView: View {
           if let f = fastingByDate[viewingDate] { fastingGapRow(f) }
         }
       }
-    }
-  }
-
-  /// Year-scale heatmap of logged-meal density. Tap any cell to jump
-  /// the date strip to that day. Empty cells are tappable too so the
-  /// user can intentionally pick a day they suspect they forgot to log
-  /// (and then add a backdated entry from the + menu).
-  @ViewBuilder
-  private var heatmapSection: some View {
-    if !entryCountsByDate.isEmpty {
-      ActivityHeatmapSection(
-        title: "Logged days",
-        accent: accent,
-        daily: entryCountsByDate,
-        date: { $0.date },
-        value: { Double($0.count) },
-        levelFor: { v in
-          let n = Int(v)
-          if n <= 0 { return 0 }
-          if n == 1 { return 1 }
-          if n == 2 { return 2 }
-          if n <= 4 { return 3 }
-          return 4
-        },
-        labelFor: { v in
-          let n = Int(v)
-          return "\(n) \(n == 1 ? "meal" : "meals")"
-        },
-        subtitleFor: { active, total, sum in
-          "\(active) of \(total) days · \(Int(sum)) meals"
-        },
-        onTapDay: { iso in viewingDate = iso }
-      )
     }
   }
 

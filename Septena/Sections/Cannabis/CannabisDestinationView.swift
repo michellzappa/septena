@@ -21,10 +21,8 @@ struct CannabisDestinationView: View {
     let method: String
     var id: String { method }
   }
-  @State private var history: [CannabisHistoryPoint] = []
   /// Day the drawer is currently viewing — driven by the drawer's
-  /// `currentDate` date strip. Defaults to today; heatmap taps jump it
-  /// to the picked day.
+  /// `currentDate` date strip. Defaults to today.
   @State private var viewingDate: String = SeptenaDate.today
 
   /// Capsule dot count for the legacy HitDots indicator.
@@ -35,8 +33,7 @@ struct CannabisDestinationView: View {
 
   private var accent: Color { theme.color(for: "cannabis") }
 
-  /// When the date strip is on a past day, hide the heatmap and show
-  /// only the day's log entries.
+  /// The smart vape leading log actions are today-only affordances.
   private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
 
   var body: some View {
@@ -62,31 +59,6 @@ struct CannabisDestinationView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
         }
-      }
-      if isViewingToday && !history.isEmpty {
-        ActivityHeatmapSection(
-          title: "Cannabis days",
-          accent: accent,
-          daily: history,
-          date: { $0.date },
-          value: { Double($0.sessions) },
-          levelFor: { v in
-            let n = Int(v)
-            if n <= 0 { return 0 }
-            if n == 1 { return 1 }
-            if n == 2 { return 2 }
-            if n == 3 { return 3 }
-            return 4
-          },
-          labelFor: { v in
-            let n = Int(v)
-            return "\(n) \(n == 1 ? "session" : "sessions")"
-          },
-          subtitleFor: { active, total, sum in
-            "\(active) of \(total) days · \(Int(sum)) sessions"
-          },
-          onTapDay: { iso in viewingDate = iso }
-        )
       }
     }
     .trackScreen("cannabis")
@@ -195,7 +167,6 @@ struct CannabisDestinationView: View {
 
   private func reload() {
     today = ChecklistMirror.loadCannabisDay(context: modelContext, date: viewingDate)
-    history = ChecklistMirror.loadCannabisHistory(context: modelContext, days: 365).daily
     loading = false
   }
 }
