@@ -36,6 +36,11 @@ struct NutritionDestinationView: View {
   @State private var loading = true
   @State private var editing: NutritionEntry? = nil
   @State private var creating = false
+  /// Whether the "+" search-and-re-log sheet is open. This is the primary
+  /// "+" path: re-logging an existing meal is the common case; authoring a
+  /// brand-new meal by hand is rare (usually done via MCP), so it's demoted
+  /// to a corner button inside this sheet.
+  @State private var searchingMeals = false
   @State private var photoPickerEntry: NutritionEntry? = nil
   @State private var photoPickerItem: PhotosPickerItem? = nil
   @State private var photoPickerPresented = false
@@ -114,11 +119,31 @@ struct NutritionDestinationView: View {
     Dictionary(uniqueKeysWithValues: (stats?.fasting ?? []).map { ($0.date, $0) })
   }
 
-  /// Days other than today, newest first, capped at one week.
-  private var earlierDays: [(date: String, items: [NutritionEntry])] {
-    let grouped = Dictionary(grouping: entries.filter { $0.date < today }, by: \.date)
-    return grouped.keys.sorted(by: >).prefix(7).map { d in
-      (d, (grouped[d] ?? []).sorted { $0.time > $1.time })
+  /// Normalized identity for a meal: its food lines, lowercased + trimmed +
+  /// joined. Two entries that re-log the same foods collapse to one row.
+  private func mealSignature(_ e: NutritionEntry) -> String {
+    e.foods
+      .map { $0.lowercased().trimmingCharacters(in: .whitespaces) }
+      .filter { !$0.isEmpty }
+      .joined(separator: "|")
+  }
+
+  /// Every distinct meal in the loaded window, deduped to one row each and
+  /// ranked by frequency then recency. Feeds the "+" search-and-re-log
+  /// sheet — no ≥2 threshold or cap, since search wants the full set.
+  private var allDistinctMeals: [UsualMeal] {
+    var groups: [String: [NutritionEntry]] = [:]
+    for e in entries {
+      guard let first = e.foods.first, !first.isEmpty else { continue }
+      groups[mealSignature(e), default: []].append(e)
+    }
+    return groups.compactMap { sig, items -> UsualMeal? in
+      let template = items.max { ($0.date, $0.time) < ($1.date, $1.time) }!
+      return UsualMeal(signature: sig, template: template, count: items.count)
+    }
+    .sorted { a, b in
+      if a.count != b.count { return a.count > b.count }
+      return (a.template.date, a.template.time) > (b.template.date, b.template.time)
     }
   }
 
@@ -131,7 +156,7 @@ struct NutritionDestinationView: View {
   var body: some View {
     SectionDrawer(sectionKey: "nutrition",
                   title: "Nutrition",
-                  onLog: { _ in creating = true },
+                  onLog: { _ in searchingMeals = true },
                   currentDate: $viewingDate) {
       // Time-travel mode: when the date strip is on a past day we drop
       // the macro tiles + heatmap and show just the day's logs. The
@@ -161,6 +186,15 @@ struct NutritionDestinationView: View {
     }
     .adaptiveDetail(isPresented: $creating) {
       EditNutritionEntrySheet(original: nil, onDone: { })
+    }
+    .sheet(isPresented: $searchingMeals) {
+      MealRelogSearchView(
+        meals: allDistinctMeals,
+        colors: MealChipColors(protein: proteinColor, fat: fatColor,
+                               carbs: carbsColor, kcal: kcalColor),
+        onPick: { entry in logAgainNow(entry) },
+        onCreateNew: { creating = true }
+      )
     }
     .photosPicker(
       isPresented: $photoPickerPresented,
@@ -557,9 +591,6 @@ struct NutritionDestinationView: View {
               .padding(.leading, 8)
           }
         }
-        ForEach(earlierDays, id: \.date) { day in
-          dayGroup(date: day.date, items: day.items)
-        }
       }
     } else {
       // History view — focused on `viewingDate`. Shows just that day's
@@ -579,15 +610,6 @@ struct NutritionDestinationView: View {
           if let f = fastingByDate[viewingDate] { fastingGapRow(f) }
         }
       }
-    }
-  }
-
-  private func dayGroup(date: String, items: [NutritionEntry]) -> some View {
-    let fast = fastingByDate[date]
-    return VStack(alignment: .leading, spacing: 6) {
-      dayHeader(date: date, totals: totalsByDate[date])
-      ForEach(items) { e in mealRow(e) }
-      if let fast { fastingGapRow(fast) }
     }
   }
 
@@ -853,6 +875,139 @@ private struct MiniMacroBar: View {
       }
       .clipShape(Capsule())
     }
+  }
+}
+
+// MARK: - Usual / distinct meal model
+
+/// A distinct meal, surfaced once for quick re-logging. `template` is the
+/// most recent instance (so macros reflect the latest version of the meal);
+/// `count` is how many times this signature was logged in the window.
+struct UsualMeal: Identifiable {
+  let signature: String
+  let template: NutritionEntry
+  let count: Int
+  var id: String { signature }
+}
+
+// MARK: - Meal re-log search sheet
+//
+// The "+" affordance opens this instead of the create form. Re-logging an
+// existing meal is the common case; authoring a new meal by hand is rare
+// (usually via MCP), so "New meal" is a corner button here, not the default.
+
+/// The macro-chip colors the search rows borrow from the destination so the
+/// sheet reads as the same product.
+struct MealChipColors {
+  let protein: Color
+  let fat: Color
+  let carbs: Color
+  let kcal: Color
+}
+
+struct MealRelogSearchView: View {
+  let meals: [UsualMeal]
+  let colors: MealChipColors
+  /// Re-log the picked meal now. The sheet dismisses itself first.
+  let onPick: (NutritionEntry) -> Void
+  /// Open the rare hand-authoring path. The sheet dismisses itself first.
+  let onCreateNew: () -> Void
+
+  @Environment(\.dismiss) private var dismiss
+  @State private var query = ""
+
+  private var filtered: [UsualMeal] {
+    let q = query.lowercased().trimmingCharacters(in: .whitespaces)
+    guard !q.isEmpty else { return meals }
+    // `signature` already holds the lowercased, "|"-joined food lines.
+    return meals.filter { $0.signature.contains(q) }
+  }
+
+  var body: some View {
+    NavigationStack {
+      Group {
+        if meals.isEmpty {
+          ContentUnavailableView {
+            Label("No meals yet", systemImage: "fork.knife")
+          } description: {
+            Text("Log a meal and it'll show up here for one-tap re-logging.")
+          } actions: {
+            Button { dismiss(); onCreateNew() } label: {
+              Label("New meal", systemImage: "square.and.pencil")
+            }
+            .buttonStyle(.borderedProminent)
+          }
+        } else if filtered.isEmpty {
+          ContentUnavailableView.search(text: query)
+        } else {
+          List(filtered) { meal in
+            Button {
+              dismiss()
+              onPick(meal.template)
+            } label: {
+              mealRow(meal)
+            }
+            .buttonStyle(.plain)
+          }
+          .listStyle(.plain)
+        }
+      }
+      .navigationTitle("Log a meal")
+      #if os(iOS)
+      .navigationBarTitleDisplayMode(.inline)
+      #endif
+      .searchable(text: $query, prompt: "Search meals")
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Cancel") { dismiss() }
+        }
+        ToolbarItem(placement: .primaryAction) {
+          Button { dismiss(); onCreateNew() } label: {
+            Label("New meal", systemImage: "square.and.pencil")
+          }
+        }
+      }
+    }
+  }
+
+  private func mealRow(_ meal: UsualMeal) -> some View {
+    let e = meal.template
+    return HStack(alignment: .center, spacing: 10) {
+      if let emoji = e.emoji, !emoji.isEmpty { Text(emoji) }
+      VStack(alignment: .leading, spacing: 2) {
+        Text(e.foods.first ?? "—")
+          .font(.subheadline.weight(.medium))
+          .lineLimit(1)
+        if e.foods.count > 1 {
+          Text(e.foods.dropFirst().joined(separator: " · "))
+            .font(.caption2).foregroundStyle(.secondary)
+            .lineLimit(1)
+        }
+        HStack(spacing: 6) {
+          Text("\(Int(e.proteinG.rounded()))P").foregroundStyle(colors.protein)
+          Text("·").foregroundStyle(.secondary.opacity(0.5))
+          Text("\(Int(e.fatG.rounded()))F").foregroundStyle(colors.fat)
+          Text("·").foregroundStyle(.secondary.opacity(0.5))
+          Text("\(Int(e.carbsG.rounded()))C").foregroundStyle(colors.carbs)
+          Text("·").foregroundStyle(.secondary.opacity(0.5))
+          Text("\(Int(e.kcal.rounded()))kcal").foregroundStyle(colors.kcal)
+        }
+        .font(.caption2.monospacedDigit().weight(.semibold))
+        .lineLimit(1)
+      }
+      Spacer(minLength: 0)
+      if meal.count > 1 {
+        Text("×\(meal.count)")
+          .font(.caption2.monospacedDigit())
+          .foregroundStyle(.secondary)
+      }
+      Image(systemName: "arrow.clockwise")
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(.tint)
+    }
+    .contentShape(Rectangle())
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("\(e.foods.first ?? "meal"), \(Int(e.kcal.rounded())) kcal. Tap to log again now.")
   }
 }
 
