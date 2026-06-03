@@ -31,6 +31,11 @@ final class NavigationState {
   /// flip, then resets this to nil. nil means "no pending shortcut".
   var pendingShortcut: ShortcutAction?
 
+  /// One-shot tab switch from a deep link (e.g. the Next widget's
+  /// `septena://next`). RootTabView observes it, selects the tab, then
+  /// resets to nil. nil means "no pending switch".
+  var pendingTab: SeptenaTab?
+
   /// One-shot driver for the section sheet presented at RootTabView when
   /// a Home Screen Quick Action resolves. Hosted at the tab-root (not
   /// inside WeekDashboardView) so the sheet presents reliably regardless

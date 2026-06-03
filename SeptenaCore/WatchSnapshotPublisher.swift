@@ -1,5 +1,6 @@
 import CloudKit
 import SwiftData
+import WidgetKit
 
 /// Publishes a single, tiny CloudKit record holding the watch's entire "Next"
 /// payload so the watch can do one O(1) `record(for:)` read instead of replaying
@@ -25,6 +26,16 @@ enum WatchSnapshotPublisher {
     let items = NextFeed.flat(context: context, date: date)
     let response = NextItemsResponse(date: date, bucket: "", items: items)
     guard let payload = try? JSONEncoder().encode(response) else { return }
+
+    // Nudge the iOS "Next" home/lock-screen widget to re-read the snapshot.
+    // Same trigger as the watch complication's reload — every checklist edit
+    // and app foreground flows through here. The kind string matches
+    // `NextWidget.kind` in the SeptenaWidgets target (separate module, so it
+    // can't be referenced directly). No-op on platforms without the widget.
+    #if os(iOS)
+    WidgetCenter.shared.reloadTimelines(ofKind: "NextWidget")
+    #endif
+
     Task.detached(priority: .utility) {
       await save(payload: payload, date: date)
     }

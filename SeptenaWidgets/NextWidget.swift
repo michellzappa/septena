@@ -1,0 +1,89 @@
+import WidgetKit
+import SwiftUI
+
+// MARK: - Timeline entry
+
+struct NextEntry: TimelineEntry {
+  let date: Date
+  let bucket: DayBucket
+  /// Already narrowed to `bucket` by `NextWidgetSnapshot`.
+  let items: [NextItem]
+
+  var remaining: Int { items.count }
+  var first: NextItem? { items.first }
+
+  /// Placeholder / gallery preview content.
+  static var sample: NextEntry {
+    NextEntry(
+      date: .now,
+      bucket: .current,
+      items: [
+        NextItem(id: "s1", kind: "task",       title: "Reply to the landlord", subtitle: nil, trailing: nil, overdue: false, sortKey: 0),
+        NextItem(id: "s2", kind: "habit",      title: "10 min stretch",        subtitle: nil, trailing: nil, overdue: false, sortKey: 1),
+        NextItem(id: "s3", kind: "supplement", title: "Vitamin D",             subtitle: nil, trailing: nil, overdue: false, sortKey: 2),
+        NextItem(id: "s4", kind: "chore",      title: "Water the plants",      subtitle: nil, trailing: nil, overdue: false, sortKey: 3),
+      ]
+    )
+  }
+}
+
+// MARK: - Provider
+
+struct NextProvider: TimelineProvider {
+  func placeholder(in context: Context) -> NextEntry { .sample }
+
+  func getSnapshot(in context: Context, completion: @escaping (NextEntry) -> Void) {
+    // In the widget gallery (`isPreview`) show sample content immediately
+    // rather than waiting on a CloudKit round-trip.
+    if context.isPreview {
+      completion(.sample)
+      return
+    }
+    Task {
+      let items = await NextWidgetSnapshot.loadItems()
+      completion(NextEntry(date: .now, bucket: .current, items: items))
+    }
+  }
+
+  func getTimeline(in context: Context, completion: @escaping (Timeline<NextEntry>) -> Void) {
+    Task {
+      let items = await NextWidgetSnapshot.loadItems()
+      let entry = NextEntry(date: .now, bucket: .current, items: items)
+      // Backstop only: the app pokes `WidgetCenter.reloadTimelines` on every
+      // checklist mutation, so this just guards against a missed poke and keeps
+      // the bucket label fresh as the day rolls over.
+      let next = Calendar.current.date(byAdding: .minute, value: 30, to: .now) ?? Date(timeIntervalSinceNow: 1800)
+      completion(Timeline(entries: [entry], policy: .after(next)))
+    }
+  }
+}
+
+// MARK: - Widget
+
+struct NextWidget: Widget {
+  /// Reload kind — the app calls `WidgetCenter.shared.reloadTimelines(ofKind:)`
+  /// with this string. Kept in sync with `NextWidget.kind` on the app side.
+  static let kind = "NextWidget"
+
+  var body: some WidgetConfiguration {
+    StaticConfiguration(kind: Self.kind, provider: NextProvider()) { entry in
+      NextWidgetView(entry: entry)
+    }
+    .configurationDisplayName("Next")
+    .description("The one thing to do right now.")
+    .supportedFamilies([
+      .systemSmall,
+      .systemMedium,
+      .accessoryRectangular,
+      .accessoryInline,
+      .accessoryCircular,
+    ])
+  }
+}
+
+@main
+struct SeptenaWidgetsBundle: WidgetBundle {
+  var body: some Widget {
+    NextWidget()
+  }
+}

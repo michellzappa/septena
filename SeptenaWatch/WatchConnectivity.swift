@@ -113,18 +113,12 @@ final class WatchConnectivity {
         return
       }
 
-      // Habits are tagged with their bucket in `subtitle`; keep only the
-      // current time-of-day bucket. Chores and supplements always apply.
-      // Locally-completed items stay hidden until the phone republishes.
+      // Narrow to the current time-of-day bucket via the shared helper (keeps
+      // the watch and the iOS widget from ever disagreeing), then drop items
+      // completed locally this session until the phone republishes.
       let doneLocal = localDoneIDs(date: today)
-      let filtered: [NextItem] = response.items.compactMap { item in
-        if doneLocal.contains(item.id) { return nil }
-        guard item.kind == "habit" else { return item }
-        guard item.subtitle == bkt else { return nil }
-        var habit = item
-        habit.subtitle = nil          // bucket is implicit on the watch
-        return habit
-      }
+      let filtered = response.itemsForBucket(DayBucket.current)
+        .filter { !doneLocal.contains($0.id) }
 
       self.items  = filtered
       self.bucket = bkt

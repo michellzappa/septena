@@ -1482,26 +1482,8 @@ struct HKSyncSettings: Codable {
   }
 }
 
-struct NextItem: Codable, Identifiable, Hashable {
-  var id: String
-  var kind: String
-  var title: String
-  var subtitle: String?
-  var trailing: String?
-  var overdue: Bool
-  var sortKey: Int
-
-  enum CodingKeys: String, CodingKey {
-    case id, kind, title, subtitle, trailing, overdue
-    case sortKey = "sortKey"
-  }
-}
-
-struct NextItemsResponse: Codable {
-  var date: String
-  var bucket: String
-  var items: [NextItem]
-}
+// `NextItem` / `NextItemsResponse` and the `itemsForBucket` helper now live in
+// `SeptenaCore/NextWire.swift` (shared by the app, Mac, watch, and widget).
 
 // MARK: - Add Info: config DTOs (caffeine / cannabis / training)
 

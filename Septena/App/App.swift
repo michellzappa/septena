@@ -266,6 +266,9 @@ struct SeptenaApp: App {
     guard url.scheme == "septena" else { return }
     if url.host == "training", url.path == "/active" {
       navigation.showTrainingSession = true
+    } else if url.host == "next" {
+      // The Next widget opens straight to the Next tab.
+      navigation.pendingTab = .next
     }
   }
 

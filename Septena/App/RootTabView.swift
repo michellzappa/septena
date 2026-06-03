@@ -3,7 +3,7 @@ import SwiftUI
 // Top-level shell for Septena — three peer tabs, each a self-contained
 // module. Week is the synthesizing dashboard, Next is the merged daily
 // checklist, Tasks is the existing iOS task app embedded verbatim.
-// Engage-app's `ContentView` (sidebar + task list) lives inside the Tasks
+// Septena-app's `ContentView` (sidebar + task list) lives inside the Tasks
 // tab unchanged so we can iterate on the new tabs without breaking the
 // daily-driver UX.
 
@@ -93,6 +93,12 @@ struct RootTabView: View {
           nav.pendingSection = PendingSection(key: key)
         }
         nav.pendingShortcut = nil
+      }
+      // Deep-link tab switch (e.g. the Next widget's `septena://next`).
+      .onChange(of: nav.pendingTab) { _, tab in
+        guard let tab else { return }
+        tabSelection.current = tab
+        nav.pendingTab = nil
       }
       // The section sheet for Home Screen Quick Actions. Hosted here so
       // it works regardless of which tab is selected. Renders the
