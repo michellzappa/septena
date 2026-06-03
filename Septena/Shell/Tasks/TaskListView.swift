@@ -132,8 +132,8 @@ struct TaskListView: View {
   @State private var sessionDoneIds: Set<String> = []
 
   /// Drives the "linger → fade" beat after a check (see `SettleStore`). Keeps
-  /// a just-completed row in place for a moment, then animates it out into the
-  /// logged footer instead of yanking it the instant you tap.
+  /// a just-completed row in place for a moment, then fades it out where it
+  /// sits instead of yanking it the instant you tap.
   @State private var settle = SettleStore()
 
 
@@ -149,7 +149,31 @@ struct TaskListView: View {
   /// show native selection circles and taps toggle membership instead of
   /// opening the inline editor. The environment key is unavailable on macOS.
   @Environment(\.editMode) private var editMode
+  /// Grips-only manual-reorder mode (distinct from multi-select). Enters edit
+  /// mode but drops the `List` selection binding, so rows show the trailing
+  /// reorder grip without the leading selection circle. Drag uses the stock
+  /// `.onMove`; the row's context menu / swipes return on exit.
+  @State private var isReordering = false
   #endif
+
+  /// Selection binding handed to `List`. Nil while reordering so edit mode
+  /// shows only reorder grips (no selection circles).
+  private var listSelection: Binding<Set<String>>? {
+    #if os(iOS)
+    return isReordering ? nil : $selection
+    #else
+    return $selection
+    #endif
+  }
+
+  /// Flat-list filters that own a manual order (and thus offer reorder). The
+  /// grouped Today / Upcoming views and the read-only logbook don't.
+  private var supportsReorder: Bool {
+    switch filter {
+    case .inbox, .someday, .project, .area: return true
+    default: return false
+    }
+  }
 
   // Inline new-task entry
   /// Tracks a task created via ⌘N (or the toolbar + button) so that
@@ -236,26 +260,6 @@ struct TaskListView: View {
   // Local semantic sorter — populates a "→ Suggested" chip on Inbox rows.
   @State private var suggestionEngine = SuggestionEngine.shared
 
-  // "Show N logged items" — recently completed tasks, scoped to the current
-  // view. Loaded lazily on first expand and refreshed alongside the main list.
-  @State private var loggedItemsStorage: [SeptenaTask] = []
-  @State private var loggedFilter: TaskFilter? = nil
-  @State private var showLogged = false
-
-  private var loggedItems: [SeptenaTask] {
-    loggedFilter == filter ? loggedItemsStorage : []
-  }
-
-  /// Where the "Show N logged items" footer is shown. Suppressed on the
-  /// Logbook screen itself, and on Today / Inbox where historical completions
-  /// would just be noise.
-  private var showsLoggedSection: Bool {
-    switch filter {
-    case .today, .inbox, .logbook: return false
-    default:                       return true
-    }
-  }
-
   // "You have N new to-dos" banner — compact start-of-day welcome that
   // surfaces tasks rolling in from scheduled-past or due-today. Dismissed
   // per-day via UserDefaults (local only); reappears the next morning.
@@ -308,6 +312,18 @@ struct TaskListView: View {
       #if os(iOS)
       if !embedded {
         ToolbarItem(placement: .topBarTrailing) { EditButton() }
+      }
+      // Grips-only manual reorder. Available on the flat lists (including the
+      // embedded Project / Area detail, where the EditButton is hidden).
+      if supportsReorder {
+        ToolbarItem(placement: .topBarTrailing) {
+          Button {
+            toggleReorder()
+          } label: {
+            Label(isReordering ? "Done" : "Reorder",
+                  systemImage: isReordering ? "checkmark" : "arrow.up.arrow.down")
+          }
+        }
       }
       #endif
     }
@@ -421,7 +437,7 @@ struct TaskListView: View {
     //   • iOS: a Set selection only engages in edit mode, so outside edit mode
     //     taps fall through to our single-tap-to-edit gesture; inside it, taps
     //     toggle the native circles.
-    List(selection: $selection) {
+    List(selection: listSelection) {
       taskListHeader
       taskListRows
       taskListFooter
@@ -450,15 +466,6 @@ struct TaskListView: View {
     default:
       reviewRows
       visibleRows
-    }
-
-    if showsLoggedSection && !loggedItems.isEmpty {
-      loggedToggleRow.asListRow()
-      if showLogged {
-        ForEach(sortedLoggedItems) { task in
-          loggedRow(task).asListRow()
-        }
-      }
     }
   }
 
@@ -520,20 +527,18 @@ struct TaskListView: View {
   }
 
   private var visibleRows: some View {
-    // Standard SwiftUI drag-and-drop for manual reorder. `.draggable` +
-    // `.dropDestination` coexist with the row's `.contextMenu`: a stationary
-    // long-press opens the menu, a long-press-and-move lifts the row to drag.
-    // No edit mode, no custom menu. (Flat lists only — the grouped Today /
-    // Upcoming views render in a different order than `visibleItems`.)
+    // Manual reorder via the stock `List` reorder API. `.onMove` is the only
+    // SwiftUI mechanism that both lands reliably inside a List and animates the
+    // other rows out of the way as you drag. (Flat lists only — the grouped
+    // Today / Upcoming views render in a different order than `visibleItems`.)
     ForEach(visibleItems) { task in
-      row(task)
-        .draggable(task.id)
-        .dropDestination(for: String.self) { dropped, _ in
-          guard let draggedId = dropped.first else { return false }
-          return moveTask(draggedId, onto: task.id)
-        }
-        .asTaskRow(id: task.id)
+      row(task).asTaskRow(id: task.id)
     }
+    // iOS only: macOS rows already use `.draggable` to re-home into sidebar
+    // areas/projects, and a List `.onMove` there would fight that gesture.
+    #if os(iOS)
+    .onMove(perform: moveTasks)
+    #endif
   }
 
   /// Existing deadline for a target task, so the picker sheet can
@@ -976,9 +981,23 @@ struct TaskListView: View {
   private func clearSelection() {
     selection.removeAll()
     #if os(iOS)
+    isReordering = false
     editMode?.wrappedValue = .inactive
     #endif
   }
+
+  #if os(iOS)
+  /// Toggle grips-only reorder mode. Enters edit mode (so `.onMove` grips
+  /// appear) but with no selection binding, so no selection circles show.
+  private func toggleReorder() {
+    let entering = !isReordering
+    editingTaskId = nil
+    selection.removeAll()
+    isReordering = entering
+    editMode?.wrappedValue = entering ? .active : .inactive
+    if entering { Haptics.tick() }
+  }
+  #endif
 
   /// Enter multi-select seeded with one row — used by the swipe action and
   /// the context-menu "Select". Commits any inline edit first; on iOS this
@@ -1217,10 +1236,9 @@ struct TaskListView: View {
 
   /// Filters applied client-side before rendering:
   /// - `excludeProjectedTasks` keeps the Area page focused on loose work.
-  /// - On every bucket that owns a "Show logged" footer, completed tasks
-  ///   are hidden from the main list and surfaced under that footer
-  ///   instead — including just-completed rows, which the optimistic
-  ///   `toggle()` mirrors directly into `loggedItemsStorage`.
+  /// - Completed tasks are hidden everywhere (a just-completed row lingers via
+  ///   the settle exception below, then fades in place and is gone — it lives
+  ///   on in the dedicated Logbook). Only the Logbook view itself keeps them.
   private var visibleItems: [SeptenaTask] {
     // `items` already arrives in manual order (LocalCache orders by
     // `TaskOrder.key`), so we never re-sort here — a task stays exactly where
@@ -1612,29 +1630,20 @@ struct TaskListView: View {
     if newStatus == .done { sessionDoneIds.insert(task.id) }
     else                  { sessionDoneIds.remove(task.id) }
 
-    // On completion the row must NOT vanish under the finger. We always open a
-    // settle window: `settle.isSettling(id)` keeps the row visible (see
-    // `visibleItems` and the grouped pool) and — crucially — `load()` preserves
-    // settling rows, so the `.septenaTasksChanged` that this very completion
-    // posts can't yank it. After the beat the settle clears and the row simply
-    // fades out IN PLACE — no relocation into a "Logged" group. The empty
-    // animated transaction is what lets the settle-clear removal play
-    // `.transition(.opacity)`. Uncomplete cancels the pending fade and restores it.
+    // Completion never relocates a row. We open a settle window so the row
+    // stays put while it lingers — `settle.isSettling(id)` keeps it visible
+    // (see `visibleItems` and the grouped pool) and `load()` preserves
+    // settling rows, so the `.septenaTasksChanged` this completion posts can't
+    // yank it. After the beat the settle clears and the row simply fades out
+    // IN PLACE and is gone (it lives on in the dedicated Logbook). The empty
+    // animated transaction lets the settle-clear removal play
+    // `.transition(.opacity)`. Uncomplete cancels the pending fade.
     if newStatus == .done {
       settle.schedule(task.id) {
         motion.run(Theme.Motion.settle) { }
       }
     } else {
       settle.cancel(task.id)
-      if showsLoggedSection && loggedFilter == filter {
-        loggedItemsStorage.removeAll { $0.id == task.id }
-        if !items.contains(where: { $0.id == task.id }) {
-          var reopened = task
-          reopened.status = .open
-          reopened.completedAt = nil
-          items.append(reopened)
-        }
-      }
     }
 
     if newStatus == .done {
@@ -1692,26 +1701,17 @@ struct TaskListView: View {
 
   // MARK: - Manual reorder (drag-and-drop)
 
-  /// Drop `draggedId` relative to `targetId` in the visible order. Directional:
-  /// dragging a row downward lands it just below the target, upward just above
-  /// — which also lets a downward drag onto the last row reach the bottom.
-  @discardableResult
-  private func moveTask(_ draggedId: String, onto targetId: String) -> Bool {
-    guard draggedId != targetId else { return false }
+  #if os(iOS)
+  /// `.onMove` handler for the flat list. Replays the move against the visible
+  /// id order, then persists the moved row's new `position` (midpoint of its
+  /// new neighbours). The List itself drives the lift + gap animation.
+  private func moveTasks(from source: IndexSet, to destination: Int) {
     let ids = visibleItems.map(\.id)
-    guard let from = ids.firstIndex(of: draggedId),
-          let to = ids.firstIndex(of: targetId) else { return false }
+    guard let movedIndex = source.first, movedIndex < ids.count else { return }
+    let movedId = ids[movedIndex]
     var newIds = ids
-    newIds.remove(at: from)
-    let insertAt: Int
-    if from < to {
-      insertAt = (newIds.firstIndex(of: targetId).map { $0 + 1 }) ?? newIds.count
-    } else {
-      insertAt = newIds.firstIndex(of: targetId) ?? 0
-    }
-    newIds.insert(draggedId, at: min(insertAt, newIds.count))
-    applyManualOrder(draggedId: draggedId, orderedIds: newIds)
-    return true
+    newIds.move(fromOffsets: source, toOffset: destination)
+    applyManualOrder(draggedId: movedId, orderedIds: newIds)
   }
 
   /// Compute the dragged row's new `position` as the midpoint of its new
@@ -1747,92 +1747,7 @@ struct TaskListView: View {
     }
     mutator.reorder(id: draggedId, toPosition: newPos)
   }
-
-  // MARK: - Logged items section
-
-  /// Scope the logbook (which is always global on the server) to the bucket
-  /// the user is currently looking at — project, area, or one of the
-  /// Anytime / Upcoming / Someday piles. Bucket detection for completed
-  /// tasks uses the same field signals the open-task filters use, since the
-  /// scheduled/deadline/today/area/project values survive completion.
-  private func filterLogged(_ all: [SeptenaTask]) -> [SeptenaTask] {
-    switch filter {
-    case .project(let pid):
-      return all.filter { $0.project == pid }
-    case .area(let aid):
-      let projectIdsInArea = Set(projects.filter { $0.area == aid }.map(\.id))
-      return all.filter { task in
-        if task.area == aid { return true }
-        if let pid = task.project, projectIdsInArea.contains(pid) { return true }
-        return false
-      }
-    case .unscheduled:
-      return all.filter { $0.scheduled == nil && $0.deadline == nil && !$0.today }
-    case .upcoming:
-      return all.filter { $0.scheduled != nil || $0.deadline != nil }
-    case .someday:
-      // Once completed the .someday status flips to .done, so we can't
-      // tell which logged tasks were Someday-bucketed. Drop the section.
-      return []
-    default:
-      return all
-    }
-  }
-
-  private var sortedLoggedItems: [SeptenaTask] {
-    loggedItems.sorted { (a, b) in
-      (a.completedAt ?? "") > (b.completedAt ?? "")
-    }
-  }
-
-  @ViewBuilder
-  private var loggedToggleRow: some View {
-    Button {
-      Haptics.tick()
-      motion.run(.easeInOut(duration: 0.2)) { showLogged.toggle() }
-    } label: {
-      HStack(spacing: 6) {
-        Image(systemName: showLogged ? "chevron.down" : "chevron.right")
-          .scaledFont(size: 11, weight: .semibold)
-          .foregroundStyle(Theme.iconMuted)
-        Text(showLogged
-             ? "Hide logged items"
-             : "Show \(loggedItems.count) logged item\(loggedItems.count == 1 ? "" : "s")")
-          .font(.septenaMeta.weight(.semibold))
-          .foregroundStyle(Theme.inkSecondary)
-        Spacer()
-      }
-      .padding(.horizontal, Theme.hPadding)
-      .padding(.top, 24)
-      .padding(.bottom, 6)
-      .contentShape(Rectangle())
-    }
-    .buttonStyle(.plain)
-  }
-
-  @ViewBuilder
-  private func loggedRow(_ task: SeptenaTask) -> some View {
-    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
-      TaskCheckbox(isDone: true, isToday: false) { toggle(task) }
-        .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
-
-      if let when = task.completedAt.flatMap(SeptenaDate.parse) {
-        Text(shortDate(when))
-          .font(.septenaMeta)
-          .foregroundStyle(Theme.inkSecondary)
-          .frame(minWidth: 44, alignment: .leading)
-      }
-
-      Text(task.title)
-        .font(.septenaTaskTitle)
-        .foregroundStyle(Theme.inkSecondary)
-        .lineLimit(1)
-        .truncationMode(.tail)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-    .padding(.horizontal, Theme.hPadding)
-    .padding(.vertical, Theme.rowVPadding)
-  }
+  #endif
 
   // MARK: - Load
 
@@ -1874,10 +1789,6 @@ struct TaskListView: View {
     // the local cache is authoritative — no network round-trip needed.
     projects = LocalCache.projects(in: modelContext)
     areas = LocalCache.areas(in: modelContext)
-    if showsLoggedSection {
-      loggedItemsStorage = filterLogged(LocalCache.tasks(in: modelContext, filter: .logbook))
-      loggedFilter = filter
-    }
     // Refresh the inbox suggestion engine from local data. LocalCache
     // returns every status, so the engine sees the full corpus for
     // ranking.
