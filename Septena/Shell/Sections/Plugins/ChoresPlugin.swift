@@ -102,6 +102,47 @@ enum ChoresPlugin: SectionPlugin {
       return nil
     }
   }
+
+  // MARK: - Notifications
+
+  static var notificationDescriptors: [NotificationDescriptor] {
+    [NotificationDescriptor(
+      id: "chores.overdue", sectionKey: "chores", title: "Overdue chore digest",
+      actions: [NotificationAction(id: NotificationActionID.choreComplete, title: "✓ Mark done")],
+      priority: 10)]
+  }
+
+  static func evaluateNotification(_ descriptorID: String,
+                                   context: ModelContext,
+                                   now: Date) -> NotificationPlan? {
+    guard descriptorID == "chores.overdue" else { return nil }
+    // Reuse the same overdue definition the Next feed and Today pill use,
+    // most-overdue first.
+    let overdue = ChecklistMirror.loadChores(context: context)
+      .filter { $0.daysOverdue > 0 }
+      .sorted { $0.daysOverdue > $1.daysOverdue }
+    guard let top = overdue.first else { return nil }   // nothing overdue → suppress
+
+    // Fire when the user has usually wrapped chores up (80th-percentile),
+    // so it only pings when genuinely behind. Fallback 18:00.
+    let events = (try? context.fetch(FetchDescriptor<ChoreEventEntity>())) ?? []
+    let dateTimes = events.compactMap { e -> (date: String, time: String)? in
+      guard e.action == "complete", let t = e.time else { return nil }
+      return (e.date, t)
+    }
+    let minute = NextScoring.learnedLateMinute(dateTimes: dateTimes,
+                                               today: SeptenaDate.today,
+                                               fallback: 18 * 60)
+    let n = overdue.count
+    let body = n == 1
+      ? "“\(top.name)” is overdue — mark it if you’ve done it."
+      : "\(n) chores overdue — “\(top.name)” is the latest. Mark it if it’s done."
+    // The "✓ Mark done" action completes the single most-overdue chore; for
+    // the rest the next reconcile re-surfaces them (or the user opens the app).
+    return NotificationPlan(descriptorID: descriptorID, title: "Chores",
+                            body: body, threadID: "chores", minuteOfDay: minute,
+                            userInfo: [NotificationUserInfoKey.choreID: top.id])
+  }
 }
 
 private struct ChoresDetailContent: View {

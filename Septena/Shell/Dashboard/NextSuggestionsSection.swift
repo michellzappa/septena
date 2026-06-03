@@ -118,6 +118,48 @@ enum NextScoring {
     return Array(latest.values)
   }
 
+  /// The user's typical first-time-of-day (minutes since midnight) for an
+  /// activity, learned from history — or `fallback` when there aren't enough
+  /// settled days to trust the rhythm. Wraps `firstDailyTimes` + `median`;
+  /// reused by `LocalNotificationScheduler` to pick a nudge's fire-time so
+  /// the "mark what you did" prompt lands around when the user usually logs.
+  static func learnedFirstMinute(dateTimes: [(date: String, time: String)],
+                                 today: String,
+                                 fallback: Int,
+                                 minSamples: Int = 3) -> Int {
+    let times = firstDailyTimes(dateTimes: dateTimes, beforeDay: today)
+    guard times.count >= minSamples, let m = median(times) else { return fallback }
+    return m
+  }
+
+  /// Linear-interpolated percentile of a minute-of-day sample. `p` in 0…1.
+  static func percentile(_ values: [Int], _ p: Double) -> Int? {
+    guard !values.isEmpty else { return nil }
+    let sorted = values.sorted()
+    if sorted.count == 1 { return sorted[0] }
+    let rank = max(0, min(Double(sorted.count - 1), p * Double(sorted.count - 1)))
+    let lo = Int(rank.rounded(.down)), hi = Int(rank.rounded(.up))
+    if lo == hi { return sorted[lo] }
+    let frac = rank - Double(lo)
+    return Int((Double(sorted[lo]) * (1 - frac) + Double(sorted[hi]) * frac).rounded())
+  }
+
+  /// A "you're running late" fire-time: the high-percentile (default 80th) of
+  /// the *latest* daily times for an activity — i.e. the hour by which you've
+  /// usually wrapped it up. Firing here (not at the median) means the nudge
+  /// stays silent on the ~80% of days you finish on schedule and only speaks
+  /// up when you've genuinely drifted past your window. Falls back to a fixed
+  /// anchor until there's enough history to trust.
+  static func learnedLateMinute(dateTimes: [(date: String, time: String)],
+                                today: String,
+                                fallback: Int,
+                                p: Double = 0.8,
+                                minSamples: Int = 3) -> Int {
+    let times = lastDailyTimes(dateTimes: dateTimes, beforeDay: today)
+    guard times.count >= minSamples, let m = percentile(times, p) else { return fallback }
+    return m
+  }
+
   static func relativeMinutes(target: Int, now: Int) -> String {
     let diff = target - now
     let abs = Swift.abs(diff)

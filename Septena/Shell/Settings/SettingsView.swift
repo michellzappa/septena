@@ -30,6 +30,11 @@ import UIKit
 
 enum SettingsKey {
   static let badgeShowOverdue = "septena.badge.showOverdue"
+  /// Master switch for local-notification nudges. Same string as
+  /// `LocalNotificationScheduler.masterKey`. Absent → on (granting the
+  /// permission prompt is the opt-in); flipping it off withdraws every
+  /// pending nudge on the next reconcile.
+  static let notificationsEnabled = "septena.notify.enabled"
   static let todayShowCompleted = "septena.today.showCompleted"
   /// Consent toggle for anonymous aggregate usage analytics (Plausible).
   /// Same key string is referenced by `PlausibleClient.consentKey` so the
@@ -635,6 +640,10 @@ struct GeneralSettingsPane: View {
   private var showTodayTimeline: Bool = true
   @AppStorage(SettingsKey.homepageShowWelcome)
   private var showWelcome: Bool = true
+  @AppStorage(SettingsKey.welcomeName)
+  private var welcomeName: String = ""
+  @AppStorage(SettingsKey.notificationsEnabled)
+  private var notificationsEnabled: Bool = true
 
   var body: some View {
     Form {
@@ -651,6 +660,7 @@ struct GeneralSettingsPane: View {
 
       homepageWelcomeSection
       homepageTimelineSection
+      notificationsSection
 
       #if os(iOS)
       Section {
@@ -683,13 +693,31 @@ struct GeneralSettingsPane: View {
   }
 
   @ViewBuilder
+  private var notificationsSection: some View {
+    Section {
+      Toggle(isOn: $notificationsEnabled) {
+        Label("Notifications", systemImage: "bell.badge")
+      }
+    } footer: {
+      Text("Gentle reminders to mark what you’ve done — habits, chores, hydration, bedtime. Turn individual nudges on or off in each section’s settings. They fire around when you usually log, and stay quiet once it’s done.")
+    }
+  }
+
+  @ViewBuilder
   private var homepageWelcomeSection: some View {
     Section {
       Toggle(isOn: $showWelcome) {
         Label("Show welcome", systemImage: "sun.horizon")
       }
+      if showWelcome {
+        TextField("Your name", text: $welcomeName)
+          .textContentType(.givenName)
+          #if os(iOS)
+          .textInputAutocapitalization(.words)
+          #endif
+      }
     } footer: {
-      Text("A centered time-of-day greeting at the top of the home tab.")
+      Text("A centered greeting at the top of the home tab. Add your name to personalize it — with Apple Intelligence it's freshly written through the day.")
     }
   }
 
@@ -1766,12 +1794,65 @@ struct SectionDetailPane: View {
     if let view = SectionRegistry.plugin(forKey: sectionKey)?.detailPaneContent() {
       view
     }
+    // Manifest-driven: any plugin that declares notification descriptors
+    // gets a "Notifications" section here automatically — no per-plugin edit.
+    SectionNotificationToggles(sectionKey: sectionKey)
   }
 
   // All per-section detail content now lives in the corresponding
   // plugin's `detailPaneContent()` view. Sections without an override
   // render the identity row + onboarding trigger only. See e.g.
   // CaffeineDetailContent / TasksDetailContent / NutritionDetailContent.
+}
+
+// MARK: - Per-section notification toggles
+//
+// Renders one "Notifications" Section listing every `NotificationDescriptor`
+// the section's plugin declares. Toggles write the descriptor's UserDefaults
+// key, which posts `didChangeNotification` → `LocalNotificationScheduler`
+// reconciles. Sections with no descriptors render nothing.
+
+struct SectionNotificationToggles: View {
+  let sectionKey: String
+
+  private var descriptors: [NotificationDescriptor] {
+    SectionRegistry.plugin(forKey: sectionKey)?.notificationDescriptors ?? []
+  }
+
+  var body: some View {
+    if !descriptors.isEmpty {
+      Section {
+        ForEach(descriptors) { descriptor in
+          NotificationToggleRow(descriptor: descriptor)
+        }
+      } header: {
+        Label("Notifications", systemImage: "bell.badge")
+      } footer: {
+        Text("Nudges fire around when you usually log this, and stay quiet once it’s done for the day.")
+      }
+    }
+  }
+}
+
+private struct NotificationToggleRow: View {
+  let descriptor: NotificationDescriptor
+  @State private var isOn: Bool
+
+  init(descriptor: NotificationDescriptor) {
+    self.descriptor = descriptor
+    let stored = UserDefaults.standard.object(forKey: descriptor.defaultsKey) as? Bool
+    _isOn = State(initialValue: stored ?? descriptor.defaultEnabled)
+  }
+
+  var body: some View {
+    Toggle(descriptor.title, isOn: Binding(
+      get: { isOn },
+      set: { newValue in
+        isOn = newValue
+        UserDefaults.standard.set(newValue, forKey: descriptor.defaultsKey)
+      }
+    ))
+  }
 }
 
 // MARK: - Macro tiles editor

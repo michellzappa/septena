@@ -136,6 +136,51 @@ enum HabitsPlugin: SectionPlugin {
       return nil
     }
   }
+
+  // MARK: - Notifications
+  //
+  // One coalesced daily nudge (not one per daypart — that's too noisy). It
+  // fires at the hour the user has *usually wrapped up* their habits (the
+  // 80th percentile of completion times), so it stays quiet on days they
+  // finish on schedule and only speaks when they've drifted past their
+  // window. Suppressed entirely once nothing is left to mark today.
+
+  static var notificationDescriptors: [NotificationDescriptor] {
+    // No inline action — habits get checked off one at a time, not in a batch,
+    // so the nudge just opens the app. Tap-to-open only.
+    [NotificationDescriptor(
+      id: "habits.incomplete", sectionKey: "habits", title: "Habits reminder",
+      priority: 20)]
+  }
+
+  static func evaluateNotification(_ descriptorID: String,
+                                   context: ModelContext,
+                                   now: Date) -> NotificationPlan? {
+    guard descriptorID == "habits.incomplete" else { return nil }
+    let today = SeptenaDate.today
+    guard let day = ChecklistMirror.loadHabitsDay(context: context, date: today) else { return nil }
+
+    let pending = day.grouped.values.flatMap { $0 }.filter { !$0.done && !$0.skipped }
+    guard !pending.isEmpty else { return nil }   // all handled → suppress
+
+    // Fire when the routine is *usually* wrapped up, learned from every
+    // habit's completion times. Fallback: 20:00 (end of the active day).
+    let states = (try? context.fetch(FetchDescriptor<HabitDayStateEntity>(
+      predicate: #Predicate { $0.done == true }
+    ))) ?? []
+    let dateTimes = states.compactMap { s -> (date: String, time: String)? in
+      guard let t = s.time else { return nil }
+      return (s.date, t)
+    }
+    let minute = NextScoring.learnedLateMinute(dateTimes: dateTimes,
+                                               today: today, fallback: 20 * 60)
+    let n = pending.count
+    let body = n == 1
+      ? "1 habit left today — mark it if it’s done."
+      : "\(n) habits left today — mark any you’ve done."
+    return NotificationPlan(descriptorID: descriptorID, title: "Habits",
+                            body: body, threadID: "habits", minuteOfDay: minute)
+  }
 }
 
 /// Starter habit suggestion — `name`, `emoji`, `bucket` mirror the fields

@@ -95,6 +95,24 @@ protocol SectionPlugin {
   /// motion depends on the entry (e.g. caffeine time-of-day) declare a
   /// default here and pass an override at the call site.
   static var logFlourish: LogFlourish? { get }
+
+  /// Local-notification nudges this section can raise. A `NotificationDescriptor`
+  /// names one nudge (e.g. "overdue chore digest") and supplies its Settings
+  /// toggle copy; `evaluateNotification` produces the live content + fire-time.
+  /// Declared on the plugin so a section owns its nudges in one place — adding
+  /// one is a one-file edit, and `LocalNotificationScheduler` enumerates them
+  /// automatically. Default: `[]` (section has nothing to nudge about).
+  static var notificationDescriptors: [NotificationDescriptor] { get }
+
+  /// Evaluate one of this section's `notificationDescriptors` against the
+  /// live data. Return a `NotificationPlan` to schedule it, or `nil` to
+  /// suppress — already logged today, nothing pending, or not enough history
+  /// to time it. `nil` is the auto-suppression mechanism: the scheduler
+  /// withdraws any pending request whose descriptor returns nil. `now` is the
+  /// evaluation instant (injected so the logic stays testable).
+  static func evaluateNotification(_ descriptorID: String,
+                                   context: ModelContext,
+                                   now: Date) -> NotificationPlan?
 }
 
 /// Description of one "+" toolbar action declared by a plugin. The
@@ -321,6 +339,15 @@ extension SectionPlugin {
   /// Default: no commit flourish. Sections opt in by declaring a
   /// `LogFlourish` and routing their writes through `SectionLog`.
   static var logFlourish: LogFlourish? { nil }
+
+  /// Default: no notification nudges. Sections opt in by declaring at least
+  /// one `NotificationDescriptor` and overriding `evaluateNotification`.
+  static var notificationDescriptors: [NotificationDescriptor] { [] }
+
+  /// Default: no evaluator. Pairs with the empty default `notificationDescriptors`.
+  static func evaluateNotification(_ descriptorID: String,
+                                   context: ModelContext,
+                                   now: Date) -> NotificationPlan? { nil }
 }
 
 /// Single source of truth for which plugins exist. Sections not in this

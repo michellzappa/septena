@@ -86,6 +86,9 @@ struct SeptenaApp: App {
           // refresh path independent of push delivery.
           if phase == .active {
             dayClock.refreshIfNeeded()
+            // Re-arm nudges: absorbs a backgrounded-across-midnight rollover
+            // and any completions made on another device while we were away.
+            LocalNotificationScheduler.shared.reconcile()
             Task {
               await ckEngine.refreshAccountStatus()
               try? await ckEngine.fetchChanges()
@@ -147,6 +150,11 @@ struct SeptenaApp: App {
           // isn't connected or a recent token is still valid).
           await ClaudeGatewayProvider.shared.refreshIfNeeded()
           BadgeManager.shared.start(context: localStore.container.mainContext)
+          // Behavioral nudge layer. Ask once (no-op if already decided),
+          // then start the scheduler — it reconciles now and re-reconciles
+          // on every section data-change notification, like BadgeManager.
+          await LocalNotificationScheduler.shared.requestAuthorizationIfNeeded()
+          LocalNotificationScheduler.shared.start(context: localStore.container.mainContext)
           TrainingMuscleBackfill.runIfNeeded(context: localStore.container.mainContext)
           TrainingLibraryEnrichment.runIfNeeded(context: localStore.container.mainContext)
           TrainingMuscleBackfillV2.runIfNeeded(context: localStore.container.mainContext)

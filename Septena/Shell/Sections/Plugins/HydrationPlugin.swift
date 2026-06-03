@@ -37,9 +37,9 @@ enum HydrationPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(HydrationDestinationView()) }
 
-  // A refreshing glass → a gentle bloom; its reach scales with the amount
-  // (see HydrationDestinationView.commit, intensity from ml).
-  static var logFlourish: LogFlourish? { LogFlourish(motion: .bloom) }
+  // Water toward your daily target → a full-page fill; its level scales
+  // with the amount (see HydrationDestinationView.commit, intensity from ml).
+  static var logFlourish: LogFlourish? { LogFlourish(motion: .fill) }
 
   // MARK: - First-enable onboarding
 
@@ -84,6 +84,39 @@ enum HydrationPlugin: SectionPlugin {
       the water-only path.
       """
     )
+  }
+
+  // MARK: - Notifications
+
+  static var notificationDescriptors: [NotificationDescriptor] {
+    [NotificationDescriptor(
+      id: "hydration.behind", sectionKey: "hydration", title: "Behind-on-water nudge",
+      actions: [
+        NotificationAction(id: NotificationActionID.hydrationAdd250, title: "💧 +250 ml"),
+        NotificationAction(id: NotificationActionID.hydrationAdd500, title: "+500 ml"),
+      ],
+      priority: 5)]
+  }
+
+  static func evaluateNotification(_ descriptorID: String,
+                                   context: ModelContext,
+                                   now: Date) -> NotificationPlan? {
+    guard descriptorID == "hydration.behind" else { return nil }
+    // Same target the destination view's stepper writes (@AppStorage).
+    let target = UserDefaults.standard.object(forKey: "hydration.dailyTargetMl") as? Int ?? 2000
+    guard target > 0 else { return nil }
+
+    let today = SeptenaDate.today
+    let entries = (try? context.fetch(FetchDescriptor<NutritionEntryEntity>())) ?? []
+    let dayMl = entries
+      .filter { SeptenaDate.format($0.loggedAt) == today }
+      .reduce(0) { $0 + Int($1.waterMl ?? 0) }
+    guard dayMl < target else { return nil }   // hit the target → suppress
+
+    // A late-afternoon check-in: enough of the day left to act on it.
+    return NotificationPlan(descriptorID: descriptorID, title: "Hydration",
+                            body: "You’re at \(dayMl) of \(target) ml — log a glass?",
+                            threadID: "hydration", hour: 17, minute: 0)
   }
 }
 
