@@ -35,6 +35,12 @@ final class ScreenshotTests: XCTestCase {
     launch(app, layout: "heatmap")
     capture(app, "06-Week-heatmap")
     app.swipeUp(); dwell(); capture(app, "07-Week-heatmap-scrolled")
+
+    // Pass 3 — Correlations layout (caffeine→sleep should surface with 90 days).
+    app.terminate()
+    launch(app, layout: "correlations")
+    capture(app, "08-Correlations")
+    app.swipeUp(); dwell(); capture(app, "09-Correlations-scrolled")
   }
 
   // MARK: - helpers
