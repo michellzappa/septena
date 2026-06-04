@@ -96,10 +96,14 @@ private struct DomainSparkline: View {
   /// before plotting. Used for spiky cadences (training) where
   /// daily points hide the trend. See `HomepageDomainData.smoothSparkline`.
   var smooth: Bool = false
-  /// When true, treat the last element of a `.bars` series as a
-  /// pending-today placeholder and drop it before plotting. The
-  /// underlying value is kept in `HomepageDomainData.history` so the
-  /// Heatmap renderer can still anchor its date map to today.
+  /// When true, drop the trailing pending-today placeholder — and any
+  /// further trailing zeros — from a `.bars` series before plotting.
+  /// For a sensor series (sleep) a 0 is never a real value; it's "no
+  /// data yet", so a run of trailing zeros (today plus recent nights
+  /// Oura hasn't scored) must not anchor the line or it dives to the
+  /// bottom of the autoscaled chart. The underlying values are kept in
+  /// `HomepageDomainData.history` so the Heatmap renderer can still
+  /// anchor its date map to today. See `trailingTrimmed`.
   var dropTrailingTodayPending: Bool = false
   /// When true, scale a `.bars` series to its window's actual min…max
   /// instead of the default 0…max. See
@@ -150,6 +154,27 @@ private struct DomainSparkline: View {
     return Array(repeating: nil, count: window - values.count) + values
   }
 
+  /// When `dropTrailingTodayPending` is set, strip the trailing
+  /// pending-today placeholder **and any further trailing zeros**. For
+  /// a sensor series like sleep a 0 is never a real score — it means
+  /// "no data recorded yet": today's still-pending night, plus any
+  /// recent nights Oura hasn't scored (e.g. before the ring is
+  /// connected or synced). Dropping only the last element left those
+  /// nil→0 nights in place, and against the autoscaled floor (~70 for
+  /// sleep score) the line dived from ~70 to the chart's bottom — the
+  /// cliff at the right edge. Trimming the whole trailing zero-run ends
+  /// the line at the last actually-measured night instead.
+  ///
+  /// Opt-in per domain — only sleep sets the flag today. Count domains
+  /// (supplements, chores) don't, so their trailing "0 so far today"
+  /// stays, where a 0 is a real and meaningful value.
+  private func trailingTrimmed(_ values: [Int]) -> [Int] {
+    guard dropTrailingTodayPending else { return values }
+    var trimmed = values
+    while let last = trimmed.last, last == 0 { trimmed.removeLast() }
+    return trimmed
+  }
+
   /// Y-domain override for the `.centered` case so AreaMark's bottom
   /// anchor + chart axis both line up on the window's actual range,
   /// not the default 0…max which would crush amplitude. Returns nil
@@ -163,12 +188,9 @@ private struct DomainSparkline: View {
     case .bars(let values) where autoscale:
       // Mirror the transform styledChart applies before plotting, then
       // frame the Y-axis on the real (non-zero) values. Leading padding
-      // zeros from `aligned` and the dropped pending-today slot must be
-      // excluded or `min` collapses the floor back to 0.
-      let trimmed = dropTrailingTodayPending && !values.isEmpty
-        ? Array(values.dropLast())
-        : values
-      let raw = aligned(trimmed.map(Double.init))
+      // zeros from `aligned` and the dropped trailing no-data slots must
+      // be excluded or `min` collapses the floor back to 0.
+      let raw = aligned(trailingTrimmed(values).map(Double.init))
       let smoothed = smooth ? rollingMean(raw) : raw
       return centeredYBounds(smoothed.filter { $0 != 0 })
     default:
@@ -204,10 +226,7 @@ private struct DomainSparkline: View {
         // Align to the fixed 90-day window first, then optionally
         // smooth. Order matters: smoothing before alignment would
         // average actual data with padded zeros at the boundary.
-        let trimmed = dropTrailingTodayPending && !values.isEmpty
-          ? Array(values.dropLast())
-          : values
-        let raw = aligned(trimmed.map(Double.init))
+        let raw = aligned(trailingTrimmed(values).map(Double.init))
         let smoothed = smooth ? rollingMean(raw) : raw
         if let series = nonEmpty(smoothed) {
           // When autoscaled, the Y-domain starts well above 0, so anchor
