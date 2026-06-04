@@ -61,6 +61,11 @@ struct SectionDrawer<Content: View>: View {
   /// destination reads the same binding to fetch its day-scoped data,
   /// replacing per-section `BrowseXDaySheet` detours.
   var currentDate: Binding<String>? = nil
+  /// Whether to render the subtle "Customize <Section>" footer that
+  /// deep-links into this section's Settings pane. Default on; the footer
+  /// also self-hides for utility drawers (empty `title` or a `sectionKey`
+  /// with no `SectionManifest`) and while time-traveling.
+  var showsSettingsLink: Bool = true
   @ViewBuilder var content: () -> Content
 
   @Environment(SectionTheme.self) private var theme
@@ -75,6 +80,10 @@ struct SectionDrawer<Content: View>: View {
   /// rather than an always-visible strip, so today's logging owns the top
   /// of the drawer.
   @State private var showingTimeTravel = false
+
+  /// Whether the deep-linked Settings sheet (this section's pane) is open.
+  /// Presented over the drawer so closing it returns the user here.
+  @State private var showingSettings = false
 
   private var resolvedAccent: Color {
     accent ?? theme.color(for: sectionKey)
@@ -115,6 +124,10 @@ struct SectionDrawer<Content: View>: View {
           failedView(message)
         } else {
           content()
+          if showsSettingsLink, !isTimeTraveling,
+             !title.isEmpty, SectionManifest.byKey[sectionKey] != nil {
+            SectionSettingsLink(sectionTitle: title) { showingSettings = true }
+          }
         }
       }
       .padding(.horizontal, 20)
@@ -131,6 +144,11 @@ struct SectionDrawer<Content: View>: View {
     // input. We use a switch over the Optional so SwiftUI's view
     // identity stays stable per branch.
     .modifier(OptionalSearchable(text: searchText, prompt: searchPrompt))
+    // Deep-linked section Settings, presented over the drawer so closing it
+    // returns the user here (the chosen "keep drawer underneath" behavior).
+    .sheet(isPresented: $showingSettings) {
+      SettingsView(initialDestination: .section(sectionKey))
+    }
     // The section name is the standard inline nav-bar title — plain text in
     // the system's default place, identical on every drawer. Kept inline
     // (not a big editorial heading) so the drawer top stays compact.
@@ -339,6 +357,30 @@ private struct TimeTravelPill: View {
       .buttonStyle(.plain)
       Spacer()
     }
+  }
+}
+
+/// Subtle "Customize <Section>" link at the very bottom of every section
+/// drawer. Tapping deep-links into this section's Settings pane (presented
+/// as a sheet over the drawer, so closing it returns here). Tertiary,
+/// footnote-weight, centered — quiet enough to stay clear of the logging
+/// content above it. The drawer's LazyVStack supplies the gap above.
+private struct SectionSettingsLink: View {
+  let sectionTitle: String
+  let onTap: () -> Void
+
+  var body: some View {
+    Button(action: onTap) {
+      HStack(spacing: 5) {
+        Image(systemName: "gearshape")
+        Text("Customize \(sectionTitle)")
+      }
+      .font(.footnote)
+      .foregroundStyle(.tertiary)
+      .frame(maxWidth: .infinity)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
   }
 }
 

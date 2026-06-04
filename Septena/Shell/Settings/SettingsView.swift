@@ -379,9 +379,22 @@ struct SettingsView: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(CKEngine.self) private var ckEngine
   @Environment(SettingsStore.self) private var store
-  @State private var selection: SettingsDestination? = .general
+  @State private var selection: SettingsDestination?
+  /// iPhone-only navigation path. Seeded from `initialDestination` so the
+  /// sheet can open already pushed to a specific pane (e.g. a section's
+  /// settings, deep-linked from its drawer) with a back-chevron to the
+  /// settings list. Unused on macOS/iPad, which deep-link via `selection`.
+  @State private var path: [SettingsDestination]
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @State private var preferredCompactColumn: NavigationSplitViewColumn = .detail
+
+  /// Open straight to a destination, or `nil` for the historical default
+  /// (sidebar list on iPhone, `.general` detail on macOS/iPad). The
+  /// "Customize <Section>" footer in `SectionDrawer` passes `.section(key)`.
+  init(initialDestination: SettingsDestination? = nil) {
+    _selection = State(initialValue: initialDestination ?? .general)
+    _path = State(initialValue: initialDestination.map { [$0] } ?? [])
+  }
 
   /// Sidebar entries. Static cases for app-wide settings; `section(key)`
   /// for per-section rows resolved against `SectionManifest` + the live
@@ -399,7 +412,7 @@ struct SettingsView: View {
 
   var body: some View {
     #if os(iOS)
-    NavigationStack {
+    NavigationStack(path: $path) {
       sidebarList
         .navigationTitle("Settings")
         .navigationDestination(for: SettingsDestination.self) { dest in
