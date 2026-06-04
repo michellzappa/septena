@@ -119,29 +119,31 @@ private struct SupplementsDetailContent: View {
   /// `supplementsNow` filter. Default ON (lingers). See `NextLinger`.
   @AppStorage(NextLinger.supplementsKey) private var carryOver = NextLinger.supplementsDefault
 
+  // Two sibling Sections returned straight from the ViewBuilder body (no
+  // `Group` wrapper). A `.sheet` attached to a multi-child `Group` inside a
+  // `Form` mis-anchors and transiently self-presents as the pane appears —
+  // so the sheet must hang off the single Section that actually triggers it.
   var body: some View {
-    Group {
-      Section {
-        Toggle(isOn: $carryOver) {
-          VStack(alignment: .leading, spacing: 1) {
-            Text("Carry over missed doses")
-            Text("Keep a supplement on the Next list after its time of day, until you take it. Off shows it only during its slot.")
-              .font(.caption)
-              .foregroundStyle(.secondary)
-          }
+    Section {
+      Toggle(isOn: $carryOver) {
+        VStack(alignment: .leading, spacing: 1) {
+          Text("Carry over missed doses")
+          Text("Keep a supplement on the Next list after its time of day, until you take it. Off shows it only during its slot.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
-      } header: {
-        Text("Next list")
       }
-      Section {
-        Button {
-          showingSheet = true
-        } label: {
-          Label("Manage Supplements", systemImage: "pills")
-        }
-      } footer: {
-        Text("Renaming a supplement doesn't affect its history — events are linked by ID.")
+    } header: {
+      Text("Next list")
+    }
+    Section {
+      Button {
+        showingSheet = true
+      } label: {
+        Label("Manage Supplements", systemImage: "pills")
       }
+    } footer: {
+      Text("Renaming a supplement doesn't affect its history — events are linked by ID.")
     }
     .sheet(isPresented: $showingSheet) {
       SupplementTypeSheet()
