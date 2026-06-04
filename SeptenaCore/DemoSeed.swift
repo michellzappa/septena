@@ -56,7 +56,6 @@ public enum DemoSeed {
     seedMood(ctx, &rng, scores: sleep)
     seedBody(ctx, &rng)
     seedGut(ctx, &rng)
-    seedCannabis(ctx, &rng)
     seedGoals(ctx)
     seedGroceries(ctx)
     seedSectionColors(ctx)
@@ -299,16 +298,6 @@ public enum DemoSeed {
       let e = GutEventEntity(id: "demo-gut-\(d)", date: day(-d), time: "08:20",
                              bristol: bristols[rng.int(0, bristols.count - 1)], blood: 0)
       e.occurredAt = at(-d, 8, 20); ctx.insert(e)
-    }
-  }
-
-  private static func seedCannabis(_ ctx: ModelContext, _ rng: inout SeededRNG) {
-    let strains = ["Blue Dream", "Northern Lights", "OG Kush"]
-    for d in 0..<days where rng.chance(0.3) {        // ~2 evenings / week
-      let e = CannabisEventEntity(id: "demo-can-\(d)", date: day(-d), time: "21:30",
-                                  method: rng.chance(0.6) ? "vape" : "edible",
-                                  strain: strains[rng.int(0, strains.count - 1)], hit: rng.int(1, 3))
-      e.occurredAt = at(-d, 21, 30); ctx.insert(e)
     }
   }
 
