@@ -129,6 +129,13 @@ struct SeptenaApp: App {
           // point, so a Siri-triggered cold launch and the scene's
           // `.task` race safely.
           await services.start()
+          #if DEBUG
+          // Screenshot / UI-test builds: load curated demo data into the
+          // in-memory store. No-op in release (DemoSeedMode.isOn is false).
+          if DemoSeedMode.isOn {
+            DemoSeed.populate(context: localStore.container.mainContext, today: dayClock.today)
+          }
+          #endif
           // Stash the engine on the platform's app delegate so silent
           // remote-notification callbacks (which aren't part of any
           // SwiftUI view hierarchy) can hand the push payload back to
@@ -159,7 +166,11 @@ struct SeptenaApp: App {
           // Behavioral nudge layer. Ask once (no-op if already decided),
           // then start the scheduler — it reconciles now and re-reconciles
           // on every section data-change notification, like BadgeManager.
-          await LocalNotificationScheduler.shared.requestAuthorizationIfNeeded()
+          // Screenshot / demo-seed builds skip the permission prompt so it
+          // doesn't cover the UI in captures.
+          if !DemoSeedMode.isOn {
+            await LocalNotificationScheduler.shared.requestAuthorizationIfNeeded()
+          }
           LocalNotificationScheduler.shared.start(context: localStore.container.mainContext)
           TrainingMuscleBackfill.runIfNeeded(context: localStore.container.mainContext)
           TrainingLibraryEnrichment.runIfNeeded(context: localStore.container.mainContext)

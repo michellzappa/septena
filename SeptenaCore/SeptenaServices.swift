@@ -867,8 +867,11 @@ final class SeptenaServices {
       projectsMutator.bind(ckEngine: ckEngine)
       OuraStore.shared.bind(ckEngine: ckEngine)
       WithingsStore.shared.bind(ckEngine: ckEngine)
-      ckEngine.start()
-      try? await ckEngine.fetchChanges()
+      // Demo-seed (screenshot) builds stay offline — never start sync.
+      if !DemoSeedMode.isOn {
+        ckEngine.start()
+        try? await ckEngine.fetchChanges()
+      }
     }
     startTask = task
     await task.value

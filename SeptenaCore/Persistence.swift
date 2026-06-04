@@ -2564,7 +2564,12 @@ final class LocalStore {
     // disallows @Attribute(.unique) — neither of which our model honors.
     // We sync via CKSyncEngine instead (see CKEngine.swift); SwiftData is
     // strictly a local cache. `.none` is the disable switch.
-    let config = ModelConfiguration("Septena", schema: schema, cloudKitDatabase: .none)
+    // Screenshot / UI-test builds (`-SeptenaSeed`) run against a throwaway
+    // in-memory store so the app boots offline with seeded demo data and never
+    // touches the real on-disk store. Release builds force `isOn` false.
+    let config = DemoSeedMode.isOn
+      ? ModelConfiguration("Septena", schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+      : ModelConfiguration("Septena", schema: schema, cloudKitDatabase: .none)
     do {
       container = try ModelContainer(for: schema, configurations: [config])
     } catch let firstError {

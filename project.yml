@@ -238,6 +238,21 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_ENTITLEMENTS: SeptenaWidgets/SeptenaWidgets.entitlements
 
+  SeptenaUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: SeptenaUITests
+        excludes:
+          - "**/.DS_Store"
+    dependencies:
+      - target: Septena
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Septena
+
 schemes:
   Septena:
     build:
@@ -247,6 +262,8 @@ schemes:
       config: Debug
     test:
       config: Debug
+      targets:
+        - SeptenaUITests
     profile:
       config: Release
     analyze:
