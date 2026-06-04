@@ -78,5 +78,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>WithingsClientID</key>
+	<string>$(WITHINGS_CLIENT_ID)</string>
+	<key>WithingsClientSecret</key>
+	<string>$(WITHINGS_CLIENT_SECRET)</string>
 </dict>
 </plist>

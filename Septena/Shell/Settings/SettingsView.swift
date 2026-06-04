@@ -3003,7 +3003,7 @@ private struct WithingsIntegrationDetail: View {
           Text("Withings app credentials are not configured.")
             .foregroundStyle(.secondary)
         } footer: {
-          Text("Register a Withings dev app at developer.withings.com (Public Health Data API), then paste your client_id and client_secret into WithingsAppCredentials in WithingsProvider.swift. The redirect URI should be septena://withings/callback.")
+          Text("Register a Withings dev app at developer.withings.com (Public Health Data API), then add your client_id and client_secret to Config/Secrets.xcconfig (copy it from Config/Secrets.example.xcconfig) and rebuild. The redirect URI should be septena://withings/callback.")
         }
       }
 

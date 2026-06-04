@@ -41,5 +41,9 @@
 	<string>Septena imports tasks from your Reminders lists into the Inbox.</string>
 	<key>NSRemindersUsageDescription</key>
 	<string>Septena imports tasks from your Reminders lists into the Inbox.</string>
+	<key>WithingsClientID</key>
+	<string>$(WITHINGS_CLIENT_ID)</string>
+	<key>WithingsClientSecret</key>
+	<string>$(WITHINGS_CLIENT_SECRET)</string>
 </dict>
 </plist>

@@ -3,3 +3,7 @@
 xcuserdata/
 .claude/
 build/
+
+# Local build-time secrets (Withings dev-app credentials). The committed
+# Config/Base.xcconfig + Config/Secrets.example.xcconfig describe the pattern.
+Config/Secrets.xcconfig

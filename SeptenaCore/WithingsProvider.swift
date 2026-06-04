@@ -187,16 +187,21 @@ extension Notification.Name {
 // MARK: - OAuth credentials
 
 /// App-level OAuth credentials registered at developer.withings.com.
-/// Paste your values here once after creating the dev app. They ship in
-/// the binary — fine for the personal-distribution scope described in
-/// `project_mcp_distribution`. If the app ever distributes more
-/// broadly, move both to a Settings-paste pattern (the user supplies
-/// their own dev-app credentials) and wire them through this enum.
+/// Withings dev-app OAuth credentials.
+///
+/// Injected at build time from `Config/Secrets.xcconfig` (gitignored) via the
+/// `WithingsClientID` / `WithingsClientSecret` Info.plist keys wired up in
+/// `project.yml` — see `Config/Secrets.example.xcconfig` for the template.
+/// The values are kept out of source control but are still embedded in the
+/// shipped binary's Info.plist, which is acceptable for an OAuth "public
+/// client" (a distributed app cannot hold a true secret). A clone without a
+/// `Secrets.xcconfig` resolves both to empty strings, so `isConfigured` is
+/// false and Withings degrades to "not configured" instead of failing the build.
 enum WithingsAppCredentials {
   /// Withings dev-app `client_id`.
-  static let clientID: String = "REDACTED-WITHINGS"
+  static let clientID: String = infoString("WithingsClientID")
   /// Withings dev-app `client_secret`.
-  static let clientSecret: String = "REDACTED-WITHINGS"
+  static let clientSecret: String = infoString("WithingsClientSecret")
   /// Must match the redirect URI registered in the Withings dev app.
   /// The `septena` scheme is declared in Septena/Info.plist so the OS
   /// can route it back if anything ever opens the URL externally;
@@ -208,6 +213,12 @@ enum WithingsAppCredentials {
 
   static var isConfigured: Bool {
     !clientID.isEmpty && !clientSecret.isEmpty
+  }
+
+  /// Reads a string from the app bundle's Info.plist, returning "" when the
+  /// key is absent or its `$(…)` build-setting substitution resolved to empty.
+  private static func infoString(_ key: String) -> String {
+    (Bundle.main.object(forInfoDictionaryKey: key) as? String) ?? ""
   }
 }
 
@@ -640,7 +651,7 @@ enum WithingsError: LocalizedError {
   var errorDescription: String? {
     switch self {
     case .notConfigured:
-      return "Withings app credentials are not configured. Paste your client_id and client_secret into WithingsAppCredentials in WithingsProvider.swift."
+      return "Withings app credentials are not configured. Add your client_id and client_secret to Config/Secrets.xcconfig (copy it from Config/Secrets.example.xcconfig), then rebuild."
     case .cancelled: return "Sign-in was cancelled."
     case .stateMismatch: return "OAuth state mismatch — possible CSRF, aborting."
     case .missingCode: return "Withings did not return an authorization code."
