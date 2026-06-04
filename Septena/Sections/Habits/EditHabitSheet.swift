@@ -34,7 +34,12 @@ struct EditHabitSheet: View {
   @ViewBuilder private var formBody: some View {
     Form {
       Section("Habit") {
-        TextField("Name", text: $name)
+        HStack(spacing: 12) {
+          TextField("Emoji", text: $emoji)
+            .frame(width: 44)
+            .multilineTextAlignment(.center)
+          TextField("Name", text: $name)
+        }
       }
       Section("Bucket") {
         Picker("Bucket", selection: $bucket) {

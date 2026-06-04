@@ -39,7 +39,12 @@ struct EditChoreSheet: View {
   @ViewBuilder private var formBody: some View {
       Form {
         Section("Chore") {
-          TextField("Name", text: $name)
+          HStack(spacing: 12) {
+            TextField("Emoji", text: $emoji)
+              .frame(width: 44)
+              .multilineTextAlignment(.center)
+            TextField("Name", text: $name)
+          }
         }
         Section("Cadence") {
           Picker("Preset", selection: $cadencePreset) {
