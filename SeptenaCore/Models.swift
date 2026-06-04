@@ -1470,11 +1470,17 @@ struct AppSettings: Codable {
   var eink: Bool?
   var nutrition: NutritionSettings?
   var hkSync: HKSyncSettings?
+  /// Personalizes the dashboard welcome greeting. Synced so the user's name
+  /// follows them across their own devices; also mirrored into the
+  /// `welcomeName` @AppStorage key that `WelcomeHeader` reads locally.
+  /// Defaulted so the existing memberwise-init call sites stay source-stable.
+  var welcomeName: String? = nil
 
   enum CodingKeys: String, CodingKey {
     case sectionOrder = "section_order"
     case targets, units, time, theme, eink, nutrition
     case hkSync = "hk_sync"
+    case welcomeName = "welcome_name"
   }
 }
 

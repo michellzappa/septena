@@ -146,6 +146,12 @@ struct SeptenaApp: App {
           try? await ckEngine.fetchChanges()
           await theme.refresh()
           await settingsStore.refresh()
+          // Bridge the welcome name between the CloudKit-synced settings
+          // payload and the local @AppStorage key WelcomeHeader reads:
+          // adopt an inbound name from another device, or push a
+          // pre-existing local-only name up (engine in hand here).
+          settingsStore.reconcileWelcomeName(
+            context: localStore.container.mainContext, engine: ckEngine)
           // Seed the Claude gateway token on cold launch (no-op if Claude
           // isn't connected or a recent token is still valid).
           await ClaudeGatewayProvider.shared.refreshIfNeeded()

@@ -54,6 +54,11 @@ enum SettingsKey {
   /// Optional first name used to personalise the homepage welcome greeting.
   /// Local-only (@AppStorage); not synced to CloudKit.
   static let welcomeName = "septena.homepage.welcomeName"
+  /// Voice of the generated welcome greeting. Raw value of `WelcomeTone`.
+  static let welcomeTone = "septena.homepage.welcomeTone"
+  /// Whether the greeting may reference today's already-loaded progress
+  /// (tasks/habits/supplements remaining). Off by default.
+  static let welcomeDataAware = "septena.homepage.welcomeDataAware"
   /// Today's on-device generated welcome lines, JSON-encoded and keyed by
   /// phase. Reset whenever the day or `welcomeName` changes.
   static let welcomeCache = "septena.homepage.welcomeCache"
@@ -279,6 +284,10 @@ final class SettingsStore {
     if let v = ResponseCache.load(MacrosConfig.self, forKey: CacheKey.macros) { macros = v }
     if let v = ResponseCache.load([SessionTypeConfig].self, forKey: CacheKey.sessionTypes) { sessionTypes = v }
     if let v = ResponseCache.load([ChoreItem].self, forKey: CacheKey.chores) { chores = v }
+    // Adopt a CloudKit-synced welcome name cached in the local mirror so the
+    // first frame's greeting is right. No engine here (init context), so the
+    // local→cloud migration leg is deferred to the launch reconcile.
+    reconcileWelcomeName(context: context, engine: nil)
   }
 
   func moveSections(fromOffsets: IndexSet, toOffset: Int,
@@ -290,6 +299,41 @@ final class SettingsStore {
     s.sectionOrder = sections.map(\.key)
     serverSettings = s
     SettingsMirror.upsert(settings: s, context: context, engine: engine)
+  }
+
+  /// Update the synced welcome name and push it to CloudKit, mirroring the
+  /// `moveSections` write pattern. The local `welcomeName` @AppStorage key
+  /// (read by `WelcomeHeader`) is written at the edit site, so both the
+  /// synced payload and the local mirror stay in lockstep.
+  func setWelcomeName(_ name: String, context: ModelContext, engine: CKEngine?) {
+    guard (serverSettings?.welcomeName ?? "") != name else { return }
+    var s = serverSettings ?? AppSettings(sectionOrder: nil, targets: nil, units: nil,
+                                          time: nil, theme: nil, eink: nil,
+                                          nutrition: nil, hkSync: nil)
+    s.welcomeName = name
+    serverSettings = s
+    SettingsMirror.upsert(settings: s, context: context, engine: engine)
+  }
+
+  /// Reconcile the CloudKit-synced welcome name with the local @AppStorage
+  /// key that `WelcomeHeader` reads for instant, offline-safe display.
+  ///
+  /// - A synced value wins: copy it into the local key so a name set on
+  ///   another device shows up here.
+  /// - No synced value but a local one exists (upgrade from the old
+  ///   local-only build): seed the payload from the local key and push it
+  ///   up. That leg enqueues a CloudKit save, so it only runs when given a
+  ///   non-nil `engine` (the launch path); `paintFromCache` passes nil and
+  ///   just does the inbound copy.
+  func reconcileWelcomeName(context: ModelContext, engine: CKEngine?) {
+    let key = SettingsKey.welcomeName
+    let local = UserDefaults.standard.string(forKey: key) ?? ""
+    let synced = serverSettings?.welcomeName ?? ""
+    if !synced.isEmpty {
+      if synced != local { UserDefaults.standard.set(synced, forKey: key) }
+    } else if !local.isEmpty, engine != nil {
+      setWelcomeName(local, context: context, engine: engine)
+    }
   }
 
   func refresh() async {
@@ -652,8 +696,15 @@ struct GeneralSettingsPane: View {
   private var showWelcome: Bool = true
   @AppStorage(SettingsKey.welcomeName)
   private var welcomeName: String = ""
+  @AppStorage(SettingsKey.welcomeTone)
+  private var welcomeToneRaw: String = WelcomeTone.warm.rawValue
+  @AppStorage(SettingsKey.welcomeDataAware)
+  private var welcomeDataAware: Bool = false
   @AppStorage(SettingsKey.notificationsEnabled)
   private var notificationsEnabled: Bool = true
+  @Environment(\.modelContext) private var modelContext
+  @Environment(CKEngine.self) private var ckEngine
+  @Environment(SettingsStore.self) private var store
 
   var body: some View {
     Form {
@@ -725,9 +776,26 @@ struct GeneralSettingsPane: View {
           #if os(iOS)
           .textInputAutocapitalization(.words)
           #endif
+          // Mirror the local edit up to the CloudKit-synced payload. Per-
+          // keystroke writes are coalesced by CKSyncEngine into one push.
+          .onChange(of: welcomeName) { _, newValue in
+            store.setWelcomeName(newValue, context: modelContext, engine: ckEngine)
+          }
+
+        Picker(selection: $welcomeToneRaw) {
+          ForEach(WelcomeTone.allCases) { tone in
+            Text(tone.label).tag(tone.rawValue)
+          }
+        } label: {
+          Label("Tone", systemImage: "textformat")
+        }
+
+        Toggle(isOn: $welcomeDataAware) {
+          Label("Aware of your day", systemImage: "sparkles")
+        }
       }
     } footer: {
-      Text("A centered greeting at the top of the home tab. Add your name to personalize it — with Apple Intelligence it's freshly written through the day.")
+      Text("A centered greeting at the top of the home tab. Add your name to personalize it — with Apple Intelligence it's freshly written through the day. \"Aware of your day\" lets it nod to what's left on today's list.")
     }
   }
 
