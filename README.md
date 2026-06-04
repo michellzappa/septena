@@ -38,7 +38,28 @@ CloudKit container: `iCloud.com.septena.cloud`.
 
 You need to be signed into iCloud on the simulator or device. First launch creates the private zone, starts `CKSyncEngine`, seeds missing section rows from `SectionManifest`, fetches remote changes, refreshes settings/theme mirrors, and runs local backfills.
 
-There is no `.env` for the app. User-facing provider credentials and integration state live in Settings or the local keychain/user defaults as appropriate.
+There is no `.env` for the app. User-facing provider credentials (e.g. the Oura token) live in Settings or the local keychain/user defaults. The one build-time credential is the optional Withings dev-app pair: copy `Config/Secrets.example.xcconfig` to `Config/Secrets.xcconfig` (gitignored) and fill it in if you want the Withings/Body integration. Without it the app builds and runs fine — Withings just shows as "not configured."
+
+### Building under your own Apple account
+
+The repo carries Septena's own identifiers. To build a signed copy on your own
+account, swap these for yours:
+
+- **Team ID** — `DEVELOPMENT_TEAM` in `project.yml`. To keep it out of source
+  entirely, move it to `Config/Secrets.xcconfig` (gitignored) with an empty
+  default in `Config/Base.xcconfig` — the same xcconfig pattern used for the
+  Withings secret — then attach `configFiles: Config/Base.xcconfig` to every
+  target so each one inherits it.
+- **Bundle IDs** — find/replace `com.septena.cloud` in `project.yml` and the
+  `*.entitlements` files with your own reverse-DNS prefix.
+- **CloudKit container** — `iCloud.com.septena.cloud` in the `*.entitlements`
+  files; use your own.
+- **App Group** — `group.com.septena.cloud` in the `*.entitlements` files.
+
+The `*.entitlements` files are hand-maintained (XcodeGen references them via
+`CODE_SIGN_ENTITLEMENTS` but does not generate them), so the container / group /
+bundle strings live there and must be edited by hand. Re-run `xcodegen generate`
+after changing `project.yml`.
 
 ## Repository Layout
 
@@ -197,4 +218,10 @@ From `project.yml` and entitlements:
 
 ## License
 
-Private - Michell Zappa.
+MIT - see [`LICENSE`](LICENSE). Copyright (c) 2026 Michell Zappa.
+
+Two bundled assets are **not** covered by the MIT grant — see [`NOTICE`](NOTICE):
+the Fraunces typeface (SIL Open Font License 1.1, full text in
+[`Septena/Resources/Fraunces-OFL.txt`](Septena/Resources/Fraunces-OFL.txt)) and
+the Claude name/logo (an Anthropic trademark, bundled only to identify the
+Claude integration).

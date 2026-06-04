@@ -1,0 +1,19 @@
+NOTICE
+======
+
+Septena is licensed under the MIT License (see LICENSE), with the following
+exceptions. These items ship in the repository so the app builds and functions,
+but they are NOT covered by the MIT grant:
+
+1. Fraunces typeface — Septena/Resources/Fraunces-Regular.ttf
+   Licensed under the SIL Open Font License, Version 1.1.
+   Full text: Septena/Resources/Fraunces-OFL.txt
+   Copyright 2018 The Fraunces Project Authors
+   (https://github.com/undercasetype/Fraunces)
+
+2. Claude name and logo — Septena/Assets.xcassets/ClaudeMark.imageset/
+   "Claude" and the Claude logo are trademarks of Anthropic, PBC. They appear
+   here only to identify Septena's optional integration with Claude. Anthropic
+   retains all rights to its marks; the MIT License does not grant any right to
+   use them. If you fork or redistribute Septena under a different name, remove
+   or replace this asset.
