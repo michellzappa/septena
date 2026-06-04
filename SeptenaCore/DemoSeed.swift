@@ -293,6 +293,40 @@ public enum DemoSeed {
     }
   }
 
+  private static func seedGut(_ ctx: ModelContext, _ rng: inout SeededRNG) {
+    let bristols = [3, 4, 4, 5, 3, 4, 5, 4, 2, 6]   // mostly healthy 3–5
+    for d in 0..<days where rng.chance(0.8) {
+      let e = GutEventEntity(id: "demo-gut-\(d)", date: day(-d), time: "08:20",
+                             bristol: bristols[rng.int(0, bristols.count - 1)], blood: 0)
+      e.occurredAt = at(-d, 8, 20); ctx.insert(e)
+    }
+  }
+
+  private static func seedCannabis(_ ctx: ModelContext, _ rng: inout SeededRNG) {
+    let strains = ["Blue Dream", "Northern Lights", "OG Kush"]
+    for d in 0..<days where rng.chance(0.3) {        // ~2 evenings / week
+      let e = CannabisEventEntity(id: "demo-can-\(d)", date: day(-d), time: "21:30",
+                                  method: rng.chance(0.6) ? "vape" : "edible",
+                                  strain: strains[rng.int(0, strains.count - 1)], hit: rng.int(1, 3))
+      e.occurredAt = at(-d, 21, 30); ctx.insert(e)
+    }
+  }
+
+  private static func seedGoals(_ ctx: ModelContext) {
+    let goals: [(String, [String])] = [
+      ("Sleep 7+ hours most nights", ["sleep"]),
+      ("Hit 120g protein on training days", ["nutrition", "training"]),
+      ("Walk every morning", ["habits"]),
+      ("Cut back on afternoon coffee", ["caffeine", "sleep"]),
+      ("Read 20 pages before bed", ["habits"]),
+      ("Down to 75 kg", ["body"]),
+    ]
+    for (i, g) in goals.enumerated() {
+      ctx.insert(GoalEntity(id: "demo-goal-\(i)", text: g.0, sections: g.1,
+                            created: day(-(i * 9 + 5)), sortIndex: i))
+    }
+  }
+
   // MARK: - presentation
 
   /// Homepage layout for screenshots — Sparkline (`dense`) by default; override

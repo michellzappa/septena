@@ -217,6 +217,17 @@ final class HealthKitBridge {
   /// Pull every metric in one parallel pass and cache. Called after
   /// authorization and on pull-to-refresh from the Week dashboard.
   func refresh() async {
+    #if DEBUG
+    // Screenshot / demo builds: synthetic Activity so the tile looks lived-in
+    // without HealthKit data (or a permission prompt).
+    if DemoSeedMode.isOn {
+      stepsToday = 9240; activeKcalToday = 540; exerciseMinutesToday = 38
+      stepsHistory = [7100, 8300, 11200, 6400, 9900, 12400, 9240]
+      vo2Max = 48.5; hrv = 58; restingHR = 52
+      hasLoaded = true
+      return
+    }
+    #endif
     #if canImport(HealthKit)
     guard isAvailable else { hasLoaded = true; return }
     async let st = todaySum(.stepCount)
