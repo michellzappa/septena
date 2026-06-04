@@ -4190,6 +4190,7 @@ private func upsertSupplementDefinition(_ r: [String: Any],
   if existing == nil { ctx.insert(e) }
   e.title = title
   e.emoji = r["emoji"] as? String
+  e.bucket = r["bucket"] as? String
   e.sortIndex = r["sortIndex"] as? Int ?? 0
   e.updatedAt = .now
   engine.noteSupplementDefinitionChange(id: id)

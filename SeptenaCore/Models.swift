@@ -480,6 +480,9 @@ struct SupplementDayItem: Codable, Identifiable, Hashable {
   let id: String
   var name: String
   var emoji: String?
+  /// Optional time-of-day bucket ("morning" | "afternoon" | "evening").
+  /// `nil` = "anytime" (shows all day). Unlike habits, bucketing is optional.
+  var bucket: String?
   var done: Bool
   var note: String?
   var time: String?
@@ -489,22 +492,25 @@ struct SupplementDayItem: Codable, Identifiable, Hashable {
     id = try c.decode(String.self, forKey: .id)
     name = try c.decodeIfPresent(String.self, forKey: .name) ?? id
     emoji = try c.decodeIfPresent(String.self, forKey: .emoji)
+    bucket = try c.decodeIfPresent(String.self, forKey: .bucket)
     done = (try? c.decode(Bool.self, forKey: .done)) ?? false
     note = try c.decodeIfPresent(String.self, forKey: .note)
     time = try c.decodeIfPresent(String.self, forKey: .time)
   }
 
-  enum CodingKeys: String, CodingKey { case id, name, emoji, done, note, time }
+  enum CodingKeys: String, CodingKey { case id, name, emoji, bucket, done, note, time }
 
   init(id: String,
        name: String,
        emoji: String?,
+       bucket: String? = nil,
        done: Bool,
        note: String?,
        time: String?) {
     self.id = id
     self.name = name
     self.emoji = emoji
+    self.bucket = bucket
     self.done = done
     self.note = note
     self.time = time
@@ -515,11 +521,14 @@ struct SupplementDefinition: Codable, Identifiable, Hashable {
   let id: String
   var name: String
   var emoji: String?
+  /// Optional time-of-day bucket; `nil` = anytime. See `SupplementDayItem`.
+  var bucket: String?
 
-  init(id: String, name: String, emoji: String?) {
+  init(id: String, name: String, emoji: String?, bucket: String? = nil) {
     self.id = id
     self.name = name
     self.emoji = emoji
+    self.bucket = bucket
   }
 }
 

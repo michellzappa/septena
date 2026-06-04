@@ -29,26 +29,7 @@ struct SupplementsDestinationView: View {
                   onLog: { _ in creating = true },
                   currentDate: $viewingDate) {
       if isViewingToday {
-        // Full day's stack — taken supplements stay in place (struck through)
-        // for the rest of today rather than fading out, so the drawer always
-        // shows what was logged. (The homepage Next feed still hides done.)
-        if !model.supplements.isEmpty {
-          DrawerSection("Today", padding: .none) {
-            ForEach(model.supplements) { supp in
-              Button { editing = supp } label: {
-                SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator, tint: accent,
-                              onDelete: { delete(supp) })
-              }
-              .buttonStyle(.plain)
-              .transition(.opacity)
-            }
-          }
-        }
-        if model.hasLoaded && model.supplements.isEmpty {
-          ContentUnavailableView("No supplements configured",
-                                 systemImage: theme.icon(for: "supplements"),
-                                 description: Text("Tap + to add a supplement."))
-        }
+        todaySections
       } else {
         pastDaySection
       }
@@ -81,6 +62,80 @@ struct SupplementsDestinationView: View {
     }
   }
 
+  // MARK: - Today
+
+  // Full day's stack — taken supplements stay in place (struck through) for
+  // the rest of today rather than fading out, so the drawer always shows what
+  // was logged. (The homepage Next feed still hides done + filters by bucket.)
+  // When nothing is bucketed the stack renders as one flat "Today" list
+  // (unchanged); the moment a supplement gets a time of day it groups into
+  // morning / afternoon / evening / anytime sections, like Habits.
+  @ViewBuilder
+  private var todaySections: some View {
+    let sections = Self.groupedSections(model.supplements)
+    if model.hasLoaded && model.supplements.isEmpty {
+      ContentUnavailableView("No supplements configured",
+                             systemImage: theme.icon(for: "supplements"),
+                             description: Text("Tap + to add a supplement."))
+    } else if Self.isFlat(sections) {
+      if !model.supplements.isEmpty {
+        DrawerSection("Today", padding: .none) {
+          ForEach(model.supplements) { supp in todayRow(supp) }
+        }
+      }
+    } else {
+      ForEach(sections, id: \.key) { section in
+        bucketSection(section.key, items: section.items) { todayRow($0) }
+      }
+    }
+  }
+
+  private func todayRow(_ supp: SupplementDayItem) -> some View {
+    Button { editing = supp } label: {
+      SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator, tint: accent,
+                    onDelete: { delete(supp) })
+    }
+    .buttonStyle(.plain)
+    .transition(.opacity)
+  }
+
+  // MARK: - Bucket grouping
+
+  /// Group a day's supplements into ordered sections: the day's time buckets
+  /// (morning → evening) first, then an "Anytime" catch-all for unbucketed
+  /// ones. Empty buckets drop out. Order within a bucket is the incoming
+  /// (sortIndex) order, which `Dictionary(grouping:)` preserves.
+  static func groupedSections(_ items: [SupplementDayItem]) -> [(key: String, items: [SupplementDayItem])] {
+    let order = DayBucket.allCases.map(\.rawValue) + [DayBucket.anytimeKey]
+    let byKey = Dictionary(grouping: items) { $0.bucket ?? DayBucket.anytimeKey }
+    return order.compactMap { key in
+      guard let group = byKey[key], !group.isEmpty else { return nil }
+      return (key: key, items: group)
+    }
+  }
+
+  /// True when nothing is bucketed — the only section is "Anytime" (or there
+  /// are none) — so the stack renders as one flat list (the pre-bucketing
+  /// look). Keeps the feature invisible until the user opts a supplement in.
+  static func isFlat(_ sections: [(key: String, items: [SupplementDayItem])]) -> Bool {
+    sections.allSatisfy { $0.key == DayBucket.anytimeKey }
+  }
+
+  // Shared header + card for one bucket section, used by today and past-day.
+  @ViewBuilder
+  private func bucketSection<RowView: View>(_ key: String,
+                                            items: [SupplementDayItem],
+                                            @ViewBuilder row: @escaping (SupplementDayItem) -> RowView) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      DayBucketHeader(bucket: key,
+                      trailing: "\(items.filter(\.done).count)/\(items.count)")
+        .padding(.horizontal, 16)
+      DrawerSection(padding: .none) {
+        ForEach(items) { item in row(item) }
+      }
+    }
+  }
+
   // MARK: - Past-day section
 
   @ViewBuilder
@@ -92,9 +147,14 @@ struct SupplementsDestinationView: View {
             .foregroundStyle(.secondary)
         }
       } else {
-        DrawerSection(padding: .none) {
-          ForEach(resp.items) { item in
-            pastDayRow(item)
+        let sections = Self.groupedSections(resp.items)
+        if Self.isFlat(sections) {
+          DrawerSection(padding: .none) {
+            ForEach(resp.items) { item in pastDayRow(item) }
+          }
+        } else {
+          ForEach(sections, id: \.key) { section in
+            bucketSection(section.key, items: section.items) { pastDayRow($0) }
           }
         }
       }

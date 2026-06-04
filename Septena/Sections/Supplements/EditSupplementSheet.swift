@@ -12,6 +12,14 @@ struct EditSupplementSheet: View {
 
   @State private var name: String = ""
   @State private var emoji: String = ""
+  /// Picker selection. Uses `DayBucket.anytimeKey` as the "no slot" sentinel
+  /// (mapped to a nil bucket at save time); morning/afternoon/evening scope
+  /// the supplement to that window onward on the home feed.
+  @State private var bucket: String = DayBucket.anytimeKey
+
+  /// "Anytime" first, then the day's buckets in order.
+  private var bucketOptions: [String] { [DayBucket.anytimeKey] + DayBucket.allCases.map(\.rawValue) }
+  private func bucketLabel(_ key: String) -> String { DayBucket(rawValue: key)?.title ?? "Anytime" }
 
   var body: some View {
     AdaptiveEditScaffold(
@@ -22,6 +30,7 @@ struct EditSupplementSheet: View {
       formBody.onAppear {
         name = original?.name ?? ""
         emoji = original?.emoji ?? ""
+        bucket = original?.bucket ?? DayBucket.anytimeKey
       }
     }
   }
@@ -29,7 +38,22 @@ struct EditSupplementSheet: View {
   @ViewBuilder private var formBody: some View {
     Form {
       Section("Supplement") {
-        TextField("Name", text: $name)
+        HStack(spacing: 12) {
+          TextField("Emoji", text: $emoji)
+            .frame(width: 44)
+            .multilineTextAlignment(.center)
+          TextField("Name", text: $name)
+        }
+      }
+      Section {
+        Picker("Time of day", selection: $bucket) {
+          ForEach(bucketOptions, id: \.self) { Text(bucketLabel($0)).tag($0) }
+        }
+        .pickerStyle(.segmented)
+      } header: {
+        Text("Time of day")
+      } footer: {
+        Text("“Anytime” keeps it on the home feed all day. Pick a slot and it only appears from then on — so you’re not staring at the whole day’s stack at once.")
       }
     }
   }
@@ -37,15 +61,17 @@ struct EditSupplementSheet: View {
   private func save() {
     let n = name.trimmingCharacters(in: .whitespaces)
     let e = emoji.trimmingCharacters(in: .whitespaces)
+    let resolvedBucket: String? = (bucket == DayBucket.anytimeKey) ? nil : bucket
     if let original {
-      checklistMutator.updateSupplement(id: original.id, name: n, emoji: e)
+      checklistMutator.updateSupplement(id: original.id, name: n, emoji: e, bucket: resolvedBucket)
       Haptics.tick()
       var rebuilt = original
       rebuilt.name = n
       rebuilt.emoji = e.isEmpty ? nil : e
+      rebuilt.bucket = resolvedBucket
       onDone(rebuilt)
     } else {
-      _ = checklistMutator.createSupplement(name: n, emoji: e)
+      _ = checklistMutator.createSupplement(name: n, emoji: e, bucket: resolvedBucket)
       Haptics.tick()
       onDone(nil)
     }

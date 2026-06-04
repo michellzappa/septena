@@ -291,6 +291,7 @@ enum ChecklistMirror {
         "id": def.id,
         "name": def.title,
         "emoji": def.emoji as Any,
+        "bucket": def.bucket as Any,
         "done": state?.done ?? false,
         "note": state?.note as Any,
         "time": state?.time as Any,
@@ -319,6 +320,7 @@ enum ChecklistMirror {
       let def = defsByID[item.id] ?? SupplementDefinitionEntity(id: item.id, title: item.name, emoji: item.emoji)
       def.title = item.name
       def.emoji = item.emoji
+      def.bucket = item.bucket
       def.sortIndex = index
       def.updatedAt = .now
       if def.modelContext == nil { context.insert(def) }
@@ -375,6 +377,7 @@ enum ChecklistMirror {
                                                                            emoji: item.emoji)
         def.title = item.name
         def.emoji = item.emoji
+        def.bucket = item.bucket
         def.sortIndex = sortIndexByID[item.id] ?? 0
         def.updatedAt = .now
         if def.modelContext == nil { context.insert(def) }
@@ -856,7 +859,7 @@ enum ChecklistMirror {
     let entities = (try? context.fetch(FetchDescriptor<SupplementDefinitionEntity>(
       sortBy: [SortDescriptor(\.sortIndex), SortDescriptor(\.title, comparator: .localizedStandard)]
     ))) ?? []
-    return entities.map { SupplementDefinition(id: $0.id, name: $0.title, emoji: $0.emoji) }
+    return entities.map { SupplementDefinition(id: $0.id, name: $0.title, emoji: $0.emoji, bucket: $0.bucket) }
   }
 
   // MARK: - Groceries (CloudKit-backed)

@@ -413,6 +413,12 @@ final class SupplementDefinitionEntity {
   @Attribute(.unique) var id: String
   var title: String
   var emoji: String?
+  /// Optional time-of-day bucket ("morning" / "afternoon" / "evening").
+  /// `nil` means "anytime" — the supplement isn't tied to a slot and shows
+  /// all day on the Next feed (the default, and the pre-bucketing behavior).
+  /// A set bucket scopes it to that window onward. Lightweight migration:
+  /// existing rows read back as `nil`.
+  var bucket: String?
   var sortIndex: Int
   var updatedAt: Date
   /// CKRecord system-fields blob. Same contract as tasks/projects/areas.
@@ -421,12 +427,14 @@ final class SupplementDefinitionEntity {
   init(id: String,
        title: String,
        emoji: String? = nil,
+       bucket: String? = nil,
        sortIndex: Int = 0,
        updatedAt: Date = .now,
        cloudKitSystemFields: Data? = nil) {
     self.id = id
     self.title = title
     self.emoji = emoji
+    self.bucket = bucket
     self.sortIndex = sortIndex
     self.updatedAt = updatedAt
     self.cloudKitSystemFields = cloudKitSystemFields
@@ -1349,6 +1357,7 @@ enum SupplementDefinitionCloudKitSchema {
   enum Field {
     static let title = "title"
     static let emoji = "emoji"
+    static let bucket = "bucket"
     static let sortIndex = "sortIndex"
   }
 
@@ -1821,6 +1830,7 @@ extension SupplementDefinitionEntity: ChecklistCloudKitBackedEntity {
     )
     record[SupplementDefinitionCloudKitSchema.Field.title] = title
     record[SupplementDefinitionCloudKitSchema.Field.emoji] = emoji
+    record[SupplementDefinitionCloudKitSchema.Field.bucket] = bucket
     record[SupplementDefinitionCloudKitSchema.Field.sortIndex] = sortIndex
     return record
   }
@@ -1828,6 +1838,7 @@ extension SupplementDefinitionEntity: ChecklistCloudKitBackedEntity {
   func apply(_ record: CKRecord) {
     if let value = record[SupplementDefinitionCloudKitSchema.Field.title] as? String { title = value }
     emoji = optionalChecklistString(record[SupplementDefinitionCloudKitSchema.Field.emoji])
+    bucket = optionalChecklistString(record[SupplementDefinitionCloudKitSchema.Field.bucket])
     if let value = record[SupplementDefinitionCloudKitSchema.Field.sortIndex] as? Int { sortIndex = value }
     updatedAt = .now
     captureCloudKitSystemFields(from: record)

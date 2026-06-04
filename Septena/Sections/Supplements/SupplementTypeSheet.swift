@@ -45,6 +45,11 @@ struct SupplementTypeSheet: View {
                   if let e = supp.emoji, !e.isEmpty { Text(e) }
                   Text(supp.name).foregroundStyle(.primary)
                   Spacer()
+                  if let raw = supp.bucket, let bucket = DayBucket(rawValue: raw) {
+                    Text(bucket.title)
+                      .font(.caption)
+                      .foregroundStyle(.secondary)
+                  }
                   Image(systemName: "chevron.right")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
@@ -85,6 +90,7 @@ struct SupplementTypeSheet: View {
           id: item.id,
           name: item.name,
           emoji: item.emoji,
+          bucket: item.bucket,
           done: false,
           note: nil,
           time: nil

@@ -938,22 +938,24 @@ final class ChecklistMutator {
   }
 
   @discardableResult
-  func createSupplement(name: String, emoji: String? = nil) -> SupplementDayItem {
+  func createSupplement(name: String, emoji: String? = nil, bucket: String? = nil) -> SupplementDayItem {
     let id = uniqueSupplementID()
     let def = SupplementDefinitionEntity(id: id,
                                          title: name,
                                          emoji: normalized(emoji),
+                                         bucket: bucket,
                                          sortIndex: nextSupplementSortIndex())
     context.insert(def)
     commitSupplementDefinition(def, op: "create")
     return SupplementDayItem(id: id, name: name, emoji: normalized(emoji),
-                             done: false, note: nil, time: nil)
+                             bucket: bucket, done: false, note: nil, time: nil)
   }
 
-  func updateSupplement(id: String, name: String, emoji: String?) {
+  func updateSupplement(id: String, name: String, emoji: String?, bucket: String?) {
     guard let def = fetchSupplementDefinition(id: id) else { return }
     def.title = name
     def.emoji = normalized(emoji)
+    def.bucket = bucket
     def.updatedAt = .now
     commitSupplementDefinition(def, op: "update")
   }

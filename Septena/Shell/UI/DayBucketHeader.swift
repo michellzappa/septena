@@ -22,10 +22,16 @@ struct DayBucketHeader: View {
   private var isCurrent: Bool {
     parsed.map { $0 == DayBucket.current } ?? false
   }
+  /// "anytime" (the optional-bucket sentinel) gets a dashed-circle glyph —
+  /// reads as "no particular slot" — rather than the unknown-bucket fallback.
+  private var iconName: String {
+    if bucket == DayBucket.anytimeKey { return "circle.dashed" }
+    return parsed?.icon ?? "circle"
+  }
 
   var body: some View {
     HStack(spacing: 8) {
-      Image(systemName: parsed?.icon ?? "circle")
+      Image(systemName: iconName)
         .font(.footnote)
         .foregroundStyle(.secondary)
       Text(parsed?.title ?? bucket.capitalized)

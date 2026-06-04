@@ -20,7 +20,9 @@ enum SupplementsPlugin: SectionPlugin {
       tables: [
         SchemaTable(name: "supplementDefinition", purpose: "a supplement you take", fields: [
           .req("id", "string"), .req("title", "string"),
-          .opt("emoji", "string"), .opt("sortIndex", "int"),
+          .opt("emoji", "string"),
+          .opt("bucket", "string"),  // "morning"|"afternoon"|"evening"; absent = anytime
+          .opt("sortIndex", "int"),
         ]),
         SchemaTable(name: "supplementDayState", purpose: "one supplement on one day", fields: [
           .req("id", "string"), .req("date", "date"),
@@ -263,7 +265,7 @@ private struct SupplementsOnboardingView: View {
 
 @MainActor func supplementDefinitionExportDict(_ e: SupplementDefinitionEntity) -> [String: Any] {
   compact([
-    "id": e.id, "title": e.title, "emoji": e.emoji,
+    "id": e.id, "title": e.title, "emoji": e.emoji, "bucket": e.bucket,
     "sortIndex": e.sortIndex, "updatedAt": isoDate(e.updatedAt),
   ])
 }

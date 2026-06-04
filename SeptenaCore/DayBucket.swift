@@ -57,6 +57,17 @@ public enum DayBucket: String, CaseIterable, Identifiable, Hashable, Sendable {
   /// The bucket the user is currently in, by wall-clock.
   public static var current: DayBucket { from(date: .now) }
 
+  /// Position in the day (morning = 0 … evening = 2). Lets callers ask
+  /// "have we reached this bucket yet?" — `b.order <= DayBucket.current.order`
+  /// — without re-hardcoding the morning/afternoon/evening sequence.
+  public var order: Int { Self.allCases.firstIndex(of: self) ?? 0 }
+
+  /// UI/grouping key for "no specific time of day". Not a `DayBucket` case —
+  /// it's stored as `nil` on the entity; this string is only used as a
+  /// section/picker key for sections (e.g. Supplements) where bucketing is
+  /// *optional* and an unbucketed item should surface all day.
+  public static let anytimeKey = "anytime"
+
   /// Exclusive end-of-window hour (local) for this bucket — the same
   /// cutoffs `from(date:)` uses, exposed so countdown UIs derive the
   /// window boundary here instead of re-hardcoding 12 / 17. Evening runs
