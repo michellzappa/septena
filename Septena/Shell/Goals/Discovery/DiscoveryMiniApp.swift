@@ -65,5 +65,6 @@ enum DiscoveryRegistry {
   static let all: [DiscoveryMiniAppDescriptor] = [
     IkigaiMiniApp.descriptor,
     ValuesMiniApp.descriptor,
+    VirtueMiniApp.descriptor,
   ]
 }
