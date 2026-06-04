@@ -9,6 +9,8 @@ enum HabitsPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(HabitsDestinationView()) }
 
+  static func detailPaneContent() -> AnyView? { AnyView(HabitsDetailContent()) }
+
   static var logActions: [LogAction] {
     [LogAction(id: "new", title: "New habit", systemImage: "plus")]
   }
@@ -328,6 +330,28 @@ private struct HabitsOnboardingView: View {
       mutator.createHabit(name: s.name, bucket: s.bucket, emoji: s.emoji)
     }
     complete()
+  }
+}
+
+// Per-section settings shown in Settings → Habits. Just the Next-list
+// carry-over toggle for now; per-device (@AppStorage), read by the Next
+// feed's `habitsNow` filter. Default OFF — habits stay strict to their slot.
+private struct HabitsDetailContent: View {
+  @AppStorage(NextLinger.habitsKey) private var carryOver = NextLinger.habitsDefault
+
+  var body: some View {
+    Section {
+      Toggle(isOn: $carryOver) {
+        VStack(alignment: .leading, spacing: 1) {
+          Text("Carry over missed habits")
+          Text("Keep an undone habit on the Next list after its time of day, until you do it. Off shows each habit only during its slot.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+    } header: {
+      Text("Next list")
+    }
   }
 }
 

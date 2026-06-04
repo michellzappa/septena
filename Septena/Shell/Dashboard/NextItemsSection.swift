@@ -454,12 +454,31 @@ final class NextItemsModel {
 
 // MARK: - Open subview (rendered above tasks-done)
 
+/// UserDefaults keys + defaults for the per-section "carry over missed
+/// items" toggle (a.k.a. linger): keep an item on the Next list after its
+/// time-of-day bucket has passed, until it's done. Per-device by design —
+/// it's a glance-filter preference, so it stays out of the CloudKit schema.
+/// The toggle lives in each section's settings (`detailPaneContent`); these
+/// keys are the shared contract between that toggle and the Next filters.
+/// Defaults preserve shipped behavior: supplements linger, habits stay strict.
+enum NextLinger {
+  static let supplementsKey = "next.linger.supplements"
+  static let supplementsDefault = true
+  static let habitsKey = "next.linger.habits"
+  static let habitsDefault = false
+}
+
 struct NextOpenSection: View {
   var model: NextItemsModel
   var tasksModel: TodayTasksModel
   @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(SettingsStore.self) private var settingsStore
   @Environment(SectionTheme.self) private var theme
+  // Per-section "carry over missed items" prefs (see `NextLinger`). Read here
+  // and written by the section-settings toggles; @AppStorage keeps the Next
+  // feed in sync the instant either is flipped.
+  @AppStorage(NextLinger.supplementsKey) private var lingerSupplements = NextLinger.supplementsDefault
+  @AppStorage(NextLinger.habitsKey) private var lingerHabits = NextLinger.habitsDefault
 
   /// The Next blocks in the user's saved section order, via the shared
   /// `NextFeed` ordering rule (the same one the watch snapshot uses) so the
@@ -470,17 +489,40 @@ struct NextOpenSection: View {
       enabledKeys: settingsStore.sections.filter(\.isEnabled).map(\.key))
   }
 
-  /// Habits are bucketed by time-of-day on the server ("morning" / "afternoon"
-  /// / "evening"). The Next screen only shows the habits for *now* — earlier
-  /// buckets shouldn't linger as catch-up debt, and later buckets shouldn't
-  /// surface ahead of time. One-bucket-at-a-time keeps the screen focused.
-  /// Bucket selection is shared with the watch via `DayBucket` so they
-  /// never disagree about which habits are due now.
+  /// Habits are bucketed by time-of-day ("morning" / "afternoon" / "evening").
+  /// By default the Next screen shows only the habits for *now* — earlier
+  /// buckets don't linger as catch-up debt, later buckets don't surface
+  /// early. With the section's "carry over missed habits" toggle on, an
+  /// undone habit from an earlier bucket keeps showing until it's done.
+  /// Bucket selection is shared with the watch via `DayBucket`.
   private var currentHabitBucket: String { DayBucket.current.rawValue }
 
   private var habitsNow: [HabitDayItem] {
-    let bucket = currentHabitBucket
-    return model.openHabits.filter { $0.bucket == bucket }
+    // Default (strict): exact current-bucket match — unchanged, and keeps
+    // non-DayBucket buckets like "anytime" out of the now-strip as before.
+    guard lingerHabits else {
+      let bucket = currentHabitBucket
+      return model.openHabits.filter { $0.bucket == bucket }
+    }
+    // Carry-over: show every undone habit whose bucket has opened. "anytime"
+    // / non-DayBucket habits aren't part of the now-strip in either mode.
+    let nowOrder = DayBucket.current.order
+    return model.openHabits.filter { h in
+      guard let b = DayBucket(rawValue: h.bucket) else { return false }
+      return b.order <= nowOrder
+    }
+  }
+
+  /// Supplements are *optionally* bucketed (unlike habits). An "anytime"
+  /// supplement (nil bucket) shows all day. A bucketed one shows during its
+  /// window; with "carry over missed doses" on (the default) it also lingers
+  /// through later buckets until taken, so a missed dose doesn't vanish.
+  private var supplementsNow: [SupplementDayItem] {
+    let nowOrder = DayBucket.current.order
+    return model.openSupplements.filter { supp in
+      guard let raw = supp.bucket, let b = DayBucket(rawValue: raw) else { return true }
+      return lingerSupplements ? (b.order <= nowOrder) : (b.order == nowOrder)
+    }
   }
 
   private func isEmpty(_ key: String) -> Bool {
@@ -488,7 +530,7 @@ struct NextOpenSection: View {
     case "tasks":       return tasksModel.openTasks.isEmpty
     case "chores":      return model.openChores.isEmpty
     case "habits":      return habitsNow.isEmpty
-    case "supplements": return model.openSupplements.isEmpty
+    case "supplements": return supplementsNow.isEmpty
     default:
       // `orderedKeys` only ever yields `NextBlocks` members, so a key with
       // no case here means a row was added to the table without a render
@@ -548,7 +590,7 @@ struct NextOpenSection: View {
       VStack(alignment: .leading, spacing: 0) {
         sectionHeader("Supplements", tint: theme.color(for: "supplements"))
         VStack(spacing: 0) {
-          ForEach(model.openSupplements) { supp in
+          ForEach(supplementsNow) { supp in
             SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator,
                           tint: theme.color(for: "supplements"))
               .transition(.opacity)

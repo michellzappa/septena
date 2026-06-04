@@ -53,9 +53,9 @@ enum SupplementsPlugin: SectionPlugin {
         SectionSkill.Tool("supplements_list",   "Definitions with today's state merged",
               inputs: "optional: date (default today)"),
         SectionSkill.Tool("supplements_create", "New definition",
-              inputs: "required: title · optional: emoji"),
+              inputs: "required: title · optional: emoji, bucket (morning|afternoon|evening; omit for anytime)"),
         SectionSkill.Tool("supplements_update", "Update fields",
-              inputs: "required: id · optional: title, emoji"),
+              inputs: "required: id · optional: title, emoji, bucket"),
         SectionSkill.Tool("supplements_delete", "Delete definition and events",
               inputs: "required: id"),
         SectionSkill.Tool("supplements_toggle", "Mark taken/untaken for a date",
@@ -115,16 +115,33 @@ enum SupplementsPlugin: SectionPlugin {
 
 private struct SupplementsDetailContent: View {
   @State private var showingSheet = false
+  /// Per-device "carry over missed doses" toggle — read by the Next feed's
+  /// `supplementsNow` filter. Default ON (lingers). See `NextLinger`.
+  @AppStorage(NextLinger.supplementsKey) private var carryOver = NextLinger.supplementsDefault
 
   var body: some View {
-    Section {
-      Button {
-        showingSheet = true
-      } label: {
-        Label("Manage Supplements", systemImage: "pills")
+    Group {
+      Section {
+        Toggle(isOn: $carryOver) {
+          VStack(alignment: .leading, spacing: 1) {
+            Text("Carry over missed doses")
+            Text("Keep a supplement on the Next list after its time of day, until you take it. Off shows it only during its slot.")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+        }
+      } header: {
+        Text("Next list")
       }
-    } footer: {
-      Text("Renaming a supplement doesn't affect its history — events are linked by ID.")
+      Section {
+        Button {
+          showingSheet = true
+        } label: {
+          Label("Manage Supplements", systemImage: "pills")
+        }
+      } footer: {
+        Text("Renaming a supplement doesn't affect its history — events are linked by ID.")
+      }
     }
     .sheet(isPresented: $showingSheet) {
       SupplementTypeSheet()
