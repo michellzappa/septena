@@ -1,0 +1,30 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Inbox" : {
+      "comment" : "Phase 0 spike — test string, not a real translation pass",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Eingang" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Entrada" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Boîte de réception" } }
+      }
+    },
+    "Settings" : {
+      "comment" : "Phase 0 spike — test string, not a real translation pass",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Einstellungen" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Ajustes" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Réglages" } }
+      }
+    },
+    "Today" : {
+      "comment" : "Phase 0 spike — test string, not a real translation pass",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Heute" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Hoy" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aujourd'hui" } }
+      }
+    }
+  },
+  "version" : "1.0"
+}

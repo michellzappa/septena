@@ -1,6 +1,7 @@
 name: Septena
 options:
   bundleIdPrefix: com.septena
+  developmentLanguage: en
   deploymentTarget:
     iOS: "26.0"
     macOS: "26.0"
@@ -49,6 +50,11 @@ targets:
       path: Septena/Info.plist
       properties:
         CFBundleDisplayName: Septena
+        CFBundleLocalizations:
+          - en
+          - fr
+          - de
+          - es
         UILaunchScreen: {}
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: true
@@ -114,6 +120,11 @@ targets:
       path: Septena/Info-Mac.plist
       properties:
         CFBundleDisplayName: Septena
+        CFBundleLocalizations:
+          - en
+          - fr
+          - de
+          - es
         CFBundleIconFile: AppIcon
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true

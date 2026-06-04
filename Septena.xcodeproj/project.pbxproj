@@ -388,6 +388,7 @@
 		BFAFA1121DC35073F6D352F6 /* BrowseGutDaySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 624F4DB126AEF0811BFBF590 /* BrowseGutDaySheet.swift */; };
 		C08B86E9AFEE7B2E7D36557E /* OnDeviceAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45A392FAFE9C986DE043966D /* OnDeviceAI.swift */; };
 		C0E093740769380C81FD31BA /* SupplementsQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = C62E8037BC8CBCE13C164828 /* SupplementsQuickAddMenu.swift */; };
+		C1167F10A74CFA8D5CA55A4B /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 82B033F3BFB3BA4D616AA595 /* Localizable.xcstrings */; };
 		C14E1B79E07BD242BD1C9810 /* MoodIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 675F31A4511CBADB2FB97B81 /* MoodIntents.swift */; };
 		C1F56FDF315938C5A58E8A98 /* PlatformShims.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13011C553B04F0ACEFD189CD /* PlatformShims.swift */; };
 		C219D784BF82706F81689818 /* ExercisePickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D3250962535171689FCDA30 /* ExercisePickerSheet.swift */; };
@@ -409,6 +410,7 @@
 		C6EE3C372089D7A231497306 /* ExerciseLibrarySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A708921A7D5F315781CFCF71 /* ExerciseLibrarySheet.swift */; };
 		C7AC2E4E116DAB445A500573 /* AreasBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E598D0EF28BF638E97F3F22 /* AreasBackend.swift */; };
 		C8431A57209DF77F8D9F9E59 /* CannabisDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8426035C14708F9B19546DE /* CannabisDestinationView.swift */; };
+		C85119F5342B35E8A92658D3 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 82B033F3BFB3BA4D616AA595 /* Localizable.xcstrings */; };
 		C8F7E91227008E29DA40DB5C /* SectionRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B8CA0380F3FD3679CE4C676 /* SectionRecord.swift */; };
 		C9730A8D5FCB43EAC9A6C304 /* NewNutritionEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C180106D47D0477F75695A /* NewNutritionEntrySheet.swift */; };
 		C9A195F8FF0C63824E0A5BD8 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */; };
@@ -735,6 +737,7 @@
 		80D7DFAC856BBE635EBBC6E4 /* ActivityDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityDestinationView.swift; sourceTree = "<group>"; };
 		81E6CCEAE6C25B88290F0666 /* DenseHomepageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DenseHomepageView.swift; sourceTree = "<group>"; };
 		82027987201417F6117BF8DA /* ScreenshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotTests.swift; sourceTree = "<group>"; };
+		82B033F3BFB3BA4D616AA595 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		8406632D2A873E175B61F4DC /* DiscoveryFlowChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveryFlowChrome.swift; sourceTree = "<group>"; };
 		840FCA6D0B9D2B9E543E4BA9 /* GoalMetricEvaluator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalMetricEvaluator.swift; sourceTree = "<group>"; };
 		8416FB0AD38638BF7038BF2A /* NextDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextDashboardView.swift; sourceTree = "<group>"; };
@@ -998,6 +1001,7 @@
 				C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */,
 				5B49A0D20B2ECD672137900F /* Info-Mac.plist */,
 				31313A0E804B33A3E43FC1F6 /* Info.plist */,
+				82B033F3BFB3BA4D616AA595 /* Localizable.xcstrings */,
 				784D3E7D8D933961200812D6 /* PrivacyInfo.xcprivacy */,
 				64938CD07808787BDFD1780F /* App */,
 				E5651035008888FF03C82755 /* Resources */,
@@ -1737,7 +1741,10 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				Base,
+				de,
 				en,
+				es,
+				fr,
 			);
 			mainGroup = 911FA069BE707320A271B250;
 			minimizedProjectReferenceProxies = 1;
@@ -1777,6 +1784,7 @@
 				207AC8DAC92253CDCFE9ADD9 /* Fraunces-OFL.txt in Resources */,
 				6E613152F22C42599AE4AAEC /* Fraunces-Regular.ttf in Resources */,
 				36325B1E6E5A771C01028105 /* Info.plist in Resources */,
+				C1167F10A74CFA8D5CA55A4B /* Localizable.xcstrings in Resources */,
 				F46ED9D5CAC9DA26811E4246 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1800,6 +1808,7 @@
 				1482821460D8B8050C19084C /* Fraunces-OFL.txt in Resources */,
 				A5A083B827BC6B45473A9F3A /* Fraunces-Regular.ttf in Resources */,
 				3D19536CFB66987D6D5C7642 /* Info-Mac.plist in Resources */,
+				C85119F5342B35E8A92658D3 /* Localizable.xcstrings in Resources */,
 				E515D9DFB7D4891875B26EF4 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
