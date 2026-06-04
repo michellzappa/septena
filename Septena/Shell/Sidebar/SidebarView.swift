@@ -1418,7 +1418,7 @@ private struct SidebarTaskDrop: ViewModifier {
     content
       .background(
         RoundedRectangle(cornerRadius: 8, style: .continuous)
-          .fill(Theme.tasksAccent.opacity(isTargeted ? 0.18 : 0))
+          .fill(Color.accentColor.opacity(isTargeted ? 0.18 : 0))
           .animation(.easeOut(duration: 0.12), value: isTargeted)
       )
       .dropDestination(for: String.self) { ids, _ in

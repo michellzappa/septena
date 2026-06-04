@@ -2148,7 +2148,10 @@ private struct MacroTileRow: View {
     Binding(
       get: {
         let hex = pref.colorHex ?? MacroCatalog.byID[pref.id]?.defaultColorHex
-        return Color(hexString: hex) ?? .gray
+        // Raw (non-adaptive): the system ColorPicker round-trips this value
+        // back through `toHexString()` on set, so an adaptive color would
+        // serialize its lifted dark-mode hex and corrupt the stored swatch.
+        return AdaptiveColor.raw(hex) ?? .gray
       },
       set: { newColor in
         pref.colorHex = newColor.toHexString()
@@ -2174,17 +2177,14 @@ private extension Color {
   }
 }
 
-/// Tolerant parse of "#rrggbb" hex strings. Falls back to gray for
-/// hsl(...) or other formats — the server returns either, but only the
-/// hex form decodes natively. A future pass can add hsl() support.
+/// Adaptive parse of a section/swatch color token, used for *display* of
+/// curated swatches and the current section accent. Routes through the shared
+/// `AdaptiveColor` resolver (handles "#rrggbb"/rgb()/hsl() and the dark-mode
+/// lift); falls back to gray on unparseable input. Editing controls that
+/// round-trip back to a hex string must use `AdaptiveColor.raw` instead — see
+/// `MacroTileRow.colorBinding`.
 private func parseHexColor(_ s: String) -> Color {
-  var hex = s.trimmingCharacters(in: .whitespacesAndNewlines)
-  if hex.hasPrefix("#") { hex.removeFirst() }
-  guard hex.count == 6, let v = UInt32(hex, radix: 16) else { return .gray }
-  let r = Double((v >> 16) & 0xFF) / 255
-  let g = Double((v >>  8) & 0xFF) / 255
-  let b = Double( v        & 0xFF) / 255
-  return Color(red: r, green: g, blue: b)
+  AdaptiveColor.adaptive(s) ?? .gray
 }
 
 // MARK: - Integrations

@@ -168,10 +168,10 @@ struct DayTimelineView: View {
   // Stripes are drawn at h=2 so they read as a marker, not a wash, and
   // never intrude on bars/dots above them.
 
-  private static let fastingFallbackColor = Color(hex: 0x8b5cf6)
+  private static let fastingFallbackColor = AdaptiveColor.adaptive(hex: 0x8b5cf6)
 
   private var fastingColor: Color {
-    Color(hexString: macroColors?.fasting) ?? Self.fastingFallbackColor
+    AdaptiveColor.adaptive(macroColors?.fasting) ?? Self.fastingFallbackColor
   }
 
   /// Today's nutrition entries, sorted by time-of-day.

@@ -367,7 +367,7 @@ private struct QuickFindRow: View {
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 7)
-    .background(selected ? Theme.rowSelected : Color.clear)
+    .background(selected ? Color.accentColor.opacity(0.18) : Color.clear)
     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
     .padding(.horizontal, 6)
   }
@@ -391,8 +391,8 @@ private struct QuickFindRow: View {
   private var iconTint: Color {
     switch hit.kind {
     case .task(let done, _): return done ? Theme.inkSecondary : Theme.inkPrimary
-    case .project(let done): return done ? Theme.inkSecondary : Theme.tasksAccent
-    case .area: return Theme.tasksAccent
+    case .project(let done): return done ? Theme.inkSecondary : Color.accentColor
+    case .area: return Color.accentColor
     }
   }
 

@@ -12,14 +12,12 @@ enum Theme {
 
   // MARK: - Accent
   //
-  // Reminders draws its per-list color from the system palette. We surface
-  // the *current* tint via `Color.accentColor` so any view inside a
-  // `.tint(listColor)` scope picks it up automatically. The "Soft" variant
-  // is the same color at a fixed alpha for selection pills / chips.
-
-  static let tasksAccent = Color.accentColor
-  static let tasksAccentSoft = Color.accentColor.opacity(0.18)
-  static let tasksAccentStrong = Color.accentColor
+  // The app accent is the asset-catalog `AccentColor` — a standalone brand
+  // tint, intentionally independent of any section color. Reminders-style
+  // per-list/section tints come from `SectionTheme.color(for:)`, applied with
+  // `.tint(...)`; any view inside that scope picks the tint up via
+  // `Color.accentColor`. Read `Color.accentColor` (or `SectionTheme.accent`)
+  // directly — there are no fixed accent tokens here.
 
   // MARK: - Surfaces
 
@@ -43,16 +41,6 @@ enum Theme {
     return Color(nsColor: .underPageBackgroundColor)
     #else
     return Color(.systemGroupedBackground)
-    #endif
-  }()
-
-  /// Selection pill background. Uses the system selection color so it
-  /// honors highlight contrast and accent inheritance.
-  static let rowSelection: Color = {
-    #if os(macOS)
-    return Color(nsColor: .selectedContentBackgroundColor).opacity(0.25)
-    #else
-    return Color.accentColor.opacity(0.15)
     #endif
   }()
 
@@ -130,7 +118,6 @@ enum Theme {
     #endif
   }()
   static let divider = border
-  static let rowSelected = tasksAccentSoft
 
   // MARK: - Semantic
 
@@ -141,7 +128,6 @@ enum Theme {
 
   // MARK: - Filter accents
 
-  static let inboxAccent    = Color.secondary
   /// Slightly darker than `Color.yellow` so the white sun glyph keeps
   /// contrast against it in light mode (system yellow is so bright the
   /// icon almost disappears). Same swatch in both modes — dark mode reads
@@ -149,9 +135,6 @@ enum Theme {
   static let todayAccent    = Color(red: 0.96, green: 0.78, blue: 0.13)
   /// Muted moonlight indigo — marks "Someday" tasks in mixed lists.
   static let somedayAccent  = Color(red: 0.50, green: 0.50, blue: 0.75)
-  static let upcomingAccent = Color.red
-  static let anytimeAccent  = Color.secondary
-  static let logbookAccent  = Color.secondary
 
   // MARK: - Shape & spacing
   //

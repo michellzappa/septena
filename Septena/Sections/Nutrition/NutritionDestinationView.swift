@@ -67,7 +67,7 @@ struct NutritionDestinationView: View {
   private func color(for macroID: String) -> Color {
     let override = tilePrefs.first(where: { $0.id == macroID })?.colorHex
     let fallback = MacroCatalog.byID[macroID]?.defaultColorHex
-    return Color(hexString: override ?? fallback) ?? .gray
+    return AdaptiveColor.adaptive(override ?? fallback) ?? .gray
   }
 
   private var proteinColor: Color { color(for: "protein") }
@@ -1011,23 +1011,6 @@ struct MealRelogSearchView: View {
   }
 }
 
-// MARK: - Color hex helper
-
-extension Color {
-  init(hex: UInt32) {
-    self.init(
-      red:   Double((hex >> 16) & 0xff) / 255,
-      green: Double((hex >> 8)  & 0xff) / 255,
-      blue:  Double( hex        & 0xff) / 255
-    )
-  }
-
-  /// Parses "#rrggbb" or "rrggbb". Returns nil on bad input so callers can
-  /// fall through to a typed default rather than silently rendering black.
-  init?(hexString: String?) {
-    guard let s = hexString else { return nil }
-    let trimmed = s.hasPrefix("#") ? String(s.dropFirst()) : s
-    guard trimmed.count == 6, let v = UInt32(trimmed, radix: 16) else { return nil }
-    self.init(hex: v)
-  }
-}
+// Hex → Color parsing now lives in `AdaptiveColor` (SectionTheme.swift) so the
+// fasting band, macro tiles, and section accents all share one resolver and
+// one dark-mode lift.
