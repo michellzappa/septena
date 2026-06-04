@@ -12,6 +12,7 @@ import SwiftData
 public enum DemoSeed {
   @MainActor
   public static func populate(context ctx: ModelContext, today: String) {
+    seedLayout() // homepage layout for screenshots (Sparkline by default)
     // In-memory store starts empty; this guard just prevents a double-seed if
     // the launch `.task` ever re-runs (unique-id collisions otherwise).
     let already = (try? ctx.fetchCount(FetchDescriptor<HabitDefinitionEntity>())) ?? 0
@@ -26,6 +27,7 @@ public enum DemoSeed {
     seedCaffeine(ctx)
     seedMood(ctx)
     seedGroceries(ctx)
+    seedSectionColors(ctx)
     try? ctx.save()
   }
 
@@ -145,14 +147,16 @@ public enum DemoSeed {
     // cardio with duration/distance).
     var n = 0
     func strength(_ off: Int, _ type: String, _ ex: String, _ w: Double, _ reps: String) {
-      ctx.insert(ExerciseEntryEntity(id: "demo-ex-\(n)", date: day(off), time: "18:00",
-                                     sessionType: type, exercise: ex, weight: w, sets: "3", reps: reps))
-      n += 1
+      let e = ExerciseEntryEntity(id: "demo-ex-\(n)", date: day(off), time: "18:00",
+                                  sessionType: type, exercise: ex, weight: w, sets: "3", reps: reps)
+      e.occurredAt = at(off, 18) // event tiles query occurredAt, not the date string
+      ctx.insert(e); n += 1
     }
     func cardio(_ off: Int, _ min: Double, _ m: Double) {
-      ctx.insert(ExerciseEntryEntity(id: "demo-ex-\(n)", date: day(off), time: "07:15",
-                                     sessionType: "cardio", exercise: "run", durationMin: min, distanceM: m))
-      n += 1
+      let e = ExerciseEntryEntity(id: "demo-ex-\(n)", date: day(off), time: "07:15",
+                                  sessionType: "cardio", exercise: "run", durationMin: min, distanceM: m)
+      e.occurredAt = at(off, 7, 15)
+      ctx.insert(e); n += 1
     }
     strength(-1, "upper", "bench-press", 62.5, "8"); strength(-1, "upper", "row", 55, "10")
     cardio(-2, 32, 5200)
@@ -185,8 +189,10 @@ public enum DemoSeed {
     let grams: [Double?] = [20, 18, nil, 24, 16, nil, 22, 19, nil, 25, 18, nil, 21, 17]
     for (d, g) in grams.enumerated() {
       guard let g else { continue }
-      ctx.insert(CaffeineEventEntity(id: "demo-caf-\(d)", date: day(-d), time: "07:40",
-                                     method: d % 3 == 0 ? "matcha" : "v60", grams: g))
+      let e = CaffeineEventEntity(id: "demo-caf-\(d)", date: day(-d), time: "07:40",
+                                  method: d % 3 == 0 ? "matcha" : "v60", grams: g)
+      e.occurredAt = at(-d, 7, 40)
+      ctx.insert(e)
     }
   }
 
@@ -202,8 +208,10 @@ public enum DemoSeed {
       (-6, "18:00:00", "evening", "hap", 3, 3, "Energized"),
     ]
     for (i, m) in moods.enumerated() {
-      ctx.insert(MoodEventEntity(id: "demo-mood-\(i)", date: day(m.0), time: m.1, bucket: m.2,
-                                 quadrant: m.3, arousal: m.4, valence: m.5, emotion: m.6))
+      let e = MoodEventEntity(id: "demo-mood-\(i)", date: day(m.0), time: m.1, bucket: m.2,
+                              quadrant: m.3, arousal: m.4, valence: m.5, emotion: m.6)
+      e.occurredAt = at(m.0, Int(m.1.prefix(2)) ?? 9)
+      ctx.insert(e)
     }
   }
 
@@ -223,6 +231,36 @@ public enum DemoSeed {
       ctx.insert(GroceryItemEntity(id: "demo-groc-\(i)", name: it.0, category: it.1,
                                    emoji: it.2, low: it.3, sortIndex: i))
     }
+  }
+
+  // MARK: - presentation
+
+  /// Homepage layout for screenshots — Sparkline (`dense`) by default; override
+  /// with `-SeptenaLayout <dense|heatmap|tiles|correlations>` (also accepts
+  /// `sparkline`/`histogram`). Key mirrors `SettingsKey.homepageLayout`.
+  private static func seedLayout() {
+    var raw = "dense"
+    let args = CommandLine.arguments
+    if let i = args.firstIndex(of: "-SeptenaLayout"), i + 1 < args.count {
+      let v = args[i + 1]
+      raw = ["sparkline": "dense", "histogram": "tiles"][v] ?? v
+    }
+    UserDefaults.standard.set(raw, forKey: "septena.homepage.layout")
+  }
+
+  /// The manifest backfill creates SectionEntity rows but not always with an
+  /// accent, so the dashboard renders a wall of fallback gray. Paint every
+  /// section from the brand palette. (SectionTheme.defaultPalette omits
+  /// hydration + mood — included here.) SectionEntity.id is the section key.
+  private static func seedSectionColors(_ ctx: ModelContext) {
+    let palette: [String: String] = [
+      "tasks": "#ef4444", "habits": "#22c55e", "training": "#f97316", "chores": "#a855f7",
+      "supplements": "#3b82f6", "sleep": "#6366f1", "nutrition": "#f59e0b", "groceries": "#84cc16",
+      "caffeine": "#92400e", "cannabis": "#65a30d", "body": "#ec4899", "gut": "#b45309",
+      "activity": "#06b6d4", "goals": "#8b5cf6", "hydration": "#0ea5e9", "mood": "#f43f5e",
+    ]
+    let rows = (try? ctx.fetch(FetchDescriptor<SectionEntity>())) ?? []
+    for r in rows { if let c = palette[r.id] { r.color = c } }
   }
 }
 #endif
