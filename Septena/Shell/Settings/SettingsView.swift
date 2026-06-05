@@ -1571,40 +1571,98 @@ private enum CorrelationPreviewSample {
 struct SeptenaPlusFeature: Identifiable {
   let id: String
   let icon: String      // SF Symbol
-  let tint: Color       // app-icon-rainbow accent for the glyph chip
   let title: String
   let detail: String
 }
 
 enum SeptenaPlus {
   static let name = "Septena+"
-  /// Brand wash for badges / seals — the full seven-disc app-icon
-  /// rainbow (red → orange → yellow → green → cyan → blue → purple), so
-  /// the Plus accent reads as "the whole of Septena."
-  static let gradient = LinearGradient(
-    colors: [parseHexColor("#ef4444"),
-             parseHexColor("#f97316"),
-             parseHexColor("#eab308"),
-             parseHexColor("#22c55e"),
-             parseHexColor("#06b6d4"),
-             parseHexColor("#3b82f6"),
-             parseHexColor("#8b5cf6")],
-    startPoint: .leading, endPoint: .trailing
+
+  // MARK: Premium finish — "Obsidian + disc medallion"
+  //
+  // The rainbow is the *free* app's identity (the seven sections). The
+  // membership is its refined, contained form: a dark graphite surface
+  // carrying a single champagne-foil accent, with the spectrum distilled
+  // into a small precise medallion (`SeptenaDiscMark`) — a jewel you earn,
+  // never a gradient smeared across text. Restraint reads as premium;
+  // maximalism reads as free.
+
+  /// Deep graphite "ink" surface. Fixed dark in both appearances — like a
+  /// metal membership card, it shouldn't dissolve into a light background.
+  static let ink = LinearGradient(
+    colors: [parseHexColor("#33353B"), parseHexColor("#17181B")],
+    startPoint: .top, endPoint: .bottom
   )
+
+  /// Champagne-gold foil — the single Plus accent. Warm, to sit with the
+  /// app's Fraunces serif. Used flat for fills/strokes…
+  static let foil = parseHexColor("#C9A86A")
+  /// …and as a metallic sweep for rims and the avatar ring.
+  static let foilGradient = LinearGradient(
+    colors: [parseHexColor("#E7D29A"), parseHexColor("#C9A86A"), parseHexColor("#9C7E45")],
+    startPoint: .topLeading, endPoint: .bottomTrailing
+  )
+
+  /// Canonical seven-disc palette (red → orange → yellow → green → cyan →
+  /// blue → purple) — the only place the spectrum survives, inside the
+  /// medallion.
+  static let discColors: [Color] = [
+    parseHexColor("#ef4444"), parseHexColor("#f97316"), parseHexColor("#eab308"),
+    parseHexColor("#22c55e"), parseHexColor("#06b6d4"), parseHexColor("#3b82f6"),
+    parseHexColor("#8b5cf6"),
+  ]
+
+  /// Heptagonal disc placement (unit square), shared with `AppIconPreview`
+  /// so the emblem and the home-screen icon stay one mark.
+  static let discCenters: [CGPoint] = [
+    CGPoint(x: 0.50, y: 0.2235), CGPoint(x: 0.7171, y: 0.3256),
+    CGPoint(x: 0.7709, y: 0.5631), CGPoint(x: 0.6206, y: 0.7505),
+    CGPoint(x: 0.3794, y: 0.7505), CGPoint(x: 0.2291, y: 0.5631),
+    CGPoint(x: 0.2829, y: 0.3256),
+  ]
 
   /// The membership's perks, in display order. Cosmetic-but-valuable
   /// extras for people who live in the app. Currently the two gated
   /// surfaces; append here as more land.
   static let features: [SeptenaPlusFeature] = [
     .init(id: "correlations",
-          icon: "chart.dots.scatter", tint: parseHexColor("#3b82f6"),
+          icon: "chart.dots.scatter",
           title: "Correlations dashboard",
           detail: "Trusted predictor → outcome pairs across every section, with dose-response charts and a supplements → sleep table."),
     .init(id: "appIcon",
-          icon: "app.badge", tint: parseHexColor("#8b5cf6"),
+          icon: "app.badge",
           title: "Custom app icons",
           detail: "Recolor the home-screen icon across the full Septena rainbow."),
   ]
+}
+
+/// The Septena mark as a contained jewel — the seven discs in their
+/// canonical colors on a graphite plate with a hairline foil rim. This is
+/// the premium emblem for Septena+: the rainbow distilled into an object
+/// you earn, never smeared as a wash. Size-parametrized so it works inline
+/// (a badge dot) and as a paywall hero.
+struct SeptenaDiscMark: View {
+  var size: CGFloat = 44
+
+  var body: some View {
+    let corner = size * 0.232
+    ZStack {
+      RoundedRectangle(cornerRadius: corner, style: .continuous)
+        .fill(SeptenaPlus.ink)
+      ForEach(Array(SeptenaPlus.discCenters.enumerated()), id: \.offset) { index, center in
+        Circle()
+          .fill(SeptenaPlus.discColors[index])
+          .frame(width: size * 0.176, height: size * 0.176)
+          .position(x: size * center.x, y: size * center.y)
+      }
+    }
+    .frame(width: size, height: size)
+    .overlay(
+      RoundedRectangle(cornerRadius: corner, style: .continuous)
+        .strokeBorder(SeptenaPlus.foilGradient, lineWidth: max(0.6, size * 0.022))
+    )
+    .shadow(color: .black.opacity(0.28), radius: size * 0.11, y: size * 0.045)
+  }
 }
 
 /// Flighty-style feature row — a tinted rounded-square glyph chip with a
@@ -1615,12 +1673,16 @@ struct SeptenaPlusFeatureRow: View {
   var body: some View {
     HStack(alignment: .top, spacing: 14) {
       RoundedRectangle(cornerRadius: 10, style: .continuous)
-        .fill(feature.tint.gradient)
+        .fill(SeptenaPlus.ink)
         .frame(width: 38, height: 38)
         .overlay(
+          RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .strokeBorder(SeptenaPlus.foil.opacity(0.28), lineWidth: 0.75)
+        )
+        .overlay(
           Image(systemName: feature.icon)
-            .font(.system(size: 17, weight: .semibold))
-            .foregroundStyle(.white)
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(SeptenaPlus.foilGradient)
         )
       VStack(alignment: .leading, spacing: 3) {
         Text(feature.title)
@@ -1636,14 +1698,17 @@ struct SeptenaPlusFeatureRow: View {
 }
 
 /// Compact "Septena+" pill used to mark Plus-gated rows in the picker.
+/// Ink capsule with a champagne-foil hairline and a foil "+", so it reads
+/// as a small pressed-metal plate rather than a colorful sticker.
 struct SeptenaPlusBadge: View {
   var body: some View {
-    Text(SeptenaPlus.name)
+    (Text("Septena").foregroundStyle(.white)
+      + Text("+").foregroundStyle(SeptenaPlus.foil))
       .font(.caption2.weight(.bold))
-      .foregroundStyle(.white)
-      .padding(.horizontal, 7)
-      .padding(.vertical, 2)
-      .background(SeptenaPlus.gradient, in: Capsule())
+      .padding(.horizontal, 8)
+      .padding(.vertical, 3)
+      .background(SeptenaPlus.ink, in: Capsule())
+      .overlay(Capsule().strokeBorder(SeptenaPlus.foil.opacity(0.5), lineWidth: 0.75))
   }
 }
 
@@ -1689,18 +1754,16 @@ struct SeptenaPlusPaywall: View {
   }
 
   private var header: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      HStack(spacing: 10) {
-        Image(systemName: "checkmark.seal.fill")
-          .font(.title)
-          .foregroundStyle(SeptenaPlus.gradient)
+    VStack(alignment: .leading, spacing: 14) {
+      SeptenaDiscMark(size: 56)
+      VStack(alignment: .leading, spacing: 6) {
         SeptenaPlusBadge()
+        Text("Make Septena yours")
+          .font(.title2.weight(.semibold))
+        Text("Power-user features for people who live in the app — starting with the Correlations dashboard and custom app icons.")
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
       }
-      Text("Make Septena yours")
-        .font(.title2.weight(.semibold))
-      Text("Power-user features for people who live in the app — starting with the Correlations dashboard and custom app icons.")
-        .font(.subheadline)
-        .foregroundStyle(.secondary)
     }
   }
 
@@ -1727,23 +1790,27 @@ struct SeptenaPlusPaywall: View {
   }
 
   private var unlockCard: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      Toggle(isOn: $mockOn) {
-        VStack(alignment: .leading, spacing: 2) {
-          Text("Unlock \(SeptenaPlus.name)")
-            .font(.subheadline.weight(.semibold))
-          Text("Mock unlock — no purchase is made yet.")
-            .font(.caption).foregroundStyle(.secondary)
-        }
+    Toggle(isOn: $mockOn) {
+      VStack(alignment: .leading, spacing: 2) {
+        Text("Unlock \(SeptenaPlus.name)")
+          .font(.subheadline.weight(.semibold))
+          .foregroundStyle(.white)
+        Text("Mock unlock — no purchase is made yet.")
+          .font(.caption).foregroundStyle(.white.opacity(0.6))
       }
-      .onChange(of: mockOn) { _, on in
-        if on { onUnlock() }
-      }
+    }
+    .tint(SeptenaPlus.foil)
+    .onChange(of: mockOn) { _, on in
+      if on { onUnlock() }
     }
     .padding(16)
     .background(
       RoundedRectangle(cornerRadius: 16, style: .continuous)
-        .fill(Theme.cardSurface)
+        .fill(SeptenaPlus.ink)
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: 16, style: .continuous)
+        .strokeBorder(SeptenaPlus.foil.opacity(0.3), lineWidth: 0.75)
     )
   }
 }
@@ -1794,7 +1861,7 @@ struct ProfileAvatar: View {
     .frame(width: size, height: size)
     .overlay {
       if isPlus {
-        Circle().inset(by: -3).stroke(SeptenaPlus.gradient, lineWidth: 2.5)
+        Circle().inset(by: -3).strokeBorder(SeptenaPlus.foilGradient, lineWidth: 2)
       }
     }
   }
@@ -1898,7 +1965,7 @@ struct AccountSettingsPane: View {
             Text("Septena+ membership")
           } icon: {
             Image(systemName: "checkmark.seal.fill")
-              .foregroundStyle(SeptenaPlus.gradient)
+              .foregroundStyle(SeptenaPlus.foilGradient)
           }
         }
       } footer: {
@@ -1910,9 +1977,7 @@ struct AccountSettingsPane: View {
           showPaywall = true
         } label: {
           HStack(spacing: 14) {
-            Image(systemName: "checkmark.seal.fill")
-              .font(.title2)
-              .foregroundStyle(SeptenaPlus.gradient)
+            SeptenaDiscMark(size: 30)
             VStack(alignment: .leading, spacing: 2) {
               Text("Upgrade to \(SeptenaPlus.name)")
                 .font(.body.weight(.semibold))
@@ -1954,22 +2019,12 @@ private struct AppIconPreview: View {
   let option: AppIconOption
   let size: CGFloat
 
-  private let discCenters: [CGPoint] = [
-    CGPoint(x: 0.50, y: 0.2235),
-    CGPoint(x: 0.7171, y: 0.3256),
-    CGPoint(x: 0.7709, y: 0.5631),
-    CGPoint(x: 0.6206, y: 0.7505),
-    CGPoint(x: 0.3794, y: 0.7505),
-    CGPoint(x: 0.2291, y: 0.5631),
-    CGPoint(x: 0.2829, y: 0.3256),
-  ]
-
   var body: some View {
     let isDarkMode = colorScheme == .dark
     ZStack {
       RoundedRectangle(cornerRadius: size * 0.223, style: .continuous)
         .fill(option.background(forDarkMode: isDarkMode))
-      ForEach(Array(discCenters.enumerated()), id: \.offset) { index, center in
+      ForEach(Array(SeptenaPlus.discCenters.enumerated()), id: \.offset) { index, center in
         Circle()
           .fill(option.dotColors(forDarkMode: isDarkMode)[index])
           .frame(width: size * 0.182, height: size * 0.182)
@@ -2005,9 +2060,9 @@ private struct AppIconChoiceCard: View {
         } else if isLocked {
           Image(systemName: "lock.fill")
             .scaledFont(size: 10, weight: .bold)
-            .foregroundStyle(.white)
+            .foregroundStyle(SeptenaPlus.foil)
             .padding(4)
-            .background(SeptenaPlus.gradient, in: Circle())
+            .background(SeptenaPlus.ink, in: Circle())
             .shadow(color: .black.opacity(0.16), radius: 4, y: 1)
             .offset(x: 5, y: -5)
         }
