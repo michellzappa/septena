@@ -1,28 +1,1272 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "·" : {
+
+    },
+    "· %@" : {
+
+    },
+    "“Anytime” keeps it on the home feed all day. Pick a slot and it only appears from then on — so you’re not staring at the whole day’s stack at once." : {
+
+    },
+    "%@" : {
+
+    },
+    "%@ — %@ of %@ exercises done%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ — %2$@ of %3$@ exercises done%4$@"
+          }
+        }
+      }
+    },
+    "%@ · lag %@d · n=%@ · p=%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · lag %2$@d · n=%3$@ · p=%4$@"
+          }
+        }
+      }
+    },
+    "%@ (%@d) vs %@ (%@d)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ (%2$@d) vs %3$@ (%4$@d)"
+          }
+        }
+      }
+    },
+    "%@ / %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ / %2$@"
+          }
+        }
+      }
+    },
+    "%@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@"
+          }
+        }
+      }
+    },
+    "%@ binary signals · %@ trusted · tap to expand" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ binary signals · %2$@ trusted · tap to expand"
+          }
+        }
+      }
+    },
+    "%@ Choose 2-4." : {
+
+    },
+    "%@ day%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ day%2$@"
+          }
+        }
+      }
+    },
+    "%@ entries · %@ days" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ entries · %2$@ days"
+          }
+        }
+      }
+    },
+    "%@ exercises" : {
+
+    },
+    "%@ Habits" : {
+
+    },
+    "%@ kcal" : {
+
+    },
+    "%@ layout — coming soon" : {
+
+    },
+    "%@ ml" : {
+
+    },
+    "%@ ref%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ ref%2$@"
+          }
+        }
+      }
+    },
+    "%@ rows" : {
+
+    },
+    "%@ selected" : {
+
+    },
+    "%@ skill" : {
+
+    },
+    "%@ target" : {
+
+    },
+    "%@: x̄=%@%@  ·  ȳ=%@%@  ·  n=%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: x̄=%2$@%3$@  ·  ȳ=%4$@%5$@  ·  n=%6$@"
+          }
+        }
+      }
+    },
+    "%@/%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@/%2$@"
+          }
+        }
+      }
+    },
+    "%@/%@ done · started %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@/%2$@ done · started %3$@"
+          }
+        }
+      }
+    },
+    "%@/%@ hard sets" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@/%2$@ hard sets"
+          }
+        }
+      }
+    },
+    "%@/%@%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@/%2$@%3$@"
+          }
+        }
+      }
+    },
+    "%@/%@m" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@/%2$@m"
+          }
+        }
+      }
+    },
+    "%@%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@%2$@"
+          }
+        }
+      }
+    },
+    "%@C" : {
+
+    },
+    "%@d" : {
+
+    },
+    "%@d over" : {
+
+    },
+    "%@F" : {
+
+    },
+    "%@Fb" : {
+
+    },
+    "%@kcal" : {
+
+    },
+    "%@m recovery" : {
+
+    },
+    "%@P" : {
+
+    },
+    "•" : {
+
+    },
+    "→ %@ %@ in 7d" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "→ %1$@ %2$@ in 7d"
+          }
+        }
+      }
+    },
+    "×%@" : {
+
+    },
+    "⏳ %@" : {
+
+    },
+    "1 year" : {
+
+    },
+    "2 years" : {
+
+    },
+    "6 months" : {
+
+    },
+    "7d vs prior" : {
+
+    },
+    "30 days" : {
+
+    },
+    "30d" : {
+
+    },
+    "60d" : {
+
+    },
+    "90 days" : {
+
+    },
+    "90d" : {
+
+    },
+    "A centered greeting at the top of the home tab. Add your name to personalize it — with Apple Intelligence it's freshly written through the day. \"Aware of your day\" lets it nod to what's left on today's list." : {
+
+    },
+    "Activity tracking runs on iPhone / iPad. Open Septena there to see steps and recovery metrics." : {
+
+    },
+    "Add a habit first, then come back to backfill." : {
+
+    },
+    "Add a supplement first, then come back to backfill." : {
+
+    },
+    "Add items to build your pantry and shopping list." : {
+
+    },
+    "Added by Claude, not yet seen" : {
+
+    },
+    "Adding to" : {
+
+    },
+    "After completion" : {
+
+    },
+    "Aliases" : {
+
+    },
+    "Already added" : {
+
+    },
+    "Always on" : {
+
+    },
+    "Amount" : {
+
+    },
+    "An exercise with this ID already exists." : {
+
+    },
+    "Analytics is provided by Plausible Analytics (EU-hosted, cookie-free)." : {
+
+    },
+    "App icon selection is available on the iPhone and iPad app." : {
+
+    },
+    "App icon selection isn’t available on this device." : {
+
+    },
+    "Apple" : {
+
+    },
+    "area: %@   project: %@   status: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "area: %1$@   project: %2$@   status: %3$@"
+          }
+        }
+      }
+    },
+    "Areas and projects are managed in the Tasks tab." : {
+
+    },
+    "Ask Siri" : {
+
+    },
+    "At least" : {
+
+    },
+    "At most" : {
+
+    },
+    "Attach a measurement so this goal shows live progress against a target." : {
+
+    },
+    "avg %@/4" : {
+
+    },
+    "Back to dashboard" : {
+
+    },
+    "Based on %@ signal%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Based on %1$@ signal%2$@"
+          }
+        }
+      }
+    },
+    "Baseline" : {
+
+    },
+    "Baseline is where you started — the bar will show how much of the distance from baseline to target you've covered. Leave blank for count-style metrics that start at 0." : {
+
+    },
+    "BEDTIME" : {
+
+    },
+    "Binary predictor — %@ minority days vs %@ majority days" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Binary predictor — %1$@ minority days vs %2$@ majority days"
+          }
+        }
+      }
+    },
+    "Buckets (tertiles, sorted by x)" : {
+
+    },
+    "Buckets are not monotonic — relationship may be threshold-shaped or U-shaped." : {
+
+    },
+    "Carry over missed doses" : {
+
+    },
+    "Carry over missed habits" : {
+
+    },
+    "Choose the principles you want to live by. Septena drafts a north-star and commitments you can save into Goals." : {
+
+    },
+    "Choose up to 4 sections to surface when you long-press the app icon on the Home Screen." : {
+
+    },
+    "Choose which generated items become Goals. You can edit the wording and tag sections before saving." : {
+
+    },
+    "Choose your values" : {
+
+    },
+    "Claude" : {
+
+    },
+    "Claude session expired" : {
+
+    },
+    "Coming soon" : {
+
+    },
+    "Comma-separated alternate names used in search." : {
+
+    },
+    "Connect Apple Health in Settings → Integrations to turn this on." : {
+
+    },
+    "Connect Claude or another MCP client to mcp.septena.app to read and write your Septena data. The brief below is what the model needs to know to use the connection well." : {
+
+    },
+    "Connect Oura in Settings › Integrations." : {
+
+    },
+    "Connect Withings in Settings › Integrations." : {
+
+    },
+    "Connecting lets Claude (at claude.ai or in the Claude app) read and write your Septena data via the MCP connector. Your data stays in iCloud — the gateway only relays a short-lived access token, which this app refreshes automatically. Add the connector in Claude using mcp.septena.app." : {
+
+    },
+    "Connection" : {
+
+    },
+    "Copied" : {
+
+    },
+    "Copies the preamble + every section's brief as one Markdown document. Paste into septena-mcp-gateway/skill.md so the LLM-facing catalog can't drift from the plugin definitions in this app." : {
+
+    },
+    "Copy a prompt and paste it into an LLM along with the source data you want to import. The model returns JSON that pastes straight into Import above." : {
+
+    },
+    "Create a Personal Access Token at cloud.ouraring.com/personal-access-tokens, then paste it here. Tokens stay on this device (Keychain) and are never sent to any Septena server." : {
+
+    },
+    "Creates %@ with recordName `%@:%@`. Existing dangling references will resolve on next fetch." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Creates %1$@ with recordName `%2$@:%3$@`. Existing dangling references will resolve on next fetch."
+          }
+        }
+      }
+    },
+    "Current Icon" : {
+
+    },
+    "Custom" : {
+
+    },
+    "Custom…" : {
+
+    },
+    "Customize %@" : {
+
+    },
+    "Dashboard" : {
+
+    },
+    "Date" : {
+
+    },
+    "Day" : {
+
+    },
+    "DAY STREAK" : {
+
+    },
+    "Direction contradicts physiology — likely confound or reverse causation. Demoted to exploratory." : {
+
+    },
+    "Disabled sections stay in the central store. Toggling one off hides it on the dashboard and sidebar, but never deletes any data or your color and label customizations." : {
+
+    },
+    "Discover" : {
+
+    },
+    "Don't Repeat" : {
+
+    },
+    "Drag to reorder. Toggle to show or hide a tile on the Nutrition dashboard. Tap a swatch to change its color." : {
+
+    },
+    "Each brief teaches a model how to use one section through the MCP — tools available, conventions, examples." : {
+
+    },
+    "Each row fires the same renderer and haptic a real log uses. Under Reduce Motion the visual is suppressed (by design) — you'll still feel the haptic." : {
+
+    },
+    "Edit" : {
+
+    },
+    "Enabled" : {
+
+    },
+    "Every" : {
+
+    },
+    "Exactly" : {
+
+    },
+    "Example" : {
+
+    },
+    "Exercises" : {
+
+    },
+    "Expected direction: %@" : {
+
+    },
+    "Exploratory" : {
+
+    },
+    "Export" : {
+
+    },
+    "Exported %@" : {
+
+    },
+    "Fill four short quadrants. Septena uses the on-device model to draft a north-star goal and commitments you can save into Goals." : {
+
+    },
+    "Fix by creating the missing record (CloudKit Console → Create New Record) with recordName matching the referenced id." : {
+
+    },
+    "Format" : {
+
+    },
+    "Format version %@. The exporter above produces files that round-trip through this importer unchanged." : {
+
+    },
+    "Free-text intentions. Tag with sections so agents have context for what you're working toward." : {
+
+    },
+    "From Reminders" : {
+
+    },
+    "Gateway sync" : {
+
+    },
+    "Gentle reminders to mark what you’ve done — habits, chores, hydration, bedtime. Turn individual nudges on or off in each section’s settings. They fire around when you usually log, and stay quiet once it’s done." : {
+
+    },
+    "Grant Access" : {
+
+    },
+    "Grant access here, or manage permissions in iOS Settings → Privacy." : {
+
+    },
+    "Guided local-AI reflections that turn into real goals." : {
+
+    },
+    "Habits & supplements" : {
+
+    },
+    "Health access denied" : {
+
+    },
+    "HealthKit isn't available on this device" : {
+
+    },
+    "Helps us understand which features people use, so we improve the right things." : {
+
+    },
+    "Hides this section everywhere. Your data and customizations stay." : {
+
+    },
+    "Hold the week up to the light" : {
+
+    },
+    "I'm feeling" : {
+
+    },
+    "id: %@" : {
+
+    },
+    "id: %@   area: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "id: %1$@   area: %2$@"
+          }
+        }
+      }
+    },
+    "If you think an entry got moved here by mistake, check nearby days too." : {
+
+    },
+    "Import" : {
+
+    },
+    "In catalog" : {
+
+    },
+    "In session" : {
+
+    },
     "Inbox" : {
       "comment" : "Phase 0 spike — test string, not a real translation pass",
       "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Eingang" } },
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "Entrada" } },
-        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Boîte de réception" } }
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eingang"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entrada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Boîte de réception"
+          }
+        }
       }
+    },
+    "Include this section's entries in the Next timeline." : {
+
+    },
+    "Incomplete logs" : {
+
+    },
+    "Insufficient pairs (1 ≤ n < %@ overlapping days) are too noisy to chart but listed here so you can see what's almost ready." : {
+
+    },
+    "Intensity" : {
+
+    },
+    "Intensity scales burst / snap / bloom / cascade / tally loudness — sink and settle ignore it. Streak drives the Ignition milestone number." : {
+
+    },
+    "iOS shows a confirmation prompt each time you switch icons." : {
+
+    },
+    "JSON dumps of every record in the local store. Use these as a backup, to move to another device, or to feed into other tools." : {
+
+    },
+    "Jump to Today" : {
+
+    },
+    "Keep a supplement on the Next list after its time of day, until you take it. Off shows it only during its slot." : {
+
+    },
+    "Keep an undone habit on the Next list after its time of day, until you do it. Off shows each habit only during its slot." : {
+
+    },
+    "Keep logging — pairs need n ≥ %@ overlapping days." : {
+
+    },
+    "kg" : {
+
+    },
+    "Kind" : {
+
+    },
+    "lag %@d · n=%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "lag %1$@d · n=%2$@"
+          }
+        }
+      }
+    },
+    "lag %@d · n=%@ · p=%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "lag %1$@d · n=%2$@ · p=%3$@"
+          }
+        }
+      }
+    },
+    "Let Claude read and write your Septena data at mcp.septena.app." : {
+
+    },
+    "Light mode uses a %@ background with white discs. Dark mode uses transparent artwork so the system background shows through behind %@ discs." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Light mode uses a %1$@ background with white discs. Dark mode uses transparent artwork so the system background shows through behind %2$@ discs."
+          }
+        }
+      }
+    },
+    "Loading session types…" : {
+
+    },
+    "Log a meal and it'll show up here for one-tap re-logging." : {
+
+    },
+    "LOGGED" : {
+
+    },
+    "Macro tiles" : {
+
+    },
+    "MCP" : {
+
+    },
+    "Metric" : {
+
+    },
+    "Missing Areas" : {
+
+    },
+    "Missing Projects" : {
+
+    },
+    "ml" : {
+
+    },
+    "Month" : {
+
+    },
+    "n < %@ — too noisy to plot" : {
+
+    },
+    "n=%@" : {
+
+    },
+    "New entries you log in Septena will be sent to Apple Health. Existing entries are not back-filled." : {
+
+    },
+    "Next list" : {
+
+    },
+    "Nice work." : {
+
+    },
+    "No bean presets yet — add some in Caffeine settings." : {
+
+    },
+    "No calendars found." : {
+
+    },
+    "no data" : {
+
+    },
+    "No data this run: %@." : {
+
+    },
+    "No entries logged on this day" : {
+
+    },
+    "No entries logged today" : {
+
+    },
+    "No entries yet" : {
+
+    },
+    "No habits defined." : {
+
+    },
+    "No onboarding available." : {
+
+    },
+    "No prior session" : {
+
+    },
+    "No recent meals" : {
+
+    },
+    "No selections yet" : {
+
+    },
+    "No sessions logged on this day" : {
+
+    },
+    "No supplements configured." : {
+
+    },
+    "None" : {
+
+    },
+    "Not enough data yet (%@)" : {
+
+    },
+    "Note" : {
+
+    },
+    "Nothing for today yet. Tap + to add a task." : {
+
+    },
+    "Nothing here yet" : {
+
+    },
+    "Nothing left for today" : {
+
+    },
+    "Nothing logged yet." : {
+
+    },
+    "Nothing on Today" : {
+
+    },
+    "Now" : {
+
+    },
+    "Nudges fire around when you usually log this, and stay quiet once it’s done for the day." : {
+
+    },
+    "of %@" : {
+
+    },
+    "OK" : {
+
+    },
+    "One app for every corner of your life" : {
+
+    },
+    "Open" : {
+
+    },
+    "Open the Shortcuts app to build shortcuts and automations from Septena's actions. Trigger them with Siri on iPhone and iPad." : {
+
+    },
+    "Opens the Shortcuts app with every Septena action ready to drop into a shortcut, Home Screen tile, or automation." : {
+
+    },
+    "Order here drives the logger order." : {
+
+    },
+    "p=%@" : {
+
+    },
+    "Parameters" : {
+
+    },
+    "Paste a Septena JSON export below." : {
+
+    },
+    "Photo access is denied. Enable it in Settings → Privacy → Photos. Meal thumbnails won't show until then." : {
+
+    },
+    "Pick 3-7. A tighter set makes better goals." : {
+
+    },
+    "Pick a Date…" : {
+
+    },
+    "Pick a Reminders list. Its pending items show in your Inbox; tap to import (originals are removed from Reminders)." : {
+
+    },
+    "Pick a Reminders list. Its pending items will show in your Inbox; tap to import (originals are removed from Reminders)." : {
+
+    },
+    "Pick how the homepage renders — Histogram, Sparkline, Heatmap, or Correlations." : {
+
+    },
+    "Pick up to %@ sections. Each one becomes a shortcut in the Home Screen long-press menu, opening directly into that section." : {
+
+    },
+    "Pick which calendars contribute events to your day timeline and Next page. Hidden calendars stay untouched in iOS Calendar." : {
+
+    },
+    "PR" : {
+
+    },
+    "PROGRESS" : {
+
+    },
+    "Projects in this area will be detached but not deleted." : {
+
+    },
+    "Provide JSON in the Septena export format. Records are merged by id — existing rows update in place, new rows are inserted. Definition tables (habits, supplements, chores, beans, grocery items) apply now; event/log tables preview only in this build." : {
+
+    },
+    "r = %@  ·  p = %@  ·  permutations = %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "r = %1$@  ·  p = %2$@  ·  permutations = %3$@"
+          }
+        }
+      }
+    },
+    "Re-enable in Settings → Health → Data Access & Devices → Septena." : {
+
+    },
+    "Re-pulls every nutrition entry and daily summary from CloudKit and merges them into the local store. Use if this device's protein/kcal history looks empty even though entries exist on another device." : {
+
+    },
+    "Read Apple Health on this device" : {
+
+    },
+    "RECENT" : {
+
+    },
+    "Reconnect" : {
+
+    },
+    "Register a Withings dev app at developer.withings.com (Public Health Data API), then add your client_id and client_secret to Config/Secrets.xcconfig (copy it from Config/Secrets.example.xcconfig) and rebuild. The redirect URI should be septena://withings/callback." : {
+
+    },
+    "Remove" : {
+
+    },
+    "Renaming a supplement doesn't affect its history — events are linked by ID." : {
+
+    },
+    "Renders the day-timeline strip above the homepage layout." : {
+
+    },
+    "Repair" : {
+
+    },
+    "Required" : {
+
+    },
+    "Review your values" : {
+
+    },
+    "Say one of these to log without opening the app. Asking for a section that's turned off turns it back on automatically — your data is never lost. Every other action is Siri-callable too — open the Shortcuts app to give it a phrase." : {
+
+    },
+    "Schema prompts" : {
+
+    },
+    "Section Skill briefs an AI assistant on how to use this section via the Septena MCP. Export downloads every record in this section as JSON." : {
+
+    },
+    "Section skills" : {
+
+    },
+    "Section unavailable." : {
+
+    },
+    "Sections" : {
+
+    },
+    "Septena" : {
+
+    },
+    "Septena attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device." : {
+
+    },
+    "Septena needs access to read your Reminders." : {
+
+    },
+    "Septena pulls steps, exercise minutes, VO2 max, HRV and resting heart rate from HealthKit. Data never leaves your phone." : {
+
+    },
+    "Septena summarizes your last 7 days of logs — on device, nothing leaves your phone — and reflects them against four cardinal virtues. A mirror, not a scorecard." : {
+
+    },
+    "Septena writes your logged data to Apple Health so it appears alongside data from your other apps and devices." : {
+
+    },
+    "Services" : {
+
+    },
+    "SESSION COMPLETE" : {
+
     },
     "Settings" : {
       "comment" : "Phase 0 spike — test string, not a real translation pass",
       "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Einstellungen" } },
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "Ajustes" } },
-        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Réglages" } }
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einstellungen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réglages"
+          }
+        }
       }
+    },
+    "Shopping list" : {
+
+    },
+    "Shortcuts" : {
+
+    },
+    "Show in Next" : {
+
+    },
+    "Since %@ · target %@–%@h" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Since %1$@ · target %2$@–%3$@h"
+          }
+        }
+      }
+    },
+    "Skill & Data" : {
+
+    },
+    "Skip" : {
+
+    },
+    "slope = %@%@ %@ per +1 %@ of %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "slope = %1$@%2$@ %3$@ per +1 %4$@ of %5$@"
+          }
+        }
+      }
+    },
+    "Some categories are turned off in Apple Health. To allow them, open Health → Profile → Apps → Septena. New entries are sent going forward — existing ones aren't back-filled." : {
+
+    },
+    "Start training" : {
+
+    },
+    "Stats" : {
+
+    },
+    "Strength volume" : {
+
+    },
+    "Stress" : {
+
+    },
+    "Suggested" : {
+
+    },
+    "Summarized from %@ section%@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Summarized from %1$@ section%2$@."
+          }
+        }
+      }
+    },
+    "Synthesize your map" : {
+
+    },
+    "Tag a section above (Training, Caffeine, Gut, Nutrition…) to see metrics you can measure." : {
+
+    },
+    "Tap + to add a supplement." : {
+
+    },
+    "Tap + to log a session." : {
+
+    },
+    "Tap a word to refine, or just Log" : {
+
+    },
+    "Tap how you feel right now" : {
+
+    },
+    "Tap the + button to add a task." : {
+
+    },
+    "Tap to play" : {
+
+    },
+    "Target" : {
+
+    },
+    "Tasks in this project keep their data but lose their project link." : {
+
+    },
+    "Tasks in this project will be moved to the inbox." : {
+
+    },
+    "Tension" : {
+
+    },
+    "The copied text includes the connection preamble + this section's brief — paste it into an MCP client's system prompt or a Claude conversation to teach it how to use the section." : {
+
+    },
+    "The original multicolor icon." : {
+
+    },
+    "The small signals of a whole life, gathered in one calm place. Septena keeps them with you and in step across your devices through iCloud, and yours alone." : {
+
+    },
+    "These four groups are the raw material for the north-star and commitments." : {
+
+    },
+    "This category is turned off in Apple Health. To allow it, open Health → Profile → Apps → Septena." : {
+
+    },
+    "This goal will also appear in the %@ section." : {
+
+    },
+    "This is the focused set Septena will turn into a north-star and commitments." : {
+
+    },
+    "This section doesn't yet have MCP tools. A skill will appear here when it does." : {
+
+    },
+    "Time of day" : {
+
+    },
+    "today" : {
+
     },
     "Today" : {
       "comment" : "Phase 0 spike — test string, not a real translation pass",
       "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Heute" } },
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "Hoy" } },
-        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aujourd'hui" } }
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heute"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoy"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aujourd'hui"
+          }
+        }
+      }
+    },
+    "Token" : {
+
+    },
+    "Tokens live in this device's Keychain and never leave it. Weigh-ins sync to your other devices via iCloud." : {
+
+    },
+    "Trusted" : {
+
+    },
+    "Turn a reflection into goals" : {
+
+    },
+    "Turn values into goals" : {
+
+    },
+    "Turned off in Apple Health" : {
+
+    },
+    "Type %@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Type %1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "Universal conventions every section relies on. Each section skill below extends this." : {
+
+    },
+    "Version %@ (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Version %1$@ (%2$@)"
+          }
+        }
+      }
+    },
+    "View This Day" : {
+
+    },
+    "WAKE" : {
+
+    },
+    "Week" : {
+
+    },
+    "Weekly Δ" : {
+
+    },
+    "When on, pending items in the source list import automatically and are removed from Reminders. Runs on app launch and whenever Reminders changes." : {
+
+    },
+    "When on, the Nutrition tile shows a live fasting timer after your last meal of the day, and you can choose what the heatmap encodes." : {
+
+    },
+    "Window controls how far back CorrelationEngine pulls data. Section filter limits which predictor → target pairs render — pairs are kept if either side matches." : {
+
+    },
+    "Withings app credentials are not configured." : {
+
+    },
+    "Write to Health" : {
+
+    },
+    "x = %@%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "x = %1$@%2$@"
+          }
+        }
+      }
+    },
+    "x̄ = %@%@  ·  ȳ = %@%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "x̄ = %1$@%2$@  ·  ȳ = %3$@%4$@"
+          }
+        }
+      }
+    },
+    "y = %@%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "y = %1$@%2$@"
+          }
+        }
+      }
+    },
+    "You have " : {
+
+    },
+    "Zone 2 cardio" : {
+
+    },
+    "Δ %@%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Δ %1$@%2$@"
+          }
+        }
       }
     }
   },
