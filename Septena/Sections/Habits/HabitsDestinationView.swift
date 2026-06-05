@@ -28,6 +28,12 @@ struct HabitsDestinationView: View {
   /// "today" track.
   @State private var pastDay: HabitsDayResponse? = nil
 
+  /// Per-bucket fold state for *today*. `nil` means "follow the clock" — the
+  /// current bucket is open with its countdown, the others tuck behind their
+  /// headers, and the open one advances as time passes. The first manual tap
+  /// freezes it to an explicit collapsed set so nothing jumps afterwards.
+  @State private var collapsedBuckets: Set<String>? = nil
+
   private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
 
   /// Server section key; accent comes from the user's Septena config so the
@@ -40,8 +46,14 @@ struct HabitsDestinationView: View {
                   onLog: { _ in creating = true },
                   currentDate: $viewingDate) {
       if isViewingToday {
-        ForEach(model.habitBuckets, id: \.self) { bucket in
-          bucketSection(bucket)
+        // Today folds into an accordion: the current time bucket is open with
+        // a "time left" countdown, the others tuck behind their headers. The
+        // minute tick lets the open bucket follow the clock until the user
+        // taps a header (which freezes the fold state).
+        TimelineView(.periodic(from: .now, by: 60)) { _ in
+          ForEach(model.habitBuckets, id: \.self) { bucket in
+            bucketSection(bucket)
+          }
         }
       } else {
         pastDaySection
@@ -155,6 +167,28 @@ struct HabitsDestinationView: View {
 
   // MARK: - Sections
 
+  /// Whether `bucket` is unfolded right now. Until the user taps a header
+  /// (`collapsedBuckets == nil`) only the live bucket is open; after, we
+  /// honor the frozen collapsed set.
+  private func isExpanded(_ bucket: String) -> Bool {
+    if let collapsedBuckets { return !collapsedBuckets.contains(bucket) }
+    return DayBucket(rawValue: bucket) == DayBucket.current
+  }
+
+  private func toggleBucket(_ bucket: String) {
+    withAnimation(.snappy) {
+      // First tap seeds from the current auto-open state (only the live
+      // bucket open) so the accordion freezes exactly as shown, then flips
+      // the tapped one.
+      var set = collapsedBuckets ?? Set(model.habitBuckets.filter {
+        DayBucket(rawValue: $0) != DayBucket.current
+      })
+      if set.contains(bucket) { set.remove(bucket) } else { set.insert(bucket) }
+      collapsedBuckets = set
+    }
+    Haptics.tap()
+  }
+
   @ViewBuilder
   private func bucketSection(_ bucket: String) -> some View {
     // Full bucket — completed/skipped habits stay in place (struck through)
@@ -163,10 +197,10 @@ struct HabitsDestinationView: View {
     let all = model.habits.filter { $0.bucket == bucket }
     let doneCount = all.filter { $0.done }.count
     if !all.isEmpty {
-      VStack(alignment: .leading, spacing: 8) {
-        DayBucketHeader(bucket: bucket,
-                        trailing: "\(doneCount)/\(all.count)")
-          .padding(.horizontal, 16)
+      BucketDisclosure(bucket: bucket,
+                       trailing: "\(doneCount)/\(all.count)",
+                       isExpanded: isExpanded(bucket),
+                       onToggle: { toggleBucket(bucket) }) {
         DrawerSection(padding: .none) {
           ForEach(all) { habit in
             Button { editing = habit } label: {

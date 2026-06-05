@@ -19,6 +19,12 @@ struct SupplementsDestinationView: View {
   /// Past-day state for `viewingDate`. Loaded when not viewing today.
   @State private var pastDay: SupplementsDayResponse? = nil
 
+  /// Per-bucket fold state for *today*. `nil` means "follow the clock" — the
+  /// current time bucket is open with its countdown, the other time buckets
+  /// tuck behind their headers. "Anytime" never folds (handled separately).
+  /// The first manual tap freezes it to an explicit collapsed set.
+  @State private var collapsedBuckets: Set<String>? = nil
+
   private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
 
   private var accent: Color { theme.color(for: "supplements") }
@@ -84,10 +90,54 @@ struct SupplementsDestinationView: View {
         }
       }
     } else {
-      ForEach(sections, id: \.key) { section in
-        bucketSection(section.key, items: section.items) { todayRow($0) }
+      // Accordion on today: the current time bucket opens with a "time left"
+      // countdown, the other time buckets fold behind their headers. "Anytime"
+      // has no cutoff and is always actionable, so it stays open. The minute
+      // tick lets the open bucket follow the clock until the user taps.
+      TimelineView(.periodic(from: .now, by: 60)) { _ in
+        ForEach(sections, id: \.key) { section in
+          if section.key == DayBucket.anytimeKey {
+            bucketSection(section.key, items: section.items) { todayRow($0) }
+          } else {
+            BucketDisclosure(bucket: section.key,
+                             trailing: "\(section.items.filter(\.done).count)/\(section.items.count)",
+                             isExpanded: isExpanded(section.key),
+                             onToggle: { toggleBucket(section.key) }) {
+              DrawerSection(padding: .none) {
+                ForEach(section.items) { item in todayRow(item) }
+              }
+            }
+          }
+        }
       }
     }
+  }
+
+  // MARK: - Accordion fold state (today)
+
+  /// Whether `key` is unfolded right now. "Anytime" is always open; otherwise
+  /// until the user taps a header (`collapsedBuckets == nil`) only the live
+  /// time bucket is open, and after that we honor the frozen collapsed set.
+  private func isExpanded(_ key: String) -> Bool {
+    if key == DayBucket.anytimeKey { return true }
+    if let collapsedBuckets { return !collapsedBuckets.contains(key) }
+    return DayBucket(rawValue: key) == DayBucket.current
+  }
+
+  private func toggleBucket(_ key: String) {
+    withAnimation(.snappy) {
+      // First tap seeds from the current auto-open state (only the live time
+      // bucket open) so the accordion freezes exactly as shown, then flips the
+      // tapped one. "Anytime" is excluded — it never folds.
+      var set = collapsedBuckets ?? Set(
+        Self.groupedSections(model.supplements)
+          .map(\.key)
+          .filter { $0 != DayBucket.anytimeKey && DayBucket(rawValue: $0) != DayBucket.current }
+      )
+      if set.contains(key) { set.remove(key) } else { set.insert(key) }
+      collapsedBuckets = set
+    }
+    Haptics.tap()
   }
 
   private func todayRow(_ supp: SupplementDayItem) -> some View {
