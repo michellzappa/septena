@@ -16,6 +16,7 @@ struct EditGroceryItemSheet: View {
   @State private var name: String = ""
   @State private var emoji: String = ""
   @State private var category: String = ""
+  @FocusState private var nameFocused: Bool
 
   private var fallbackID: String {
     categories.first(where: { $0.id == "other" })?.id ?? categories.first?.id ?? "other"
@@ -35,6 +36,7 @@ struct EditGroceryItemSheet: View {
     Form {
       Section("Item") {
         TextField("Name", text: $name)
+          .focused($nameFocused)
         Picker("Category", selection: $category) {
           ForEach(categories) { cat in
             Text(cat.name).tag(cat.id)
@@ -42,6 +44,7 @@ struct EditGroceryItemSheet: View {
         }
       }
     }
+    .defaultFocus($nameFocused, true)
   }
 
   private func seed() {

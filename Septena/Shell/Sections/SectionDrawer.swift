@@ -503,9 +503,12 @@ struct AdaptiveEditScaffold<FormContent: View>: View {
           .toolbar {
             ToolbarItem(placement: .cancellationAction) {
               Button(cancelTitle, action: close)
+                .keyboardShortcut(.cancelAction) // Esc
             }
             ToolbarItem(placement: .confirmationAction) {
-              Button(saveTitle, action: confirm).disabled(!canSave)
+              Button(saveTitle, action: confirm)
+                .disabled(!canSave)
+                .keyboardShortcut(.defaultAction) // Return / ⌘Return
             }
           }
       }
@@ -527,12 +530,14 @@ private struct AdaptiveEditHeader: View {
   var body: some View {
     HStack {
       Button(cancelTitle, action: onCancel)
+        .keyboardShortcut(.cancelAction) // Esc
       Spacer()
       Text(title).font(.headline)
       Spacer()
       Button(saveTitle, action: onSave)
         .fontWeight(.semibold)
         .disabled(!canSave)
+        .keyboardShortcut(.defaultAction) // Return / ⌘Return
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 10)

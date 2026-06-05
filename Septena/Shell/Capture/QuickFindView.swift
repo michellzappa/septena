@@ -17,6 +17,7 @@ struct QuickFindView: View {
   @Query private var areas: [AreaEntity]
 
   @State private var query: String = ""
+  @FocusState private var searchFocused: Bool
   @State private var selection: Int = 0
 
   private static let resultLimit = 12
@@ -46,6 +47,7 @@ struct QuickFindView: View {
           prompt: "Search tasks, projects, areas…"
         )
         #endif
+        .searchFocused($searchFocused)
         .onSubmit(of: .search, activateSelected)
         .onKeyPress(.upArrow) {
           selection = max(0, selection - 1)
@@ -60,6 +62,9 @@ struct QuickFindView: View {
       // Pre-warm the session-type list so the training launcher reads
       // populated on first ⌘K. Cheap; the store keeps a cached copy.
       trainingDraft.refreshCatalog(context: modelContext)
+      // Reliably focus the search field on open (macOS doesn't auto-focus
+      // `.searchable` the way iOS does), so you can type immediately.
+      searchFocused = true
     }
     .onChange(of: query) { selection = 0 }
   }

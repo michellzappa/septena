@@ -98,6 +98,7 @@ struct SupplementTypeSheet: View {
           reload()
         }
       }
+      .defaultFocus($addFieldFocused, true)
     }
     .task { reload() }
   }

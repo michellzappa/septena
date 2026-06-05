@@ -104,6 +104,9 @@ struct GoalsView: View {
                 GoalTile(goal: goal, theme: theme)
               }
               .buttonStyle(.plain)
+              // Keyboard: each goal is a focus stop on iPad/Mac (Tab / ⇧Tab,
+              // system focus ring); Return / Space opens its editor.
+              .focusable()
               .contextMenu {
                 Button(role: .destructive) { deleteGoal(goal) } label: {
                   Label("Delete", systemImage: "trash")

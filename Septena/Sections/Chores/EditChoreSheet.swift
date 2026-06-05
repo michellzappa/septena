@@ -13,6 +13,7 @@ struct EditChoreSheet: View {
   @State private var name: String = ""
   @State private var emoji: String = ""
   @State private var cadenceDays: Int = 7
+  @FocusState private var nameFocused: Bool
   /// Recognised cadence presets — picking one drives `cadenceDays`. Same
   /// shape the webapp's chore editor uses.
   @State private var cadencePreset: String = "Weekly"
@@ -32,7 +33,9 @@ struct EditChoreSheet: View {
       canSave: !name.trimmingCharacters(in: .whitespaces).isEmpty,
       onSave: save
     ) {
-      formBody.onAppear { seed() }
+      formBody
+        .onAppear { seed() }
+        .defaultFocus($nameFocused, true)
     }
   }
 
@@ -44,6 +47,7 @@ struct EditChoreSheet: View {
               .frame(width: 44)
               .multilineTextAlignment(.center)
             TextField("Name", text: $name)
+              .focused($nameFocused)
           }
         }
         Section("Cadence") {

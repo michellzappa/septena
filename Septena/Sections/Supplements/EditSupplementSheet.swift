@@ -16,6 +16,7 @@ struct EditSupplementSheet: View {
   /// (mapped to a nil bucket at save time); morning/afternoon/evening scope
   /// the supplement to that window onward on the home feed.
   @State private var bucket: String = DayBucket.anytimeKey
+  @FocusState private var nameFocused: Bool
 
   /// "Anytime" first, then the day's buckets in order.
   private var bucketOptions: [String] { [DayBucket.anytimeKey] + DayBucket.allCases.map(\.rawValue) }
@@ -27,11 +28,13 @@ struct EditSupplementSheet: View {
       canSave: !name.trimmingCharacters(in: .whitespaces).isEmpty,
       onSave: save
     ) {
-      formBody.onAppear {
-        name = original?.name ?? ""
-        emoji = original?.emoji ?? ""
-        bucket = original?.bucket ?? DayBucket.anytimeKey
-      }
+      formBody
+        .onAppear {
+          name = original?.name ?? ""
+          emoji = original?.emoji ?? ""
+          bucket = original?.bucket ?? DayBucket.anytimeKey
+        }
+        .defaultFocus($nameFocused, true)
     }
   }
 
@@ -43,6 +46,7 @@ struct EditSupplementSheet: View {
             .frame(width: 44)
             .multilineTextAlignment(.center)
           TextField("Name", text: $name)
+            .focused($nameFocused)
         }
       }
       Section {

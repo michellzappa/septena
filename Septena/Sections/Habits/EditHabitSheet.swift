@@ -20,6 +20,7 @@ struct EditHabitSheet: View {
   @State private var name: String = ""
   @State private var emoji: String = ""
   @State private var bucket: String = "morning"
+  @FocusState private var nameFocused: Bool
 
   private var navTitle: String { original == nil ? "New Habit" : "Edit Habit" }
 
@@ -27,7 +28,9 @@ struct EditHabitSheet: View {
     AdaptiveEditScaffold(title: navTitle,
                          canSave: !name.trimmingCharacters(in: .whitespaces).isEmpty,
                          onSave: save) {
-      formBody.onAppear { seed() }
+      formBody
+        .onAppear { seed() }
+        .defaultFocus($nameFocused, true)
     }
   }
 
@@ -39,6 +42,7 @@ struct EditHabitSheet: View {
             .frame(width: 44)
             .multilineTextAlignment(.center)
           TextField("Name", text: $name)
+            .focused($nameFocused)
         }
       }
       Section("Bucket") {

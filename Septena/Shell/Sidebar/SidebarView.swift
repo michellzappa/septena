@@ -423,6 +423,11 @@ struct SidebarRootView: View {
     Button { selectRoute(route) } label: { label() }
       .buttonStyle(InertButtonStyle())
       .background(rowBackground(for: route))
+      // Keyboard: every sidebar row (filters, areas, projects) becomes a
+      // focus stop on iPad/Mac — Tab / ⇧Tab to move through them, Return /
+      // Space to open. The persistent selection pill (current route) and the
+      // focus ring are independent, as expected.
+      .focusable()
   }
 
   private func selectRoute(_ route: Route) {
