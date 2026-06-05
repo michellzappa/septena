@@ -10,6 +10,9 @@
     "“Anytime” keeps it on the home feed all day. Pick a slot and it only appears from then on — so you’re not staring at the whole day’s stack at once." : {
 
     },
+    "“Aware of your day” lets the greeting nod to what's left on today's list and what's coming up next on your calendar." : {
+
+    },
     "%@" : {
       "shouldTranslate" : false
     },
@@ -263,6 +266,9 @@
       },
       "shouldTranslate" : false
     },
+    "+" : {
+
+    },
     "×%@" : {
       "shouldTranslate" : false
     },
@@ -299,7 +305,7 @@
     "90d" : {
       "shouldTranslate" : false
     },
-    "A centered greeting at the top of the home tab. Add your name to personalize it — with Apple Intelligence it's freshly written through the day. \"Aware of your day\" lets it nod to what's left on today's list." : {
+    "A centered greeting at the top of the home tab." : {
 
     },
     "Activity tracking runs on iPhone / iPad. Open Septena there to see steps and recovery metrics." : {
@@ -1200,6 +1206,9 @@
     "The default icon is always free. Color icons are part of Septena+. iOS shows a confirmation prompt each time you switch icons." : {
 
     },
+    "The greeting at the top of the home tab — your name, tone, and how aware of your day it is." : {
+
+    },
     "The master switch. Each nudge fires around when you usually log it and goes quiet once it's marked for the day." : {
 
     },
@@ -1288,6 +1297,9 @@
 
     },
     "Upgrade to %@" : {
+
+    },
+    "Used to personalize the greeting. With Apple Intelligence it's freshly written through the day." : {
 
     },
     "Version %@ (%@)" : {
