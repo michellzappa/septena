@@ -4268,21 +4268,20 @@ struct AboutSettingsPane: View {
       }
 
       Section {
-        Text("The small signals of a whole life, gathered in one calm place. Septena keeps them with you and in step across your devices through iCloud, and yours alone.")
+        Text("Septena keeps the everyday things you track in one place: tasks, habits, what you eat, how you sleep. It syncs across your devices over iCloud and stays yours alone.")
           .font(.callout)
           .foregroundStyle(.secondary)
       }
 
       Section("Links") {
         outboundLink("Website", destination: "https://septena.app", icon: "globe")
+        outboundLink("Telegram", destination: "https://t.me/septena_app", icon: "paperplane")
         outboundLink("Feedback", destination: "mailto:mz@envisioning.com", icon: "envelope")
         outboundLink("License", destination: "https://opensource.org/licenses/MIT", icon: "doc.text")
       }
 
       Section {
         infoRow("Platform", platformLabel)
-        infoRow("Version", version)
-        infoRow("Build", build)
       }
     }
     .formStyle(.grouped)
