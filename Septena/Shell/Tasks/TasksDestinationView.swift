@@ -339,7 +339,7 @@ private struct TaskQuickEditSheet: View {
         areaId = a; projectId = p
       }
         #if os(iOS)
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large, .medium])
         #endif
     }
   }

@@ -189,81 +189,25 @@ struct ScreenTitle: View {
 
 // MARK: - Task row
 
-// One unified row — the title is ALWAYS a `TextField`, so opening the editor
-// is pure focus, never a Text↔TextField swap (the swap is what used to nudge
-// the title sideways). Notes + the info button appear only while editing; the
-// meta line + trailing date show otherwise. When the row isn't being edited
-// the title field is `.allowsHitTesting(false)` so it reads as plain text and
-// taps fall through to the row's selection / tap-to-edit. Done / cancelled
-// tasks render a strikethrough `Text` (a TextField can't strike) — but those
-// are never edited, so the edit path itself still has zero swap.
+// Display-only row: checkbox + title + meta + trailing date. Tapping the row
+// (handled by the parent List) opens the detail drawer; the checkbox toggles
+// completion. The app is agent-first — Claude does the heavy task work — so the
+// row carries no inline editing, focus, or text fields. That keeps it cheap to
+// render and free of the gesture/focus/animation machinery the old inline
+// editor needed.
 struct TaskRowView<MetaLine: View, TrailingDate: View>: View {
   @Environment(SectionTheme.self) private var theme
-  @Environment(\.scenePhase) private var scenePhase
 
   let task: SeptenaTask
   let filter: TaskFilter
-  /// True when this row is being renamed inline (the parent owns
-  /// `editingTaskId`). Inline editing is title-ONLY — notes + all metadata
-  /// live in the detail drawer reached via the trailing (i) button. There's no
-  /// row expansion, so opening the editor is pure focus (no height change to
-  /// animate, no layout pass to race the focus claim).
-  let isEditing: Bool
   let accent: Color
-  /// Title scratch buffer owned by the parent; bound only while `isEditing`.
-  @Binding var editingTitle: String
   @ViewBuilder let metaLine: () -> MetaLine
   @ViewBuilder let trailingDate: () -> TrailingDate
   let onToggle: () -> Void
-  let onCommit: () -> Void
-  let onCancel: () -> Void
-  /// Open the full edit drawer (notes + metadata) for this row — the (i)
-  /// button, Reminders-style.
-  let onOpenDetail: () -> Void
-
-  @FocusState private var focused: Field?
-  /// Set true the moment the user cancels, so the blur handler doesn't race
-  /// in and auto-commit before the parent tears the editor down.
-  @State private var cancelling = false
-
-  enum Field { case title }
 
   private var isInactive: Bool { task.status == .done || task.status == .cancelled }
   private var hasNotes: Bool {
     !(task.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-  }
-
-  private func handleCancel() {
-    cancelling = true
-    onCancel()
-  }
-
-  /// Claim title focus one tick after edit begins — assigning FocusState in
-  /// the same frame the row enables races UIKit's input-session setup and the
-  /// field silently fails to become first responder.
-  private func claimFocus() {
-    Task {
-      try? await Task.sleep(for: .milliseconds(50))
-      focused = .title
-    }
-  }
-
-  /// The trailing (i) button shown while renaming — opens the full edit
-  /// drawer (notes + metadata). Reminders-style: inline handles the title, the
-  /// drawer handles everything else.
-  private var detailButton: some View {
-    Button {
-      Haptics.pick()
-      onOpenDetail()
-    } label: {
-      Image(systemName: "info.circle")
-        .scaledFont(size: 18)
-        .foregroundStyle(accent)
-        .frame(width: 36, height: 30)
-        .contentShape(Rectangle())
-    }
-    .buttonStyle(.plain)
-    .accessibilityLabel("Details")
   }
 
   var body: some View {
@@ -277,76 +221,31 @@ struct TaskRowView<MetaLine: View, TrailingDate: View>: View {
       )
       .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 
-      // Agent-created cue — display mode only; opening the editor (which sets
-      // isEditing) is itself an acknowledgment, so the marker shouldn't linger.
-      if !isEditing && task.showsAgentCue() {
+      if task.showsAgentCue() {
         AgentCueMarker(tint: accent)
           .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
       }
 
       VStack(alignment: .leading, spacing: 4) {
         titleView
-        // The meta line is display-only; while renaming, the row collapses to
-        // just the title field so there's no height change to animate.
-        if !isEditing { metaLine() }
+        metaLine()
       }
       .frame(maxWidth: .infinity, alignment: .leading)
 
-      // Trailing: the (i) detail button while renaming; the notes glyph +
-      // date in display mode. (Multi-select uses the native edit-mode circle
-      // on iOS / selection highlight on macOS — no custom checkmark.)
-      if isEditing {
-        detailButton
-      } else {
-        if hasNotes {
-          Image(systemName: "text.alignleft")
-            .scaledFont(size: 12)
-            .foregroundStyle(Theme.inkSecondary)
-        }
-        trailingDate()
+      if hasNotes {
+        Image(systemName: "text.alignleft")
+          .scaledFont(size: 12)
+          .foregroundStyle(Theme.inkSecondary)
       }
+      trailingDate()
     }
     .padding(.horizontal, Theme.hPadding)
     .padding(.vertical, Theme.rowVPadding)
     .contentShape(Rectangle())
-    // Edit shortcuts only while this row is the editor, so every row doesn't
-    // register a duplicate scene-wide ⌘K / Esc.
-    .background { if isEditing { commitShortcut } }
-    .background { if isEditing { cancelShortcut } }
-    .onKeyPress(.escape) {
-      guard isEditing else { return .ignored }
-      handleCancel()
-      return .handled
-    }
-    // Focus lifecycle: claim on edit-start, resign on edit-end.
-    .onChange(of: isEditing) { _, editing in
-      if editing { cancelling = false; claimFocus() }
-      else { focused = nil }
-    }
-    .onAppear { if isEditing { claimFocus() } }
-    // Save-on-blur — focus left both fields while editing. Empty title on a
-    // fresh draft cancels (deletes the placeholder); otherwise commits.
-    .onChange(of: focused) { _, new in
-      guard new == nil, isEditing, !cancelling else { return }
-      if editingTitle.trimmingCharacters(in: .whitespaces).isEmpty {
-        onCancel()
-      } else {
-        onCommit()
-      }
-    }
-    // App backgrounded mid-edit — iOS may yank the keyboard without routing
-    // focus through nil first.
-    .onChange(of: scenePhase) { _, new in
-      if new != .active && isEditing && !cancelling { onCommit() }
-    }
-    // Editor torn down by a parent reload / navigation while still editing.
-    .onDisappear {
-      if isEditing && !cancelling { onCommit() }
-    }
   }
 
   @ViewBuilder private var titleView: some View {
-    if isInactive && !isEditing {
+    if isInactive {
       Text(task.title)
         .font(.septenaTaskTitle)
         .foregroundStyle(Theme.inkSecondary)
@@ -355,41 +254,14 @@ struct TaskRowView<MetaLine: View, TrailingDate: View>: View {
         .lineLimit(1)
         .truncationMode(.tail)
     } else {
-      // Always a TextField (open rows) — `.allowsHitTesting(isEditing)` lets a
-      // non-editing row read as text while taps fall through to the row.
-      TextField("Title", text: isEditing ? $editingTitle : .constant(task.title))
-        .textFieldStyle(.plain)
-        .focusEffectDisabled()
+      Text(task.title)
         .font(.septenaTaskTitle)
         .foregroundStyle(Theme.inkPrimary)
         .lineLimit(1)
-        .focused($focused, equals: .title)
-        .submitLabel(.return)
-        .onSubmit { onCommit() }
-        .allowsHitTesting(isEditing)
+        .truncationMode(.tail)
         .fixedSize(horizontal: false, vertical: true)
     }
   }
-
-  private var commitShortcut: some View {
-    Button("Commit") { onCommit() }
-      .keyboardShortcut("k", modifiers: .command)
-      .opacity(0)
-      .frame(width: 0, height: 0)
-      .accessibilityHidden(true)
-  }
-
-  /// Window-wide Esc shortcut — fires reliably even while an NSTextField
-  /// is first responder (which swallows Esc and stops `.onExitCommand` from
-  /// receiving it).
-  private var cancelShortcut: some View {
-    Button("Cancel") { handleCancel() }
-      .keyboardShortcut(.cancelAction)
-      .opacity(0)
-      .frame(width: 0, height: 0)
-      .accessibilityHidden(true)
-  }
-
 }
 
 // MARK: - Week strip
