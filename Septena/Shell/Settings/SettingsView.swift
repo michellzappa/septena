@@ -1031,16 +1031,32 @@ struct TimeOfDaySettingsPane: View {
 struct LayoutSettingsPane: View {
   @AppStorage(SettingsKey.homepageLayout)
   private var homepageLayoutRaw: String = HomepageLayoutMode.tiles.rawValue
+  @AppStorage(SettingsKey.plusUnlocked)
+  private var plusUnlocked: Bool = false
+  @State private var showPaywall = false
 
+  private var current: HomepageLayoutMode {
+    HomepageLayoutMode(rawValue: homepageLayoutRaw) ?? .tiles
+  }
+
+  /// Picker binding that enforces the Septena+ gate: selecting a Plus-only
+  /// mode while locked opens the paywall and leaves the stored selection
+  /// untouched (so the picker snaps back to the previous, free mode).
   private var binding: Binding<HomepageLayoutMode> {
     Binding(
       get: { HomepageLayoutMode(rawValue: homepageLayoutRaw) ?? .tiles },
-      set: { homepageLayoutRaw = $0.rawValue }
+      set: { mode in
+        if mode.requiresPlus && !plusUnlocked {
+          showPaywall = true
+          return
+        }
+        homepageLayoutRaw = mode.rawValue
+      }
     )
   }
 
   var body: some View {
-    let current = binding.wrappedValue
+    let current = self.current
     Form {
       Section {
         Picker(selection: binding) {
