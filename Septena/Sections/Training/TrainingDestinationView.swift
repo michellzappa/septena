@@ -1940,7 +1940,6 @@ struct TrainingSessionView: View {
   }
 
   private func statsHeader(_ d: DraftSession) -> some View {
-    let elapsed = elapsedMinutes(since: d.startedAt)
     let lifted = d.entries
       .filter { $0.status == .done && !$0.isCardio }
       .reduce(0.0) { acc, e in
@@ -1953,7 +1952,7 @@ struct TrainingSessionView: View {
       .reduce(0.0) { $0 + ($1.durationMin ?? 0) }
     return Section {
       HStack(alignment: .top, spacing: 24) {
-        stat(value: "\(elapsed)", label: "elapsed", unit: "m")
+        liveElapsedStat(startedAt: d.startedAt)
         stat(value: "\(Int(cardio))", label: "cardio", unit: "m")
         stat(value: "\(Int(lifted))", label: "lifted", unit: "kg")
         Spacer()
@@ -1988,6 +1987,35 @@ struct TrainingSessionView: View {
       }
       Text(label).font(.caption).foregroundStyle(.secondary)
     }
+  }
+
+  /// Live session clock — ticks every second via `TimelineView` so only
+  /// this stat re-renders, not the whole list. Shows M:SS, or H:MM:SS once
+  /// past an hour. Driven off the absolute `startedAt`, so it stays
+  /// accurate across backgrounding.
+  private func liveElapsedStat(startedAt iso: String) -> some View {
+    let f = ISO8601DateFormatter()
+    f.formatOptions = [.withInternetDateTime]
+    let start = f.date(from: iso)
+    return TimelineView(.periodic(from: .now, by: 1)) { ctx in
+      let secs = start.map { max(0, Int(ctx.date.timeIntervalSince($0))) } ?? 0
+      VStack(alignment: .leading, spacing: 2) {
+        Text(clock(secs))
+          .font(.system(.title2, design: .rounded).weight(.semibold))
+          .monospacedDigit()
+          .foregroundStyle(accent)
+        Text("elapsed").font(.caption).foregroundStyle(.secondary)
+      }
+    }
+  }
+
+  private func clock(_ totalSeconds: Int) -> String {
+    let h = totalSeconds / 3600
+    let m = (totalSeconds % 3600) / 60
+    let s = totalSeconds % 60
+    return h > 0
+      ? String(format: "%d:%02d:%02d", h, m, s)
+      : String(format: "%d:%02d", m, s)
   }
 
   // MARK: - Actions
