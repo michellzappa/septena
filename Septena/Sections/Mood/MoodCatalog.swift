@@ -21,20 +21,20 @@ enum MoodQuadrant: String, CaseIterable, Identifiable, Hashable {
   /// proper names for the quadrants, not sentence fragments.
   var title: String {
     switch self {
-    case .hap: return "High Energy, Pleasant"
-    case .han: return "High Energy, Unpleasant"
-    case .lan: return "Low Energy, Unpleasant"
-    case .lap: return "Low Energy, Pleasant"
+    case .hap: return String(localized: "High Energy, Pleasant", comment: "Mood quadrant title")
+    case .han: return String(localized: "High Energy, Unpleasant", comment: "Mood quadrant title")
+    case .lan: return String(localized: "Low Energy, Unpleasant", comment: "Mood quadrant title")
+    case .lap: return String(localized: "Low Energy, Pleasant", comment: "Mood quadrant title")
     }
   }
 
   /// One-word affective summary used in the quadrant card subtitle.
   var blurb: String {
     switch self {
-    case .hap: return "Activated · Positive"
-    case .han: return "Activated · Negative"
-    case .lan: return "Quiet · Negative"
-    case .lap: return "Quiet · Positive"
+    case .hap: return String(localized: "Activated · Positive", comment: "Mood quadrant subtitle")
+    case .han: return String(localized: "Activated · Negative", comment: "Mood quadrant subtitle")
+    case .lan: return String(localized: "Quiet · Negative", comment: "Mood quadrant subtitle")
+    case .lap: return String(localized: "Quiet · Positive", comment: "Mood quadrant subtitle")
     }
   }
 

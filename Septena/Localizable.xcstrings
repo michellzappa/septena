@@ -3732,6 +3732,216 @@
           }
         }
       }
+    },
+    "High Energy, Pleasant" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muita energia, agradável"
+          }
+        }
+      }
+    },
+    "High Energy, Unpleasant" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muita energia, desagradável"
+          }
+        }
+      }
+    },
+    "Low Energy, Unpleasant" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pouca energia, desagradável"
+          }
+        }
+      }
+    },
+    "Low Energy, Pleasant" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pouca energia, agradável"
+          }
+        }
+      }
+    },
+    "Activated · Positive" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ativado · Positivo"
+          }
+        }
+      }
+    },
+    "Activated · Negative" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ativado · Negativo"
+          }
+        }
+      }
+    },
+    "Quiet · Negative" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quieto · Negativo"
+          }
+        }
+      }
+    },
+    "Quiet · Positive" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quieto · Positivo"
+          }
+        }
+      }
+    },
+    "Protein" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proteína"
+          }
+        }
+      }
+    },
+    "Fat" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gordura"
+          }
+        }
+      }
+    },
+    "Saturated Fat" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gordura saturada"
+          }
+        }
+      }
+    },
+    "Carbs" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carboidratos"
+          }
+        }
+      }
+    },
+    "Sugar" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Açúcar"
+          }
+        }
+      }
+    },
+    "Fiber" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fibra"
+          }
+        }
+      }
+    },
+    "Alcohol" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Álcool"
+          }
+        }
+      }
+    },
+    "Kcal" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kcal"
+          }
+        }
+      }
+    },
+    "Sodium" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sódio"
+          }
+        }
+      }
+    },
+    "Cholesterol" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colesterol"
+          }
+        }
+      }
+    },
+    "Potassium" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Potássio"
+          }
+        }
+      }
+    },
+    "Water" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Água"
+          }
+        }
+      }
+    },
+    "Fasting" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jejum"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

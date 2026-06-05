@@ -140,6 +140,21 @@ Four parallel read-only sweeps. The ~307 real catalog strings are a **floor**. B
 6. **Translate** (pick mechanism) → native review → pseudoloc QA.
 7. **Ship locales incrementally** — add a language to `CFBundleLocalizations` only when it's translated enough (avoids mixed UI).
 
+### Localization convention (the structure)
+The repeatable structure every wrap follows:
+- **One canonical store** — `Septena/Localizable.xcstrings`. Auto-extraction keeps it synced with code; pt-BR (and future languages) live here.
+- **Chrome** → `String(localized: "…", comment: "Feature: context")`, co-located in the type that owns the string. The `comment:` gives translators context **and** groups the catalog by feature (Xcode sorts/filters by comment).
+- **Return types stay `String`** — wrapping the *literal* (not changing the property's type) means zero call-site breakage; `Text(x.label)` then shows the localized value.
+- **User data / stored values stay canonical English** — e.g. `MoodEvent.emotion` persists the English word; localize only at the display layer (never the array/storage).
+- **Per-batch pt-BR fill is reproducible**: add `String(localized:)` in code → add the pt-BR value to the catalog → build-verify `pt-BR.lproj` → commit clean files only.
+
+### Milestone B progress
+- ✅ **Batch 1** — Welcome greeting (fallbacks + tone labels + AI prompt writes in the app's language) + DayBucket (Manhã/Tarde/Noite). `abd6200`.
+- ✅ **Batch 2** — Mood quadrant titles + blurbs (8) + Macro labels (13).
+- ⏳ **Deferred (careful)** — 36 mood emotion words: stored on `MoodEvent.emotion`, so keep `words(for:)` English and add a display-only localizer at the (clean) sites `EditMoodEntrySheet` / `AddMoodPage`.
+- 🚧 **Blocked on active WIP** — section names (`SectionManifest`), settings enums (`SettingsView`), dashboard tiles. Wrap once those files are committed.
+- 🔎 `AddInfoSection.swift` not found (renamed in the dashboard refactor) — relocate the quick-add menu strings.
+
 ## Repo-specific gotchas (ranked)
 
 1. **xcodegen silently undoes Xcode-side localization config.** Declare languages via `CFBundleLocalizations` in `project.yml`, never the Xcode UI.
