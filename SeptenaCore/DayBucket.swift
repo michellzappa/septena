@@ -43,8 +43,14 @@ public enum DayBucket: String, CaseIterable, Identifiable, Hashable, Sendable {
 
   public var id: String { rawValue }
 
-  /// Capitalized noun for headers and labels ("Morning").
-  public var title: String { rawValue.capitalized }
+  /// Localized noun for headers and labels ("Morning" / "Manhã").
+  public var title: String {
+    switch self {
+    case .morning:   return String(localized: "Morning")
+    case .afternoon: return String(localized: "Afternoon")
+    case .evening:   return String(localized: "Evening")
+    }
+  }
 
   /// SF Symbol used as the bucket's visual identity. Picked once here
   /// so Mood slot cards, Habits section headers, and any future bucket

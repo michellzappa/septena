@@ -138,9 +138,9 @@ enum WelcomePhase: String, CaseIterable {
 
   var greeting: String {
     switch self {
-    case .morning:   return "Good morning"
-    case .afternoon: return "Good afternoon"
-    case .evening:   return "Good evening"
+    case .morning:   return String(localized: "Good morning")
+    case .afternoon: return String(localized: "Good afternoon")
+    case .evening:   return String(localized: "Good evening")
     }
   }
 
@@ -202,9 +202,9 @@ enum WelcomeTone: String, CaseIterable, Identifiable {
 
   var label: String {
     switch self {
-    case .warm:    return "Warm"
-    case .dry:     return "Dry"
-    case .minimal: return "Minimal"
+    case .warm:    return String(localized: "Warm")
+    case .dry:     return String(localized: "Dry")
+    case .minimal: return String(localized: "Minimal")
     }
   }
 
@@ -275,6 +275,9 @@ private enum WelcomeGenerator {
     let clock = date.formatted(date: .omitted, time: .shortened)
     let when = TimeBand.from(date: date).descriptor
     let length = context == nil ? "roughly two to five words" : "roughly four to eight words"
+    let language = Locale.current.localizedString(
+      forLanguageCode: Locale.current.language.languageCode?.identifier ?? "en"
+    ) ?? "English"
     let contextBlock = context.map {
       """
 
@@ -285,6 +288,7 @@ private enum WelcomeGenerator {
     } ?? ""
     return """
     Write ONE short, characterful greeting for the home screen of \(name)'s personal app.
+    Write the greeting in \(language).
 
     Right now it is \(clock) on \(weekday) — \(when).
     Tone: \(tone.direction)\(contextBlock)
@@ -308,6 +312,7 @@ private enum WelcomeGenerator {
     - Today is \(weekday). If you name a day, it MUST be \(weekday) — never any other day.
     - Grounded and human, never corporate or saccharine.
     - Vary it each time — surprise me a little.
+    - The greeting must be written in \(language).
     - No emoji. No quotation marks.
 
     Respond with only the greeting line, nothing else.
