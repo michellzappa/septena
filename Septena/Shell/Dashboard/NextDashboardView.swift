@@ -16,7 +16,7 @@ struct NextDashboardView: View {
         #endif
         // Consistent home-page chrome across Week / Next / Tasks:
         //   • top-left "…" menu (Settings today; room to grow)
-        //   • top-right magnifyingglass → universal Quick Find sheet
+        // Search lives in the Tasks sidebar, not the dashboard chrome.
         .toolbar { homeToolbar }
     }
   }
@@ -25,10 +25,8 @@ struct NextDashboardView: View {
   private var homeToolbar: some ToolbarContent {
     #if os(iOS)
     ToolbarItem(placement: .topBarLeading) { homeMenu }
-    ToolbarItem(placement: .topBarTrailing) { homeSearch }
     #else
     ToolbarItem(placement: .primaryAction) { homeMenu }
-    ToolbarItem(placement: .primaryAction) { homeSearch }
     #endif
   }
 
@@ -43,12 +41,5 @@ struct NextDashboardView: View {
       Image(systemName: "ellipsis.circle")
     }
     .accessibilityLabel("More")
-  }
-
-  private var homeSearch: some View {
-    Button { nav.showQuickFind = true } label: {
-      Image(systemName: "magnifyingglass")
-    }
-    .accessibilityLabel("Search")
   }
 }

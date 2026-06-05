@@ -1,16 +1,15 @@
 import SwiftUI
 import SwiftData
 
-// Floating ⌘K palette. Substring + token scoring across tasks, projects,
-// and areas — fast, predictable, no ML. Selection routes via NavigationState
-// (project/area for entity hits; for tasks, jumps to the containing list).
+// Floating search palette for the Tasks domain. Substring + token scoring
+// across tasks, projects, and areas — fast, predictable, no ML. Selection
+// routes via NavigationState (project/area for entity hits; for tasks, jumps
+// to the containing list). Scoped to tasks only — it does not search or
+// launch other sections.
 
 struct QuickFindView: View {
   @Environment(\.dismiss) private var dismiss
-  @Environment(\.modelContext) private var modelContext
   @Environment(NavigationState.self) private var nav
-  @Environment(SectionTheme.self) private var theme
-  @Environment(TrainingDraftStore.self) private var trainingDraft
   @Environment(\.a11yMotion) private var motion
   @Query private var tasks: [TaskEntity]
   @Query private var projects: [ProjectEntity]
@@ -59,9 +58,6 @@ struct QuickFindView: View {
         }
     }
     .onAppear {
-      // Pre-warm the session-type list so the training launcher reads
-      // populated on first ⌘K. Cheap; the store keeps a cached copy.
-      trainingDraft.refreshCatalog(context: modelContext)
       // Reliably focus the search field on open (macOS doesn't auto-focus
       // `.searchable` the way iOS does), so you can type immediately.
       searchFocused = true
@@ -74,7 +70,7 @@ struct QuickFindView: View {
     let rows = hits
     if rows.isEmpty {
       if query.isEmpty {
-        trainingLauncher
+        emptyPrompt
       } else {
         ContentUnavailableView.search(text: query)
       }
@@ -222,108 +218,15 @@ struct QuickFindView: View {
     dismiss()
   }
 
-  // MARK: - Training launcher
-  //
-  // Mirrors the webapp's ⌘K training page. Empty-query state pins a
-  // "Resume" row if a draft exists, then lists session types with "Last
-  // Nd ago" + Suggested badges. Tapping a row presents the logger sheet.
+  // MARK: - Empty state
 
-  private var trainingAccent: Color { theme.color(for: "training") }
-
-  @ViewBuilder
-  private var trainingLauncher: some View {
-    let types = trainingDraft.sessionTypes
-    ScrollView {
-      VStack(alignment: .leading, spacing: 4) {
-        Text("Start training")
-          .font(.septenaLabel)
-          .foregroundStyle(Theme.inkSecondary)
-          .padding(.horizontal, 20)
-          .padding(.top, 14)
-          .padding(.bottom, 6)
-        if let d = trainingDraft.draft {
-          launcherRow(
-            symbol: SessionKind.defaulted(for: d.sessionType).icon,
-            title: "Resume \(d.label)",
-            subtitle: "\(d.doneCount)/\(max(d.totalCount,1)) done",
-            badge: nil,
-            tint: trainingAccent
-          ) {
-            nav.showTrainingSession = true
-            dismiss()
-          }
-        }
-        if types.isEmpty {
-          HStack {
-            ProgressView().controlSize(.small)
-            Text("Loading session types…")
-              .font(.septenaMeta)
-              .foregroundStyle(Theme.inkSecondary)
-          }
-          .padding(.horizontal, 20).padding(.vertical, 10)
-        } else {
-          ForEach(types) { type in
-            let days = trainingDraft.daysAgo[type.id]
-            launcherRow(
-              symbol: type.kind.icon,
-              title: type.label,
-              subtitle: days.map {
-                $0 == 0 ? "Today" :
-                $0 == 1 ? "1 day ago" : "\($0) days ago"
-              } ?? "No prior session",
-              badge: trainingDraft.suggested == type.id ? "Suggested" : nil,
-              tint: trainingAccent
-            ) {
-              startType(type)
-            }
-          }
-        }
-      }
-      .padding(.bottom, 12)
-    }
-  }
-
-  private func launcherRow(symbol: String,
-                           title: String,
-                           subtitle: String,
-                           badge: String?,
-                           tint: Color,
-                           action: @escaping () -> Void) -> some View {
-    Button(action: action) {
-      HStack(spacing: 12) {
-        Image(systemName: symbol)
-          .scaledFont(size: 15, weight: .semibold)
-          .foregroundStyle(tint)
-          .frame(width: 22)
-        VStack(alignment: .leading, spacing: 1) {
-          Text(title)
-            .font(.septenaTaskTitle)
-            .foregroundStyle(Theme.inkPrimary)
-          Text(subtitle)
-            .font(.septenaMeta)
-            .foregroundStyle(Theme.inkSecondary)
-        }
-        Spacer()
-        if let badge {
-          Text(badge)
-            .font(.septenaBadge)
-            .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(tint.opacity(0.18), in: Capsule())
-            .foregroundStyle(tint)
-        }
-      }
-      .padding(.horizontal, 14).padding(.vertical, 8)
-      .contentShape(Rectangle())
-    }
-    .buttonStyle(.plain)
-    .padding(.horizontal, 6)
-  }
-
-  private func startType(_ type: SessionTypeConfig) {
-    Task {
-      trainingDraft.start(type: type, context: modelContext)
-      nav.showTrainingSession = true
-      dismiss()
+  // Before anything is typed: a quiet hint that this palette searches the
+  // Tasks domain only.
+  private var emptyPrompt: some View {
+    ContentUnavailableView {
+      Label("Search Tasks", systemImage: "magnifyingglass")
+    } description: {
+      Text("Find any task, project, or area.")
     }
   }
 }
