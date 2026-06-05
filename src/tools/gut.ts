@@ -1,19 +1,11 @@
 import { queryByDateRange, type CloudKitClient } from "../cloudkit.js";
+import { getEffectiveTimezone, todayYMD, ymdNDaysAgo, nowHHMMSS, localToEpochMs } from "../tz.js";
 
 const SHORTID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 function newId(len = 4): string {
   const buf = new Uint8Array(len);
   crypto.getRandomValues(buf);
   return Array.from(buf, (b) => SHORTID_ALPHABET[b & 31]).join("");
-}
-
-function todayYMD(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function currentHHMMSS(): string {
-  return new Date().toTimeString().slice(0, 8);
 }
 
 function optStr(v: unknown): string | undefined {
@@ -87,8 +79,9 @@ export interface LogGutEventInput {
 // ---- Implementations ----
 
 export async function listGutEvents(client: CloudKitClient, input: ListGutEventsInput) {
-  const from = input.date ?? input.from ?? (() => { const d = new Date(); d.setDate(d.getDate() - 6); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
-  const to   = input.date ?? input.to   ?? todayYMD();
+  const tz = await getEffectiveTimezone(client);
+  const from = input.date ?? input.from ?? ymdNDaysAgo(6, tz);
+  const to   = input.date ?? input.to   ?? todayYMD(tz);
 
   const records = await queryByDateRange(client, {
     recordType: "GutEvent",
@@ -115,14 +108,16 @@ export async function listGutEvents(client: CloudKitClient, input: ListGutEvents
 }
 
 export async function logGutEvent(client: CloudKitClient, input: LogGutEventInput) {
+  const tz = await getEffectiveTimezone(client);
   const id = newId(6);
-  const date = input.date ?? todayYMD();
-  const time = input.time ?? currentHHMMSS();
+  const date = input.date ?? todayYMD(tz);
+  const time = input.time ?? nowHHMMSS(tz);
   const fields: Record<string, { value: unknown }> = {
     date:    { value: date },
     time:    { value: time },
     bristol: { value: input.bristol },
     blood:   { value: input.blood ? 1 : 0 },
+    occurredAt: { value: localToEpochMs(date, time, tz) },
   };
   if (input.volume)           fields.volume           = { value: input.volume };
   if (input.discomfortLevel)  fields.discomfortLevel  = { value: input.discomfortLevel };

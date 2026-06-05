@@ -1,4 +1,5 @@
 import { queryByDateRange, type CloudKitClient } from "../cloudkit.js";
+import { getEffectiveTimezone, todayYMD, nowHHMM, addDaysYMD, localToEpochMs } from "../tz.js";
 
 const SHORTID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 
@@ -8,24 +9,8 @@ function newId(len = 4): string {
   return Array.from(buf, (b) => SHORTID_ALPHABET[b & 31]).join("");
 }
 
-function todayYMD(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function currentHHMM(): string {
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
-
-function sortKey(): string {
-  return `${todayYMD()}::${Date.now().toFixed(0).padStart(20, "0")}`;
-}
-
-function addDays(ymd: string, days: number): string {
-  const d = new Date(`${ymd}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
+function sortKey(tz: string): string {
+  return `${todayYMD(tz)}::${Date.now().toFixed(0).padStart(20, "0")}`;
 }
 
 function nextSaturday(from: string): string {
@@ -67,7 +52,7 @@ function computeDueDate(
   for (const ev of sorted) {
     if (ev.action === "complete") {
       lastCompleted = ev.date;
-      dueDate = addDays(ev.date, cadenceDays);
+      dueDate = addDaysYMD(ev.date, cadenceDays);
     } else if (ev.action === "defer" && ev.newDueDate) {
       // Defer overrides the due date for that moment; subsequent completes
       // will recalculate from the completion date + cadence.
@@ -150,8 +135,9 @@ export interface UncompleteChoreInput { id: string; date?: string }
 // ---- Implementations ----
 
 export async function listChores(client: CloudKitClient) {
-  const today = todayYMD();
-  const since = addDays(today, -180);
+  const tz = await getEffectiveTimezone(client);
+  const today = todayYMD(tz);
+  const since = addDaysYMD(today, -180);
 
   const [defsRes, eventRecords] = await Promise.all([
     client.queryRecords({
@@ -260,25 +246,33 @@ export async function deleteChore(client: CloudKitClient, input: { id: string })
 }
 
 export async function completeChore(client: CloudKitClient, input: CompleteChoreInput) {
-  const date = input.date ?? todayYMD();
+  const tz = await getEffectiveTimezone(client);
+  const date = input.date ?? todayYMD(tz);
+  const time = nowHHMM(tz);
   const eventID = `chore:${date}:${input.id}:${newId(6)}`;
   const fields: Record<string, { value: unknown }> = {
     choreID: { value: input.id },
     action: { value: "complete" },
     date: { value: date },
-    time: { value: currentHHMM() },
-    sortKey: { value: sortKey() },
+    time: { value: time },
+    sortKey: { value: sortKey(tz) },
+    occurredAt: { value: localToEpochMs(date, time, tz) },
   };
-  await modify(client, [{
-    operationType: "create",
-    record: { recordType: "ChoreEvent", recordName: `chore-event:${eventID}`, fields },
-  }]);
+  // createWithFieldFallback so occurredAt drops gracefully if the schema
+  // doesn't know it yet (eventID is unique, so no CONFLICT path needed).
+  await client.createWithFieldFallback({
+    recordType: "ChoreEvent",
+    recordName: `chore-event:${eventID}`,
+    fields,
+    protectedFields: ["choreID", "action", "date", "sortKey"],
+  });
   return { id: input.id, date, action: "complete" };
 }
 
 export async function deferChore(client: CloudKitClient, input: DeferChoreInput) {
-  const date = input.date ?? todayYMD();
-  const newDueDate = input.mode === "weekend" ? nextSaturday(date) : addDays(date, 1);
+  const tz = await getEffectiveTimezone(client);
+  const date = input.date ?? todayYMD(tz);
+  const newDueDate = input.mode === "weekend" ? nextSaturday(date) : addDaysYMD(date, 1);
   const eventID = `chore:${date}:${input.id}:${newId(6)}`;
   const fields: Record<string, { value: unknown }> = {
     choreID: { value: input.id },
@@ -286,17 +280,21 @@ export async function deferChore(client: CloudKitClient, input: DeferChoreInput)
     date: { value: date },
     newDueDate: { value: newDueDate },
     reason: { value: input.mode },
-    sortKey: { value: sortKey() },
+    sortKey: { value: sortKey(tz) },
+    occurredAt: { value: localToEpochMs(date, undefined, tz) },
   };
-  await modify(client, [{
-    operationType: "create",
-    record: { recordType: "ChoreEvent", recordName: `chore-event:${eventID}`, fields },
-  }]);
+  await client.createWithFieldFallback({
+    recordType: "ChoreEvent",
+    recordName: `chore-event:${eventID}`,
+    fields,
+    protectedFields: ["choreID", "action", "date", "newDueDate", "sortKey"],
+  });
   return { id: input.id, date, newDueDate, action: "defer" };
 }
 
 export async function uncompleteChore(client: CloudKitClient, input: UncompleteChoreInput) {
-  const date = input.date ?? todayYMD();
+  const tz = await getEffectiveTimezone(client);
+  const date = input.date ?? todayYMD(tz);
   // Find the most recent complete event for this chore on this date
   const eventsRes = await client.queryRecords({
     recordType: "ChoreEvent",

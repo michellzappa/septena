@@ -1,4 +1,5 @@
 import type { CloudKitClient } from "../cloudkit.js";
+import { getEffectiveTimezone, todayYMD } from "../tz.js";
 
 // Ported from /Users/mz/Dev/septena-mcp/src/tools/listTasks.ts.
 // Single source of truth for tool definitions can come later once a 3rd
@@ -84,7 +85,8 @@ export async function listTasks(
   }));
 
   if (needsClientFilter) {
-    const todayStr = todayYMD();
+    const tz = await getEffectiveTimezone(client);
+    const todayStr = todayYMD(tz);
     tasks = tasks.filter((t) => matchesView(t, view, todayStr)).slice(0, limit);
   }
   return { tasks };
@@ -92,14 +94,6 @@ export async function listTasks(
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
-}
-
-function todayYMD(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
 }
 
 /// Mirrors Persistence.swift LocalCache.tasks(filter:). Keep in lockstep

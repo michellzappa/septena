@@ -1,30 +1,19 @@
 import type { CloudKitClient } from "../cloudkit.js";
+import { getEffectiveTimezone, todayYMD, ymdNDaysAgo, addDaysYMD, localToEpochMs } from "../tz.js";
 
 function newUUID(): string {
   return crypto.randomUUID();
 }
 
-function todayYMD(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function startOfDayEpochMs(ymd: string, tz: string): number {
+  // Start of the user-local day `ymd` (in `tz`) as a UTC epoch instant. The
+  // Swift side uses user-local dates for NutritionDaySum.date; we match that.
+  return localToEpochMs(ymd, "00:00", tz);
 }
 
-function startOfDayEpochMs(ymd: string): number {
-  // Parse YYYY-MM-DD as local-time midnight. The Swift side uses user-local
-  // dates for NutritionDaySum.date, so we match that interpretation here.
-  const [y, m, d] = ymd.split("-").map(Number);
-  return new Date(y, (m ?? 1) - 1, d ?? 1, 0, 0, 0, 0).getTime();
-}
-
-function endOfDayEpochMs(ymd: string): number {
-  const [y, m, d] = ymd.split("-").map(Number);
-  return new Date(y, (m ?? 1) - 1, d ?? 1, 23, 59, 59, 999).getTime();
-}
-
-function ymdNDaysAgo(n: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function endOfDayEpochMs(ymd: string, tz: string): number {
+  // Inclusive end = 1ms before the start of the next local day.
+  return localToEpochMs(addDaysYMD(ymd, 1), "00:00", tz) - 1;
 }
 
 function optStr(v: unknown): string | undefined {
@@ -146,15 +135,16 @@ export interface GetNutritionDaySummaryInput { date?: string }
 // ---- Implementations ----
 
 export async function listNutritionEntries(client: CloudKitClient, input: ListNutritionEntriesInput) {
-  const from = input.date ?? input.from ?? ymdNDaysAgo(6);
-  const to   = input.date ?? input.to   ?? todayYMD();
+  const tz = await getEffectiveTimezone(client);
+  const from = input.date ?? input.from ?? ymdNDaysAgo(6, tz);
+  const to   = input.date ?? input.to   ?? todayYMD(tz);
 
   // loggedAt is a Date/TIMESTAMP field — filter on epoch milliseconds.
   const res = await client.queryRecords({
     recordType: "NutritionEntry",
     filterBy: [
-      { fieldName: "loggedAt", comparator: "GREATER_THAN_OR_EQUALS", fieldValue: { value: startOfDayEpochMs(from) } },
-      { fieldName: "loggedAt", comparator: "LESS_THAN_OR_EQUALS",    fieldValue: { value: endOfDayEpochMs(to) } },
+      { fieldName: "loggedAt", comparator: "GREATER_THAN_OR_EQUALS", fieldValue: { value: startOfDayEpochMs(from, tz) } },
+      { fieldName: "loggedAt", comparator: "LESS_THAN_OR_EQUALS",    fieldValue: { value: endOfDayEpochMs(to, tz) } },
     ],
     sortBy: [{ fieldName: "loggedAt", ascending: false }],
     resultsLimit: input.limit ?? 200,
@@ -277,7 +267,8 @@ export async function deleteNutritionEntry(client: CloudKitClient, input: { id: 
 }
 
 export async function getNutritionDaySummary(client: CloudKitClient, input: GetNutritionDaySummaryInput) {
-  const date = input.date ?? todayYMD();
+  const tz = await getEffectiveTimezone(client);
+  const date = input.date ?? todayYMD(tz);
   const res = await client.post<CKLookupResponse>("records/lookup", {
     zoneID: { zoneName: client.zoneName },
     records: [{ recordName: `nutrition-day:${date}` }],

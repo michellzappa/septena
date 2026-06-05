@@ -1,4 +1,5 @@
 import type { CloudKitClient } from "../cloudkit.js";
+import { getEffectiveTimezone, todayYMD } from "../tz.js";
 
 const SHORTID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 
@@ -6,11 +7,6 @@ function newId(len = 4): string {
   const buf = new Uint8Array(len);
   crypto.getRandomValues(buf);
   return Array.from(buf, (b) => SHORTID_ALPHABET[b & 31]).join("");
-}
-
-function todayYMD(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function optStr(v: unknown): string | undefined {
@@ -100,11 +96,12 @@ export async function listGoals(client: CloudKitClient) {
 }
 
 export async function createGoal(client: CloudKitClient, input: CreateGoalInput) {
+  const tz = await getEffectiveTimezone(client);
   const id = newId(4);
   const fields: Record<string, { value: unknown }> = {
     text: { value: input.text },
     sections: { value: input.sections ?? [] },
-    created: { value: todayYMD() },
+    created: { value: todayYMD(tz) },
     sortIndex: { value: 0 },
   };
   await modify(client, [{

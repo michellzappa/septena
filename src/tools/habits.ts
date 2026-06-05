@@ -1,4 +1,5 @@
-import type { CloudKitClient } from "../cloudkit.js";
+import { extractUnknownFieldName, type CloudKitClient } from "../cloudkit.js";
+import { getEffectiveTimezone, todayYMD, nowHHMM, localToEpochMs } from "../tz.js";
 
 const SHORTID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 
@@ -6,16 +7,6 @@ function newId(len = 4): string {
   const buf = new Uint8Array(len);
   crypto.getRandomValues(buf);
   return Array.from(buf, (b) => SHORTID_ALPHABET[b & 31]).join("");
-}
-
-function todayYMD(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function currentHHMM(): string {
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 function optStr(v: unknown): string | undefined {
@@ -27,7 +18,7 @@ type ModifyOp =
   | { operationType: "delete"; record: { recordName: string } };
 
 interface CKModifyResponse {
-  records: Array<{ recordName: string; fields?: Record<string, { value: unknown }>; serverErrorCode?: string }>;
+  records: Array<{ recordName: string; fields?: Record<string, { value: unknown }>; serverErrorCode?: string; reason?: string }>;
 }
 
 async function modify(client: CloudKitClient, ops: ModifyOp[]): Promise<CKModifyResponse> {
@@ -94,7 +85,8 @@ export interface ToggleHabitInput { id: string; date?: string; done: boolean; sk
 // ---- Implementations ----
 
 export async function listHabits(client: CloudKitClient, input: ListHabitsInput) {
-  const date = input.date ?? todayYMD();
+  const tz = await getEffectiveTimezone(client);
+  const date = input.date ?? todayYMD(tz);
   const [defsRes, eventsRes] = await Promise.all([
     client.queryRecords({
       recordType: "HabitDefinition",
@@ -184,7 +176,8 @@ export async function deleteHabit(client: CloudKitClient, input: { id: string })
 }
 
 export async function toggleHabit(client: CloudKitClient, input: ToggleHabitInput) {
-  const date = input.date ?? todayYMD();
+  const tz = await getEffectiveTimezone(client);
+  const date = input.date ?? todayYMD(tz);
   const stateID = `habit:${date}:${input.id}`;
   const recordName = `habit-event:${stateID}`;
   const needsRow = input.done || (input.skipped ?? false);
@@ -198,12 +191,15 @@ export async function toggleHabit(client: CloudKitClient, input: ToggleHabitInpu
     return { id: input.id, date, done: false, skipped: false };
   }
 
+  const time = nowHHMM(tz);
   const fields: Record<string, { value: unknown }> = {
     date: { value: date },
     habitID: { value: input.id },
     done: { value: input.done ? 1 : 0 },
     skipped: { value: (input.skipped ?? false) ? 1 : 0 },
-    time: { value: currentHHMM() },
+    time: { value: time },
+    // occurredAt drops gracefully if the schema doesn't know it yet (see below).
+    occurredAt: { value: localToEpochMs(date, time, tz) },
   };
 
   const createRes = await modify(client, [{
@@ -217,7 +213,27 @@ export async function toggleHabit(client: CloudKitClient, input: ToggleHabitInpu
       record: { recordType: "HabitEvent", recordName, fields },
     }]);
   } else if (code) {
-    throw new Error(`Failed to toggle habit: ${code}`);
+    // If the only problem is an unregistered occurredAt field, drop it and retry
+    // once — the schema may not know occurredAt yet on this account.
+    const unknown = extractUnknownFieldName(createRes.records[0]?.reason ?? code);
+    if (unknown && unknown in fields && unknown !== "date" && unknown !== "habitID" && unknown !== "done") {
+      delete fields[unknown];
+      const retry = await modify(client, [{
+        operationType: "create",
+        record: { recordType: "HabitEvent", recordName, fields },
+      }]);
+      const rcode = retry.records[0]?.serverErrorCode;
+      if (rcode === "CONFLICT" || rcode === "EXISTS" || rcode === "UNIQUE_FIELD_ERROR") {
+        await modify(client, [{
+          operationType: "forceUpdate",
+          record: { recordType: "HabitEvent", recordName, fields },
+        }]);
+      } else if (rcode) {
+        throw new Error(`Failed to toggle habit: ${rcode}`);
+      }
+    } else {
+      throw new Error(`Failed to toggle habit: ${code}`);
+    }
   }
 
   return { id: input.id, date, done: input.done, skipped: input.skipped ?? false };

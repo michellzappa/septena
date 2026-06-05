@@ -1,5 +1,6 @@
 import type { CloudKitClient } from "../cloudkit.js";
 import { logEvent } from "../util.js";
+import { getEffectiveTimezone, todayYMD, localServerTimestamp } from "../tz.js";
 
 // Mutators for Task records. Uses CKWS records/modify with forceUpdate.
 // Identity for new tasks: base32-6 shortid per identifiers.md.
@@ -10,11 +11,6 @@ export function newTaskId(): string {
   const buf = new Uint8Array(6);
   crypto.getRandomValues(buf);
   return Array.from(buf, (b) => SHORTID_ALPHABET[b & 31]).join("");
-}
-
-function todayYMD(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 interface CKModifyResponse {
@@ -123,17 +119,18 @@ export interface UpdateTaskInput {
 // ---- Implementations ----
 
 export async function createTask(client: CloudKitClient, input: CreateTaskInput) {
+  const tz = await getEffectiveTimezone(client);
   const id = newTaskId();
   const fields: Record<string, { value: unknown }> = {
     title: { value: input.title },
     status: { value: "open" },
-    created: { value: todayYMD() },         // legacy YYYY-MM-DD string (app still reads it)
+    created: { value: todayYMD(tz) },        // legacy YYYY-MM-DD string (app still reads it)
     createdAt: { value: Date.now() },       // epoch ms → CloudKit TIMESTAMP (NSDate), matches nutrition.loggedAt
     source: { value: "mcp" },               // provenance: created via the MCP gateway
     sourceClient: { value: "Claude" },      // only Claude connects today; plumb clientId through later
     today: { value: input.today ? 1 : 0 },
   };
-  if (input.today) fields.todaySetOn = { value: todayYMD() };
+  if (input.today) fields.todaySetOn = { value: todayYMD(tz) };
   if (input.scheduled) fields.scheduled = { value: input.scheduled };
   if (input.due) fields.deadline = { value: input.due };
   if (input.area) fields.area = { value: input.area };
@@ -162,6 +159,7 @@ export async function createTask(client: CloudKitClient, input: CreateTaskInput)
 }
 
 export async function completeTask(client: CloudKitClient, input: { id: string }) {
+  const tz = await getEffectiveTimezone(client);
   const fields = await lookupRecord(client, input.id);
   if (!fields) throw new Error(`Task not found: ${input.id}`);
   const recurrenceUnit = fields.recurrenceUnit?.value as string | undefined;
@@ -170,7 +168,7 @@ export async function completeTask(client: CloudKitClient, input: { id: string }
       `Task ${input.id} is recurring (every ${recurrenceUnit}). Complete it in the Septena app so the next occurrence spawns.`,
     );
   }
-  const completedAt = new Date().toISOString();
+  const completedAt = localServerTimestamp(tz);
   await modifyRecords(client, [
     {
       operationType: "forceUpdate",
@@ -194,8 +192,9 @@ export async function updateTask(client: CloudKitClient, input: UpdateTaskInput)
   const updated: string[] = [];
   if (input.title !== undefined) { fields.title = { value: input.title }; updated.push("title"); }
   if (input.today !== undefined) {
+    const tz = await getEffectiveTimezone(client);
     fields.today = { value: input.today ? 1 : 0 };
-    fields.todaySetOn = { value: input.today ? todayYMD() : "" };
+    fields.todaySetOn = { value: input.today ? todayYMD(tz) : "" };
     updated.push("today");
   }
   if (input.scheduled !== undefined) { fields.scheduled = { value: input.scheduled ?? "" }; updated.push("scheduled"); }

@@ -1,4 +1,5 @@
 import { queryByDateRange, type CloudKitClient } from "../cloudkit.js";
+import { getEffectiveTimezone, todayYMD, ymdNDaysAgo, nowHHMM, localToEpochMs } from "../tz.js";
 
 const SHORTID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 function newId(len = 6): string {
@@ -16,19 +17,6 @@ function slugify(s: string): string {
     || newId(6);
 }
 
-function todayYMD(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-function ymdNDaysAgo(n: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-function currentHHMM(): string {
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
 function optStr(v: unknown): string | undefined {
   return typeof v === "string" && v.length > 0 ? v : undefined;
 }
@@ -247,8 +235,9 @@ export interface UpdateSessionTypeInput {
 // ============================================================================
 
 export async function listTrainingEntries(client: CloudKitClient, input: ListTrainingEntriesInput) {
-  const from = input.date ?? input.from ?? ymdNDaysAgo(13);
-  const to   = input.date ?? input.to   ?? todayYMD();
+  const tz = await getEffectiveTimezone(client);
+  const from = input.date ?? input.from ?? ymdNDaysAgo(13, tz);
+  const to   = input.date ?? input.to   ?? todayYMD(tz);
 
   // `exercise` is an unindexed STRING — pushing EQUALS server-side risks a
   // CloudKit 400 (same failure mode as the date range). Fetch the date window,
@@ -289,15 +278,17 @@ export async function listTrainingEntries(client: CloudKitClient, input: ListTra
 }
 
 export async function logTrainingEntry(client: CloudKitClient, input: LogTrainingEntryInput) {
+  const tz = await getEffectiveTimezone(client);
   const id = newId(6);
-  const date = input.date ?? todayYMD();
-  const time = input.time ?? currentHHMM();
+  const date = input.date ?? todayYMD(tz);
+  const time = input.time ?? nowHHMM(tz);
   const fields: Record<string, { value: unknown }> = {
     date:        { value: date },
     time:        { value: time },
     sessionType: { value: input.sessionType },
     exercise:    { value: input.exercise },
     loggedAt:    { value: new Date().toISOString() },
+    occurredAt:  { value: localToEpochMs(date, time, tz) },
   };
   if (input.weight      !== undefined) fields.weight      = { value: input.weight };
   if (input.sets        !== undefined) fields.sets        = { value: input.sets };

@@ -1,4 +1,5 @@
 import type { CloudKitClient } from "../cloudkit.js";
+import { getEffectiveTimezone, todayYMD } from "../tz.js";
 
 const SHORTID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 function newId(len = 4): string {
@@ -7,10 +8,6 @@ function newId(len = 4): string {
   return Array.from(buf, (b) => SHORTID_ALPHABET[b & 31]).join("");
 }
 
-function todayYMD(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 function optStr(v: unknown): string | undefined {
   return typeof v === "string" && v.length > 0 ? v : undefined;
 }
@@ -187,12 +184,14 @@ export async function updateGroceryItem(client: CloudKitClient, input: UpdateGro
 /// item as out / running low. `low=false` clears the flag and stamps
 /// lastBought to today (restock signal).
 export async function setGroceryLow(client: CloudKitClient, input: SetGroceryLowInput) {
+  const tz = await getEffectiveTimezone(client);
+  const today = todayYMD(tz);
   const fields: Record<string, { value: unknown }> = {
     low: { value: input.low ? 1 : 0 },
   };
   if (!input.low) {
     // Restocked. lastBought=today is the conventional signal.
-    fields.lastBought = { value: todayYMD() };
+    fields.lastBought = { value: today };
   }
   const res = await modify(client, [{
     operationType: "forceUpdate",
@@ -200,7 +199,7 @@ export async function setGroceryLow(client: CloudKitClient, input: SetGroceryLow
   }]);
   const code = res.records[0]?.serverErrorCode;
   if (code) throw new Error(res.records[0]?.reason ?? code);
-  return { id: input.id, low: input.low, ...(input.low ? {} : { lastBought: todayYMD() }) };
+  return { id: input.id, low: input.low, ...(input.low ? {} : { lastBought: today }) };
 }
 
 export async function deleteGroceryItem(client: CloudKitClient, input: { id: string }) {

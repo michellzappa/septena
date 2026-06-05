@@ -1,19 +1,11 @@
 import { queryByDateRange, type CloudKitClient } from "../cloudkit.js";
+import { getEffectiveTimezone, todayYMD, ymdNDaysAgo, nowHHMMSS, localToEpochMs } from "../tz.js";
 
 const SHORTID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 function newId(len = 4): string {
   const buf = new Uint8Array(len);
   crypto.getRandomValues(buf);
   return Array.from(buf, (b) => SHORTID_ALPHABET[b & 31]).join("");
-}
-
-function todayYMD(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function currentHHMMSS(): string {
-  return new Date().toTimeString().slice(0, 8);
 }
 
 function optStr(v: unknown): string | undefined {
@@ -96,8 +88,9 @@ export interface CreateCannabisStrainInput { name: string }
 // ---- Implementations ----
 
 export async function listCannabisEvents(client: CloudKitClient, input: ListCannabisEventsInput) {
-  const from = input.date ?? input.from ?? (() => { const d = new Date(); d.setDate(d.getDate() - 6); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
-  const to   = input.date ?? input.to   ?? todayYMD();
+  const tz = await getEffectiveTimezone(client);
+  const from = input.date ?? input.from ?? ymdNDaysAgo(6, tz);
+  const to   = input.date ?? input.to   ?? todayYMD(tz);
 
   const records = await queryByDateRange(client, {
     recordType: "CannabisEvent",
@@ -123,13 +116,15 @@ export async function listCannabisEvents(client: CloudKitClient, input: ListCann
 }
 
 export async function logCannabisEvent(client: CloudKitClient, input: LogCannabisEventInput) {
+  const tz = await getEffectiveTimezone(client);
   const id = newId(6);
-  const date = input.date ?? todayYMD();
-  const time = input.time ?? currentHHMMSS();
+  const date = input.date ?? todayYMD(tz);
+  const time = input.time ?? nowHHMMSS(tz);
   const fields: Record<string, { value: unknown }> = {
     date:   { value: date },
     time:   { value: time },
     method: { value: input.method },
+    occurredAt: { value: localToEpochMs(date, time, tz) },
   };
   if (input.strain)             fields.strain = { value: input.strain };
   if (input.hit   !== undefined) fields.hit   = { value: input.hit };

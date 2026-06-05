@@ -12,34 +12,28 @@ import type { CloudKitClient } from "../cloudkit.js";
 // contributes correctly. The water-only entry list is filtered to the
 // marker shape for the "what did I log under hydration?" view.
 
+import { getEffectiveTimezone, todayYMD, ymdNDaysAgo, addDaysYMD, localToEpochMs } from "../tz.js";
+
 function newUUID(): string {
   return crypto.randomUUID();
 }
 
-function todayYMD(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function startOfDayEpochMs(ymd: string, tz: string): number {
+  return localToEpochMs(ymd, "00:00", tz);
 }
 
-function ymdNDaysAgo(n: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function endOfDayEpochMs(ymd: string, tz: string): number {
+  // Inclusive end = 1ms before the start of the next local day.
+  return localToEpochMs(addDaysYMD(ymd, 1), "00:00", tz) - 1;
 }
 
-function startOfDayEpochMs(ymd: string): number {
-  const [y, m, d] = ymd.split("-").map(Number);
-  return new Date(y, (m ?? 1) - 1, d ?? 1, 0, 0, 0, 0).getTime();
-}
-
-function endOfDayEpochMs(ymd: string): number {
-  const [y, m, d] = ymd.split("-").map(Number);
-  return new Date(y, (m ?? 1) - 1, d ?? 1, 23, 59, 59, 999).getTime();
-}
-
-function ymdFromEpochMs(ms: number): string {
-  const d = new Date(ms);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+/** The local calendar date (in `tz`) of an instant, "YYYY-MM-DD". */
+function ymdFromEpochMs(ms: number, tz: string): string {
+  const dtf = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
+  });
+  // en-CA renders as YYYY-MM-DD.
+  return dtf.format(new Date(ms));
 }
 
 function optStr(v: unknown): string | undefined {
@@ -121,12 +115,12 @@ function isHydrationOnly(e: NutritionEntryShape): boolean {
       && e.carbsG === 0;
 }
 
-async function queryNutritionRange(client: CloudKitClient, from: string, to: string, limit = 500) {
+async function queryNutritionRange(client: CloudKitClient, from: string, to: string, tz: string, limit = 500) {
   return client.queryRecords({
     recordType: "NutritionEntry",
     filterBy: [
-      { fieldName: "loggedAt", comparator: "GREATER_THAN_OR_EQUALS", fieldValue: { value: startOfDayEpochMs(from) } },
-      { fieldName: "loggedAt", comparator: "LESS_THAN_OR_EQUALS",    fieldValue: { value: endOfDayEpochMs(to) } },
+      { fieldName: "loggedAt", comparator: "GREATER_THAN_OR_EQUALS", fieldValue: { value: startOfDayEpochMs(from, tz) } },
+      { fieldName: "loggedAt", comparator: "LESS_THAN_OR_EQUALS",    fieldValue: { value: endOfDayEpochMs(to, tz) } },
     ],
     sortBy: [{ fieldName: "loggedAt", ascending: false }],
     resultsLimit: limit,
@@ -169,8 +163,9 @@ export async function logHydration(client: CloudKitClient, input: LogHydrationIn
 }
 
 export async function hydrationToday(client: CloudKitClient) {
-  const today = todayYMD();
-  const res = await queryNutritionRange(client, today, today, 200);
+  const tz = await getEffectiveTimezone(client);
+  const today = todayYMD(tz);
+  const res = await queryNutritionRange(client, today, today, tz, 200);
 
   let totalMl = 0;
   const waterOnly: Array<{ id: string; ml: number; loggedAt: string; note?: string }> = [];
@@ -199,10 +194,11 @@ export async function hydrationToday(client: CloudKitClient) {
 }
 
 export async function hydrationHistory(client: CloudKitClient, input: HydrationHistoryInput) {
-  const to   = input.to ?? todayYMD();
-  const from = input.from ?? ymdNDaysAgo((input.days ?? 7) - 1);
+  const tz = await getEffectiveTimezone(client);
+  const to   = input.to ?? todayYMD(tz);
+  const from = input.from ?? ymdNDaysAgo((input.days ?? 7) - 1, tz);
 
-  const res = await queryNutritionRange(client, from, to, 1000);
+  const res = await queryNutritionRange(client, from, to, tz, 1000);
 
   // Bucket by day. Total includes water from ALL nutrition entries —
   // a meal that recorded waterMl contributes to its day's hydration total.
@@ -211,7 +207,7 @@ export async function hydrationHistory(client: CloudKitClient, input: HydrationH
   for (const r of res.records) {
     const loggedAt = typeof r.fields.loggedAt?.value === "number" ? (r.fields.loggedAt.value as number) : 0;
     if (!loggedAt) continue;
-    const day = ymdFromEpochMs(loggedAt);
+    const day = ymdFromEpochMs(loggedAt, tz);
     const e: NutritionEntryShape = {
       loggedAt,
       foods:    optStr(r.fields.foods?.value) ?? "",
@@ -228,11 +224,9 @@ export async function hydrationHistory(client: CloudKitClient, input: HydrationH
   }
 
   // Emit one row per day in the range, including zero days for visibility.
+  // Step calendar dates directly (DST-safe) rather than fixed-ms epoch hops.
   const days: Array<{ date: string; totalMl: number; waterOnlyCount: number }> = [];
-  const startMs = startOfDayEpochMs(from);
-  const endMs   = startOfDayEpochMs(to);
-  for (let t = startMs; t <= endMs; t += 24 * 60 * 60 * 1000) {
-    const day = ymdFromEpochMs(t);
+  for (let day = from; day <= to; day = addDaysYMD(day, 1)) {
     const cur = byDay.get(day) ?? { totalMl: 0, waterOnlyCount: 0 };
     days.push({ date: day, totalMl: cur.totalMl, waterOnlyCount: cur.waterOnlyCount });
   }
