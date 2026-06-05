@@ -93,6 +93,20 @@ Net: the linchpin risk (xcodegen wiping localization config) is **retired**. The
 
 ---
 
+## Groundwork log (Phase 1 prep)
+
+**Extraction (build-time, auto):** the iOS target populated `Septena/Localizable.xcstrings` to ~344 keys. Composition: ~246 real phrases (158 short chrome + 88 long sentences — the bulk of the translation work), 73 with format args, 6 plural hacks, 37 non-linguistic.
+
+**Triage — DONE:** 37 non-linguistic keys marked `shouldTranslate:false` (symbols `· • ×`, SI units `kg/ml`, stat codes `n=%@`/`%@C`/`30d`, axis labels `x̄ = …`). Surgical edit — Xcode formatting preserved, JSON valid, key set unchanged. They now skip every translation pass.
+- Judgment calls flagged for later: `of %@` is a **sentence fragment** (real fix = kill the source string-concatenation, not don't-translate); `PR` and `→ %@ %@ in 7d` left English as compact stat lines.
+
+**Remaining groundwork before any translation starts:**
+1. **Plurals** — convert the 6 `count == 1 ? "" : "s"` hacks to catalog plural variations. Needs a *source* change: pass the count as a number (`%lld`), not a pre-formatted string, so Xcode can key plural rules on it.
+2. **Non-auto strings (biggest gap)** — computed `String` (enum `displayName`s, view-model strings, greeting fallbacks) don't auto-extract. Audit + wrap chrome in `String(localized:)` so it lands in the catalog.
+3. **Comments** — add translator context to the 73 format strings, ideally via `Text("…", comment:)` at source (durable across re-extraction).
+4. **Formatting** — locale-aware number parse (replace the Caffeine `,`→`.` hack) + convert display date formatters to `.formatted()` (Phase 0 Task 3).
+5. **Pick the translation mechanism** — in-catalog editor vs. export `.xcloc`/`.xliff` to a service / DeepL / Claude.
+
 ## Repo-specific gotchas (ranked)
 
 1. **xcodegen silently undoes Xcode-side localization config.** Declare languages via `CFBundleLocalizations` in `project.yml`, never the Xcode UI.

@@ -2,16 +2,27 @@
   "sourceLanguage" : "en",
   "strings" : {
     "·" : {
-
+      "shouldTranslate" : false
     },
     "· %@" : {
-
+      "shouldTranslate" : false
     },
     "“Anytime” keeps it on the home feed all day. Pick a slot and it only appears from then on — so you’re not staring at the whole day’s stack at once." : {
 
     },
     "%@" : {
-
+      "shouldTranslate" : false
+    },
+    "%@ – %@" : {
+      "shouldTranslate" : false,
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ – %2$@"
+          }
+        }
+      }
     },
     "%@ — %@ of %@ exercises done%@" : {
       "localizations" : {
@@ -34,6 +45,7 @@
       }
     },
     "%@ (%@d) vs %@ (%@d)" : {
+      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -44,6 +56,7 @@
       }
     },
     "%@ / %@" : {
+      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -54,6 +67,7 @@
       }
     },
     "%@ %@" : {
+      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -109,7 +123,7 @@
 
     },
     "%@ ml" : {
-
+      "shouldTranslate" : false
     },
     "%@ ref%@" : {
       "localizations" : {
@@ -134,6 +148,7 @@
 
     },
     "%@: x̄=%@%@  ·  ȳ=%@%@  ·  n=%@" : {
+      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -144,6 +159,7 @@
       }
     },
     "%@/%@" : {
+      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -174,6 +190,7 @@
       }
     },
     "%@/%@%@" : {
+      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -184,6 +201,7 @@
       }
     },
     "%@/%@m" : {
+      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -194,6 +212,7 @@
       }
     },
     "%@%@" : {
+      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -204,19 +223,19 @@
       }
     },
     "%@C" : {
-
+      "shouldTranslate" : false
     },
     "%@d" : {
-
+      "shouldTranslate" : false
     },
     "%@d over" : {
 
     },
     "%@F" : {
-
+      "shouldTranslate" : false
     },
     "%@Fb" : {
-
+      "shouldTranslate" : false
     },
     "%@kcal" : {
 
@@ -225,12 +244,13 @@
 
     },
     "%@P" : {
-
+      "shouldTranslate" : false
     },
     "•" : {
-
+      "shouldTranslate" : false
     },
     "→ %@ %@ in 7d" : {
+      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -241,10 +261,13 @@
       }
     },
     "×%@" : {
+      "shouldTranslate" : false
+    },
+    "|r| ≥ 0.30, p < 0.05, monotonic" : {
 
     },
     "⏳ %@" : {
-
+      "shouldTranslate" : false
     },
     "1 year" : {
 
@@ -262,16 +285,16 @@
 
     },
     "30d" : {
-
+      "shouldTranslate" : false
     },
     "60d" : {
-
+      "shouldTranslate" : false
     },
     "90 days" : {
 
     },
     "90d" : {
-
+      "shouldTranslate" : false
     },
     "A centered greeting at the top of the home tab. Add your name to personalize it — with Apple Intelligence it's freshly written through the day. \"Aware of your day\" lets it nod to what's left on today's list." : {
 
@@ -447,6 +470,12 @@
     "Copy a prompt and paste it into an LLM along with the source data you want to import. The model returns JSON that pastes straight into Import above." : {
 
     },
+    "CORRELATIONS DASHBOARD" : {
+
+    },
+    "Correlations dashboard, custom app icons, and more." : {
+
+    },
     "Create a Personal Access Token at cloud.ouraring.com/personal-access-tokens, then paste it here. Tokens stay on this device (Keychain) and are never sent to any Septena server." : {
 
     },
@@ -483,6 +512,16 @@
     },
     "DAY STREAK" : {
 
+    },
+    "Default: morning until %@, afternoon until %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Default: morning until %1$@, afternoon until %2$@."
+          }
+        }
+      }
     },
     "Direction contradicts physiology — likely confound or reverse causation. Demoted to exploratory." : {
 
@@ -589,8 +628,11 @@
     "I'm feeling" : {
 
     },
-    "id: %@" : {
+    "iCloud" : {
 
+    },
+    "id: %@" : {
+      "shouldTranslate" : false
     },
     "id: %@   area: %@" : {
       "localizations" : {
@@ -671,7 +713,7 @@
 
     },
     "kg" : {
-
+      "shouldTranslate" : false
     },
     "Kind" : {
 
@@ -682,16 +724,6 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "lag %1$@d · n=%2$@"
-          }
-        }
-      }
-    },
-    "lag %@d · n=%@ · p=%@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "lag %1$@d · n=%2$@ · p=%3$@"
           }
         }
       }
@@ -721,7 +753,13 @@
     "Macro tiles" : {
 
     },
+    "Make Septena yours" : {
+
+    },
     "MCP" : {
+
+    },
+    "Membership" : {
 
     },
     "Metric" : {
@@ -734,6 +772,12 @@
 
     },
     "ml" : {
+      "shouldTranslate" : false
+    },
+    "Mock membership for testing — no purchase is made. Turn this off to re-lock Septena+ features." : {
+
+    },
+    "Mock unlock — no purchase is made yet." : {
 
     },
     "Month" : {
@@ -743,7 +787,7 @@
 
     },
     "n=%@" : {
-
+      "shouldTranslate" : false
     },
     "New entries you log in Septena will be sent to Apple Health. Existing entries are not back-filled." : {
 
@@ -827,10 +871,10 @@
 
     },
     "of %@" : {
-
+      "shouldTranslate" : false
     },
     "OK" : {
-
+      "shouldTranslate" : false
     },
     "One app for every corner of your life" : {
 
@@ -848,7 +892,7 @@
 
     },
     "p=%@" : {
-
+      "shouldTranslate" : false
     },
     "Parameters" : {
 
@@ -880,8 +924,11 @@
     "Pick which calendars contribute events to your day timeline and Next page. Hidden calendars stay untouched in iOS Calendar." : {
 
     },
-    "PR" : {
+    "Power-user features for people who live in the app — starting with the Correlations dashboard and custom app icons." : {
 
+    },
+    "PR" : {
+      "shouldTranslate" : false
     },
     "PROGRESS" : {
 
@@ -962,6 +1009,12 @@
     "Septena attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device." : {
 
     },
+    "Septena keeps all your data in your private iCloud, so it needs you signed in. Open Settings and sign in to iCloud to use the app and sync across your devices." : {
+
+    },
+    "Septena keeps everything in your private iCloud — there's no separate Septena account. Your data and membership are tied to your Apple ID." : {
+
+    },
     "Septena needs access to read your Reminders." : {
 
     },
@@ -974,10 +1027,19 @@
     "Septena writes your logged data to Apple Health so it appears alongside data from your other apps and devices." : {
 
     },
+    "Septena+ membership" : {
+
+    },
     "Services" : {
 
     },
     "SESSION COMPLETE" : {
+
+    },
+    "Set when each part of your day begins. These boundaries drive the Morning / Afternoon / Evening groups in Habits and Supplements, the “Now” marker, what the Next list surfaces, and the welcome greeting." : {
+
+    },
+    "Set when morning, afternoon, and evening begin — used across Habits, Supplements, the “Now” marker, and the greeting." : {
 
     },
     "Settings" : {
@@ -1066,6 +1128,9 @@
         }
       }
     },
+    "Supplements → Sleep score" : {
+
+    },
     "Synthesize your map" : {
 
     },
@@ -1103,6 +1168,9 @@
 
     },
     "The copied text includes the connection preamble + this section's brief — paste it into an MCP client's system prompt or a Claude conversation to teach it how to use the section." : {
+
+    },
+    "The default icon is always free. Color icons are part of Septena+. iOS shows a confirmation prompt each time you switch icons." : {
 
     },
     "The original multicolor icon." : {
@@ -1164,6 +1232,9 @@
     "Trusted" : {
 
     },
+    "Trusted signals" : {
+
+    },
     "Turn a reflection into goals" : {
 
     },
@@ -1184,6 +1255,12 @@
       }
     },
     "Universal conventions every section relies on. Each section skill below extends this." : {
+
+    },
+    "Unlock %@" : {
+
+    },
+    "Upgrade to %@" : {
 
     },
     "Version %@ (%@)" : {
@@ -1224,6 +1301,7 @@
 
     },
     "x = %@%@" : {
+      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1234,6 +1312,7 @@
       }
     },
     "x̄ = %@%@  ·  ȳ = %@%@" : {
+      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1244,6 +1323,7 @@
       }
     },
     "y = %@%@" : {
+      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1256,10 +1336,17 @@
     "You have " : {
 
     },
+    "Your name personalizes the home greeting and this profile. It syncs across your devices via iCloud." : {
+
+    },
+    "Your Septena+ perks" : {
+
+    },
     "Zone 2 cardio" : {
 
     },
     "Δ %@%@" : {
+      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1268,6 +1355,9 @@
           }
         }
       }
+    },
+    "Δ = taken mean − off mean" : {
+
     }
   },
   "version" : "1.0"
