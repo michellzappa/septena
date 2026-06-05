@@ -51,9 +51,6 @@ struct RootTabView: View {
       // sidebar row in Tasks does too.
       .sheet(isPresented: $nav.showSettings) {
         SettingsView()
-          #if os(macOS)
-          .frame(minWidth: 720, minHeight: 460)
-          #endif
       }
       // App-global Quick Find palette. Mounted here so the magnifyingglass
       // button in every home view's top-right opens it, regardless of tab.

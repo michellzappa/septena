@@ -94,6 +94,11 @@ enum SettingsKey {
   /// the Tasks tab. Default `drawer` so Tasks matches the other sections;
   /// users who prefer landing on the full Tasks tab can flip it.
   static let tasksOpenIn      = "septena.tasks.openIn"
+  /// Mock entitlement flag for the (not-yet-real) Septena+ membership.
+  /// Local-only @AppStorage — there's no StoreKit / IAP yet, so this is
+  /// flipped by the in-app "mock unlock" toggle in the paywall. Gates the
+  /// Correlations homepage layout; turning it off re-locks Plus features.
+  static let plusUnlocked     = "septena.plus.unlocked"
 }
 
 /// Where a homepage tap on the Tasks tile lands. `drawer` shows today's
@@ -143,6 +148,16 @@ enum AppIconOption: String, CaseIterable, Identifiable {
 
   var alternateIconName: String? {
     self == .default ? nil : rawValue
+  }
+
+  /// Whether this icon sits behind Septena+. The original multicolor icon
+  /// is free; every recolor is a Plus perk for now. When we want to give
+  /// away a colorway, list it here alongside `.default`.
+  var requiresPlus: Bool {
+    switch self {
+    case .default: return false
+    default:       return true
+    }
   }
 
   var background: Color {
@@ -484,7 +499,13 @@ struct SettingsView: View {
           .navigationTitle(title(for: dest))
       }
     }
-    .frame(minWidth: 720, minHeight: 460)
+    // Fixed sheet size on macOS. With only minimums the sheet grew and
+    // shrank to fit each pane's intrinsic content height, so navigating
+    // between a short pane (Privacy) and a tall one (App Icon grid) made
+    // the whole window jump. A stable frame lets the Form/List scroll
+    // internally instead — matching the fixed-frame QuickFind / AddInfo
+    // sheets.
+    .frame(width: 760, height: 560)
     .toolbar {
       ToolbarItem(placement: .confirmationAction) {
         Button("Done") { dismiss() }
@@ -497,6 +518,11 @@ struct SettingsView: View {
   @ViewBuilder
   private var sidebarList: some View {
     List {
+      SwiftUI.Section {
+        NavigationLink(value: SettingsDestination.account) {
+          IdentityHeaderRow()
+        }
+      }
       SwiftUI.Section {
         ForEach(staticDestinations, id: \.self) { dest in
           NavigationLink(value: dest) { staticRow(dest) }
@@ -517,11 +543,16 @@ struct SettingsView: View {
         .environment(\.editMode, .constant(.active))
       }
     }
+    .scrollContentBackground(.hidden)
+    .background(SettingsTopGradient())
   }
   #else
   @ViewBuilder
   private func sidebarList(selection: Binding<SettingsDestination?>) -> some View {
     List(selection: selection) {
+      SwiftUI.Section {
+        IdentityHeaderRow().tag(SettingsDestination.account)
+      }
       SwiftUI.Section {
         ForEach(staticDestinations, id: \.self) { dest in
           staticRow(dest).tag(dest)
@@ -699,6 +730,29 @@ struct SectionEntry: Identifiable, Hashable {
   /// User has turned this section off. The row stays in the sidebar but
   /// renders muted so it's clear the section isn't active.
   var isEnabled: Bool { server.isEnabled }
+}
+
+/// Soft top-down luminance wash behind the Settings list — the same
+/// subtle lift Apple's Settings.app draws under the title. A near-white
+/// (or, in dark mode, a faint white) band fades into the grouped
+/// background over the first ~300pt, so the top of the list reads a touch
+/// brighter without changing the rest of the surface.
+private struct SettingsTopGradient: View {
+  @Environment(\.colorScheme) private var scheme
+  var body: some View {
+    ZStack(alignment: .top) {
+      Theme.groupedBackground
+      LinearGradient(
+        colors: [scheme == .dark ? Color.white.opacity(0.06)
+                                 : Color.white.opacity(0.9),
+                 .clear],
+        startPoint: .top, endPoint: .bottom
+      )
+      .frame(height: 300)
+      .frame(maxWidth: .infinity, alignment: .top)
+    }
+    .ignoresSafeArea()
+  }
 }
 
 // MARK: - Privacy
@@ -994,8 +1048,10 @@ struct LayoutSettingsPane: View {
             Label {
               HStack {
                 Text(mode.title)
-                if !mode.isImplemented {
-                  Spacer()
+                Spacer()
+                if mode.requiresPlus && !plusUnlocked {
+                  SeptenaPlusBadge()
+                } else if !mode.isImplemented {
                   Text("Coming soon")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -1025,6 +1081,20 @@ struct LayoutSettingsPane: View {
       }
     }
     .formStyle(.grouped)
+    .sheet(isPresented: $showPaywall) {
+      SeptenaPlusPaywall {
+        plusUnlocked = true
+        homepageLayoutRaw = HomepageLayoutMode.correlations.rawValue
+        showPaywall = false
+      }
+    }
+    // Re-locking (via the Account pane's mock toggle) must not leave a
+    // Plus-only layout active — fall back to the default free layout.
+    .onChange(of: plusUnlocked) { _, unlocked in
+      if !unlocked && self.current.requiresPlus {
+        homepageLayoutRaw = HomepageLayoutMode.tiles.rawValue
+      }
+    }
   }
 }
 
@@ -1088,6 +1158,8 @@ struct CorrelationsSettingsPane: View {
 // MARK: - App Icon submenu
 
 struct AppIconSettingsPane: View {
+  @AppStorage(SettingsKey.plusUnlocked) private var plusUnlocked: Bool = false
+  @State private var showPaywall = false
   #if os(iOS)
   @State private var selectedIcon: AppIconOption = .current
   @State private var iconError: String? = nil
@@ -1115,6 +1187,12 @@ struct AppIconSettingsPane: View {
       #endif
     }
     .formStyle(.grouped)
+    .sheet(isPresented: $showPaywall) {
+      SeptenaPlusPaywall {
+        plusUnlocked = true
+        showPaywall = false
+      }
+    }
     #if os(iOS)
     .onAppear { selectedIcon = .current }
     .alert("Couldn’t Change App Icon", isPresented: Binding(
@@ -1160,6 +1238,7 @@ struct AppIconSettingsPane: View {
             } label: {
               AppIconChoiceCard(option: option,
                                 isSelected: option == selectedIcon,
+                                isLocked: option.requiresPlus && !plusUnlocked,
                                 isDisabled: iconChangeInFlight)
             }
             .buttonStyle(.plain)
@@ -1169,11 +1248,21 @@ struct AppIconSettingsPane: View {
       }
       .padding(.vertical, 4)
     } footer: {
-      Text("iOS shows a confirmation prompt each time you switch icons.")
+      if plusUnlocked {
+        Text("iOS shows a confirmation prompt each time you switch icons.")
+      } else {
+        Text("The default icon is always free. Color icons are part of Septena+. iOS shows a confirmation prompt each time you switch icons.")
+      }
     }
   }
 
   private func selectIcon(_ option: AppIconOption) {
+    // Alternate colorways are a Septena+ perk — route locked picks to the
+    // paywall instead of switching the icon. The default icon is free.
+    if option.requiresPlus && !plusUnlocked {
+      showPaywall = true
+      return
+    }
     guard option != selectedIcon, !iconChangeInFlight else { return }
     iconChangeInFlight = true
     UIApplication.shared.setAlternateIconName(option.alternateIconName) { error in
@@ -1271,47 +1360,540 @@ private struct LayoutPreviewExample: View {
   }
 }
 
-/// Static sample row for the `.correlations` mode preview — doesn't
-/// run CorrelationEngine, just shows what one trusted-pair row looks
-/// like so the settings example matches the live dashboard shape.
+/// Fuller, static stand-in for the `.correlations` homepage layout — the
+/// same shape `CorrelationsHomepageView` draws (supplements → sleep
+/// table, a "Trusted signals" header, and a grid of dose-response tiles
+/// with mini scatter + bucket charts) but on deterministic sample data,
+/// so the Layout example (and the Septena+ paywall hero) reads like the
+/// real dashboard rather than a single summary row. Doesn't touch
+/// CorrelationEngine.
 private struct CorrelationsPreviewExample: View {
   var body: some View {
-    VStack(spacing: 0) {
-      row(predictor: "Magnesium", target: "Sleep score", r: 0.42, lag: 1, n: 58, p: 0.014, color: .indigo, positive: true)
-      Divider().padding(.leading, 12)
-      row(predictor: "Caffeine after 2pm", target: "Sleep score", r: -0.31, lag: 0, n: 41, p: 0.038, color: .brown, positive: false)
+    VStack(alignment: .leading, spacing: 14) {
+      supplementsCard
+
+      VStack(alignment: .leading, spacing: 2) {
+        Text("Trusted signals").font(.septenaSectionTitle)
+        Text("|r| ≥ 0.30, p < 0.05, monotonic")
+          .font(.caption).foregroundStyle(.secondary)
+      }
+
+      LazyVGrid(columns: [GridItem(.flexible(), spacing: 12),
+                          GridItem(.flexible(), spacing: 12)],
+                spacing: 12) {
+        TileView(pair: CorrelationPreviewSample.magnesium, color: .indigo)
+        TileView(pair: CorrelationPreviewSample.fiber, color: .green)
+      }
+    }
+  }
+
+  private var supplementsCard: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      VStack(alignment: .leading, spacing: 2) {
+        Text("Supplements → Sleep score").font(.septenaSectionTitle)
+        Text("Δ = taken mean − off mean")
+          .font(.caption).foregroundStyle(.secondary)
+      }
+      VStack(spacing: 0) {
+        let rows = CorrelationPreviewSample.supplementRows
+        ForEach(rows) { row in
+          supplementRow(row)
+          if row.id != rows.last?.id {
+            Divider().padding(.leading, 28)
+          }
+        }
+      }
+      .background(
+        RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.cardSurface)
+      )
+    }
+  }
+
+  private func supplementRow(_ row: CorrelationEngine.SupplementSleepRow) -> some View {
+    let color: Color = row.meetsBar ? (row.delta >= 0 ? .green : .red) : .gray
+    return HStack(spacing: 8) {
+      Circle().fill(color).frame(width: 8, height: 8)
+      Text("\(row.emoji) \(row.label)")
+        .font(.subheadline).lineLimit(1)
+      Spacer()
+      Text("Δ \(row.delta >= 0 ? "+" : "")\(String(format: "%.1f", row.delta))")
+        .font(.caption.monospacedDigit().weight(.semibold))
+        .foregroundStyle(color)
+      Text(row.strength)
+        .font(.caption2)
+        .padding(.horizontal, 5)
+        .padding(.vertical, 1)
+        .background(color.opacity(0.15), in: Capsule())
+        .foregroundStyle(color)
+    }
+    .padding(.vertical, 8)
+    .padding(.horizontal, 12)
+  }
+}
+
+/// Deterministic sample data backing `CorrelationsPreviewExample`. Two
+/// continuous predictor → target pairs (so the mini charts show a real
+/// scatter + tertile bucket line) plus a small supplements → sleep table.
+private enum CorrelationPreviewSample {
+  static let magnesium = makePair(
+    predictor: .init(key: "mag", label: "Magnesium", section: "supplements", unit: "mg", binary: false),
+    target:    .init(key: "sleep_score", label: "Sleep score", section: "sleep", unit: "", binary: false),
+    r: 0.42, slope: 0.04, lag: 1, p: 0.014,
+    xRange: 120...420, yBase: 72, yPerX: 0.035, jitter: 3.5
+  )
+
+  static let fiber = makePair(
+    predictor: .init(key: "fiber", label: "Fiber", section: "nutrition", unit: "g", binary: false),
+    target:    .init(key: "readiness", label: "Readiness", section: "sleep", unit: "", binary: false),
+    r: 0.36, slope: 0.45, lag: 0, p: 0.028,
+    xRange: 12...46, yBase: 70, yPerX: 0.42, jitter: 3.5
+  )
+
+  static let supplementRows: [CorrelationEngine.SupplementSleepRow] = [
+    .init(supplementID: "mag", label: "Magnesium", emoji: "💊",
+          takenMean: 84.2, takenN: 41, offMean: 78.9, offN: 22),
+    .init(supplementID: "gly", label: "Glycine", emoji: "🌙",
+          takenMean: 82.6, takenN: 28, offMean: 79.4, offN: 30),
+    .init(supplementID: "theanine", label: "L-Theanine", emoji: "🍵",
+          takenMean: 80.9, takenN: 19, offMean: 80.3, offN: 33),
+  ]
+
+  /// Build one evaluated pair with a scatter that trends along
+  /// `yBase + (x − min) · yPerX` plus deterministic sinusoidal jitter,
+  /// and three tertile buckets summarising it. Just enough structure for
+  /// `MiniChart` to draw points + the bucket line.
+  private static func makePair(
+    predictor: CorrelationEngine.FeatureSpec,
+    target: CorrelationEngine.FeatureSpec,
+    r: Double, slope: Double, lag: Int, p: Double,
+    xRange: ClosedRange<Double>, yBase: Double, yPerX: Double, jitter: Double
+  ) -> CorrelationEngine.EvaluatedPair {
+    let count = 34
+    let span = xRange.upperBound - xRange.lowerBound
+    let points: [CorrelationPairPoint] = (0..<count).map { i in
+      let t = Double(i) / Double(count - 1)
+      let x = xRange.lowerBound + t * span
+      let noise = sin(Double(i) * 1.9) * jitter + cos(Double(i) * 0.7) * jitter * 0.5
+      let y = yBase + (x - xRange.lowerBound) * yPerX + noise
+      return CorrelationPairPoint(date: "d\(i)", x: x, y: y)
+    }
+    let lo = xRange.lowerBound + span / 3
+    let hi = xRange.lowerBound + span * 2 / 3
+    func bucket(_ contains: (Double) -> Bool, center: Double) -> CorrelationEngine.Bucket {
+      let pts = points.filter { contains($0.x) }
+      let ys = pts.map(\.y)
+      let xs = pts.map(\.x)
+      let meanY = ys.isEmpty ? yBase : ys.reduce(0, +) / Double(ys.count)
+      return CorrelationEngine.Bucket(centerX: center, meanY: meanY, n: pts.count,
+                                      xMin: xs.min() ?? center, xMax: xs.max() ?? center)
+    }
+    let buckets = [
+      bucket({ $0 < lo }, center: (xRange.lowerBound + lo) / 2),
+      bucket({ $0 >= lo && $0 < hi }, center: (lo + hi) / 2),
+      bucket({ $0 >= hi }, center: (hi + xRange.upperBound) / 2),
+    ]
+    let meanX = points.map(\.x).reduce(0, +) / Double(count)
+    let meanY = points.map(\.y).reduce(0, +) / Double(count)
+    return CorrelationEngine.EvaluatedPair(
+      spec: .init(predictor: predictor, target: target,
+                  lagPreference: lag, expected: .positive, titleOverride: nil),
+      r: r, n: count, lag: lag, p: p, slope: slope, meanX: meanX, meanY: meanY,
+      buckets: buckets, monotonic: true, expectedSign: .positive, confound: false,
+      binary: false, stateMinority: 0, stateMajority: 0, tier: .trusted, points: points
+    )
+  }
+}
+
+// MARK: - Septena+ (mock membership)
+//
+// First pass at a paid tier. There's no StoreKit / receipt validation
+// yet — `SettingsKey.plusUnlocked` is a local @AppStorage flag flipped by
+// the in-app "mock unlock" toggle. When real IAP lands, that key becomes
+// the entitlement check and the paywall's unlock action calls into
+// StoreKit instead of just setting the flag.
+
+/// One sellable Septena+ benefit. The paywall renders the list straight
+/// from `SeptenaPlus.features`, so adding a perk is a one-line append
+/// here — no paywall surgery. Keep `id` stable; a future real-IAP build
+/// can map it to an entitlement / destination.
+struct SeptenaPlusFeature: Identifiable {
+  let id: String
+  let icon: String      // SF Symbol
+  let tint: Color       // app-icon-rainbow accent for the glyph chip
+  let title: String
+  let detail: String
+}
+
+enum SeptenaPlus {
+  static let name = "Septena+"
+  /// Brand wash for badges / seals — the full seven-disc app-icon
+  /// rainbow (red → orange → yellow → green → cyan → blue → purple), so
+  /// the Plus accent reads as "the whole of Septena."
+  static let gradient = LinearGradient(
+    colors: [parseHexColor("#ef4444"),
+             parseHexColor("#f97316"),
+             parseHexColor("#eab308"),
+             parseHexColor("#22c55e"),
+             parseHexColor("#06b6d4"),
+             parseHexColor("#3b82f6"),
+             parseHexColor("#8b5cf6")],
+    startPoint: .leading, endPoint: .trailing
+  )
+
+  /// The membership's perks, in display order. Cosmetic-but-valuable
+  /// extras for people who live in the app. Currently the two gated
+  /// surfaces; append here as more land.
+  static let features: [SeptenaPlusFeature] = [
+    .init(id: "correlations",
+          icon: "chart.dots.scatter", tint: parseHexColor("#3b82f6"),
+          title: "Correlations dashboard",
+          detail: "Trusted predictor → outcome pairs across every section, with dose-response charts and a supplements → sleep table."),
+    .init(id: "appIcon",
+          icon: "app.badge", tint: parseHexColor("#8b5cf6"),
+          title: "Custom app icons",
+          detail: "Recolor the home-screen icon across the full Septena rainbow."),
+  ]
+}
+
+/// Flighty-style feature row — a tinted rounded-square glyph chip with a
+/// title + detail. Reusable wherever the membership perks are listed.
+struct SeptenaPlusFeatureRow: View {
+  let feature: SeptenaPlusFeature
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 14) {
+      RoundedRectangle(cornerRadius: 10, style: .continuous)
+        .fill(feature.tint.gradient)
+        .frame(width: 38, height: 38)
+        .overlay(
+          Image(systemName: feature.icon)
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(.white)
+        )
+      VStack(alignment: .leading, spacing: 3) {
+        Text(feature.title)
+          .font(.subheadline.weight(.semibold))
+        Text(feature.detail)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      Spacer(minLength: 0)
+    }
+  }
+}
+
+/// Compact "Septena+" pill used to mark Plus-gated rows in the picker.
+struct SeptenaPlusBadge: View {
+  var body: some View {
+    Text(SeptenaPlus.name)
+      .font(.caption2.weight(.bold))
+      .foregroundStyle(.white)
+      .padding(.horizontal, 7)
+      .padding(.vertical, 2)
+      .background(SeptenaPlus.gradient, in: Capsule())
+  }
+}
+
+/// Mock paywall for the Septena+ upgrade. Shows the live-shaped
+/// Correlations preview as the hero, the value bullets, and a clearly
+/// labelled mock unlock toggle (no purchase is made). `onUnlock` flips
+/// the entitlement and applies the gated layout.
+struct SeptenaPlusPaywall: View {
+  @Environment(\.dismiss) private var dismiss
+  let onUnlock: () -> Void
+
+  @State private var mockOn = false
+
+  var body: some View {
+    NavigationStack {
+      ScrollView {
+        VStack(alignment: .leading, spacing: 22) {
+          header
+          previewHero
+          VStack(alignment: .leading, spacing: 18) {
+            ForEach(SeptenaPlus.features) { feature in
+              SeptenaPlusFeatureRow(feature: feature)
+            }
+          }
+          unlockCard
+        }
+        .padding(20)
+      }
+      .background(Theme.groupedBackground.ignoresSafeArea())
+      .navigationTitle(SeptenaPlus.name)
+      #if os(iOS)
+      .navigationBarTitleDisplayMode(.inline)
+      #endif
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Not now") { dismiss() }
+        }
+      }
+    }
+    #if os(macOS)
+    .frame(width: 500, height: 640)
+    #endif
+  }
+
+  private var header: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(spacing: 10) {
+        Image(systemName: "checkmark.seal.fill")
+          .font(.title)
+          .foregroundStyle(SeptenaPlus.gradient)
+        SeptenaPlusBadge()
+      }
+      Text("Make Septena yours")
+        .font(.title2.weight(.semibold))
+      Text("Power-user features for people who live in the app — starting with the Correlations dashboard and custom app icons.")
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  private var previewHero: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text("CORRELATIONS DASHBOARD")
+        .font(.caption2.weight(.semibold))
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 14)
+        .padding(.top, 12)
+      CorrelationsPreviewExample()
+        .padding(.horizontal, 14)
+        .padding(.bottom, 14)
+        .allowsHitTesting(false)
     }
     .background(
-      RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.cardSurface)
+      RoundedRectangle(cornerRadius: 16, style: .continuous)
+        .fill(Theme.groupedBackground)
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: 16, style: .continuous)
+        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
     )
   }
 
-  private func row(predictor: String, target: String, r: Double, lag: Int, n: Int, p: Double, color: Color, positive: Bool) -> some View {
-    HStack(spacing: 10) {
-      Circle().fill(color).frame(width: 8, height: 8)
-      VStack(alignment: .leading, spacing: 2) {
-        HStack(spacing: 4) {
-          Text(predictor).font(.subheadline.weight(.medium)).lineLimit(1)
-          Image(systemName: "arrow.right").font(.caption2).foregroundStyle(.secondary)
-          Text(target).font(.subheadline.weight(.medium)).lineLimit(1)
+  private var unlockCard: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      Toggle(isOn: $mockOn) {
+        VStack(alignment: .leading, spacing: 2) {
+          Text("Unlock \(SeptenaPlus.name)")
+            .font(.subheadline.weight(.semibold))
+          Text("Mock unlock — no purchase is made yet.")
+            .font(.caption).foregroundStyle(.secondary)
         }
-        Text("lag \(lag)d · n=\(n) · p=\(String(format: "%.3f", p))")
-          .font(.caption2.monospacedDigit())
-          .foregroundStyle(.secondary)
       }
-      Spacer(minLength: 8)
-      Text(String(format: "%+.2f", r))
-        .font(.caption.monospacedDigit().weight(.semibold))
-        .padding(.horizontal, 6)
-        .padding(.vertical, 2)
-        .background((positive ? Color.green : Color.red).opacity(0.18), in: Capsule())
-        .foregroundStyle(positive ? Color.green : Color.red)
-      Image(systemName: "chevron.right")
-        .font(.caption2.weight(.semibold))
-        .foregroundStyle(.tertiary)
+      .onChange(of: mockOn) { _, on in
+        if on { onUnlock() }
+      }
     }
-    .padding(.vertical, 10)
-    .padding(.horizontal, 12)
+    .padding(16)
+    .background(
+      RoundedRectangle(cornerRadius: 16, style: .continuous)
+        .fill(Theme.cardSurface)
+    )
+  }
+}
+
+// MARK: - Identity (profile header + Account pane)
+//
+// Apple's Settings.app shows an Apple-ID card at the top of the list. We
+// can't read the real iCloud avatar or name (no public API for either),
+// so we render the standard substitute: a monogram avatar built from the
+// user's given name (`welcomeName`, already CloudKit-synced) with the
+// Septena+ status attached to that identity — a rainbow ring on the
+// avatar plus a badge. The card pushes to `AccountSettingsPane`, the home
+// for name, membership, and iCloud sync state.
+
+/// Circular monogram avatar. Initials over a neutral fill; a Septena+
+/// member gets the seven-color rainbow ring so the plan reads as part of
+/// who they are, not a buried setting.
+struct ProfileAvatar: View {
+  let name: String
+  let isPlus: Bool
+  var size: CGFloat = 56
+
+  private var initials: String {
+    let words = name.trimmingCharacters(in: .whitespaces).split(separator: " ")
+    // A single short token is almost certainly typed-in initials ("MZ",
+    // "abc") — show it verbatim. A longer single name → its first letter.
+    // Multi-word → first letter of the first two words.
+    if words.count <= 1 {
+      let token = words.first.map(String.init) ?? ""
+      return (token.count <= 3 ? token : String(token.prefix(1))).uppercased()
+    }
+    return words.prefix(2).compactMap(\.first).map(String.init).joined().uppercased()
+  }
+
+  var body: some View {
+    ZStack {
+      Circle().fill(Color.secondary.opacity(0.18))
+      if initials.isEmpty {
+        Image(systemName: "person.fill")
+          .font(.system(size: size * 0.46))
+          .foregroundStyle(.secondary)
+      } else {
+        Text(initials)
+          .font(.system(size: size * 0.4, weight: .semibold))
+          .foregroundStyle(.primary)
+      }
+    }
+    .frame(width: size, height: size)
+    .overlay {
+      if isPlus {
+        Circle().inset(by: -3).stroke(SeptenaPlus.gradient, lineWidth: 2.5)
+      }
+    }
+  }
+}
+
+/// Top-of-Settings identity row (avatar + name + plan). The enclosing
+/// `NavigationLink` supplies the disclosure chevron.
+struct IdentityHeaderRow: View {
+  @AppStorage(SettingsKey.welcomeName) private var welcomeName: String = ""
+  @AppStorage(SettingsKey.plusUnlocked) private var plusUnlocked: Bool = false
+
+  var body: some View {
+    HStack(spacing: 14) {
+      ProfileAvatar(name: welcomeName, isPlus: plusUnlocked, size: 56)
+      VStack(alignment: .leading, spacing: 3) {
+        Text(welcomeName.isEmpty ? "Your Profile" : welcomeName)
+          .font(.title3.weight(.semibold))
+          .foregroundStyle(.primary)
+        if plusUnlocked {
+          SeptenaPlusBadge()
+        }
+      }
+      Spacer(minLength: 0)
+    }
+    .padding(.vertical, 8)
+  }
+}
+
+/// The "Apple ID" analogue: name + avatar, membership (with the mock
+/// unlock/relock toggle), and iCloud sync state — since there's no
+/// Septena account, identity *is* the Apple ID / iCloud.
+struct AccountSettingsPane: View {
+  @AppStorage(SettingsKey.welcomeName) private var welcomeName: String = ""
+  @AppStorage(SettingsKey.plusUnlocked) private var plusUnlocked: Bool = false
+  @State private var showPaywall = false
+  @Environment(\.modelContext) private var modelContext
+  @Environment(CKEngine.self) private var ckEngine
+  @Environment(SettingsStore.self) private var store
+
+  var body: some View {
+    Form {
+      Section {
+        HStack(spacing: 16) {
+          ProfileAvatar(name: welcomeName, isPlus: plusUnlocked, size: 64)
+          VStack(alignment: .leading, spacing: 4) {
+            TextField("Your name", text: $welcomeName)
+              .font(.title2.weight(.semibold))
+              .textContentType(.givenName)
+              #if os(iOS)
+              .textInputAutocapitalization(.words)
+              #endif
+              .onChange(of: welcomeName) { _, newValue in
+                store.setWelcomeName(newValue, context: modelContext, engine: ckEngine)
+              }
+            if plusUnlocked {
+              SeptenaPlusBadge()
+            }
+          }
+        }
+        .padding(.vertical, 6)
+      } footer: {
+        Text("Your name personalizes the home greeting and this profile. It syncs across your devices via iCloud.")
+      }
+
+      membershipSection
+
+      Section {
+        HStack {
+          Label("Sync", systemImage: iCloudStatus.symbol)
+          Spacer()
+          Text(iCloudStatus.text).foregroundStyle(.secondary)
+        }
+      } header: {
+        Text("iCloud")
+      } footer: {
+        Text("Septena keeps everything in your private iCloud — there's no separate Septena account. Your data and membership are tied to your Apple ID.")
+      }
+    }
+    .formStyle(.grouped)
+    .sheet(isPresented: $showPaywall) {
+      SeptenaPlusPaywall {
+        plusUnlocked = true
+        showPaywall = false
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var membershipSection: some View {
+    if plusUnlocked {
+      Section {
+        ForEach(SeptenaPlus.features) { feature in
+          SeptenaPlusFeatureRow(feature: feature)
+        }
+      } header: {
+        Text("Your Septena+ perks")
+      }
+      Section {
+        Toggle(isOn: $plusUnlocked) {
+          Label {
+            Text("Septena+ membership")
+          } icon: {
+            Image(systemName: "checkmark.seal.fill")
+              .foregroundStyle(SeptenaPlus.gradient)
+          }
+        }
+      } footer: {
+        Text("Mock membership for testing — no purchase is made. Turn this off to re-lock Septena+ features.")
+      }
+    } else {
+      Section {
+        Button {
+          showPaywall = true
+        } label: {
+          HStack(spacing: 14) {
+            Image(systemName: "checkmark.seal.fill")
+              .font(.title2)
+              .foregroundStyle(SeptenaPlus.gradient)
+            VStack(alignment: .leading, spacing: 2) {
+              Text("Upgrade to \(SeptenaPlus.name)")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(.primary)
+              Text("Correlations dashboard, custom app icons, and more.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            Image(systemName: "chevron.right")
+              .font(.caption.weight(.semibold))
+              .foregroundStyle(.tertiary)
+          }
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+      } header: {
+        Text("Membership")
+      }
+    }
+  }
+
+  /// Friendly label for the live CloudKit account state (`CKEngine`
+  /// publishes `accountStatus`). Keeps the iCloud row honest rather than
+  /// claiming "synced" unconditionally.
+  private var iCloudStatus: (text: String, symbol: String) {
+    switch ckEngine.accountStatus {
+    case .available:              return ("Active", "checkmark.icloud.fill")
+    case .noAccount:              return ("No iCloud account", "exclamationmark.icloud.fill")
+    case .restricted:             return ("Restricted", "xmark.icloud.fill")
+    case .temporarilyUnavailable: return ("Temporarily unavailable", "exclamationmark.icloud.fill")
+    default:                      return ("Checking…", "icloud")
+    }
   }
 }
 
@@ -1355,6 +1937,7 @@ private struct AppIconPreview: View {
 private struct AppIconChoiceCard: View {
   let option: AppIconOption
   let isSelected: Bool
+  let isLocked: Bool
   let isDisabled: Bool
 
   var body: some View {
@@ -1365,6 +1948,14 @@ private struct AppIconChoiceCard: View {
           Image(systemName: "checkmark.circle.fill")
             .scaledFont(size: 18, weight: .semibold)
             .foregroundStyle(.white, .green)
+            .shadow(color: .black.opacity(0.16), radius: 4, y: 1)
+            .offset(x: 5, y: -5)
+        } else if isLocked {
+          Image(systemName: "lock.fill")
+            .scaledFont(size: 10, weight: .bold)
+            .foregroundStyle(.white)
+            .padding(4)
+            .background(SeptenaPlus.gradient, in: Circle())
             .shadow(color: .black.opacity(0.16), radius: 4, y: 1)
             .offset(x: 5, y: -5)
         }

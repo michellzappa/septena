@@ -78,4 +78,15 @@ enum HomepageLayoutMode: String, CaseIterable, Identifiable, Hashable {
     case .tiles, .dense, .heatmap, .correlations: return true
     }
   }
+
+  /// Whether this layout sits behind the Septena+ membership. The
+  /// cross-section Correlations dashboard is the first Plus-gated mode;
+  /// every other layout stays free. Used by Settings to badge + gate the
+  /// picker. (Mock gate — no StoreKit yet; see `SettingsKey.plusUnlocked`.)
+  var requiresPlus: Bool {
+    switch self {
+    case .correlations: return true
+    case .tiles, .dense, .heatmap: return false
+    }
+  }
 }
