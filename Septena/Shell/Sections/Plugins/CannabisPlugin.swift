@@ -13,6 +13,27 @@ enum CannabisPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(CannabisDestinationView()) }
 
+  static func onboarding(complete: @escaping () -> Void) -> AnyView? {
+    AnyView(SectionExplainerView(
+      sectionKey: "cannabis",
+      title: "Cannabis",
+      intro: "A private log for vape and edible sessions — when, how much, and how it landed.",
+      bullets: [
+        .init("Two quick logs",
+              "Vape or edible from the section's + menu. Strain and effect are optional fields.",
+              icon: "leaf"),
+        .init("Strains as you go",
+              "Add strain names from the destination view when you identify them. Nothing is pre-seeded.",
+              icon: "tag"),
+        .init("Private to this device",
+              "Cannabis data syncs through your iCloud account like every other section — never to a Septena server.",
+              icon: "lock"),
+      ],
+      primaryActionLabel: "Start logging",
+      complete: complete
+    ))
+  }
+
   // A mellow wind-down — a calm full-screen ripple wash. Single motion, no
   // time/dose dynamism (a cannabis log has no meaningful magnitude axis).
   static var logFlourish: LogFlourish? { LogFlourish(motion: .ripple) }
