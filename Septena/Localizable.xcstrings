@@ -247,6 +247,7 @@
       }
     },
     "%@ selected" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -1510,10 +1511,10 @@
         }
       }
     },
-    "Find what actually moves your day — which habits, inputs, and routines track with better sleep, mood, recovery, and more. Real correlations across everything you log, computed privately on-device." : {
+    "Find any task, project, or area." : {
 
     },
-    "Find what moves your sleep, mood, and more →" : {
+    "Find what actually moves your day — which habits, inputs, and routines track with better sleep, mood, recovery, and more. Real correlations across everything you log, computed privately on-device." : {
 
     },
     "Fix by creating the missing record (CloudKit Console → Create New Record) with recordName matching the referenced id." : {
@@ -2026,6 +2027,7 @@
       }
     },
     "Loading session types…" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -3300,9 +3302,6 @@
           }
         }
       }
-    },
-    "Strongest trusted signal · tap to explore" : {
-
     },
     "Sugar" : {
       "localizations" : {
