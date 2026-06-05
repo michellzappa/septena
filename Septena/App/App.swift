@@ -222,21 +222,33 @@ struct SeptenaApp: App {
     #if os(macOS)
     .windowStyle(.hiddenTitleBar)
     #endif
-    // ⌘1-4 jump to the smart lists. compact: 1=Inbox, 2=Today, 3=Upcoming,
-    // 4=Unscheduled. Sets nav.path to the route directly so it works from
-    // anywhere in the app, including detail screens.
+    // ⌘1-4 switch the four top-level tabs (Week / Next / Tasks / Goals) via
+    // `nav.pendingTab`, which RootTabView observes. ⌥⌘1-5 jump to the Tasks
+    // smart lists; each first hops to the Tasks tab so the filter is visible
+    // no matter which tab you're on, then sets nav.path to the route.
     .commands {
       CommandMenu("Go") {
-        Button("Inbox")       { navigation.path = [.filter(.inbox)] }
+        Button("Week")  { navigation.pendingTab = .week }
           .keyboardShortcut("1", modifiers: .command)
-        Button("Today")       { navigation.path = [.filter(.today)] }
+        Button("Next")  { navigation.pendingTab = .next }
           .keyboardShortcut("2", modifiers: .command)
-        Button("Next")        { navigation.path = [.next] }
+        Button("Tasks") { navigation.pendingTab = .tasks }
           .keyboardShortcut("3", modifiers: .command)
-        Button("Upcoming")    { navigation.path = [.filter(.upcoming)] }
+        Button("Goals") { navigation.pendingTab = .goals }
           .keyboardShortcut("4", modifiers: .command)
-        Button("Unscheduled") { navigation.path = [.filter(.unscheduled)] }
-          .keyboardShortcut("5", modifiers: .command)
+
+        Divider()
+
+        Button("Inbox")       { navigation.pendingTab = .tasks; navigation.path = [.filter(.inbox)] }
+          .keyboardShortcut("1", modifiers: [.command, .option])
+        Button("Today")       { navigation.pendingTab = .tasks; navigation.path = [.filter(.today)] }
+          .keyboardShortcut("2", modifiers: [.command, .option])
+        Button("Next List")   { navigation.pendingTab = .tasks; navigation.path = [.next] }
+          .keyboardShortcut("3", modifiers: [.command, .option])
+        Button("Upcoming")    { navigation.pendingTab = .tasks; navigation.path = [.filter(.upcoming)] }
+          .keyboardShortcut("4", modifiers: [.command, .option])
+        Button("Unscheduled") { navigation.pendingTab = .tasks; navigation.path = [.filter(.unscheduled)] }
+          .keyboardShortcut("5", modifiers: [.command, .option])
       }
       // Row-level actions, fed by `TaskListView`'s `focusedSceneValue`.
       // Items disable themselves when no task list is focused, which also
