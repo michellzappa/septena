@@ -39,10 +39,11 @@ struct DayBucketHeader: View {
   }
 
   var body: some View {
-    HStack(spacing: 8) {
+    HStack(spacing: 10) {
       Image(systemName: iconName)
-        .font(.subheadline)
+        .font(.title3)
         .foregroundStyle(.secondary)
+        .frame(width: 26, alignment: .center)
       Text(parsed?.title ?? bucket.capitalized)
         .font(.septenaSectionTitle)
       if isCurrent {
@@ -60,10 +61,13 @@ struct DayBucketHeader: View {
       // — the cue that this window is closing. "anytime" has no cutoff, so it
       // never shows one even if it were somehow flagged current.
       if showTimeLeft, isCurrent, bucket != DayBucket.anytimeKey {
-        BucketTimeLeft(bucket: bucket, font: .subheadline)
+        BucketTimeLeft(bucket: bucket, font: .subheadline.weight(.semibold))
       }
       if let trailing {
-        Text(trailing).monospacedDigit()
+        Text(trailing)
+          .font(.subheadline.weight(.semibold))
+          .monospacedDigit()
+          .foregroundStyle(.secondary)
       }
       if let disclosed {
         Image(systemName: "chevron.right")
@@ -165,6 +169,10 @@ struct BucketDisclosure<Content: View>: View {
       }
       .buttonStyle(.plain)
       .padding(.horizontal, 16)
+      // Collapsed buckets show only their header, so they need a touch of their
+      // own vertical room to sit evenly; the expanded one already gets breathing
+      // space from the VStack gap above its content.
+      .padding(.vertical, isExpanded ? 0 : 4)
       .accessibilityHint(isExpanded ? "Collapse" : "Expand")
 
       if isExpanded {
