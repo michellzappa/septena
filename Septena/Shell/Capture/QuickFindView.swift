@@ -269,9 +269,6 @@ private struct QuickFindRow: View {
         }
       }
       Spacer(minLength: 8)
-      Text(kindLabel)
-        .font(Font.septenaMeta)
-        .foregroundStyle(Theme.inkSecondary)
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 11)
@@ -301,14 +298,6 @@ private struct QuickFindRow: View {
     case .task(let done, _): return done ? Theme.inkSecondary : Theme.inkPrimary
     case .project(let done): return done ? Theme.inkSecondary : Color.accentColor
     case .area: return Color.accentColor
-    }
-  }
-
-  private var kindLabel: String {
-    switch hit.kind {
-    case .task(let done, _): return done ? "Done" : "Task"
-    case .project(let done): return done ? "Project · Done" : "Project"
-    case .area: return "Area"
     }
   }
 }
