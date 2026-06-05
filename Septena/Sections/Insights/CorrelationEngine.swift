@@ -90,6 +90,9 @@ struct CorrelationEngine {
     let stateMinority: Int
     let stateMajority: Int
     let tier: Tier
+    /// Benjamini-Hochberg FDR-adjusted p across the whole candidate set.
+    /// `.trusted` requires this < `strongP`, not just the raw permutation p.
+    let qValue: Double
     let points: [CorrelationPairPoint]
     var id: String { spec.id }
     var absR: Double { abs(r) }
@@ -134,15 +137,54 @@ struct CorrelationEngine {
 
   // MARK: - Public entry point
 
+  @MainActor
   static func runEverything(
     context: ModelContext,
     ouraNights: [OuraNight],
     days: Int = 365
   ) -> Result {
     let extraction = extract(context: context, ouraNights: ouraNights, days: days)
-    let features = extraction.features
-    let allPairs = curatedPairs() + autoBinaryPairs(habits: extraction.habits,
-                                                   supplements: extraction.supplements)
+
+    // The universe is "everything you actively track," not a curated list.
+    // Active sections come straight from the enabled SectionEntity set; an
+    // empty set (fresh account before the mirror hydrates) means "all."
+    let activeSections: Set<String> = {
+      let rows = (try? context.fetch(FetchDescriptor<SectionEntity>())) ?? []
+      return Set(rows.filter { $0.isEnabled }.map { $0.id })
+    }()
+
+    // Pull plugin-declared daily features from active sections (GitHub today;
+    // any section that adopts `correlationFeatures` flows in with no engine
+    // edit). Merge their series into the bag and their metadata into the
+    // catalog. Built-in features stay catalogued in `legacyCatalog`.
+    var features = extraction.features
+    var catalog = featureCatalog(habits: extraction.habits,
+                                 supplements: extraction.supplements)
+    for plugin in SectionRegistry.all
+    where activeSections.isEmpty || activeSections.contains(plugin.manifest.key) {
+      for pf in plugin.correlationFeatures(context: context) {
+        catalog[pf.key] = CatalogEntry(label: pf.label, section: pf.section,
+                                       unit: pf.unit, role: pf.role,
+                                       distribution: pf.distribution)
+        for (date, value) in pf.series {
+          var f = features[date] ?? DayFeatures()
+          f.values[pf.key] = value
+          features[date] = f
+        }
+      }
+    }
+
+    // Keys with actual data this window → the eligible feature set.
+    var availableKeys = Set<String>()
+    for (_, f) in features { availableKeys.formUnion(f.values.keys) }
+
+    // Auto-pair every eligible predictor against every eligible OUTCOME from
+    // a different section; curated specs are overlaid as direction/lag hints,
+    // not as the gate. (Subsumes the old curated + autoBinary lists.)
+    let allPairs = autoPairs(catalog: catalog,
+                             availableKeys: availableKeys,
+                             activeSections: activeSections,
+                             curated: curatedPairs())
 
     var evaluated: [EvaluatedPair] = []
     var insufficient: [InsufficientPair] = []
@@ -246,14 +288,8 @@ struct CorrelationEngine {
         if sign != exp { confound = true }
       }
 
-      // Tier classification — mirrors the webapp logic.
-      // Trusted = |r| ≥ STRONG_R AND p < 0.05 AND monotonic AND no confound.
-      // Otherwise exploratory (when n is sufficient).
-      var tier: Tier = .exploratory
-      if abs(r) >= strongR && pVal < strongP && monotonic && !confound {
-        tier = .trusted
-      }
-
+      // Provisional tier — finalised in the FDR pass below, once every
+      // candidate's p-value is known (trusted gates on the q-value, not p).
       evaluated.append(EvaluatedPair(
         spec: spec,
         r: r,
@@ -270,9 +306,26 @@ struct CorrelationEngine {
         binary: binary,
         stateMinority: stateMinority,
         stateMajority: stateMajority,
-        tier: tier,
+        tier: .exploratory,
+        qValue: 1.0,
         points: pickedPoints
       ))
+    }
+
+    // FDR across the full candidate set. Trusted = strong, monotonic,
+    // non-confounded AND survives Benjamini-Hochberg (q < strongP). With a
+    // wide auto-paired universe this is what keeps the top tier honest —
+    // raw p < 0.05 alone would mint ~1-in-20 false positives.
+    let qMap = benjaminiHochberg(evaluated.map { (id: $0.id, p: $0.p) })
+    evaluated = evaluated.map { e in
+      let q = qMap[e.id] ?? 1.0
+      let trusted = e.absR >= strongR && e.monotonic && !e.confound && q < strongP
+      return EvaluatedPair(
+        spec: e.spec, r: e.r, n: e.n, lag: e.lag, p: e.p, slope: e.slope,
+        meanX: e.meanX, meanY: e.meanY, buckets: e.buckets, monotonic: e.monotonic,
+        expectedSign: e.expectedSign, confound: e.confound, binary: e.binary,
+        stateMinority: e.stateMinority, stateMajority: e.stateMajority,
+        tier: trusted ? .trusted : .exploratory, qValue: q, points: e.points)
     }
 
     evaluated.sort { $0.absR > $1.absR }
@@ -560,35 +613,10 @@ struct CorrelationEngine {
     ]
   }
 
-  /// Auto-derived binary pairs — every habit / supplement against the
-  /// primary sleep targets. Mirrors the auto-correlations panel from the
-  /// webapp, scoped to the most informative outcome variables.
-  static func autoBinaryPairs(
-    habits: [(id: String, label: String, emoji: String)],
-    supplements: [(id: String, label: String, emoji: String)]
-  ) -> [PairSpec] {
-    let targets: [FeatureSpec] = [
-      .init(key: "sleep_score", label: "Sleep score", section: "sleep", unit: "",    binary: false),
-      .init(key: "readiness",   label: "Readiness",   section: "sleep", unit: "",    binary: false),
-      .init(key: "hrv",         label: "HRV",         section: "sleep", unit: "ms",  binary: false),
-    ]
-    var out: [PairSpec] = []
-    for h in habits {
-      let label = h.emoji.isEmpty ? h.label : "\(h.emoji) \(h.label)"
-      let pred = FeatureSpec(key: "habit:\(h.id)", label: label, section: "habits", unit: "", binary: true)
-      for t in targets {
-        out.append(PairSpec(predictor: pred, target: t, lagPreference: nil, expected: .unknown, titleOverride: nil))
-      }
-    }
-    for s in supplements {
-      let label = s.emoji.isEmpty ? s.label : "\(s.emoji) \(s.label)"
-      let pred = FeatureSpec(key: "supp:\(s.id)", label: label, section: "supplements", unit: "", binary: true)
-      for t in targets {
-        out.append(PairSpec(predictor: pred, target: t, lagPreference: nil, expected: .unknown, titleOverride: nil))
-      }
-    }
-    return out
-  }
+  // (Removed `autoBinaryPairs` — habit/supplement binaries are now ordinary
+  // `.lever`/`.binary` catalog features (`featureCatalog`) and auto-pair
+  // against *every* active outcome, not just the three sleep targets. The
+  // minority-state gate still applies in the evaluation loop.)
 
   // MARK: - Supplements → sleep score table
 
