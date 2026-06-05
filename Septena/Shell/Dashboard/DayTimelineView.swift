@@ -254,7 +254,7 @@ struct DayTimelineView: View {
     let w = max(8, pct(b.endHour - b.startHour + windowStart) * width / 100)
     return RoundedRectangle(cornerRadius: 3, style: .continuous)
       .fill(b.color)
-      .frame(width: w, height: b.thin ? 3 : 8)
+      .frame(width: w, height: b.thin ? 3 : 6)
       .frame(maxHeight: .infinity)
       .position(x: x + w / 2, y: 14)
   }
@@ -430,8 +430,11 @@ struct DayTimelineView: View {
       // concludedAt is like "2026-05-17T07:42:11" — slice HH:MM.
       let startHHMM = String(concluded.dropFirst(11).prefix(5))
       guard let startH = parseHHMM(startHHMM) else { continue }
-      let loggedHHMM = e.loggedAt.map { String($0.dropFirst(11).prefix(5)) }
-      let loggedH = loggedHHMM.flatMap(parseHHMM)
+      // `concludedAt` is local wall-clock, but `loggedAt` is stored in
+      // UTC ("…Z") — convert it to the user's zone before comparing the
+      // two, or the pill's end (and thus its length) skews by the UTC
+      // offset.
+      let loggedH = e.loggedAt.flatMap(localHour(fromISO:))
       var s = byKey[startHHMM] ?? SessionAccum(startHour: startH)
       s.totalDuration += e.durationMin ?? 0
       if let lh = loggedH, lh > (s.lastLoggedHour ?? 0) { s.lastLoggedHour = lh }
@@ -545,6 +548,17 @@ struct DayTimelineView: View {
   }
 
   // MARK: - Helpers
+
+  /// UTC ISO8601 timestamp ("…Z") → fractional hour-of-day in the user's
+  /// zone. Mirrors `timeOnly` in TrainingDestinationView: `loggedAt` is
+  /// stored in UTC but the timeline's start hours are local, so the two
+  /// must be put on the same clock before any max/compare.
+  private func localHour(fromISO ts: String) -> Double? {
+    guard let d = ISO8601DateFormatter().date(from: ts) else { return nil }
+    let c = Calendar.current.dateComponents([.hour, .minute], from: d)
+    guard let h = c.hour else { return nil }
+    return Double(h) + Double(c.minute ?? 0) / 60
+  }
 
   /// "HH:MM" → fractional hour. Returns nil on malformed input.
   private func parseHHMM(_ s: String) -> Double? {
