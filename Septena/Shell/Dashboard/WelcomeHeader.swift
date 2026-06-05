@@ -8,10 +8,11 @@ import FoundationModels
 // Generation is 0.3–1s+ and the app opens faster than that, so we never
 // block on it:
 //
-//   1. A persistent cache (`@AppStorage`), keyed by a ~2-hour time slot, means
-//      re-opening within the same slot is instant. Most opens are instant.
-//   2. The line refreshes as the clock moves into a new slot, so the greeting
-//      tracks the actual time of day rather than a single coarse phase.
+//   1. A persistent cache (`@AppStorage`), keyed by the time band the line was
+//      written for, means re-opening within the same band is instant — and a
+//      line is never reused outside its band (no "almost noon" after noon).
+//   2. The clock ticks every 60s; when it crosses into a new band the line
+//      refreshes, so the greeting tracks the actual time of day.
 //   3. While a cold line is in flight we keep the previous line (or the plain
 //      fallback) and cross-fade the generated line in when it lands.
 //
@@ -46,9 +47,10 @@ struct WelcomeHeader: View {
   private var phase: WelcomePhase { .resolve(at: now) }
   private var currentSignature: String { context?.signature ?? "" }
 
-  /// ~2-hour slot the greeting refreshes on, so the line tracks the clock
-  /// through the day instead of freezing for a whole phase.
-  private var slot: String { "\(Calendar.current.component(.hour, from: now) / 2)" }
+  /// The fine-grained time band the greeting is written for. Doubles as the
+  /// cache key, so a cached line is reused ONLY within the same band it was
+  /// generated for — "late morning" can't survive into the afternoon.
+  private var band: TimeBand { .from(date: now) }
 
   /// Invalidates the cache when the day, name or tone changes.
   private var stamp: String {
@@ -74,20 +76,23 @@ struct WelcomeHeader: View {
       .accessibilityElement(children: .combine)
       .accessibilityHint("Double tap for a new greeting")
       .accessibilityAction(named: "New greeting") { Task { await regenerate() } }
-      .task(id: "\(stamp)|\(slot)|\(currentSignature)") { await refresh() }
+      .task(id: "\(stamp)|\(band.rawValue)|\(currentSignature)") { await refresh() }
   }
 
   @MainActor
   private func refresh() async {
     var cache = WelcomeCache.load(cacheJSON, stamp: stamp)
 
-    // Already have a valid line for this time slot + data snapshot? Instant.
-    // (Leave any prior line in place otherwise, so a new slot cross-fades from
-    // the last greeting instead of flashing back to the plain fallback.)
-    if let entry = cache.lines[slot], entry.sig == currentSignature {
+    // Already have a valid line for THIS band + data snapshot? Show it, done.
+    if let entry = cache.lines[band.rawValue], entry.sig == currentSignature {
       line = entry.text
       return
     }
+
+    // Otherwise the previous line belongs to a stale band/snapshot — drop to
+    // the always-time-correct fallback so we never show "almost noon" at 12:35,
+    // then cross-fade the freshly generated line in over it.
+    line = ""
 
     guard OnDeviceAI.isAvailable, !name.isEmpty else {
       #if DEBUG
@@ -100,7 +105,7 @@ struct WelcomeHeader: View {
     guard let generated = await WelcomeGenerator.line(
       name: name, date: now, tone: tone, context: context?.phrase
     ) else { return }
-    cache.lines[slot] = WelcomeCache.Entry(text: generated, sig: currentSignature)
+    cache.lines[band.rawValue] = WelcomeCache.Entry(text: generated, sig: currentSignature)
     cacheJSON = cache.encoded()
     // Animate the swap so the box grows/shrinks (and content below slides)
     // rather than snapping to the new line count.
@@ -119,7 +124,7 @@ struct WelcomeHeader: View {
       name: name, date: now, tone: tone, context: context?.phrase
     ) else { return }
     var cache = WelcomeCache.load(cacheJSON, stamp: stamp)
-    cache.lines[slot] = WelcomeCache.Entry(text: generated, sig: currentSignature)
+    cache.lines[band.rawValue] = WelcomeCache.Entry(text: generated, sig: currentSignature)
     cacheJSON = cache.encoded()
     withAnimation(.smooth(duration: 0.4)) { line = generated }
     rerollTick += 1  // fires the haptic
@@ -147,6 +152,43 @@ enum WelcomePhase: String, CaseIterable {
     case .morning:   return .morning
     case .afternoon: return .afternoon
     case .evening:   return .evening
+    }
+  }
+}
+
+// MARK: - Time band
+//
+// Fine-grained time-of-day, far more specific than the three coarse phases —
+// so the line can say "late morning" / "just past noon" instead of a blanket
+// "good morning". Drives BOTH the model's descriptor and the cache key, so a
+// cached line is only ever reused inside the exact window it was written for.
+
+enum TimeBand: String, CaseIterable {
+  case earlyMorning, morning, lateMorning, midday, afternoon, earlyEvening, evening, night
+
+  static func from(date: Date) -> TimeBand {
+    switch Calendar.current.component(.hour, from: date) {
+    case 5..<8:   return .earlyMorning
+    case 8..<11:  return .morning
+    case 11..<12: return .lateMorning
+    case 12..<14: return .midday
+    case 14..<17: return .afternoon
+    case 17..<19: return .earlyEvening
+    case 19..<22: return .evening
+    default:      return .night
+    }
+  }
+
+  var descriptor: String {
+    switch self {
+    case .earlyMorning: return "early morning, just after dawn"
+    case .morning:      return "mid-morning"
+    case .lateMorning:  return "late morning"
+    case .midday:       return "midday, just past noon, around lunch"
+    case .afternoon:    return "mid-afternoon"
+    case .earlyEvening: return "early evening, around dusk"
+    case .evening:      return "evening"
+    case .night:        return "late at night"
     }
   }
 }
@@ -215,21 +257,6 @@ private enum WelcomeGenerator {
     return nil
   }
 
-  /// Fine-grained, human time-of-day descriptor from the actual hour — far
-  /// more specific than the three coarse phases, so the line can say things
-  /// like "nearly noon" instead of a blanket "good morning".
-  private static func timeOfDay(_ date: Date) -> String {
-    switch Calendar.current.component(.hour, from: date) {
-    case 5..<8:   return "early morning, just after dawn"
-    case 8..<11:  return "mid-morning"
-    case 11..<12: return "late morning, nearly noon"
-    case 12..<14: return "midday, around lunch"
-    case 14..<17: return "mid-afternoon"
-    case 17..<19: return "early evening, around dusk"
-    case 19..<22: return "evening"
-    default:      return "late at night"
-    }
-  }
 
   /// True if the line names any weekday other than today's — guards against
   /// the model confidently greeting the wrong day.
@@ -246,7 +273,7 @@ private enum WelcomeGenerator {
                              context: String?) -> String {
     let weekday = date.formatted(.dateTime.weekday(.wide))
     let clock = date.formatted(date: .omitted, time: .shortened)
-    let when = timeOfDay(date)
+    let when = TimeBand.from(date: date).descriptor
     let length = context == nil ? "roughly two to five words" : "roughly four to eight words"
     let contextBlock = context.map {
       """
@@ -262,21 +289,22 @@ private enum WelcomeGenerator {
     Right now it is \(clock) on \(weekday) — \(when).
     Tone: \(tone.direction)\(contextBlock)
 
-    Greet \(name) for THIS specific moment. Lean on the real time — nearly noon,
-    just past nine, the dead of night — instead of a generic "good morning".
+    Greet \(name) for THIS specific moment. Fit the stated time of day — but do
+    NOT claim a precise minute (avoid "almost noon", "just past nine"); the line
+    may stay up for a while, so keep it true for the whole \(when) window.
     Keep it brief — \(length), ending with the name \(name).
     Reach for something with a little life; never the plainest greeting.
 
     Examples of the range and tone (don't reuse verbatim):
-    - Almost noon, \(name)
     - Bright and early, \(name)
     - Halfway through \(weekday), \(name)
+    - Easing into the afternoon, \(name)
     - Winding down, \(name)
     - Burning the midnight oil, \(name)?
 
     Guidelines:
     - Always end with the name \(name).
-    - Match the actual time of day — never say morning in the afternoon or vice versa.
+    - Match the stated time of day — never say morning in the afternoon or vice versa.
     - Today is \(weekday). If you name a day, it MUST be \(weekday) — never any other day.
     - Grounded and human, never corporate or saccharine.
     - Vary it each time — surprise me a little.
