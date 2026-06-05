@@ -41,6 +41,15 @@ final class ScreenshotTests: XCTestCase {
     launch(app, layout: "correlations")
     capture(app, "08-Correlations")
     app.swipeUp(); dwell(); capture(app, "09-Correlations-scrolled")
+
+    // Pass 4 — section detail sheets (dense layout so the rows are tappable).
+    app.terminate()
+    launch(app, layout: "dense")
+    captureSection(app, "Nutrition", "10-Nutrition")
+    captureSection(app, "Training", "11-Training")
+    captureSection(app, "Sleep", "12-Sleep")
+    captureSection(app, "Mood", "13-Mood")
+    captureSection(app, "Body", "14-Body")
   }
 
   // MARK: - helpers
@@ -66,6 +75,22 @@ final class ScreenshotTests: XCTestCase {
     add(attachment)
   }
 
+  /// Open a section's detail sheet from the Week list, snapshot it, dismiss.
+  /// Rows carry a compound a11y label that starts with the section name.
+  @MainActor private func captureSection(_ app: XCUIApplication, _ name: String, _ shot: String) {
+    for _ in 0..<6 { app.swipeDown() }                 // reset to the top
+    dwell(0.5)
+    let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", name)).firstMatch
+    var tries = 0
+    while !(row.exists && row.isHittable) && tries < 8 { app.swipeUp(); dwell(0.4); tries += 1 }
+    guard row.exists, row.isHittable else { return }   // skip rather than fail
+    row.tap()
+    dwell()
+    capture(app, shot)
+    app.swipeDown(); app.swipeDown()                   // dismiss the sheet
+    dwell(0.5)
+  }
+
   /// Let async section loads (training/nutrition fetches) finish before capture.
-  private func dwell() { Thread.sleep(forTimeInterval: 2.0) }
+  private func dwell(_ seconds: Double = 2.0) { Thread.sleep(forTimeInterval: seconds) }
 }
