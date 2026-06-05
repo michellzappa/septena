@@ -158,6 +158,14 @@ final class SectionTheme {
                               forKey: Self.cacheKey)
   }
 
+  /// Repaint a single section's accent in place. Called from the Settings
+  /// color picker so the dashboard and section views recolor immediately —
+  /// the SwiftData/CloudKit write is already done by the caller; this just
+  /// keeps the in-memory accent cache in sync without a full `refresh()`.
+  func setColor(_ raw: String, for sectionKey: String) {
+    if let c = parseColor(raw) { accentByKey[sectionKey] = c }
+  }
+
   private func applySections(_ sections: [SectionConfig]) {
     var byKey: [String: Color] = [:]
     for s in sections {
