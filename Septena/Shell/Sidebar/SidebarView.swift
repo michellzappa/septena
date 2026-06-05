@@ -423,11 +423,6 @@ struct SidebarRootView: View {
     Button { selectRoute(route) } label: { label() }
       .buttonStyle(InertButtonStyle())
       .background(rowBackground(for: route))
-      // Keyboard: every sidebar row (filters, areas, projects) becomes a
-      // focus stop on iPad/Mac — Tab / ⇧Tab to move through them, Return /
-      // Space to open. The persistent selection pill (current route) and the
-      // focus ring are independent, as expected.
-      .focusable()
   }
 
   private func selectRoute(_ route: Route) {
@@ -1062,9 +1057,19 @@ struct ColoredGlyph: View {
   }
 
   var body: some View {
+    let shape = RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
     ZStack {
-      RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-        .fill(adaptedFill)
+      shape.fill(adaptedFill)
+      // Per-tile sheen, the modern iOS Settings look: a soft top-down
+      // gradient that lightens the top edge and gently deepens the bottom,
+      // giving each saturated square a little dimensionality. Drawn over
+      // the base fill so the color stays the source of truth.
+      shape.fill(
+        LinearGradient(
+          colors: [Color.white.opacity(0.26), .clear, Color.black.opacity(0.07)],
+          startPoint: .top, endPoint: .bottom
+        )
+      )
       Image(systemName: icon)
         .scaledFont(size: size * glyphRatio, weight: .semibold)
         .foregroundStyle(.white)

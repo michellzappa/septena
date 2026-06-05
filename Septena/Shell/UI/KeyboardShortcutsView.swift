@@ -42,14 +42,11 @@ enum KeyboardShortcutsCatalogue {
       KeyboardShortcut2(keys: ["⌘", ","], label: "Settings"),
       KeyboardShortcut2(keys: ["⌘", "⇧", "/"], label: "Keyboard shortcuts (this sheet)"),
     ]),
-    KeyboardShortcutGroup(title: "Lists & rows", shortcuts: [
+    KeyboardShortcutGroup(title: "Task list", shortcuts: [
       KeyboardShortcut2(keys: ["↑", "↓"], label: "Move selection"),
-      KeyboardShortcut2(keys: ["Tab"], label: "Move focus between items"),
-      KeyboardShortcut2(keys: ["Space"], label: "Toggle complete / done"),
+      KeyboardShortcut2(keys: ["Space"], label: "Toggle complete"),
       KeyboardShortcut2(keys: ["return"], label: "Open / edit"),
       KeyboardShortcut2(keys: ["esc"], label: "Clear selection"),
-    ]),
-    KeyboardShortcutGroup(title: "Tasks (selected row)", shortcuts: [
       KeyboardShortcut2(keys: ["⌘", "N"], label: "New to-do"),
       KeyboardShortcut2(keys: ["⌘", "T"], label: "Toggle Today"),
       KeyboardShortcut2(keys: ["⌘", "K"], label: "Mark as complete"),
@@ -58,9 +55,10 @@ enum KeyboardShortcutsCatalogue {
       KeyboardShortcut2(keys: ["⌘", "."], label: "Clear schedule"),
       KeyboardShortcut2(keys: ["⌘", "⌫"], label: "Delete"),
     ]),
-    KeyboardShortcutGroup(title: "Sections & tiles", shortcuts: [
-      KeyboardShortcut2(keys: ["return"], label: "Open the focused tile"),
+    KeyboardShortcutGroup(title: "Edit & section sheets", shortcuts: [
       KeyboardShortcut2(keys: ["⌘", "N"], label: "Quick-add in an open section"),
+      KeyboardShortcut2(keys: ["return"], label: "Save the open edit form"),
+      KeyboardShortcut2(keys: ["esc"], label: "Cancel the open edit form"),
     ]),
   ]
 }
@@ -94,6 +92,7 @@ struct KeyboardShortcutsView: View {
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
           Button("Done") { dismiss() }
+            .keyboardShortcut(.cancelAction) // Esc closes
         }
       }
     }

@@ -25,6 +25,28 @@ struct GoalsView: View {
   @State private var editing: Goal? = nil
   @State private var activeMiniApp: AnyDiscoveryMiniApp? = nil
 
+  // Keyboard navigation (iPad/Mac). The grid auto-focuses on appear — the
+  // Goals tab is single-pane, so there's no detail view to fight over focus
+  // (unlike the Tasks split view). Arrow keys move a highlighted selection
+  // (linear, so it's column-count-agnostic), Return / Space opens the editor.
+  // Works with macOS "Full Keyboard Access" OFF because focus is grabbed
+  // programmatically, the same way QuickFind / the task list already do it.
+  @State private var kbSelection: Int? = nil
+  @FocusState private var gridFocused: Bool
+
+  private func moveSelection(_ delta: Int) -> KeyPress.Result {
+    guard !goals.isEmpty else { return .ignored }
+    let current = kbSelection ?? 0
+    kbSelection = min(max(0, current + delta), goals.count - 1)
+    return .handled
+  }
+
+  private func activateSelection() -> KeyPress.Result {
+    guard let s = kbSelection, goals.indices.contains(s) else { return .ignored }
+    editing = goals[s]
+    return .handled
+  }
+
   /// Mirrors WeekDashboardView's grid: iPhone compact = 1 col, iPad regular
   /// = 3 cols, macOS = adaptive ~280pt tiles.
   private var columns: [GridItem] {
@@ -99,14 +121,17 @@ struct GoalsView: View {
           .frame(maxWidth: .infinity, minHeight: 260)
         } else {
           LazyVGrid(columns: columns, spacing: 14) {
-            ForEach(goals) { goal in
+            ForEach(Array(goals.enumerated()), id: \.element.id) { index, goal in
               Button { editing = goal } label: {
                 GoalTile(goal: goal, theme: theme)
+                  .overlay {
+                    if gridFocused && kbSelection == index {
+                      RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+                        .strokeBorder(theme.accent, lineWidth: 2)
+                    }
+                  }
               }
               .buttonStyle(.plain)
-              // Keyboard: each goal is a focus stop on iPad/Mac (Tab / ⇧Tab,
-              // system focus ring); Return / Space opens its editor.
-              .focusable()
               .contextMenu {
                 Button(role: .destructive) { deleteGoal(goal) } label: {
                   Label("Delete", systemImage: "trash")
@@ -114,6 +139,21 @@ struct GoalsView: View {
               }
             }
           }
+          // Programmatic focus → arrow keys work with Full Keyboard Access off.
+          // We draw our own selection ring, so suppress the system focus halo.
+          .focusable()
+          .focused($gridFocused)
+          .focusEffectDisabled()
+          .onAppear {
+            gridFocused = true
+            if kbSelection == nil { kbSelection = 0 }
+          }
+          .onKeyPress(.upArrow) { moveSelection(-1) }
+          .onKeyPress(.leftArrow) { moveSelection(-1) }
+          .onKeyPress(.downArrow) { moveSelection(1) }
+          .onKeyPress(.rightArrow) { moveSelection(1) }
+          .onKeyPress(.return) { activateSelection() }
+          .onKeyPress(.space) { activateSelection() }
         }
       }
     }
