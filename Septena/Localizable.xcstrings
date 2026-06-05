@@ -8,10 +8,24 @@
       "shouldTranslate" : false
     },
     "“Anytime” keeps it on the home feed all day. Pick a slot and it only appears from then on — so you’re not staring at the whole day’s stack at once." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“A qualquer hora” mantém no feed inicial o dia todo. Escolha um período e ele só aparece a partir daí — assim você não encara a pilha do dia inteiro de uma vez."
+          }
+        }
+      }
     },
     "“Aware of your day” lets the greeting nod to what's left on today's list and what's coming up next on your calendar." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“Ciente do seu dia” deixa a saudação acenar para o que falta na lista de hoje e o que vem a seguir na sua agenda."
+          }
+        }
+      }
     },
     "%@" : {
       "shouldTranslate" : false
@@ -34,6 +48,12 @@
             "state" : "new",
             "value" : "%1$@ — %2$@ of %3$@ exercises done%4$@"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ — %2$@ de %3$@ exercícios concluídos%4$@"
+          }
         }
       }
     },
@@ -44,11 +64,24 @@
             "state" : "new",
             "value" : "%1$@ · lag %2$@d · n=%3$@ · p=%4$@"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · defasagem %2$@d · n=%3$@ · p=%4$@"
+          }
         }
       }
     },
     "%@ · quiet" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · quieto"
+          }
+        }
+      }
     },
     "%@ (%@d) vs %@ (%@d)" : {
       "localizations" : {
@@ -90,11 +123,24 @@
             "state" : "new",
             "value" : "%1$@ binary signals · %2$@ trusted · tap to expand"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ sinais binários · %2$@ confiáveis · toque para expandir"
+          }
         }
       }
     },
     "%@ Choose 2-4." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ Escolha de 2 a 4."
+          }
+        }
+      }
     },
     "%@ day%@" : {
       "localizations" : {
@@ -102,6 +148,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@ day%2$@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ dia%2$@"
           }
         }
       }
@@ -113,20 +165,54 @@
             "state" : "new",
             "value" : "%1$@ entries · %2$@ days"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ entradas · %2$@ dias"
+          }
         }
       }
     },
     "%@ exercises" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ exercícios"
+          }
+        }
+      }
     },
     "%@ Habits" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ Hábitos"
+          }
+        }
+      }
     },
     "%@ kcal" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ kcal"
+          }
+        }
+      }
     },
     "%@ layout — coming soon" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Layout %@ — em breve"
+          }
+        }
+      }
     },
     "%@ ml" : {
       "shouldTranslate" : false
@@ -138,20 +224,54 @@
             "state" : "new",
             "value" : "%1$@ ref%2$@"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ ref%2$@"
+          }
         }
       }
     },
     "%@ rows" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ linhas"
+          }
+        }
+      }
     },
     "%@ selected" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ selecionados"
+          }
+        }
+      }
     },
     "%@ skill" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ skill"
+          }
+        }
+      }
     },
     "%@ target" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ alvo"
+          }
+        }
+      }
     },
     "%@: x̄=%@%@  ·  ȳ=%@%@  ·  n=%@" : {
       "localizations" : {
@@ -182,6 +302,12 @@
             "state" : "new",
             "value" : "%1$@/%2$@ done · started %3$@"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@/%2$@ concluídos · iniciado %3$@"
+          }
         }
       }
     },
@@ -191,6 +317,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@/%2$@ hard sets"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@/%2$@ séries pesadas"
           }
         }
       }
@@ -235,7 +367,14 @@
       "shouldTranslate" : false
     },
     "%@d over" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@d em atraso"
+          }
+        }
+      }
     },
     "%@F" : {
       "shouldTranslate" : false
@@ -244,10 +383,24 @@
       "shouldTranslate" : false
     },
     "%@kcal" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@kcal"
+          }
+        }
+      }
     },
     "%@m recovery" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@m de recuperação"
+          }
+        }
+      }
     },
     "%@P" : {
       "shouldTranslate" : false
@@ -267,31 +420,80 @@
       "shouldTranslate" : false
     },
     "+" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+"
+          }
+        }
+      }
     },
     "×%@" : {
       "shouldTranslate" : false
     },
     "|r| ≥ 0.30, p < 0.05, monotonic" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "|r| ≥ 0,30, p < 0,05, monotônico"
+          }
+        }
+      }
     },
     "⏳ %@" : {
       "shouldTranslate" : false
     },
     "1 year" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 ano"
+          }
+        }
+      }
     },
     "2 years" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2 anos"
+          }
+        }
+      }
     },
     "6 months" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "6 meses"
+          }
+        }
+      }
     },
     "7d vs prior" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "7d vs anterior"
+          }
+        }
+      }
     },
     "30 days" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30 dias"
+          }
+        }
+      }
     },
     "30d" : {
       "shouldTranslate" : false
@@ -300,64 +502,197 @@
       "shouldTranslate" : false
     },
     "90 days" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "90 dias"
+          }
+        }
+      }
     },
     "90d" : {
       "shouldTranslate" : false
     },
     "A centered greeting at the top of the home tab." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uma saudação centralizada no topo da aba inicial."
+          }
+        }
+      }
     },
     "Activity tracking runs on iPhone / iPad. Open Septena there to see steps and recovery metrics." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O monitoramento de atividade roda no iPhone / iPad. Abra o Septena lá para ver passos e métricas de recuperação."
+          }
+        }
+      }
     },
     "Add a GitHub access token in Settings › Integrations." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicione um token de acesso do GitHub em Ajustes › Integrações."
+          }
+        }
+      }
     },
     "Add a habit first, then come back to backfill." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicione um hábito primeiro e depois volte para preencher o histórico."
+          }
+        }
+      }
     },
     "Add a supplement first, then come back to backfill." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicione um suplemento primeiro e depois volte para preencher o histórico."
+          }
+        }
+      }
     },
     "Add items to build your pantry and shopping list." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicione itens para montar sua despensa e lista de compras."
+          }
+        }
+      }
     },
     "Added by Claude, not yet seen" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionado pelo Claude, ainda não visto"
+          }
+        }
+      }
     },
     "Adding to" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionando a"
+          }
+        }
+      }
     },
     "After completion" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Após a conclusão"
+          }
+        }
+      }
     },
     "Aliases" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apelidos"
+          }
+        }
+      }
     },
     "Already added" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Já adicionado"
+          }
+        }
+      }
     },
     "Always on" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sempre ativo"
+          }
+        }
+      }
     },
     "Amount" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quantidade"
+          }
+        }
+      }
     },
     "An exercise with this ID already exists." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Já existe um exercício com este ID."
+          }
+        }
+      }
     },
     "Analytics is provided by Plausible Analytics (EU-hosted, cookie-free)." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As análises são fornecidas pelo Plausible Analytics (hospedado na UE, sem cookies)."
+          }
+        }
+      }
     },
     "App icon selection is available on the iPhone and iPad app." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A seleção de ícone do app está disponível nos apps de iPhone e iPad."
+          }
+        }
+      }
     },
     "App icon selection isn’t available on this device." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A seleção de ícone do app não está disponível neste dispositivo."
+          }
+        }
+      }
     },
     "Apple" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple"
+          }
+        }
+      }
     },
     "area: %@   project: %@   status: %@" : {
       "localizations" : {
@@ -366,29 +701,84 @@
             "state" : "new",
             "value" : "area: %1$@   project: %2$@   status: %3$@"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "área: %1$@   projeto: %2$@   status: %3$@"
+          }
         }
       }
     },
     "Areas and projects are managed in the Tasks tab." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Áreas e projetos são gerenciados na aba Tarefas."
+          }
+        }
+      }
     },
     "Ask Siri" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perguntar à Siri"
+          }
+        }
+      }
     },
     "At least" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pelo menos"
+          }
+        }
+      }
     },
     "At most" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No máximo"
+          }
+        }
+      }
     },
     "Attach a measurement so this goal shows live progress against a target." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vincule uma medição para que esta meta mostre o progresso ao vivo em relação a um alvo."
+          }
+        }
+      }
     },
     "avg %@/4" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "média %@/4"
+          }
+        }
+      }
     },
     "Back to dashboard" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voltar ao painel"
+          }
+        }
+      }
     },
     "Based on %@ signal%@" : {
       "localizations" : {
@@ -397,17 +787,44 @@
             "state" : "new",
             "value" : "Based on %1$@ signal%2$@"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Com base em %1$@ sinais"
+          }
         }
       }
     },
     "Baseline" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Linha de base"
+          }
+        }
+      }
     },
     "Baseline is where you started — the bar will show how much of the distance from baseline to target you've covered. Leave blank for count-style metrics that start at 0." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A linha de base é onde você começou — a barra mostra quanto da distância entre a linha de base e o alvo você já percorreu. Deixe em branco para métricas de contagem que começam em 0."
+          }
+        }
+      }
     },
     "BEDTIME" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HORA DE DORMIR"
+          }
+        }
+      }
     },
     "Binary predictor — %@ minority days vs %@ majority days" : {
       "localizations" : {
@@ -416,83 +833,264 @@
             "state" : "new",
             "value" : "Binary predictor — %1$@ minority days vs %2$@ majority days"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preditor binário — %1$@ dias minoritários vs %2$@ dias majoritários"
+          }
         }
       }
     },
     "Buckets (tertiles, sorted by x)" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faixas (tercis, ordenadas por x)"
+          }
+        }
+      }
     },
     "Buckets are not monotonic — relationship may be threshold-shaped or U-shaped." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As faixas não são monotônicas — a relação pode ter formato de limiar ou de U."
+          }
+        }
+      }
     },
     "Carry over missed doses" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transferir doses perdidas"
+          }
+        }
+      }
     },
     "Carry over missed habits" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transferir hábitos perdidos"
+          }
+        }
+      }
     },
     "Choose the principles you want to live by. Septena drafts a north-star and commitments you can save into Goals." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha os princípios pelos quais você quer viver. O Septena esboça uma estrela-guia e compromissos que você pode salvar em Metas."
+          }
+        }
+      }
     },
     "Choose up to 4 sections to surface when you long-press the app icon on the Home Screen." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha até 4 seções para exibir quando você mantém o ícone do app pressionado na Tela de Início."
+          }
+        }
+      }
     },
     "Choose which generated items become Goals. You can edit the wording and tag sections before saving." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha quais itens gerados viram Metas. Você pode editar o texto e marcar seções antes de salvar."
+          }
+        }
+      }
     },
     "Choose your values" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha seus valores"
+          }
+        }
+      }
     },
     "Claude" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude"
+          }
+        }
+      }
     },
     "Claude session expired" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sessão do Claude expirada"
+          }
+        }
+      }
     },
     "Coming soon" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Em breve"
+          }
+        }
+      }
     },
     "Comma-separated alternate names used in search." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nomes alternativos separados por vírgula usados na busca."
+          }
+        }
+      }
     },
     "Connect Apple Health in Settings → Integrations to turn this on." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conecte o Apple Health em Ajustes → Integrações para ativar isto."
+          }
+        }
+      }
     },
     "Connect Claude or another MCP client to mcp.septena.app to read and write your Septena data. The brief below is what the model needs to know to use the connection well." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conecte o Claude ou outro cliente MCP a mcp.septena.app para ler e gravar seus dados do Septena. O resumo abaixo é o que o modelo precisa saber para usar bem a conexão."
+          }
+        }
+      }
     },
     "Connect Oura in Settings › Integrations." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conecte o Oura em Ajustes › Integrações."
+          }
+        }
+      }
     },
     "Connect Withings in Settings › Integrations." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conecte o Withings em Ajustes › Integrações."
+          }
+        }
+      }
     },
     "Connecting lets Claude (at claude.ai or in the Claude app) read and write your Septena data via the MCP connector. Your data stays in iCloud — the gateway only relays a short-lived access token, which this app refreshes automatically. Add the connector in Claude using mcp.septena.app." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectar permite que o Claude (em claude.ai ou no app do Claude) leia e grave seus dados do Septena pelo conector MCP. Seus dados ficam no iCloud — o gateway só repassa um token de acesso de curta duração, que este app renova automaticamente. Adicione o conector no Claude usando mcp.septena.app."
+          }
+        }
+      }
     },
     "Connection" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conexão"
+          }
+        }
+      }
     },
     "Copied" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiado"
+          }
+        }
+      }
     },
     "Copies the preamble + every section's brief as one Markdown document. Paste into septena-mcp-gateway/skill.md so the LLM-facing catalog can't drift from the plugin definitions in this app." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copia o preâmbulo + o resumo de cada seção como um único documento Markdown. Cole em septena-mcp-gateway/skill.md para que o catálogo voltado ao LLM não fique fora de sincronia com as definições de plugin deste app."
+          }
+        }
+      }
     },
     "Copy a prompt and paste it into an LLM along with the source data you want to import. The model returns JSON that pastes straight into Import above." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copie um prompt e cole em um LLM junto com os dados de origem que você quer importar. O modelo retorna um JSON que cola direto em Importar acima."
+          }
+        }
+      }
     },
     "CORRELATIONS DASHBOARD" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PAINEL DE CORRELAÇÕES"
+          }
+        }
+      }
     },
     "Correlations dashboard, custom app icons, and more." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Painel de correlações, ícones de app personalizados e mais."
+          }
+        }
+      }
     },
     "Create a Personal Access Token at cloud.ouraring.com/personal-access-tokens, then paste it here. Tokens stay on this device (Keychain) and are never sent to any Septena server." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crie um Token de Acesso Pessoal em cloud.ouraring.com/personal-access-tokens e cole aqui. Os tokens ficam neste dispositivo (Keychain) e nunca são enviados a nenhum servidor do Septena."
+          }
+        }
+      }
     },
     "Create a personal access token with the read:user scope at github.com/settings/tokens, then paste it here. Tokens stay on this device (Keychain) and are never sent to any Septena server." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crie um token de acesso pessoal com o escopo read:user em github.com/settings/tokens e cole aqui. Os tokens ficam neste dispositivo (Keychain) e nunca são enviados a nenhum servidor do Septena."
+          }
+        }
+      }
     },
     "Creates %@ with recordName `%@:%@`. Existing dangling references will resolve on next fetch." : {
       "localizations" : {
@@ -501,32 +1099,94 @@
             "state" : "new",
             "value" : "Creates %1$@ with recordName `%2$@:%3$@`. Existing dangling references will resolve on next fetch."
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cria %1$@ com recordName `%2$@:%3$@`. Referências pendentes serão resolvidas na próxima busca."
+          }
         }
       }
     },
     "Current Icon" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ícone atual"
+          }
+        }
+      }
     },
     "Custom" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personalizado"
+          }
+        }
+      }
     },
     "Custom…" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personalizado…"
+          }
+        }
+      }
     },
     "Customize %@" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personalizar %@"
+          }
+        }
+      }
     },
     "Dashboard" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Painel"
+          }
+        }
+      }
     },
     "Date" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Data"
+          }
+        }
+      }
     },
     "Day" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dia"
+          }
+        }
+      }
     },
     "DAY STREAK" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SEQUÊNCIA DE DIAS"
+          }
+        }
+      }
     },
     "Default: morning until %@, afternoon until %@." : {
       "localizations" : {
@@ -535,116 +1195,374 @@
             "state" : "new",
             "value" : "Default: morning until %1$@, afternoon until %2$@."
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Padrão: manhã até %1$@, tarde até %2$@."
+          }
         }
       }
     },
     "Direction contradicts physiology — likely confound or reverse causation. Demoted to exploratory." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A direção contradiz a fisiologia — provável fator de confusão ou causalidade reversa. Rebaixado para exploratório."
+          }
+        }
+      }
     },
     "Disabled sections stay in the central store. Toggling one off hides it on the dashboard and sidebar, but never deletes any data or your color and label customizations." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seções desativadas permanecem no armazenamento central. Desativar uma a oculta no painel e na barra lateral, mas nunca apaga dados nem suas personalizações de cor e rótulo."
+          }
+        }
+      }
     },
     "Discover" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descobrir"
+          }
+        }
+      }
     },
     "Don't Repeat" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não repetir"
+          }
+        }
+      }
     },
     "Drag to reorder. Toggle to show or hide a tile on the Nutrition dashboard. Tap a swatch to change its color." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arraste para reordenar. Use o botão para mostrar ou ocultar um bloco no painel de Nutrição. Toque em uma amostra para mudar a cor."
+          }
+        }
+      }
     },
     "Each brief teaches a model how to use one section through the MCP — tools available, conventions, examples." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada resumo ensina um modelo a usar uma seção pelo MCP — ferramentas disponíveis, convenções, exemplos."
+          }
+        }
+      }
     },
     "Each row fires the same renderer and haptic a real log uses. Under Reduce Motion the visual is suppressed (by design) — you'll still feel the haptic." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada linha dispara o mesmo render e o mesmo retorno tátil que um registro real usa. Com Reduzir Movimento, o visual é suprimido (de propósito) — você ainda sente o toque."
+          }
+        }
+      }
     },
     "Edit" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editar"
+          }
+        }
+      }
     },
     "Enabled" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ativado"
+          }
+        }
+      }
     },
     "Every" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A cada"
+          }
+        }
+      }
     },
     "Exactly" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exatamente"
+          }
+        }
+      }
     },
     "Example" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exemplo"
+          }
+        }
+      }
     },
     "Exercises" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exercícios"
+          }
+        }
+      }
     },
     "Expected direction: %@" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Direção esperada: %@"
+          }
+        }
+      }
     },
     "Exploratory" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exploratório"
+          }
+        }
+      }
     },
     "Export" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exportar"
+          }
+        }
+      }
     },
     "Exported %@" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exportado %@"
+          }
+        }
+      }
     },
     "Fill four short quadrants. Septena uses the on-device model to draft a north-star goal and commitments you can save into Goals." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preencha quatro quadrantes curtos. O Septena usa o modelo no dispositivo para esboçar uma meta estrela-guia e compromissos que você pode salvar em Metas."
+          }
+        }
+      }
     },
     "Fix by creating the missing record (CloudKit Console → Create New Record) with recordName matching the referenced id." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corrija criando o registro ausente (Console do CloudKit → Create New Record) com o recordName igual ao id referenciado."
+          }
+        }
+      }
     },
     "Format" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Formato"
+          }
+        }
+      }
     },
     "Format version %@. The exporter above produces files that round-trip through this importer unchanged." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versão do formato %@. O exportador acima produz arquivos que voltam por este importador sem alterações."
+          }
+        }
+      }
     },
     "Free-text intentions. Tag with sections so agents have context for what you're working toward." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Intenções em texto livre. Marque com seções para que os agentes tenham contexto do que você busca."
+          }
+        }
+      }
     },
     "From Reminders" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dos Lembretes"
+          }
+        }
+      }
     },
     "Gateway sync" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sincronização do gateway"
+          }
+        }
+      }
     },
     "Gentle reminders to mark what you’ve done — habits, chores, hydration, bedtime. They fire around when you usually log, and stay quiet once it’s done. See everything that’s scheduled — and turn individual nudges on or off — under Scheduled Notifications." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lembretes gentis para marcar o que você fez — hábitos, tarefas, hidratação, hora de dormir. Eles disparam por volta do horário em que você costuma registrar e ficam quietos depois de concluído. Veja tudo o que está agendado — e ative ou desative avisos individuais — em Notificações Agendadas."
+          }
+        }
+      }
     },
     "Grant Access" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conceder acesso"
+          }
+        }
+      }
     },
     "Grant access here, or manage permissions in iOS Settings → Privacy." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conceda acesso aqui ou gerencie permissões em Ajustes do iOS → Privacidade."
+          }
+        }
+      }
     },
     "Guided local-AI reflections that turn into real goals." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reflexões guiadas por IA local que viram metas de verdade."
+          }
+        }
+      }
     },
     "Habits & supplements" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hábitos e suplementos"
+          }
+        }
+      }
     },
     "Health access denied" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acesso à Saúde negado"
+          }
+        }
+      }
     },
     "HealthKit isn't available on this device" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O HealthKit não está disponível neste dispositivo"
+          }
+        }
+      }
     },
     "Helps us understand which features people use, so we improve the right things." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajuda a entender quais recursos as pessoas usam, para melhorarmos as coisas certas."
+          }
+        }
+      }
     },
     "Hides this section everywhere. Your data and customizations stay." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oculta esta seção em todos os lugares. Seus dados e personalizações permanecem."
+          }
+        }
+      }
     },
     "Hold the week up to the light" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coloque a semana contra a luz"
+          }
+        }
+      }
     },
     "I'm feeling" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estou me sentindo"
+          }
+        }
+      }
     },
     "iCloud" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud"
+          }
+        }
+      }
     },
     "id: %@" : {
       "shouldTranslate" : false
@@ -656,20 +1574,54 @@
             "state" : "new",
             "value" : "id: %1$@   area: %2$@"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "id: %1$@   área: %2$@"
+          }
         }
       }
     },
     "If you think an entry got moved here by mistake, check nearby days too." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se você acha que uma entrada veio parar aqui por engano, confira também os dias próximos."
+          }
+        }
+      }
     },
     "Import" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importar"
+          }
+        }
+      }
     },
     "In catalog" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No catálogo"
+          }
+        }
+      }
     },
     "In session" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Em sessão"
+          }
+        }
+      }
     },
     "Inbox" : {
       "comment" : "Phase 0 spike — test string, not a real translation pass",
@@ -691,47 +1643,137 @@
             "state" : "translated",
             "value" : "Boîte de réception"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Caixa de entrada"
+          }
         }
       }
     },
     "Include this section's entries in the Next timeline." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incluir as entradas desta seção na linha do tempo do Próximo."
+          }
+        }
+      }
     },
     "Incomplete logs" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registros incompletos"
+          }
+        }
+      }
     },
     "Insufficient pairs (1 ≤ n < %@ overlapping days) are too noisy to chart but listed here so you can see what's almost ready." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pares insuficientes (1 ≤ n < %@ dias sobrepostos) são ruidosos demais para o gráfico, mas listados aqui para você ver o que está quase pronto."
+          }
+        }
+      }
     },
     "Intensity" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Intensidade"
+          }
+        }
+      }
     },
     "Intensity scales burst / snap / bloom / cascade / tally loudness — sink and settle ignore it. Streak drives the Ignition milestone number." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A intensidade controla a força de burst / snap / bloom / cascade / tally — sink e settle a ignoram. A sequência define o número do marco de Ignição."
+          }
+        }
+      }
     },
     "iOS shows a confirmation prompt each time you switch icons." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O iOS mostra uma confirmação cada vez que você troca de ícone."
+          }
+        }
+      }
     },
     "JSON dumps of every record in the local store. Use these as a backup, to move to another device, or to feed into other tools." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Despejos JSON de cada registro no armazenamento local. Use como backup, para migrar para outro dispositivo ou para alimentar outras ferramentas."
+          }
+        }
+      }
     },
     "Jump to Today" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ir para Hoje"
+          }
+        }
+      }
     },
     "Keep a supplement on the Next list after its time of day, until you take it. Off shows it only during its slot." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantém um suplemento na lista do Próximo após o horário, até você tomar. Desligado, ele aparece só durante o período dele."
+          }
+        }
+      }
     },
     "Keep an undone habit on the Next list after its time of day, until you do it. Off shows each habit only during its slot." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantém um hábito não concluído na lista do Próximo após o horário, até você fazê-lo. Desligado, cada hábito aparece só durante o período dele."
+          }
+        }
+      }
     },
     "Keep logging — pairs need n ≥ %@ overlapping days." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue registrando — os pares precisam de n ≥ %@ dias sobrepostos."
+          }
+        }
+      }
     },
     "kg" : {
       "shouldTranslate" : false
     },
     "Kind" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tipo"
+          }
+        }
+      }
     },
     "lag %@d · n=%@" : {
       "localizations" : {
@@ -740,11 +1782,24 @@
             "state" : "new",
             "value" : "lag %1$@d · n=%2$@"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "defasagem %1$@d · n=%2$@"
+          }
         }
       }
     },
     "Let Claude read and write your Septena data at mcp.septena.app." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deixe o Claude ler e gravar seus dados do Septena em mcp.septena.app."
+          }
+        }
+      }
     },
     "Light mode uses a %@ background with white discs. Dark mode uses transparent artwork so the system background shows through behind %@ discs." : {
       "localizations" : {
@@ -753,218 +1808,672 @@
             "state" : "new",
             "value" : "Light mode uses a %1$@ background with white discs. Dark mode uses transparent artwork so the system background shows through behind %2$@ discs."
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O modo claro usa um fundo %1$@ com discos brancos. O modo escuro usa arte transparente, então o fundo do sistema aparece atrás de discos %2$@."
+          }
         }
       }
     },
     "Loading session types…" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carregando tipos de sessão…"
+          }
+        }
+      }
     },
     "Log a meal and it'll show up here for one-tap re-logging." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registre uma refeição e ela aparecerá aqui para registrar de novo com um toque."
+          }
+        }
+      }
     },
     "LOGGED" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "REGISTRADO"
+          }
+        }
+      }
     },
     "Macro tiles" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blocos de macros"
+          }
+        }
+      }
     },
     "Make Septena yours" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deixe o Septena com a sua cara"
+          }
+        }
+      }
     },
     "MCP" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MCP"
+          }
+        }
+      }
     },
     "Membership" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Assinatura"
+          }
+        }
+      }
     },
     "Metric" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Métrica"
+          }
+        }
+      }
     },
     "Missing Areas" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Áreas ausentes"
+          }
+        }
+      }
     },
     "Missing Projects" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projetos ausentes"
+          }
+        }
+      }
     },
     "ml" : {
       "shouldTranslate" : false
     },
     "Mock membership for testing — no purchase is made. Turn this off to re-lock Septena+ features." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Assinatura fictícia para teste — nenhuma compra é feita. Desative para bloquear de novo os recursos do Septena+."
+          }
+        }
+      }
     },
     "Mock unlock — no purchase is made yet." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desbloqueio fictício — nenhuma compra é feita ainda."
+          }
+        }
+      }
     },
     "Month" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mês"
+          }
+        }
+      }
     },
     "n < %@ — too noisy to plot" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "n < %@ — ruidoso demais para plotar"
+          }
+        }
+      }
     },
     "n=%@" : {
       "shouldTranslate" : false
     },
     "New entries you log in Septena will be sent to Apple Health. Existing entries are not back-filled." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Novas entradas que você registrar no Septena serão enviadas ao Apple Health. As entradas existentes não são preenchidas retroativamente."
+          }
+        }
+      }
     },
     "Next list" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lista do Próximo"
+          }
+        }
+      }
     },
     "Nice work." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bom trabalho."
+          }
+        }
+      }
     },
     "No bean presets yet — add some in Caffeine settings." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum preset de grãos ainda — adicione alguns nos ajustes de Cafeína."
+          }
+        }
+      }
     },
     "No calendars found." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum calendário encontrado."
+          }
+        }
+      }
     },
     "no data" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sem dados"
+          }
+        }
+      }
     },
     "No data this run: %@." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem dados nesta execução: %@."
+          }
+        }
+      }
     },
     "No entries logged on this day" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma entrada registrada neste dia"
+          }
+        }
+      }
     },
     "No entries logged today" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma entrada registrada hoje"
+          }
+        }
+      }
     },
     "No entries yet" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma entrada ainda"
+          }
+        }
+      }
     },
     "No habits defined." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum hábito definido."
+          }
+        }
+      }
     },
     "No onboarding available." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma introdução disponível."
+          }
+        }
+      }
     },
     "No prior session" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma sessão anterior"
+          }
+        }
+      }
     },
     "No recent meals" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma refeição recente"
+          }
+        }
+      }
     },
     "No sections declare notifications yet." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma seção declara notificações ainda."
+          }
+        }
+      }
     },
     "No selections yet" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma seleção ainda"
+          }
+        }
+      }
     },
     "No sessions logged on this day" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma sessão registrada neste dia"
+          }
+        }
+      }
     },
     "No supplements configured." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum suplemento configurado."
+          }
+        }
+      }
     },
     "None" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum"
+          }
+        }
+      }
     },
     "Not enough data yet (%@)" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dados insuficientes ainda (%@)"
+          }
+        }
+      }
     },
     "Note" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nota"
+          }
+        }
+      }
     },
     "Nothing for today yet. Tap + to add a task." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada para hoje ainda. Toque em + para adicionar uma tarefa."
+          }
+        }
+      }
     },
     "Nothing here yet" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada aqui ainda"
+          }
+        }
+      }
     },
     "Nothing left for today" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada mais para hoje"
+          }
+        }
+      }
     },
     "Nothing logged yet." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada registrado ainda."
+          }
+        }
+      }
     },
     "Nothing on Today" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada em Hoje"
+          }
+        }
+      }
     },
     "Now" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agora"
+          }
+        }
+      }
     },
     "Nudges fire around when you usually log this, and stay quiet once it’s done for the day." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os avisos disparam por volta do horário em que você costuma registrar isto e ficam quietos depois de concluído no dia."
+          }
+        }
+      }
     },
     "of %@" : {
       "shouldTranslate" : false
     },
     "Off" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desligado"
+          }
+        }
+      }
     },
     "OK" : {
       "shouldTranslate" : false
     },
     "On, but nothing to nudge yet — already done today, nothing pending, or waiting out quiet hours." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ativo, mas nada para avisar ainda — já concluído hoje, nada pendente, ou aguardando o fim das horas de silêncio."
+          }
+        }
+      }
     },
     "One app for every corner of your life" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um app para cada canto da sua vida"
+          }
+        }
+      }
     },
     "Open" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir"
+          }
+        }
+      }
     },
     "Open the Shortcuts app to build shortcuts and automations from Septena's actions. Trigger them with Siri on iPhone and iPad." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abra o app Atalhos para criar atalhos e automações a partir das ações do Septena. Acione-os com a Siri no iPhone e no iPad."
+          }
+        }
+      }
     },
     "Opens the Shortcuts app with every Septena action ready to drop into a shortcut, Home Screen tile, or automation." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre o app Atalhos com cada ação do Septena pronta para entrar em um atalho, bloco da Tela de Início ou automação."
+          }
+        }
+      }
     },
     "Order here drives the logger order." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A ordem aqui define a ordem do registrador."
+          }
+        }
+      }
     },
     "p=%@" : {
       "shouldTranslate" : false
     },
     "Parameters" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parâmetros"
+          }
+        }
+      }
     },
     "Paste a Septena JSON export below." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cole abaixo uma exportação JSON do Septena."
+          }
+        }
+      }
     },
     "Photo access is denied. Enable it in Settings → Privacy → Photos. Meal thumbnails won't show until then." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O acesso a fotos está negado. Ative em Ajustes → Privacidade → Fotos. As miniaturas das refeições não aparecem até lá."
+          }
+        }
+      }
     },
     "Pick 3-7. A tighter set makes better goals." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha de 3 a 7. Um conjunto mais enxuto gera metas melhores."
+          }
+        }
+      }
     },
     "Pick a Date…" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha uma data…"
+          }
+        }
+      }
     },
     "Pick a Reminders list. Its pending items show in your Inbox; tap to import (originals are removed from Reminders)." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha uma lista dos Lembretes. Os itens pendentes dela aparecem na sua Caixa de entrada; toque para importar (os originais são removidos dos Lembretes)."
+          }
+        }
+      }
     },
     "Pick a Reminders list. Its pending items will show in your Inbox; tap to import (originals are removed from Reminders)." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha uma lista dos Lembretes. Os itens pendentes dela aparecerão na sua Caixa de entrada; toque para importar (os originais são removidos dos Lembretes)."
+          }
+        }
+      }
     },
     "Pick how the homepage renders — Histogram, Sparkline, Heatmap, or Correlations." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha como a tela inicial é exibida — Histograma, Minigráfico, Mapa de calor ou Correlações."
+          }
+        }
+      }
     },
     "Pick up to %@ sections. Each one becomes a shortcut in the Home Screen long-press menu, opening directly into that section." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha até %@ seções. Cada uma vira um atalho no menu de toque longo da Tela de Início, abrindo direto naquela seção."
+          }
+        }
+      }
     },
     "Pick which calendars contribute events to your day timeline and Next page. Hidden calendars stay untouched in iOS Calendar." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha quais calendários contribuem com eventos para a linha do tempo do seu dia e a página Próximo. Calendários ocultos permanecem intactos no Calendário do iOS."
+          }
+        }
+      }
     },
     "Power-user features for people who live in the app — starting with the Correlations dashboard and custom app icons." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recursos avançados para quem vive no app — começando pelo painel de Correlações e pelos ícones de app personalizados."
+          }
+        }
+      }
     },
     "PR" : {
       "shouldTranslate" : false
     },
     "PROGRESS" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PROGRESSO"
+          }
+        }
+      }
     },
     "Projects in this area will be detached but not deleted." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os projetos desta área serão desvinculados, mas não excluídos."
+          }
+        }
+      }
     },
     "Provide JSON in the Septena export format. Records are merged by id — existing rows update in place, new rows are inserted. Definition tables (habits, supplements, chores, beans, grocery items) apply now; event/log tables preview only in this build." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forneça um JSON no formato de exportação do Septena. Os registros são mesclados por id — as linhas existentes são atualizadas no lugar e as novas são inseridas. Tabelas de definição (hábitos, suplementos, tarefas, grãos, itens de compras) valem agora; tabelas de evento/registro são só prévia nesta versão."
+          }
+        }
+      }
     },
     "Quiet" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quieto"
+          }
+        }
+      }
     },
     "r = %@  ·  p = %@  ·  permutations = %@" : {
       "localizations" : {
@@ -973,107 +2482,344 @@
             "state" : "new",
             "value" : "r = %1$@  ·  p = %2$@  ·  permutations = %3$@"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "r = %1$@  ·  p = %2$@  ·  permutações = %3$@"
+          }
         }
       }
     },
     "Re-enable in Settings → Health → Data Access & Devices → Septena." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reative em Ajustes → Saúde → Acesso a Dados e Dispositivos → Septena."
+          }
+        }
+      }
     },
     "Re-pulls every nutrition entry and daily summary from CloudKit and merges them into the local store. Use if this device's protein/kcal history looks empty even though entries exist on another device." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rebusca cada entrada de nutrição e resumo diário do CloudKit e os mescla no armazenamento local. Use se o histórico de proteína/kcal deste dispositivo parecer vazio mesmo havendo entradas em outro dispositivo."
+          }
+        }
+      }
     },
     "Read Apple Health on this device" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ler o Apple Health neste dispositivo"
+          }
+        }
+      }
     },
     "RECENT" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "RECENTE"
+          }
+        }
+      }
     },
     "Reconnect" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reconectar"
+          }
+        }
+      }
     },
     "Register a Withings dev app at developer.withings.com (Public Health Data API), then add your client_id and client_secret to Config/Secrets.xcconfig (copy it from Config/Secrets.example.xcconfig) and rebuild. The redirect URI should be septena://withings/callback." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registre um app de desenvolvedor Withings em developer.withings.com (Public Health Data API), depois adicione seu client_id e client_secret em Config/Secrets.xcconfig (copie de Config/Secrets.example.xcconfig) e recompile. O redirect URI deve ser septena://withings/callback."
+          }
+        }
+      }
     },
     "Remove" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remover"
+          }
+        }
+      }
     },
     "Renaming a supplement doesn't affect its history — events are linked by ID." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renomear um suplemento não afeta seu histórico — os eventos são vinculados por ID."
+          }
+        }
+      }
     },
     "Renders the day-timeline strip above the homepage layout." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exibe a faixa de linha do tempo do dia acima do layout da tela inicial."
+          }
+        }
+      }
     },
     "Repair" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reparar"
+          }
+        }
+      }
     },
     "Required" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obrigatório"
+          }
+        }
+      }
     },
     "Review your values" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revise seus valores"
+          }
+        }
+      }
     },
     "Say one of these to log without opening the app. Asking for a section that's turned off turns it back on automatically — your data is never lost. Every other action is Siri-callable too — open the Shortcuts app to give it a phrase." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diga um destes para registrar sem abrir o app. Pedir uma seção que está desativada a reativa automaticamente — seus dados nunca são perdidos. Toda outra ação também pode ser chamada pela Siri — abra o app Atalhos para dar um comando de voz a ela."
+          }
+        }
+      }
     },
     "Schema prompts" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompts de esquema"
+          }
+        }
+      }
     },
     "Section off" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seção desativada"
+          }
+        }
+      }
     },
     "Section Skill briefs an AI assistant on how to use this section via the Septena MCP. Export downloads every record in this section as JSON." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Skill da seção orienta um assistente de IA sobre como usar esta seção pelo MCP do Septena. Exportar baixa cada registro desta seção em JSON."
+          }
+        }
+      }
     },
     "Section skills" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skills das seções"
+          }
+        }
+      }
     },
     "Section unavailable." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seção indisponível."
+          }
+        }
+      }
     },
     "Sections" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seções"
+          }
+        }
+      }
     },
     "Septena" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Septena"
+          }
+        }
+      }
     },
     "Septena attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Septena anexa fotos às suas refeições e mostra as miniaturas no seu registro de nutrição. As fotos ficam no seu dispositivo."
+          }
+        }
+      }
     },
     "Septena keeps all your data in your private iCloud, so it needs you signed in. Open Settings and sign in to iCloud to use the app and sync across your devices." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Septena guarda todos os seus dados no seu iCloud privado, então precisa que você esteja conectado. Abra os Ajustes e entre no iCloud para usar o app e sincronizar entre seus dispositivos."
+          }
+        }
+      }
     },
     "Septena keeps everything in your private iCloud — there's no separate Septena account. Your data and membership are tied to your Apple ID." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Septena guarda tudo no seu iCloud privado — não existe uma conta Septena separada. Seus dados e sua assinatura ficam vinculados ao seu Apple ID."
+          }
+        }
+      }
     },
     "Septena keeps the everyday things you track in one place: tasks, habits, what you eat, how you sleep. It syncs across your devices over iCloud and stays yours alone." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Septena mantém num só lugar as coisas do dia a dia que você acompanha: tarefas, hábitos, o que você come, como você dorme. Ele sincroniza entre seus dispositivos pelo iCloud e continua só seu."
+          }
+        }
+      }
     },
     "Septena needs access to read your Reminders." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Septena precisa de acesso para ler seus Lembretes."
+          }
+        }
+      }
     },
     "Septena pulls steps, exercise minutes, VO2 max, HRV and resting heart rate from HealthKit. Data never leaves your phone." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Septena puxa passos, minutos de exercício, VO2 máx, VFC e frequência cardíaca de repouso do HealthKit. Os dados nunca saem do seu telefone."
+          }
+        }
+      }
     },
     "Septena summarizes your last 7 days of logs — on device, nothing leaves your phone — and reflects them against four cardinal virtues. A mirror, not a scorecard." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Septena resume seus últimos 7 dias de registros — no dispositivo, nada sai do seu telefone — e os reflete diante de quatro virtudes cardeais. Um espelho, não um placar."
+          }
+        }
+      }
     },
     "Septena writes your logged data to Apple Health so it appears alongside data from your other apps and devices." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Septena grava seus dados registrados no Apple Health para que apareçam junto aos dados dos seus outros apps e dispositivos."
+          }
+        }
+      }
     },
     "Septena+ membership" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Assinatura Septena+"
+          }
+        }
+      }
     },
     "Services" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Serviços"
+          }
+        }
+      }
     },
     "SESSION COMPLETE" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SESSÃO CONCLUÍDA"
+          }
+        }
+      }
     },
     "Set when each part of your day begins. These boundaries drive the Morning / Afternoon / Evening groups in Habits and Supplements, the “Now” marker, what the Next list surfaces, and the welcome greeting." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Defina quando cada parte do seu dia começa. Esses limites definem os grupos Manhã / Tarde / Noite em Hábitos e Suplementos, o marcador “Agora”, o que a lista do Próximo mostra e a saudação de boas-vindas."
+          }
+        }
+      }
     },
     "Set when morning, afternoon, and evening begin — used across Habits, Supplements, the “Now” marker, and the greeting." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Defina quando começam a manhã, a tarde e a noite — usado em Hábitos, Suplementos, no marcador “Agora” e na saudação."
+          }
+        }
+      }
     },
     "Settings" : {
       "comment" : "Phase 0 spike — test string, not a real translation pass",
@@ -1095,17 +2841,44 @@
             "state" : "translated",
             "value" : "Réglages"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustes"
+          }
         }
       }
     },
     "Shopping list" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lista de compras"
+          }
+        }
+      }
     },
     "Shortcuts" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atalhos"
+          }
+        }
+      }
     },
     "Show in Next" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar no Próximo"
+          }
+        }
+      }
     },
     "Since %@ · target %@–%@h" : {
       "localizations" : {
@@ -1114,14 +2887,34 @@
             "state" : "new",
             "value" : "Since %1$@ · target %2$@–%3$@h"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desde %1$@ · alvo %2$@–%3$@h"
+          }
         }
       }
     },
     "Skill & Data" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skill e Dados"
+          }
+        }
+      }
     },
     "Skip" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pular"
+          }
+        }
+      }
     },
     "slope = %@%@ %@ per +1 %@ of %@" : {
       "localizations" : {
@@ -1130,26 +2923,74 @@
             "state" : "new",
             "value" : "slope = %1$@%2$@ %3$@ per +1 %4$@ of %5$@"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "inclinação = %1$@%2$@ %3$@ por +1 %4$@ de %5$@"
+          }
         }
       }
     },
     "Some categories are turned off in Apple Health. To allow them, open Health → Profile → Apps → Septena. New entries are sent going forward — existing ones aren't back-filled." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Algumas categorias estão desativadas no Apple Health. Para permiti-las, abra Saúde → Perfil → Apps → Septena. Novas entradas são enviadas daqui em diante — as existentes não são preenchidas retroativamente."
+          }
+        }
+      }
     },
     "Start training" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Começar treino"
+          }
+        }
+      }
     },
     "Stats" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estatísticas"
+          }
+        }
+      }
     },
     "Strength volume" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volume de força"
+          }
+        }
+      }
     },
     "Stress" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estresse"
+          }
+        }
+      }
     },
     "Suggested" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sugerido"
+          }
+        }
+      }
     },
     "Summarized from %@ section%@." : {
       "localizations" : {
@@ -1158,83 +2999,264 @@
             "state" : "new",
             "value" : "Summarized from %1$@ section%2$@."
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resumido de %1$@ seções."
+          }
         }
       }
     },
     "Supplements → Sleep score" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suplementos → Pontuação de sono"
+          }
+        }
+      }
     },
     "Synthesize your map" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sintetize seu mapa"
+          }
+        }
+      }
     },
     "Tag a section above (Training, Caffeine, Gut, Nutrition…) to see metrics you can measure." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marque uma seção acima (Treino, Cafeína, Intestino, Nutrição…) para ver métricas que você pode medir."
+          }
+        }
+      }
     },
     "Tap + to add a supplement." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toque em + para adicionar um suplemento."
+          }
+        }
+      }
     },
     "Tap + to log a session." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toque em + para registrar uma sessão."
+          }
+        }
+      }
     },
     "Tap a word to refine, or just Log" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toque em uma palavra para refinar, ou só Registrar"
+          }
+        }
+      }
     },
     "Tap how you feel right now" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toque em como você se sente agora"
+          }
+        }
+      }
     },
     "Tap the + button to add a task." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toque no botão + para adicionar uma tarefa."
+          }
+        }
+      }
     },
     "Tap to play" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toque para reproduzir"
+          }
+        }
+      }
     },
     "Target" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alvo"
+          }
+        }
+      }
     },
     "Tasks in this project keep their data but lose their project link." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As tarefas deste projeto mantêm seus dados, mas perdem o vínculo com o projeto."
+          }
+        }
+      }
     },
     "Tasks in this project will be moved to the inbox." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As tarefas deste projeto serão movidas para a caixa de entrada."
+          }
+        }
+      }
     },
     "Tension" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tensão"
+          }
+        }
+      }
     },
     "The copied text includes the connection preamble + this section's brief — paste it into an MCP client's system prompt or a Claude conversation to teach it how to use the section." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O texto copiado inclui o preâmbulo da conexão + o resumo desta seção — cole no prompt de sistema de um cliente MCP ou numa conversa com o Claude para ensiná-lo a usar a seção."
+          }
+        }
+      }
     },
     "The default icon is always free. Color icons are part of Septena+. iOS shows a confirmation prompt each time you switch icons." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O ícone padrão é sempre gratuito. Os ícones coloridos fazem parte do Septena+. O iOS mostra uma confirmação cada vez que você troca de ícone."
+          }
+        }
+      }
     },
     "The greeting at the top of the home tab — your name, tone, and how aware of your day it is." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A saudação no topo da aba inicial — seu nome, o tom e o quanto ela está ciente do seu dia."
+          }
+        }
+      }
     },
     "The master switch. Each nudge fires around when you usually log it and goes quiet once it's marked for the day." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O interruptor principal. Cada aviso dispara por volta do horário em que você costuma registrar e fica quieto depois de marcado no dia."
+          }
+        }
+      }
     },
     "The original multicolor icon." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O ícone multicolorido original."
+          }
+        }
+      }
     },
     "These four groups are the raw material for the north-star and commitments." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esses quatro grupos são a matéria-prima para a estrela-guia e os compromissos."
+          }
+        }
+      }
     },
     "This category is turned off in Apple Health. To allow it, open Health → Profile → Apps → Septena." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta categoria está desativada no Apple Health. Para permiti-la, abra Saúde → Perfil → Apps → Septena."
+          }
+        }
+      }
     },
     "This goal will also appear in the %@ section." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta meta também aparecerá na seção %@."
+          }
+        }
+      }
     },
     "This is the focused set Septena will turn into a north-star and commitments." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este é o conjunto enxuto que o Septena vai transformar em uma estrela-guia e compromissos."
+          }
+        }
+      }
     },
     "This section doesn't yet have MCP tools. A skill will appear here when it does." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta seção ainda não tem ferramentas MCP. Um skill aparecerá aqui quando tiver."
+          }
+        }
+      }
     },
     "Time of day" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hora do dia"
+          }
+        }
+      }
     },
     "today" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "hoje"
+          }
+        }
+      }
     },
     "Today" : {
       "comment" : "Phase 0 spike — test string, not a real translation pass",
@@ -1256,29 +3278,84 @@
             "state" : "translated",
             "value" : "Aujourd'hui"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoje"
+          }
         }
       }
     },
     "Token" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Token"
+          }
+        }
+      }
     },
     "Tokens live in this device's Keychain and never leave it. Weigh-ins sync to your other devices via iCloud." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os tokens ficam no Keychain deste dispositivo e nunca saem dele. As pesagens sincronizam com seus outros dispositivos pelo iCloud."
+          }
+        }
+      }
     },
     "Trusted" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confiável"
+          }
+        }
+      }
     },
     "Trusted signals" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sinais confiáveis"
+          }
+        }
+      }
     },
     "Turn a reflection into goals" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transforme uma reflexão em metas"
+          }
+        }
+      }
     },
     "Turn values into goals" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transforme valores em metas"
+          }
+        }
+      }
     },
     "Turned off in Apple Health" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desativado no Apple Health"
+          }
+        }
+      }
     },
     "Type %@ · %@" : {
       "localizations" : {
@@ -1287,20 +3364,54 @@
             "state" : "new",
             "value" : "Type %1$@ · %2$@"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tipo %1$@ · %2$@"
+          }
         }
       }
     },
     "Universal conventions every section relies on. Each section skill below extends this." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Convenções universais das quais cada seção depende. Cada skill de seção abaixo estende isto."
+          }
+        }
+      }
     },
     "Unlock %@" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desbloquear %@"
+          }
+        }
+      }
     },
     "Upgrade to %@" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fazer upgrade para %@"
+          }
+        }
+      }
     },
     "Used to personalize the greeting. With Apple Intelligence it's freshly written through the day." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usado para personalizar a saudação. Com a Apple Intelligence, ela é reescrita ao longo do dia."
+          }
+        }
+      }
     },
     "Version %@ (%@)" : {
       "localizations" : {
@@ -1309,35 +3420,104 @@
             "state" : "new",
             "value" : "Version %1$@ (%2$@)"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versão %1$@ (%2$@)"
+          }
         }
       }
     },
     "View This Day" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ver este dia"
+          }
+        }
+      }
     },
     "WAKE" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ACORDAR"
+          }
+        }
+      }
     },
     "Week" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Semana"
+          }
+        }
+      }
     },
     "Weekly Δ" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Δ semanal"
+          }
+        }
+      }
     },
     "When on, pending items in the source list import automatically and are removed from Reminders. Runs on app launch and whenever Reminders changes." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando ativo, os itens pendentes da lista de origem são importados automaticamente e removidos dos Lembretes. Roda ao abrir o app e sempre que os Lembretes mudam."
+          }
+        }
+      }
     },
     "When on, the Nutrition tile shows a live fasting timer after your last meal of the day, and you can choose what the heatmap encodes." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando ativo, o bloco de Nutrição mostra um cronômetro de jejum ao vivo após sua última refeição do dia, e você pode escolher o que o mapa de calor representa."
+          }
+        }
+      }
     },
     "Window controls how far back CorrelationEngine pulls data. Section filter limits which predictor → target pairs render — pairs are kept if either side matches." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A janela controla até quando o CorrelationEngine puxa dados. O filtro de seção limita quais pares preditor → alvo são exibidos — os pares são mantidos se qualquer um dos lados corresponder."
+          }
+        }
+      }
     },
     "Withings app credentials are not configured." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As credenciais do app Withings não estão configuradas."
+          }
+        }
+      }
     },
     "Write to Health" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gravar na Saúde"
+          }
+        }
+      }
     },
     "x = %@%@" : {
       "localizations" : {
@@ -1373,16 +3553,44 @@
       "shouldTranslate" : false
     },
     "You have " : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você tem "
+          }
+        }
+      }
     },
     "Your name personalizes the home greeting and this profile. It syncs across your devices via iCloud." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seu nome personaliza a saudação inicial e este perfil. Ele sincroniza entre seus dispositivos pelo iCloud."
+          }
+        }
+      }
     },
     "Your Septena+ perks" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seus benefícios Septena+"
+          }
+        }
+      }
     },
     "Zone 2 cardio" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cardio de zona 2"
+          }
+        }
+      }
     },
     "Δ %@%@" : {
       "localizations" : {
@@ -1396,7 +3604,14 @@
       "shouldTranslate" : false
     },
     "Δ = taken mean − off mean" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Δ = média com − média sem"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

@@ -55,6 +55,7 @@ targets:
           - fr
           - de
           - es
+          - pt-BR
         UILaunchScreen: {}
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: true
@@ -125,6 +126,7 @@ targets:
           - fr
           - de
           - es
+          - pt-BR
         CFBundleIconFile: AppIcon
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
