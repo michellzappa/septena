@@ -3,6 +3,7 @@
 // no Node APIs. Auth is API token (env) + per-request ckWebAuthToken.
 
 import type { Env } from "./env.js";
+import { logEvent } from "./util.js";
 
 const HOST = "https://api.apple-cloudkit.com";
 
@@ -69,13 +70,25 @@ export class CloudKitClient {
     filterBy?: CKFilter[];
     sortBy?: CKSort[];
     resultsLimit?: number;
+    /**
+     * Paginate to true exhaustion, ignoring resultsLimit. Use when the caller
+     * must see the *whole* record set before applying its own (e.g. unindexed,
+     * client-side) filter — otherwise a partial page in CloudKit's unspecified
+     * order can hide matches. A page-count runaway guard still applies.
+     */
+    fetchAll?: boolean;
   }): Promise<CKQueryResponse> {
     // CloudKit caps each response at ~200 records and returns a
     // continuationMarker for the rest. Follow it until the caller's
-    // resultsLimit is reached or the server says we're done.
-    const target = args.resultsLimit ?? 200;
+    // resultsLimit is reached (or, with fetchAll, until the server is done).
+    const target = args.fetchAll ? Infinity : (args.resultsLimit ?? 200);
+    // Runaway guard for fetchAll: ~20k records. Far above any realistic
+    // personal history; if a query ever trips it we log so it's visible
+    // rather than silently truncating a window into "no data".
+    const MAX_PAGES = 100;
     const collected: CKRecord[] = [];
     let continuationMarker: string | undefined;
+    let pages = 0;
 
     do {
       const remaining = target - collected.length;
@@ -91,7 +104,16 @@ export class CloudKitClient {
       });
       collected.push(...page.records);
       continuationMarker = page.continuationMarker;
-    } while (continuationMarker && collected.length < target);
+      pages++;
+    } while (continuationMarker && collected.length < target && pages < MAX_PAGES);
+
+    if (continuationMarker && pages >= MAX_PAGES) {
+      logEvent("queryRecords_page_cap", {
+        recordType: args.recordType,
+        fetched: collected.length,
+        maxPages: MAX_PAGES,
+      });
+    }
 
     return {
       records: collected,
@@ -147,15 +169,25 @@ export async function queryByDateRange(
     ...(args.extraFilters ?? []),
   ];
 
-  // No server-side sortBy — `date`/`time` aren't reliably marked Sortable.
-  // Pull a generous page (capped at the caller's limit times a small
-  // multiplier so a wide window can still return `limit` matches when the
-  // record type has lots of out-of-window history).
-  const fetchLimit = Math.max(limit, 200);
+  // We can't push the window to the server: `date`/`time` aren't reliably
+  // marked Sortable, range comparators on the STRING `date` are rejected, and
+  // CloudKit returns match-all records in an unspecified order. Capping the
+  // fetch near the caller's limit is therefore unsafe — a partial page can
+  // miss the requested window entirely once the type has more history than one
+  // page (the original bug: "last week's training" returned ~nothing because
+  // the recent rows weren't in the first 200 fetched). So fetch the FULL
+  // match-all set, then filter the YMD window and slice to `limit` here.
+  //
+  // Why not range-filter on the `occurredAt` TIMESTAMP (server-indexable)?
+  // Because gateway-created rows don't carry it and its Queryable flag is
+  // unverified — a partially-populated field would silently drop matches with
+  // no error to fall back on. The local-time `date` STRING is the only
+  // authoritative, fully-populated day key, so it stays the filter of record.
+  // (See BACKLOG: a safe occurredAt fast-path needs the write side filled in.)
   const res = await client.queryRecords({
     recordType: args.recordType,
     filterBy,
-    resultsLimit: fetchLimit,
+    fetchAll: true,
   });
 
   const { from, to } = args;
@@ -200,9 +232,19 @@ export async function fetchUserRecordName(
   u.searchParams.set("ckWebAuthToken", ckWebAuthToken);
   const res = await fetch(u.toString(), { headers: { Accept: "application/json" } });
   const body = (await res.json().catch(() => null)) as
-    | { userRecordName?: string; redirectURL?: string }
+    | { userRecordName?: string; redirectURL?: string; serverErrorCode?: string }
     | null;
-  if (!res.ok || !body?.userRecordName) return null;
+  if (!res.ok || !body?.userRecordName) {
+    // Diagnostic only — no token logged. AUTHENTICATION_REQUIRED + a
+    // redirectURL means the token isn't recognized under our CK_API_TOKEN
+    // (API-token/env mismatch). A different error points elsewhere.
+    logEvent("whoami_fail", {
+      status: res.status,
+      serverErrorCode: body?.serverErrorCode,
+      hasRedirect: !!body?.redirectURL,
+    });
+    return null;
+  }
   return body.userRecordName;
 }
 

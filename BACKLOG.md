@@ -1,5 +1,38 @@
 # Backlog
 
+## Optional fast-path for `queryByDateRange` via the `occurredAt` TIMESTAMP
+
+### Why
+`queryByDateRange` (src/cloudkit.ts) currently fetches the **full** match-all
+record set for the type and filters the YMD window in JS. This is correct and
+the only safe option today, but cost is O(total history) per query — every
+"last 7 days" call paginates the entire `ExerciseEntry`/`CaffeineEvent`/… table.
+Fine for now (hundreds–low-thousands of rows); revisit when any type's history
+makes the full scan slow.
+
+### The idea
+`occurredAt` is a UTC TIMESTAMP that CloudKit *can* range-filter and sort
+server-side. Bound the fetch with `occurredAt >= from-24h AND <= to+48h`
+(padding absorbs the local-vs-UTC tz/DST skew — `date` is local, `occurredAt`
+is UTC), sort DESC, then still apply the authoritative client-side `date`-STRING
+filter for exact correctness. Turns a full-table scan into a window±~3-day scan.
+
+### Prerequisites (why it's NOT done yet — all must hold)
+1. **Write side fills `occurredAt` on every create/update.** Today the gateway
+   writes none (grep: zero `occurredAt` refs). Any gateway-created row would
+   fall outside the `occurredAt` filter and silently vanish — the same class of
+   bug we just fixed, but with no error to fall back on. Derive it like iOS:
+   `loggedAt ?? concludedAt ?? (date + "T" + time in local tz → UTC)`.
+2. **Confirm `occurredAt` is QUERYABLE + SORTABLE** in the gateway's CK
+   environment (auto-managed schema — verify, don't assume). If non-queryable,
+   CloudKit *errors*, so wrap the fast-path in try/catch and fall back to the
+   full scan. (Error = safe fallback; silent-empty from prereq 1 = NOT safe,
+   hence prereq 1 first.)
+3. Backfill `occurredAt` on historical gateway-created rows (the iOS launch
+   backfill covers app-synced rows; confirm none are missed).
+
+Until 1–3 hold, the full-scan + `date`-STRING filter stays the design of record.
+
 ## Move to CloudKit **production** to unlock long-lived (2-week) tokens — without data loss
 
 ### Why
