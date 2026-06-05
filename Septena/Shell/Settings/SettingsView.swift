@@ -467,6 +467,8 @@ struct SettingsView: View {
     case layout
     case correlations
     case timeOfDay
+    case welcome
+    case notifications
     case motionGallery
     case section(String)
   }
@@ -629,6 +631,8 @@ struct SettingsView: View {
     case .layout:       return "Layout"
     case .correlations: return "Correlations"
     case .timeOfDay:    return "Time of Day"
+    case .welcome:      return "Welcome"
+    case .notifications: return "Notifications"
     case .integrations: return "Integrations"
     case .importExport: return "Import & Export"
     case .skills:       return "Skills"
@@ -655,6 +659,8 @@ struct SettingsView: View {
     case .layout:       return "square.grid.2x2"
     case .correlations: return "chart.dots.scatter"
     case .timeOfDay:    return "clock"
+    case .welcome:      return "sun.horizon"
+    case .notifications: return "bell.badge"
     case .integrations: return "app.connected.to.app.below.fill"
     case .importExport: return "square.and.arrow.up.on.square"
     case .skills:       return "sparkles"
@@ -696,6 +702,8 @@ struct SettingsView: View {
     case .layout:            LayoutSettingsPane()
     case .correlations:      CorrelationsSettingsPane()
     case .timeOfDay:         TimeOfDaySettingsPane()
+    case .welcome:           WelcomeSettingsPane()
+    case .notifications:     NotificationsOverviewPane()
     case .integrations:      IntegrationsSettingsPane()
     case .importExport:      ImportExportSettingsPane()
     case .skills:            SkillsSettingsPane()
@@ -811,19 +819,8 @@ struct PrivacySettingsPane: View {
 struct GeneralSettingsPane: View {
   @AppStorage(SettingsKey.homepageShowTodayTimeline)
   private var showTodayTimeline: Bool = true
-  @AppStorage(SettingsKey.homepageShowWelcome)
-  private var showWelcome: Bool = true
-  @AppStorage(SettingsKey.welcomeName)
-  private var welcomeName: String = ""
-  @AppStorage(SettingsKey.welcomeTone)
-  private var welcomeToneRaw: String = WelcomeTone.warm.rawValue
-  @AppStorage(SettingsKey.welcomeDataAware)
-  private var welcomeDataAware: Bool = false
   @AppStorage(SettingsKey.notificationsEnabled)
   private var notificationsEnabled: Bool = true
-  @Environment(\.modelContext) private var modelContext
-  @Environment(CKEngine.self) private var ckEngine
-  @Environment(SettingsStore.self) private var store
 
   var body: some View {
     Form {
@@ -846,7 +843,14 @@ struct GeneralSettingsPane: View {
         Text("Set when morning, afternoon, and evening begin — used across Habits, Supplements, the “Now” marker, and the greeting.")
       }
 
-      homepageWelcomeSection
+      Section {
+        NavigationLink(value: SettingsView.SettingsDestination.welcome) {
+          Label("Welcome", systemImage: "sun.horizon")
+        }
+      } footer: {
+        Text("The greeting at the top of the home tab — your name, tone, and how aware of your day it is.")
+      }
+
       homepageTimelineSection
       notificationsSection
 
@@ -886,46 +890,78 @@ struct GeneralSettingsPane: View {
       Toggle(isOn: $notificationsEnabled) {
         Label("Notifications", systemImage: "bell.badge")
       }
+      if notificationsEnabled {
+        NavigationLink(value: SettingsView.SettingsDestination.notifications) {
+          Label("Scheduled Notifications", systemImage: "bell.and.waves.left.and.right")
+        }
+      }
     } footer: {
-      Text("Gentle reminders to mark what you’ve done — habits, chores, hydration, bedtime. Turn individual nudges on or off in each section’s settings. They fire around when you usually log, and stay quiet once it’s done.")
+      Text("Gentle reminders to mark what you’ve done — habits, chores, hydration, bedtime. They fire around when you usually log, and stay quiet once it’s done. See everything that’s scheduled — and turn individual nudges on or off — under Scheduled Notifications.")
     }
   }
 
-  @ViewBuilder
-  private var homepageWelcomeSection: some View {
-    Section {
-      Toggle(isOn: $showWelcome) {
-        Label("Show welcome", systemImage: "sun.horizon")
+}
+
+// MARK: - Welcome (dedicated page)
+
+struct WelcomeSettingsPane: View {
+  @AppStorage(SettingsKey.homepageShowWelcome)
+  private var showWelcome: Bool = true
+  @AppStorage(SettingsKey.welcomeName)
+  private var welcomeName: String = ""
+  @AppStorage(SettingsKey.welcomeTone)
+  private var welcomeToneRaw: String = WelcomeTone.warm.rawValue
+  @AppStorage(SettingsKey.welcomeDataAware)
+  private var welcomeDataAware: Bool = false
+  @Environment(\.modelContext) private var modelContext
+  @Environment(CKEngine.self) private var ckEngine
+  @Environment(SettingsStore.self) private var store
+
+  var body: some View {
+    Form {
+      Section {
+        Toggle(isOn: $showWelcome) {
+          Label("Show welcome", systemImage: "sun.horizon")
+        }
+      } footer: {
+        Text("A centered greeting at the top of the home tab.")
       }
+
       if showWelcome {
-        TextField("Your name", text: $welcomeName)
-          .textContentType(.givenName)
-          #if os(iOS)
-          .textInputAutocapitalization(.words)
-          #endif
-          // Mirror the local edit up to the CloudKit-synced payload. Per-
-          // keystroke writes are coalesced by CKSyncEngine into one push.
-          .onChange(of: welcomeName) { _, newValue in
-            store.setWelcomeName(newValue, context: modelContext, engine: ckEngine)
-          }
-
-        Picker(selection: $welcomeToneRaw) {
-          ForEach(WelcomeTone.allCases) { tone in
-            Text(tone.label).tag(tone.rawValue)
-          }
-        } label: {
-          Label("Tone", systemImage: "textformat")
+        Section {
+          TextField("Your name", text: $welcomeName)
+            .textContentType(.givenName)
+            #if os(iOS)
+            .textInputAutocapitalization(.words)
+            #endif
+            // Mirror the local edit up to the CloudKit-synced payload. Per-
+            // keystroke writes are coalesced by CKSyncEngine into one push.
+            .onChange(of: welcomeName) { _, newValue in
+              store.setWelcomeName(newValue, context: modelContext, engine: ckEngine)
+            }
+        } footer: {
+          Text("Used to personalize the greeting. With Apple Intelligence it's freshly written through the day.")
         }
 
-        Toggle(isOn: $welcomeDataAware) {
-          Label("Aware of your day", systemImage: "sparkles")
+        Section {
+          Picker(selection: $welcomeToneRaw) {
+            ForEach(WelcomeTone.allCases) { tone in
+              Text(tone.label).tag(tone.rawValue)
+            }
+          } label: {
+            Label("Tone", systemImage: "textformat")
+          }
+
+          Toggle(isOn: $welcomeDataAware) {
+            Label("Aware of your day", systemImage: "sparkles")
+          }
+        } footer: {
+          Text("“Aware of your day” lets the greeting nod to what's left on today's list and what's coming up next on your calendar.")
         }
       }
-    } footer: {
-      Text("A centered greeting at the top of the home tab. Add your name to personalize it — with Apple Intelligence it's freshly written through the day. \"Aware of your day\" lets it nod to what's left on today's list.")
     }
+    .formStyle(.grouped)
   }
-
 }
 
 // MARK: - Time of Day submenu

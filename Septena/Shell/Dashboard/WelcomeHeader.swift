@@ -8,12 +8,12 @@ import FoundationModels
 // Generation is 0.3–1s+ and the app opens faster than that, so we never
 // block on it:
 //
-//   1. A persistent cache (`@AppStorage`) means the second open of any phase
-//      is instant. Most opens are instant.
-//   2. Without live context we pre-generate the rest of today's phases in the
-//      background, so morning→afternoon→evening rollovers are already cached.
-//   3. While a cold line is in flight we render the plain fallback greeting
-//      and cross-fade the generated line in when it lands.
+//   1. A persistent cache (`@AppStorage`), keyed by a ~2-hour time slot, means
+//      re-opening within the same slot is instant. Most opens are instant.
+//   2. The line refreshes as the clock moves into a new slot, so the greeting
+//      tracks the actual time of day rather than a single coarse phase.
+//   3. While a cold line is in flight we keep the previous line (or the plain
+//      fallback) and cross-fade the generated line in when it lands.
 //
 // Data-aware mode (Settings → Welcome) injects a short phrase built from the
 // dashboard's already-loaded state — no new fetch. Because that snapshot
@@ -46,6 +46,10 @@ struct WelcomeHeader: View {
   private var phase: WelcomePhase { .resolve(at: now) }
   private var currentSignature: String { context?.signature ?? "" }
 
+  /// ~2-hour slot the greeting refreshes on, so the line tracks the clock
+  /// through the day instead of freezing for a whole phase.
+  private var slot: String { "\(Calendar.current.component(.hour, from: now) / 2)" }
+
   /// Invalidates the cache when the day, name or tone changes.
   private var stamp: String {
     "\(Int(now.timeIntervalSince1970 / 86_400))|\(name)|\(tone.rawValue)"
@@ -70,16 +74,19 @@ struct WelcomeHeader: View {
       .accessibilityElement(children: .combine)
       .accessibilityHint("Double tap for a new greeting")
       .accessibilityAction(named: "New greeting") { Task { await regenerate() } }
-      .task(id: "\(stamp)|\(phase.rawValue)|\(currentSignature)") { await refresh() }
+      .task(id: "\(stamp)|\(slot)|\(currentSignature)") { await refresh() }
   }
 
   @MainActor
   private func refresh() async {
     var cache = WelcomeCache.load(cacheJSON, stamp: stamp)
 
-    // Instant if we already have a valid line for this phase + data snapshot.
-    if let entry = cache.lines[phase.rawValue], entry.sig == currentSignature {
+    // Already have a valid line for this time slot + data snapshot? Instant.
+    // (Leave any prior line in place otherwise, so a new slot cross-fades from
+    // the last greeting instead of flashing back to the plain fallback.)
+    if let entry = cache.lines[slot], entry.sig == currentSignature {
       line = entry.text
+      return
     }
 
     guard OnDeviceAI.isAvailable, !name.isEmpty else {
@@ -90,22 +97,14 @@ struct WelcomeHeader: View {
     }
     WelcomeGenerator.prewarm()
 
-    // Data-aware lines depend on the live snapshot, so we can't pre-generate
-    // future phases; without context we pre-fill the rest of the day.
-    let phases = context == nil ? WelcomePhase.upcoming(from: phase) : [phase]
-    for p in phases {
-      let sig = (p == phase) ? currentSignature : ""
-      if let entry = cache.lines[p.rawValue], entry.sig == sig { continue }
-      let phrase = (p == phase) ? context?.phrase : nil
-      guard let generated = await WelcomeGenerator.line(
-        name: name, phase: p, date: now, tone: tone, context: phrase
-      ) else { continue }
-      cache.lines[p.rawValue] = WelcomeCache.Entry(text: generated, sig: sig)
-      cacheJSON = cache.encoded()
-      // Animate the swap so the box grows/shrinks (and content below slides)
-      // rather than snapping to the new line count.
-      if p == phase { withAnimation(.smooth(duration: 0.4)) { line = generated } }
-    }
+    guard let generated = await WelcomeGenerator.line(
+      name: name, date: now, tone: tone, context: context?.phrase
+    ) else { return }
+    cache.lines[slot] = WelcomeCache.Entry(text: generated, sig: currentSignature)
+    cacheJSON = cache.encoded()
+    // Animate the swap so the box grows/shrinks (and content below slides)
+    // rather than snapping to the new line count.
+    withAnimation(.smooth(duration: 0.4)) { line = generated }
   }
 
   /// Tap-to-reroll: force a fresh line for the current phase and cache it.
@@ -117,10 +116,10 @@ struct WelcomeHeader: View {
     defer { isGenerating = false }
 
     guard let generated = await WelcomeGenerator.line(
-      name: name, phase: phase, date: now, tone: tone, context: context?.phrase
+      name: name, date: now, tone: tone, context: context?.phrase
     ) else { return }
     var cache = WelcomeCache.load(cacheJSON, stamp: stamp)
-    cache.lines[phase.rawValue] = WelcomeCache.Entry(text: generated, sig: currentSignature)
+    cache.lines[slot] = WelcomeCache.Entry(text: generated, sig: currentSignature)
     cacheJSON = cache.encoded()
     withAnimation(.smooth(duration: 0.4)) { line = generated }
     rerollTick += 1  // fires the haptic
@@ -149,14 +148,6 @@ enum WelcomePhase: String, CaseIterable {
     case .afternoon: return .afternoon
     case .evening:   return .evening
     }
-  }
-
-  /// Phases from `phase` to the end of the day — used to pre-generate the
-  /// remaining phases once the current one is ready.
-  static func upcoming(from phase: WelcomePhase) -> [WelcomePhase] {
-    let all = WelcomePhase.allCases
-    guard let i = all.firstIndex(of: phase) else { return all }
-    return Array(all[i...])
   }
 }
 
@@ -196,7 +187,6 @@ private enum WelcomeGenerator {
   }
 
   static func line(name: String,
-                   phase: WelcomePhase,
                    date: Date,
                    tone: WelcomeTone,
                    context: String?) async -> String? {
@@ -204,7 +194,7 @@ private enum WelcomeGenerator {
     // into wrong facts (like naming the wrong weekday).
     let options = GenerationOptions(temperature: 0.9)
     let today = date.formatted(.dateTime.weekday(.wide))
-    let request = prompt(name: name, phase: phase, date: date, tone: tone, context: context)
+    let request = prompt(name: name, date: date, tone: tone, context: context)
 
     // Up to two attempts: reject any line that names a day other than today.
     for attempt in 0..<2 {
@@ -217,12 +207,28 @@ private enum WelcomeGenerator {
         #endif
       } catch {
         #if DEBUG
-        print("[Welcome] generation failed for \(phase.rawValue): \(error)")
+        print("[Welcome] generation failed: \(error)")
         #endif
         return nil
       }
     }
     return nil
+  }
+
+  /// Fine-grained, human time-of-day descriptor from the actual hour — far
+  /// more specific than the three coarse phases, so the line can say things
+  /// like "nearly noon" instead of a blanket "good morning".
+  private static func timeOfDay(_ date: Date) -> String {
+    switch Calendar.current.component(.hour, from: date) {
+    case 5..<8:   return "early morning, just after dawn"
+    case 8..<11:  return "mid-morning"
+    case 11..<12: return "late morning, nearly noon"
+    case 12..<14: return "midday, around lunch"
+    case 14..<17: return "mid-afternoon"
+    case 17..<19: return "early evening, around dusk"
+    case 19..<22: return "evening"
+    default:      return "late at night"
+    }
   }
 
   /// True if the line names any weekday other than today's — guards against
@@ -235,40 +241,43 @@ private enum WelcomeGenerator {
   }
 
   private static func prompt(name: String,
-                             phase: WelcomePhase,
                              date: Date,
                              tone: WelcomeTone,
                              context: String?) -> String {
     let weekday = date.formatted(.dateTime.weekday(.wide))
+    let clock = date.formatted(date: .omitted, time: .shortened)
+    let when = timeOfDay(date)
     let length = context == nil ? "roughly two to five words" : "roughly four to eight words"
     let contextBlock = context.map {
       """
 
-      Today so far: \($0).
-      You may nod to this warmly and lightly — never scold, count, or imply they're behind.
+      \(name)'s day right now: \($0).
+      If something here fits, weave in ONE detail warmly and lightly — anticipate
+      what's coming up, or nod to progress. Never scold, nag, count, or list it back.
       """
     } ?? ""
     return """
     Write ONE short, characterful greeting for the home screen of \(name)'s personal app.
 
-    Time of day: \(phase.rawValue).
-    Day: \(weekday).
+    Right now it is \(clock) on \(weekday) — \(when).
     Tone: \(tone.direction)\(contextBlock)
 
+    Greet \(name) for THIS specific moment. Lean on the real time — nearly noon,
+    just past nine, the dead of night — instead of a generic "good morning".
     Keep it brief — \(length), ending with the name \(name).
-    Give it a little personality and specificity to the moment. Do NOT default
-    to the plainest "Good \(phase.rawValue), \(name)" — reach for something with a bit of life.
+    Reach for something with a little life; never the plainest greeting.
 
-    Examples of the range and tone:
-    - Rise and shine, \(name)
-    - Happy \(weekday), \(name)
-    - Evening already, \(name)?
-    - Back at it, \(name)
+    Examples of the range and tone (don't reuse verbatim):
+    - Almost noon, \(name)
+    - Bright and early, \(name)
+    - Halfway through \(weekday), \(name)
+    - Winding down, \(name)
+    - Burning the midnight oil, \(name)?
 
     Guidelines:
     - Always end with the name \(name).
+    - Match the actual time of day — never say morning in the afternoon or vice versa.
     - Today is \(weekday). If you name a day, it MUST be \(weekday) — never any other day.
-    - Fit the time of day; the day of the week may flavor it, but don't force it.
     - Grounded and human, never corporate or saccharine.
     - Vary it each time — surprise me a little.
     - No emoji. No quotation marks.

@@ -885,6 +885,20 @@ struct WeekDashboardView: View {
       sig.append("s\(coarse(suppsLeft))")
     }
 
+    // What's coming up next — the soonest timed event still ahead today. This
+    // is the "Next-aware" bit: a concrete thing on the horizon, with a time.
+    if let next = dailies.calendarEvents
+      .filter({ !$0.isAllDay && $0.startDate > clock.now })
+      .min(by: { $0.startDate < $1.startDate }) {
+      let raw = next.title ?? ""
+      let title = raw.isEmpty ? "something" : raw
+      let at = next.startDate.formatted(date: .omitted, time: .shortened)
+      phrases.append("coming up: \(title) at \(at)")
+      // Regenerate when the next event itself changes (one passes / is added),
+      // not as the clock merely ticks toward it.
+      sig.append("n\(next.eventIdentifier ?? at)")
+    }
+
     guard !phrases.isEmpty else { return nil }
     return WelcomeContext(phrase: phrases.joined(separator: ", "),
                           signature: sig.joined(separator: "|"))
