@@ -175,6 +175,7 @@ struct TodayTaskRow: View {
         Label("Delete", systemImage: "trash")
       }
     }
+    .nextRowKeyboardToggle { model.toggle(task, mutator: mutator, motion: motion) }
   }
 }
 
@@ -628,6 +629,36 @@ struct HabitRow: View {
   // not all inherit the root env. nil → celebration no-ops, toggle still runs.
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
+  /// The optimistic flip + write lives on NextItemsModel; layer the streak
+  /// celebration on top here (the View can reach the environment; the model
+  /// can't). Shared by the checkbox tap and the Space/Return key handler.
+  private func commitToggle() {
+    let done = !habit.done
+    model.toggleHabit(habit, mutator: checklistMutator, motion: motion)
+    let streak = ChecklistMirror.habitStreak(context: modelContext, habitId: habit.id, asOf: SeptenaDate.today)
+    let accent = theme.color(for: "habits")
+    if done {
+      if let m = StreakMilestones.reached(streak), HabitMilestoneStore.lastCelebrated(habit.id) < m {
+        // Milestone — the loud version: rings + streak number.
+        HabitMilestoneStore.setCelebrated(habit.id, m)
+        Haptics.success()
+        logCommit?.fire(.ignition(accent: accent, streak: streak))
+        A11y.announce("\(streak) day streak!")
+      } else {
+        // Everyday completion — quantity-aware continuity: the tally row
+        // grows as you get further through *this bucket* of the day. Count
+        // includes the just-completed habit (model flipped it above), so
+        // each tick within a bucket adds a mark; a new bucket starts fresh.
+        let doneInBucket = model.habits.filter { $0.bucket == habit.bucket && $0.done }.count
+        let intensity = min(2.0, Double(doneInBucket) / 4.0)
+        Haptics.play(CommitMotion.tally.hapticSpec(intensity: intensity))
+        logCommit?.fire(.flourish(motion: .tally, accent: accent, intensity: intensity))
+      }
+    } else {
+      HabitMilestoneStore.reconcile(habit.id, currentStreak: streak)
+    }
+  }
+
   var body: some View {
     let inactive = habit.done || habit.skipped
     HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
@@ -635,33 +666,7 @@ struct HabitRow: View {
         tint: habit.skipped && !habit.done ? Theme.inkSecondary : tint,
         isDone: inactive
       ) {
-        // The optimistic flip + write lives on NextItemsModel; layer the
-        // streak celebration on top here (the View can reach the environment;
-        // the model can't). `done` is the value being written.
-        let done = !habit.done
-        model.toggleHabit(habit, mutator: checklistMutator, motion: motion)
-        let streak = ChecklistMirror.habitStreak(context: modelContext, habitId: habit.id, asOf: SeptenaDate.today)
-        let accent = theme.color(for: "habits")
-        if done {
-          if let m = StreakMilestones.reached(streak), HabitMilestoneStore.lastCelebrated(habit.id) < m {
-            // Milestone — the loud version: rings + streak number.
-            HabitMilestoneStore.setCelebrated(habit.id, m)
-            Haptics.success()
-            logCommit?.fire(.ignition(accent: accent, streak: streak))
-            A11y.announce("\(streak) day streak!")
-          } else {
-            // Everyday completion — quantity-aware continuity: the tally row
-            // grows as you get further through *this bucket* of the day. Count
-            // includes the just-completed habit (model flipped it above), so
-            // each tick within a bucket adds a mark; a new bucket starts fresh.
-            let doneInBucket = model.habits.filter { $0.bucket == habit.bucket && $0.done }.count
-            let intensity = min(2.0, Double(doneInBucket) / 4.0)
-            Haptics.play(CommitMotion.tally.hapticSpec(intensity: intensity))
-            logCommit?.fire(.flourish(motion: .tally, accent: accent, intensity: intensity))
-          }
-        } else {
-          HabitMilestoneStore.reconcile(habit.id, currentStreak: streak)
-        }
+        commitToggle()
       }
       .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 
@@ -694,6 +699,7 @@ struct HabitRow: View {
         }
       }
     }
+    .nextRowKeyboardToggle { commitToggle() }
   }
 }
 
@@ -761,6 +767,7 @@ struct SupplementRow: View {
         }
       }
     }
+    .nextRowKeyboardToggle { commitToggle() }
   }
 }
 
@@ -777,6 +784,21 @@ struct ChoreRow: View {
   @Environment(SectionTheme.self) private var theme
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
+  /// Complete / uncomplete the chore — shared by the checkbox tap and the
+  /// Space/Return key handler.
+  private func commitToggle() {
+    if model.completedChores.contains(chore.id) {
+      model.uncompleteChore(chore, mutator: checklistMutator)
+    } else {
+      model.completeChore(chore, mutator: checklistMutator, motion: motion)
+      // Filed onto the done pile. Settle ignores intensity (done is binary).
+      Haptics.play(CommitMotion.settle.hapticSpec(intensity: 1))
+      logCommit?.fire(.flourish(motion: .settle,
+                                accent: theme.color(for: "chores"),
+                                intensity: 1))
+    }
+  }
+
   var body: some View {
     let isDone = model.completedChores.contains(chore.id)
     let deferLabel = model.deferredChores[chore.id]
@@ -787,16 +809,7 @@ struct ChoreRow: View {
         tint: deferLabel != nil ? Theme.inkSecondary : tint,
         isDone: inactive
       ) {
-        if isDone {
-          model.uncompleteChore(chore, mutator: checklistMutator)
-        } else {
-          model.completeChore(chore, mutator: checklistMutator, motion: motion)
-          // Filed onto the done pile. Settle ignores intensity (done is binary).
-          Haptics.play(CommitMotion.settle.hapticSpec(intensity: 1))
-          logCommit?.fire(.flourish(motion: .settle,
-                                    accent: theme.color(for: "chores"),
-                                    intensity: 1))
-        }
+        commitToggle()
       }
       .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
       Text(chore.emoji ?? "•").font(.body)
@@ -850,6 +863,7 @@ struct ChoreRow: View {
         }
       }
     }
+    .nextRowKeyboardToggle { commitToggle() }
   }
 
   @ViewBuilder
@@ -865,6 +879,19 @@ struct ChoreRow: View {
 }
 
 // MARK: - Shared chrome
+
+extension View {
+  /// Makes a Next row keyboard-operable on iPad/Mac: the row becomes a focus
+  /// stop (Tab / ⇧Tab move between rows, and the system draws a focus ring),
+  /// and Space or Return runs the same toggle the checkbox tap does. A no-op
+  /// without a hardware keyboard, so it doesn't change the touch experience.
+  func nextRowKeyboardToggle(_ toggle: @escaping () -> Void) -> some View {
+    self
+      .focusable()
+      .onKeyPress(.space) { toggle(); return .handled }
+      .onKeyPress(.return) { toggle(); return .handled }
+  }
+}
 
 extension View {
   /// Wraps a stack of Next rows in the same rounded "pill" card that the

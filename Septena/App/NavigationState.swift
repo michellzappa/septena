@@ -76,4 +76,9 @@ final class NavigationState {
   /// shortcuts ("Start: Upper", etc.). Cleared after consumption.
   var pendingTrainingType: String? = nil
 
+  /// Drives the Keyboard Shortcuts cheat-sheet (⌘? — i.e. ⌘⇧/). A reference
+  /// overlay listing every shortcut, grouped by area. Read-only; closes via
+  /// its own Done button or Escape.
+  var showKeyboardShortcuts = false
+
 }

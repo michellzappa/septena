@@ -28,6 +28,10 @@ struct LogEntryRow: View {
       if let onEdit {
         Button(action: onEdit) { row }
           .buttonStyle(.plain)
+          // Make the row a keyboard focus stop on iPad/Mac (Tab / ⇧Tab to
+          // move between entries, system focus ring); Return / Space fires
+          // the button's edit action. No-op without a hardware keyboard.
+          .focusable()
       } else {
         row
       }

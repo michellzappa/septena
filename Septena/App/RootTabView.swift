@@ -133,6 +133,17 @@ struct RootTabView: View {
       // (Insights destination removed — the Correlations homepage
       // layout now hosts the trusted + exploratory grids inline, with
       // per-pair DetailSheet drill-in on tap.)
+      // App-global keyboard-shortcuts cheat-sheet (⌘?). Mounted here so it
+      // opens over any tab.
+      .sheet(isPresented: $nav.showKeyboardShortcuts) {
+        KeyboardShortcutsView()
+          #if os(iOS)
+          .presentationDetents([.medium, .large])
+          .presentationDragIndicator(.visible)
+          #else
+          .frame(width: 480, height: 560)
+          #endif
+      }
   }
 
   // Standard iOS 26 TabView with the system tab-bar minimize behavior

@@ -289,6 +289,12 @@ struct SeptenaApp: App {
       // otherwise it falls back to the menu-bar Quick Add path (jump to
       // Inbox + draft a row), the same flow as the iOS Quick Action.
       CommandGroup(replacing: .newItem) { NewTaskCommand() }
+      // ⌘? opens the keyboard-shortcuts cheat-sheet. Sits in the Help menu —
+      // the standard macOS home for it — and surfaces in the iPad ⌘-HUD too.
+      CommandGroup(after: .help) {
+        Button("Keyboard Shortcuts") { navigation.showKeyboardShortcuts = true }
+          .keyboardShortcut("/", modifiers: [.command, .shift])
+      }
     }
 
     // macOS menu bar quick-entry. Click the checklist glyph in the status

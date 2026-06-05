@@ -1043,7 +1043,22 @@ struct WeekDashboardView: View {
   private var tiles: some View {
     ForEach(visibleDomains) { domain in
       tile(for: domain)
+        // Keyboard open on iPad/Mac: each tile becomes a focus stop (Tab /
+        // ⇧Tab to move between tiles, with the system focus ring), and
+        // Return or Space opens it through the same router the Dense /
+        // Heatmap layouts use. A no-op without a hardware keyboard.
+        .focusable()
+        .onKeyPress(.return) { openFocusedTile(domain) }
+        .onKeyPress(.space) { openFocusedTile(domain) }
     }
+  }
+
+  /// Opens the tile for `domain` from a key press, reusing `handleDomainTap`
+  /// so keyboard activation and pointer taps share one code path.
+  private func openFocusedTile(_ domain: HomepageDomain) -> KeyPress.Result {
+    guard let tap = domainData(for: domain)?.tap else { return .ignored }
+    handleDomainTap(tap)
+    return .handled
   }
 
   /// Domain order + visibility, driven by Settings so reordering in
