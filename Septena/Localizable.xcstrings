@@ -14,7 +14,6 @@
       "shouldTranslate" : false
     },
     "%@ – %@" : {
-      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -22,7 +21,8 @@
             "value" : "%1$@ – %2$@"
           }
         }
-      }
+      },
+      "shouldTranslate" : false
     },
     "%@ — %@ of %@ exercises done%@" : {
       "localizations" : {
@@ -44,8 +44,10 @@
         }
       }
     },
+    "%@ · quiet" : {
+
+    },
     "%@ (%@d) vs %@ (%@d)" : {
-      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -53,10 +55,10 @@
             "value" : "%1$@ (%2$@d) vs %3$@ (%4$@d)"
           }
         }
-      }
+      },
+      "shouldTranslate" : false
     },
     "%@ / %@" : {
-      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -64,10 +66,10 @@
             "value" : "%1$@ / %2$@"
           }
         }
-      }
+      },
+      "shouldTranslate" : false
     },
     "%@ %@" : {
-      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -75,7 +77,8 @@
             "value" : "%1$@ %2$@"
           }
         }
-      }
+      },
+      "shouldTranslate" : false
     },
     "%@ binary signals · %@ trusted · tap to expand" : {
       "localizations" : {
@@ -148,7 +151,6 @@
 
     },
     "%@: x̄=%@%@  ·  ȳ=%@%@  ·  n=%@" : {
-      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -156,10 +158,10 @@
             "value" : "%1$@: x̄=%2$@%3$@  ·  ȳ=%4$@%5$@  ·  n=%6$@"
           }
         }
-      }
+      },
+      "shouldTranslate" : false
     },
     "%@/%@" : {
-      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -167,7 +169,8 @@
             "value" : "%1$@/%2$@"
           }
         }
-      }
+      },
+      "shouldTranslate" : false
     },
     "%@/%@ done · started %@" : {
       "localizations" : {
@@ -190,7 +193,6 @@
       }
     },
     "%@/%@%@" : {
-      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -198,10 +200,10 @@
             "value" : "%1$@/%2$@%3$@"
           }
         }
-      }
+      },
+      "shouldTranslate" : false
     },
     "%@/%@m" : {
-      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -209,10 +211,10 @@
             "value" : "%1$@/%2$@m"
           }
         }
-      }
+      },
+      "shouldTranslate" : false
     },
     "%@%@" : {
-      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -220,7 +222,8 @@
             "value" : "%1$@%2$@"
           }
         }
-      }
+      },
+      "shouldTranslate" : false
     },
     "%@C" : {
       "shouldTranslate" : false
@@ -250,7 +253,6 @@
       "shouldTranslate" : false
     },
     "→ %@ %@ in 7d" : {
-      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -258,7 +260,8 @@
             "value" : "→ %1$@ %2$@ in 7d"
           }
         }
-      }
+      },
+      "shouldTranslate" : false
     },
     "×%@" : {
       "shouldTranslate" : false
@@ -300,6 +303,9 @@
 
     },
     "Activity tracking runs on iPhone / iPad. Open Septena there to see steps and recovery metrics." : {
+
+    },
+    "Add a GitHub access token in Settings › Integrations." : {
 
     },
     "Add a habit first, then come back to backfill." : {
@@ -479,6 +485,9 @@
     "Create a Personal Access Token at cloud.ouraring.com/personal-access-tokens, then paste it here. Tokens stay on this device (Keychain) and are never sent to any Septena server." : {
 
     },
+    "Create a personal access token with the read:user scope at github.com/settings/tokens, then paste it here. Tokens stay on this device (Keychain) and are never sent to any Septena server." : {
+
+    },
     "Creates %@ with recordName `%@:%@`. Existing dangling references will resolve on next fetch." : {
       "localizations" : {
         "en" : {
@@ -595,7 +604,7 @@
     "Gateway sync" : {
 
     },
-    "Gentle reminders to mark what you’ve done — habits, chores, hydration, bedtime. Turn individual nudges on or off in each section’s settings. They fire around when you usually log, and stay quiet once it’s done." : {
+    "Gentle reminders to mark what you’ve done — habits, chores, hydration, bedtime. They fire around when you usually log, and stay quiet once it’s done. See everything that’s scheduled — and turn individual nudges on or off — under Scheduled Notifications." : {
 
     },
     "Grant Access" : {
@@ -831,6 +840,9 @@
     "No recent meals" : {
 
     },
+    "No sections declare notifications yet." : {
+
+    },
     "No selections yet" : {
 
     },
@@ -873,8 +885,14 @@
     "of %@" : {
       "shouldTranslate" : false
     },
+    "Off" : {
+
+    },
     "OK" : {
       "shouldTranslate" : false
+    },
+    "On, but nothing to nudge yet — already done today, nothing pending, or waiting out quiet hours." : {
+
     },
     "One app for every corner of your life" : {
 
@@ -939,6 +957,9 @@
     "Provide JSON in the Septena export format. Records are merged by id — existing rows update in place, new rows are inserted. Definition tables (habits, supplements, chores, beans, grocery items) apply now; event/log tables preview only in this build." : {
 
     },
+    "Quiet" : {
+
+    },
     "r = %@  ·  p = %@  ·  permutations = %@" : {
       "localizations" : {
         "en" : {
@@ -991,6 +1012,9 @@
     "Schema prompts" : {
 
     },
+    "Section off" : {
+
+    },
     "Section Skill briefs an AI assistant on how to use this section via the Septena MCP. Export downloads every record in this section as JSON." : {
 
     },
@@ -1013,6 +1037,9 @@
 
     },
     "Septena keeps everything in your private iCloud — there's no separate Septena account. Your data and membership are tied to your Apple ID." : {
+
+    },
+    "Septena keeps the everyday things you track in one place: tasks, habits, what you eat, how you sleep. It syncs across your devices over iCloud and stays yours alone." : {
 
     },
     "Septena needs access to read your Reminders." : {
@@ -1173,10 +1200,10 @@
     "The default icon is always free. Color icons are part of Septena+. iOS shows a confirmation prompt each time you switch icons." : {
 
     },
-    "The original multicolor icon." : {
+    "The master switch. Each nudge fires around when you usually log it and goes quiet once it's marked for the day." : {
 
     },
-    "The small signals of a whole life, gathered in one calm place. Septena keeps them with you and in step across your devices through iCloud, and yours alone." : {
+    "The original multicolor icon." : {
 
     },
     "These four groups are the raw material for the north-star and commitments." : {
@@ -1301,7 +1328,6 @@
 
     },
     "x = %@%@" : {
-      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1309,10 +1335,10 @@
             "value" : "x = %1$@%2$@"
           }
         }
-      }
+      },
+      "shouldTranslate" : false
     },
     "x̄ = %@%@  ·  ȳ = %@%@" : {
-      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1320,10 +1346,10 @@
             "value" : "x̄ = %1$@%2$@  ·  ȳ = %3$@%4$@"
           }
         }
-      }
+      },
+      "shouldTranslate" : false
     },
     "y = %@%@" : {
-      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1331,7 +1357,8 @@
             "value" : "y = %1$@%2$@"
           }
         }
-      }
+      },
+      "shouldTranslate" : false
     },
     "You have " : {
 
@@ -1346,7 +1373,6 @@
 
     },
     "Δ %@%@" : {
-      "shouldTranslate" : false,
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1354,7 +1380,8 @@
             "value" : "Δ %1$@%2$@"
           }
         }
-      }
+      },
+      "shouldTranslate" : false
     },
     "Δ = taken mean − off mean" : {
 

@@ -107,6 +107,39 @@ Net: the linchpin risk (xcodegen wiping localization config) is **retired**. The
 4. **Formatting** — locale-aware number parse (replace the Caffeine `,`→`.` hack) + convert display date formatters to `.formatted()` (Phase 0 Task 3).
 5. **Pick the translation mechanism** — in-catalog editor vs. export `.xcloc`/`.xliff` to a service / DeepL / Claude.
 
+### Audit results — the non-auto-extracted gap
+
+Four parallel read-only sweeps. The ~307 real catalog strings are a **floor**. Beyond them:
+
+**Chrome to wrap (mechanical → `LocalizedStringResource` / `String(localized:)`): ~180**, across ~30 files:
+- settings/welcome/add-menu/layout enums ~58 · Models/DayBucket/Recurrence/Muscle/`friendlyLabel` ~28 · Discovery mini-apps (Values/Ikigai/Virtue) ~30 · CorrelationEngine strength + markdown report ~15 · error enums (Withings/Migration/Gateway/Import) ~20 · notifications ~12 (fire-time) · Widgets/Watch/LiveActivity ~20
+- **Key move:** change computed chrome props from `-> String` to `-> LocalizedStringResource`. That both extracts them AND makes existing `Text(x.label)` call sites localize — so the "372 bypass sites" mostly fix themselves at the source.
+
+**Vocabulary / data — product decision: ~350 (most deferrable)**
+- Mood 4 quadrant + 4 blurb + 36 emotion words = 44 · Section names 16 + descriptions 16 · Macros 13 · Exercise library ~200 · Demo seed ~60 (DEBUG/screenshot only → exclude)
+
+**Bypass call sites:** 372 `Text(stringVar)`, but the 8 `Text(verbatim:)` are all correct and most show USER DATA (correctly unlocalized). Actionable subset = the chrome enums above.
+
+**Targets with NO catalog yet:** SeptenaWidgets, SeptenaWatch (+Complication), SeptenaLiveActivitiesExtension (Phase 1b). SeptenaCore needs none — its `String(localized:)` extracts into the iOS/Mac app catalog (compiled-in source).
+
+**v1 chrome surface (deferring exercises + demo seed): ~490 strings ×3**, plus whichever vocabulary sets are opted in.
+
+**Scope decisions (LOCKED):**
+- Exercise library (~200) → **keep English** (mark don't-translate; revisit v2).
+- Mood vocabulary (44: 4 quadrants + 4 blurbs + 36 emotion words) → **translate**.
+- Section names + descriptions (32) + macro labels (13) → **translate**.
+- Demo seed (~60) → **exclude** (DEBUG/screenshot-only).
+- **Locked v1 surface ≈ 307 + 180 + 44 + 45 ≈ ~575 strings × 3 languages.**
+
+### Execution roadmap (post-groundwork)
+1. **Wrap chrome → `LocalizedStringResource`/`String(localized:)`** (~270 = 180 chrome + 44 mood + 45 section/macro), batched by area. Mark exercises don't-translate. (Fixes extraction + bypass sites together.)
+2. **Plurals** — 6 hacks → catalog plural variations (pass counts as numbers).
+3. **Comments** — 73 format strings get translator context (`Text("…", comment:)`).
+4. **Formatting** — locale-aware number parse (Caffeine) + display date formatters.
+5. **Phase 1b** — own catalogs for Widgets / Watch / LiveActivity (~20).
+6. **Translate** (pick mechanism) → native review → pseudoloc QA.
+7. **Ship locales incrementally** — add a language to `CFBundleLocalizations` only when it's translated enough (avoids mixed UI).
+
 ## Repo-specific gotchas (ranked)
 
 1. **xcodegen silently undoes Xcode-side localization config.** Declare languages via `CFBundleLocalizations` in `project.yml`, never the Xcode UI.
