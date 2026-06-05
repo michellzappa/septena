@@ -25,6 +25,7 @@ struct EditTaskSheet: View {
 
   @State private var title = ""
   @State private var notes = ""
+  @State private var onToday = false
   @State private var scheduled: Date? = nil
   @State private var deadline: Date? = nil
   @State private var recurrence: Recurrence? = nil
@@ -49,29 +50,43 @@ struct EditTaskSheet: View {
           TextField("Notes", text: $notes, axis: .vertical)
             .font(.septenaNotes)
             .foregroundStyle(.secondary)
-            .lineLimit(3...10)
+            .lineLimit(2...6)
         }
 
+        // Metadata — one compact section, each row led by the same glyph the
+        // row/quick-actions use (sun · calendar · flag · repeat · folder).
         Section {
-          Toggle("When", isOn: enabledBinding(for: scheduledBinding, default: today))
-            .tint(theme.accent)
+          Toggle(isOn: $onToday) {
+            iconLabel("Today", "sun.max")
+          }
+          .tint(theme.accent)
+
+          Toggle(isOn: enabledBinding(for: scheduledBinding, default: today)) {
+            iconLabel("When", "calendar")
+          }
+          .tint(theme.accent)
           if scheduled != nil {
-            DatePicker("Date", selection: nonOptional(scheduledBinding),
-                       displayedComponents: [.date])
-              .tint(theme.accent)
-          }
-          Toggle("Deadline", isOn: enabledBinding(for: deadlineBinding, default: today))
+            DatePicker(selection: nonOptional(scheduledBinding), displayedComponents: [.date]) {
+              iconLabel("Date", "calendar").labelStyle(.titleOnly)
+            }
             .tint(theme.accent)
-          if deadline != nil {
-            DatePicker("Date", selection: nonOptional(deadlineBinding),
-                       displayedComponents: [.date])
-              .tint(theme.accent)
           }
-        }
 
-        Section {
-          Toggle("Repeat", isOn: repeatEnabledBinding)
+          Toggle(isOn: enabledBinding(for: deadlineBinding, default: today)) {
+            iconLabel("Deadline", "flag")
+          }
+          .tint(theme.accent)
+          if deadline != nil {
+            DatePicker(selection: nonOptional(deadlineBinding), displayedComponents: [.date]) {
+              iconLabel("Date", "flag").labelStyle(.titleOnly)
+            }
             .tint(theme.accent)
+          }
+
+          Toggle(isOn: repeatEnabledBinding) {
+            iconLabel("Repeat", "repeat")
+          }
+          .tint(theme.accent)
           if recurrence != nil {
             Picker("Unit", selection: recurrenceUnitBinding) {
               Text("Day").tag(Recurrence.Unit.day)
@@ -85,10 +100,8 @@ struct EditTaskSheet: View {
             Toggle("After completion", isOn: recurrenceAfterCompletionBinding)
               .tint(theme.accent)
           }
-        }
 
-        Section {
-          Picker("List", selection: listBinding) {
+          Picker(selection: listBinding) {
             Text("Inbox").tag(ListTag.inbox)
             ForEach(topProjects) { p in Text(p.title).tag(ListTag.project(p.id)) }
             ForEach(areas) { area in
@@ -97,9 +110,23 @@ struct EditTaskSheet: View {
                 Text("  ↳ \(p.title)").tag(ListTag.project(p.id))
               }
             }
+          } label: {
+            iconLabel("List", "folder")
           }
           .pickerStyle(.menu)
           .tint(theme.accent)
+        }
+
+        // Status actions — mirror the row's context menu. These act
+        // immediately and dismiss (like Delete), so they're grouped apart from
+        // the Save-committed fields above.
+        Section {
+          Button(action: moveToSomeday) {
+            iconLabel("Move to Someday", "moon.stars")
+          }
+          Button(action: cancelTask) {
+            iconLabel("Cancel Task", "xmark.circle")
+          }
         }
 
         Section {
@@ -107,6 +134,19 @@ struct EditTaskSheet: View {
         }
       }
       .onAppear(perform: seed)
+    }
+    // Open compact on iPhone (half-height), draggable taller. No-op for the
+    // iPad/macOS inspector presentation.
+    .presentationDetents([.medium, .large])
+    .presentationDragIndicator(.visible)
+  }
+
+  /// A row label with the section's signature glyph, accent-tinted.
+  private func iconLabel(_ title: String, _ systemImage: String) -> some View {
+    Label {
+      Text(title)
+    } icon: {
+      Image(systemName: systemImage).foregroundStyle(theme.accent)
     }
   }
 
@@ -198,8 +238,7 @@ struct EditTaskSheet: View {
     recurrence = original.recurrence
     areaId = original.area
     projectId = original.project
-    // An explicit Today pin reads as "scheduled today" here.
-    if original.today && scheduled == nil { scheduled = today }
+    onToday = original.today
     // Opening the editor counts as engagement — clear any agent cue.
     mutator.acknowledge(id: original.id)
   }
@@ -212,13 +251,15 @@ struct EditTaskSheet: View {
 
     // Things-style scheduled mapping: scheduling *today* pins `today` and
     // clears the stored date; a future date stores the date with today=false.
+    // The explicit Today toggle also pins it.
     let schedIsToday = scheduled.map { Calendar.current.isDateInToday($0) } ?? false
+    let pinToday = onToday || schedIsToday
 
     if t != original.title || notes != (original.notes ?? "") {
       mutator.update(id: id, title: t, notes: notes)
     }
     mutator.schedule(id: id, date: schedIsToday ? nil : scheduled)
-    mutator.moveToToday(id: id, today: schedIsToday)
+    mutator.moveToToday(id: id, today: pinToday)
     if deadline != SeptenaDate.parse(original.deadline) {
       mutator.setDue(id: id, date: deadline)
     }
@@ -228,6 +269,23 @@ struct EditTaskSheet: View {
     if projectId != original.project { mutator.moveToProject(id: id, project: projectId) }
     if areaId != original.area { mutator.moveToArea(id: id, area: areaId) }
     onDone(nil)
+  }
+
+  // Status actions mirror the row's context menu: act immediately and close,
+  // discarding any in-flight field edits (same as Delete).
+
+  private func moveToSomeday() {
+    Haptics.tick()
+    mutator.moveToSomeday(id: original.id)
+    onDone(nil)
+    (adaptiveClose ?? { dismiss() })()
+  }
+
+  private func cancelTask() {
+    Haptics.tick()
+    mutator.cancel(id: original.id)
+    onDone(nil)
+    (adaptiveClose ?? { dismiss() })()
   }
 
   private func deleteTask() {
