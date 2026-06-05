@@ -289,6 +289,15 @@ struct CorrelationsHomepageView: View {
       dateRange: r.dateRange
     )
     result = sorted
+    // Cache the single strongest trusted signal for the homepage glance
+    // tile, so the tile shows a live insight without running the engine.
+    if let top = sorted.evaluated.first(where: { $0.tier == .trusted }) {
+      ResponseCache.save(InsightTeaser(predictor: top.spec.predictor.label,
+                                       target: top.spec.target.label,
+                                       r: top.r,
+                                       positive: top.r >= 0),
+                         forKey: InsightTeaser.cacheKey)
+    }
     if r.evaluated.isEmpty && r.supplementsTable.isEmpty {
       loadError = "No logged data in the last \(windowDays) days."
     } else {

@@ -1,0 +1,79 @@
+import SwiftUI
+
+// Insights — the dedicated destination the Correlations engine graduated
+// into (from a homepage *layout mode* to its own surface). Hosts the full
+// correlation explorer (`CorrelationsHomepageView`) inside the standard
+// section chrome, behind the Septena+ gate. The homepage keeps only a
+// single glance tile (the strongest trusted signal) that deep-links here.
+//
+// Why a destination, not a layout mode: tiles/dense/heatmap are renderings
+// of *today's sections*; Insights is a derived analysis of your *history*
+// with its own depth (and a roadmap toward hypothesis tracking + N-of-1
+// experiments) that a single homepage layout can't hold.
+
+/// One-line summary of the strongest trusted correlation, cached by the
+/// Insights explorer for the homepage glance tile so the tile never has to
+/// run the (expensive) engine itself.
+struct InsightTeaser: Codable, Hashable {
+  let predictor: String
+  let target: String
+  let r: Double
+  let positive: Bool
+
+  /// e.g. "Training volume ↑ Sleep score" / "Caffeine ↓ HRV".
+  var headline: String { "\(predictor) \(positive ? "↑" : "↓") \(target)" }
+
+  static let cacheKey = "insights.topSignal"
+}
+
+struct InsightsDestinationView: View {
+  @AppStorage(SettingsKey.plusUnlocked) private var plusUnlocked: Bool = false
+  @State private var showPaywall = false
+
+  var body: some View {
+    SectionDrawer(sectionKey: "insights", title: "Insights", showsSettingsLink: false) {
+      if plusUnlocked {
+        CorrelationsHomepageView()
+      } else {
+        InsightsLockedView { showPaywall = true }
+      }
+    }
+    .trackScreen("insights")
+    .sheet(isPresented: $showPaywall) {
+      SeptenaPlusPaywall { plusUnlocked = true; showPaywall = false }
+    }
+  }
+}
+
+/// Upsell shown in the Insights destination when Septena+ is locked. The
+/// homepage glance tile always deep-links here; the gate lives in one place.
+private struct InsightsLockedView: View {
+  let onUnlock: () -> Void
+  @Environment(SectionTheme.self) private var theme
+  private var accent: Color { theme.color(for: "insights") }
+
+  var body: some View {
+    VStack(spacing: 14) {
+      Image(systemName: "chart.dots.scatter")
+        .font(.system(size: 40, weight: .semibold))
+        .foregroundStyle(accent)
+      Text("Insights")
+        .font(.title2.weight(.semibold))
+      Text("Find what actually moves your day — which habits, inputs, and routines track with better sleep, mood, recovery, and more. Real correlations across everything you log, computed privately on-device.")
+        .font(.callout)
+        .foregroundStyle(.secondary)
+        .multilineTextAlignment(.center)
+        .padding(.horizontal, 8)
+      Button(action: onUnlock) {
+        Text("Unlock with Septena+")
+          .frame(maxWidth: .infinity)
+      }
+      .buttonStyle(.borderedProminent)
+      .controlSize(.large)
+      .tint(accent)
+      .padding(.top, 4)
+    }
+    .frame(maxWidth: .infinity)
+    .padding(.vertical, 24)
+  }
+}

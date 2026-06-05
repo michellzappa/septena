@@ -113,6 +113,15 @@ protocol SectionPlugin {
   static func evaluateNotification(_ descriptorID: String,
                                    context: ModelContext,
                                    now: Date) -> NotificationPlan?
+
+  /// Daily numeric series this section contributes to correlation discovery.
+  /// Each `CorrelationFeature` is one date→value series tagged with role
+  /// (lever / outcome / neutral) + distribution, so the `CorrelationEngine`
+  /// can auto-pair and gate it WITHOUT a hand-written relationship list.
+  /// Default `[]` — a section contributes nothing until it opts in (built-in
+  /// sections are still catalogued engine-side in `legacyCatalog` during the
+  /// migration; new sections declare here). Only called for ACTIVE sections.
+  static func correlationFeatures(context: ModelContext) -> [CorrelationFeature]
 }
 
 /// Description of one "+" toolbar action declared by a plugin. The
@@ -348,6 +357,10 @@ extension SectionPlugin {
   static func evaluateNotification(_ descriptorID: String,
                                    context: ModelContext,
                                    now: Date) -> NotificationPlan? { nil }
+
+  /// Default: section contributes no correlation features. Sections opt in
+  /// by overriding this with at least one `CorrelationFeature`.
+  static func correlationFeatures(context: ModelContext) -> [CorrelationFeature] { [] }
 }
 
 /// Single source of truth for which plugins exist. Sections not in this
@@ -374,6 +387,7 @@ enum SectionRegistry {
     NutritionPlugin.self,
     HydrationPlugin.self,
     GitHubPlugin.self,
+    InsightsPlugin.self,
   ]
 
   static var byKey: [String: any SectionPlugin.Type] {

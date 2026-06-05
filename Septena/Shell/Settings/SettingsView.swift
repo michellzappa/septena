@@ -94,6 +94,12 @@ enum SettingsKey {
   /// the Tasks tab. Default `drawer` so Tasks matches the other sections;
   /// users who prefer landing on the full Tasks tab can flip it.
   static let tasksOpenIn      = "septena.tasks.openIn"
+  /// Master switch for the per-log "commit flourish" animations (the
+  /// `CommitMotion` / `LogCommitOverlay` celebrations that play when you log
+  /// something). Absent → on. Off suppresses every logging animation
+  /// app-wide; the commit haptic + VoiceOver confirmation still fire, exactly
+  /// like Reduce Motion. Read by `CommitFlourish` and `LogCommitOverlay`.
+  static let loggingAnimationsEnabled = "septena.ui.loggingAnimations"
   /// Mock entitlement flag for the (not-yet-real) Septena+ membership.
   /// Local-only @AppStorage — there's no StoreKit / IAP yet, so this is
   /// flipped by the in-app "mock unlock" toggle in the paywall. Gates the
@@ -259,8 +265,8 @@ final class SettingsStore {
 
   /// Hydrate from the local mirror / disk cache during construction so the
   /// dashboard's first frame uses the user's saved section order and config
-  /// instead of an empty array (which falls back to `HomepageDomain.defaultOrder`
-  /// and causes a half-second reorder flash).
+  /// instead of an empty array (which falls back to the `SectionManifest`
+  /// catalog order and causes a half-second reorder flash).
   init() {
     paintFromCache()
   }
@@ -629,7 +635,7 @@ struct SettingsView: View {
     case .quickActions: return "Quick Actions"
     case .appIcon:      return "App Icon"
     case .layout:       return "Layout"
-    case .correlations: return "Correlations"
+    case .correlations: return "Insights"
     case .timeOfDay:    return "Time of Day"
     case .welcome:      return "Welcome"
     case .notifications: return "Notifications"
@@ -821,6 +827,8 @@ struct GeneralSettingsPane: View {
   private var showTodayTimeline: Bool = true
   @AppStorage(SettingsKey.notificationsEnabled)
   private var notificationsEnabled: Bool = true
+  @AppStorage(SettingsKey.loggingAnimationsEnabled)
+  private var loggingAnimationsEnabled: Bool = true
 
   var body: some View {
     Form {
@@ -829,10 +837,10 @@ struct GeneralSettingsPane: View {
           Label("Layout", systemImage: "square.grid.2x2")
         }
         NavigationLink(value: SettingsView.SettingsDestination.correlations) {
-          Label("Correlations", systemImage: "chart.dots.scatter")
+          Label("Insights", systemImage: "chart.dots.scatter")
         }
       } footer: {
-        Text("Pick how the homepage renders — Histogram, Sparkline, Heatmap, or Correlations.")
+        Text("Layout picks how the homepage renders — Histogram, Sparkline, or Heatmap. Insights tunes the cross-section correlation explorer.")
       }
 
       Section {
@@ -852,6 +860,7 @@ struct GeneralSettingsPane: View {
       }
 
       homepageTimelineSection
+      loggingAnimationsSection
       notificationsSection
 
       #if os(iOS)
@@ -881,6 +890,17 @@ struct GeneralSettingsPane: View {
       }
     } footer: {
       Text("Renders the day-timeline strip above the homepage layout.")
+    }
+  }
+
+  @ViewBuilder
+  private var loggingAnimationsSection: some View {
+    Section {
+      Toggle(isOn: $loggingAnimationsEnabled) {
+        Label("Logging animations", systemImage: "sparkles")
+      }
+    } footer: {
+      Text("The little celebration that plays when you log something — confetti, ripples, a streak landing. Off keeps the confirming haptic but skips the motion. Reduce Motion always overrides this.")
     }
   }
 
@@ -1067,27 +1087,15 @@ struct TimeOfDaySettingsPane: View {
 struct LayoutSettingsPane: View {
   @AppStorage(SettingsKey.homepageLayout)
   private var homepageLayoutRaw: String = HomepageLayoutMode.tiles.rawValue
-  @AppStorage(SettingsKey.plusUnlocked)
-  private var plusUnlocked: Bool = false
-  @State private var showPaywall = false
 
   private var current: HomepageLayoutMode {
     HomepageLayoutMode(rawValue: homepageLayoutRaw) ?? .tiles
   }
 
-  /// Picker binding that enforces the Septena+ gate: selecting a Plus-only
-  /// mode while locked opens the paywall and leaves the stored selection
-  /// untouched (so the picker snaps back to the previous, free mode).
   private var binding: Binding<HomepageLayoutMode> {
     Binding(
       get: { HomepageLayoutMode(rawValue: homepageLayoutRaw) ?? .tiles },
-      set: { mode in
-        if mode.requiresPlus && !plusUnlocked {
-          showPaywall = true
-          return
-        }
-        homepageLayoutRaw = mode.rawValue
-      }
+      set: { homepageLayoutRaw = $0.rawValue }
     )
   }
 
@@ -1101,9 +1109,7 @@ struct LayoutSettingsPane: View {
               HStack {
                 Text(mode.title)
                 Spacer()
-                if mode.requiresPlus && !plusUnlocked {
-                  SeptenaPlusBadge()
-                } else if !mode.isImplemented {
+                if !mode.isImplemented {
                   Text("Coming soon")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -1133,29 +1139,15 @@ struct LayoutSettingsPane: View {
       }
     }
     .formStyle(.grouped)
-    .sheet(isPresented: $showPaywall) {
-      SeptenaPlusPaywall {
-        plusUnlocked = true
-        homepageLayoutRaw = HomepageLayoutMode.correlations.rawValue
-        showPaywall = false
-      }
-    }
-    // Re-locking (via the Account pane's mock toggle) must not leave a
-    // Plus-only layout active — fall back to the default free layout.
-    .onChange(of: plusUnlocked) { _, unlocked in
-      if !unlocked && self.current.requiresPlus {
-        homepageLayoutRaw = HomepageLayoutMode.tiles.rawValue
-      }
-    }
   }
 }
 
-// MARK: - Correlations submenu
+// MARK: - Insights submenu
 //
-// Controls the `.correlations` homepage layout mode — time window,
-// section filter, and which extra sections (supplements table /
-// insufficient-data fold-out) render below the trusted + exploratory
-// grids. Replaces the toolbar controls of the old Insights page.
+// Tunes the Insights correlation explorer (the `InsightsDestinationView`
+// grid) — time window, section filter, and which extra sections
+// (supplements table / insufficient-data fold-out) render below the
+// trusted + exploratory grids.
 
 struct CorrelationsSettingsPane: View {
   @AppStorage(SettingsKey.correlationsWindowDays)
@@ -1404,8 +1396,6 @@ private struct LayoutPreviewExample: View {
           onTap: { _ in },
           menuContent: { _ in EmptyView() }
         )
-      case .correlations:
-        CorrelationsPreviewExample()
       }
     }
     .allowsHitTesting(false)
@@ -1551,7 +1541,7 @@ private enum CorrelationPreviewSample {
                   lagPreference: lag, expected: .positive, titleOverride: nil),
       r: r, n: count, lag: lag, p: p, slope: slope, meanX: meanX, meanY: meanY,
       buckets: buckets, monotonic: true, expectedSign: .positive, confound: false,
-      binary: false, stateMinority: 0, stateMajority: 0, tier: .trusted, points: points
+      binary: false, stateMinority: 0, stateMajority: 0, tier: .trusted, qValue: 0, points: points
     )
   }
 }
@@ -2353,7 +2343,10 @@ struct MotionGalleryPane: View {
       IgnitionView(accent: accent, streak: streak, trigger: trigger)
         .allowsHitTesting(false)
     } else if let motion = current.motion {
-      CommitFlourish(motion: motion, accent: accent, intensity: intensity, trigger: trigger)
+      // The gallery exists to feel motions on demand, so it bypasses the
+      // global "Logging animations" opt-out (Reduce Motion still applies).
+      CommitFlourish(motion: motion, accent: accent, intensity: intensity,
+                     trigger: trigger, ignoresUserPreference: true)
     }
   }
 
@@ -2652,6 +2645,7 @@ struct SectionDetailPane: View {
   @Environment(SettingsStore.self) private var store
   @Environment(\.modelContext) private var modelContext
   @Environment(CKEngine.self) private var ckEngine
+  @Environment(SectionTheme.self) private var theme
   let sectionKey: String
   @State private var showingColorPicker = false
   // showingSupplementSheet moved into SupplementsPlugin's detailPaneContent.
@@ -2911,6 +2905,9 @@ struct SectionDetailPane: View {
                         hasOnboarded: config.hasOnboarded)
         : config
     }
+    // Repaint the in-memory accent cache so the dashboard and section
+    // views recolor immediately — no wait for the next theme.refresh().
+    theme.setColor(hex, for: sectionKey)
   }
 
   /// Per-key content. Tasks gets local prefs; the rest pull cached

@@ -49,6 +49,7 @@
 		1482821460D8B8050C19084C /* Fraunces-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = A46A4C109CF7C73318332FD0 /* Fraunces-OFL.txt */; };
 		14A026D5D1BAFF0B4943D0E0 /* GutBristolRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52B5EEA9B508AB5AAB6152F8 /* GutBristolRecorder.swift */; };
 		14AEC1B28FF545504CFC66C4 /* TrainingLiveActivityCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D97027452B1A57DBEAF13DE /* TrainingLiveActivityCoordinator.swift */; };
+		14E4E2DAB8E916A7F6AFDC57 /* InsightsDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12BBB5200E230B6672B99A6A /* InsightsDestination.swift */; };
 		15EE3B56B18381CC683C9E5F /* ValuesPromptService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D8254C1AF91828DE8F75D78 /* ValuesPromptService.swift */; };
 		165E6473042BC172DBB53F65 /* FoundationModels.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9E48AFEC976A22FEF321AE70 /* FoundationModels.framework */; };
 		1700D3A58CB14FD90BAE2108 /* ReviewAndSaveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9769DD4F4BB2D266390D9AE /* ReviewAndSaveView.swift */; };
@@ -66,6 +67,7 @@
 		1A6A9B5FB89C891F4D104C82 /* NextWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = D26E0516067040713136547D /* NextWire.swift */; };
 		1B5C67C9AB68E1F9822472D3 /* EditCannabisEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E49712FC24D8C18675935DF /* EditCannabisEntrySheet.swift */; };
 		1B693725E48BCC5939FE1196 /* AddInfoRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD5AAD8DD0E25AF940E3237C /* AddInfoRow.swift */; };
+		1B848C2A8119E644C28BBB17 /* InsightsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C13CA95314425D0D1DDACB /* InsightsPlugin.swift */; };
 		1C507D0995C20ECA4DA6479F /* ChoresQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = F531676F7BCEFA46F3A7D827 /* ChoresQuickAddMenu.swift */; };
 		1C66407AC9157A11987CE3DB /* WelcomeHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD1B703F4A00C0E46140FEC1 /* WelcomeHeader.swift */; };
 		1CBF0222F73BAE3CDDB0E342 /* ProjectRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A7C4DF4E90BB39F4A0D23DE /* ProjectRecord.swift */; };
@@ -81,6 +83,7 @@
 		2173E7FE6EFC115273513DF4 /* TasksQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0B5F0D2E1B01AAEF2217FA4 /* TasksQuickAddMenu.swift */; };
 		2242B79D13554F2C937E85BD /* NutritionSearchSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 533ABAE12036AA623BE82B59 /* NutritionSearchSheet.swift */; };
 		226BFDEF2964B3BA661ACC67 /* DayTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 880B70E1267B3CAAFFBA9D65 /* DayTimelineView.swift */; };
+		22F585D18BB8F13B4C088F2D /* InsightsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C13CA95314425D0D1DDACB /* InsightsPlugin.swift */; };
 		2395786BEB918CD00236678C /* SupplementIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78C110FEAA290C71AE8A57A4 /* SupplementIntents.swift */; };
 		23D0E10A24B9D654D78B129F /* SupplementsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28AD8E60186F9AAF8C1E52A3 /* SupplementsPlugin.swift */; };
 		23E576367F520EA8ACA8C355 /* TaskComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41F8977A576F2BB747E8DBD7 /* TaskComponents.swift */; };
@@ -155,6 +158,7 @@
 		43C9357C3238780EE8C04378 /* SupplementTypeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F326D9758674AD8EA4DBB211 /* SupplementTypeSheet.swift */; };
 		450496F40630174648D27F2F /* NextFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848DD768C118B7BDF4E27FC4 /* NextFeed.swift */; };
 		450F6EE8AD17A6935567940D /* DayClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFD8EA98B891BB43A0CE4640 /* DayClock.swift */; };
+		453C269D8C75FAE280E2394D /* EditTaskSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EE202AC79973BBD3067DA43 /* EditTaskSheet.swift */; };
 		454D024E707CE7FF7C823FEA /* NutritionRecommendations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CEAA5532CD1C1A47DB1BBAC /* NutritionRecommendations.swift */; };
 		45CFCA5E661E722E12BCA92B /* BackfillChoresSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54F508173C5BD014AEB8830C /* BackfillChoresSheet.swift */; };
 		46105F4548BD31EC85EC61CF /* IkigaiViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 277E998B7BA4B19B1AEFB2C6 /* IkigaiViewModel.swift */; };
@@ -221,6 +225,7 @@
 		632655A0488ADF895CE234F8 /* NextWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = D26E0516067040713136547D /* NextWire.swift */; };
 		6333196E0D4D21B3870B208F /* WatchSnapshotPublisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EDE23D823F6238C9977BF16 /* WatchSnapshotPublisher.swift */; };
 		637C82B79BB177B96BD557E1 /* SleepPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8FACD3A9FAD9509B187D281 /* SleepPlugin.swift */; };
+		63BDFE20DBBB08795FD135AE /* CorrelationFeatures.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAD69A204D1E2CF4993DE291 /* CorrelationFeatures.swift */; };
 		64BB65F0683A560F5055BA6A /* NextItemsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A26475D9A9D19DC0840960D /* NextItemsSection.swift */; };
 		6521E27B88444ACE53AE24BE /* ChecklistMirror.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9D2A0C223ECB0DAA0D3EB12 /* ChecklistMirror.swift */; };
 		65246BE2E94DD5324730533D /* Plausible.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CA646178F906B39ADA6689F /* Plausible.swift */; };
@@ -314,6 +319,7 @@
 		97056BA97DD06A5D8A5A0AE4 /* BrowseCaffeineDaySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BEAFA5D3DBFCEBEE2EA7FAC /* BrowseCaffeineDaySheet.swift */; };
 		99277F861EF959F986D7589B /* ChartCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6677D4008D68908591E4937 /* ChartCard.swift */; };
 		99C5E0B4C1F96A710C71DFFC /* DayTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 880B70E1267B3CAAFFBA9D65 /* DayTimelineView.swift */; };
+		99F32E2446B12071AC929809 /* CorrelationFeatures.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAD69A204D1E2CF4993DE291 /* CorrelationFeatures.swift */; };
 		9A309102A56D669A431C6703 /* EditGroceryItemSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4C5E5E15422EB17DB5D3960 /* EditGroceryItemSheet.swift */; };
 		9BB4EA54B6DB8B01A7CE8C19 /* AddTaskPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0EBCAFF8036A11B0BBEC06E /* AddTaskPage.swift */; };
 		9D294C6FFD9CFE45F6E11B7D /* ChoresPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D3C973F9983AB94CEB95337 /* ChoresPlugin.swift */; };
@@ -464,6 +470,7 @@
 		DE0F3ECD1EA2391814BE31F9 /* SessionCompleteSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F9F5509B06FAD96E79B08D4 /* SessionCompleteSheet.swift */; };
 		DE2DC97811EBF7E4B01C3261 /* HabitsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136C8433FB649CD81132B054 /* HabitsPlugin.swift */; };
 		DF016EF192B7891D2DBE3CB6 /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E25F81FE5AA4B6BBC056275 /* DateParser.swift */; };
+		DF18562CFD663359486C92FF /* InsightsDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12BBB5200E230B6672B99A6A /* InsightsDestination.swift */; };
 		E13166B735F6109781FB1178 /* GutPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E4B85E65CB1D53481420C4C /* GutPlugin.swift */; };
 		E180CC3F5D34C7CD682290A9 /* CannabisDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8426035C14708F9B19546DE /* CannabisDestinationView.swift */; };
 		E18A84E4ED0B805920276DF6 /* EditExerciseEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5B59047A762635E5A4D89D0 /* EditExerciseEntrySheet.swift */; };
@@ -497,6 +504,7 @@
 		ECCC23D380E913723DB60222 /* Logging.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE89901CA806AA91E0441236 /* Logging.swift */; };
 		ED0AA58CABA5CF7F1EEA51BC /* AddGroceryPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50371A7532E006FCD529D414 /* AddGroceryPage.swift */; };
 		ED82759C6079C919DD635ED6 /* ExerciseDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA383A920BC6CB923009E20 /* ExerciseDetailView.swift */; };
+		EDB05AD5CC83817EE1C41D82 /* EditTaskSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EE202AC79973BBD3067DA43 /* EditTaskSheet.swift */; };
 		EE0148FB1DAF371884EAAF36 /* GitHubPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = E08935BF88E6A00E2837EA77 /* GitHubPlugin.swift */; };
 		EE902B419406F504517110B8 /* NavigationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C59B083F7F5C67ABE440868 /* NavigationState.swift */; };
 		EF6F6DC70A2A20577E2BDCBD /* HealthKitBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F61B77A80F53A6EEEBBC90EA /* HealthKitBridge.swift */; };
@@ -621,6 +629,7 @@
 		0D3C4FD96F6113A7975BA394 /* AddInfoRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddInfoRouter.swift; sourceTree = "<group>"; };
 		10C80A63D8E45192FE97CA9D /* NextWidgetViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextWidgetViews.swift; sourceTree = "<group>"; };
 		1130C3EBCF558AF0EFB27AB9 /* SeptenaWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptenaWatchApp.swift; sourceTree = "<group>"; };
+		12BBB5200E230B6672B99A6A /* InsightsDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsDestination.swift; sourceTree = "<group>"; };
 		12E14E48DFB87C5F1543BEA4 /* MoodDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodDestinationView.swift; sourceTree = "<group>"; };
 		13011C553B04F0ACEFD189CD /* PlatformShims.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformShims.swift; sourceTree = "<group>"; };
 		136C8433FB649CD81132B054 /* HabitsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitsPlugin.swift; sourceTree = "<group>"; };
@@ -660,6 +669,7 @@
 		33EB22A93C55573C49CFB21B /* MoodCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodCatalog.swift; sourceTree = "<group>"; };
 		3478D00EF04684D27A69EECF /* NutritionPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionPlugin.swift; sourceTree = "<group>"; };
 		356B3BA1FD42A9CB75318D25 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		36C13CA95314425D0D1DDACB /* InsightsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsPlugin.swift; sourceTree = "<group>"; };
 		3841DB555C39521C2A088942 /* CaffeineQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaffeineQuickAddMenu.swift; sourceTree = "<group>"; };
 		3882D64DF6517B0447F5F65C /* TasksBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksBackend.swift; sourceTree = "<group>"; };
 		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -738,6 +748,7 @@
 		7D7AE711DD74BE91E7EECA48 /* BodyPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyPlugin.swift; sourceTree = "<group>"; };
 		7D85EAF7345BE84A44B89936 /* CorrelationsHomepageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrelationsHomepageView.swift; sourceTree = "<group>"; };
 		7DA5A367598E8EAAD49252C9 /* ValuesFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValuesFlowView.swift; sourceTree = "<group>"; };
+		7EE202AC79973BBD3067DA43 /* EditTaskSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditTaskSheet.swift; sourceTree = "<group>"; };
 		7F70E70D8BC6F8B767D06FF9 /* EditSupplementSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditSupplementSheet.swift; sourceTree = "<group>"; };
 		7F911216C13CBFC7E330714A /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		7FD1B7B2BAE523F2E4D3F99C /* ProjectsBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectsBackend.swift; sourceTree = "<group>"; };
@@ -820,6 +831,7 @@
 		C7BAA3E1C2D19A55758017FC /* GitHubProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubProvider.swift; sourceTree = "<group>"; };
 		C9D6916E979E5B0D7497CAEF /* ResponseCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResponseCache.swift; sourceTree = "<group>"; };
 		CAB04CA79A9C3207CCE972F9 /* QuickFindView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickFindView.swift; sourceTree = "<group>"; };
+		CAD69A204D1E2CF4993DE291 /* CorrelationFeatures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrelationFeatures.swift; sourceTree = "<group>"; };
 		CE7DF7DE41AF304A9324BC6E /* IntensityGlyph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntensityGlyph.swift; sourceTree = "<group>"; };
 		CEA8B3755DDC65DD48AF4C3E /* NutritionQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionQuickAddMenu.swift; sourceTree = "<group>"; };
 		CF2235080B8CCDA9426DAFD9 /* PurposePromptService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurposePromptService.swift; sourceTree = "<group>"; };
@@ -1190,6 +1202,7 @@
 				2E4B85E65CB1D53481420C4C /* GutPlugin.swift */,
 				136C8433FB649CD81132B054 /* HabitsPlugin.swift */,
 				C19D6CEBE8804EB7CD5D0256 /* HydrationPlugin.swift */,
+				36C13CA95314425D0D1DDACB /* InsightsPlugin.swift */,
 				F4E90D21C382F9970E4AAF88 /* MoodPlugin.swift */,
 				3478D00EF04684D27A69EECF /* NutritionPlugin.swift */,
 				0CA2DD637D2CF49F03A211BB /* SectionExplainer.swift */,
@@ -1205,6 +1218,8 @@
 			isa = PBXGroup;
 			children = (
 				8F0DA5FA7D3E03C2DB1DE7C7 /* CorrelationEngine.swift */,
+				CAD69A204D1E2CF4993DE291 /* CorrelationFeatures.swift */,
+				12BBB5200E230B6672B99A6A /* InsightsDestination.swift */,
 				91BAA74D7BB0302A9AA70DE9 /* InsightsDestinationView.swift */,
 			);
 			path = Insights;
@@ -1397,6 +1412,7 @@
 			isa = PBXGroup;
 			children = (
 				D0EBCAFF8036A11B0BBEC06E /* AddTaskPage.swift */,
+				7EE202AC79973BBD3067DA43 /* EditTaskSheet.swift */,
 				0B24F662EF5D7717780A4F8D /* RemindersInboxSection.swift */,
 				A08DA8E8E77422BB9583A61C /* TaskCommands.swift */,
 				41F8977A576F2BB747E8DBD7 /* TaskComponents.swift */,
@@ -1920,6 +1936,7 @@
 				331439A1A265FAA64B5B02B6 /* ConsistencyHeatmap.swift in Sources */,
 				A6D80B6B57734D9155888CC7 /* ContentView.swift in Sources */,
 				9056B762F0365C38DEA0F888 /* CorrelationEngine.swift in Sources */,
+				63BDFE20DBBB08795FD135AE /* CorrelationFeatures.swift in Sources */,
 				BFA5390E06045DBE733EE2BA /* CorrelationsHomepageView.swift in Sources */,
 				DF016EF192B7891D2DBE3CB6 /* DateParser.swift in Sources */,
 				BF8496432439A9FD8CFAE95E /* DayBucket.swift in Sources */,
@@ -1943,6 +1960,7 @@
 				FF82CEDA629B023E377F342A /* EditMoodEntrySheet.swift in Sources */,
 				92F25DBCB85C19C91F51ADB7 /* EditNutritionEntrySheet.swift in Sources */,
 				AB68497A7AF5F88ED33EAB79 /* EditSupplementSheet.swift in Sources */,
+				EDB05AD5CC83817EE1C41D82 /* EditTaskSheet.swift in Sources */,
 				38D2BDDEB7410B6AC61B2A85 /* ExerciseCatalogView.swift in Sources */,
 				ED82759C6079C919DD635ED6 /* ExerciseDetailView.swift in Sources */,
 				C6EE3C372089D7A231497306 /* ExerciseLibrarySheet.swift in Sources */,
@@ -1983,7 +2001,9 @@
 				DD51381780B1556223B6960A /* IkigaiMiniApp.swift in Sources */,
 				2AF02DF6D711B8E1C34DCBFF /* IkigaiQuadrantStep.swift in Sources */,
 				46105F4548BD31EC85EC61CF /* IkigaiViewModel.swift in Sources */,
+				DF18562CFD663359486C92FF /* InsightsDestination.swift in Sources */,
 				1A579BBFDFC67BB3FA2F7E6A /* InsightsDestinationView.swift in Sources */,
+				1B848C2A8119E644C28BBB17 /* InsightsPlugin.swift in Sources */,
 				3EEDE3247DF0EDB92F55843D /* IntensityGlyph.swift in Sources */,
 				B952E848C59122F46C1DF7D3 /* KeyboardShortcutsView.swift in Sources */,
 				FEF7B36E05988907669E6A03 /* LocalNotificationScheduler.swift in Sources */,
@@ -2201,6 +2221,7 @@
 				EA56ADCFD84CE200C7CEF2A9 /* ConsistencyHeatmap.swift in Sources */,
 				2A5F1570FB36894B1FBE4364 /* ContentView.swift in Sources */,
 				0578243E033490DBAFABEEE2 /* CorrelationEngine.swift in Sources */,
+				99F32E2446B12071AC929809 /* CorrelationFeatures.swift in Sources */,
 				1EEF01356485CDA24BA9787E /* CorrelationsHomepageView.swift in Sources */,
 				513C8B1D41E5BA85B785129C /* DateParser.swift in Sources */,
 				2781B65014FE7E1D52A10876 /* DayBucket.swift in Sources */,
@@ -2224,6 +2245,7 @@
 				D057C45AB5852CC5800058D8 /* EditMoodEntrySheet.swift in Sources */,
 				88D6592312AB55D1A314C247 /* EditNutritionEntrySheet.swift in Sources */,
 				11091A62DB6744BDE8673415 /* EditSupplementSheet.swift in Sources */,
+				453C269D8C75FAE280E2394D /* EditTaskSheet.swift in Sources */,
 				262EF303D006D36A39042280 /* ExerciseCatalogView.swift in Sources */,
 				BF21A6B5BEFFC4F242D109B8 /* ExerciseDetailView.swift in Sources */,
 				3292128871BF0E9AAEE59677 /* ExerciseLibrarySheet.swift in Sources */,
@@ -2264,7 +2286,9 @@
 				7C9FCE494744086CBC4EFAA7 /* IkigaiMiniApp.swift in Sources */,
 				620AD94FDB3EE952CF308E24 /* IkigaiQuadrantStep.swift in Sources */,
 				90F0CDB55D4821C478EC6714 /* IkigaiViewModel.swift in Sources */,
+				14E4E2DAB8E916A7F6AFDC57 /* InsightsDestination.swift in Sources */,
 				BBA737CEEE52190FE9486AA6 /* InsightsDestinationView.swift in Sources */,
+				22F585D18BB8F13B4C088F2D /* InsightsPlugin.swift in Sources */,
 				AB689CCEB13486AEB4AE05C8 /* IntensityGlyph.swift in Sources */,
 				8D1D5310AB62AF7E33538641 /* KeyboardShortcutsView.swift in Sources */,
 				074A612AE1335D061817FE4A /* LocalNotificationScheduler.swift in Sources */,

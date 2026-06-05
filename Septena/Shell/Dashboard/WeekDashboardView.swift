@@ -15,6 +15,8 @@ enum WeekDestination: String, Hashable, Identifiable {
   case groceries, caffeine, cannabis, body, gut
   case mood
   case activity
+  case github
+  case insights
   /// Tasks-as-drawer. Mirrors every other section's bottom-sheet behaviour
   /// for users who prefer not to lose the homepage when they peek at today.
   /// The full Tasks tab is still reachable via the long-press menu and via
@@ -120,6 +122,13 @@ struct WeekDashboardView: View {
   @State private var cannabisUsesPerCapsule: Int = 3
   @State private var cannabisLastVape: CannabisEntry? = nil
   @State private var bodyRows: [WithingsRow] = []
+  /// GitHub contribution calendar (read-only, per-device token). Drives the
+  /// GitHub tile's commit counts; the destination view fetches its own copy.
+  @State private var githubContributions: GitHubContributions = .empty
+  /// Strongest trusted correlation, cached by the Insights explorer. Drives
+  /// the homepage glance tile so it never runs the engine itself; nil until
+  /// Insights has been opened (or no trusted signal exists yet).
+  @State private var insightTeaser: InsightTeaser? = nil
   @State private var gutToday: GutDayResponse? = nil
   @State private var gutHistory: [GutHistoryPoint] = []
   @State private var moodToday: MoodDayResponse? = nil
@@ -175,6 +184,8 @@ struct WeekDashboardView: View {
     if let v = ResponseCache.load(CannabisDayResponse.self, forKey: CacheKey.cannabisToday) { _cannabisToday = State(initialValue: v) }
     if let v = ResponseCache.load([CannabisHistoryPoint].self, forKey: CacheKey.cannabisHistory) { _cannabisHistory = State(initialValue: v) }
     if let v = ResponseCache.load([WithingsRow].self, forKey: CacheKey.bodyRows) { _bodyRows = State(initialValue: v) }
+    if let v = ResponseCache.load(GitHubContributions.self, forKey: CacheKey.github) { _githubContributions = State(initialValue: v) }
+    if let v = ResponseCache.load(InsightTeaser.self, forKey: InsightTeaser.cacheKey) { _insightTeaser = State(initialValue: v) }
     if let v = ResponseCache.load(GutDayResponse.self, forKey: CacheKey.gutToday) { _gutToday = State(initialValue: v) }
     if let v = ResponseCache.load([GutHistoryPoint].self, forKey: CacheKey.gutHistory) { _gutHistory = State(initialValue: v) }
     if let v = ResponseCache.load(MoodDayResponse.self, forKey: CacheKey.moodToday) { _moodToday = State(initialValue: v) }
@@ -416,6 +427,7 @@ struct WeekDashboardView: View {
     static let cannabisToday      = "week.cannabisToday"
     static let cannabisHistory    = "week.cannabisHistory"
     static let bodyRows           = "week.bodyRows"
+    static let github             = "week.github"
     static let gutToday           = "week.gutToday"
     static let gutHistory         = "week.gutHistory"
     static let moodToday          = "week.moodToday"
@@ -452,6 +464,8 @@ struct WeekDashboardView: View {
     if let v = ResponseCache.load(CannabisDayResponse.self, forKey: CacheKey.cannabisToday) { cannabisToday = v }
     if let v = ResponseCache.load([CannabisHistoryPoint].self, forKey: CacheKey.cannabisHistory) { cannabisHistory = v }
     if let v = ResponseCache.load([WithingsRow].self, forKey: CacheKey.bodyRows) { bodyRows = v }
+    if let v = ResponseCache.load(GitHubContributions.self, forKey: CacheKey.github) { githubContributions = v }
+    if let v = ResponseCache.load(InsightTeaser.self, forKey: InsightTeaser.cacheKey) { insightTeaser = v }
     if let v = ResponseCache.load(GutDayResponse.self, forKey: CacheKey.gutToday) { gutToday = v }
     if let v = ResponseCache.load([GutHistoryPoint].self, forKey: CacheKey.gutHistory) { gutHistory = v }
     if let v = ResponseCache.load(MoodDayResponse.self, forKey: CacheKey.moodToday) { moodToday = v }
@@ -658,6 +672,15 @@ struct WeekDashboardView: View {
       let sorted = wR.sorted { $0.date > $1.date }
       bodyRows = sorted
       ResponseCache.save(sorted, forKey: CacheKey.bodyRows)
+    }
+    // GitHub — fetched sequentially (not in the `async let` group) to stay
+    // within the dashboard's ≤4-concurrent-HTTP ceiling that otherwise
+    // heap-corrupts at launch. Guarded by `hasToken` so users who haven't
+    // connected GitHub pay no network cost; the tile simply renders zeros.
+    if GitHubProvider.shared.hasToken,
+       let gh = try? await GitHubProvider.shared.fetchContributions(days: 365) {
+      githubContributions = gh
+      ResponseCache.save(gh, forKey: CacheKey.github)
     }
     if let gT {
       gutToday = gT
@@ -958,9 +981,8 @@ struct WeekDashboardView: View {
   }
 
   /// Renders the homepage body for the currently-selected layout mode.
-  /// Phase 2: only `.tiles` is implemented; the other modes render the
-  /// shared "Coming soon" placeholder. Phases 3-5 swap each case out
-  /// for a real renderer reading from `HomepageDomainData`.
+  /// Three renderers, all reading from `HomepageDomainData`. (Correlations
+  /// is no longer a layout mode — it's the Insights destination.)
   @ViewBuilder
   private var layoutBody: some View {
     switch currentLayoutMode {
@@ -980,8 +1002,6 @@ struct WeekDashboardView: View {
         onTap: handleDomainTap,
         menuContent: { domain in quickAddMenu(for: domain) }
       )
-    case .correlations:
-      CorrelationsHomepageView()
     }
   }
 
@@ -1040,7 +1060,7 @@ struct WeekDashboardView: View {
     case .cannabis:    cannabisQuickAddMenu
     case .gut:         gutQuickAddMenu
     case .mood:        moodQuickAddMenu
-    case .sleep, .body, .activity:
+    case .sleep, .body, .activity, .github, .insights:
       EmptyView()
     }
   }
@@ -1050,40 +1070,33 @@ struct WeekDashboardView: View {
   // Order and visibility both come from Settings (`settingsStore.sections`),
   // and the resolved list is the same across every layout mode
   // (Tiles / Dense / Heatmap). User reorders in Settings → Sections →
-  // all three modes update. `HomepageDomain.defaultOrder` is only the
-  // cold-launch fallback before the section list has loaded.
+  // all three modes update. The only fallback (cold launch, before the
+  // section mirror hydrates) is the `SectionManifest` catalog order — no
+  // separate hardcoded list. See `visibleDomains`.
 
   @ViewBuilder
   private var tiles: some View {
     ForEach(visibleDomains) { domain in
       tile(for: domain)
-        // Keyboard open on iPad/Mac: each tile becomes a focus stop (Tab /
-        // ⇧Tab to move between tiles, with the system focus ring), and
-        // Return or Space opens it through the same router the Dense /
-        // Heatmap layouts use. A no-op without a hardware keyboard.
-        .focusable()
-        .onKeyPress(.return) { openFocusedTile(domain) }
-        .onKeyPress(.space) { openFocusedTile(domain) }
     }
   }
 
-  /// Opens the tile for `domain` from a key press, reusing `handleDomainTap`
-  /// so keyboard activation and pointer taps share one code path.
-  private func openFocusedTile(_ domain: HomepageDomain) -> KeyPress.Result {
-    guard let tap = domainData(for: domain)?.tap else { return .ignored }
-    handleDomainTap(tap)
-    return .handled
-  }
-
   /// Domain order + visibility, driven by Settings so reordering in
-  /// Settings → Sections applies uniformly to every layout mode.
-  /// Falls back to `HomepageDomain.defaultOrder` only on cold launch /
-  /// load failure. Section keys we don't recognise as a
-  /// `HomepageDomain` (e.g. `"calendar"`, which is surfaced inline in
-  /// the Next tab) are dropped.
+  /// Settings → Sections applies uniformly to every layout mode. Section
+  /// keys we don't recognise as a `HomepageDomain` (e.g. `"calendar"`,
+  /// which is surfaced inline in the Next tab) are dropped.
+  ///
+  /// Cold-launch fallback (before the section mirror hydrates) is the
+  /// `SectionManifest` catalog order, filtered to dashboard-capable
+  /// sections — the manifest is the single source of truth for section
+  /// order, so there's no hardcoded list to keep in sync.
   private var visibleDomains: [HomepageDomain] {
     let enabledKeys = settingsStore.sections.filter(\.isEnabled).map(\.key)
-    guard !enabledKeys.isEmpty else { return HomepageDomain.defaultOrder }
+    guard !enabledKeys.isEmpty else {
+      return SectionManifest.all
+        .filter(\.supportsDashboard)
+        .compactMap { HomepageDomain(rawValue: $0.key) }
+    }
     return enabledKeys.compactMap { HomepageDomain(rawValue: $0) }
   }
 
@@ -1105,6 +1118,8 @@ struct WeekDashboardView: View {
     case .gut:         gutTile
     case .mood:        moodTile
     case .activity:    activityTile
+    case .github:      githubTile
+    case .insights:    insightsTile
     }
   }
 
@@ -1136,6 +1151,8 @@ struct WeekDashboardView: View {
     case .gut:         return gutDomainData()
     case .mood:        return moodDomainData()
     case .activity:    return activityDomainData()
+    case .github:      return githubDomainData()
+    case .insights:    return insightsDomainData()
     }
   }
 
@@ -1188,6 +1205,79 @@ struct WeekDashboardView: View {
     )
   }
 
+  // MARK: Unified training "effort"
+  //
+  // Strength volume (weight×sets×reps, in the thousands) and cardio
+  // minutes (tens) can't share an axis — cardio gets crushed to an
+  // invisible sliver, so a real 25-min session looks like nothing
+  // happened. Fix: convert every modality to one comparable unit —
+  // **effort-minutes** — so any session visibly moves the needle.
+  // Yoga/mobility is classified on its own so it counts as effort but
+  // never inflates the cardio (Z2) totals.
+
+  /// Classify one entry's modality and its effort-minute contribution.
+  private func effortContribution(for e: ExerciseEntry)
+    -> (kind: SessionKind, minutes: Double)
+  {
+    // Resolve modality: prefer the routine's configured kind, fall back
+    // to the seed mapping, then refine an ambiguous `.mixed` from fields.
+    var kind = trainingSessionTypes
+      .first { $0.id.caseInsensitiveCompare(e.session) == .orderedSame }?.kind
+      ?? SessionKind.defaulted(for: e.session)
+    // Yoga/mobility can hide inside a mixed or mislabeled routine — catch
+    // it by exercise name so it never lands in the cardio bucket.
+    if let ex = e.exercise?.lowercased(),
+       ex.contains("yoga") || ex.contains("stretch") || ex.contains("mobility") {
+      kind = .mobility
+    }
+    if kind == .mixed {
+      let looksCardio = (e.distanceM ?? 0) > 0
+        || ((e.durationMin ?? 0) > 0 && e.weight == nil)
+      kind = looksCardio ? .cardio : .strength
+    }
+
+    let dur = e.durationMin ?? 0
+    switch kind {
+    case .cardio:
+      if dur > 0 { return (.cardio, dur) }
+      // Distance-only run/ride: estimate ~6 min/km so it still counts.
+      if let m = e.distanceM, m > 0 { return (.cardio, m / 1000.0 * 6.0) }
+      return (.cardio, 0)
+    case .mobility:
+      // Yoga is time-based; counts as effort, never as cardio/Z2.
+      return (.mobility, dur)
+    case .strength, .mixed:
+      if dur > 0 { return (.strength, dur) }
+      // No clock on a lift → estimate from set count (~3.5 min/set incl.
+      // rest). Reps/weight don't change wall-clock effort.
+      if let s = e.sets.flatMap(Int.init), s > 0 {
+        return (.strength, Double(s) * 3.5)
+      }
+      return (.strength, 0)
+    }
+  }
+
+  /// Daily effort-minutes split into the two series the training
+  /// visualization already uses: `cardio` keeps its own band, while
+  /// `strengthLike` folds strength + mobility/yoga together (yoga counts
+  /// as effort but never as cardio). Keyed by ISO date.
+  private func effortByDate()
+    -> (strengthLike: [String: Double], cardio: [String: Double])
+  {
+    var strengthLike: [String: Double] = [:]
+    var cardio: [String: Double] = [:]
+    for e in recentTraining {
+      let c = effortContribution(for: e)
+      guard c.minutes > 0 else { continue }
+      if c.kind == .cardio {
+        cardio[e.date, default: 0] += c.minutes
+      } else {
+        strengthLike[e.date, default: 0] += c.minutes
+      }
+    }
+    return (strengthLike, cardio)
+  }
+
   private func trainingDomainData() -> HomepageDomainData {
     // Sessions + Z2 minutes are always **trailing 7 days** so they read
     // sensibly against the weekly target (`targetWeeklyMin`, default
@@ -1200,23 +1290,12 @@ struct WeekDashboardView: View {
     // Domain data drives Heatmap mode, which needs the long window —
     // the tile (which uses `lastSevenDays`) stays at 7 by design.
     let days = lastNDays(90)
-    var strengthByDate: [String: Double] = [:]
-    var cardioByDate: [String: Double] = [:]
-    for e in recentTraining {
-      let isCardio = (e.distanceM ?? 0) > 0
-        || ((e.durationMin ?? 0) > 0 && e.weight == nil)
-      if isCardio {
-        if let d = e.durationMin, d > 0 {
-          cardioByDate[e.date, default: 0] += d
-        }
-      } else if let w = e.weight, w > 0,
-                let s = e.sets.flatMap(Int.init), s > 0,
-                let r = e.reps.flatMap(Int.init), r > 0 {
-        strengthByDate[e.date, default: 0] += w * Double(s * r)
-      }
-    }
-    let strengthSeries = days.map { strengthByDate[$0] ?? 0 }
-    let cardioSeries = days.map { cardioByDate[$0] ?? 0 }
+    let effort = effortByDate()
+    // Both series in the same unit (effort-minutes) so cardio is no longer
+    // crushed under strength volume; yoga is folded into strength-like, not
+    // cardio. Same `.stackedBars` visualization as before.
+    let strengthSeries = days.map { effort.strengthLike[$0] ?? 0 }
+    let cardioSeries = days.map { effort.cardio[$0] ?? 0 }
     return HomepageDomainData(
       domain: .training,
       title: "Training",
@@ -1489,6 +1568,141 @@ struct WeekDashboardView: View {
     )
   }
 
+  // MARK: - GitHub
+  //
+  // Read-only contribution tile. `githubContributions` is the per-device
+  // GraphQL fetch (Keychain token, no CloudKit); the tile shows daily
+  // commit counts and the destination view owns the year heatmap. When the
+  // user hasn't connected GitHub the series is all-zero and the tile reads
+  // "0 this week" — same honest empty state as Sleep without Oura.
+
+  /// Daily contribution counts for the trailing `n` days, aligned to
+  /// `lastNDays(n)` (oldest → newest) so they index the same way every
+  /// other domain's `.bars` history does.
+  private func githubDailyCounts(_ n: Int) -> [Int] {
+    let byDate = Dictionary(uniqueKeysWithValues:
+      githubContributions.days.map { ($0.date, $0.count) })
+    return lastNDays(n).map { byDate[$0] ?? 0 }
+  }
+
+  /// Consecutive days with ≥1 contribution counting back from today.
+  /// Honest: no commits today breaks the streak to 0 (matching the
+  /// destination view's streak and the app's "no grace days" stance).
+  private func githubCurrentStreak() -> Int {
+    let byDate = Dictionary(uniqueKeysWithValues:
+      githubContributions.days.map { ($0.date, $0.count) })
+    var streak = 0
+    for day in lastNDays(366).reversed() {
+      if (byDate[day] ?? 0) > 0 { streak += 1 } else { break }
+    }
+    return streak
+  }
+
+  private func githubDomainData() -> HomepageDomainData {
+    let counts = githubDailyCounts(90)
+    let today = counts.last ?? 0
+    let week = counts.suffix(7).reduce(0, +)
+    let streak = githubCurrentStreak()
+    return HomepageDomainData(
+      domain: .github,
+      title: "GitHub",
+      accent: theme.color(for: "github"),
+      headline: today > 0 ? "\(today) today · \(week) this week" : "\(week) this week",
+      headlineStats: [
+        .init(label: "Today", value: "\(today)"),
+        .init(label: "Streak", value: "\(streak)", unit: "d"),
+        .init(label: "Year", value: "\(githubContributions.total)"),
+      ],
+      progress: nil,
+      history: .bars(counts),
+      tap: .openSheet(.github)
+    )
+  }
+
+  // GitHub — daily commit counts; 7-day histogram in the tile, full year
+  // in the destination's heatmap.
+  private var githubTile: some View {
+    let counts = githubDailyCounts(90)
+    let today = counts.last ?? 0
+    let week = counts.suffix(7).reduce(0, +)
+    let streak = githubCurrentStreak()
+    let bars = Array(counts.suffix(7))
+    return Button { sheetDest = .github } label: {
+      ModuleTile(
+        title: "GitHub",
+        accent: theme.color(for: "github"),
+        stats: [
+          .init(label: "Today", value: "\(today)"),
+          .init(label: "Streak", value: "\(streak)", unit: "d"),
+          .init(label: "Week", value: "\(week)")
+        ],
+        history: .init(label: "Commits (7d)", values: bars)
+      )
+    }
+    .buttonStyle(.plain)
+  }
+
+  // MARK: - Insights (glance tile)
+  //
+  // A single deep-link tile: the strongest trusted correlation if the
+  // explorer has computed one (cached), else a generic prompt. Tapping
+  // opens the Insights destination, which owns the depth + the Plus gate.
+  // The tile never runs the engine — it reads `insightTeaser` from cache.
+
+  private var insightsHeadline: String {
+    insightTeaser?.headline ?? "What moves your day?"
+  }
+
+  private func insightsDomainData() -> HomepageDomainData {
+    HomepageDomainData(
+      domain: .insights,
+      title: "Insights",
+      accent: theme.color(for: "insights"),
+      headline: insightsHeadline,
+      headlineStats: [],
+      progress: nil,
+      history: nil,
+      tap: .openSheet(.insights)
+    )
+  }
+
+  private var insightsTile: some View {
+    let accent = theme.color(for: "insights")
+    return Button { sheetDest = .insights } label: {
+      VStack(alignment: .leading, spacing: 10) {
+        Label("Insights", systemImage: "chart.dots.scatter")
+          .font(.septenaTileTitle)
+          .foregroundStyle(.primary)
+        if let t = insightTeaser {
+          Text(t.headline)
+            .font(.title3.weight(.semibold))
+            .foregroundStyle(accent)
+            .lineLimit(2)
+          Text("Strongest trusted signal · tap to explore")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        } else {
+          Text("Find what moves your sleep, mood, and more →")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .lineLimit(2)
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(16)
+      .background(
+        RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+          .fill(Theme.secondaryGroupedBackground)
+      )
+      .overlay(alignment: .leading) {
+        RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+          .fill(accent).frame(width: 3)
+      }
+      .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+    }
+    .buttonStyle(.plain)
+  }
+
   private func gutDomainData() -> HomepageDomainData {
     let count = gutToday?.movementCount ?? 0
     let discomfort = gutToday?.totalDiscomfortH ?? 0
@@ -1653,10 +1867,10 @@ struct WeekDashboardView: View {
 
   // Training — sessions count derived from unique dates in the last 7
   // days of entries; Z2 minutes and target come from the cardio endpoint;
-  // histogram bars stack strength volume (full accent) and cardio minutes
-  // (lighter shade) per day, mirroring the webapp's training overview.
-  // Each series is normalized to its own 7-day max ×50 so a peak day fills
-  // the chart and a half-sized bar reads as ~half that week's effort.
+  // histogram bars stack strength-like effort (full accent) and cardio
+  // effort (lighter shade) per day — both in effort-minutes, with yoga
+  // folded into strength-like rather than cardio. Each series is normalized
+  // to its own 7-day max ×50 so a peak day fills the chart.
   private var trainingTile: some View {
     let accent = theme.color(for: "training")
     // Same fix as `trainingDomainData`: stats are trailing 7 days so
@@ -1667,25 +1881,11 @@ struct WeekDashboardView: View {
     let target = cardio?.targetWeeklyMin ?? 150
 
     let days = lastSevenDays
-    var strengthByDate: [String: Double] = [:]
-    var cardioByDate: [String: Double] = [:]
-    for e in recentTraining {
-      let isCardio = (e.distanceM ?? 0) > 0
-        || ((e.durationMin ?? 0) > 0 && e.weight == nil)
-      if isCardio {
-        if let d = e.durationMin, d > 0 {
-          cardioByDate[e.date, default: 0] += d
-        }
-      } else if let w = e.weight, w > 0,
-                let s = e.sets.flatMap(Int.init), s > 0,
-                let r = e.reps.flatMap(Int.init), r > 0 {
-        strengthByDate[e.date, default: 0] += w * Double(s * r)
-      }
-    }
-    let maxS = max(1, days.map { strengthByDate[$0] ?? 0 }.max() ?? 0)
-    let maxC = max(1, days.map { cardioByDate[$0] ?? 0 }.max() ?? 0)
-    let strengthBars = days.map { Int(((strengthByDate[$0] ?? 0) / maxS) * 50) }
-    let cardioBars   = days.map { Int(((cardioByDate[$0]   ?? 0) / maxC) * 50) }
+    let effort = effortByDate()
+    let maxS = max(1, days.map { effort.strengthLike[$0] ?? 0 }.max() ?? 0)
+    let maxC = max(1, days.map { effort.cardio[$0] ?? 0 }.max() ?? 0)
+    let strengthBars = days.map { Int(((effort.strengthLike[$0] ?? 0) / maxS) * 50) }
+    let cardioBars   = days.map { Int(((effort.cardio[$0]       ?? 0) / maxC) * 50) }
 
     return WeekTrainingTile(
       accent: accent,

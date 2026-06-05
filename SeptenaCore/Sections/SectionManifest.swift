@@ -40,7 +40,8 @@ import SwiftUI
 //   • Catalog row + icon ............ here (`SectionManifest.all`, `iconByKey`)
 //   • Behaviour (view, skill, …) .... `Septena/Shell/Sections/Plugins/<X>Plugin.swift`
 //                                     + register in `SectionRegistry.all`
-//   • Dashboard tile ................ `HomepageDomain` case + `defaultOrder`,
+//   • Dashboard tile ................ `HomepageDomain` case (+ `supportsDashboard`
+//                                     here drives order/visibility),
 //                                     then `WeekDashboardView` (tile, domainData,
 //                                     quickAddMenu, state, cache, loadAll)
 //   • Settings + ordering ........... automatic once the row is seeded
@@ -152,6 +153,7 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
     "goals":       "target",
     "hydration":   "drop.fill",
     "github":      "chevron.left.forwardslash.chevron.right",
+    "insights":    "chart.dots.scatter",
   ]
 
   public var iconSymbol: String {
@@ -355,10 +357,9 @@ public extension SectionManifest {
     // GitHub — read-only mirror of the authenticated user's contribution
     // calendar (the commit heatmap), fetched from the GraphQL API with a
     // per-device token (Keychain, never CloudKit — GitHub is the source of
-    // truth). Reachable from the sidebar once enabled; no homepage tile yet
-    // (`supportsDashboard: false`) — there's no `HomepageDomain` case, so
-    // the section deliberately renders only its destination view. See
-    // GitHubPlugin / GitHubDestinationView / GitHubProvider.
+    // truth). Homepage tile (commit counts) + sidebar destination (year
+    // heatmap + weekly sparkline). See GitHubPlugin / GitHubDestinationView
+    // / GitHubProvider and the `.github` wiring in WeekDashboardView.
     .init(
       key: "github",
       defaultLabel: "GitHub",
@@ -366,8 +367,25 @@ public extension SectionManifest {
       activation: .integration,
       onboarding: .optional,
       supportsTab: true,
-      supportsDashboard: false,
+      supportsDashboard: true,
       settingsEditor: .appearance
+    ),
+    // Insights — read-only meta-section: cross-section correlation
+    // discovery (CorrelationEngine). Graduated from a homepage layout mode
+    // to its own destination; the homepage keeps a single glance tile
+    // (strongest trusted signal) that deep-links in. Gated behind Septena+
+    // inside the destination. No Today presence, no quick-add, no editor.
+    // `.optional`/off-by-default — opt in from Manage Sections (whether to
+    // show a default upsell tile to non-Plus users is a later product call).
+    .init(
+      key: "insights",
+      defaultLabel: "Insights",
+      shortDescription: "What moves your day — cross-section correlations",
+      activation: .optional,
+      onboarding: .optional,
+      supportsTab: true,
+      supportsDashboard: true,
+      settingsEditor: .none
     ),
     // Hydration — water-only log. UX over existing nutrition data:
     // every entry is a NutritionEntryEntity with `foods: ["Water"]`,

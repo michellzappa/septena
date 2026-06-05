@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // GitHub — read-only mirror of the authenticated user's contribution
 // calendar (the commit heatmap). No Today timeline and no homepage tile
@@ -28,5 +29,25 @@ enum GitHubPlugin: SectionPlugin {
       primaryActionLabel: "Open GitHub",
       complete: complete
     ))
+  }
+
+  // Commits-per-day as a correlation feature. Tagged `.outcome` (it's an
+  // output you might want to *raise* — "what helps me ship?") and `.count`.
+  // Reads the cached contribution calendar the destination / tile already
+  // fetch; no extra network. Returns [] until GitHub is connected.
+  static func correlationFeatures(context: ModelContext) -> [CorrelationFeature] {
+    let cached = ResponseCache.load(GitHubContributions.self, forKey: "github.contributions")
+      ?? ResponseCache.load(GitHubContributions.self, forKey: "week.github")
+    guard let c = cached, !c.days.isEmpty else { return [] }
+    let series = Dictionary(uniqueKeysWithValues: c.days.map { ($0.date, Double($0.count)) })
+    return [
+      CorrelationFeature(key: "github_commits",
+                         label: "Commits",
+                         section: "github",
+                         unit: "",
+                         role: .outcome,
+                         distribution: .count,
+                         series: series)
+    ]
   }
 }

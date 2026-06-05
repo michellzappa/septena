@@ -1,17 +1,18 @@
 import Foundation
 
-/// Which renderer the homepage uses for the canonical list of domains
-/// (`HomepageDomain.defaultOrder`). The order is the same across every
-/// mode — only the presentation changes.
+/// Which renderer the homepage uses for the resolved list of domains
+/// (`WeekDashboardView.visibleDomains`, ordered by Settings). The order is
+/// the same across every mode — only the presentation changes.
 ///
-/// Phase 2 of the layout-modes refactor introduces this enum + the
-/// `@AppStorage` setting that selects between modes. Only `.tiles`
-/// renders real content for now; the other three short-circuit to a
-/// "Coming soon" placeholder that resets back to Tiles. Phases 3-5
-/// land the actual renderers.
+/// Three modes, all free and implemented: a card grid, dense sparkline
+/// rows, and a consistency heatmap. (Cross-section *correlations* used to
+/// be a fourth mode here; it graduated into its own Insights destination —
+/// see `InsightsDestinationView` — because it's a derived analysis of your
+/// history, not a rendering of today's sections.)
 ///
 /// The raw value is what's persisted in `UserDefaults`, so don't rename
-/// existing cases — only add new ones.
+/// existing cases — only add new ones. A persisted value that no longer
+/// maps to a case (e.g. the retired `"correlations"`) falls back to `.tiles`.
 enum HomepageLayoutMode: String, CaseIterable, Identifiable, Hashable {
   /// The current card-grid layout. Each domain renders as a tile with
   /// headline stats + 7-day chart. Optimized for quick-launch + glance.
@@ -30,21 +31,14 @@ enum HomepageLayoutMode: String, CaseIterable, Identifiable, Hashable {
   /// for "am I being consistent."
   case heatmap
 
-  /// Derived order: trusted cross-section correlations sorted by |r|.
-  /// Doesn't list every domain — only pairs that cleared the trusted
-  /// gate in CorrelationEngine. Tap a row to open the full Insights
-  /// detail sheet.
-  case correlations
-
   var id: String { rawValue }
 
   /// Title shown in Settings → General → Homepage layout.
   var title: String {
     switch self {
-    case .tiles:        return "Histogram"
-    case .dense:        return "Sparkline"
-    case .heatmap:      return "Heatmap"
-    case .correlations: return "Correlations"
+    case .tiles:   return "Histogram"
+    case .dense:   return "Sparkline"
+    case .heatmap: return "Heatmap"
     }
   }
 
@@ -52,41 +46,27 @@ enum HomepageLayoutMode: String, CaseIterable, Identifiable, Hashable {
   /// each mode optimizes for.
   var summary: String {
     switch self {
-    case .tiles:        return "Card grid with 7-day histogram per tile. Quick-launch + ambient glance."
-    case .dense:        return "Rows with today's value + sparkline. Maximum signal per scroll."
-    case .heatmap:      return "Rows with 90-day heatmap grid. Optimized for consistency."
-    case .correlations: return "Trusted predictor → target pairs, sorted by strength."
+    case .tiles:   return "Card grid with 7-day histogram per tile. Quick-launch + ambient glance."
+    case .dense:   return "Rows with today's value + sparkline. Maximum signal per scroll."
+    case .heatmap: return "Rows with 90-day heatmap grid. Optimized for consistency."
     }
   }
 
   /// SF Symbol shown in the picker as a visual cue per mode.
   var icon: String {
     switch self {
-    case .tiles:        return "square.grid.2x2"
-    case .dense:        return "waveform.path"
-    case .heatmap:      return "square.grid.3x3.fill"
-    case .correlations: return "chart.dots.scatter"
+    case .tiles:   return "square.grid.2x2"
+    case .dense:   return "waveform.path"
+    case .heatmap: return "square.grid.3x3.fill"
     }
   }
 
-  /// All currently-implemented modes are listed; the `isImplemented`
-  /// flag is kept for forward-compatibility — adding a new case that
-  /// returns `false` re-enables the "Coming soon" placeholder + reset
-  /// button in `WeekDashboardView` without further wiring.
+  /// Forward-compat flag: a future mode that returns `false` re-enables the
+  /// "Coming soon" placeholder + reset button in `WeekDashboardView` without
+  /// further wiring. All current modes are implemented.
   var isImplemented: Bool {
     switch self {
-    case .tiles, .dense, .heatmap, .correlations: return true
-    }
-  }
-
-  /// Whether this layout sits behind the Septena+ membership. The
-  /// cross-section Correlations dashboard is the first Plus-gated mode;
-  /// every other layout stays free. Used by Settings to badge + gate the
-  /// picker. (Mock gate — no StoreKit yet; see `SettingsKey.plusUnlocked`.)
-  var requiresPlus: Bool {
-    switch self {
-    case .correlations: return true
-    case .tiles, .dense, .heatmap: return false
+    case .tiles, .dense, .heatmap: return true
     }
   }
 }
