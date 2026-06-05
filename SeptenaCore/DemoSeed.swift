@@ -45,7 +45,7 @@ public enum DemoSeed {
       sleep[d] = Int(min(94, max(58, s)))
     }
 
-    seedTasks(ctx)
+    seedTasks(ctx, &rng)
     seedHabits(ctx, &rng)
     seedSupplements(ctx, &rng)
     seedChores(ctx, &rng)
@@ -58,7 +58,7 @@ public enum DemoSeed {
     seedGut(ctx, &rng)
     seedGoals(ctx)
     seedGroceries(ctx)
-    seedSectionColors(ctx)
+    seedSections(ctx)
     try? ctx.save()
   }
 
@@ -75,15 +75,63 @@ public enum DemoSeed {
 
   // MARK: - sections
 
-  private static func seedTasks(_ ctx: ModelContext) {
-    var pos = 1024.0
-    for (i, t) in ["Reply to the landlord", "Book flights for the trip", "Draft the Q3 plan",
-                   "Call the dentist", "Review the design doc", "Renew the parking permit"].enumerated() {
-      ctx.insert(TaskEntity(id: "demo-task-open-\(i)", title: t, today: true, position: pos)); pos += 1024
+  private static func seedAreasProjects(_ ctx: ModelContext) {
+    for (id, title) in [("area-work", "Work"), ("area-personal", "Personal"), ("area-health", "Health")] {
+      ctx.insert(AreaEntity(id: id, title: title))
     }
-    for (i, t) in ["Morning run", "Clear the inbox", "Stretch 10 min"].enumerated() {
-      ctx.insert(TaskEntity(id: "demo-task-done-\(i)", title: t, statusRaw: TaskStatus.done.rawValue,
-                            today: true, completedAt: SeptenaDate.today, position: pos)); pos += 1024
+    // ProjectEntity.area links to AreaEntity.id (slug is legacy/unused).
+    for (id, title, area) in [
+      ("proj-q3", "Q3 launch", "area-work"),
+      ("proj-website", "Website redesign", "area-work"),
+      ("proj-move", "Apartment move", "area-personal"),
+      ("proj-marathon", "Marathon training", "area-health"),
+    ] {
+      ctx.insert(ProjectEntity(id: id, title: title, area: area, created: day(-45)))
+    }
+  }
+
+  private static func seedTasks(_ ctx: ModelContext, _ rng: inout SeededRNG) {
+    seedAreasProjects(ctx)
+    var pos = 1024.0
+    // (title, onToday, area, project) — a couple loose (inbox), a few on Today,
+    // the rest organized under projects/areas.
+    let open: [(String, Bool, String?, String?)] = [
+      ("Reply to the landlord", false, nil, nil),
+      ("Call the dentist", true, nil, nil),
+      ("Renew the parking permit", false, nil, nil),
+      ("Draft the Q3 plan", true, "area-work", "proj-q3"),
+      ("Finalize the launch checklist", false, "area-work", "proj-q3"),
+      ("Review the design doc", true, "area-work", "proj-website"),
+      ("Book flights for the trip", false, "area-personal", "proj-move"),
+      ("Pack the kitchen", false, "area-personal", "proj-move"),
+      ("20-mile long run", false, "area-health", "proj-marathon"),
+      ("Buy new running shoes", false, "area-health", "proj-marathon"),
+    ]
+    for (i, t) in open.enumerated() {
+      ctx.insert(TaskEntity(id: "demo-task-open-\(i)", title: t.0, today: t.1,
+                            area: t.2, project: t.3, position: pos)); pos += 1024
+    }
+    // 90 days of completions (1–4/day); ~⅓ attached to a project so projects
+    // have history. `tasksHistory` buckets by the date prefix of completedAt.
+    let projects = [("proj-q3", "area-work"), ("proj-website", "area-work"),
+                    ("proj-move", "area-personal"), ("proj-marathon", "area-health")]
+    let verbs = ["Email", "Call", "Review", "Pay", "Schedule", "Fix", "Plan", "Send", "Order", "Book", "Tidy", "File"]
+    let nouns = ["the report", "the invoice", "the team", "the bill", "the notes", "the bug",
+                 "the draft", "the update", "the brief", "the form", "the deck", "the PR"]
+    var n = 0
+    for d in 0..<days {
+      for _ in 0..<rng.int(1, 4) {
+        let title = "\(verbs[rng.int(0, verbs.count - 1)]) \(nouns[rng.int(0, nouns.count - 1)])"
+        var area: String?
+        var project: String?
+        if rng.chance(0.35) {
+          let p = projects[rng.int(0, projects.count - 1)]; project = p.0; area = p.1
+        }
+        ctx.insert(TaskEntity(id: "demo-task-h-\(n)", title: title, statusRaw: TaskStatus.done.rawValue,
+                              created: day(-d - rng.int(0, 2)), completedAt: day(-d),
+                              area: area, project: project, position: pos))
+        n += 1; pos += 1024
+      }
     }
   }
 
@@ -146,27 +194,26 @@ public enum DemoSeed {
   }
 
   private static func seedNutrition(_ ctx: ModelContext, _ rng: inout SeededRNG, trainDay: [Bool]) {
-    for d in 0..<days {
-      let date = day(-d)
-      let wknd = isWeekend(-d)
-      let protein = 108 + (trainDay[d] ? 16 : 0) + rng.int(-10, 12)
-      let kcal = 2050 + (wknd ? 240 : 0) + rng.int(-180, 220)
-      ctx.insert(NutritionDailySummaryEntity(
-        id: date, date: date, entryCount: 3,
-        kcal: Double(kcal), proteinG: Double(protein),
-        fatG: Double(62 + rng.int(-8, 14)), carbsG: Double(210 + rng.int(-30, 50)),
-        fiberG: Double(26 + rng.int(-6, 9)), waterMl: Double(1600 + rng.int(0, 800))))
-    }
-    // Today's individual meals (for the detail view + today tile).
-    let meals: [(Int, String, String, Double, Double, Double, Double)] = [
-      (8, "🥣", "Oats, blueberries, Greek yogurt", 24, 9, 58, 380),
-      (13, "🥗", "Chicken, quinoa, roasted veg", 46, 18, 52, 560),
-      (19, "🍝", "Salmon, pasta, side salad", 42, 26, 70, 720),
+    // Nutrition stats (and the today headline) are computed from ENTRIES, not
+    // summaries — so seed three meals every day for a full macro sparkline/
+    // heatmap and a correct "Xg protein" headline.
+    let meals: [(Int, String, [String])] = [
+      (8, "🥣", ["Oats, blueberries, yogurt", "Eggs and toast", "Protein smoothie"]),
+      (13, "🥗", ["Chicken, quinoa, veg", "Salmon poke bowl", "Turkey wrap"]),
+      (19, "🍝", ["Salmon, pasta, salad", "Steak and potatoes", "Tofu stir-fry"]),
     ]
-    for (i, m) in meals.enumerated() {
-      ctx.insert(NutritionEntryEntity(id: "demo-meal-\(i)", loggedAt: at(0, m.0), emoji: m.1, foods: m.2,
-                                      mealType: ["breakfast", "lunch", "dinner"][i],
-                                      proteinG: m.3, fatG: m.4, carbsG: m.5, kcal: m.6, waterMl: 350))
+    for d in 0..<days {
+      let wknd = isWeekend(-d)
+      for (mi, m) in meals.enumerated() {
+        let protein = Double([22, 42, 40][mi] + (trainDay[d] ? 6 : 0) + rng.int(-4, 6))
+        let carbs = Double([56, 50, 64][mi] + (wknd ? 10 : 0) + rng.int(-8, 12))
+        let fat = Double([10, 16, 24][mi] + rng.int(-3, 6))
+        ctx.insert(NutritionEntryEntity(
+          id: "demo-meal-\(d)-\(mi)", loggedAt: at(-d, m.0), emoji: m.1,
+          foods: m.2[rng.int(0, m.2.count - 1)], mealType: ["breakfast", "lunch", "dinner"][mi],
+          proteinG: protein, fatG: fat, carbsG: carbs,
+          kcal: 4 * protein + 9 * fat + 4 * carbs, waterMl: Double(300 + rng.int(0, 220))))
+      }
     }
   }
 
@@ -331,17 +378,30 @@ public enum DemoSeed {
     UserDefaults.standard.set(raw, forKey: "septena.homepage.layout")
   }
 
-  /// Paint every section from the brand palette (the manifest backfill leaves
-  /// colors empty → fallback gray). SectionEntity.id is the section key.
-  private static func seedSectionColors(_ ctx: ModelContext) {
+  /// Paint every section from the brand palette AND enable the full dashboard.
+  /// The manifest enables only ~6 sections by default; here we turn on all 14
+  /// dashboard domains (`HomepageDomain` cases) so the demo reads like a power
+  /// user who tracks everything. Cannabis stays off (no data + not featured);
+  /// goals is a tab, not a tile. `visibleDomains` shows enabled sections, so
+  /// flipping `isEnabled` is all it takes. SectionEntity.id is the section key.
+  private static func seedSections(_ ctx: ModelContext) {
     let palette: [String: String] = [
       "tasks": "#ef4444", "habits": "#22c55e", "training": "#f97316", "chores": "#a855f7",
       "supplements": "#3b82f6", "sleep": "#6366f1", "nutrition": "#f59e0b", "groceries": "#84cc16",
       "caffeine": "#92400e", "cannabis": "#65a30d", "body": "#ec4899", "gut": "#b45309",
       "activity": "#06b6d4", "goals": "#8b5cf6", "hydration": "#0ea5e9", "mood": "#f43f5e",
     ]
+    let show: Set<String> = [
+      "tasks", "habits", "training", "chores", "supplements", "sleep", "nutrition",
+      "hydration", "groceries", "caffeine", "body", "gut", "mood", "activity",
+    ]
     for r in (try? ctx.fetch(FetchDescriptor<SectionEntity>())) ?? [] {
       if let c = palette[r.id] { r.color = c }
+      if show.contains(r.id) {
+        r.isEnabled = true; r.showInToday = true; r.hasOnboarded = true
+      } else if r.id == "cannabis" {
+        r.isEnabled = false
+      }
     }
   }
 }

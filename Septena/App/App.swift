@@ -134,6 +134,11 @@ struct SeptenaApp: App {
           // in-memory store. No-op in release (DemoSeedMode.isOn is false).
           if DemoSeedMode.isOn {
             DemoSeed.populate(context: localStore.container.mainContext, today: dayClock.today)
+            // Direct inserts post no change notifications, so the dashboard's
+            // first loadAll() can race ahead of the seed (its synchronous
+            // history reads land empty). Nudge a full reload now that the data
+            // exists — onTaskChange → loadAll().
+            NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
           }
           #endif
           // Stash the engine on the platform's app delegate so silent
