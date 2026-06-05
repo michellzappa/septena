@@ -481,6 +481,23 @@ struct NextOpenSection: View {
   @AppStorage(NextLinger.supplementsKey) private var lingerSupplements = NextLinger.supplementsDefault
   @AppStorage(NextLinger.habitsKey) private var lingerHabits = NextLinger.habitsDefault
 
+  /// Live width offered to the section stack, measured below. Drives the
+  /// column count without leaning on `horizontalSizeClass`, so a resizable
+  /// macOS window and an iPad split view both reflow from real pixels (same
+  /// approach as the homepage timeline / Dense layout).
+  @State private var availableWidth: CGFloat = 0
+
+  /// Wide screens tile the section cards into balanced columns instead of
+  /// one long scroll. Thresholds are tuned so iPhone (any orientation) and a
+  /// narrow split view stay single-column, iPad portrait gets two, and iPad
+  /// landscape / a roomy Mac window gets three. Widths are the *inset* page
+  /// width (NextView already trims 20pt each side).
+  private func columnCount(for width: CGFloat) -> Int {
+    if width >= 1040 { return 3 }
+    if width >= 680  { return 2 }
+    return 1
+  }
+
   /// The Next blocks in the user's saved section order, via the shared
   /// `NextFeed` ordering rule (the same one the watch snapshot uses) so the
   /// list never diverges from the watch. Reads the reactive `SettingsStore`
@@ -543,12 +560,36 @@ struct NextOpenSection: View {
 
   var body: some View {
     let visible = orderedKeys.filter { !isEmpty($0) }
+    let columns = columnCount(for: availableWidth)
     // Each block is a tinted header above its own rounded "pill" card (see
     // `nextSectionCard`); the cards + the header's top inset separate the
     // sections, so there's no hairline between them anymore.
-    VStack(alignment: .leading, spacing: 0) {
-      ForEach(Array(visible.enumerated()), id: \.element) { _, key in
-        block(for: key)
+    VStack(spacing: 0) {
+      // Zero-height width probe (same pattern as DenseHomepageView): a real
+      // view gives the background GeometryReader a concrete frame to measure.
+      Color.clear
+        .frame(maxWidth: .infinity, maxHeight: 0)
+        .background(
+          GeometryReader { geo in
+            Color.clear.preference(key: NextSectionWidthKey.self, value: geo.size.width)
+          }
+        )
+        .onPreferenceChange(NextSectionWidthKey.self) { availableWidth = $0 }
+
+      if columns > 1 {
+        // Wide: pack the variable-height cards into balanced columns so a
+        // short section (e.g. 2 supplements) doesn't leave a tall ragged
+        // gap beside a long one.
+        NextMasonry(keys: visible, columnCount: columns) { key in
+          block(for: key)
+        }
+      } else {
+        // Compact: the original single open list, untouched.
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(visible, id: \.self) { key in
+            block(for: key)
+          }
+        }
       }
     }
   }
@@ -607,6 +648,80 @@ struct NextOpenSection: View {
       let _ = { assertionFailure("NextOpenSection.block(for:) has no case for '\(key)'") }()
       EmptyView()
     }
+  }
+}
+
+// MARK: - Column tiling (wide screens)
+
+/// Reports the section stack's offered width up to `NextOpenSection`, which
+/// turns it into a column count.
+private struct NextSectionWidthKey: PreferenceKey {
+  static let defaultValue: CGFloat = 0
+  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
+/// Per-tile measured heights, keyed by section key, collected up the tree so
+/// the masonry can pack each card into the currently-shortest column.
+private struct NextTileHeightsKey: PreferenceKey {
+  static let defaultValue: [String: CGFloat] = [:]
+  static func reduce(value: inout [String: CGFloat], nextValue: () -> [String: CGFloat]) {
+    value.merge(nextValue()) { _, new in new }
+  }
+}
+
+/// Masonry layout for the Next section cards. Greedily assigns each card (in
+/// the user's saved section order) to the shortest column, so cards of wildly
+/// different heights pack tightly instead of aligning to a grid row's tallest
+/// cell. Columns are equal-width, so a card's height is independent of which
+/// column it lands in — the greedy pass therefore converges in a single
+/// reflow rather than oscillating.
+///
+/// Before the first height measurement lands every tile reports a nominal
+/// height, so the opening frame round-robins by count instead of dumping every
+/// card into column 0; the real heights then refine the balance.
+private struct NextMasonry<Block: View>: View {
+  let keys: [String]
+  let columnCount: Int
+  var columnSpacing: CGFloat = 16
+  @ViewBuilder let block: (String) -> Block
+
+  @State private var heights: [String: CGFloat] = [:]
+
+  /// Nominal height for a not-yet-measured tile. Only used on the first
+  /// frame; large enough that unknown tiles spread across columns by count.
+  private static var estimatedHeight: CGFloat { 240 }
+
+  private var columns: [[String]] {
+    var cols = Array(repeating: [String](), count: columnCount)
+    var colHeights = Array(repeating: CGFloat(0), count: columnCount)
+    for key in keys {
+      let h = heights[key] ?? Self.estimatedHeight
+      let target = colHeights.enumerated().min { $0.element < $1.element }?.offset ?? 0
+      cols[target].append(key)
+      colHeights[target] += h
+    }
+    return cols
+  }
+
+  var body: some View {
+    let cols = columns
+    HStack(alignment: .top, spacing: columnSpacing) {
+      ForEach(0..<columnCount, id: \.self) { col in
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(cols[col], id: \.self) { key in
+            block(key)
+              .background(
+                GeometryReader { geo in
+                  Color.clear.preference(key: NextTileHeightsKey.self,
+                                         value: [key: geo.size.height])
+                }
+              )
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .top)
+      }
+    }
+    .onPreferenceChange(NextTileHeightsKey.self) { heights = $0 }
   }
 }
 
