@@ -35,7 +35,6 @@ enum HomepageDomain: String, CaseIterable, Hashable, Identifiable {
   case mood
   case activity
   case github
-  case insights
 
   var id: String { rawValue }
 

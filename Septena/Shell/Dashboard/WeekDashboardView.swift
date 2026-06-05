@@ -125,10 +125,6 @@ struct WeekDashboardView: View {
   /// GitHub contribution calendar (read-only, per-device token). Drives the
   /// GitHub tile's commit counts; the destination view fetches its own copy.
   @State private var githubContributions: GitHubContributions = .empty
-  /// Strongest trusted correlation, cached by the Insights explorer. Drives
-  /// the homepage glance tile so it never runs the engine itself; nil until
-  /// Insights has been opened (or no trusted signal exists yet).
-  @State private var insightTeaser: InsightTeaser? = nil
   @State private var gutToday: GutDayResponse? = nil
   @State private var gutHistory: [GutHistoryPoint] = []
   @State private var moodToday: MoodDayResponse? = nil
@@ -185,7 +181,6 @@ struct WeekDashboardView: View {
     if let v = ResponseCache.load([CannabisHistoryPoint].self, forKey: CacheKey.cannabisHistory) { _cannabisHistory = State(initialValue: v) }
     if let v = ResponseCache.load([WithingsRow].self, forKey: CacheKey.bodyRows) { _bodyRows = State(initialValue: v) }
     if let v = ResponseCache.load(GitHubContributions.self, forKey: CacheKey.github) { _githubContributions = State(initialValue: v) }
-    if let v = ResponseCache.load(InsightTeaser.self, forKey: InsightTeaser.cacheKey) { _insightTeaser = State(initialValue: v) }
     if let v = ResponseCache.load(GutDayResponse.self, forKey: CacheKey.gutToday) { _gutToday = State(initialValue: v) }
     if let v = ResponseCache.load([GutHistoryPoint].self, forKey: CacheKey.gutHistory) { _gutHistory = State(initialValue: v) }
     if let v = ResponseCache.load(MoodDayResponse.self, forKey: CacheKey.moodToday) { _moodToday = State(initialValue: v) }
@@ -290,12 +285,28 @@ struct WeekDashboardView: View {
     #if os(iOS)
     ToolbarItem(placement: .topBarLeading) { homeMenu }
     ToolbarItem(placement: .topBarTrailing) { SyncIndicator() }
-    ToolbarItem(placement: .topBarTrailing) { homeSearch }
+    if insightsEnabled { ToolbarItem(placement: .topBarTrailing) { insightsToolbarButton } }
     #else
     ToolbarItem(placement: .primaryAction) { homeMenu }
     ToolbarItem(placement: .primaryAction) { SyncIndicator() }
-    ToolbarItem(placement: .primaryAction) { homeSearch }
+    if insightsEnabled { ToolbarItem(placement: .primaryAction) { insightsToolbarButton } }
     #endif
+  }
+
+  /// Insights entry point — toolbar button (not a body tile/card: Insights
+  /// has no per-day series, so it belongs in the dashboard's chrome, not its
+  /// section content). Opens the full explorer. Shown only when the user has
+  /// enabled the Insights section.
+  private var insightsToolbarButton: some View {
+    Button { sheetDest = .insights } label: {
+      Image(systemName: "chart.dots.scatter")
+    }
+    .accessibilityLabel("Insights")
+  }
+
+  /// True when the user has enabled the Insights section (Manage Sections).
+  private var insightsEnabled: Bool {
+    settingsStore.sections.first(where: { $0.key == "insights" })?.isEnabled ?? false
   }
 
   private var homeMenu: some View {
@@ -319,18 +330,10 @@ struct WeekDashboardView: View {
       }
     } label: {
       // Bare glyph (not `ellipsis.circle`) so it sits on the system's
-      // gray toolbar circle exactly like the search button — no double
-      // ring.
+      // gray toolbar circle — no double ring.
       Image(systemName: "ellipsis")
     }
     .accessibilityLabel("More")
-  }
-
-  private var homeSearch: some View {
-    Button { nav.showQuickFind = true } label: {
-      Image(systemName: "magnifyingglass")
-    }
-    .accessibilityLabel("Search")
   }
 
   /// True when sections should open as a pushed full pane rather than a
@@ -465,7 +468,6 @@ struct WeekDashboardView: View {
     if let v = ResponseCache.load([CannabisHistoryPoint].self, forKey: CacheKey.cannabisHistory) { cannabisHistory = v }
     if let v = ResponseCache.load([WithingsRow].self, forKey: CacheKey.bodyRows) { bodyRows = v }
     if let v = ResponseCache.load(GitHubContributions.self, forKey: CacheKey.github) { githubContributions = v }
-    if let v = ResponseCache.load(InsightTeaser.self, forKey: InsightTeaser.cacheKey) { insightTeaser = v }
     if let v = ResponseCache.load(GutDayResponse.self, forKey: CacheKey.gutToday) { gutToday = v }
     if let v = ResponseCache.load([GutHistoryPoint].self, forKey: CacheKey.gutHistory) { gutHistory = v }
     if let v = ResponseCache.load(MoodDayResponse.self, forKey: CacheKey.moodToday) { moodToday = v }
@@ -1060,7 +1062,7 @@ struct WeekDashboardView: View {
     case .cannabis:    cannabisQuickAddMenu
     case .gut:         gutQuickAddMenu
     case .mood:        moodQuickAddMenu
-    case .sleep, .body, .activity, .github, .insights:
+    case .sleep, .body, .activity, .github:
       EmptyView()
     }
   }
@@ -1119,7 +1121,6 @@ struct WeekDashboardView: View {
     case .mood:        moodTile
     case .activity:    activityTile
     case .github:      githubTile
-    case .insights:    insightsTile
     }
   }
 
@@ -1152,7 +1153,6 @@ struct WeekDashboardView: View {
     case .mood:        return moodDomainData()
     case .activity:    return activityDomainData()
     case .github:      return githubDomainData()
-    case .insights:    return insightsDomainData()
     }
   }
 
@@ -1642,66 +1642,6 @@ struct WeekDashboardView: View {
     .buttonStyle(.plain)
   }
 
-  // MARK: - Insights (glance tile)
-  //
-  // A single deep-link tile: the strongest trusted correlation if the
-  // explorer has computed one (cached), else a generic prompt. Tapping
-  // opens the Insights destination, which owns the depth + the Plus gate.
-  // The tile never runs the engine — it reads `insightTeaser` from cache.
-
-  private var insightsHeadline: String {
-    insightTeaser?.headline ?? "What moves your day?"
-  }
-
-  private func insightsDomainData() -> HomepageDomainData {
-    HomepageDomainData(
-      domain: .insights,
-      title: "Insights",
-      accent: theme.color(for: "insights"),
-      headline: insightsHeadline,
-      headlineStats: [],
-      progress: nil,
-      history: nil,
-      tap: .openSheet(.insights)
-    )
-  }
-
-  private var insightsTile: some View {
-    let accent = theme.color(for: "insights")
-    return Button { sheetDest = .insights } label: {
-      VStack(alignment: .leading, spacing: 10) {
-        Label("Insights", systemImage: "chart.dots.scatter")
-          .font(.septenaTileTitle)
-          .foregroundStyle(.primary)
-        if let t = insightTeaser {
-          Text(t.headline)
-            .font(.title3.weight(.semibold))
-            .foregroundStyle(accent)
-            .lineLimit(2)
-          Text("Strongest trusted signal · tap to explore")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        } else {
-          Text("Find what moves your sleep, mood, and more →")
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-            .lineLimit(2)
-        }
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(16)
-      .background(
-        RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-          .fill(Theme.secondaryGroupedBackground)
-      )
-      .overlay(alignment: .leading) {
-        RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-          .fill(accent).frame(width: 3)
-      }
-      .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-    }
-    .buttonStyle(.plain)
-  }
 
   private func gutDomainData() -> HomepageDomainData {
     let count = gutToday?.movementCount ?? 0
@@ -2730,8 +2670,8 @@ private struct WeekDashboardScreen<CurrentDay: Equatable, Toolbar: ToolbarConten
       .navigationBarTitleDisplayMode(.inline)
       #endif
       // Consistent home-page chrome across Week / Next / Tasks:
-      //   • top-left "…" menu (Settings today; room to grow)
-      //   • top-right magnifyingglass → universal Quick Find sheet
+      //   • top-left "…" menu (dashboard layout + Settings)
+      // Search lives in the Tasks sidebar, not the dashboard chrome.
       .toolbar { toolbar() }
       // Two-phase load: paint cached blobs synchronously so tiles +
       // histograms appear immediately on cold launch, then kick off the

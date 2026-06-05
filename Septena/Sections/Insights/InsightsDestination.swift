@@ -9,22 +9,9 @@ import SwiftUI
 // Why a destination, not a layout mode: tiles/dense/heatmap are renderings
 // of *today's sections*; Insights is a derived analysis of your *history*
 // with its own depth (and a roadmap toward hypothesis tracking + N-of-1
-// experiments) that a single homepage layout can't hold.
-
-/// One-line summary of the strongest trusted correlation, cached by the
-/// Insights explorer for the homepage glance tile so the tile never has to
-/// run the (expensive) engine itself.
-struct InsightTeaser: Codable, Hashable {
-  let predictor: String
-  let target: String
-  let r: Double
-  let positive: Bool
-
-  /// e.g. "Training volume ↑ Sleep score" / "Caffeine ↓ HRV".
-  var headline: String { "\(predictor) \(positive ? "↑" : "↓") \(target)" }
-
-  static let cacheKey = "insights.topSignal"
-}
+// experiments) that a single homepage layout can't hold. Its homepage
+// entry point is a toolbar button on the Week dashboard (it has no per-day
+// series of its own, so it isn't a tile or a body card) + the sidebar row.
 
 struct InsightsDestinationView: View {
   @AppStorage(SettingsKey.plusUnlocked) private var plusUnlocked: Bool = false

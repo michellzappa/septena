@@ -372,11 +372,13 @@ public extension SectionManifest {
     ),
     // Insights — read-only meta-section: cross-section correlation
     // discovery (CorrelationEngine). Graduated from a homepage layout mode
-    // to its own destination; the homepage keeps a single glance tile
-    // (strongest trusted signal) that deep-links in. Gated behind Septena+
-    // inside the destination. No Today presence, no quick-add, no editor.
-    // `.optional`/off-by-default — opt in from Manage Sections (whether to
-    // show a default upsell tile to non-Plus users is a later product call).
+    // to its own destination. `supportsDashboard: false` deliberately — it
+    // has NO per-day series of its own (it's an analysis *of* the other
+    // sections), so it can't be a layout-rendered domain tile (a Sparkline/
+    // Heatmap row would have nothing to plot). Its homepage presence is a
+    // standalone hook card in WeekDashboardView (`insightsGlanceCard`),
+    // outside the layout switcher. Gated behind Septena+ in the destination.
+    // `.optional`/off-by-default — opt in from Manage Sections.
     .init(
       key: "insights",
       defaultLabel: "Insights",
@@ -384,7 +386,7 @@ public extension SectionManifest {
       activation: .optional,
       onboarding: .optional,
       supportsTab: true,
-      supportsDashboard: true,
+      supportsDashboard: false,
       settingsEditor: .none
     ),
     // Hydration — water-only log. UX over existing nutrition data:
