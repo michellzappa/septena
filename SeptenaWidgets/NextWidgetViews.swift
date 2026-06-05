@@ -126,11 +126,12 @@ private struct Header: View {
   var body: some View {
     HStack(spacing: 5) {
       Image(systemName: bucket.icon)
+        .font(.system(size: 8, weight: .semibold))
       Text(bucket.title.uppercased())
       Spacer()
       Text("\(total) left")
     }
-    .font(.caption2.weight(.semibold))
+    .font(.system(size: 9.5, weight: .semibold))
     .foregroundStyle(.secondary)
   }
 }
@@ -139,20 +140,25 @@ private struct CategoryRow: View {
   let cat: NextCategory
   let compact: Bool
 
+  // Icons −30%, text −15% vs. the prior callout/subheadline/footnote sizes.
+  private var iconSize: CGFloat { compact ? 9 : 11 }
+  private var iconFrame: CGFloat { compact ? 11 : 14 }
+  private var titleSize: CGFloat { compact ? 11 : 12.5 }
+
   var body: some View {
-    HStack(spacing: 8) {
+    HStack(spacing: 7) {
       Image(systemName: kindIcon(cat.kind))
-        .font(compact ? .footnote : .callout)
+        .font(.system(size: iconSize))
         .foregroundStyle(.secondary)
-        .frame(width: compact ? 16 : 20)
+        .frame(width: iconFrame)
       Text(cat.title)
-        .font(compact ? .footnote.weight(.medium) : .subheadline.weight(.medium))
+        .font(.system(size: titleSize, weight: .medium))
         .foregroundStyle(cat.overdue ? Color.red : Color.primary)
         .lineLimit(1)
       Spacer(minLength: 4)
       if cat.count > 1 {
         Text("\(cat.count)")
-          .font(.caption2.weight(.semibold).monospacedDigit())
+          .font(.system(size: 9.5, weight: .semibold).monospacedDigit())
           .foregroundStyle(.secondary)
       }
     }
