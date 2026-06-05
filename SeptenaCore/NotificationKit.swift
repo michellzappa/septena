@@ -131,3 +131,50 @@ public struct NotificationPlan: Sendable, Hashable {
               threadID: threadID, hour: m / 60, minute: m % 60, userInfo: userInfo)
   }
 }
+
+/// A read-only row for the unified Notifications overview in Settings — one
+/// per declared `NotificationDescriptor` across every section, tagged with
+/// why it will or won't fire. Where `LocalNotificationScheduler.computeNudges`
+/// *drops* every ineligible descriptor (so it only returns what fires),
+/// `overview` keeps them all and records each one's `State`, so a single
+/// screen can show the whole picture and link each nudge to its section.
+public struct NotificationOverviewItem: Sendable, Identifiable {
+  /// Why a nudge is or isn't currently scheduled. Mirrors the gates in
+  /// `computeNudges`, in the order they're applied.
+  public enum State: Sendable, Hashable {
+    /// On and live: will fire today at this wall-clock time.
+    case scheduled(hour: Int, minute: Int)
+    /// On, but nothing to nudge right now — already logged today or nothing
+    /// pending. The "stays quiet once it's done" case (`evaluate` → nil).
+    case idle
+    /// On and would fire, but its learned time lands in quiet hours
+    /// (21:00–08:00) and it isn't `quietHoursExempt`, so it's held back.
+    case quietHours(hour: Int, minute: Int)
+    /// The user turned this specific nudge off in the section's settings.
+    case off
+    /// The owning section is disabled, so none of its nudges fire.
+    case sectionOff
+    /// The Notifications master switch is off.
+    case masterOff
+  }
+
+  /// Descriptor id — `"<section>.<nudge>"`.
+  public let id: String
+  public let sectionKey: String
+  /// The descriptor's `title` (the same label as its per-section toggle).
+  public let title: String
+  public let state: State
+
+  public init(id: String, sectionKey: String, title: String, state: State) {
+    self.id = id
+    self.sectionKey = sectionKey
+    self.title = title
+    self.state = state
+  }
+
+  /// True when this nudge is on and will actually fire today.
+  public var isLive: Bool {
+    if case .scheduled = state { return true }
+    return false
+  }
+}

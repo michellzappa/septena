@@ -159,6 +159,48 @@ final class LocalNotificationScheduler {
     hour >= quietStartHour || hour < quietEndHour
   }
 
+  // MARK: Overview (Settings)
+
+  /// Read-only snapshot of *every* declared nudge and its current state, for
+  /// the unified Notifications screen in Settings. Unlike `computeNudges`
+  /// (which returns only what will fire), this keeps off / idle / disabled
+  /// descriptors and tags each with why, so one screen shows the full
+  /// picture. Pure read over the local store; safe on every platform —
+  /// `evaluateNotification` is UI-free, so the overview renders on macOS even
+  /// though scheduling itself is iOS-only.
+  func overview(context: ModelContext) -> [NotificationOverviewItem] {
+    let master = Self.masterEnabled
+    let enabledSections = Set(
+      SettingsMirror.loadSections(context: context).filter(\.isEnabled).map(\.key)
+    )
+    let now = Date()
+    var items: [NotificationOverviewItem] = []
+    for plugin in SectionRegistry.all {
+      let sectionKey = plugin.manifest.key
+      for descriptor in plugin.notificationDescriptors {
+        let state: NotificationOverviewItem.State
+        if !master {
+          state = .masterOff
+        } else if !enabledSections.contains(sectionKey) {
+          state = .sectionOff
+        } else if !Self.isEnabled(descriptor) {
+          state = .off
+        } else if let plan = plugin.evaluateNotification(descriptor.id, context: context, now: now) {
+          if !descriptor.quietHoursExempt && Self.isQuietHour(plan.hour) {
+            state = .quietHours(hour: plan.hour, minute: plan.minute)
+          } else {
+            state = .scheduled(hour: plan.hour, minute: plan.minute)
+          }
+        } else {
+          state = .idle
+        }
+        items.append(NotificationOverviewItem(id: descriptor.id, sectionKey: sectionKey,
+                                              title: descriptor.title, state: state))
+      }
+    }
+    return items
+  }
+
   #if canImport(UIKit)
   private func apply(nudges: [Nudge]) async {
     let center = UNUserNotificationCenter.current()

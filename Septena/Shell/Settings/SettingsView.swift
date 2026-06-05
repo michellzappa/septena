@@ -2895,6 +2895,177 @@ private struct NotificationToggleRow: View {
   }
 }
 
+// MARK: - Unified notifications overview
+//
+// One screen listing every nudge across all sections and when it's set to
+// fire — the answer to "what will notify me, and when?". The schedule comes
+// straight from `LocalNotificationScheduler.overview` (the same gates the
+// real scheduler applies), so this can't drift from what actually fires.
+// Each row deep-links to its section's settings, where the nudge can be
+// toggled. Reached from Customize → Scheduled Notifications.
+
+struct NotificationsOverviewPane: View {
+  @Environment(SettingsStore.self) private var store
+  @Environment(\.modelContext) private var modelContext
+  @AppStorage(SettingsKey.notificationsEnabled) private var notificationsEnabled: Bool = true
+  @State private var items: [NotificationOverviewItem] = []
+
+  /// On and firing today, earliest first.
+  private var live: [NotificationOverviewItem] {
+    items.filter(\.isLive).sorted { minutes($0.state) < minutes($1.state) }
+  }
+  /// On, but suppressed right now (already logged / nothing pending, or held
+  /// out of quiet hours).
+  private var resting: [NotificationOverviewItem] {
+    items.filter {
+      switch $0.state {
+      case .idle, .quietHours: return true
+      default: return false
+      }
+    }
+  }
+  /// Turned off — this nudge, or its whole section.
+  private var off: [NotificationOverviewItem] {
+    items.filter {
+      switch $0.state {
+      case .off, .sectionOff: return true
+      default: return false
+      }
+    }
+  }
+
+  var body: some View {
+    Form {
+      Section {
+        Toggle(isOn: $notificationsEnabled) {
+          Label("Notifications", systemImage: "bell.badge")
+        }
+      } footer: {
+        Text("The master switch. Each nudge fires around when you usually log it and goes quiet once it's marked for the day.")
+      }
+
+      if notificationsEnabled {
+        if !live.isEmpty {
+          Section {
+            ForEach(live) { row(for: $0) }
+          } header: {
+            Label("Coming Up Today", systemImage: "clock")
+          }
+        }
+
+        if !resting.isEmpty {
+          Section {
+            ForEach(resting) { row(for: $0) }
+          } header: {
+            Label("Quiet Right Now", systemImage: "moon.zzz")
+          } footer: {
+            Text("On, but nothing to nudge yet — already done today, nothing pending, or waiting out quiet hours.")
+          }
+        }
+
+        if !off.isEmpty {
+          Section {
+            ForEach(off) { row(for: $0) }
+          } header: {
+            Label("Off", systemImage: "bell.slash")
+          }
+        }
+
+        if items.isEmpty {
+          Section {
+            Text("No sections declare notifications yet.")
+              .foregroundStyle(.secondary)
+          }
+        }
+      }
+    }
+    .formStyle(.grouped)
+    .onAppear(perform: reload)
+    // Toggling a nudge writes UserDefaults; logging data posts a data-change.
+    // Both can change what's scheduled, so re-read on either.
+    .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in reload() }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in reload() }
+  }
+
+  private func reload() {
+    items = LocalNotificationScheduler.shared.overview(context: modelContext)
+  }
+
+  @ViewBuilder
+  private func row(for item: NotificationOverviewItem) -> some View {
+    let p = presentation(for: item.sectionKey)
+    NavigationLink(value: SettingsView.SettingsDestination.section(item.sectionKey)) {
+      HStack(spacing: 12) {
+        SectionGlyph(icon: p.icon, accent: p.accent, size: 29, glyphRatio: 0.38)
+        VStack(alignment: .leading, spacing: 2) {
+          Text(item.title)
+          Text(p.label)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        Spacer(minLength: 8)
+        trailing(for: item.state)
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func trailing(for state: NotificationOverviewItem.State) -> some View {
+    switch state {
+    case let .scheduled(hour, minute):
+      Text(timeLabel(hour, minute))
+        .font(.callout.weight(.medium))
+        .foregroundStyle(.primary)
+        .monospacedDigit()
+    case let .quietHours(hour, minute):
+      Text("\(timeLabel(hour, minute)) · quiet")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .monospacedDigit()
+    case .idle:
+      Text("Quiet")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    case .off:
+      Text("Off")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    case .sectionOff:
+      Text("Section off")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    case .masterOff:
+      EmptyView()
+    }
+  }
+
+  /// Resolve a section's display label, accent, and icon the same way the
+  /// sidebar and `SectionDetailPane` do — live override first, manifest
+  /// default as fallback.
+  private func presentation(for key: String) -> (label: String, accent: Color, icon: String) {
+    let server = store.sections.first(where: { $0.key == key })
+    let manifest = SectionManifest.byKey[key]
+    let serverLabel = server?.label ?? ""
+    let label = !serverLabel.isEmpty ? serverLabel : (manifest?.defaultLabel ?? key.capitalized)
+    return (label, parseHexColor(server?.color ?? ""), manifest?.iconSymbol ?? "circle.fill")
+  }
+
+  private func minutes(_ state: NotificationOverviewItem.State) -> Int {
+    switch state {
+    case let .scheduled(hour, minute): return hour * 60 + minute
+    default: return Int.max
+    }
+  }
+
+  private func timeLabel(_ hour: Int, _ minute: Int) -> String {
+    var comps = DateComponents()
+    comps.hour = hour
+    comps.minute = minute
+    let date = Calendar.current.date(from: comps) ?? Date()
+    return date.formatted(date: .omitted, time: .shortened)
+  }
+}
+
 // MARK: - Macro tiles editor
 //
 // Reorderable / toggleable / recolorable list of nutrition macro tiles.
