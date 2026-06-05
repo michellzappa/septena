@@ -274,7 +274,7 @@ private struct QuickFindRow: View {
         .foregroundStyle(Theme.inkSecondary)
     }
     .padding(.horizontal, 14)
-    .padding(.vertical, 7)
+    .padding(.vertical, 11)
     .background(selected ? Color.accentColor.opacity(0.18) : Color.clear)
     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
     .padding(.horizontal, 6)
