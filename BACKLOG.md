@@ -18,20 +18,19 @@ is UTC), sort DESC, then still apply the authoritative client-side `date`-STRING
 filter for exact correctness. Turns a full-table scan into a window±~3-day scan.
 
 ### Prerequisites (why it's NOT done yet — all must hold)
-1. **Write side fills `occurredAt` on every create/update.** Today the gateway
-   writes none (grep: zero `occurredAt` refs). Any gateway-created row would
-   fall outside the `occurredAt` filter and silently vanish — the same class of
-   bug we just fixed, but with no error to fall back on. Derive it like iOS:
-   `loggedAt ?? concludedAt ?? (date + "T" + time in local tz → UTC)`.
+1. ~~**Write side fills `occurredAt` on every create/update.**~~ ✅ DONE
+   (2026-06-05): all 7 event creates now write `occurredAt = localToEpochMs(
+   date, time, tz)` via src/tz.ts. New rows carry it.
 2. **Confirm `occurredAt` is QUERYABLE + SORTABLE** in the gateway's CK
    environment (auto-managed schema — verify, don't assume). If non-queryable,
    CloudKit *errors*, so wrap the fast-path in try/catch and fall back to the
    full scan. (Error = safe fallback; silent-empty from prereq 1 = NOT safe,
    hence prereq 1 first.)
-3. Backfill `occurredAt` on historical gateway-created rows (the iOS launch
-   backfill covers app-synced rows; confirm none are missed).
+3. Backfill `occurredAt` on historical gateway-created rows (pre-2026-06-05
+   gateway writes lack it; the iOS launch backfill covers app-synced rows —
+   confirm none are missed).
 
-Until 1–3 hold, the full-scan + `date`-STRING filter stays the design of record.
+Until 2–3 hold, the full-scan + `date`-STRING filter stays the design of record.
 
 ## Move to CloudKit **production** to unlock long-lived (2-week) tokens — without data loss
 
