@@ -212,8 +212,8 @@ public extension SectionManifest {
   static let all: [SectionManifest] = [
     .init(
       key: "tasks",
-      defaultLabel: "Tasks",
-      shortDescription: "Inbox, projects, areas, today and upcoming",
+      defaultLabel: String(localized: "Tasks", comment: "Section name"),
+      shortDescription: String(localized: "Inbox, projects, areas, today and upcoming", comment: "Section description"),
       // Tasks is .optional like every other section: disabling never
       // deletes data, and the architecture's data-preservation
       // guarantees make a hard lock unnecessary. .always remains in
@@ -226,8 +226,8 @@ public extension SectionManifest {
     ),
     .init(
       key: "training",
-      defaultLabel: "Training",
-      shortDescription: "Sessions, exercises, weekly Z2",
+      defaultLabel: String(localized: "Training", comment: "Section name"),
+      shortDescription: String(localized: "Sessions, exercises, weekly Z2", comment: "Section description"),
       activation: .optional,
       onboarding: .core,
       supportsTab: true,
@@ -236,8 +236,8 @@ public extension SectionManifest {
     ),
     .init(
       key: "nutrition",
-      defaultLabel: "Nutrition",
-      shortDescription: "Macros and calorie ranges",
+      defaultLabel: String(localized: "Nutrition", comment: "Section name"),
+      shortDescription: String(localized: "Macros and calorie ranges", comment: "Section description"),
       activation: .optional,
       onboarding: .core,
       supportsTab: true,
@@ -246,8 +246,8 @@ public extension SectionManifest {
     ),
     .init(
       key: "sleep",
-      defaultLabel: "Sleep",
-      shortDescription: "Bed and wake times, nightly duration",
+      defaultLabel: String(localized: "Sleep", comment: "Section name"),
+      shortDescription: String(localized: "Bed and wake times, nightly duration", comment: "Section description"),
       activation: .optional,
       onboarding: .core,
       supportsTab: true,
@@ -256,8 +256,8 @@ public extension SectionManifest {
     ),
     .init(
       key: "habits",
-      defaultLabel: "Habits",
-      shortDescription: "Daily routines and streaks",
+      defaultLabel: String(localized: "Habits", comment: "Section name"),
+      shortDescription: String(localized: "Daily routines and streaks", comment: "Section description"),
       activation: .optional,
       onboarding: .core,
       supportsTab: true,
@@ -266,8 +266,8 @@ public extension SectionManifest {
     ),
     .init(
       key: "chores",
-      defaultLabel: "Chores",
-      shortDescription: "Recurring household tasks",
+      defaultLabel: String(localized: "Chores", comment: "Section name"),
+      shortDescription: String(localized: "Recurring household tasks", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
       supportsTab: true,
@@ -276,8 +276,8 @@ public extension SectionManifest {
     ),
     .init(
       key: "supplements",
-      defaultLabel: "Supplements",
-      shortDescription: "Daily supplements log",
+      defaultLabel: String(localized: "Supplements", comment: "Section name"),
+      shortDescription: String(localized: "Daily supplements log", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
       supportsTab: true,
@@ -286,8 +286,8 @@ public extension SectionManifest {
     ),
     .init(
       key: "groceries",
-      defaultLabel: "Groceries",
-      shortDescription: "Shopping list and pantry",
+      defaultLabel: String(localized: "Groceries", comment: "Section name"),
+      shortDescription: String(localized: "Shopping list and pantry", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
       supportsTab: true,
@@ -296,8 +296,8 @@ public extension SectionManifest {
     ),
     .init(
       key: "caffeine",
-      defaultLabel: "Caffeine",
-      shortDescription: "Coffee, beans, brewing methods",
+      defaultLabel: String(localized: "Caffeine", comment: "Section name"),
+      shortDescription: String(localized: "Coffee, beans, brewing methods", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
       supportsTab: true,
@@ -306,8 +306,8 @@ public extension SectionManifest {
     ),
     .init(
       key: "cannabis",
-      defaultLabel: "Cannabis",
-      shortDescription: "Intake log and dosing",
+      defaultLabel: String(localized: "Cannabis", comment: "Section name"),
+      shortDescription: String(localized: "Intake log and dosing", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
       supportsTab: true,
@@ -316,8 +316,8 @@ public extension SectionManifest {
     ),
     .init(
       key: "body",
-      defaultLabel: "Body",
-      shortDescription: "Weight, body fat, measurements",
+      defaultLabel: String(localized: "Body", comment: "Section name"),
+      shortDescription: String(localized: "Weight, body fat, measurements", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
       supportsTab: true,
@@ -326,8 +326,8 @@ public extension SectionManifest {
     ),
     .init(
       key: "gut",
-      defaultLabel: "Gut",
-      shortDescription: "Digestion log",
+      defaultLabel: String(localized: "Gut", comment: "Section name"),
+      shortDescription: String(localized: "Digestion log", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
       supportsTab: false,
@@ -336,8 +336,8 @@ public extension SectionManifest {
     ),
     .init(
       key: "mood",
-      defaultLabel: "Mood",
-      shortDescription: "Three-times-a-day affect check-ins",
+      defaultLabel: String(localized: "Mood", comment: "Section name"),
+      shortDescription: String(localized: "Three-times-a-day affect check-ins", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
       supportsTab: false,
@@ -346,8 +346,8 @@ public extension SectionManifest {
     ),
     .init(
       key: "activity",
-      defaultLabel: "Activity",
-      shortDescription: "Steps and movement (HealthKit)",
+      defaultLabel: String(localized: "Activity", comment: "Section name"),
+      shortDescription: String(localized: "Steps and movement (HealthKit)", comment: "Section description"),
       activation: .integration,
       onboarding: .optional,
       supportsTab: false,
@@ -362,8 +362,8 @@ public extension SectionManifest {
     // / GitHubProvider and the `.github` wiring in WeekDashboardView.
     .init(
       key: "github",
-      defaultLabel: "GitHub",
-      shortDescription: "Commit activity as a contribution heatmap",
+      defaultLabel: String(localized: "GitHub", comment: "Section name"),
+      shortDescription: String(localized: "Commit activity as a contribution heatmap", comment: "Section description"),
       activation: .integration,
       onboarding: .optional,
       supportsTab: true,
@@ -381,8 +381,8 @@ public extension SectionManifest {
     // `.optional`/off-by-default — opt in from Manage Sections.
     .init(
       key: "insights",
-      defaultLabel: "Insights",
-      shortDescription: "What moves your day — cross-section correlations",
+      defaultLabel: String(localized: "Insights", comment: "Section name"),
+      shortDescription: String(localized: "What moves your day — cross-section correlations", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
       supportsTab: true,
@@ -399,8 +399,8 @@ public extension SectionManifest {
     // total without showing as a separate hydration row.
     .init(
       key: "hydration",
-      defaultLabel: "Hydration",
-      shortDescription: "Water intake against a daily target",
+      defaultLabel: String(localized: "Hydration", comment: "Section name"),
+      shortDescription: String(localized: "Water intake against a daily target", comment: "Section description"),
       activation: .optional,
       onboarding: .core,
       supportsTab: false,
@@ -414,8 +414,8 @@ public extension SectionManifest {
     // in Manage Sections so the user can disable / re-enable it.
     .init(
       key: "goals",
-      defaultLabel: "Goals",
-      shortDescription: "Free-text intentions tagged with section keys",
+      defaultLabel: String(localized: "Goals", comment: "Section name"),
+      shortDescription: String(localized: "Free-text intentions tagged with section keys", comment: "Section description"),
       activation: .optional,
       onboarding: .hidden,
       supportsTab: false,

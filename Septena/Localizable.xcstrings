@@ -1857,7 +1857,16 @@
         }
       }
     },
-    "Insights" : {},
+    "Insights" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Análises"
+          }
+        }
+      }
+    },
     "Insufficient pairs (1 ≤ n < %@ overlapping days) are too noisy to chart but listed here so you can see what's almost ready." : {
       "localizations" : {
         "pt-BR" : {
@@ -4320,6 +4329,336 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tranquilo"
+          }
+        }
+      }
+    },
+    "Training" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Treino"
+          }
+        }
+      }
+    },
+    "Nutrition" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nutrição"
+          }
+        }
+      }
+    },
+    "Sleep" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sono"
+          }
+        }
+      }
+    },
+    "Habits" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hábitos"
+          }
+        }
+      }
+    },
+    "Chores" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afazeres"
+          }
+        }
+      }
+    },
+    "Supplements" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suplementos"
+          }
+        }
+      }
+    },
+    "Groceries" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compras"
+          }
+        }
+      }
+    },
+    "Caffeine" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cafeína"
+          }
+        }
+      }
+    },
+    "Cannabis" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cannabis"
+          }
+        }
+      }
+    },
+    "Body" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corpo"
+          }
+        }
+      }
+    },
+    "Gut" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Intestino"
+          }
+        }
+      }
+    },
+    "Mood" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Humor"
+          }
+        }
+      }
+    },
+    "Activity" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atividade"
+          }
+        }
+      }
+    },
+    "GitHub" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub"
+          }
+        }
+      }
+    },
+    "Hydration" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hidratação"
+          }
+        }
+      }
+    },
+    "Inbox, projects, areas, today and upcoming" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Caixa de entrada, projetos, áreas, hoje e em breve"
+          }
+        }
+      }
+    },
+    "Sessions, exercises, weekly Z2" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sessões, exercícios, Z2 semanal"
+          }
+        }
+      }
+    },
+    "Macros and calorie ranges" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macros e faixas de calorias"
+          }
+        }
+      }
+    },
+    "Bed and wake times, nightly duration" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Horários de dormir e acordar, duração da noite"
+          }
+        }
+      }
+    },
+    "Daily routines and streaks" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rotinas diárias e sequências"
+          }
+        }
+      }
+    },
+    "Recurring household tasks" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarefas domésticas recorrentes"
+          }
+        }
+      }
+    },
+    "Daily supplements log" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registro diário de suplementos"
+          }
+        }
+      }
+    },
+    "Shopping list and pantry" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lista de compras e despensa"
+          }
+        }
+      }
+    },
+    "Coffee, beans, brewing methods" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Café, grãos, métodos de preparo"
+          }
+        }
+      }
+    },
+    "Intake log and dosing" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registro de consumo e dosagem"
+          }
+        }
+      }
+    },
+    "Weight, body fat, measurements" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Peso, gordura corporal, medidas"
+          }
+        }
+      }
+    },
+    "Digestion log" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registro de digestão"
+          }
+        }
+      }
+    },
+    "Three-times-a-day affect check-ins" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check-ins de humor três vezes ao dia"
+          }
+        }
+      }
+    },
+    "Steps and movement (HealthKit)" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passos e movimento (HealthKit)"
+          }
+        }
+      }
+    },
+    "Commit activity as a contribution heatmap" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atividade de commits como mapa de contribuições"
+          }
+        }
+      }
+    },
+    "What moves your day — cross-section correlations" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O que move o seu dia — correlações entre seções"
+          }
+        }
+      }
+    },
+    "Water intake against a daily target" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consumo de água em relação a uma meta diária"
+          }
+        }
+      }
+    },
+    "Free-text intentions tagged with section keys" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Intenções em texto livre marcadas com seções"
           }
         }
       }
