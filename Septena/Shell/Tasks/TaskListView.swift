@@ -835,27 +835,14 @@ struct TaskListView: View {
     selection = [id]
   }
 
-  /// Deselect everything and leave iOS edit mode — the single "clear
-  /// selection" entry point used by every deselect path.
+  /// Deselect everything — the single "clear selection" entry point used by
+  /// every deselect path.
   private func clearSelection() {
     selection.removeAll()
     #if os(iOS)
-    isReordering = false
     editMode?.wrappedValue = .inactive
     #endif
   }
-
-  #if os(iOS)
-  /// Toggle grips-only reorder mode. Enters edit mode (so `.onMove` grips
-  /// appear) but with no selection binding, so no selection circles show.
-  private func toggleReorder() {
-    let entering = !isReordering
-    selection.removeAll()
-    isReordering = entering
-    editMode?.wrappedValue = entering ? .active : .inactive
-    if entering { Haptics.tick() }
-  }
-  #endif
 
   /// Backplate for the row whose detail drawer is open — a soft accent fill so
   /// it reads as "active". Selection itself is the List's native highlight
@@ -1314,56 +1301,6 @@ struct TaskListView: View {
     }
     drop(&items); drop(&review); drop(&doneToday)
   }
-
-  // MARK: - Manual reorder (drag-and-drop)
-
-  #if os(iOS)
-  /// `.onMove` handler for the flat list. Replays the move against the visible
-  /// id order, then persists the moved row's new `position` (midpoint of its
-  /// new neighbours). The List itself drives the lift + gap animation.
-  private func moveTasks(from source: IndexSet, to destination: Int) {
-    let ids = visibleItems.map(\.id)
-    guard let movedIndex = source.first, movedIndex < ids.count else { return }
-    let movedId = ids[movedIndex]
-    var newIds = ids
-    newIds.move(fromOffsets: source, toOffset: destination)
-    applyManualOrder(draggedId: movedId, orderedIds: newIds)
-  }
-
-  /// Compute the dragged row's new `position` as the midpoint of its new
-  /// neighbours' order keys, update the list optimistically (animated), and
-  /// persist via the reorder mutation (which syncs through CloudKit).
-  private func applyManualOrder(draggedId: String, orderedIds: [String]) {
-    guard let i = orderedIds.firstIndex(of: draggedId) else { return }
-    func key(_ id: String) -> Double? { visibleItems.first { $0.id == id }?.orderKey }
-    let above = i > 0 ? key(orderedIds[i - 1]) : nil
-    let below = i < orderedIds.count - 1 ? key(orderedIds[i + 1]) : nil
-
-    let newPos: Double
-    switch (above, below) {
-    case let (a?, b?):
-      // No room left between neighbours (gaps exhausted by repeated inserts)
-      // — fall back to nudging just past the upper neighbour. Rare on the
-      // creation-instant scale these keys live on.
-      newPos = (b - a) > .ulpOfOne ? a + (b - a) / 2 : a + TaskOrder.gap
-    case let (a?, nil): newPos = a + TaskOrder.gap     // dropped at the bottom
-    case let (nil, b?): newPos = b - TaskOrder.gap     // dropped at the top
-    case (nil, nil):    return
-    }
-
-    Haptics.tick()
-    // Optimistic local reorder so the row animates into place immediately;
-    // the reorder mutation posts `.septenaTasksChanged`, and the reload lands
-    // on this same order.
-    if let idx = items.firstIndex(where: { $0.id == draggedId }) {
-      items[idx].position = newPos
-      withAnimation(.easeInOut(duration: 0.2)) {
-        items.sort { $0.orderKey != $1.orderKey ? $0.orderKey < $1.orderKey : $0.id < $1.id }
-      }
-    }
-    mutator.reorder(id: draggedId, toPosition: newPos)
-  }
-  #endif
 
   // MARK: - Load
 
