@@ -151,6 +151,7 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
     "activity":    "figure.walk",
     "goals":       "target",
     "hydration":   "drop.fill",
+    "github":      "chevron.left.forwardslash.chevron.right",
   ]
 
   public var iconSymbol: String {
@@ -349,6 +350,23 @@ public extension SectionManifest {
       onboarding: .optional,
       supportsTab: false,
       supportsDashboard: true,
+      settingsEditor: .appearance
+    ),
+    // GitHub — read-only mirror of the authenticated user's contribution
+    // calendar (the commit heatmap), fetched from the GraphQL API with a
+    // per-device token (Keychain, never CloudKit — GitHub is the source of
+    // truth). Reachable from the sidebar once enabled; no homepage tile yet
+    // (`supportsDashboard: false`) — there's no `HomepageDomain` case, so
+    // the section deliberately renders only its destination view. See
+    // GitHubPlugin / GitHubDestinationView / GitHubProvider.
+    .init(
+      key: "github",
+      defaultLabel: "GitHub",
+      shortDescription: "Commit activity as a contribution heatmap",
+      activation: .integration,
+      onboarding: .optional,
+      supportsTab: true,
+      supportsDashboard: false,
       settingsEditor: .appearance
     ),
     // Hydration — water-only log. UX over existing nutrition data:

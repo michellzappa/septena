@@ -3043,6 +3043,7 @@ struct IntegrationsSettingsPane: View {
   @State private var healthBridge = HealthKitBridge.shared
   @State private var ouraProvider = OuraProvider.shared
   @State private var withingsProvider = WithingsProvider.shared
+  @State private var githubProvider = GitHubProvider.shared
   @State private var photosBridge = PhotosBridge.shared
   @State private var claudeProvider = ClaudeGatewayProvider.shared
   var body: some View {
@@ -3151,6 +3152,21 @@ struct IntegrationsSettingsPane: View {
                    systemImage: "scalemass",
                    state: withingsProvider.hasTokens ? "Connected" : "Connect",
                    isGranted: withingsProvider.hasTokens)
+        }
+
+        // GitHub — read-only contribution calendar via the GraphQL API.
+        // Per-device token (Keychain); nothing syncs to CloudKit.
+        NavigationLink {
+          GitHubIntegrationDetail()
+            .navigationTitle("GitHub")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+        } label: {
+          stateRow(title: "GitHub",
+                   systemImage: "chevron.left.forwardslash.chevron.right",
+                   state: githubProvider.hasToken ? "Connected" : "Connect",
+                   isGranted: githubProvider.hasToken)
         }
 
       } header: {
@@ -3756,6 +3772,92 @@ private struct OuraIntegrationDetail: View {
       lastResult = "Backfill complete — \(rows.count) nights, \(withScore) with a sleep score. Syncing to iCloud."
     } catch {
       lastResult = "Backfill failed: \(error.localizedDescription)"
+    }
+  }
+}
+
+// GitHub → personal access token entry. The user pastes a token with the
+// `read:user` scope from github.com/settings/tokens; GitHubProvider stores
+// it in Keychain (never CloudKit, never a Septena server). Test button does
+// a contributions round-trip so the user gets immediate confirmation.
+private struct GitHubIntegrationDetail: View {
+  @State private var provider = GitHubProvider.shared
+  @State private var draft: String = ""
+  @State private var testing = false
+  @State private var lastResult: String? = nil
+
+  var body: some View {
+    Form {
+      Section {
+        SecureField("Access Token", text: $draft)
+          #if os(iOS)
+          .textInputAutocapitalization(.never)
+          .autocorrectionDisabled()
+          #endif
+        HStack {
+          Button("Save") {
+            provider.setToken(draft)
+            draft = ""
+            lastResult = nil
+            // Immediately validate so the user sees the token works (and
+            // warms the dashboard cache via the destination's own fetch).
+            Task { await runTest() }
+          }
+          .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+          Spacer()
+          if provider.hasToken {
+            Button("Remove", role: .destructive) {
+              provider.clearToken()
+              lastResult = nil
+            }
+          }
+        }
+      } header: {
+        Text("Token")
+      } footer: {
+        VStack(alignment: .leading, spacing: 6) {
+          Text("Create a personal access token with the read:user scope at github.com/settings/tokens, then paste it here. Tokens stay on this device (Keychain) and are never sent to any Septena server.")
+          Link("Open GitHub tokens page",
+               destination: URL(string: "https://github.com/settings/tokens")!)
+            .font(.callout)
+        }
+      }
+
+      Section {
+        HStack {
+          Label("Status", systemImage: "chevron.left.forwardslash.chevron.right")
+          Spacer()
+          Text(provider.hasToken ? "Connected" : "Not configured")
+            .foregroundStyle(provider.hasToken ? .green : .secondary)
+        }
+        Button {
+          Task { await runTest() }
+        } label: {
+          HStack {
+            Label("Test connection", systemImage: "checkmark.seal")
+            Spacer()
+            if testing { ProgressView().controlSize(.small) }
+          }
+        }
+        .disabled(!provider.hasToken || testing)
+        if let lastResult {
+          Text(lastResult)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+    }
+    .formStyle(.grouped)
+  }
+
+  private func runTest() async {
+    testing = true
+    defer { testing = false }
+    do {
+      let c = try await provider.fetchContributions(days: 365)
+      lastResult = "OK — \(c.total) contributions for @\(c.login) in the last year."
+    } catch {
+      lastResult = "Failed: \(error.localizedDescription)"
     }
   }
 }

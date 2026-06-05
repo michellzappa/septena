@@ -373,6 +373,7 @@ enum SectionRegistry {
     TrainingPlugin.self,
     NutritionPlugin.self,
     HydrationPlugin.self,
+    GitHubPlugin.self,
   ]
 
   static var byKey: [String: any SectionPlugin.Type] {
