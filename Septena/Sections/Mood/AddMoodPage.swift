@@ -118,7 +118,7 @@ struct AddMoodPage: View {
           Text("I'm feeling")
             .font(.subheadline)
             .foregroundStyle(.secondary)
-          Text(emotion.word)
+          Text(emotion.displayWord)
             .font(.system(.largeTitle, design: .rounded).weight(.bold))
             .foregroundStyle(emotion.quadrant.color)
             // Pop-in: scale-spring keyed by the emotion word, so each
@@ -188,7 +188,7 @@ struct AddMoodPage: View {
                    Haptics.tick()
                    // The header updates to "I'm feeling X" visually; mirror
                    // that for VoiceOver, which can't perceive the pop-in.
-                   A11y.announce("\(picked.word). Log to save.")
+                   A11y.announce("\(picked.displayWord). Log to save.")
                  })
         .frame(width: geo.size.width, height: geo.size.height)
     }
@@ -370,8 +370,8 @@ private struct MoodCanvas: View {
     if let q = quadrant {
       VStack(alignment: .leading, spacing: 0) {
         ForEach(MoodCatalog.grid(for: q)) { emotion in
-          Button { onPickEmotion(emotion) } label: { Text(emotion.word) }
-            .accessibilityLabel(emotion.word)
+          Button { onPickEmotion(emotion) } label: { Text(emotion.displayWord) }
+            .accessibilityLabel(emotion.displayWord)
             .accessibilityHint("Feeling in \(q.title). Then Log to save.")
             .accessibilityAddTraits(emotion == selectedEmotion ? .isSelected : [])
         }
@@ -733,7 +733,7 @@ private struct EmotionChip: View {
       Circle()
         .strokeBorder(.white.opacity(outlineOpacity),
                       lineWidth: outlineWidth)
-      Text(emotion.word)
+      Text(emotion.displayWord)
         .font(.system(.footnote, design: .rounded).weight(.semibold))
         .foregroundStyle(textColor)
         .multilineTextAlignment(.center)

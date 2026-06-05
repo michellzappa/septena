@@ -1,9 +1,7 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "  ↳ %@" : {
-
-    },
+    "  ↳ %@" : {},
     "·" : {
       "shouldTranslate" : false
     },
@@ -1358,9 +1356,7 @@
         }
       }
     },
-    "elapsed" : {
-
-    },
+    "elapsed" : {},
     "Enabled" : {
       "localizations" : {
         "pt-BR" : {
@@ -1511,12 +1507,8 @@
         }
       }
     },
-    "Find any task, project, or area." : {
-
-    },
-    "Find what actually moves your day — which habits, inputs, and routines track with better sleep, mood, recovery, and more. Real correlations across everything you log, computed privately on-device." : {
-
-    },
+    "Find any task, project, or area." : {},
+    "Find what actually moves your day — which habits, inputs, and routines track with better sleep, mood, recovery, and more. Real correlations across everything you log, computed privately on-device." : {},
     "Fix by creating the missing record (CloudKit Console → Create New Record) with recordName matching the referenced id." : {
       "localizations" : {
         "pt-BR" : {
@@ -1865,9 +1857,7 @@
         }
       }
     },
-    "Insights" : {
-
-    },
+    "Insights" : {},
     "Insufficient pairs (1 ≤ n < %@ overlapping days) are too noisy to chart but listed here so you can see what's almost ready." : {
       "localizations" : {
         "pt-BR" : {
@@ -1997,9 +1987,7 @@
         }
       }
     },
-    "Layout picks how the homepage renders — Histogram, Sparkline, or Heatmap. Insights tunes the cross-section correlation explorer." : {
-
-    },
+    "Layout picks how the homepage renders — Histogram, Sparkline, or Heatmap. Insights tunes the cross-section correlation explorer." : {},
     "Let Claude read and write your Septena data at mcp.septena.app." : {
       "localizations" : {
         "pt-BR" : {
@@ -3509,9 +3497,7 @@
         }
       }
     },
-    "The little celebration that plays when you log something — confetti, ripples, a streak landing. Off keeps the confirming haptic but skips the motion. Reduce Motion always overrides this." : {
-
-    },
+    "The little celebration that plays when you log something — confetti, ripples, a streak landing. Off keeps the confirming haptic but skips the motion. Reduce Motion always overrides this." : {},
     "The master switch. Each nudge fires around when you usually log it and goes quiet once it's marked for the day." : {
       "localizations" : {
         "pt-BR" : {
@@ -3737,9 +3723,7 @@
         }
       }
     },
-    "Unlock with Septena+" : {
-
-    },
+    "Unlock with Septena+" : {},
     "Upgrade to %@" : {
       "localizations" : {
         "pt-BR" : {
@@ -3976,6 +3960,366 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Δ = média com − média sem"
+          }
+        }
+      }
+    },
+    "Excited" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empolgado"
+          }
+        }
+      }
+    },
+    "Elated" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eufórico"
+          }
+        }
+      }
+    },
+    "Ecstatic" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Em êxtase"
+          }
+        }
+      }
+    },
+    "Eager" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entusiasmado"
+          }
+        }
+      }
+    },
+    "Upbeat" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Animado"
+          }
+        }
+      }
+    },
+    "Joyful" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alegre"
+          }
+        }
+      }
+    },
+    "Focused" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Focado"
+          }
+        }
+      }
+    },
+    "Alive" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibrante"
+          }
+        }
+      }
+    },
+    "Content" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contente"
+          }
+        }
+      }
+    },
+    "Enraged" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Furioso"
+          }
+        }
+      }
+    },
+    "Panicked" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Em pânico"
+          }
+        }
+      }
+    },
+    "Stressed" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estressado"
+          }
+        }
+      }
+    },
+    "Angry" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Com raiva"
+          }
+        }
+      }
+    },
+    "Anxious" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ansioso"
+          }
+        }
+      }
+    },
+    "Frustrated" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Frustrado"
+          }
+        }
+      }
+    },
+    "Irritated" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Irritado"
+          }
+        }
+      }
+    },
+    "Tense" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tenso"
+          }
+        }
+      }
+    },
+    "Restless" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inquieto"
+          }
+        }
+      }
+    },
+    "Bored" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entediado"
+          }
+        }
+      }
+    },
+    "Discouraged" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desencorajado"
+          }
+        }
+      }
+    },
+    "Disappointed" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decepcionado"
+          }
+        }
+      }
+    },
+    "Sad" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Triste"
+          }
+        }
+      }
+    },
+    "Lonely" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solitário"
+          }
+        }
+      }
+    },
+    "Glum" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cabisbaixo"
+          }
+        }
+      }
+    },
+    "Drained" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esgotado"
+          }
+        }
+      }
+    },
+    "Hopeless" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem esperança"
+          }
+        }
+      }
+    },
+    "Despondent" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desolado"
+          }
+        }
+      }
+    },
+    "Mellow" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suave"
+          }
+        }
+      }
+    },
+    "Easygoing" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descontraído"
+          }
+        }
+      }
+    },
+    "Pleased" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Satisfeito"
+          }
+        }
+      }
+    },
+    "Calm" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calmo"
+          }
+        }
+      }
+    },
+    "Grateful" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grato"
+          }
+        }
+      }
+    },
+    "Loved" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amado"
+          }
+        }
+      }
+    },
+    "Relaxed" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relaxado"
+          }
+        }
+      }
+    },
+    "Serene" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sereno"
+          }
+        }
+      }
+    },
+    "Tranquil" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tranquilo"
           }
         }
       }

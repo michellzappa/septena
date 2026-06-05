@@ -106,7 +106,7 @@ private struct EmotionPill: View {
   let emotion: MoodEmotion
   let isSelected: Bool
   var body: some View {
-    Text(emotion.word)
+    Text(emotion.displayWord)
       .font(.system(.footnote, design: .rounded).weight(.semibold))
       .foregroundStyle(.black.opacity(0.9))
       .multilineTextAlignment(.center)
