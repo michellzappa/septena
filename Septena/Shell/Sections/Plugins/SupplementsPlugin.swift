@@ -111,6 +111,49 @@ enum SupplementsPlugin: SectionPlugin {
       return nil
     }
   }
+
+  // MARK: - Notifications
+  //
+  // The Habits nudge, applied to the same definition+state shape. One
+  // coalesced daily reminder (never one per supplement) that fires at the
+  // hour the user has *usually finished* taking them — the 80th percentile
+  // of past taken-times — and suppresses the instant nothing's left to mark
+  // today. Tap-to-open only: doses get checked off one at a time.
+
+  static var notificationDescriptors: [NotificationDescriptor] {
+    [NotificationDescriptor(
+      id: "supplements.incomplete", sectionKey: "supplements", title: "Supplements reminder",
+      priority: 15)]
+  }
+
+  static func evaluateNotification(_ descriptorID: String,
+                                   context: ModelContext,
+                                   now: Date) -> NotificationPlan? {
+    guard descriptorID == "supplements.incomplete" else { return nil }
+    let today = SeptenaDate.today
+    guard let day = ChecklistMirror.loadSupplementsDay(context: context, date: today) else { return nil }
+
+    let pending = day.items.filter { !$0.done }
+    guard !pending.isEmpty else { return nil }   // all taken → suppress
+
+    // Fire when the routine is *usually* wrapped up, learned from every
+    // supplement's taken-times. Fallback: 20:00 (end of the active day).
+    let states = (try? context.fetch(FetchDescriptor<SupplementDayStateEntity>(
+      predicate: #Predicate { $0.done == true }
+    ))) ?? []
+    let dateTimes = states.compactMap { s -> (date: String, time: String)? in
+      guard let t = s.time else { return nil }
+      return (s.date, t)
+    }
+    let minute = NextScoring.learnedLateMinute(dateTimes: dateTimes,
+                                               today: today, fallback: 20 * 60)
+    let n = pending.count
+    let body = n == 1
+      ? "1 supplement left today — mark it if you’ve taken it."
+      : "\(n) supplements left today — mark any you’ve taken."
+    return NotificationPlan(descriptorID: descriptorID, title: "Supplements",
+                            body: body, threadID: "supplements", minuteOfDay: minute)
+  }
 }
 
 private struct SupplementsDetailContent: View {

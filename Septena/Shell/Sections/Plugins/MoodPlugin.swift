@@ -89,6 +89,53 @@ enum MoodPlugin: SectionPlugin {
       return nil
     }
   }
+
+  // MARK: - Notifications
+  //
+  // Mood's unit is the daypart check-in (morning / afternoon / evening), so
+  // the nudge tracks the *current* daypart: it fires only when this part of
+  // the day has no check-in yet, and goes quiet the moment you log one. The
+  // scheduler keeps a single pending request per descriptor, so at most one
+  // mood nudge is ever queued — as the day advances, reconcile re-arms it for
+  // whichever daypart you're now in. Fire-time is the hour you usually check
+  // in for that daypart (learned), falling back to near the end of its
+  // window so you get the whole stretch to log naturally first.
+
+  static var notificationDescriptors: [NotificationDescriptor] {
+    [NotificationDescriptor(
+      id: "mood.checkin", sectionKey: "mood", title: "Mood check-in",
+      priority: 7)]
+  }
+
+  static func evaluateNotification(_ descriptorID: String,
+                                   context: ModelContext,
+                                   now: Date) -> NotificationPlan? {
+    guard descriptorID == "mood.checkin" else { return nil }
+    let today = SeptenaDate.today
+    let bucket = DayBucket.from(date: now)
+    let day = ChecklistMirror.loadMoodDay(context: context, date: today)
+    // Already checked in for the daypart we're in → nothing to nudge.
+    guard day.byBucket[bucket.rawValue] == nil else { return nil }
+
+    // Learn from past check-ins *in this same daypart* so morning fires near
+    // your usual morning time, etc. Fallback: just before the window closes.
+    let bucketRaw = bucket.rawValue
+    let history = (try? context.fetch(FetchDescriptor<MoodEventEntity>(
+      predicate: #Predicate { $0.bucket == bucketRaw }
+    ))) ?? []
+    let dateTimes = history.map { (date: $0.date, time: $0.time) }
+    let fallbackHour: Int
+    switch bucket {
+    case .morning:   fallbackHour = max(DayBucket.cutoffs.morningEnd - 1, 8)
+    case .afternoon: fallbackHour = max(DayBucket.cutoffs.afternoonEnd - 1, DayBucket.cutoffs.morningEnd)
+    case .evening:   fallbackHour = 20   // evening runs to midnight; keep it before quiet hours
+    }
+    let minute = NextScoring.learnedLateMinute(dateTimes: dateTimes,
+                                               today: today, fallback: fallbackHour * 60)
+    let body = "Haven’t checked in this \(bucket.rawValue) yet — tap to note how you’re feeling."
+    return NotificationPlan(descriptorID: descriptorID, title: "Mood",
+                            body: body, threadID: "mood", minuteOfDay: minute)
+  }
 }
 
 private struct MoodDetailContent: View {
