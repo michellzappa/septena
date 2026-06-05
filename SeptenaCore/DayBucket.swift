@@ -5,14 +5,38 @@ import SwiftUI
 // afternoon / evening. Single source of truth for the cutoff hours and
 // the SF Symbol used as the bucket's visual identity.
 //
-// Cutoffs (local time):
-//   morning   : hour <  12
-//   afternoon : hour <  17
-//   evening   : otherwise
+// Cutoffs (local time) are USER-CONFIGURABLE via Settings ▸ Time of Day.
+// They live in the shared App Group suite so the main app, widget, and
+// watch all read the same boundaries; the authoritative copy is synced
+// across devices in `AppSettings` and mirrored into the suite at launch.
+// Defaults match the historical hardcoded values:
+//   morning   : hour <  morningEnd   (default 12)
+//   afternoon : hour <  afternoonEnd (default 17)
+//   evening   : otherwise (runs to the day boundary, 24)
 //
 // `rawValue` is the persisted string ("morning", "afternoon", "evening")
 // — every place that stores a bucket on an entity uses this lowercase
 // form, so a future schema change happens here and not at the call sites.
+
+/// User-configurable boundary hours between the three day buckets.
+/// `morningEnd` is the first hour that counts as afternoon; `afternoonEnd`
+/// the first hour that counts as evening. The init clamps to a valid,
+/// strictly-increasing pair so callers never see a degenerate window.
+public struct DayBucketCutoffs: Equatable, Sendable {
+  public let morningEnd: Int
+  public let afternoonEnd: Int
+
+  public static let `default` = DayBucketCutoffs(morningEnd: 12, afternoonEnd: 17)
+
+  public init(morningEnd: Int, afternoonEnd: Int) {
+    // morningEnd ∈ 1…22, afternoonEnd strictly greater and ≤ 23, so every
+    // bucket keeps at least one hour and evening never starts at midnight.
+    let m = min(max(morningEnd, 1), 22)
+    let a = min(max(afternoonEnd, m + 1), 23)
+    self.morningEnd = m
+    self.afternoonEnd = a
+  }
+}
 
 public enum DayBucket: String, CaseIterable, Identifiable, Hashable, Sendable {
   case morning, afternoon, evening
@@ -38,19 +62,21 @@ public enum DayBucket: String, CaseIterable, Identifiable, Hashable, Sendable {
   /// user to confirm.
   public static func from(date: Date,
                           calendar: Calendar = .current) -> DayBucket {
-    let h = calendar.component(.hour, from: date)
-    if h < 12 { return .morning }
-    if h < 17 { return .afternoon }
-    return .evening
+    bucket(forHour: calendar.component(.hour, from: date))
   }
 
   /// Parse an `"HH:MM"` or `"HH:MM:SS"` string into a bucket. Falls back
   /// to morning on a malformed input — defensive, since logged times
   /// should always be well-formed.
   public static func from(time hms: String) -> DayBucket {
-    let h = Int(hms.prefix(2)) ?? 0
-    if h < 12 { return .morning }
-    if h < 17 { return .afternoon }
+    bucket(forHour: Int(hms.prefix(2)) ?? 0)
+  }
+
+  /// Shared hour → bucket mapping, reading the user's configured cutoffs.
+  private static func bucket(forHour h: Int) -> DayBucket {
+    let c = cutoffs
+    if h < c.morningEnd { return .morning }
+    if h < c.afternoonEnd { return .afternoon }
     return .evening
   }
 
@@ -73,10 +99,49 @@ public enum DayBucket: String, CaseIterable, Identifiable, Hashable, Sendable {
   /// window boundary here instead of re-hardcoding 12 / 17. Evening runs
   /// to the day boundary (24 → next 00:00).
   public var endHour: Int {
+    let c = Self.cutoffs
     switch self {
-    case .morning:   return 12
-    case .afternoon: return 17
+    case .morning:   return c.morningEnd
+    case .afternoon: return c.afternoonEnd
     case .evening:   return 24
     }
+  }
+}
+
+// MARK: - Configurable cutoffs (App Group–backed)
+
+public extension DayBucket {
+  /// App Group suite shared by the app, widget, and watch — same string
+  /// used elsewhere for cross-target shared state.
+  static let appGroupSuite = "group.com.septena.cloud"
+
+  private enum CutoffKey {
+    static let morningEnd   = "septena.timeofday.morningEnd"
+    static let afternoonEnd = "septena.timeofday.afternoonEnd"
+  }
+
+  private static var sharedDefaults: UserDefaults {
+    UserDefaults(suiteName: appGroupSuite) ?? .standard
+  }
+
+  /// The user's configured cutoffs, or `.default` when none have been set.
+  /// Read on every `from(date:)` / `current` lookup — cheap (a UserDefaults
+  /// hit), and always reflects the latest value the app mirrored in.
+  static var cutoffs: DayBucketCutoffs {
+    let d = sharedDefaults
+    guard let m = d.object(forKey: CutoffKey.morningEnd) as? Int,
+          let a = d.object(forKey: CutoffKey.afternoonEnd) as? Int else {
+      return .default
+    }
+    return DayBucketCutoffs(morningEnd: m, afternoonEnd: a)
+  }
+
+  /// Persist cutoffs into the shared suite so the app, widget, and watch
+  /// pick them up immediately. The authoritative cross-device copy lives in
+  /// `AppSettings`; this is the fast local mirror.
+  static func saveCutoffs(_ c: DayBucketCutoffs) {
+    let d = sharedDefaults
+    d.set(c.morningEnd, forKey: CutoffKey.morningEnd)
+    d.set(c.afternoonEnd, forKey: CutoffKey.afternoonEnd)
   }
 }

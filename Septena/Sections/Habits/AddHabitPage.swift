@@ -1,8 +1,9 @@
 import SwiftUI
 
 // Habits palette — undone-only + time-of-day bucket filter. Tap toggles
-// done. Type a new name to create in the current bucket (morning before
-// 12, afternoon 12–17, evening after 17).
+// done. Type a new name to create in the current bucket; the morning /
+// afternoon / evening boundaries follow the user's Settings ▸ Time of Day
+// cutoffs (defaults: morning before 12, afternoon 12–17, evening after 17).
 
 private func visibleBuckets(_ all: [String]) -> [String] {
   // Index into a canonical [morning, afternoon, evening] order so that an

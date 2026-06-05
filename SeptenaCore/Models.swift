@@ -1476,11 +1476,20 @@ struct AppSettings: Codable {
   /// Defaulted so the existing memberwise-init call sites stay source-stable.
   var welcomeName: String? = nil
 
+  /// User-configured boundary hours for the morning/afternoon/evening day
+  /// buckets (Settings ▸ Time of Day). Synced across devices; mirrored into
+  /// the shared App Group suite that `DayBucket` reads. Nil → historical
+  /// defaults (12 / 17). Defaulted so memberwise-init call sites stay stable.
+  var morningCutoffHour: Int? = nil
+  var afternoonCutoffHour: Int? = nil
+
   enum CodingKeys: String, CodingKey {
     case sectionOrder = "section_order"
     case targets, units, time, theme, eink, nutrition
     case hkSync = "hk_sync"
     case welcomeName = "welcome_name"
+    case morningCutoffHour = "morning_cutoff_hour"
+    case afternoonCutoffHour = "afternoon_cutoff_hour"
   }
 }
 

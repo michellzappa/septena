@@ -140,12 +140,14 @@ enum WelcomePhase: String, CaseIterable {
     }
   }
 
+  // Derive from `DayBucket` so the greeting honors the user's configured
+  // time-of-day cutoffs (Settings ▸ Time of Day) and never disagrees with
+  // the bucket headers, the "Now" marker, or the Next list.
   static func resolve(at date: Date) -> WelcomePhase {
-    let hour = Calendar.current.component(.hour, from: date)
-    switch hour {
-    case ..<11:  return .morning
-    case ..<17:  return .afternoon
-    default:     return .evening
+    switch DayBucket.from(date: date) {
+    case .morning:   return .morning
+    case .afternoon: return .afternoon
+    case .evening:   return .evening
     }
   }
 

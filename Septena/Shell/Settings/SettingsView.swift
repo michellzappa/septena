@@ -288,6 +288,7 @@ final class SettingsStore {
     // first frame's greeting is right. No engine here (init context), so the
     // local→cloud migration leg is deferred to the launch reconcile.
     reconcileWelcomeName(context: context, engine: nil)
+    reconcileDayBucketCutoffs(context: context, engine: nil)
   }
 
   func moveSections(fromOffsets: IndexSet, toOffset: Int,
@@ -333,6 +334,49 @@ final class SettingsStore {
       if synced != local { UserDefaults.standard.set(synced, forKey: key) }
     } else if !local.isEmpty, engine != nil {
       setWelcomeName(local, context: context, engine: engine)
+    }
+  }
+
+  /// The user's day-bucket cutoffs as currently configured, falling back to
+  /// the synced payload and finally the historical defaults. Reads the App
+  /// Group mirror that `DayBucket` uses, so the Settings pane and the rest of
+  /// the app agree on the active value.
+  var dayBucketCutoffs: DayBucketCutoffs { DayBucket.cutoffs }
+
+  /// Update the day-bucket cutoffs: write the fast App Group mirror that
+  /// `DayBucket` (and the widget/watch) read, then push the authoritative
+  /// copy into the CloudKit-synced `AppSettings`. Mirrors `setWelcomeName`.
+  func setDayBucketCutoffs(morningEnd: Int, afternoonEnd: Int,
+                           context: ModelContext, engine: CKEngine?) {
+    let c = DayBucketCutoffs(morningEnd: morningEnd, afternoonEnd: afternoonEnd)
+    DayBucket.saveCutoffs(c)  // instant local mirror — UI updates immediately
+    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+    guard serverSettings?.morningCutoffHour != c.morningEnd
+            || serverSettings?.afternoonCutoffHour != c.afternoonEnd else { return }
+    var s = serverSettings ?? AppSettings(sectionOrder: nil, targets: nil, units: nil,
+                                          time: nil, theme: nil, eink: nil,
+                                          nutrition: nil, hkSync: nil)
+    s.morningCutoffHour = c.morningEnd
+    s.afternoonCutoffHour = c.afternoonEnd
+    serverSettings = s
+    SettingsMirror.upsert(settings: s, context: context, engine: engine)
+  }
+
+  /// Reconcile the synced cutoffs with the App Group mirror `DayBucket` reads.
+  /// A synced value (set on another device) wins → copy it into the suite. No
+  /// synced value but a local override exists (upgrade leg) → push it up.
+  /// Same inbound/outbound shape as `reconcileWelcomeName`.
+  func reconcileDayBucketCutoffs(context: ModelContext, engine: CKEngine?) {
+    if let m = serverSettings?.morningCutoffHour,
+       let a = serverSettings?.afternoonCutoffHour {
+      DayBucket.saveCutoffs(DayBucketCutoffs(morningEnd: m, afternoonEnd: a))
+    } else {
+      let local = DayBucket.cutoffs
+      if local != .default, engine != nil {
+        setDayBucketCutoffs(morningEnd: local.morningEnd,
+                            afternoonEnd: local.afternoonEnd,
+                            context: context, engine: engine)
+      }
     }
   }
 
@@ -400,12 +444,14 @@ struct SettingsView: View {
   /// for per-section rows resolved against `SectionManifest` + the live
   /// `store.sections` list.
   enum SettingsDestination: Hashable {
+    case account
     case general, integrations, importExport, skills, siriShortcuts, privacy, about
     case manageSections
     case quickActions
     case appIcon
     case layout
     case correlations
+    case timeOfDay
     case motionGallery
     case section(String)
   }
@@ -545,11 +591,13 @@ struct SettingsView: View {
 
   private func title(for dest: SettingsDestination) -> String {
     switch dest {
+    case .account:      return "Account"
     case .general:      return "Customize"
     case .quickActions: return "Quick Actions"
     case .appIcon:      return "App Icon"
     case .layout:       return "Layout"
     case .correlations: return "Correlations"
+    case .timeOfDay:    return "Time of Day"
     case .integrations: return "Integrations"
     case .importExport: return "Import & Export"
     case .skills:       return "Skills"
@@ -569,11 +617,13 @@ struct SettingsView: View {
   // section rows render their own color-dot label via `sectionRow`.
   private func icon(for dest: SettingsDestination) -> String {
     switch dest {
+    case .account:      return "person.crop.circle"
     case .general:      return "slider.horizontal.3"
     case .quickActions: return "bolt"
     case .appIcon:      return "app.badge"
     case .layout:       return "square.grid.2x2"
     case .correlations: return "chart.dots.scatter"
+    case .timeOfDay:    return "clock"
     case .integrations: return "app.connected.to.app.below.fill"
     case .importExport: return "square.and.arrow.up.on.square"
     case .skills:       return "sparkles"
@@ -608,11 +658,13 @@ struct SettingsView: View {
   @ViewBuilder
   private func pane(for dest: SettingsDestination) -> some View {
     switch dest {
+    case .account:           AccountSettingsPane()
     case .general:           GeneralSettingsPane()
     case .quickActions:      QuickActionsSettingsPane()
     case .appIcon:           AppIconSettingsPane()
     case .layout:            LayoutSettingsPane()
     case .correlations:      CorrelationsSettingsPane()
+    case .timeOfDay:         TimeOfDaySettingsPane()
     case .integrations:      IntegrationsSettingsPane()
     case .importExport:      ImportExportSettingsPane()
     case .skills:            SkillsSettingsPane()
@@ -732,6 +784,14 @@ struct GeneralSettingsPane: View {
         Text("Pick how the homepage renders — Histogram, Sparkline, Heatmap, or Correlations.")
       }
 
+      Section {
+        NavigationLink(value: SettingsView.SettingsDestination.timeOfDay) {
+          Label("Time of Day", systemImage: "clock")
+        }
+      } footer: {
+        Text("Set when morning, afternoon, and evening begin — used across Habits, Supplements, the “Now” marker, and the greeting.")
+      }
+
       homepageWelcomeSection
       homepageTimelineSection
       notificationsSection
@@ -812,6 +872,100 @@ struct GeneralSettingsPane: View {
     }
   }
 
+}
+
+// MARK: - Time of Day submenu
+//
+// Lets the user move the two boundaries that split the day into Morning /
+// Afternoon / Evening. The values write straight through to the App Group
+// mirror `DayBucket` reads (so Habits, Supplements, the "Now" marker, the
+// Next list, and the welcome greeting all shift at once) and up to the
+// CloudKit-synced `AppSettings`.
+
+struct TimeOfDaySettingsPane: View {
+  @Environment(\.modelContext) private var modelContext
+  @Environment(CKEngine.self) private var ckEngine
+  @Environment(SettingsStore.self) private var store
+
+  @State private var morningEnd = DayBucketCutoffs.default.morningEnd
+  @State private var afternoonEnd = DayBucketCutoffs.default.afternoonEnd
+  @State private var loaded = false
+
+  var body: some View {
+    Form {
+      Section {
+        Picker(selection: $morningEnd) {
+          ForEach(1...22, id: \.self) { Text(hourLabel($0)).tag($0) }
+        } label: {
+          Label("Morning ends", systemImage: DayBucket.morning.icon)
+        }
+        Picker(selection: $afternoonEnd) {
+          ForEach((morningEnd + 1)...23, id: \.self) { Text(hourLabel($0)).tag($0) }
+        } label: {
+          Label("Afternoon ends", systemImage: DayBucket.afternoon.icon)
+        }
+      } footer: {
+        Text("Set when each part of your day begins. These boundaries drive the Morning / Afternoon / Evening groups in Habits and Supplements, the “Now” marker, what the Next list surfaces, and the welcome greeting.")
+      }
+
+      Section("Your day") {
+        bucketRow(.morning, start: hourLabel(0), end: hourLabel(morningEnd))
+        bucketRow(.afternoon, start: hourLabel(morningEnd), end: hourLabel(afternoonEnd))
+        bucketRow(.evening, start: hourLabel(afternoonEnd), end: hourLabel(0))
+      }
+
+      Section {
+        Button("Reset to default") { apply(.default) }
+          .disabled(morningEnd == DayBucketCutoffs.default.morningEnd
+                    && afternoonEnd == DayBucketCutoffs.default.afternoonEnd)
+      } footer: {
+        Text("Default: morning until \(hourLabel(DayBucketCutoffs.default.morningEnd)), afternoon until \(hourLabel(DayBucketCutoffs.default.afternoonEnd)).")
+      }
+    }
+    .formStyle(.grouped)
+    .onAppear {
+      let c = store.dayBucketCutoffs
+      morningEnd = c.morningEnd
+      afternoonEnd = c.afternoonEnd
+      loaded = true
+    }
+    .onChange(of: morningEnd) { _, newMorning in
+      if afternoonEnd <= newMorning { afternoonEnd = newMorning + 1 }
+      persist()
+    }
+    .onChange(of: afternoonEnd) { _, _ in persist() }
+  }
+
+  private func bucketRow(_ b: DayBucket, start: String, end: String) -> some View {
+    HStack {
+      Label(b.title, systemImage: b.icon)
+      Spacer()
+      Text("\(start) – \(end)")
+        .foregroundStyle(.secondary)
+        .monospacedDigit()
+    }
+  }
+
+  private func apply(_ c: DayBucketCutoffs) {
+    morningEnd = c.morningEnd
+    afternoonEnd = c.afternoonEnd
+    // The onChange handlers fire from these mutations and persist.
+  }
+
+  private func persist() {
+    guard loaded else { return }
+    store.setDayBucketCutoffs(morningEnd: morningEnd, afternoonEnd: afternoonEnd,
+                              context: modelContext, engine: ckEngine)
+  }
+
+  /// Localized short time for a whole hour (0–23), e.g. "12:00 PM" or "17:00"
+  /// depending on the user's locale.
+  private func hourLabel(_ h: Int) -> String {
+    let cal = Calendar.current
+    let base = cal.startOfDay(for: .now)
+    let date = cal.date(byAdding: .hour, value: h, to: base) ?? base
+    return date.formatted(date: .omitted, time: .shortened)
+  }
 }
 
 // MARK: - Layout submenu
