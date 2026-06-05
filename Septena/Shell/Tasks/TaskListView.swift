@@ -5,34 +5,6 @@ import SwiftData
 // Read-through cache: views render from SwiftData immediately, then refresh
 // from the server in the background and fold the response back in.
 
-/// Process-wide warm cache for the structure lists (areas/projects). The first
-/// `TaskListView` constructed pays one SwiftData fetch; every later section
-/// navigation reads the warm copy instead of re-querying SwiftData on the main
-/// thread inside `init`. `load()` refreshes both the cache and the view's state
-/// whenever data changes, so it never goes stale for longer than one reload.
-@MainActor
-private enum TaskStructureCache {
-  static var areas: [Area] = []
-  static var projects: [Project] = []
-  static var warmed = false
-
-  static func warm() -> (areas: [Area], projects: [Project]) {
-    if !warmed {
-      let ctx = LocalStore.shared.container.mainContext
-      areas = LocalCache.areas(in: ctx)
-      projects = LocalCache.projects(in: ctx)
-      warmed = true
-    }
-    return (areas, projects)
-  }
-
-  static func refresh(areas: [Area], projects: [Project]) {
-    self.areas = areas
-    self.projects = projects
-    warmed = true
-  }
-}
-
 struct TaskListView: View {
   /// Task write-path: applies optimistic SwiftData changes, enqueues
   /// CloudKit-backed ops. Every mutation in this view routes through here
@@ -98,9 +70,9 @@ struct TaskListView: View {
     self.embedded = embedded
     self.excludeProjectedTasks = excludeProjectedTasks
     self.embeddedHeader = { AnyView(embeddedHeader()) }
-    let warm = TaskStructureCache.warm()
-    _areas = State(initialValue: warm.areas)
-    _projects = State(initialValue: warm.projects)
+    let ctx = LocalStore.shared.container.mainContext
+    _areas = State(initialValue: LocalCache.areas(in: ctx))
+    _projects = State(initialValue: LocalCache.projects(in: ctx))
   }
 
   init(
@@ -112,9 +84,9 @@ struct TaskListView: View {
     self.embedded = embedded
     self.excludeProjectedTasks = excludeProjectedTasks
     self.embeddedHeader = { AnyView(EmptyView()) }
-    let warm = TaskStructureCache.warm()
-    _areas = State(initialValue: warm.areas)
-    _projects = State(initialValue: warm.projects)
+    let ctx = LocalStore.shared.container.mainContext
+    _areas = State(initialValue: LocalCache.areas(in: ctx))
+    _projects = State(initialValue: LocalCache.projects(in: ctx))
   }
 
   private var items: [SeptenaTask] {
@@ -203,12 +175,20 @@ struct TaskListView: View {
     }
   }
 
-  // Task editor — `EditTaskSheet` hosted by `.adaptiveDetail` (bottom sheet on
-  // iPhone, docked inspector on iPad/macOS), the same chrome every other
-  // section uses. `editingTask` drives the edit presentation; `creating` the
-  // new-task presentation (⌘N / + button).
-  @State private var editingTask: SeptenaTask?
-  @State private var creating = false
+  // Inline new-task entry
+  /// Tracks a task created via ⌘N (or the toolbar + button) so that
+  /// committing/cancelling an empty title deletes it — the editor flow
+  /// is the new-task flow, no leftover drafts.
+  @State private var newlyCreatedTaskId: String? = nil
+
+  // Inline title edit (title only; everything else lives in the detail drawer)
+  @State private var editingTaskId: String?
+  @State private var editingTitle = ""
+
+  // Full edit drawer (notes + metadata), opened by the row's (i) button.
+  // Hosted by `.adaptiveDetail` — sheet on iPhone, docked inspector on
+  // iPad/macOS — like every other section's editor.
+  @State private var editingDetail: SeptenaTask?
 
   // When picker. Use a single Identifiable item so the sheet's kind
   // is intrinsic to the presentation — avoids stale-state races where
@@ -311,9 +291,8 @@ struct TaskListView: View {
         applyRecurrence: applyRecurrence,
         multiSelectionIDs: { Array(selection) }
       ))
-      // Edit an existing task. The form persists through the mutator and
-      // calls back so the list reloads.
-      .adaptiveDetail(item: $editingTask) { task in
+      // Full edit drawer (notes + metadata) — opened by a row's (i) button.
+      .adaptiveDetail(item: $editingDetail) { task in
         EditTaskSheet(
           original: task,
           areas: areas,
@@ -321,34 +300,6 @@ struct TaskListView: View {
           onDone: { _ in Task { await load() } }
         )
       }
-      // Create a new task, seeded from the active filter.
-      .adaptiveDetail(isPresented: $creating) {
-        EditTaskSheet(
-          original: nil,
-          areas: areas,
-          projects: projects,
-          createDefaults: createDefaults(),
-          onDone: { _ in Task { await load() } }
-        )
-      }
-  }
-
-  /// Default destination/scheduling for a fresh task, derived from the
-  /// filter currently in view (Today → today-pinned, a project view → that
-  /// project, etc.). Mirrors the old `startDraft` seeding.
-  private func createDefaults() -> EditTaskSheet.CreateDefaults {
-    var d = EditTaskSheet.CreateDefaults()
-    let cal = Calendar.current
-    switch filter {
-    case .today:            d.today = true
-    case .upcoming:         d.scheduled = cal.date(byAdding: .day, value: 1,
-                                                   to: cal.startOfDay(for: Date()))
-    case .someday:          d.status = .someday
-    case .project(let pid): d.project = pid
-    case .area(let aid):    d.area = aid
-    default:                break
-    }
-    return d
   }
 
   private var taskList: some View {
@@ -398,16 +349,26 @@ struct TaskListView: View {
     // Apple's pattern (WWDC25 session 323) is `.safeAreaInset` + the
     // iOS 26 `.glassEffect()` — not `ToolbarItemGroup(.keyboard)`,
     // which renders as a flat strip flush to the keyboard.
+    #if os(iOS)
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      if let id = editingTaskId, let task = currentTask(id: id) {
+        editorKeyboardAccessory(for: task)
+      } else if !selection.isEmpty {
+        batchActionBar
+      }
+    }
+    #else
     .safeAreaInset(edge: .bottom, spacing: 0) {
       if !selection.isEmpty { batchActionBar }
     }
+    #endif
     .modifier(KeyboardNavigationModifier(
-      isInputMode: editingTask != nil || creating,
+      isInputMode: editingTaskId != nil,
       hasSelection: !selection.isEmpty,
       onReturn: openSelectedForEdit,
       onEscape: { clearSelection() },
       onSpace: toggleSelected,
-      onNewTask: { creating = true },
+      onNewTask: startDraft,
       onToggleToday: toggleTodayForSelected,
       onOpenWhen: openWhenForSelected,
       onOpenDeadline: openDeadlineForSelected,
@@ -448,8 +409,8 @@ struct TaskListView: View {
       sessionDoneIds = []
       settle.cancelAll()
       clearSelection()
-      editingTask = nil
-      creating = false
+      editingTaskId = nil
+      newlyCreatedTaskId = nil
       Task { await load() }
     }
     // Leaving iOS edit mode drops the selection so a stale set doesn't keep
@@ -466,15 +427,15 @@ struct TaskListView: View {
       // flag in the same render cycle, the late-firing onChange sees
       // false and bails instead of creating a duplicate draft.
       guard nav.shouldStartCreating else { return }
-      SeptenaLog.info("[Create] shouldStartCreating observed → open create sheet (via onChange)")
+      SeptenaLog.info("[Create] shouldStartCreating observed → startDraft (via onChange)")
       nav.shouldStartCreating = false
-      creating = true
+      startDraft()
     }
     .onAppear {
       if nav.shouldStartCreating {
-        SeptenaLog.info("[Create] shouldStartCreating consumed on appear → open create sheet")
+        SeptenaLog.info("[Create] shouldStartCreating consumed on appear → startDraft")
         nav.shouldStartCreating = false
-        creating = true
+        startDraft()
       }
     }
   }
@@ -529,7 +490,7 @@ struct TaskListView: View {
     Color.clear
       .frame(minHeight: 96)
       .contentShape(Rectangle())
-      .onTapGesture { clearSelection() }
+      .onTapGesture { dismissInlineEdit() }
       .asListRow()
   }
 
@@ -663,7 +624,7 @@ struct TaskListView: View {
   private func openSelectedForEdit() {
     guard let id = effectiveSelectionId(),
           let t = currentTask(id: id) else { return }
-    editingTask = t
+    startEdit(t)
   }
 
   private func toggleSelected() {
@@ -800,6 +761,7 @@ struct TaskListView: View {
   private func row(_ task: SeptenaTask) -> some View {
     rowContent(task)
       .background(rowBackground(for: task))
+      .a11yAnimation(Theme.Motion.expand, value: editingTaskId == task.id)
       // Drag a row (or the whole selection) to a sidebar area/project to
       // re-home it. `.draggable` pairs with the sidebar's
       // `.dropDestination(for: String.self)`; the explicit preview is a
@@ -870,38 +832,63 @@ struct TaskListView: View {
   }
 
   private func rowContent(_ task: SeptenaTask) -> some View {
+    let editing = editingTaskId == task.id
     return TaskRowView(
       task: task,
       filter: filter,
+      isEditing: editing,
       accent: theme.accent,
+      editingTitle: $editingTitle,
       metaLine: { metaLine(task) },
       trailingDate: { trailingDate(task) },
-      onToggle: { toggle(task) }
+      onToggle: { toggle(task) },
+      onCommit: { commitEdit() },
+      onCancel: {
+        let id = editingTaskId
+        let title = editingTitle.trimmingCharacters(in: .whitespaces)
+        let wasNew = (id != nil && id == newlyCreatedTaskId)
+        editingTaskId = nil
+        newlyCreatedTaskId = nil
+        // Esc on a fresh ⌘N task with an empty title → delete the stub.
+        if wasNew && title.isEmpty, let id {
+          mutator.delete(id: id)
+          removeLocally(id: id)
+        }
+      },
+      // (i) button → commit the inline rename, then open the full drawer
+      // seeded with the just-typed title (so it doesn't show a stale one).
+      onOpenDetail: {
+        var detail = task
+        let typed = editingTitle.trimmingCharacters(in: .whitespaces)
+        if !typed.isEmpty { detail.title = typed }
+        commitEdit()
+        editingDetail = detail
+      }
     )
     // Fade on insert/removal. The fade only plays inside an animated
     // transaction; every settle-driven removal runs through `motion.run`, so
     // Reduce Motion still gets an instant (un-animated) drop.
     .transition(.opacity)
-    // iOS: a single tap opens the editor sheet (Things-style). In edit mode the
-    // tap must instead toggle the native selection circle, so we no-op there
-    // and use `simultaneousGesture` so the tap also reaches List's edit-mode
+    // iOS: a single tap opens the editor (Things-style). In edit mode the tap
+    // must instead toggle the native selection circle, so we no-op there and
+    // use `simultaneousGesture` so the tap also reaches List's edit-mode
     // selection handling.
     // macOS: List owns single-click selection, ⌘/⇧-click, and arrows. We add
     // ONLY double-click-to-edit, via `simultaneousGesture` so the gesture
     // doesn't consume the single click List needs for selection.
     #if os(iOS)
     .simultaneousGesture(SpatialTapGesture().onEnded { value in
-      guard !isEditMode else { return }
+      guard !editing && !isEditMode else { return }
       // A tap on the leading checkbox is a completion toggle, NOT an edit —
       // the checkbox Button handles it. Because this gesture is simultaneous
-      // it would otherwise also fire and open the editor on every check.
+      // it would otherwise also fire and pop the editor open on every check.
       // Skip the checkbox hit region (leading hPadding + tap target).
       if value.location.x < Theme.hPadding + Theme.checkboxTap { return }
-      editingTask = task
+      startEdit(task)
     })
     #else
     .simultaneousGesture(TapGesture(count: 2).onEnded {
-      editingTask = task
+      if !editing { startEdit(task) }
     })
     #endif
     // Right-click selects this row (unless already part of a multi-selection)
@@ -1020,7 +1007,7 @@ struct TaskListView: View {
   /// appear) but with no selection binding, so no selection circles show.
   private func toggleReorder() {
     let entering = !isReordering
-    editingTask = nil
+    editingTaskId = nil
     selection.removeAll()
     isReordering = entering
     editMode?.wrappedValue = entering ? .active : .inactive
@@ -1029,10 +1016,10 @@ struct TaskListView: View {
   #endif
 
   /// Enter multi-select seeded with one row — used by the swipe action and
-  /// the context-menu "Select". On iOS this flips into native edit mode so the
-  /// selection circles appear.
+  /// the context-menu "Select". Commits any inline edit first; on iOS this
+  /// flips into native edit mode so the selection circles appear.
   private func beginSelecting(_ id: String) {
-    editingTask = nil
+    if editingTaskId != nil { commitEdit() }
     #if os(iOS)
     editMode?.wrappedValue = .active
     #endif
@@ -1040,13 +1027,14 @@ struct TaskListView: View {
     Haptics.tick()
   }
 
-  /// Editing-state backplate — a stronger accent fill so the row whose editor
-  /// sheet is open reads as "active". Selection is NOT drawn here on either
-  /// platform: macOS uses List's native selection highlight, iOS the native
-  /// edit-mode circles. Drawing our own would double up on both.
+  /// Editing-state backplate — a stronger accent fill so the row being
+  /// inline-edited reads as "open" while the keyboard accessory acts on it.
+  /// Selection is NOT drawn here on either platform: macOS uses List's native
+  /// selection highlight, iOS the native edit-mode circles. Drawing our own
+  /// would double up on both.
   @ViewBuilder
   private func rowBackground(for task: SeptenaTask) -> some View {
-    let isEditing = editingTask?.id == task.id
+    let isEditing = editingTaskId == task.id
     RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
       .fill(isEditing ? theme.accent.opacity(0.18) : .clear)
       .padding(.horizontal, Theme.hPadding - 6)
@@ -1406,6 +1394,61 @@ struct TaskListView: View {
 
   // MARK: - Keyboard accessory (iOS)
 
+  #if os(iOS)
+  /// Reminders-style floating glass pill that appears above the soft
+  /// keyboard while the inline editor is open. Built with the iOS 26
+  /// `.glassEffect()` + `.safeAreaInset` pattern — not
+  /// `ToolbarItemGroup(.keyboard)`, which renders as a flat strip.
+  @ViewBuilder
+  private func editorKeyboardAccessory(for task: SeptenaTask) -> some View {
+    HStack(spacing: 18) {
+      accessoryChip(systemName: "calendar") {
+        whenSheet = WhenSheet(taskId: task.id, kind: .scheduled)
+      }
+      accessoryChip(systemName: task.isOnToday ? "sun.max.fill" : "sun.max",
+                    tint: task.isOnToday ? .orange : nil) {
+        Haptics.tick()
+        if task.isOnToday { mutator.removeFromToday(id: task.id) }
+        else { mutator.moveToToday(id: task.id, today: true) }
+        Task { await load() }
+      }
+      accessoryChip(systemName: "number") {
+        moveTargetId = task.id; showingMoveSheet = true
+      }
+      accessoryChip(systemName: "flag") {
+        whenSheet = WhenSheet(taskId: task.id, kind: .due)
+      }
+      accessoryChip(systemName: "repeat") {
+        repeatTargetId = task.id; showingRepeatSheet = true
+      }
+    }
+    .padding(.horizontal, 20)
+    .padding(.vertical, 10)
+    .glassEffect(.regular.interactive(), in: .capsule)
+    .padding(.horizontal, 14)
+    .padding(.bottom, 8)
+  }
+
+  @ViewBuilder
+  private func accessoryChip(systemName: String, tint: Color? = nil,
+                             action: @escaping () -> Void) -> some View {
+    Button {
+      Haptics.pick()
+      // Commit any in-flight title/notes draft so the picker reads
+      // fresh state.
+      if editingTaskId != nil { commitEdit() }
+      action()
+    } label: {
+      Image(systemName: systemName)
+        .scaledFont(size: 20, weight: .regular)
+        .foregroundStyle(tint ?? Theme.inkPrimary)
+        .frame(width: 36, height: 36)
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+  }
+  #endif
+
   /// Floating glass pill shown while a multi-select session is active.
   /// Sources its actions from `rowActionsMenu(target: .bulk(...))` so the
   /// batch surface and the per-row context menu never drift apart.
@@ -1435,6 +1478,126 @@ struct TaskListView: View {
     #endif
     .padding(.horizontal, 14)
     .padding(.bottom, 8)
+  }
+
+  // MARK: - Edit
+
+  private func startEdit(_ task: SeptenaTask) {
+    // If switching from another task, persist the prior draft inline
+    // (no nested withAnimation) so the swap is ONE animation transaction:
+    // editingTaskId stays on the prior id until our withAnimation block
+    // atomically flips title + notes + id together. The previous version
+    // called commitEdit() — which has its own withAnimation setting
+    // editingTaskId = nil — and that intermediate frame let the prior
+    // row's view mode flash into existence between the two transactions.
+    if let priorId = editingTaskId, priorId != task.id {
+      let priorTitle = editingTitle.trimmingCharacters(in: .whitespaces)
+      let wasNew = (newlyCreatedTaskId == priorId)
+      if priorTitle.isEmpty {
+        if wasNew {
+          mutator.delete(id: priorId)
+          removeLocally(id: priorId)
+        }
+      } else {
+        mutator.update(id: priorId, title: priorTitle, notes: nil)
+        Task { await load() }
+      }
+      newlyCreatedTaskId = nil
+    }
+    // Inline editing is title-only and never changes the row's height, so
+    // there's no expand to animate and nothing to race the focus claim — set
+    // the editing state plainly. (Notes + metadata live in the detail drawer.)
+    editingTitle = task.title
+    editingTaskId = task.id
+    // Opening the editor counts as engagement — clear the agent cue.
+    mutator.acknowledge(id: task.id)
+  }
+
+  private func commitEdit() {
+    guard let id = editingTaskId else {
+      SeptenaLog.info("[Edit] commitEdit called but editingTaskId=nil — no-op")
+      return
+    }
+    let t = editingTitle.trimmingCharacters(in: .whitespaces)
+    let wasNew = (newlyCreatedTaskId == id)
+    SeptenaLog.info("[Edit] commitEdit id=\(id) wasNew=\(wasNew)")
+    editingTaskId = nil   // plain; collapse animates via the row's .a11yAnimation
+    newlyCreatedTaskId = nil
+    if t.isEmpty {
+      // Empty title: delete the task if it was a fresh ⌘N draft;
+      // otherwise leave it alone (existing tasks shouldn't vanish just
+      // because the user blurred while the field was empty).
+      if wasNew {
+        SeptenaLog.info("[Edit] commitEdit empty+new → deleting placeholder id=\(id)")
+        mutator.delete(id: id)
+        removeLocally(id: id)
+      } else {
+        SeptenaLog.info("[Edit] commitEdit empty+existing → leaving alone id=\(id)")
+      }
+      return
+    }
+    SeptenaLog.info("[Edit] commitEdit → mutator.update id=\(id) title=\"\(t)\"")
+    // Patch the in-memory bucket synchronously so the static row re-renders
+    // with the new title in the same frame as editingTaskId clears.
+    // `mutator.update` mutates SwiftData asynchronously and `await load()`
+    // re-pulls into `items` — without this poke the row briefly paints the
+    // placeholder ("New To-Do") between commit and load completion.
+    updateLocally(id: id, title: t)
+    mutator.update(id: id, title: t, notes: nil)
+    Task { await load() }
+  }
+
+  /// Tap-outside dismiss — commits any active inline edit AND clears the
+  /// keyboard-cursor selection so the accent pill goes away when the
+  /// user clicks empty space.
+  private func dismissInlineEdit() {
+    if editingTaskId != nil { commitEdit() }
+    clearSelection()
+  }
+
+  // MARK: - Create
+
+  private func startDraft() {
+    // Create the new task server-side immediately, then open it in the
+    // standard inline editor. Empty-title commit/cancel deletes the
+    // task so the user isn't punished for hitting ⌘N speculatively.
+    var scheduled: Date?
+    var project: String?
+    var area: String?
+    var today = false
+    var status: String? = nil
+
+    let cal = Calendar.current
+    let tomorrow = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: Date()))
+
+    switch filter {
+    case .today:            today = true
+    case .upcoming:         scheduled = tomorrow
+    case .someday:          status = "someday"
+    case .project(let pid): project = pid
+    case .area(let aid):    area = aid
+    default:                break
+    }
+
+    // Optimistic: TaskMutator inserts a SwiftData row with a client UUID
+    // and queues the server push. Returns the new task immediately so
+    // the inline editor opens without a network round-trip.
+    //   - empty title → delete (handled in commitEdit / onCancel)
+    //   - non-empty → first CK push happens via commitEdit's update,
+    //     so other devices see one event with the real title rather
+    //     than a "New To-Do" placeholder followed by a rename.
+    SeptenaLog.info("[Create] startDraft filter=\(String(describing: filter)) area=\(area ?? "nil") project=\(project ?? "nil") today=\(today)")
+    let created = mutator.create(
+      title: "New To-Do", area: area, project: project,
+      scheduled: scheduled, due: nil, today: today, notes: nil, status: status,
+      deferPush: true
+    )
+    SeptenaLog.info("[Create] mutator.create returned id=\(created.id)")
+    insertLocally(created)
+    editingTitle = ""
+    newlyCreatedTaskId = created.id
+    editingTaskId = created.id
+    SeptenaLog.info("[Create] editingTaskId set id=\(created.id) — inline editor opens")
   }
 
   // MARK: - When picker apply
@@ -1530,6 +1693,26 @@ struct TaskListView: View {
     drop(&items); drop(&review); drop(&doneToday)
   }
 
+  /// Inverse of `removeLocally` — paired with `TaskMutator.create(...)`.
+  /// Inserts the freshly-minted task at the top of `items` so the inline
+  /// editor mounts on a visible row.
+  private func insertLocally(_ task: SeptenaTask) {
+    items.insert(task, at: 0)
+  }
+
+  /// Patch the title/notes of a task in the in-memory buckets so the
+  /// static row re-renders with the new content immediately after commit
+  /// — without waiting for the async `await load()` to repaint from
+  /// LocalCache. Paired with `TaskMutator.update(...)`.
+  private func updateLocally(id: String, title: String) {
+    func apply(_ list: inout [SeptenaTask]) {
+      if let i = list.firstIndex(where: { $0.id == id }) {
+        list[i].title = title
+      }
+    }
+    apply(&items); apply(&review); apply(&doneToday)
+  }
+
   // MARK: - Manual reorder (drag-and-drop)
 
   #if os(iOS)
@@ -1612,14 +1795,7 @@ struct TaskListView: View {
     // clears these out. We do NOT cancelAll() here for the same reason.
     let freshIDs = Set(local.map(\.id))
     let lingering = prior.filter { settle.isSettling($0.id) && !freshIDs.contains($0.id) }
-    // Re-home each mid-settle row at the spot it already held, so a completed
-    // task fades in place instead of jumping to the bottom of the list.
-    var merged = local
-    for task in lingering {
-      let at = min(prior.firstIndex { $0.id == task.id } ?? merged.count, merged.count)
-      merged.insert(task, at: at)
-    }
-    items = merged
+    items = local + lingering
     review = []
     doneToday = []
     loadedFilters.insert(filter)
@@ -1627,9 +1803,6 @@ struct TaskListView: View {
     // the local cache is authoritative — no network round-trip needed.
     projects = LocalCache.projects(in: modelContext)
     areas = LocalCache.areas(in: modelContext)
-    // Keep the process-wide warm cache fresh so the next section navigation
-    // seeds instantly from these values instead of re-querying SwiftData.
-    TaskStructureCache.refresh(areas: areas, projects: projects)
     // Refresh the inbox suggestion engine from local data. LocalCache
     // returns every status, so the engine sees the full corpus for
     // ranking.
