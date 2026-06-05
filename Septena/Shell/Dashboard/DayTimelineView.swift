@@ -254,6 +254,10 @@ struct DayTimelineView: View {
     let w = max(8, pct(b.endHour - b.startHour + windowStart) * width / 100)
     return RoundedRectangle(cornerRadius: 3, style: .continuous)
       .fill(b.color)
+      .overlay(
+        RoundedRectangle(cornerRadius: 3, style: .continuous)
+          .stroke(Theme.paperBackground, lineWidth: 1)
+      )
       .frame(width: w, height: b.thin ? 3 : 6)
       .frame(maxHeight: .infinity)
       .position(x: x + w / 2, y: 14)
