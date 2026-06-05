@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "  ↳ %@" : {
+
+    },
     "·" : {
       "shouldTranslate" : false
     },
@@ -524,6 +527,26 @@
         }
       }
     },
+    "Activated · Negative" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ativado · Negativo"
+          }
+        }
+      }
+    },
+    "Activated · Positive" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ativado · Positivo"
+          }
+        }
+      }
+    },
     "Activity tracking runs on iPhone / iPad. Open Septena there to see steps and recovery metrics." : {
       "localizations" : {
         "pt-BR" : {
@@ -600,6 +623,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Após a conclusão"
+          }
+        }
+      }
+    },
+    "Afternoon" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarde"
+          }
+        }
+      }
+    },
+    "Alcohol" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Álcool"
           }
         }
       }
@@ -862,6 +905,16 @@
         }
       }
     },
+    "Carbs" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carboidratos"
+          }
+        }
+      }
+    },
     "Carry over missed doses" : {
       "localizations" : {
         "pt-BR" : {
@@ -878,6 +931,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Transferir hábitos perdidos"
+          }
+        }
+      }
+    },
+    "Cholesterol" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Colesterol"
           }
         }
       }
@@ -1254,6 +1317,16 @@
         }
       }
     },
+    "Dry" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seco"
+          }
+        }
+      }
+    },
     "Each brief teaches a model how to use one section through the MCP — tools available, conventions, examples." : {
       "localizations" : {
         "pt-BR" : {
@@ -1294,12 +1367,32 @@
         }
       }
     },
+    "Evening" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noite"
+          }
+        }
+      }
+    },
     "Every" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "A cada"
+          }
+        }
+      }
+    },
+    "Every %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Every %1$@ %2$@"
           }
         }
       }
@@ -1374,6 +1467,36 @@
         }
       }
     },
+    "Fasting" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jejum"
+          }
+        }
+      }
+    },
+    "Fat" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gordura"
+          }
+        }
+      }
+    },
+    "Fiber" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fibra"
+          }
+        }
+      }
+    },
     "Fill four short quadrants. Septena uses the on-device model to draft a north-star goal and commitments you can save into Goals." : {
       "localizations" : {
         "pt-BR" : {
@@ -1383,6 +1506,12 @@
           }
         }
       }
+    },
+    "Find what actually moves your day — which habits, inputs, and routines track with better sleep, mood, recovery, and more. Real correlations across everything you log, computed privately on-device." : {
+
+    },
+    "Find what moves your sleep, mood, and more →" : {
+
     },
     "Fix by creating the missing record (CloudKit Console → Create New Record) with recordName matching the referenced id." : {
       "localizations" : {
@@ -1450,6 +1579,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lembretes gentis para marcar o que você fez — hábitos, tarefas, hidratação, hora de dormir. Eles disparam por volta do horário em que você costuma registrar e ficam quietos depois de concluído. Veja tudo o que está agendado — e ative ou desative avisos individuais — em Notificações Agendadas."
+          }
+        }
+      }
+    },
+    "Goals" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Metas"
+          }
+        }
+      }
+    },
+    "Good afternoon" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Boa tarde"
+          }
+        }
+      }
+    },
+    "Good evening" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Boa noite"
+          }
+        }
+      }
+    },
+    "Good morning" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bom dia"
           }
         }
       }
@@ -1530,6 +1699,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Oculta esta seção em todos os lugares. Seus dados e personalizações permanecem."
+          }
+        }
+      }
+    },
+    "High Energy, Pleasant" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muita energia, agradável"
+          }
+        }
+      }
+    },
+    "High Energy, Unpleasant" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muita energia, desagradável"
           }
         }
       }
@@ -1672,6 +1861,9 @@
         }
       }
     },
+    "Insights" : {
+
+    },
     "Insufficient pairs (1 ≤ n < %@ overlapping days) are too noisy to chart but listed here so you can see what's almost ready." : {
       "localizations" : {
         "pt-BR" : {
@@ -1728,6 +1920,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ir para Hoje"
+          }
+        }
+      }
+    },
+    "Kcal" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kcal"
           }
         }
       }
@@ -1791,6 +1993,9 @@
         }
       }
     },
+    "Layout picks how the homepage renders — Histogram, Sparkline, or Heatmap. Insights tunes the cross-section correlation explorer." : {
+
+    },
     "Let Claude read and write your Septena data at mcp.septena.app." : {
       "localizations" : {
         "pt-BR" : {
@@ -1847,6 +2052,26 @@
         }
       }
     },
+    "Low Energy, Pleasant" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pouca energia, agradável"
+          }
+        }
+      }
+    },
+    "Low Energy, Unpleasant" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pouca energia, desagradável"
+          }
+        }
+      }
+    },
     "Macro tiles" : {
       "localizations" : {
         "pt-BR" : {
@@ -1893,6 +2118,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Métrica"
+          }
+        }
+      }
+    },
+    "Minimal" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Minimalista"
           }
         }
       }
@@ -1950,6 +2185,16 @@
         }
       }
     },
+    "Morning" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manhã"
+          }
+        }
+      }
+    },
     "n < %@ — too noisy to plot" : {
       "localizations" : {
         "pt-BR" : {
@@ -1969,6 +2214,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Novas entradas que você registrar no Septena serão enviadas ao Apple Health. As entradas existentes não são preenchidas retroativamente."
+          }
+        }
+      }
+    },
+    "Next" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próximo"
           }
         }
       }
@@ -2393,6 +2648,7 @@
       }
     },
     "Pick how the homepage renders — Histogram, Sparkline, Heatmap, or Correlations." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -2418,6 +2674,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Escolha quais calendários contribuem com eventos para a linha do tempo do seu dia e a página Próximo. Calendários ocultos permanecem intactos no Calendário do iOS."
+          }
+        }
+      }
+    },
+    "Potassium" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Potássio"
           }
         }
       }
@@ -2455,6 +2721,16 @@
         }
       }
     },
+    "Protein" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proteína"
+          }
+        }
+      }
+    },
     "Provide JSON in the Septena export format. Records are merged by id — existing rows update in place, new rows are inserted. Definition tables (habits, supplements, chores, beans, grocery items) apply now; event/log tables preview only in this build." : {
       "localizations" : {
         "pt-BR" : {
@@ -2471,6 +2747,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Quieto"
+          }
+        }
+      }
+    },
+    "Quiet · Negative" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quieto · Negativo"
+          }
+        }
+      }
+    },
+    "Quiet · Positive" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quieto · Positivo"
           }
         }
       }
@@ -2607,6 +2903,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Revise seus valores"
+          }
+        }
+      }
+    },
+    "Saturated Fat" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gordura saturada"
           }
         }
       }
@@ -2932,6 +3238,16 @@
         }
       }
     },
+    "Sodium" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sódio"
+          }
+        }
+      }
+    },
     "Some categories are turned off in Apple Health. To allow them, open Health → Profile → Apps → Septena. New entries are sent going forward — existing ones aren't back-filled." : {
       "localizations" : {
         "pt-BR" : {
@@ -2978,6 +3294,19 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Estresse"
+          }
+        }
+      }
+    },
+    "Strongest trusted signal · tap to explore" : {
+
+    },
+    "Sugar" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Açúcar"
           }
         }
       }
@@ -3108,6 +3437,16 @@
         }
       }
     },
+    "Tasks" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarefas"
+          }
+        }
+      }
+    },
     "Tasks in this project keep their data but lose their project link." : {
       "localizations" : {
         "pt-BR" : {
@@ -3167,6 +3506,9 @@
           }
         }
       }
+    },
+    "The little celebration that plays when you log something — confetti, ripples, a streak landing. Off keeps the confirming haptic but skips the motion. Reduce Motion always overrides this." : {
+
     },
     "The master switch. Each nudge fires around when you usually log it and goes quiet once it's marked for the day." : {
       "localizations" : {
@@ -3393,6 +3735,9 @@
         }
       }
     },
+    "Unlock with Septena+" : {
+
+    },
     "Upgrade to %@" : {
       "localizations" : {
         "pt-BR" : {
@@ -3445,6 +3790,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ACORDAR"
+          }
+        }
+      }
+    },
+    "Warm" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Caloroso"
+          }
+        }
+      }
+    },
+    "Water" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Água"
           }
         }
       }
@@ -3609,336 +3974,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Δ = média com − média sem"
-          }
-        }
-      }
-    },
-    "Next" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Próximo"
-          }
-        }
-      }
-    },
-    "Tasks" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tarefas"
-          }
-        }
-      }
-    },
-    "Goals" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Metas"
-          }
-        }
-      }
-    },
-    "Good morning" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bom dia"
-          }
-        }
-      }
-    },
-    "Good afternoon" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Boa tarde"
-          }
-        }
-      }
-    },
-    "Good evening" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Boa noite"
-          }
-        }
-      }
-    },
-    "Warm" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Caloroso"
-          }
-        }
-      }
-    },
-    "Dry" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seco"
-          }
-        }
-      }
-    },
-    "Minimal" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Minimalista"
-          }
-        }
-      }
-    },
-    "Morning" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Manhã"
-          }
-        }
-      }
-    },
-    "Afternoon" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tarde"
-          }
-        }
-      }
-    },
-    "Evening" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Noite"
-          }
-        }
-      }
-    },
-    "High Energy, Pleasant" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Muita energia, agradável"
-          }
-        }
-      }
-    },
-    "High Energy, Unpleasant" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Muita energia, desagradável"
-          }
-        }
-      }
-    },
-    "Low Energy, Unpleasant" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pouca energia, desagradável"
-          }
-        }
-      }
-    },
-    "Low Energy, Pleasant" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pouca energia, agradável"
-          }
-        }
-      }
-    },
-    "Activated · Positive" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ativado · Positivo"
-          }
-        }
-      }
-    },
-    "Activated · Negative" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ativado · Negativo"
-          }
-        }
-      }
-    },
-    "Quiet · Negative" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Quieto · Negativo"
-          }
-        }
-      }
-    },
-    "Quiet · Positive" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Quieto · Positivo"
-          }
-        }
-      }
-    },
-    "Protein" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Proteína"
-          }
-        }
-      }
-    },
-    "Fat" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gordura"
-          }
-        }
-      }
-    },
-    "Saturated Fat" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gordura saturada"
-          }
-        }
-      }
-    },
-    "Carbs" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Carboidratos"
-          }
-        }
-      }
-    },
-    "Sugar" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Açúcar"
-          }
-        }
-      }
-    },
-    "Fiber" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fibra"
-          }
-        }
-      }
-    },
-    "Alcohol" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Álcool"
-          }
-        }
-      }
-    },
-    "Kcal" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kcal"
-          }
-        }
-      }
-    },
-    "Sodium" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sódio"
-          }
-        }
-      }
-    },
-    "Cholesterol" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Colesterol"
-          }
-        }
-      }
-    },
-    "Potassium" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Potássio"
-          }
-        }
-      }
-    },
-    "Water" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Água"
-          }
-        }
-      }
-    },
-    "Fasting" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Jejum"
           }
         }
       }
