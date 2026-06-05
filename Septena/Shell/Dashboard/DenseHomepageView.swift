@@ -13,6 +13,12 @@ import Charts
 ///
 /// The whole row is one tap target. Domains with no data render
 /// "—" instead of a sparkline so the row stays the same height.
+///
+/// On wide iPad (> 900pt): 4-column card grid.
+/// On portrait iPad (550–900pt): 3-column card grid.
+/// On iPhone / compact: original full-width list.
+/// Mirrors `HeatmapHomepageView`'s width-probe → column-count approach
+/// so all wide-screen layout modes reflow into tiles consistently.
 struct DenseHomepageView<MenuContent: View>: View {
   let items: [HomepageDomainData]
   let onTap: (DomainTapAction) -> Void
@@ -22,25 +28,75 @@ struct DenseHomepageView<MenuContent: View>: View {
   /// body, activity) and the menu is silently suppressed.
   @ViewBuilder let menuContent: (HomepageDomain) -> MenuContent
 
+  /// Measured at render time via a 0-height probe in the VStack below.
+  /// Starts at 0; `hSize` guards against showing the grid on first
+  /// render on iPhone.
+  @State private var containerWidth: CGFloat = 0
+  @Environment(\.horizontalSizeClass) private var hSize
+
+  private var gridColumnCount: Int {
+    // On compact (iPhone), always use the list layout regardless of width.
+    guard hSize == .regular else { return 1 }
+    // Default to 3 on first render (containerWidth == 0) so iPad shows a
+    // grid immediately; refines to 4 once the width probe fires for landscape.
+    if containerWidth > 900 { return 4 }
+    return 3
+  }
+
+  private var gridColumns: [GridItem] {
+    Array(repeating: GridItem(.flexible(), spacing: 12), count: gridColumnCount)
+  }
+
   var body: some View {
     VStack(spacing: 0) {
-      ForEach(Array(items.enumerated()), id: \.element.domain) { idx, item in
-        Button {
-          onTap(item.tap)
-        } label: {
-          DenseDomainRow(data: item)
-        }
-        .buttonStyle(.plain)
-        .contextMenu { menuContent(item.domain) }
+      // Zero-height width probe — see `HeatmapHomepageView` for the
+      // rationale: a real (non-Group) view is needed to give the
+      // background GeometryReader a concrete frame to measure.
+      Color.clear
+        .frame(maxWidth: .infinity, maxHeight: 0)
+        .background(
+          GeometryReader { geo in
+            Color.clear.preference(key: DenseContainerWidthKey.self, value: geo.size.width)
+          }
+        )
+        .onPreferenceChange(DenseContainerWidthKey.self) { containerWidth = $0 }
 
-        if idx < items.count - 1 {
-          Divider().padding(.leading, 56)
+      if gridColumnCount > 1 {
+        LazyVGrid(columns: gridColumns, spacing: 12) {
+          ForEach(items, id: \.domain) { item in
+            Button { onTap(item.tap) } label: {
+              DenseDomainCard(data: item)
+            }
+            .buttonStyle(.plain)
+            .contextMenu { menuContent(item.domain) }
+          }
         }
+      } else {
+        VStack(spacing: 0) {
+          ForEach(Array(items.enumerated()), id: \.element.domain) { idx, item in
+            Button {
+              onTap(item.tap)
+            } label: {
+              DenseDomainRow(data: item)
+            }
+            .buttonStyle(.plain)
+            .contextMenu { menuContent(item.domain) }
+
+            if idx < items.count - 1 {
+              Divider().padding(.leading, 56)
+            }
+          }
+        }
+        .background(Theme.cardSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
       }
     }
-    .background(Theme.cardSurface)
-    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
   }
+}
+
+private struct DenseContainerWidthKey: PreferenceKey {
+  static let defaultValue: CGFloat = 0
+  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
 
 /// Single row in the Dense layout. Pure presentation — all data is in
@@ -78,6 +134,45 @@ private struct DenseDomainRow: View {
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 10)
+    .contentShape(Rectangle())
+  }
+}
+
+/// Card variant used in the multi-column iPad grid. Icon + title +
+/// headline stack above a full-width sparkline so the grid cells stay
+/// readable — mirrors `HeatmapDomainCard`'s structure for the heatmap
+/// grid, swapping the heatmap strip for the dense sparkline.
+private struct DenseDomainCard: View {
+  let data: HomepageDomainData
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      HStack(spacing: 8) {
+        SectionGlyph(icon: SectionManifest.byKey[data.domain.rawValue]?.iconSymbol ?? "circle.fill",
+                     accent: data.accent)
+        Text(data.title)
+          .font(.subheadline.weight(.semibold))
+          .foregroundStyle(.primary)
+          .lineLimit(1)
+        Spacer(minLength: 0)
+      }
+      Text(data.headline)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .lineLimit(2)
+        .fixedSize(horizontal: false, vertical: true)
+      DomainSparkline(history: data.history,
+                      accent: data.accent,
+                      smooth: data.smoothSparkline,
+                      dropTrailingTodayPending: data.trailingTodayPending,
+                      autoscale: data.autoscaleSparkline)
+        .frame(maxWidth: .infinity)
+        .frame(height: 40)
+    }
+    .padding(12)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(Theme.cardSurface)
+    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     .contentShape(Rectangle())
   }
 }

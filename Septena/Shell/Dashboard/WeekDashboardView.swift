@@ -74,6 +74,18 @@ struct WeekDashboardView: View {
   @Environment(\.horizontalSizeClass) private var hSize
   #endif
 
+  /// Live width of the timeline's container, measured below. Drives the
+  /// wide-layout treatment (cap the rail, span the full day) without
+  /// leaning on `horizontalSizeClass` — so a resizable macOS window and a
+  /// narrow iPad split view both get the right call from actual pixels.
+  @State private var timelineWidth: CGFloat = 0
+
+  /// Past this offered width the timeline stops stretching edge-to-edge
+  /// (capped at `timelineMaxWidth`, centered) and shows the whole 0–24h
+  /// day rather than only the wake→bedtime window.
+  private static let wideTimelineThreshold: CGFloat = 600
+  private static let timelineMaxWidth: CGFloat = 760
+
   @State private var dailies = NextItemsModel()
   @State private var habitHistory: [Int] = Array(repeating: 0, count: 90)
   @State private var choreHistory: [Int] = Array(repeating: 0, count: 90)
@@ -881,7 +893,8 @@ struct WeekDashboardView: View {
   // MARK: - Today timeline (single row above the tile grid)
 
   private var todayTimeline: some View {
-    WeekDashboardTimelineCard(
+    let isWide = timelineWidth >= Self.wideTimelineThreshold
+    return WeekDashboardTimelineCard(
       date: clock.today,
       oura: ouraNights.first,
       caffeine: caffeineToday?.entries ?? [],
@@ -895,7 +908,20 @@ struct WeekDashboardView: View {
       training: recentTraining,
       tasks: completedTasks,
       calendar: dailies.calendarEvents,
-      macroColors: macroColors
+      macroColors: macroColors,
+      fullDay: isWide
+    )
+    // Cap the width on wide layouts so the rail doesn't stretch into an
+    // unreadable hairline-per-hour; centered in the VStack. Compact stays
+    // edge-to-edge. `timelineMaxWidth` > `wideTimelineThreshold`, so the
+    // measured-width feedback below settles instead of oscillating.
+    .frame(maxWidth: isWide ? Self.timelineMaxWidth : .infinity)
+    .background(
+      GeometryReader { geo in
+        Color.clear
+          .onAppear { timelineWidth = geo.size.width }
+          .onChange(of: geo.size.width) { _, w in timelineWidth = w }
+      }
     )
     // The timeline is the ambient, read-only glance at today; tapping it
     // routes to Next — the single unified "today page" (things to do up
@@ -2537,6 +2563,7 @@ private struct WeekDashboardTimelineCard: View {
   let tasks: [SeptenaTask]
   let calendar: [EKEvent]
   let macroColors: MacroColors?
+  var fullDay: Bool = false
 
   var body: some View {
     DayTimelineView(
@@ -2553,7 +2580,8 @@ private struct WeekDashboardTimelineCard: View {
       training: training,
       tasks: tasks,
       calendar: calendar,
-      macroColors: macroColors
+      macroColors: macroColors,
+      fullDay: fullDay
     )
     .padding(14)
     .background(

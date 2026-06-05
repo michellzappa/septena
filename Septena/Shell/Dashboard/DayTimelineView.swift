@@ -33,6 +33,10 @@ struct DayTimelineView: View {
   var calendar: [EKEvent] = []
   /// Used to source the fasting band color (`macro_colors.fasting`).
   var macroColors: MacroColors? = nil
+  /// When true, the rail spans the full 0–24h day instead of the
+  /// wake→bedtime window. Wide layouts (iPad/macOS) set this once there's
+  /// room for the whole day; compact stays windowed to keep events legible.
+  var fullDay: Bool = false
 
   @Environment(SectionTheme.self) private var theme
   @Environment(DayClock.self) private var clock
@@ -225,11 +229,13 @@ struct DayTimelineView: View {
     }
   }
 
-  /// Moon visibility — for non-today dates, always show. For today, only
-  /// show once bedtime is "approaching" (within 4h) so the homepage stays
-  /// clean in the morning and only flags bed time as evening sets in.
+  /// Moon visibility. Wide always shows it — the whole daily loop is on
+  /// screen, and bedtime is the bookend. Compact keeps it hidden until
+  /// bedtime is "approaching" (within 4h) so the morning rail stays clean
+  /// and only flags bed time as evening sets in. Non-today: always show.
   private var shouldShowMoon: Bool {
-    guard let moon = moonHour, moon < 24 else { return false }
+    guard let moon = moonHour else { return false }
+    if fullDay { return true }
     if !isToday { return true }
     if nowHour >= moon { return false }       // past bedtime → hide
     return moon - nowHour <= 4
@@ -307,25 +313,34 @@ struct DayTimelineView: View {
 
   /// Use the Oura wake_time as a hint; bedtime hour comes from Oura's own
   /// bedtime when present. Skipping the 14-night median for v1.
+  ///
+  /// A bedtime in the small hours (earlier than wake) belongs to the END
+  /// of this day's loop, not the next morning — so normalize it past 24.
+  /// That keeps a 00:30 bedtime bookending the right edge instead of
+  /// collapsing onto sunrise.
   private var moonHour: Double? {
-    if let bt = oura?.bedtime, let h = parseHHMM(bt) { return h }
-    return nil
+    guard let bt = oura?.bedtime, let h = parseHHMM(bt) else { return nil }
+    return h < (wakeHour ?? 12) ? h + 24 : h
   }
 
   private var windowStart: Double {
-    max(0, (wakeHour ?? 6) - 0.5)
+    if fullDay { return 0 }
+    return max(0, (wakeHour ?? 6) - 0.5)
   }
 
   private var windowEnd: Double {
-    let latest: Double = {
-      var values: [Double] = []
-      if let m = moonHour { values.append(m + 0.5) }
-      if isToday { values.append(nowHour + 0.5) }
-      values.append(latestEventHour + 0.5)
-      values.append(20)
-      return values.max() ?? 24
-    }()
-    return min(24, latest)
+    // Latest hour the rail must keep in view. Bedtime is part of the daily
+    // loop, so it always counts — even normalized past midnight.
+    var values: [Double] = [20]
+    if let m = moonHour { values.append(m + 0.5) }
+    if isToday { values.append(nowHour + 0.5) }
+    values.append(latestEventHour + 0.5)
+    let latest = values.max() ?? 24
+    // Wide: show the whole loop end-to-end, stretching past 24 only when
+    // bedtime runs into the small hours. Compact: crop toward now, but
+    // never clip bedtime off the right edge.
+    if fullDay { return max(24, latest) }
+    return min(max(24, (moonHour ?? 0) + 0.5), latest)
   }
 
   private var windowSpan: Double { max(1, windowEnd - windowStart) }
