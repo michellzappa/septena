@@ -85,8 +85,8 @@ struct NextItemRow: View {
           .lineLimit(1)
           .strikethrough(done)
           .foregroundStyle(done ? .secondary : .primary)
-        if let sub = item.subtitle, !sub.isEmpty {
-          Text(sub)
+        if hasSubtitle {
+          Text(item.subtitle!)
             .font(.caption2)
             .foregroundStyle(.secondary)
             .lineLimit(1)
@@ -101,7 +101,14 @@ struct NextItemRow: View {
           .foregroundStyle(.red)
       }
     }
-    .padding(.vertical, 1)
+    // Subtitle-less rows would otherwise be noticeably shorter; pad them up
+    // partway toward the two-line height so the list reads more evenly.
+    .padding(.vertical, hasSubtitle ? 1 : 4)
+  }
+
+  private var hasSubtitle: Bool {
+    if let sub = item.subtitle, !sub.isEmpty { return true }
+    return false
   }
 
   private var iconColor: Color {
