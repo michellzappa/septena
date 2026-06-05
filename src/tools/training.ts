@@ -250,16 +250,22 @@ export async function listTrainingEntries(client: CloudKitClient, input: ListTra
   const from = input.date ?? input.from ?? ymdNDaysAgo(13);
   const to   = input.date ?? input.to   ?? todayYMD();
 
-  const records = await queryByDateRange(client, {
+  // `exercise` is an unindexed STRING — pushing EQUALS server-side risks a
+  // CloudKit 400 (same failure mode as the date range). Fetch the date window,
+  // then filter by exercise client-side and slice to `limit`.
+  const limit = input.limit ?? 200;
+  const windowRecords = await queryByDateRange(client, {
     recordType: "ExerciseEntry",
     from,
     to,
-    extraFilters: input.exercise
-      ? [{ fieldName: "exercise", comparator: "EQUALS", fieldValue: { value: input.exercise } }]
-      : undefined,
     timeField: "time",
-    resultsLimit: input.limit ?? 200,
+    resultsLimit: input.exercise ? 5000 : limit,
   });
+  const wanted = input.exercise?.toLowerCase();
+  const records = (wanted
+    ? windowRecords.filter((r) => optStr(r.fields.exercise?.value)?.toLowerCase() === wanted)
+    : windowRecords
+  ).slice(0, limit);
 
   const entries = records.map((r) => ({
     id:          r.recordName.replace(/^exercise-entry:/, ""),

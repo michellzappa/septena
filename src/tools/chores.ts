@@ -1,4 +1,4 @@
-import type { CloudKitClient } from "../cloudkit.js";
+import { queryByDateRange, type CloudKitClient } from "../cloudkit.js";
 
 const SHORTID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 
@@ -153,7 +153,7 @@ export async function listChores(client: CloudKitClient) {
   const today = todayYMD();
   const since = addDays(today, -180);
 
-  const [defsRes, eventsRes] = await Promise.all([
+  const [defsRes, eventRecords] = await Promise.all([
     client.queryRecords({
       recordType: "ChoreDefinition",
       // CK requires at least one filter; `title BEGINS_WITH ""` matches
@@ -162,13 +162,18 @@ export async function listChores(client: CloudKitClient) {
       sortBy: [{ fieldName: "sortIndex", ascending: true }],
       resultsLimit: 200,
     }),
-    client.queryRecords({
+    // ChoreEvent.date is a STRING — CloudKit rejects range comparators on it
+    // (GREATER_THAN_OR_EQUALS → 400), which broke listChores entirely. Use the
+    // shared match-all + client-side window path; computeDueDate re-sorts by
+    // sortKey itself, so server order doesn't matter.
+    queryByDateRange(client, {
       recordType: "ChoreEvent",
-      filterBy: [{ fieldName: "date", comparator: "GREATER_THAN_OR_EQUALS", fieldValue: { value: since } }],
-      sortBy: [{ fieldName: "sortKey", ascending: true }],
-      resultsLimit: 2000,
+      from: since,
+      to: today,
+      resultsLimit: 5000,
     }),
   ]);
+  const eventsRes = { records: eventRecords };
 
   // Group events by choreID
   const eventsByChore = new Map<

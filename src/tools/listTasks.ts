@@ -56,7 +56,11 @@ export async function listTasks(
   // task population and filter client-side using iOS's rules (see
   // Persistence.swift LocalCache.tasks(filter:)).
   const needsClientFilter = view === "today" || view === "inbox" || view === "upcoming";
-  const fetchLimit = needsClientFilter ? 500 : limit;
+  // These views are filtered client-side (today/inbox/upcoming aren't
+  // expressible as one CK query), and the matching tasks often have NO
+  // `scheduled` value (inbox items, today-flagged) so they sort unpredictably.
+  // A capped fetch could leave them outside the page → missing tasks. Pull the
+  // full open-task set, then filter and slice to `limit`.
   const res = await client.queryRecords({
     recordType: "Task",
     filterBy: filtersForView(view),
@@ -64,7 +68,7 @@ export async function listTasks(
       view === "completed"
         ? [{ fieldName: "completedAt", ascending: false }]
         : [{ fieldName: "scheduled", ascending: true }],
-    resultsLimit: fetchLimit,
+    ...(needsClientFilter ? { fetchAll: true } : { resultsLimit: limit }),
   });
 
   let tasks: TaskOut[] = res.records.map((r) => ({
