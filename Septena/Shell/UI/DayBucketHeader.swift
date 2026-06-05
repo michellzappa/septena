@@ -41,9 +41,10 @@ struct DayBucketHeader: View {
   var body: some View {
     HStack(spacing: 8) {
       Image(systemName: iconName)
-        .font(.footnote)
+        .font(.subheadline)
         .foregroundStyle(.secondary)
       Text(parsed?.title ?? bucket.capitalized)
+        .font(.septenaSectionTitle)
       if isCurrent {
         Text("Now")
           .font(.caption2.weight(.semibold))
