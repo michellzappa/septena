@@ -165,12 +165,20 @@ struct CommitFlourish: View {
   /// Increment to fire a fresh run. Same `.task(id:)` contract as
   /// the renderer watches it and replays on each bump.
   let trigger: Int
+  /// When true, ignore the user's "Logging animations" opt-out and always
+  /// render (Reduce Motion is still honored). Set only by the Motion Gallery,
+  /// where the whole point is to feel a motion on demand.
+  var ignoresUserPreference: Bool = false
 
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  /// User opt-out for logging animations (Settings ▸ Customize). Absent → on.
+  /// Suppresses the visual the same way Reduce Motion does; the commit haptic
+  /// + announcement at the call site still confirm the log.
+  @AppStorage(SettingsKey.loggingAnimationsEnabled) private var animationsEnabled = true
 
   var body: some View {
     ZStack {
-      if !reduceMotion {
+      if !reduceMotion && (animationsEnabled || ignoresUserPreference) {
         switch motion {
         case .burst: BurstFlourish(color: accent, intensity: intensity, trigger: trigger)
         case .snap:  SnapFlourish(color: accent, intensity: intensity, trigger: trigger)

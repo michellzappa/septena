@@ -61,10 +61,14 @@ final class LogCommitCenter {
 struct LogCommitOverlay: View {
   @Environment(LogCommitCenter.self) private var center
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  /// User opt-out for logging animations (Settings ▸ Customize). Absent → on.
+  /// Gates the milestone `ignition` here too; the `flourish` case renders
+  /// `CommitFlourish`, which honors the same key on its own.
+  @AppStorage(SettingsKey.loggingAnimationsEnabled) private var animationsEnabled = true
 
   var body: some View {
     ZStack {
-      if !reduceMotion, let style = center.style {
+      if !reduceMotion, animationsEnabled, let style = center.style {
         switch style {
         case .flourish(let motion, let accent, let intensity):
           CommitFlourish(motion: motion, accent: accent,
