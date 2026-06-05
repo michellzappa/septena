@@ -87,3 +87,50 @@ struct SeptenaWidgetsBundle: WidgetBundle {
     NextWidget()
   }
 }
+
+// MARK: - Previews (canvas — flip light/dark with the appearance toggle)
+
+private extension NextEntry {
+  /// Several items across categories, some with more than one open, so the
+  /// per-category rows and count badges are exercised.
+  static var richSample: NextEntry {
+    NextEntry(
+      date: .now,
+      bucket: .afternoon,
+      items: [
+        NextItem(id: "t1", kind: "task",       title: "Reply to the landlord", subtitle: nil, trailing: nil, overdue: true,  sortKey: 0),
+        NextItem(id: "t2", kind: "task",       title: "Book dentist",          subtitle: nil, trailing: nil, overdue: false, sortKey: 1),
+        NextItem(id: "c1", kind: "chore",      title: "Water the plants",      subtitle: nil, trailing: nil, overdue: false, sortKey: 2),
+        NextItem(id: "h1", kind: "habit",      title: "10 min stretch",        subtitle: nil, trailing: nil, overdue: false, sortKey: 3),
+        NextItem(id: "s1", kind: "supplement", title: "Vitamin D",             subtitle: nil, trailing: nil, overdue: false, sortKey: 4),
+        NextItem(id: "s2", kind: "supplement", title: "Magnesium",             subtitle: nil, trailing: nil, overdue: false, sortKey: 5),
+      ]
+    )
+  }
+
+  static var empty: NextEntry {
+    NextEntry(date: .now, bucket: .evening, items: [])
+  }
+}
+
+#Preview("Small", as: .systemSmall) { NextWidget() } timeline: {
+  NextEntry.richSample
+  NextEntry.empty
+}
+
+#Preview("Medium", as: .systemMedium) { NextWidget() } timeline: {
+  NextEntry.richSample
+  NextEntry.empty
+}
+
+#Preview("Rectangular", as: .accessoryRectangular) { NextWidget() } timeline: {
+  NextEntry.richSample
+}
+
+#Preview("Inline", as: .accessoryInline) { NextWidget() } timeline: {
+  NextEntry.richSample
+}
+
+#Preview("Circular", as: .accessoryCircular) { NextWidget() } timeline: {
+  NextEntry.richSample
+}

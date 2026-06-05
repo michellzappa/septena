@@ -49,76 +49,68 @@ struct NextWidgetView: View {
   }
 }
 
-// MARK: - "more" phrasing shared across families
+// MARK: - Category model — the next item in each open category
 
-/// "+2 more" / "+1 more" / nil when the hero item is the only one.
-private func moreText(_ entry: NextEntry) -> String? {
-  let more = entry.remaining - 1
-  guard more > 0 else { return nil }
-  return "+\(more) more"
+/// One open category (tasks / chores / habits / …) reduced to its next item
+/// plus how many remain in it. Built from the bucket-filtered flat feed, in the
+/// feed's existing section order.
+private struct NextCategory: Identifiable {
+  let kind: String
+  let title: String   // the next item's title
+  let count: Int      // open items in this category (current bucket)
+  let overdue: Bool   // is the next item overdue
+  var id: String { kind }
 }
 
-// MARK: - Home Screen: small — one hero item
+private func categories(_ items: [NextItem]) -> [NextCategory] {
+  var order: [String] = []
+  var byKind: [String: [NextItem]] = [:]
+  for item in items {
+    if byKind[item.kind] == nil { order.append(item.kind) }
+    byKind[item.kind, default: []].append(item)
+  }
+  return order.map { kind in
+    let group = byKind[kind]!
+    return NextCategory(kind: kind, title: group[0].title, count: group.count, overdue: group[0].overdue)
+  }
+}
+
+// MARK: - Home Screen: small — top categories
 
 private struct SmallView: View {
   let entry: NextEntry
+  private var cats: [NextCategory] { categories(entry.items) }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      BucketEyebrow(bucket: entry.bucket)
-      Spacer(minLength: 6)
-      if let next = entry.first {
-        Text(next.title)
-          .font(.title3.weight(.semibold))
-          .foregroundStyle(next.overdue ? Color.red : Color.primary)
-          .lineLimit(3)
-      } else {
+    VStack(alignment: .leading, spacing: 7) {
+      Header(bucket: entry.bucket, total: entry.remaining)
+      if cats.isEmpty {
+        Spacer(minLength: 0)
         AllDone()
-      }
-      Spacer(minLength: 6)
-      if let more = moreText(entry) {
-        Text(more)
-          .font(.caption)
-          .foregroundStyle(.secondary)
+        Spacer(minLength: 0)
+      } else {
+        ForEach(cats.prefix(3)) { CategoryRow(cat: $0, compact: true) }
+        Spacer(minLength: 0)
       }
     }
   }
 }
 
-// MARK: - Home Screen: medium — hero item + a hint of what's after
+// MARK: - Home Screen: medium — one row per open category
 
 private struct MediumView: View {
   let entry: NextEntry
+  private var cats: [NextCategory] { categories(entry.items) }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      BucketEyebrow(bucket: entry.bucket)
-
-      if let next = entry.first {
-        VStack(alignment: .leading, spacing: 3) {
-          Text(next.title)
-            .font(.title2.weight(.bold))
-            .foregroundStyle(next.overdue ? Color.red : Color.primary)
-            .lineLimit(2)
-          if let trailing = next.trailing, !trailing.isEmpty {
-            Text(trailing)
-              .font(.subheadline)
-              .foregroundStyle(.secondary)
-          }
-        }
-        Spacer(minLength: 0)
-        // One step of look-ahead — keeps the focus on "next" while hinting
-        // continuity, without becoming a checklist.
-        if entry.items.count > 1 {
-          let after = entry.items[1]
-          (Text("Then  ").foregroundStyle(.tertiary)
-            + Text(after.title).foregroundStyle(.secondary))
-            .font(.subheadline)
-            .lineLimit(1)
-        }
-      } else {
+    VStack(alignment: .leading, spacing: 9) {
+      Header(bucket: entry.bucket, total: entry.remaining)
+      if cats.isEmpty {
         Spacer(minLength: 0)
         AllDone()
+        Spacer(minLength: 0)
+      } else {
+        ForEach(cats.prefix(4)) { CategoryRow(cat: $0, compact: false) }
         Spacer(minLength: 0)
       }
     }
@@ -127,13 +119,43 @@ private struct MediumView: View {
 
 // MARK: - Shared home-screen pieces
 
-private struct BucketEyebrow: View {
+private struct Header: View {
   let bucket: DayBucket
+  let total: Int
 
   var body: some View {
-    Text("NEXT · \(bucket.title.uppercased())")
-      .font(.caption2.weight(.semibold))
-      .foregroundStyle(.secondary)
+    HStack(spacing: 5) {
+      Image(systemName: bucket.icon)
+      Text(bucket.title.uppercased())
+      Spacer()
+      Text("\(total) left")
+    }
+    .font(.caption2.weight(.semibold))
+    .foregroundStyle(.secondary)
+  }
+}
+
+private struct CategoryRow: View {
+  let cat: NextCategory
+  let compact: Bool
+
+  var body: some View {
+    HStack(spacing: 8) {
+      Image(systemName: kindIcon(cat.kind))
+        .font(compact ? .footnote : .callout)
+        .foregroundStyle(.secondary)
+        .frame(width: compact ? 16 : 20)
+      Text(cat.title)
+        .font(compact ? .footnote.weight(.medium) : .subheadline.weight(.medium))
+        .foregroundStyle(cat.overdue ? Color.red : Color.primary)
+        .lineLimit(1)
+      Spacer(minLength: 4)
+      if cat.count > 1 {
+        Text("\(cat.count)")
+          .font(.caption2.weight(.semibold).monospacedDigit())
+          .foregroundStyle(.secondary)
+      }
+    }
   }
 }
 
@@ -149,25 +171,24 @@ private struct AllDone: View {
 
 private struct RectangularView: View {
   let entry: NextEntry
+  private var cats: [NextCategory] { categories(entry.items) }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 2) {
       Text("NEXT · \(entry.bucket.title.uppercased())")
         .font(.caption2.weight(.semibold))
         .foregroundStyle(.secondary)
-      if let next = entry.first {
-        Text(next.title)
-          .font(.caption.weight(.medium))
-          .lineLimit(2)
-        if let more = moreText(entry) {
-          Text(more)
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-        }
-      } else {
+      if cats.isEmpty {
         Text("All done")
           .font(.caption)
           .foregroundStyle(.secondary)
+      } else {
+        ForEach(cats.prefix(2)) { cat in
+          HStack(spacing: 5) {
+            Image(systemName: kindIcon(cat.kind)).font(.caption2)
+            Text(cat.title).font(.caption.weight(.medium)).lineLimit(1)
+          }
+        }
       }
     }
   }
@@ -177,7 +198,6 @@ private struct InlineView: View {
   let entry: NextEntry
 
   var body: some View {
-    // Inline is a single short line; lead with the thing, no glyph.
     Text(entry.first?.title ?? "All done")
   }
 }
@@ -194,5 +214,20 @@ private struct CircularView: View {
         .foregroundStyle(.secondary)
         .opacity(entry.remaining == 0 ? 0 : 1)
     }
+  }
+}
+
+// MARK: - Category → glyph
+
+/// Per-category SF Symbol. Now load-bearing (distinguishes categories), not
+/// decoration. Mirrors the app's per-section iconography.
+private func kindIcon(_ kind: String) -> String {
+  switch kind {
+  case "task":       return "checklist"
+  case "chore":      return "house"
+  case "habit":      return "repeat"
+  case "supplement": return "pills"
+  case "suggestion": return "sparkles"
+  default:           return "circle"
   }
 }
