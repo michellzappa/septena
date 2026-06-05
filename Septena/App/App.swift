@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import EventKit
+import CloudKit
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -64,6 +65,10 @@ struct SeptenaApp: App {
         // OUTSIDE that scope and crash on the first frame.) Presented sheets
         // still render above it, so sheet-based logs fire after dismissal.
         .overlay { LogCommitOverlay() }
+        // Septena keeps everything in the user's private iCloud, so warn
+        // plainly when there's no usable account. Applied here (inside the
+        // .environment chain below) so it can read `ckEngine`.
+        .iCloudRequirementWarning()
         .environment(navigation)
         .environment(theme)
         .environment(trainingDraft)
@@ -325,5 +330,57 @@ struct SeptenaApp: App {
     if bridge.recentImports.count != before {
       NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
     }
+  }
+}
+
+// MARK: - iCloud requirement warning
+
+/// Surfaces a warning when the device has no usable iCloud account.
+/// Septena stores everything in the user's private CloudKit database — no
+/// account means nowhere to read or write — so we say so plainly rather
+/// than failing silently. Driven by `CKEngine.accountStatus` (refreshed
+/// on launch, foreground, and `.CKAccountChanged`). Only the definitive
+/// "missing" states trip it; the transient `.couldNotDetermine` /
+/// `.temporarilyUnavailable` don't, so a slow first status query never
+/// flashes a false warning.
+private struct ICloudRequirementModifier: ViewModifier {
+  @Environment(CKEngine.self) private var ckEngine
+  @State private var showAlert = false
+
+  func body(content: Content) -> some View {
+    content
+      .onAppear { showAlert = Self.accountMissing(ckEngine.accountStatus) }
+      .onChange(of: ckEngine.accountStatus) { _, status in
+        showAlert = Self.accountMissing(status)
+      }
+      .alert("iCloud Required", isPresented: $showAlert) {
+        #if os(iOS)
+        Button("Open Settings") { Self.openSettings() }
+        #endif
+        Button("OK", role: .cancel) { }
+      } message: {
+        Text("Septena keeps all your data in your private iCloud, so it needs you signed in. Open Settings and sign in to iCloud to use the app and sync across your devices.")
+      }
+  }
+
+  /// Definitive "no usable account" states. `.couldNotDetermine` and
+  /// `.temporarilyUnavailable` are transient (slow query, momentary
+  /// outage) and deliberately excluded.
+  private static func accountMissing(_ status: CKAccountStatus) -> Bool {
+    status == .noAccount || status == .restricted
+  }
+
+  #if os(iOS)
+  private static func openSettings() {
+    if let url = URL(string: UIApplication.openSettingsURLString) {
+      UIApplication.shared.open(url)
+    }
+  }
+  #endif
+}
+
+private extension View {
+  func iCloudRequirementWarning() -> some View {
+    modifier(ICloudRequirementModifier())
   }
 }
