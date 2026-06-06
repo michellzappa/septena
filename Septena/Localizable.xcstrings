@@ -1,7 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "  ↳ %@" : {},
+    "  ↳ %@" : {
+
+    },
     "·" : {
       "shouldTranslate" : false
     },
@@ -546,6 +548,16 @@
         }
       }
     },
+    "Activity" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atividade"
+          }
+        }
+      }
+    },
     "Activity tracking runs on iPhone / iPad. Open Septena there to see steps and recovery metrics." : {
       "localizations" : {
         "pt-BR" : {
@@ -656,6 +668,16 @@
         }
       }
     },
+    "Alive" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibrante"
+          }
+        }
+      }
+    },
     "Already added" : {
       "localizations" : {
         "pt-BR" : {
@@ -706,6 +728,36 @@
         }
       }
     },
+    "Angry" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Com raiva"
+          }
+        }
+      }
+    },
+    "Anxious" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ansioso"
+          }
+        }
+      }
+    },
+    "Anytime" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A qualquer momento"
+          }
+        }
+      }
+    },
     "App icon selection is available on the iPhone and iPad app." : {
       "localizations" : {
         "pt-BR" : {
@@ -732,6 +784,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Apple"
+          }
+        }
+      }
+    },
+    "Area" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Área"
           }
         }
       }
@@ -858,6 +920,16 @@
         }
       }
     },
+    "Bed and wake times, nightly duration" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Horários de dormir e acordar, duração da noite"
+          }
+        }
+      }
+    },
     "BEDTIME" : {
       "localizations" : {
         "pt-BR" : {
@@ -884,6 +956,36 @@
         }
       }
     },
+    "Blue" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Azul"
+          }
+        }
+      }
+    },
+    "Body" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corpo"
+          }
+        }
+      }
+    },
+    "Bored" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entediado"
+          }
+        }
+      }
+    },
     "Buckets (tertiles, sorted by x)" : {
       "localizations" : {
         "pt-BR" : {
@@ -904,12 +1006,52 @@
         }
       }
     },
+    "Caffeine" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cafeína"
+          }
+        }
+      }
+    },
+    "Calm" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calmo"
+          }
+        }
+      }
+    },
+    "Cannabis" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cannabis"
+          }
+        }
+      }
+    },
     "Carbs" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Carboidratos"
+          }
+        }
+      }
+    },
+    "Card grid with 7-day histogram per tile. Quick-launch + ambient glance." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grade de cartões com histograma de 7 dias por bloco. Acesso rápido + visão de relance."
           }
         }
       }
@@ -984,6 +1126,16 @@
         }
       }
     },
+    "Chores" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afazeres"
+          }
+        }
+      }
+    },
     "Claude" : {
       "localizations" : {
         "pt-BR" : {
@@ -1004,6 +1156,16 @@
         }
       }
     },
+    "Coffee, beans, brewing methods" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Café, grãos, métodos de preparo"
+          }
+        }
+      }
+    },
     "Coming soon" : {
       "localizations" : {
         "pt-BR" : {
@@ -1020,6 +1182,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nomes alternativos separados por vírgula usados na busca."
+          }
+        }
+      }
+    },
+    "Commit activity as a contribution heatmap" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atividade de commits como mapa de contribuições"
           }
         }
       }
@@ -1080,6 +1252,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Conexão"
+          }
+        }
+      }
+    },
+    "Content" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contente"
           }
         }
       }
@@ -1210,6 +1392,46 @@
         }
       }
     },
+    "Cyan" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ciano"
+          }
+        }
+      }
+    },
+    "Daily" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diário"
+          }
+        }
+      }
+    },
+    "Daily routines and streaks" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rotinas diárias e sequências"
+          }
+        }
+      }
+    },
+    "Daily supplements log" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registro diário de suplementos"
+          }
+        }
+      }
+    },
     "Dashboard" : {
       "localizations" : {
         "pt-BR" : {
@@ -1250,6 +1472,16 @@
         }
       }
     },
+    "Default" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Padrão"
+          }
+        }
+      }
+    },
     "Default: morning until %@, afternoon until %@." : {
       "localizations" : {
         "en" : {
@@ -1262,6 +1494,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Padrão: manhã até %1$@, tarde até %2$@."
+          }
+        }
+      }
+    },
+    "Despondent" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desolado"
+          }
+        }
+      }
+    },
+    "Digestion log" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registro de digestão"
           }
         }
       }
@@ -1286,6 +1538,26 @@
         }
       }
     },
+    "Disappointed" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decepcionado"
+          }
+        }
+      }
+    },
+    "Discouraged" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desencorajado"
+          }
+        }
+      }
+    },
     "Discover" : {
       "localizations" : {
         "pt-BR" : {
@@ -1306,12 +1578,35 @@
         }
       }
     },
+    "Done Today" : {
+
+    },
     "Drag to reorder. Toggle to show or hide a tile on the Nutrition dashboard. Tap a swatch to change its color." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Arraste para reordenar. Use o botão para mostrar ou ocultar um bloco no painel de Nutrição. Toque em uma amostra para mudar a cor."
+          }
+        }
+      }
+    },
+    "Drained" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esgotado"
+          }
+        }
+      }
+    },
+    "Drawer" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gaveta"
           }
         }
       }
@@ -1346,6 +1641,36 @@
         }
       }
     },
+    "Eager" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entusiasmado"
+          }
+        }
+      }
+    },
+    "Easygoing" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descontraído"
+          }
+        }
+      }
+    },
+    "Ecstatic" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Em êxtase"
+          }
+        }
+      }
+    },
     "Edit" : {
       "localizations" : {
         "pt-BR" : {
@@ -1356,13 +1681,35 @@
         }
       }
     },
-    "elapsed" : {},
+    "elapsed" : {
+
+    },
+    "Elated" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eufórico"
+          }
+        }
+      }
+    },
     "Enabled" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ativado"
+          }
+        }
+      }
+    },
+    "Enraged" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Furioso"
           }
         }
       }
@@ -1413,6 +1760,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Exemplo"
+          }
+        }
+      }
+    },
+    "Excited" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empolgado"
           }
         }
       }
@@ -1477,6 +1834,16 @@
         }
       }
     },
+    "Fasting hours" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Horas de jejum"
+          }
+        }
+      }
+    },
     "Fat" : {
       "localizations" : {
         "pt-BR" : {
@@ -1507,14 +1874,28 @@
         }
       }
     },
-    "Find any task, project, or area." : {},
-    "Find what actually moves your day — which habits, inputs, and routines track with better sleep, mood, recovery, and more. Real correlations across everything you log, computed privately on-device." : {},
+    "Find any task, project, or area." : {
+
+    },
+    "Find what actually moves your day — which habits, inputs, and routines track with better sleep, mood, recovery, and more. Real correlations across everything you log, computed privately on-device." : {
+
+    },
     "Fix by creating the missing record (CloudKit Console → Create New Record) with recordName matching the referenced id." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Corrija criando o registro ausente (Console do CloudKit → Create New Record) com o recordName igual ao id referenciado."
+          }
+        }
+      }
+    },
+    "Focused" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Focado"
           }
         }
       }
@@ -1539,6 +1920,16 @@
         }
       }
     },
+    "Free-text intentions tagged with section keys" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Intenções em texto livre marcadas com seções"
+          }
+        }
+      }
+    },
     "Free-text intentions. Tag with sections so agents have context for what you're working toward." : {
       "localizations" : {
         "pt-BR" : {
@@ -1559,6 +1950,16 @@
         }
       }
     },
+    "Frustrated" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Frustrado"
+          }
+        }
+      }
+    },
     "Gateway sync" : {
       "localizations" : {
         "pt-BR" : {
@@ -1575,6 +1976,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lembretes gentis para marcar o que você fez — hábitos, tarefas, hidratação, hora de dormir. Eles disparam por volta do horário em que você costuma registrar e ficam quietos depois de concluído. Veja tudo o que está agendado — e ative ou desative avisos individuais — em Notificações Agendadas."
+          }
+        }
+      }
+    },
+    "GitHub" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub"
+          }
+        }
+      }
+    },
+    "Glum" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cabisbaixo"
           }
         }
       }
@@ -1639,12 +2060,62 @@
         }
       }
     },
+    "Grateful" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grato"
+          }
+        }
+      }
+    },
+    "Green" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verde"
+          }
+        }
+      }
+    },
+    "Groceries" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compras"
+          }
+        }
+      }
+    },
     "Guided local-AI reflections that turn into real goals." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Reflexões guiadas por IA local que viram metas de verdade."
+          }
+        }
+      }
+    },
+    "Gut" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Intestino"
+          }
+        }
+      }
+    },
+    "Habits" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hábitos"
           }
         }
       }
@@ -1675,6 +2146,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "O HealthKit não está disponível neste dispositivo"
+          }
+        }
+      }
+    },
+    "Heatmap" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mapa de calor"
           }
         }
       }
@@ -1719,12 +2200,42 @@
         }
       }
     },
+    "Histogram" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Histograma"
+          }
+        }
+      }
+    },
     "Hold the week up to the light" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Coloque a semana contra a luz"
+          }
+        }
+      }
+    },
+    "Hopeless" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem esperança"
+          }
+        }
+      }
+    },
+    "Hydration" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hidratação"
           }
         }
       }
@@ -1837,6 +2348,16 @@
         }
       }
     },
+    "Inbox, projects, areas, today and upcoming" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Caixa de entrada, projetos, áreas, hoje e em breve"
+          }
+        }
+      }
+    },
     "Include this section's entries in the Next timeline." : {
       "localizations" : {
         "pt-BR" : {
@@ -1877,6 +2398,16 @@
         }
       }
     },
+    "Intake log and dosing" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registro de consumo e dosagem"
+          }
+        }
+      }
+    },
     "Intensity" : {
       "localizations" : {
         "pt-BR" : {
@@ -1903,6 +2434,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "O iOS mostra uma confirmação cada vez que você troca de ícone."
+          }
+        }
+      }
+    },
+    "Irritated" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Irritado"
+          }
+        }
+      }
+    },
+    "Joyful" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alegre"
           }
         }
       }
@@ -1996,7 +2547,9 @@
         }
       }
     },
-    "Layout picks how the homepage renders — Histogram, Sparkline, or Heatmap. Insights tunes the cross-section correlation explorer." : {},
+    "Layout picks how the homepage renders — Histogram, Sparkline, or Heatmap. Insights tunes the cross-section correlation explorer." : {
+
+    },
     "Let Claude read and write your Septena data at mcp.septena.app." : {
       "localizations" : {
         "pt-BR" : {
@@ -2044,12 +2597,42 @@
         }
       }
     },
+    "Logbook" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registro"
+          }
+        }
+      }
+    },
     "LOGGED" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "REGISTRADO"
+          }
+        }
+      }
+    },
+    "Lonely" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solitário"
+          }
+        }
+      }
+    },
+    "Loved" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amado"
           }
         }
       }
@@ -2084,6 +2667,16 @@
         }
       }
     },
+    "Macros and calorie ranges" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macros e faixas de calorias"
+          }
+        }
+      }
+    },
     "Make Septena yours" : {
       "localizations" : {
         "pt-BR" : {
@@ -2100,6 +2693,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "MCP"
+          }
+        }
+      }
+    },
+    "Mellow" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suave"
           }
         }
       }
@@ -2183,6 +2786,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mês"
+          }
+        }
+      }
+    },
+    "Monthly" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mensal"
+          }
+        }
+      }
+    },
+    "Mood" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Humor"
           }
         }
       }
@@ -2500,6 +3123,16 @@
         }
       }
     },
+    "Nutrition" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nutrição"
+          }
+        }
+      }
+    },
     "of %@" : {
       "shouldTranslate" : false
     },
@@ -2566,6 +3199,16 @@
         }
       }
     },
+    "Orange" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laranja"
+          }
+        }
+      }
+    },
     "Order here drives the logger order." : {
       "localizations" : {
         "pt-BR" : {
@@ -2578,6 +3221,16 @@
     },
     "p=%@" : {
       "shouldTranslate" : false
+    },
+    "Panicked" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Em pânico"
+          }
+        }
+      }
     },
     "Parameters" : {
       "localizations" : {
@@ -2680,6 +3333,16 @@
         }
       }
     },
+    "Pleased" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Satisfeito"
+          }
+        }
+      }
+    },
     "Potassium" : {
       "localizations" : {
         "pt-BR" : {
@@ -2713,6 +3376,16 @@
         }
       }
     },
+    "Project" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projeto"
+          }
+        }
+      }
+    },
     "Projects in this area will be detached but not deleted." : {
       "localizations" : {
         "pt-BR" : {
@@ -2739,6 +3412,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Forneça um JSON no formato de exportação do Septena. Os registros são mesclados por id — as linhas existentes são atualizadas no lugar e as novas são inseridas. Tabelas de definição (hábitos, suplementos, tarefas, grãos, itens de compras) valem agora; tabelas de evento/registro são só prévia nesta versão."
+          }
+        }
+      }
+    },
+    "Purple" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Roxo"
           }
         }
       }
@@ -2839,12 +3522,42 @@
         }
       }
     },
+    "Recurring household tasks" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarefas domésticas recorrentes"
+          }
+        }
+      }
+    },
+    "Red" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vermelho"
+          }
+        }
+      }
+    },
     "Register a Withings dev app at developer.withings.com (Public Health Data API), then add your client_id and client_secret to Config/Secrets.xcconfig (copy it from Config/Secrets.example.xcconfig) and rebuild. The redirect URI should be septena://withings/callback." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Registre um app de desenvolvedor Withings em developer.withings.com (Public Health Data API), depois adicione seu client_id e client_secret em Config/Secrets.xcconfig (copie de Config/Secrets.example.xcconfig) e recompile. O redirect URI deve ser septena://withings/callback."
+          }
+        }
+      }
+    },
+    "Relaxed" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relaxado"
           }
         }
       }
@@ -2899,12 +3612,52 @@
         }
       }
     },
+    "Restless" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inquieto"
+          }
+        }
+      }
+    },
     "Review your values" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Revise seus valores"
+          }
+        }
+      }
+    },
+    "Rows with 90-day heatmap grid. Optimized for consistency." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Linhas com grade de mapa de calor de 90 dias. Otimizado para consistência."
+          }
+        }
+      }
+    },
+    "Rows with today's value + sparkline. Maximum signal per scroll." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Linhas com o valor de hoje + minigráfico. Máximo de sinal por rolagem."
+          }
+        }
+      }
+    },
+    "Sad" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Triste"
           }
         }
       }
@@ -3089,6 +3842,16 @@
         }
       }
     },
+    "Serene" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sereno"
+          }
+        }
+      }
+    },
     "Services" : {
       "localizations" : {
         "pt-BR" : {
@@ -3105,6 +3868,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "SESSÃO CONCLUÍDA"
+          }
+        }
+      }
+    },
+    "Sessions, exercises, weekly Z2" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sessões, exercícios, Z2 semanal"
           }
         }
       }
@@ -3168,6 +3941,16 @@
         }
       }
     },
+    "Shopping list and pantry" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lista de compras e despensa"
+          }
+        }
+      }
+    },
     "Shortcuts" : {
       "localizations" : {
         "pt-BR" : {
@@ -3224,6 +4007,16 @@
         }
       }
     },
+    "Sleep" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sono"
+          }
+        }
+      }
+    },
     "slope = %@%@ %@ per +1 %@ of %@" : {
       "localizations" : {
         "en" : {
@@ -3260,6 +4053,26 @@
         }
       }
     },
+    "Someday" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Algum dia"
+          }
+        }
+      }
+    },
+    "Sparkline" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Minigráfico"
+          }
+        }
+      }
+    },
     "Start training" : {
       "localizations" : {
         "pt-BR" : {
@@ -3280,6 +4093,16 @@
         }
       }
     },
+    "Steps and movement (HealthKit)" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passos e movimento (HealthKit)"
+          }
+        }
+      }
+    },
     "Strength volume" : {
       "localizations" : {
         "pt-BR" : {
@@ -3296,6 +4119,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Estresse"
+          }
+        }
+      }
+    },
+    "Stressed" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estressado"
           }
         }
       }
@@ -3332,6 +4165,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Resumido de %1$@ seções."
+          }
+        }
+      }
+    },
+    "Supplements" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suplementos"
           }
         }
       }
@@ -3466,6 +4309,26 @@
         }
       }
     },
+    "Tasks tab" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aba Tarefas"
+          }
+        }
+      }
+    },
+    "Tense" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tenso"
+          }
+        }
+      }
+    },
     "Tension" : {
       "localizations" : {
         "pt-BR" : {
@@ -3506,7 +4369,9 @@
         }
       }
     },
-    "The little celebration that plays when you log something — confetti, ripples, a streak landing. Off keeps the confirming haptic but skips the motion. Reduce Motion always overrides this." : {},
+    "The little celebration that plays when you log something — confetti, ripples, a streak landing. Off keeps the confirming haptic but skips the motion. Reduce Motion always overrides this." : {
+
+    },
     "The master switch. Each nudge fires around when you usually log it and goes quiet once it's marked for the day." : {
       "localizations" : {
         "pt-BR" : {
@@ -3577,6 +4442,16 @@
         }
       }
     },
+    "Three-times-a-day affect check-ins" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check-ins de humor três vezes ao dia"
+          }
+        }
+      }
+    },
     "Time of day" : {
       "localizations" : {
         "pt-BR" : {
@@ -3642,6 +4517,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Os tokens ficam no Keychain deste dispositivo e nunca saem dele. As pesagens sincronizam com seus outros dispositivos pelo iCloud."
+          }
+        }
+      }
+    },
+    "Training" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Treino"
+          }
+        }
+      }
+    },
+    "Tranquil" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tranquilo"
           }
         }
       }
@@ -3732,7 +4627,29 @@
         }
       }
     },
-    "Unlock with Septena+" : {},
+    "Unlock with Septena+" : {
+
+    },
+    "Upbeat" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Animado"
+          }
+        }
+      }
+    },
+    "Upcoming" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Em breve"
+          }
+        }
+      }
+    },
     "Upgrade to %@" : {
       "localizations" : {
         "pt-BR" : {
@@ -3809,6 +4726,16 @@
         }
       }
     },
+    "Water intake against a daily target" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consumo de água em relação a uma meta diária"
+          }
+        }
+      }
+    },
     "Week" : {
       "localizations" : {
         "pt-BR" : {
@@ -3819,12 +4746,42 @@
         }
       }
     },
+    "Weekly" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Semanal"
+          }
+        }
+      }
+    },
     "Weekly Δ" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Δ semanal"
+          }
+        }
+      }
+    },
+    "Weight, body fat, measurements" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Peso, gordura corporal, medidas"
+          }
+        }
+      }
+    },
+    "What moves your day — cross-section correlations" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O que move o seu dia — correlações entre seções"
           }
         }
       }
@@ -3912,6 +4869,16 @@
       },
       "shouldTranslate" : false
     },
+    "Yellow" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amarelo"
+          }
+        }
+      }
+    },
     "You have " : {
       "localizations" : {
         "pt-BR" : {
@@ -3969,956 +4936,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Δ = média com − média sem"
-          }
-        }
-      }
-    },
-    "Excited" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Empolgado"
-          }
-        }
-      }
-    },
-    "Elated" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eufórico"
-          }
-        }
-      }
-    },
-    "Ecstatic" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Em êxtase"
-          }
-        }
-      }
-    },
-    "Eager" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Entusiasmado"
-          }
-        }
-      }
-    },
-    "Upbeat" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Animado"
-          }
-        }
-      }
-    },
-    "Joyful" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Alegre"
-          }
-        }
-      }
-    },
-    "Focused" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Focado"
-          }
-        }
-      }
-    },
-    "Alive" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vibrante"
-          }
-        }
-      }
-    },
-    "Content" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Contente"
-          }
-        }
-      }
-    },
-    "Enraged" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Furioso"
-          }
-        }
-      }
-    },
-    "Panicked" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Em pânico"
-          }
-        }
-      }
-    },
-    "Stressed" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Estressado"
-          }
-        }
-      }
-    },
-    "Angry" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Com raiva"
-          }
-        }
-      }
-    },
-    "Anxious" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ansioso"
-          }
-        }
-      }
-    },
-    "Frustrated" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Frustrado"
-          }
-        }
-      }
-    },
-    "Irritated" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Irritado"
-          }
-        }
-      }
-    },
-    "Tense" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tenso"
-          }
-        }
-      }
-    },
-    "Restless" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Inquieto"
-          }
-        }
-      }
-    },
-    "Bored" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Entediado"
-          }
-        }
-      }
-    },
-    "Discouraged" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Desencorajado"
-          }
-        }
-      }
-    },
-    "Disappointed" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Decepcionado"
-          }
-        }
-      }
-    },
-    "Sad" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Triste"
-          }
-        }
-      }
-    },
-    "Lonely" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Solitário"
-          }
-        }
-      }
-    },
-    "Glum" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cabisbaixo"
-          }
-        }
-      }
-    },
-    "Drained" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Esgotado"
-          }
-        }
-      }
-    },
-    "Hopeless" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sem esperança"
-          }
-        }
-      }
-    },
-    "Despondent" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Desolado"
-          }
-        }
-      }
-    },
-    "Mellow" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Suave"
-          }
-        }
-      }
-    },
-    "Easygoing" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descontraído"
-          }
-        }
-      }
-    },
-    "Pleased" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Satisfeito"
-          }
-        }
-      }
-    },
-    "Calm" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Calmo"
-          }
-        }
-      }
-    },
-    "Grateful" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Grato"
-          }
-        }
-      }
-    },
-    "Loved" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Amado"
-          }
-        }
-      }
-    },
-    "Relaxed" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Relaxado"
-          }
-        }
-      }
-    },
-    "Serene" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sereno"
-          }
-        }
-      }
-    },
-    "Tranquil" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tranquilo"
-          }
-        }
-      }
-    },
-    "Training" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Treino"
-          }
-        }
-      }
-    },
-    "Nutrition" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nutrição"
-          }
-        }
-      }
-    },
-    "Sleep" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sono"
-          }
-        }
-      }
-    },
-    "Habits" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hábitos"
-          }
-        }
-      }
-    },
-    "Chores" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Afazeres"
-          }
-        }
-      }
-    },
-    "Supplements" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Suplementos"
-          }
-        }
-      }
-    },
-    "Groceries" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Compras"
-          }
-        }
-      }
-    },
-    "Caffeine" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cafeína"
-          }
-        }
-      }
-    },
-    "Cannabis" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cannabis"
-          }
-        }
-      }
-    },
-    "Body" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Corpo"
-          }
-        }
-      }
-    },
-    "Gut" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Intestino"
-          }
-        }
-      }
-    },
-    "Mood" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Humor"
-          }
-        }
-      }
-    },
-    "Activity" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Atividade"
-          }
-        }
-      }
-    },
-    "GitHub" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GitHub"
-          }
-        }
-      }
-    },
-    "Hydration" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hidratação"
-          }
-        }
-      }
-    },
-    "Inbox, projects, areas, today and upcoming" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Caixa de entrada, projetos, áreas, hoje e em breve"
-          }
-        }
-      }
-    },
-    "Sessions, exercises, weekly Z2" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sessões, exercícios, Z2 semanal"
-          }
-        }
-      }
-    },
-    "Macros and calorie ranges" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Macros e faixas de calorias"
-          }
-        }
-      }
-    },
-    "Bed and wake times, nightly duration" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Horários de dormir e acordar, duração da noite"
-          }
-        }
-      }
-    },
-    "Daily routines and streaks" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rotinas diárias e sequências"
-          }
-        }
-      }
-    },
-    "Recurring household tasks" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tarefas domésticas recorrentes"
-          }
-        }
-      }
-    },
-    "Daily supplements log" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registro diário de suplementos"
-          }
-        }
-      }
-    },
-    "Shopping list and pantry" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lista de compras e despensa"
-          }
-        }
-      }
-    },
-    "Coffee, beans, brewing methods" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Café, grãos, métodos de preparo"
-          }
-        }
-      }
-    },
-    "Intake log and dosing" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registro de consumo e dosagem"
-          }
-        }
-      }
-    },
-    "Weight, body fat, measurements" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Peso, gordura corporal, medidas"
-          }
-        }
-      }
-    },
-    "Digestion log" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registro de digestão"
-          }
-        }
-      }
-    },
-    "Three-times-a-day affect check-ins" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Check-ins de humor três vezes ao dia"
-          }
-        }
-      }
-    },
-    "Steps and movement (HealthKit)" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Passos e movimento (HealthKit)"
-          }
-        }
-      }
-    },
-    "Commit activity as a contribution heatmap" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Atividade de commits como mapa de contribuições"
-          }
-        }
-      }
-    },
-    "What moves your day — cross-section correlations" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O que move o seu dia — correlações entre seções"
-          }
-        }
-      }
-    },
-    "Water intake against a daily target" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Consumo de água em relação a uma meta diária"
-          }
-        }
-      }
-    },
-    "Free-text intentions tagged with section keys" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Intenções em texto livre marcadas com seções"
-          }
-        }
-      }
-    },
-    "Drawer" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gaveta"
-          }
-        }
-      }
-    },
-    "Tasks tab" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aba Tarefas"
-          }
-        }
-      }
-    },
-    "Fasting hours" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Horas de jejum"
-          }
-        }
-      }
-    },
-    "Default" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Padrão"
-          }
-        }
-      }
-    },
-    "Red" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vermelho"
-          }
-        }
-      }
-    },
-    "Orange" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Laranja"
-          }
-        }
-      }
-    },
-    "Yellow" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Amarelo"
-          }
-        }
-      }
-    },
-    "Green" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verde"
-          }
-        }
-      }
-    },
-    "Cyan" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ciano"
-          }
-        }
-      }
-    },
-    "Blue" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Azul"
-          }
-        }
-      }
-    },
-    "Purple" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Roxo"
-          }
-        }
-      }
-    },
-    "Histogram" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Histograma"
-          }
-        }
-      }
-    },
-    "Sparkline" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Minigráfico"
-          }
-        }
-      }
-    },
-    "Heatmap" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mapa de calor"
-          }
-        }
-      }
-    },
-    "Card grid with 7-day histogram per tile. Quick-launch + ambient glance." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Grade de cartões com histograma de 7 dias por bloco. Acesso rápido + visão de relance."
-          }
-        }
-      }
-    },
-    "Rows with today's value + sparkline. Maximum signal per scroll." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Linhas com o valor de hoje + minigráfico. Máximo de sinal por rolagem."
-          }
-        }
-      }
-    },
-    "Rows with 90-day heatmap grid. Optimized for consistency." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Linhas com grade de mapa de calor de 90 dias. Otimizado para consistência."
-          }
-        }
-      }
-    },
-    "Upcoming" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Em breve"
-          }
-        }
-      }
-    },
-    "Anytime" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A qualquer momento"
-          }
-        }
-      }
-    },
-    "Someday" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Algum dia"
-          }
-        }
-      }
-    },
-    "Logbook" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registro"
-          }
-        }
-      }
-    },
-    "Project" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Projeto"
-          }
-        }
-      }
-    },
-    "Area" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Área"
-          }
-        }
-      }
-    },
-    "Daily" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Diário"
-          }
-        }
-      }
-    },
-    "Weekly" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Semanal"
-          }
-        }
-      }
-    },
-    "Monthly" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mensal"
           }
         }
       }
