@@ -203,9 +203,9 @@ struct Recurrence: Codable, Hashable {
   var shortLabel: String {
     if interval == 1 {
       switch unit {
-      case .day: return "Daily"
-      case .week: return "Weekly"
-      case .month: return "Monthly"
+      case .day: return String(localized: "Daily", comment: "Recurrence cadence")
+      case .week: return String(localized: "Weekly", comment: "Recurrence cadence")
+      case .month: return String(localized: "Monthly", comment: "Recurrence cadence")
       }
     }
     return "Every \(interval) \(unit.rawValue)s"
@@ -407,14 +407,14 @@ enum TaskFilter: Equatable, Hashable {
   // The serverView key stays `unscheduled` so the API contract is unchanged.
   var title: String {
     switch self {
-    case .today: return "Today"
-    case .inbox: return "Inbox"
-    case .upcoming: return "Upcoming"
-    case .unscheduled: return "Anytime"
-    case .someday: return "Someday"
-    case .logbook: return "Logbook"
-    case .project: return "Project"
-    case .area: return "Area"
+    case .today: return String(localized: "Today", comment: "Task filter")
+    case .inbox: return String(localized: "Inbox", comment: "Task filter")
+    case .upcoming: return String(localized: "Upcoming", comment: "Task filter")
+    case .unscheduled: return String(localized: "Anytime", comment: "Task filter")
+    case .someday: return String(localized: "Someday", comment: "Task filter")
+    case .logbook: return String(localized: "Logbook", comment: "Task filter")
+    case .project: return String(localized: "Project", comment: "Task filter")
+    case .area: return String(localized: "Area", comment: "Task filter")
     }
   }
 }
