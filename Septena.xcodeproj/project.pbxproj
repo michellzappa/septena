@@ -325,6 +325,7 @@
 		99C5E0B4C1F96A710C71DFFC /* DayTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 880B70E1267B3CAAFFBA9D65 /* DayTimelineView.swift */; };
 		99F32E2446B12071AC929809 /* CorrelationFeatures.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAD69A204D1E2CF4993DE291 /* CorrelationFeatures.swift */; };
 		9A309102A56D669A431C6703 /* EditGroceryItemSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4C5E5E15422EB17DB5D3960 /* EditGroceryItemSheet.swift */; };
+		9AC5922C800B87A4C67231C7 /* MirrorReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 422B1072AC84061389BB5BA5 /* MirrorReader.swift */; };
 		9BB4EA54B6DB8B01A7CE8C19 /* AddTaskPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0EBCAFF8036A11B0BBEC06E /* AddTaskPage.swift */; };
 		9D294C6FFD9CFE45F6E11B7D /* ChoresPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D3C973F9983AB94CEB95337 /* ChoresPlugin.swift */; };
 		9D7138B8011A2931709E1F96 /* HydrationIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = D78BBADF69CAD2C6D2605053 /* HydrationIntents.swift */; };
@@ -536,6 +537,7 @@
 		FB79CB77D7DB4D47195A606D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */; };
 		FC13A7AE0BCBC2D9F413B232 /* VirtueSummarizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 283D02F47FC57BD00F27178E /* VirtueSummarizer.swift */; };
 		FC4FF942C172ECE99D6CEFD8 /* HomepageDomain.swift in Sources */ = {isa = PBXBuildFile; fileRef = F026D3432CFBCE4FE8412750 /* HomepageDomain.swift */; };
+		FC7818C6AC28D1D064D52C5C /* MirrorReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 422B1072AC84061389BB5BA5 /* MirrorReader.swift */; };
 		FD2D921637A390ABCEA55A9C /* RoutineDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71127DDB09DDF4AADA870825 /* RoutineDetailView.swift */; };
 		FD78F45875BF6FB39FBB90AF /* MoodCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33EB22A93C55573C49CFB21B /* MoodCatalog.swift */; };
 		FDD4E2807DBBB981F1F6C321 /* LogRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DDBCEACF8957679BD5E02F2 /* LogRow.swift */; };
@@ -691,6 +693,7 @@
 		40D9EAAB80FD7F9FAC57F20B /* GoalsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsView.swift; sourceTree = "<group>"; };
 		40EC4A3BEF564998AEF7B95F /* CaffeineCommit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaffeineCommit.swift; sourceTree = "<group>"; };
 		41F8977A576F2BB747E8DBD7 /* TaskComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskComponents.swift; sourceTree = "<group>"; };
+		422B1072AC84061389BB5BA5 /* MirrorReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MirrorReader.swift; sourceTree = "<group>"; };
 		42EB061D69FA656547DC171F /* NutritionDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionDestinationView.swift; sourceTree = "<group>"; };
 		44AF7AFAC799CE9882271F8A /* ValuesSuggestions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValuesSuggestions.swift; sourceTree = "<group>"; };
 		44D44998956C28A061A4DBAE /* AreasProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreasProjectsView.swift; sourceTree = "<group>"; };
@@ -1498,6 +1501,7 @@
 				F026D3432CFBCE4FE8412750 /* HomepageDomain.swift */,
 				F9E4B96D09624A89E4D87019 /* HomepageDomainData.swift */,
 				F0B811772EC1DF4C9130BECD /* HomepageLayoutMode.swift */,
+				422B1072AC84061389BB5BA5 /* MirrorReader.swift */,
 				8416FB0AD38638BF7038BF2A /* NextDashboardView.swift */,
 				9A26475D9A9D19DC0840960D /* NextItemsSection.swift */,
 				6392DC43E2FE913972F42911 /* NextSuggestionsSection.swift */,
@@ -2028,6 +2032,7 @@
 				77B186F9015710E0B19204AB /* MacroCatalog.swift in Sources */,
 				7BF180B58D52C2BD10BBC5AB /* MenuBarMenu.swift in Sources */,
 				58AFCBB034501ACEC2C5DEF7 /* Migration.swift in Sources */,
+				FC7818C6AC28D1D064D52C5C /* MirrorReader.swift in Sources */,
 				0448F507E1F1600F9933AEED /* Models.swift in Sources */,
 				9EA753D4BE7912ACB670B69F /* ModuleTile.swift in Sources */,
 				497ECF175FD15339CA083270 /* MoodCatalog.swift in Sources */,
@@ -2316,6 +2321,7 @@
 				59333A2540ABE31E381C30C7 /* MacroCatalog.swift in Sources */,
 				D8337D72DCD514F36A6094B4 /* MenuBarMenu.swift in Sources */,
 				6D1BE00011E60EE3A490364D /* Migration.swift in Sources */,
+				9AC5922C800B87A4C67231C7 /* MirrorReader.swift in Sources */,
 				DD200EF411309E29B543963F /* Models.swift in Sources */,
 				4BA5BEC17010A16EB46CA603 /* ModuleTile.swift in Sources */,
 				FD78F45875BF6FB39FBB90AF /* MoodCatalog.swift in Sources */,
