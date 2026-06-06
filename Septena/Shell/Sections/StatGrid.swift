@@ -52,8 +52,10 @@ struct StatTile<Content: View>: View {
     content()
       .frame(maxWidth: .infinity)
       .padding(.vertical, verticalPadding)
+      // EXPERIMENT (full-Maps glass): clear so the tile sits directly on the
+      // translucent sheet instead of an opaque card. Affects every StatGrid use.
       .background(
-        Theme.secondaryGroupedBackground,
+        Color.clear,
         in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
       )
   }

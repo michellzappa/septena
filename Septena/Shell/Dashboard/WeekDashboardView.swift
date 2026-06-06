@@ -401,6 +401,12 @@ struct WeekDashboardView: View {
     #if os(iOS)
     .presentationDetents([.medium, .large])
     .presentationDragIndicator(.visible)
+    // Maps-style translucent sheet. A Material renders opaque here because a
+    // floating sheet (backgroundInteraction enabled) gives it no backdrop to
+    // blur — so we use a translucent COLOR, which blends by alpha regardless.
+    // Interaction stays enabled to suppress the dimming scrim behind the sheet.
+    .presentationBackground(Color(.systemBackground).opacity(0.55))
+    .presentationBackgroundInteraction(.enabled(upThrough: .large))
     #else
     .frame(width: 560, height: 600)
     #endif
