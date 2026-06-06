@@ -83,7 +83,7 @@ struct ActivityDestinationView: View {
     if bridge.vo2Max != nil || bridge.hrv != nil || bridge.restingHR != nil {
       DrawerSection("Recent vitals") {
         if let v = bridge.vo2Max {
-          row("VO2 max", String(format: "%.1f ml/kg·min", v))
+          row("VO2 max", "\(v.decimalString(1)) ml/kg·min")
         }
         if let h = bridge.hrv {
           row("HRV (SDNN)", "\(Int(h)) ms")

@@ -481,7 +481,7 @@ struct TrainingDestinationView: View {
       let weekFmt: (Date) -> String = { d in
         let f = DateFormatter(); f.dateFormat = "MMM d"; return f.string(from: d)
       }
-      let summary = "Strength volume. This week \(thisWeekValue) hard sets, target \(Int(target)). \(bandText) 8-week trend \(deltaText). Average intensity \(String(format: "%.1f", avgIntensity)) out of 4."
+      let summary = "Strength volume. This week \(thisWeekValue) hard sets, target \(Int(target)). \(bandText) 8-week trend \(deltaText). Average intensity \(avgIntensity.decimalString()) out of 4."
 
       DrawerSection("Strength") {
         VStack(alignment: .leading, spacing: 8) {
@@ -639,7 +639,7 @@ struct TrainingDestinationView: View {
       HStack {
         Text("Intensity").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
         Spacer()
-        Text("avg \(String(format: "%.1f", avg))/4")
+        Text("avg \(avg.decimalString())/4")
           .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
       }
       Chart {
@@ -652,7 +652,7 @@ struct TrainingDestinationView: View {
             .interpolationMethod(.monotone)
             .foregroundStyle(accent)
             .accessibilityLabel(weekFmt(w.weekStart))
-            .accessibilityValue("intensity \(String(format: "%.1f", v))")
+            .accessibilityValue("intensity \(v.decimalString())")
             PointMark(
               x: .value("Week", w.weekStart, unit: .weekOfYear),
               y: .value("Intensity", v)
@@ -1079,7 +1079,7 @@ struct TrainingDestinationView: View {
   private func yLabel(_ v: Double) -> String {
     switch metricKind(for: selectedExercise) {
     case .volume, .cardioTotal: return "\(Int(v))"
-    case .pace: return String(format: "%.0f", v)
+    case .pace: return v.decimalString(0)
     case .duration: return "\(Int(v))m"
     case .weight: return "\(Int(v))kg"
     }
@@ -1173,12 +1173,12 @@ struct TrainingDestinationView: View {
   private func formatWeight(_ w: Double) -> String {
     w.truncatingRemainder(dividingBy: 1) == 0
       ? "\(Int(w))kg"
-      : String(format: "%.1fkg", w)
+      : "\(w.decimalString(1))kg"
   }
 
   private func formatDistance(_ m: Double) -> String {
     m >= 1000
-      ? String(format: "%.1f km", m / 1000)
+      ? "\((m / 1000).decimalString(1)) km"
       : "\(Int(m)) m"
   }
 
@@ -2237,7 +2237,7 @@ struct TrainingExerciseCard: View {
     } else if entry.isCardio {
       if let d = entry.durationMin, d > 0 { parts.append("\(Int(d)) min") }
       if let m = entry.distanceM, m > 0 {
-        parts.append(m >= 1000 ? String(format: "%.1f km", m / 1000) : "\(Int(m)) m")
+        parts.append(m >= 1000 ? "\((m / 1000).decimalString(1)) km" : "\(Int(m)) m")
       }
       if let l = entry.level, l > 0 { parts.append("L\(fmt(l))") }
     } else {
@@ -2417,7 +2417,7 @@ struct TrainingExerciseCard: View {
     var parts: [String] = []
     if let w = r.weight, w > 0 {
       parts.append(w.truncatingRemainder(dividingBy: 1) == 0
-                   ? "\(Int(w))kg" : String(format: "%.1fkg", w))
+                   ? "\(Int(w))kg" : "\(w.decimalString(1))kg")
     }
     if let s = r.sets, let reps = r.reps {
       parts.append("\(s)×\(reps)")
@@ -2428,7 +2428,7 @@ struct TrainingExerciseCard: View {
       parts.append("\(Int(d))m")
     }
     if let m = r.distanceM, m > 0 {
-      parts.append(m >= 1000 ? String(format: "%.1fkm", m/1000) : "\(Int(m))m")
+      parts.append(m >= 1000 ? "\((m/1000).decimalString(1))km" : "\(Int(m))m")
     }
     if let l = r.level, l > 0 {
       parts.append("L\(fmt(l))")
@@ -2749,7 +2749,7 @@ struct TrainingExerciseCard: View {
     let next = max(0, (Double(raw) ?? 0) + delta)
     value.wrappedValue = next.truncatingRemainder(dividingBy: 1) == 0
       ? String(Int(next))
-      : String(format: "%.1f", next)
+      : next.decimalString()
   }
 
   private func numberField(label: String,
@@ -2778,7 +2778,7 @@ struct TrainingExerciseCard: View {
 
   private func fmt(_ d: Double) -> String {
     d.truncatingRemainder(dividingBy: 1) == 0
-      ? String(Int(d)) : String(format: "%.1f", d)
+      ? String(Int(d)) : d.decimalString()
   }
 
   private func setWeight(_ s: String) {

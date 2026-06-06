@@ -101,7 +101,7 @@ struct EditExerciseEntrySheet: View {
   }
 
   private func numString(_ d: Double) -> String {
-    d == d.rounded() ? String(Int(d)) : String(format: "%.1f", d)
+    d == d.rounded() ? String(Int(d)) : d.decimalString()
   }
 
   private func parseDouble(_ s: String) -> Double? {

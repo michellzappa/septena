@@ -131,7 +131,7 @@ struct EditGutEntrySheet: View {
     volume = original.volume ?? ""
     discomfortLevel = original.discomfortLevel ?? ""
     discomfortHoursString = original.discomfortHours.map {
-      $0 == $0.rounded() ? String(Int($0)) : String(format: "%.1f", $0)
+      $0 == $0.rounded() ? String(Int($0)) : $0.decimalString()
     } ?? ""
     note = original.note ?? ""
     when = EventTimestamp.from(date: original.date, time: original.time)

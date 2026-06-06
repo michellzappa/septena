@@ -258,7 +258,7 @@ struct SleepDestinationView: View {
     let avgDeep = deeps.isEmpty ? 0 : deeps.reduce(0, +) / Double(deeps.count)
     let avgRem  = rems.isEmpty  ? 0 : rems.reduce(0, +) / Double(rems.count)
     let avgText = (avgDeep > 0 || avgRem > 0)
-      ? "Seven-night averages: deep \(String(format: "%.1f", avgDeep)) hours, REM \(String(format: "%.1f", avgRem)) hours."
+      ? "Seven-night averages: deep \(avgDeep.decimalString()) hours, REM \(avgRem.decimalString()) hours."
       : ""
     let summary = "Sleep stages chart. Deep, REM, and light hours per night. \(avgText)"
     return ChartCard(title: "Sleep Stages", detail: "hours") {
@@ -269,21 +269,21 @@ struct SleepDestinationView: View {
                     y: .value("Deep", d))
               .foregroundStyle(accent)
               .accessibilityLabel(weekdayFull(n.date))
-              .accessibilityValue("Deep \(String(format: "%.1f", d)) hours")
+              .accessibilityValue("Deep \(d.decimalString()) hours")
           }
           if let r = n.remH {
             BarMark(x: .value("Day", n.date),
                     y: .value("REM", r))
               .foregroundStyle(accent.opacity(0.7))
               .accessibilityLabel(weekdayFull(n.date))
-              .accessibilityValue("REM \(String(format: "%.1f", r)) hours")
+              .accessibilityValue("REM \(r.decimalString()) hours")
           }
           if let l = n.lightH {
             BarMark(x: .value("Day", n.date),
                     y: .value("Light", l))
               .foregroundStyle(accent.opacity(0.4))
               .accessibilityLabel(weekdayFull(n.date))
-              .accessibilityValue("Light \(String(format: "%.1f", l)) hours")
+              .accessibilityValue("Light \(l.decimalString()) hours")
           }
         }
       }
@@ -314,7 +314,7 @@ struct SleepDestinationView: View {
     let totals = last7.compactMap { $0.totalH }
     let avg = totals.isEmpty ? 0 : totals.reduce(0, +) / Double(totals.count)
     let avgText = avg > 0
-      ? "Seven-night average \(String(format: "%.1f", avg)) hours."
+      ? "Seven-night average \(avg.decimalString()) hours."
       : ""
     let summary = "Total sleep chart. Target 7 to 9 hours. \(avgText)"
     return ChartCard(title: "Total Sleep", detail: "↑ 7–9 h") {
@@ -331,7 +331,7 @@ struct SleepDestinationView: View {
               .foregroundStyle(accent)
               .symbolSize(40)
               .accessibilityLabel(weekdayFull(n.date))
-              .accessibilityValue("\(String(format: "%.1f", t)) hours")
+              .accessibilityValue("\(t.decimalString()) hours")
           }
         }
         RuleMark(y: .value("Target", 7))

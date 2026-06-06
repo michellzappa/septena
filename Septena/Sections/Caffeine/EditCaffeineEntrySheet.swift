@@ -120,7 +120,7 @@ struct EditCaffeineEntrySheet: View {
         beansFreeform = ""
       }
       gramsString = lastSame?.grams.map {
-        $0 == $0.rounded() ? String(Int($0)) : String(format: "%.1f", $0)
+        $0 == $0.rounded() ? String(Int($0)) : $0.decimalString()
       } ?? ""
       note = ""
       let dayFmt = DateFormatter(); dayFmt.dateFormat = "yyyy-MM-dd"
@@ -146,7 +146,7 @@ struct EditCaffeineEntrySheet: View {
       beansChoice = ""
     }
     gramsString = original.grams.map {
-      $0 == $0.rounded() ? String(Int($0)) : String(format: "%.1f", $0)
+      $0 == $0.rounded() ? String(Int($0)) : $0.decimalString()
     } ?? ""
     note = original.note ?? ""
     when = EventTimestamp.from(date: date, time: original.time)

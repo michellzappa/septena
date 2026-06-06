@@ -179,12 +179,12 @@ struct EditNutritionEntrySheet: View {
   }
 
   private func numString(_ d: Double) -> String {
-    d == d.rounded() ? String(Int(d)) : String(format: "%.1f", d)
+    d == d.rounded() ? String(Int(d)) : d.decimalString()
   }
 
   private func optString(_ d: Double?) -> String {
     guard let d, d != 0 else { return "" }
-    return d == d.rounded() ? String(Int(d)) : String(format: "%.1f", d)
+    return d == d.rounded() ? String(Int(d)) : d.decimalString()
   }
 
   private func parseDouble(_ s: String) -> Double {

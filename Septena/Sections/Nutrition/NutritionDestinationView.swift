@@ -318,7 +318,7 @@ struct NutritionDestinationView: View {
 
   private func makeSpec(for macro: MacroCatalog.Macro) -> MacroTileSpec {
     let formatter: (Double) -> String = macro.id == "fasting"
-      ? { $0 <= 0 ? "—" : String(format: "%.1f", $0) }
+      ? { $0 <= 0 ? "—" : $0.decimalString() }
       : { $0 <= 0 ? "—" : String(Int($0.rounded())) }
     return .init(
       id: macro.id,

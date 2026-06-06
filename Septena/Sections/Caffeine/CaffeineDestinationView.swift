@@ -135,7 +135,7 @@ struct CaffeineDestinationView: View {
   private func detailLine(_ e: CaffeineEntry) -> String? {
     var parts: [String] = []
     if let beans = e.beans, !beans.isEmpty { parts.append(beans) }
-    if let g = e.grams { parts.append(String(format: "%.1fg", g)) }
+    if let g = e.grams { parts.append("\(g.decimalString(1))g") }
     if let n = e.note, !n.isEmpty { parts.append(n) }
     return parts.isEmpty ? nil : parts.joined(separator: " · ")
   }

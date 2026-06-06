@@ -50,7 +50,7 @@ struct TileView: View {
         HStack {
           Text("lag \(pair.lag)d · n=\(pair.n)")
           Spacer()
-          Text("p=\(String(format: "%.3f", pair.p))")
+          Text("p=\(pair.p.decimalString(3))")
         }
         .font(.caption2.monospacedDigit())
         .foregroundStyle(.secondary)
@@ -72,8 +72,8 @@ struct TileView: View {
     let yUnit = pair.spec.target.unit
     let sign  = pair.slope >= 0 ? "+" : ""
     let value = abs(pair.slope) >= 100
-      ? String(format: "%.0f", pair.slope)
-      : String(format: "%.2f", pair.slope)
+      ? pair.slope.decimalString(0)
+      : pair.slope.decimalString(2)
     let perUnit = xUnit.isEmpty ? "unit" : xUnit
     let yLabel  = yUnit.isEmpty ? "pts" : yUnit
     return "per +1 \(perUnit): \(sign)\(value) \(yLabel)"
@@ -190,7 +190,7 @@ struct DetailSheet: View {
     VStack(alignment: .leading, spacing: 6) {
       HStack(spacing: 8) {
         TierBadge(pair: pair)
-        Text("\(CorrelationEngine.strengthLabel(pair.r)) · lag \(pair.lag)d · n=\(pair.n) · p=\(String(format: "%.3f", pair.p))")
+        Text("\(CorrelationEngine.strengthLabel(pair.r)) · lag \(pair.lag)d · n=\(pair.n) · p=\(pair.p.decimalString(3))")
           .font(.caption)
           .foregroundStyle(.secondary)
         Spacer()
@@ -301,7 +301,7 @@ struct DetailSheet: View {
     VStack(alignment: .leading, spacing: 4) {
       Text("Stats")
         .font(.caption.weight(.medium))
-      Text("r = \(CorrelationEngine.formatR(pair.r))  ·  p = \(String(format: "%.3f", pair.p))  ·  permutations = \(CorrelationEngine.permutations)")
+      Text("r = \(CorrelationEngine.formatR(pair.r))  ·  p = \(pair.p.decimalString(3))  ·  permutations = \(CorrelationEngine.permutations)")
         .font(.caption.monospacedDigit())
         .foregroundStyle(.secondary)
       Text("x̄ = \(format(pair.meanX))\(unit(pair.spec.predictor.unit))  ·  ȳ = \(format(pair.meanY))\(unit(pair.spec.target.unit))")
@@ -341,7 +341,7 @@ struct DetailSheet: View {
   }
 
   private func format(_ d: Double) -> String {
-    abs(d) >= 100 ? String(format: "%.0f", d) : String(format: "%.2f", d)
+    abs(d) >= 100 ? d.decimalString(0) : d.decimalString(2)
   }
   private func unit(_ u: String) -> String { u.isEmpty ? "" : " \(u)" }
 

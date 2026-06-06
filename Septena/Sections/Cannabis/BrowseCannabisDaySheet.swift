@@ -98,7 +98,7 @@ struct BrowseCannabisDaySheet: View {
   private func detailLine(_ e: CannabisEntry) -> String? {
     var parts: [String] = []
     if let hit = e.hit { parts.append(hitDots(hit: hit)) }
-    if let g = e.grams, g > 0 { parts.append(String(format: "%.2fg", g)) }
+    if let g = e.grams, g > 0 { parts.append("\(g.decimalString(2))g") }
     if let eff = e.effect, !eff.isEmpty { parts.append(eff) }
     return parts.isEmpty ? nil : parts.joined(separator: " · ")
   }

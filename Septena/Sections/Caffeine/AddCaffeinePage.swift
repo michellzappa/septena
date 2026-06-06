@@ -98,7 +98,7 @@ struct AddCaffeinePage: View {
   }
 
   private func grams(_ g: Double) -> String {
-    g == g.rounded() ? String(Int(g)) : String(format: "%.1f", g)
+    g == g.rounded() ? String(Int(g)) : g.decimalString()
   }
 
   private func logBean(_ bean: CaffeineBean) {

@@ -315,12 +315,12 @@ struct SessionCompleteSheet: View {
       if let d = e.durationMin, d > 0 { parts.append("\(Int(d)) min") }
       if let m = e.distanceM, m > 0 { parts.append(formatDistance(m)) }
       if let l = e.level, l > 0 {
-        parts.append("L\(l.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(l))" : String(format: "%.1f", l))")
+        parts.append("L\(l.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(l))" : l.decimalString())")
       }
     } else {
       if let s = e.sets, let r = e.reps { parts.append("\(s)×\(r)") }
       if let w = e.weight, w > 0 {
-        parts.append("@ \(w.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(w))" : String(format: "%.1f", w)) kg")
+        parts.append("@ \(w.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(w))" : w.decimalString()) kg")
       }
     }
     if !e.difficulty.isEmpty { parts.append(e.difficulty) }
@@ -345,7 +345,7 @@ struct SessionCompleteSheet: View {
 
   private func formatDistance(_ m: Double) -> String {
     guard m > 0 else { return "—" }
-    if m >= 1000 { return String(format: "%.1f km", m / 1000) }
+    if m >= 1000 { return "\((m / 1000).decimalString(1)) km" }
     return "\(Int(m)) m"
   }
 }

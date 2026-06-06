@@ -663,20 +663,20 @@ struct CorrelationEngine {
     lines.append("## Context")
     lines.append("- User does not drink alcohol — don't suggest it as a confound.")
     lines.append("- User's days are largely identical (low day-of-week variance).")
-    lines.append("- Trusted = n ≥ \(minN), |r| ≥ \(String(format: "%.2f", strongR)), monotonic buckets, sign matches physiology.")
+    lines.append("- Trusted = n ≥ \(minN), |r| ≥ \(strongR.decimalString(2)), monotonic buckets, sign matches physiology.")
     lines.append("- Exploratory = n ≥ \(minN) but weak r, non-monotonic, or contradicts physiology.")
     lines.append("")
 
     func chartBlock(_ e: EvaluatedPair) -> String {
       var out: [String] = []
       out.append("### \(e.spec.title)")
-      out.append("- n=\(e.n), lag=\(e.lag)d, r=\(formatR(e.r)) (\(strengthLabel(e.r))), p=\(String(format: "%.3f", e.p))")
+      out.append("- n=\(e.n), lag=\(e.lag)d, r=\(formatR(e.r)) (\(strengthLabel(e.r))), p=\(e.p.decimalString(3))")
       let xUnit = e.spec.predictor.unit.isEmpty ? "" : " \(e.spec.predictor.unit)"
       let yUnit = e.spec.target.unit.isEmpty ? "" : " \(e.spec.target.unit)"
-      out.append("- slope: \(e.slope >= 0 ? "+" : "")\(String(format: "%.3f", e.slope))\(yUnit)/\(xUnit.isEmpty ? "1" : xUnit.trimmingCharacters(in: .whitespaces)); x̄=\(String(format: "%.2f", e.meanX)); ȳ=\(String(format: "%.2f", e.meanY))")
+      out.append("- slope: \(e.slope >= 0 ? "+" : "")\(e.slope.decimalString(3))\(yUnit)/\(xUnit.isEmpty ? "1" : xUnit.trimmingCharacters(in: .whitespaces)); x̄=\(e.meanX.decimalString(2)); ȳ=\(e.meanY.decimalString(2))")
       if !e.buckets.isEmpty {
         let parts = zip(["Low", "Mid", "High"], e.buckets).map { name, b in
-          "\(name)(x̄=\(String(format: "%.2f", b.centerX)), n=\(b.n)) → ȳ=\(String(format: "%.2f", b.meanY))"
+          "\(name)(x̄=\(b.centerX.decimalString(2)), n=\(b.n)) → ȳ=\(b.meanY.decimalString(2))"
         }
         out.append("- buckets: \(parts.joined(separator: " · "))")
       }
@@ -701,7 +701,7 @@ struct CorrelationEngine {
       for r in result.supplementsTable {
         let arrow = r.delta >= 0 ? "+" : ""
         let prefix = r.emoji.isEmpty ? "" : "\(r.emoji) "
-        lines.append("- \(prefix)\(r.label): taken \(String(format: "%.1f", r.takenMean)) (\(r.takenN)d) · off \(String(format: "%.1f", r.offMean)) (\(r.offN)d) · Δ=\(arrow)\(String(format: "%.1f", r.delta)) · \(r.strength)")
+        lines.append("- \(prefix)\(r.label): taken \(r.takenMean.decimalString()) (\(r.takenN)d) · off \(r.offMean.decimalString()) (\(r.offN)d) · Δ=\(arrow)\(r.delta.decimalString()) · \(r.strength)")
       }
       lines.append("")
     }
@@ -730,7 +730,7 @@ struct CorrelationEngine {
   }
 
   static func formatR(_ r: Double) -> String {
-    "\(r >= 0 ? "+" : "")\(String(format: "%.2f", r))"
+    "\(r >= 0 ? "+" : "")\(r.decimalString(2))"
   }
 
   /// Build (predictor at D-lag, target at D) points. Lag 0 = same day.
