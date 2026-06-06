@@ -43,6 +43,19 @@ struct DayTimelineView: View {
 
   private var isToday: Bool { date == clock.today }
 
+  // Hoisted formatters — these run in render paths; re-allocating a
+  // DateFormatter per render is expensive, so share one configured
+  // instance per distinct config.
+  private static let ymdFormatter: DateFormatter = {
+    let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f
+  }()
+  private static let weekdayFormatter: DateFormatter = {
+    let f = DateFormatter(); f.dateFormat = "EEEE"; return f
+  }()
+  private static let monthDayFormatter: DateFormatter = {
+    let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("MMMd"); return f
+  }()
+
   // MARK: - Body
 
   var body: some View {
@@ -104,18 +117,15 @@ struct DayTimelineView: View {
   }
 
   private var headerDate: String {
-    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
-    guard let d = fmt.date(from: date) else { return date }
+    guard let d = Self.ymdFormatter.date(from: date) else { return date }
     let cal = Calendar.current
     if cal.isDateInToday(d)     { return "Today" }
     if cal.isDateInYesterday(d) { return "Yesterday" }
     let days = cal.dateComponents([.day], from: d, to: Date()).day ?? 0
     if days < 7 {
-      let w = DateFormatter(); w.dateFormat = "EEEE"
-      return w.string(from: d)
+      return Self.weekdayFormatter.string(from: d)
     }
-    let p = DateFormatter(); p.setLocalizedDateFormatFromTemplate("MMMd")
-    return p.string(from: d)
+    return Self.monthDayFormatter.string(from: d)
   }
 
   private var headerRight: String {
@@ -460,8 +470,7 @@ struct DayTimelineView: View {
   /// would span the entire rail and drown out everything else.
   private var calendarBars: [Bar] {
     let cal = Foundation.Calendar.current
-    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
-    guard let dayStart = fmt.date(from: date),
+    guard let dayStart = Self.ymdFormatter.date(from: date),
           let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart) else { return [] }
     let fallbackColor = theme.color(for: "calendar")
     var out: [Bar] = []

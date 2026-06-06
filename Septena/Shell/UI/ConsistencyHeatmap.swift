@@ -34,6 +34,14 @@ struct ConsistencyHeatmap: View {
   private let cell: CGFloat = 12
   private let gap: CGFloat = 3
 
+  private static let ymdFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.calendar = Calendar(identifier: .iso8601)
+    f.timeZone = .current
+    f.dateFormat = "yyyy-MM-dd"
+    return f
+  }()
+
   /// When the user has "Differentiate Without Color" enabled, we overlay
   /// small dot glyphs whose count tracks the intensity level — so the
   /// information the opacity ramp encodes for sighted users is still
@@ -214,18 +222,10 @@ struct ConsistencyHeatmap: View {
   }
 
   static func iso(_ date: Date) -> String {
-    let f = DateFormatter()
-    f.calendar = Calendar(identifier: .iso8601)
-    f.timeZone = .current
-    f.dateFormat = "yyyy-MM-dd"
-    return f.string(from: date)
+    return ymdFormatter.string(from: date)
   }
 
   static func date(fromISO iso: String) -> Date? {
-    let f = DateFormatter()
-    f.calendar = Calendar(identifier: .iso8601)
-    f.timeZone = .current
-    f.dateFormat = "yyyy-MM-dd"
-    return f.date(from: iso)
+    return ymdFormatter.date(from: iso)
   }
 }

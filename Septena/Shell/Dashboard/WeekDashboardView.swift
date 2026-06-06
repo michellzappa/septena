@@ -92,6 +92,15 @@ struct WeekDashboardView: View {
   /// trailing week slice this down themselves (`.suffix(7)`); the heatmap
   /// layout wants the full span.
   private static let historyDays = 90
+
+  /// Cached `yyyy-MM-dd` formatter. `body`-reachable helpers (`sinceDate`
+  /// via `weeklySessionCount`, the weight series) used to allocate a fresh
+  /// `DateFormatter` on every render — expensive; this shares one.
+  private static let ymdFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd"
+    return f
+  }()
   /// Sections the background `reader` handles — everything except tasks,
   /// whose persistence layer is `@MainActor` (tasks read via `refreshTasks`
   /// on the main actor). `loadAll` reads these plus tasks; `.septenaDataChanged`
@@ -764,9 +773,7 @@ struct WeekDashboardView: View {
 
   private func sinceDate(daysBack: Int) -> String {
     let d = Calendar.current.date(byAdding: .day, value: -daysBack, to: Date()) ?? Date()
-    let f = DateFormatter()
-    f.dateFormat = "yyyy-MM-dd"
-    return f.string(from: d)
+    return Self.ymdFormatter.string(from: d)
   }
 
   /// Sessions in the trailing 7 days, derived from the full 90-day
@@ -1781,7 +1788,7 @@ struct WeekDashboardView: View {
   /// `trainingDomainData` (90 days for the Heatmap mode).
   private func lastNDays(_ n: Int) -> [String] {
     let cal = Calendar.current
-    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+    let fmt = Self.ymdFormatter
     return (0..<n).reversed().compactMap { offset in
       cal.date(byAdding: .day, value: -offset, to: Date()).map(fmt.string(from:))
     }
@@ -2166,7 +2173,7 @@ struct WeekDashboardView: View {
   /// weigh-in are nil. Bumped from 7 → 30 in Phase 4b.
   private func weeklyWeightSeries() -> [Double?] {
     let cal = Calendar.current
-    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+    let fmt = Self.ymdFormatter
     // Map date → weight for fast lookup. bodyRows is newest-first; weights
     // may be nil on partial rows so filter those out.
     var byDate: [String: Double] = [:]
@@ -2195,7 +2202,7 @@ struct WeekDashboardView: View {
   /// from 7 → 30 in Phase 4b.
   private func weeklyWeightActual() -> [Double?] {
     let cal = Calendar.current
-    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+    let fmt = Self.ymdFormatter
     var byDate: [String: Double] = [:]
     for r in bodyRows { if let w = r.weightKg { byDate[r.date] = w } }
     let today = cal.startOfDay(for: Date())

@@ -164,6 +164,12 @@ private struct HistoryView: View {
   let row: ModuleTile.HistoryRow
   let accent: Color
 
+  private static let narrowWeekdayFormatter: DateFormatter = {
+    let fmt = DateFormatter()
+    fmt.dateFormat = "EEEEE"     // narrow weekday: single letter
+    return fmt
+  }()
+
   var body: some View {
     // Tile histograms always render 7 columns (last 7 days, oldest →
     // newest). When the caller passes fewer values — e.g. a loader
@@ -197,8 +203,7 @@ private struct HistoryView: View {
   /// keep the tile compact; we accept that the two T's and two S's collide.
   private static func weekdayLabels(count: Int) -> [String] {
     let cal = Calendar.current
-    let fmt = DateFormatter()
-    fmt.dateFormat = "EEEEE"     // narrow weekday: single letter
+    let fmt = narrowWeekdayFormatter
     return (0..<count).reversed().compactMap { offset in
       cal.date(byAdding: .day, value: -offset, to: Date()).map(fmt.string(from:))
     }
@@ -208,6 +213,11 @@ private struct HistoryView: View {
 private struct CenteredHistoryView: View {
   let row: ModuleTile.CenteredHistoryRow
   let accent: Color
+
+  private static let narrowWeekdayFormatter: DateFormatter = {
+    let fmt = DateFormatter(); fmt.dateFormat = "EEEEE"
+    return fmt
+  }()
 
   var body: some View {
     // Always render 7 columns; pad leading days with `nil` (missing) so
@@ -228,7 +238,7 @@ private struct CenteredHistoryView: View {
 
   private func weekdayLabels(count: Int) -> [String] {
     let cal = Calendar.current
-    let fmt = DateFormatter(); fmt.dateFormat = "EEEEE"
+    let fmt = Self.narrowWeekdayFormatter
     return (0..<count).reversed().compactMap { offset in
       cal.date(byAdding: .day, value: -offset, to: Date()).map(fmt.string(from:))
     }

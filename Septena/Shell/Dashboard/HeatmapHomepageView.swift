@@ -151,6 +151,11 @@ private struct HeatmapDomainCard: View {
 private struct HeatmapDomainRow: View {
   let data: HomepageDomainData
 
+  private static let ymdFormatter: DateFormatter = {
+    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+    return fmt
+  }()
+
   /// Days back from today the grid covers. 90 ≈ 13 week columns —
   /// dense enough to read consistency patterns, narrow enough to fit
   /// on an iPhone with the identity column.
@@ -224,7 +229,7 @@ private struct HeatmapDomainRow: View {
       levels = Array(repeating: 0, count: windowDays - levels.count) + levels
     }
     let cal = Calendar.current
-    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+    let fmt = Self.ymdFormatter
     let today = cal.startOfDay(for: Date())
     var map: [String: Int] = [:]
     for (i, level) in levels.enumerated() {
