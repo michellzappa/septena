@@ -201,6 +201,13 @@ struct SeptenaApp: App {
           // Derive `createdAt` for legacy task rows from their `created`
           // string so the agent-cue decay window has a real instant to read.
           TaskCreatedAtBackfill.runIfNeeded(context: localStore.container.mainContext)
+          #if DEBUG
+          // One-shot, DEBUG-only: register optional CloudKit fields that
+          // exist in code but were never written in Development, so they
+          // promote to Production (which won't auto-register on write).
+          // See docs/CloudKitSchema.md § Dev schema reconciliation.
+          SchemaSeedRegistrar.runIfNeeded()
+          #endif
           #if os(iOS)
           TrainingLiveActivityCoordinator.shared.reconcile(with: trainingDraft.draft)
           #endif
