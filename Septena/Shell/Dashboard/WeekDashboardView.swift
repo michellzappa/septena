@@ -113,6 +113,11 @@ struct WeekDashboardView: View {
   /// `@State` so it survives view re-creation (it isn't observed).
   @State private var reader = DashboardReader(modelContainer: LocalStore.shared.container)
 
+  /// Precomputed display data for the data-heavy tiles (Training/Body/GitHub),
+  /// refreshed by `recomputeDerived()` when their inputs change — keeps the
+  /// reshaping out of the render path. See the `Derived` struct.
+  @State private var derived = Derived()
+
   @State private var dailies = NextItemsModel()
   @State private var habitHistory: [Int] = Array(repeating: 0, count: 90)
   @State private var choreHistory: [Int] = Array(repeating: 0, count: 90)
@@ -216,6 +221,14 @@ struct WeekDashboardView: View {
     }
     if let v = ResponseCache.load([ExerciseEntry].self, forKey: CacheKey.recentTraining) { _recentTraining = State(initialValue: v) }
     if let v = ResponseCache.load(MacroColors.self, forKey: CacheKey.macroColors) { _macroColors = State(initialValue: v) }
+    // Prime the derived tile cache from disk so the heavy tiles render with
+    // real data on the very first frame (session types arrive later and
+    // trigger a recompute). Mirrors the cache loads above.
+    _derived = State(initialValue: Self.computeDerived(
+      recentTraining: ResponseCache.load([ExerciseEntry].self, forKey: CacheKey.recentTraining) ?? [],
+      sessionTypes: [],
+      github: ResponseCache.load(GitHubContributions.self, forKey: CacheKey.github) ?? .empty,
+      bodyRows: ResponseCache.load([WithingsRow].self, forKey: CacheKey.bodyRows) ?? []))
   }
 
   /// iPhone compact: 1 column. iPad regular: 3 columns.
@@ -261,7 +274,7 @@ struct WeekDashboardView: View {
         if showTodayTimeline { todayTimeline }
         layoutBody
       }
-      .padding(.horizontal, Theme.hPadding)
+      .padding(.horizontal, Theme.pageGutter)
       .padding(.top, 12)
       .padding(.bottom, 80)
       // Regular width (iPad / macOS): a section opens as a pushed full
@@ -503,6 +516,9 @@ struct WeekDashboardView: View {
     }
     if let v = ResponseCache.load([ExerciseEntry].self, forKey: CacheKey.recentTraining) { recentTraining = v }
     if let v = ResponseCache.load(MacroColors.self, forKey: CacheKey.macroColors) { macroColors = v }
+    // Heavy tiles read from `derived`, so prime it from the cache-loaded
+    // inputs before first paint (session types arrive later via menu extras).
+    recomputeDerived()
   }
 
   /// Full reload: read every section off-main via `DashboardReader` in one
@@ -605,6 +621,8 @@ struct WeekDashboardView: View {
       hydrationToday = s.hydrationHistory.last ?? 0
       ResponseCache.save(s.hydrationHistory, forKey: CacheKey.hydrationHistory)
     }
+    // Training inputs (recentTraining) may have changed — refresh the cache.
+    if sections.contains(.training) { recomputeDerived() }
   }
 
   /// Reload a scoped set of sections and apply. Mirror-backed sections read
@@ -670,6 +688,8 @@ struct WeekDashboardView: View {
       ResponseCache.save(gh, forKey: CacheKey.github)
     }
     await HealthKitBridge.shared.refresh()
+    // Body (Withings) + GitHub inputs just landed — refresh the tile cache.
+    recomputeDerived()
   }
 
   /// QuickAdd-menu-only data, loaded on its own hop so it never blocks the
@@ -684,6 +704,9 @@ struct WeekDashboardView: View {
       trainingSessionTypes = m.trainingSessionTypes
       trainingSuggestedId = m.trainingSuggestedId
       trainingDaysAgo = m.trainingDaysAgo
+      // Training effort classification depends on the session-type catalog
+      // that just loaded — recompute so the Training tile reflects it.
+      recomputeDerived()
     }
   }
 
@@ -1126,12 +1149,15 @@ struct WeekDashboardView: View {
   // never inflates the cardio (Z2) totals.
 
   /// Classify one entry's modality and its effort-minute contribution.
-  private func effortContribution(for e: ExerciseEntry)
+  /// Static + `sessionTypes` passed in so it runs inside `computeDerived`
+  /// off the render path.
+  private static func effortContribution(for e: ExerciseEntry,
+                                         sessionTypes: [SessionTypeConfig])
     -> (kind: SessionKind, minutes: Double)
   {
     // Resolve modality: prefer the routine's configured kind, fall back
     // to the seed mapping, then refine an ambiguous `.mixed` from fields.
-    var kind = trainingSessionTypes
+    var kind = sessionTypes
       .first { $0.id.caseInsensitiveCompare(e.session) == .orderedSame }?.kind
       ?? SessionKind.defaulted(for: e.session)
     // Yoga/mobility can hide inside a mixed or mislabeled routine — catch
@@ -1171,13 +1197,14 @@ struct WeekDashboardView: View {
   /// visualization already uses: `cardio` keeps its own band, while
   /// `strengthLike` folds strength + mobility/yoga together (yoga counts
   /// as effort but never as cardio). Keyed by ISO date.
-  private func effortByDate()
+  private static func effortByDate(_ entries: [ExerciseEntry],
+                                   sessionTypes: [SessionTypeConfig])
     -> (strengthLike: [String: Double], cardio: [String: Double])
   {
     var strengthLike: [String: Double] = [:]
     var cardio: [String: Double] = [:]
-    for e in recentTraining {
-      let c = effortContribution(for: e)
+    for e in entries {
+      let c = effortContribution(for: e, sessionTypes: sessionTypes)
       guard c.minutes > 0 else { continue }
       if c.kind == .cardio {
         cardio[e.date, default: 0] += c.minutes
@@ -1186,6 +1213,83 @@ struct WeekDashboardView: View {
       }
     }
     return (strengthLike, cardio)
+  }
+
+  // MARK: - Derived tile cache
+  //
+  // The three data-heavy tiles (Training, Body, GitHub) used to reshape
+  // their series *inside* the view body — iterating every training entry,
+  // every weigh-in, and building a 366-day date array on each render. That
+  // ran for every visible tile on every redraw (taps, logs, scroll), which
+  // is what made the homepage janky. Compute it ONCE whenever the underlying
+  // data changes (`recomputeDerived`); the tiles just read the cached result.
+  struct Derived {
+    var trainStrengthBars7: [Int] = []
+    var trainCardioBars7: [Int] = []
+    var trainStrengthSeries90: [Double] = []
+    var trainCardioSeries90: [Double] = []
+    var weightActual30: [Double?] = []
+    var githubCounts90: [Int] = []
+    var githubStreak: Int = 0
+  }
+
+  static func computeDerived(
+    recentTraining: [ExerciseEntry],
+    sessionTypes: [SessionTypeConfig],
+    github: GitHubContributions,
+    bodyRows: [WithingsRow]
+  ) -> Derived {
+    var d = Derived()
+    let cal = Calendar.current
+    let fmt = ymdFormatter
+    let now = Date()
+    func dayKeys(_ n: Int) -> [String] {
+      (0..<n).reversed().compactMap {
+        cal.date(byAdding: .day, value: -$0, to: now).map(fmt.string(from:))
+      }
+    }
+    let d7 = dayKeys(7)
+    let d90 = dayKeys(90)
+
+    // Training effort → normalized 7-day bars (tile) + raw 90-day series (domain).
+    let effort = effortByDate(recentTraining, sessionTypes: sessionTypes)
+    let maxS = max(1, d7.map { effort.strengthLike[$0] ?? 0 }.max() ?? 0)
+    let maxC = max(1, d7.map { effort.cardio[$0] ?? 0 }.max() ?? 0)
+    d.trainStrengthBars7 = d7.map { Int(((effort.strengthLike[$0] ?? 0) / maxS) * 50) }
+    d.trainCardioBars7   = d7.map { Int(((effort.cardio[$0]       ?? 0) / maxC) * 50) }
+    d.trainStrengthSeries90 = d90.map { effort.strengthLike[$0] ?? 0 }
+    d.trainCardioSeries90   = d90.map { effort.cardio[$0] ?? 0 }
+
+    // GitHub daily counts (90d) + current streak (consecutive days back).
+    let gByDate = Dictionary(github.days.map { ($0.date, $0.count) },
+                             uniquingKeysWith: { a, _ in a })
+    d.githubCounts90 = d90.map { gByDate[$0] ?? 0 }
+    var streak = 0
+    for day in dayKeys(366).reversed() {
+      if (gByDate[day] ?? 0) > 0 { streak += 1 } else { break }
+    }
+    d.githubStreak = streak
+
+    // Body — actual weigh-ins for the last 30 days (nil on gap days).
+    var wByDate: [String: Double] = [:]
+    for r in bodyRows { if let w = r.weightKg { wByDate[r.date] = w } }
+    let startToday = cal.startOfDay(for: now)
+    d.weightActual30 = (0..<30).reversed().map { off -> Double? in
+      guard let dd = cal.date(byAdding: .day, value: -off, to: startToday) else { return nil }
+      return wByDate[fmt.string(from: dd)]
+    }
+    return d
+  }
+
+  /// Recompute the derived tile cache from current state — cheap relative to
+  /// reshaping per-render. Called whenever Training / Body / GitHub inputs land.
+  @MainActor
+  private func recomputeDerived() {
+    derived = Self.computeDerived(
+      recentTraining: recentTraining,
+      sessionTypes: trainingSessionTypes,
+      github: githubContributions,
+      bodyRows: bodyRows)
   }
 
   private func trainingDomainData() -> HomepageDomainData {
@@ -1197,15 +1301,11 @@ struct WeekDashboardView: View {
     let sessionCount = weeklySessionCount
     let minutes = Int(cardio?.daily.last?.rolling7d ?? 0)
     let target = cardio?.targetWeeklyMin ?? 150
-    // Domain data drives Heatmap mode, which needs the long window —
-    // the tile (which uses `lastSevenDays`) stays at 7 by design.
-    let days = lastNDays(90)
-    let effort = effortByDate()
-    // Both series in the same unit (effort-minutes) so cardio is no longer
-    // crushed under strength volume; yoga is folded into strength-like, not
-    // cardio. Same `.stackedBars` visualization as before.
-    let strengthSeries = days.map { effort.strengthLike[$0] ?? 0 }
-    let cardioSeries = days.map { effort.cardio[$0] ?? 0 }
+    // Series come from the precomputed cache (90-day effort-minutes, both
+    // in the same unit so cardio isn't crushed under strength volume; yoga
+    // folds into strength-like). Same `.stackedBars` visualization as before.
+    let strengthSeries = derived.trainStrengthSeries90
+    let cardioSeries = derived.trainCardioSeries90
     return HomepageDomainData(
       domain: .training,
       title: "Training",
@@ -1445,7 +1545,7 @@ struct WeekDashboardView: View {
     let latest = bodyRows.first
     let weight = latest?.weightKg
     let fat = latest?.fatPct
-    let actualSeries = weeklyWeightActual()
+    let actualSeries = derived.weightActual30
     let present = actualSeries.compactMap { $0 }
     let avg = present.isEmpty ? 0.0 : present.reduce(0, +) / Double(present.count)
     let centeredValues: [Double?] = actualSeries.map { $0.map { $0 - avg } }
@@ -1486,33 +1586,15 @@ struct WeekDashboardView: View {
   // user hasn't connected GitHub the series is all-zero and the tile reads
   // "0 this week" — same honest empty state as Sleep without Oura.
 
-  /// Daily contribution counts for the trailing `n` days, aligned to
-  /// `lastNDays(n)` (oldest → newest) so they index the same way every
-  /// other domain's `.bars` history does.
-  private func githubDailyCounts(_ n: Int) -> [Int] {
-    let byDate = Dictionary(uniqueKeysWithValues:
-      githubContributions.days.map { ($0.date, $0.count) })
-    return lastNDays(n).map { byDate[$0] ?? 0 }
-  }
-
-  /// Consecutive days with ≥1 contribution counting back from today.
-  /// Honest: no commits today breaks the streak to 0 (matching the
-  /// destination view's streak and the app's "no grace days" stance).
-  private func githubCurrentStreak() -> Int {
-    let byDate = Dictionary(uniqueKeysWithValues:
-      githubContributions.days.map { ($0.date, $0.count) })
-    var streak = 0
-    for day in lastNDays(366).reversed() {
-      if (byDate[day] ?? 0) > 0 { streak += 1 } else { break }
-    }
-    return streak
-  }
+  // GitHub daily counts + streak are precomputed in `computeDerived`
+  // (off the render path) and read via `derived.githubCounts90` /
+  // `derived.githubStreak`.
 
   private func githubDomainData() -> HomepageDomainData {
-    let counts = githubDailyCounts(90)
+    let counts = derived.githubCounts90
     let today = counts.last ?? 0
     let week = counts.suffix(7).reduce(0, +)
-    let streak = githubCurrentStreak()
+    let streak = derived.githubStreak
     return HomepageDomainData(
       domain: .github,
       title: "GitHub",
@@ -1532,10 +1614,10 @@ struct WeekDashboardView: View {
   // GitHub — daily commit counts; 7-day histogram in the tile, full year
   // in the destination's heatmap.
   private var githubTile: some View {
-    let counts = githubDailyCounts(90)
+    let counts = derived.githubCounts90
     let today = counts.last ?? 0
     let week = counts.suffix(7).reduce(0, +)
-    let streak = githubCurrentStreak()
+    let streak = derived.githubStreak
     let bars = Array(counts.suffix(7))
     return Button { sheetDest = .github } label: {
       ModuleTile(
@@ -1730,12 +1812,8 @@ struct WeekDashboardView: View {
     let minutes = Int(cardio?.daily.last?.rolling7d ?? 0)
     let target = cardio?.targetWeeklyMin ?? 150
 
-    let days = lastSevenDays
-    let effort = effortByDate()
-    let maxS = max(1, days.map { effort.strengthLike[$0] ?? 0 }.max() ?? 0)
-    let maxC = max(1, days.map { effort.cardio[$0] ?? 0 }.max() ?? 0)
-    let strengthBars = days.map { Int(((effort.strengthLike[$0] ?? 0) / maxS) * 50) }
-    let cardioBars   = days.map { Int(((effort.cardio[$0]       ?? 0) / maxC) * 50) }
+    let strengthBars = derived.trainStrengthBars7
+    let cardioBars   = derived.trainCardioBars7
 
     return WeekTrainingTile(
       accent: accent,
@@ -2061,7 +2139,7 @@ struct WeekDashboardView: View {
     let fat    = latest?.fatPct
     // Tile chart is a 7-day window; the full 90-day series lives on
     // `bodyDomainData` for Sparkline / Heatmap modes.
-    let actualSeriesFull = weeklyWeightActual()
+    let actualSeriesFull = derived.weightActual30
     let actualSeries = Array(actualSeriesFull.suffix(7))
     let present = actualSeries.compactMap { $0 }
     let avg = present.isEmpty ? 0.0 : present.reduce(0, +) / Double(present.count)
@@ -2167,50 +2245,8 @@ struct WeekDashboardView: View {
   // Settings is reached from the sidebar (and ⌘, on macOS) — it's an
   // app-level surface, not a Week tile, and not on this toolbar.
 
-  /// Last 30 calendar days oldest→newest (today rightmost) of
-  /// carry-forward weights from `bodyRows`. A day with no weigh-in
-  /// inherits the most recent prior weight; days before the first ever
-  /// weigh-in are nil. Bumped from 7 → 30 in Phase 4b.
-  private func weeklyWeightSeries() -> [Double?] {
-    let cal = Calendar.current
-    let fmt = Self.ymdFormatter
-    // Map date → weight for fast lookup. bodyRows is newest-first; weights
-    // may be nil on partial rows so filter those out.
-    var byDate: [String: Double] = [:]
-    for r in bodyRows { if let w = r.weightKg { byDate[r.date] = w } }
-    // Sorted ascending dates of known weights, for carry-forward search.
-    let knownDates = byDate.keys.sorted()
-    var out: [Double?] = []
-    let today = cal.startOfDay(for: Date())
-    for offset in (0..<30).reversed() {
-      let d = cal.date(byAdding: .day, value: -offset, to: today) ?? today
-      let key = fmt.string(from: d)
-      if let exact = byDate[key] {
-        out.append(exact)
-      } else if let prior = knownDates.last(where: { $0 <= key }) {
-        out.append(byDate[prior])
-      } else {
-        out.append(nil)
-      }
-    }
-    return out
-  }
-
-  /// Last 30 calendar days with actual weigh-ins only — no
-  /// carry-forward. Days without a measurement are nil so the centered
-  /// chart shows stubs rather than collapsing to zero deviation. Bumped
-  /// from 7 → 30 in Phase 4b.
-  private func weeklyWeightActual() -> [Double?] {
-    let cal = Calendar.current
-    let fmt = Self.ymdFormatter
-    var byDate: [String: Double] = [:]
-    for r in bodyRows { if let w = r.weightKg { byDate[r.date] = w } }
-    let today = cal.startOfDay(for: Date())
-    return (0..<30).reversed().map { offset -> Double? in
-      guard let d = cal.date(byAdding: .day, value: -offset, to: today) else { return nil }
-      return byDate[fmt.string(from: d)]
-    }
-  }
+  // The 30-day actual-weigh-in series (no carry-forward) is precomputed in
+  // `computeDerived` off the render path and read via `derived.weightActual30`.
 
   /// 7.2 → "7:12" — compact h:mm form for the tile.
   private func formatHoursShort(_ h: Double) -> String {

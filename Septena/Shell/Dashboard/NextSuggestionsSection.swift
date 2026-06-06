@@ -594,7 +594,8 @@ struct NextSuggestionsSection: View {
         Text("Suggested")
           .font(.septenaSectionTitle)
           .foregroundStyle(Theme.inkSecondary)
-          .padding(.horizontal, Theme.hPadding)
+          // Aligns with the row content inside the card below (rowHInset = Spacing.xl).
+          .padding(.horizontal, Theme.Spacing.xl)
           .padding(.top, Theme.sectionSpacing)
           .padding(.bottom, 6)
         VStack(spacing: 0) {
@@ -618,6 +619,8 @@ private struct NextSuggestionRow: View {
   var model: NextSuggestionsModel
   let nav: NavigationState
   let tint: Color
+
+  @Environment(\.rowHInset) private var rowHInset
 
   var body: some View {
     Button {
@@ -653,7 +656,7 @@ private struct NextSuggestionRow: View {
           .font(.septenaMeta)
           .foregroundStyle(Theme.inkSecondary)
       }
-      .padding(.horizontal, Theme.hPadding)
+      .padding(.horizontal, rowHInset)
       .padding(.vertical, Theme.rowVPadding + 2)
       .contentShape(Rectangle())
     }
