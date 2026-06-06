@@ -178,7 +178,7 @@ struct TasksDestinationView: View {
   }()
   private static let shortFormatter: DateFormatter = {
     let f = DateFormatter()
-    f.dateFormat = "MMM d"
+    f.setLocalizedDateFormatFromTemplate("MMMd")
     return f
   }()
   private static func shortDate(_ iso: String) -> String {
@@ -367,7 +367,7 @@ private struct TaskQuickEditSheet: View {
 
   private static let shortFormatter: DateFormatter = {
     let f = DateFormatter()
-    f.dateFormat = "MMM d"
+    f.setLocalizedDateFormatFromTemplate("MMMd")
     return f
   }()
 

@@ -795,7 +795,7 @@ struct NutritionDestinationView: View {
       let w = DateFormatter(); w.dateFormat = "EEEE"
       return w.string(from: d)
     }
-    let p = DateFormatter(); p.dateFormat = "MMM d"
+    let p = DateFormatter(); p.setLocalizedDateFormatFromTemplate("MMMd")
     return p.string(from: d)
   }
 

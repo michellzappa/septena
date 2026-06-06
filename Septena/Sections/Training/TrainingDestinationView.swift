@@ -479,7 +479,7 @@ struct TrainingDestinationView: View {
         return vals.isEmpty ? 0 : vals.reduce(0, +) / Double(vals.count)
       }()
       let weekFmt: (Date) -> String = { d in
-        let f = DateFormatter(); f.dateFormat = "MMM d"; return f.string(from: d)
+        let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("MMMd"); return f.string(from: d)
       }
       let summary = "Strength volume. This week \(thisWeekValue) hard sets, target \(Int(target)). \(bandText) 8-week trend \(deltaText). Average intensity \(avgIntensity.decimalString()) out of 4."
 
@@ -633,7 +633,7 @@ struct TrainingDestinationView: View {
   @ViewBuilder
   private func intensitySparkline(_ series: [WeekVolumePoint], avg: Double) -> some View {
     let weekFmt: (Date) -> String = { d in
-      let f = DateFormatter(); f.dateFormat = "MMM d"; return f.string(from: d)
+      let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("MMMd"); return f.string(from: d)
     }
     VStack(alignment: .leading, spacing: 4) {
       HStack {
@@ -1086,7 +1086,7 @@ struct TrainingDestinationView: View {
   }
 
   private func shortMonthDay(_ d: Date) -> String {
-    let f = DateFormatter(); f.dateFormat = "MMM d"
+    let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("MMMd")
     return f.string(from: d)
   }
 
@@ -1216,7 +1216,7 @@ struct TrainingDestinationView: View {
       return weekday.string(from: d)
     }
     let pretty = DateFormatter()
-    pretty.dateFormat = "MMM d"
+    pretty.setLocalizedDateFormatFromTemplate("MMMd")
     return pretty.string(from: d)
   }
 
@@ -2470,7 +2470,7 @@ struct TrainingExerciseCard: View {
   private func shortDate(_ iso: String) -> String {
     guard let d = SeptenaDate.parse(iso) else { return iso }
     let f = DateFormatter()
-    f.dateFormat = "MMM d"
+    f.setLocalizedDateFormatFromTemplate("MMMd")
     f.locale = Locale(identifier: "en_US_POSIX")
     return f.string(from: d)
   }

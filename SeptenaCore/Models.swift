@@ -1647,7 +1647,7 @@ enum SeptenaDate {
 
   private static let monthDayFormatter: DateFormatter = {
     let f = DateFormatter()
-    f.dateFormat = "MMM d"
+    f.setLocalizedDateFormatFromTemplate("MMMd")
     return f
   }()
 

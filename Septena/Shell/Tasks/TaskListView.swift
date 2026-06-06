@@ -984,7 +984,7 @@ struct TaskListView: View {
     if cal.isDateInToday(d) { return "Today" }
     if cal.isDateInTomorrow(d) { return "Tomorrow" }
     let f = DateFormatter()
-    f.dateFormat = "MMM d"
+    f.setLocalizedDateFormatFromTemplate("MMMd")
     return f.string(from: d)
   }
 

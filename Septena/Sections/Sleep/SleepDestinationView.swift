@@ -460,7 +460,7 @@ struct SleepDestinationView: View {
       return weekday.string(from: d)
     }
     let pretty = DateFormatter()
-    pretty.dateFormat = "MMM d"
+    pretty.setLocalizedDateFormatFromTemplate("MMMd")
     return pretty.string(from: d)
   }
 
