@@ -15,6 +15,8 @@ struct LogRow: View {
   // training log for difficulty pips and cardio level bars.
   var accessory: AnyView? = nil
 
+  @Environment(\.rowHInset) private var rowHInset
+
   var body: some View {
     HStack(spacing: Theme.iconTextGap) {
       VStack(alignment: .leading, spacing: 2) {
@@ -41,7 +43,7 @@ struct LogRow: View {
           .foregroundStyle(Theme.inkSecondary)
       }
     }
-    .padding(.horizontal, Theme.hPadding)
+    .padding(.horizontal, rowHInset)
     .padding(.vertical, Theme.rowVPadding + 2)
   }
 }

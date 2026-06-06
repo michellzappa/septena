@@ -184,7 +184,7 @@ struct SectionDrawer<Content: View>: View {
           }
         }
       }
-      .padding(.horizontal, 20)
+      .padding(.horizontal, Theme.pageGutter)
       .padding(.top, Theme.Spacing.sm)
       .padding(.bottom, 24)
     }
@@ -257,8 +257,10 @@ struct SectionDrawer<Content: View>: View {
       // appearance is defined in a single place for both single- and
       // multi-action sections. A fixed spacer keeps it in its own glass group,
       // separated from the calendar + goals cluster, on every drawer.
+      // No ToolbarSpacer: it wraps the action in its own glass group, which
+      // renders as a capsule AROUND the button. The system already places the
+      // primaryAction "+" as a standalone prominent control.
       if let onLog, !actions.isEmpty {
-        ToolbarSpacer(.fixed, placement: .primaryAction)
         ToolbarItem(placement: .primaryAction) {
           DrawerActionButton(actions: actions, accent: resolvedAccent, onLog: onLog)
         }
@@ -267,64 +269,46 @@ struct SectionDrawer<Content: View>: View {
   }
 }
 
-/// The drawer's log/action toolbar control. A single component so the action
-/// button's appearance lives in exactly ONE place: single-action sections fire
-/// on tap, multi-action sections present a menu, but both inherit the same
-/// prominent accent glass styling — eliminating the per-branch drift that
-/// previously left menu-based drawers (e.g. Cannabis) unstyled.
+/// The drawer's log/action toolbar control, centralized in ONE component so
+/// every drawer's action button is identical. This is the pre-refactor
+/// rendering exactly: a single action is a plain primaryAction `Button` (which
+/// the system draws as the prominent accent circle), multiple actions are a
+/// plain `Menu`. No custom button/menu style — `.glassProminent`/`.menuStyle`
+/// nest a circle inside the toolbar's own capsule (the pill), so we let the
+/// system render and only carry the section tint.
 struct DrawerActionButton: View {
   let actions: [LogAction]
   let accent: Color
   let onLog: (String) -> Void
 
+  @State private var showingActions = false
+
   var body: some View {
-    // ALWAYS a Menu so the control type — and therefore the rendered shape — is
-    // identical for single- and multi-action sections. A single-action section
-    // still fires on one tap via `primaryAction:` (no extra step); multi-action
-    // sections open the menu. Style + shape live in exactly one place.
     Group {
       if actions.count == 1, let only = actions.first {
-        Menu {
-          menuItems
-        } label: {
-          plusLabel
-        } primaryAction: {
-          onLog(only.id)
+        Button { onLog(only.id) } label: {
+          Label(only.title, systemImage: only.systemImage ?? "plus")
         }
+        .keyboardShortcut("n", modifiers: .command)
       } else {
-        Menu {
-          menuItems
-        } label: {
-          plusLabel
+        // Multi-action: a Button (not a Menu) so it renders as the SAME round
+        // accent control as the single-action case — a prominent Menu renders
+        // as a pill. Options are presented in an action sheet instead.
+        Button { showingActions = true } label: {
+          Image(systemName: "plus")
+        }
+        .keyboardShortcut("n", modifiers: .command)
+        .confirmationDialog("Log", isPresented: $showingActions, titleVisibility: .hidden) {
+          ForEach(actions) { action in
+            Button(action.title) { onLog(action.id) }
+          }
         }
       }
     }
-    // System-default circular glass toolbar control (the clean Training look).
-    // Custom labels or `.glassProminent` on a Menu nest a circle inside the
-    // toolbar's own capsule, so we keep the system rendering and just tint.
+    // One prominent accent style for whichever branch renders → identical round
+    // accent button on every drawer, floated out from the calendar/goals cluster.
+    .buttonStyle(.glassProminent)
     .tint(accent)
-  }
-
-  /// The "+" glyph, icon-only so the system renders a compact circular control
-  /// (with a spoken label for accessibility).
-  private var plusLabel: some View {
-    Image(systemName: "plus")
-      .accessibilityLabel(actions.count == 1 ? (actions.first?.title ?? "Log") : "Log")
-  }
-
-  /// The action list. First item carries ⌘N so the most common log path is one
-  /// keystroke — including the single-action case (its lone item).
-  @ViewBuilder private var menuItems: some View {
-    ForEach(Array(actions.enumerated()), id: \.element.id) { idx, action in
-      Button { onLog(action.id) } label: {
-        if let img = action.systemImage {
-          Label(action.title, systemImage: img)
-        } else {
-          Text(action.title)
-        }
-      }
-      .keyboardShortcut(idx == 0 ? KeyboardShortcut("n", modifiers: .command) : nil)
-    }
   }
 }
 
@@ -823,6 +807,23 @@ enum DrawerPadding {
   case standard, tight, none
 }
 
+private struct RowHInsetKey: EnvironmentKey {
+  static let defaultValue: CGFloat = Theme.hPadding
+}
+
+extension EnvironmentValues {
+  /// Horizontal inset a checkable / log row applies between its own edge and
+  /// its content. Defaults to `Theme.hPadding` (20pt) — the value a row needs
+  /// when it's the only frame around its content. A `DrawerSection` card lowers
+  /// it to `Theme.Spacing.xl`: the card already sits 20pt off the screen edge,
+  /// so the full 20pt row inset would stack into a visible double margin. At the
+  /// card's value the row content lines up with the section title instead.
+  var rowHInset: CGFloat {
+    get { self[RowHInsetKey.self] }
+    set { self[RowHInsetKey.self] = newValue }
+  }
+}
+
 struct DrawerSection<Content: View>: View {
   let title: String?
   let spacing: CGFloat
@@ -856,6 +857,10 @@ struct DrawerSection<Content: View>: View {
           .padding(.horizontal, Theme.Spacing.xl)
       }
       paddedStack
+        // Rows dropped into this card (DrawerPadding.none) read this for their
+        // own horizontal inset so they align with the title above instead of
+        // stacking a second 20pt margin inside the already-inset card.
+        .environment(\.rowHInset, Theme.Spacing.xl)
         .frame(maxWidth: .infinity, alignment: .leading)
         // Surface fill from the injected style — opaque card on a solid host,
         // clear on the glass (translucent-sheet) host. One decision, one place.

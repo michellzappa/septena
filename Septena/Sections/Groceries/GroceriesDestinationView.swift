@@ -215,6 +215,8 @@ private struct GroceryRow: View {
   let showCategory: Bool
   let onToggle: () -> Void
 
+  @Environment(\.rowHInset) private var rowHInset
+
   var body: some View {
     HStack(spacing: Theme.iconTextGap) {
       Button(action: onToggle) {
@@ -241,7 +243,7 @@ private struct GroceryRow: View {
       }
       Spacer()
     }
-    .padding(.horizontal, Theme.hPadding)
+    .padding(.horizontal, rowHInset)
     .padding(.vertical, Theme.rowVPadding + 2)
   }
 }

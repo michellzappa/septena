@@ -7,6 +7,7 @@ import SwiftUI
 
 struct SupplementsDestinationView: View {
   @Environment(ChecklistMutator.self) private var checklistMutator
+  @Environment(\.rowHInset) private var rowHInset
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
 
@@ -227,7 +228,7 @@ struct SupplementsDestinationView: View {
         .opacity(item.done ? 0.5 : 1)
       Spacer()
     }
-    .padding(.horizontal, Theme.hPadding)
+    .padding(.horizontal, rowHInset)
     .padding(.vertical, Theme.rowVPadding)
   }
 

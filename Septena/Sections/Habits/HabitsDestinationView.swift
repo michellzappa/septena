@@ -8,6 +8,7 @@ import SwiftUI
 
 struct HabitsDestinationView: View {
   @Environment(ChecklistMutator.self) private var checklistMutator
+  @Environment(\.rowHInset) private var rowHInset
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
   // Optional: this view is also hosted inside the Home-Screen-Quick-Action
@@ -145,7 +146,7 @@ struct HabitsDestinationView: View {
         .opacity(item.done ? 0.5 : 1)
       Spacer()
     }
-    .padding(.horizontal, Theme.hPadding)
+    .padding(.horizontal, rowHInset)
     .padding(.vertical, Theme.rowVPadding)
   }
 

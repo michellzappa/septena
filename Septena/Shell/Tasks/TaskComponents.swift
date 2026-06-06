@@ -106,6 +106,8 @@ struct TaskRow: View {
   let onToggle: () -> Void
   var onTap: (() -> Void)? = nil
 
+  @Environment(\.rowHInset) private var rowHInset
+
   private var isInactive: Bool {
     task.status == .done || task.status == .cancelled
   }
@@ -156,7 +158,7 @@ struct TaskRow: View {
           .foregroundStyle(trailingTint ?? Theme.inkSecondary)
       }
     }
-    .padding(.horizontal, Theme.hPadding)
+    .padding(.horizontal, rowHInset)
     .padding(.vertical, Theme.rowVPadding)
     .contentShape(Rectangle())
     .onTapGesture { onTap?() }
