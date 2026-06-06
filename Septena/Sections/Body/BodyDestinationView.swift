@@ -39,7 +39,7 @@ struct BodyDestinationView: View {
           LogRow(
             title: friendlyDate(row.date),
             detail: detailLine(row),
-            trailing: row.weightKg.map { String(format: "%.1f kg", $0) }
+            trailing: row.weightKg.map { "\($0.decimalString()) kg" }
           )
         }
       }
@@ -62,7 +62,7 @@ struct BodyDestinationView: View {
   private var statsSection: some View {
     StatGrid(columns: 3) {
         statTile(label: "Weight",
-                 value: latest(\.weightKg).map { String(format: "%.1f", $0) },
+                 value: latest(\.weightKg).map { $0.decimalString() },
                  unit: "kg",
                  target: targets.flatMap { t in
                    if let mn = t.weightMinKg, let mx = t.weightMaxKg {
@@ -72,7 +72,7 @@ struct BodyDestinationView: View {
                  },
                  color: accent)
         statTile(label: "Body Fat",
-                 value: latest(\.fatPct).map { String(format: "%.1f", $0) },
+                 value: latest(\.fatPct).map { $0.decimalString() },
                  unit: "%",
                  target: targets.flatMap { t in
                    if let mn = t.fatMinPct, let mx = t.fatMaxPct {
@@ -84,21 +84,21 @@ struct BodyDestinationView: View {
         weeklyDeltaTile
         if latest(\.muscleMassKg) != nil {
           statTile(label: "Muscle",
-                   value: latest(\.muscleMassKg).map { String(format: "%.1f", $0) },
+                   value: latest(\.muscleMassKg).map { $0.decimalString() },
                    unit: "kg",
                    target: nil,
                    color: accent.opacity(0.85))
         }
         if latest(\.hydrationKg) != nil {
           statTile(label: "Hydration",
-                   value: latest(\.hydrationKg).map { String(format: "%.1f", $0) },
+                   value: latest(\.hydrationKg).map { $0.decimalString() },
                    unit: "kg",
                    target: nil,
                    color: accent.opacity(0.6))
         }
         if latest(\.boneMassKg) != nil {
           statTile(label: "Bone Mass",
-                   value: latest(\.boneMassKg).map { String(format: "%.1f", $0) },
+                   value: latest(\.boneMassKg).map { $0.decimalString() },
                    unit: "kg",
                    target: nil,
                    color: accent.opacity(0.5))
@@ -132,7 +132,7 @@ struct BodyDestinationView: View {
     let delta = weeklyWeightDelta()
     let formatted: String? = delta.map { (d: Double) -> String in
       let sign = d > 0 ? "+" : ""
-      return "\(sign)\(String(format: "%.1f", d))"
+      return "\(sign)\(d.decimalString())"
     }
     let color: Color = (delta ?? 0) <= 0 ? accent : .orange
     return StatTile {
@@ -223,16 +223,16 @@ struct BodyDestinationView: View {
       }()
       let valSum = points.map(\.value).reduce(0, +)
       let avg = points.isEmpty ? 0 : valSum / Double(points.count)
-      let projText = projection.map { "Projection in 7 days \(String(format: "%.1f", $0)) \(unit)." } ?? ""
+      let projText = projection.map { "Projection in 7 days \($0.decimalString()) \(unit)." } ?? ""
       let summary = "\(title) trend chart. "
-                  + "Window average \(String(format: "%.1f", avg)) \(unit). "
+                  + "Window average \(avg.decimalString()) \(unit). "
                   + projText
       ChartCard(
         title: title,
         detail: caption,
         accessory: {
           if let p = projection {
-            Text("→ \(String(format: "%.1f", p)) \(unit) in 7d")
+            Text("→ \(p.decimalString()) \(unit) in 7d")
               .font(.caption)
               .foregroundStyle(.secondary)
           }
@@ -251,7 +251,7 @@ struct BodyDestinationView: View {
               .foregroundStyle(accent)
               .symbolSize(28)
               .accessibilityLabel(weekdayFull(p.date))
-              .accessibilityValue("\(String(format: "%.1f", p.value)) \(unit)")
+              .accessibilityValue("\(p.value.decimalString()) \(unit)")
           }
           if let t = trend {
             ForEach(0..<(points.count + 7), id: \.self) { idx in
@@ -329,8 +329,8 @@ struct BodyDestinationView: View {
 
   private func detailLine(_ r: WithingsRow) -> String? {
     var parts: [String] = []
-    if let f = r.fatPct { parts.append(String(format: "%.1f%% fat", f)) }
-    if let m = r.muscleMassKg { parts.append(String(format: "%.1f kg muscle", m)) }
+    if let f = r.fatPct { parts.append("\(f.decimalString())% fat") }
+    if let m = r.muscleMassKg { parts.append("\(m.decimalString()) kg muscle") }
     return parts.isEmpty ? nil : parts.joined(separator: " · ")
   }
 
