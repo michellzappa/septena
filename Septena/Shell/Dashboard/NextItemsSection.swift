@@ -220,19 +220,24 @@ final class NextItemsModel {
   // `.onChange(of: clock.today)` to refetch day-scoped data on rollover.
   private var today: String { SeptenaDate.today }
 
-  // MARK: - Open split (the source of truth for the open list)
+  // MARK: - Open / Done splits (the source of truth for both subviews)
   //
-  // No "done" split: a completed/skipped item lingers in the open list
-  // (struck through) for the settle beat, then fades out in place and is
-  // gone — it never collects in a Done section. `completedChores` etc. still
-  // track session state so the row reads as done while it lingers.
+  // A completed/skipped item lingers in the open list (struck through) for
+  // the settle beat — `completedChores`/`actedHabits` etc. keep it there —
+  // then drops into the Done split, which the "Done Today" log renders at the
+  // bottom of Next.
 
   /// Show an item in the open list if it's still pending OR if the user
-  /// just acted on it this session (keeps it from jumping out from under
-  /// the finger before it fades).
+  /// just acted on it this session (keeps it from jumping to "done").
   var openHabits: [HabitDayItem] {
     habits.filter { h in
       actedHabits.contains(h.id) || (!h.done && !h.skipped)
+    }
+  }
+
+  var doneHabits: [HabitDayItem] {
+    habits.filter { h in
+      !actedHabits.contains(h.id) && (h.done || h.skipped)
     }
   }
 
@@ -242,9 +247,15 @@ final class NextItemsModel {
     }
   }
 
+  var doneSupplements: [SupplementDayItem] {
+    supplements.filter { s in
+      !actedSupplements.contains(s.id) && s.done
+    }
+  }
+
   /// Chores due today or overdue. A just-acted chore lingers in the open list
   /// (struck through) for the settle beat so it doesn't vanish under the
-  /// finger; once the beat clears `actedChores` it fades out in place.
+  /// finger; once the beat clears `actedChores` it drops into `doneChores`.
   var openChores: [ChoreItem] {
     chores
       .filter { $0.daysOverdue >= 0 }
@@ -255,8 +266,21 @@ final class NextItemsModel {
       .sorted { ($0.daysOverdue, $0.name) > ($1.daysOverdue, $1.name) }
   }
 
+  /// Completed- or deferred-this-session chores that have finished lingering
+  /// (no longer in `actedChores`) — they show in the Done strip.
+  var doneChores: [ChoreItem] {
+    chores.filter { c in
+      !actedChores.contains(c.id)
+        && (completedChores.contains(c.id) || deferredChores[c.id] != nil)
+    }
+  }
+
   var hasAnyOpen: Bool {
     !openHabits.isEmpty || !openSupplements.isEmpty || !openChores.isEmpty
+  }
+
+  var hasAnyDone: Bool {
+    !doneHabits.isEmpty || !doneSupplements.isEmpty || !doneChores.isEmpty
   }
 
   // MARK: - Loading
@@ -721,6 +745,52 @@ private struct NextMasonry<Block: View>: View {
       }
     }
     .onPreferenceChange(NextTileHeightsKey.self) { heights = $0 }
+  }
+}
+
+// MARK: - Done subview (rendered after the open list)
+
+struct NextDoneSection: View {
+  var model: NextItemsModel
+  @Environment(ChecklistMutator.self) private var checklistMutator
+  @Environment(SectionTheme.self) private var theme
+
+  var body: some View {
+    let chores = model.doneChores
+    let habits = model.doneHabits
+    let supplements = model.doneSupplements
+
+    VStack(alignment: .leading, spacing: 0) {
+      // No section headers in the done strip — keep it visually quiet.
+      // Items still wear their section accent on the (filled) check. One
+      // hairline between adjacent kinds rather than between every row.
+      if !chores.isEmpty {
+        ForEach(chores) { chore in
+          ChoreRow(chore: chore, model: model, checklistMutator: checklistMutator,
+                   tint: theme.color(for: "chores"))
+        }
+      }
+      if !habits.isEmpty {
+        if !chores.isEmpty { Hairline().padding(.top, 8) }
+        ForEach(habits) { habit in
+          HabitRow(habit: habit, model: model, checklistMutator: checklistMutator,
+                   tint: theme.color(for: "habits"))
+        }
+      }
+      if !supplements.isEmpty {
+        if !chores.isEmpty || !habits.isEmpty {
+          Hairline().padding(.top, 8)
+        }
+        ForEach(supplements) { supp in
+          SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator,
+                        tint: theme.color(for: "supplements"))
+        }
+      }
+    }
+    // Sit in the same rounded "pill" card the open Next blocks use so the
+    // Done log reads as one quiet card rather than floating bare on the
+    // grouped background.
+    .nextSectionCard()
   }
 }
 
