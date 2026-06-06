@@ -146,6 +146,12 @@ enum Theme {
   static let cornerRadius: CGFloat = 22
   static let cornerRadiusSmall: CGFloat = 6
 
+  /// Horizontal inset from the screen edge to the floating "pill" cards in
+  /// every scrolling page (section drawers, the Next feed, the home tile
+  /// grid). The single knob for how far the cards sit off the edge — kept
+  /// tight (closer to a flush list) rather than a wide breathing gutter.
+  static let pageGutter: CGFloat = 12
+
   /// Tap-target width of the row checkbox. Reused by group-header icon
   /// columns and inline-new placeholder so the icon column lines up
   /// across every list row and section header — one X for icons, one X
@@ -166,7 +172,7 @@ enum Theme {
   /// HStack spacing between the icon column and the text column, shared
   /// across closed task rows, the editor row, the new-task placeholder
   /// row, and group headers — so text always starts at the same X.
-  static let iconTextGap: CGFloat = 12
+  static let iconTextGap: CGFloat = 8
 
   #if os(macOS)
   static let hPadding: CGFloat = 12
