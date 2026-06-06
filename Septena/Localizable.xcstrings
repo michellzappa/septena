@@ -2167,12 +2167,12 @@
         }
       }
     },
-    "Mock unlock — no purchase is made yet." : {
+    "Mock unlock. No purchase happens yet." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Desbloqueio fictício — nenhuma compra é feita ainda."
+            "value" : "Desbloqueio fictício. Nenhuma compra é feita ainda."
           }
         }
       }
@@ -2690,12 +2690,12 @@
         }
       }
     },
-    "Power-user features for people who live in the app — starting with the Correlations dashboard and custom app icons." : {
+    "Power-user features for people who live in the app, starting with the Correlations dashboard and custom app icons." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Recursos avançados para quem vive no app — começando pelo painel de Correlações e pelos ícones de app personalizados."
+            "value" : "Recursos avançados para quem vive no app, começando pelo painel de Correlações e pelos ícones de app personalizados."
           }
         }
       }
@@ -3059,12 +3059,12 @@
         }
       }
     },
-    "Septena summarizes your last 7 days of logs — on device, nothing leaves your phone — and reflects them against four cardinal virtues. A mirror, not a scorecard." : {
+    "Septena summarizes your last 7 days of logs (on device, nothing leaves your phone) and reflects them against four cardinal virtues. A mirror, not a scorecard." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Septena resume seus últimos 7 dias de registros — no dispositivo, nada sai do seu telefone — e os reflete diante de quatro virtudes cardeais. Um espelho, não um placar."
+            "value" : "O Septena resume seus últimos 7 dias de registros (no dispositivo, nada sai do seu telefone) e os reflete diante de quatro virtudes cardeais. Um espelho, não um placar."
           }
         }
       }

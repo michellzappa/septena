@@ -285,7 +285,7 @@ enum VirtueSummarizer {
     // Justice always carries its blind-spot line — informational, never
     // a data signal on its own.
     buckets[.justice, default: []].append(
-      VirtueSignal(text: "Most of how you treat others happens off-log — this view sees only what's tracked.",
+      VirtueSignal(text: "Most of how you treat others happens off-log, so this view sees only what's tracked.",
                    valence: .neutral)
     )
 

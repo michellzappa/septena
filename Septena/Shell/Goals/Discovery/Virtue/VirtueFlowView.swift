@@ -54,7 +54,7 @@ final class VirtueViewModel {
       Haptics.success()
     } catch {
       readings = service.fallbackReadings(summary: summary)
-      phase = .failed("The on-device model couldn't finish — showing the plain summary.")
+      phase = .failed("The on-device model couldn't finish, so here's the plain summary.")
       Haptics.warning()
     }
   }
@@ -110,7 +110,7 @@ struct VirtueFlowView: View {
       VStack(alignment: .leading, spacing: 10) {
         Text("Hold the week up to the light")
           .font(.largeTitle.weight(.bold))
-        Text("Septena summarizes your last 7 days of logs — on device, nothing leaves your phone — and reflects them against four cardinal virtues. A mirror, not a scorecard.")
+        Text("Septena summarizes your last 7 days of logs (on device, nothing leaves your phone) and reflects them against four cardinal virtues. A mirror, not a scorecard.")
           .font(.body)
           .foregroundStyle(.secondary)
       }
@@ -246,7 +246,7 @@ struct VirtueFlowView: View {
 
   private func footer(for summary: VirtueWeekSummary) -> some View {
     VStack(alignment: .leading, spacing: 4) {
-      Label("Local & on-device — nothing left your phone.", systemImage: "lock.fill")
+      Label("Local and on-device. Nothing left your phone.", systemImage: "lock.fill")
       Text("Summarized from \(summary.sectionsWithData.count) section\(summary.sectionsWithData.count == 1 ? "" : "s").")
       if !summary.sectionsMissing.isEmpty {
         Text("No data this run: \(summary.sectionsMissing.joined(separator: ", ")).")

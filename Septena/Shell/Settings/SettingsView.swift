@@ -1750,7 +1750,7 @@ struct SeptenaPlusPaywall: View {
         SeptenaPlusBadge()
         Text("Make Septena yours")
           .font(.title2.weight(.semibold))
-        Text("Power-user features for people who live in the app — starting with the Correlations dashboard and custom app icons.")
+        Text("Power-user features for people who live in the app, starting with the Correlations dashboard and custom app icons.")
           .font(.subheadline)
           .foregroundStyle(.secondary)
       }
@@ -1785,7 +1785,7 @@ struct SeptenaPlusPaywall: View {
         Text("Unlock \(SeptenaPlus.name)")
           .font(.subheadline.weight(.semibold))
           .foregroundStyle(.white)
-        Text("Mock unlock — no purchase is made yet.")
+        Text("Mock unlock. No purchase happens yet.")
           .font(.caption).foregroundStyle(.white.opacity(0.6))
       }
     }
