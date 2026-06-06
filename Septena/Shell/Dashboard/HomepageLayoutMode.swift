@@ -36,9 +36,9 @@ enum HomepageLayoutMode: String, CaseIterable, Identifiable, Hashable {
   /// Title shown in Settings → General → Homepage layout.
   var title: String {
     switch self {
-    case .tiles:   return "Histogram"
-    case .dense:   return "Sparkline"
-    case .heatmap: return "Heatmap"
+    case .tiles:   return String(localized: "Histogram", comment: "Homepage layout mode")
+    case .dense:   return String(localized: "Sparkline", comment: "Homepage layout mode")
+    case .heatmap: return String(localized: "Heatmap", comment: "Homepage layout mode")
     }
   }
 
@@ -46,9 +46,9 @@ enum HomepageLayoutMode: String, CaseIterable, Identifiable, Hashable {
   /// each mode optimizes for.
   var summary: String {
     switch self {
-    case .tiles:   return "Card grid with 7-day histogram per tile. Quick-launch + ambient glance."
-    case .dense:   return "Rows with today's value + sparkline. Maximum signal per scroll."
-    case .heatmap: return "Rows with 90-day heatmap grid. Optimized for consistency."
+    case .tiles:   return String(localized: "Card grid with 7-day histogram per tile. Quick-launch + ambient glance.", comment: "Homepage layout mode description")
+    case .dense:   return String(localized: "Rows with today's value + sparkline. Maximum signal per scroll.", comment: "Homepage layout mode description")
+    case .heatmap: return String(localized: "Rows with 90-day heatmap grid. Optimized for consistency.", comment: "Homepage layout mode description")
     }
   }
 

@@ -4662,6 +4662,176 @@
           }
         }
       }
+    },
+    "Drawer" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gaveta"
+          }
+        }
+      }
+    },
+    "Tasks tab" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aba Tarefas"
+          }
+        }
+      }
+    },
+    "Fasting hours" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Horas de jejum"
+          }
+        }
+      }
+    },
+    "Default" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Padrão"
+          }
+        }
+      }
+    },
+    "Red" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vermelho"
+          }
+        }
+      }
+    },
+    "Orange" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laranja"
+          }
+        }
+      }
+    },
+    "Yellow" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amarelo"
+          }
+        }
+      }
+    },
+    "Green" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verde"
+          }
+        }
+      }
+    },
+    "Cyan" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ciano"
+          }
+        }
+      }
+    },
+    "Blue" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Azul"
+          }
+        }
+      }
+    },
+    "Purple" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Roxo"
+          }
+        }
+      }
+    },
+    "Histogram" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Histograma"
+          }
+        }
+      }
+    },
+    "Sparkline" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Minigráfico"
+          }
+        }
+      }
+    },
+    "Heatmap" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mapa de calor"
+          }
+        }
+      }
+    },
+    "Card grid with 7-day histogram per tile. Quick-launch + ambient glance." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grade de cartões com histograma de 7 dias por bloco. Acesso rápido + visão de relance."
+          }
+        }
+      }
+    },
+    "Rows with today's value + sparkline. Maximum signal per scroll." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Linhas com o valor de hoje + minigráfico. Máximo de sinal por rolagem."
+          }
+        }
+      }
+    },
+    "Rows with 90-day heatmap grid. Optimized for consistency." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Linhas com grade de mapa de calor de 90 dias. Otimizado para consistência."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

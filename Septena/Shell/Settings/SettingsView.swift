@@ -115,8 +115,8 @@ enum TasksOpenMode: String, CaseIterable, Identifiable {
   var id: String { rawValue }
   var label: String {
     switch self {
-    case .drawer: return "Drawer"
-    case .tab:    return "Tasks tab"
+    case .drawer: return String(localized: "Drawer", comment: "Tasks-tile open mode")
+    case .tab:    return String(localized: "Tasks tab", comment: "Tasks-tile open mode")
     }
   }
 }
@@ -124,7 +124,7 @@ enum TasksOpenMode: String, CaseIterable, Identifiable {
 enum NutritionHeatmapMetric: String, CaseIterable, Identifiable {
   case protein, fasting
   var id: String { rawValue }
-  var label: String { self == .protein ? "Protein" : "Fasting hours" }
+  var label: String { self == .protein ? String(localized: "Protein", comment: "Nutrition heatmap metric") : String(localized: "Fasting hours", comment: "Nutrition heatmap metric") }
 }
 
 enum AppIconOption: String, CaseIterable, Identifiable {
@@ -141,14 +141,14 @@ enum AppIconOption: String, CaseIterable, Identifiable {
 
   var title: String {
     switch self {
-    case .default: return "Default"
-    case .red:     return "Red"
-    case .orange:  return "Orange"
-    case .yellow:  return "Yellow"
-    case .green:   return "Green"
-    case .cyan:    return "Cyan"
-    case .blue:    return "Blue"
-    case .purple:  return "Purple"
+    case .default: return String(localized: "Default", comment: "App icon color")
+    case .red:     return String(localized: "Red", comment: "App icon color")
+    case .orange:  return String(localized: "Orange", comment: "App icon color")
+    case .yellow:  return String(localized: "Yellow", comment: "App icon color")
+    case .green:   return String(localized: "Green", comment: "App icon color")
+    case .cyan:    return String(localized: "Cyan", comment: "App icon color")
+    case .blue:    return String(localized: "Blue", comment: "App icon color")
+    case .purple:  return String(localized: "Purple", comment: "App icon color")
     }
   }
 
