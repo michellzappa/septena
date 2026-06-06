@@ -22,6 +22,16 @@ settings:
     INFOPLIST_KEY_UILaunchScreen_Generation: YES
     INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
     INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+  configs:
+    # Debug defaults to `-Onone`, which makes SwiftUI/SwiftData/Observation
+    # (all heavily generic) 10–50× slower on-device — the app is unusable
+    # in a plain debug build even though Release is fast. Optimize Debug so
+    # dev-device runs match Release speed. Trade-off: step-debugging is less
+    # precise (locals may read "optimized out", breakpoints can skip inlined
+    # frames). For a pure breakpoint session, temporarily set this back to
+    # `-Onone` in Xcode's build settings (or revert this line).
+    Debug:
+      SWIFT_OPTIMIZATION_LEVEL: "-Osize"
 
 targets:
   Septena:
