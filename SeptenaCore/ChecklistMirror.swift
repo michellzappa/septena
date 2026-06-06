@@ -1,7 +1,12 @@
 import Foundation
 import SwiftData
 
-@MainActor
+// Every method here operates solely on the `ModelContext` it's handed —
+// no main-actor state, no shared singletons — so it's safe to run on
+// whichever actor owns that context. The app calls these with the main
+// context from the main actor; `DashboardReader` calls them with its own
+// background context off-main. Hence no `@MainActor`: pinning these to main
+// is what forced the dashboard's reads to block the UI thread.
 enum ChecklistMirror {
   private static let fallbackHabitBuckets = ["morning", "afternoon", "evening"]
 

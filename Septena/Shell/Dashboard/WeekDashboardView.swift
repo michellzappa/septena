@@ -88,6 +88,22 @@ struct WeekDashboardView: View {
   private static let wideTimelineThreshold: CGFloat = 600
   private static let timelineMaxWidth: CGFloat = 760
 
+  /// History window for every tile's mirror read. Tiles that only show the
+  /// trailing week slice this down themselves (`.suffix(7)`); the heatmap
+  /// layout wants the full span.
+  private static let historyDays = 90
+  /// Sections the background `reader` handles — everything except tasks,
+  /// whose persistence layer is `@MainActor` (tasks read via `refreshTasks`
+  /// on the main actor). `loadAll` reads these plus tasks; `.septenaDataChanged`
+  /// reloads just these (tasks have their own `.septenaTasksChanged` path).
+  private static let mirrorSections = Set(DashSection.allCases).subtracting([.tasks])
+  private static let dataChangeSections = mirrorSections
+
+  /// Off-main SwiftData reader. Owns a background `ModelContext`, so the
+  /// dashboard's mirror reads no longer block the main thread. Held in
+  /// `@State` so it survives view re-creation (it isn't observed).
+  @State private var reader = DashboardReader(modelContainer: LocalStore.shared.container)
+
   @State private var dailies = NextItemsModel()
   @State private var habitHistory: [Int] = Array(repeating: 0, count: 90)
   @State private var choreHistory: [Int] = Array(repeating: 0, count: 90)
@@ -214,7 +230,9 @@ struct WeekDashboardView: View {
       },
       onRefresh: loadAll,
       onTaskChange: {
-        Task { await loadAll() }
+        // A task mutation only touches the Tasks tile — reload just that,
+        // not all ~20 sections. This is the per-toggle hitch fix.
+        Task { await refresh([.tasks]) }
       },
       onDayChange: {
         Task { await loadAll() }
@@ -398,18 +416,10 @@ struct WeekDashboardView: View {
         EmptyView()
       }
     }
-    #if os(iOS)
-    .presentationDetents([.medium, .large])
-    .presentationDragIndicator(.visible)
-    // Maps-style translucent sheet. A Material renders opaque here because a
-    // floating sheet (backgroundInteraction enabled) gives it no backdrop to
-    // blur — so we use a translucent COLOR, which blends by alpha regardless.
-    // Interaction stays enabled to suppress the dimming scrim behind the sheet.
-    .presentationBackground(Color(.systemBackground).opacity(0.55))
-    .presentationBackgroundInteraction(.enabled(upThrough: .large))
-    #else
-    .frame(width: 560, height: 600)
-    #endif
+    // All sheet/presentation chrome (detents, translucent background, glass
+    // surface style) lives in one owner so the drawer look can't drift between
+    // here and SectionDrawer.
+    .sectionDrawerPresentation()
   }
 
   // MARK: - Cache keys
@@ -486,220 +496,186 @@ struct WeekDashboardView: View {
     if let v = ResponseCache.load(MacroColors.self, forKey: CacheKey.macroColors) { macroColors = v }
   }
 
-  /// Fan out the per-tile fetches in parallel. NextItemsModel covers today's
-  /// habits / chores / supplements (used by every "today" stat on the page);
-  /// the two history endpoints provide the 7-day histograms.
-  ///
-  /// Every successful response is mirrored to ResponseCache so the next
-  /// cold launch repaints from disk. Failures leave both the @State and
-  /// the cached blob alone — last-known-good wins until the next refresh.
+  /// Full reload: read every section off-main via `DashboardReader` in one
+  /// pass, apply on the main actor, then layer in the network-backed tiles.
+  /// Each applied value is mirrored to `ResponseCache` so the next cold
+  /// launch repaints from disk before the reload lands.
   private func loadAll() async {
-    async let _ = dailies.load()
-    // Habits / Supplements / Chores / Settings come from the CloudKit-
-    // backed local mirror — no FastAPI round-trip.
-    let ctx = LocalStore.shared.container.mainContext
-    // History window: 30 days so the Heatmap layout mode has a meaningful
-    // strip width. Tile-mode bar charts render the same arrays and now
-    // show 30 thinner bars instead of 7 — visually denser but still
-    // readable. If a particular tile feels cramped, slice `.suffix(7)`
-    // in just that tile's builder.
-    let h: HabitHistoryResponse? = ChecklistMirror.loadHabitsHistory(context: ctx, days: 90)
-    let c: ChoreHistoryResponse? = ChecklistMirror.loadChoresHistory(context: ctx, days: 90)
-    let s: SupplementHistoryResponse? = ChecklistMirror.loadSupplementsHistory(context: ctx, days: 90)
-    let appSettings: AppSettings? = SettingsMirror.loadSettings(context: ctx)
-    let ca: CardioHistoryResponse? = ChecklistMirror.loadTrainingCardioHistory(context: ctx, days: 90)
-    let e: [ExerciseEntry]? = ChecklistMirror.loadTrainingEntries(context: ctx, since: sinceDate(daysBack: 90))
-    async let tc = TaskReads.counts(
-      context: LocalStore.shared.container.mainContext)
-    let th: TasksHistory? = TaskReads.tasksHistory(
-      days: 90, context: LocalStore.shared.container.mainContext)
-    async let tl = TaskReads.list(
-      view: "logbook", days: 1,
-      context: LocalStore.shared.container.mainContext)
-    async let on = try? await OuraProvider.shared.fetchHistory(days: 90)
-    let ns: NutritionStatsResponse? = ChecklistMirror.buildNutritionStatsResponse(context: modelContext, days: 90)
-    let ne: [NutritionEntry]? = ChecklistMirror.loadNutritionToday(context: modelContext)
-    let nt: MacrosConfig? = NutritionPrefs.loadMacrosConfig()
-    let gRes: [GroceryItem]? = ChecklistMirror.loadGroceryItems(context: modelContext)
-    let (t, o) = await (tc, on)
-    if let colors = appSettings?.nutrition?.macroColors {
-      macroColors = colors
-      ResponseCache.save(colors, forKey: CacheKey.macroColors)
+    let snap = await reader.read(Self.mirrorSections,
+                                 today: SeptenaDate.today,
+                                 days: Self.historyDays)
+    apply(snap, Self.mirrorSections)
+    await refreshTasks()
+    await dailies.load()
+    loadMenuExtras()
+    await loadNetwork()
+  }
+
+  /// Assign a reader `Snapshot` to the tile `@State` and mirror each value
+  /// to `ResponseCache`, scoped to the sections that were read. The single
+  /// place mirror data lands in the view — `loadAll` and every scoped
+  /// refresh share it.
+  @MainActor
+  private func apply(_ s: DashboardReader.Snapshot, _ sections: Set<DashSection>) {
+    if sections.contains(.habits) {
+      habitHistory = s.habitHistory
+      ResponseCache.save(s.habitHistory, forKey: CacheKey.habitHistory)
     }
-    if let g = gRes {
-      groceries = g
-      ResponseCache.save(g, forKey: CacheKey.groceries)
+    if sections.contains(.chores) {
+      choreHistory = s.choreHistory
+      ResponseCache.save(s.choreHistory, forKey: CacheKey.choreHistory)
     }
-    if let h {
-      habitHistory = h.daily.map { $0.done }
-      ResponseCache.save(habitHistory, forKey: CacheKey.habitHistory)
+    if sections.contains(.supplements) {
+      supplementHistory = s.supplementHistory
+      ResponseCache.save(s.supplementHistory, forKey: CacheKey.supplementHistory)
     }
-    if let c {
-      choreHistory = c.daily.map { $0.completed }
-      ResponseCache.save(choreHistory, forKey: CacheKey.choreHistory)
-    }
-    if let ca {
-      cardio = ca
-      ResponseCache.save(ca, forKey: CacheKey.cardio)
-    }
-    if let e {
-      trainingSessionDates = Set(e.map(\.date))
+    if sections.contains(.training) {
+      cardio = s.cardio
+      trainingSessionDates = Set(s.trainingEntries.map(\.date))
+      recentTraining = s.trainingEntries
+      if let c = s.cardio { ResponseCache.save(c, forKey: CacheKey.cardio) }
       ResponseCache.save(trainingSessionDates, forKey: CacheKey.trainingDates)
+      ResponseCache.save(s.trainingEntries, forKey: CacheKey.recentTraining)
     }
-    if let s {
-      supplementHistory = s.daily.map { $0.done }
-      ResponseCache.save(supplementHistory, forKey: CacheKey.supplementHistory)
+    if sections.contains(.nutrition) {
+      if let ns = s.nutritionStats {
+        nutritionStats = ns
+        ResponseCache.save(ns, forKey: CacheKey.nutritionStats)
+      }
+      todayNutrition = s.todayNutrition
+      todayProteinSum = s.todayNutrition.reduce(0) { $0 + $1.proteinG }
+      todayKcalSum    = s.todayNutrition.reduce(0) { $0 + $1.kcal }
+      ResponseCache.save(s.todayNutrition, forKey: CacheKey.todayNutrition)
+      if let nt = s.nutritionTarget {
+        nutritionTarget = nt
+        ResponseCache.save(nt, forKey: CacheKey.nutritionTarget)
+      }
+      if let mc = s.macroColors {
+        macroColors = mc
+        ResponseCache.save(mc, forKey: CacheKey.macroColors)
+      }
     }
-    taskCounts = t
-    ResponseCache.save(t, forKey: CacheKey.taskCounts)
-    if let thRes = th {
-      tasksHistory = thRes
-      ResponseCache.save(thRes, forKey: CacheKey.tasksHistory)
+    if sections.contains(.groceries) {
+      groceries = s.groceries
+      ResponseCache.save(s.groceries, forKey: CacheKey.groceries)
     }
-    do {
-      let items = await tl.items
-      completedTasks = items
-      ResponseCache.save(items, forKey: CacheKey.completedTasks)
+    if sections.contains(.caffeine) {
+      if let d = s.caffeineToday {
+        caffeineToday = d
+        ResponseCache.save(d, forKey: CacheKey.caffeineToday)
+      }
+      caffeineHistory = s.caffeineHistory
+      ResponseCache.save(s.caffeineHistory, forKey: CacheKey.caffeineHistory)
     }
-    if let o {
+    if sections.contains(.cannabis) {
+      if let d = s.cannabisToday {
+        cannabisToday = d
+        ResponseCache.save(d, forKey: CacheKey.cannabisToday)
+      }
+      cannabisHistory = s.cannabisHistory
+      ResponseCache.save(s.cannabisHistory, forKey: CacheKey.cannabisHistory)
+    }
+    if sections.contains(.gut) {
+      if let d = s.gutToday {
+        gutToday = d
+        ResponseCache.save(d, forKey: CacheKey.gutToday)
+      }
+      gutHistory = s.gutHistory
+      ResponseCache.save(s.gutHistory, forKey: CacheKey.gutHistory)
+    }
+    if sections.contains(.mood) {
+      if let d = s.moodToday {
+        moodToday = d
+        ResponseCache.save(d, forKey: CacheKey.moodToday)
+      }
+      moodHistory = s.moodHistory
+      ResponseCache.save(s.moodHistory, forKey: CacheKey.moodHistory)
+    }
+    if sections.contains(.hydration) {
+      hydrationHistory = s.hydrationHistory
+      hydrationToday = s.hydrationHistory.last ?? 0
+      ResponseCache.save(s.hydrationHistory, forKey: CacheKey.hydrationHistory)
+    }
+  }
+
+  /// Reload a scoped set of sections and apply. Mirror-backed sections read
+  /// off-main via `reader`; tasks read on the main actor (their persistence
+  /// layer is `@MainActor`). Every change-driven refresh path funnels here.
+  private func refresh(_ sections: Set<DashSection>) async {
+    guard !sections.isEmpty else { return }
+    let mirror = sections.intersection(Self.mirrorSections)
+    if !mirror.isEmpty {
+      let snap = await reader.read(mirror,
+                                   today: SeptenaDate.today,
+                                   days: Self.historyDays)
+      apply(snap, mirror)
+    }
+    if sections.contains(.tasks) {
+      await refreshTasks()
+    }
+    // The "today" items model mirrors habits/supplements/chores — keep it
+    // in step when any of those reloaded.
+    if !sections.isDisjoint(with: [.habits, .chores, .supplements]) {
+      await dailies.load()
+    }
+  }
+
+  /// Reload the Tasks tile on the main actor. `TaskReads` → `LocalCache` is
+  /// `@MainActor`, so unlike the mirror sections this can't go through the
+  /// background reader. Scoped to tasks, it's cheap — a single tile, not the
+  /// whole dashboard.
+  @MainActor
+  private func refreshTasks() async {
+    let ctx = LocalStore.shared.container.mainContext
+    async let countsTask = TaskReads.counts(context: ctx)
+    let history = TaskReads.tasksHistory(days: Self.historyDays, context: ctx)
+    async let listTask = TaskReads.list(view: "logbook", days: 1, context: ctx)
+    let counts = await countsTask
+    taskCounts = counts
+    ResponseCache.save(counts, forKey: CacheKey.taskCounts)
+    tasksHistory = history
+    ResponseCache.save(history, forKey: CacheKey.tasksHistory)
+    let items = await listTask.items
+    completedTasks = items
+    ResponseCache.save(items, forKey: CacheKey.completedTasks)
+  }
+
+  /// Network-backed tiles (Oura, Withings, GitHub, HealthKit). Kept off the
+  /// mirror path and capped at ≤2 concurrent HTTP calls — past ~4 the shared
+  /// URLSession path has heap-corrupted at launch, so GitHub stays sequential.
+  private func loadNetwork() async {
+    async let ouraTask = OuraProvider.shared.fetchHistory(days: Self.historyDays)
+    async let withingsTask = WithingsProvider.shared.fetchHistory(days: Self.historyDays)
+    if let o = try? await ouraTask {
       ouraNights = o
       ResponseCache.save(o, forKey: CacheKey.ouraNights)
     }
-    if let ns {
-      nutritionStats = ns
-      ResponseCache.save(ns, forKey: CacheKey.nutritionStats)
-    }
-    if let nt {
-      nutritionTarget = nt
-      ResponseCache.save(nt, forKey: CacheKey.nutritionTarget)
-    }
-    if let ne {
-      let today = SeptenaDate.today
-      let todayEntries = ne.filter { $0.date == today }
-      todayProteinSum = todayEntries.reduce(0) { $0 + $1.proteinG }
-      todayKcalSum    = todayEntries.reduce(0) { $0 + $1.kcal }
-      todayNutrition = todayEntries
-      ResponseCache.save(todayEntries, forKey: CacheKey.todayNutrition)
-    }
-    if let e {
-      recentTraining = e
-      ResponseCache.save(e, forKey: CacheKey.recentTraining)
-    }
-    // Caffeine + Cannabis — read from local SwiftData (CK-synced) so the
-    // dashboard renders instantly from the mirror without a network hop.
-    let cafT: CaffeineDayResponse? = ChecklistMirror.loadCaffeineDay(context: modelContext, date: SeptenaDate.today)
-    let cafH: CaffeineHistoryResponse? = ChecklistMirror.loadCaffeineHistory(context: modelContext, days: 90)
-    let cnbT: CannabisDayResponse? = ChecklistMirror.loadCannabisDay(context: modelContext, date: SeptenaDate.today)
-    let cnbH: CannabisHistoryResponse? = ChecklistMirror.loadCannabisHistory(context: modelContext, days: 90)
-
-    // QuickAdd menu preset data — fire-and-forget on a separate Task so it
-    // doesn't block the rest of `loadAll()`. Adding these to the second
-    // wave's parallel `async let` group triggered "freed pointer was not
-    // the last allocation" heap corruption mid-launch (a SeptenaClient /
-    // URLSession concurrency edge past ~4 simultaneous calls); doing them
-    // inline-but-sequential here would block tile rendering if any one
-    // request stalls. The dashboard tiles don't need this data for first
-    // paint, only when the user opens a context menu.
-    Task { @MainActor in
-      // Caffeine: only the last entry is needed (Repeat is the menu's
-      // only contextual action — bean-picking lives in the sheet).
-      // Pull from local SwiftData; CK has the canonical history now.
-      let recentDescriptor = FetchDescriptor<CaffeineEventEntity>(
-        sortBy: [SortDescriptor(\.date, order: .reverse), SortDescriptor(\.time, order: .reverse)]
-      )
-      if let last = (try? modelContext.fetch(recentDescriptor))?.first {
-        let hh = last.time.split(separator: ":").first.flatMap { Int($0) } ?? 0
-        let mm = last.time.split(separator: ":").dropFirst().first.flatMap { Int($0) } ?? 0
-        caffeineLastEntry = CaffeineTimePoint(date: last.date,
-                                              time: last.time,
-                                              hour: Double(hh) + Double(mm) / 60.0,
-                                              method: last.method,
-                                              beans: last.beans,
-                                              grams: last.grams)
-      }
-      // Cannabis: usesPerCapsule is a constant on CK (3 uses × 0.05g).
-      cannabisUsesPerCapsule = 3
-      // Last vape across all days — drives the "Continue · Hit N / Strain"
-      // row even when there's been no vape today. Mirrors the webapp's
-      // 30-day lookback (we just take the latest, no day cap needed since
-      // SwiftData is local).
-      let lastVapeDescriptor = FetchDescriptor<CannabisEventEntity>(
-        predicate: #Predicate { $0.method == "vape" },
-        sortBy: [SortDescriptor(\.date, order: .reverse), SortDescriptor(\.time, order: .reverse)]
-      )
-      if let last = (try? modelContext.fetch(lastVapeDescriptor))?.first {
-        cannabisLastVape = CannabisEntry(id: last.id, time: last.time, method: last.method,
-                                         strain: last.strain, hit: last.hit, grams: last.grams,
-                                         note: last.note, effect: last.effect)
-      }
-      // Nutrition: 30-day meal history feeds the menu's "Recommended"
-      // scoring and the NutritionSearchSheet's full searchable list.
-      let since = SeptenaDate.format(
-        Calendar.current.date(byAdding: .day, value: -30, to: .now)
-      ) ?? SeptenaDate.today
-      nutritionHistory = ChecklistMirror.loadNutritionEntries(context: modelContext, since: since)
-      // Training: session-type catalog + suggested + daysAgo. Feeds the
-      // menu's "Start: {suggested}" row and the "Recent" section. All
-      // three come from existing endpoints — no new server work needed.
-      trainingSessionTypes = ChecklistMirror.loadSessionTypes(context: modelContext)
-      let resp = ChecklistMirror.loadSuggestedWorkout(context: modelContext)
-      trainingSuggestedId = resp.suggested?.type
-      trainingDaysAgo = resp.daysAgo
-    }
-    if let cafT {
-      caffeineToday = cafT
-      ResponseCache.save(cafT, forKey: CacheKey.caffeineToday)
-    }
-    if let ch = cafH?.daily {
-      caffeineHistory = ch
-      ResponseCache.save(ch, forKey: CacheKey.caffeineHistory)
-    }
-    if let cnbT {
-      cannabisToday = cnbT
-      ResponseCache.save(cnbT, forKey: CacheKey.cannabisToday)
-    }
-    if let cnh = cnbH?.daily {
-      cannabisHistory = cnh
-      ResponseCache.save(cnh, forKey: CacheKey.cannabisHistory)
-    }
-    async let wRows = try? await WithingsProvider.shared.fetchHistory(days: 90)
-    let gT: GutDayResponse? = ChecklistMirror.loadGutDay(context: modelContext, date: SeptenaDate.today)
-    let gH: GutHistoryResponse? = ChecklistMirror.loadGutHistory(context: modelContext, days: 90)
-    let mT: MoodDayResponse = ChecklistMirror.loadMoodDay(context: modelContext, date: SeptenaDate.today)
-    let mH: MoodHistoryResponse = ChecklistMirror.loadMoodHistory(context: modelContext, days: 90)
-    moodToday = mT
-    ResponseCache.save(mT, forKey: CacheKey.moodToday)
-    moodHistory = mH.daily
-    ResponseCache.save(mH.daily, forKey: CacheKey.moodHistory)
-    let hydration = ChecklistMirror.loadHydrationDailyMl(context: modelContext, days: 90)
-    hydrationHistory = hydration
-    hydrationToday = hydration.last ?? 0
-    ResponseCache.save(hydration, forKey: CacheKey.hydrationHistory)
-    let wR = await wRows
-    if let wR {
-      let sorted = wR.sorted { $0.date > $1.date }
+    if let w = try? await withingsTask {
+      let sorted = w.sorted { $0.date > $1.date }
       bodyRows = sorted
       ResponseCache.save(sorted, forKey: CacheKey.bodyRows)
     }
-    // GitHub — fetched sequentially (not in the `async let` group) to stay
-    // within the dashboard's ≤4-concurrent-HTTP ceiling that otherwise
-    // heap-corrupts at launch. Guarded by `hasToken` so users who haven't
-    // connected GitHub pay no network cost; the tile simply renders zeros.
     if GitHubProvider.shared.hasToken,
        let gh = try? await GitHubProvider.shared.fetchContributions(days: 365) {
       githubContributions = gh
       ResponseCache.save(gh, forKey: CacheKey.github)
     }
-    if let gT {
-      gutToday = gT
-      ResponseCache.save(gT, forKey: CacheKey.gutToday)
-    }
-    if let gh = gH?.daily {
-      gutHistory = gh
-      ResponseCache.save(gh, forKey: CacheKey.gutHistory)
-    }
-    // HealthKit — on-device, no FastAPI. Mac builds short-circuit.
     await HealthKitBridge.shared.refresh()
+  }
+
+  /// QuickAdd-menu-only data, loaded on its own hop so it never blocks the
+  /// tiles' first paint (the menus need it only when opened).
+  private func loadMenuExtras() {
+    Task {
+      let m = await reader.menuExtras(today: SeptenaDate.today)
+      caffeineLastEntry = m.caffeineLastEntry
+      cannabisUsesPerCapsule = m.cannabisUsesPerCapsule
+      cannabisLastVape = m.cannabisLastVape
+      nutritionHistory = m.nutritionHistory
+      trainingSessionTypes = m.trainingSessionTypes
+      trainingSuggestedId = m.trainingSuggestedId
+      trainingDaysAgo = m.trainingDaysAgo
+    }
   }
 
   // MARK: - Per-section refresh (quick-add fast path)
@@ -741,11 +717,16 @@ struct WeekDashboardView: View {
         gutHistory = v
       }
     case .nutrition:
-      let repaintToday = ChecklistMirror.loadNutritionToday(context: modelContext)
-      todayNutrition = repaintToday
-      todayProteinSum = repaintToday.reduce(0) { $0 + $1.proteinG }
-      todayKcalSum    = repaintToday.reduce(0) { $0 + $1.kcal }
-      nutritionStats = ChecklistMirror.buildNutritionStatsResponse(context: modelContext, days: 90)
+      // Cache-only optimistic repaint (no main-thread SwiftData) — the
+      // async `refresh` that follows reloads from the mirror off-main.
+      if let v = ResponseCache.load([NutritionEntry].self, forKey: CacheKey.todayNutrition) {
+        todayNutrition = v
+        todayProteinSum = v.reduce(0) { $0 + $1.proteinG }
+        todayKcalSum    = v.reduce(0) { $0 + $1.kcal }
+      }
+      if let v = ResponseCache.load(NutritionStatsResponse.self, forKey: CacheKey.nutritionStats) {
+        nutritionStats = v
+      }
     case .habits:
       if let v = ResponseCache.load([Int].self, forKey: CacheKey.habitHistory) { habitHistory = v }
     case .chores:
@@ -767,88 +748,7 @@ struct WeekDashboardView: View {
   }
 
   private func refresh(section: AddInfoSection) async {
-    switch section {
-    case .cannabis:
-      let d = ChecklistMirror.loadCannabisDay(context: modelContext, date: SeptenaDate.today)
-      cannabisToday = d
-      ResponseCache.save(d, forKey: CacheKey.cannabisToday)
-      let h = ChecklistMirror.loadCannabisHistory(context: modelContext, days: 90).daily
-      cannabisHistory = h
-      ResponseCache.save(h, forKey: CacheKey.cannabisHistory)
-    case .caffeine:
-      let d = ChecklistMirror.loadCaffeineDay(context: modelContext, date: SeptenaDate.today)
-      caffeineToday = d
-      ResponseCache.save(d, forKey: CacheKey.caffeineToday)
-      let h = ChecklistMirror.loadCaffeineHistory(context: modelContext, days: 90).daily
-      caffeineHistory = h
-      ResponseCache.save(h, forKey: CacheKey.caffeineHistory)
-    case .gut:
-      let d = ChecklistMirror.loadGutDay(context: modelContext, date: SeptenaDate.today)
-      gutToday = d
-      ResponseCache.save(d, forKey: CacheKey.gutToday)
-      let h = ChecklistMirror.loadGutHistory(context: modelContext, days: 90).daily
-      gutHistory = h
-      ResponseCache.save(h, forKey: CacheKey.gutHistory)
-    case .nutrition:
-      let todays = ChecklistMirror.loadNutritionToday(context: modelContext)
-      todayNutrition = todays
-      todayProteinSum = todays.reduce(0) { $0 + $1.proteinG }
-      todayKcalSum    = todays.reduce(0) { $0 + $1.kcal }
-      ResponseCache.save(todays, forKey: CacheKey.todayNutrition)
-      let s = ChecklistMirror.buildNutritionStatsResponse(context: modelContext, days: 90)
-      nutritionStats = s
-      ResponseCache.save(s, forKey: CacheKey.nutritionStats)
-    case .habits:
-      async let _ = dailies.load()
-      let h = ChecklistMirror.loadHabitsHistory(
-        context: LocalStore.shared.container.mainContext, days: 90)
-      habitHistory = h.daily.map { $0.done }
-      ResponseCache.save(habitHistory, forKey: CacheKey.habitHistory)
-    case .chores:
-      async let _ = dailies.load()
-      let c = ChecklistMirror.loadChoresHistory(
-        context: LocalStore.shared.container.mainContext, days: 90)
-      choreHistory = c.daily.map { $0.completed }
-      ResponseCache.save(choreHistory, forKey: CacheKey.choreHistory)
-    case .supplements:
-      async let _ = dailies.load()
-      let s = ChecklistMirror.loadSupplementsHistory(
-        context: LocalStore.shared.container.mainContext, days: 90)
-      supplementHistory = s.daily.map { $0.done }
-      ResponseCache.save(supplementHistory, forKey: CacheKey.supplementHistory)
-    case .groceries:
-      let g = ChecklistMirror.loadGroceryItems(context: modelContext)
-      groceries = g
-      ResponseCache.save(g, forKey: CacheKey.groceries)
-    case .tasks:
-      async let tc = TaskReads.counts(
-        context: LocalStore.shared.container.mainContext)
-      let th: TasksHistory? = TaskReads.tasksHistory(
-        days: 90, context: LocalStore.shared.container.mainContext)
-      async let tl = TaskReads.list(
-        view: "logbook", days: 1,
-        context: LocalStore.shared.container.mainContext)
-      let t = await tc
-      taskCounts = t
-      ResponseCache.save(t, forKey: CacheKey.taskCounts)
-      if let th {
-        tasksHistory = th
-        ResponseCache.save(th, forKey: CacheKey.tasksHistory)
-      }
-      let items = await tl.items
-      completedTasks = items
-      ResponseCache.save(items, forKey: CacheKey.completedTasks)
-    case .training:
-      let c = ChecklistMirror.loadTrainingCardioHistory(context: modelContext, days: 90)
-      cardio = c
-      ResponseCache.save(c, forKey: CacheKey.cardio)
-      let e = ChecklistMirror.loadTrainingEntries(context: modelContext,
-                                                  since: sinceDate(daysBack: 90))
-      trainingSessionDates = Set(e.map(\.date))
-      recentTraining = e
-      ResponseCache.save(trainingSessionDates, forKey: CacheKey.trainingDates)
-      ResponseCache.save(e, forKey: CacheKey.recentTraining)
-    }
+    await refresh([DashSection(section)])
   }
 
   /// Re-read every CK-backed tile from its SwiftData mirror. Triggered
@@ -856,13 +756,10 @@ struct WeekDashboardView: View {
   /// cross-device writes) repaint the dashboard. Tasks have their own
   /// `.septenaTasksChanged` path and are skipped here.
   private func repaintAllMirrors() async {
-    for section in AddInfoSection.allCases where section != .tasks {
-      await refresh(section: section)
-    }
-    // Hydration isn't an AddInfoSection (it writes through Nutrition), so
-    // it's refreshed explicitly after the loop — otherwise water logged on
-    // another device would never repaint the tile.
-    await refreshHydration()
+    // CK fetch landed for non-task domains — reload every mirror-backed
+    // section in one off-main pass. Tasks have their own change path
+    // (`.septenaTasksChanged`); mood + hydration ride along here now.
+    await refresh(Self.dataChangeSections)
   }
 
   private func sinceDate(daysBack: Int) -> String {
@@ -2513,12 +2410,7 @@ struct WeekDashboardView: View {
   /// other domains use via tilesDidChange notifications — Mood doesn't
   /// route through AddInfoSection so it refreshes itself.
   private func refreshMood() async {
-    let d = ChecklistMirror.loadMoodDay(context: modelContext, date: SeptenaDate.today)
-    moodToday = d
-    ResponseCache.save(d, forKey: CacheKey.moodToday)
-    let h = ChecklistMirror.loadMoodHistory(context: modelContext, days: 90).daily
-    moodHistory = h
-    ResponseCache.save(h, forKey: CacheKey.moodHistory)
+    await refresh([.mood])
   }
 
   // MARK: - Hydration
@@ -2612,10 +2504,7 @@ struct WeekDashboardView: View {
   /// route through `AddInfoSection.notifyTilesChanged`, so — like Mood —
   /// it refreshes itself from the Nutrition mirror.
   private func refreshHydration() async {
-    let series = ChecklistMirror.loadHydrationDailyMl(context: modelContext, days: 90)
-    hydrationHistory = series
-    hydrationToday = series.last ?? 0
-    ResponseCache.save(series, forKey: CacheKey.hydrationHistory)
+    await refresh([.hydration])
   }
 }
 

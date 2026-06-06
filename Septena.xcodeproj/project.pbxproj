@@ -85,6 +85,7 @@
 		2242B79D13554F2C937E85BD /* NutritionSearchSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 533ABAE12036AA623BE82B59 /* NutritionSearchSheet.swift */; };
 		226BFDEF2964B3BA661ACC67 /* DayTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 880B70E1267B3CAAFFBA9D65 /* DayTimelineView.swift */; };
 		22F585D18BB8F13B4C088F2D /* InsightsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C13CA95314425D0D1DDACB /* InsightsPlugin.swift */; };
+		235C8E02A2E919E2E5FA23D0 /* SchemaSeedRegistrar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A8ACF72CEC4EEB78A6951E1 /* SchemaSeedRegistrar.swift */; };
 		2395786BEB918CD00236678C /* SupplementIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78C110FEAA290C71AE8A57A4 /* SupplementIntents.swift */; };
 		23D0E10A24B9D654D78B129F /* SupplementsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28AD8E60186F9AAF8C1E52A3 /* SupplementsPlugin.swift */; };
 		23E576367F520EA8ACA8C355 /* TaskComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41F8977A576F2BB747E8DBD7 /* TaskComponents.swift */; };
@@ -148,6 +149,7 @@
 		3F551F42D378A536BCFECB01 /* TasksDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40B5D7C95F12FB9F9E53565E /* TasksDestinationView.swift */; };
 		3FE7AEAC8F018966C5592413 /* CaffeineCommit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40EC4A3BEF564998AEF7B95F /* CaffeineCommit.swift */; };
 		403EE99D65456FD99F82D568 /* ActivityDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80D7DFAC856BBE635EBBC6E4 /* ActivityDestinationView.swift */; };
+		406485770B71FC7B93855865 /* DashboardReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = E91427A4EA51692C963F686C /* DashboardReader.swift */; };
 		4077525AE4794C36B68770F9 /* SectionExplainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CA2DD637D2CF49F03A211BB /* SectionExplainer.swift */; };
 		4082657062EBC11108916FAE /* CannabisPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 159121D1191175E510CD312F /* CannabisPlugin.swift */; };
 		40A0EE423552A4504E87DCC4 /* MoodDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12E14E48DFB87C5F1543BEA4 /* MoodDestinationView.swift */; };
@@ -264,6 +266,7 @@
 		78A4E7FB3BB9AED6E920A21E /* EditCannabisEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E49712FC24D8C18675935DF /* EditCannabisEntrySheet.swift */; };
 		78C28CA0B3780E99EC30BC75 /* DayClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFD8EA98B891BB43A0CE4640 /* DayClock.swift */; };
 		79D1DC33EB8C79CE79487DE3 /* DemoSeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13465E0A2D6B50EEAE9C880 /* DemoSeed.swift */; };
+		7B31219E381E3F70CD833622 /* DashboardReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = E91427A4EA51692C963F686C /* DashboardReader.swift */; };
 		7B5CEDE70C1D69D64A2F6CC9 /* ValuesSuggestions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44AF7AFAC799CE9882271F8A /* ValuesSuggestions.swift */; };
 		7BF180B58D52C2BD10BBC5AB /* MenuBarMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD90B8D1D8A0A978D1CE744C /* MenuBarMenu.swift */; };
 		7C9FCE494744086CBC4EFAA7 /* IkigaiMiniApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB16726C9C1C5A2A1CDEDD3 /* IkigaiMiniApp.swift */; };
@@ -340,6 +343,7 @@
 		A4CE6F3B52A5191642AB9316 /* SharedComplicationData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F191C9B4CF7C226C46AC330 /* SharedComplicationData.swift */; };
 		A5A083B827BC6B45473A9F3A /* Fraunces-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 486E060C50F1CDAEAFCE8E73 /* Fraunces-Regular.ttf */; };
 		A5DBCDF52DE4E8E077C6451E /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */; };
+		A612EFA9DBD5AF34CEBE35F0 /* SchemaSeedRegistrar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A8ACF72CEC4EEB78A6951E1 /* SchemaSeedRegistrar.swift */; };
 		A64695EB2E96AEA85444D310 /* Fasting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5835F104E8DFAA668ACCF9A5 /* Fasting.swift */; };
 		A656A1AAAD5DE20253D6ABB7 /* AreasProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44D44998956C28A061A4DBAE /* AreasProjectsView.swift */; };
 		A6D80B6B57734D9155888CC7 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B0FAB25573797D6BF8C9482 /* ContentView.swift */; };
@@ -696,6 +700,7 @@
 		482D9E9FA333137B98A9DBE1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		4847155874CE3B82AD612728 /* WeekDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekDashboardView.swift; sourceTree = "<group>"; };
 		486E060C50F1CDAEAFCE8E73 /* Fraunces-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces-Regular.ttf"; sourceTree = "<group>"; };
+		4A8ACF72CEC4EEB78A6951E1 /* SchemaSeedRegistrar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchemaSeedRegistrar.swift; sourceTree = "<group>"; };
 		4ACB6256DD75D93215BDFD3C /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
 		4D23858A1A44DB2F156B311E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		4D38FA671236F83BEFCB8EBE /* HabitsDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitsDestinationView.swift; sourceTree = "<group>"; };
@@ -868,6 +873,7 @@
 		E4FAB4962B4EB09DF89A16D8 /* CannabisIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CannabisIntents.swift; sourceTree = "<group>"; };
 		E5439F75303F906465F9F2C6 /* SettingsMirror.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsMirror.swift; sourceTree = "<group>"; };
 		E67995E99B0CD2E0D1A07BE2 /* SectionDrawer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionDrawer.swift; sourceTree = "<group>"; };
+		E91427A4EA51692C963F686C /* DashboardReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardReader.swift; sourceTree = "<group>"; };
 		E9769DD4F4BB2D266390D9AE /* ReviewAndSaveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewAndSaveView.swift; sourceTree = "<group>"; };
 		EA64E4CD9F48DE7AFFA52D84 /* GoalRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalRecord.swift; sourceTree = "<group>"; };
 		EB3DA6C707EA3988C90D573B /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
@@ -1332,6 +1338,7 @@
 				64EB95DB6A86885B3FA483C1 /* Migration.swift */,
 				1A7C4DF4E90BB39F4A0D23DE /* ProjectRecord.swift */,
 				7FD1B7B2BAE523F2E4D3F99C /* ProjectsBackend.swift */,
+				4A8ACF72CEC4EEB78A6951E1 /* SchemaSeedRegistrar.swift */,
 				6B8CA0380F3FD3679CE4C676 /* SectionRecord.swift */,
 				50C93BF01E5F69A01E9E9302 /* SettingsRecord.swift */,
 				1CBF0DAD74F9392D507229CE /* TaskReads.swift */,
@@ -1484,6 +1491,7 @@
 			isa = PBXGroup;
 			children = (
 				7D85EAF7345BE84A44B89936 /* CorrelationsHomepageView.swift */,
+				E91427A4EA51692C963F686C /* DashboardReader.swift */,
 				880B70E1267B3CAAFFBA9D65 /* DayTimelineView.swift */,
 				81E6CCEAE6C25B88290F0666 /* DenseHomepageView.swift */,
 				7BD0C4383360CD1A06E2A546 /* HeatmapHomepageView.swift */,
@@ -1942,6 +1950,7 @@
 				9056B762F0365C38DEA0F888 /* CorrelationEngine.swift in Sources */,
 				63BDFE20DBBB08795FD135AE /* CorrelationFeatures.swift in Sources */,
 				BFA5390E06045DBE733EE2BA /* CorrelationsHomepageView.swift in Sources */,
+				406485770B71FC7B93855865 /* DashboardReader.swift in Sources */,
 				DF016EF192B7891D2DBE3CB6 /* DateParser.swift in Sources */,
 				BF8496432439A9FD8CFAE95E /* DayBucket.swift in Sources */,
 				D87619020A982717812E2C6C /* DayBucketHeader.swift in Sources */,
@@ -2065,6 +2074,7 @@
 				CC39344C28C121004522CAB8 /* RootTabView.swift in Sources */,
 				711BBE3777A1E22BE474BDF0 /* RoutineCatalogView.swift in Sources */,
 				FD2D921637A390ABCEA55A9C /* RoutineDetailView.swift in Sources */,
+				A612EFA9DBD5AF34CEBE35F0 /* SchemaSeedRegistrar.swift in Sources */,
 				ABEF14EBDA2904304D5559C3 /* SectionDrawer.swift in Sources */,
 				4E81F7D428FDB2E8DB6E105D /* SectionExplainer.swift in Sources */,
 				713762038CBF75DAC8A73954 /* SectionGoalsStrip.swift in Sources */,
@@ -2228,6 +2238,7 @@
 				0578243E033490DBAFABEEE2 /* CorrelationEngine.swift in Sources */,
 				99F32E2446B12071AC929809 /* CorrelationFeatures.swift in Sources */,
 				1EEF01356485CDA24BA9787E /* CorrelationsHomepageView.swift in Sources */,
+				7B31219E381E3F70CD833622 /* DashboardReader.swift in Sources */,
 				513C8B1D41E5BA85B785129C /* DateParser.swift in Sources */,
 				2781B65014FE7E1D52A10876 /* DayBucket.swift in Sources */,
 				F8FD2F1BF2020A03D3DF018D /* DayBucketHeader.swift in Sources */,
@@ -2351,6 +2362,7 @@
 				6B3C51BC822675123EE51792 /* RootTabView.swift in Sources */,
 				027376E6E47C54E7A535D80C /* RoutineCatalogView.swift in Sources */,
 				3E0184DE60F06697D6F59120 /* RoutineDetailView.swift in Sources */,
+				235C8E02A2E919E2E5FA23D0 /* SchemaSeedRegistrar.swift in Sources */,
 				E414C000AAC8150D9E0C4FF2 /* SectionDrawer.swift in Sources */,
 				4077525AE4794C36B68770F9 /* SectionExplainer.swift in Sources */,
 				78A010829ED331BCE4D95AEE /* SectionGoalsStrip.swift in Sources */,

@@ -6,13 +6,18 @@ enum SettingsMirror {
   private static let encoder = JSONEncoder()
   private static let decoder = JSONDecoder()
 
-  static func loadSettings(context: ModelContext) -> AppSettings? {
+  // `nonisolated`: a pure context read, so `DashboardReader` can pull
+  // settings on its background context off-main. Uses a local decoder
+  // rather than the enum's `@MainActor` shared one (the write methods here
+  // genuinely need main — they push through CKEngine — so the enum stays
+  // `@MainActor` and only this read opts out).
+  nonisolated static func loadSettings(context: ModelContext) -> AppSettings? {
     let singletonID = SettingsCloudKitSchema.singletonID
     let descriptor = FetchDescriptor<SettingsEntity>(
       predicate: #Predicate { $0.id == singletonID }
     )
     guard let entity = try? context.fetch(descriptor).first else { return nil }
-    return try? decoder.decode(AppSettings.self, from: entity.payloadData)
+    return try? JSONDecoder().decode(AppSettings.self, from: entity.payloadData)
   }
 
   static func loadSections(context: ModelContext) -> [SectionConfig] {
