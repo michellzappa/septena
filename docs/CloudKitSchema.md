@@ -84,6 +84,60 @@ view regardless.
 
 ---
 
+## Dev schema reconciliation (verified 2026-06-06)
+
+Diffed the actual **Development** schema export against this code-derived manifest.
+Three buckets. The third is the one that can break Production — read it first.
+
+### 🔴 C. In code, MISSING from the Dev schema → **will fail to write in Production**
+
+Production (unlike Development) does **not** auto-register fields on first write — the
+schema is locked. Any field the app can write that isn't in the deployed Production
+schema causes that record's save to **fail** (stuck `CKSyncEngine` change / broken sync).
+
+These fields exist in code but never registered in Dev because they're optional and were
+**never exercised in the dev build** (no record ever set a non-nil value):
+
+| Record type | Missing field(s) |
+|---|---|
+| `Area` | `context` |
+| `Project` | `completedAt`, `context`, `githubRepo` |
+| `SessionType` | `kind` |
+| `NutritionEntry` | `mealType`, `sugarG`, `saturatedFatG`, `alcoholG`, `sodiumMg`, `cholesterolMg`, `potassiumMg` |
+| `NutritionDaySum` | `sugarG`, `saturatedFatG`, `alcoholG`, `sodiumMg`, `cholesterolMg`, `potassiumMg` |
+
+**Fix (required before deploy):** in a Development build, write each field once so it
+auto-registers — set a Project's `githubRepo`/`context` and complete one, set an Area
+`context`, set a `SessionType.kind`, log a meal that populates every macro
+(`sugarG`/`saturatedFatG`/`alcoholG`/`sodiumMg`/`cholesterolMg`/`potassiumMg`). Confirm
+they appear in the Dev schema, **then** Deploy to Production. Otherwise a real user
+hitting any of these in Prod gets a silent write failure.
+
+### 🟡 A. In Dev schema, no current writer → orphaned ("unused field") cleanup candidates
+
+| Item | Status | Recommendation |
+|---|---|---|
+| `AirReading` (whole type) | Feature removed; gone from code | Delete from Dev before deploy, or it's permanent cruft in Prod |
+| `Area.slug`, `Area.previousSlugs` | Orphaned — local SwiftData props remain, but **no `*Record.swift` encodes them** and the gateway neither reads nor writes them | Decide: revive the slug feature (then fix iOS to encode) **or** delete |
+| `Project.slug`, `Project.previousSlugs` | Same as Area | Same decision |
+
+These cause **zero functional harm** if promoted — the cost is permanence + tidiness.
+Cleanup is optional, but now is the only cheap moment.
+
+### 🟢 B. In Dev schema, not in the (iOS-derived) manifest, but legitimate → **keep**
+
+| Item | Why it's real |
+|---|---|
+| `CannabisStrain` (whole type) | **Gateway-managed catalog** (`listCannabisStrains`/`createCannabisStrain` in `septena-mcp-gateway`), the cannabis analog of `CaffeineBean`. iOS doesn't touch it yet. |
+| `Users` | CloudKit **system record type** (default `roles` field). Built-in; cannot/should not be deleted. |
+
+> Everything else in the export matches the manifest exactly (27 types reconciled).
+> Note this manifest's tables are **iOS-write-derived**; the gateway is a second writer,
+> so `CannabisStrain` and the orphaned `slug` fields don't appear in them — see this
+> section for the full truth.
+
+---
+
 ## Field manifest
 
 **Type legend:** `String`, `Int(64)`, `Double`, `Bytes`, `Timestamp` (Date), `List<String>`.
