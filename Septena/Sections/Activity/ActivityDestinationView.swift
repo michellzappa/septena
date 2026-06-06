@@ -20,7 +20,6 @@ struct ActivityDestinationView: View {
       case .denied:        deniedNotice
       }
     }
-    .trackScreen("activity")
     .tint(accent)
     .task { await bridge.refresh() }
   }

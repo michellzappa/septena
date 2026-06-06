@@ -31,7 +31,6 @@ struct GitHubDestinationView: View {
       }
       emptyState
     }
-    .trackScreen("github")
     .tint(accent)
     .task {
       paintFromCache()

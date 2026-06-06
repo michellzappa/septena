@@ -74,7 +74,6 @@ struct TasksDestinationView: View {
         }
       }
     }
-    .trackScreen("tasks")
     .tint(accent)
     .task { reload() }
     .sheet(item: $editing) { task in

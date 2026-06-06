@@ -57,6 +57,43 @@ struct NutritionDestinationView: View {
   /// Timer.publish — same value the DayTimeline cursor reads.
   private var now: Date { clock.now }
 
+  // MARK: - Cached formatters
+  //
+  // Hoisted from per-call allocations in the chart/row render paths — a fresh
+  // DateFormatter on every render is expensive. Configs are byte-identical to
+  // the originals.
+
+  private static let ymdFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd"
+    return f
+  }()
+
+  private static let ymdCurrentTZFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd"
+    f.timeZone = .current
+    return f
+  }()
+
+  private static let weekdayFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "EEEE"
+    return f
+  }()
+
+  private static let narrowWeekdayFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "EEEEE"  // narrow weekday
+    return f
+  }()
+
+  private static let monthDayFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.setLocalizedDateFormatFromTemplate("MMMd")
+    return f
+  }()
+
   // MARK: - Colors
   //
   // Resolved from `NutritionSettings.macroTiles` (per-id override) with a
@@ -167,24 +204,19 @@ struct NutritionDestinationView: View {
       }
       entriesList
     }
-    .trackScreen("nutrition")
-    .task { reload() }
     // Day rollover: reload so the fasting row, today's totals, and the
-    // "earlier days" grouping all reflect the new day's data.
+    // "earlier days" grouping all reflect the new day's data. The
+    // sectionReload wire below drives the reload (initial load, day
+    // rollover via `on: clock.today`, and `.septenaDataChanged`); this
+    // .onChange keeps only the viewing-pointer roll-forward side effect.
     .onChange(of: clock.today) { _, newToday in
       // Roll the viewing pointer forward only if the user was already
       // looking at "today" — otherwise leave their selection alone.
       if isViewingToday { viewingDate = newToday }
-      reload()
     }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
-      reload()
-    }
-    .adaptiveDetail(item: $editing) { entry in
+    .sectionReload(on: clock.today, onDataChange: true) { await reload() }
+    .drawerDetail(edit: $editing, create: $creating) { entry in
       EditNutritionEntrySheet(original: entry, onDone: { })
-    }
-    .adaptiveDetail(isPresented: $creating) {
-      EditNutritionEntrySheet(original: nil, onDone: { })
     }
     .sheet(isPresented: $searchingMeals) {
       MealRelogSearchView(
@@ -210,16 +242,21 @@ struct NutritionDestinationView: View {
 
   // MARK: - Edit / delete
 
-  private func reload() {
-    let ctx = modelContext
+  private func reload() async {
     // 365-day window — the heatmap and date-strip browsing need the
     // historical archive (FastAPI backfill restored ~50 days; this
     // covers a full year so the user can scroll back across season
     // changes without per-day refetches).
-    entries = ChecklistMirror.loadNutritionEntries(context: ctx, since: sinceDate(daysBack: 365))
-    stats = ChecklistMirror.buildNutritionStatsResponse(context: ctx, days: 90)
+    let since = sinceDate(daysBack: 365)
+    let r = await MirrorReader.shared.read { ctx in
+      (entries: ChecklistMirror.loadNutritionEntries(context: ctx, since: since),
+       stats: ChecklistMirror.buildNutritionStatsResponse(context: ctx, days: 90),
+       settings: SettingsMirror.loadSettings(context: ctx))
+    }
+    entries = r.entries
+    stats = r.stats
     macros = NutritionPrefs.loadMacrosConfig()
-    let settingsRes = SettingsMirror.loadSettings(context: ctx)
+    let settingsRes = r.settings
     tilePrefs = MacroCatalog.reconcile(
       settingsRes?.nutrition?.macroTiles
         ?? legacyPrefs(from: settingsRes?.nutrition?.macroColors)
@@ -285,7 +322,7 @@ struct NutritionDestinationView: View {
         photoAssetID: .some(assetID)
       )
       photoPickerItem = nil
-      reload()
+      Task { await reload() }
       Haptics.tick()
     }
   }
@@ -551,8 +588,7 @@ struct NutritionDestinationView: View {
   /// exact 7-bar window — `stats.daily` omits days with no entries, so a
   /// naive `.suffix(7)` would silently render fewer (or stale) bars.
   private var last7Dates: [String] {
-    let fmt = DateFormatter()
-    fmt.dateFormat = "yyyy-MM-dd"
+    let fmt = Self.ymdFormatter
     let cal = Calendar.current
     return (0..<7).reversed().compactMap { off in
       cal.date(byAdding: .day, value: -off, to: Date()).map(fmt.string(from:))
@@ -782,51 +818,41 @@ struct NutritionDestinationView: View {
   // MARK: - Format helpers
 
   private func friendlyDate(_ iso: String) -> String {
-    let fmt = DateFormatter()
-    fmt.dateFormat = "yyyy-MM-dd"
-    fmt.timeZone = .current
+    let fmt = Self.ymdCurrentTZFormatter
     guard let d = fmt.date(from: iso) else { return iso }
     let cal = Calendar.current
     if cal.isDateInToday(d)     { return "Today" }
     if cal.isDateInYesterday(d) { return "Yesterday" }
     let days = cal.dateComponents([.day], from: d, to: Date()).day ?? 0
     if days < 7 {
-      let w = DateFormatter(); w.dateFormat = "EEEE"
-      return w.string(from: d)
+      return Self.weekdayFormatter.string(from: d)
     }
-    let p = DateFormatter(); p.setLocalizedDateFormatFromTemplate("MMMd")
-    return p.string(from: d)
+    return Self.monthDayFormatter.string(from: d)
   }
 
   private func weekdayInitial(_ iso: String) -> String {
-    let fmt = DateFormatter()
-    fmt.dateFormat = "yyyy-MM-dd"
+    let fmt = Self.ymdFormatter
     guard let d = fmt.date(from: iso) else { return "" }
-    let w = DateFormatter(); w.dateFormat = "EEEEE"  // narrow weekday
-    return w.string(from: d)
+    return Self.narrowWeekdayFormatter.string(from: d)
   }
 
   /// Full weekday name for VoiceOver. The visual axis uses narrow initials
   /// ("M") which read as a single letter and lose meaning — screen readers
   /// hear the per-bar label, which uses the full form ("Monday").
   private func weekdayFull(_ iso: String) -> String {
-    let fmt = DateFormatter()
-    fmt.dateFormat = "yyyy-MM-dd"
+    let fmt = Self.ymdFormatter
     guard let d = fmt.date(from: iso) else { return iso }
     let cal = Calendar.current
     if cal.isDateInToday(d)     { return "Today" }
     if cal.isDateInYesterday(d) { return "Yesterday" }
-    let w = DateFormatter(); w.dateFormat = "EEEE"
-    return w.string(from: d)
+    return Self.weekdayFormatter.string(from: d)
   }
 
   // MARK: - Loading
 
   private func sinceDate(daysBack: Int) -> String {
     let d = Calendar.current.date(byAdding: .day, value: -daysBack, to: Date()) ?? Date()
-    let f = DateFormatter()
-    f.dateFormat = "yyyy-MM-dd"
-    return f.string(from: d)
+    return Self.ymdFormatter.string(from: d)
   }
 }
 

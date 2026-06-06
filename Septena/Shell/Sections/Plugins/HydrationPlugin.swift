@@ -166,7 +166,6 @@ private struct HydrationDestinationView: View {
         preferencesCard
       }
     }
-    .trackScreen("hydration")
     .tint(accent)
     .task { reload() }
     .onChange(of: viewingDate) { _, _ in reload() }

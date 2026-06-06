@@ -56,13 +56,8 @@ struct CaffeineDestinationView: View {
         }
       }
     }
-    .trackScreen("caffeine")
     .tint(accent)
-    .task { reload() }
-    .onChange(of: viewingDate) { _, _ in reload() }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
-      reload()
-    }
+    .sectionReload(on: viewingDate, onDataChange: true) { await reload() }
     .sheet(isPresented: $managingTypes) {
       CaffeineTypeSheet()
         #if os(iOS)
@@ -74,7 +69,7 @@ struct CaffeineDestinationView: View {
       EditCaffeineEntrySheet(
         date: viewingDate,
         original: entry,
-        onSave: { _ in reload() }
+        onSave: { _ in Task { await reload() } }
       )
     }
     .sheet(item: $loggingMethod) { wrap in
@@ -82,14 +77,14 @@ struct CaffeineDestinationView: View {
         date: viewingDate,
         original: nil,
         presetMethod: wrap.method,
-        onSave: { _ in reload() }
+        onSave: { _ in Task { await reload() } }
       )
     }
   }
 
   private func delete(_ entry: CaffeineEntry) {
     caffeine.deleteEntry(id: entry.id)
-    reload()
+    Task { await reload() }
     Haptics.warning()
   }
 
@@ -139,8 +134,11 @@ struct CaffeineDestinationView: View {
     return parts.isEmpty ? nil : parts.joined(separator: " · ")
   }
 
-  private func reload() {
-    today = ChecklistMirror.loadCaffeineDay(context: modelContext, date: viewingDate)
+  private func reload() async {
+    let date = viewingDate
+    today = await MirrorReader.shared.read {
+      ChecklistMirror.loadCaffeineDay(context: $0, date: date)
+    }
     loading = false
   }
 }

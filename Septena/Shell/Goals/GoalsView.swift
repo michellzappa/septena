@@ -64,7 +64,6 @@ struct GoalsView: View {
                     onLog: { _ in addGoal() }) {
         content
       }
-      .trackScreen("goals")
       .task { await load() }
         .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
           goals = LocalCache.goals(in: context)

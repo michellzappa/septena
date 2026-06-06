@@ -119,24 +119,13 @@ struct GroceriesDestinationView: View {
         }
       }
     }
-    .trackScreen("groceries")
     .tint(accent)
-    .task { reload() }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
-      reload()
-    }
-    .adaptiveDetail(item: $editing) { item in
+    .sectionReload(onDataChange: true) { await reload() }
+    .drawerDetail(edit: $editing, create: $creating) { item in
       EditGroceryItemSheet(
         original: item,
         categories: categories,
-        onDone: { _ in reload() }
-      )
-    }
-    .adaptiveDetail(isPresented: $creating) {
-      EditGroceryItemSheet(
-        original: nil,
-        categories: categories,
-        onDone: { _ in reload() }
+        onDone: { _ in Task { await reload() } }
       )
     }
   }
@@ -171,7 +160,7 @@ struct GroceriesDestinationView: View {
 
   private func delete(_ item: GroceryItem) {
     grocery.deleteItem(id: item.id)
-    reload()
+    Task { await reload() }
     Haptics.warning()
   }
 
@@ -179,7 +168,7 @@ struct GroceriesDestinationView: View {
 
   private func toggle(_ item: GroceryItem) {
     grocery.setLow(id: item.id, low: !item.low)
-    reload()
+    Task { await reload() }
     Haptics.tap()
   }
 
@@ -201,15 +190,20 @@ struct GroceriesDestinationView: View {
       for item in lowItems {
         grocery.setLow(id: item.id, low: false)
       }
-      reload()
       AddInfoSection.groceries.notifyTilesChanged()
     }
+    Task { await reload() }
   }
 
-  private func reload() {
-    items = ChecklistMirror.loadGroceryItems(context: modelContext)
-    let cats = ChecklistMirror.loadGroceryCategories(context: modelContext)
-    categories = cats.isEmpty ? DEFAULT_GROCERY_CATEGORIES : cats
+  private func reload() async {
+    let loaded = await MirrorReader.shared.read { ctx in
+      (
+        items: ChecklistMirror.loadGroceryItems(context: ctx),
+        categories: ChecklistMirror.loadGroceryCategories(context: ctx)
+      )
+    }
+    items = loaded.items
+    categories = loaded.categories.isEmpty ? DEFAULT_GROCERY_CATEGORIES : loaded.categories
     loading = false
   }
 }

@@ -48,6 +48,29 @@ struct TrainingDestinationView: View {
   /// ticks over. Older history is reachable through the time-travel control.
   private static let defaultWindowDays = 14
 
+  // Hoisted formatters — these were previously re-allocated inside chart and
+  // row render paths on every render. DateFormatter init parses locale data,
+  // so hoisting to shared statics avoids that cost. Configs are identical to
+  // the original inline ones.
+  private static let ymdFormatter: DateFormatter = {
+    let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f
+  }()
+  private static let ymdLocalFormatter: DateFormatter = {
+    let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.timeZone = .current; return f
+  }()
+  private static let monthDayFormatter: DateFormatter = {
+    let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("MMMd"); return f
+  }()
+  private static let weekdayFormatter: DateFormatter = {
+    let f = DateFormatter(); f.dateFormat = "EEEE"; return f
+  }()
+  private static let narrowWeekdayFormatter: DateFormatter = {
+    let f = DateFormatter(); f.dateFormat = "EEEEE"; return f
+  }()
+  private static let hhmmFormatter: DateFormatter = {
+    let f = DateFormatter(); f.dateFormat = "HH:mm"; f.timeZone = .current; return f
+  }()
+
   /// Sessions shown in the default (today) view: the trailing
   /// `defaultWindowDays`, newest first. Falls back to the single most recent
   /// session when the window is empty so the list never goes blank.
@@ -125,7 +148,6 @@ struct TrainingDestinationView: View {
         }
       }
     }
-    .trackScreen("training")
     .tint(accent)
     .task {
       paintFromCache()
@@ -302,12 +324,16 @@ struct TrainingDestinationView: View {
   private func load() async {
     loading = true
     let since = sinceDate(daysBack: 90)
-    let entriesRes = ChecklistMirror.loadTrainingEntries(context: modelContext, since: since)
-    let cardioRes = ChecklistMirror.loadTrainingCardioHistory(context: modelContext, days: 30)
-    entries = entriesRes
-    ResponseCache.save(entriesRes, forKey: CacheKey.entries)
-    cardio = cardioRes
-    ResponseCache.save(cardioRes, forKey: CacheKey.cardio)
+    // Off-main: the two history reads run on MirrorReader's background
+    // context so opening the Training pane doesn't hitch on the main thread.
+    let r = await MirrorReader.shared.read { ctx in
+      (entries: ChecklistMirror.loadTrainingEntries(context: ctx, since: since),
+       cardio: ChecklistMirror.loadTrainingCardioHistory(context: ctx, days: 30))
+    }
+    entries = r.entries
+    ResponseCache.save(r.entries, forKey: CacheKey.entries)
+    cardio = r.cardio
+    ResponseCache.save(r.cardio, forKey: CacheKey.cardio)
     loading = false
   }
 
@@ -478,7 +504,7 @@ struct TrainingDestinationView: View {
         return vals.isEmpty ? 0 : vals.reduce(0, +) / Double(vals.count)
       }()
       let weekFmt: (Date) -> String = { d in
-        let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("MMMd"); return f.string(from: d)
+        Self.monthDayFormatter.string(from: d)
       }
       let summary = "Strength volume. This week \(thisWeekValue) hard sets, target \(Int(target)). \(bandText) 8-week trend \(deltaText). Average intensity \(avgIntensity.decimalString()) out of 4."
 
@@ -578,8 +604,7 @@ struct TrainingDestinationView: View {
 
   private var weeklyVolumeTrend: [WeekVolumePoint] {
     let cal = Calendar.current
-    let fmt = DateFormatter()
-    fmt.dateFormat = "yyyy-MM-dd"
+    let fmt = Self.ymdFormatter
     // Anchor to this week's start (Monday-ish per user locale).
     let comps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date())
     guard let thisWeekStart = cal.date(from: comps) else { return [] }
@@ -632,7 +657,7 @@ struct TrainingDestinationView: View {
   @ViewBuilder
   private func intensitySparkline(_ series: [WeekVolumePoint], avg: Double) -> some View {
     let weekFmt: (Date) -> String = { d in
-      let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("MMMd"); return f.string(from: d)
+      Self.monthDayFormatter.string(from: d)
     }
     VStack(alignment: .leading, spacing: 4) {
       HStack {
@@ -692,8 +717,7 @@ struct TrainingDestinationView: View {
   /// to gap-fill the bar chart so empty days appear as zero columns rather
   /// than silently disappearing from the series.
   private var last7Dates: [String] {
-    let fmt = DateFormatter()
-    fmt.dateFormat = "yyyy-MM-dd"
+    let fmt = Self.ymdFormatter
     let cal = Calendar.current
     return (0..<7).reversed().compactMap { off in
       cal.date(byAdding: .day, value: -off, to: Date()).map(fmt.string(from:))
@@ -929,7 +953,7 @@ struct TrainingDestinationView: View {
   private var lineData: [LinePoint] {
     let cutoff = sinceDate(daysBack: windowDays)
     let cal = Calendar.current
-    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+    let fmt = Self.ymdFormatter
 
     var byDate: [String: [Double]] = [:]
     let meta = MetaExercise.isMeta(selectedExercise)
@@ -977,7 +1001,7 @@ struct TrainingDestinationView: View {
   /// its own line; days without that category's data are simply omitted so
   /// adjacent same-category sessions connect cleanly.
   private func splitStrengthLineData(cutoff: String) -> [LinePoint] {
-    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+    let fmt = Self.ymdFormatter
     var byKey: [String: [String: [Double]]] = [:]   // session -> iso -> [volume]
     for e in entries where e.date >= cutoff {
       guard isStrengthEntry(e), let v = volumeValue(e) else { continue }
@@ -1085,27 +1109,21 @@ struct TrainingDestinationView: View {
   }
 
   private func shortMonthDay(_ d: Date) -> String {
-    let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("MMMd")
-    return f.string(from: d)
+    return Self.monthDayFormatter.string(from: d)
   }
 
   // Full weekday name for VoiceOver — visual axis uses narrow initials.
   private func weekdayFull(_ iso: String) -> String {
-    let fmt = DateFormatter()
-    fmt.dateFormat = "yyyy-MM-dd"
-    guard let d = fmt.date(from: iso) else { return iso }
+    guard let d = Self.ymdFormatter.date(from: iso) else { return iso }
     let cal = Calendar.current
     if cal.isDateInToday(d)     { return "Today" }
     if cal.isDateInYesterday(d) { return "Yesterday" }
-    let w = DateFormatter(); w.dateFormat = "EEEE"
-    return w.string(from: d)
+    return Self.weekdayFormatter.string(from: d)
   }
 
   private func weekdayInitial(_ iso: String) -> String {
-    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
-    guard let d = fmt.date(from: iso) else { return "" }
-    let w = DateFormatter(); w.dateFormat = "EEEEE"
-    return w.string(from: d)
+    guard let d = Self.ymdFormatter.date(from: iso) else { return "" }
+    return Self.narrowWeekdayFormatter.string(from: d)
   }
 
   private func loadProgression() async {
@@ -1114,8 +1132,10 @@ struct TrainingDestinationView: View {
       return
     }
     progressionLoading = true
-    progression = ChecklistMirror.loadTrainingProgression(context: modelContext,
-                                                          exercise: selectedExercise)
+    let exercise = selectedExercise
+    progression = await MirrorReader.shared.read {
+      ChecklistMirror.loadTrainingProgression(context: $0, exercise: exercise)
+    }
     progressionLoading = false
   }
 
@@ -1185,10 +1205,7 @@ struct TrainingDestinationView: View {
     // `loggedAt` is written as UTC ISO8601 ("…Z"); display in the user's zone.
     let iso = ISO8601DateFormatter()
     if let d = iso.date(from: ts) {
-      let f = DateFormatter()
-      f.dateFormat = "HH:mm"
-      f.timeZone = .current
-      return f.string(from: d)
+      return Self.hhmmFormatter.string(from: d)
     }
     if let tIdx = ts.firstIndex(of: "T") {
       let after = ts.index(after: tIdx)
@@ -1201,29 +1218,20 @@ struct TrainingDestinationView: View {
   /// "Today" / "Yesterday" / weekday name / full date — same vocabulary as
   /// the rest of the app's date display.
   private func friendlyDate(_ iso: String) -> String {
-    let fmt = DateFormatter()
-    fmt.dateFormat = "yyyy-MM-dd"
-    fmt.timeZone = .current
-    guard let d = fmt.date(from: iso) else { return iso }
+    guard let d = Self.ymdLocalFormatter.date(from: iso) else { return iso }
     let cal = Calendar.current
     if cal.isDateInToday(d)     { return "Today" }
     if cal.isDateInYesterday(d) { return "Yesterday" }
     let days = cal.dateComponents([.day], from: d, to: Date()).day ?? 0
     if days < 7 {
-      let weekday = DateFormatter()
-      weekday.dateFormat = "EEEE"
-      return weekday.string(from: d)
+      return Self.weekdayFormatter.string(from: d)
     }
-    let pretty = DateFormatter()
-    pretty.setLocalizedDateFormatFromTemplate("MMMd")
-    return pretty.string(from: d)
+    return Self.monthDayFormatter.string(from: d)
   }
 
   private func sinceDate(daysBack: Int) -> String {
     let d = Calendar.current.date(byAdding: .day, value: -daysBack, to: Date()) ?? Date()
-    let fmt = DateFormatter()
-    fmt.dateFormat = "yyyy-MM-dd"
-    return fmt.string(from: d)
+    return Self.ymdFormatter.string(from: d)
   }
 
 }
@@ -1280,6 +1288,14 @@ private extension Color {
 @Observable
 final class TrainingDraftStore {
   private static let key = "septena.training.draft"
+
+  // Hoisted formatter — was re-allocated per session start.
+  private static let hhmmPosixFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "HH:mm"
+    f.locale = Locale(identifier: "en_US_POSIX")
+    return f
+  }()
 
   /// Cached session-types from the server. Empty until first fetch.
   var sessionTypes: [SessionTypeConfig] = []
@@ -1494,9 +1510,7 @@ final class TrainingDraftStore {
     let prBaselines = TrainingPRCalculator.baselines(for: exercises, in: context)
     let recents = TrainingPRCalculator.recents(for: exercises, in: context, limit: 3)
     let now = Date()
-    let timeF = DateFormatter()
-    timeF.dateFormat = "HH:mm"
-    timeF.locale = Locale(identifier: "en_US_POSIX")
+    let timeF = Self.hhmmPosixFormatter
     let isoF = ISO8601DateFormatter()
     isoF.formatOptions = [.withInternetDateTime]
     draft = DraftSession(
@@ -2159,6 +2173,14 @@ struct TrainingExerciseCard: View {
   /// no banner, no sound, just the row briefly confirming the rep.
   @State private var celebrate = 0
 
+  // Hoisted formatter — was re-allocated per recents-row render.
+  private static let monthDayPosixFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.setLocalizedDateFormatFromTemplate("MMMd")
+    f.locale = Locale(identifier: "en_US_POSIX")
+    return f
+  }()
+
   /// True when this card is the open one in the single-open accordion.
   private var expanded: Bool { openExercise == entry.exercise }
 
@@ -2468,10 +2490,7 @@ struct TrainingExerciseCard: View {
   // abbreviation; the year is implicit since recents are recent.
   private func shortDate(_ iso: String) -> String {
     guard let d = SeptenaDate.parse(iso) else { return iso }
-    let f = DateFormatter()
-    f.setLocalizedDateFormatFromTemplate("MMMd")
-    f.locale = Locale(identifier: "en_US_POSIX")
-    return f.string(from: d)
+    return Self.monthDayPosixFormatter.string(from: d)
   }
 
   private var prPill: some View {

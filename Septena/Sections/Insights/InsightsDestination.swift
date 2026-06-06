@@ -25,7 +25,6 @@ struct InsightsDestinationView: View {
         InsightsLockedView { showPaywall = true }
       }
     }
-    .trackScreen("insights")
     .sheet(isPresented: $showPaywall) {
       SeptenaPlusPaywall { plusUnlocked = true; showPaywall = false }
     }

@@ -58,16 +58,12 @@ struct HabitsDestinationView: View {
         pastDaySection
       }
     }
-    .trackScreen("habits")
     .tint(accent)
     .task {
       model.paintFromCache()
       await model.load()
     }
-    .onChange(of: viewingDate) { _, _ in reloadPastDay() }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
-      reloadPastDay()
-    }
+    .sectionReload(on: viewingDate, onDataChange: true) { await reloadPastDay() }
     .adaptiveDetail(item: $editing) { habit in
       EditHabitSheet(
         original: habit,
@@ -153,9 +149,12 @@ struct HabitsDestinationView: View {
     .padding(.vertical, Theme.rowVPadding)
   }
 
-  private func reloadPastDay() {
+  private func reloadPastDay() async {
     guard !isViewingToday else { pastDay = nil; return }
-    pastDay = ChecklistMirror.loadHabitsDay(context: modelContext, date: viewingDate)
+    let date = viewingDate
+    pastDay = await MirrorReader.shared.read { ctx in
+      ChecklistMirror.loadHabitsDay(context: ctx, date: date)
+    }
   }
 
   private func delete(_ habit: HabitDayItem) {

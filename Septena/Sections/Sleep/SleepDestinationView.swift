@@ -9,6 +9,24 @@ import Charts
 struct SleepDestinationView: View {
   @Environment(SectionTheme.self) private var theme
 
+  // Hoisted formatters — these run in chart/row render paths, so allocating
+  // a DateFormatter per call was wasteful. Configs preserved exactly.
+  private static let ymdFormatter: DateFormatter = {
+    let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f
+  }()
+  private static let ymdLocalTZFormatter: DateFormatter = {
+    let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.timeZone = .current; return f
+  }()
+  private static let weekdayFormatter: DateFormatter = {
+    let f = DateFormatter(); f.dateFormat = "EEEE"; return f
+  }()
+  private static let narrowWeekdayFormatter: DateFormatter = {
+    let f = DateFormatter(); f.dateFormat = "EEEEE"; return f
+  }()
+  private static let monthDayFormatter: DateFormatter = {
+    let f = DateFormatter(); f.setLocalizedDateFormatFromTemplate("MMMd"); return f
+  }()
+
   @State private var nights: [OuraNight] = []
   @State private var loading = true
 
@@ -47,7 +65,6 @@ struct SleepDestinationView: View {
                                description: Text("Connect Oura in Settings › Integrations."))
       }
     }
-    .trackScreen("sleep")
     .tint(accent)
     .task {
       paintFromCache()
@@ -446,40 +463,28 @@ struct SleepDestinationView: View {
   }
 
   private func friendlyDate(_ iso: String) -> String {
-    let fmt = DateFormatter()
-    fmt.dateFormat = "yyyy-MM-dd"
-    fmt.timeZone = .current
-    guard let d = fmt.date(from: iso) else { return iso }
+    guard let d = Self.ymdLocalTZFormatter.date(from: iso) else { return iso }
     let cal = Calendar.current
     if cal.isDateInToday(d)     { return "Today" }
     if cal.isDateInYesterday(d) { return "Yesterday" }
     let days = cal.dateComponents([.day], from: d, to: Date()).day ?? 0
     if days < 7 {
-      let weekday = DateFormatter()
-      weekday.dateFormat = "EEEE"
-      return weekday.string(from: d)
+      return Self.weekdayFormatter.string(from: d)
     }
-    let pretty = DateFormatter()
-    pretty.setLocalizedDateFormatFromTemplate("MMMd")
-    return pretty.string(from: d)
+    return Self.monthDayFormatter.string(from: d)
   }
 
   private func weekdayInitial(_ iso: String) -> String {
-    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
-    guard let d = fmt.date(from: iso) else { return "" }
-    let w = DateFormatter(); w.dateFormat = "EEEEE"
-    return w.string(from: d)
+    guard let d = Self.ymdFormatter.date(from: iso) else { return "" }
+    return Self.narrowWeekdayFormatter.string(from: d)
   }
 
   // Full weekday name for VoiceOver — visual axis uses abbreviated form.
   private func weekdayFull(_ iso: String) -> String {
-    let fmt = DateFormatter()
-    fmt.dateFormat = "yyyy-MM-dd"
-    guard let d = fmt.date(from: iso) else { return iso }
+    guard let d = Self.ymdFormatter.date(from: iso) else { return iso }
     let cal = Calendar.current
     if cal.isDateInToday(d)     { return "Today" }
     if cal.isDateInYesterday(d) { return "Yesterday" }
-    let w = DateFormatter(); w.dateFormat = "EEEE"
-    return w.string(from: d)
+    return Self.weekdayFormatter.string(from: d)
   }
 }

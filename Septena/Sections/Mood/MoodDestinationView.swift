@@ -36,19 +36,14 @@ struct MoodDestinationView: View {
         breakdownSection
       }
     }
-    .trackScreen("mood")
-    .task { reload() }
-    .onChange(of: viewingDate) { _, _ in reload() }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
-      reload()
-    }
+    .sectionReload(on: viewingDate, onDataChange: true) { await reload() }
     .adaptiveDetail(isPresented: $addingNew) {
-      AddMoodPage(onLogged: { reload() })
+      AddMoodPage(onLogged: { Task { await reload() } })
     }
     .adaptiveDetail(item: $editing) { entry in
       EditMoodEntrySheet(date: viewingDate,
                          original: entry,
-                         onSave: { reload() })
+                         onSave: { Task { await reload() } })
     }
   }
 
@@ -68,7 +63,7 @@ struct MoodDestinationView: View {
               Button(role: .destructive) {
                 SeptenaServices.shared.moodMutator.deleteEntry(id: entry.id)
                 Haptics.warning()
-                reload()
+                Task { await reload() }
               } label: {
                 Label("Delete", systemImage: "trash")
               }
@@ -94,22 +89,28 @@ struct MoodDestinationView: View {
     }
   }
 
-  private func reload() {
-    today = ChecklistMirror.loadMoodDay(context: modelContext, date: viewingDate)
+  private func reload() async {
+    let date = viewingDate
     // The monthly breakdown renders only when viewing today, so only
     // refresh it in that mode — saves a fetch when time-travelling.
-    if isViewingToday {
-      monthEntries = loadMonthEntries()
+    let wantsMonth = isViewingToday
+    let result = await MirrorReader.shared.read { ctx in
+      (day: ChecklistMirror.loadMoodDay(context: ctx, date: date),
+       month: wantsMonth ? Self.loadMonthEntries(context: ctx) : nil)
+    }
+    today = result.day
+    if let month = result.month {
+      monthEntries = month
     }
     loading = false
   }
 
-  private func loadMonthEntries() -> [MoodEntry] {
+  private static func loadMonthEntries(context: ModelContext) -> [MoodEntry] {
     let today = SeptenaDate.today
     guard let todayDate = SeptenaDate.parse(today) else { return [] }
     let start = Calendar.current.date(byAdding: .day, value: -29, to: todayDate) ?? todayDate
     let startStr = SeptenaDate.format(start) ?? today
-    let entities = (try? modelContext.fetch(FetchDescriptor<MoodEventEntity>(
+    let entities = (try? context.fetch(FetchDescriptor<MoodEventEntity>(
       predicate: #Predicate { $0.date >= startStr && $0.date <= today }
     ))) ?? []
     return entities.map {

@@ -60,15 +60,13 @@ struct CannabisDestinationView: View {
         }
       }
     }
-    .trackScreen("cannabis")
     .tint(accent)
-    .task { reload() }
-    .onChange(of: viewingDate) { _, _ in reload() }
+    .sectionReload(on: viewingDate, onDataChange: true) { await reload() }
     .adaptiveDetail(item: $editing) { entry in
       EditCannabisEntrySheet(
         date: viewingDate,
         original: entry,
-        onSave: { _ in reload() }
+        onSave: { _ in Task { await reload() } }
       )
     }
     .sheet(item: $loggingMethod) { wrap in
@@ -76,17 +74,14 @@ struct CannabisDestinationView: View {
         date: viewingDate,
         original: nil,
         presetMethod: wrap.method,
-        onSave: { _ in reload() }
+        onSave: { _ in Task { await reload() } }
       )
-    }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
-      reload()
     }
   }
 
   private func delete(_ entry: CannabisEntry) {
     cannabis.deleteEntry(id: entry.id)
-    reload()
+    Task { await reload() }
     Haptics.warning()
   }
 
@@ -164,8 +159,11 @@ struct CannabisDestinationView: View {
       + String(repeating: "○", count: total - clamped)
   }
 
-  private func reload() {
-    today = ChecklistMirror.loadCannabisDay(context: modelContext, date: viewingDate)
+  private func reload() async {
+    let date = viewingDate
+    today = await MirrorReader.shared.read {
+      ChecklistMirror.loadCannabisDay(context: $0, date: date)
+    }
     loading = false
   }
 }

@@ -44,34 +44,22 @@ struct GutDestinationView: View {
         }
       }
     }
-    .trackScreen("gut")
     .tint(accent)
-    .task { reload() }
-    .onChange(of: viewingDate) { _, _ in reload() }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
-      reload()
-    }
+    .sectionReload(on: viewingDate, onDataChange: true) { await reload() }
     // Adaptive: sheet on iPhone, docked inspector on iPad/macOS so editing
     // a logged entry keeps the day's log visible alongside it.
-    .adaptiveDetail(item: $editing) { entry in
+    .drawerDetail(edit: $editing, create: $creating) { entry in
       EditGutEntrySheet(
         date: viewingDate,
         original: entry,
-        onSave: { _ in reload() }
-      )
-    }
-    .adaptiveDetail(isPresented: $creating) {
-      EditGutEntrySheet(
-        date: viewingDate,
-        original: nil,
-        onSave: { _ in reload() }
+        onSave: { _ in Task { await reload() } }
       )
     }
   }
 
   private func delete(_ entry: GutEntry) {
     gut.deleteEntry(id: entry.id)
-    reload()
+    Task { await reload() }
     Haptics.warning()
   }
 
@@ -100,8 +88,11 @@ struct GutDestinationView: View {
     return parts.isEmpty ? nil : parts.joined(separator: " · ")
   }
 
-  private func reload() {
-    today = ChecklistMirror.loadGutDay(context: modelContext, date: viewingDate)
+  private func reload() async {
+    let date = viewingDate
+    today = await MirrorReader.shared.read {
+      ChecklistMirror.loadGutDay(context: $0, date: date)
+    }
     loading = false
   }
 }

@@ -213,6 +213,9 @@ struct SectionDrawer<Content: View>: View {
     .navigationBarTitleDisplayMode(.inline)
     #endif
     .tint(resolvedAccent)
+    // Screen analytics keyed by the section — internalized here so no drawer
+    // hand-passes a `.trackScreen("key")` that always equals `sectionKey`.
+    .trackScreen(sectionKey)
     .toolbar {
       if loadState == .loading {
         // Subtle inline activity indicator next to the title slot so
@@ -275,36 +278,53 @@ struct DrawerActionButton: View {
   let onLog: (String) -> Void
 
   var body: some View {
+    // ALWAYS a Menu so the control type — and therefore the rendered shape — is
+    // identical for single- and multi-action sections. A single-action section
+    // still fires on one tap via `primaryAction:` (no extra step); multi-action
+    // sections open the menu. Style + shape live in exactly one place.
     Group {
       if actions.count == 1, let only = actions.first {
-        Button { onLog(only.id) } label: {
-          Label(only.title, systemImage: only.systemImage ?? "plus")
+        Menu {
+          menuItems
+        } label: {
+          plusLabel
+        } primaryAction: {
+          onLog(only.id)
         }
-        .keyboardShortcut("n", modifiers: .command)
       } else {
         Menu {
-          // First item carries ⌘N so the most common log path is one
-          // keystroke even when multiple options exist.
-          ForEach(Array(actions.enumerated()), id: \.element.id) { idx, action in
-            Button { onLog(action.id) } label: {
-              if let img = action.systemImage {
-                Label(action.title, systemImage: img)
-              } else {
-                Text(action.title)
-              }
-            }
-            .keyboardShortcut(idx == 0 ? KeyboardShortcut("n", modifiers: .command) : nil)
-          }
+          menuItems
         } label: {
-          Image(systemName: "plus")
+          plusLabel
         }
-        // Required for the button style to take effect on a Menu.
-        .menuStyle(.button)
       }
     }
-    // Styling defined ONCE; propagates to whichever branch renders.
-    .buttonStyle(.glassProminent)
+    // System-default circular glass toolbar control (the clean Training look).
+    // Custom labels or `.glassProminent` on a Menu nest a circle inside the
+    // toolbar's own capsule, so we keep the system rendering and just tint.
     .tint(accent)
+  }
+
+  /// The "+" glyph, icon-only so the system renders a compact circular control
+  /// (with a spoken label for accessibility).
+  private var plusLabel: some View {
+    Image(systemName: "plus")
+      .accessibilityLabel(actions.count == 1 ? (actions.first?.title ?? "Log") : "Log")
+  }
+
+  /// The action list. First item carries ⌘N so the most common log path is one
+  /// keystroke — including the single-action case (its lone item).
+  @ViewBuilder private var menuItems: some View {
+    ForEach(Array(actions.enumerated()), id: \.element.id) { idx, action in
+      Button { onLog(action.id) } label: {
+        if let img = action.systemImage {
+          Label(action.title, systemImage: img)
+        } else {
+          Text(action.title)
+        }
+      }
+      .keyboardShortcut(idx == 0 ? KeyboardShortcut("n", modifiers: .command) : nil)
+    }
   }
 }
 
@@ -331,6 +351,38 @@ extension View {
     self
       .frame(width: 560, height: 600)
     #endif
+  }
+}
+
+extension View {
+  /// Standard section data lifecycle in one wire. `perform` runs:
+  ///   • on appear,
+  ///   • whenever `value` changes (e.g. the viewing date) — `.task(id:)` both
+  ///     starts on appear and restarts on change, replacing a separate
+  ///     `.onChange(of:)`, and cancels any in-flight load on a date switch,
+  ///   • on `.septenaDataChanged` when `onDataChange` is true (log drawers that
+  ///     should refresh after a write elsewhere).
+  /// Collapses the `.task` + `.onChange` + `.onReceive` trio every drawer
+  /// repeated. Accepts an `async` closure so both sync `reload()` and
+  /// `paintFromCache(); await load()` shapes fit.
+  func sectionReload<V: Equatable>(
+    on value: V,
+    onDataChange: Bool = false,
+    perform: @escaping () async -> Void
+  ) -> some View {
+    self
+      .task(id: value) { await perform() }
+      .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
+        if onDataChange { Task { @MainActor in await perform() } }
+      }
+  }
+
+  /// Lifecycle variant for drawers with no observed value (no time travel).
+  func sectionReload(
+    onDataChange: Bool = false,
+    perform: @escaping () async -> Void
+  ) -> some View {
+    sectionReload(on: 0, onDataChange: onDataChange, perform: perform)
   }
 }
 
@@ -539,6 +591,20 @@ extension View {
     @ViewBuilder content: @escaping () -> DetailContent
   ) -> some View {
     modifier(AdaptiveDetailFlag(isPresented: isPresented, onDismiss: onDismiss, detail: content))
+  }
+
+  /// Standard edit/create detail pair for a log drawer. Both surfaces use the
+  /// SAME form, differing only by whether an item is present (edit) or `nil`
+  /// (create) — so the form is written once and `content` receives an optional.
+  /// Collapses the two near-identical `.adaptiveDetail` calls every log drawer
+  /// repeated into one.
+  func drawerDetail<Item: Identifiable, DetailContent: View>(
+    edit: Binding<Item?>,
+    create: Binding<Bool>,
+    @ViewBuilder content: @escaping (Item?) -> DetailContent
+  ) -> some View {
+    adaptiveDetail(item: edit) { content($0) }
+      .adaptiveDetail(isPresented: create) { content(nil) }
   }
 }
 

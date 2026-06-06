@@ -48,7 +48,6 @@ struct ChoresDestinationView: View {
         DrawerSection("Later", padding: .none) { ForEach(later) { row(for: $0) } }
       }
     }
-    .trackScreen("chores")
     .tint(accent)
     .task {
       model.paintFromCache()

@@ -39,16 +39,12 @@ struct SupplementsDestinationView: View {
         pastDaySection
       }
     }
-    .trackScreen("supplements")
     .tint(accent)
     .task {
       model.paintFromCache()
       await model.load()
     }
-    .onChange(of: viewingDate) { _, _ in reloadPastDay() }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
-      reloadPastDay()
-    }
+    .sectionReload(on: viewingDate, onDataChange: true) { await reloadPastDay() }
     .adaptiveDetail(item: $editing) { supp in
       EditSupplementSheet(
         original: supp,
@@ -235,9 +231,12 @@ struct SupplementsDestinationView: View {
     .padding(.vertical, Theme.rowVPadding)
   }
 
-  private func reloadPastDay() {
+  private func reloadPastDay() async {
     guard !isViewingToday else { pastDay = nil; return }
-    pastDay = ChecklistMirror.loadSupplementsDay(context: modelContext, date: viewingDate)
+    let date = viewingDate
+    pastDay = await MirrorReader.shared.read { ctx in
+      ChecklistMirror.loadSupplementsDay(context: ctx, date: date)
+    }
   }
 
   private func delete(_ supp: SupplementDayItem) {
