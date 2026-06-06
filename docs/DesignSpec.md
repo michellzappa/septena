@@ -91,6 +91,21 @@ Use the named styles in [Theme.swift](../Septena/Shell/UI/Theme.swift). No raw `
 - `.septenaMeta` / `.septenaMetaStrong` — timestamps, metadata (SF Mono, `footnote`, tabular)
 - `.septenaMetric` — numeric values, counts, durations (SF Mono, `body`, tabular)
 
+## 5.5 Materials & depth (Liquid Glass)
+
+Glass is the **chrome material — it floats above content, never replaces it.** Content surfaces stay on system backgrounds (`Theme.paperBackground` = `systemBackground`; grouped backgrounds inside `Form`s). Rows, cards, and Form content are *not* glass — coating content in glass fights legibility and Apple's iOS-26 guidance.
+
+Where glass belongs: floating **interactive controls** — pills, action bars, circular buttons, quick-action toolbars that hover over scrolling content.
+
+- `.glassEffect(.regular, in: <shape>)` — the base. `in:` is the clip shape: `.capsule` for bars/pills, `.circle` for round buttons, `.rect(cornerRadius: Theme.cornerRadius)` for tiles.
+- `.interactive()` — add for controls that respond to press (lift/specular). Almost always on, for tappable glass.
+- `.tint(accent.opacity(~0.4))` — carries the section accent through the glass when the control is "active"/primary; clear when neutral.
+- **Co-animating glass** (adjacent controls that should merge/morph) goes in a `GlassEffectContainer` with `glassEffectID(_:in:)` so they fluidly combine instead of cross-fading.
+
+Established usages: the Goals Discovery flow chrome, the Mood/Insights/Settings floating controls, and edit-sheet save bars. Match them — one translucent layer at a time; don't stack glass on glass.
+
+Modals use a large continuous corner radius (`Theme.cornerRadius`, 22pt) to match the iOS-26 soft-modal shape. Honor Reduce Transparency: the system substitutes an opaque material automatically, but any *custom* translucency must degrade too.
+
 ## 6. Empty, loading, and error states
 
 `ContentUnavailableView` is the unified empty-state pattern. Required slots: title, `systemImage` (use the section's icon, not a generic placeholder), description.
@@ -101,13 +116,14 @@ Use the named styles in [Theme.swift](../Septena/Shell/UI/Theme.swift). No raw `
 
 ## 7. Edit sheets
 
-Shape shared across `EditCaffeineEntrySheet`, `EditCannabisEntrySheet`, `EditNutritionEntrySheet`:
+Every create/edit form goes through `AdaptiveEditScaffold` ([SectionDrawer.swift](../Septena/Shell/Sections/SectionDrawer.swift)), presented by `.adaptiveDetail(item:)` / `.adaptiveDetail(isPresented:)`. The scaffold absorbs the cross-surface chrome so no form repeats it:
 
-1. `NavigationStack` wrapper.
-2. `Form` with sectioned layout — "When" (`DatePicker`), method/strain/etc. (`Picker`), free-form notes (`TextField(axis: .vertical)`).
-3. Save closure + `dismiss`.
-4. Cancel via the `dismiss` environment.
-5. **No delete in sheet.** Delete lives on the row's context menu.
+1. **Adaptive host** — a docked inspector at regular width (iPad / macOS) with an inline Cancel · title · Save header; a `NavigationStack` bottom **sheet** at compact width (iPhone) with a nav-bar toolbar. Forms never wrap their own `NavigationStack`.
+2. **Body** — a `Form` (or a custom content view) supplied by the form; sectioned layout — dates (`DatePicker` / `WeekStrip`), relations (`Picker`), free-form notes (`TextField(axis: .vertical)`).
+3. **Save** — the form passes an `onSave` closure and a `canSave` flag; the scaffold runs the action then closes. Forms must **not** call `dismiss`/close themselves.
+4. **Cancel** — handled by the scaffold (inline header button on inspector, toolbar button on sheet).
+5. **Destructive / status actions** — may live **in-sheet** when the editor is the primary surface for them (e.g. `EditTaskSheet` carries Delete, Cancel, and Move-to-Someday so it stays at parity with the row's context menu); they act immediately and close via `\.adaptiveDetailClose` with a `dismiss` fallback. Lighter editors leave delete on the row's context menu. Either is fine — the scaffold supports both.
+6. **Detents** — compact-width sheets open at `[.medium, .large]` with a drag indicator; the inspector ignores detents.
 
 ## 8. Centralization rule
 

@@ -684,14 +684,28 @@ struct DrawerSection<Content: View>: View {
           .foregroundStyle(.secondary)
           .padding(.horizontal, Theme.Spacing.xl)
       }
-      paddedStack
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-          RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-            .fill(Theme.secondaryGroupedBackground)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+      card
     }
+  }
+
+  // The grouped content card. On iOS 26 it's a real Liquid Glass surface
+  // (`.glassEffect`) so the card refracts the scrolling content behind it —
+  // matching the floating-control glass used in the Discovery flow. macOS
+  // keeps the opaque secondary-grouped fill (the Mac drawer has no scrolling
+  // content layer behind these cards to refract, and the system sidebar glass
+  // already carries the Tahoe look).
+  private var card: some View {
+    let shape = RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+    let base = paddedStack.frame(maxWidth: .infinity, alignment: .leading)
+    #if os(iOS)
+    return base
+      .glassEffect(.regular, in: shape)
+      .clipShape(shape)
+    #else
+    return base
+      .background(shape.fill(Theme.secondaryGroupedBackground))
+      .clipShape(shape)
+    #endif
   }
 
   @ViewBuilder
