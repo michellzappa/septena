@@ -10,13 +10,19 @@ struct NextView: View {
   @State private var model = NextItemsModel()
   @State private var tasksModel = TodayTasksModel()
   @State private var suggestionsModel = NextSuggestionsModel()
+  @State private var doneModel = NextDoneModel()
+
+  /// Anything finished today — the trio's live done splits OR a passive log
+  /// (caffeine, meals, mood, …). Drives both the empty state and whether the
+  /// "Done Today" log renders.
+  private var hasAnyDone: Bool { model.hasAnyDone || !doneModel.events.isEmpty }
 
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 0) {
         // Title removed — the tab bar already labels this view.
 
-        if model.hasLoaded && !model.hasAnyOpen && !model.hasAnyDone
+        if model.hasLoaded && !model.hasAnyOpen && !hasAnyDone
             && tasksModel.openTasks.isEmpty
             && suggestionsModel.suggestions.isEmpty {
           // Match the other drawers' empty state: the message lives in a
@@ -39,25 +45,26 @@ struct NextView: View {
         // NextOpenSection.orderedKeys.
         NextOpenSection(model: model, tasksModel: tasksModel)
 
-        // A completed chore/habit/supplement lingers struck-through in the
-        // open list for the settle beat, then drops into this "Done Today"
-        // log so the day's finished items stay visible at the bottom.
-        if model.hasAnyDone {
+        // A chronological log of everything finished today — the trio the
+        // user just ticked off (lingers struck-through above, then lands
+        // here newest-first) plus passive logs (caffeine, meals, mood, …).
+        if hasAnyDone {
           Text("Done Today")
             .font(.septenaSectionTitle)
             .foregroundStyle(Theme.inkPrimary)
-            .padding(.horizontal, Theme.hPadding)
+            // Aligns with the row content inside the card below (rowHInset = Spacing.xl).
+            .padding(.horizontal, Theme.Spacing.xl)
             .padding(.top, Theme.sectionSpacing)
             .padding(.bottom, 6)
-          NextDoneSection(model: model)
+          NextDoneSection(model: model, passive: doneModel.events)
         }
 
         Spacer(minLength: 140)
       }
-      // Match the Tasks / Goals drawers: ~20pt page inset so the rounded
-      // section "pills" (see `nextSectionCard`) breathe against the light
-      // grouped background instead of touching the screen edges.
-      .padding(.horizontal, 20)
+      // Match the Tasks / Goals drawers: shared page inset (Theme.pageGutter)
+      // so the rounded section "pills" (see `nextSectionCard`) sit a consistent
+      // distance off the screen edge.
+      .padding(.horizontal, Theme.pageGutter)
     }
     .background(Theme.groupedBackground)
     .septenaInlineTitle()
@@ -68,18 +75,22 @@ struct NextView: View {
       async let a: () = model.load()
       async let b: () = tasksModel.load()
       async let c: () = suggestionsModel.load()
-      _ = await (a, b, c)
+      async let d: () = doneModel.load()
+      _ = await (a, b, c, d)
     }
     .refreshable {
       async let a: () = model.load()
       async let b: () = tasksModel.load()
       async let c: () = suggestionsModel.load()
-      _ = await (a, b, c)
+      async let d: () = doneModel.load()
+      _ = await (a, b, c, d)
     }
     // Repaint when other surfaces (Tasks tab, menu bar, outbox drain)
-    // mutate tasks so the Next checklist stays in sync.
+    // mutate tasks so the Next checklist stays in sync. A completed task also
+    // lands in the Done Today log, so reload that too.
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
       tasksModel.refreshFromCache()
+      Task { await doneModel.load() }
     }
     // Day rollover (midnight crossed while the app was alive, or session
     // resumed after midnight): refetch so habits/supplements/chores reflect
@@ -89,7 +100,8 @@ struct NextView: View {
         async let a: () = model.load()
         async let b: () = tasksModel.load()
         async let c: () = suggestionsModel.load()
-        _ = await (a, b, c)
+        async let d: () = doneModel.load()
+        _ = await (a, b, c, d)
       }
     }
   }

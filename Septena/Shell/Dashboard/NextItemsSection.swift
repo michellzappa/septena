@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import EventKit
 
 // Today-screen "everything else" rendering: chores, habits, supplements.
@@ -123,6 +124,7 @@ struct TodayTaskRow: View {
   let mutator: TaskMutator
   let tint: Color
   @Environment(\.a11yMotion) private var motion
+  @Environment(\.rowHInset) private var rowHInset
 
   var body: some View {
     let isDone = task.status == .done
@@ -138,7 +140,7 @@ struct TodayTaskRow: View {
         .opacity(isDone ? 0.5 : 1)
       Spacer()
     }
-    .padding(.horizontal, Theme.hPadding)
+    .padding(.horizontal, rowHInset)
     .padding(.vertical, Theme.rowVPadding)
     // Same app-wide pattern as the other rows: long-press → menu. The
     // richer task menu (When… / Move… / Repeat… / Suggested) lives in
@@ -748,49 +750,234 @@ private struct NextMasonry<Block: View>: View {
   }
 }
 
-// MARK: - Done subview (rendered after the open list)
+// MARK: - Done Today timeline
+//
+// A single chronological log of everything finished today — not a second
+// copy of the open list. Two sources merge into one time-sorted stream:
+//   • the checklist trio (chores / habits / supplements) from `NextItemsModel`,
+//     so an item the user just ticked off appears here the instant its settle
+//     beat ends (live session state, no refetch);
+//   • passive logs (caffeine, cannabis, gut, mood, meals, training, completed
+//     tasks) from `NextDoneModel`, read off the local mirror.
+// Newest at top, so the freshest completion lands right under the open list.
+
+/// One row in the Done Today log. Value type (no `Color`) so it crosses the
+/// `MirrorReader` actor boundary; the row view resolves color from the
+/// `sectionKey` (or `moodQuadrant`) at render time.
+struct DoneEvent: Identifiable, Sendable {
+  let id: String
+  /// Fractional hour-of-day for sorting. `-1` for timeless items (e.g. a
+  /// skipped habit) so they sink to the bottom.
+  let hour: Double
+  let time: String?       // "HH:MM" display, nil when timeless
+  let label: String
+  let detail: String?     // trailing secondary text (grams, kcal, set count…)
+  let sectionKey: String  // drives the dot color + icon via SectionTheme
+  let moodQuadrant: String? // non-nil only for mood → colored by quadrant
+
+  static func hour(from hhmm: String) -> Double? {
+    let parts = hhmm.split(separator: ":")
+    guard parts.count >= 2, let h = Double(parts[0]), let m = Double(parts[1]) else { return nil }
+    return h + m / 60
+  }
+}
+
+/// Loads today's passive logs (everything that doesn't pass through the Next
+/// open list) for the Done Today timeline. Mirror reads run off-main via
+/// `MirrorReader`; tasks come from the `@MainActor` `TaskReads`.
+@Observable
+final class NextDoneModel {
+  private(set) var events: [DoneEvent] = []
+  var hasLoaded = false
+
+  func load() async {
+    let date = SeptenaDate.today
+    let mirror = await MirrorReader.shared.read { ctx in
+      NextDoneModel.collect(ctx: ctx, date: date)
+    }
+    let tasks = await Self.collectTasks(date: date)
+    events = (mirror + tasks).sorted { $0.hour > $1.hour }
+    hasLoaded = true
+  }
+
+  @MainActor
+  private static func collectTasks(date: String) async -> [DoneEvent] {
+    let ctx = LocalStore.shared.container.mainContext
+    let resp = await TaskReads.list(view: "logbook", days: 1, context: ctx)
+    return resp.items.compactMap { t -> DoneEvent? in
+      guard t.status == .done, let ts = t.completedAt,
+            ts.hasPrefix(date), ts.count >= 16 else { return nil }
+      let hhmm = String(ts.dropFirst(11).prefix(5))
+      return DoneEvent(id: "task-\(t.id)", hour: DoneEvent.hour(from: hhmm) ?? -1,
+                       time: hhmm, label: t.title, detail: nil,
+                       sectionKey: "tasks", moodQuadrant: nil)
+    }
+  }
+
+  private static func collect(ctx: ModelContext, date: String) -> [DoneEvent] {
+    var out: [DoneEvent] = []
+
+    // Wake time from today's Oura night. Reads the same cached blob the Week
+    // dashboard fills (`CacheKey.ouraNights`); only the night dated today
+    // counts, so a missed sync shows nothing rather than yesterday's wake.
+    if let nights = ResponseCache.load([OuraNight].self, forKey: "week.ouraNights"),
+       let night = nights.first(where: { $0.date == date }),
+       let wake = night.wakeTime {
+      out.append(.init(id: "wake-\(date)", hour: DoneEvent.hour(from: wake) ?? -1,
+                       time: wake, label: "Woke up", detail: nil,
+                       sectionKey: "sleep", moodQuadrant: nil))
+    }
+
+    for e in ChecklistMirror.loadCaffeineDay(context: ctx, date: date).entries {
+      out.append(.init(id: "caf-\(e.id)", hour: DoneEvent.hour(from: e.time) ?? -1,
+                       time: e.time, label: caffeineLabel(e.method),
+                       detail: e.grams.map { "\(Int($0))g" } ?? e.beans,
+                       sectionKey: "caffeine", moodQuadrant: nil))
+    }
+
+    for e in ChecklistMirror.loadCannabisDay(context: ctx, date: date).entries {
+      out.append(.init(id: "can-\(e.id)", hour: DoneEvent.hour(from: e.time) ?? -1,
+                       time: e.time, label: cannabisLabel(e.method),
+                       detail: e.strain, sectionKey: "cannabis", moodQuadrant: nil))
+    }
+
+    for e in ChecklistMirror.loadGutDay(context: ctx, date: date).entries {
+      out.append(.init(id: "gut-\(e.id)", hour: DoneEvent.hour(from: e.time) ?? -1,
+                       time: e.time, label: "Gut event",
+                       detail: "Bristol \(e.bristol)", sectionKey: "gut", moodQuadrant: nil))
+    }
+
+    for e in ChecklistMirror.loadMoodDay(context: ctx, date: date).entries {
+      let hhmm = String(e.time.prefix(5))
+      out.append(.init(id: "mood-\(e.id)", hour: DoneEvent.hour(from: hhmm) ?? -1,
+                       time: hhmm, label: e.emotion, detail: nil,
+                       sectionKey: "mood", moodQuadrant: e.quadrant))
+    }
+
+    for e in ChecklistMirror.loadNutritionToday(context: ctx) {
+      let label = e.foods.first ?? e.emoji ?? "Meal"
+      out.append(.init(id: "nut-\(e.id)", hour: DoneEvent.hour(from: e.time) ?? -1,
+                       time: e.time, label: label, detail: "\(Int(e.kcal)) kcal",
+                       sectionKey: "nutrition", moodQuadrant: nil))
+    }
+
+    // Training: collapse a session's many sets into one row (earliest set
+    // start = the row's time, count = sets logged).
+    var sessions: [String: (hour: Double, time: String, count: Int)] = [:]
+    for e in ChecklistMirror.loadTrainingEntries(context: ctx, since: date) where e.date == date {
+      guard let c = e.concludedAt, c.count >= 16 else { continue }
+      let hhmm = String(c.dropFirst(11).prefix(5))
+      guard let h = DoneEvent.hour(from: hhmm) else { continue }
+      let key = e.session.isEmpty ? "session" : e.session
+      var s = sessions[key] ?? (hour: h, time: hhmm, count: 0)
+      s.count += 1
+      if h < s.hour { s.hour = h; s.time = hhmm }
+      sessions[key] = s
+    }
+    for (key, s) in sessions {
+      out.append(.init(id: "train-\(key)", hour: s.hour, time: s.time,
+                       label: key == "session" ? "Workout" : key.capitalized,
+                       detail: "\(s.count) \(s.count == 1 ? "set" : "sets")",
+                       sectionKey: "training", moodQuadrant: nil))
+    }
+
+    return out
+  }
+
+  private static func caffeineLabel(_ m: String) -> String {
+    switch m {
+    case "v60":    return "V60"
+    case "matcha": return "Matcha"
+    case "other":  return "Caffeine"
+    default:       return m.capitalized
+    }
+  }
+
+  private static func cannabisLabel(_ m: String) -> String {
+    switch m {
+    case "vape":   return "Vape"
+    case "edible": return "Edible"
+    default:       return m.capitalized
+    }
+  }
+}
 
 struct NextDoneSection: View {
+  /// Live session state for the checklist trio (chores / habits / supplements).
   var model: NextItemsModel
-  @Environment(ChecklistMutator.self) private var checklistMutator
+  /// Today's passive logs (caffeine / cannabis / gut / mood / meals /
+  /// training / completed tasks).
+  var passive: [DoneEvent]
   @Environment(SectionTheme.self) private var theme
 
-  var body: some View {
-    let chores = model.doneChores
-    let habits = model.doneHabits
-    let supplements = model.doneSupplements
+  /// Merge the trio's live done splits with the passive logs into one
+  /// newest-first stream.
+  private var events: [DoneEvent] {
+    var out = passive
+    for c in model.doneChores {
+      out.append(.init(id: "chore-\(c.id)", hour: c.lastCompletedTime.flatMap(DoneEvent.hour(from:)) ?? -1,
+                       time: c.lastCompletedTime, label: c.name, detail: nil,
+                       sectionKey: "chores", moodQuadrant: nil))
+    }
+    for h in model.doneHabits {
+      out.append(.init(id: "habit-\(h.id)", hour: h.time.flatMap(DoneEvent.hour(from:)) ?? -1,
+                       time: h.time, label: h.name,
+                       detail: (h.skipped && !h.done) ? "skipped" : nil,
+                       sectionKey: "habits", moodQuadrant: nil))
+    }
+    for s in model.doneSupplements {
+      out.append(.init(id: "supp-\(s.id)", hour: s.time.flatMap(DoneEvent.hour(from:)) ?? -1,
+                       time: s.time, label: s.name, detail: nil,
+                       sectionKey: "supplements", moodQuadrant: nil))
+    }
+    return out.sorted { $0.hour > $1.hour }
+  }
 
+  var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      // No section headers in the done strip — keep it visually quiet.
-      // Items still wear their section accent on the (filled) check. One
-      // hairline between adjacent kinds rather than between every row.
-      if !chores.isEmpty {
-        ForEach(chores) { chore in
-          ChoreRow(chore: chore, model: model, checklistMutator: checklistMutator,
-                   tint: theme.color(for: "chores"))
-        }
-      }
-      if !habits.isEmpty {
-        if !chores.isEmpty { Hairline().padding(.top, 8) }
-        ForEach(habits) { habit in
-          HabitRow(habit: habit, model: model, checklistMutator: checklistMutator,
-                   tint: theme.color(for: "habits"))
-        }
-      }
-      if !supplements.isEmpty {
-        if !chores.isEmpty || !habits.isEmpty {
-          Hairline().padding(.top, 8)
-        }
-        ForEach(supplements) { supp in
-          SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator,
-                        tint: theme.color(for: "supplements"))
-        }
+      ForEach(events) { event in
+        DoneEventRow(event: event)
       }
     }
     // Sit in the same rounded "pill" card the open Next blocks use so the
     // Done log reads as one quiet card rather than floating bare on the
     // grouped background.
     .nextSectionCard()
+  }
+}
+
+/// One timeline row: time chip · section-color dot · label · trailing detail.
+private struct DoneEventRow: View {
+  let event: DoneEvent
+  @Environment(SectionTheme.self) private var theme
+  @Environment(\.rowHInset) private var rowHInset
+
+  var body: some View {
+    let color = event.moodQuadrant.flatMap { MoodQuadrant(rawValue: $0)?.color }
+      ?? theme.color(for: event.sectionKey)
+    HStack(spacing: 10) {
+      Text(event.time ?? "—")
+        .font(.caption.monospacedDigit())
+        .foregroundStyle(.secondary)
+        .frame(width: 42, alignment: .trailing)
+      Circle()
+        .fill(color)
+        .frame(width: 7, height: 7)
+      Text(event.label)
+        .font(.callout)
+        .foregroundStyle(Theme.inkPrimary)
+        .lineLimit(1)
+      Spacer(minLength: 8)
+      if let detail = event.detail {
+        Text(detail)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+      }
+    }
+    .padding(.vertical, 7)
+    .padding(.horizontal, rowHInset)
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 }
 
@@ -812,6 +999,7 @@ struct HabitRow: View {
   // Optional — HabitRow renders in multiple hosts (Next tab, Habits sheet);
   // not all inherit the root env. nil → celebration no-ops, toggle still runs.
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
+  @Environment(\.rowHInset) private var rowHInset
 
   var body: some View {
     let inactive = habit.done || habit.skipped
@@ -863,7 +1051,7 @@ struct HabitRow: View {
         Text(t).font(.septenaMeta).foregroundStyle(Theme.inkSecondary)
       }
     }
-    .padding(.horizontal, Theme.hPadding)
+    .padding(.horizontal, rowHInset)
     .padding(.vertical, Theme.rowVPadding)
     .contextMenu {
       Button {
@@ -894,6 +1082,7 @@ struct SupplementRow: View {
   @Environment(\.a11yMotion) private var motion
   @Environment(SectionTheme.self) private var theme
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
+  @Environment(\.rowHInset) private var rowHInset
 
   /// Toggle + (on taken) the `.cascade` celebration: marks dropping in
   /// sequence, scaled by how many supplements are now taken today. Undo's
@@ -927,7 +1116,7 @@ struct SupplementRow: View {
         Text(t).font(.septenaMeta).foregroundStyle(Theme.inkSecondary)
       }
     }
-    .padding(.horizontal, Theme.hPadding)
+    .padding(.horizontal, rowHInset)
     .padding(.vertical, Theme.rowVPadding)
     // Consistent with the other Next rows: long-press always offers a menu.
     // Mark taken/not-taken mirrors the checkbox for discoverability; Delete
@@ -961,6 +1150,7 @@ struct ChoreRow: View {
   @Environment(\.a11yMotion) private var motion
   @Environment(SectionTheme.self) private var theme
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
+  @Environment(\.rowHInset) private var rowHInset
 
   var body: some View {
     let isDone = model.completedChores.contains(chore.id)
@@ -1006,7 +1196,7 @@ struct ChoreRow: View {
         choreOverdueBadge(chore.daysOverdue)
       }
     }
-    .padding(.horizontal, Theme.hPadding)
+    .padding(.horizontal, rowHInset)
     .padding(.vertical, Theme.rowVPadding)
     .contextMenu {
       if !isDone && deferLabel == nil {
@@ -1060,6 +1250,10 @@ extension View {
   /// this card (not inside), mirroring the drawer convention.
   func nextSectionCard() -> some View {
     self
+      // Same de-stacking as DrawerSection: the card already sits 20pt off the
+      // screen edge, so rows inside it read this tighter inset (aligned with the
+      // section header above) instead of stacking a second 20pt margin.
+      .environment(\.rowHInset, Theme.Spacing.xl)
       .frame(maxWidth: .infinity, alignment: .leading)
       .background(
         RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
@@ -1091,7 +1285,9 @@ private func sectionHeader(_ title: String, tint: Color) -> some View {
   Text(title)
     .font(.septenaSectionTitle)
     .foregroundStyle(tint)
-    .padding(.horizontal, Theme.hPadding)
+    // Aligns with the row content inside the card below (which reads
+    // `rowHInset` = Spacing.xl), not the wider Theme.hPadding.
+    .padding(.horizontal, Theme.Spacing.xl)
     .padding(.top, Theme.sectionSpacing)
     .padding(.bottom, 6)
 }
@@ -1110,7 +1306,8 @@ private func habitBucketHeader(bucket: String, tint: Color) -> some View {
     Spacer()
     BucketTimeLeft(bucket: bucket)
   }
-  .padding(.horizontal, Theme.hPadding)
+  // Aligns with the row content inside the card below (rowHInset = Spacing.xl).
+  .padding(.horizontal, Theme.Spacing.xl)
   .padding(.top, Theme.sectionSpacing)
   .padding(.bottom, 6)
 }
