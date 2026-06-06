@@ -23,7 +23,7 @@ struct GitHubDestinationView: View {
   }
 
   var body: some View {
-    SectionDrawer(sectionKey: "github", title: "GitHub") {
+    SectionDrawer(sectionKey: "github") {
       if !contributions.days.isEmpty {
         summarySection
         heatmapSection

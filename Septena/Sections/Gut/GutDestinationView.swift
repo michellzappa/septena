@@ -23,7 +23,6 @@ struct GutDestinationView: View {
 
   var body: some View {
     SectionDrawer(sectionKey: "gut",
-                  title: "Gut",
                   onLog: { _ in creating = true },
                   currentDate: $viewingDate) {
       DrawerSection("Today", padding: .none) {

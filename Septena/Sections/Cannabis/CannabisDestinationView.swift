@@ -38,7 +38,6 @@ struct CannabisDestinationView: View {
 
   var body: some View {
     SectionDrawer(sectionKey: "cannabis",
-                  title: "Cannabis",
                   onLog: handleLogAction,
                   leadingLogActions: leadingLogActions,
                   currentDate: $viewingDate) {

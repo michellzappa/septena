@@ -18,7 +18,7 @@ struct InsightsDestinationView: View {
   @State private var showPaywall = false
 
   var body: some View {
-    SectionDrawer(sectionKey: "insights", title: "Insights", showsSettingsLink: false) {
+    SectionDrawer(sectionKey: "insights", showsSettingsLink: false) {
       if plusUnlocked {
         CorrelationsHomepageView()
       } else {

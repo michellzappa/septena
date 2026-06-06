@@ -88,7 +88,6 @@ struct TrainingDestinationView: View {
 
   var body: some View {
     SectionDrawer(sectionKey: "training",
-                  title: "Training",
                   onLog: { _ in nav.showTrainingSession = true },
                   currentDate: $viewingDate) {
       if isViewingToday {

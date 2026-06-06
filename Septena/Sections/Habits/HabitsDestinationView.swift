@@ -42,7 +42,6 @@ struct HabitsDestinationView: View {
 
   var body: some View {
     SectionDrawer(sectionKey: "habits",
-                  title: "Habits",
                   onLog: { _ in creating = true },
                   currentDate: $viewingDate) {
       if isViewingToday {

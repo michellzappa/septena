@@ -155,7 +155,6 @@ struct NutritionDestinationView: View {
 
   var body: some View {
     SectionDrawer(sectionKey: "nutrition",
-                  title: "Nutrition",
                   onLog: { _ in searchingMeals = true },
                   currentDate: $viewingDate) {
       // Time-travel mode: when the date strip is on a past day we drop

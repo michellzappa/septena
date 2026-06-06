@@ -34,7 +34,6 @@ struct CaffeineDestinationView: View {
 
   var body: some View {
     SectionDrawer(sectionKey: "caffeine",
-                  title: "Caffeine",
                   onLog: handleLogAction,
                   leadingLogActions: leadingLogActions,
                   currentDate: $viewingDate) {

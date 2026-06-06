@@ -13,7 +13,7 @@ struct ActivityDestinationView: View {
   private var accent: Color { theme.color(for: "activity") }
 
   var body: some View {
-    SectionDrawer(sectionKey: "activity", title: "Activity") {
+    SectionDrawer(sectionKey: "activity") {
       switch bridge.access {
       case .granted:       grantedBody
       case .notDetermined: askForAccess

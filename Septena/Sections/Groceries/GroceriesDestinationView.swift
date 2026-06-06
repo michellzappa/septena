@@ -76,7 +76,6 @@ struct GroceriesDestinationView: View {
 
   var body: some View {
     SectionDrawer(sectionKey: "groceries",
-                  title: "Groceries",
                   onLog: { _ in creating = true }) {
       if !low.isEmpty {
         VStack(alignment: .leading, spacing: 8) {

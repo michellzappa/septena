@@ -31,7 +31,6 @@ struct SupplementsDestinationView: View {
 
   var body: some View {
     SectionDrawer(sectionKey: "supplements",
-                  title: "Supplements",
                   onLog: { _ in creating = true },
                   currentDate: $viewingDate) {
       if isViewingToday {

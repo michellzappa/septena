@@ -21,11 +21,55 @@ enum DrawerLoadState: Equatable {
   case failed(String)
 }
 
+/// How a section drawer paints its surfaces (the scroll background and the
+/// `DrawerSection` / `StatTile` cards). One enum is the single source of truth
+/// so the solid-vs-glass decision lives in exactly one place instead of being
+/// hand-applied per card.
+///
+/// - `.solid` — opaque grouped background + opaque cards (default; the
+///   iPad/macOS pushed pane and any opaque host).
+/// - `.glass` — clear background + clear cards so content sits directly on a
+///   translucent presentation (the iPhone sheet). Injected by
+///   `sectionDrawerPresentation()`, never set by hand in a destination view.
+enum DrawerSurfaceStyle {
+  case solid
+  case glass
+
+  /// Fill for a card surface (`DrawerSection`, `StatTile`).
+  var cardFill: Color {
+    switch self {
+    case .solid: return Theme.secondaryGroupedBackground
+    case .glass: return .clear
+    }
+  }
+
+  /// Fill behind the drawer's scroll content.
+  var scrollFill: Color {
+    switch self {
+    case .solid: return Theme.groupedBackground
+    case .glass: return .clear
+    }
+  }
+}
+
+private struct DrawerSurfaceStyleKey: EnvironmentKey {
+  static let defaultValue: DrawerSurfaceStyle = .solid
+}
+
+extension EnvironmentValues {
+  var drawerSurfaceStyle: DrawerSurfaceStyle {
+    get { self[DrawerSurfaceStyleKey.self] }
+    set { self[DrawerSurfaceStyleKey.self] = newValue }
+  }
+}
+
 struct SectionDrawer<Content: View>: View {
   let sectionKey: String
-  /// Section name shown as the inline nav-bar title. Pass an empty string
-  /// to skip it (utility drawers that don't need a heading).
-  let title: String
+  /// Section name shown as the inline nav-bar title. Optional — when omitted,
+  /// the drawer derives it from the section manifest (`defaultLabel`), so call
+  /// sites don't hand-pass a title that's already in the catalog. Pass an empty
+  /// string to explicitly suppress it (utility drawers with no heading).
+  var title: String? = nil
   /// Tint used for the "+" toolbar affordance (and inherited by sheets
   /// presented from this drawer). Defaults to the section's theme color
   /// if the destination doesn't override.
@@ -69,6 +113,10 @@ struct SectionDrawer<Content: View>: View {
   @ViewBuilder var content: () -> Content
 
   @Environment(SectionTheme.self) private var theme
+  /// Solid (default) vs glass surfaces, injected by the presentation host
+  /// (`sectionDrawerPresentation()`) so the iPhone sheet reads `.glass` while
+  /// the iPad/macOS pane stays `.solid`.
+  @Environment(\.drawerSurfaceStyle) private var surfaceStyle
 
   /// Whether the goals strip is currently revealed. Collapsed by default —
   /// the goals live behind the `target` toolbar toggle and appear on cue,
@@ -87,6 +135,12 @@ struct SectionDrawer<Content: View>: View {
 
   private var resolvedAccent: Color {
     accent ?? theme.color(for: sectionKey)
+  }
+
+  /// Title shown in the nav bar. Falls back to the manifest's default label so
+  /// call sites can omit `title:` for any catalogued section.
+  private var resolvedTitle: String {
+    title ?? SectionManifest.byKey[sectionKey]?.defaultLabel ?? ""
   }
 
   private var actions: [LogAction] {
@@ -125,8 +179,8 @@ struct SectionDrawer<Content: View>: View {
         } else {
           content()
           if showsSettingsLink, !isTimeTraveling,
-             !title.isEmpty, SectionManifest.byKey[sectionKey] != nil {
-            SectionSettingsLink(sectionTitle: title) { showingSettings = true }
+             !resolvedTitle.isEmpty, SectionManifest.byKey[sectionKey] != nil {
+            SectionSettingsLink(sectionTitle: resolvedTitle) { showingSettings = true }
           }
         }
       }
@@ -134,10 +188,9 @@ struct SectionDrawer<Content: View>: View {
       .padding(.top, Theme.Spacing.sm)
       .padding(.bottom, 24)
     }
-    // Per Apple "Adopting Liquid Glass": remove custom sheet backgrounds and
-    // let the system supply the material. EXPERIMENT — affects the iPad/macOS
-    // pushed pane too; revert if not kept.
-    .scrollContentBackground(.hidden)
+    // Surface fill driven by the injected style: opaque grouped background on
+    // a solid host, clear on the glass (translucent-sheet) host.
+    .background(surfaceStyle.scrollFill)
     // Time-travel picker. Attached to the body (not the toolbar item) so
     // presentation is stable on iOS; gated on `currentDate` so non
     // day-scoped drawers never build it.
@@ -155,7 +208,7 @@ struct SectionDrawer<Content: View>: View {
     // The section name is the standard inline nav-bar title — plain text in
     // the system's default place, identical on every drawer. Kept inline
     // (not a big editorial heading) so the drawer top stays compact.
-    .navigationTitle(title)
+    .navigationTitle(resolvedTitle)
     #if os(iOS)
     .navigationBarTitleDisplayMode(.inline)
     #endif
@@ -172,8 +225,8 @@ struct SectionDrawer<Content: View>: View {
       }
       // Calendar / time-travel button — leftmost of the trailing cluster,
       // present only when the destination is day-scoped. Tints accent and
-      // gains a clock badge while viewing a past day so its active state
-      // reads at a glance.
+      // gains a clock badge while viewing a past day. The system supplies the
+      // glass background for standard toolbar buttons.
       if currentDate != nil {
         ToolbarItem(placement: .primaryAction) {
           Button {
@@ -197,40 +250,87 @@ struct SectionDrawer<Content: View>: View {
           )
         }
       }
+      // Log/action button — ONE component (`DrawerActionButton`) so its
+      // appearance is defined in a single place for both single- and
+      // multi-action sections. A fixed spacer keeps it in its own glass group,
+      // separated from the calendar + goals cluster, on every drawer.
       if let onLog, !actions.isEmpty {
+        ToolbarSpacer(.fixed, placement: .primaryAction)
         ToolbarItem(placement: .primaryAction) {
-          if actions.count == 1, let only = actions.first {
-            Button { onLog(only.id) } label: {
-              Label(only.title,
-                    systemImage: only.systemImage ?? "plus")
-            }
-            .tint(resolvedAccent)
-            .keyboardShortcut("n", modifiers: .command)
-          } else {
-            Menu {
-              // First menu item carries the ⌘N shortcut so it parallels
-              // the single-action case — the most common log path is
-              // one keystroke even when other options exist.
-              ForEach(Array(actions.enumerated()), id: \.element.id) { idx, action in
-                Button {
-                  onLog(action.id)
-                } label: {
-                  if let img = action.systemImage {
-                    Label(action.title, systemImage: img)
-                  } else {
-                    Text(action.title)
-                  }
-                }
-                .keyboardShortcut(idx == 0 ? KeyboardShortcut("n", modifiers: .command) : nil)
-              }
-            } label: {
-              Image(systemName: "plus")
-            }
-            .tint(resolvedAccent)
-          }
+          DrawerActionButton(actions: actions, accent: resolvedAccent, onLog: onLog)
         }
       }
     }
+  }
+}
+
+/// The drawer's log/action toolbar control. A single component so the action
+/// button's appearance lives in exactly ONE place: single-action sections fire
+/// on tap, multi-action sections present a menu, but both inherit the same
+/// prominent accent glass styling — eliminating the per-branch drift that
+/// previously left menu-based drawers (e.g. Cannabis) unstyled.
+struct DrawerActionButton: View {
+  let actions: [LogAction]
+  let accent: Color
+  let onLog: (String) -> Void
+
+  var body: some View {
+    Group {
+      if actions.count == 1, let only = actions.first {
+        Button { onLog(only.id) } label: {
+          Label(only.title, systemImage: only.systemImage ?? "plus")
+        }
+        .keyboardShortcut("n", modifiers: .command)
+      } else {
+        Menu {
+          // First item carries ⌘N so the most common log path is one
+          // keystroke even when multiple options exist.
+          ForEach(Array(actions.enumerated()), id: \.element.id) { idx, action in
+            Button { onLog(action.id) } label: {
+              if let img = action.systemImage {
+                Label(action.title, systemImage: img)
+              } else {
+                Text(action.title)
+              }
+            }
+            .keyboardShortcut(idx == 0 ? KeyboardShortcut("n", modifiers: .command) : nil)
+          }
+        } label: {
+          Image(systemName: "plus")
+        }
+        // Required for the button style to take effect on a Menu.
+        .menuStyle(.button)
+      }
+    }
+    // Styling defined ONCE; propagates to whichever branch renders.
+    .buttonStyle(.glassProminent)
+    .tint(accent)
+  }
+}
+
+extension View {
+  /// The single owner of a section drawer's *presentation* look. Applied to the
+  /// content presented in a sheet, it sets the detents and the translucent
+  /// background, and injects the `.glass` surface style so the drawer's cards go
+  /// clear to match. iPad/macOS (non-sheet hosts) get sized framing and keep the
+  /// default `.solid` surface. Keeping all of this in one modifier is what
+  /// prevents the drawer look from drifting between the drawer and its presenter.
+  func sectionDrawerPresentation() -> some View {
+    #if os(iOS)
+    self
+      .presentationDetents([.medium, .large])
+      .presentationDragIndicator(.visible)
+      // Translucent COLOR, not a Material: a floating sheet with background
+      // interaction enabled gives a Material no backdrop to blur, so it would
+      // render opaque. A color blends by alpha regardless. Interaction-enabled
+      // also suppresses the dimming scrim so content shows through.
+      .presentationBackground(Color(.systemBackground).opacity(0.55))
+      .presentationBackgroundInteraction(.enabled(upThrough: .large))
+      .environment(\.drawerSurfaceStyle, .glass)
+    #else
+    self
+      .frame(width: 560, height: 600)
+    #endif
   }
 }
 
@@ -663,6 +763,8 @@ struct DrawerSection<Content: View>: View {
   let padding: DrawerPadding
   @ViewBuilder var content: () -> Content
 
+  @Environment(\.drawerSurfaceStyle) private var surfaceStyle
+
   init(_ title: String? = nil,
        spacing: CGFloat = Theme.Spacing.xs,
        padding: DrawerPadding = .standard,
@@ -689,11 +791,11 @@ struct DrawerSection<Content: View>: View {
       }
       paddedStack
         .frame(maxWidth: .infinity, alignment: .leading)
-        // EXPERIMENT (full-Maps glass): clear so content sits directly on the
-        // translucent sheet instead of an opaque card. Affects every DrawerSection.
+        // Surface fill from the injected style — opaque card on a solid host,
+        // clear on the glass (translucent-sheet) host. One decision, one place.
         .background(
           RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-            .fill(Color.clear)
+            .fill(surfaceStyle.cardFill)
         )
         .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
     }

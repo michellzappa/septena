@@ -28,7 +28,7 @@ struct SleepDestinationView: View {
   }
 
   var body: some View {
-    SectionDrawer(sectionKey: "sleep", title: "Sleep") {
+    SectionDrawer(sectionKey: "sleep") {
       scoresSection
       durationSection
       chartsSection

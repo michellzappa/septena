@@ -40,7 +40,6 @@ struct ChoresDestinationView: View {
 
   var body: some View {
     SectionDrawer(sectionKey: "chores",
-                  title: "Chores",
                   onLog: { _ in creating = true }) {
       if !today.isEmpty {
         DrawerSection("Today", padding: .none) { ForEach(today) { row(for: $0) } }

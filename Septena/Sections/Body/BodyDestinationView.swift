@@ -31,7 +31,7 @@ struct BodyDestinationView: View {
   }
 
   var body: some View {
-    SectionDrawer(sectionKey: "body", title: "Body") {
+    SectionDrawer(sectionKey: "body") {
       statsSection
       chartsSection
       DrawerSection("Recent weigh-ins", padding: .none) {

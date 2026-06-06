@@ -61,7 +61,6 @@ struct GoalsView: View {
   var body: some View {
     NavigationStack {
       SectionDrawer(sectionKey: "goals",
-                    title: "Goals",
                     onLog: { _ in addGoal() }) {
         content
       }

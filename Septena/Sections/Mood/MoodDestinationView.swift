@@ -29,7 +29,6 @@ struct MoodDestinationView: View {
 
   var body: some View {
     SectionDrawer(sectionKey: "mood",
-                  title: "Mood",
                   onLog: { _ in addingNew = true },
                   currentDate: $viewingDate) {
       todaySection

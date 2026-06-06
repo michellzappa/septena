@@ -154,7 +154,6 @@ private struct HydrationDestinationView: View {
 
   var body: some View {
     SectionDrawer(sectionKey: "hydration",
-                  title: "Hydration",
                   currentDate: $viewingDate) {
       if isViewingToday {
         summaryCard
