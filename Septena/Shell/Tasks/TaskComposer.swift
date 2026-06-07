@@ -43,7 +43,11 @@ struct TaskComposerCard: View {
   }
 
   var body: some View {
-    ZStack(alignment: .top) {
+    // Vertically centered: with the keyboard up, SwiftUI's avoidance lifts the
+    // card so it settles midway (just above the keyboard) instead of pinned to
+    // the very top. The card is compact enough to fit; expanding a date/repeat
+    // pill drops the keyboard (see onInteractStart), freeing room to grow.
+    ZStack {
       // Dimmed scrim — tap anywhere outside the card to cancel.
       Color.black.opacity(0.22)
         .ignoresSafeArea()
@@ -103,7 +107,6 @@ struct TaskComposerCard: View {
       )
       .shadow(color: .black.opacity(0.20), radius: 22, y: 10)
       .padding(.horizontal, 14)
-      .padding(.top, 8)
     }
     .onAppear(perform: seed)
   }
@@ -150,7 +153,10 @@ struct TaskComposerCard: View {
     switch mode {
     case .create(let filter):
       draft = TaskDraft(filter: filter)
-      titleFocused = true
+      // Focus after the present animation settles — inside a fullScreenCover an
+      // immediate focus is dropped before the field joins the responder chain,
+      // so the keyboard wouldn't come up on open.
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { titleFocused = true }
     case .edit(let task):
       draft = TaskDraft(task: task)
       // Opening the editor counts as engagement — clear any agent cue.
