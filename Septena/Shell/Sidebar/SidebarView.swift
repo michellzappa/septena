@@ -1264,6 +1264,10 @@ struct NewProjectSheet: View {
           .labelsHidden()
         }
       }
+      // Grouped style keeps the macOS sheet from collapsing to no height
+      // (default-styled Forms report no flexible height) — same rule the
+      // shared AdaptiveEditScaffold applies to its sheet branch.
+      .formStyle(.grouped)
       .navigationTitle("New Project")
       .septenaInlineTitle()
       .toolbar {
