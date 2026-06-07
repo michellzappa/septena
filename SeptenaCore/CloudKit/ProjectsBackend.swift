@@ -23,6 +23,10 @@ protocol ProjectsBackend: AnyObject {
 final class ProjectsMutator: ProjectsBackend {
   private let context: ModelContext
   private var ckBackend: CloudKitProjectsBackend?
+  /// Set once at startup so `delete` can cascade-clear the project link on
+  /// referencing tasks through the task write boundary. No retain cycle —
+  /// `TaskMutator` does not reference back. See `delete(id:)`.
+  weak var taskMutator: TaskMutator?
 
   init(context: ModelContext) {
     self.context = context
@@ -61,6 +65,18 @@ final class ProjectsMutator: ProjectsBackend {
     try await requireBackend().setGithubRepo(id: id, repo: repo)
   }
   func delete(id: String) async throws {
+    // Cascade: clear the project link on every task that referenced this
+    // project, so they truly "lose their project link" (as the delete dialog
+    // promises) instead of being left with a dangling id. A dangling id would
+    // otherwise be re-stubbed by `SeptenaServices.reconcileProjectGraph()` on
+    // the next launch — making the deletion reappear.
+    let descriptor = FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { $0.project == id }
+    )
+    let referencing = (try? context.fetch(descriptor)) ?? []
+    for task in referencing {
+      taskMutator?.moveToProject(id: task.id, project: nil)
+    }
     try await requireBackend().delete(id: id)
   }
 

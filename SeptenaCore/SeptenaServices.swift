@@ -865,16 +865,67 @@ final class SeptenaServices {
       nutritionMutator.bind(ckEngine: ckEngine)
       areasMutator.bind(ckEngine: ckEngine)
       projectsMutator.bind(ckEngine: ckEngine)
+      // Lets project deletion cascade-clear the link on referencing tasks.
+      projectsMutator.taskMutator = taskMutator
       OuraStore.shared.bind(ckEngine: ckEngine)
       WithingsStore.shared.bind(ckEngine: ckEngine)
       // Demo-seed (screenshot) builds stay offline — never start sync.
       if !DemoSeedMode.isOn {
         ckEngine.start()
         try? await ckEngine.fetchChanges()
+        // Heal dangling project references now that the initial fetch has
+        // landed (so we never stub a project that's merely mid-sync).
+        await reconcileProjectGraph(context: context)
       }
     }
     startTask = task
     await task.value
+  }
+
+  /// Heals the project graph surfaced by the launch crosswalk. Tasks imported
+  /// under the retired slug model can carry `project` ids ("ios", "septena", …)
+  /// that never got a `ProjectEntity`, so they resolve to *no* project chip in
+  /// the UI (`TaskListView` joins on `ProjectEntity.id`). Rather than log the
+  /// orphans every launch, materialize a stub project per id through the mutator
+  /// — idempotent, since `createWithExplicitID` returns the existing record if
+  /// present — so the tasks regain their grouping and the project surfaces in
+  /// the sidebar for the user to rename / merge / delete intentionally.
+  ///
+  /// Also drops the stale empty `seed-project` artifact left over from earlier
+  /// seeding, but only when nothing references it, so a task is never stranded.
+  /// Runs after the initial CloudKit fetch; routes every write through the
+  /// `projectsMutator` boundary (local update + CloudKit queue + notifications).
+  @MainActor
+  func reconcileProjectGraph(context: ModelContext) async {
+    let tasks = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
+    let projects = (try? context.fetch(FetchDescriptor<ProjectEntity>())) ?? []
+    let projectIds = Set(projects.map { $0.id })
+    let referenced = Set(tasks.compactMap { $0.project })
+    let orphans = referenced.subtracting(projectIds).sorted()
+
+    for id in orphans {
+      _ = try? await projectsMutator.createWithExplicitID(
+        id: id, title: Self.humanizeProjectSlug(id))
+    }
+
+    let removedSeed = projectIds.contains("seed-project") && !referenced.contains("seed-project")
+    if removedSeed {
+      try? await projectsMutator.delete(id: "seed-project")
+    }
+
+    if !orphans.isEmpty || removedSeed {
+      SeptenaLog.info(
+        "[Crosswalk] reconciled project graph: stubbed \(orphans), removedSeedProject=\(removedSeed)")
+    }
+  }
+
+  /// Best-effort display title for a rebuilt stub project id. "ios" → "iOS",
+  /// "septena" → "Septena"; the user can rename it afterward.
+  private static func humanizeProjectSlug(_ slug: String) -> String {
+    switch slug {
+    case "ios": return "iOS"
+    default: return slug.prefix(1).uppercased() + slug.dropFirst()
+    }
   }
 }
 
