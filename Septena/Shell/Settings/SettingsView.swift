@@ -648,9 +648,9 @@ struct SettingsView: View {
     case .motionGallery: return "Motion Gallery"
     case .manageSections: return "Manage Sections"
     case .section(let key):
-      return store.sections.first(where: { $0.key == key })?.label
-        ?? SectionManifest.byKey[key]?.defaultLabel
-        ?? key.capitalized
+      return SectionManifest.displayLabel(
+        key: key,
+        stored: store.sections.first(where: { $0.key == key })?.label ?? "")
     }
   }
 
@@ -734,7 +734,7 @@ struct SectionEntry: Identifiable, Hashable {
   /// fallback when the user hasn't customized the label (or the local
   /// mirror hasn't hydrated yet).
   var label: String {
-    server.label.isEmpty ? manifest.defaultLabel : server.label
+    SectionManifest.displayLabel(key: manifest.key, stored: server.label)
   }
   /// Accent comes from the user's `SectionEntity.color`. No catalog
   /// default — `parseHexColor` already returns neutral gray for empty
@@ -2151,7 +2151,7 @@ struct QuickActionsSettingsPane: View {
         ColoredGlyph(icon: manifest.iconSymbol, color: accent, size: 22)
         VStack(alignment: .leading, spacing: 1) {
           let serverLabel = store.sections.first(where: { $0.key == manifest.key })?.label ?? ""
-          Text(serverLabel.isEmpty ? manifest.defaultLabel : serverLabel)
+          Text(SectionManifest.displayLabel(key: manifest.key, stored: serverLabel))
             .foregroundStyle(.primary)
           if !manifest.shortDescription.isEmpty {
             Text(manifest.shortDescription)
@@ -2602,7 +2602,7 @@ struct ManageSectionsPane: View {
 
   private func label(for manifest: SectionManifest) -> String {
     let server = store.sections.first(where: { $0.key == manifest.key })?.label ?? ""
-    return server.isEmpty ? manifest.defaultLabel : server
+    return SectionManifest.displayLabel(key: manifest.key, stored: server)
   }
 
   private func setEnabled(_ key: String, _ enabled: Bool) {
@@ -2660,9 +2660,7 @@ struct SectionDetailPane: View {
     store.sections.first(where: { $0.key == sectionKey })
   }
   private var label: String {
-    let serverLabel = server?.label ?? ""
-    if !serverLabel.isEmpty { return serverLabel }
-    return manifest?.defaultLabel ?? sectionKey.capitalized
+    SectionManifest.displayLabel(key: sectionKey, stored: server?.label ?? "")
   }
   private var accent: Color {
     parseHexColor(server?.color ?? "")
@@ -3145,7 +3143,7 @@ struct NotificationsOverviewPane: View {
     let server = store.sections.first(where: { $0.key == key })
     let manifest = SectionManifest.byKey[key]
     let serverLabel = server?.label ?? ""
-    let label = !serverLabel.isEmpty ? serverLabel : (manifest?.defaultLabel ?? key.capitalized)
+    let label = SectionManifest.displayLabel(key: key, stored: serverLabel)
     return (label, parseHexColor(server?.color ?? ""), manifest?.iconSymbol ?? "circle.fill")
   }
 
@@ -4511,9 +4509,7 @@ struct SkillsSettingsPane: View {
   @ViewBuilder
   private func skillRowLabel(for key: String, skill: SectionSkill) -> some View {
     let entry = store.sections.first(where: { $0.key == key })
-    let label = entry?.label
-      ?? SectionManifest.byKey[key]?.defaultLabel
-      ?? key.capitalized
+    let label = SectionManifest.displayLabel(key: key, stored: entry?.label ?? "")
     let color = parseHexColor(entry?.color ?? "")
     HStack(spacing: 12) {
       ColoredGlyph(icon: skillSectionIcon(key: key), color: color, size: 22)
@@ -4541,9 +4537,9 @@ struct SectionSkillView: View {
 
   private var skill: SectionSkill? { SectionSkill.resolve(sectionKey) }
   private var label: String {
-    store.sections.first(where: { $0.key == sectionKey })?.label
-      ?? SectionManifest.byKey[sectionKey]?.defaultLabel
-      ?? sectionKey.capitalized
+    SectionManifest.displayLabel(
+      key: sectionKey,
+      stored: store.sections.first(where: { $0.key == sectionKey })?.label ?? "")
   }
 
   var body: some View {
@@ -5061,9 +5057,9 @@ struct ImportExportSettingsPane: View {
   // MARK: Helpers
 
   private func sectionLabel(for key: String) -> String {
-    store.sections.first(where: { $0.key == key })?.label
-      ?? SectionManifest.byKey[key]?.defaultLabel
-      ?? key.capitalized
+    SectionManifest.displayLabel(
+      key: key,
+      stored: store.sections.first(where: { $0.key == key })?.label ?? "")
   }
 
   private func sectionGlyph(for key: String) -> String {

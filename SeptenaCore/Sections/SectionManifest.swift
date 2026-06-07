@@ -429,6 +429,17 @@ public extension SectionManifest {
   static let byKey: [String: SectionManifest] = Dictionary(
     uniqueKeysWithValues: SectionManifest.all.map { ($0.key, $0) }
   )
+
+  /// User-facing section name. A genuine user rename is shown verbatim; the
+  /// canonical English default is localized on display ("Tasks" → "Tarefas")
+  /// while the stored `SectionEntity.title` stays English. Empty stored value
+  /// falls through to the (already-localized) manifest default.
+  static func displayLabel(key: String, stored: String) -> String {
+    if !stored.isEmpty {
+      return Bundle.main.localizedString(forKey: stored, value: stored, table: nil)
+    }
+    return byKey[key]?.defaultLabel ?? key.capitalized
+  }
 }
 // SectionSkill — the canonical "what a model needs to know" briefing for
 // each section, presented to the user inside the app's Settings → Skills
