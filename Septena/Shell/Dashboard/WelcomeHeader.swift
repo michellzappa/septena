@@ -32,6 +32,73 @@ struct WelcomeContext {
   let signature: String
 }
 
+/// Wraps `WelcomeHeader` and owns the `DayClock` observation + the data-aware
+/// context computation. The 60s `clock.now` tick therefore re-renders only the
+/// header — not the dashboard's tile grid, which is what happened when the
+/// parent body read `clock.now` to pass it down.
+struct WelcomeHeaderSection: View {
+  @Environment(DayClock.self) private var clock
+  let dataAware: Bool
+  let todayTaskCount: Int
+  let dailies: NextItemsModel
+
+  var body: some View {
+    WelcomeHeader(now: clock.now, context: welcomeContext)
+  }
+
+  /// Built purely from already-loaded dashboard state — no new fetch. The
+  /// `signature` is coarse so the greeting only regenerates when something
+  /// crosses a bucket, not on every check-off.
+  private var welcomeContext: WelcomeContext? {
+    guard dataAware else { return nil }
+
+    func coarse(_ n: Int) -> String {
+      switch n {
+      case ..<1:  return "0"
+      case 1...2: return "lo"
+      case 3...5: return "mid"
+      default:    return "hi"
+      }
+    }
+    func plural(_ n: Int, _ word: String) -> String { "\(n) \(word)\(n == 1 ? "" : "s")" }
+
+    var phrases: [String] = []
+    var sig: [String] = []
+
+    if todayTaskCount > 0 {
+      phrases.append("\(plural(todayTaskCount, "task")) on today's list")
+      sig.append("t\(coarse(todayTaskCount))")
+    }
+    let habitsLeft = dailies.openHabits.count
+    if habitsLeft > 0 {
+      phrases.append("\(plural(habitsLeft, "habit")) still to check off")
+      sig.append("h\(coarse(habitsLeft))")
+    }
+    let suppsLeft = dailies.openSupplements.count
+    if suppsLeft > 0 {
+      phrases.append("\(plural(suppsLeft, "supplement")) left to take")
+      sig.append("s\(coarse(suppsLeft))")
+    }
+
+    // The soonest timed event still ahead today — a concrete thing on the
+    // horizon, with a time. Regenerates when that event changes, not as the
+    // clock merely ticks toward it (the signature keys on event identity).
+    if let next = dailies.calendarEvents
+      .filter({ !$0.isAllDay && $0.startDate > clock.now })
+      .min(by: { $0.startDate < $1.startDate }) {
+      let raw = next.title ?? ""
+      let title = raw.isEmpty ? "something" : raw
+      let at = next.startDate.formatted(date: .omitted, time: .shortened)
+      phrases.append("coming up: \(title) at \(at)")
+      sig.append("n\(next.eventIdentifier ?? at)")
+    }
+
+    guard !phrases.isEmpty else { return nil }
+    return WelcomeContext(phrase: phrases.joined(separator: ", "),
+                          signature: sig.joined(separator: "|"))
+  }
+}
+
 struct WelcomeHeader: View {
   let now: Date
   var context: WelcomeContext? = nil
