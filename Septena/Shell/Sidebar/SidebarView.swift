@@ -942,7 +942,6 @@ private struct SidebarBehaviorModifier: ViewModifier {
         onCreateArea: onCreateArea
       ))
       .task { reload() }
-      .refreshable { reload() }
       .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
         reload()
       }

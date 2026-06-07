@@ -78,13 +78,6 @@ struct NextView: View {
       async let d: () = doneModel.load()
       _ = await (a, b, c, d)
     }
-    .refreshable {
-      async let a: () = model.load()
-      async let b: () = tasksModel.load()
-      async let c: () = suggestionsModel.load()
-      async let d: () = doneModel.load()
-      _ = await (a, b, c, d)
-    }
     // Repaint when other surfaces (Tasks tab, menu bar, outbox drain)
     // mutate tasks so the Next checklist stays in sync. A completed task also
     // lands in the Done Today log, so reload that too.

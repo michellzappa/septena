@@ -172,11 +172,6 @@ struct WeekDashboardView: View {
   /// AppStorage key, so the tile's progress matches the section's.
   @AppStorage("hydration.dailyTargetMl") private var hydrationTargetMl: Int = 2000
   @State private var sheetDest: WeekDestination? = nil
-  /// A section requested via a tile tap *while* a bottom-sheet drawer is
-  /// already open. SwiftUI's `.sheet(item:)` won't swap to a new item while
-  /// one is presented, so we stash the request here, dismiss the current
-  /// drawer, and present this in the sheet's `onDismiss`. See `open(_:)`.
-  @State private var pendingDest: WeekDestination? = nil
   /// Today-scoped collections kept in state so DayTimelineView can read
   /// them. NextItemsModel already covers habits/supplements/chores and
   /// today's caffeine/cannabis/gut live in their respective `*Today`
@@ -255,7 +250,6 @@ struct WeekDashboardView: View {
         paintFromCache()
         await loadAll()
       },
-      onRefresh: loadAll,
       onTaskChange: {
         // A task mutation only touches the Tasks tile — reload just that,
         // not all ~20 sections. This is the per-toggle hitch fix.
@@ -282,6 +276,19 @@ struct WeekDashboardView: View {
       .padding(.horizontal, Theme.pageGutter)
       .padding(.top, 12)
       .padding(.bottom, 80)
+      // While a bottom-sheet drawer is open, a tap anywhere on the dashboard
+      // behind it — welcome header, today timeline, a tile, or empty space —
+      // dismisses the drawer (standard popover-style tap-away). The drawer
+      // keeps its translucent, non-dimmed backdrop; this transparent layer
+      // just turns the whole backdrop into a dismiss target. Compact only;
+      // on push navigation there's no floating drawer to dismiss.
+      .overlay {
+        if !usesPushNavigation, sheetDest != nil {
+          Color.clear
+            .contentShape(Rectangle())
+            .onTapGesture { sheetDest = nil }
+        }
+      }
       // Regular width (iPad / macOS): a section opens as a pushed full
       // pane *inside* the dashboard's NavigationStack — a real screen with
       // a back button, not a floating modal drawer. `pushDest` is nil on
@@ -292,15 +299,7 @@ struct WeekDashboardView: View {
     }
     // Compact (iPhone): navigation into a module is a bottom-sheet slide-
     // over so the dashboard stays visually present underneath.
-    //
-    // Attached OUTSIDE the NavigationStack on purpose: `.refreshable`
-    // inside publishes `\.refresh` into the env, and SwiftUI sheet
-    // contents inherit env from the view they're attached to. Hosting
-    // `.sheet` on the NavigationStack itself (not on the ScrollView
-    // beside `.refreshable`) keeps the sheet's attachment point outside
-    // the refreshable's scope, so drawers don't inherit a pull-to-
-    // refresh gesture that re-runs Week's loader.
-    .sheet(item: sheetDestBinding, onDismiss: presentPendingIfNeeded) { dest in
+    .sheet(item: sheetDestBinding) { dest in
       sheetContent(for: dest)
     }
     .sheet(item: $nutritionSheet) { sheet in
@@ -967,29 +966,18 @@ struct WeekDashboardView: View {
   /// Single entry point for "open a section from a homepage tile." On
   /// push-nav widths (iPad / macOS) the dashboard is covered by the pushed
   /// pane, so a direct set is fine. On compact the section is a bottom-sheet
-  /// drawer with background interaction enabled, so a tile *under* an open
-  /// drawer is tappable — but SwiftUI's `.sheet(item:)` silently no-ops when
-  /// the item changes from one non-nil value to another, leaving the
-  /// presentation stuck (the next drawer then opens at full height). So when
-  /// a drawer is already open we stash the request and dismiss the current
-  /// one; `presentPendingIfNeeded()` (the sheet's `onDismiss`) presents it
-  /// once the old drawer has animated away — a clean swap to the new section.
+  /// The drawer presents with background interaction enabled, so a tile
+  /// *under* an open drawer stays tappable. We follow the standard
+  /// popover/menu convention: while a drawer is open, a tap on the background
+  /// or another tile just *dismisses* the current one — the tap is consumed,
+  /// not forwarded to open a new section. (On iPad/macOS push navigation
+  /// there's no overlay to dismiss, so swap to the tapped section directly.)
   private func open(_ dest: WeekDestination) {
-    guard !usesPushNavigation, sheetDest != nil else {
-      sheetDest = dest
+    guard usesPushNavigation || sheetDest == nil else {
+      sheetDest = nil
       return
     }
-    pendingDest = dest
-    sheetDest = nil
-  }
-
-  /// Presents a section queued by `open(_:)` while a drawer was open. Runs as
-  /// the bottom-sheet's `onDismiss`; a no-op for ordinary dismissals (swipe
-  /// down / tap away) where nothing is pending.
-  private func presentPendingIfNeeded() {
-    guard let next = pendingDest else { return }
-    pendingDest = nil
-    sheetDest = next
+    sheetDest = dest
   }
 
   /// Single entry point for "user tapped the Tasks tile on the homepage."
@@ -2617,7 +2605,6 @@ private struct ComingSoonLayoutPlaceholder: View {
 private struct WeekDashboardScreen<CurrentDay: Equatable, Toolbar: ToolbarContent, Content: View>: View {
   let currentDay: CurrentDay
   let onInitialLoad: () async -> Void
-  let onRefresh: () async -> Void
   let onTaskChange: () -> Void
   let onDayChange: () -> Void
   let onDataChange: () -> Void
@@ -2646,17 +2633,12 @@ private struct WeekDashboardScreen<CurrentDay: Equatable, Toolbar: ToolbarConten
       .toolbar { toolbar() }
       // Two-phase load: paint cached blobs synchronously so tiles +
       // histograms appear immediately on cold launch, then kick off the
-      // network refresh in the background. Pull-to-refresh skips the
-      // cache step since it's a manual "I want fresh data now" gesture.
+      // network refresh in the background.
       .task {
         await onInitialLoad()
       }
-      .refreshable {
-        await onRefresh()
-      }
-      // CK fetch landed (push, foreground refresh, or pull-to-refresh on
-      // any other surface) — repaint so today's task counts reflect
-      // mutations from other devices.
+      // CK fetch landed (push or foreground refresh) — repaint so today's
+      // task counts reflect mutations from other devices.
       .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
         onTaskChange()
       }
@@ -2664,8 +2646,8 @@ private struct WeekDashboardScreen<CurrentDay: Equatable, Toolbar: ToolbarConten
       // fetch, or a write on another device). Refresh every CK-backed
       // tile from its SwiftData mirror. Without this, the dashboard
       // stays stuck on whatever `loadAll` saw at cold launch — entries
-      // logged on another device never repaint until the user pulls to
-      // refresh or visits the section.
+      // logged on another device never repaint until the user visits
+      // the section.
       .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
         onDataChange()
       }
