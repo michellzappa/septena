@@ -299,7 +299,7 @@ private struct TrainingOnboardingView: View {
   }
 
   private var actionTitle: String {
-    selected.isEmpty ? "Done" : "Add \(selected.count) template\(selected.count == 1 ? "" : "s")"
+    selected.isEmpty ? String(localized: "Done") : String(localized: "Add \(selected.count) templates")
   }
 
   private func addAndFinish() {

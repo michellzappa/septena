@@ -63,7 +63,7 @@ struct EditChoreSheet: View {
             }
           }
           Stepper(value: $cadenceDays, in: 1...365) {
-            Text("\(cadenceDays) day\(cadenceDays == 1 ? "" : "s")")
+            Text("\(cadenceDays) days")
           }
           .onChange(of: cadenceDays) { _, new in
             // Snap preset back to "custom" when stepping away from a known value.

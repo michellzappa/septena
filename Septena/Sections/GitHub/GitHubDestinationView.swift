@@ -72,8 +72,9 @@ struct GitHubDestinationView: View {
         accent: accent
       ) { iso in
         let count = byDate[iso]?.count ?? 0
+        let contributions = String(localized: "\(count) contributions")
         return HeatmapDay(level: byDate[iso]?.level ?? 0,
-                          label: "\(friendly(iso)): \(count) contribution\(count == 1 ? "" : "s")")
+                          label: "\(friendly(iso)): \(contributions)")
       }
     }
   }

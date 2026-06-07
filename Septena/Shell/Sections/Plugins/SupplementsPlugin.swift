@@ -311,7 +311,7 @@ private struct SupplementsOnboardingView: View {
   }
 
   private var actionTitle: String {
-    selected.isEmpty ? "Done" : "Add \(selected.count) supplement\(selected.count == 1 ? "" : "s")"
+    selected.isEmpty ? String(localized: "Done") : String(localized: "Add \(selected.count) supplements")
   }
 
   private func addAndFinish() {

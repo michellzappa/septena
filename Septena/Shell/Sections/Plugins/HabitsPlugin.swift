@@ -316,7 +316,7 @@ private struct HabitsOnboardingView: View {
   }
 
   private var actionTitle: String {
-    selected.isEmpty ? "Done" : "Add \(selected.count) habit\(selected.count == 1 ? "" : "s")"
+    selected.isEmpty ? String(localized: "Done") : String(localized: "Add \(selected.count) habits")
   }
 
   private func addAndFinish() {

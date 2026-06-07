@@ -288,7 +288,7 @@ private struct CaffeineOnboardingView: View {
   }
 
   private var actionTitle: String {
-    selected.isEmpty ? "Done" : "Add \(selected.count) source\(selected.count == 1 ? "" : "s")"
+    selected.isEmpty ? String(localized: "Done") : String(localized: "Add \(selected.count) sources")
   }
 
   private func addAndFinish() {

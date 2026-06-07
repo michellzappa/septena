@@ -300,7 +300,7 @@ private struct ChoresOnboardingView: View {
   }
 
   private var actionTitle: String {
-    selected.isEmpty ? "Done" : "Add \(selected.count) chore\(selected.count == 1 ? "" : "s")"
+    selected.isEmpty ? String(localized: "Done") : String(localized: "Add \(selected.count) chores")
   }
 
   private func addAndFinish() {

@@ -231,7 +231,7 @@ struct VirtueFlowView: View {
           }
           .padding(.top, 6)
         } label: {
-          Text("Based on \(signals.count) signal\(signals.count == 1 ? "" : "s")")
+          Text("Based on \(signals.count) signals")
             .font(.caption.weight(.medium))
             .foregroundStyle(VirtueMiniApp.accent)
         }
@@ -247,7 +247,7 @@ struct VirtueFlowView: View {
   private func footer(for summary: VirtueWeekSummary) -> some View {
     VStack(alignment: .leading, spacing: 4) {
       Label("Local and on-device. Nothing left your phone.", systemImage: "lock.fill")
-      Text("Summarized from \(summary.sectionsWithData.count) section\(summary.sectionsWithData.count == 1 ? "" : "s").")
+      Text("Summarized from \(summary.sectionsWithData.count) sections.")
       if !summary.sectionsMissing.isEmpty {
         Text("No data this run: \(summary.sectionsMissing.joined(separator: ", ")).")
       }
