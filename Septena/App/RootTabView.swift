@@ -33,12 +33,18 @@ struct RootTabView: View {
   @Environment(NavigationState.self) private var nav
   @Environment(SectionTheme.self) private var theme
   @State private var tabSelection = TabSelection()
+  /// App-level task composer, floated over everything (see `taskComposerHost`).
+  @State private var taskComposer = TaskComposerPresenter()
 
   var body: some View {
     @Bindable var nav = nav
     rootTabView
       .tint(theme.accent)
       .environment(tabSelection)
+      .environment(taskComposer)
+      // App-level composer overlay — floats over every tab / pushed screen and
+      // pops in (no fullScreenCover slide).
+      .taskComposerHost(taskComposer)
       // Anonymous aggregate analytics — one event when the user lands on
       // a tab. `.task(id:)` re-runs only when the value changes and is
       // cancelled on disappear, so back-nav within a tab doesn't double

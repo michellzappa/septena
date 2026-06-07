@@ -52,23 +52,23 @@ struct TaskComposerCard: View {
     // the very top. The card is compact enough to fit; expanding a date/repeat
     // pill drops the keyboard (see onInteractStart), freeing room to grow.
     ZStack {
-      // Dimmed scrim — tap anywhere outside the card to cancel.
+      // Dimmed scrim — tapping outside commits the task (Reminders-style) when
+      // there's something to save, otherwise just closes (no phantom task).
       Color.black.opacity(0.22)
         .ignoresSafeArea()
         .contentShape(Rectangle())
-        .onTapGesture { onDismiss() }
+        .onTapGesture { dismissSaving() }
 
       VStack(alignment: .leading, spacing: 12) {
         header
 
         VStack(alignment: .leading, spacing: 8) {
           HStack(spacing: 10) {
-            TextField("What needs doing?", text: $draft.title)
+            TextField("What needs doing?", text: $draft.title, axis: .vertical)
               .textFieldStyle(.plain)
               .font(.septenaTaskTitle)
               .focused($titleFocused)
-              .submitLabel(.done)
-              .onSubmit { if draft.canSave { commit() } }
+              .lineLimit(1...4)
 
             Button(action: commit) {
               Image(systemName: isEditing ? "checkmark.circle.fill" : "arrow.up.circle.fill")
@@ -83,11 +83,11 @@ struct TaskComposerCard: View {
           Divider()
 
           // Optional notes — room to paste or explain context.
-          TextField("Notes or pasted context (optional)", text: $draft.notes, axis: .vertical)
+          TextField("Notes", text: $draft.notes, axis: .vertical)
             .textFieldStyle(.plain)
             .font(.septenaNotes)
             .foregroundStyle(Theme.inkSecondary)
-            .lineLimit(1...5)
+            .lineLimit(3...10)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
@@ -121,7 +121,18 @@ struct TaskComposerCard: View {
       .padding(.horizontal, 14)
     }
     .onAppear(perform: seed)
-    .onChange(of: draft.title) { _, _ in updateSuggestion() }
+    .onChange(of: draft.title) { _, newValue in
+      // The title wraps (axis: .vertical) so long titles show in full instead
+      // of truncating — but it stays single-line in spirit: a Return inserts a
+      // newline, which we treat as "save". Strip it and commit (or just tidy it
+      // away when there's nothing to save yet).
+      if newValue.contains("\n") {
+        draft.title = newValue.replacingOccurrences(of: "\n", with: " ")
+          .trimmingCharacters(in: .whitespacesAndNewlines)
+        if draft.canSave { commit(); return }
+      }
+      updateSuggestion()
+    }
   }
 
   private func updateSuggestion() {
@@ -148,9 +159,12 @@ struct TaskComposerCard: View {
           .foregroundStyle(Theme.inkSecondary)
       } else if case .edit(let task) = mode {
         Menu {
-          Button { mutator.moveToSomeday(id: task.id); finish() } label: {
-            Label("Move to Someday", systemImage: "moon.stars")
+          // Conclude the task right from the editor — completes and closes.
+          Button { mutator.complete(id: task.id); finish() } label: {
+            Label("Complete", systemImage: "checkmark.circle")
           }
+          // "Move to Someday" now lives in the When control. This menu keeps
+          // the terminal actions.
           Button { mutator.cancel(id: task.id); finish() } label: {
             Label("Cancel Task", systemImage: "xmark.circle")
           }
@@ -180,7 +194,7 @@ struct TaskComposerCard: View {
 
   private func isUnset(_ token: DetectedToken) -> Bool {
     switch token.kind {
-    case .today, .date: return !draft.onToday && draft.scheduled == nil
+    case .today, .date: return !draft.onToday && draft.scheduled == nil && !draft.someday
     case .project:      return draft.projectId == nil
     case .area:         return draft.areaId == nil && draft.projectId == nil
     }
@@ -252,10 +266,9 @@ struct TaskComposerCard: View {
   private func applyToken(_ token: DetectedToken) {
     switch token.kind {
     case .today:
-      draft.onToday = true; draft.scheduled = nil
+      draft.setToday()
     case .date(let d):
-      if Calendar.current.isDateInToday(d) { draft.onToday = true; draft.scheduled = nil }
-      else { draft.onToday = false; draft.scheduled = Calendar.current.startOfDay(for: d) }
+      draft.setScheduled(d)
     case .project(let id, _):
       draft.projectId = id
       draft.areaId = projects.first { $0.id == id }?.area
@@ -311,6 +324,12 @@ struct TaskComposerCard: View {
       draft.update(task, via: mutator)
     }
     finish()
+  }
+
+  /// Tap-outside behaviour: commit when there's something worth saving,
+  /// otherwise just close so an empty draft never creates a phantom task.
+  private func dismissSaving() {
+    if draft.canSave { commit() } else { onDismiss() }
   }
 
   /// Reload the caller's list and close.
@@ -395,10 +414,12 @@ struct TaskAttributeBar: View {
       : nil
   }
 
-  /// "When" folds in Today: a task pinned to today (no date) reads "Today",
-  /// a future planning date reads its date.
-  private var whenIsSet: Bool { draft.scheduled != nil || draft.onToday }
+  /// "When" folds in Today and Someday: a task pinned to today (no date) reads
+  /// "Today", a future planning date reads its date, the Someday bucket reads
+  /// "Someday".
+  private var whenIsSet: Bool { draft.someday || draft.scheduled != nil || draft.onToday }
   private var whenValue: String? {
+    if draft.someday { return "Someday" }
     if let s = draft.scheduled { return Self.dateLabel(s) }
     return draft.onToday ? "Today" : nil
   }
@@ -407,7 +428,7 @@ struct TaskAttributeBar: View {
   private var inlineEditor: some View {
     switch expanded {
     case .when:
-      InlineWhenPanel(onToday: $draft.onToday, scheduled: $draft.scheduled, accent: accent)
+      InlineWhenPanel(draft: $draft, accent: accent)
         .transition(.opacity.combined(with: .move(edge: .top)))
     case .deadline:
       InlineDatePanel(date: $draft.deadline, accent: accent)
@@ -493,13 +514,13 @@ private struct AttributePill: View {
 
 // MARK: - Inline "When" editor
 
-/// The scheduling control — manages both the `today` pin and a planning
-/// `Date?` so "Today" doesn't need its own pill. Quick chips (Today / Tomorrow
-/// / Weekend) sit above a graphical calendar; picking today normalizes back to
-/// the pinned-Today state. Expanded under the When pill.
+/// The scheduling control — the single home for Today, a planning date, and
+/// the Someday bucket, so none of them needs its own pill. Quick chips (Today /
+/// Tomorrow / Weekend / Someday) sit above a graphical calendar; picking today
+/// normalizes back to the pinned-Today state, and Someday dims the calendar
+/// since it's an explicitly date-free bucket. Expanded under the When pill.
 private struct InlineWhenPanel: View {
-  @Binding var onToday: Bool
-  @Binding var scheduled: Date?
+  @Binding var draft: TaskDraft
   let accent: Color
 
   private var cal: Calendar { Calendar.current }
@@ -512,27 +533,35 @@ private struct InlineWhenPanel: View {
     return cal.startOfDay(for: next)
   }
 
-  private var isSet: Bool { scheduled != nil || onToday }
+  private var isSet: Bool { draft.someday || draft.scheduled != nil || draft.onToday }
 
   private var calendarBinding: Binding<Date> {
-    Binding(get: { scheduled ?? today }, set: { setDate($0) })
+    Binding(get: { draft.scheduled ?? today },
+            set: { d in withAnimation(.snappy(duration: 0.2)) { draft.setScheduled(d) } })
   }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
       HStack(spacing: 8) {
-        chip("Today", active: onToday && scheduled == nil) { setToday() }
-        chip("Tomorrow", active: isSameDay(scheduled, tomorrow)) { setDate(tomorrow) }
-        chip("Weekend", active: isSameDay(scheduled, weekend)) { setDate(weekend) }
+        chip("Today", active: draft.onToday && draft.scheduled == nil && !draft.someday) {
+          draft.setToday()
+        }
+        chip("Tomorrow", active: isSameDay(draft.scheduled, tomorrow)) { draft.setScheduled(tomorrow) }
+        chip("Weekend", active: isSameDay(draft.scheduled, weekend)) { draft.setScheduled(weekend) }
+        chip("Someday", active: draft.someday) { draft.setSomeday() }
       }
 
       DatePicker("", selection: calendarBinding, displayedComponents: [.date])
         .datePickerStyle(.graphical)
         .tint(accent)
+        // Someday is intentionally date-free — dim + disable the calendar so it
+        // reads as "no date" rather than today's date.
+        .opacity(draft.someday ? 0.4 : 1)
+        .disabled(draft.someday)
 
       if isSet {
         Button(role: .destructive) {
-          withAnimation(.snappy(duration: 0.2)) { onToday = false; scheduled = nil }
+          withAnimation(.snappy(duration: 0.2)) { draft.clearWhen() }
         } label: {
           Label("Clear", systemImage: "xmark.circle").font(.septenaLabel)
         }
@@ -545,19 +574,13 @@ private struct InlineWhenPanel: View {
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous))
   }
 
-  private func setToday() { onToday = true; scheduled = nil }
-  private func setDate(_ d: Date) {
-    let day = cal.startOfDay(for: d)
-    if cal.isDateInToday(day) { setToday() }
-    else { onToday = false; scheduled = day }
-  }
   private func isSameDay(_ a: Date?, _ b: Date) -> Bool {
     a.map { cal.isDate($0, inSameDayAs: b) } ?? false
   }
 
   @ViewBuilder
   private func chip(_ title: String, active: Bool, _ action: @escaping () -> Void) -> some View {
-    Button(action: action) {
+    Button { withAnimation(.snappy(duration: 0.2)) { action() } } label: {
       Text(title)
         .font(.septenaLabel)
         .foregroundStyle(active ? Theme.inkPrimary : Theme.inkSecondary)
@@ -672,36 +695,53 @@ private struct InlineRepeatPanel: View {
   }
 }
 
-// MARK: - Presentation
+// MARK: - Root presenter
 
-extension View {
-  /// Present a `TaskComposerCard` so it floats over the *whole app*, not just
-  /// the view it's attached to. iOS uses a transparent full-screen cover (the
-  /// card carries its own dim scrim); macOS — where full-screen covers aren't
-  /// available — falls back to an in-place overlay, fine on a roomy window.
-  /// Used wherever a composer is launched from a constrained container (the
-  /// pushed Tasks drawer, the homepage tile menu).
-  func taskComposerCover<Card: View>(
-    isPresented: Binding<Bool>,
-    @ViewBuilder card: @escaping () -> Card
-  ) -> some View {
-    modifier(TaskComposerCover(isPresented: isPresented, card: card))
+/// App-level presenter so the composer can float over the *whole* UI (above
+/// pushed screens and the tab bar) and animate as a simple fade/pop — instead
+/// of a `fullScreenCover`'s bottom slide. Hosted once at the tab root via
+/// `taskComposerHost`; any surface launches it through `present(...)`.
+@Observable
+final class TaskComposerPresenter {
+  struct Request: Identifiable {
+    let id = UUID()
+    let mode: TaskComposerCard.Mode
+    let areas: [Area]
+    let projects: [Project]
+    let accent: Color
+    let onDone: () -> Void
   }
+
+  var request: Request?
+
+  func present(_ mode: TaskComposerCard.Mode,
+               areas: [Area], projects: [Project], accent: Color,
+               onDone: @escaping () -> Void) {
+    request = Request(mode: mode, areas: areas, projects: projects,
+                      accent: accent, onDone: onDone)
+  }
+
+  func dismiss() { request = nil }
 }
 
-private struct TaskComposerCover<Card: View>: ViewModifier {
-  @Binding var isPresented: Bool
-  @ViewBuilder var card: () -> Card
-
-  func body(content: Content) -> some View {
-    #if os(iOS)
-    content.fullScreenCover(isPresented: $isPresented) {
-      card().presentationBackground(.clear)
+extension View {
+  /// Mount the app-level composer overlay. It fades/pops in over everything
+  /// (the card carries its own dim scrim) — no slide, no moving background.
+  func taskComposerHost(_ presenter: TaskComposerPresenter) -> some View {
+    overlay {
+      if let req = presenter.request {
+        TaskComposerCard(
+          mode: req.mode,
+          areas: req.areas,
+          projects: req.projects,
+          accent: req.accent,
+          onDismiss: { presenter.dismiss() },
+          onDone: req.onDone
+        )
+        .id(req.id)
+        .transition(.opacity)
+      }
     }
-    #else
-    content
-      .overlay { if isPresented { card() } }
-      .animation(.snappy(duration: 0.2), value: isPresented)
-    #endif
+    .animation(.snappy(duration: 0.22), value: presenter.request?.id)
   }
 }

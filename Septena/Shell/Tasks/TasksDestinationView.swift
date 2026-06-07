@@ -33,15 +33,28 @@ struct TasksDestinationView: View {
   /// home the same way the full Tasks surface does.
   @State private var areas: [Area] = []
   @State private var projects: [Project] = []
-  @State private var editing: SeptenaTask? = nil
-  @State private var creating = false
+  @Environment(TaskComposerPresenter.self) private var composer
+  /// Row currently open in the composer — drives the selection highlight.
+  @State private var selectedId: String?
 
   private var accent: Color { theme.color(for: "tasks") }
+
+  /// New tasks from the drawer default to Today; a row tap edits. Both launch
+  /// the app-level composer so it floats over everything and pops in.
+  private func openCreate() {
+    composer.present(.create(.today), areas: areas, projects: projects,
+                     accent: accent, onDone: { reload() })
+  }
+  private func openEdit(_ task: SeptenaTask) {
+    selectedId = task.id
+    composer.present(.edit(task), areas: areas, projects: projects, accent: accent,
+                     onDone: { selectedId = nil; reload() })
+  }
 
   var body: some View {
     SectionDrawer(sectionKey: "tasks",
                   title: "Tasks",
-                  onLog: { _ in creating = true }) {
+                  onLog: { _ in openCreate() }) {
       if !openTasks.isEmpty {
         DrawerSection("Today", padding: .none) {
           ForEach(openTasks) { task in
@@ -50,8 +63,9 @@ struct TasksDestinationView: View {
                     areas: areas,
                     projects: projects,
                     showsTodayIndicator: false,
+                    isSelected: selectedId == task.id,
                     onToggle: { toggle(task) },
-                    onTap: { editing = task })
+                    onTap: { openEdit(task) })
               .transition(.opacity)
           }
         }
@@ -64,8 +78,9 @@ struct TasksDestinationView: View {
                     areas: areas,
                     projects: projects,
                     showsTodayIndicator: false,
+                    isSelected: selectedId == task.id,
                     onToggle: { toggle(task) },
-                    onTap: { editing = task })
+                    onTap: { openEdit(task) })
           }
         }
       }
@@ -80,43 +95,6 @@ struct TasksDestinationView: View {
     }
     .tint(accent)
     .task { reload() }
-    .taskComposerCover(isPresented: composerBinding) { composerCard }
-  }
-
-  /// One liquid-glass composer for both add (the drawer's + / ⌘N, declared via
-  /// TasksPlugin.logActions) and edit (row tap) — the same `TaskComposerCard`
-  /// the Tasks tab uses. The drawer is a *pushed* screen, so an `.overlay`
-  /// would clip the card to the drawer's bounds; on iOS we present it through a
-  /// transparent `.fullScreenCover` instead, so the card floats over the whole
-  /// app. (See `DrawerTaskComposer` for the macOS overlay fallback.)
-  @ViewBuilder
-  private var composerCard: some View {
-    if let mode = composerMode {
-      TaskComposerCard(
-        mode: mode,
-        areas: areas,
-        projects: projects,
-        accent: accent,
-        onDismiss: closeComposer,
-        onDone: { reload() }
-      )
-    }
-  }
-
-  /// The drawer is the Today drawer, so a new task defaults to Today; a row
-  /// tap edits. The scrim blocks drawer taps while open, so the two modes are
-  /// naturally mutually exclusive.
-  private var composerMode: TaskComposerCard.Mode? {
-    if creating { return .create(.today) }
-    if let task = editing { return .edit(task) }
-    return nil
-  }
-  private var composerBinding: Binding<Bool> {
-    Binding(get: { creating || editing != nil }, set: { if !$0 { closeComposer() } })
-  }
-  private func closeComposer() {
-    creating = false
-    editing = nil
   }
 
   // MARK: - Data

@@ -40,6 +40,7 @@ struct WeekDashboardView: View {
   @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(TaskMutator.self) private var taskMutator
   @Environment(SectionTheme.self) private var theme
+  @Environment(TaskComposerPresenter.self) private var composer
   // Optional: lets the tile quick-add fire the commit flourish over the
   // dashboard. nil-safe (skips the visual) for hosts without the root env.
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
@@ -163,9 +164,6 @@ struct WeekDashboardView: View {
   /// standalone sheet (separate from `sheetDest` because Mood needs both
   /// the destination route and the standalone check-in flow).
   @State private var presentingMoodCheckin = false
-  /// Drives the Tasks-tile "Create in Inbox…" composer, popped in place over
-  /// the homepage rather than navigating into the Tasks tab first.
-  @State private var creatingTask = false
   /// Hydration tile state. Today's total ml + a 90-day daily series
   /// (oldest→newest). Derived from Nutrition's water entries — Hydration
   /// owns no entity (see HydrationPlugin / ChecklistMirror.loadHydrationDailyMl).
@@ -272,7 +270,14 @@ struct WeekDashboardView: View {
     ) {
       VStack(spacing: 18) {
         ClaudeReconnectBanner()
-        if showWelcome { WelcomeHeader(now: clock.now, context: welcomeContext) }
+        if showWelcome {
+          // Self-observes DayClock so the 60s `now` tick re-renders only the
+          // header, not the whole tile grid. (Reading `clock.now` here in the
+          // parent body would invalidate every tile each minute.)
+          WelcomeHeaderSection(dataAware: welcomeDataAware,
+                               todayTaskCount: taskCounts?.todayCount ?? 0,
+                               dailies: dailies)
+        }
         if showTodayTimeline { todayTimeline }
         layoutBody
       }
@@ -812,61 +817,6 @@ struct WeekDashboardView: View {
   private var weeklySessionCount: Int {
     let cutoff = sinceDate(daysBack: 7)
     return trainingSessionDates.filter { $0 >= cutoff }.count
-  }
-
-  // MARK: - Welcome context (data-aware greeting)
-  //
-  // Built purely from already-loaded dashboard state — no new fetch (the load
-  // path is concurrency-sensitive). The `signature` is coarse so the greeting
-  // only regenerates when something crosses a bucket, not on every check-off.
-  private var welcomeContext: WelcomeContext? {
-    guard welcomeDataAware else { return nil }
-
-    func coarse(_ n: Int) -> String {
-      switch n {
-      case ..<1:  return "0"
-      case 1...2: return "lo"
-      case 3...5: return "mid"
-      default:    return "hi"
-      }
-    }
-    func plural(_ n: Int, _ word: String) -> String { "\(n) \(word)\(n == 1 ? "" : "s")" }
-
-    var phrases: [String] = []
-    var sig: [String] = []
-
-    if let todayCount = taskCounts?.todayCount, todayCount > 0 {
-      phrases.append("\(plural(todayCount, "task")) on today's list")
-      sig.append("t\(coarse(todayCount))")
-    }
-    let habitsLeft = dailies.openHabits.count
-    if habitsLeft > 0 {
-      phrases.append("\(plural(habitsLeft, "habit")) still to check off")
-      sig.append("h\(coarse(habitsLeft))")
-    }
-    let suppsLeft = dailies.openSupplements.count
-    if suppsLeft > 0 {
-      phrases.append("\(plural(suppsLeft, "supplement")) left to take")
-      sig.append("s\(coarse(suppsLeft))")
-    }
-
-    // What's coming up next — the soonest timed event still ahead today. This
-    // is the "Next-aware" bit: a concrete thing on the horizon, with a time.
-    if let next = dailies.calendarEvents
-      .filter({ !$0.isAllDay && $0.startDate > clock.now })
-      .min(by: { $0.startDate < $1.startDate }) {
-      let raw = next.title ?? ""
-      let title = raw.isEmpty ? "something" : raw
-      let at = next.startDate.formatted(date: .omitted, time: .shortened)
-      phrases.append("coming up: \(title) at \(at)")
-      // Regenerate when the next event itself changes (one passes / is added),
-      // not as the clock merely ticks toward it.
-      sig.append("n\(next.eventIdentifier ?? at)")
-    }
-
-    guard !phrases.isEmpty else { return nil }
-    return WelcomeContext(phrase: phrases.joined(separator: ", "),
-                          signature: sig.joined(separator: "|"))
   }
 
   // MARK: - Today timeline (single row above the tile grid)
@@ -1764,7 +1714,11 @@ struct WeekDashboardView: View {
       onCreateInInbox: {
         // Pop the composer right here over the homepage — no tab switch /
         // navigation into the Tasks list first.
-        creatingTask = true
+        composer.present(.create(.inbox),
+                         areas: LocalCache.areas(in: modelContext),
+                         projects: LocalCache.projects(in: modelContext),
+                         accent: theme.color(for: "tasks"),
+                         onDone: { Task { await refreshTasks() } })
       },
       onGoToInbox: {
         tabSelection.current = .tasks
@@ -2436,18 +2390,6 @@ struct WeekDashboardView: View {
       .presentationDetents([.medium, .large])
       .presentationDragIndicator(.visible)
       #endif
-    }
-    // Tasks-tile "Create in Inbox…" — the same liquid-glass composer the tab
-    // and drawer use, floated over the homepage in place.
-    .taskComposerCover(isPresented: $creatingTask) {
-      TaskComposerCard(
-        mode: .create(.inbox),
-        areas: LocalCache.areas(in: modelContext),
-        projects: LocalCache.projects(in: modelContext),
-        accent: theme.color(for: "tasks"),
-        onDismiss: { creatingTask = false },
-        onDone: { Task { await refreshTasks() } }
-      )
     }
   }
 
