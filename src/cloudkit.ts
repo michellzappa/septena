@@ -152,6 +152,13 @@ export interface QueryByDateRangeArgs {
   resultsLimit?: number;
   /** Optional secondary sort field (e.g. "time" — applied client-side). */
   timeField?: string;
+  /**
+   * Optional numeric TIMESTAMP field (epoch ms, e.g. "occurredAt") used as the
+   * within-day secondary sort. Takes precedence over `timeField` — this is the
+   * replacement now that the legacy `time` STRING is being retired. Rows that
+   * lack it fall back to date-only ordering.
+   */
+  instantField?: string;
 }
 
 export async function queryByDateRange(
@@ -200,7 +207,11 @@ export async function queryByDateRange(
     const ad = (a.fields[dateField]?.value as string) ?? "";
     const bd = (b.fields[dateField]?.value as string) ?? "";
     if (ad !== bd) return ad < bd ? 1 : -1;
-    if (args.timeField) {
+    if (args.instantField) {
+      const ai = typeof a.fields[args.instantField]?.value === "number" ? (a.fields[args.instantField]!.value as number) : 0;
+      const bi = typeof b.fields[args.instantField]?.value === "number" ? (b.fields[args.instantField]!.value as number) : 0;
+      if (ai !== bi) return ai < bi ? 1 : -1;
+    } else if (args.timeField) {
       const at = (a.fields[args.timeField]?.value as string) ?? "";
       const bt = (b.fields[args.timeField]?.value as string) ?? "";
       if (at !== bt) return at < bt ? 1 : -1;

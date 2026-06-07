@@ -1,5 +1,5 @@
 import { queryByDateRange, type CloudKitClient } from "../cloudkit.js";
-import { getEffectiveTimezone, todayYMD, ymdNDaysAgo, nowHHMMSS, localToEpochMs } from "../tz.js";
+import { getEffectiveTimezone, todayYMD, ymdNDaysAgo, nowHHMMSS, localToEpochMs, epochMsToHHMM } from "../tz.js";
 
 const SHORTID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 function newId(len = 4): string {
@@ -94,14 +94,14 @@ export async function listCaffeineEvents(client: CloudKitClient, input: ListCaff
     recordType: "CaffeineEvent",
     from,
     to,
-    timeField: "time",
+    instantField: "occurredAt",
     resultsLimit: input.limit ?? 100,
   });
 
   const events = records.map((r) => ({
     id: r.recordName.replace(/^caffeine-event:/, ""),
     date:   optStr(r.fields.date?.value)   ?? "",
-    time:   optStr(r.fields.time?.value)   ?? "",
+    time:   optStr(r.fields.time?.value)   ?? (typeof r.fields.occurredAt?.value === "number" ? epochMsToHHMM(r.fields.occurredAt.value as number, tz) : ""),
     method: optStr(r.fields.method?.value) ?? "",
     beans:  optStr(r.fields.beans?.value),
     grams:  typeof r.fields.grams?.value === "number" ? r.fields.grams.value : undefined,
@@ -118,8 +118,9 @@ export async function logCaffeineEvent(client: CloudKitClient, input: LogCaffein
   const time = input.time ?? nowHHMMSS(tz);
   const fields: Record<string, { value: unknown }> = {
     date:   { value: date },
-    time:   { value: time },
     method: { value: input.method },
+    // `occurredAt` (epoch ms) is the canonical instant; the legacy `time`
+    // STRING is no longer written — derive it from occurredAt on read.
     occurredAt: { value: localToEpochMs(date, time, tz) },
   };
   if (input.beans)              fields.beans = { value: input.beans };
@@ -130,7 +131,7 @@ export async function logCaffeineEvent(client: CloudKitClient, input: LogCaffein
     recordType: "CaffeineEvent",
     recordName: `caffeine-event:${id}`,
     fields,
-    protectedFields: ["date", "time", "method"],
+    protectedFields: ["date", "method"],
   });
 
   return droppedFields.length > 0

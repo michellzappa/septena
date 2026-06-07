@@ -1,5 +1,5 @@
 import { queryByDateRange, type CloudKitClient } from "../cloudkit.js";
-import { getEffectiveTimezone, todayYMD, ymdNDaysAgo, nowHHMMSS, localToEpochMs } from "../tz.js";
+import { getEffectiveTimezone, todayYMD, ymdNDaysAgo, nowHHMMSS, localToEpochMs, epochMsToHHMM } from "../tz.js";
 
 const SHORTID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 function newId(len = 4): string {
@@ -96,14 +96,14 @@ export async function listCannabisEvents(client: CloudKitClient, input: ListCann
     recordType: "CannabisEvent",
     from,
     to,
-    timeField: "time",
+    instantField: "occurredAt",
     resultsLimit: input.limit ?? 100,
   });
 
   const events = records.map((r) => ({
     id:     r.recordName.replace(/^cannabis-event:/, ""),
     date:   optStr(r.fields.date?.value)   ?? "",
-    time:   optStr(r.fields.time?.value)   ?? "",
+    time:   optStr(r.fields.time?.value)   ?? (typeof r.fields.occurredAt?.value === "number" ? epochMsToHHMM(r.fields.occurredAt.value as number, tz) : ""),
     method: optStr(r.fields.method?.value) ?? "",
     strain: optStr(r.fields.strain?.value),
     hit:    typeof r.fields.hit?.value   === "number" ? r.fields.hit.value   : undefined,
@@ -122,8 +122,8 @@ export async function logCannabisEvent(client: CloudKitClient, input: LogCannabi
   const time = input.time ?? nowHHMMSS(tz);
   const fields: Record<string, { value: unknown }> = {
     date:   { value: date },
-    time:   { value: time },
     method: { value: input.method },
+    // canonical instant; legacy `time` STRING retired (derive from occurredAt).
     occurredAt: { value: localToEpochMs(date, time, tz) },
   };
   if (input.strain)             fields.strain = { value: input.strain };
@@ -136,7 +136,7 @@ export async function logCannabisEvent(client: CloudKitClient, input: LogCannabi
     recordType: "CannabisEvent",
     recordName: `cannabis-event:${id}`,
     fields,
-    protectedFields: ["date", "time", "method"],
+    protectedFields: ["date", "method"],
   });
 
   return droppedFields.length > 0

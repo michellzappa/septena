@@ -1,5 +1,5 @@
 import { queryByDateRange, type CloudKitClient } from "../cloudkit.js";
-import { getEffectiveTimezone, todayYMD, ymdNDaysAgo, nowHHMM, localToEpochMs } from "../tz.js";
+import { getEffectiveTimezone, todayYMD, ymdNDaysAgo, nowHHMM, localToEpochMs, epochMsToHHMM } from "../tz.js";
 
 const SHORTID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 function newId(len = 6): string {
@@ -41,6 +41,19 @@ async function modify(client: CloudKitClient, ops: ModifyOp[]): Promise<CKModify
     zoneID: { zoneName: client.zoneName },
     operations: ops,
   });
+}
+
+async function lookupExerciseEntry(
+  client: CloudKitClient,
+  id: string,
+): Promise<Record<string, { value: unknown }> | null> {
+  const res = await client.post<{ records: Array<{ recordName: string; fields?: Record<string, { value: unknown }>; serverErrorCode?: string }> }>(
+    "records/lookup",
+    { zoneID: { zoneName: client.zoneName }, records: [{ recordName: `exercise-entry:${id}` }] },
+  );
+  const r = res.records[0];
+  if (!r || r.serverErrorCode === "NOT_FOUND") return null;
+  return r.fields ?? {};
 }
 
 // ============================================================================
@@ -247,7 +260,7 @@ export async function listTrainingEntries(client: CloudKitClient, input: ListTra
     recordType: "ExerciseEntry",
     from,
     to,
-    timeField: "time",
+    instantField: "occurredAt",
     resultsLimit: input.exercise ? 5000 : limit,
   });
   const wanted = input.exercise?.toLowerCase();
@@ -259,7 +272,7 @@ export async function listTrainingEntries(client: CloudKitClient, input: ListTra
   const entries = records.map((r) => ({
     id:          r.recordName.replace(/^exercise-entry:/, ""),
     date:        optStr(r.fields.date?.value) ?? "",
-    time:        optStr(r.fields.time?.value) ?? "",
+    time:        optStr(r.fields.time?.value) ?? (typeof r.fields.occurredAt?.value === "number" ? epochMsToHHMM(r.fields.occurredAt.value as number, tz) : ""),
     sessionType: optStr(r.fields.sessionType?.value) ?? "",
     exercise:    optStr(r.fields.exercise?.value) ?? "",
     weight:      optNum(r.fields.weight?.value),
@@ -284,10 +297,10 @@ export async function logTrainingEntry(client: CloudKitClient, input: LogTrainin
   const time = input.time ?? nowHHMM(tz);
   const fields: Record<string, { value: unknown }> = {
     date:        { value: date },
-    time:        { value: time },
     sessionType: { value: input.sessionType },
     exercise:    { value: input.exercise },
     loggedAt:    { value: new Date().toISOString() },
+    // canonical instant; legacy `time` STRING retired (derive from occurredAt).
     occurredAt:  { value: localToEpochMs(date, time, tz) },
   };
   if (input.weight      !== undefined) fields.weight      = { value: input.weight };
@@ -304,7 +317,7 @@ export async function logTrainingEntry(client: CloudKitClient, input: LogTrainin
     recordType: "ExerciseEntry",
     recordName: `exercise-entry:${id}`,
     fields,
-    protectedFields: ["date", "time", "sessionType", "exercise"],
+    protectedFields: ["date", "sessionType", "exercise"],
   });
 
   return droppedFields.length > 0
@@ -325,8 +338,25 @@ export async function updateTrainingEntry(client: CloudKitClient, input: UpdateT
     }
   };
 
-  if (input.date)        { fields.date        = { value: input.date }; updated.push("date"); }
-  if (input.time)        { fields.time        = { value: input.time }; updated.push("time"); }
+  // `date` (calendar-day key) is still stored; `time` STRING is retired —
+  // a time/date change recomputes the canonical `occurredAt` instead, filling
+  // the missing half from the existing record.
+  if (input.date || input.time) {
+    const tz = await getEffectiveTimezone(client);
+    let d = input.date;
+    let t = input.time;
+    if (!d || !t) {
+      const existing = await lookupExerciseEntry(client, input.id);
+      if (!d) d = optStr(existing?.date?.value) ?? todayYMD(tz);
+      if (!t) {
+        t = optStr(existing?.time?.value)
+          ?? (typeof existing?.occurredAt?.value === "number" ? epochMsToHHMM(existing.occurredAt.value as number, tz) : undefined);
+      }
+    }
+    if (input.date) { fields.date = { value: input.date }; updated.push("date"); }
+    fields.occurredAt = { value: localToEpochMs(d!, t, tz) };
+    updated.push("occurredAt");
+  }
   // sessionType: treat empty string as an explicit clear, not "field not provided".
   if (input.sessionType !== undefined) { fields.sessionType = { value: input.sessionType }; updated.push("sessionType"); }
   if (input.exercise)    { fields.exercise    = { value: input.exercise };    updated.push("exercise"); }

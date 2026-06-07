@@ -80,6 +80,17 @@ export function nowHHMMSS(tz: string): string {
 }
 
 /**
+ * Local "HH:MM" (24h) of an instant given as UTC epoch milliseconds, in `tz`.
+ * The inverse of `localToEpochMs` for display: used to derive an event's
+ * wall-clock time from its `occurredAt` TIMESTAMP now that the legacy `time`
+ * STRING field is no longer written.
+ */
+export function epochMsToHHMM(ms: number, tz: string): string {
+  const p = partsInTz(new Date(ms), tz);
+  return `${p.hour}:${p.minute}`;
+}
+
+/**
  * Calendar arithmetic on a "YYYY-MM-DD" string. DST-safe because it operates on
  * calendar fields via UTC, never on a wall-clock instant.
  */

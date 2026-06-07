@@ -254,7 +254,7 @@ export async function completeChore(client: CloudKitClient, input: CompleteChore
     choreID: { value: input.id },
     action: { value: "complete" },
     date: { value: date },
-    time: { value: time },
+    // canonical instant; legacy `time` STRING retired (derive from occurredAt).
     sortKey: { value: sortKey(tz) },
     occurredAt: { value: localToEpochMs(date, time, tz) },
   };

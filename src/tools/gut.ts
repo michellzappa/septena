@@ -1,5 +1,5 @@
 import { queryByDateRange, type CloudKitClient } from "../cloudkit.js";
-import { getEffectiveTimezone, todayYMD, ymdNDaysAgo, nowHHMMSS, localToEpochMs } from "../tz.js";
+import { getEffectiveTimezone, todayYMD, ymdNDaysAgo, nowHHMMSS, localToEpochMs, epochMsToHHMM } from "../tz.js";
 
 const SHORTID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 function newId(len = 4): string {
@@ -87,14 +87,14 @@ export async function listGutEvents(client: CloudKitClient, input: ListGutEvents
     recordType: "GutEvent",
     from,
     to,
-    timeField: "time",
+    instantField: "occurredAt",
     resultsLimit: input.limit ?? 100,
   });
 
   const events = records.map((r) => ({
     id:              r.recordName.replace(/^gut-event:/, ""),
     date:            optStr(r.fields.date?.value)  ?? "",
-    time:            optStr(r.fields.time?.value)  ?? "",
+    time:            optStr(r.fields.time?.value)  ?? (typeof r.fields.occurredAt?.value === "number" ? epochMsToHHMM(r.fields.occurredAt.value as number, tz) : ""),
     bristol:         (r.fields.bristol?.value  as number) ?? 0,
     blood:           ((r.fields.blood?.value   as number) ?? 0) !== 0,
     volume:          optStr(r.fields.volume?.value),
@@ -114,9 +114,9 @@ export async function logGutEvent(client: CloudKitClient, input: LogGutEventInpu
   const time = input.time ?? nowHHMMSS(tz);
   const fields: Record<string, { value: unknown }> = {
     date:    { value: date },
-    time:    { value: time },
     bristol: { value: input.bristol },
     blood:   { value: input.blood ? 1 : 0 },
+    // canonical instant; legacy `time` STRING retired (derive from occurredAt).
     occurredAt: { value: localToEpochMs(date, time, tz) },
   };
   if (input.volume)           fields.volume           = { value: input.volume };
@@ -129,7 +129,7 @@ export async function logGutEvent(client: CloudKitClient, input: LogGutEventInpu
     recordType: "GutEvent",
     recordName: `gut-event:${id}`,
     fields,
-    protectedFields: ["date", "time", "bristol"],
+    protectedFields: ["date", "bristol"],
   });
 
   return droppedFields.length > 0

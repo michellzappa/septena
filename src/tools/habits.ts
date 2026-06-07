@@ -1,5 +1,5 @@
 import { extractUnknownFieldName, type CloudKitClient } from "../cloudkit.js";
-import { getEffectiveTimezone, todayYMD, nowHHMM, localToEpochMs } from "../tz.js";
+import { getEffectiveTimezone, todayYMD, nowHHMM, localToEpochMs, epochMsToHHMM } from "../tz.js";
 
 const SHORTID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 
@@ -108,7 +108,7 @@ export async function listHabits(client: CloudKitClient, input: ListHabitsInput)
         done: ((r.fields.done?.value as number) ?? 0) !== 0,
         skipped: ((r.fields.skipped?.value as number) ?? 0) !== 0,
         note: optStr(r.fields.note?.value),
-        time: optStr(r.fields.time?.value),
+        time: optStr(r.fields.time?.value) ?? (typeof r.fields.occurredAt?.value === "number" ? epochMsToHHMM(r.fields.occurredAt.value as number, tz) : undefined),
       });
     }
   }
@@ -197,7 +197,7 @@ export async function toggleHabit(client: CloudKitClient, input: ToggleHabitInpu
     habitID: { value: input.id },
     done: { value: input.done ? 1 : 0 },
     skipped: { value: (input.skipped ?? false) ? 1 : 0 },
-    time: { value: time },
+    // canonical instant; legacy `time` STRING retired (derive from occurredAt).
     // occurredAt drops gracefully if the schema doesn't know it yet (see below).
     occurredAt: { value: localToEpochMs(date, time, tz) },
   };

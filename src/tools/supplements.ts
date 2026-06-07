@@ -1,5 +1,5 @@
 import { extractUnknownFieldName, type CloudKitClient } from "../cloudkit.js";
-import { getEffectiveTimezone, todayYMD, nowHHMM, localToEpochMs } from "../tz.js";
+import { getEffectiveTimezone, todayYMD, nowHHMM, localToEpochMs, epochMsToHHMM } from "../tz.js";
 
 const SHORTID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 
@@ -104,7 +104,7 @@ export async function listSupplements(client: CloudKitClient, input: ListSupplem
       byID.set(sid, {
         done: ((r.fields.done?.value as number) ?? 0) !== 0,
         note: optStr(r.fields.note?.value),
-        time: optStr(r.fields.time?.value),
+        time: optStr(r.fields.time?.value) ?? (typeof r.fields.occurredAt?.value === "number" ? epochMsToHHMM(r.fields.occurredAt.value as number, tz) : undefined),
       });
     }
   }
@@ -186,7 +186,7 @@ export async function toggleSupplement(client: CloudKitClient, input: ToggleSupp
     date: { value: date },
     supplementID: { value: input.id },
     done: { value: 1 },
-    time: { value: time },
+    // canonical instant; legacy `time` STRING retired (derive from occurredAt).
     // occurredAt drops gracefully if the schema doesn't know it yet.
     occurredAt: { value: localToEpochMs(date, time, tz) },
   };
