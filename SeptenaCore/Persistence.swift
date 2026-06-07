@@ -10,9 +10,7 @@ import SwiftData
 //     reference by name, like areas/projects/chores/habits/sections), use
 //     the uniform `id + title` model documented in
 //     [IDENTIFIERS.md](IDENTIFIERS.md). Tasks-style content entities are
-//     exempt (id-only). Areas/Projects still carry legacy slug columns
-//     until the SwiftData schema can drop them safely, but current code
-//     does not read or write those fields.
+//     exempt (id-only).
 
 // MARK: - Entities
 
@@ -46,11 +44,8 @@ final class TaskEntity {
   /// rest; `TaskOrder.normalize` re-spaces and backfills (0 = unset) and is
   /// synced via CloudKit so the order matches across devices.
   var position: Double = 0
-  /// True while one or more `OutboxEntity` rows reference this task. The
-  /// Syncer will not overwrite local fields on a row with `pendingSync ==
-  /// true` — we don't want a server snapshot taken before the user's
-  /// optimistic write to clobber the local state. Cleared by TaskMutator
-  /// once the queue for this id is empty.
+  /// Legacy FastAPI-era optimistic-write guard; no longer consulted on the
+  /// CloudKit path. Retained as a schema field pending Phase-2 cleanup.
   var pendingSync: Bool = false
   /// True between the moment `TaskMutator.delete(id:)` is called and the
   /// drainer confirming the server-side delete. `LocalCache` filters rows
@@ -201,13 +196,6 @@ final class ProjectEntity {
   /// the same contract — captured on round-trip through CloudKit so the
   /// next save preserves recordChangeTag.
   var cloudKitSystemFields: Data?
-  /// Legacy transition column from the removed slug model. Kept only to
-  /// avoid a destructive SwiftData schema change during the CloudKit
-  /// migration; current code leaves it nil and does not resolve by it.
-  var slug: String?
-  /// Legacy transition column from the removed slug model. Current code
-  /// leaves it empty and does not resolve by it.
-  var previousSlugs: [String] = []
 
   init(id: String,
        title: String,
@@ -221,9 +209,7 @@ final class ProjectEntity {
        lastSyncedAt: Date = .distantPast,
        updatedAt: String? = nil,
        deletedAt: String? = nil,
-       cloudKitSystemFields: Data? = nil,
-       slug: String? = nil,
-       previousSlugs: [String] = []) {
+       cloudKitSystemFields: Data? = nil) {
     self.id = id
     self.title = title
     self.statusRaw = statusRaw
@@ -237,8 +223,6 @@ final class ProjectEntity {
     self.updatedAt = updatedAt
     self.deletedAt = deletedAt
     self.cloudKitSystemFields = cloudKitSystemFields
-    self.slug = slug
-    self.previousSlugs = previousSlugs
   }
 
   var status: ProjectStatus {
@@ -256,26 +240,16 @@ final class AreaEntity {
   var updatedAt: String?
   /// CKRecord system-fields blob. See `TaskEntity.cloudKitSystemFields`.
   var cloudKitSystemFields: Data?
-  /// Legacy transition column from the removed slug model. See
-  /// ProjectEntity.slug.
-  var slug: String?
-  /// Legacy transition column from the removed slug model. See
-  /// ProjectEntity.previousSlugs.
-  var previousSlugs: [String] = []
 
   init(id: String, title: String, context: String? = nil,
        lastSyncedAt: Date = .distantPast, updatedAt: String? = nil,
-       cloudKitSystemFields: Data? = nil,
-       slug: String? = nil,
-       previousSlugs: [String] = []) {
+       cloudKitSystemFields: Data? = nil) {
     self.id = id
     self.title = title
     self.context = context
     self.lastSyncedAt = lastSyncedAt
     self.updatedAt = updatedAt
     self.cloudKitSystemFields = cloudKitSystemFields
-    self.slug = slug
-    self.previousSlugs = previousSlugs
   }
 }
 
@@ -2555,8 +2529,7 @@ final class LocalStore {
                          SessionTypeEntity.self,
                          NutritionEntryEntity.self, NutritionDailySummaryEntity.self,
                          OuraNightEntity.self,
-                         WithingsRowEntity.self,
-                         OutboxEntity.self])
+                         WithingsRowEntity.self])
     // Explicitly opt OUT of NSPersistentCloudKitContainer mirroring. Having
     // CloudKit in the target entitlements would otherwise switch SwiftData
     // into auto-mirror mode, which requires all-optional attributes and

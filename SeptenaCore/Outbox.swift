@@ -5,41 +5,7 @@ import SwiftData
 //
 // CloudKit (via CKSyncEngine) is the only backend for tasks. TaskMutator
 // is a thin pass-through to `CloudKitTasksBackend`; the legacy FastAPI
-// outbox path has been removed. The OutboxEntity model is kept in the
-// SwiftData schema so we don't have to migrate; no code writes to it.
-
-// MARK: - Outbox entity (legacy — model kept for schema compatibility)
-
-@Model
-final class OutboxEntity {
-  /// Operation UUID. Unique per enqueued mutation.
-  @Attribute(.unique) var id: String
-  /// Operation kind (legacy raw value). Unused now.
-  var kind: String
-  /// Target task id.
-  var taskId: String
-  /// JSON-encoded operation arguments.
-  var payloadData: Data
-  var createdAt: Date
-  var attempts: Int
-  var nextAttemptAt: Date
-  /// Last error message — surfaced in the Sync pane for debugging.
-  var lastError: String?
-
-  init(id: String = UUID().uuidString,
-       kind: String,
-       taskId: String,
-       payloadData: Data) {
-    self.id = id
-    self.kind = kind
-    self.taskId = taskId
-    self.payloadData = payloadData
-    self.createdAt = Date()
-    self.attempts = 0
-    self.nextAttemptAt = Date()
-    self.lastError = nil
-  }
-}
+// outbox path (and its OutboxEntity model) has been removed.
 
 // MARK: - TaskMutator
 

@@ -1178,7 +1178,10 @@ enum ChecklistMirror {
         ?? SessionKind.defaulted(for: e.id)
       return SessionTypeConfig.make(
         id: e.id,
-        label: e.label,
+        // Mirror SessionTypeConfig's JSON decoder: a blank label (e.g. a
+        // CloudKit record synced before its label field arrived) falls back
+        // to the capitalized id so the row never renders nameless.
+        label: e.label.isEmpty ? e.id.capitalized : e.label,
         emoji: e.emoji,
         exercises: e.exercises,
         archived: e.archived,
@@ -1298,7 +1301,13 @@ enum ChecklistMirror {
 
     // Pick the type with the largest days-ago. Types never trained get
     // priority (treat missing as +infinity).
-    let candidates = types.filter { !$0.id.isEmpty }
+    //
+    // Only nudge routines that can actually be shown: a non-archived row
+    // with a real label. A label-less or archived routine (e.g. a stray
+    // CloudKit record that synced before its label arrived) must never win
+    // the pick — a never-trained one always would, and the menu would then
+    // render a blank "Suggested" row.
+    let candidates = types.filter { !$0.id.isEmpty && !$0.label.isEmpty && !$0.archived }
     let pick: SessionTypeEntity? = candidates.max { a, b in
       (daysAgo[a.id] ?? Int.max) < (daysAgo[b.id] ?? Int.max)
     }
