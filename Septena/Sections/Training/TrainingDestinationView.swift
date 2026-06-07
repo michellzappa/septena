@@ -2024,11 +2024,14 @@ struct TrainingSessionView: View {
       .filter { $0.status == .done && $0.isCardio }
       .reduce(0.0) { $0 + ($1.durationMin ?? 0) }
     return Section {
-      HStack(alignment: .top, spacing: 24) {
+      // Spread the three stats edge-to-edge rather than clustering them on
+      // the left — Spacers between each give the even, full-width spacing.
+      HStack(alignment: .top) {
         liveElapsedStat(startedAt: d.startedAt)
-        stat(value: "\(Int(cardio))", label: "cardio", unit: "m")
-        stat(value: "\(Int(lifted))", label: "lifted", unit: "kg")
         Spacer()
+        stat(value: "\(Int(cardio))", label: "cardio", unit: "m")
+        Spacer()
+        stat(value: "\(Int(lifted))", label: "lifted", unit: "kg")
       }
       let done = d.doneCount
       let total = max(d.totalCount, 1)
@@ -2802,13 +2805,16 @@ struct TrainingExerciseCard: View {
                        presetDistanceFromDuration(newVal)
                      }
                    ))
+      // Two-across, so the ±buttons get a narrower 40pt target (vs. the
+      // 60pt the full-width fields use) — otherwise the buttons crowd out
+      // the value in these half-width fields.
       HStack(spacing: 8) {
-        steppedField(label: "Distance", unit: "m", step: 50,
+        steppedField(label: "Meters", step: 50, buttonWidth: 40,
                      value: Binding(
                        get: { entry.distanceM.map { fmt($0) } ?? "" },
                        set: { setDistance($0) }
                      ))
-        steppedField(label: "Level", step: 1,
+        steppedField(label: "Level", step: 1, buttonWidth: 40,
                      value: Binding(
                        get: { entry.level.map { fmt($0) } ?? "" },
                        set: { setLevel($0) }
@@ -2838,13 +2844,14 @@ struct TrainingExerciseCard: View {
   private func steppedField(label: String,
                             unit: String? = nil,
                             step: Double,
+                            buttonWidth: CGFloat = 60,
                             value: Binding<String>) -> some View {
     VStack(alignment: .leading, spacing: 4) {
       Text(label.uppercased())
         .font(.caption2.weight(.semibold))
         .foregroundStyle(.secondary)
       HStack(spacing: 4) {
-        stepButton("minus") { bump(value, by: -step) }
+        stepButton("minus", width: buttonWidth) { bump(value, by: -step) }
         HStack(spacing: 2) {
           TextField("", text: value)
             #if os(iOS)
@@ -2864,12 +2871,12 @@ struct TrainingExerciseCard: View {
         // grey muted surface washed out against the accent.
         .background(Theme.cardSurface,
                     in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        stepButton("plus") { bump(value, by: step) }
+        stepButton("plus", width: buttonWidth) { bump(value, by: step) }
       }
     }
   }
 
-  private func stepButton(_ systemName: String, action: @escaping () -> Void) -> some View {
+  private func stepButton(_ systemName: String, width: CGFloat = 60, action: @escaping () -> Void) -> some View {
     Button {
       action()
       Haptics.tick()
@@ -2878,8 +2885,9 @@ struct TrainingExerciseCard: View {
         .scaledFont(size: 13, weight: .bold)
         // Wide hit target — at the gym you tap −/+ far more than you type
         // into the field, so the buttons earn the width and the number
-        // input keeps just enough room for its 2–3 digits.
-        .frame(width: 60, height: 40)
+        // input keeps just enough room for its 2–3 digits. Two-across
+        // fields pass a narrower width so the value isn't crowded out.
+        .frame(width: width, height: 40)
         .background(accent.opacity(0.14),
                     in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .foregroundStyle(accent)
