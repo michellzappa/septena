@@ -37,6 +37,10 @@ struct EditTaskSheet: View {
     title.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
+  /// Per-section Tasks accent (not the global app accent), matching the list
+  /// and drawer surfaces.
+  private var accent: Color { theme.color(for: "tasks") }
+
   var body: some View {
     AdaptiveEditScaffold(
       title: "Edit To-Do",
@@ -59,34 +63,34 @@ struct EditTaskSheet: View {
           Toggle(isOn: $onToday) {
             iconLabel("Today", "sun.max")
           }
-          .tint(theme.accent)
+          .tint(accent)
 
           Toggle(isOn: enabledBinding(for: scheduledBinding, default: today)) {
             iconLabel("When", "calendar")
           }
-          .tint(theme.accent)
+          .tint(accent)
           if scheduled != nil {
             DatePicker(selection: nonOptional(scheduledBinding), displayedComponents: [.date]) {
               iconLabel("Date", "calendar").labelStyle(.titleOnly)
             }
-            .tint(theme.accent)
+            .tint(accent)
           }
 
           Toggle(isOn: enabledBinding(for: deadlineBinding, default: today)) {
             iconLabel("Deadline", "flag")
           }
-          .tint(theme.accent)
+          .tint(accent)
           if deadline != nil {
             DatePicker(selection: nonOptional(deadlineBinding), displayedComponents: [.date]) {
               iconLabel("Date", "flag").labelStyle(.titleOnly)
             }
-            .tint(theme.accent)
+            .tint(accent)
           }
 
           Toggle(isOn: repeatEnabledBinding) {
             iconLabel("Repeat", "repeat")
           }
-          .tint(theme.accent)
+          .tint(accent)
           if recurrence != nil {
             Picker("Unit", selection: recurrenceUnitBinding) {
               Text("Day").tag(Recurrence.Unit.day)
@@ -98,7 +102,7 @@ struct EditTaskSheet: View {
               Text("Every \(recurrence?.interval ?? 1) \(unitNoun(plural: (recurrence?.interval ?? 1) != 1))")
             }
             Toggle("After completion", isOn: recurrenceAfterCompletionBinding)
-              .tint(theme.accent)
+              .tint(accent)
           }
 
           Picker(selection: listBinding) {
@@ -114,7 +118,7 @@ struct EditTaskSheet: View {
             iconLabel("List", "folder")
           }
           .pickerStyle(.menu)
-          .tint(theme.accent)
+          .tint(accent)
         }
 
         // Status actions — mirror the row's context menu. These act
@@ -135,6 +139,9 @@ struct EditTaskSheet: View {
       }
       .onAppear(perform: seed)
     }
+    // Tint the whole scaffold so the Cancel/Save controls (owned by the shared
+    // scaffold, not this form) also pick up the Tasks accent.
+    .tint(accent)
     // Open compact on iPhone (half-height), draggable taller. No-op for the
     // iPad/macOS inspector presentation.
     .presentationDetents([.medium, .large])
@@ -146,7 +153,7 @@ struct EditTaskSheet: View {
     Label {
       Text(title)
     } icon: {
-      Image(systemName: systemImage).foregroundStyle(theme.accent)
+      Image(systemName: systemImage).foregroundStyle(accent)
     }
   }
 
