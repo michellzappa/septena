@@ -186,8 +186,8 @@ enum TaskReads {
         default: break
         }
       }
-      if let c = e.created, c.count >= 10 {
-        madeByDay[String(c.prefix(10)), default: 0] += 1
+      if e.createdAt != .distantPast {
+        madeByDay[f.string(from: e.createdAt), default: 0] += 1
       }
     }
 
