@@ -116,6 +116,9 @@
       },
       "shouldTranslate" : false
     },
+    "%@ ago" : {
+
+    },
     "%@ binary signals · %@ trusted · tap to expand" : {
       "localizations" : {
         "en" : {
@@ -1147,6 +1150,9 @@
           }
         }
       }
+    },
+    "auto-refresh in %@" : {
+
     },
     "avg %@/4" : {
       "localizations" : {
@@ -3154,6 +3160,9 @@
     "n=%@" : {
       "shouldTranslate" : false
     },
+    "Never" : {
+
+    },
     "New entries you log in Septena will be sent to Apple Health. Existing entries are not back-filled." : {
       "localizations" : {
         "pt-BR" : {
@@ -3868,6 +3877,9 @@
           }
         }
       }
+    },
+    "refresh recommended" : {
+
     },
     "Register a Withings dev app at developer.withings.com (Public Health Data API), then add your client_id and client_secret to Config/Secrets.xcconfig (copy it from Config/Secrets.example.xcconfig) and rebuild. The redirect URI should be septena://withings/callback." : {
       "localizations" : {
