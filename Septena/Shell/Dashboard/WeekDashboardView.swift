@@ -172,6 +172,11 @@ struct WeekDashboardView: View {
   /// AppStorage key, so the tile's progress matches the section's.
   @AppStorage("hydration.dailyTargetMl") private var hydrationTargetMl: Int = 2000
   @State private var sheetDest: WeekDestination? = nil
+  /// A section requested via a tile tap *while* a bottom-sheet drawer is
+  /// already open. SwiftUI's `.sheet(item:)` won't swap to a new item while
+  /// one is presented, so we stash the request here, dismiss the current
+  /// drawer, and present this in the sheet's `onDismiss`. See `open(_:)`.
+  @State private var pendingDest: WeekDestination? = nil
   /// Today-scoped collections kept in state so DayTimelineView can read
   /// them. NextItemsModel already covers habits/supplements/chores and
   /// today's caffeine/cannabis/gut live in their respective `*Today`
@@ -295,7 +300,7 @@ struct WeekDashboardView: View {
     // beside `.refreshable`) keeps the sheet's attachment point outside
     // the refreshable's scope, so drawers don't inherit a pull-to-
     // refresh gesture that re-runs Week's loader.
-    .sheet(item: sheetDestBinding) { dest in
+    .sheet(item: sheetDestBinding, onDismiss: presentPendingIfNeeded) { dest in
       sheetContent(for: dest)
     }
     .sheet(item: $nutritionSheet) { sheet in
@@ -338,7 +343,7 @@ struct WeekDashboardView: View {
   /// section content). Opens the full explorer. Shown only when the user has
   /// enabled the Insights section.
   private var insightsToolbarButton: some View {
-    Button { sheetDest = .insights } label: {
+    Button { open(.insights) } label: {
       Image(systemName: "chart.dots.scatter")
     }
     .accessibilityLabel("Insights")
@@ -390,8 +395,8 @@ struct WeekDashboardView: View {
 
   /// Drives the `.navigationDestination` push. Mirrors `sheetDest` only
   /// when pushing, and stays nil otherwise so the sheet path owns
-  /// presentation on compact. Every `sheetDest = .foo` tap site flows
-  /// through whichever of these two bindings is currently active.
+  /// presentation on compact. Tile taps set `sheetDest` via `open(_:)`, which
+  /// feeds whichever of these two bindings is currently active.
   private var pushDest: Binding<WeekDestination?> {
     Binding(
       get: { usesPushNavigation ? sheetDest : nil },
@@ -954,9 +959,37 @@ struct WeekDashboardView: View {
   /// wires up inline.
   private func handleDomainTap(_ tap: DomainTapAction) {
     switch tap {
-    case .openSheet(let dest):     sheetDest = dest
+    case .openSheet(let dest):     open(dest)
     case .switchToTasksTab:        openTasksFromTile()
     }
+  }
+
+  /// Single entry point for "open a section from a homepage tile." On
+  /// push-nav widths (iPad / macOS) the dashboard is covered by the pushed
+  /// pane, so a direct set is fine. On compact the section is a bottom-sheet
+  /// drawer with background interaction enabled, so a tile *under* an open
+  /// drawer is tappable — but SwiftUI's `.sheet(item:)` silently no-ops when
+  /// the item changes from one non-nil value to another, leaving the
+  /// presentation stuck (the next drawer then opens at full height). So when
+  /// a drawer is already open we stash the request and dismiss the current
+  /// one; `presentPendingIfNeeded()` (the sheet's `onDismiss`) presents it
+  /// once the old drawer has animated away — a clean swap to the new section.
+  private func open(_ dest: WeekDestination) {
+    guard !usesPushNavigation, sheetDest != nil else {
+      sheetDest = dest
+      return
+    }
+    pendingDest = dest
+    sheetDest = nil
+  }
+
+  /// Presents a section queued by `open(_:)` while a drawer was open. Runs as
+  /// the bottom-sheet's `onDismiss`; a no-op for ordinary dismissals (swipe
+  /// down / tap away) where nothing is pending.
+  private func presentPendingIfNeeded() {
+    guard let next = pendingDest else { return }
+    pendingDest = nil
+    sheetDest = next
   }
 
   /// Single entry point for "user tapped the Tasks tile on the homepage."
@@ -968,7 +1001,7 @@ struct WeekDashboardView: View {
   /// generic "open Tasks."
   private func openTasksFromTile() {
     switch TasksOpenMode(rawValue: tasksOpenInRaw) ?? .drawer {
-    case .drawer: sheetDest = .tasks
+    case .drawer: open(.tasks)
     case .tab:    tabSelection.current = .tasks
     }
   }
@@ -1619,7 +1652,7 @@ struct WeekDashboardView: View {
     let week = counts.suffix(7).reduce(0, +)
     let streak = derived.githubStreak
     let bars = Array(counts.suffix(7))
-    return Button { sheetDest = .github } label: {
+    return Button { open(.github) } label: {
       ModuleTile(
         title: "GitHub",
         accent: theme.color(for: "github"),
@@ -1778,7 +1811,7 @@ struct WeekDashboardView: View {
       history: Array(habitHistory.suffix(7))
     )
     .contentShape(Rectangle())
-    .onTapGesture { sheetDest = .habits }
+    .onTapGesture { open(.habits) }
     .contextMenu { habitsQuickAddMenu }
   }
 
@@ -1824,7 +1857,7 @@ struct WeekDashboardView: View {
       cardioBars: cardioBars
     )
     .contentShape(Rectangle())
-    .onTapGesture { sheetDest = .training }
+    .onTapGesture { open(.training) }
     .contextMenu { trainingQuickAddMenu }
   }
 
@@ -1899,7 +1932,7 @@ struct WeekDashboardView: View {
       history: Array(choreHistory.suffix(7))
     )
     .contentShape(Rectangle())
-    .onTapGesture { sheetDest = .chores }
+    .onTapGesture { open(.chores) }
     .contextMenu { choresQuickAddMenu }
   }
 
@@ -1934,7 +1967,7 @@ struct WeekDashboardView: View {
       history: Array(supplementHistory.suffix(7))
     )
     .contentShape(Rectangle())
-    .onTapGesture { sheetDest = .supplements }
+    .onTapGesture { open(.supplements) }
     .contextMenu { supplementsQuickAddMenu }
   }
 
@@ -1959,7 +1992,7 @@ struct WeekDashboardView: View {
     let lastH = last?.totalH ?? 0
     let score = last?.sleepScore.map { "\($0)" } ?? "—"
     let bars = Array(ouraNights.reversed().map { $0.sleepScore ?? 0 }.suffix(7))
-    return Button { sheetDest = .sleep } label: {
+    return Button { open(.sleep) } label: {
       WeekSleepTile(
         accent: theme.color(for: "sleep"),
         lastHoursText: formatHoursShort(lastH),
@@ -1984,7 +2017,7 @@ struct WeekDashboardView: View {
       missingPerDay: missingPerDay
     )
     .contentShape(Rectangle())
-    .onTapGesture { sheetDest = .groceries }
+    .onTapGesture { open(.groceries) }
     .contextMenu { groceriesQuickAddMenu }
   }
 
@@ -2042,7 +2075,7 @@ struct WeekDashboardView: View {
                        ? Array(repeating: 0, count: 7) : bars)
     )
     .contentShape(Rectangle())
-    .onTapGesture { sheetDest = .caffeine }
+    .onTapGesture { open(.caffeine) }
     .contextMenu { caffeineQuickAddMenu }
   }
 
@@ -2052,7 +2085,7 @@ struct WeekDashboardView: View {
       onCommit: { method, beans, grams in
         commitCaffeine(method: method, beans: beans, grams: grams)
       },
-      onEditLast: caffeineLastEntry == nil ? nil : { sheetDest = .caffeine }
+      onEditLast: caffeineLastEntry == nil ? nil : { open(.caffeine) }
     )
   }
 
@@ -2085,7 +2118,7 @@ struct WeekDashboardView: View {
                        ? Array(repeating: 0, count: 7) : bars)
     )
     .contentShape(Rectangle())
-    .onTapGesture { sheetDest = .cannabis }
+    .onTapGesture { open(.cannabis) }
     .contextMenu { cannabisQuickAddMenu }
   }
 
@@ -2107,7 +2140,7 @@ struct WeekDashboardView: View {
       onCommit: { method, hit in
         commitCannabis(method: method, hit: hit)
       },
-      onEditLast: lastCannabisVape == nil ? nil : { sheetDest = .cannabis }
+      onEditLast: lastCannabisVape == nil ? nil : { open(.cannabis) }
     )
   }
 
@@ -2147,7 +2180,7 @@ struct WeekDashboardView: View {
     // Body-fat percentage tracked against a soft 18% target (single number,
     // overrideable later via Settings.targets.fat_min_pct).
     let fatTarget: Double = 18
-    return Button { sheetDest = .body } label: {
+    return Button { open(.body) } label: {
       ModuleTile(
         title: "Body",
         accent: accent,
@@ -2187,7 +2220,7 @@ struct WeekDashboardView: View {
                        ? Array(repeating: 0, count: 7) : bars)
     )
     .contentShape(Rectangle())
-    .onTapGesture { sheetDest = .gut }
+    .onTapGesture { open(.gut) }
     .contextMenu { gutQuickAddMenu }
   }
 
@@ -2200,7 +2233,7 @@ struct WeekDashboardView: View {
       recentBristolTypes: GutBristolRecorder.recentTypes,
       onCommit: { bristol in commitGut(bristol: bristol) },
       hasLastEntry: hasLast,
-      onEditLast: hasLast ? { sheetDest = .gut } : nil
+      onEditLast: hasLast ? { open(.gut) } : nil
     )
   }
 
@@ -2222,7 +2255,7 @@ struct WeekDashboardView: View {
     if bridge.isAvailable {
       let accent = theme.color(for: "activity")
       let stepsTarget = 8000
-      Button { sheetDest = .activity } label: {
+      Button { open(.activity) } label: {
         ModuleTile(
           title: "Activity",
           accent: accent,
@@ -2286,7 +2319,7 @@ struct WeekDashboardView: View {
         history: .init(label: "7-day fasts (h)", values: fastingHoursBars())
       )
       .contentShape(Rectangle())
-      .onTapGesture { sheetDest = .nutrition }
+      .onTapGesture { open(.nutrition) }
       .contextMenu { nutritionQuickAddMenu }
     } else {
       let proteinTarget = nutritionTarget?.protein.min ?? 150
@@ -2306,7 +2339,7 @@ struct WeekDashboardView: View {
         history: .init(label: "7-day protein", values: bars)
       )
       .contentShape(Rectangle())
-      .onTapGesture { sheetDest = .nutrition }
+      .onTapGesture { open(.nutrition) }
       .contextMenu { nutritionQuickAddMenu }
     }
   }
@@ -2411,7 +2444,7 @@ struct WeekDashboardView: View {
                        ? Array(repeating: 0, count: 7) : bars)
     )
     .contentShape(Rectangle())
-    .onTapGesture { sheetDest = .mood }
+    .onTapGesture { open(.mood) }
     .contextMenu { moodQuickAddMenu }
     .sheet(isPresented: $presentingMoodCheckin) {
       AddMoodPage(onLogged: {
@@ -2481,7 +2514,7 @@ struct WeekDashboardView: View {
                        ? Array(repeating: 0, count: 7) : bars)
     )
     .contentShape(Rectangle())
-    .onTapGesture { sheetDest = .hydration }
+    .onTapGesture { open(.hydration) }
     .contextMenu { hydrationQuickAddMenu }
   }
 
