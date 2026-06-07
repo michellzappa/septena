@@ -78,6 +78,18 @@ enum CoachContextBuilder {
         """ + "\n" + goals.joined(separator: "\n"))
     }
 
+    // RECORDS — the raw logged entries behind the FACTS, so a capable model
+    // can reason over detail the summary throws away (per-session sets,
+    // time-of-day, sequence). Most-recent-first, capped per section.
+    var recordBlocks: [String] = []
+    for key in keys {
+      if let block = recordBlock(for: key, r, context) { recordBlocks.append(block) }
+    }
+    if !recordBlocks.isEmpty {
+      blocks.append("RECORDS — raw logged entries behind the FACTS above (most recent first):\n\n"
+                    + recordBlocks.joined(separator: "\n\n"))
+    }
+
     return blocks.joined(separator: "\n\n")
   }
 
@@ -107,6 +119,167 @@ enum CoachContextBuilder {
   private static func num(_ v: Double) -> String {
     v == v.rounded() ? String(Int(v)) : String(format: "%.1f", v)
   }
+
+  // MARK: - Records (raw entries behind the summary)
+
+  /// Max rows per section, with explicit "older omitted" disclosure (no
+  /// silent truncation). Tuning knob for the context/token budget.
+  private static let recordCap = 50
+
+  private static func recordBlock(for key: String, _ r: Range, _ ctx: ModelContext) -> String? {
+    let (label, rows) = rawRecords(for: key, r, ctx)
+    guard !rows.isEmpty else { return nil }
+    var head = "### \(label) — \(rows.count) record\(rows.count == 1 ? "" : "s")"
+    if rows.count > recordCap { head += " (showing latest \(recordCap); \(rows.count - recordCap) older omitted)" }
+    return head + "\n" + rows.prefix(recordCap).joined(separator: "\n")
+  }
+
+  private static func rawRecords(for key: String, _ r: Range, _ ctx: ModelContext) -> (String, [String]) {
+    switch key {
+    case "training":  return ("Training", trainingRecords(r, ctx))
+    case "nutrition": return ("Nutrition", nutritionRecords(r, ctx))
+    case "caffeine":  return ("Caffeine", caffeineRecords(r, ctx))
+    case "cannabis":  return ("Cannabis", cannabisRecords(r, ctx))
+    case "gut":       return ("Gut", gutRecords(r, ctx))
+    case "mood":      return ("Mood", moodRecords(r, ctx))
+    case "sleep":     return ("Sleep", sleepRecords(r, ctx))
+    case "body":      return ("Body", bodyRecords(r, ctx))
+    case "tasks":     return ("Tasks completed", taskRecords(r, ctx))
+    default:          return ("", [])   // chores/habits/supplements/hydration stay aggregate-only
+    }
+  }
+
+  private static func trainingRecords(_ r: Range, _ ctx: ModelContext) -> [String] {
+    fetchDated(ExerciseEntryEntity.self, r, ctx) { $0.date }
+      .sorted { $0.occurredAt > $1.occurredAt }
+      .map { x in
+        var s = "\(stamp(x.date, x.occurredAt)) · \(x.sessionType) · \(x.exercise)"
+        if let w = x.weight { s += " · \(num(w))kg" }
+        if x.sets != nil || x.reps != nil { s += " · \(x.sets ?? "?")×\(x.reps ?? "?")" }
+        if let d = x.durationMin, d > 0 { s += " · \(Int(d.rounded()))min" }
+        if let dist = x.distanceM, dist > 0 { s += " · \(num(dist / 1000))km" }
+        if let diff = x.difficulty, !diff.isEmpty { s += " · \(diff)" }
+        if let n = x.note, !n.isEmpty { s += " — \(n)" }
+        return s
+      }
+  }
+
+  private static func nutritionRecords(_ r: Range, _ ctx: ModelContext) -> [String] {
+    fetchNutrition(r, ctx).filter { $0.foods.lowercased() != "water" }
+      .sorted { $0.loggedAt > $1.loggedAt }
+      .map { f in
+        let foods = f.foods.replacingOccurrences(of: "\n", with: ", ")
+        var s = "\(stamp(dayString(f.loggedAt), f.loggedAt)) · \(f.mealType ?? "meal") · \(foods)"
+        s += " · \(Int(kcalOf(f).rounded()))kcal \(Int(f.proteinG.rounded()))P/\(Int(f.fatG.rounded()))F/\(Int(f.carbsG.rounded()))C"
+        if let fib = f.fiberG, fib > 0 { s += " fiber \(Int(fib.rounded()))g" }
+        if let n = f.note, !n.isEmpty { s += " — \(n)" }
+        return s
+      }
+  }
+
+  private static func caffeineRecords(_ r: Range, _ ctx: ModelContext) -> [String] {
+    fetchDated(CaffeineEventEntity.self, r, ctx) { $0.date }
+      .sorted { $0.occurredAt > $1.occurredAt }
+      .map { x in
+        var s = "\(stamp(x.date, x.occurredAt)) · \(x.method)"
+        if let b = x.beans, !b.isEmpty { s += " · \(b)" }
+        if let g = x.grams { s += " · \(num(g))g" }
+        if let n = x.note, !n.isEmpty { s += " — \(n)" }
+        return s
+      }
+  }
+
+  private static func cannabisRecords(_ r: Range, _ ctx: ModelContext) -> [String] {
+    fetchDated(CannabisEventEntity.self, r, ctx) { $0.date }
+      .sorted { $0.occurredAt > $1.occurredAt }
+      .map { x in
+        var s = "\(stamp(x.date, x.occurredAt)) · \(x.method)"
+        if let st = x.strain, !st.isEmpty { s += " · \(st)" }
+        if let h = x.hit { s += " · \(h) hits" }
+        if let g = x.grams { s += " · \(num(g))g" }
+        if let e = x.effect, !e.isEmpty { s += " · \(e)" }
+        if let n = x.note, !n.isEmpty { s += " — \(n)" }
+        return s
+      }
+  }
+
+  private static func gutRecords(_ r: Range, _ ctx: ModelContext) -> [String] {
+    fetchDated(GutEventEntity.self, r, ctx) { $0.date }
+      .sorted { $0.occurredAt > $1.occurredAt }
+      .map { x in
+        var s = "\(stamp(x.date, x.occurredAt)) · Bristol \(x.bristol) · \(x.blood != 0 ? "blood" : "no blood")"
+        if let v = x.volume, !v.isEmpty { s += " · \(v)" }
+        if let d = x.discomfortLevel, !d.isEmpty { s += " · discomfort \(d)" }
+        if let n = x.note, !n.isEmpty { s += " — \(n)" }
+        return s
+      }
+  }
+
+  private static func moodRecords(_ r: Range, _ ctx: ModelContext) -> [String] {
+    fetchDated(MoodEventEntity.self, r, ctx) { $0.date }
+      .sorted { $0.occurredAt > $1.occurredAt }
+      .map { x in
+        var s = "\(stamp(x.date, x.occurredAt)) · \(x.bucket) · \(x.emotion) (valence \(x.valence)/3, arousal \(x.arousal)/3)"
+        if let n = x.note, !n.isEmpty { s += " — \(n)" }
+        return s
+      }
+  }
+
+  private static func sleepRecords(_ r: Range, _ ctx: ModelContext) -> [String] {
+    fetchDated(OuraNightEntity.self, r, ctx) { $0.id }
+      .sorted { $0.id > $1.id }
+      .map { x in
+        var parts = [x.id]
+        if let h = x.totalH { parts.append("\(oneDecimal(h))h") }
+        if let sc = x.sleepScore { parts.append("score \(sc)") }
+        if let d = x.deepH { parts.append("deep \(oneDecimal(d))h") }
+        if let rem = x.remH { parts.append("rem \(oneDecimal(rem))h") }
+        if let e = x.efficiency { parts.append("eff \(e)%") }
+        if let hrv = x.hrv { parts.append("hrv \(hrv)") }
+        return parts.joined(separator: " · ")
+      }
+  }
+
+  private static func bodyRecords(_ r: Range, _ ctx: ModelContext) -> [String] {
+    fetchDated(WithingsRowEntity.self, r, ctx) { $0.id }
+      .sorted { $0.id > $1.id }
+      .map { x in
+        var parts = [x.id]
+        if let w = x.weightKg { parts.append("\(oneDecimal(w))kg") }
+        if let f = x.fatPct { parts.append("\(oneDecimal(f))% fat") }
+        if let m = x.muscleMassKg { parts.append("muscle \(oneDecimal(m))kg") }
+        return parts.joined(separator: " · ")
+      }
+  }
+
+  private static func taskRecords(_ r: Range, _ ctx: ModelContext) -> [String] {
+    fetchCompletedTasks(r, ctx)
+      .sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
+      .map { t in
+        var s = "\(String((t.completedAt ?? "").prefix(10))) · \(t.title)"
+        var tags: [String] = []
+        if let a = t.area, !a.isEmpty { tags.append(a) }
+        if let p = t.project, !p.isEmpty { tags.append(p) }
+        if !tags.isEmpty { s += " [\(tags.joined(separator: "/"))]" }
+        return s
+      }
+  }
+
+  private static func stamp(_ day: String, _ at: Date) -> String {
+    if let t = hm(at) { return "\(day) \(t)" }
+    return day
+  }
+
+  private static func hm(_ date: Date) -> String? {
+    date == Date.distantPast ? nil : timeFormatter.string(from: date)
+  }
+
+  private static let timeFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "HH:mm"
+    f.locale = Locale(identifier: "en_US_POSIX")
+    return f
+  }()
 
   /// The sections in this preset+window that actually have data, with entry
   /// counts and icons — what the chat's data pills show. Sections with zero
