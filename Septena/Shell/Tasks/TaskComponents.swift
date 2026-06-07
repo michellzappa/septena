@@ -118,6 +118,10 @@ struct CheckableRow<Trailing: View>: View {
   var leadingEmoji: String? = nil
   let title: String
   var subtitle: String? = nil
+  /// Paints the row's active/selected highlight (tint at low opacity) while its
+  /// detail/edit modal is open, so the surface that opened the modal keeps a
+  /// visible anchor. Mirrors the deep `TaskListView` active-row treatment.
+  var isSelected: Bool = false
   @ViewBuilder var trailing: () -> Trailing
   let onToggle: () -> Void
   var onTap: (() -> Void)? = nil
@@ -165,19 +169,29 @@ struct CheckableRow<Trailing: View>: View {
     }
     .padding(.horizontal, rowHInset)
     .padding(.vertical, Theme.rowVPadding)
+    .background(selectionHighlight)
     .contentShape(Rectangle())
     .modifier(OptionalTap(action: onTap))
+  }
+
+  @ViewBuilder private var selectionHighlight: some View {
+    if isSelected {
+      RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
+        .fill(tint.opacity(0.18))
+        .padding(.horizontal, max(0, rowHInset - 6))
+    }
   }
 }
 
 extension CheckableRow where Trailing == EmptyView {
   init(tint: Color, isDone: Bool, isToday: Bool = false, isSomeday: Bool = false,
        isInactive: Bool, showsAgentCue: Bool = false, leadingEmoji: String? = nil,
-       title: String, subtitle: String? = nil,
+       title: String, subtitle: String? = nil, isSelected: Bool = false,
        onToggle: @escaping () -> Void, onTap: (() -> Void)? = nil) {
     self.init(tint: tint, isDone: isDone, isToday: isToday, isSomeday: isSomeday,
               isInactive: isInactive, showsAgentCue: showsAgentCue,
               leadingEmoji: leadingEmoji, title: title, subtitle: subtitle,
+              isSelected: isSelected,
               trailing: { EmptyView() }, onToggle: onToggle, onTap: onTap)
   }
 }
@@ -219,6 +233,8 @@ struct TaskRow: View {
   /// row is already today, so both are noise).
   var showsTodayIndicator: Bool = true
   var showsSomedayIndicator: Bool = true
+  /// Highlight this row while its edit modal is open (see `CheckableRow`).
+  var isSelected: Bool = false
   let onToggle: () -> Void
   var onTap: (() -> Void)? = nil
 
@@ -249,6 +265,7 @@ struct TaskRow: View {
       showsAgentCue: task.showsAgentCue(),
       title: task.title,
       subtitle: subtitle,
+      isSelected: isSelected,
       trailing: { trailing },
       onToggle: onToggle,
       onTap: onTap
