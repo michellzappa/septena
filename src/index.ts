@@ -32,6 +32,20 @@ app.get("/skill.md", (c) =>
 
 app.get("/health", (c) => c.json({ ok: true }));
 
+// Apple App Site Association — lets the Septena app claim mcp.septena.app
+// via the Associated Domains `webcredentials` service, which is what
+// ASWebAuthenticationSession's HTTPS callback (.https) requires before it
+// will hand the /auth/apple/callback redirect (carrying ckWebAuthToken)
+// back to the app. webcredentials only — we deliberately do NOT add
+// applinks (no universal-link hijacking of the landing page).
+app.get("/.well-known/apple-app-site-association", (c) =>
+  c.json(
+    { webcredentials: { apps: ["992N457T8D.com.septena.cloud"] } },
+    200,
+    { "Cache-Control": "public, max-age=3600" },
+  ),
+);
+
 // OAuth 2.0 Authorization Server metadata (RFC 8414). MCP clients fetch
 // this to discover the registration/authorize/token endpoints.
 app.get("/.well-known/oauth-authorization-server", (c) => {
