@@ -807,9 +807,11 @@ struct TaskListView: View {
       editingDetail = task
     })
     #else
-    .simultaneousGesture(TapGesture(count: 2).onEnded {
-      editingDetail = task
-    })
+    // Double-click opens the editor. Routed through an AppKit catcher (not a
+    // SwiftUI `TapGesture`) so single clicks fall through to `List` selection —
+    // a TapGesture here would swallow the selection click. See
+    // `septenaOnDoubleClick`.
+    .septenaOnDoubleClick { editingDetail = task }
     #endif
     // Right-click selects this row (unless already part of a selection) so the
     // menu's target is unambiguous.
@@ -908,8 +910,9 @@ struct TaskListView: View {
   @ViewBuilder
   private func rowBackground(for task: SeptenaTask) -> some View {
     let isActive = editingDetail?.id == task.id
+    let fill: Color = isActive ? theme.color(for: "tasks").opacity(0.18) : .clear
     RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
-      .fill(isActive ? theme.color(for: "tasks").opacity(0.18) : .clear)
+      .fill(fill)
       .padding(.horizontal, Theme.hPadding - 6)
   }
 
@@ -1761,8 +1764,9 @@ extension FocusedValues {
 // Every row we draw inside the List should opt out of the default
 // separator / row background / row insets so our existing row composition
 // (selection pill, padding, full-bleed action icons) lines up exactly the
-// way it did inside the old LazyVStack. Used in `body` directly and inside
-// the grouping helpers.
+// way it did inside the old LazyVStack. Non-task rows also opt out of List
+// selection so keyboard traversal lands only on tagged task rows.
+// Used in `body` directly and inside the grouping helpers.
 
 extension View {
   func asListRow() -> some View {
@@ -1770,6 +1774,7 @@ extension View {
       .listRowSeparator(.hidden)
       .listRowBackground(Color.clear)
       .listRowInsets(EdgeInsets())
+      .selectionDisabled()
   }
 
   func asTaskRow(id: String) -> some View {
@@ -1784,5 +1789,6 @@ extension View {
     listRowSeparator(.hidden)
       .listRowBackground(Color.clear)
       .listRowInsets(EdgeInsets())
+      .selectionDisabled()
   }
 }

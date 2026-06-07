@@ -68,6 +68,21 @@ extension View {
     self
     #endif
   }
+
+  /// Run `action` on a primary double-click. macOS only — iOS opens via a
+  /// single tap. Like `septenaOnRightClick`, the catcher sits as an overlay
+  /// that claims ONLY double-click (`clickCount >= 2`) events; single clicks
+  /// fall through to SwiftUI underneath, so a row inside a `List(selection:)`
+  /// still selects on the first click. A SwiftUI `TapGesture` here would
+  /// instead enter the gesture arena and swallow the List's selection click.
+  @ViewBuilder
+  func septenaOnDoubleClick(_ action: @escaping () -> Void) -> some View {
+    #if os(macOS)
+    self.overlay(DoubleClickCatcher(action: action).allowsHitTesting(true))
+    #else
+    self
+    #endif
+  }
 }
 
 #if os(macOS)
@@ -111,6 +126,44 @@ struct RightClickCatcher: NSViewRepresentable {
       // Forward up the responder chain so SwiftUI's contextMenu still
       // opens — without this, returning self in hitTest would swallow it.
       nextResponder?.rightMouseDown(with: event)
+    }
+  }
+}
+
+/// Transparent AppKit view that fires `action` on a primary double-click and
+/// otherwise gets out of the way. `hitTest(_:)` claims only `leftMouseDown`
+/// events whose `clickCount >= 2`, so the first click of the gesture (and
+/// every single click) falls through to the SwiftUI `List` beneath and still
+/// drives native row selection.
+struct DoubleClickCatcher: NSViewRepresentable {
+  let action: () -> Void
+
+  func makeNSView(context: Context) -> NSView { Catcher(action: action) }
+  func updateNSView(_ nsView: NSView, context: Context) {
+    (nsView as? Catcher)?.action = action
+  }
+
+  final class Catcher: NSView {
+    var action: () -> Void
+    init(action: @escaping () -> Void) {
+      self.action = action
+      super.init(frame: .zero)
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+      guard super.hitTest(point) != nil else { return nil }
+      guard let event = NSApp.currentEvent else { return nil }
+      switch event.type {
+      case .leftMouseDown where event.clickCount >= 2:
+        return self
+      default:
+        return nil
+      }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+      if event.clickCount >= 2 { action() }
     }
   }
 }
