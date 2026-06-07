@@ -66,22 +66,15 @@ struct TaskComposerCard: View {
         header
 
         VStack(alignment: .leading, spacing: 8) {
-          HStack(spacing: 10) {
-            TextField("What needs doing?", text: $draft.title, axis: .vertical)
-              .textFieldStyle(.plain)
-              .font(.septenaTaskTitle)
-              .focused($titleFocused)
-              .lineLimit(1...4)
-
-            Button(action: commit) {
-              Image(systemName: isEditing ? "checkmark.circle.fill" : "arrow.up.circle.fill")
-                .font(.system(size: 26))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(draft.canSave ? accent : Theme.inkSecondary.opacity(0.4))
-            }
-            .buttonStyle(.plain)
-            .disabled(!draft.canSave)
-          }
+          TextField("What needs doing?", text: $draft.title, axis: .vertical)
+            .textFieldStyle(.plain)
+            .font(.septenaTaskTitle)
+            .focused($titleFocused)
+            .lineLimit(1...4)
+            // macOS: a vertical-axis field doesn't insert a newline on plain
+            // Return (Option-Return does) — it fires onSubmit, so the iOS
+            // newline-as-save trick below never triggers. Commit here instead.
+            .onSubmit { if draft.canSave { commit() } }
 
           Divider()
 
@@ -124,6 +117,10 @@ struct TaskComposerCard: View {
       .padding(.horizontal, 14)
     }
     .opacity(shown ? 1 : 0)
+    #if os(macOS)
+    // Escape cancels — close without saving (the scrim tap commits; Esc doesn't).
+    .onExitCommand { onDismiss() }
+    #endif
     .onAppear(perform: seed)
     .onChange(of: draft.title) { _, newValue in
       // The title wraps (axis: .vertical) so long titles show in full instead
@@ -182,7 +179,24 @@ struct TaskComposerCard: View {
             .foregroundStyle(Theme.inkSecondary)
         }
       }
+      // Confirm / save — top-right, just past the … menu, instead of crammed
+      // into the title row.
+      confirmButton
     }
+  }
+
+  /// Commits the draft and closes. Create shows an up-arrow, edit a checkmark;
+  /// dims until there's a savable title.
+  private var confirmButton: some View {
+    Button(action: commit) {
+      Image(systemName: isEditing ? "checkmark.circle.fill" : "arrow.up.circle.fill")
+        .font(.system(size: 26))
+        .symbolRenderingMode(.hierarchical)
+        .foregroundStyle(draft.canSave ? accent : Theme.inkSecondary.opacity(0.4))
+    }
+    .buttonStyle(.plain)
+    .disabled(!draft.canSave)
+    .accessibilityLabel(isEditing ? "Save" : "Add Task")
   }
 
   // MARK: - Quick entry
@@ -701,76 +715,49 @@ private struct InlineRepeatPanel: View {
   }
 }
 
-// MARK: - Root presenter
+// MARK: - Presentation
 
-/// App-level presenter so the composer floats over the *whole* UI — above
-/// pushed screens, sheets, and the tab bar. A plain `.overlay` renders beneath
-/// any sheet a descendant presents (e.g. the Tasks drawer), so we host it in a
-/// `fullScreenCover`; its bottom-slide is suppressed (present/dismiss run in a
-/// non-animated transaction) and the card fades itself in, so it pops rather
-/// than slides. Launched via `present(...)`.
-@Observable
-final class TaskComposerPresenter {
-  struct Request: Identifiable {
-    let id = UUID()
-    let mode: TaskComposerCard.Mode
-    let areas: [Area]
-    let projects: [Project]
-    let accent: Color
-    let onDone: () -> Void
-  }
-
-  var request: Request?
-
-  func present(_ mode: TaskComposerCard.Mode,
-               areas: [Area], projects: [Project], accent: Color,
-               onDone: @escaping () -> Void) {
-    setRequest(Request(mode: mode, areas: areas, projects: projects,
-                       accent: accent, onDone: onDone))
-  }
-
-  func dismiss() { setRequest(nil) }
-
-  /// Mutate without animation so the cover doesn't slide; the card animates
-  /// its own fade in `TaskComposerCard`.
-  private func setRequest(_ value: Request?) {
-    var txn = Transaction()
-    txn.disablesAnimations = true
-    withTransaction(txn) { request = value }
+extension View {
+  /// Present the composer above the *current* context — including a sheet/drawer
+  /// it's launched from — with a pop, not a slide. Hosting the cover on the
+  /// launching view (rather than the app root) means it stacks on top of any
+  /// sheet that view lives in, so the sheet survives underneath. The cover's
+  /// bottom-slide is suppressed (the present/dismiss toggle runs in a
+  /// non-animated transaction) and the card fades itself in. macOS (no
+  /// full-screen covers) falls back to an in-place overlay.
+  func taskComposerCover<Card: View>(
+    isPresented: Binding<Bool>,
+    @ViewBuilder card: @escaping () -> Card
+  ) -> some View {
+    modifier(TaskComposerCover(isPresented: isPresented, card: card))
   }
 }
 
-extension View {
-  /// Mount the app-level composer. iOS uses a transparent, slide-suppressed
-  /// `fullScreenCover` so the card sits above every sheet/cover and pops in;
-  /// macOS (no full-screen covers) falls back to an in-place overlay.
-  func taskComposerHost(_ presenter: TaskComposerPresenter) -> some View {
-    let binding = Binding<TaskComposerPresenter.Request?>(
-      get: { presenter.request },
-      set: { if $0 == nil { presenter.dismiss() } }
-    )
-    return Group {
-      #if os(iOS)
-      self.fullScreenCover(item: binding) { req in
-        TaskComposerCard(
-          mode: req.mode, areas: req.areas, projects: req.projects, accent: req.accent,
-          onDismiss: { presenter.dismiss() }, onDone: req.onDone
-        )
-        .presentationBackground(.clear)
+private struct TaskComposerCover<Card: View>: ViewModifier {
+  @Binding var isPresented: Bool
+  @ViewBuilder var card: () -> Card
+  /// Internal mirror so we can toggle the cover in a non-animated transaction
+  /// (killing the slide) regardless of how the caller flips `isPresented`.
+  @State private var coverUp = false
+
+  func body(content: Content) -> some View {
+    #if os(iOS)
+    content
+      .fullScreenCover(isPresented: $coverUp) {
+        card().presentationBackground(.clear)
       }
-      #else
-      self.overlay {
-        if let req = presenter.request {
-          TaskComposerCard(
-            mode: req.mode, areas: req.areas, projects: req.projects, accent: req.accent,
-            onDismiss: { presenter.dismiss() }, onDone: req.onDone
-          )
-          .id(req.id)
-          .transition(.opacity)
-        }
+      .onChange(of: isPresented) { _, now in
+        var txn = Transaction(); txn.disablesAnimations = true
+        withTransaction(txn) { coverUp = now }
       }
-      .animation(.snappy(duration: 0.22), value: presenter.request?.id)
-      #endif
-    }
+      .onChange(of: coverUp) { _, now in
+        // Cover closed (the card called its dismiss) — sync the source flag.
+        if !now, isPresented { isPresented = false }
+      }
+    #else
+    content
+      .overlay { if isPresented { card() } }
+      .animation(.snappy(duration: 0.22), value: isPresented)
+    #endif
   }
 }

@@ -40,7 +40,6 @@ struct WeekDashboardView: View {
   @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(TaskMutator.self) private var taskMutator
   @Environment(SectionTheme.self) private var theme
-  @Environment(TaskComposerPresenter.self) private var composer
   // Optional: lets the tile quick-add fire the commit flourish over the
   // dashboard. nil-safe (skips the visual) for hosts without the root env.
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
@@ -164,6 +163,8 @@ struct WeekDashboardView: View {
   /// standalone sheet (separate from `sheetDest` because Mood needs both
   /// the destination route and the standalone check-in flow).
   @State private var presentingMoodCheckin = false
+  /// Drives the Tasks-tile "Create in Inbox…" composer, popped in place.
+  @State private var creatingTask = false
   /// Hydration tile state. Today's total ml + a 90-day daily series
   /// (oldest→newest). Derived from Nutrition's water entries — Hydration
   /// owns no entity (see HydrationPlugin / ChecklistMirror.loadHydrationDailyMl).
@@ -1714,11 +1715,7 @@ struct WeekDashboardView: View {
       onCreateInInbox: {
         // Pop the composer right here over the homepage — no tab switch /
         // navigation into the Tasks list first.
-        composer.present(.create(.inbox),
-                         areas: LocalCache.areas(in: modelContext),
-                         projects: LocalCache.projects(in: modelContext),
-                         accent: theme.color(for: "tasks"),
-                         onDone: { Task { await refreshTasks() } })
+        creatingTask = true
       },
       onGoToInbox: {
         tabSelection.current = .tasks
@@ -2390,6 +2387,17 @@ struct WeekDashboardView: View {
       .presentationDetents([.medium, .large])
       .presentationDragIndicator(.visible)
       #endif
+    }
+    // Tasks-tile "Create in Inbox…" — the composer, popped over the homepage.
+    .taskComposerCover(isPresented: $creatingTask) {
+      TaskComposerCard(
+        mode: .create(.inbox),
+        areas: LocalCache.areas(in: modelContext),
+        projects: LocalCache.projects(in: modelContext),
+        accent: theme.color(for: "tasks"),
+        onDismiss: { creatingTask = false },
+        onDone: { Task { await refreshTasks() } }
+      )
     }
   }
 

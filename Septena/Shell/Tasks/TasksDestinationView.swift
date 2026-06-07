@@ -33,22 +33,20 @@ struct TasksDestinationView: View {
   /// home the same way the full Tasks surface does.
   @State private var areas: [Area] = []
   @State private var projects: [Project] = []
-  @Environment(TaskComposerPresenter.self) private var composer
+  /// Composer state, hosted on this drawer so its cover stacks *above* the
+  /// drawer sheet (rather than replacing it).
+  @State private var creating = false
+  @State private var editingTask: SeptenaTask?
   /// Row currently open in the composer — drives the selection highlight.
   @State private var selectedId: String?
 
   private var accent: Color { theme.color(for: "tasks") }
 
-  /// New tasks from the drawer default to Today; a row tap edits. Both launch
-  /// the app-level composer so it floats over everything and pops in.
-  private func openCreate() {
-    composer.present(.create(.today), areas: areas, projects: projects,
-                     accent: accent, onDone: { reload() })
-  }
+  /// New tasks from the drawer default to Today; a row tap edits.
+  private func openCreate() { creating = true }
   private func openEdit(_ task: SeptenaTask) {
     selectedId = task.id
-    composer.present(.edit(task), areas: areas, projects: projects, accent: accent,
-                     onDone: { selectedId = nil; reload() })
+    editingTask = task
   }
 
   var body: some View {
@@ -95,6 +93,30 @@ struct TasksDestinationView: View {
     }
     .tint(accent)
     .task { reload() }
+    // Host the composer here so it stacks on top of the drawer sheet, pops in,
+    // and dismisses back to the drawer.
+    .taskComposerCover(isPresented: composerBinding) { composerCard }
+  }
+
+  @ViewBuilder
+  private var composerCard: some View {
+    if let mode = composerMode {
+      TaskComposerCard(mode: mode, areas: areas, projects: projects, accent: accent,
+                       onDismiss: closeComposer, onDone: { reload() })
+    }
+  }
+  private var composerMode: TaskComposerCard.Mode? {
+    if creating { return .create(.today) }
+    if let task = editingTask { return .edit(task) }
+    return nil
+  }
+  private var composerBinding: Binding<Bool> {
+    Binding(get: { creating || editingTask != nil }, set: { if !$0 { closeComposer() } })
+  }
+  private func closeComposer() {
+    creating = false
+    editingTask = nil
+    selectedId = nil
   }
 
   // MARK: - Data
