@@ -428,17 +428,23 @@ struct DayTimelineView: View {
     return values.max() ?? 0
   }
 
-  /// Group exercise entries by (date + session) into start/end pairs.
-  /// Start = earliest concluded_at, end = latest logged_at or
-  /// start + cardio duration when logged_at is missing.
-  private struct SessionAccum {
-    var startHour: Double
-    var totalDuration: Double = 0
-    var lastLoggedHour: Double? = nil
+  /// One coherent workout = one pill. Each exercise entry contributes a
+  /// time span; spans that overlap or sit within `sessionGapHours` of each
+  /// other are merged into a single session bar. Keying on the exact start
+  /// minute (the old approach) split one workout into several pills the
+  /// moment its exercises were concluded at different minutes — e.g. a
+  /// cardio + strength block + cardio session became two or three bars.
+  private struct SessionSpan {
+    var start: Double
+    var end: Double
   }
 
+  /// Gaps shorter than this between consecutive entries are treated as rests
+  /// within the same workout; a longer gap starts a new session pill.
+  private static let sessionGapHours = 0.75
+
   private var trainingSessions: [Bar] {
-    var byKey: [String: SessionAccum] = [:]
+    var spans: [SessionSpan] = []
     for e in training where e.date == date {
       guard let concluded = e.concludedAt else { continue }
       // concludedAt is like "2026-05-17T07:42:11" — slice HH:MM.
@@ -446,22 +452,32 @@ struct DayTimelineView: View {
       guard let startH = parseHHMM(startHHMM) else { continue }
       // `concludedAt` is local wall-clock, but `loggedAt` is stored in
       // UTC ("…Z") — convert it to the user's zone before comparing the
-      // two, or the pill's end (and thus its length) skews by the UTC
-      // offset.
+      // two, or the span's end (and thus the pill's length) skews by the
+      // UTC offset.
       let loggedH = e.loggedAt.flatMap(localHour(fromISO:))
-      var s = byKey[startHHMM] ?? SessionAccum(startHour: startH)
-      s.totalDuration += e.durationMin ?? 0
-      if let lh = loggedH, lh > (s.lastLoggedHour ?? 0) { s.lastLoggedHour = lh }
-      byKey[startHHMM] = s
+      let cardioEnd = (e.durationMin ?? 0) > 0 ? startH + (e.durationMin ?? 0) / 60 : startH
+      let end = max(startH, cardioEnd, loggedH ?? startH)
+      spans.append(SessionSpan(start: startH, end: end))
     }
+
+    // Merge overlapping / near-adjacent spans into coherent sessions.
+    let sorted = spans.sorted { $0.start < $1.start }
+    var merged: [SessionSpan] = []
+    for s in sorted {
+      if var last = merged.last, s.start <= last.end + Self.sessionGapHours {
+        last.end = max(last.end, s.end)
+        merged[merged.count - 1] = last
+      } else {
+        merged.append(s)
+      }
+    }
+
     let trainingColor = theme.color(for: "training")
-    return byKey.values.map { s in
-      let cardioEnd = s.totalDuration > 0 ? s.startHour + s.totalDuration / 60 : s.startHour
-      let end = max(s.lastLoggedHour ?? s.startHour, cardioEnd)
-      return Bar(startHour: s.startHour,
-                 endHour: max(end, s.startHour + 0.05),
-                 color: trainingColor,
-                 thin: false)
+    return merged.map { s in
+      Bar(startHour: s.start,
+          endHour: max(s.end, s.start + 0.05),
+          color: trainingColor,
+          thin: false)
     }
   }
 
