@@ -1,6 +1,6 @@
 import type { CloudKitClient } from "../cloudkit.js";
 import { logEvent } from "../util.js";
-import { getEffectiveTimezone, todayYMD, localServerTimestamp } from "../tz.js";
+import { getEffectiveTimezone, localServerTimestamp } from "../tz.js";
 
 // Mutators for Task records. Uses CKWS records/modify with forceUpdate.
 // Identity for new tasks: base32-6 shortid per identifiers.md.
@@ -119,18 +119,15 @@ export interface UpdateTaskInput {
 // ---- Implementations ----
 
 export async function createTask(client: CloudKitClient, input: CreateTaskInput) {
-  const tz = await getEffectiveTimezone(client);
   const id = newTaskId();
   const fields: Record<string, { value: unknown }> = {
     title: { value: input.title },
     status: { value: "open" },
-    created: { value: todayYMD(tz) },        // legacy YYYY-MM-DD string (app still reads it)
-    createdAt: { value: Date.now() },       // epoch ms → CloudKit TIMESTAMP (NSDate), matches nutrition.loggedAt
+    createdAt: { value: Date.now() },       // epoch ms → CloudKit TIMESTAMP (NSDate); canonical creation instant
     source: { value: "mcp" },               // provenance: created via the MCP gateway
     sourceClient: { value: "Claude" },      // only Claude connects today; plumb clientId through later
     today: { value: input.today ? 1 : 0 },
   };
-  if (input.today) fields.todaySetOn = { value: todayYMD(tz) };
   if (input.scheduled) fields.scheduled = { value: input.scheduled };
   if (input.due) fields.deadline = { value: input.due };
   if (input.area) fields.area = { value: input.area };
@@ -146,7 +143,7 @@ export async function createTask(client: CloudKitClient, input: CreateTaskInput)
     recordType: "Task",
     recordName: id,
     fields,
-    protectedFields: ["title", "status", "created"],
+    protectedFields: ["title", "status"],
   });
 
   // Signals exactly when the prod schema catches up: a non-empty list here
@@ -179,7 +176,6 @@ export async function completeTask(client: CloudKitClient, input: { id: string }
           status: { value: "done" },
           completedAt: { value: completedAt },
           today: { value: 0 },
-          todaySetOn: { value: "" },
         },
       },
     },
@@ -192,9 +188,7 @@ export async function updateTask(client: CloudKitClient, input: UpdateTaskInput)
   const updated: string[] = [];
   if (input.title !== undefined) { fields.title = { value: input.title }; updated.push("title"); }
   if (input.today !== undefined) {
-    const tz = await getEffectiveTimezone(client);
     fields.today = { value: input.today ? 1 : 0 };
-    fields.todaySetOn = { value: input.today ? todayYMD(tz) : "" };
     updated.push("today");
   }
   if (input.scheduled !== undefined) { fields.scheduled = { value: input.scheduled ?? "" }; updated.push("scheduled"); }
