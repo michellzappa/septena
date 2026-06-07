@@ -1577,8 +1577,34 @@ final class TrainingDraftStore {
   /// row's status to `done` immediately; CK upload is fire-and-forget.
   func markDone(index: Int, mutator: TrainingMutator) {
     guard let d = draft, d.entries.indices.contains(index) else { return }
-    update { $0.entries[index].status = .saving }
     let entry = d.entries[index]
+    // Cardio has no difficulty UI in the logger; never persist one even if a
+    // value lingers on the draft (legacy drafts, category switch).
+    let difficulty = (entry.isCardio || entry.difficulty.isEmpty) ? nil : entry.difficulty
+    let note: String? = entry.note.isEmpty ? nil : entry.note
+
+    // Re-saving an entry that's already been logged (the "Update" button) is
+    // an EDIT, not a new set: mutate the existing record in place. Without
+    // this branch every Update inserted a fresh row with a new id, silently
+    // duplicating the set.
+    if let savedID = entry.savedFile {
+      update { $0.entries[index].status = .saving }
+      mutator.updateEntry(
+        id: savedID,
+        weight: .some(entry.weight),
+        sets: .some(entry.sets.map(String.init)),
+        reps: .some(entry.reps),
+        difficulty: .some(difficulty),
+        durationMin: .some(entry.durationMin),
+        distanceM: .some(entry.distanceM),
+        level: .some(entry.level),
+        note: .some(note)
+      )
+      update { $0.entries[index].status = .done }
+      return
+    }
+
+    update { $0.entries[index].status = .saving }
     let saved = mutator.addEntry(
       date: d.date,
       time: d.time,
@@ -1587,13 +1613,11 @@ final class TrainingDraftStore {
       weight: entry.weight,
       sets: entry.sets.map(String.init),
       reps: entry.reps,
-      // Cardio has no difficulty UI in the logger; never persist one even
-      // if a value lingers on the draft (legacy drafts, category switch).
-      difficulty: (entry.isCardio || entry.difficulty.isEmpty) ? nil : entry.difficulty,
+      difficulty: difficulty,
       durationMin: entry.durationMin,
       distanceM: entry.distanceM,
       level: entry.level,
-      note: entry.note.isEmpty ? nil : entry.note,
+      note: note,
       concludedAt: "\(d.date)T\(d.time.isEmpty ? "00:00" : d.time):00"
     )
     update {
