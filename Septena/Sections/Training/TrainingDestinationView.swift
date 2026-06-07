@@ -1667,10 +1667,15 @@ final class TrainingDraftStore {
     }
   }
 
-  /// Drop the entry at `index` from the in-progress session. An entry
-  /// already marked Done keeps its logged history — this only removes the
-  /// card; deleting saved history is the history pane's job.
-  func removeEntry(at index: Int) {
+  /// Drop the entry at `index` from the in-progress session. When the entry
+  /// was already logged (status `done`), its saved record is deleted too —
+  /// this is the "undo an accidental save" path. Distinct from Skip, which
+  /// keeps the slot greyed on the list for later.
+  func removeEntry(at index: Int, mutator: TrainingMutator) {
+    guard let d = draft, d.entries.indices.contains(index) else { return }
+    if let savedID = d.entries[index].savedFile {
+      mutator.deleteEntry(id: savedID)
+    }
     update {
       guard $0.entries.indices.contains(index) else { return }
       $0.entries.remove(at: index)
@@ -1876,7 +1881,11 @@ struct TrainingSessionView: View {
         List {
           statsHeader(d)
           Section {
-            ForEach(Array(d.entries.enumerated()), id: \.element.exercise) { idx, e in
+            ForEach(orderedEntries(d), id: \.exercise) { e in
+              // `index` must be the entry's real slot in `draft.entries`
+              // (store mutations key off it), even though the rows render
+              // in completed-first order.
+              let idx = d.entries.firstIndex { $0.exercise == e.exercise } ?? 0
               TrainingExerciseCard(
                 index: idx,
                 entry: e,
@@ -2037,6 +2046,21 @@ struct TrainingSessionView: View {
     store.start(type: type, context: modelContext)
   }
 
+  /// Entries reordered so finished sets (done / mid-save) float to the top,
+  /// leaving everything still to do clustered at the bottom of the list —
+  /// glance at the bottom to see what's left. Pending and skipped rows keep
+  /// their routine order below the done block. A stable secondary sort on the
+  /// original index keeps each group's internal order steady (Swift's sort
+  /// isn't stable on its own).
+  private func orderedEntries(_ d: DraftSession) -> [DraftEntry] {
+    func settled(_ s: DraftEntry.Status) -> Bool { s == .done || s == .saving }
+    return d.entries.enumerated().sorted { a, b in
+      let sa = settled(a.element.status), sb = settled(b.element.status)
+      if sa != sb { return sa }
+      return a.offset < b.offset
+    }.map(\.element)
+  }
+
   private func finish() {
     // Snapshot the draft *before* discarding — the completion sheet
     // needs its entries, started-at, and PR baselines. Routine kind
@@ -2165,6 +2189,9 @@ struct TrainingExerciseCard: View {
 
   /// Presents the catalog picker to swap this slot's exercise.
   @State private var showSwitch = false
+  /// Confirms removing an already-logged entry — deleting it discards the
+  /// saved record, so we ask first. Pending/skipped rows skip the prompt.
+  @State private var showRemoveConfirm = false
   /// Mean pace (m/min) from this exercise's history — seeds the cardio
   /// duration→distance auto-preset. Computed on appear for cardio cards.
   @State private var avgPace: Double? = nil
@@ -2225,6 +2252,24 @@ struct TrainingExerciseCard: View {
         }
       )
     }
+    .confirmationDialog(
+      "Remove \(displayName(entry.exercise))?",
+      isPresented: $showRemoveConfirm,
+      titleVisibility: .visible
+    ) {
+      Button("Remove and delete log", role: .destructive) { removeThisEntry() }
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text("This exercise is already logged. Removing it deletes the saved entry.")
+    }
+  }
+
+  /// Drop this card from the session (and delete its saved record if it was
+  /// logged), closing the drawer if it was the open one.
+  private func removeThisEntry() {
+    if expanded { openExercise = nil }
+    store.removeEntry(at: index, mutator: trainingMutator)
+    Haptics.tick()
   }
 
   /// Exercise names in the session other than this slot's — disabled in
@@ -2305,8 +2350,9 @@ struct TrainingExerciseCard: View {
           Label("Switch exercise", systemImage: "arrow.triangle.2.circlepath")
         }
         // Skip (toggles to Unskip), hidden for already-logged entries.
-        // Remove is intentionally absent — in a routine session you skip
-        // an exercise (keep it greyed on the list), you don't delete it.
+        // Skip greys the slot on the list; Remove drops it outright — and
+        // for a logged entry also deletes the saved record (undo an
+        // accidental Done).
         if entry.status == .skipped {
           Button {
             store.unskip(index: index)
@@ -2321,6 +2367,20 @@ struct TrainingExerciseCard: View {
             Haptics.tick()
           } label: {
             Label("Skip", systemImage: "forward.end")
+          }
+        }
+        if entry.status != .saving {
+          Divider()
+          Button(role: .destructive) {
+            // A logged entry deletes saved data — confirm first. Anything
+            // else (pending / skipped) just drops the card immediately.
+            if entry.status == .done {
+              showRemoveConfirm = true
+            } else {
+              removeThisEntry()
+            }
+          } label: {
+            Label("Remove", systemImage: "trash")
           }
         }
       } label: {
@@ -2665,7 +2725,9 @@ struct TrainingExerciseCard: View {
       // Minutes is the value you set first; on change we preset distance to
       // your average pace for that exercise ("you know my cadence"). So it
       // gets the full-width hero row, with distance/level two-across below.
-      steppedField(label: "Minutes", step: 1,
+      // Steps by 5 — cardio bouts land on 5-minute marks, not single minutes
+      // (the field still accepts any typed value for the odd 6-minute cooldown).
+      steppedField(label: "Minutes", step: 5,
                    value: Binding(
                      get: { entry.durationMin.map { fmt($0) } ?? "" },
                      set: { newVal in
