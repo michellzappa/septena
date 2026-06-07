@@ -3123,6 +3123,9 @@
         }
       }
     },
+    "Nudges you to refresh the Claude connection just before its ~8-hour session expires, so Claude keeps reading your data without you reconnecting from claude.ai. Only fires while Claude is connected." : {
+
+    },
     "Nutrition" : {
       "localizations" : {
         "pt-BR" : {
@@ -4411,6 +4414,9 @@
           }
         }
       }
+    },
+    "This exercise is already logged. Removing it deletes the saved entry." : {
+
     },
     "This goal will also appear in the %@ section." : {
       "localizations" : {

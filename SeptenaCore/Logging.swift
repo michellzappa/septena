@@ -24,6 +24,10 @@ extension Notification.Name {
   /// Posted by the macOS menu bar's "New To-Do" item. ContentView
   /// listens and starts an inline draft on Inbox — same flow as ⌘N.
   static let septenaOpenQuickAdd = Notification.Name("septena.openQuickAdd")
+  /// Posted whenever the Claude gateway's token state changes (refreshed,
+  /// connected, disconnected). The notification scheduler re-arms the
+  /// pre-expiry reconnect nudge off the new `lastRefreshAt`.
+  static let septenaClaudeGatewayChanged = Notification.Name("septena.claudeGatewayChanged")
 }
 
 // MARK: - Logger

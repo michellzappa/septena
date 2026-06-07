@@ -57,6 +57,25 @@ public final class ClaudeGatewayProvider {
   private static let enabledKey = "septena.claudeGateway.enabled"
   private static let lastRefreshKey = "septena.claudeGateway.lastRefreshAt"
 
+  /// UserDefaults key for the "keep Claude connected" notification choice.
+  /// Follows the `septena.notify.toggle.<id>` convention used by the section
+  /// nudges, so it reads as one more per-nudge toggle even though Claude is
+  /// an Account▸Integrations feature, not a dashboard section. Absent → on.
+  public static let connectionNudgeKey = "septena.notify.toggle.claude.connection"
+
+  /// Whether the pre-expiry reconnect nudge is enabled. Absent → on (opt-out).
+  public static var connectionNudgeEnabled: Bool {
+    UserDefaults.standard.object(forKey: connectionNudgeKey) as? Bool ?? true
+  }
+
+  /// The wall-clock moment the current token is presumed to go stale —
+  /// `lastRefreshAt` + the ~7h refresh interval (under the ~8h CloudKit
+  /// lifetime). `nil` if never authed. The scheduler arms a one-shot nudge
+  /// for this instant so the user can re-mint *while Claude is still live*.
+  public var nudgeFireDate: Date? {
+    lastRefreshAt.map { $0.addingTimeInterval(Self.refreshInterval) }
+  }
+
   public var isEnabled: Bool {
     didSet { UserDefaults.standard.set(isEnabled, forKey: Self.enabledKey) }
   }
@@ -118,6 +137,8 @@ public final class ClaudeGatewayProvider {
       needsReauth = false
       lastRefreshAt = Date()
       UserDefaults.standard.set(lastRefreshAt!.timeIntervalSince1970, forKey: Self.lastRefreshKey)
+      // Re-arm the pre-expiry reconnect nudge off the fresh timestamp.
+      NotificationCenter.default.post(name: .septenaClaudeGatewayChanged, object: nil)
       logger.info("Claude gateway token refreshed")
     } catch {
       lastError = error.localizedDescription
@@ -134,6 +155,8 @@ public final class ClaudeGatewayProvider {
     isEnabled = false
     lastError = nil
     needsReauth = false
+    // Withdraw any pending reconnect nudge.
+    NotificationCenter.default.post(name: .septenaClaudeGatewayChanged, object: nil)
   }
 
   // MARK: Internals

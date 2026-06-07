@@ -72,8 +72,15 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         _ = services.nutritionMutator.addEntry(
           loggedAt: .now, emoji: "💧",
           foods: HydrationPlugin.waterFoodsMarker, source: "manual", waterMl: 500)
+      case NotificationActionID.claudeReconnect:
+        // Explicit "Reconnect" button — re-mint the gateway token now.
+        await ClaudeGatewayProvider.shared.refreshIfNeeded(force: true)
       default:
-        break   // default tap (opens the app) — nothing to mutate here
+        // A plain tap on the Claude nudge also re-mints (this is the
+        // "refresh on open" path); other default taps just open the app.
+        if userInfo["claudeReconnect"] != nil {
+          await ClaudeGatewayProvider.shared.refreshIfNeeded(force: true)
+        }
       }
 
       LocalNotificationScheduler.shared.reconcile()

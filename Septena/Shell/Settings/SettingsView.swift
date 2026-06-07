@@ -2996,6 +2996,7 @@ struct NotificationsOverviewPane: View {
   @Environment(SettingsStore.self) private var store
   @Environment(\.modelContext) private var modelContext
   @AppStorage(SettingsKey.notificationsEnabled) private var notificationsEnabled: Bool = true
+  @AppStorage(ClaudeGatewayProvider.connectionNudgeKey) private var claudeNudgeEnabled: Bool = true
   @State private var items: [NotificationOverviewItem] = []
 
   /// On and firing today, earliest first.
@@ -3033,6 +3034,16 @@ struct NotificationsOverviewPane: View {
       }
 
       if notificationsEnabled {
+        Section {
+          Toggle(isOn: $claudeNudgeEnabled) {
+            Label("Keep Claude connected", systemImage: "sparkles")
+          }
+        } header: {
+          Label("Connections", systemImage: "link")
+        } footer: {
+          Text("Nudges you to refresh the Claude connection just before its ~8-hour session expires, so Claude keeps reading your data without you reconnecting from claude.ai. Only fires while Claude is connected.")
+        }
+
         if !live.isEmpty {
           Section {
             ForEach(live) { row(for: $0) }

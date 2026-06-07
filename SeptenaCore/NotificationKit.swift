@@ -43,6 +43,8 @@ public enum NotificationActionID {
   public static let choreComplete   = "septena.action.chores.complete"
   public static let hydrationAdd250 = "septena.action.hydration.add250"
   public static let hydrationAdd500 = "septena.action.hydration.add500"
+  /// Opens the app and re-mints the Claude gateway token (the reconnect nudge).
+  public static let claudeReconnect = "septena.action.claude.reconnect"
 }
 
 /// Keys for the per-notification `userInfo` payload the handler reads back.
