@@ -4192,8 +4192,42 @@ private struct ClaudeGatewayDetail: View {
           Text("Connection")
         }
       }
+
+      Section {
+        explainerRow(icon: "link",
+                     title: "A small relay",
+                     text: "Claude talks to Septena through a connector at mcp.septena.app. Add it in Claude (claude.ai or the Claude app) using that address.")
+        explainerRow(icon: "lock.icloud",
+                     title: "Your data stays private",
+                     text: "Reads and writes go straight to your own private iCloud database. The relay never stores your data — it only passes a short-lived access token through.")
+        explainerRow(icon: "text.bubble",
+                     title: "Ask in plain language",
+                     text: "Claude can read and log your tasks, habits, supplements, meals, training and more, just by you asking.")
+        explainerRow(icon: "arrow.triangle.2.circlepath",
+                     title: "Syncs everywhere",
+                     text: "Anything Claude logs shows up across all your devices automatically.")
+      } header: {
+        Text("How it works")
+      } footer: {
+        Text("Good to know: Apple only issues short-lived keys for private iCloud data — a few hours, with no server-side renewal. So Septena refreshes the connection automatically when you open the app, and the “Keep Claude connected” reminder nudges you before it lapses. If it does lapse, Claude simply asks you to open Septena to refresh — you won't need to reconnect from claude.ai, and it resumes on its own. Refreshing happens on iPhone and Mac only, not the watch.")
+      }
     }
     .formStyle(.grouped)
+  }
+
+  @ViewBuilder
+  private func explainerRow(icon: String, title: String, text: String) -> some View {
+    HStack(alignment: .top, spacing: 12) {
+      Image(systemName: icon)
+        .font(.body)
+        .foregroundStyle(.secondary)
+        .frame(width: 24, alignment: .center)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(title).font(.subheadline.weight(.medium))
+        Text(text).font(.caption).foregroundStyle(.secondary)
+      }
+    }
+    .padding(.vertical, 2)
   }
 }
 

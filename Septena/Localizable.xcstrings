@@ -2367,6 +2367,9 @@
         }
       }
     },
+    "Good to know: Apple only issues short-lived keys for private iCloud data — a few hours, with no server-side renewal. So Septena refreshes the connection automatically when you open the app, and the “Keep Claude connected” reminder nudges you before it lapses. If it does lapse, Claude simply asks you to open Septena to refresh — you won't need to reconnect from claude.ai, and it resumes on its own. Refreshing happens on iPhone and Mac only, not the watch." : {
+
+    },
     "Grant Access" : {
       "localizations" : {
         "pt-BR" : {
@@ -2556,6 +2559,9 @@
           }
         }
       }
+    },
+    "How it works" : {
+
     },
     "Hydration" : {
       "localizations" : {
