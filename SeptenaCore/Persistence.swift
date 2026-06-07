@@ -355,7 +355,6 @@ final class HabitDayStateEntity {
   var done: Bool
   var skipped: Bool
   var note: String?
-  var time: String?
   var updatedAt: Date
   /// CKRecord system-fields blob. Same contract as tasks/projects/areas.
   var cloudKitSystemFields: Data?
@@ -366,7 +365,6 @@ final class HabitDayStateEntity {
        done: Bool,
        skipped: Bool,
        note: String? = nil,
-       time: String? = nil,
        updatedAt: Date = .now,
        cloudKitSystemFields: Data? = nil) {
     self.id = id
@@ -375,7 +373,6 @@ final class HabitDayStateEntity {
     self.done = done
     self.skipped = skipped
     self.note = note
-    self.time = time
     self.updatedAt = updatedAt
     self.cloudKitSystemFields = cloudKitSystemFields
   }
@@ -424,7 +421,6 @@ final class SupplementDayStateEntity {
   var supplementID: String
   var done: Bool
   var note: String?
-  var time: String?
   var updatedAt: Date
   /// CKRecord system-fields blob. Same contract as tasks/projects/areas.
   var cloudKitSystemFields: Data?
@@ -434,7 +430,6 @@ final class SupplementDayStateEntity {
        supplementID: String,
        done: Bool,
        note: String? = nil,
-       time: String? = nil,
        updatedAt: Date = .now,
        cloudKitSystemFields: Data? = nil) {
     self.id = id
@@ -442,7 +437,6 @@ final class SupplementDayStateEntity {
     self.supplementID = supplementID
     self.done = done
     self.note = note
-    self.time = time
     self.updatedAt = updatedAt
     self.cloudKitSystemFields = cloudKitSystemFields
   }
@@ -577,7 +571,6 @@ final class ChoreEventEntity {
   var newDueDate: String?
   var reason: String?
   var note: String?
-  var time: String?
   var sortKey: String
   var updatedAt: Date
   var cloudKitSystemFields: Data?
@@ -589,7 +582,6 @@ final class ChoreEventEntity {
        newDueDate: String? = nil,
        reason: String? = nil,
        note: String? = nil,
-       time: String? = nil,
        sortKey: String,
        updatedAt: Date = .now,
        cloudKitSystemFields: Data? = nil) {
@@ -600,7 +592,6 @@ final class ChoreEventEntity {
     self.newDueDate = newDueDate
     self.reason = reason
     self.note = note
-    self.time = time
     self.sortKey = sortKey
     self.updatedAt = updatedAt
     self.cloudKitSystemFields = cloudKitSystemFields
@@ -614,7 +605,6 @@ final class GutEventEntity {
   /// `EventTimestamp` on write; `.distantPast` only on pre-migration rows.
   var occurredAt: Date = Date.distantPast
   var date: String
-  var time: String
   var bristol: Int
   var blood: Int
   var volume: String?
@@ -627,7 +617,6 @@ final class GutEventEntity {
 
   init(id: String,
        date: String,
-       time: String,
        bristol: Int,
        blood: Int = 0,
        volume: String? = nil,
@@ -639,7 +628,6 @@ final class GutEventEntity {
        cloudKitSystemFields: Data? = nil) {
     self.id = id
     self.date = date
-    self.time = time
     self.bristol = bristol
     self.blood = blood
     self.volume = volume
@@ -661,10 +649,8 @@ final class MoodEventEntity {
   /// `YYYY-MM-DD` of the logged moment, in local time. Indexed for fast
   /// day-scoped queries — mirrors CaffeineEventEntity.
   var date: String
-  /// `HH:MM:SS` of the logged moment, in local time.
-  var time: String
-  /// Bucket derived from `time` at write: morning (<12), afternoon (12–17), evening (≥17).
-  /// Stored so dashboard heatmaps can slice without re-parsing every event.
+  /// Bucket derived from `occurredAt` at write: morning (<12), afternoon (12–17),
+  /// evening (≥17). Stored so dashboard heatmaps can slice without re-parsing.
   var bucket: String
   /// One of `hap | han | lan | lap` — the Russell circumplex quadrant.
   var quadrant: String
@@ -687,7 +673,6 @@ final class MoodEventEntity {
 
   init(id: String,
        date: String,
-       time: String,
        bucket: String,
        quadrant: String,
        arousal: Int,
@@ -698,7 +683,6 @@ final class MoodEventEntity {
        cloudKitSystemFields: Data? = nil) {
     self.id = id
     self.date = date
-    self.time = time
     self.bucket = bucket
     self.quadrant = quadrant
     self.arousal = arousal
@@ -717,7 +701,6 @@ final class CaffeineEventEntity {
   /// `EventTimestamp` on write; `.distantPast` only on pre-migration rows.
   var occurredAt: Date = Date.distantPast
   var date: String
-  var time: String
   var method: String   // "v60" | "matcha" | "other"
   var beans: String?
   var grams: Double?
@@ -727,7 +710,6 @@ final class CaffeineEventEntity {
 
   init(id: String,
        date: String,
-       time: String,
        method: String,
        beans: String? = nil,
        grams: Double? = nil,
@@ -736,7 +718,6 @@ final class CaffeineEventEntity {
        cloudKitSystemFields: Data? = nil) {
     self.id = id
     self.date = date
-    self.time = time
     self.method = method
     self.beans = beans
     self.grams = grams
@@ -774,7 +755,6 @@ final class CannabisEventEntity {
   /// `EventTimestamp` on write; `.distantPast` only on pre-migration rows.
   var occurredAt: Date = Date.distantPast
   var date: String
-  var time: String
   var method: String   // "vape" | "edible"
   var strain: String?
   var hit: Int?
@@ -786,7 +766,6 @@ final class CannabisEventEntity {
 
   init(id: String,
        date: String,
-       time: String,
        method: String,
        strain: String? = nil,
        hit: Int? = nil,
@@ -797,7 +776,6 @@ final class CannabisEventEntity {
        cloudKitSystemFields: Data? = nil) {
     self.id = id
     self.date = date
-    self.time = time
     self.method = method
     self.strain = strain
     self.hit = hit
@@ -870,7 +848,6 @@ final class ExerciseEntryEntity {
   /// `EventTimestamp` on write; `.distantPast` only on pre-migration rows.
   var occurredAt: Date = Date.distantPast
   var date: String           // YYYY-MM-DD
-  var time: String           // HH:MM session start
   var sessionType: String    // upper|lower|cardio|yoga|...
   var exercise: String       // canonical exercise name
   var weight: Double?
@@ -888,7 +865,6 @@ final class ExerciseEntryEntity {
 
   init(id: String,
        date: String,
-       time: String,
        sessionType: String,
        exercise: String,
        weight: Double? = nil,
@@ -905,7 +881,6 @@ final class ExerciseEntryEntity {
        cloudKitSystemFields: Data? = nil) {
     self.id = id
     self.date = date
-    self.time = time
     self.sessionType = sessionType
     self.exercise = exercise
     self.weight = weight
@@ -1767,7 +1742,6 @@ extension HabitDayStateEntity: ChecklistCloudKitBackedEntity {
     record[HabitEventCloudKitSchema.Field.done] = done ? 1 : 0
     record[HabitEventCloudKitSchema.Field.skipped] = skipped ? 1 : 0
     record[HabitEventCloudKitSchema.Field.note] = note
-    record[HabitEventCloudKitSchema.Field.time] = time
     record[HabitEventCloudKitSchema.Field.occurredAt] = occurredAt as NSDate
     return record
   }
@@ -1778,7 +1752,6 @@ extension HabitDayStateEntity: ChecklistCloudKitBackedEntity {
     if let value = record[HabitEventCloudKitSchema.Field.done] as? Int { done = value != 0 }
     if let value = record[HabitEventCloudKitSchema.Field.skipped] as? Int { skipped = value != 0 }
     note = optionalChecklistString(record[HabitEventCloudKitSchema.Field.note])
-    time = optionalChecklistString(record[HabitEventCloudKitSchema.Field.time])
     if let v = record[HabitEventCloudKitSchema.Field.occurredAt] as? Date { occurredAt = v }
     updatedAt = .now
     captureCloudKitSystemFields(from: record)
@@ -1835,7 +1808,6 @@ extension SupplementDayStateEntity: ChecklistCloudKitBackedEntity {
     record[SupplementEventCloudKitSchema.Field.supplementID] = supplementID
     record[SupplementEventCloudKitSchema.Field.done] = done ? 1 : 0
     record[SupplementEventCloudKitSchema.Field.note] = note
-    record[SupplementEventCloudKitSchema.Field.time] = time
     record[SupplementEventCloudKitSchema.Field.occurredAt] = occurredAt as NSDate
     return record
   }
@@ -1845,7 +1817,6 @@ extension SupplementDayStateEntity: ChecklistCloudKitBackedEntity {
     if let value = record[SupplementEventCloudKitSchema.Field.supplementID] as? String { supplementID = value }
     if let value = record[SupplementEventCloudKitSchema.Field.done] as? Int { done = value != 0 }
     note = optionalChecklistString(record[SupplementEventCloudKitSchema.Field.note])
-    time = optionalChecklistString(record[SupplementEventCloudKitSchema.Field.time])
     if let v = record[SupplementEventCloudKitSchema.Field.occurredAt] as? Date { occurredAt = v }
     updatedAt = .now
     captureCloudKitSystemFields(from: record)
@@ -1904,7 +1875,6 @@ extension ChoreEventEntity: ChecklistCloudKitBackedEntity {
     record[ChoreEventCloudKitSchema.Field.newDueDate] = newDueDate
     record[ChoreEventCloudKitSchema.Field.reason] = reason
     record[ChoreEventCloudKitSchema.Field.note] = note
-    record[ChoreEventCloudKitSchema.Field.time] = time
     record[ChoreEventCloudKitSchema.Field.sortKey] = sortKey
     record[ChoreEventCloudKitSchema.Field.occurredAt] = occurredAt as NSDate
     return record
@@ -1917,7 +1887,6 @@ extension ChoreEventEntity: ChecklistCloudKitBackedEntity {
     newDueDate = optionalChecklistString(record[ChoreEventCloudKitSchema.Field.newDueDate])
     reason = optionalChecklistString(record[ChoreEventCloudKitSchema.Field.reason])
     note = optionalChecklistString(record[ChoreEventCloudKitSchema.Field.note])
-    time = optionalChecklistString(record[ChoreEventCloudKitSchema.Field.time])
     if let value = record[ChoreEventCloudKitSchema.Field.sortKey] as? String { sortKey = value }
     if let v = record[ChoreEventCloudKitSchema.Field.occurredAt] as? Date { occurredAt = v }
     updatedAt = .now
@@ -1942,7 +1911,6 @@ extension GutEventEntity: ChecklistCloudKitBackedEntity {
                             zoneID: SeptenaCloudKit.zoneID)
     )
     record[GutEventCloudKitSchema.Field.date] = date
-    record[GutEventCloudKitSchema.Field.time] = time
     record[GutEventCloudKitSchema.Field.bristol] = bristol
     record[GutEventCloudKitSchema.Field.blood] = blood
     record[GutEventCloudKitSchema.Field.volume] = volume
@@ -1956,7 +1924,6 @@ extension GutEventEntity: ChecklistCloudKitBackedEntity {
 
   func apply(_ record: CKRecord) {
     if let value = record[GutEventCloudKitSchema.Field.date] as? String { date = value }
-    if let value = record[GutEventCloudKitSchema.Field.time] as? String { time = value }
     if let value = record[GutEventCloudKitSchema.Field.bristol] as? Int { bristol = value }
     if let value = record[GutEventCloudKitSchema.Field.blood] as? Int { blood = value }
     volume = optionalChecklistString(record[GutEventCloudKitSchema.Field.volume])
@@ -1971,7 +1938,7 @@ extension GutEventEntity: ChecklistCloudKitBackedEntity {
 
   convenience init(cloudKit record: CKRecord) {
     self.init(id: GutEventCloudKitSchema.entityID(from: record.recordID.recordName),
-              date: "", time: "", bristol: 4)
+              date: "", bristol: 4)
     apply(record)
   }
 }
@@ -1984,7 +1951,6 @@ extension MoodEventEntity: ChecklistCloudKitBackedEntity {
                             zoneID: SeptenaCloudKit.zoneID)
     )
     record[MoodEventCloudKitSchema.Field.date] = date
-    record[MoodEventCloudKitSchema.Field.time] = time
     record[MoodEventCloudKitSchema.Field.bucket] = bucket
     record[MoodEventCloudKitSchema.Field.quadrant] = quadrant
     record[MoodEventCloudKitSchema.Field.arousal] = arousal
@@ -1997,7 +1963,6 @@ extension MoodEventEntity: ChecklistCloudKitBackedEntity {
 
   func apply(_ record: CKRecord) {
     if let value = record[MoodEventCloudKitSchema.Field.date] as? String { date = value }
-    if let value = record[MoodEventCloudKitSchema.Field.time] as? String { time = value }
     if let value = record[MoodEventCloudKitSchema.Field.bucket] as? String { bucket = value }
     if let value = record[MoodEventCloudKitSchema.Field.quadrant] as? String { quadrant = value }
     if let value = record[MoodEventCloudKitSchema.Field.arousal] as? Int { arousal = value }
@@ -2011,7 +1976,7 @@ extension MoodEventEntity: ChecklistCloudKitBackedEntity {
 
   convenience init(cloudKit record: CKRecord) {
     self.init(id: MoodEventCloudKitSchema.entityID(from: record.recordID.recordName),
-              date: "", time: "", bucket: "morning",
+              date: "", bucket: "morning",
               quadrant: "lap", arousal: 2, valence: 2, emotion: "")
     apply(record)
   }
@@ -2111,7 +2076,6 @@ extension CaffeineEventEntity: ChecklistCloudKitBackedEntity {
                             zoneID: SeptenaCloudKit.zoneID)
     )
     record[CaffeineEventCloudKitSchema.Field.date] = date
-    record[CaffeineEventCloudKitSchema.Field.time] = time
     record[CaffeineEventCloudKitSchema.Field.method] = method
     record[CaffeineEventCloudKitSchema.Field.beans] = beans
     record[CaffeineEventCloudKitSchema.Field.grams] = grams
@@ -2122,7 +2086,6 @@ extension CaffeineEventEntity: ChecklistCloudKitBackedEntity {
 
   func apply(_ record: CKRecord) {
     if let value = record[CaffeineEventCloudKitSchema.Field.date] as? String { date = value }
-    if let value = record[CaffeineEventCloudKitSchema.Field.time] as? String { time = value }
     if let value = record[CaffeineEventCloudKitSchema.Field.method] as? String { method = value }
     beans = optionalChecklistString(record[CaffeineEventCloudKitSchema.Field.beans])
     grams = record[CaffeineEventCloudKitSchema.Field.grams] as? Double
@@ -2134,7 +2097,7 @@ extension CaffeineEventEntity: ChecklistCloudKitBackedEntity {
 
   convenience init(cloudKit record: CKRecord) {
     self.init(id: CaffeineEventCloudKitSchema.entityID(from: record.recordID.recordName),
-              date: "", time: "", method: "v60")
+              date: "", method: "v60")
     apply(record)
   }
 }
@@ -2172,7 +2135,6 @@ extension CannabisEventEntity: ChecklistCloudKitBackedEntity {
                             zoneID: SeptenaCloudKit.zoneID)
     )
     record[CannabisEventCloudKitSchema.Field.date] = date
-    record[CannabisEventCloudKitSchema.Field.time] = time
     record[CannabisEventCloudKitSchema.Field.method] = method
     record[CannabisEventCloudKitSchema.Field.strain] = strain
     record[CannabisEventCloudKitSchema.Field.hit] = hit
@@ -2185,7 +2147,6 @@ extension CannabisEventEntity: ChecklistCloudKitBackedEntity {
 
   func apply(_ record: CKRecord) {
     if let value = record[CannabisEventCloudKitSchema.Field.date] as? String { date = value }
-    if let value = record[CannabisEventCloudKitSchema.Field.time] as? String { time = value }
     if let value = record[CannabisEventCloudKitSchema.Field.method] as? String { method = value }
     strain = optionalChecklistString(record[CannabisEventCloudKitSchema.Field.strain])
     hit = record[CannabisEventCloudKitSchema.Field.hit] as? Int
@@ -2199,7 +2160,7 @@ extension CannabisEventEntity: ChecklistCloudKitBackedEntity {
 
   convenience init(cloudKit record: CKRecord) {
     self.init(id: CannabisEventCloudKitSchema.entityID(from: record.recordID.recordName),
-              date: "", time: "", method: "vape")
+              date: "", method: "vape")
     apply(record)
   }
 }
@@ -2271,7 +2232,6 @@ extension ExerciseEntryEntity: ChecklistCloudKitBackedEntity {
                             zoneID: SeptenaCloudKit.zoneID)
     )
     record[ExerciseEntryCloudKitSchema.Field.date] = date
-    record[ExerciseEntryCloudKitSchema.Field.time] = time
     record[ExerciseEntryCloudKitSchema.Field.sessionType] = sessionType
     record[ExerciseEntryCloudKitSchema.Field.exercise] = exercise
     record[ExerciseEntryCloudKitSchema.Field.weight] = weight
@@ -2290,7 +2250,6 @@ extension ExerciseEntryEntity: ChecklistCloudKitBackedEntity {
 
   func apply(_ record: CKRecord) {
     if let v = record[ExerciseEntryCloudKitSchema.Field.date] as? String { date = v }
-    if let v = record[ExerciseEntryCloudKitSchema.Field.time] as? String { time = v }
     if let v = record[ExerciseEntryCloudKitSchema.Field.sessionType] as? String { sessionType = v }
     if let v = record[ExerciseEntryCloudKitSchema.Field.exercise] as? String { exercise = v }
     weight = record[ExerciseEntryCloudKitSchema.Field.weight] as? Double
@@ -2310,7 +2269,7 @@ extension ExerciseEntryEntity: ChecklistCloudKitBackedEntity {
 
   convenience init(cloudKit record: CKRecord) {
     self.init(id: ExerciseEntryCloudKitSchema.entityID(from: record.recordID.recordName),
-              date: "", time: "", sessionType: "", exercise: "")
+              date: "", sessionType: "", exercise: "")
     apply(record)
   }
 }

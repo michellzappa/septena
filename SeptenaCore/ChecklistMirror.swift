@@ -41,7 +41,7 @@ enum ChecklistMirror {
         "done": done,
         "skipped": skipped,
         "note": state?.note as Any,
-        "time": state?.time as Any,
+        "time": state.map { EventTimestamp.hhmm(from: $0.occurredAt) } as Any,
       ])
     }
 
@@ -89,7 +89,7 @@ enum ChecklistMirror {
           state.done = item.done
           state.skipped = item.skipped
           state.note = item.note
-          state.time = item.time
+          state.occurredAt = EventTimestamp.from(date: response.date, time: item.time)
           state.updatedAt = .now
           if state.modelContext == nil { context.insert(state) }
         } else if let state = statesByID[item.id] {
@@ -153,7 +153,7 @@ enum ChecklistMirror {
             state.done = item.done
             state.skipped = item.skipped
             state.note = item.note
-            state.time = item.time
+            state.occurredAt = EventTimestamp.from(date: day.date, time: item.time)
             state.updatedAt = .now
             if state.modelContext == nil { context.insert(state) }
           }
@@ -299,7 +299,7 @@ enum ChecklistMirror {
         "bucket": def.bucket as Any,
         "done": state?.done ?? false,
         "note": state?.note as Any,
-        "time": state?.time as Any,
+        "time": state.map { EventTimestamp.hhmm(from: $0.occurredAt) } as Any,
       ]
     }
 
@@ -339,7 +339,7 @@ enum ChecklistMirror {
         )
         state.done = item.done
         state.note = item.note
-        state.time = item.time
+        state.occurredAt = EventTimestamp.from(date: response.date, time: item.time)
         state.updatedAt = .now
         if state.modelContext == nil { context.insert(state) }
       } else if let state = statesByID[item.id] {
@@ -398,7 +398,7 @@ enum ChecklistMirror {
           )
           state.done = item.done
           state.note = item.note
-          state.time = item.time
+          state.occurredAt = EventTimestamp.from(date: day.date, time: item.time)
           state.updatedAt = .now
           if state.modelContext == nil { context.insert(state) }
         }
@@ -490,7 +490,7 @@ enum ChecklistMirror {
       row.newDueDate = event.newDueDate
       row.reason = event.reason
       row.note = event.note
-      row.time = event.time
+      row.occurredAt = EventTimestamp.from(date: event.date, time: event.time)
       row.sortKey = "\(event.date)::\(event.recordID)"
       row.updatedAt = .now
       if row.modelContext == nil { context.insert(row) }
@@ -528,7 +528,7 @@ enum ChecklistMirror {
       switch event.action {
       case "complete":
         lastCompleted = event.date
-        lastCompletedTime = event.time
+        lastCompletedTime = EventTimestamp.hhmm(from: event.occurredAt)
         if let next = shift(date: event.date, byDays: def.cadenceDays) {
           dueDate = next
         }
@@ -589,10 +589,8 @@ enum ChecklistMirror {
       seen.insert(entry.id)
       let entity = existingByID[entry.id] ?? GutEventEntity(id: entry.id,
                                                             date: entry.date,
-                                                            time: entry.time,
                                                             bristol: entry.bristol)
       entity.date = entry.date
-      entity.time = entry.time
       entity.bristol = entry.bristol
       entity.blood = entry.blood
       entity.volume = entry.volume
@@ -600,6 +598,7 @@ enum ChecklistMirror {
       entity.discomfortStart = entry.discomfortStart
       entity.discomfortEnd = entry.discomfortEnd
       entity.note = entry.note
+      entity.occurredAt = EventTimestamp.from(date: entry.date, time: entry.time)
       entity.updatedAt = .now
       if entity.modelContext == nil { context.insert(entity) }
     }
@@ -615,7 +614,7 @@ enum ChecklistMirror {
   static func loadGutDay(context: ModelContext, date: String) -> GutDayResponse {
     let entities = (try? context.fetch(FetchDescriptor<GutEventEntity>(
       predicate: #Predicate { $0.date == date },
-      sortBy: [SortDescriptor(\.time)]
+      sortBy: [SortDescriptor(\.occurredAt)]
     ))) ?? []
     var maxBlood = 0
     var totalDiscomfortH: Double = 0
@@ -625,7 +624,7 @@ enum ChecklistMirror {
       if let hours { totalDiscomfortH += hours }
       return GutEntry(id: e.id,
                       date: e.date,
-                      time: e.time,
+                      time: EventTimestamp.hhmm(from: e.occurredAt),
                       bristol: e.bristol,
                       blood: e.blood,
                       volume: e.volume,
@@ -711,14 +710,13 @@ enum ChecklistMirror {
       seenEntries.insert(row.id)
       let entity = entriesByID[row.id] ?? CaffeineEventEntity(id: row.id,
                                                               date: row.date,
-                                                              time: row.time,
                                                               method: row.method)
       entity.date = row.date
-      entity.time = row.time
       entity.method = row.method
       entity.beans = row.beans
       entity.grams = row.grams
       entity.note = row.note
+      entity.occurredAt = EventTimestamp.from(date: row.date, time: row.time)
       entity.updatedAt = .now
       if entity.modelContext == nil { context.insert(entity) }
     }
@@ -746,12 +744,12 @@ enum ChecklistMirror {
   static func loadCaffeineDay(context: ModelContext, date: String) -> CaffeineDayResponse {
     let entities = (try? context.fetch(FetchDescriptor<CaffeineEventEntity>(
       predicate: #Predicate { $0.date == date },
-      sortBy: [SortDescriptor(\.time)]
+      sortBy: [SortDescriptor(\.occurredAt)]
     ))) ?? []
     var totalG: Double = 0
     let entries: [CaffeineEntry] = entities.map { e in
       if let g = e.grams { totalG += g }
-      return CaffeineEntry(id: e.id, time: e.time, method: e.method,
+      return CaffeineEntry(id: e.id, time: EventTimestamp.hhmm(from: e.occurredAt), method: e.method,
                            beans: e.beans, grams: e.grams, note: e.note)
     }
     return CaffeineDayResponse(date: date,
@@ -800,16 +798,15 @@ enum ChecklistMirror {
       seenEntries.insert(row.id)
       let entity = entriesByID[row.id] ?? CannabisEventEntity(id: row.id,
                                                               date: row.date,
-                                                              time: row.time,
                                                               method: row.method)
       entity.date = row.date
-      entity.time = row.time
       entity.method = row.method
       entity.strain = row.strain
       entity.hit = row.hit
       entity.grams = row.grams
       entity.effect = row.effect
       entity.note = row.note
+      entity.occurredAt = EventTimestamp.from(date: row.date, time: row.time)
       entity.updatedAt = .now
       if entity.modelContext == nil { context.insert(entity) }
     }
@@ -822,12 +819,12 @@ enum ChecklistMirror {
   static func loadCannabisDay(context: ModelContext, date: String) -> CannabisDayResponse {
     let entities = (try? context.fetch(FetchDescriptor<CannabisEventEntity>(
       predicate: #Predicate { $0.date == date },
-      sortBy: [SortDescriptor(\.time)]
+      sortBy: [SortDescriptor(\.occurredAt)]
     ))) ?? []
     var totalG: Double = 0
     let entries: [CannabisEntry] = entities.map { e in
       if let g = e.grams { totalG += g }
-      return CannabisEntry(id: e.id, time: e.time, method: e.method,
+      return CannabisEntry(id: e.id, time: EventTimestamp.hhmm(from: e.occurredAt), method: e.method,
                            strain: e.strain, hit: e.hit, grams: e.grams,
                            note: e.note, effect: e.effect)
     }
@@ -952,12 +949,10 @@ enum ChecklistMirror {
       let entity = entriesByFile[id] ?? ExerciseEntryEntity(
         id: id,
         date: row.date,
-        time: Self.deriveTime(from: row.concludedAt),
         sessionType: row.session,
         exercise: row.exercise ?? ""
       )
       entity.date = row.date
-      entity.time = Self.deriveTime(from: row.concludedAt)
       entity.sessionType = row.session
       entity.exercise = row.exercise ?? ""
       entity.weight = row.weight
@@ -969,6 +964,7 @@ enum ChecklistMirror {
       entity.level = row.level
       entity.concludedAt = row.concludedAt
       entity.loggedAt = row.loggedAt
+      entity.occurredAt = EventTimestamp.from(date: row.date, time: Self.deriveTime(from: row.concludedAt))
       entity.updatedAt = .now
       if entity.modelContext == nil { context.insert(entity) }
     }
@@ -1672,10 +1668,10 @@ enum ChecklistMirror {
   static func loadMoodDay(context: ModelContext, date: String) -> MoodDayResponse {
     let entities = (try? context.fetch(FetchDescriptor<MoodEventEntity>(
       predicate: #Predicate { $0.date == date },
-      sortBy: [SortDescriptor(\.time)]
+      sortBy: [SortDescriptor(\.occurredAt)]
     ))) ?? []
     let entries: [MoodEntry] = entities.map { e in
-      MoodEntry(id: e.id, time: e.time, bucket: e.bucket,
+      MoodEntry(id: e.id, time: EventTimestamp.hhmm(from: e.occurredAt), bucket: e.bucket,
                 quadrant: e.quadrant, arousal: e.arousal, valence: e.valence,
                 emotion: e.emotion, note: e.note)
     }

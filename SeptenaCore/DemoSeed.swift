@@ -230,7 +230,7 @@ public enum DemoSeed {
     var n = 0
     func add(_ off: Int, _ type: String, _ ex: String, w: Double? = nil, reps: String? = nil,
              min: Double? = nil, dist: Double? = nil, hour: Int) {
-      let e = ExerciseEntryEntity(id: "demo-ex-\(n)", date: day(off), time: String(format: "%02d:00", hour),
+      let e = ExerciseEntryEntity(id: "demo-ex-\(n)", date: day(off),
                                   sessionType: type, exercise: ex, weight: w, sets: w != nil ? "3" : nil,
                                   reps: reps, durationMin: min, distanceM: dist)
       e.occurredAt = at(off, hour); ctx.insert(e); n += 1
@@ -256,11 +256,11 @@ public enum DemoSeed {
     for d in 0..<days {
       guard let g = grams[d] else { continue }
       let date = day(-d)
-      let am = CaffeineEventEntity(id: "demo-caf-\(d)", date: date, time: "07:40",
+      let am = CaffeineEventEntity(id: "demo-caf-\(d)", date: date,
                                    method: d % 4 == 0 ? "matcha" : "v60", grams: g)
       am.occurredAt = at(-d, 7, 40); ctx.insert(am)
       if late[d] {
-        let pm = CaffeineEventEntity(id: "demo-caf-\(d)-pm", date: date, time: "15:10", method: "v60",
+        let pm = CaffeineEventEntity(id: "demo-caf-\(d)-pm", date: date, method: "v60",
                                      grams: Double(Int(g) - 4))
         pm.occurredAt = at(-d, 15, 10); ctx.insert(pm)
       }
@@ -303,7 +303,7 @@ public enum DemoSeed {
         }
         let h = morning ? 8 : 18
         let e = MoodEventEntity(id: "demo-mood-\(d)-\(k)", date: day(-d),
-                                time: String(format: "%02d:30:00", h), bucket: morning ? "morning" : "evening",
+                                bucket: morning ? "morning" : "evening",
                                 quadrant: quadrant, arousal: arousal, valence: valence, emotion: emotion)
         e.occurredAt = at(-d, h, 30); ctx.insert(e)
       }
@@ -342,7 +342,7 @@ public enum DemoSeed {
   private static func seedGut(_ ctx: ModelContext, _ rng: inout SeededRNG) {
     let bristols = [3, 4, 4, 5, 3, 4, 5, 4, 2, 6]   // mostly healthy 3–5
     for d in 0..<days where rng.chance(0.8) {
-      let e = GutEventEntity(id: "demo-gut-\(d)", date: day(-d), time: "08:20",
+      let e = GutEventEntity(id: "demo-gut-\(d)", date: day(-d),
                              bristol: bristols[rng.int(0, bristols.count - 1)], blood: 0)
       e.occurredAt = at(-d, 8, 20); ctx.insert(e)
     }

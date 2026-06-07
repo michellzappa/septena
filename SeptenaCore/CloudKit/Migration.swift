@@ -746,4 +746,16 @@ enum EventTimestamp {
     }
     return dayOnly.date(from: date) ?? .now
   }
+
+  /// Local "HH:mm" of an instant — the inverse of `from` for the update path:
+  /// when only the day changes we preserve the existing time-of-day by deriving
+  /// it from `occurredAt`, now that the legacy `time` STRING field is retired.
+  static func hhmm(from instant: Date) -> String {
+    let f = DateFormatter()
+    f.calendar = Calendar(identifier: .iso8601)
+    f.locale = Locale(identifier: "en_US_POSIX")
+    f.timeZone = .current
+    f.dateFormat = "HH:mm"
+    return f.string(from: instant)
+  }
 }

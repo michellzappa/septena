@@ -1051,7 +1051,7 @@ final class ChecklistMutator {
     // CloudKit on first toggle. Display code already treats "" the same
     // as nil (both render as "no note").
     state.note = ""
-    state.time = SeptenaDate.nowHHMM
+    state.occurredAt = EventTimestamp.from(date: date, time: SeptenaDate.nowHHMM)
     state.updatedAt = .now
     if state.modelContext == nil { context.insert(state) }
     commitSupplementEvent(state, op: "toggle")
@@ -1107,8 +1107,8 @@ final class ChecklistMutator {
                                  date: date,
                                  reason: "",
                                  note: "",
-                                 time: SeptenaDate.nowHHMM,
                                  sortKey: sortKey(for: date))
+    event.occurredAt = EventTimestamp.from(date: date, time: SeptenaDate.nowHHMM)
     context.insert(event)
     commitChoreEvent(event, op: "complete")
   }
@@ -1122,6 +1122,7 @@ final class ChecklistMutator {
                                  reason: mode,
                                  note: "",
                                  sortKey: sortKey(for: today))
+    event.occurredAt = EventTimestamp.from(date: today, time: SeptenaDate.nowHHMM)
     context.insert(event)
     commitChoreEvent(event, op: "defer")
   }
@@ -1171,7 +1172,7 @@ final class ChecklistMutator {
     // register with CloudKit on first write. `time` stays nil when absent —
     // empty isn't a valid HH:MM. Display code treats "" the same as nil.
     state.note = normalizedNote ?? ""
-    state.time = normalizedTime
+    state.occurredAt = EventTimestamp.from(date: date, time: normalizedTime)
     state.updatedAt = .now
     if state.modelContext == nil { context.insert(state) }
     commitHabitEvent(state, op: "state")
@@ -1282,7 +1283,6 @@ final class ChecklistMutator {
   }
 
   private func commitHabitEvent(_ entity: HabitDayStateEntity, op: String) {
-    entity.occurredAt = EventTimestamp.from(date: entity.date, time: entity.time)
     saveContext("CK habit event \(op)")
     ckEngine?.noteHabitEventChange(id: entity.id)
     postChecklistChanged()
@@ -1295,7 +1295,6 @@ final class ChecklistMutator {
   }
 
   private func commitSupplementEvent(_ entity: SupplementDayStateEntity, op: String) {
-    entity.occurredAt = EventTimestamp.from(date: entity.date, time: entity.time)
     saveContext("CK supplement event \(op)")
     ckEngine?.noteSupplementEventChange(id: entity.id)
     postChecklistChanged()
@@ -1308,7 +1307,6 @@ final class ChecklistMutator {
   }
 
   private func commitChoreEvent(_ entity: ChoreEventEntity, op: String) {
-    entity.occurredAt = EventTimestamp.from(date: entity.date, time: entity.time)
     saveContext("CK chore event \(op)")
     ckEngine?.noteChoreEventChange(id: entity.id)
     postChecklistChanged()
@@ -1476,7 +1474,6 @@ final class GutMutator {
     let id = uniqueID()
     let entity = GutEventEntity(id: id,
                                 date: date,
-                                time: time,
                                 bristol: bristol,
                                 blood: blood,
                                 volume: volume,
@@ -1484,6 +1481,7 @@ final class GutMutator {
                                 discomfortStart: discomfortStart,
                                 discomfortEnd: discomfortEnd,
                                 note: note)
+    entity.occurredAt = EventTimestamp.from(date: date, time: time)
     context.insert(entity)
     commit(entity, op: "create")
     return entity
@@ -1501,7 +1499,6 @@ final class GutMutator {
                    note: String?? = nil) {
     guard let entity = fetch(id: id) else { return }
     if let date { entity.date = date }
-    if let time { entity.time = time }
     if let bristol { entity.bristol = bristol }
     if let blood { entity.blood = blood }
     if let volume { entity.volume = volume }
@@ -1509,6 +1506,12 @@ final class GutMutator {
     if let discomfortStart { entity.discomfortStart = discomfortStart }
     if let discomfortEnd { entity.discomfortEnd = discomfortEnd }
     if let note { entity.note = note }
+    // `time` STRING retired: fold a day/time change into the canonical
+    // occurredAt, deriving the unspecified half from the existing instant.
+    if date != nil || time != nil {
+      let t = time ?? EventTimestamp.hhmm(from: entity.occurredAt)
+      entity.occurredAt = EventTimestamp.from(date: entity.date, time: t)
+    }
     entity.updatedAt = .now
     commit(entity, op: "update")
   }
@@ -1536,7 +1539,6 @@ final class GutMutator {
   }
 
   private func commit(_ entity: GutEventEntity, op: String) {
-    entity.occurredAt = EventTimestamp.from(date: entity.date, time: entity.time)
     saveContext("CK gut \(op)")
     ckEngine?.noteGutEventChange(id: entity.id)
     postChanged()
@@ -1581,11 +1583,11 @@ final class CaffeineMutator {
     let id = uniqueEntryID()
     let entity = CaffeineEventEntity(id: id,
                                      date: date,
-                                     time: time,
                                      method: method,
                                      beans: beans,
                                      grams: grams,
                                      note: note)
+    entity.occurredAt = EventTimestamp.from(date: date, time: time)
     context.insert(entity)
     commitEntry(entity, op: "create")
     return entity
@@ -1600,11 +1602,15 @@ final class CaffeineMutator {
                    note: String?? = nil) {
     guard let entity = fetchEntry(id: id) else { return }
     if let date { entity.date = date }
-    if let time { entity.time = time }
     if let method { entity.method = method }
     if let beans { entity.beans = beans }
     if let grams { entity.grams = grams }
     if let note { entity.note = note }
+    // `time` STRING retired: fold a day/time change into the canonical occurredAt.
+    if date != nil || time != nil {
+      let t = time ?? EventTimestamp.hhmm(from: entity.occurredAt)
+      entity.occurredAt = EventTimestamp.from(date: entity.date, time: t)
+    }
     entity.updatedAt = .now
     commitEntry(entity, op: "update")
   }
@@ -1685,7 +1691,6 @@ final class CaffeineMutator {
   }
 
   private func commitEntry(_ entity: CaffeineEventEntity, op: String) {
-    entity.occurredAt = EventTimestamp.from(date: entity.date, time: entity.time)
     saveContext("CK caffeine \(op)")
     ckEngine?.noteCaffeineEventChange(id: entity.id)
     postChanged()
@@ -1745,12 +1750,12 @@ final class CannabisMutator {
     let resolvedGrams = grams ?? (method == "vape" ? Self.gramsPerVapeUse : nil)
     let entity = CannabisEventEntity(id: id,
                                      date: date,
-                                     time: time,
                                      method: method,
                                      hit: hit,
                                      grams: resolvedGrams,
                                      effect: effect,
                                      note: note)
+    entity.occurredAt = EventTimestamp.from(date: date, time: time)
     context.insert(entity)
     commitEntry(entity, op: "create")
     return entity
@@ -1766,12 +1771,16 @@ final class CannabisMutator {
                    note: String?? = nil) {
     guard let entity = fetchEntry(id: id) else { return }
     if let date { entity.date = date }
-    if let time { entity.time = time }
     if let method { entity.method = method }
     if let hit { entity.hit = hit }
     if let grams { entity.grams = grams }
     if let effect { entity.effect = effect }
     if let note { entity.note = note }
+    // `time` STRING retired: fold a day/time change into the canonical occurredAt.
+    if date != nil || time != nil {
+      let t = time ?? EventTimestamp.hhmm(from: entity.occurredAt)
+      entity.occurredAt = EventTimestamp.from(date: entity.date, time: t)
+    }
     entity.updatedAt = .now
     commitEntry(entity, op: "update")
   }
@@ -1801,7 +1810,6 @@ final class CannabisMutator {
   }
 
   private func commitEntry(_ entity: CannabisEventEntity, op: String) {
-    entity.occurredAt = EventTimestamp.from(date: entity.date, time: entity.time)
     saveContext("CK cannabis \(op)")
     ckEngine?.noteCannabisEventChange(id: entity.id)
     postChanged()
@@ -2017,7 +2025,6 @@ final class TrainingMutator {
     let entity = ExerciseEntryEntity(
       id: id,
       date: date,
-      time: time,
       sessionType: sessionType,
       exercise: CanonicalExerciseName.forStorage(exercise),
       weight: weight,
@@ -2031,6 +2038,7 @@ final class TrainingMutator {
       concludedAt: concludedAt,
       loggedAt: ISO8601DateFormatter().string(from: Date())
     )
+    entity.occurredAt = EventTimestamp.from(date: date, time: time)
     context.insert(entity)
     commitEntry(entity, op: "create")
     return entity
@@ -2250,7 +2258,6 @@ final class TrainingMutator {
   }
 
   private func commitEntry(_ entity: ExerciseEntryEntity, op: String) {
-    entity.occurredAt = EventTimestamp.from(date: entity.date, time: entity.time)
     saveContext("CK exercise entry \(op)")
     ckEngine?.noteExerciseEntryChange(id: entity.id)
     postChanged()
@@ -2559,7 +2566,6 @@ final class MoodMutator {
     let id = uniqueEntryID()
     let entity = MoodEventEntity(id: id,
                                  date: date,
-                                 time: time,
                                  bucket: Self.bucket(for: time),
                                  quadrant: quadrant,
                                  arousal: arousal,
@@ -2595,16 +2601,17 @@ final class MoodMutator {
     let needsHKSync = date != nil || time != nil || quadrant != nil || valence != nil || emotion != nil
     let oldHKID = needsHKSync ? entity.hkSampleID : nil
     if let date { entity.date = date }
-    if let time {
-      entity.time = time
-      entity.bucket = Self.bucket(for: time)
-    }
+    if let time { entity.bucket = Self.bucket(for: time) }
     if let quadrant { entity.quadrant = quadrant }
     if let arousal { entity.arousal = arousal }
     if let valence { entity.valence = valence }
     if let emotion { entity.emotion = emotion }
     if let note { entity.note = (note?.isEmpty ?? true) ? nil : note }
-    entity.occurredAt = EventTimestamp.from(date: entity.date, time: entity.time)
+    // `time` STRING retired: fold a day/time change into the canonical occurredAt.
+    if date != nil || time != nil {
+      let t = time ?? EventTimestamp.hhmm(from: entity.occurredAt)
+      entity.occurredAt = EventTimestamp.from(date: entity.date, time: t)
+    }
     entity.updatedAt = .now
     if needsHKSync {
       entity.hkSampleID = nil
