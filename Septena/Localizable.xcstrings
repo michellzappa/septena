@@ -912,6 +912,9 @@
         }
       }
     },
+    "Adding to %@" : {
+
+    },
     "After completion" : {
       "localizations" : {
         "pt-BR" : {
@@ -3163,6 +3166,9 @@
           }
         }
       }
+    },
+    "New Task" : {
+
     },
     "Next" : {
       "localizations" : {

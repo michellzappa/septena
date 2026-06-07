@@ -161,6 +161,12 @@ struct TaskListView: View {
   // (Claude does the heavy task work), so there's no inline editing surface.
   @State private var editingDetail: SeptenaTask?
 
+  // Drives the focused "New Task" compose modal opened by the `+` toolbar
+  // button (and ⌘N, and the sidebar "New To-Do"). A dedicated composer — not
+  // the app-wide capture / quick-find sheet — so creating from a list lands
+  // the task in that list's context with no search surface in the way.
+  @State private var creating = false
+
   // When picker. Use a single Identifiable item so the sheet's kind
   // is intrinsic to the presentation — avoids stale-state races where
   // tapping "When" could open the prior "Deadline" pane.
@@ -257,17 +263,22 @@ struct TaskListView: View {
     .scrollDismissesKeyboard(.interactively)
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
+        // Identical to the drawer's action button (`DrawerActionButton`): a
+        // plain Button + `.glassProminent` + section tint, so the system draws
+        // the same prominent accent circle — no custom circle-in-a-pill.
         Button {
           SeptenaLog.info("[Create] + button tapped filter=\(String(describing: filter))")
           nav.shouldStartCreating = true
         } label: {
           Image(systemName: "plus")
         }
+        .buttonStyle(.glassProminent)
+        .tint(theme.color(for: "tasks"))
         .accessibilityLabel("New Task")
       }
     }
-    // The `+` toolbar button (and ⌘N, and the sidebar "New To-Do") route to
-    // the app's standard capture sheet via `shouldStartCreating`.
+    // The `+` toolbar button (and ⌘N, and the sidebar "New To-Do") open the
+    // focused new-task composer via `shouldStartCreating` → `startCreate()`.
     .modifier(KeyboardNavigationModifier(
       isInputMode: false,
       hasSelection: !selection.isEmpty,
@@ -323,7 +334,7 @@ struct TaskListView: View {
       if !editing { selection.removeAll() }
     }
     // Consume the global "start a new task" trigger (⌘N / + / sidebar menu) by
-    // opening the app's standard capture sheet, focused on the Tasks section.
+    // opening the focused new-task composer, scoped to the current list.
     .onChange(of: nav.shouldStartCreating) { _, _ in
       guard nav.shouldStartCreating else { return }
       nav.shouldStartCreating = false
@@ -335,14 +346,32 @@ struct TaskListView: View {
         startCreate()
       }
     }
+    // Floating new-task capture. A glass card anchored near the top rather
+    // than a bottom sheet — so opening the keyboard can never push it to full
+    // height; it just floats above the dimmed list. Commits straight through
+    // the mutator into the current list's bucket (Today pins to today,
+    // Upcoming schedules tomorrow, a Project/Area files it there).
+    .overlay {
+      if creating {
+        QuickTaskCapture(
+          filter: filter,
+          areas: areas,
+          projects: projects,
+          accent: theme.color(for: "tasks"),
+          onDismiss: { withAnimation(.snappy(duration: 0.2)) { creating = false } },
+          onDone: { Task { await load() } }
+        )
+        .transition(.opacity)
+      }
+    }
   }
 
-  /// Open the app-wide capture sheet (`AddInfoSheet`) focused on Tasks. The
-  /// agent-first model means quick capture is the human's main create path;
-  /// the sheet commits on submit, so there are no leftover placeholder rows.
+  /// Open the floating new-task capture card (`QuickTaskCapture`) for the
+  /// current list. Unlike the app-wide capture sheet, this is a plain compose
+  /// field — title + the list it lands in — with no search/quick-find surface;
+  /// it commits on submit, so there are no leftover placeholder rows.
   private func startCreate() {
-    nav.addInfoRequestedSection = .tasks
-    nav.showAddInfo = true
+    withAnimation(.snappy(duration: 0.25)) { creating = true }
   }
 
   private var taskListContent: some View {
@@ -727,7 +756,7 @@ struct TaskListView: View {
     TaskRowView(
       task: task,
       filter: filter,
-      accent: theme.accent,
+      accent: theme.color(for: "tasks"),
       metaLine: { metaLine(task) },
       trailingDate: { trailingDate(task) },
       onToggle: { toggle(task) }
@@ -851,7 +880,7 @@ struct TaskListView: View {
   private func rowBackground(for task: SeptenaTask) -> some View {
     let isActive = editingDetail?.id == task.id
     RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
-      .fill(isActive ? theme.accent.opacity(0.18) : .clear)
+      .fill(isActive ? theme.color(for: "tasks").opacity(0.18) : .clear)
       .padding(.horizontal, Theme.hPadding - 6)
   }
 
@@ -1431,6 +1460,150 @@ struct TaskListView: View {
   }
 
 }
+
+// MARK: - New task capture
+
+/// Floating glass capture card opened by the Tasks tab's `+` (and ⌘N, and the
+/// sidebar "New To-Do"). Anchored near the top over a dimmed scrim rather than
+/// presented as a bottom sheet — so the keyboard can never resize it to full
+/// height; it simply floats above the list. Unlike the app-wide capture sheet
+/// (which surfaces a search/quick-find list of existing tasks), this is a
+/// single compose field plus a caption naming the list the task lands in. The
+/// destination is derived from the list you're standing in: Today pins to
+/// today, Upcoming schedules tomorrow, Someday demotes, and a Project / Area
+/// page files the task there. Deeper scheduling lives in the row editor.
+private struct QuickTaskCapture: View {
+  let filter: TaskFilter
+  let areas: [Area]
+  let projects: [Project]
+  let accent: Color
+  let onDismiss: () -> Void
+  let onDone: () -> Void
+
+  @Environment(TaskMutator.self) private var mutator
+  @State private var title = ""
+  @State private var notes = ""
+  @FocusState private var focused: Bool
+
+  private var canAdd: Bool {
+    !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
+  var body: some View {
+    ZStack(alignment: .top) {
+      // Dimmed scrim — tap anywhere outside the card to cancel.
+      Color.black.opacity(0.22)
+        .ignoresSafeArea()
+        .contentShape(Rectangle())
+        .onTapGesture { onDismiss() }
+
+      VStack(alignment: .leading, spacing: 12) {
+        HStack {
+          Text("New Task")
+            .font(.septenaSectionTitle)
+            .foregroundStyle(Theme.inkPrimary)
+          Spacer()
+          Text("Adding to \(destinationLabel)")
+            .font(.septenaMeta)
+            .foregroundStyle(Theme.inkSecondary)
+        }
+
+        VStack(alignment: .leading, spacing: 8) {
+          HStack(spacing: 10) {
+            TextField("What needs doing?", text: $title)
+              .textFieldStyle(.plain)
+              .font(.septenaTaskTitle)
+              .focused($focused)
+              .submitLabel(.done)
+              .onSubmit { if canAdd { add() } }
+
+            Button(action: add) {
+              Image(systemName: "arrow.up.circle.fill")
+                .font(.system(size: 26))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(canAdd ? accent : Theme.inkSecondary.opacity(0.4))
+            }
+            .buttonStyle(.plain)
+            .disabled(!canAdd)
+          }
+
+          Divider()
+
+          // Optional notes — room to paste or explain context. Grows up to a
+          // few lines; deeper editing still lives in the row editor.
+          TextField("Notes or pasted context (optional)", text: $notes, axis: .vertical)
+            .textFieldStyle(.plain)
+            .font(.septenaNotes)
+            .foregroundStyle(Theme.inkSecondary)
+            .lineLimit(1...5)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(Theme.secondaryGroupedBackground,
+                    in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+      }
+      .padding(16)
+      .background(.ultraThinMaterial,
+                  in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+      .overlay(
+        RoundedRectangle(cornerRadius: 22, style: .continuous)
+          .strokeBorder(Color.white.opacity(0.12))
+      )
+      .shadow(color: .black.opacity(0.20), radius: 22, y: 10)
+      .padding(.horizontal, 14)
+      .padding(.top, 8)
+    }
+    .onAppear { focused = true }
+  }
+
+  /// Human label for the list the new task lands in — shown beside the title so
+  /// the destination is verifiable before committing.
+  private var destinationLabel: String {
+    switch filter {
+    case .today:    return "Today"
+    case .upcoming: return "Upcoming"
+    case .someday:  return "Someday"
+    case .project(let id):
+      return projects.first(where: { $0.id == id })?.title ?? "Inbox"
+    case .area(let id):
+      return areas.first(where: { $0.id == id })?.title ?? "Inbox"
+    case .inbox, .unscheduled, .logbook:
+      return "Inbox"
+    }
+  }
+
+  /// Commit through the mutator with the destination derived from `filter`,
+  /// mirroring the bucket mapping the capture sheet's `AddTaskPage` used.
+  private func add() {
+    let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+    let scheduled: Date? = {
+      if case .upcoming = filter {
+        return Calendar.current.date(byAdding: .day, value: 1, to: .now)
+      }
+      return nil
+    }()
+    let today: Bool = { if case .today = filter { return true }; return false }()
+    let status: String? = { if case .someday = filter { return "someday" }; return nil }()
+    let area: String? = { if case .area(let id) = filter { return id }; return nil }()
+    let project: String? = { if case .project(let id) = filter { return id }; return nil }()
+    mutator.create(
+      title: trimmed,
+      area: area,
+      project: project,
+      scheduled: scheduled,
+      today: today,
+      notes: trimmedNotes.isEmpty ? nil : trimmedNotes,
+      status: status
+    )
+    AddInfoSection.tasks.notifyTilesChanged()
+    Haptics.tick()
+    onDone()
+    onDismiss()
+  }
+}
+
 /// Compact tappable target for area / project section headers inside a list.
 /// Wraps just the title (and optional chevron) so the click target matches the
 /// visible text rather than the whole row width. Lights up with a subtle hover
