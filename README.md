@@ -94,7 +94,7 @@ Production CloudKit API token's URL Redirect: `https://mcp.septena.app/auth/appl
 - [ ] First live test with `wrangler dev` + tunnel + claude.ai connector
 - [x] Initial MCP tools: `tasks_list`, `tasks_create`, `tasks_complete`, `tasks_update`, `tasks_defer`, `tasks_move_to_today`, `tasks_list_projects`, `tasks_list_areas`, `sections_list`
 - [ ] Search tools
-- [ ] Re-auth UX when CloudKit returns 401 (token expired)
+- [x] Re-auth UX when CloudKit returns 401 (token expired) — user-bound bearers now degrade to an **in-band** tool error (`isError: true`) instead of a hard 401, so Claude's connector stays connected and self-heals on the next call once the app re-mints the token (paired with the app's "Keep Claude connected" nudge). Legacy bootstrap-only bearers still get the discovery 401.
 - [ ] `claude://` deep-link button on septena.app
 - [ ] Promote CloudKit schema to Production + production API token
 - [ ] Additional domains: chores, nutrition, training, groceries, caffeine, cannabis
