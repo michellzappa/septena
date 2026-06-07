@@ -162,7 +162,11 @@ struct SectionDrawer<Content: View>: View {
       // Spacing/margins tuned to match insetGrouped List: ~20pt screen
       // inset and ~28pt between sections so the page breathes the same
       // way the old List did.
-      LazyVStack(spacing: Theme.Spacing.xxl) {
+      // The chrome (time-travel pill, goals strip, settings footer, failure
+      // state) stays full-width; only the destination's section cards flow
+      // into columns via `DrawerColumns`. A plain VStack here — the lazy,
+      // column-aware stacking now lives inside `DrawerColumns`.
+      VStack(spacing: Theme.Spacing.xxl) {
         // While viewing a past day, surface a slim pill under the title so
         // the time-travel context is never invisible — tap it to reopen the
         // picker or jump back to today. On today the drawer stays clean and
@@ -177,7 +181,12 @@ struct SectionDrawer<Content: View>: View {
         if case .failed(let message) = loadState {
           failedView(message)
         } else {
-          content()
+          // On a regular-width pane (iPad / Mac) the section cards spread
+          // across up to two columns; on iPhone (and any narrow pane) they
+          // stay a single lazy column, exactly as before.
+          DrawerColumns(spacing: Theme.Spacing.xxl) {
+            content()
+          }
           if showsSettingsLink, !isTimeTraveling,
              !resolvedTitle.isEmpty, SectionManifest.byKey[sectionKey] != nil {
             SectionSettingsLink(sectionTitle: resolvedTitle) { showingSettings = true }
@@ -649,6 +658,11 @@ struct AdaptiveEditScaffold<FormContent: View>: View {
     } else {
       NavigationStack {
         content()
+          // A default-styled macOS `Form` reports no flexible height, so in
+          // this sheet branch it collapses to no apparent height. Grouped (the
+          // app's house style, and already the iOS Form default) scrolls and
+          // fills the sheet. Centralized here so no individual form repeats it.
+          .formStyle(.grouped)
           .navigationTitle(title)
           #if os(iOS)
           .navigationBarTitleDisplayMode(.inline)
@@ -882,5 +896,106 @@ struct DrawerSection<Content: View>: View {
                          .padding(.vertical, Theme.Spacing.sm)
     case .none:     stack
     }
+  }
+}
+
+/// Lays the drawer's section cards out in one column on a narrow pane and up
+/// to two on a wide one (iPad / Mac). On compact width (iPhone) it stays the
+/// original lazy single column so the phone layout is byte-for-byte unchanged;
+/// on regular width it hands the cards to `MasonryLayout`, which itself decides
+/// 1-vs-2 columns from the *actual* available width. That width gate — not the
+/// size class alone — is what keeps the narrow 560pt Mac sheet and iPad
+/// slide-over single-column while a full-width pane goes two-up.
+struct DrawerColumns<Content: View>: View {
+  /// Gap between stacked cards and between the two columns. Matches the
+  /// drawer's between-section spacing so the board reads as one rhythm.
+  var spacing: CGFloat
+  /// Cards narrower than this never get a second column — below `2 × min +
+  /// spacing` of available width the layout collapses to a single column.
+  var minColumnWidth: CGFloat = 330
+  @ViewBuilder var content: () -> Content
+
+  #if !os(macOS)
+  @Environment(\.horizontalSizeClass) private var hSize
+  #endif
+
+  var body: some View {
+    #if os(macOS)
+    // macOS has no compact width; always offer the width-driven board.
+    masonry
+    #else
+    if hSize == .regular {
+      masonry
+    } else {
+      // iPhone path — untouched: lazy single column.
+      LazyVStack(spacing: spacing) { content() }
+    }
+    #endif
+  }
+
+  private var masonry: some View {
+    MasonryLayout(spacing: spacing, minColumnWidth: minColumnWidth, maxColumns: 2) {
+      content()
+    }
+  }
+}
+
+/// A balanced masonry `Layout`: each subview is placed into the currently
+/// shortest column, so variable-height cards pack tightly instead of leaving
+/// the per-row gaps a `LazyVGrid` would. The column count is derived from the
+/// proposed width (`minColumnWidth`, capped at `maxColumns`), so the same
+/// layout renders one column on a narrow pane and two on a wide one without a
+/// size-class branch at the call site.
+struct MasonryLayout: Layout {
+  var spacing: CGFloat
+  var minColumnWidth: CGFloat
+  var maxColumns: Int
+
+  func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> CGSize {
+    let width = proposal.replacingUnspecifiedDimensions().width
+    let cols = columnCount(for: width)
+    let colWidth = columnWidth(for: width, columns: cols)
+    var heights = Array(repeating: CGFloat.zero, count: cols)
+    for subview in subviews {
+      let h = subview.sizeThatFits(.init(width: colWidth, height: nil)).height
+      let c = shortestIndex(heights)
+      heights[c] += h + spacing
+    }
+    // Each column accumulated one trailing `spacing` too many; drop it.
+    let tallest = heights.map { max($0 - spacing, 0) }.max() ?? 0
+    return CGSize(width: width, height: tallest)
+  }
+
+  func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
+    let cols = columnCount(for: bounds.width)
+    let colWidth = columnWidth(for: bounds.width, columns: cols)
+    var heights = Array(repeating: CGFloat.zero, count: cols)
+    for subview in subviews {
+      let size = subview.sizeThatFits(.init(width: colWidth, height: nil))
+      let c = shortestIndex(heights)
+      let x = bounds.minX + CGFloat(c) * (colWidth + spacing)
+      let y = bounds.minY + heights[c]
+      subview.place(at: CGPoint(x: x, y: y),
+                    anchor: .topLeading,
+                    proposal: .init(width: colWidth, height: size.height))
+      heights[c] += size.height + spacing
+    }
+  }
+
+  private func columnCount(for width: CGFloat) -> Int {
+    guard width > 0 else { return 1 }
+    let fit = Int(floor((width + spacing) / (minColumnWidth + spacing)))
+    return max(1, min(maxColumns, fit))
+  }
+
+  private func columnWidth(for width: CGFloat, columns: Int) -> CGFloat {
+    let n = CGFloat(max(columns, 1))
+    return (width - spacing * (n - 1)) / n
+  }
+
+  private func shortestIndex(_ heights: [CGFloat]) -> Int {
+    var best = 0
+    for i in heights.indices where heights[i] < heights[best] { best = i }
+    return best
   }
 }
