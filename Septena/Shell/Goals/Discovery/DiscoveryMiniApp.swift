@@ -66,5 +66,6 @@ enum DiscoveryRegistry {
     IkigaiMiniApp.descriptor,
     ValuesMiniApp.descriptor,
     VirtueMiniApp.descriptor,
+    CoachMiniApp.descriptor,
   ]
 }

@@ -1,9 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "  ↳ %@" : {
-
-    },
     "·" : {
       "shouldTranslate" : false
     },
@@ -4758,6 +4755,9 @@
           }
         }
       }
+    },
+    "Thinking…" : {
+
     },
     "This category is turned off in Apple Health. To allow it, open Health → Profile → Apps → Septena." : {
       "localizations" : {
