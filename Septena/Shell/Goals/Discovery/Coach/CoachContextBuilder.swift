@@ -39,7 +39,8 @@ enum CoachContextBuilder {
   /// All section keys a coach can summarize. `CoachDomain.wholeLife`
   /// (sectionKeys == nil) sees this whole list; other presets pick a slice.
   static let supportedKeys = ["training", "nutrition", "hydration", "supplements",
-                              "gut", "tasks", "chores", "habits", "caffeine", "cannabis"]
+                              "sleep", "body", "mood", "gut", "tasks", "chores",
+                              "habits", "caffeine", "cannabis"]
 
   /// A compact facts block for the preset + window, safe to paste into a
   /// prompt. `excluding` drops sections the user toggled off — the model
@@ -56,16 +57,55 @@ enum CoachContextBuilder {
       if produced.isEmpty { missing.append(key) } else { lines.append(contentsOf: produced) }
     }
 
-    guard !lines.isEmpty else {
-      return "FACTS: nothing was logged in the last \(window.label) (\(r.from) → \(r.to)) for this area."
+    var blocks: [String] = []
+    if lines.isEmpty {
+      blocks.append("FACTS: nothing was logged in the last \(window.label) (\(r.from) → \(r.to)) for this area.")
+    } else {
+      var f = "FACTS (trailing \(window.label), \(r.from) → \(r.to) — computed locally, treat as ground truth):\n"
+      f += lines.joined(separator: "\n")
+      if !missing.isEmpty { f += "\nNo data this window: \(missing.joined(separator: ", "))." }
+      blocks.append(f)
     }
 
-    var out = "FACTS (trailing \(window.label), \(r.from) → \(r.to) — computed locally, treat as ground truth):\n"
-    out += lines.joined(separator: "\n")
-    if !missing.isEmpty {
-      out += "\nNo data this window: \(missing.joined(separator: ", "))."
+    // Goals related to the in-scope sections — so the coach reflects against
+    // the person's actual targets, not just raw numbers.
+    let goals = goalLines(relatedTo: Set(keys), context)
+    if !goals.isEmpty {
+      blocks.append("""
+        GOALS — targets the person SET for themselves (aspirations, NOT logged events). \
+        Format is "goal text" — current / comparator target. Encourage progress; never \
+        treat a goal as something that already happened:
+        """ + "\n" + goals.joined(separator: "\n"))
     }
-    return out
+
+    return blocks.joined(separator: "\n\n")
+  }
+
+  // MARK: - Goals
+
+  private static func goalLines(relatedTo keys: Set<String>, _ ctx: ModelContext) -> [String] {
+    let goals = LocalCache.goals(in: ctx).filter { g in
+      g.sections.contains(where: keys.contains)
+        || (g.metricKey.flatMap { GoalMetricCatalog.sectionKey(for: $0) }.map(keys.contains) == true)
+    }
+    guard !goals.isEmpty else { return [] }
+    return goals.prefix(8).map { g in
+      if let p = GoalMetricEvaluator.evaluate(goal: g, context: ctx) {
+        return "- \"\(g.text)\" — \(goalCaption(p))"
+      }
+      return "- \"\(g.text)\""
+    }
+  }
+
+  private static func goalCaption(_ p: GoalMetricProgress) -> String {
+    let cmp = p.comparator == "lte" ? "≤" : (p.comparator == "eq" ? "=" : "≥")
+    var s = "\(num(p.current)) / \(cmp) \(num(p.target)) \(p.unitLabel)"
+    if p.hit { s += " (met)" }
+    return s
+  }
+
+  private static func num(_ v: Double) -> String {
+    v == v.rounded() ? String(Int(v)) : String(format: "%.1f", v)
   }
 
   /// The sections in this preset+window that actually have data, with entry
@@ -104,6 +144,9 @@ enum CoachContextBuilder {
     case "training":    return training(w, r, ctx)
     case "nutrition":   return nutrition(w, r, ctx)
     case "hydration":   return hydration(w, r, ctx)
+    case "sleep":       return sleep(w, r, ctx)
+    case "mood":        return mood(w, r, ctx)
+    case "body":        return body(w, r, ctx)
     case "supplements": return adherence(SupplementDefinitionEntity.self, SupplementDayStateEntity.self,
                                          label: "Supplements", taken: "taken", w, r, ctx) { $0.date } done: { $0.done }
     case "habits":      return adherence(HabitDefinitionEntity.self, HabitDayStateEntity.self,
@@ -154,6 +197,39 @@ enum CoachContextBuilder {
     let dayKeys = Set(withWater.map { dayString($0.loggedAt) })
     let perDay = totalMl / Double(w.days)
     return ["- Hydration: ~\(Int(perDay.rounded())) ml/day over \(dayKeys.count)/\(w.days) days logged"]
+  }
+
+  private static func sleep(_ w: CoachWindow, _ r: Range, _ ctx: ModelContext) -> [String] {
+    let nights = fetchDated(OuraNightEntity.self, r, ctx) { $0.id }
+    guard !nights.isEmpty else { return [] }
+    let hours = nights.compactMap(\.totalH)
+    let scores = nights.compactMap(\.sleepScore)
+    var t = "Sleep: \(nights.count) nights over \(w.days) days"
+    if !hours.isEmpty { t += ", avg \(oneDecimal(hours.reduce(0, +) / Double(hours.count)))h" }
+    if !scores.isEmpty { t += ", avg score \(Int((Double(scores.reduce(0, +)) / Double(scores.count)).rounded()))" }
+    return ["- \(t)"]
+  }
+
+  private static func mood(_ w: CoachWindow, _ r: Range, _ ctx: ModelContext) -> [String] {
+    let mood = fetchDated(MoodEventEntity.self, r, ctx) { $0.date }
+    guard !mood.isEmpty else { return [] }
+    let days = Set(mood.map(\.date)).count
+    let avgValence = Double(mood.reduce(0) { $0 + $1.valence }) / Double(mood.count)
+    return ["- Mood: \(mood.count) check-ins over \(days)/\(w.days) days (avg valence \(oneDecimal(avgValence))/3, higher = more pleasant)"]
+  }
+
+  private static func body(_ w: CoachWindow, _ r: Range, _ ctx: ModelContext) -> [String] {
+    let rows = fetchDated(WithingsRowEntity.self, r, ctx) { $0.id }.sorted { $0.id < $1.id }
+    let weights = rows.compactMap { row in row.weightKg.map { (row.id, $0) } }
+    guard !weights.isEmpty else { return [] }
+    let first = weights.first!.1, last = weights.last!.1
+    var t = "Body: \(weights.count) weigh-ins, latest \(oneDecimal(last))kg"
+    if weights.count > 1 {
+      let d = last - first
+      t += " (\(d >= 0 ? "+" : "")\(oneDecimal(d))kg over window)"
+    }
+    if let fat = rows.compactMap(\.fatPct).last { t += ", body fat \(oneDecimal(fat))%" }
+    return ["- \(t)"]
   }
 
   private static func gut(_ w: CoachWindow, _ r: Range, _ ctx: ModelContext) -> [String] {
@@ -226,6 +302,9 @@ enum CoachContextBuilder {
     case "training":    return fetchDated(ExerciseEntryEntity.self, r, ctx) { $0.date }.count
     case "nutrition":   return fetchNutrition(r, ctx).filter { $0.foods.lowercased() != "water" }.count
     case "hydration":   return fetchNutrition(r, ctx).filter { ($0.waterMl ?? 0) > 0 }.count
+    case "sleep":       return fetchDated(OuraNightEntity.self, r, ctx) { $0.id }.count
+    case "mood":        return fetchDated(MoodEventEntity.self, r, ctx) { $0.date }.count
+    case "body":        return fetchDated(WithingsRowEntity.self, r, ctx) { $0.id }.count
     case "supplements": return fetchDated(SupplementDayStateEntity.self, r, ctx) { $0.date }.filter(\.done).count
     case "habits":      return fetchDated(HabitDayStateEntity.self, r, ctx) { $0.date }.filter(\.done).count
     case "gut":         return fetchDated(GutEventEntity.self, r, ctx) { $0.date }.count
@@ -241,6 +320,7 @@ enum CoachContextBuilder {
     switch key {
     case "training": return "Training"; case "nutrition": return "Nutrition"
     case "hydration": return "Hydration"; case "supplements": return "Supplements"
+    case "sleep": return "Sleep"; case "mood": return "Mood"; case "body": return "Body"
     case "habits": return "Habits"; case "gut": return "Gut"
     case "tasks": return "Tasks"; case "chores": return "Chores"
     case "caffeine": return "Caffeine"; case "cannabis": return "Cannabis"
@@ -252,6 +332,7 @@ enum CoachContextBuilder {
     switch key {
     case "training": return "figure.run"; case "nutrition": return "fork.knife"
     case "hydration": return "drop.fill"; case "supplements": return "pills.fill"
+    case "sleep": return "bed.double"; case "mood": return "face.smiling"; case "body": return "scalemass"
     case "habits": return "repeat"; case "gut": return "stethoscope"
     case "tasks": return "checklist"; case "chores": return "house.fill"
     case "caffeine": return "cup.and.saucer.fill"; case "cannabis": return "leaf.fill"
