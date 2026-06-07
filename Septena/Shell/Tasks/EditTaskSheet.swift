@@ -44,6 +44,7 @@ struct EditTaskSheet: View {
   var body: some View {
     AdaptiveEditScaffold(
       title: "Edit To-Do",
+      accent: accent,
       canSave: !trimmedTitle.isEmpty,
       onSave: save
     ) {
@@ -63,34 +64,28 @@ struct EditTaskSheet: View {
           Toggle(isOn: $onToday) {
             iconLabel("Today", "sun.max")
           }
-          .tint(accent)
 
           Toggle(isOn: enabledBinding(for: scheduledBinding, default: today)) {
             iconLabel("When", "calendar")
           }
-          .tint(accent)
           if scheduled != nil {
             DatePicker(selection: nonOptional(scheduledBinding), displayedComponents: [.date]) {
               iconLabel("Date", "calendar").labelStyle(.titleOnly)
             }
-            .tint(accent)
           }
 
           Toggle(isOn: enabledBinding(for: deadlineBinding, default: today)) {
             iconLabel("Deadline", "flag")
           }
-          .tint(accent)
           if deadline != nil {
             DatePicker(selection: nonOptional(deadlineBinding), displayedComponents: [.date]) {
               iconLabel("Date", "flag").labelStyle(.titleOnly)
             }
-            .tint(accent)
           }
 
           Toggle(isOn: repeatEnabledBinding) {
             iconLabel("Repeat", "repeat")
           }
-          .tint(accent)
           if recurrence != nil {
             Picker("Unit", selection: recurrenceUnitBinding) {
               Text("Day").tag(Recurrence.Unit.day)
@@ -102,7 +97,6 @@ struct EditTaskSheet: View {
               Text("Every \(recurrence?.interval ?? 1) \(unitNoun(plural: (recurrence?.interval ?? 1) != 1))")
             }
             Toggle("After completion", isOn: recurrenceAfterCompletionBinding)
-              .tint(accent)
           }
 
           Picker(selection: listBinding) {
@@ -118,7 +112,6 @@ struct EditTaskSheet: View {
             iconLabel("List", "folder")
           }
           .pickerStyle(.menu)
-          .tint(accent)
         }
 
         // Status actions — mirror the row's context menu. These act
@@ -139,21 +132,19 @@ struct EditTaskSheet: View {
       }
       .onAppear(perform: seed)
     }
-    // Tint the whole scaffold so the Cancel/Save controls (owned by the shared
-    // scaffold, not this form) also pick up the Tasks accent.
-    .tint(accent)
     // Open compact on iPhone (half-height), draggable taller. No-op for the
     // iPad/macOS inspector presentation.
     .presentationDetents([.medium, .large])
     .presentationDragIndicator(.visible)
   }
 
-  /// A row label with the section's signature glyph, accent-tinted.
+  /// A row label with the section's signature glyph. The glyph stays neutral
+  /// (matching the row text) — only the scaffold's Save/Cancel carry the accent.
   private func iconLabel(_ title: String, _ systemImage: String) -> some View {
     Label {
       Text(title)
     } icon: {
-      Image(systemName: systemImage).foregroundStyle(accent)
+      Image(systemName: systemImage).foregroundStyle(.primary)
     }
   }
 

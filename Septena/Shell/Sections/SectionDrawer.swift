@@ -626,6 +626,10 @@ struct AdaptiveEditScaffold<FormContent: View>: View {
   /// Confirmation label. Defaults to "Save"; pass "Add", "Done", etc.
   var saveTitle: String = "Save"
   var cancelTitle: String = "Cancel"
+  /// Tints just the Cancel/Save controls. The form content stays neutral; pass
+  /// a section color when you want the confirm/cancel affordances accented
+  /// without coloring the whole form.
+  var accent: Color? = nil
   /// Disables the confirmation control (e.g. while a required field is
   /// empty). The form owns the validation; the scaffold owns the affordance.
   var canSave: Bool = true
@@ -651,6 +655,7 @@ struct AdaptiveEditScaffold<FormContent: View>: View {
             cancelTitle: cancelTitle,
             saveTitle: saveTitle,
             canSave: canSave,
+            accent: accent,
             onCancel: close,
             onSave: confirm
           )
@@ -670,10 +675,12 @@ struct AdaptiveEditScaffold<FormContent: View>: View {
           .toolbar {
             ToolbarItem(placement: .cancellationAction) {
               Button(cancelTitle, action: close)
+                .tint(accent)
                 .keyboardShortcut(.cancelAction) // Esc
             }
             ToolbarItem(placement: .confirmationAction) {
               Button(saveTitle, action: confirm)
+                .tint(accent)
                 .disabled(!canSave)
                 .keyboardShortcut(.defaultAction) // Return / ⌘Return
             }
@@ -691,6 +698,7 @@ private struct AdaptiveEditHeader: View {
   let cancelTitle: String
   let saveTitle: String
   let canSave: Bool
+  var accent: Color? = nil
   let onCancel: () -> Void
   let onSave: () -> Void
 
@@ -706,6 +714,7 @@ private struct AdaptiveEditHeader: View {
         .disabled(!canSave)
         .keyboardShortcut(.defaultAction) // Return / ⌘Return
     }
+    .tint(accent)
     .padding(.horizontal, 16)
     .padding(.vertical, 10)
     .background(.bar)
