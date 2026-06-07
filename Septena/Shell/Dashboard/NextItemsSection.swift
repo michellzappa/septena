@@ -99,6 +99,11 @@ struct TodayTasksSection: View {
   var model: TodayTasksModel
   @Environment(TaskMutator.self) private var mutator
   @Environment(SectionTheme.self) private var theme
+  @Environment(\.modelContext) private var modelContext
+  /// Backing catalog for each row's project / area subtitle. Loaded once from
+  /// the local mirror — areas / projects are small and effectively static.
+  @State private var areas: [Area] = []
+  @State private var projects: [Project] = []
 
   var body: some View {
     let tasks = model.openTasks
@@ -108,11 +113,16 @@ struct TodayTasksSection: View {
         VStack(spacing: 0) {
           ForEach(tasks) { task in
             TodayTaskRow(task: task, model: model, mutator: mutator,
-                         tint: theme.color(for: "tasks"))
+                         tint: theme.color(for: "tasks"),
+                         areas: areas, projects: projects)
               .transition(.opacity)
           }
         }
         .nextSectionCard()
+      }
+      .task {
+        areas = LocalCache.areas(in: modelContext)
+        projects = LocalCache.projects(in: modelContext)
       }
     }
   }
@@ -123,15 +133,19 @@ struct TodayTaskRow: View {
   var model: TodayTasksModel
   let mutator: TaskMutator
   let tint: Color
+  var areas: [Area] = []
+  var projects: [Project] = []
   @Environment(\.a11yMotion) private var motion
 
   var body: some View {
     // On the Next surface every row is already today, so no Today indicator and
     // no scheduled chip; an overdue `due` still surfaces via the canonical
-    // trailing. No subtitle here (the Next model doesn't load areas/projects).
+    // trailing. The project / area subtitle renders when the catalog is loaded.
     TaskRow(
       task: task,
       accent: tint,
+      areas: areas,
+      projects: projects,
       showsTodayIndicator: false,
       onToggle: { model.toggle(task, mutator: mutator, motion: motion) },
       onTap: nil
