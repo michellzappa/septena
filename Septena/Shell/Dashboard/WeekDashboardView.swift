@@ -163,6 +163,9 @@ struct WeekDashboardView: View {
   /// standalone sheet (separate from `sheetDest` because Mood needs both
   /// the destination route and the standalone check-in flow).
   @State private var presentingMoodCheckin = false
+  /// Drives the Tasks-tile "Create in Inbox…" composer, popped in place over
+  /// the homepage rather than navigating into the Tasks tab first.
+  @State private var creatingTask = false
   /// Hydration tile state. Today's total ml + a 90-day daily series
   /// (oldest→newest). Derived from Nutrition's water entries — Hydration
   /// owns no entity (see HydrationPlugin / ChecklistMirror.loadHydrationDailyMl).
@@ -1759,18 +1762,9 @@ struct WeekDashboardView: View {
     TasksQuickAddMenu(
       todayTasks: todayOpenTasks,
       onCreateInInbox: {
-        tabSelection.current = .tasks
-        nav.path = [.filter(.inbox)]
-        // Trip the "start inline create" flag on the next runloop so
-        // the tab/filter swap settles first. Same-tick mutation would
-        // let TaskListView's .onAppear (tab becoming visible) AND
-        // .onChange(shouldStartCreating) both fire, each calling
-        // startDraft and creating duplicate tasks; the filter onChange
-        // would then clobber editingTaskId so neither row stays in the
-        // inline editor.
-        DispatchQueue.main.async {
-          nav.shouldStartCreating = true
-        }
+        // Pop the composer right here over the homepage — no tab switch /
+        // navigation into the Tasks list first.
+        creatingTask = true
       },
       onGoToInbox: {
         tabSelection.current = .tasks
@@ -2442,6 +2436,18 @@ struct WeekDashboardView: View {
       .presentationDetents([.medium, .large])
       .presentationDragIndicator(.visible)
       #endif
+    }
+    // Tasks-tile "Create in Inbox…" — the same liquid-glass composer the tab
+    // and drawer use, floated over the homepage in place.
+    .taskComposerCover(isPresented: $creatingTask) {
+      TaskComposerCard(
+        mode: .create(.inbox),
+        areas: LocalCache.areas(in: modelContext),
+        projects: LocalCache.projects(in: modelContext),
+        accent: theme.color(for: "tasks"),
+        onDismiss: { creatingTask = false },
+        onDone: { Task { await refreshTasks() } }
+      )
     }
   }
 
