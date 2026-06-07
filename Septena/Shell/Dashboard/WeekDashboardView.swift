@@ -1119,7 +1119,7 @@ struct WeekDashboardView: View {
     let bars = tasksHistory?.daily.map(\.done) ?? []
     return HomepageDomainData(
       domain: .tasks,
-      title: "Tasks",
+      title: String(localized: "Tasks", comment: "Section name"),
       accent: theme.color(for: "tasks"),
       headline: "\(openToday) open · \(doneToday)/\(totalToday) done",
       headlineStats: [
@@ -1141,7 +1141,7 @@ struct WeekDashboardView: View {
     let skipped = dailies.habits.filter { $0.skipped }.count
     return HomepageDomainData(
       domain: .habits,
-      title: "Habits",
+      title: String(localized: "Habits", comment: "Section name"),
       accent: theme.color(for: "habits"),
       headline: skipped > 0
         ? "\(done)/\(total) · \(skipped) skipped"
@@ -1329,7 +1329,7 @@ struct WeekDashboardView: View {
     let cardioSeries = derived.trainCardioSeries90
     return HomepageDomainData(
       domain: .training,
-      title: "Training",
+      title: String(localized: "Training", comment: "Section name"),
       accent: theme.color(for: "training"),
       headline: "\(sessionCount) sessions · \(minutes)/\(target) min",
       headlineStats: [
@@ -1366,7 +1366,7 @@ struct WeekDashboardView: View {
     let total = dueToday + overdue + done
     return HomepageDomainData(
       domain: .chores,
-      title: "Chores",
+      title: String(localized: "Chores", comment: "Section name"),
       accent: theme.color(for: "chores"),
       headline: overdue > 0
         ? "\(done)/\(total) · \(overdue) overdue"
@@ -1389,7 +1389,7 @@ struct WeekDashboardView: View {
     let done = dailies.supplements.filter { $0.done }.count
     return HomepageDomainData(
       domain: .supplements,
-      title: "Supplements",
+      title: String(localized: "Supplements", comment: "Section name"),
       accent: theme.color(for: "supplements"),
       headline: "\(done)/\(total)",
       headlineStats: [
@@ -1415,7 +1415,7 @@ struct WeekDashboardView: View {
     let bars = ouraNights.reversed().map { $0.sleepScore ?? 0 } + [0]
     return HomepageDomainData(
       domain: .sleep,
-      title: "Sleep",
+      title: String(localized: "Sleep", comment: "Section name"),
       accent: theme.color(for: "sleep"),
       headline: lastH > 0
         ? "\(formatHoursShort(lastH)) · score \(score)"
@@ -1457,7 +1457,7 @@ struct WeekDashboardView: View {
       let h = totalMin / 60, m = totalMin % 60
       return HomepageDomainData(
         domain: .nutrition,
-        title: "Nutrition",
+        title: String(localized: "Nutrition", comment: "Section name"),
         accent: accent,
         headline: "\(h)h \(m)m fasting · since \(since)",
         headlineStats: [
@@ -1476,7 +1476,7 @@ struct WeekDashboardView: View {
     let proteinTarget = nutritionTarget?.protein.min ?? 150
     return HomepageDomainData(
       domain: .nutrition,
-      title: "Nutrition",
+      title: String(localized: "Nutrition", comment: "Section name"),
       accent: accent,
       headline: "\(Int(todayProteinSum))g protein · \(Int(todayKcalSum)) kcal",
       headlineStats: [
@@ -1498,7 +1498,7 @@ struct WeekDashboardView: View {
     let missingPerDay = groceriesMissingPerDay()
     return HomepageDomainData(
       domain: .groceries,
-      title: "Groceries",
+      title: String(localized: "Groceries", comment: "Section name"),
       accent: theme.color(for: "groceries"),
       headline: lowCount > 0
         ? "\(lowCount) low · \(stocked) stocked"
@@ -1525,7 +1525,7 @@ struct WeekDashboardView: View {
     let dailyLimit = 3
     return HomepageDomainData(
       domain: .caffeine,
-      title: "Caffeine",
+      title: String(localized: "Caffeine", comment: "Section name"),
       accent: theme.color(for: "caffeine"),
       headline: "\(sessions) · \(String(format: "%.1f", grams))g",
       headlineStats: [
@@ -1547,7 +1547,7 @@ struct WeekDashboardView: View {
     let dailyLimit = 2
     return HomepageDomainData(
       domain: .cannabis,
-      title: "Cannabis",
+      title: String(localized: "Cannabis", comment: "Section name"),
       accent: theme.color(for: "cannabis"),
       headline: "\(sessions) · \(String(format: "%.2f", grams))g",
       headlineStats: [
@@ -1573,7 +1573,7 @@ struct WeekDashboardView: View {
     let fatTarget: Double = 18
     return HomepageDomainData(
       domain: .body,
-      title: "Body",
+      title: String(localized: "Body", comment: "Section name"),
       accent: theme.color(for: "body"),
       headline: {
         let parts = [
@@ -1618,7 +1618,7 @@ struct WeekDashboardView: View {
     let streak = derived.githubStreak
     return HomepageDomainData(
       domain: .github,
-      title: "GitHub",
+      title: String(localized: "GitHub", comment: "Section name"),
       accent: theme.color(for: "github"),
       headline: today > 0 ? "\(today) today · \(week) this week" : "\(week) this week",
       headlineStats: [
@@ -1642,7 +1642,7 @@ struct WeekDashboardView: View {
     let bars = Array(counts.suffix(7))
     return Button { open(.github) } label: {
       ModuleTile(
-        title: "GitHub",
+        title: String(localized: "GitHub", comment: "Section name"),
         accent: theme.color(for: "github"),
         stats: [
           .init(label: "Today", value: "\(today)"),
@@ -1663,7 +1663,7 @@ struct WeekDashboardView: View {
     let dailyTarget = 2
     return HomepageDomainData(
       domain: .gut,
-      title: "Gut",
+      title: String(localized: "Gut", comment: "Section name"),
       accent: theme.color(for: "gut"),
       headline: discomfort > 0
         ? "\(count) · \(String(format: "%.1f", discomfort))h disc."
@@ -1688,7 +1688,7 @@ struct WeekDashboardView: View {
     let stepsTarget = 8000
     return HomepageDomainData(
       domain: .activity,
-      title: "Activity",
+      title: String(localized: "Activity", comment: "Section name"),
       accent: theme.color(for: "activity"),
       headline: "\(bridge.stepsToday) steps · \(bridge.exerciseMinutesToday) min",
       headlineStats: [
@@ -2049,7 +2049,7 @@ struct WeekDashboardView: View {
     let bars = Array(caffeineHistory.map { $0.sessions }.suffix(7))
     let dailyLimit = 3   // soft default until Settings.targets is wired
     return ModuleTile(
-      title: "Caffeine",
+      title: String(localized: "Caffeine", comment: "Section name"),
       accent: accent,
       stats: [
         .init(label: "Today", value: "\(sessions)"),
@@ -2092,7 +2092,7 @@ struct WeekDashboardView: View {
     let bars = Array(cannabisHistory.map { $0.sessions }.suffix(7))
     let dailyLimit = 2
     return ModuleTile(
-      title: "Cannabis",
+      title: String(localized: "Cannabis", comment: "Section name"),
       accent: accent,
       stats: [
         .init(label: "Today", value: "\(sessions)"),
@@ -2170,7 +2170,7 @@ struct WeekDashboardView: View {
     let fatTarget: Double = 18
     return Button { open(.body) } label: {
       ModuleTile(
-        title: "Body",
+        title: String(localized: "Body", comment: "Section name"),
         accent: accent,
         stats: [
           .init(label: "Weight", value: weight.map { String(format: "%.1f", $0) } ?? "—", unit: "kg"),
@@ -2194,7 +2194,7 @@ struct WeekDashboardView: View {
     let bars = Array(gutHistory.map { $0.movements }.suffix(7))
     let dailyTarget = 2
     return ModuleTile(
-      title: "Gut",
+      title: String(localized: "Gut", comment: "Section name"),
       accent: accent,
       stats: [
         .init(label: "Today",      value: "\(count)"),
@@ -2245,7 +2245,7 @@ struct WeekDashboardView: View {
       let stepsTarget = 8000
       Button { open(.activity) } label: {
         ModuleTile(
-          title: "Activity",
+          title: String(localized: "Activity", comment: "Section name"),
           accent: accent,
           stats: [
             .init(label: "Steps",    value: "\(bridge.stepsToday)"),
@@ -2297,7 +2297,7 @@ struct WeekDashboardView: View {
     let state = currentFastingState(now: now)
     if nutritionTrackFasting, case .fasting(_, let since, let totalMin) = state {
       ModuleTile(
-        title: "Nutrition",
+        title: String(localized: "Nutrition", comment: "Section name"),
         accent: accent,
         stats: [
           .init(label: "Fasting", value: fastingDurationText(totalMin: totalMin)),
@@ -2314,7 +2314,7 @@ struct WeekDashboardView: View {
       let bars = Array((nutritionStats?.daily.map { Int($0.proteinG) }
                 ?? Array(repeating: 0, count: 7)).suffix(7))
       ModuleTile(
-        title: "Nutrition",
+        title: String(localized: "Nutrition", comment: "Section name"),
         accent: accent,
         stats: [
           .init(label: "Protein", value: "\(Int(todayProteinSum))", unit: "g"),
@@ -2418,7 +2418,7 @@ struct WeekDashboardView: View {
     let today = moodToday?.logCount ?? 0
     let bars = Array(moodHistory.map { $0.logs }.suffix(7))
     return ModuleTile(
-      title: "Mood",
+      title: String(localized: "Mood", comment: "Section name"),
       accent: accent,
       stats: [
         .init(label: "Today",  value: "\(today)"),
@@ -2454,7 +2454,7 @@ struct WeekDashboardView: View {
     let bars = moodHistory.map { $0.logs }
     return HomepageDomainData(
       domain: .mood,
-      title: "Mood",
+      title: String(localized: "Mood", comment: "Section name"),
       accent: theme.color(for: "mood"),
       headline: "\(today) of 3 today",
       headlineStats: [
@@ -2487,7 +2487,7 @@ struct WeekDashboardView: View {
     let accent = theme.color(for: "hydration")
     let bars = Array(hydrationHistory.suffix(7))
     return ModuleTile(
-      title: "Hydration",
+      title: String(localized: "Hydration", comment: "Section name"),
       accent: accent,
       stats: [
         .init(label: "Today",  value: "\(hydrationToday)", unit: "ml"),
@@ -2522,7 +2522,7 @@ struct WeekDashboardView: View {
   private func hydrationDomainData() -> HomepageDomainData {
     HomepageDomainData(
       domain: .hydration,
-      title: "Hydration",
+      title: String(localized: "Hydration", comment: "Section name"),
       accent: theme.color(for: "hydration"),
       headline: "\(hydrationToday) of \(hydrationTargetMl) ml",
       headlineStats: [
@@ -2724,7 +2724,7 @@ private struct WeekTasksTile: View {
 
   var body: some View {
     ModuleTile(
-      title: "Tasks",
+      title: String(localized: "Tasks", comment: "Section name"),
       accent: accent,
       stats: [
         .init(label: "Today", value: "\(openToday)"),
@@ -2750,7 +2750,7 @@ private struct WeekHabitsTile: View {
 
   var body: some View {
     ModuleTile(
-      title: "Habits",
+      title: String(localized: "Habits", comment: "Section name"),
       accent: accent,
       stats: [
         .init(label: "Today", value: "\(done)"),
@@ -2776,7 +2776,7 @@ private struct WeekTrainingTile: View {
 
   var body: some View {
     ModuleTile(
-      title: "Training",
+      title: String(localized: "Training", comment: "Section name"),
       accent: accent,
       stats: [
         .init(label: "Sessions", value: "\(sessionCount)/7"),
@@ -2807,7 +2807,7 @@ private struct WeekChoresTile: View {
 
   var body: some View {
     ModuleTile(
-      title: "Chores",
+      title: String(localized: "Chores", comment: "Section name"),
       accent: accent,
       stats: [
         .init(label: "Due today", value: "\(dueToday)"),
@@ -2831,7 +2831,7 @@ private struct WeekSupplementsTile: View {
 
   var body: some View {
     ModuleTile(
-      title: "Supplements",
+      title: String(localized: "Supplements", comment: "Section name"),
       accent: accent,
       stats: [.init(label: "Today", value: "\(done)")],
       progress: .init(
@@ -2853,7 +2853,7 @@ private struct WeekSleepTile: View {
 
   var body: some View {
     ModuleTile(
-      title: "Sleep",
+      title: String(localized: "Sleep", comment: "Section name"),
       accent: accent,
       stats: [
         .init(label: "Last night", value: lastHoursText, unit: "h"),
@@ -2879,7 +2879,7 @@ private struct WeekGroceriesTile: View {
 
   var body: some View {
     ModuleTile(
-      title: "Groceries",
+      title: String(localized: "Groceries", comment: "Section name"),
       accent: accent,
       stats: [
         .init(label: "Low", value: "\(lowCount)"),
