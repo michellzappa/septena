@@ -86,10 +86,9 @@ final class TaskEntity {
   /// device. Distinct from `source`, which never clears.
   var acknowledgedAt: Date?
   /// Canonical creation instant. `Date` (UTC; NSDate in CloudKit) to match
-  /// the app-wide convention (`occurredAt`, `loggedAt`). `.distantPast` is
-  /// the lightweight-migration default; `TaskCreatedAtBackfill` fills it
-  /// from the legacy `created` YYYY-MM-DD string at launch. Drives the
-  /// agent-cue decay window.
+  /// the app-wide convention (`occurredAt`, `loggedAt`). New rows stamp it on
+  /// insert; `.distantPast` only on pre-migration rows. Drives the agent-cue
+  /// decay window.
   var createdAt: Date = Date.distantPast
 
   init(id: String,
@@ -374,8 +373,8 @@ final class HabitDefinitionEntity {
 @Model
 final class HabitDayStateEntity {
   @Attribute(.unique) var id: String
-  /// Canonical UTC instant of the event. `.distantPast` is the lightweight-
-  /// migration default for existing rows; `OccurredAtBackfill` fills it at launch.
+  /// Canonical UTC instant of the event. Derived from `date`/`time` via
+  /// `EventTimestamp` on write; `.distantPast` only on pre-migration rows.
   var occurredAt: Date = Date.distantPast
   var date: String
   var habitID: String
@@ -444,8 +443,8 @@ final class SupplementDefinitionEntity {
 @Model
 final class SupplementDayStateEntity {
   @Attribute(.unique) var id: String
-  /// Canonical UTC instant of the event. `.distantPast` is the lightweight-
-  /// migration default for existing rows; `OccurredAtBackfill` fills it at launch.
+  /// Canonical UTC instant of the event. Derived from `date`/`time` via
+  /// `EventTimestamp` on write; `.distantPast` only on pre-migration rows.
   var occurredAt: Date = Date.distantPast
   var date: String
   var supplementID: String
@@ -595,8 +594,8 @@ final class ChoreDefinitionEntity {
 @Model
 final class ChoreEventEntity {
   @Attribute(.unique) var id: String
-  /// Canonical UTC instant of the event. `.distantPast` is the lightweight-
-  /// migration default for existing rows; `OccurredAtBackfill` fills it at launch.
+  /// Canonical UTC instant of the event. Derived from `date`/`time` via
+  /// `EventTimestamp` on write; `.distantPast` only on pre-migration rows.
   var occurredAt: Date = Date.distantPast
   var choreID: String
   var action: String
@@ -637,8 +636,8 @@ final class ChoreEventEntity {
 @Model
 final class GutEventEntity {
   @Attribute(.unique) var id: String
-  /// Canonical UTC instant of the event. `.distantPast` is the lightweight-
-  /// migration default for existing rows; `OccurredAtBackfill` fills it at launch.
+  /// Canonical UTC instant of the event. Derived from `date`/`time` via
+  /// `EventTimestamp` on write; `.distantPast` only on pre-migration rows.
   var occurredAt: Date = Date.distantPast
   var date: String
   var time: String
@@ -682,8 +681,8 @@ final class GutEventEntity {
 @Model
 final class MoodEventEntity {
   @Attribute(.unique) var id: String
-  /// Canonical UTC instant of the event. `.distantPast` is the lightweight-
-  /// migration default for existing rows; `OccurredAtBackfill` fills it at launch.
+  /// Canonical UTC instant of the event. Derived from `date`/`time` via
+  /// `EventTimestamp` on write; `.distantPast` only on pre-migration rows.
   var occurredAt: Date = Date.distantPast
   /// `YYYY-MM-DD` of the logged moment, in local time. Indexed for fast
   /// day-scoped queries — mirrors CaffeineEventEntity.
@@ -740,8 +739,8 @@ final class MoodEventEntity {
 @Model
 final class CaffeineEventEntity {
   @Attribute(.unique) var id: String
-  /// Canonical UTC instant of the event. `.distantPast` is the lightweight-
-  /// migration default for existing rows; `OccurredAtBackfill` fills it at launch.
+  /// Canonical UTC instant of the event. Derived from `date`/`time` via
+  /// `EventTimestamp` on write; `.distantPast` only on pre-migration rows.
   var occurredAt: Date = Date.distantPast
   var date: String
   var time: String
@@ -797,8 +796,8 @@ final class CaffeineBeanEntity {
 @Model
 final class CannabisEventEntity {
   @Attribute(.unique) var id: String
-  /// Canonical UTC instant of the event. `.distantPast` is the lightweight-
-  /// migration default for existing rows; `OccurredAtBackfill` fills it at launch.
+  /// Canonical UTC instant of the event. Derived from `date`/`time` via
+  /// `EventTimestamp` on write; `.distantPast` only on pre-migration rows.
   var occurredAt: Date = Date.distantPast
   var date: String
   var time: String
@@ -893,8 +892,8 @@ final class GroceryCategoryEntity {
 @Model
 final class ExerciseEntryEntity {
   @Attribute(.unique) var id: String
-  /// Canonical UTC instant of the event. `.distantPast` is the lightweight-
-  /// migration default for existing rows; `OccurredAtBackfill` fills it at launch.
+  /// Canonical UTC instant of the event. Derived from `date`/`time` via
+  /// `EventTimestamp` on write; `.distantPast` only on pre-migration rows.
   var occurredAt: Date = Date.distantPast
   var date: String           // YYYY-MM-DD
   var time: String           // HH:MM session start
@@ -2734,22 +2733,18 @@ enum LocalCache {
     // When tasks reference ids that aren't in ProjectEntity / AreaEntity,
     // or projects exist without any tasks, log just the orphans — those
     // are actionable problems to investigate.
-    let taskProjectIds = Set(rows.compactMap { $0.project })
-    let projectIds = Set(projects.map { $0.id })
-    let orphanedTaskProjectIds = taskProjectIds.subtracting(projectIds)
-    let projectsWithNoTasks = projectIds.subtracting(taskProjectIds)
+    // Dangling project references and the stale empty `seed-project` artifact
+    // are healed at startup by `SeptenaServices.reconcileProjectGraph()` (which
+    // logs the action it takes), so they're intentionally not warned about
+    // here — this diagnostic stays read-only and quiet in the steady state.
+    // Area references have no remediation path yet, so a dangling area id is
+    // still worth surfacing.
     let taskAreaIds = Set(rows.compactMap { $0.area })
     let areaIds = Set(areas.map { $0.id })
     let orphanedTaskAreaIds = taskAreaIds.subtracting(areaIds)
 
-    if !orphanedTaskProjectIds.isEmpty {
-      SeptenaLog.info("[Crosswalk] ⚠️ tasks reference project ids not in ProjectEntity: \(orphanedTaskProjectIds.sorted())")
-    }
     if !orphanedTaskAreaIds.isEmpty {
       SeptenaLog.info("[Crosswalk] ⚠️ tasks reference area ids not in AreaEntity: \(orphanedTaskAreaIds.sorted())")
-    }
-    if !projectsWithNoTasks.isEmpty {
-      SeptenaLog.info("[Crosswalk] projects with no tasks: \(projectsWithNoTasks.sorted())")
     }
   }
 

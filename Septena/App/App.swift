@@ -186,21 +186,6 @@ struct SeptenaApp: App {
             await LocalNotificationScheduler.shared.requestAuthorizationIfNeeded()
           }
           LocalNotificationScheduler.shared.start(context: localStore.container.mainContext)
-          TrainingMuscleBackfill.runIfNeeded(context: localStore.container.mainContext)
-          TrainingLibraryEnrichment.runIfNeeded(context: localStore.container.mainContext)
-          TrainingMuscleBackfillV2.runIfNeeded(context: localStore.container.mainContext)
-          // Repair orphan routine slugs *after* the backfills run so any
-          // stub entities created here inherit the latest inference rules.
-          RoutineSlugRepair.runIfNeeded(context: localStore.container.mainContext)
-          // Run after RoutineSlugRepair so any stubs it created that
-          // collide with library/manual entries get collapsed.
-          DuplicateExerciseMerge.runIfNeeded(context: localStore.container.mainContext)
-          // Derive `occurredAt` for legacy event rows (and first-sync Mood)
-          // after the engine has fetched, so pushes carry the real timestamp.
-          OccurredAtBackfill.runIfNeeded(context: localStore.container.mainContext)
-          // Derive `createdAt` for legacy task rows from their `created`
-          // string so the agent-cue decay window has a real instant to read.
-          TaskCreatedAtBackfill.runIfNeeded(context: localStore.container.mainContext)
           #if DEBUG
           // One-shot, DEBUG-only: register optional CloudKit fields that
           // exist in code but were never written in Development, so they

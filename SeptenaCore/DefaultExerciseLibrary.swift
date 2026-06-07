@@ -3,13 +3,12 @@ import Foundation
 // Curated catalog of common exercises with muscle-group assignments.
 // Consumers:
 //   1. ExerciseLibrarySheet — opt-in picker.
-//   2. MuscleInference — backfill matches user slugs against library
-//      ids AND aliases. Aliases let users with personal naming
-//      conventions ("incline-db-press", "bb-row") still pick up
-//      muscle metadata without us renaming their entries.
+//   2. CanonicalExerciseName — resolves logged names against ids + aliases.
+//      Aliases let users with personal naming conventions ("incline-db-press",
+//      "bb-row") still resolve without us renaming their entries.
 //
 // Slugs are the canonical join key. Keep ids stable; aliases are
-// additive — adding a new alias only widens what enrichment catches.
+// additive — adding a new alias only widens what name resolution catches.
 
 struct LibraryExercise: Hashable, Identifiable, Sendable {
   let id: String                  // canonical slug

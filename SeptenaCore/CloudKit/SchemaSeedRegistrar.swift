@@ -38,7 +38,7 @@ enum SchemaSeedRegistrar {
     ownerName: CKCurrentUserDefaultName
   )
 
-  /// Fire-and-forget boot hook, mirroring `OccurredAtBackfill.runIfNeeded`.
+  /// Fire-and-forget, run-once boot hook gated by `userDefaultsKey`.
   static func runIfNeeded() {
     guard !UserDefaults.standard.bool(forKey: userDefaultsKey) else { return }
     Task {
