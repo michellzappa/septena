@@ -76,23 +76,48 @@ struct TasksDestinationView: View {
     }
     .tint(accent)
     .task { reload() }
-    .sheet(item: $editing) { task in
-      TaskQuickEditSheet(task: task, accent: accent, areas: areas, projects: projects,
-                         onDone: { reload() })
-        #if os(iOS)
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-        #endif
+    .modifier(DrawerTaskComposer(
+      isOpen: composerBinding,
+      composerIsOpen: composerIsOpen,
+      card: { composerCard }
+    ))
+  }
+
+  /// One liquid-glass composer for both add (the drawer's + / ⌘N, declared via
+  /// TasksPlugin.logActions) and edit (row tap) — the same `TaskComposerCard`
+  /// the Tasks tab uses. The drawer is a *pushed* screen, so an `.overlay`
+  /// would clip the card to the drawer's bounds; on iOS we present it through a
+  /// transparent `.fullScreenCover` instead, so the card floats over the whole
+  /// app. (See `DrawerTaskComposer` for the macOS overlay fallback.)
+  @ViewBuilder
+  private var composerCard: some View {
+    if let mode = composerMode {
+      TaskComposerCard(
+        mode: mode,
+        areas: areas,
+        projects: projects,
+        accent: accent,
+        onDismiss: closeComposer,
+        onDone: { reload() }
+      )
     }
-    // The drawer's standard "+" / ⌘N (SectionDrawer toolbar, declared via
-    // TasksPlugin.logActions) opens this — no bespoke add affordance.
-    .sheet(isPresented: $creating) {
-      NewTaskSheet(accent: accent, onDone: { reload() })
-        #if os(iOS)
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-        #endif
-    }
+  }
+
+  /// The drawer is the Today drawer, so a new task defaults to Today; a row
+  /// tap edits. The scrim blocks drawer taps while open, so the two modes are
+  /// naturally mutually exclusive.
+  private var composerMode: TaskComposerCard.Mode? {
+    if creating { return .create(.today) }
+    if let task = editing { return .edit(task) }
+    return nil
+  }
+  private var composerIsOpen: Bool { creating || editing != nil }
+  private var composerBinding: Binding<Bool> {
+    Binding(get: { composerIsOpen }, set: { if !$0 { closeComposer() } })
+  }
+  private func closeComposer() {
+    creating = false
+    editing = nil
   }
 
   // MARK: - Data
@@ -186,297 +211,28 @@ struct TasksDestinationView: View {
   }
 }
 
-// MARK: - Quick edit
+// MARK: - Composer presentation
 
-/// Compact task editor presented from a drawer row tap. Exposes the same
-/// fields the full Tasks surface does — title, notes, schedule (When),
-/// deadline, repeat, and area/project (List) — behind the canonical task
-/// icons, so a task edits identically wherever it's opened. Changes are held
-/// locally and committed on Done (Cancel discards), matching the modal's
-/// Cancel/Done contract.
-private struct TaskQuickEditSheet: View {
-  let task: SeptenaTask
-  let accent: Color
-  let areas: [Area]
-  let projects: [Project]
-  let onDone: () -> Void
+/// Presents the drawer's task composer so it floats over the *whole app*, not
+/// just the pushed drawer screen. iOS uses a transparent full-screen cover (the
+/// card carries its own dim scrim); macOS — where full-screen covers aren't
+/// available — falls back to an in-place overlay, which is fine on a roomy
+/// window.
+private struct DrawerTaskComposer<Card: View>: ViewModifier {
+  @Binding var isOpen: Bool
+  let composerIsOpen: Bool
+  @ViewBuilder var card: () -> Card
 
-  @Environment(TaskMutator.self) private var mutator
-  @Environment(\.dismiss) private var dismiss
-  @State private var title: String
-  @State private var notes: String
-  // Local edit buffers for the meta fields, seeded from the task and committed
-  // on Done. `scheduled` mirrors the full surface: a task pinned to Today (no
-  // explicit date) shows no scheduled date here — picking "Today" re-pins it.
-  @State private var scheduled: Date?
-  @State private var deadline: Date?
-  @State private var recurrence: Recurrence?
-  @State private var areaId: String?
-  @State private var projectId: String?
-  @State private var picker: EditPicker?
-
-  private enum EditPicker: Int, Identifiable {
-    case when, deadline, repeatRule, move
-    var id: Int { rawValue }
-  }
-
-  init(task: SeptenaTask, accent: Color, areas: [Area], projects: [Project],
-       onDone: @escaping () -> Void) {
-    self.task = task
-    self.accent = accent
-    self.areas = areas
-    self.projects = projects
-    self.onDone = onDone
-    _title = State(initialValue: task.title)
-    _notes = State(initialValue: task.notes ?? "")
-    _scheduled = State(initialValue: SeptenaDate.parse(task.scheduled))
-    _deadline = State(initialValue: SeptenaDate.parse(task.deadline))
-    _recurrence = State(initialValue: task.recurrence)
-    _areaId = State(initialValue: task.area)
-    _projectId = State(initialValue: task.project)
-  }
-
-  var body: some View {
-    NavigationStack {
-      Form {
-        Section {
-          TextField("Title", text: $title, axis: .vertical)
-          TextField("Notes", text: $notes, axis: .vertical)
-            .lineLimit(1...6)
-            .foregroundStyle(.secondary)
-        }
-        // Standard task meta — same icons + pickers as the full Tasks surface.
-        Section {
-          metaRow("calendar", "When", value: scheduledLabel,
-                  set: scheduled != nil) { picker = .when }
-          metaRow("flag", "Deadline", value: deadlineLabel,
-                  set: deadline != nil) { picker = .deadline }
-          metaRow("repeat", "Repeat", value: recurrence?.shortLabel ?? "Never",
-                  set: recurrence != nil) { picker = .repeatRule }
-          metaRow("folder", "List", value: listLabel,
-                  set: areaId != nil || projectId != nil) { picker = .move }
-        }
-        Section {
-          Button(role: .destructive) {
-            mutator.delete(id: task.id)
-            onDone()
-            dismiss()
-          } label: {
-            Label("Delete Task", systemImage: "trash")
-          }
-        }
-      }
-      .formStyle(.grouped)
-      .navigationTitle("Task")
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
-        }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Done") { save() }
-        }
-      }
-      .tint(accent)
-      .sheet(item: $picker) { which in
-        editPicker(which)
-      }
+  func body(content: Content) -> some View {
+    #if os(iOS)
+    content.fullScreenCover(isPresented: $isOpen) {
+      card()
+        .presentationBackground(.clear)
     }
-  }
-
-  // MARK: - Meta row
-
-  /// A tappable Form row: leading task icon (tinted accent when the field is
-  /// set), the field name, and its current value. Opens the matching picker.
-  @ViewBuilder
-  private func metaRow(_ icon: String, _ label: String, value: String,
-                       set: Bool, _ action: @escaping () -> Void) -> some View {
-    Button(action: action) {
-      HStack(spacing: 12) {
-        Image(systemName: icon)
-          .scaledFont(size: 16)
-          .foregroundStyle(set ? accent : Theme.inkSecondary)
-          .frame(width: 24)
-        Text(label)
-          .foregroundStyle(Theme.inkPrimary)
-        Spacer()
-        Text(value)
-          .foregroundStyle(.secondary)
-      }
-      .contentShape(Rectangle())
-    }
-    .buttonStyle(.plain)
-  }
-
-  @ViewBuilder
-  private func editPicker(_ which: EditPicker) -> some View {
-    switch which {
-    case .when:
-      DatePickerSheet(title: "When", initialDate: scheduled,
-                      setLabel: "Set Date", updateLabel: "Update Date",
-                      clearLabel: "No Date") { scheduled = $0 }
-        #if os(iOS)
-        .presentationDetents([.height(DatePickerSheet.sheetHeight), .large])
-        #endif
-    case .deadline:
-      DatePickerSheet(title: "Deadline", initialDate: deadline,
-                      setLabel: "Set Deadline", updateLabel: "Update Deadline",
-                      clearLabel: "Remove Deadline") { deadline = $0 }
-        #if os(iOS)
-        .presentationDetents([.height(DatePickerSheet.sheetHeight), .large])
-        #endif
-    case .repeatRule:
-      RecurrencePickerSheet(initial: recurrence) { recurrence = $0 }
-        #if os(iOS)
-        .presentationDetents([.medium, .large])
-        #endif
-    case .move:
-      MovePickerSheet(areas: areas, projects: projects,
-                      currentAreaId: areaId, currentProjectId: projectId) { a, p in
-        areaId = a; projectId = p
-      }
-        #if os(iOS)
-        .presentationDetents([.large, .medium])
-        #endif
-    }
-  }
-
-  // MARK: - Value labels
-
-  private var scheduledLabel: String {
-    guard let scheduled else { return "None" }
-    if Calendar.current.isDateInToday(scheduled) { return "Today" }
-    return Self.shortFormatter.string(from: scheduled)
-  }
-  private var deadlineLabel: String {
-    guard let deadline else { return "None" }
-    return Self.shortFormatter.string(from: deadline)
-  }
-  private var listLabel: String {
-    if let projectId, let p = projects.first(where: { $0.id == projectId }) {
-      return p.title
-    }
-    if let areaId, let a = areas.first(where: { $0.id == areaId }) {
-      return a.title
-    }
-    return "Inbox"
-  }
-
-  private static let shortFormatter: DateFormatter = {
-    let f = DateFormatter()
-    f.setLocalizedDateFormatFromTemplate("MMMd")
-    return f
-  }()
-
-  // MARK: - Commit
-
-  private func save() {
-    let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-    let titleChanged = !trimmed.isEmpty && trimmed != task.title
-    let notesChanged = notes != (task.notes ?? "")
-    if titleChanged || notesChanged {
-      mutator.update(id: task.id,
-                     title: titleChanged ? trimmed : nil,
-                     notes: notesChanged ? notes : nil)
-    }
-
-    // Schedule — Things-style mapping, mirroring `TaskListView.applyWhen`:
-    // a "Today" pick pins to Today and clears any planning date; a future
-    // date schedules it (server surfaces it on Today when it arrives); nil
-    // clears both. Only fire when the picked date actually changed.
-    if scheduled != SeptenaDate.parse(task.scheduled) {
-      if let d = scheduled {
-        if Calendar.current.isDateInToday(d) {
-          mutator.schedule(id: task.id, date: nil)
-          mutator.moveToToday(id: task.id, today: true)
-        } else {
-          mutator.moveToToday(id: task.id, today: false)
-          mutator.schedule(id: task.id, date: d)
-        }
-      } else {
-        mutator.schedule(id: task.id, date: nil)
-        mutator.moveToToday(id: task.id, today: false)
-      }
-    }
-
-    if deadline != SeptenaDate.parse(task.deadline) {
-      mutator.setDue(id: task.id, date: deadline)
-    }
-    if recurrence != task.recurrence {
-      mutator.setRecurrence(id: task.id, recurrence: recurrence)
-    }
-
-    // List — project wins; Septena derives the area from the project on save.
-    if areaId != task.area || projectId != task.project {
-      if projectId != nil {
-        mutator.moveToProject(id: task.id, project: projectId)
-      } else {
-        mutator.moveToArea(id: task.id, area: areaId)
-        mutator.moveToProject(id: task.id, project: nil)
-      }
-    }
-
-    onDone()
-    dismiss()
-  }
-}
-
-// MARK: - New task
-
-/// Compact new-task composer opened from the drawer's standard "+" toolbar
-/// action (SectionDrawer, declared via `TasksPlugin.logActions`). Creates a
-/// task pinned to Today by default — this is the Today drawer; deeper
-/// routing and scheduling live in the full Tasks surface.
-private struct NewTaskSheet: View {
-  let accent: Color
-  let onDone: () -> Void
-
-  @Environment(TaskMutator.self) private var mutator
-  @Environment(\.dismiss) private var dismiss
-  @State private var title = ""
-  @State private var isToday = true
-  @FocusState private var titleFocused: Bool
-
-  var body: some View {
-    NavigationStack {
-      Form {
-        Section {
-          TextField("Title", text: $title)
-            .focused($titleFocused)
-            .submitLabel(.done)
-            .onSubmit(add)
-        }
-        Section {
-          Toggle("Today", isOn: $isToday)
-        }
-      }
-      .formStyle(.grouped)
-      .navigationTitle("New Task")
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
-        }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Add", action: add)
-            .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        }
-      }
-      .tint(accent)
-      .onAppear { titleFocused = true }
-    }
-  }
-
-  private func add() {
-    let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else { return }
-    mutator.create(title: trimmed, today: isToday)
-    Haptics.tick()
-    onDone()
-    dismiss()
+    #else
+    content
+      .overlay { if composerIsOpen { card() } }
+      .animation(.snappy(duration: 0.2), value: composerIsOpen)
+    #endif
   }
 }

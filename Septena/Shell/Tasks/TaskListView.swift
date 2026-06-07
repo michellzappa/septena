@@ -244,15 +244,6 @@ struct TaskListView: View {
         applyMove: applyMove,
         applyRecurrence: applyRecurrence
       ))
-      // Full edit drawer (notes + metadata) — opened by a row's (i) button.
-      .adaptiveDetail(item: $editingDetail) { task in
-        EditTaskSheet(
-          original: task,
-          areas: areas,
-          projects: projects,
-          onDone: { _ in Task { await load() } }
-        )
-      }
   }
 
   private var taskList: some View {
@@ -307,7 +298,6 @@ struct TaskListView: View {
     // Re-load on every appearance so completed tasks (kept visible in-place
     // while the user is on the screen) drop off when they return.
     .onAppear { Task { await load() } }
-    .refreshable { await load() }
     // CKSyncEngine fires .septenaTasksChanged at the end of every fetch
     // batch — including pushes from other devices and the foreground
     // bootstrap fetch. Without this, the list only refreshes when the
@@ -346,24 +336,40 @@ struct TaskListView: View {
         startCreate()
       }
     }
-    // Floating new-task composer. A liquid-glass card anchored near the top
-    // rather than a bottom sheet — so opening the keyboard can never push it to
-    // full height; it floats above the dimmed list. Commits through the mutator
-    // into the current list's bucket via `TaskDraft` (Today pins to today,
-    // Upcoming schedules tomorrow, a Project/Area files it there).
+    // Floating liquid-glass composer — used for BOTH create (tab + / ⌘N /
+    // sidebar) and edit (row tap / (i) button). One card, anchored near the
+    // top rather than a bottom sheet, so opening the keyboard can never push it
+    // to full height; it floats above the dimmed list. Commits through
+    // `TaskDraft` so the Things-style scheduled/today/list mapping lives in one
+    // place.
     .overlay {
-      if creating {
+      if let mode = composerMode {
         TaskComposerCard(
-          mode: .create(filter),
+          mode: mode,
           areas: areas,
           projects: projects,
           accent: theme.color(for: "tasks"),
-          onDismiss: { withAnimation(.snappy(duration: 0.2)) { creating = false } },
+          onDismiss: closeComposer,
           onDone: { Task { await load() } }
         )
         .transition(.opacity)
       }
     }
+    .animation(.snappy(duration: 0.2), value: composerIsOpen)
+  }
+
+  /// The composer presents create when `+`/⌘N is tripped, otherwise edit when
+  /// a row is opened. The scrim blocks list taps while open, so the two are
+  /// naturally mutually exclusive.
+  private var composerMode: TaskComposerCard.Mode? {
+    if creating { return .create(filter) }
+    if let task = editingDetail { return .edit(task) }
+    return nil
+  }
+  private var composerIsOpen: Bool { creating || editingDetail != nil }
+  private func closeComposer() {
+    creating = false
+    editingDetail = nil
   }
 
   /// Open the floating new-task capture card (`QuickTaskCapture`) for the
@@ -371,7 +377,10 @@ struct TaskListView: View {
   /// field — title + the list it lands in — with no search/quick-find surface;
   /// it commits on submit, so there are no leftover placeholder rows.
   private func startCreate() {
-    withAnimation(.snappy(duration: 0.25)) { creating = true }
+    withAnimation(.snappy(duration: 0.25)) {
+      editingDetail = nil
+      creating = true
+    }
   }
 
   private var taskListContent: some View {
@@ -1492,6 +1501,11 @@ private struct GroupHeaderLabel: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
+    // Area/project headers are pointer-only affordances: clickable to drill
+    // into the section, but kept OUT of the keyboard focus chain so ↑/↓ and
+    // Tab traverse only task rows. Without this, the header Button steals a
+    // focus stop between every group.
+    .focusable(false)
     .onHover { hovered = $0 }
   }
 }

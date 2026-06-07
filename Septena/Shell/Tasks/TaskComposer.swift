@@ -197,43 +197,34 @@ struct TaskAttributeBar: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
-      ScrollView(.horizontal) {
-        HStack(spacing: 8) {
-          AttributePill(icon: "sun.max", label: "Today",
-                        value: nil, isSet: draft.onToday, isActive: false, accent: accent) {
-            withAnimation(.snappy(duration: 0.2)) {
-              draft.onToday.toggle()
-              expanded = nil
-            }
-          }
+      // Pills wrap onto extra rows as needed (FlowLayout) so every elective
+      // stays visible — no offscreen horizontal scroll. "Today" isn't its own
+      // pill: it's the same stored state as When=Today, so it lives inside the
+      // When control (quick chip) instead of duplicating the rail.
+      FlowLayout(spacing: 8) {
+        AttributePill(icon: "calendar", label: "When",
+                      value: whenValue, isSet: whenIsSet, isActive: expanded == .when,
+                      accent: accent) { toggle(.when) }
 
-          AttributePill(icon: "calendar", label: "When",
-                        value: draft.scheduled.map(Self.dateLabel),
-                        isSet: draft.scheduled != nil, isActive: expanded == .when,
-                        accent: accent) { toggle(.when) }
+        AttributePill(icon: "flag", label: "Deadline",
+                      value: draft.deadline.map(Self.dateLabel),
+                      isSet: draft.deadline != nil, isActive: expanded == .deadline,
+                      accent: accent) { toggle(.deadline) }
 
-          AttributePill(icon: "flag", label: "Deadline",
-                        value: draft.deadline.map(Self.dateLabel),
-                        isSet: draft.deadline != nil, isActive: expanded == .deadline,
-                        accent: accent) { toggle(.deadline) }
+        AttributePill(icon: "repeat", label: "Repeat",
+                      value: draft.recurrence?.shortLabel,
+                      isSet: draft.recurrence != nil, isActive: expanded == .repeatRule,
+                      accent: accent) { toggleRepeat() }
 
-          AttributePill(icon: "repeat", label: "Repeat",
-                        value: draft.recurrence?.shortLabel,
-                        isSet: draft.recurrence != nil, isActive: expanded == .repeatRule,
-                        accent: accent) { toggleRepeat() }
-
-          AttributePill(icon: "folder", label: "List",
-                        value: listValue,
-                        isSet: draft.areaId != nil || draft.projectId != nil,
-                        isActive: false, accent: accent) {
-            onInteractStart()
-            withAnimation(.snappy(duration: 0.2)) { expanded = nil }
-            showingList = true
-          }
+        AttributePill(icon: "folder", label: "List",
+                      value: listValue,
+                      isSet: draft.areaId != nil || draft.projectId != nil,
+                      isActive: false, accent: accent) {
+          onInteractStart()
+          withAnimation(.snappy(duration: 0.2)) { expanded = nil }
+          showingList = true
         }
-        .padding(.horizontal, 2)
       }
-      .scrollIndicators(.hidden)
 
       inlineEditor
     }
@@ -256,11 +247,19 @@ struct TaskAttributeBar: View {
       : nil
   }
 
+  /// "When" folds in Today: a task pinned to today (no date) reads "Today",
+  /// a future planning date reads its date.
+  private var whenIsSet: Bool { draft.scheduled != nil || draft.onToday }
+  private var whenValue: String? {
+    if let s = draft.scheduled { return Self.dateLabel(s) }
+    return draft.onToday ? "Today" : nil
+  }
+
   @ViewBuilder
   private var inlineEditor: some View {
     switch expanded {
     case .when:
-      InlineDatePanel(date: $draft.scheduled, accent: accent)
+      InlineWhenPanel(onToday: $draft.onToday, scheduled: $draft.scheduled, accent: accent)
         .transition(.opacity.combined(with: .move(edge: .top)))
     case .deadline:
       InlineDatePanel(date: $draft.deadline, accent: accent)
@@ -338,11 +337,90 @@ private struct AttributePill: View {
   }
 }
 
+// MARK: - Inline "When" editor
+
+/// The scheduling control — manages both the `today` pin and a planning
+/// `Date?` so "Today" doesn't need its own pill. Quick chips (Today / Tomorrow
+/// / Weekend) sit above a graphical calendar; picking today normalizes back to
+/// the pinned-Today state. Expanded under the When pill.
+private struct InlineWhenPanel: View {
+  @Binding var onToday: Bool
+  @Binding var scheduled: Date?
+  let accent: Color
+
+  private var cal: Calendar { Calendar.current }
+  private var today: Date { cal.startOfDay(for: Date()) }
+  private var tomorrow: Date { cal.date(byAdding: .day, value: 1, to: today) ?? today }
+  /// Next Saturday.
+  private var weekend: Date {
+    var comps = DateComponents(); comps.weekday = 7
+    let next = cal.nextDate(after: today, matching: comps, matchingPolicy: .nextTime) ?? today
+    return cal.startOfDay(for: next)
+  }
+
+  private var isSet: Bool { scheduled != nil || onToday }
+
+  private var calendarBinding: Binding<Date> {
+    Binding(get: { scheduled ?? today }, set: { setDate($0) })
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      HStack(spacing: 8) {
+        chip("Today", active: onToday && scheduled == nil) { setToday() }
+        chip("Tomorrow", active: isSameDay(scheduled, tomorrow)) { setDate(tomorrow) }
+        chip("Weekend", active: isSameDay(scheduled, weekend)) { setDate(weekend) }
+      }
+
+      DatePicker("", selection: calendarBinding, displayedComponents: [.date])
+        .datePickerStyle(.graphical)
+        .tint(accent)
+
+      if isSet {
+        Button(role: .destructive) {
+          withAnimation(.snappy(duration: 0.2)) { onToday = false; scheduled = nil }
+        } label: {
+          Label("Clear", systemImage: "xmark.circle").font(.septenaLabel)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Theme.overdueRed)
+      }
+    }
+    .padding(12)
+    .background(Theme.secondaryGroupedBackground,
+                in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+  }
+
+  private func setToday() { onToday = true; scheduled = nil }
+  private func setDate(_ d: Date) {
+    let day = cal.startOfDay(for: d)
+    if cal.isDateInToday(day) { setToday() }
+    else { onToday = false; scheduled = day }
+  }
+  private func isSameDay(_ a: Date?, _ b: Date) -> Bool {
+    a.map { cal.isDate($0, inSameDayAs: b) } ?? false
+  }
+
+  @ViewBuilder
+  private func chip(_ title: String, active: Bool, _ action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+      Text(title)
+        .font(.septenaLabel)
+        .foregroundStyle(active ? Theme.inkPrimary : Theme.inkSecondary)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .contentShape(Capsule())
+    }
+    .buttonStyle(.plain)
+    .glassEffect(.regular.tint(active ? accent.opacity(0.42) : .clear).interactive(), in: .capsule)
+  }
+}
+
 // MARK: - Inline date editor
 
 /// A graphical calendar that writes a `Date?`. Selecting a day sets it;
-/// "Clear" removes it. Lives inside the composer card when a When / Deadline
-/// pill is expanded.
+/// "Clear" removes it. Lives inside the composer card when the Deadline pill
+/// is expanded.
 private struct InlineDatePanel: View {
   @Binding var date: Date?
   let accent: Color

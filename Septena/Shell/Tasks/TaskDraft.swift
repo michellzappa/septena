@@ -84,8 +84,8 @@ struct TaskDraft {
     return task
   }
 
-  /// Apply edits to an existing task, mirroring the original `EditTaskSheet`
-  /// save: only fire the mutations whose value actually changed.
+  /// Apply edits to an existing task: only fire the mutations whose value
+  /// actually changed (the Things-style save the composer commits on Done).
   @MainActor
   func update(_ original: SeptenaTask, via mutator: TaskMutator) {
     let id = original.id
