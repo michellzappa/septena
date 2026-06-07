@@ -1285,7 +1285,25 @@ struct TaskListView: View {
     // clears these out. We do NOT cancelAll() here for the same reason.
     let freshIDs = Set(local.map(\.id))
     let lingering = prior.filter { settle.isSettling($0.id) && !freshIDs.contains($0.id) }
-    items = local + lingering
+    // Reinsert each lingering row at the slot it held in `prior` rather than
+    // appending it. Appending would yank the just-checked row to the bottom of
+    // the list before it had a chance to fade — exactly the "moves down" jump
+    // we're avoiding. Anchor each one right after its nearest still-present
+    // predecessor so it fades out in place. `lingering` is in `prior` order, so
+    // earlier insertions become valid anchors for adjacent lingering rows.
+    var merged = local
+    for task in lingering {
+      guard let priorIndex = prior.firstIndex(where: { $0.id == task.id }) else { continue }
+      var insertAt = 0
+      for i in stride(from: priorIndex - 1, through: 0, by: -1) {
+        if let anchor = merged.firstIndex(where: { $0.id == prior[i].id }) {
+          insertAt = anchor + 1
+          break
+        }
+      }
+      merged.insert(task, at: min(insertAt, merged.count))
+    }
+    items = merged
     review = []
     doneToday = []
     loadedFilters.insert(filter)
