@@ -4140,11 +4140,6 @@ private struct GitHubIntegrationDetail: View {
 private struct ClaudeGatewayDetail: View {
   @State private var provider = ClaudeGatewayProvider.shared
 
-  private var lastRefreshLabel: String {
-    guard let at = provider.lastRefreshAt else { return "Never" }
-    return at.formatted(.relative(presentation: .named))
-  }
-
   var body: some View {
     Form {
       Section {
@@ -4169,10 +4164,14 @@ private struct ClaudeGatewayDetail: View {
             Text(provider.needsReauth ? "Reconnect needed" : (provider.lastError == nil ? "Connected" : "Needs attention"))
               .foregroundStyle(provider.needsReauth || provider.lastError != nil ? .orange : .green)
           }
-          HStack {
-            Label("Last authenticated", systemImage: "clock.arrow.circlepath")
-            Spacer()
-            Text(lastRefreshLabel).foregroundStyle(.secondary)
+          if let last = provider.lastRefreshAt {
+            ClaudeConnectionTimer(lastRefreshAt: last, dueAt: provider.nudgeFireDate)
+          } else {
+            HStack {
+              Label("Last authenticated", systemImage: "clock.arrow.circlepath")
+              Spacer()
+              Text("Never").foregroundStyle(.secondary)
+            }
           }
           Button {
             Task { await provider.refreshNow() }
@@ -4195,6 +4194,59 @@ private struct ClaudeGatewayDetail: View {
       }
     }
     .formStyle(.grouped)
+  }
+}
+
+// Live "time since last connected" + countdown to the auto-refresh horizon.
+// `TimelineView` ticks the labels without any manual timer; it stops when the
+// pane is offscreen. The "due" line keys off `nudgeFireDate` (lastRefreshAt +
+// ~7h) — the same horizon that flips `needsReauth` and arms the reconnect
+// nudge — so the number the user sees here matches what the app acts on.
+private struct ClaudeConnectionTimer: View {
+  let lastRefreshAt: Date
+  let dueAt: Date?
+
+  var body: some View {
+    TimelineView(.periodic(from: .now, by: 1)) { ctx in
+      let now = ctx.date
+      HStack(alignment: .firstTextBaseline) {
+        Label("Connected", systemImage: "clock.arrow.circlepath")
+        Spacer()
+        VStack(alignment: .trailing, spacing: 2) {
+          Text("\(Self.compact(now.timeIntervalSince(lastRefreshAt))) ago")
+            .foregroundStyle(.secondary)
+            .monospacedDigit()
+          dueLine(now: now)
+        }
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func dueLine(now: Date) -> some View {
+    if let dueAt {
+      let remaining = dueAt.timeIntervalSince(now)
+      if remaining > 0 {
+        Text("auto-refresh in \(Self.compact(remaining))")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .monospacedDigit()
+      } else {
+        Text("refresh recommended")
+          .font(.caption)
+          .foregroundStyle(.orange)
+      }
+    }
+  }
+
+  /// "2h 14m", "46m 03s", "12s" — drops to finer units as the value shrinks so
+  /// the trailing digits visibly tick.
+  static func compact(_ interval: TimeInterval) -> String {
+    let total = max(0, Int(interval))
+    let h = total / 3600, m = (total % 3600) / 60, s = total % 60
+    if h > 0 { return "\(h)h \(m)m" }
+    if m > 0 { return String(format: "%dm %02ds", m, s) }
+    return "\(s)s"
   }
 }
 
