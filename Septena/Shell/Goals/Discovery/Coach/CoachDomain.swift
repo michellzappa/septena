@@ -12,8 +12,13 @@ enum CoachDomain: String, CaseIterable, Identifiable {
   case food
   case accountability
   case wholeLife
+  case custom
 
   var id: String { rawValue }
+
+  /// Freeform presets start with NOTHING in scope — the user opts sections
+  /// in via the pills, rather than muting an opinionated default down.
+  var handPicksContext: Bool { self == .custom }
 
   var title: String {
     switch self {
@@ -21,6 +26,7 @@ enum CoachDomain: String, CaseIterable, Identifiable {
     case .food:           return "Food Coach"
     case .accountability: return "Accountability Coach"
     case .wholeLife:      return "Whole-Life Coach"
+    case .custom:         return "Custom Coach"
     }
   }
 
@@ -30,6 +36,7 @@ enum CoachDomain: String, CaseIterable, Identifiable {
     case .food:           return "Reflect on what you ate, drank, and how your gut felt."
     case .accountability: return "Where did your tasks, chores, and habits land?"
     case .wholeLife:      return "A view across everything you tracked this week."
+    case .custom:         return "Hand-pick exactly what I can see, then talk."
     }
   }
 
@@ -39,6 +46,7 @@ enum CoachDomain: String, CaseIterable, Identifiable {
     case .food:           return "fork.knife"
     case .accountability: return "checklist"
     case .wholeLife:      return "sparkles"
+    case .custom:         return "slider.horizontal.3"
     }
   }
 
@@ -48,6 +56,7 @@ enum CoachDomain: String, CaseIterable, Identifiable {
     case .food:           return .green
     case .accountability: return .blue
     case .wholeLife:      return .teal
+    case .custom:         return .purple
     }
   }
 
@@ -60,6 +69,7 @@ enum CoachDomain: String, CaseIterable, Identifiable {
     case .food:           return ["nutrition", "supplements", "hydration", "gut"]
     case .accountability: return ["tasks", "chores", "habits"]
     case .wholeLife:      return nil
+    case .custom:         return nil   // all sections offered; user scopes via pills
     }
   }
 
@@ -85,6 +95,8 @@ enum CoachDomain: String, CaseIterable, Identifiable {
       return "You are a warm but direct accountability coach. You care about follow-through on the things the person said mattered.\n\n" + shared
     case .wholeLife:
       return "You are a thoughtful life coach with a view across all the person's tracked domains. You gently connect patterns between areas.\n\n" + shared
+    case .custom:
+      return "You are a flexible coach. The person has hand-picked which areas you can see. Talk only about what's in scope; if the FACTS show nothing, invite them to add a section via the pills above.\n\n" + shared
     }
   }
 
@@ -108,6 +120,10 @@ enum CoachDomain: String, CaseIterable, Identifiable {
       return ["What stands out this period?",
               "Where am I doing well?",
               "What needs my attention?"]
+    case .custom:
+      return ["What stands out?",
+              "Any patterns here?",
+              "What should I notice?"]
     }
   }
 
@@ -119,6 +135,7 @@ enum CoachDomain: String, CaseIterable, Identifiable {
     case .food:           return "I've got your last week of food, hydration, and gut logs in view. Where do you want to start?"
     case .accountability: return "I can see how your tasks, chores, and habits landed this week. What's nagging at you?"
     case .wholeLife:      return "I've got the whole week in front of me. What feels worth talking through?"
+    case .custom:         return "Tap the sections above to bring them into view, then ask me anything about them."
     }
   }
 }

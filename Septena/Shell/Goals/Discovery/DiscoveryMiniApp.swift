@@ -63,9 +63,9 @@ struct AnyDiscoveryMiniApp: Identifiable {
 @MainActor
 enum DiscoveryRegistry {
   static let all: [DiscoveryMiniAppDescriptor] = [
+    CoachMiniApp.descriptor,
     IkigaiMiniApp.descriptor,
     ValuesMiniApp.descriptor,
     VirtueMiniApp.descriptor,
-    CoachMiniApp.descriptor,
   ]
 }

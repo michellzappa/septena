@@ -42,7 +42,13 @@ struct CoachChatView: View {
       }
     }
     .task {
-      if session == nil { rebuild() }
+      if session == nil {
+        // Freeform coach starts with nothing in scope — you opt sections in.
+        if domain.handPicksContext {
+          mutedKeys = Set(domain.sectionKeys ?? CoachContextBuilder.supportedKeys)
+        }
+        rebuild()
+      }
     }
     .onChange(of: window) { rebuild() }
   }
@@ -89,7 +95,9 @@ struct CoachChatView: View {
 
       Divider()
       // Just above the keyboard: tappable starters, until the chat begins.
-      if !hasUserMessage(session), session.isLive, !session.domain.starters.isEmpty {
+      // For the freeform coach, hold them back until something's in scope.
+      if !hasUserMessage(session), session.isLive, !session.domain.starters.isEmpty,
+         !domain.handPicksContext || anyInScope(session) {
         starterStrip(session)
       }
       inputBar(session)
@@ -163,6 +171,11 @@ struct CoachChatView: View {
 
   private func hasUserMessage(_ session: CoachSession) -> Bool {
     session.messages.contains { $0.role == .user }
+  }
+
+  /// Any section currently in scope (pill present and not muted).
+  private func anyInScope(_ session: CoachSession) -> Bool {
+    session.pills.contains { !mutedKeys.contains($0.id) }
   }
 
   private func bubble(_ message: CoachSession.Message) -> some View {
