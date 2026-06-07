@@ -4139,6 +4139,11 @@ private struct GitHubIntegrationDetail: View {
 /// token, never the user's data.
 private struct ClaudeGatewayDetail: View {
   @State private var provider = ClaudeGatewayProvider.shared
+  @State private var urlCopied = false
+
+  /// The exact custom-connector address Claude expects (the JSON-RPC MCP
+  /// transport endpoint). NOT the bare domain — Claude needs the `/mcp` path.
+  private static let connectorURL = "https://mcp.septena.app/mcp"
 
   var body: some View {
     Form {
@@ -4153,7 +4158,36 @@ private struct ClaudeGatewayDetail: View {
           }
         }
       } footer: {
-        Text("Connecting lets Claude (at claude.ai or in the Claude app) read and write your Septena data via the MCP connector. Your data stays in iCloud — the gateway only relays a short-lived access token, which this app refreshes automatically. Add the connector in Claude using mcp.septena.app.")
+        Text("Connecting lets Claude (at claude.ai or in the Claude app) read and write your Septena data via the MCP connector. Your data stays in iCloud — the gateway only relays a short-lived access token, which this app refreshes automatically. Use the address below to add the connector in Claude.")
+      }
+
+      Section {
+        Button {
+          SkillCopy.copy(Self.connectorURL)
+          withAnimation { urlCopied = true }
+          Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            withAnimation { urlCopied = false }
+          }
+        } label: {
+          HStack(spacing: 12) {
+            Image(systemName: "link").font(.body).foregroundStyle(.secondary).frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
+              Text("Connector address")
+              Text(Self.connectorURL)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            Image(systemName: urlCopied ? "checkmark.circle.fill" : "doc.on.doc")
+              .foregroundStyle(urlCopied ? .green : .secondary)
+          }
+        }
+        .buttonStyle(.plain)
+      } header: {
+        Text("Add to Claude")
+      } footer: {
+        Text("In Claude — claude.ai → Settings → Connectors, or the Claude app — add a custom connector and paste this address. You'll be asked to sign in with your Apple ID once to authorize access to your private iCloud data.")
       }
 
       if provider.isEnabled {

@@ -892,6 +892,9 @@
         }
       }
     },
+    "Add to Claude" : {
+
+    },
     "Added by Claude, not yet seen" : {
       "localizations" : {
         "pt-BR" : {
@@ -1554,6 +1557,7 @@
       }
     },
     "Connecting lets Claude (at claude.ai or in the Claude app) read and write your Septena data via the MCP connector. Your data stays in iCloud — the gateway only relays a short-lived access token, which this app refreshes automatically. Add the connector in Claude using mcp.septena.app." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -1562,6 +1566,9 @@
           }
         }
       }
+    },
+    "Connecting lets Claude (at claude.ai or in the Claude app) read and write your Septena data via the MCP connector. Your data stays in iCloud — the gateway only relays a short-lived access token, which this app refreshes automatically. Use the address below to add the connector in Claude." : {
+
     },
     "Connection" : {
       "localizations" : {
@@ -1572,6 +1579,9 @@
           }
         }
       }
+    },
+    "Connector address" : {
+
     },
     "Content" : {
       "localizations" : {
@@ -2641,6 +2651,9 @@
           }
         }
       }
+    },
+    "In Claude — claude.ai → Settings → Connectors, or the Claude app — add a custom connector and paste this address. You'll be asked to sign in with your Apple ID once to authorize access to your private iCloud data." : {
+
     },
     "In session" : {
       "localizations" : {
