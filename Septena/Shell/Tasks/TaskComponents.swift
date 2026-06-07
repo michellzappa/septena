@@ -92,21 +92,135 @@ struct AgentCueMarker: View {
   }
 }
 
-struct TaskRow: View {
-  let task: SeptenaTask
-  var accent: Color
-  /// Show the "promoted to Today" sun glyph in the checkbox. Pass `false`
-  /// inside the Today list itself (where every row is already today, so
-  /// the indicator is noise) and `true` elsewhere.
-  var showsTodayIndicator: Bool = false
-  /// Optional trailing text (e.g. a deadline like "May 30"). Rendered in
-  /// `trailingTint` when set, otherwise secondary ink.
-  var trailing: String? = nil
-  var trailingTint: Color? = nil
+// MARK: - Checkable row primitive
+//
+// The shared skeleton behind every row with a checkbox — tasks, habits,
+// supplements, chores. Owns the checkbox (+ baseline guide), the leading glyph
+// (an agent-cue dot for tasks, an emoji for the checklist sections), the title
+// with its inactive (done / skipped / deferred / cancelled) treatment, an
+// optional subtitle, and the h/v padding so it drops into a
+// `DrawerSection(padding: .none)` the same way `LogEntryRow` does. The only
+// genuinely per-type piece — the trailing region (dates, time, badges) — is a
+// `@ViewBuilder` slot the caller fills. Per-type toggle side-effects
+// (celebrations, haptics) live in `onToggle`; per-type long-press actions are
+// attached by the caller via `.contextMenu` on the returned row.
+struct CheckableRow<Trailing: View>: View {
+  var tint: Color
+  var isDone: Bool
+  var isToday: Bool = false
+  var isSomeday: Bool = false
+  /// Strikethrough + dimmed title. Usually `isDone`, but habits fold in
+  /// skipped and chores fold in deferred, so the caller decides.
+  var isInactive: Bool
+  /// Leading glyph. `showsAgentCue` wins (tasks); otherwise `leadingEmoji`
+  /// renders (checklist sections). Both off → title sits next to the box.
+  var showsAgentCue: Bool = false
+  var leadingEmoji: String? = nil
+  let title: String
+  var subtitle: String? = nil
+  @ViewBuilder var trailing: () -> Trailing
   let onToggle: () -> Void
   var onTap: (() -> Void)? = nil
 
   @Environment(\.rowHInset) private var rowHInset
+
+  var body: some View {
+    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
+      TaskCheckbox(
+        tint: tint,
+        isDone: isDone,
+        isToday: isToday,
+        isSomeday: isSomeday,
+        onToggle: onToggle
+      )
+      .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+
+      if showsAgentCue {
+        AgentCueMarker(tint: tint)
+          .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+      } else if let leadingEmoji {
+        Text(leadingEmoji).font(.body)
+      }
+
+      VStack(alignment: .leading, spacing: 4) {
+        Text(title)
+          .font(.septenaTaskTitle)
+          .foregroundStyle(isInactive ? Theme.inkSecondary : Theme.inkPrimary)
+          .strikethrough(isInactive)
+          .opacity(isInactive ? 0.5 : 1)
+          .lineLimit(1)
+          .truncationMode(.tail)
+          .fixedSize(horizontal: false, vertical: true)
+        if let subtitle {
+          Text(subtitle)
+            .font(.septenaMeta)
+            .foregroundStyle(Theme.inkSecondary)
+            .lineLimit(1)
+            .truncationMode(.tail)
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+
+      trailing()
+    }
+    .padding(.horizontal, rowHInset)
+    .padding(.vertical, Theme.rowVPadding)
+    .contentShape(Rectangle())
+    .modifier(OptionalTap(action: onTap))
+  }
+}
+
+extension CheckableRow where Trailing == EmptyView {
+  init(tint: Color, isDone: Bool, isToday: Bool = false, isSomeday: Bool = false,
+       isInactive: Bool, showsAgentCue: Bool = false, leadingEmoji: String? = nil,
+       title: String, subtitle: String? = nil,
+       onToggle: @escaping () -> Void, onTap: (() -> Void)? = nil) {
+    self.init(tint: tint, isDone: isDone, isToday: isToday, isSomeday: isSomeday,
+              isInactive: isInactive, showsAgentCue: showsAgentCue,
+              leadingEmoji: leadingEmoji, title: title, subtitle: subtitle,
+              trailing: { EmptyView() }, onToggle: onToggle, onTap: onTap)
+  }
+}
+
+/// Adds an `onTapGesture` only when an action is supplied. Rows inside a
+/// SwiftUI `List` (the deep `TaskListView`) pass `nil` so the row's own tap
+/// gesture never swallows List selection — they wire tap externally instead.
+private struct OptionalTap: ViewModifier {
+  let action: (() -> Void)?
+  func body(content: Content) -> some View {
+    if let action {
+      content.onTapGesture(perform: action)
+    } else {
+      content
+    }
+  }
+}
+
+// MARK: - Task row
+//
+// The single closed (non-editing) task row used by every task surface — the
+// Tasks drawer, the deep `TaskListView`, and the dashboard Next feed — so a
+// task looks identical wherever it appears. A thin, data-driven wrapper over
+// `CheckableRow`: it owns the canonical trailing (notes / recurrence glyphs +
+// the due / scheduled date treatment) and resolves the project→area subtitle.
+struct TaskRow: View {
+  let task: SeptenaTask
+  var accent: Color
+  /// Backing catalog for the project / area subtitle. Empty → no subtitle.
+  var areas: [Area] = []
+  var projects: [Project] = []
+  /// Suppress the project / area chip when the surrounding context already
+  /// shows it (a project page suppresses both; an area page suppresses area
+  /// only). The deep list maps these from its `TaskFilter`.
+  var suppressProject: Bool = false
+  var suppressArea: Bool = false
+  /// Show the "promoted to Today" accent in the checkbox, and the scheduled
+  /// date in the trailing. Pass `false` on Today / Next surfaces (where every
+  /// row is already today, so both are noise).
+  var showsTodayIndicator: Bool = true
+  var showsSomedayIndicator: Bool = true
+  let onToggle: () -> Void
+  var onTap: (() -> Void)? = nil
 
   private var isInactive: Bool {
     task.status == .done || task.status == .cancelled
@@ -115,53 +229,82 @@ struct TaskRow: View {
     !(task.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
+  /// Project wins over area (a task in a project implies its area), each
+  /// honoring its suppression flag. Mirrors the old `TaskListView.metaLine`.
+  private var subtitle: String? {
+    if !suppressProject, let pid = task.project,
+       let p = projects.first(where: { $0.id == pid }) { return p.title }
+    if !suppressArea, let aid = task.area,
+       let a = areas.first(where: { $0.id == aid }) { return a.title }
+    return nil
+  }
+
   var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
-      TaskCheckbox(
-        tint: accent,
-        isDone: task.status == .done,
-        isToday: task.isOnToday && showsTodayIndicator,
-        isSomeday: task.status == .someday,
-        onToggle: onToggle
-      )
-      .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+    CheckableRow(
+      tint: accent,
+      isDone: task.status == .done,
+      isToday: task.isOnToday && showsTodayIndicator,
+      isSomeday: task.status == .someday && showsSomedayIndicator,
+      isInactive: isInactive,
+      showsAgentCue: task.showsAgentCue(),
+      title: task.title,
+      subtitle: subtitle,
+      trailing: { trailing },
+      onToggle: onToggle,
+      onTap: onTap
+    )
+  }
 
-      if task.showsAgentCue() {
-        AgentCueMarker(tint: accent)
-          .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
-      }
-
-      Text(task.title)
-        .font(.septenaTaskTitle)
-        .foregroundStyle(isInactive ? Theme.inkSecondary : Theme.inkPrimary)
-        .strikethrough(isInactive)
-        .opacity(isInactive ? 0.5 : 1)
-        .lineLimit(1)
-        .truncationMode(.tail)
-        .frame(maxWidth: .infinity, alignment: .leading)
-
-      if hasNotes {
-        Image(systemName: "text.alignleft")
-          .scaledFont(size: 12)
-          .foregroundStyle(Theme.inkSecondary)
-      }
-
-      if task.recurrence != nil {
-        Image(systemName: "arrow.triangle.2.circlepath")
-          .scaledFont(size: 12)
-          .foregroundStyle(Theme.inkSecondary)
-      }
-
-      if let trailing {
-        Text(trailing)
-          .font(.caption)
-          .foregroundStyle(trailingTint ?? Theme.inkSecondary)
-      }
+  @ViewBuilder private var trailing: some View {
+    if hasNotes {
+      Image(systemName: "text.alignleft")
+        .scaledFont(size: 12)
+        .foregroundStyle(Theme.inkSecondary)
     }
-    .padding(.horizontal, rowHInset)
-    .padding(.vertical, Theme.rowVPadding)
-    .contentShape(Rectangle())
-    .onTapGesture { onTap?() }
+    if task.recurrence != nil {
+      Image(systemName: "arrow.triangle.2.circlepath")
+        .scaledFont(size: 12)
+        .foregroundStyle(Theme.inkSecondary)
+    }
+    trailingDate
+  }
+
+  /// Date treatment, lifted from the old `TaskListView.trailingDate`:
+  ///   • `due ≤ today` → red bold date (`Today` / `May 14`).
+  ///   • `due > today` → gray flag + date (marked, not urgent).
+  ///   • no `due`, scheduled, not a Today surface → muted calendar + date.
+  @ViewBuilder private var trailingDate: some View {
+    let cal = Calendar.current
+    let today = cal.startOfDay(for: Date())
+    if let due = task.due.flatMap(SeptenaDate.parse) {
+      let dueDay = cal.startOfDay(for: due)
+      if dueDay <= today {
+        Text(cal.isDateInToday(due) ? "Today" : Self.shortDate(due))
+          .font(.septenaMeta.weight(.semibold))
+          .foregroundStyle(Theme.overdueRed)
+      } else {
+        HStack(spacing: 4) {
+          Image(systemName: "flag.fill").scaledFont(size: 12)
+          Text(Self.shortDate(due)).font(.septenaMeta)
+        }
+        .foregroundStyle(Theme.inkSecondary)
+      }
+    } else if showsTodayIndicator, let scheduled = task.scheduled.flatMap(SeptenaDate.parse) {
+      HStack(spacing: 4) {
+        Image(systemName: "calendar").scaledFont(size: 11)
+        Text(Self.shortDate(scheduled)).font(.septenaMeta)
+      }
+      .foregroundStyle(Theme.inkSecondary)
+    }
+  }
+
+  private static func shortDate(_ d: Date) -> String {
+    let cal = Calendar.current
+    if cal.isDateInToday(d) { return "Today" }
+    if cal.isDateInTomorrow(d) { return "Tomorrow" }
+    let f = DateFormatter()
+    f.setLocalizedDateFormatFromTemplate("MMMd")
+    return f.string(from: d)
   }
 }
 
@@ -188,83 +331,6 @@ struct ScreenTitle: View {
   }
 }
 
-
-// MARK: - Task row
-
-// Display-only row: checkbox + title + meta + trailing date. Tapping the row
-// (handled by the parent List) opens the detail drawer; the checkbox toggles
-// completion. The app is agent-first — Claude does the heavy task work — so the
-// row carries no inline editing, focus, or text fields. That keeps it cheap to
-// render and free of the gesture/focus/animation machinery the old inline
-// editor needed.
-struct TaskRowView<MetaLine: View, TrailingDate: View>: View {
-  @Environment(SectionTheme.self) private var theme
-
-  let task: SeptenaTask
-  let filter: TaskFilter
-  let accent: Color
-  @ViewBuilder let metaLine: () -> MetaLine
-  @ViewBuilder let trailingDate: () -> TrailingDate
-  let onToggle: () -> Void
-
-  private var isInactive: Bool { task.status == .done || task.status == .cancelled }
-  private var hasNotes: Bool {
-    !(task.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-  }
-
-  var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
-      TaskCheckbox(
-        tint: accent,
-        isDone: task.status == .done,
-        isToday: task.isOnToday && filter != .today,
-        isSomeday: task.status == .someday && filter != .someday,
-        onToggle: onToggle
-      )
-      .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
-
-      if task.showsAgentCue() {
-        AgentCueMarker(tint: accent)
-          .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
-      }
-
-      VStack(alignment: .leading, spacing: 4) {
-        titleView
-        metaLine()
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-
-      if hasNotes {
-        Image(systemName: "text.alignleft")
-          .scaledFont(size: 12)
-          .foregroundStyle(Theme.inkSecondary)
-      }
-      trailingDate()
-    }
-    .padding(.horizontal, Theme.hPadding)
-    .padding(.vertical, Theme.rowVPadding)
-    .contentShape(Rectangle())
-  }
-
-  @ViewBuilder private var titleView: some View {
-    if isInactive {
-      Text(task.title)
-        .font(.septenaTaskTitle)
-        .foregroundStyle(Theme.inkSecondary)
-        .strikethrough()
-        .opacity(0.5)
-        .lineLimit(1)
-        .truncationMode(.tail)
-    } else {
-      Text(task.title)
-        .font(.septenaTaskTitle)
-        .foregroundStyle(Theme.inkPrimary)
-        .lineLimit(1)
-        .truncationMode(.tail)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-  }
-}
 
 // MARK: - Week strip
 

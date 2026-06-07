@@ -124,24 +124,18 @@ struct TodayTaskRow: View {
   let mutator: TaskMutator
   let tint: Color
   @Environment(\.a11yMotion) private var motion
-  @Environment(\.rowHInset) private var rowHInset
 
   var body: some View {
-    let isDone = task.status == .done
-    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
-      TaskCheckbox(tint: tint, isDone: isDone) {
-        model.toggle(task, mutator: mutator, motion: motion)
-      }
-      .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
-      Text(task.title)
-        .font(.septenaTaskTitle)
-        .foregroundStyle(isDone ? Theme.inkSecondary : Theme.inkPrimary)
-        .strikethrough(isDone)
-        .opacity(isDone ? 0.5 : 1)
-      Spacer()
-    }
-    .padding(.horizontal, rowHInset)
-    .padding(.vertical, Theme.rowVPadding)
+    // On the Next surface every row is already today, so no Today indicator and
+    // no scheduled chip; an overdue `due` still surfaces via the canonical
+    // trailing. No subtitle here (the Next model doesn't load areas/projects).
+    TaskRow(
+      task: task,
+      accent: tint,
+      showsTodayIndicator: false,
+      onToggle: { model.toggle(task, mutator: mutator, motion: motion) },
+      onTap: nil
+    )
     // Same app-wide pattern as the other rows: long-press → menu. The
     // richer task menu (When… / Move… / Repeat… / Suggested) lives in
     // TaskListView because those actions need sheet state that doesn't
@@ -999,15 +993,23 @@ struct HabitRow: View {
   // Optional — HabitRow renders in multiple hosts (Next tab, Habits sheet);
   // not all inherit the root env. nil → celebration no-ops, toggle still runs.
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
-  @Environment(\.rowHInset) private var rowHInset
 
   var body: some View {
     let inactive = habit.done || habit.skipped
-    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
-      TaskCheckbox(
-        tint: habit.skipped && !habit.done ? Theme.inkSecondary : tint,
-        isDone: inactive
-      ) {
+    CheckableRow(
+      tint: habit.skipped && !habit.done ? Theme.inkSecondary : tint,
+      isDone: inactive,
+      isInactive: inactive,
+      leadingEmoji: habit.emoji ?? "•",
+      title: habit.name,
+      trailing: {
+        if habit.skipped {
+          StatusBadge(text: "Skipped")
+        } else if let t = habit.time {
+          Text(t).font(.septenaMeta).foregroundStyle(Theme.inkSecondary)
+        }
+      },
+      onToggle: {
         // The optimistic flip + write lives on NextItemsModel; layer the
         // streak celebration on top here (the View can reach the environment;
         // the model can't). `done` is the value being written.
@@ -1036,23 +1038,7 @@ struct HabitRow: View {
           HabitMilestoneStore.reconcile(habit.id, currentStreak: streak)
         }
       }
-      .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
-
-      Text(habit.emoji ?? "•").font(.body)
-      Text(habit.name)
-        .font(.septenaTaskTitle)
-        .foregroundStyle(inactive ? Theme.inkSecondary : Theme.inkPrimary)
-        .strikethrough(inactive)
-        .opacity(inactive ? 0.5 : 1)
-      Spacer()
-      if habit.skipped {
-        StatusBadge(text: "Skipped")
-      } else if let t = habit.time {
-        Text(t).font(.septenaMeta).foregroundStyle(Theme.inkSecondary)
-      }
-    }
-    .padding(.horizontal, rowHInset)
-    .padding(.vertical, Theme.rowVPadding)
+    )
     .contextMenu {
       Button {
         model.skipHabit(habit, skipped: !habit.skipped, mutator: checklistMutator, motion: motion)
@@ -1082,7 +1068,6 @@ struct SupplementRow: View {
   @Environment(\.a11yMotion) private var motion
   @Environment(SectionTheme.self) private var theme
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
-  @Environment(\.rowHInset) private var rowHInset
 
   /// Toggle + (on taken) the `.cascade` celebration: marks dropping in
   /// sequence, scaled by how many supplements are now taken today. Undo's
@@ -1100,24 +1085,19 @@ struct SupplementRow: View {
   }
 
   var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
-      TaskCheckbox(tint: tint, isDone: supplement.done) {
-        commitToggle()
-      }
-      .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
-      Text(supplement.emoji ?? "•").font(.body)
-      Text(supplement.name)
-        .font(.septenaTaskTitle)
-        .foregroundStyle(supplement.done ? Theme.inkSecondary : Theme.inkPrimary)
-        .strikethrough(supplement.done)
-        .opacity(supplement.done ? 0.5 : 1)
-      Spacer()
-      if let t = supplement.time {
-        Text(t).font(.septenaMeta).foregroundStyle(Theme.inkSecondary)
-      }
-    }
-    .padding(.horizontal, rowHInset)
-    .padding(.vertical, Theme.rowVPadding)
+    CheckableRow(
+      tint: tint,
+      isDone: supplement.done,
+      isInactive: supplement.done,
+      leadingEmoji: supplement.emoji ?? "•",
+      title: supplement.name,
+      trailing: {
+        if let t = supplement.time {
+          Text(t).font(.septenaMeta).foregroundStyle(Theme.inkSecondary)
+        }
+      },
+      onToggle: { commitToggle() }
+    )
     // Consistent with the other Next rows: long-press always offers a menu.
     // Mark taken/not-taken mirrors the checkbox for discoverability; Delete
     // shows only where a host owns the record (the Supplements mini-app).
@@ -1150,18 +1130,35 @@ struct ChoreRow: View {
   @Environment(\.a11yMotion) private var motion
   @Environment(SectionTheme.self) private var theme
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
-  @Environment(\.rowHInset) private var rowHInset
 
   var body: some View {
     let isDone = model.completedChores.contains(chore.id)
     let deferLabel = model.deferredChores[chore.id]
     let inactive = isDone || deferLabel != nil
 
-    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
-      TaskCheckbox(
-        tint: deferLabel != nil ? Theme.inkSecondary : tint,
-        isDone: inactive
-      ) {
+    CheckableRow(
+      tint: deferLabel != nil ? Theme.inkSecondary : tint,
+      isDone: inactive,
+      isInactive: inactive,
+      leadingEmoji: chore.emoji ?? "•",
+      title: chore.name,
+      trailing: {
+        if isDone {
+          // Show when it was completed (persisted via the chore's complete
+          // event), matching the time treatment on habit / supplement rows.
+          // Falls back to a "Done" badge if no time was recorded.
+          if let t = chore.lastCompletedTime, !t.isEmpty {
+            Text(t).font(.septenaMeta).foregroundStyle(Theme.inkSecondary)
+          } else {
+            StatusBadge(text: "Done")
+          }
+        } else if let label = deferLabel {
+          StatusBadge(text: label)
+        } else {
+          choreOverdueBadge(chore.daysOverdue)
+        }
+      },
+      onToggle: {
         if isDone {
           model.uncompleteChore(chore, mutator: checklistMutator)
         } else {
@@ -1173,31 +1170,7 @@ struct ChoreRow: View {
                                     intensity: 1))
         }
       }
-      .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
-      Text(chore.emoji ?? "•").font(.body)
-      Text(chore.name)
-        .font(.septenaTaskTitle)
-        .foregroundStyle(inactive ? Theme.inkSecondary : Theme.inkPrimary)
-        .strikethrough(inactive)
-        .opacity(inactive ? 0.5 : 1)
-      Spacer()
-      if isDone {
-        // Show when it was completed (persisted via the chore's complete
-        // event), matching the time treatment on habit / supplement rows.
-        // Falls back to a "Done" badge if no time was recorded.
-        if let t = chore.lastCompletedTime, !t.isEmpty {
-          Text(t).font(.septenaMeta).foregroundStyle(Theme.inkSecondary)
-        } else {
-          StatusBadge(text: "Done")
-        }
-      } else if let label = deferLabel {
-        StatusBadge(text: label)
-      } else {
-        choreOverdueBadge(chore.daysOverdue)
-      }
-    }
-    .padding(.horizontal, rowHInset)
-    .padding(.vertical, Theme.rowVPadding)
+    )
     .contextMenu {
       if !isDone && deferLabel == nil {
         if chore.daysOverdue < 0 {

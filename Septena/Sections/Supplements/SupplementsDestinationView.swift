@@ -7,7 +7,6 @@ import SwiftUI
 
 struct SupplementsDestinationView: View {
   @Environment(ChecklistMutator.self) private var checklistMutator
-  @Environment(\.rowHInset) private var rowHInset
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
 
@@ -213,23 +212,18 @@ struct SupplementsDestinationView: View {
   // fonts/padding/strikethrough treatment, checkbox-only tap target. Only the
   // write target differs — it commits to `viewingDate`, not today.
   private func pastDayRow(_ item: SupplementDayItem) -> some View {
-    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
-      TaskCheckbox(tint: accent, isDone: item.done) {
+    CheckableRow(
+      tint: accent,
+      isDone: item.done,
+      isInactive: item.done,
+      leadingEmoji: item.emoji ?? "•",
+      title: item.name,
+      onToggle: {
         let next = !item.done
         checklistMutator.toggleSupplement(id: item.id, date: viewingDate, done: next)
         if next { Haptics.success() } else { Haptics.tap() }
       }
-      .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
-      Text(item.emoji ?? "•").font(.body)
-      Text(item.name)
-        .font(.septenaTaskTitle)
-        .foregroundStyle(item.done ? Theme.inkSecondary : Theme.inkPrimary)
-        .strikethrough(item.done)
-        .opacity(item.done ? 0.5 : 1)
-      Spacer()
-    }
-    .padding(.horizontal, rowHInset)
-    .padding(.vertical, Theme.rowVPadding)
+    )
   }
 
   private func reloadPastDay() async {
