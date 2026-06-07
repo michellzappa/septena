@@ -32,7 +32,7 @@ struct CoachPickerView: View {
         Section {
           ForEach(CoachDomain.allCases) { domain in
             NavigationLink {
-              CoachChatView(domain: domain)
+              CoachChatView(domain: domain, onFinish: onFinish)
             } label: {
               Label {
                 VStack(alignment: .leading, spacing: 2) {

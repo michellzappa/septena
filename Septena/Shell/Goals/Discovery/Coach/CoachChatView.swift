@@ -1,5 +1,10 @@
 import SwiftData
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 // The one genuinely new bit of UI: a transcript + input. The session is
 // created lazily in `.task` (so it has access to the environment's
@@ -7,6 +12,9 @@ import SwiftUI
 
 struct CoachChatView: View {
   let domain: CoachDomain
+  /// Bridge back to the Discovery flow: hand it DraftGoals to leave the
+  /// chat and drop the user into goal review (the sanctioned write path).
+  let onFinish: ([DraftGoal]) -> Void
 
   @Environment(\.modelContext) private var context
   @State private var session: CoachSession?
@@ -15,6 +23,8 @@ struct CoachChatView: View {
   /// context. Persists across window changes within this chat.
   @State private var mutedKeys: Set<String> = []
   @State private var draft = ""
+  @State private var makingGoal = false
+  @State private var showingPrompt = false
   @FocusState private var inputFocused: Bool
 
   var body: some View {
@@ -32,13 +42,37 @@ struct CoachChatView: View {
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         Menu {
-          Picker("Look back", selection: $window) {
-            ForEach(CoachWindow.allCases) { w in Text(w.label).tag(w) }
+          // Time window — tucked into its own submenu.
+          Menu {
+            Picker("Look back", selection: $window) {
+              ForEach(CoachWindow.allCases) { w in Text(w.label).tag(w) }
+            }
+          } label: {
+            Label("Time · \(window.label)", systemImage: "calendar")
+          }
+
+          if let session {
+            Divider()
+            Button {
+              showingPrompt = true
+            } label: {
+              Label("View prompt", systemImage: "doc.text.magnifyingglass")
+            }
+            Button {
+              makeGoal(session)
+            } label: {
+              Label("Turn this chat into a goal", systemImage: "target")
+            }
+            .disabled(!hasUserMessage(session) || session.isThinking || makingGoal || !session.isLive)
           }
         } label: {
-          Label(window.shortLabel, systemImage: "calendar")
-            .labelStyle(.titleAndIcon)
+          Image(systemName: makingGoal ? "hourglass" : "ellipsis.circle")
         }
+      }
+    }
+    .sheet(isPresented: $showingPrompt) {
+      if let session {
+        CoachPromptInspector(text: session.systemPrompt, accent: domain.accent)
       }
     }
     .task {
@@ -80,15 +114,15 @@ struct CoachChatView: View {
         ScrollView {
           LazyVStack(spacing: 12) {
             ForEach(session.messages) { message in
-              bubble(message).id(message.id)
+              messageRow(session, message).id(message.id)
             }
-            if session.isThinking {
+            if session.awaitingFirstToken {
               thinkingRow.id("thinking")
             }
           }
           .padding(16)
         }
-        .onChange(of: session.messages.count) {
+        .onChange(of: session.messages.last?.text) {
           withAnimation { proxy.scrollTo(session.messages.last?.id, anchor: .bottom) }
         }
       }
@@ -178,26 +212,57 @@ struct CoachChatView: View {
     session.pills.contains { !mutedKeys.contains($0.id) }
   }
 
-  private func bubble(_ message: CoachSession.Message) -> some View {
+  /// One transcript row: the bubble plus any follow-up / action / citation
+  /// chips. Empty coach placeholders (pre-first-token) render nothing — the
+  /// "Thinking…" row covers that gap.
+  @ViewBuilder
+  private func messageRow(_ session: CoachSession, _ message: CoachSession.Message) -> some View {
     let isCoach = message.role == .coach
-    return VStack(alignment: isCoach ? .leading : .trailing, spacing: 6) {
-      Text(message.text)
-        .font(.body)
-        .fixedSize(horizontal: false, vertical: true)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(
-          isCoach ? AnyShapeStyle(Theme.secondaryGroupedBackground)
-                  : AnyShapeStyle(domain.accent.opacity(0.18)),
-          in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-        )
-      // Dormant today — lit up by a reasoning backend that proposes actions
-      // (confirmable, routed through mutators) and cites the data it used.
-      if isCoach, !message.actions.isEmpty { actionChips(message.actions) }
-      if isCoach, !message.citations.isEmpty { citationRow(message.citations) }
+    if isCoach && message.text.isEmpty {
+      EmptyView()
+    } else {
+      VStack(alignment: isCoach ? .leading : .trailing, spacing: 6) {
+        Text(message.text)
+          .font(.body)
+          .fixedSize(horizontal: false, vertical: true)
+          .padding(.horizontal, 14)
+          .padding(.vertical, 10)
+          .background(
+            isCoach ? AnyShapeStyle(Theme.secondaryGroupedBackground)
+                    : AnyShapeStyle(domain.accent.opacity(0.18)),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+          )
+        if isCoach, !message.followUps.isEmpty { followUpChips(session, message.followUps) }
+        // Dormant today — lit up by a reasoning backend that proposes actions
+        // (confirmable, routed through mutators) and cites the data it used.
+        if isCoach, !message.actions.isEmpty { actionChips(message.actions) }
+        if isCoach, !message.citations.isEmpty { citationRow(message.citations) }
+      }
+      .frame(maxWidth: .infinity, alignment: isCoach ? .leading : .trailing)
+      .padding(isCoach ? .trailing : .leading, 40)
     }
-    .frame(maxWidth: .infinity, alignment: isCoach ? .leading : .trailing)
-    .padding(isCoach ? .trailing : .leading, 40)
+  }
+
+  /// Tappable follow-ups offered after a coach reply — tap to ask it.
+  private func followUpChips(_ session: CoachSession, _ followUps: [String]) -> some View {
+    ScrollView(.horizontal, showsIndicators: false) {
+      HStack(spacing: 6) {
+        ForEach(followUps, id: \.self) { q in
+          Button {
+            draft = q
+            submit(session)
+          } label: {
+            Text(q)
+              .font(.caption.weight(.medium))
+              .foregroundStyle(domain.accent)
+              .padding(.horizontal, 12).padding(.vertical, 7)
+              .background(Capsule().stroke(domain.accent.opacity(0.35), lineWidth: 1))
+          }
+          .buttonStyle(.plain)
+          .disabled(session.isThinking)
+        }
+      }
+    }
   }
 
   /// Proposed actions as confirmable chips. The accept handler is a TODO:
@@ -273,6 +338,76 @@ struct CoachChatView: View {
     let text = draft
     draft = ""
     Task { await session.send(text) }
+  }
+
+  /// Distill the conversation into a DraftGoal and hand it back to the
+  /// Discovery flow for the user to confirm. No direct write — the goal is
+  /// reviewed and saved through the normal Goals path.
+  private func makeGoal(_ session: CoachSession) {
+    makingGoal = true
+    Task {
+      let text = await session.proposeGoal()
+      makingGoal = false
+      guard let text, !text.isEmpty else { return }
+      let sections = (domain.sectionKeys ?? CoachContextBuilder.supportedKeys)
+        .filter { !mutedKeys.contains($0) }
+      onFinish([DraftGoal(text: text, sections: sections, kind: .commitment)])
+    }
+  }
+}
+
+/// Read-only inspector for the exact context seeded into the model — the
+/// persona + computed FACTS/GOALS block. Has a copy button so the prompt
+/// can be pasted into another model for testing.
+private struct CoachPromptInspector: View {
+  let text: String
+  let accent: Color
+
+  @Environment(\.dismiss) private var dismiss
+  @State private var copied = false
+
+  var body: some View {
+    NavigationStack {
+      ScrollView {
+        Text(text)
+          .font(.system(.footnote, design: .monospaced))
+          .textSelection(.enabled)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(16)
+      }
+      .navigationTitle("Prompt")
+      #if os(iOS)
+      .navigationBarTitleDisplayMode(.inline)
+      #endif
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Done") { dismiss() }
+        }
+        ToolbarItem(placement: .primaryAction) {
+          Button {
+            CoachClipboard.copy(text)
+            withAnimation { copied = true }
+          } label: {
+            Label(copied ? "Copied" : "Copy",
+                  systemImage: copied ? "checkmark" : "doc.on.doc")
+          }
+          .tint(accent)
+        }
+      }
+    }
+  }
+}
+
+/// Tiny cross-platform pasteboard wrapper.
+private enum CoachClipboard {
+  static func copy(_ text: String) {
+    #if canImport(UIKit)
+    UIPasteboard.general.string = text
+    #elseif canImport(AppKit)
+    let pb = NSPasteboard.general
+    pb.clearContents()
+    pb.setString(text, forType: .string)
+    #endif
   }
 }
 
