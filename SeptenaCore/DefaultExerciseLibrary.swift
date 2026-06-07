@@ -270,6 +270,24 @@ enum DefaultExerciseLibrary {
     return dict
   }()
 
+  // Resolution table keyed by `exerciseKey` (lowercase, alphanumerics
+  // only) over id + name + every alias. Unlike `byAnySlug`, which keys on
+  // the literal alias string, this survives casing/separator drift —
+  // "Rear-Delt", "rear delt" and "rear-delt" all collapse to one hit.
+  // Used by CanonicalExerciseName to map stored labels → canonical names.
+  static let byKey: [String: LibraryExercise] = {
+    var dict: [String: LibraryExercise] = [:]
+    for entry in all {
+      for raw in [entry.id, entry.name] + entry.aliases {
+        let key = exerciseKey(raw)
+        // First writer wins: id and name are visited before aliases, so a
+        // canonical slug/name always beats an alias on collision.
+        if !key.isEmpty, dict[key] == nil { dict[key] = entry }
+      }
+    }
+    return dict
+  }()
+
   // Stable display order for the picker UI: strength grouped by muscle
   // (Muscle.allCases order), then core, cardio, mobility.
   static let grouped: [(title: String, items: [LibraryExercise])] = {

@@ -282,7 +282,7 @@ struct SessionCompleteSheet: View {
 
   private func loggedRow(_ e: DraftEntry) -> some View {
     HStack(spacing: 8) {
-      Text(e.exercise)
+      Text(CanonicalExerciseName.display(e.exercise))
         .font(.subheadline)
       if let pr = stats.prFlags[e.id] {
         if pr.weight   { prPill("PR kg") }

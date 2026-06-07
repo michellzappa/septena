@@ -1960,12 +1960,15 @@ final class TrainingMutator {
                 note: String? = nil,
                 concludedAt: String? = nil) -> ExerciseEntryEntity {
     let id = uniqueEntryID()
+    // Tidy the name on the way in (case/separator cleanup only — see
+    // CanonicalExerciseName.forStorage). Display still resolves through the
+    // catalog, so this just stops new entries adding fresh casing drift.
     let entity = ExerciseEntryEntity(
       id: id,
       date: date,
       time: time,
       sessionType: sessionType,
-      exercise: exercise,
+      exercise: CanonicalExerciseName.forStorage(exercise),
       weight: weight,
       sets: sets,
       reps: reps,

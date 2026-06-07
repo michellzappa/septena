@@ -180,7 +180,7 @@ struct TrainingDestinationView: View {
         ForEach(block.entries) { entry in
           if entry.file != nil {
             LogEntryRow(
-              title: entry.exercise ?? "—",
+              title: exerciseTitle(entry),
               detail: detailLine(entry),
               trailing: entry.loggedAt.map(timeOnly),
               accessory: glyphAccessory(for: entry),
@@ -189,7 +189,7 @@ struct TrainingDestinationView: View {
             )
           } else {
             LogEntryRow(
-              title: entry.exercise ?? "—",
+              title: exerciseTitle(entry),
               detail: detailLine(entry),
               trailing: entry.loggedAt.map(timeOnly),
               accessory: glyphAccessory(for: entry)
@@ -198,6 +198,14 @@ struct TrainingDestinationView: View {
         }
       }
     }
+  }
+
+  /// Canonical, title-cased name for a logged entry. Resolves the stored
+  /// label through the user's catalog + curated library so the history list
+  /// reads coherently regardless of how the name was originally written.
+  private func exerciseTitle(_ entry: ExerciseEntry) -> String {
+    guard let raw = entry.exercise, !raw.isEmpty else { return "—" }
+    return CanonicalExerciseName.display(raw, catalog: draftStore.exerciseNameByKey)
   }
 
   private func applyLocalUpdate(_ updated: ExerciseEntry) {
@@ -1253,7 +1261,7 @@ enum MetaExercise {
     switch name {
     case strength: return "All strength"
     case cardio:   return "All cardio"
-    default:       return name.capitalized
+    default:       return CanonicalExerciseName.display(name)
     }
   }
 }
@@ -1305,6 +1313,12 @@ final class TrainingDraftStore {
   /// Server-suggested next type, if any.
   var suggested: String? = nil
 
+  /// Cached `exerciseKey → display name` map from the user's catalog, used
+  /// to resolve stored entry labels to canonical names at render time.
+  /// Refreshed alongside the rest of the catalog; empty until first fetch
+  /// (display falls back to the curated library + title-case meanwhile).
+  var exerciseNameByKey: [String: String] = [:]
+
   /// Currently active draft. Nil when no session is in flight.
   var draft: DraftSession?
 
@@ -1344,6 +1358,7 @@ final class TrainingDraftStore {
     let s = ChecklistMirror.loadSuggestedWorkout(context: context)
     daysAgo = s.daysAgo
     suggested = s.suggested?.type
+    exerciseNameByKey = CanonicalExerciseName.catalogMap(context: context)
   }
 
   /// Re-hydrate progression context (last-entry, PR baselines, recents)
@@ -1664,6 +1679,18 @@ final class TrainingDraftStore {
     for id in ids {
       guard let name = nameByID[id] else { continue }
       addExercise(name, context: context)
+    }
+  }
+
+  /// Move the entry at `index` to the end of the session — "I'll do this one
+  /// last" (e.g. splitting cardio across the start and end of a workout).
+  /// Reorders the underlying entries; the completed-first list sort then
+  /// keeps it at the bottom of the remaining work.
+  func moveToEnd(at index: Int) {
+    update {
+      guard $0.entries.indices.contains(index) else { return }
+      let e = $0.entries.remove(at: index)
+      $0.entries.append(e)
     }
   }
 
@@ -2272,6 +2299,13 @@ struct TrainingExerciseCard: View {
     Haptics.tick()
   }
 
+  /// True when this slot is already the last entry in the session — no point
+  /// offering "Move to end".
+  private var isLastEntry: Bool {
+    guard let entries = store.draft?.entries else { return true }
+    return index == entries.count - 1
+  }
+
   /// Exercise names in the session other than this slot's — disabled in
   /// the switch picker so a swap can't create a duplicate entry.
   private var otherSessionNames: Set<String> {
@@ -2367,6 +2401,18 @@ struct TrainingExerciseCard: View {
             Haptics.tick()
           } label: {
             Label("Skip", systemImage: "forward.end")
+          }
+        }
+        // Reorder mid-session: push this exercise to the back of the queue
+        // (e.g. do part of your cardio now, the rest at the end). Hidden for
+        // finished rows and when it's already the last unfinished slot.
+        if entry.status != .done && entry.status != .saving && !isLastEntry {
+          Button {
+            store.moveToEnd(at: index)
+            openExercise = nil
+            Haptics.tick()
+          } label: {
+            Label("Move to end", systemImage: "arrow.down.to.line")
           }
         }
         if entry.status != .saving {
@@ -2696,10 +2742,7 @@ struct TrainingExerciseCard: View {
   /// canonical) and "chest press" (legacy). Replace any separator
   /// with a space and Title-Case the words for display.
   private func displayName(_ slug: String) -> String {
-    slug
-      .replacingOccurrences(of: "-", with: " ")
-      .replacingOccurrences(of: "_", with: " ")
-      .capitalized
+    CanonicalExerciseName.display(slug, catalog: store.exerciseNameByKey)
   }
 
   // MARK: - Mobility fields
@@ -2809,7 +2852,10 @@ struct TrainingExerciseCard: View {
     } label: {
       Image(systemName: systemName)
         .scaledFont(size: 13, weight: .bold)
-        .frame(width: 30, height: 40)
+        // Wide hit target — at the gym you tap −/+ far more than you type
+        // into the field, so the buttons earn the width and the number
+        // input keeps just enough room for its 2–3 digits.
+        .frame(width: 60, height: 40)
         .background(accent.opacity(0.14),
                     in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .foregroundStyle(accent)
