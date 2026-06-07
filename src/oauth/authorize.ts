@@ -95,12 +95,6 @@ function consentPage(clientName: string): string {
     background: #fafafa;
     color: #1a1a1a;
   }
-  @media (prefers-color-scheme: dark) {
-    body { background: #0a0a0a; color: #f5f5f5; }
-    .card { background: #161616; border-color: #2a2a2a; }
-    .scope-list { background: #1f1f1f; border-color: #2a2a2a; }
-    .footer { color: #888; }
-  }
   .card {
     background: #fff;
     border: 1px solid #e5e5e5;
@@ -129,7 +123,6 @@ function consentPage(clientName: string): string {
     font-size: 15px;
     color: #4a4a4a;
   }
-  @media (prefers-color-scheme: dark) { p { color: #b5b5b5; } }
   .scope-list {
     background: #f5f5f7;
     border: 1px solid #e5e5e5;
@@ -173,6 +166,16 @@ function consentPage(clientName: string): string {
     text-align: center;
     margin-top: 18px;
     line-height: 1.5;
+  }
+  /* Dark mode last, so these win on source order (media queries add no
+     specificity — placing them before the base rules let light override). */
+  @media (prefers-color-scheme: dark) {
+    body { background: #0a0a0a; color: #f5f5f5; }
+    .card { background: #161616; border-color: #2a2a2a; box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
+    h1 { color: #f5f5f5; }
+    p { color: #b5b5b5; }
+    .scope-list { background: #1f1f1f; border-color: #2a2a2a; }
+    .footer { color: #888; }
   }
 </style>
 </head>
