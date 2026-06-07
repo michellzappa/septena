@@ -119,8 +119,10 @@ public final class ClaudeGatewayProvider {
     }
     if let last = lastRefreshAt, Date().timeIntervalSince(last) < Self.refreshInterval {
       needsReauth = false
+      logger.info("Claude gateway fresh on foreground (age \(Int(Date().timeIntervalSince(last)), privacy: .public)s)")
     } else {
       needsReauth = true // stale (or never authed) — flag, don't pop UI
+      logger.info("Claude gateway stale on foreground → needsReauth (showing reconnect cue)")
     }
   }
 
@@ -237,6 +239,7 @@ public final class ClaudeGatewayProvider {
     req.httpBody = try JSONSerialization.data(withJSONObject: ["ckWebAuthToken": ckWebAuthToken])
     let (data, resp) = try await session.data(for: req)
     let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+    logger.info("Claude gateway push /ingest/ck-token → HTTP \(code, privacy: .public)")
     guard (200...299).contains(code) else {
       let detail = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
       throw GatewayError.server(code, String(detail))
