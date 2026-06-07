@@ -762,13 +762,33 @@ struct TaskListView: View {
   }
 
   private func rowContent(_ task: SeptenaTask) -> some View {
-    TaskRowView(
+    // Suppress the project / area subtitle when the surrounding context already
+    // shows it: a project page suppresses both; an area page suppresses area; a
+    // Today / Unscheduled group renders project/area cluster headers above each
+    // group. Upcoming groups by date, so the chip stays.
+    let suppressProject: Bool = {
+      switch filter {
+      case .project, .unscheduled, .today: return true
+      default:                             return false
+      }
+    }()
+    let suppressArea: Bool = {
+      switch filter {
+      case .project, .area, .unscheduled, .today: return true
+      default:                                    return false
+      }
+    }()
+    return TaskRow(
       task: task,
-      filter: filter,
       accent: theme.color(for: "tasks"),
-      metaLine: { metaLine(task) },
-      trailingDate: { trailingDate(task) },
-      onToggle: { toggle(task) }
+      areas: areas,
+      projects: projects,
+      suppressProject: suppressProject,
+      suppressArea: suppressArea,
+      showsTodayIndicator: filter != .today,
+      showsSomedayIndicator: filter != .someday,
+      onToggle: { toggle(task) },
+      onTap: nil
     )
     // Fade on insert/removal. The fade only plays inside an animated
     // transaction; every settle-driven removal runs through `motion.run`, so
@@ -926,113 +946,6 @@ struct TaskListView: View {
     suggestionEngine.recordRejection(taskText: text,
                                      targetKind: top.kind,
                                      targetId: top.id)
-  }
-
-  /// A task with a due date that's today or in the past — surfaces a flag.
-  /// Delegates to the canonical `SeptenaTask.isOverdue` so row styling, the
-  /// deep list, and the app badge can never drift apart.
-  private func isOverdue(_ task: SeptenaTask) -> Bool {
-    task.isOverdue
-  }
-
-  /// Trailing date / status indicator. Red only ever means **deadline
-  /// missed** — a `scheduled` date in the past is not "overdue", it's just
-  /// the reason the row is on Today. Rules:
-  ///   • `due ≤ today` → red bold date text (`Today` / `Yesterday` / `May 14`).
-  ///   • `due > today` → gray flag + date (marked, not urgent).
-  ///   • No `due`, scheduled future, not on Today → muted calendar + date.
-  ///   • No `due`, scheduled past → nothing. The row's presence on Today
-  ///     *is* the signal; a red label here would conflate "missed deadline"
-  ///     with "showed up because of a planning date."
-  @ViewBuilder
-  private func trailingDate(_ task: SeptenaTask) -> some View {
-    let cal = Calendar.current
-    let today = cal.startOfDay(for: Date())
-    if let due = task.due.flatMap(SeptenaDate.parse) {
-      let dueDay = cal.startOfDay(for: due)
-      if dueDay <= today {
-        Text(cal.isDateInToday(due) ? "Today" : shortDate(due))
-          .font(.septenaMeta.weight(.semibold))
-          .foregroundStyle(Theme.overdueRed)
-          .padding(.top, 3)
-      } else {
-        HStack(spacing: 4) {
-          Image(systemName: "flag.fill").scaledFont(size: 12)
-          Text(shortDate(due)).font(.septenaMeta)
-        }
-        .foregroundStyle(Theme.inkSecondary)
-        .padding(.top, 3)
-      }
-    } else if filter != .today, let scheduled = task.scheduled.flatMap(SeptenaDate.parse) {
-      HStack(spacing: 4) {
-        Image(systemName: "calendar").scaledFont(size: 11)
-        Text(shortDate(scheduled)).font(.septenaMeta)
-      }
-      .foregroundStyle(Theme.inkSecondary)
-      .padding(.top, 3)
-    }
-  }
-
-  /// Sub-line beneath the title: `★ today · # project · 📅 May 20 · 🚩`.
-  /// Two date roles: `scheduled` is residence (calendar chip with date);
-  /// `due` is a warning flag (icon-only when scheduled is also present;
-  /// flag + days-left when due is the only date signal). Red tint when
-  /// due ≤ today, neutral otherwise.
-  @ViewBuilder
-  private func metaLine(_ task: SeptenaTask) -> some View {
-    // Suppress project/area chips when the surrounding context already shows
-    // them: on a project page (project + area), an area page (area), and on
-    // Unscheduled (which renders project/area cluster headers above each
-    // group). Upcoming groups by date, so chips stay there.
-    let suppressProject: Bool = {
-      switch filter {
-      case .project, .unscheduled, .today: return true
-      default:                             return false
-      }
-    }()
-    let suppressArea: Bool = {
-      switch filter {
-      case .project, .area, .unscheduled, .today: return true
-      default:                                    return false
-      }
-    }()
-    let projectTitle = suppressProject
-      ? nil
-      : task.project.flatMap { pid in projects.first(where: { $0.id == pid })?.title }
-    let areaTitle = suppressArea
-      ? nil
-      : task.area.flatMap { aid in areas.first(where: { $0.id == aid })?.title }
-
-    // Dates live in the trailing region (see trailingDate); only project/area
-    // chips render under the title now.
-    let hasAny = projectTitle != nil || areaTitle != nil
-    if hasAny {
-      HStack(spacing: 10) {
-        if let title = projectTitle {
-          metaChip(icon: "number", text: title)
-        } else if let title = areaTitle {
-          metaChip(icon: "folder", text: title)
-        }
-      }
-    }
-  }
-
-  private func shortDate(_ d: Date) -> String {
-    let cal = Calendar.current
-    if cal.isDateInToday(d) { return "Today" }
-    if cal.isDateInTomorrow(d) { return "Tomorrow" }
-    let f = DateFormatter()
-    f.setLocalizedDateFormatFromTemplate("MMMd")
-    return f.string(from: d)
-  }
-
-  @ViewBuilder
-  private func metaChip(icon: String, text: String) -> some View {
-    // Icon param kept for call-site compatibility but no longer rendered —
-    // project / area context is clear from text alone, and the leading glyph
-    // was visual noise. Plain SF Sans proportional digits.
-    Text(text).font(.septenaMeta)
-      .foregroundStyle(Theme.inkSecondary)
   }
 
   // MARK: - List row helpers

@@ -47,8 +47,9 @@ struct TasksDestinationView: View {
           ForEach(openTasks) { task in
             TaskRow(task: task,
                     accent: accent,
-                    trailing: deadlineLabel(task),
-                    trailingTint: isOverdue(task) ? Theme.overdueRed : nil,
+                    areas: areas,
+                    projects: projects,
+                    showsTodayIndicator: false,
                     onToggle: { toggle(task) },
                     onTap: { editing = task })
               .transition(.opacity)
@@ -60,6 +61,9 @@ struct TasksDestinationView: View {
           ForEach(doneTasks) { task in
             TaskRow(task: task,
                     accent: accent,
+                    areas: areas,
+                    projects: projects,
+                    showsTodayIndicator: false,
                     onToggle: { toggle(task) },
                     onTap: { editing = task })
           }
@@ -76,11 +80,7 @@ struct TasksDestinationView: View {
     }
     .tint(accent)
     .task { reload() }
-    .modifier(DrawerTaskComposer(
-      isOpen: composerBinding,
-      composerIsOpen: composerIsOpen,
-      card: { composerCard }
-    ))
+    .taskComposerCover(isPresented: composerBinding) { composerCard }
   }
 
   /// One liquid-glass composer for both add (the drawer's + / ⌘N, declared via
@@ -111,9 +111,8 @@ struct TasksDestinationView: View {
     if let task = editing { return .edit(task) }
     return nil
   }
-  private var composerIsOpen: Bool { creating || editing != nil }
   private var composerBinding: Binding<Bool> {
-    Binding(get: { composerIsOpen }, set: { if !$0 { closeComposer() } })
+    Binding(get: { creating || editing != nil }, set: { if !$0 { closeComposer() } })
   }
   private func closeComposer() {
     creating = false
@@ -180,59 +179,5 @@ struct TasksDestinationView: View {
     }
   }
 
-  // MARK: - Row meta
-
-  private func isOverdue(_ task: SeptenaTask) -> Bool {
-    // Deadline-only, Things-style: a past *scheduled* date is just a plan that
-    // rolled into Today, not an overdue task. See `SeptenaTask.isOverdue`.
-    task.isOverdue
-  }
-
-  /// Trailing chip: the task's deadline rendered as "MMM d", or nil.
-  private func deadlineLabel(_ task: SeptenaTask) -> String? {
-    guard let deadline = task.deadline else { return nil }
-    return Self.shortDate(deadline)
-  }
-
-  private static let isoParser: DateFormatter = {
-    let f = DateFormatter()
-    f.dateFormat = "yyyy-MM-dd"
-    f.locale = Locale(identifier: "en_US_POSIX")
-    return f
-  }()
-  private static let shortFormatter: DateFormatter = {
-    let f = DateFormatter()
-    f.setLocalizedDateFormatFromTemplate("MMMd")
-    return f
-  }()
-  private static func shortDate(_ iso: String) -> String {
-    guard let date = isoParser.date(from: String(iso.prefix(10))) else { return iso }
-    return shortFormatter.string(from: date)
-  }
 }
 
-// MARK: - Composer presentation
-
-/// Presents the drawer's task composer so it floats over the *whole app*, not
-/// just the pushed drawer screen. iOS uses a transparent full-screen cover (the
-/// card carries its own dim scrim); macOS — where full-screen covers aren't
-/// available — falls back to an in-place overlay, which is fine on a roomy
-/// window.
-private struct DrawerTaskComposer<Card: View>: ViewModifier {
-  @Binding var isOpen: Bool
-  let composerIsOpen: Bool
-  @ViewBuilder var card: () -> Card
-
-  func body(content: Content) -> some View {
-    #if os(iOS)
-    content.fullScreenCover(isPresented: $isOpen) {
-      card()
-        .presentationBackground(.clear)
-    }
-    #else
-    content
-      .overlay { if composerIsOpen { card() } }
-      .animation(.snappy(duration: 0.2), value: composerIsOpen)
-    #endif
-  }
-}
