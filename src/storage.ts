@@ -133,7 +133,16 @@ export async function putAccessToken(
 export async function getCkTokenForAccessToken(
   env: Env,
   accessToken: string,
-): Promise<{ ckWebAuthToken: string; createdAt: number; lastUsedAt: number } | null> {
+): Promise<{
+  ckWebAuthToken: string;
+  createdAt: number;
+  lastUsedAt: number;
+  // Present when the bearer is bound to a CloudKit identity — i.e. the app can
+  // re-mint this user's token, so an expiry is a *transient* lapse the handler
+  // can degrade gracefully rather than hard-disconnecting. Absent only for
+  // legacy bootstrap-only bearers, which truly need an OAuth re-run.
+  userRecordName?: string;
+} | null> {
   const raw = await env.TOKENS.get(`token:${accessToken}`);
   if (!raw) return null;
   const rec = JSON.parse(raw) as AccessTokenRecord;
@@ -141,13 +150,23 @@ export async function getCkTokenForAccessToken(
   if (rec.userRecordName) {
     const user = await getUserCkToken(env, rec.userRecordName);
     if (user) {
-      return { ckWebAuthToken: user.ckWebAuthToken, createdAt: rec.createdAt, lastUsedAt: rec.lastUsedAt };
+      return {
+        ckWebAuthToken: user.ckWebAuthToken,
+        createdAt: rec.createdAt,
+        lastUsedAt: rec.lastUsedAt,
+        userRecordName: rec.userRecordName,
+      };
     }
     // App hasn't pushed yet — fall through to the bootstrap token below.
   }
   if (rec.ckWebAuthTokenEnc) {
     const ckWebAuthToken = await decrypt(rec.ckWebAuthTokenEnc, env.TOKEN_ENC_KEY);
-    return { ckWebAuthToken, createdAt: rec.createdAt, lastUsedAt: rec.lastUsedAt };
+    return {
+      ckWebAuthToken,
+      createdAt: rec.createdAt,
+      lastUsedAt: rec.lastUsedAt,
+      userRecordName: rec.userRecordName,
+    };
   }
   return null; // stale bearer with no usable token → reconnect
 }

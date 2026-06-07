@@ -411,7 +411,7 @@ export async function mcpHandler(c: Context<{ Bindings: Env }>) {
 
   const tokenRec = await getCkTokenForAccessToken(c.env, accessToken);
   if (!tokenRec) return unauthorized("access_token not found in KV");
-  const { ckWebAuthToken, createdAt, lastUsedAt } = tokenRec;
+  const { ckWebAuthToken, createdAt, lastUsedAt, userRecordName } = tokenRec;
 
   // Bump lastUsedAt (throttled, non-blocking) so the cleanup cron can tell
   // this token is alive. One KV write per TOUCH_INTERVAL_MS at most.
@@ -541,7 +541,27 @@ export async function mcpHandler(c: Context<{ Bindings: Env }>) {
         // auth expiry (AUTHENTICATION_REQUIRED/FAILED) from a transient 421
         // Misdirected we may be misclassifying as expiry.
         ckBody: err.body.slice(0, 300),
+        // Which recovery path we took: in-band (bearer is user-bound, the app
+        // can re-mint → keep the connector connected) vs hard 401 (legacy
+        // bootstrap-only bearer → client must re-run OAuth).
+        recovery: userRecordName && req.method === "tools/call" ? "inband" : "401",
       });
+      // Self-heal: when the bearer is bound to a CloudKit identity, the
+      // expiry is transient — the Septena app re-mints the user's token (on
+      // foreground, or from the "Keep Claude connected" nudge) and the gateway
+      // resolves every request to that freshest token. So instead of a hard
+      // 401 — which flips Claude's connector to a *sticky* disconnected state
+      // that only a manual claude.ai reconnect clears — return an in-band tool
+      // error. The connector stays connected; the very next tool call after
+      // the app pushes a fresh token just works, no reconnect needed.
+      if (userRecordName && req.method === "tools/call") {
+        return rpcResult(req.id, {
+          isError: true,
+          content: [{ type: "text", text: AUTH_EXPIRED_MESSAGE }],
+        });
+      }
+      // Legacy bootstrap-only bearer (no identity binding): the only recovery
+      // is an OAuth re-run, so emit the spec-correct discovery 401.
       return unauthorized(`CloudKit auth expired (status=${err.status})`);
     }
     // Non-auth CloudKit failure — capture status + body so a transient error
@@ -880,6 +900,19 @@ async function callTool(
       return rpcError(id, -32602, `Unknown tool: ${params.name}`);
   }
 }
+
+// Returned in-band (as a tool result, not a transport 401) when a user-bound
+// bearer's CloudKit token has lapsed. Addressed to the model so it relays
+// clearly: the fix is on the user's device, and it heals without reconnecting
+// this connector.
+const AUTH_EXPIRED_MESSAGE =
+  "Your Septena session has expired. Septena's access to your private iCloud " +
+  "data uses a token that lasts about 8 hours and has to be refreshed from your " +
+  "device. To restore access: open the Septena app on your iPhone or Mac (it " +
+  "re-mints the token automatically on launch, or tap the “Reconnect” prompt). " +
+  "Once you've done that, just ask again — this connector stays connected, so " +
+  "I'll be able to read and write your data again with no need to reconnect from " +
+  "claude.ai.";
 
 function rpcResult(id: JsonRpcRequest["id"], result: unknown): Response {
   return Response.json({ jsonrpc: "2.0", id, result });
