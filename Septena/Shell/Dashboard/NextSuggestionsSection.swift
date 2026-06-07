@@ -304,18 +304,20 @@ final class NextSuggestionsModel {
     let st: AppSettings? = SettingsMirror.loadSettings(context: ctx)
 
     let cafTimePoints: [CaffeineTimePoint] = cafEntries.compactMap { e in
-      let parts = e.time.split(separator: ":")
+      let hhmm = EventTimestamp.hhmm(from: e.occurredAt)
+      let parts = hhmm.split(separator: ":")
       guard let hh = parts.first.flatMap({ Int($0) }) else { return nil }
       let mm = parts.dropFirst().first.flatMap { Int($0) } ?? 0
-      return CaffeineTimePoint(date: e.date, time: e.time,
+      return CaffeineTimePoint(date: e.date, time: hhmm,
                                hour: Double(hh) + Double(mm) / 60.0,
                                method: e.method, beans: e.beans, grams: e.grams)
     }
     let canTimePoints: [CannabisTimePoint] = canEntries.compactMap { e in
-      let parts = e.time.split(separator: ":")
+      let hhmm = EventTimestamp.hhmm(from: e.occurredAt)
+      let parts = hhmm.split(separator: ":")
       guard let hh = parts.first.flatMap({ Int($0) }) else { return nil }
       let mm = parts.dropFirst().first.flatMap { Int($0) } ?? 0
-      return CannabisTimePoint(date: e.date, time: e.time,
+      return CannabisTimePoint(date: e.date, time: hhmm,
                                hour: Double(hh) + Double(mm) / 60.0,
                                method: e.method, strain: e.strain, hit: e.hit)
     }

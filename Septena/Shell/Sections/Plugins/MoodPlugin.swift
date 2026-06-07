@@ -123,7 +123,7 @@ enum MoodPlugin: SectionPlugin {
     let history = (try? context.fetch(FetchDescriptor<MoodEventEntity>(
       predicate: #Predicate { $0.bucket == bucketRaw }
     ))) ?? []
-    let dateTimes = history.map { (date: $0.date, time: $0.time) }
+    let dateTimes = history.map { (date: $0.date, time: EventTimestamp.hhmm(from: $0.occurredAt)) }
     let fallbackHour: Int
     switch bucket {
     case .morning:   fallbackHour = max(DayBucket.cutoffs.morningEnd - 1, 8)

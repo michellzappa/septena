@@ -264,7 +264,7 @@ enum CoachContextBuilder {
     guard !caffeine.isEmpty else { return [] }
     let days = Set(caffeine.map(\.date)).count
     let perDay = Double(caffeine.count) / Double(w.days)
-    let late = caffeine.filter { (hour(of: $0.time) ?? 0) >= 16 }.count
+    let late = caffeine.filter { (hour(of: EventTimestamp.hhmm(from: $0.occurredAt)) ?? 0) >= 16 }.count
     var text = "Caffeine: \(oneDecimal(perDay))/day, \(days)/\(w.days) days"
     text += late == 0 ? ", none after 16:00" : ", \(late) after 16:00"
     return ["- \(text)"]

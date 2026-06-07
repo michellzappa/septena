@@ -114,7 +114,7 @@ struct MoodDestinationView: View {
       predicate: #Predicate { $0.date >= startStr && $0.date <= today }
     ))) ?? []
     return entities.map {
-      MoodEntry(id: $0.id, time: $0.time, bucket: $0.bucket,
+      MoodEntry(id: $0.id, time: EventTimestamp.hhmm(from: $0.occurredAt), bucket: $0.bucket,
                 quadrant: $0.quadrant, arousal: $0.arousal, valence: $0.valence,
                 emotion: $0.emotion, note: $0.note)
     }

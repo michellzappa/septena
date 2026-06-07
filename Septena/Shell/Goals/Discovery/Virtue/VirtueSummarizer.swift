@@ -166,7 +166,7 @@ enum VirtueSummarizer {
     if !caffeine.isEmpty {
       let days = Set(caffeine.map(\.date)).count
       let perDay = Double(caffeine.count) / 7.0
-      let late = caffeine.filter { (hour(of: $0.time) ?? 0) >= 16 }.count
+      let late = caffeine.filter { (hour(of: EventTimestamp.hhmm(from: $0.occurredAt)) ?? 0) >= 16 }.count
       var text = "Coffee \(oneDecimal(perDay))/day, \(days)/7 days"
       text += late == 0 ? ", none after 16:00" : ", \(late) after 16:00"
       let valence: Valence = (perDay <= 3 && late == 0) ? .good : (perDay <= 4 ? .neutral : .strain)
@@ -181,7 +181,7 @@ enum VirtueSummarizer {
       let perDay = Double(cannabis.count) / 7.0
       let hits = cannabis.reduce(0) { $0 + ($1.hit ?? 0) }
       let morningDays = dayKeys.filter { day in
-        (cannabis.filter { $0.date == day }.compactMap { hour(of: $0.time) }.min() ?? 99) < 11
+        (cannabis.filter { $0.date == day }.compactMap { hour(of: EventTimestamp.hhmm(from: $0.occurredAt)) }.min() ?? 99) < 11
       }.count
       var text = "Cannabis \(oneDecimal(perDay))/day, \(days)/7 days, \(hits) hits"
       if morningDays > 0 { text += "; first use before 11:00 on \(morningDays)/\(days) days" }

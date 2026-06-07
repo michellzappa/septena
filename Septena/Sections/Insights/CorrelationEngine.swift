@@ -448,7 +448,7 @@ struct CorrelationEngine {
         var f = bag[e.date] ?? DayFeatures()
         if let g = e.grams { f.values["caffeine_g", default: 0] += g }
         f.values["caffeine_cups", default: 0] += 1
-        if let h = hourOfDay(e.time) {
+        if let h = hourOfDay(EventTimestamp.hhmm(from: e.occurredAt)) {
           let prev = f.values["last_caffeine_hour"] ?? -1
           f.values["last_caffeine_hour"] = max(prev, h)
         }

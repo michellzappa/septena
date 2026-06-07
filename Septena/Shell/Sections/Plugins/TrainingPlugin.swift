@@ -315,7 +315,7 @@ private struct TrainingOnboardingView: View {
 
 @MainActor func exerciseEntryExportDict(_ e: ExerciseEntryEntity) -> [String: Any] {
   compact([
-    "id": e.id, "date": e.date, "time": e.time,
+    "id": e.id, "date": e.date, "time": EventTimestamp.hhmm(from: e.occurredAt),
     "sessionType": e.sessionType, "exercise": e.exercise,
     "weight": e.weight, "sets": e.sets, "reps": e.reps,
     "difficulty": e.difficulty, "durationMin": e.durationMin,

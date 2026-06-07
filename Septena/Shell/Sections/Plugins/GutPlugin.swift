@@ -162,7 +162,7 @@ enum GutPlugin: SectionPlugin {
 
 @MainActor func gutEventExportDict(_ e: GutEventEntity) -> [String: Any] {
   compact([
-    "id": e.id, "date": e.date, "time": e.time,
+    "id": e.id, "date": e.date, "time": EventTimestamp.hhmm(from: e.occurredAt),
     "bristol": e.bristol, "blood": e.blood, "volume": e.volume,
     "discomfortLevel": e.discomfortLevel,
     "discomfortStart": e.discomfortStart,

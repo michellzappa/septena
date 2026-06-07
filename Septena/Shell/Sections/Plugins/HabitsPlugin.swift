@@ -171,8 +171,7 @@ enum HabitsPlugin: SectionPlugin {
       predicate: #Predicate { $0.done == true }
     ))) ?? []
     let dateTimes = states.compactMap { s -> (date: String, time: String)? in
-      guard let t = s.time else { return nil }
-      return (s.date, t)
+      return (s.date, EventTimestamp.hhmm(from: s.occurredAt))
     }
     let minute = NextScoring.learnedLateMinute(dateTimes: dateTimes,
                                                today: today, fallback: 20 * 60)
@@ -366,7 +365,8 @@ private struct HabitsDetailContent: View {
 @MainActor func habitDayStateExportDict(_ e: HabitDayStateEntity) -> [String: Any] {
   compact([
     "id": e.id, "date": e.date, "habitID": e.habitID,
-    "done": e.done, "skipped": e.skipped, "note": e.note, "time": e.time,
+    "done": e.done, "skipped": e.skipped, "note": e.note,
+    "time": EventTimestamp.hhmm(from: e.occurredAt),
     "updatedAt": isoDate(e.updatedAt),
   ])
 }

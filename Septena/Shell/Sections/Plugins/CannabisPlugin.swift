@@ -144,7 +144,7 @@ private struct CannabisDetailContent: View {
 
 @MainActor func cannabisEventExportDict(_ e: CannabisEventEntity) -> [String: Any] {
   compact([
-    "id": e.id, "date": e.date, "time": e.time, "method": e.method,
+    "id": e.id, "date": e.date, "time": EventTimestamp.hhmm(from: e.occurredAt), "method": e.method,
     "strain": e.strain, "hit": e.hit, "grams": e.grams,
     "effect": e.effect, "note": e.note,
     "updatedAt": isoDate(e.updatedAt),

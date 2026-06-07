@@ -127,8 +127,8 @@ enum ChoresPlugin: SectionPlugin {
     // so it only pings when genuinely behind. Fallback 18:00.
     let events = (try? context.fetch(FetchDescriptor<ChoreEventEntity>())) ?? []
     let dateTimes = events.compactMap { e -> (date: String, time: String)? in
-      guard e.action == "complete", let t = e.time else { return nil }
-      return (e.date, t)
+      guard e.action == "complete" else { return nil }
+      return (e.date, EventTimestamp.hhmm(from: e.occurredAt))
     }
     let minute = NextScoring.learnedLateMinute(dateTimes: dateTimes,
                                                today: SeptenaDate.today,
@@ -326,7 +326,8 @@ private struct ChoresOnboardingView: View {
   compact([
     "id": e.id, "choreID": e.choreID, "action": e.action,
     "date": e.date, "newDueDate": e.newDueDate,
-    "reason": e.reason, "note": e.note, "time": e.time,
+    "reason": e.reason, "note": e.note,
+    "time": e.action == "complete" ? EventTimestamp.hhmm(from: e.occurredAt) : nil,
     "sortKey": e.sortKey, "updatedAt": isoDate(e.updatedAt),
   ])
 }

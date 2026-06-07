@@ -317,7 +317,7 @@ private struct CaffeineOnboardingView: View {
 
 @MainActor func caffeineEventExportDict(_ e: CaffeineEventEntity) -> [String: Any] {
   compact([
-    "id": e.id, "date": e.date, "time": e.time, "method": e.method,
+    "id": e.id, "date": e.date, "time": EventTimestamp.hhmm(from: e.occurredAt), "method": e.method,
     "beans": e.beans, "grams": e.grams, "note": e.note,
     "updatedAt": isoDate(e.updatedAt),
   ])

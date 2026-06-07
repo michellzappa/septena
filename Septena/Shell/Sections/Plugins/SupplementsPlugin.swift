@@ -142,8 +142,7 @@ enum SupplementsPlugin: SectionPlugin {
       predicate: #Predicate { $0.done == true }
     ))) ?? []
     let dateTimes = states.compactMap { s -> (date: String, time: String)? in
-      guard let t = s.time else { return nil }
-      return (s.date, t)
+      return (s.date, EventTimestamp.hhmm(from: s.occurredAt))
     }
     let minute = NextScoring.learnedLateMinute(dateTimes: dateTimes,
                                                today: today, fallback: 20 * 60)
@@ -335,7 +334,8 @@ private struct SupplementsOnboardingView: View {
 @MainActor func supplementDayStateExportDict(_ e: SupplementDayStateEntity) -> [String: Any] {
   compact([
     "id": e.id, "date": e.date, "supplementID": e.supplementID,
-    "done": e.done, "note": e.note, "time": e.time,
+    "done": e.done, "note": e.note,
+    "time": EventTimestamp.hhmm(from: e.occurredAt),
     "updatedAt": isoDate(e.updatedAt),
   ])
 }

@@ -117,7 +117,7 @@ struct AddCaffeinePage: View {
     beans = ChecklistMirror.loadCaffeineBeans(context: modelContext)
     // Find the most recent entry across all entries for "repeat" support.
     let entries = (try? modelContext.fetch(FetchDescriptor<CaffeineEventEntity>(
-      sortBy: [SortDescriptor(\.date, order: .reverse), SortDescriptor(\.time, order: .reverse)]
+      sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
     ))) ?? []
     if let last = entries.first {
       lastEntry = (method: last.method, beans: last.beans, grams: last.grams, date: last.date)

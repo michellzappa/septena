@@ -117,10 +117,7 @@ struct EditCannabisEntrySheet: View {
     }()
     var descriptor = FetchDescriptor<CannabisEventEntity>(
       predicate: #Predicate { $0.method == method && $0.date >= cutoff },
-      sortBy: [
-        SortDescriptor(\.date, order: .reverse),
-        SortDescriptor(\.time, order: .reverse),
-      ]
+      sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
     )
     descriptor.fetchLimit = 1
     return try? modelContext.fetch(descriptor).first

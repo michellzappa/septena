@@ -141,13 +141,14 @@ actor DashboardReader {
 
     // Caffeine: only the last entry powers the menu's Repeat action.
     let lastCaffeine = FetchDescriptor<CaffeineEventEntity>(
-      sortBy: [SortDescriptor(\.date, order: .reverse), SortDescriptor(\.time, order: .reverse)]
+      sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
     )
     if let last = (try? ctx.fetch(lastCaffeine))?.first {
-      let hh = last.time.split(separator: ":").first.flatMap { Int($0) } ?? 0
-      let mm = last.time.split(separator: ":").dropFirst().first.flatMap { Int($0) } ?? 0
+      let hhmm = EventTimestamp.hhmm(from: last.occurredAt)
+      let hh = hhmm.split(separator: ":").first.flatMap { Int($0) } ?? 0
+      let mm = hhmm.split(separator: ":").dropFirst().first.flatMap { Int($0) } ?? 0
       m.caffeineLastEntry = CaffeineTimePoint(date: last.date,
-                                              time: last.time,
+                                              time: hhmm,
                                               hour: Double(hh) + Double(mm) / 60.0,
                                               method: last.method,
                                               beans: last.beans,
@@ -156,10 +157,10 @@ actor DashboardReader {
     // Cannabis: latest vape across all days drives the "Continue" row.
     let lastVape = FetchDescriptor<CannabisEventEntity>(
       predicate: #Predicate { $0.method == "vape" },
-      sortBy: [SortDescriptor(\.date, order: .reverse), SortDescriptor(\.time, order: .reverse)]
+      sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
     )
     if let last = (try? ctx.fetch(lastVape))?.first {
-      m.cannabisLastVape = CannabisEntry(id: last.id, time: last.time, method: last.method,
+      m.cannabisLastVape = CannabisEntry(id: last.id, time: EventTimestamp.hhmm(from: last.occurredAt), method: last.method,
                                          strain: last.strain, hit: last.hit, grams: last.grams,
                                          note: last.note, effect: last.effect)
     }
