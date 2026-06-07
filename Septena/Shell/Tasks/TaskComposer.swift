@@ -26,9 +26,13 @@ struct TaskComposerCard: View {
   let onDone: () -> Void
 
   @Environment(TaskMutator.self) private var mutator
+  @Environment(\.modelContext) private var modelContext
   @State private var draft = TaskDraft()
   @State private var seeded = false
   @FocusState private var titleFocused: Bool
+  /// SuggestionEngine's learned area/project pick for the current title (the
+  /// "Suggested" chip). Recomputed as the title changes; create-mode only.
+  @State private var suggestedList: SuggestionEngine.Suggestion?
 
   private var isEditing: Bool {
     if case .edit = mode { return true }
@@ -90,6 +94,8 @@ struct TaskComposerCard: View {
         .background(Theme.secondaryGroupedBackground,
                     in: RoundedRectangle(cornerRadius: 18, style: .continuous))
 
+        quickEntryChips
+
         TaskAttributeBar(
           draft: $draft,
           areas: areas,
@@ -99,8 +105,14 @@ struct TaskComposerCard: View {
         )
       }
       .padding(16)
-      .background(.ultraThinMaterial,
-                  in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+      // White (paper) glass: tint the translucent material with the system
+      // background so it reads white in light mode instead of picking up the
+      // dim scrim as gray. Stays adaptive — near-black in dark mode.
+      .background {
+        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        shape.fill(.ultraThinMaterial)
+          .overlay(shape.fill(Theme.paperBackground.opacity(0.6)))
+      }
       .overlay(
         RoundedRectangle(cornerRadius: 22, style: .continuous)
           .strokeBorder(Color.white.opacity(0.12))
@@ -109,6 +121,16 @@ struct TaskComposerCard: View {
       .padding(.horizontal, 14)
     }
     .onAppear(perform: seed)
+    .onChange(of: draft.title) { _, _ in updateSuggestion() }
+  }
+
+  private func updateSuggestion() {
+    guard case .create = mode else { return }
+    if draft.projectId != nil || draft.areaId != nil {
+      suggestedList = nil
+    } else {
+      suggestedList = SuggestionEngine.shared.suggest(forText: draft.title)
+    }
   }
 
   // MARK: - Header
@@ -145,6 +167,110 @@ struct TaskComposerCard: View {
     }
   }
 
+  // MARK: - Quick entry
+
+  /// Date phrases and #project / @area / !today tokens detected in the title,
+  /// limited to ones whose field isn't already set. Create-mode only — parsing
+  /// an existing title on edit would surface noise.
+  private var detectedTokens: [DetectedToken] {
+    guard case .create = mode else { return [] }
+    return TaskTitleParser.detect(in: draft.title, projects: projects, areas: areas)
+      .filter(isUnset)
+  }
+
+  private func isUnset(_ token: DetectedToken) -> Bool {
+    switch token.kind {
+    case .today, .date: return !draft.onToday && draft.scheduled == nil
+    case .project:      return draft.projectId == nil
+    case .area:         return draft.areaId == nil && draft.projectId == nil
+    }
+  }
+
+  /// Whether to offer the learned "Suggested list" chip — only when the user
+  /// hasn't filed the task somewhere already.
+  private var listSuggestion: SuggestionEngine.Suggestion? {
+    guard draft.projectId == nil, draft.areaId == nil else { return nil }
+    return suggestedList
+  }
+
+  /// Tap-to-apply chips: tokens parsed out of the title (date / #project /
+  /// @area / !today) plus the learned list suggestion. Nothing is applied
+  /// silently — the user confirms each (and committing applies parsed tokens).
+  @ViewBuilder
+  private var quickEntryChips: some View {
+    let tokens = detectedTokens
+    let suggestion = listSuggestion
+    if !tokens.isEmpty || suggestion != nil {
+      FlowLayout(spacing: 8) {
+        ForEach(tokens) { token in
+          chip(icon: token.icon, leading: "plus", text: token.displayText) { apply(token) }
+        }
+        if let s = suggestion {
+          chip(icon: s.kind == .project ? "number" : "folder",
+               leading: "sparkles", text: s.title) { applySuggestedList() }
+        }
+      }
+      .transition(.opacity)
+    }
+  }
+
+  /// A small glass action chip: a leading hint glyph (`plus` to add a parsed
+  /// token, `sparkles` for the smart suggestion), the field's icon, and a label.
+  private func chip(icon: String, leading: String, text: String,
+                    _ action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+      HStack(spacing: 5) {
+        Image(systemName: leading).font(.system(size: 10, weight: .bold))
+        Image(systemName: icon).font(.system(size: 11, weight: .semibold))
+        Text(text).font(.septenaLabel).lineLimit(1)
+      }
+      .foregroundStyle(accent)
+      .padding(.horizontal, 11)
+      .padding(.vertical, 6)
+      .contentShape(Capsule())
+    }
+    .buttonStyle(.plain)
+    .glassEffect(.regular.tint(accent.opacity(0.28)).interactive(), in: .capsule)
+  }
+
+  private func applySuggestedList() {
+    guard let s = suggestedList else { return }
+    Haptics.tick()
+    withAnimation(.snappy(duration: 0.2)) {
+      switch s.kind {
+      case .project:
+        draft.projectId = s.id
+        draft.areaId = projects.first { $0.id == s.id }?.area
+      case .area:
+        draft.areaId = s.id; draft.projectId = nil
+      }
+      suggestedList = nil
+    }
+  }
+
+  /// Apply a detected token to the draft and strip its phrase from the title.
+  private func applyToken(_ token: DetectedToken) {
+    switch token.kind {
+    case .today:
+      draft.onToday = true; draft.scheduled = nil
+    case .date(let d):
+      if Calendar.current.isDateInToday(d) { draft.onToday = true; draft.scheduled = nil }
+      else { draft.onToday = false; draft.scheduled = Calendar.current.startOfDay(for: d) }
+    case .project(let id, _):
+      draft.projectId = id
+      draft.areaId = projects.first { $0.id == id }?.area
+    case .area(let id, _):
+      draft.areaId = id; draft.projectId = nil
+    }
+    draft.title = TaskTitleParser.strip(token.phrase, from: draft.title)
+  }
+
+  private func apply(_ token: DetectedToken) {
+    Haptics.tick()
+    withAnimation(.snappy(duration: 0.2)) { applyToken(token) }
+    updateSuggestion()
+  }
+
   // MARK: - Lifecycle
 
   private func seed() {
@@ -153,6 +279,12 @@ struct TaskComposerCard: View {
     switch mode {
     case .create(let filter):
       draft = TaskDraft(filter: filter)
+      // Train the list classifier once so the "Suggested" chip can query it
+      // cheaply per keystroke.
+      SuggestionEngine.shared.prepare(
+        allTasks: LocalCache.allTasks(in: modelContext),
+        projects: projects, areas: areas
+      )
       // Focus after the present animation settles — inside a fullScreenCover an
       // immediate focus is dropped before the field joins the responder chain,
       // so the keyboard wouldn't come up on open.
@@ -169,6 +301,10 @@ struct TaskComposerCard: View {
     Haptics.tick()
     switch mode {
     case .create:
+      // Apply any quick-entry tokens the user didn't tap, then create. The
+      // isUnset guard means an earlier token (e.g. !today) wins over a later
+      // conflicting one (a detected date) instead of being clobbered.
+      for token in detectedTokens where isUnset(token) { applyToken(token) }
       draft.create(via: mutator)
       AddInfoSection.tasks.notifyTilesChanged()
     case .edit(let task):
@@ -200,35 +336,41 @@ struct TaskAttributeBar: View {
   enum Expanded { case when, deadline, repeatRule }
   @State private var expanded: Expanded?
   @State private var showingList = false
+  @Namespace private var glassNS
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
       // Pills wrap onto extra rows as needed (FlowLayout) so every elective
       // stays visible — no offscreen horizontal scroll. "Today" isn't its own
       // pill: it's the same stored state as When=Today, so it lives inside the
-      // When control (quick chip) instead of duplicating the rail.
-      FlowLayout(spacing: 8) {
-        AttributePill(icon: "calendar", label: "When",
-                      value: whenValue, isSet: whenIsSet, isActive: expanded == .when,
-                      accent: accent) { toggle(.when) }
+      // When control (quick chip) instead of duplicating the rail. The
+      // GlassEffectContainer lets the pills' glass morph/merge fluidly as their
+      // values change (DesignSpec §5.5) rather than cross-fading.
+      GlassEffectContainer(spacing: 8) {
+        FlowLayout(spacing: 8) {
+          AttributePill(icon: "calendar", label: "When",
+                        value: whenValue, isSet: whenIsSet, isActive: expanded == .when,
+                        accent: accent, glassID: "when", glassNS: glassNS) { toggle(.when) }
 
-        AttributePill(icon: "flag", label: "Deadline",
-                      value: draft.deadline.map(Self.dateLabel),
-                      isSet: draft.deadline != nil, isActive: expanded == .deadline,
-                      accent: accent) { toggle(.deadline) }
+          AttributePill(icon: "flag", label: "Deadline",
+                        value: draft.deadline.map(Self.dateLabel),
+                        isSet: draft.deadline != nil, isActive: expanded == .deadline,
+                        accent: accent, glassID: "deadline", glassNS: glassNS) { toggle(.deadline) }
 
-        AttributePill(icon: "repeat", label: "Repeat",
-                      value: draft.recurrence?.shortLabel,
-                      isSet: draft.recurrence != nil, isActive: expanded == .repeatRule,
-                      accent: accent) { toggleRepeat() }
+          AttributePill(icon: "repeat", label: "Repeat",
+                        value: draft.recurrence?.shortLabel,
+                        isSet: draft.recurrence != nil, isActive: expanded == .repeatRule,
+                        accent: accent, glassID: "repeat", glassNS: glassNS) { toggleRepeat() }
 
-        AttributePill(icon: "folder", label: "List",
-                      value: listValue,
-                      isSet: draft.areaId != nil || draft.projectId != nil,
-                      isActive: false, accent: accent) {
-          onInteractStart()
-          withAnimation(.snappy(duration: 0.2)) { expanded = nil }
-          showingList = true
+          AttributePill(icon: "folder", label: "List",
+                        value: listValue,
+                        isSet: draft.areaId != nil || draft.projectId != nil,
+                        isActive: false, accent: accent,
+                        glassID: "list", glassNS: glassNS) {
+            onInteractStart()
+            withAnimation(.snappy(duration: 0.2)) { expanded = nil }
+            showingList = true
+          }
         }
       }
 
@@ -319,6 +461,11 @@ private struct AttributePill: View {
   let isSet: Bool
   let isActive: Bool
   let accent: Color
+  /// Stable identity inside the bar's `GlassEffectContainer`, so the pill's
+  /// glass morphs in place (and merges with neighbours) as its value changes
+  /// instead of cross-fading. See DesignSpec §5.5.
+  let glassID: String
+  let glassNS: Namespace.ID
   let action: () -> Void
 
   var body: some View {
@@ -340,6 +487,7 @@ private struct AttributePill: View {
       .regular.tint((isSet || isActive) ? accent.opacity(0.42) : .clear).interactive(),
       in: .capsule
     )
+    .glassEffectID(glassID, in: glassNS)
   }
 }
 
@@ -521,5 +669,39 @@ private struct InlineRepeatPanel: View {
     case .week:  return plural ? "weeks" : "week"
     case .month: return plural ? "months" : "month"
     }
+  }
+}
+
+// MARK: - Presentation
+
+extension View {
+  /// Present a `TaskComposerCard` so it floats over the *whole app*, not just
+  /// the view it's attached to. iOS uses a transparent full-screen cover (the
+  /// card carries its own dim scrim); macOS — where full-screen covers aren't
+  /// available — falls back to an in-place overlay, fine on a roomy window.
+  /// Used wherever a composer is launched from a constrained container (the
+  /// pushed Tasks drawer, the homepage tile menu).
+  func taskComposerCover<Card: View>(
+    isPresented: Binding<Bool>,
+    @ViewBuilder card: @escaping () -> Card
+  ) -> some View {
+    modifier(TaskComposerCover(isPresented: isPresented, card: card))
+  }
+}
+
+private struct TaskComposerCover<Card: View>: ViewModifier {
+  @Binding var isPresented: Bool
+  @ViewBuilder var card: () -> Card
+
+  func body(content: Content) -> some View {
+    #if os(iOS)
+    content.fullScreenCover(isPresented: $isPresented) {
+      card().presentationBackground(.clear)
+    }
+    #else
+    content
+      .overlay { if isPresented { card() } }
+      .animation(.snappy(duration: 0.2), value: isPresented)
+    #endif
   }
 }

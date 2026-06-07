@@ -42,6 +42,24 @@ final class SuggestionEngine {
   /// follow for the context-menu "Suggested" section.
   private(set) var suggestions: [String: [Suggestion]] = [:]
 
+  /// Last trained classifier, kept so a free-text query (the composer's
+  /// "suggested list" chip) can classify without retraining on every keystroke.
+  /// Refreshed by `refresh` and `prepare`.
+  private var preparedModel: Model?
+
+  /// The trained Naive-Bayes classifier — class token counts + the gates'
+  /// supporting tallies — shared by Inbox classification and free-text queries.
+  private struct Model {
+    var tokenCount: [String: [String: Int]]
+    var classTokens: [String: Int]
+    var docCount: [String: Int]
+    var labels: [String: (Suggestion.Kind, String)]
+    var keys: [String]
+    var vocabSize: Int
+    var totalDocs: Int
+    var rejectedSets: [String: [Set<String>]]
+  }
+
   // MARK: - Tuning knobs
   //
   // NB posteriors are peaked, so the absolute posterior isn't a great gate on
@@ -68,7 +86,40 @@ final class SuggestionEngine {
                allTasks: [SeptenaTask],
                projects: [Project],
                areas: [Area]) {
-    // ── 1. Train: per-class token counts, class token totals, doc counts ──
+    let model = buildModel(allTasks: allTasks, projects: projects, areas: areas)
+    preparedModel = model
+    guard !model.keys.isEmpty else { suggestions = [:]; return }
+
+    var next: [String: [Suggestion]] = [:]
+    for t in inbox {
+      let out = classify(taskTokens: tokenize(composite(t.title, t.notes)), model: model)
+      if !out.isEmpty { next[t.id] = out }
+    }
+    suggestions = next
+  }
+
+  /// Train (or retrain) the classifier without classifying an inbox — so a
+  /// free-text query can run cheaply afterwards. Call once when a composer
+  /// opens; `suggest(forText:)` then reuses the stored model per keystroke.
+  func prepare(allTasks: [SeptenaTask], projects: [Project], areas: [Area]) {
+    preparedModel = buildModel(allTasks: allTasks, projects: projects, areas: areas)
+  }
+
+  /// Top area/project suggestion for freeform text (e.g. a task being typed),
+  /// using the last-prepared model. Same evidence + margin gates as Inbox, so
+  /// it stays quiet unless there's a clear, well-supported winner. Returns nil
+  /// until `prepare`/`refresh` has run.
+  func suggest(forText text: String) -> Suggestion? {
+    guard let model = preparedModel, !model.keys.isEmpty else { return nil }
+    return classify(taskTokens: tokenize(text), model: model).first
+  }
+
+  // MARK: - Train / classify
+
+  private func buildModel(allTasks: [SeptenaTask],
+                          projects: [Project],
+                          areas: [Area]) -> Model {
+    // Per-class token counts, class token totals, doc counts.
     var tokenCount: [String: [String: Int]] = [:]  // classKey → token → n
     var classTokens: [String: Int] = [:]           // classKey → Σ token n
     var docCount: [String: Int] = [:]              // classKey → #tasks
@@ -103,72 +154,74 @@ final class SuggestionEngine {
       if let pid = t.project { train("p:\(pid)", toks, isDoc: true) }
     }
 
-    let keys = Array(labels.keys)
-    guard !keys.isEmpty else { suggestions = [:]; return }
-    let vocabSize = max(vocab.count, 1)
-    let totalDocs = docCount.values.reduce(0, +)
-
     // Pre-tokenize rejection texts into sets for overlap scoring.
     var rejectedSets: [String: [Set<String>]] = [:]
     for (key, texts) in rejectedTexts {
       rejectedSets[key] = texts.map { Set(tokenize($0)) }
     }
 
-    // ── 2. Classify each inbox task ──
-    var next: [String: [Suggestion]] = [:]
-    for t in inbox {
-      let taskTokens = tokenize(composite(t.title, t.notes))
-      guard !taskTokens.isEmpty else { continue }
-      let taskSet = Set(taskTokens)
+    return Model(tokenCount: tokenCount,
+                 classTokens: classTokens,
+                 docCount: docCount,
+                 labels: labels,
+                 keys: Array(labels.keys),
+                 vocabSize: max(vocab.count, 1),
+                 totalDocs: docCount.values.reduce(0, +),
+                 rejectedSets: rejectedSets)
+  }
 
-      var logScore: [String: Double] = [:]
-      var matched: [String: Int] = [:]
-      for key in keys {
-        let counts = tokenCount[key] ?? [:]
-        let denom = Double((classTokens[key] ?? 0) + vocabSize)
-        // Frequency prior, Laplace-smoothed.
-        var lp = log(Double((docCount[key] ?? 0) + 1) / Double(totalDocs + keys.count))
-        var hits = 0
-        for tok in taskTokens {
-          let c = counts[tok] ?? 0
-          if c > 0 { hits += 1 }
-          lp += log(Double(c + 1) / denom)   // Laplace smoothing
-        }
-        // "Not this" penalty: shared words with a rejected text for this target.
-        if let rsets = rejectedSets[key], !rsets.isEmpty {
-          let overlap = rsets.map { jaccard(taskSet, $0) }.max() ?? 0
-          lp -= rejectionPenalty * overlap
-        }
-        logScore[key] = lp
-        matched[key] = hits
+  /// Rank targets for a single tokenized text, returning the gated winner (+ up
+  /// to two runners-up) or `[]` when nothing clears the evidence/margin gates.
+  private func classify(taskTokens: [String], model: Model) -> [Suggestion] {
+    guard !taskTokens.isEmpty, !model.keys.isEmpty else { return [] }
+    let taskSet = Set(taskTokens)
+
+    var logScore: [String: Double] = [:]
+    var matched: [String: Int] = [:]
+    for key in model.keys {
+      let counts = model.tokenCount[key] ?? [:]
+      let denom = Double((model.classTokens[key] ?? 0) + model.vocabSize)
+      // Frequency prior, Laplace-smoothed.
+      var lp = log(Double((model.docCount[key] ?? 0) + 1) / Double(model.totalDocs + model.keys.count))
+      var hits = 0
+      for tok in taskTokens {
+        let c = counts[tok] ?? 0
+        if c > 0 { hits += 1 }
+        lp += log(Double(c + 1) / denom)   // Laplace smoothing
       }
-
-      // Softmax → posteriors, best first.
-      let ordered = keys.sorted { logScore[$0]! > logScore[$1]! }
-      let ranked = Array(zip(ordered, softmax(ordered.map { logScore[$0]! })))
-
-      guard let (topKey, topP) = ranked.first, let topLabel = labels[topKey]
-      else { continue }
-
-      // Gate: genuine lexical evidence + a clear win over #2.
-      let secondP = ranked.count > 1 ? ranked[1].1 : 0
-      guard (matched[topKey] ?? 0) >= minMatchedTokens,
-            (topP - secondP) >= marginFloor
-      else { continue }
-
-      var out = [Suggestion(kind: topLabel.0,
-                            id: String(topKey.dropFirst(2)),
-                            title: topLabel.1,
-                            score: topP)]
-      for (key, p) in ranked.dropFirst() where p >= altFloor {
-        guard let l = labels[key] else { continue }
-        out.append(Suggestion(kind: l.0, id: String(key.dropFirst(2)),
-                              title: l.1, score: p))
-        if out.count >= 3 { break }
+      // "Not this" penalty: shared words with a rejected text for this target.
+      if let rsets = model.rejectedSets[key], !rsets.isEmpty {
+        let overlap = rsets.map { jaccard(taskSet, $0) }.max() ?? 0
+        lp -= rejectionPenalty * overlap
       }
-      next[t.id] = out
+      logScore[key] = lp
+      matched[key] = hits
     }
-    suggestions = next
+
+    // Softmax → posteriors, best first.
+    let ordered = model.keys.sorted { logScore[$0]! > logScore[$1]! }
+    let ranked = Array(zip(ordered, softmax(ordered.map { logScore[$0]! })))
+
+    guard let (topKey, topP) = ranked.first, let topLabel = model.labels[topKey]
+    else { return [] }
+
+    // Gate: genuine lexical evidence + a clear win over #2.
+    let secondP = ranked.count > 1 ? ranked[1].1 : 0
+    guard (matched[topKey] ?? 0) >= minMatchedTokens,
+          (topP - secondP) >= marginFloor
+    else { return [] }
+
+    var out = [Suggestion(kind: topLabel.0,
+                          id: String(topKey.dropFirst(2)),
+                          title: topLabel.1,
+                          score: topP)]
+    for (key, p) in ranked.dropFirst() where p >= altFloor {
+      guard let l = model.labels[key] else { continue }
+      out.append(Suggestion(kind: l.0, id: String(key.dropFirst(2)),
+                            title: l.1, score: p))
+      if out.count >= 3 { break }
+    }
+    return out
   }
 
   func topSuggestion(for taskId: String) -> Suggestion? {
