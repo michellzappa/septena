@@ -716,7 +716,9 @@ struct NutritionDestinationView: View {
     }
     .padding(.horizontal, 10)
     .padding(.vertical, 8)
-    .background(Theme.secondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 10))
+    // Selected (edit modal open) → accent wash; otherwise the neutral surface.
+    .background(editing?.id == e.id ? accent.opacity(0.18) : Theme.secondaryGroupedBackground,
+                in: RoundedRectangle(cornerRadius: 10))
     // Not inside a SwiftUI `List` — so `.swipeActions` doesn't apply.
     // The native equivalents on free-form rows are: tap → present sheet,
     // long-press / right-click → `.contextMenu`. Both are documented

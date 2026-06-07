@@ -14,6 +14,11 @@ struct LogRow: View {
   // Optional micrographic shown to the right of `detail` — used by the
   // training log for difficulty pips and cardio level bars.
   var accessory: AnyView? = nil
+  // Active/selected highlight: painted while this entry's edit modal is open,
+  // so the row that opened it stays visibly anchored. `tint` supplies the
+  // section accent for the wash. Mirrors `CheckableRow`'s selection treatment.
+  var tint: Color = Theme.inkPrimary
+  var isSelected: Bool = false
 
   @Environment(\.rowHInset) private var rowHInset
 
@@ -45,6 +50,15 @@ struct LogRow: View {
     }
     .padding(.horizontal, rowHInset)
     .padding(.vertical, Theme.rowVPadding + 2)
+    .background(selectionHighlight)
+  }
+
+  @ViewBuilder private var selectionHighlight: some View {
+    if isSelected {
+      RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
+        .fill(tint.opacity(0.18))
+        .padding(.horizontal, max(0, rowHInset - 6))
+    }
   }
 }
 

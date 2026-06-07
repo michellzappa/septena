@@ -12,6 +12,10 @@ struct LogEntryRow: View {
   var detail: String? = nil
   var trailing: String? = nil
   var accessory: AnyView? = nil
+  /// Section accent for the selection wash (see `isSelected`).
+  var tint: Color = Theme.inkPrimary
+  /// Highlight this row while its edit modal is open.
+  var isSelected: Bool = false
 
   /// Fires on tap. Conventionally opens the section's edit sheet for
   /// the underlying entry. Pass `nil` to make the row non-interactive
@@ -50,7 +54,9 @@ struct LogEntryRow: View {
     LogRow(title: title,
            detail: detail,
            trailing: trailing,
-           accessory: accessory)
+           accessory: accessory,
+           tint: tint,
+           isSelected: isSelected)
   }
 }
 

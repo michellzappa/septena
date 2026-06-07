@@ -48,6 +48,8 @@ struct CannabisDestinationView: View {
               title: methodLabel(entry.method),
               detail: detailLine(entry),
               trailing: entry.time,
+              tint: accent,
+              isSelected: editing?.id == entry.id,
               onEdit: { editing = entry },
               onDelete: { delete(entry) }
             )

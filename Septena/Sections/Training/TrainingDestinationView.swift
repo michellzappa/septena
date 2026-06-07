@@ -184,6 +184,8 @@ struct TrainingDestinationView: View {
               detail: detailLine(entry),
               trailing: entry.loggedAt.map(timeOnly),
               accessory: glyphAccessory(for: entry),
+              tint: accent,
+              isSelected: editing?.id == entry.id,
               onEdit: { editing = entry },
               onDelete: { delete(entry) }
             )
