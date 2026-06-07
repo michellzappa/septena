@@ -29,6 +29,9 @@ struct TaskComposerCard: View {
   @Environment(\.modelContext) private var modelContext
   @State private var draft = TaskDraft()
   @State private var seeded = false
+  /// Drives the fade/pop-in (the cover present animation is suppressed, so this
+  /// is the entrance the user sees).
+  @State private var shown = false
   @FocusState private var titleFocused: Bool
   /// SuggestionEngine's learned area/project pick for the current title (the
   /// "Suggested" chip). Recomputed as the title changes; create-mode only.
@@ -120,6 +123,7 @@ struct TaskComposerCard: View {
       .shadow(color: .black.opacity(0.20), radius: 22, y: 10)
       .padding(.horizontal, 14)
     }
+    .opacity(shown ? 1 : 0)
     .onAppear(perform: seed)
     .onChange(of: draft.title) { _, newValue in
       // The title wraps (axis: .vertical) so long titles show in full instead
@@ -289,6 +293,8 @@ struct TaskComposerCard: View {
   private func seed() {
     guard !seeded else { return }
     seeded = true
+    // Fade/pop the card in (the cover present animation is suppressed).
+    withAnimation(.snappy(duration: 0.24)) { shown = true }
     switch mode {
     case .create(let filter):
       draft = TaskDraft(filter: filter)
@@ -697,10 +703,12 @@ private struct InlineRepeatPanel: View {
 
 // MARK: - Root presenter
 
-/// App-level presenter so the composer can float over the *whole* UI (above
-/// pushed screens and the tab bar) and animate as a simple fade/pop — instead
-/// of a `fullScreenCover`'s bottom slide. Hosted once at the tab root via
-/// `taskComposerHost`; any surface launches it through `present(...)`.
+/// App-level presenter so the composer floats over the *whole* UI — above
+/// pushed screens, sheets, and the tab bar. A plain `.overlay` renders beneath
+/// any sheet a descendant presents (e.g. the Tasks drawer), so we host it in a
+/// `fullScreenCover`; its bottom-slide is suppressed (present/dismiss run in a
+/// non-animated transaction) and the card fades itself in, so it pops rather
+/// than slides. Launched via `present(...)`.
 @Observable
 final class TaskComposerPresenter {
   struct Request: Identifiable {
@@ -717,31 +725,52 @@ final class TaskComposerPresenter {
   func present(_ mode: TaskComposerCard.Mode,
                areas: [Area], projects: [Project], accent: Color,
                onDone: @escaping () -> Void) {
-    request = Request(mode: mode, areas: areas, projects: projects,
-                      accent: accent, onDone: onDone)
+    setRequest(Request(mode: mode, areas: areas, projects: projects,
+                       accent: accent, onDone: onDone))
   }
 
-  func dismiss() { request = nil }
+  func dismiss() { setRequest(nil) }
+
+  /// Mutate without animation so the cover doesn't slide; the card animates
+  /// its own fade in `TaskComposerCard`.
+  private func setRequest(_ value: Request?) {
+    var txn = Transaction()
+    txn.disablesAnimations = true
+    withTransaction(txn) { request = value }
+  }
 }
 
 extension View {
-  /// Mount the app-level composer overlay. It fades/pops in over everything
-  /// (the card carries its own dim scrim) — no slide, no moving background.
+  /// Mount the app-level composer. iOS uses a transparent, slide-suppressed
+  /// `fullScreenCover` so the card sits above every sheet/cover and pops in;
+  /// macOS (no full-screen covers) falls back to an in-place overlay.
   func taskComposerHost(_ presenter: TaskComposerPresenter) -> some View {
-    overlay {
-      if let req = presenter.request {
+    let binding = Binding<TaskComposerPresenter.Request?>(
+      get: { presenter.request },
+      set: { if $0 == nil { presenter.dismiss() } }
+    )
+    return Group {
+      #if os(iOS)
+      self.fullScreenCover(item: binding) { req in
         TaskComposerCard(
-          mode: req.mode,
-          areas: req.areas,
-          projects: req.projects,
-          accent: req.accent,
-          onDismiss: { presenter.dismiss() },
-          onDone: req.onDone
+          mode: req.mode, areas: req.areas, projects: req.projects, accent: req.accent,
+          onDismiss: { presenter.dismiss() }, onDone: req.onDone
         )
-        .id(req.id)
-        .transition(.opacity)
+        .presentationBackground(.clear)
       }
+      #else
+      self.overlay {
+        if let req = presenter.request {
+          TaskComposerCard(
+            mode: req.mode, areas: req.areas, projects: req.projects, accent: req.accent,
+            onDismiss: { presenter.dismiss() }, onDone: req.onDone
+          )
+          .id(req.id)
+          .transition(.opacity)
+        }
+      }
+      .animation(.snappy(duration: 0.22), value: presenter.request?.id)
+      #endif
     }
-    .animation(.snappy(duration: 0.22), value: presenter.request?.id)
   }
 }
