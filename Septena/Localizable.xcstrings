@@ -195,6 +195,16 @@
         }
       }
     },
+    "%@ events over the last %@ days" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ events over the last %2$@ days"
+          }
+        }
+      }
+    },
     "%@ exercises" : {
       "localizations" : {
         "pt-BR" : {
@@ -661,6 +671,9 @@
           }
         }
       }
+    },
+    "Add" : {
+
     },
     "Add %lld chores" : {
       "localizations" : {
@@ -1259,6 +1272,9 @@
           }
         }
       }
+    },
+    "Between" : {
+
     },
     "Biceps" : {
       "localizations" : {
@@ -1952,6 +1968,9 @@
         }
       }
     },
+    "Dismiss" : {
+
+    },
     "Don't Repeat" : {
       "localizations" : {
         "pt-BR" : {
@@ -1981,6 +2000,9 @@
           }
         }
       }
+    },
+    "Double tap to switch between today and the last %@ days" : {
+
     },
     "Drag to reorder. Toggle to show or hide a tile on the Nutrition dashboard. Tap a swatch to change its color." : {
       "localizations" : {
@@ -2081,6 +2103,9 @@
           }
         }
       }
+    },
+    "Either way, an AI reads and writes the same private data — and everything it touches is marked." : {
+
     },
     "elapsed" : {
       "localizations" : {
@@ -3056,7 +3081,7 @@
         }
       }
     },
-    "Layout picks how the homepage renders — Histogram, Sparkline, Heatmap, or Rings. Insights tunes the cross-section correlation explorer." : {
+    "Layout picks how the homepage renders — Histogram, Sparkline, Heatmap, Rings, or Wheel. Insights tunes the cross-section correlation explorer." : {
 
     },
     "Learning your rhythm — a couple more completions and Septena will predict the next one." : {
@@ -3125,6 +3150,9 @@
           }
         }
       }
+    },
+    "Log meals, coffee, mood, or other timestamped sections and your daily rhythm shows up here." : {
+
     },
     "Logbook" : {
       "localizations" : {
@@ -5160,6 +5188,9 @@
         }
       }
     },
+    "Time-of-day wheel" : {
+
+    },
     "today" : {
       "localizations" : {
         "pt-BR" : {
@@ -5377,6 +5408,9 @@
           }
         }
       }
+    },
+    "Upper" : {
+
     },
     "Used to personalize the greeting. With Apple Intelligence it's freshly written through the day." : {
       "localizations" : {
@@ -5626,6 +5660,9 @@
           }
         }
       }
+    },
+    "Your data stays in your private iCloud. Connecting an AI just opens a door into it — one you control and can revoke." : {
+
     },
     "Your name personalizes the home greeting and this profile. It syncs across your devices via iCloud." : {
       "localizations" : {
