@@ -1671,8 +1671,8 @@ enum SeptenaDate {
   static func friendlyLabel(_ iso: String) -> String {
     guard let d = parse(iso) else { return iso }
     let cal = Calendar.current
-    if cal.isDateInToday(d)     { return "Today" }
-    if cal.isDateInYesterday(d) { return "Yesterday" }
+    if cal.isDateInToday(d)     { return String(localized: "Today", comment: "Relative date") }
+    if cal.isDateInYesterday(d) { return String(localized: "Yesterday", comment: "Relative date") }
     let days = cal.dateComponents([.day], from: d, to: Date()).day ?? 0
     if days < 7 { return weekdayFormatter.string(from: d) }
     return monthDayFormatter.string(from: d)
@@ -1691,7 +1691,20 @@ enum Muscle: String, Codable, CaseIterable, Hashable, Identifiable, Sendable {
   case chest, back, shoulders, biceps, triceps
   case quads, hamstrings, glutes, calves, core
   var id: String { rawValue }
-  var label: String { rawValue.capitalized }
+  var label: String {
+    switch self {
+    case .chest:      return String(localized: "Chest", comment: "Muscle group")
+    case .back:       return String(localized: "Back", comment: "Muscle group")
+    case .shoulders:  return String(localized: "Shoulders", comment: "Muscle group")
+    case .biceps:     return String(localized: "Biceps", comment: "Muscle group")
+    case .triceps:    return String(localized: "Triceps", comment: "Muscle group")
+    case .quads:      return String(localized: "Quads", comment: "Muscle group")
+    case .hamstrings: return String(localized: "Hamstrings", comment: "Muscle group")
+    case .glutes:     return String(localized: "Glutes", comment: "Muscle group")
+    case .calves:     return String(localized: "Calves", comment: "Muscle group")
+    case .core:       return String(localized: "Core", comment: "Muscle group")
+    }
+  }
 }
 
 /// One configured session type from `GET /api/training/session-types`.

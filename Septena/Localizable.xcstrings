@@ -117,7 +117,14 @@
       "shouldTranslate" : false
     },
     "%@ ago" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ atrás"
+          }
+        }
+      }
     },
     "%@ binary signals · %@ trusted · tap to expand" : {
       "localizations" : {
@@ -163,7 +170,14 @@
       }
     },
     "%@ days" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ dias"
+          }
+        }
+      }
     },
     "%@ entries · %@ days" : {
       "localizations" : {
@@ -368,6 +382,16 @@
       },
       "shouldTranslate" : false
     },
+    "%@%%" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@%%"
+          }
+        }
+      }
+    },
     "%@C" : {
       "shouldTranslate" : false
     },
@@ -434,21 +458,9 @@
           }
         },
         "pt-BR" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%lld contribuição"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%lld contribuições"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld contribuições"
           }
         }
       }
@@ -474,21 +486,9 @@
           }
         },
         "pt-BR" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%lld dia"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "%lld dias"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld dias"
           }
         }
       }
@@ -673,21 +673,9 @@
           }
         },
         "pt-BR" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "Adicionar %lld afazer"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "Adicionar %lld afazeres"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar %lld afazeres"
           }
         }
       }
@@ -713,21 +701,9 @@
           }
         },
         "pt-BR" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "Adicionar %lld hábito"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "Adicionar %lld hábitos"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar %lld hábitos"
           }
         }
       }
@@ -753,21 +729,9 @@
           }
         },
         "pt-BR" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "Adicionar %lld fonte"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "Adicionar %lld fontes"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar %lld fontes"
           }
         }
       }
@@ -793,21 +757,9 @@
           }
         },
         "pt-BR" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "Adicionar %lld suplemento"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "Adicionar %lld suplementos"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar %lld suplementos"
           }
         }
       }
@@ -833,21 +785,9 @@
           }
         },
         "pt-BR" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "Adicionar %lld modelo"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "Adicionar %lld modelos"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar %lld modelos"
           }
         }
       }
@@ -893,7 +833,14 @@
       }
     },
     "Add to Claude" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar ao Claude"
+          }
+        }
+      }
     },
     "Added by Claude, not yet seen" : {
       "localizations" : {
@@ -916,7 +863,14 @@
       }
     },
     "Adding to %@" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionando a %@"
+          }
+        }
+      }
     },
     "After completion" : {
       "localizations" : {
@@ -1144,6 +1098,16 @@
         }
       }
     },
+    "At your real pace, expect this again **%@**." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No seu ritmo real, espere isto de novo **%@**."
+          }
+        }
+      }
+    },
     "Attach a measurement so this goal shows live progress against a target." : {
       "localizations" : {
         "pt-BR" : {
@@ -1155,7 +1119,14 @@
       }
     },
     "auto-refresh in %@" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "renovação automática em %@"
+          }
+        }
+      }
     },
     "avg %@/4" : {
       "localizations" : {
@@ -1178,7 +1149,14 @@
       }
     },
     "Based on %@ signals" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Com base em %@ sinais"
+          }
+        }
+      }
     },
     "Based on %lld signals" : {
       "localizations" : {
@@ -1201,21 +1179,9 @@
           }
         },
         "pt-BR" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "Com base em %lld sinal"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "Com base em %lld sinais"
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Com base em %lld sinais"
           }
         }
       }
@@ -1568,7 +1534,14 @@
       }
     },
     "Connecting lets Claude (at claude.ai or in the Claude app) read and write your Septena data via the MCP connector. Your data stays in iCloud — the gateway only relays a short-lived access token, which this app refreshes automatically. Use the address below to add the connector in Claude." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectar permite que o Claude (em claude.ai ou no app do Claude) leia e grave seus dados do Septena pelo conector MCP. Seus dados ficam no iCloud — o gateway só repassa um token de acesso de curta duração, que este app renova automaticamente. Use o endereço abaixo para adicionar o conector no Claude."
+          }
+        }
+      }
     },
     "Connection" : {
       "localizations" : {
@@ -1581,7 +1554,14 @@
       }
     },
     "Connector address" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Endereço do conector"
+          }
+        }
+      }
     },
     "Content" : {
       "localizations" : {
@@ -1909,14 +1889,21 @@
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
-            "state" : "needs_review",
+            "state" : "translated",
             "value" : "Concluído"
           }
         }
       }
     },
     "Done Today" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Concluído hoje"
+          }
+        }
+      }
     },
     "Drag to reorder. Toggle to show or hide a tile on the Nutrition dashboard. Tap a swatch to change its color." : {
       "localizations" : {
@@ -2019,7 +2006,14 @@
       }
     },
     "elapsed" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "decorrido"
+          }
+        }
+      }
     },
     "Elated" : {
       "localizations" : {
@@ -2077,6 +2071,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Every %1$@ %2$@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A cada %@ %@"
           }
         }
       }
@@ -2212,10 +2212,24 @@
       }
     },
     "Find any task, project, or area." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encontre qualquer tarefa, projeto ou área."
+          }
+        }
+      }
     },
     "Find what actually moves your day — which habits, inputs, and routines track with better sleep, mood, recovery, and more. Real correlations across everything you log, computed privately on-device." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descubra o que realmente move o seu dia — quais hábitos, insumos e rotinas acompanham melhor sono, humor, recuperação e mais. Correlações reais entre tudo o que você registra, calculadas de forma privada no dispositivo."
+          }
+        }
+      }
     },
     "Fix by creating the missing record (CloudKit Console → Create New Record) with recordName matching the referenced id." : {
       "localizations" : {
@@ -2279,7 +2293,14 @@
       }
     },
     "Free-text intentions. Tag with sections so your coaches have context for what you're working toward." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Intenções em texto livre. Marque com seções para que seus coaches tenham contexto do que você busca."
+          }
+        }
+      }
     },
     "From Reminders" : {
       "localizations" : {
@@ -2382,7 +2403,14 @@
       }
     },
     "Good to know: Apple only issues short-lived keys for private iCloud data — a few hours, with no server-side renewal. So Septena refreshes the connection automatically when you open the app, and the “Keep Claude connected” reminder nudges you before it lapses. If it does lapse, Claude simply asks you to open Septena to refresh — you won't need to reconnect from claude.ai, and it resumes on its own. Refreshing happens on iPhone and Mac only, not the watch." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bom saber: a Apple só emite chaves de curta duração para dados privados do iCloud — algumas horas, sem renovação no servidor. Por isso o Septena renova a conexão automaticamente quando você abre o app, e o lembrete “Manter o Claude conectado” avisa antes de expirar. Se expirar, o Claude apenas pede para você abrir o Septena para renovar — você não precisará reconectar pelo claude.ai, e ele retoma sozinho. A renovação acontece só no iPhone e no Mac, não no relógio."
+          }
+        }
+      }
     },
     "Grant Access" : {
       "localizations" : {
@@ -2575,7 +2603,14 @@
       }
     },
     "How it works" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Como funciona"
+          }
+        }
+      }
     },
     "Hydration" : {
       "localizations" : {
@@ -2657,7 +2692,14 @@
       }
     },
     "In Claude — claude.ai → Settings → Connectors, or the Claude app — add a custom connector and paste this address. You'll be asked to sign in with your Apple ID once to authorize access to your private iCloud data." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Claude — claude.ai → Ajustes → Conectores, ou no app do Claude — adicione um conector personalizado e cole este endereço. Você precisará entrar com seu Apple ID uma vez para autorizar o acesso aos seus dados privados do iCloud."
+          }
+        }
+      }
     },
     "In session" : {
       "localizations" : {
@@ -2898,7 +2940,24 @@
       }
     },
     "Layout picks how the homepage renders — Histogram, Sparkline, or Heatmap. Insights tunes the cross-section correlation explorer." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O layout escolhe como a tela inicial é exibida — Histograma, Minigráfico ou Mapa de calor. Insights ajusta o explorador de correlações entre seções."
+          }
+        }
+      }
+    },
+    "Learning your rhythm — a couple more completions and Septena will predict the next one." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aprendendo o seu ritmo — mais algumas conclusões e o Septena vai prever a próxima."
+          }
+        }
+      }
     },
     "Let Claude read and write your Septena data at mcp.septena.app." : {
       "localizations" : {
@@ -3184,7 +3243,14 @@
       "shouldTranslate" : false
     },
     "Never" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nunca"
+          }
+        }
+      }
     },
     "New entries you log in Septena will be sent to Apple Health. Existing entries are not back-filled." : {
       "localizations" : {
@@ -3197,7 +3263,14 @@
       }
     },
     "New Task" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nova tarefa"
+          }
+        }
+      }
     },
     "Next" : {
       "localizations" : {
@@ -3335,6 +3408,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nenhuma refeição recente"
+          }
+        }
+      }
+    },
+    "No rhythm yet — the schedule above drives the next-due date until there's a pattern to learn from." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ainda sem ritmo — a programação acima define a próxima data até haver um padrão para aprender."
           }
         }
       }
@@ -3480,7 +3563,14 @@
       }
     },
     "Nudges you to refresh the Claude connection just before its ~8-hour session expires, so Claude keeps reading your data without you reconnecting from claude.ai. Only fires while Claude is connected." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lembra você de renovar a conexão do Claude pouco antes da sessão de ~8 horas expirar, para o Claude continuar lendo seus dados sem você reconectar pelo claude.ai. Só dispara enquanto o Claude está conectado."
+          }
+        }
+      }
     },
     "Nutrition" : {
       "localizations" : {
@@ -3529,7 +3619,14 @@
       }
     },
     "Only a Claude Code running on this Mac can connect." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Só um Claude Code rodando neste Mac pode se conectar."
+          }
+        }
+      }
     },
     "Open" : {
       "localizations" : {
@@ -3905,7 +4002,14 @@
       }
     },
     "refresh recommended" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "renovação recomendada"
+          }
+        }
+      }
     },
     "Register a Withings dev app at developer.withings.com (Public Health Data API), then add your client_id and client_secret to Config/Secrets.xcconfig (copy it from Config/Secrets.example.xcconfig) and rebuild. The redirect URI should be septena://withings/callback." : {
       "localizations" : {
@@ -4519,7 +4623,14 @@
       }
     },
     "Summarized from %@ sections." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resumido de %@ seções."
+          }
+        }
+      }
     },
     "Summarized from %lld sections." : {
       "localizations" : {
@@ -4542,21 +4653,9 @@
           }
         },
         "pt-BR" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "Resumido de %lld seção."
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "needs_review",
-                  "value" : "Resumido de %lld seções."
-                }
-              }
-            }
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resumido de %lld seções."
           }
         }
       }
@@ -4602,7 +4701,14 @@
       }
     },
     "Talk to your %@ coach" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fale com seu coach de %@"
+          }
+        }
+      }
     },
     "Tap + to add a supplement." : {
       "localizations" : {
@@ -4765,7 +4871,14 @@
       }
     },
     "The little celebration that plays when you log something — confetti, ripples, a streak landing. Off keeps the confirming haptic but skips the motion. Reduce Motion always overrides this." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A pequena comemoração que toca quando você registra algo — confetes, ondas, uma sequência batendo. Desligado mantém o retorno tátil de confirmação, mas pula a animação. Reduzir Movimento sempre prevalece sobre isto."
+          }
+        }
+      }
     },
     "The master switch. Each nudge fires around when you usually log it and goes quiet once it's marked for the day." : {
       "localizations" : {
@@ -4798,7 +4911,14 @@
       }
     },
     "Thinking…" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pensando…"
+          }
+        }
+      }
     },
     "This category is turned off in Apple Health. To allow it, open Health → Profile → Apps → Septena." : {
       "localizations" : {
@@ -4811,7 +4931,14 @@
       }
     },
     "This exercise is already logged. Removing it deletes the saved entry." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este exercício já foi registrado. Removê-lo apaga a entrada salva."
+          }
+        }
+      }
     },
     "This goal will also appear in the %@ section." : {
       "localizations" : {
@@ -5029,7 +5156,14 @@
       }
     },
     "Unlock with Septena+" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desbloquear com o Septena+"
+          }
+        }
+      }
     },
     "Upbeat" : {
       "localizations" : {
@@ -5337,6 +5471,116 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Δ = média com − média sem"
+          }
+        }
+      }
+    },
+    "Yesterday" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ontem"
+          }
+        }
+      }
+    },
+    "Chest" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Peito"
+          }
+        }
+      }
+    },
+    "Back" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Costas"
+          }
+        }
+      }
+    },
+    "Shoulders" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ombros"
+          }
+        }
+      }
+    },
+    "Biceps" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bíceps"
+          }
+        }
+      }
+    },
+    "Triceps" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tríceps"
+          }
+        }
+      }
+    },
+    "Quads" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quadríceps"
+          }
+        }
+      }
+    },
+    "Hamstrings" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Posteriores"
+          }
+        }
+      }
+    },
+    "Glutes" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glúteos"
+          }
+        }
+      }
+    },
+    "Calves" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Panturrilhas"
+          }
+        }
+      }
+    },
+    "Core" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Core"
           }
         }
       }
