@@ -863,7 +863,7 @@ struct GeneralSettingsPane: View {
           Label("Insights", systemImage: "chart.dots.scatter")
         }
       } footer: {
-        Text("Layout picks how the homepage renders — Histogram, Sparkline, or Heatmap. Insights tunes the cross-section correlation explorer.")
+        Text("Layout picks how the homepage renders — Histogram, Sparkline, Heatmap, or Rings. Insights tunes the cross-section correlation explorer.")
       }
 
       Section {
@@ -1415,6 +1415,12 @@ private struct LayoutPreviewExample: View {
         )
       case .heatmap:
         HeatmapHomepageView(
+          items: [LayoutPreviewSample.domainData],
+          onTap: { _ in },
+          menuContent: { _ in EmptyView() }
+        )
+      case .rings:
+        RingsHomepageView(
           items: [LayoutPreviewSample.domainData],
           onTap: { _ in },
           menuContent: { _ in EmptyView() }
@@ -2420,22 +2426,22 @@ private struct PaletteSwatch: Identifiable {
 
 private let sectionPalette: [PaletteSwatch] = [
   // Bright row — Tailwind 500
-  .init(id: "red",        label: "Red",        hex: "#ef4444"),
-  .init(id: "orange",     label: "Orange",     hex: "#f97316"),
-  .init(id: "amber",      label: "Amber",      hex: "#f59e0b"),
-  .init(id: "yellow",     label: "Yellow",     hex: "#eab308"),
-  .init(id: "lime",       label: "Lime",       hex: "#84cc16"),
-  .init(id: "green",      label: "Green",      hex: "#22c55e"),
-  .init(id: "emerald",    label: "Emerald",    hex: "#10b981"),
-  .init(id: "teal",       label: "Teal",       hex: "#14b8a6"),
-  .init(id: "cyan",       label: "Cyan",       hex: "#06b6d4"),
-  .init(id: "sky",        label: "Sky",        hex: "#0ea5e9"),
-  .init(id: "blue",       label: "Blue",       hex: "#3b82f6"),
-  .init(id: "indigo",     label: "Indigo",     hex: "#6366f1"),
-  .init(id: "violet",     label: "Violet",     hex: "#8b5cf6"),
-  .init(id: "purple",     label: "Purple",     hex: "#a855f7"),
-  .init(id: "pink",       label: "Pink",       hex: "#ec4899"),
-  .init(id: "rose",       label: "Rose",       hex: "#f43f5e"),
+  .init(id: "red",        label: String(localized: "Red", comment: "Accent color"),        hex: "#ef4444"),
+  .init(id: "orange",     label: String(localized: "Orange", comment: "Accent color"),     hex: "#f97316"),
+  .init(id: "amber",      label: String(localized: "Amber", comment: "Accent color"),      hex: "#f59e0b"),
+  .init(id: "yellow",     label: String(localized: "Yellow", comment: "Accent color"),     hex: "#eab308"),
+  .init(id: "lime",       label: String(localized: "Lime", comment: "Accent color"),       hex: "#84cc16"),
+  .init(id: "green",      label: String(localized: "Green", comment: "Accent color"),      hex: "#22c55e"),
+  .init(id: "emerald",    label: String(localized: "Emerald", comment: "Accent color"),    hex: "#10b981"),
+  .init(id: "teal",       label: String(localized: "Teal", comment: "Accent color"),       hex: "#14b8a6"),
+  .init(id: "cyan",       label: String(localized: "Cyan", comment: "Accent color"),       hex: "#06b6d4"),
+  .init(id: "sky",        label: String(localized: "Sky", comment: "Accent color"),        hex: "#0ea5e9"),
+  .init(id: "blue",       label: String(localized: "Blue", comment: "Accent color"),       hex: "#3b82f6"),
+  .init(id: "indigo",     label: String(localized: "Indigo", comment: "Accent color"),     hex: "#6366f1"),
+  .init(id: "violet",     label: String(localized: "Violet", comment: "Accent color"),     hex: "#8b5cf6"),
+  .init(id: "purple",     label: String(localized: "Purple", comment: "Accent color"),     hex: "#a855f7"),
+  .init(id: "pink",       label: String(localized: "Pink", comment: "Accent color"),       hex: "#ec4899"),
+  .init(id: "rose",       label: String(localized: "Rose", comment: "Accent color"),       hex: "#f43f5e"),
   // Earth row — Tailwind 700/800 warm hues
   .init(id: "terracotta", label: "Terracotta", hex: "#9a3412"),
   .init(id: "brown",      label: "Brown",      hex: "#b45309"),
