@@ -62,8 +62,9 @@ struct AnyDiscoveryMiniApp: Identifiable {
 
 @MainActor
 enum DiscoveryRegistry {
+  // Coaches are now a top-level surface (CoachView), no longer a Discovery
+  // card. The introspective exercises surface inside the Whole-Life coach.
   static let all: [DiscoveryMiniAppDescriptor] = [
-    CoachMiniApp.descriptor,
     IkigaiMiniApp.descriptor,
     ValuesMiniApp.descriptor,
     VirtueMiniApp.descriptor,
