@@ -895,6 +895,12 @@ struct WeekDashboardView: View {
         onTap: handleDomainTap,
         menuContent: { domain in quickAddMenu(for: domain) }
       )
+    case .rings:
+      RingsHomepageView(
+        items: visibleDomainData,
+        onTap: handleDomainTap,
+        menuContent: { domain in quickAddMenu(for: domain) }
+      )
     }
   }
 
