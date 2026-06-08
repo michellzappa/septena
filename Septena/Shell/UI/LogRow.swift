@@ -14,6 +14,10 @@ struct LogRow: View {
   // Optional micrographic shown to the right of `detail` — used by the
   // training log for difficulty pips and cardio level bars.
   var accessory: AnyView? = nil
+  // Optional leading glyph (e.g. a status dot) shown before the title column.
+  // Used by the per-item detail's recent timeline to mark done/skipped/missed
+  // days. Omitted by default so existing log rows are unchanged.
+  var leading: AnyView? = nil
   // Active/selected highlight: painted while this entry's edit modal is open,
   // so the row that opened it stays visibly anchored. `tint` supplies the
   // section accent for the wash. Mirrors `CheckableRow`'s selection treatment.
@@ -24,6 +28,9 @@ struct LogRow: View {
 
   var body: some View {
     HStack(spacing: Theme.iconTextGap) {
+      if let leading {
+        leading.frame(width: 18)
+      }
       VStack(alignment: .leading, spacing: 2) {
         Text(title)
           .font(.septenaTaskTitle)

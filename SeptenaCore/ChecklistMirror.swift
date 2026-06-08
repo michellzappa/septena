@@ -245,6 +245,16 @@ enum ChecklistMirror {
     return Array(Set(states.map(\.date))).sorted()
   }
 
+  /// Dates a habit was explicitly *skipped* (YYYY-MM-DD, de-duplicated,
+  /// ascending). Distinct from "not done": a skip is a recorded "intentionally
+  /// not today". Shown in the detail's recent list / heatmap alongside dones.
+  static func habitSkippedDates(context: ModelContext, habitID: String) -> [String] {
+    let states = (try? context.fetch(FetchDescriptor<HabitDayStateEntity>(
+      predicate: #Predicate { $0.habitID == habitID && $0.skipped == true }
+    ))) ?? []
+    return Array(Set(states.map(\.date))).sorted()
+  }
+
   /// Dates a supplement was marked taken (YYYY-MM-DD, de-duplicated, ascending).
   /// Pure read — counterpart to `habitCompletionDates` for the supplement
   /// detail view.

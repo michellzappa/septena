@@ -81,6 +81,7 @@ struct HabitsDestinationView: View {
         accent: accent,
         doneVerb: "done",
         fetch: { ChecklistMirror.habitCompletionDates(context: $0, habitID: habit.id) },
+        skippedFetch: { ChecklistMirror.habitSkippedDates(context: $0, habitID: habit.id) },
         onEdit: { viewing = nil; editing = habit }
       )
     }

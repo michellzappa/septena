@@ -45,12 +45,16 @@ struct LogCard: Identifiable {
   var note: String? = nil
 }
 
-/// One row in the "Recent" history list (rendered with `LogRow`).
+/// One row in the "Recent" history list (rendered with `LogRow`). `status`
+/// drives an optional leading dot for daily-item timelines (done/skipped/
+/// missed); `.none` leaves the row glyph-free (event-log lists).
 struct LogRecent: Identifiable {
+  enum Status { case none, done, skipped, missed }
   let id = UUID()
   let title: String
   var detail: String? = nil
   var trailing: String? = nil
+  var status: Status = .none
 }
 
 /// Drives the consistency heatmap. `level` maps an ISO date → 0…4 intensity.
@@ -178,9 +182,27 @@ struct LogDetailBody: View {
       VStack(spacing: 0) {
         ForEach(Array(detail.recent.enumerated()), id: \.element.id) { idx, row in
           if idx > 0 { Divider() }
-          LogRow(title: row.title, detail: row.detail, trailing: row.trailing)
+          LogRow(title: row.title, detail: row.detail, trailing: row.trailing,
+                 leading: statusGlyph(row.status))
         }
       }
+    }
+  }
+
+  /// Leading status dot for a daily-timeline row. `nil` for `.none` so
+  /// event-log lists render without a glyph column.
+  private func statusGlyph(_ status: LogRecent.Status) -> AnyView? {
+    switch status {
+    case .none: return nil
+    case .done:
+      return AnyView(Image(systemName: "checkmark.circle.fill")
+        .font(.footnote).foregroundStyle(accent))
+    case .skipped:
+      return AnyView(Image(systemName: "minus.circle.fill")
+        .font(.footnote).foregroundStyle(.tertiary))
+    case .missed:
+      return AnyView(Image(systemName: "circle")
+        .font(.footnote).foregroundStyle(Color.secondary.opacity(0.35)))
     }
   }
 }
