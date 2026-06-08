@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import Observation
 
 // In-process MCP server for the Mac app. Binds a loopback-only HTTP listener
 // that a local Claude Code instance connects to as a streamable-HTTP MCP
@@ -26,6 +27,38 @@ public enum MCPDefaultsKey {
   public static let token = "septena.dev.localMcpToken"
   /// String — `MCPAccessScope` raw value (which networks may connect).
   public static let scope = "septena.dev.localMcpScope"
+}
+
+/// Observable live state for the local MCP server, so menu-bar / Settings UI
+/// can reflect "listening" and recent activity without polling. Kept separate
+/// from `LocalMCPServer` (which isn't `@Observable` and runs its socket work
+/// off the main actor) — the server pokes this on the main actor whenever its
+/// state changes or an authorized request lands.
+@MainActor
+@Observable
+public final class LocalMCPStatus {
+  public static let shared = LocalMCPStatus()
+  private init() {}
+
+  /// True while the loopback listener is bound.
+  public private(set) var isRunning = false
+  /// When the server last served an authorized request. Drives the
+  /// "active recently" indicator; nil until the first call lands (and reset
+  /// whenever the server stops).
+  public private(set) var lastActivity: Date?
+
+  func setRunning(_ running: Bool) {
+    isRunning = running
+    if !running { lastActivity = nil }
+  }
+
+  func markActivity() { lastActivity = Date() }
+
+  /// True when a request landed within `seconds` — the "green dot" window.
+  public func isActive(within seconds: TimeInterval = 120) -> Bool {
+    guard let lastActivity else { return false }
+    return Date().timeIntervalSince(lastActivity) < seconds
+  }
 }
 
 @MainActor
@@ -85,12 +118,14 @@ final class LocalMCPServer {
     }
     l.start(queue: netQueue)
     listener = l
+    LocalMCPStatus.shared.setRunning(true)
     SeptenaLog.info("[LocalMCP] listening on :\(port) scope=\(MCPAccessScope.current.rawValue)")
   }
 
   func stop() {
     listener?.cancel()
     listener = nil
+    LocalMCPStatus.shared.setRunning(false)
     SeptenaLog.info("[LocalMCP] stopped")
   }
 
@@ -153,6 +188,8 @@ final class LocalMCPServer {
       respond(conn, status: "401 Unauthorized", json: ["error": "invalid or missing bearer token"])
       return
     }
+    // An authenticated request landed — light up the menu-bar "active" dot.
+    await MainActor.run { LocalMCPStatus.shared.markActivity() }
 
     // --- Decode the JSON-RPC request. ---
     guard let obj = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any],

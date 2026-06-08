@@ -47,6 +47,8 @@ private final class MenuBarTodayLoader {
 /// reached via "New To-Do" which activates the window into draft mode.
 struct MenuBarMenu: View {
   @State private var loader = MenuBarTodayLoader()
+  @AppStorage(MCPDefaultsKey.enabled) private var mcpEnabled = false
+  @Environment(\.openWindow) private var openWindow
 
   var body: some View {
     Button("New To-Do") { startQuickAdd() }
@@ -63,11 +65,33 @@ struct MenuBarMenu: View {
       }
     }
 
+    // Live MCP server state, shown only while the server is enabled. Reading
+    // `LocalMCPStatus.shared` properties here registers Observation tracking,
+    // so the line updates when the server starts/stops or serves a request.
+    if mcpEnabled {
+      Divider()
+      Text(mcpStatusText)
+    }
+
     Divider()
 
     Button("Open Septena") { activateMainWindow() }
-    Button("Quit Septena") { NSApp.terminate(nil) }
+    // ⌘Q soft-quits to the menu bar when the server is on (NSApp.terminate
+    // routes through MacAppDelegate.applicationShouldTerminate); otherwise it
+    // quits normally. "Quit Completely" always exits.
+    Button(mcpEnabled ? "Hide Septena" : "Quit Septena") { NSApp.terminate(nil) }
       .keyboardShortcut("q")
+    if mcpEnabled {
+      Button("Quit Completely") { MacAppLifecycle.quitCompletely() }
+        .keyboardShortcut("q", modifiers: [.command, .option])
+    }
+  }
+
+  private var mcpStatusText: String {
+    let status = LocalMCPStatus.shared
+    if !status.isRunning { return "MCP server off" }
+    if status.isActive(within: 120) { return "MCP · active just now" }
+    return "MCP · listening on :\(LocalMCPServer.shared.port)"
   }
 
   private func startQuickAdd() {
@@ -78,10 +102,16 @@ struct MenuBarMenu: View {
   }
 
   private func activateMainWindow() {
+    // Unhide first (soft-quit hides the app ⌘H-style), then front the existing
+    // window — or recreate it if a red-button close fully released it while the
+    // server kept the app alive.
+    NSApp.unhide(nil)
     NSApp.activate(ignoringOtherApps: true)
-    NSApp.windows
-      .first { $0.canBecomeMain }?
-      .makeKeyAndOrderFront(nil)
+    if let window = NSApp.windows.first(where: { $0.canBecomeMain }) {
+      window.makeKeyAndOrderFront(nil)
+    } else {
+      openWindow(id: "main")
+    }
     Task { await loader.refresh() }
   }
 }

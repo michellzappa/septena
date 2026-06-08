@@ -56,7 +56,10 @@ struct SeptenaApp: App {
   #endif
 
   var body: some Scene {
-    WindowGroup {
+    // Explicit id so the menu-bar "Open Septena" can recreate the window via
+    // `openWindow(id:)` if it was fully closed (red button) while the app
+    // stayed alive serving MCP.
+    WindowGroup(id: "main") {
       RootTabView()
         // Single app-wide celebration layer. Mounted INNERMOST (before the
         // .environment chain) so the overlay is a descendant of every
@@ -191,6 +194,10 @@ struct SeptenaApp: App {
             await LocalNotificationScheduler.shared.requestAuthorizationIfNeeded()
           }
           LocalNotificationScheduler.shared.start(context: localStore.container.mainContext)
+          // One-shot: lift legacy macro targets (MacrosConfig bands) into
+          // range goals. After CK fetch above so it won't duplicate bands a
+          // sibling device already migrated.
+          MacroTargetMigration.runIfNeeded(context: localStore.container.mainContext)
           #if DEBUG
           // One-shot, DEBUG-only: register optional CloudKit fields that
           // exist in code but were never written in Development, so they
@@ -292,6 +299,15 @@ struct SeptenaApp: App {
         Button("Keyboard Shortcuts") { navigation.showKeyboardShortcuts = true }
           .keyboardShortcut("/", modifiers: [.command, .shift])
       }
+      #if os(macOS)
+      // When the local MCP server is on, ⌘Q soft-quits (hides to the menu bar
+      // so the server keeps serving). ⌥⌘Q forces a real exit. When the server
+      // is off, plain ⌘Q quits as usual — the soft-quit path is gated on it.
+      CommandGroup(after: .appTermination) {
+        Button("Quit Septena Completely") { MacAppLifecycle.quitCompletely() }
+          .keyboardShortcut("q", modifiers: [.command, .option])
+      }
+      #endif
     }
 
     // macOS menu bar quick-entry. Click the checklist glyph in the status
