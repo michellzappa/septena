@@ -1637,6 +1637,15 @@ enum SeptenaDate {
     return f
   }()
 
+  private static let secondsTimeFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.calendar = Calendar(identifier: .gregorian)
+    f.locale = Locale(identifier: "en_US_POSIX")
+    f.timeZone = TimeZone.current
+    f.dateFormat = "HH:mm:ss"
+    return f
+  }()
+
   private static let weekdayFormatter: DateFormatter = {
     let f = DateFormatter()
     f.dateFormat = "EEEE"
@@ -1663,6 +1672,11 @@ enum SeptenaDate {
 
   /// Wall-clock "HH:mm" right now.
   static var nowHHMM: String { timeFormatter.string(from: Date()) }
+
+  /// Wall-clock "HH:mm:ss" right now. Used where sub-minute ordering matters
+  /// (e.g. several events logged in the same minute) and to match the hosted
+  /// gateway, which defaults event times to second precision.
+  static var nowHHMMSS: String { secondsTimeFormatter.string(from: Date()) }
 
   /// Human label for a "yyyy-MM-dd" string: "Today", "Yesterday", the
   /// weekday name within the last week, else "MMM d". Returns the raw

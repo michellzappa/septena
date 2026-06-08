@@ -242,6 +242,10 @@ func noteNutritionEntryChange(id: String) { noteChange(recordName: NutritionEntr
 func noteNutritionEntryDeletion(id: String) { noteDeletion(recordName: NutritionEntryCloudKitSchema.recordName(for: id), kind: "nutritionEntry") }
 func noteNutritionDayChange(id: String) { noteChange(recordName: NutritionDailySummaryCloudKitSchema.recordName(for: id), kind: "nutritionDay") }
 func noteNutritionDayDeletion(id: String) { noteDeletion(recordName: NutritionDailySummaryCloudKitSchema.recordName(for: id), kind: "nutritionDay") }
+func noteCoachVoiceChange(id: String) { noteChange(recordName: CoachVoiceCloudKitSchema.recordName(for: id), kind: "coachVoice") }
+func noteCoachVoiceDeletion(id: String) { noteDeletion(recordName: CoachVoiceCloudKitSchema.recordName(for: id), kind: "coachVoice") }
+func noteCoachMessageChange(id: String) { noteChange(recordName: CoachMessageCloudKitSchema.recordName(for: id), kind: "coachMessage") }
+func noteCoachMessageDeletion(id: String) { noteDeletion(recordName: CoachMessageCloudKitSchema.recordName(for: id), kind: "coachMessage") }
 
   private func noteChange(recordName: String, kind: String) {
     guard let engine else {

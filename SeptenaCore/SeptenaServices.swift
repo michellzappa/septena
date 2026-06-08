@@ -33,6 +33,8 @@ final class SeptenaServices {
   let taskMutator: TaskMutator
   let checklistMutator: ChecklistMutator
   let goalMutator: GoalMutator
+  let coachVoiceMutator: CoachVoiceMutator
+  let coachMessageMutator: CoachMessageMutator
   let gutMutator: GutMutator
   let caffeineMutator: CaffeineMutator
   let moodMutator: MoodMutator
@@ -53,6 +55,8 @@ final class SeptenaServices {
     self.taskMutator = TaskMutator(context: context, ckEngine: nil)
     self.checklistMutator = ChecklistMutator(context: context, ckEngine: nil)
     self.goalMutator = GoalMutator(context: context, ckEngine: nil)
+    self.coachVoiceMutator = CoachVoiceMutator(context: context, ckEngine: nil)
+    self.coachMessageMutator = CoachMessageMutator(context: context, ckEngine: nil)
     self.gutMutator = GutMutator(context: context, ckEngine: nil)
     self.caffeineMutator = CaffeineMutator(context: context, ckEngine: nil)
     self.moodMutator = MoodMutator(context: context)
@@ -209,6 +213,24 @@ final class SeptenaServices {
         if recordName.hasPrefix("goal:") {
           let id = GoalCloudKitSchema.entityID(from: recordName)
           if let entity = try? context.fetch(FetchDescriptor<GoalEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
+        if recordName.hasPrefix("coachVoice:") {
+          let id = CoachVoiceCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<CoachVoiceEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
+        if recordName.hasPrefix("coachMsg:") {
+          let id = CoachMessageCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<CoachMessageEntity>(
             predicate: #Predicate { $0.id == id }
           )).first {
             return entity.toCloudKitRecord()
@@ -478,6 +500,26 @@ final class SeptenaServices {
           } else {
             context.insert(GoalEntity(cloudKit: record))
           }
+        case CoachVoiceCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = CoachVoiceCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<CoachVoiceEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(CoachVoiceEntity(cloudKit: record))
+          }
+        case CoachMessageCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = CoachMessageCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<CoachMessageEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(CoachMessageEntity(cloudKit: record))
+          }
         case GutEventCloudKitSchema.recordType:
           batchTouchedData = true
           let id = GutEventCloudKitSchema.entityID(from: record.recordID.recordName)
@@ -723,6 +765,22 @@ final class SeptenaServices {
           )).first {
             context.delete(entity)
           }
+        case CoachVoiceCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = CoachVoiceCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<CoachVoiceEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
+        case CoachMessageCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = CoachMessageCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<CoachMessageEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
         case GutEventCloudKitSchema.recordType:
           batchTouchedData = true
           let id = GutEventCloudKitSchema.entityID(from: recordID.recordName)
@@ -857,6 +915,8 @@ final class SeptenaServices {
       taskMutator.bind(ckEngine: ckEngine)
       checklistMutator.bind(ckEngine: ckEngine)
       goalMutator.bind(ckEngine: ckEngine)
+      coachVoiceMutator.bind(ckEngine: ckEngine)
+      coachMessageMutator.bind(ckEngine: ckEngine)
       gutMutator.bind(ckEngine: ckEngine)
       caffeineMutator.bind(ckEngine: ckEngine)
       cannabisMutator.bind(ckEngine: ckEngine)
@@ -876,6 +936,11 @@ final class SeptenaServices {
         // Heal dangling project references now that the initial fetch has
         // landed (so we never stub a project that's merely mid-sync).
         await reconcileProjectGraph(context: context)
+        // Now that synced history is present: repair pre-`occurredAt` event
+        // rows (local-only) and publish this device's timezone so the gateway
+        // resolves the user's real zone instead of defaulting to UTC.
+        OccurredAtBackfill.runIfNeeded(context: context)
+        SettingsMirror.publishDeviceTimezone(context: context, engine: ckEngine)
       }
     }
     startTask = task
@@ -1430,6 +1495,148 @@ final class GoalMutator {
     saveContext("CK goals \(op)")
     ckEngine?.noteGoalChange(id: entity.id)
     postChanged()
+  }
+
+  private func saveContext(_ label: String) {
+    do { try context.save() }
+    catch { SeptenaLog.error(label, error) }
+  }
+
+  private func postChanged() {
+    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+  }
+}
+
+// MARK: - CoachVoiceMutator
+
+/// Upserts the per-coach voice settings (tone dials + custom note). One row
+/// per coach, keyed by coach key. Raw-string API so SeptenaCore stays free of
+/// the app-side voice enums; the app's `CoachVoiceStore` maps to/from them.
+@MainActor
+@Observable
+final class CoachVoiceMutator {
+  private let context: ModelContext
+  private var ckEngine: CKEngine?
+
+  init(context: ModelContext, ckEngine: CKEngine? = nil) {
+    self.context = context
+    self.ckEngine = ckEngine
+  }
+
+  func bind(ckEngine: CKEngine) {
+    self.ckEngine = ckEngine
+  }
+
+  /// The stored voice row for a coach, or nil if the user never changed it
+  /// (callers fall back to the coach's defaults).
+  func voice(forCoachKey key: String) -> CoachVoiceEntity? {
+    fetch(key)
+  }
+
+  func save(coachKey: String,
+            warmth: String, brevity: String,
+            challenge: String, formality: String, note: String) {
+    let entity: CoachVoiceEntity
+    if let existing = fetch(coachKey) {
+      existing.warmth = warmth
+      existing.brevity = brevity
+      existing.challenge = challenge
+      existing.formality = formality
+      existing.note = note
+      existing.updatedAt = .now
+      entity = existing
+    } else {
+      entity = CoachVoiceEntity(id: coachKey, warmth: warmth, brevity: brevity,
+                                challenge: challenge, formality: formality, note: note)
+      context.insert(entity)
+    }
+    saveContext("CK coachVoice save")
+    ckEngine?.noteCoachVoiceChange(id: entity.id)
+    postChanged()
+  }
+
+  func delete(coachKey: String) {
+    guard let entity = fetch(coachKey) else { return }
+    context.delete(entity)
+    saveContext("CK coachVoice delete")
+    ckEngine?.noteCoachVoiceDeletion(id: coachKey)
+    postChanged()
+  }
+
+  private func fetch(_ key: String) -> CoachVoiceEntity? {
+    try? context.fetch(FetchDescriptor<CoachVoiceEntity>(
+      predicate: #Predicate { $0.id == key }
+    )).first
+  }
+
+  private func saveContext(_ label: String) {
+    do { try context.save() }
+    catch { SeptenaLog.error(label, error) }
+  }
+
+  private func postChanged() {
+    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+  }
+}
+
+// MARK: - CoachMessageMutator
+
+/// Persists a coach conversation as flat per-message rows keyed by coach key.
+/// Append-only during a chat; `clear` wipes one coach's transcript. Plain
+/// strings for role so SeptenaCore needn't know the app's Message type.
+@MainActor
+@Observable
+final class CoachMessageMutator {
+  private let context: ModelContext
+  private var ckEngine: CKEngine?
+
+  init(context: ModelContext, ckEngine: CKEngine? = nil) {
+    self.context = context
+    self.ckEngine = ckEngine
+  }
+
+  func bind(ckEngine: CKEngine) {
+    self.ckEngine = ckEngine
+  }
+
+  /// One coach's transcript, oldest-first.
+  func messages(forCoachKey key: String) -> [CoachMessageEntity] {
+    (try? context.fetch(FetchDescriptor<CoachMessageEntity>(
+      predicate: #Predicate { $0.coachKey == key },
+      sortBy: [SortDescriptor(\.sortIndex, order: .forward)]
+    ))) ?? []
+  }
+
+  @discardableResult
+  func append(coachKey: String, role: String, text: String) -> CoachMessageEntity {
+    let entity = CoachMessageEntity(id: UUID().uuidString.lowercased(),
+                                    coachKey: coachKey,
+                                    role: role,
+                                    text: text,
+                                    sortIndex: nextSortIndex(forCoachKey: coachKey))
+    context.insert(entity)
+    saveContext("CK coachMessage append")
+    ckEngine?.noteCoachMessageChange(id: entity.id)
+    postChanged()
+    return entity
+  }
+
+  /// Wipe one coach's transcript (queues a CK deletion per row).
+  func clear(coachKey: String) {
+    let rows = messages(forCoachKey: coachKey)
+    guard !rows.isEmpty else { return }
+    let ids = rows.map(\.id)
+    for entity in rows { context.delete(entity) }
+    saveContext("CK coachMessage clear")
+    for id in ids { ckEngine?.noteCoachMessageDeletion(id: id) }
+    postChanged()
+  }
+
+  private func nextSortIndex(forCoachKey key: String) -> Int {
+    ((try? context.fetch(FetchDescriptor<CoachMessageEntity>(
+      predicate: #Predicate { $0.coachKey == key },
+      sortBy: [SortDescriptor(\.sortIndex, order: .reverse)]
+    )).first?.sortIndex) ?? -1) + 1
   }
 
   private func saveContext(_ label: String) {

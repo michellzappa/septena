@@ -30,6 +30,8 @@ struct CoachDetailView: View {
   @State private var availableSections: [SectionConfig] = []
   @State private var editing: Goal? = nil
   @State private var showingChat = false
+  @State private var showingVoice = false
+  @State private var voice: CoachVoice? = nil
   @State private var pills: [CoachDataPill] = []
   /// Custom coach only: the sections the user tapped to scope it (ephemeral
   /// in Step 1 — persisted alongside the transcript in Step 2).
@@ -78,38 +80,68 @@ struct CoachDetailView: View {
       if !drafts.isEmpty { GoalDrafts.save(drafts, mutator: goalMutator) }
       showingChat = false
     }
+    .adaptiveDetail(isPresented: $showingVoice,
+                    onDismiss: { voice = CoachVoiceStore.load(domain) }) {
+      CoachVoiceEditor(domain: domain)
+    }
   }
 
   // MARK: - Conversation
 
   private var conversationSection: some View {
     DrawerSection {
-      Button {
-        showingChat = true
-        Haptics.tick()
-      } label: {
-        HStack(spacing: 12) {
-          Image(systemName: "bubble.left.and.text.bubble.right.fill")
-            .font(.title3)
-            .foregroundStyle(domain.accent)
-          VStack(alignment: .leading, spacing: 2) {
-            Text("Talk to your \(domain.title.replacingOccurrences(of: " Coach", with: "").lowercased()) coach")
-              .font(.body.weight(.medium))
-              .foregroundStyle(.primary)
-            Text(domain.blurb)
-              .font(.caption)
-              .foregroundStyle(.secondary)
-              .multilineTextAlignment(.leading)
-          }
-          Spacer(minLength: 0)
-          Image(systemName: "chevron.right")
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.tertiary)
+      VStack(spacing: 0) {
+        Button {
+          showingChat = true
+          Haptics.tick()
+        } label: {
+          coachRow(icon: "bubble.left.and.text.bubble.right.fill",
+                   title: "Talk to your \(shortName) coach",
+                   subtitle: domain.blurb)
         }
-        .contentShape(Rectangle())
+        .buttonStyle(.plain)
+
+        Divider().padding(.vertical, 4)
+
+        Button {
+          showingVoice = true
+          Haptics.tick()
+        } label: {
+          coachRow(icon: "waveform",
+                   title: "Voice & tone",
+                   subtitle: (voice ?? CoachVoiceStore.load(domain)).summary)
+        }
+        .buttonStyle(.plain)
       }
-      .buttonStyle(.plain)
     }
+  }
+
+  /// The coach's name without the trailing " Coach" — for inline copy.
+  private var shortName: String {
+    domain.title.replacingOccurrences(of: " Coach", with: "").lowercased()
+  }
+
+  private func coachRow(icon: String, title: String, subtitle: String) -> some View {
+    HStack(spacing: 12) {
+      Image(systemName: icon)
+        .font(.title3)
+        .foregroundStyle(domain.accent)
+        .frame(width: 24)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(title)
+          .font(.body.weight(.medium))
+          .foregroundStyle(.primary)
+        Text(subtitle)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .multilineTextAlignment(.leading)
+      }
+      Spacer(minLength: 0)
+      Image(systemName: "chevron.right")
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(.tertiary)
+    }
+    .contentShape(Rectangle())
   }
 
   // MARK: - Goals
@@ -202,6 +234,7 @@ struct CoachDetailView: View {
     availableSections = SettingsMirror.loadSections(context: context)
       .filter { $0.key != "goals" }
     pills = CoachContextBuilder.availability(for: domain, window: .week, context: context)
+    voice = CoachVoiceStore.load(domain)
   }
 
   private func toggleScope(_ key: String) {

@@ -73,33 +73,46 @@ enum CoachDomain: String, CaseIterable, Identifiable {
     }
   }
 
-  /// The persona prompt. `CoachContextBuilder` appends the computed
-  /// facts; together they seed the conversation on its first turn.
-  /// Same discipline as the Examined Week mirror: cite the numbers
-  /// you're given, never invent data, stay brief.
-  var persona: String {
-    let shared = """
-      You are speaking with the person whose data this is, inside their private \
-      life-tracking app. The context has two parts: FACTS are what they actually \
-      LOGGED (true, computed — never invent, add, or recompute numbers), and GOALS \
-      are targets they SET for themselves (intentions, not events). Reflect facts \
-      back with concrete figures; nudge gently toward goals, and never speak of a \
-      goal as if it already happened. Ask one good question at a time. Keep replies \
-      short (2–4 sentences). No grades, no emoji, no "you should" lectures. Avoid \
-      the words: journey, holistic, nuanced, synergy, leverage.
-      """
+  /// The coach's identity — the per-coach opening framing (role + what it
+  /// cares about). The user-tunable voice layer (`CoachVoice`) sits between
+  /// this and `sharedDiscipline`; the dials never touch either.
+  var roleIntro: String {
     switch self {
     case .training:
-      return "You are a calm, evidence-minded training coach. You care about consistency, recovery, and honest effort.\n\n" + shared
+      return "You are an evidence-minded training coach. You care about consistency, recovery, and honest effort."
     case .food:
-      return "You are a steady, non-judgmental food coach. You care about patterns, not perfection — energy, hydration, and how the gut responds.\n\n" + shared
+      return "You are a food coach. You care about patterns, not perfection — energy, hydration, and how the gut responds."
     case .accountability:
-      return "You are a warm but direct accountability coach. You care about follow-through on the things the person said mattered.\n\n" + shared
+      return "You are an accountability coach. You care about follow-through on the things the person said mattered."
     case .wholeLife:
-      return "You are a thoughtful life coach with a view across all the person's tracked domains. You gently connect patterns between areas.\n\n" + shared
+      return "You are a life coach with a view across all the person's tracked domains. You connect patterns between areas."
     case .custom:
-      return "You are a flexible coach. The person has hand-picked which areas you can see. Talk only about what's in scope; if the FACTS show nothing, invite them to add a section via the pills above.\n\n" + shared
+      return "You are a flexible coach. The person has hand-picked which areas you can see. Talk only about what's in scope; if the FACTS show nothing, invite them to add a section via the pills above."
     }
+  }
+
+  /// The non-negotiable floor every coach speaks from — the facts/goals
+  /// discipline that the voice dials must never be able to override. (Reply
+  /// length is owned by the brevity dial now, so it's intentionally absent.)
+  static let sharedDiscipline = """
+    You are speaking with the person whose data this is, inside their private \
+    life-tracking app. The context has two parts: FACTS are what they actually \
+    LOGGED (true, computed — never invent, add, or recompute numbers), and GOALS \
+    are targets they SET for themselves (intentions, not events). Reflect facts \
+    back with concrete figures; nudge toward goals, and never speak of a \
+    goal as if it already happened. Ask one good question at a time. No grades, \
+    no emoji, no "you should" lectures. Avoid the words: journey, holistic, \
+    nuanced, synergy, leverage.
+    """
+
+  /// Baseline persona with no user voice applied (role + floor). Kept for
+  /// callers that don't have a `CoachVoice` to hand.
+  var persona: String { roleIntro + "\n\n" + Self.sharedDiscipline }
+
+  /// Full system persona with the user's voice dialed in: role → how-to-speak
+  /// (from the dials) → the shared discipline floor.
+  func persona(voice: CoachVoice) -> String {
+    [roleIntro, voice.instructionBlock(), Self.sharedDiscipline].joined(separator: "\n\n")
   }
 
   /// Tappable conversation starters shown before the first message.

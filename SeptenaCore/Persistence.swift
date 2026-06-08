@@ -9,7 +9,7 @@ import SwiftData
 // ⚠️  When adding a new label-style entity (anything users will rename and
 //     reference by name, like areas/projects/chores/habits/sections), use
 //     the uniform `id + title` model documented in
-//     [IDENTIFIERS.md](IDENTIFIERS.md). Tasks-style content entities are
+//     [IDENTIFIERS.md](docs/IDENTIFIERS.md). Tasks-style content entities are
 //     exempt (id-only).
 
 // MARK: - Entities
@@ -493,6 +493,74 @@ final class GoalEntity {
     self.metricComparator = metricComparator
     self.metricTarget = metricTarget
     self.metricBaseline = metricBaseline
+  }
+}
+
+/// Per-coach voice settings — the user's tone dials for one coach. `id` is the
+/// coach key (CoachDomain rawValue); one row per coach. Dial values are stored
+/// as raw strings so SeptenaCore stays free of the app-side voice enums. Syncs
+/// via CKSyncEngine like every other entity (record type "CoachVoice").
+@Model
+final class CoachVoiceEntity {
+  @Attribute(.unique) var id: String   // coach key, e.g. "training"
+  var warmth: String
+  var brevity: String
+  var challenge: String
+  var formality: String
+  var note: String
+  var updatedAt: Date
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       warmth: String,
+       brevity: String,
+       challenge: String,
+       formality: String,
+       note: String = "",
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.warmth = warmth
+    self.brevity = brevity
+    self.challenge = challenge
+    self.formality = formality
+    self.note = note
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
+/// One line of a coach conversation. Flat per-message rows keyed by coach
+/// (`coachKey` = CoachDomain rawValue), ordered by `sortIndex`; the whole
+/// transcript is the rows for a coach. Syncs via CKSyncEngine (record type
+/// "CoachMessage") so the relationship persists across launches and devices.
+@Model
+final class CoachMessageEntity {
+  @Attribute(.unique) var id: String
+  var coachKey: String
+  var role: String      // "coach" | "user"
+  var text: String
+  var createdAt: Date
+  var sortIndex: Int
+  var updatedAt: Date
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       coachKey: String,
+       role: String,
+       text: String,
+       createdAt: Date = .now,
+       sortIndex: Int = 0,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.coachKey = coachKey
+    self.role = role
+    self.text = text
+    self.createdAt = createdAt
+    self.sortIndex = sortIndex
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
   }
 }
 
@@ -2473,6 +2541,8 @@ final class LocalStore {
                          ChoreDefinitionEntity.self, ChoreEventEntity.self,
                          ChoreSnapshotEntity.self,
                          GoalEntity.self,
+                         CoachVoiceEntity.self,
+                         CoachMessageEntity.self,
                          GutEventEntity.self,
                          MoodEventEntity.self,
                          CaffeineEventEntity.self, CaffeineBeanEntity.self,
@@ -2719,9 +2789,10 @@ enum LocalCache {
 // MARK: - LoggedEvent (cross-section read abstraction)
 
 /// Uniform read view over every logged "event" entity, keyed on the real
-/// `occurredAt` instant. Lets analysis, timelines, and the gateway iterate all
-/// sections without per-type code. Read-only projection — it does not change
-/// how rows are stored or written.
+/// instant it happened — `occurredAt` for most sections, `loggedAt` for
+/// nutrition/hydration (aliased below). Lets analysis, timelines, and the
+/// gateway iterate all sections without per-type code. Read-only projection —
+/// it does not change how rows are stored or written.
 protocol LoggedEvent {
   var id: String { get }
   var occurredAt: Date { get }
@@ -2736,6 +2807,16 @@ extension ChoreEventEntity: LoggedEvent { var sectionKey: String { "chores" } }
 extension HabitDayStateEntity: LoggedEvent { var sectionKey: String { "habits" } }
 extension SupplementDayStateEntity: LoggedEvent { var sectionKey: String { "supplements" } }
 extension ExerciseEntryEntity: LoggedEvent { var sectionKey: String { "training" } }
+
+/// Nutrition (and hydration, which rides on the same entity) stores its instant
+/// as `loggedAt` — always populated, no `.distantPast` sentinel — rather than
+/// `occurredAt`, and the CloudKit field name stays `loggedAt`. Aliasing it here
+/// brings meals and water into the unified timeline and elapsed-time queries
+/// without a schema change or data migration.
+extension NutritionEntryEntity: LoggedEvent {
+  var occurredAt: Date { loggedAt }
+  var sectionKey: String { "nutrition" }
+}
 
 /// Cross-section event queries powered by `occurredAt` — the payoff of the
 /// occurredAt migration: elapsed-time and unified-timeline questions the
@@ -2758,6 +2839,7 @@ enum LoggedEvents {
     add(HabitDayStateEntity.self)
     add(SupplementDayStateEntity.self)
     add(ExerciseEntryEntity.self)
+    add(NutritionEntryEntity.self)
     return out
   }
 

@@ -1,10 +1,15 @@
 import SwiftData
 import SwiftUI
 
-// Ephemeral conversation state for one coach. Created when the chat opens,
-// dropped when it closes — nothing persisted (v1). Builds the facts
-// snapshot once at init, hands persona + facts to a model-agnostic
-// backend, and tracks the visible transcript.
+// Conversation state for one coach. The visible transcript is PERSISTED per
+// coach (SwiftData + CloudKit via CoachMessageMutator), so it survives closing
+// the chat, relaunching, and reaches other devices. Built each time the chat
+// opens (and on window change): rehydrates the stored transcript, rebuilds the
+// facts snapshot, and hands persona + facts to a model-agnostic backend.
+//
+// Caveat: the on-device model's OWN memory is not restored — a fresh backend
+// is created each time, so the coach "reads" the history the user sees but
+// doesn't internally remember prior turns across launches/window changes.
 
 @MainActor
 @Observable
@@ -41,14 +46,29 @@ final class CoachSession {
     // to re-enable); the snapshot excludes the muted ones from the model.
     self.pills = CoachContextBuilder.availability(for: domain, window: window, context: context)
     let facts = CoachContextBuilder.snapshot(for: domain, window: window, context: context, excluding: excluding)
-    let instructions = domain.persona + "\n\n" + facts
+    // The user's per-coach voice (tone dials + custom note) is dialed into the
+    // persona; the shared discipline floor is unaffected.
+    let voice = CoachVoiceStore.load(domain)
+    let instructions = domain.persona(voice: voice) + "\n\n" + facts
     self.systemPrompt = instructions
     // Pills = permission: the coach may only read the preset's sections that
     // aren't muted. Enforced today by the pre-filtered snapshot above.
     let allKeys = Set(domain.sectionKeys ?? CoachContextBuilder.supportedKeys)
     let scope = CoachScope(permitted: allKeys.subtracting(excluding))
     self.backend = CoachBackendFactory.make(instructions: instructions, scope: scope)
-    self.messages = [Message(role: .coach, text: domain.opener)]
+
+    // Rehydrate the persisted transcript. First-ever open seeds + persists the
+    // deterministic opener so the stored history reads naturally from line one.
+    let store = SeptenaServices.shared.coachMessageMutator
+    let stored = store.messages(forCoachKey: domain.rawValue)
+    if stored.isEmpty {
+      self.messages = [Message(role: .coach, text: domain.opener)]
+      store.append(coachKey: domain.rawValue, role: "coach", text: domain.opener)
+    } else {
+      self.messages = stored.map {
+        Message(role: $0.role == "user" ? .user : .coach, text: $0.text)
+      }
+    }
   }
 
   /// Whether the coach can actually converse (vs. the echo fallback).
@@ -66,6 +86,7 @@ final class CoachSession {
     guard !trimmed.isEmpty, !isThinking else { return }
 
     messages.append(Message(role: .user, text: trimmed))
+    store.append(coachKey: domain.rawValue, role: "user", text: trimmed)
     isThinking = true
     defer { isThinking = false }
 
@@ -87,6 +108,19 @@ final class CoachSession {
         ? "Sorry — I lost my train of thought. Try that again?"
         : messages[coachIndex].text
     }
+    // Persist the final coach reply (one row, not per-token) so the stored
+    // transcript matches what the user saw.
+    store.append(coachKey: domain.rawValue, role: "coach", text: messages[coachIndex].text)
+  }
+
+  /// The persisted-transcript store for this coach.
+  private var store: CoachMessageMutator { SeptenaServices.shared.coachMessageMutator }
+
+  /// Wipe this coach's saved conversation and start over from the opener.
+  func clearTranscript() {
+    store.clear(coachKey: domain.rawValue)
+    messages = [Message(role: .coach, text: domain.opener)]
+    store.append(coachKey: domain.rawValue, role: "coach", text: domain.opener)
   }
 
   /// Ask the model to distill the conversation into one adoptable goal.

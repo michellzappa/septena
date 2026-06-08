@@ -227,6 +227,27 @@ These six are the task backend, written by `SeptenaCore/CloudKit/*Record.swift`.
 | `metricBaseline` | Double | `Double?` | Yes | |
 | `reservedString1`, `reservedString2`, `reservedDate1`, `reservedInt1` | — | reserved | — | |
 
+#### CoachVoice  — recordName `coachVoice:{coachKey}`
+One row per coach (coachKey = CoachDomain rawValue: training/food/accountability/wholeLife/custom). The user's per-coach tone dials. **NEW — pending Prod deploy.**
+| Field | CK type | Swift | Nullable | Notes |
+|---|---|---|---|---|
+| `warmth` | String | `String` | No | gentle\|balanced\|direct |
+| `brevity` | String | `String` | No | terse\|balanced\|detailed |
+| `challenge` | String | `String` | No | supportive\|balanced\|pushy |
+| `formality` | String | `String` | No | casual\|neutral\|formal |
+| `note` | String | `String` | No | custom coach free-text (may be empty) |
+| `reservedString1`, `reservedString2` | — | reserved | — | future: custom name, spoken-voice id |
+
+#### CoachMessage  — recordName `coachMsg:{id}`
+One row per message; a coach's transcript = all rows with that `coachKey`. **NEW — pending Prod deploy.**
+| Field | CK type | Swift | Nullable | Notes |
+|---|---|---|---|---|
+| `coachKey` | String | `String` | No | CoachDomain rawValue |
+| `role` | String | `String` | No | coach\|user |
+| `text` | String | `String` | No | |
+| `createdAt` | Date/Time | `Date` | No | |
+| `sortIndex` | Int(64) | `Int` | No | per-coach order |
+
 ### Checklists — zone `septena-v1`
 
 #### HabitDefinition  — `habit-def:{id}`
