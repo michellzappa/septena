@@ -1337,7 +1337,15 @@ enum ChecklistMirror {
   // 2-day rest from the most recent session.
 
   static func loadSuggestedWorkout(context: ModelContext) -> SuggestedWorkoutResponse {
+    // Bound to a trailing year — we only need the *last* occurrence of each
+    // session type to compute "days since." Anything older than a year already
+    // reads as "never trained → priority", so the pick is unchanged while the
+    // fetch stops scanning all lifetime history on every dashboard load.
+    let cutoffStr = SeptenaDate.format(
+      Calendar.current.date(byAdding: .day, value: -365, to: Date()) ?? Date()
+    ) ?? SeptenaDate.today
     let entries = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(
+      predicate: #Predicate { $0.date >= cutoffStr },
       sortBy: [SortDescriptor(\.date)]
     ))) ?? []
     let types = (try? context.fetch(FetchDescriptor<SessionTypeEntity>(
