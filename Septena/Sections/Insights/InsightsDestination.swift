@@ -16,6 +16,10 @@ import SwiftUI
 struct InsightsDestinationView: View {
   @AppStorage(SettingsKey.plusUnlocked) private var plusUnlocked: Bool = false
   @State private var showPaywall = false
+  /// The Insights tuning pane (window, section filter), presented over the
+  /// drawer. Its canonical home is Customize → Insights; this leading-edge
+  /// shortcut opens the same page without leaving the explorer.
+  @State private var showSettings = false
 
   var body: some View {
     SectionDrawer(sectionKey: "insights", showsSettingsLink: false) {
@@ -24,6 +28,27 @@ struct InsightsDestinationView: View {
       } else {
         InsightsLockedView { showPaywall = true }
       }
+    }
+    // Tuning only matters once the explorer is live — gate the shortcut on
+    // the same unlock as the content.
+    .toolbar {
+      if plusUnlocked {
+        #if os(iOS)
+        let placement: ToolbarItemPlacement = .topBarLeading
+        #else
+        let placement: ToolbarItemPlacement = .navigation
+        #endif
+        ToolbarItem(placement: placement) {
+          Button {
+            showSettings = true
+          } label: {
+            Label("Insights Settings", systemImage: "slider.horizontal.3")
+          }
+        }
+      }
+    }
+    .sheet(isPresented: $showSettings) {
+      SettingsView(initialDestination: .correlations)
     }
     .sheet(isPresented: $showPaywall) {
       SeptenaPlusPaywall { plusUnlocked = true; showPaywall = false }
