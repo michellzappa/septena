@@ -88,11 +88,11 @@ final class IkigaiViewModel {
   func generateDrafts(availableSections: [SectionConfig] = []) async {
     guard canGenerate else { return }
     phase = .generating
-    generationMessage = "Finding the through-line..."
+    generationMessage = String(localized: "Finding the through-line...", comment: "Discovery generation status")
 
     do {
       let purpose = try await service.generatePurposeTitleAndDescription(inputs: inputs)
-      generationMessage = "Drafting commitments..."
+      generationMessage = String(localized: "Drafting commitments...", comment: "Discovery generation status")
       let commitments = try await service.generateCommitments(
         purpose: "\(purpose.title): \(purpose.content)"
       )
@@ -110,7 +110,7 @@ final class IkigaiViewModel {
         )
       })
 
-      generationMessage = "Tagging sections..."
+      generationMessage = String(localized: "Tagging sections...", comment: "Discovery generation status")
       nextDrafts = await draftsWithSectionSelections(nextDrafts, availableSections: availableSections)
       drafts = nextDrafts
       generationMessage = nil

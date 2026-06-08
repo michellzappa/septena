@@ -12,26 +12,26 @@ enum IkigaiQuadrant: String, CaseIterable, Identifiable {
   var title: String {
     switch self {
     case .love:
-      return "What do you love?"
+      return String(localized: "What do you love?", comment: "Ikigai prompt")
     case .identity:
-      return "What are you good at?"
+      return String(localized: "What are you good at?", comment: "Ikigai prompt")
     case .value:
-      return "What can you be paid for?"
+      return String(localized: "What can you be paid for?", comment: "Ikigai prompt")
     case .world:
-      return "What does the world need?"
+      return String(localized: "What does the world need?", comment: "Ikigai prompt")
     }
   }
 
   var subtitle: String {
     switch self {
     case .love:
-      return "Activities, topics, and moments that consistently pull you in."
+      return String(localized: "Activities, topics, and moments that consistently pull you in.", comment: "Ikigai prompt subtitle")
     case .identity:
-      return "Skills, traits, and strengths other people rely on you for."
+      return String(localized: "Skills, traits, and strengths other people rely on you for.", comment: "Ikigai prompt subtitle")
     case .value:
-      return "Capabilities that could become offers, services, products, or roles."
+      return String(localized: "Capabilities that could become offers, services, products, or roles.", comment: "Ikigai prompt subtitle")
     case .world:
-      return "Needs, communities, or problems you feel responsible to support."
+      return String(localized: "Needs, communities, or problems you feel responsible to support.", comment: "Ikigai prompt subtitle")
     }
   }
 

@@ -9,8 +9,8 @@ import SwiftUI
 
 enum VirtueMiniApp: DiscoveryMiniApp {
   static let id = "virtue"
-  static let title = "Examined Week"
-  static let blurb = "See your last 7 days reflected against temperance, wisdom, courage, and justice."
+  static let title = String(localized: "Examined Week", comment: "Discovery mini-app title")
+  static let blurb = String(localized: "See your last 7 days reflected against temperance, wisdom, courage, and justice.", comment: "Discovery mini-app blurb")
   static let systemImage = "building.columns"
   static let accent = Color.indigo
 

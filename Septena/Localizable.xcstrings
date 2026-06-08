@@ -672,9 +672,7 @@
         }
       }
     },
-    "Add" : {
-
-    },
+    "Add" : {},
     "Add %lld chores" : {
       "localizations" : {
         "en" : {
@@ -1055,9 +1053,7 @@
         }
       }
     },
-    "Appended to how this coach talks." : {
-
-    },
+    "Appended to how this coach talks." : {},
     "Apple" : {
       "localizations" : {
         "pt-BR" : {
@@ -1273,9 +1269,7 @@
         }
       }
     },
-    "Between" : {
-
-    },
+    "Between" : {},
     "Biceps" : {
       "localizations" : {
         "pt-BR" : {
@@ -1769,9 +1763,7 @@
         }
       }
     },
-    "Custom instruction" : {
-
-    },
+    "Custom instruction" : {},
     "Custom…" : {
       "localizations" : {
         "pt-BR" : {
@@ -1968,9 +1960,7 @@
         }
       }
     },
-    "Dismiss" : {
-
-    },
+    "Dismiss" : {},
     "Don't Repeat" : {
       "localizations" : {
         "pt-BR" : {
@@ -2001,9 +1991,7 @@
         }
       }
     },
-    "Double tap to switch between today and the last %@ days" : {
-
-    },
+    "Double tap to switch between today and the last %@ days" : {},
     "Drag to reorder. Toggle to show or hide a tile on the Nutrition dashboard. Tap a swatch to change its color." : {
       "localizations" : {
         "pt-BR" : {
@@ -2104,9 +2092,7 @@
         }
       }
     },
-    "Either way, an AI reads and writes the same private data — and everything it touches is marked." : {
-
-    },
+    "Either way, an AI reads and writes the same private data — and everything it touches is marked." : {},
     "elapsed" : {
       "localizations" : {
         "pt-BR" : {
@@ -3081,9 +3067,7 @@
         }
       }
     },
-    "Layout picks how the homepage renders — Histogram, Sparkline, Heatmap, Rings, or Wheel. Insights tunes the cross-section correlation explorer." : {
-
-    },
+    "Layout picks how the homepage renders — Histogram, Sparkline, Heatmap, Rings, or Wheel. Insights tunes the cross-section correlation explorer." : {},
     "Learning your rhythm — a couple more completions and Septena will predict the next one." : {
       "localizations" : {
         "pt-BR" : {
@@ -3151,9 +3135,7 @@
         }
       }
     },
-    "Log meals, coffee, mood, or other timestamped sections and your daily rhythm shows up here." : {
-
-    },
+    "Log meals, coffee, mood, or other timestamped sections and your daily rhythm shows up here." : {},
     "Logbook" : {
       "localizations" : {
         "pt-BR" : {
@@ -5188,9 +5170,7 @@
         }
       }
     },
-    "Time-of-day wheel" : {
-
-    },
+    "Time-of-day wheel" : {},
     "today" : {
       "localizations" : {
         "pt-BR" : {
@@ -5250,9 +5230,7 @@
         }
       }
     },
-    "Tone" : {
-
-    },
+    "Tone" : {},
     "Training" : {
       "localizations" : {
         "pt-BR" : {
@@ -5409,9 +5387,7 @@
         }
       }
     },
-    "Upper" : {
-
-    },
+    "Upper" : {},
     "Used to personalize the greeting. With Apple Intelligence it's freshly written through the day." : {
       "localizations" : {
         "pt-BR" : {
@@ -5661,9 +5637,7 @@
         }
       }
     },
-    "Your data stays in your private iCloud. Connecting an AI just opens a door into it — one you control and can revoke." : {
-
-    },
+    "Your data stays in your private iCloud. Connecting an AI just opens a door into it — one you control and can revoke." : {},
     "Your name personalizes the home greeting and this profile. It syncs across your devices via iCloud." : {
       "localizations" : {
         "pt-BR" : {
@@ -5711,6 +5685,296 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Δ = média com − média sem"
+          }
+        }
+      }
+    },
+    "What do you love?" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O que você ama?"
+          }
+        }
+      }
+    },
+    "What are you good at?" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No que você é bom?"
+          }
+        }
+      }
+    },
+    "What can you be paid for?" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pelo que você pode ser pago?"
+          }
+        }
+      }
+    },
+    "What does the world need?" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Do que o mundo precisa?"
+          }
+        }
+      }
+    },
+    "Activities, topics, and moments that consistently pull you in." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atividades, temas e momentos que sempre te atraem."
+          }
+        }
+      }
+    },
+    "Skills, traits, and strengths other people rely on you for." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Habilidades, traços e forças pelos quais as pessoas contam com você."
+          }
+        }
+      }
+    },
+    "Capabilities that could become offers, services, products, or roles." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capacidades que podem virar ofertas, serviços, produtos ou funções."
+          }
+        }
+      }
+    },
+    "Needs, communities, or problems you feel responsible to support." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Necessidades, comunidades ou problemas que você sente responsabilidade de apoiar."
+          }
+        }
+      }
+    },
+    "Temperance" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Temperança"
+          }
+        }
+      }
+    },
+    "Wisdom" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sabedoria"
+          }
+        }
+      }
+    },
+    "Courage" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coragem"
+          }
+        }
+      }
+    },
+    "Justice" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Justiça"
+          }
+        }
+      }
+    },
+    "Moderation & self-governance" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moderação e autogoverno"
+          }
+        }
+      }
+    },
+    "Judgment & foresight" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discernimento e previsão"
+          }
+        }
+      }
+    },
+    "Doing the hard thing" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fazer o que é difícil"
+          }
+        }
+      }
+    },
+    "Duty to others" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dever para com os outros"
+          }
+        }
+      }
+    },
+    "Steady" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Firme"
+          }
+        }
+      }
+    },
+    "Mixed" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Misto"
+          }
+        }
+      }
+    },
+    "Strained" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sob tensão"
+          }
+        }
+      }
+    },
+    "No data" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem dados"
+          }
+        }
+      }
+    },
+    "Values" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valores"
+          }
+        }
+      }
+    },
+    "Choose what matters most, then turn it into concrete goals." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha o que mais importa e transforme em metas concretas."
+          }
+        }
+      }
+    },
+    "Purpose" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Propósito"
+          }
+        }
+      }
+    },
+    "Map what you love, do well, can offer, and want to serve." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mapeie o que você ama, faz bem, pode oferecer e quer servir."
+          }
+        }
+      }
+    },
+    "Examined Week" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Semana examinada"
+          }
+        }
+      }
+    },
+    "See your last 7 days reflected against temperance, wisdom, courage, and justice." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Veja seus últimos 7 dias refletidos diante de temperança, sabedoria, coragem e justiça."
+          }
+        }
+      }
+    },
+    "Finding the through-line..." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encontrando o fio condutor..."
+          }
+        }
+      }
+    },
+    "Drafting commitments..." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rascunhando compromissos..."
+          }
+        }
+      }
+    },
+    "Tagging sections..." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marcando seções..."
           }
         }
       }

@@ -25,14 +25,21 @@ enum Virtue: String, CaseIterable, Identifiable {
   case temperance, wisdom, courage, justice
 
   var id: String { rawValue }
-  var title: String { rawValue.capitalized }
+  var title: String {
+    switch self {
+    case .temperance: return String(localized: "Temperance", comment: "Cardinal virtue")
+    case .wisdom:     return String(localized: "Wisdom", comment: "Cardinal virtue")
+    case .courage:    return String(localized: "Courage", comment: "Cardinal virtue")
+    case .justice:    return String(localized: "Justice", comment: "Cardinal virtue")
+    }
+  }
 
   var gloss: String {
     switch self {
-    case .temperance: return "Moderation & self-governance"
-    case .wisdom:     return "Judgment & foresight"
-    case .courage:    return "Doing the hard thing"
-    case .justice:    return "Duty to others"
+    case .temperance: return String(localized: "Moderation & self-governance", comment: "Virtue gloss")
+    case .wisdom:     return String(localized: "Judgment & foresight", comment: "Virtue gloss")
+    case .courage:    return String(localized: "Doing the hard thing", comment: "Virtue gloss")
+    case .justice:    return String(localized: "Duty to others", comment: "Virtue gloss")
     }
   }
 
@@ -61,10 +68,10 @@ enum VirtueStatus: String {
 
   var label: String {
     switch self {
-    case .steady:   return "Steady"
-    case .mixed:    return "Mixed"
-    case .strained: return "Strained"
-    case .unknown:  return "No data"
+    case .steady:   return String(localized: "Steady", comment: "Virtue status")
+    case .mixed:    return String(localized: "Mixed", comment: "Virtue status")
+    case .strained: return String(localized: "Strained", comment: "Virtue status")
+    case .unknown:  return String(localized: "No data", comment: "Virtue status")
     }
   }
 

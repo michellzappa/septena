@@ -47,7 +47,7 @@ final class ValuesViewModel {
   func generateDrafts(availableSections: [SectionConfig]) async {
     guard canGenerate else { return }
     phase = .generating
-    generationMessage = "Finding the through-line..."
+    generationMessage = String(localized: "Finding the through-line...", comment: "Discovery generation status")
 
     do {
       let inputs = ValuesInputs(
@@ -56,7 +56,7 @@ final class ValuesViewModel {
       )
       let purpose = try await valuesService.generatePurpose(inputs: inputs)
       let purposeText = "\(purpose.title): \(purpose.content)"
-      generationMessage = "Drafting commitments..."
+      generationMessage = String(localized: "Drafting commitments...", comment: "Discovery generation status")
       let commitments = try await valuesService.generateCommitments(values: sortedValues,
                                                                     purpose: purposeText)
 
@@ -67,7 +67,7 @@ final class ValuesViewModel {
         DraftGoal(text: "\(commitment.title): \(commitment.description)", kind: .commitment)
       })
 
-      generationMessage = "Tagging sections..."
+      generationMessage = String(localized: "Tagging sections...", comment: "Discovery generation status")
       drafts = await draftsWithSectionSelections(nextDrafts, availableSections: availableSections)
       generationMessage = nil
       phase = .ready
