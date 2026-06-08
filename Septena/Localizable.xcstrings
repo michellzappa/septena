@@ -295,6 +295,16 @@
         }
       }
     },
+    "%@ will sound **%@**. The facts discipline — cite real numbers, never invent data — always applies." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ will sound **%2$@**. The facts discipline — cite real numbers, never invent data — always applies."
+          }
+        }
+      }
+    },
     "%@: x̄=%@%@  ·  ȳ=%@%@  ·  n=%@" : {
       "localizations" : {
         "en" : {
@@ -942,6 +952,16 @@
         }
       }
     },
+    "Amber" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Âmbar"
+          }
+        }
+      }
+    },
     "Amount" : {
       "localizations" : {
         "pt-BR" : {
@@ -1022,6 +1042,9 @@
         }
       }
     },
+    "Appended to how this coach talks." : {
+
+    },
     "Apple" : {
       "localizations" : {
         "pt-BR" : {
@@ -1099,6 +1122,7 @@
       }
     },
     "At your real pace, expect this again **%@**." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -1134,6 +1158,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "média %@/4"
+          }
+        }
+      }
+    },
+    "Back" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Costas"
           }
         }
       }
@@ -1226,6 +1260,16 @@
         }
       }
     },
+    "Biceps" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bíceps"
+          }
+        }
+      }
+    },
     "Binary predictor — %@ minority days vs %@ majority days" : {
       "localizations" : {
         "en" : {
@@ -1312,6 +1356,16 @@
         }
       }
     },
+    "Calves" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Panturrilhas"
+          }
+        }
+      }
+    },
     "Cannabis" : {
       "localizations" : {
         "pt-BR" : {
@@ -1358,6 +1412,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Transferir hábitos perdidos"
+          }
+        }
+      }
+    },
+    "Chest" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Peito"
           }
         }
       }
@@ -1603,6 +1667,16 @@
         }
       }
     },
+    "Core" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Core"
+          }
+        }
+      }
+    },
     "CORRELATIONS DASHBOARD" : {
       "localizations" : {
         "pt-BR" : {
@@ -1678,6 +1752,9 @@
           }
         }
       }
+    },
+    "Custom instruction" : {
+
     },
     "Custom…" : {
       "localizations" : {
@@ -2025,6 +2102,16 @@
         }
       }
     },
+    "Emerald" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esmeralda"
+          }
+        }
+      }
+    },
     "Enabled" : {
       "localizations" : {
         "pt-BR" : {
@@ -2362,6 +2449,16 @@
         }
       }
     },
+    "Glutes" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glúteos"
+          }
+        }
+      }
+    },
     "Goals" : {
       "localizations" : {
         "pt-BR" : {
@@ -2498,6 +2595,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hábitos e suplementos"
+          }
+        }
+      }
+    },
+    "Hamstrings" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Posteriores"
           }
         }
       }
@@ -2770,6 +2877,16 @@
         }
       }
     },
+    "Indigo" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Índigo"
+          }
+        }
+      }
+    },
     "Insights" : {
       "localizations" : {
         "pt-BR" : {
@@ -2939,15 +3056,8 @@
         }
       }
     },
-    "Layout picks how the homepage renders — Histogram, Sparkline, or Heatmap. Insights tunes the cross-section correlation explorer." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O layout escolhe como a tela inicial é exibida — Histograma, Minigráfico ou Mapa de calor. Insights ajusta o explorador de correlações entre seções."
-          }
-        }
-      }
+    "Layout picks how the homepage renders — Histogram, Sparkline, Heatmap, or Rings. Insights tunes the cross-section correlation explorer." : {
+
     },
     "Learning your rhythm — a couple more completions and Septena will predict the next one." : {
       "localizations" : {
@@ -2981,6 +3091,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "O modo claro usa um fundo %1$@ com discos brancos. O modo escuro usa arte transparente, então o fundo do sistema aparece atrás de discos %2$@."
+          }
+        }
+      }
+    },
+    "Lime" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lima"
           }
         }
       }
@@ -3413,6 +3533,7 @@
       }
     },
     "No rhythm yet — the schedule above drives the next-due date until there's a pattern to learn from." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -3761,17 +3882,6 @@
         }
       }
     },
-    "Pick how the homepage renders — Histogram, Sparkline, Heatmap, or Correlations." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Escolha como a tela inicial é exibida — Histograma, Minigráfico, Mapa de calor ou Correlações."
-          }
-        }
-      }
-    },
     "Pick up to %@ sections. Each one becomes a shortcut in the Home Screen long-press menu, opening directly into that section." : {
       "localizations" : {
         "pt-BR" : {
@@ -3788,6 +3898,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Escolha quais calendários contribuem com eventos para a linha do tempo do seu dia e a página Próximo. Calendários ocultos permanecem intactos no Calendário do iOS."
+          }
+        }
+      }
+    },
+    "Pink" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rosa"
           }
         }
       }
@@ -3881,6 +4001,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Roxo"
+          }
+        }
+      }
+    },
+    "Quads" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quadríceps"
           }
         }
       }
@@ -4097,6 +4227,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Revise seus valores"
+          }
+        }
+      }
+    },
+    "Rose" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rosé"
           }
         }
       }
@@ -4430,6 +4570,16 @@
         }
       }
     },
+    "Shoulders" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ombros"
+          }
+        }
+      }
+    },
     "Show in Next" : {
       "localizations" : {
         "pt-BR" : {
@@ -4472,6 +4622,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pular"
+          }
+        }
+      }
+    },
+    "Sky" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Celeste"
           }
         }
       }
@@ -4820,6 +4980,16 @@
         }
       }
     },
+    "Teal" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Azul-petróleo"
+          }
+        }
+      }
+    },
     "Tense" : {
       "localizations" : {
         "pt-BR" : {
@@ -5049,6 +5219,9 @@
         }
       }
     },
+    "Tone" : {
+
+    },
     "Training" : {
       "localizations" : {
         "pt-BR" : {
@@ -5065,6 +5238,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tranquilo"
+          }
+        }
+      }
+    },
+    "Triceps" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tríceps"
           }
         }
       }
@@ -5227,6 +5410,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ver este dia"
+          }
+        }
+      }
+    },
+    "Violet" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Violeta"
           }
         }
       }
@@ -5414,6 +5607,16 @@
         }
       }
     },
+    "Yesterday" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ontem"
+          }
+        }
+      }
+    },
     "You have " : {
       "localizations" : {
         "pt-BR" : {
@@ -5471,206 +5674,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Δ = média com − média sem"
-          }
-        }
-      }
-    },
-    "Yesterday" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ontem"
-          }
-        }
-      }
-    },
-    "Chest" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Peito"
-          }
-        }
-      }
-    },
-    "Back" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Costas"
-          }
-        }
-      }
-    },
-    "Shoulders" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ombros"
-          }
-        }
-      }
-    },
-    "Biceps" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bíceps"
-          }
-        }
-      }
-    },
-    "Triceps" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tríceps"
-          }
-        }
-      }
-    },
-    "Quads" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Quadríceps"
-          }
-        }
-      }
-    },
-    "Hamstrings" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Posteriores"
-          }
-        }
-      }
-    },
-    "Glutes" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Glúteos"
-          }
-        }
-      }
-    },
-    "Calves" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Panturrilhas"
-          }
-        }
-      }
-    },
-    "Core" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Core"
-          }
-        }
-      }
-    },
-    "Amber" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Âmbar"
-          }
-        }
-      }
-    },
-    "Lime" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lima"
-          }
-        }
-      }
-    },
-    "Emerald" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Esmeralda"
-          }
-        }
-      }
-    },
-    "Teal" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Azul-petróleo"
-          }
-        }
-      }
-    },
-    "Sky" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Celeste"
-          }
-        }
-      }
-    },
-    "Indigo" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Índigo"
-          }
-        }
-      }
-    },
-    "Violet" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Violeta"
-          }
-        }
-      }
-    },
-    "Pink" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rosa"
-          }
-        }
-      }
-    },
-    "Rose" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rosé"
           }
         }
       }
