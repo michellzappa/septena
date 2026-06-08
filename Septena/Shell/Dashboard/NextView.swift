@@ -85,6 +85,17 @@ struct NextView: View {
       tasksModel.refreshFromCache()
       Task { await doneModel.load() }
     }
+    // Passive logs (mood check-in, caffeine, meals, …) post .septenaDataChanged
+    // via their mutators. Reload the suggestions so a just-logged mood daypart
+    // drops its "How are you feeling?" prompt, and the done log so the entry
+    // lands in "Done Today".
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
+      Task {
+        async let a: () = suggestionsModel.load()
+        async let b: () = doneModel.load()
+        _ = await (a, b)
+      }
+    }
     // Day rollover (midnight crossed while the app was alive, or session
     // resumed after midnight): refetch so habits/supplements/chores reflect
     // the new day's bucket and completion state.

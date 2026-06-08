@@ -76,6 +76,12 @@ final class NavigationState {
   /// shortcuts ("Start: Upper", etc.). Cleared after consumption.
   var pendingTrainingType: String? = nil
 
+  /// Drives the Mood check-in sheet (`AddMoodPage`, the two-step quadrant
+  /// picker). Flipped from the Next feed's "How are you feeling?" daypart
+  /// suggestion; the sheet self-dismisses after a log. Mounted at the tab
+  /// root so it presents from any tab, like the Training session sheet.
+  var showMoodCheckin = false
+
   /// Drives the Keyboard Shortcuts cheat-sheet (⌘? — i.e. ⌘⇧/). A reference
   /// overlay listing every shortcut, grouped by area. Read-only; closes via
   /// its own Done button or Escape.

@@ -16,7 +16,7 @@ import SwiftData
 
 struct NextSuggestion: Identifiable, Hashable {
   enum Kind: String, Hashable {
-    case caffeine, cannabis, training, fastBreak
+    case caffeine, cannabis, training, fastBreak, mood
 
     /// Section accent key for `SectionTheme.color(for:)`.
     var sectionKey: String {
@@ -25,6 +25,7 @@ struct NextSuggestion: Identifiable, Hashable {
       case .cannabis:  return "cannabis"
       case .training:  return "training"
       case .fastBreak: return "nutrition"
+      case .mood:      return "mood"
       }
     }
   }
@@ -303,6 +304,18 @@ final class NextSuggestionsModel {
     let sw: SuggestedWorkoutResponse? = ChecklistMirror.loadSuggestedWorkout(context: ctx)
     let st: AppSettings? = SettingsMirror.loadSettings(context: ctx)
 
+    // Mood is a per-daypart check-in (morning / afternoon / evening), not a
+    // learned-time activity: surface it whenever the bucket we're currently
+    // in has no entry yet. So it reappears up to three times a day, once per
+    // bucket, and goes quiet the moment you log — see the `mood` block in
+    // `compute`. Gated on the section being enabled so a hidden Mood section
+    // never nudges.
+    let moodEnabled = SettingsMirror.loadSections(context: ctx)
+      .first { $0.key == "mood" }?.isEnabled ?? false
+    let moodBucket = DayBucket.from(date: now)
+    let moodLoggedThisBucket = ChecklistMirror.loadMoodDay(context: ctx, date: today)
+      .byBucket[moodBucket.rawValue] != nil
+
     let cafTimePoints: [CaffeineTimePoint] = cafEntries.compactMap { e in
       let hhmm = EventTimestamp.hhmm(from: e.occurredAt)
       let parts = hhmm.split(separator: ":")
@@ -334,6 +347,8 @@ final class NextSuggestionsModel {
       workout: sw?.suggested,
       workoutDaysAgo: sw?.daysAgo ?? [:],
       fastingTargetH: st?.targets?.fastingMaxH ?? 18,
+      moodEnabled: moodEnabled,
+      moodLoggedThisBucket: moodLoggedThisBucket,
       now: now
     )
   }
@@ -386,6 +401,8 @@ final class NextSuggestionsModel {
     workout: SuggestedWorkout?,
     workoutDaysAgo: [String: Int],
     fastingTargetH: Double,
+    moodEnabled: Bool = false,
+    moodLoggedThisBucket: Bool = false,
     now: Date
   ) -> [NextSuggestion] {
     let cal = Calendar.current
@@ -547,6 +564,27 @@ final class NextSuggestionsModel {
       ))
     }
 
+    // Mood — daypart check-in. Unlike the activity nudges above, this isn't
+    // learned from a median time: the gate is simply "the bucket we're in now
+    // has no entry yet." That makes it a recurring, low-friction prompt that
+    // surfaces once per morning / afternoon / evening and clears the instant
+    // you check in. No `proposedMinutes` (it isn't due at a clock time — it's
+    // due whenever you next look), so it sorts among the untimed nudges by
+    // score, sitting gently below anything that's genuinely time-critical.
+    if moodEnabled, isToday, !moodLoggedThisBucket {
+      let bucket = DayBucket.from(date: now)
+      out.append(NextSuggestion(
+        id: "mood:\(bucket.rawValue)",
+        kind: .mood,
+        title: "How are you feeling?",
+        emoji: nil,
+        symbol: "face.smiling",
+        detail: "\(bucket.title) check-in",
+        score: 20,
+        proposedMinutes: nil
+      ))
+    }
+
     // Webapp sorts by proposedMinutes asc, falling back to score desc when one
     // side has no time. Keeps "due now" items in time order, then the rest.
     return out.sorted { a, b in
@@ -683,6 +721,11 @@ private struct NextSuggestionRow: View {
     case .fastBreak:
       nav.addInfoRequestedSection = .nutrition
       nav.showAddInfo = true
+    case .mood:
+      // Mood isn't in the AddInfo palette (its check-in is a bespoke
+      // two-step quadrant picker, not a search-to-log row), so route to
+      // the dedicated AddMoodPage sheet mounted at the tab root.
+      nav.showMoodCheckin = true
     case .training:
       // TrainingSessionView reads the active draft out of TrainingDraftStore;
       // routing the suggested type is handled by the existing Start flow.

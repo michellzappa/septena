@@ -130,6 +130,21 @@ struct RootTabView: View {
           .frame(minWidth: 560, minHeight: 600)
           #endif
       }
+      // Mood check-in sheet — mounted at the tab root so the Next feed's
+      // "How are you feeling?" daypart suggestion presents the two-step
+      // quadrant picker from any tab. AddMoodPage owns its own
+      // NavigationStack and dismisses itself after logging; the mutator
+      // posts `.septenaDataChanged`, which the Next feed listens for to
+      // clear the suggestion for the now-logged bucket.
+      .sheet(isPresented: $nav.showMoodCheckin) {
+        AddMoodPage()
+          #if os(iOS)
+          .presentationDetents([.large])
+          .presentationDragIndicator(.visible)
+          #else
+          .frame(minWidth: 560, minHeight: 600)
+          #endif
+      }
       // (Insights destination removed — the Correlations homepage
       // layout now hosts the trusted + exploratory grids inline, with
       // per-pair DetailSheet drill-in on tap.)
@@ -173,7 +188,8 @@ struct RootTabView: View {
 
       CoachView()
         .tabItem {
-          Label("Coach", systemImage: "bubble.left")
+          Label("Coaches", systemImage: "bubble.left.and.bubble.right")
+            .environment(\.symbolVariants, .none)
         }
         .tag(SeptenaTab.goals)
     }
