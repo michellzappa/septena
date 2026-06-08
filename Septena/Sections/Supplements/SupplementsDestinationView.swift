@@ -11,6 +11,7 @@ struct SupplementsDestinationView: View {
   @Environment(SectionTheme.self) private var theme
 
   @State private var model = NextItemsModel()
+  @State private var viewing: SupplementDayItem? = nil
   @State private var editing: SupplementDayItem? = nil
   @State private var creating = false
   /// Day the drawer's date strip is pointing at; toggles write to this
@@ -45,6 +46,19 @@ struct SupplementsDestinationView: View {
       await model.load()
     }
     .sectionReload(on: viewingDate, onDataChange: true) { await reloadPastDay() }
+    // Tapping a supplement opens its detail "infobox" (streak + history +
+    // consistency); the row's checkbox still marks it taken. "Edit" swaps to
+    // the editor for the same supplement.
+    .adaptiveDetail(item: $viewing) { supp in
+      LoggableDetailView(
+        title: supp.name,
+        emoji: supp.emoji,
+        accent: accent,
+        doneVerb: "taken",
+        fetch: { ChecklistMirror.supplementCompletionDates(context: $0, supplementID: supp.id) },
+        onEdit: { viewing = nil; editing = supp }
+      )
+    }
     .adaptiveDetail(item: $editing) { supp in
       EditSupplementSheet(
         original: supp,
@@ -136,7 +150,7 @@ struct SupplementsDestinationView: View {
   }
 
   private func todayRow(_ supp: SupplementDayItem) -> some View {
-    Button { editing = supp } label: {
+    Button { viewing = supp } label: {
       SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator, tint: accent,
                     onDelete: { delete(supp) })
     }

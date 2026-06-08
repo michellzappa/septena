@@ -17,6 +17,7 @@ struct HabitsDestinationView: View {
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
   @State private var model = NextItemsModel()
+  @State private var viewing: HabitDayItem? = nil
   @State private var editing: HabitDayItem? = nil
   @State private var creating = false
   /// Day the drawer's date strip is pointing at. Drives summary +
@@ -64,6 +65,19 @@ struct HabitsDestinationView: View {
       await model.load()
     }
     .sectionReload(on: viewingDate, onDataChange: true) { await reloadPastDay() }
+    // Tapping a habit opens its detail "infobox" (streak + history +
+    // consistency); the row's checkbox still checks it off. "Edit" in the
+    // detail swaps to the editor for the same habit.
+    .adaptiveDetail(item: $viewing) { habit in
+      LoggableDetailView(
+        title: habit.name,
+        emoji: habit.emoji,
+        accent: accent,
+        doneVerb: "done",
+        fetch: { ChecklistMirror.habitCompletionDates(context: $0, habitID: habit.id) },
+        onEdit: { viewing = nil; editing = habit }
+      )
+    }
     .adaptiveDetail(item: $editing) { habit in
       EditHabitSheet(
         original: habit,
@@ -196,7 +210,7 @@ struct HabitsDestinationView: View {
                        onToggle: { toggleBucket(bucket) }) {
         DrawerSection(padding: .none) {
           ForEach(all) { habit in
-            Button { editing = habit } label: {
+            Button { viewing = habit } label: {
               HabitRow(habit: habit, model: model, checklistMutator: checklistMutator, tint: accent,
                        onDelete: { delete(habit) })
             }

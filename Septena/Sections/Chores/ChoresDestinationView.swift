@@ -11,6 +11,7 @@ struct ChoresDestinationView: View {
   @Environment(SectionTheme.self) private var theme
 
   @State private var model = NextItemsModel()
+  @State private var viewing: ChoreItem? = nil
   @State private var editing: ChoreItem? = nil
   @State private var creating = false
 
@@ -53,6 +54,15 @@ struct ChoresDestinationView: View {
       model.paintFromCache()
       await model.load()
     }
+    // Tapping a chore opens its detail "infobox" (history + learned cadence);
+    // the row's own checkbox still completes it. From the detail, "Edit" swaps
+    // to the editor for the same chore.
+    .adaptiveDetail(item: $viewing) { chore in
+      ChoreDetailView(chore: chore, onEdit: {
+        viewing = nil
+        editing = chore
+      })
+    }
     .adaptiveDetail(item: $editing) { chore in
       EditChoreSheet(
         original: chore,
@@ -76,7 +86,7 @@ struct ChoresDestinationView: View {
   /// by `ChoreRow`) covers defer + delete.
   @ViewBuilder
   private func row(for chore: ChoreItem) -> some View {
-    Button { editing = chore } label: {
+    Button { viewing = chore } label: {
       ChoreRow(chore: chore, model: model, checklistMutator: checklistMutator, tint: accent,
                onDelete: { delete(chore) })
     }
