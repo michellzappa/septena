@@ -124,6 +124,11 @@ watch). The classic bug: a section with a manifest row + destination but **no
 - Match surrounding code: comment density, naming, idiom.
 - Don't add FastAPI/server client code — the repo is CloudKit-first; remaining
   FastAPI references are migration history slated for cleanup.
-- The hosted MCP gateway is a **separate repo** (`../septena-mcp-gateway`); its
-  `skill.md` is generated from `SectionRegistry.fullSkillMarkdown()`, so keep
-  in-app section skill briefs in sync with the gateway's MCP tools.
+- **Two MCP servers, edited in lockstep.** There are TWO: the **in-app** server
+  (`SeptenaCore/MCP/` — `LocalMCPServer` + `MCPDispatch` + `MCPToolCatalog`,
+  macOS, for Claude Code) and the **hosted gateway** (separate repo
+  `../septena-mcp-gateway`, Cloudflare Worker / TS, for consumer chat). **Any MCP
+  tool change must land in BOTH, plus the docs/skills, in the same change** —
+  never one without the others, or the two surfaces silently diverge. The
+  gateway's `skill.md` is generated from `SectionRegistry.fullSkillMarkdown()`, so
+  keep in-app section skill briefs in sync with the gateway's tools.
