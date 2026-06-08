@@ -13,6 +13,10 @@ function optStr(v: unknown): string | undefined {
   return typeof v === "string" && v.length > 0 ? v : undefined;
 }
 
+function optNum(v: unknown): number | undefined {
+  return typeof v === "number" ? v : undefined;
+}
+
 type ModifyOp =
   | { operationType: "create" | "forceUpdate"; record: { recordType: string; recordName: string; fields: Record<string, { value: unknown }> } }
   | { operationType: "delete"; record: { recordName: string } };
@@ -84,13 +88,29 @@ export async function listGoals(client: CloudKitClient) {
     resultsLimit: 200,
   });
 
-  const goals = res.records.map((r) => ({
-    id: r.recordName.replace(/^goal:/, ""),
-    text: optStr(r.fields.text?.value) ?? "",
-    sections: (r.fields.sections?.value as string[] | undefined) ?? [],
-    created: optStr(r.fields.created?.value),
-    sortIndex: (r.fields.sortIndex?.value as number) ?? 0,
-  }));
+  const goals = res.records.map((r) => {
+    const g: Record<string, unknown> = {
+      id: r.recordName.replace(/^goal:/, ""),
+      text: optStr(r.fields.text?.value) ?? "",
+      sections: (r.fields.sections?.value as string[] | undefined) ?? [],
+      created: optStr(r.fields.created?.value),
+      sortIndex: (r.fields.sortIndex?.value as number) ?? 0,
+    };
+    // Measurement attachment (quant goals) — kept in lockstep with the in-app
+    // server's goals_list so an agent sees targets, ranges and progress, not
+    // just the title. Omitted on free-text goals; metricTargetUpper present ⇒
+    // a "between" range band [metricTarget, metricTargetUpper].
+    const metricKey = optStr(r.fields.metricKey?.value);
+    if (metricKey) {
+      g.metricKey = metricKey;
+      const w = optStr(r.fields.metricWindow?.value); if (w) g.metricWindow = w;
+      const c = optStr(r.fields.metricComparator?.value); if (c) g.metricComparator = c;
+      const t = optNum(r.fields.metricTarget?.value); if (t !== undefined) g.metricTarget = t;
+      const u = optNum(r.fields.metricTargetUpper?.value); if (u !== undefined) g.metricTargetUpper = u;
+      const b = optNum(r.fields.metricBaseline?.value); if (b !== undefined) g.metricBaseline = b;
+    }
+    return g;
+  });
 
   return { goals };
 }
