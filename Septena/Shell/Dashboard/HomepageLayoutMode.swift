@@ -36,6 +36,11 @@ enum HomepageLayoutMode: String, CaseIterable, Identifiable, Hashable {
   /// targets." Target-less domains fall back to a week-activity ring.
   case rings
 
+  /// One holistic 24-hour dial overlaying every section's timestamped
+  /// events from the last 7 days, color-coded and faded by recency.
+  /// Optimized for "when does my day actually happen."
+  case wheel
+
   var id: String { rawValue }
 
   /// Title shown in Settings → General → Homepage layout.
@@ -45,6 +50,7 @@ enum HomepageLayoutMode: String, CaseIterable, Identifiable, Hashable {
     case .dense:   return String(localized: "Sparkline", comment: "Homepage layout mode")
     case .heatmap: return String(localized: "Heatmap", comment: "Homepage layout mode")
     case .rings:   return String(localized: "Rings", comment: "Homepage layout mode")
+    case .wheel:   return String(localized: "Wheel", comment: "Homepage layout mode")
     }
   }
 
@@ -56,6 +62,7 @@ enum HomepageLayoutMode: String, CaseIterable, Identifiable, Hashable {
     case .dense:   return String(localized: "Rows with today's value + sparkline. Maximum signal per scroll.", comment: "Homepage layout mode description")
     case .heatmap: return String(localized: "Rows with 90-day heatmap grid. Optimized for consistency.", comment: "Homepage layout mode description")
     case .rings:   return String(localized: "Grid of progress rings vs today's targets. Optimized for goals.", comment: "Homepage layout mode description")
+    case .wheel:   return String(localized: "One 24-hour dial of every section's events over the last 7 days. Optimized for when your day happens.", comment: "Homepage layout mode description")
     }
   }
 
@@ -66,6 +73,7 @@ enum HomepageLayoutMode: String, CaseIterable, Identifiable, Hashable {
     case .dense:   return "waveform.path"
     case .heatmap: return "square.grid.3x3.fill"
     case .rings:   return "circle.dashed"
+    case .wheel:   return "clock"
     }
   }
 
@@ -74,7 +82,7 @@ enum HomepageLayoutMode: String, CaseIterable, Identifiable, Hashable {
   /// further wiring. All current modes are implemented.
   var isImplemented: Bool {
     switch self {
-    case .tiles, .dense, .heatmap, .rings: return true
+    case .tiles, .dense, .heatmap, .rings, .wheel: return true
     }
   }
 }

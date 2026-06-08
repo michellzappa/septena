@@ -201,6 +201,7 @@ struct NutritionDestinationView: View {
       // to go" picker which the user already used to get here.
       if isViewingToday {
         macroTilesGrid
+        mealRhythmSection
       }
       entriesList
     }
@@ -367,11 +368,15 @@ struct NutritionDestinationView: View {
       formatValue: formatter)
   }
 
-  /// Pulls a target range from `MacrosConfig` when available, otherwise uses
-  /// the catalog's built-in default. Fasting + the 7 "new" macros (sat fat,
-  /// sugar, alcohol, sodium, …) always go through the catalog defaults until
-  /// `macros-config` learns about them.
+  /// Resolves a macro's target band, goals-first: a range goal for the macro
+  /// (the authoritative source now) wins; otherwise the legacy `MacrosConfig`
+  /// band; otherwise the catalog default. Fasting + the guardrail macros (sat
+  /// fat, sugar, alcohol, sodium, …) have no goal and flow through the lower
+  /// tiers unchanged.
   private func target(for macro: MacroCatalog.Macro) -> MacroRange {
+    if let g = NutritionTargets.goalRange(forMacroID: macro.id, context: modelContext) {
+      return g
+    }
     if let m = macros {
       switch macro.id {
       case "protein": return m.protein
@@ -424,6 +429,50 @@ struct NutritionDestinationView: View {
     LazyVGrid(columns: macroTileColumns, spacing: 8) {
       ForEach(macroTileSpecs) { spec in unifiedMacroTile(spec) }
     }
+  }
+
+  // MARK: - Meal rhythm wheel
+  //
+  // A 24-hour dial of *when* meals land over the trailing 7 days, faded by
+  // recency. Derived purely from the already-loaded entries' local
+  // `date` + `time` — no extra query, no model change. Hidden when there's
+  // too little to read (a lone dot tells you nothing about rhythm).
+
+  @ViewBuilder
+  private var mealRhythmSection: some View {
+    let events = mealWheelEvents
+    if events.count >= 3 {
+      DrawerSection("When you eat", padding: .tight) {
+        TimeOfDayWheel(events: events,
+                       accent: theme.color(for: "nutrition"),
+                       windowDays: 7,
+                       nowFraction: nowFraction)
+          .frame(maxWidth: .infinity)
+      }
+    }
+  }
+
+  /// Map the trailing 7 days of meals to wheel points. `date` (yyyy-MM-dd,
+  /// local) gives the days-ago ring; `time` (HH:mm, local) gives the angle.
+  private var mealWheelEvents: [TimeOfDayWheel.Event] {
+    let cal = Calendar.current
+    guard let todayDate = Self.ymdCurrentTZFormatter.date(from: clock.today) else { return [] }
+    let todayStart = cal.startOfDay(for: todayDate)
+    return entries.compactMap { e in
+      guard let day = Self.ymdCurrentTZFormatter.date(from: e.date) else { return nil }
+      let daysAgo = cal.dateComponents([.day], from: cal.startOfDay(for: day), to: todayStart).day ?? 0
+      guard daysAgo >= 0, daysAgo < 7 else { return nil }
+      let parts = e.time.split(separator: ":")
+      let h = Double(parts.first ?? "0") ?? 0
+      let m = parts.count > 1 ? (Double(parts[1]) ?? 0) : 0
+      return TimeOfDayWheel.Event(id: e.id, fraction: (h * 60 + m) / 1440, daysAgo: daysAgo)
+    }
+  }
+
+  /// Current local time as a 0..<1 day fraction for the wheel's "now" hand.
+  private var nowFraction: Double {
+    let c = Calendar.current.dateComponents([.hour, .minute], from: clock.now)
+    return (Double(c.hour ?? 0) * 60 + Double(c.minute ?? 0)) / 1440
   }
 
   private var macroTileColumns: [GridItem] {

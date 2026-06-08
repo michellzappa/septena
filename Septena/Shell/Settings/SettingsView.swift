@@ -863,7 +863,7 @@ struct GeneralSettingsPane: View {
           Label("Insights", systemImage: "chart.dots.scatter")
         }
       } footer: {
-        Text("Layout picks how the homepage renders — Histogram, Sparkline, Heatmap, or Rings. Insights tunes the cross-section correlation explorer.")
+        Text("Layout picks how the homepage renders — Histogram, Sparkline, Heatmap, Rings, or Wheel. Insights tunes the cross-section correlation explorer.")
       }
 
       Section {
@@ -1389,6 +1389,26 @@ private enum LayoutPreviewSample {
 private struct LayoutPreviewExample: View {
   let mode: HomepageLayoutMode
 
+  /// Deterministic multi-section sample for the Wheel picker preview —
+  /// morning coffee, midday + evening meals, an evening mood note, across a
+  /// couple of recent days so the recency fade and color overlay both show.
+  static let wheelSampleEvents: [TimeOfDayWheel.Event] = [
+    .init(id: "a", fraction: 7.5 / 24, daysAgo: 0, color: .orange),
+    .init(id: "b", fraction: 8.0 / 24, daysAgo: 1, color: .orange),
+    .init(id: "c", fraction: 12.5 / 24, daysAgo: 0, color: .green),
+    .init(id: "d", fraction: 13.0 / 24, daysAgo: 2, color: .green),
+    .init(id: "e", fraction: 19.5 / 24, daysAgo: 0, color: .green),
+    .init(id: "f", fraction: 20.0 / 24, daysAgo: 1, color: .green),
+    .init(id: "g", fraction: 21.5 / 24, daysAgo: 0, color: .purple),
+    .init(id: "h", fraction: 9.0 / 24, daysAgo: 3, color: .brown),
+  ]
+
+  /// Sample sleep bands (bedtime → wake, wrapping midnight) for the preview.
+  static let wheelSampleBands: [TimeOfDayWheel.Band] = [
+    .init(id: "s0", start: 23.0 / 24, end: 7.0 / 24, daysAgo: 0, color: .indigo),
+    .init(id: "s1", start: 23.5 / 24, end: 6.5 / 24, daysAgo: 2, color: .indigo),
+  ]
+
   var body: some View {
     Group {
       switch mode {
@@ -1425,6 +1445,16 @@ private struct LayoutPreviewExample: View {
           onTap: { _ in },
           menuContent: { _ in EmptyView() }
         )
+      case .wheel:
+        // Static sample dial (no fetch): a few multi-color dots across the
+        // window so the holistic look reads in the picker without data.
+        TimeOfDayWheel(events: Self.wheelSampleEvents,
+                       accent: Theme.inkSecondary,
+                       bands: Self.wheelSampleBands,
+                       windowDays: 7,
+                       nowFraction: 0.55,
+                       diameter: 200)
+          .frame(maxWidth: .infinity)
       }
     }
     .allowsHitTesting(false)
@@ -4763,6 +4793,11 @@ struct SectionSkillView: View {
 struct SkillPreambleView: View {
   var body: some View {
     Form {
+      Section {
+        MCPConnectionDiagram()
+      } footer: {
+        Text("Your data stays in your private iCloud. Connecting an AI just opens a door into it — one you control and can revoke.")
+      }
       Section {
         Text(.init(SectionSkill.preamble))
           .font(.callout)

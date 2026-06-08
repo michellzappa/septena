@@ -901,6 +901,12 @@ struct WeekDashboardView: View {
         onTap: handleDomainTap,
         menuContent: { domain in quickAddMenu(for: domain) }
       )
+    case .wheel:
+      RhythmHomepageView(
+        items: visibleDomainData,
+        sleepNights: ouraNights,
+        onTap: handleDomainTap
+      )
     }
   }
 

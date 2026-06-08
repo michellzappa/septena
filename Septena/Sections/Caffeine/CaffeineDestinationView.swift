@@ -7,10 +7,16 @@ import SwiftData
 struct CaffeineDestinationView: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var clock
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
   @State private var today: CaffeineDayResponse? = nil
   @State private var loading = true
+  /// Trailing-7-day event instants for the rhythm wheel — a separate,
+  /// lightweight fetch from the per-day `today` response above (the wheel
+  /// is the only surface that needs a week at once). Sendable id+instant
+  /// pairs so the read can cross the mirror's actor boundary.
+  @State private var weekPoints: [WheelPoint] = []
   @State private var editing: CaffeineEntry? = nil
   @State private var managingTypes = false
   /// Driven by `CaffeinePlugin.logActions`: tapping "Log V60" / "Log
@@ -37,6 +43,7 @@ struct CaffeineDestinationView: View {
                   onLog: handleLogAction,
                   leadingLogActions: leadingLogActions,
                   currentDate: $viewingDate) {
+      rhythmSection
       DrawerSection("Today", padding: .none) {
         if let today, !today.entries.isEmpty {
           ForEach(Array(today.entries.reversed())) { entry in
@@ -141,6 +148,59 @@ struct CaffeineDestinationView: View {
     today = await MirrorReader.shared.read {
       ChecklistMirror.loadCaffeineDay(context: $0, date: date)
     }
+    await reloadWeek()
     loading = false
+  }
+
+  // MARK: - Rhythm wheel
+  //
+  // A 24-hour dial of *when* caffeine lands over the trailing 7 days, faded by
+  // recency. See `TimeOfDayWheel`. Only on today (a past-day rhythm view is
+  // odd) and only with enough events to read a pattern.
+
+  private struct WheelPoint: Identifiable, Sendable {
+    let id: String
+    let at: Date
+  }
+
+  /// Start of *today* in the local calendar, from the shared day clock so it
+  /// honors day-rollover. Falls back to the device midnight if unparseable.
+  private var todayStart: Date {
+    SeptenaDate.parse(clock.today).map { Calendar.current.startOfDay(for: $0) }
+      ?? Calendar.current.startOfDay(for: clock.now)
+  }
+
+  private func reloadWeek() async {
+    let weekStart = Calendar.current.date(byAdding: .day, value: -6, to: todayStart) ?? todayStart
+    weekPoints = await MirrorReader.shared.read { ctx in
+      let desc = FetchDescriptor<CaffeineEventEntity>(
+        predicate: #Predicate { $0.occurredAt >= weekStart },
+        sortBy: [SortDescriptor(\.occurredAt)]
+      )
+      return ((try? ctx.fetch(desc)) ?? []).map { WheelPoint(id: $0.id, at: $0.occurredAt) }
+    }
+  }
+
+  private var wheelEvents: [TimeOfDayWheel.Event] {
+    let start = todayStart
+    return weekPoints.compactMap {
+      TimeOfDayWheel.Event(id: $0.id, occurredAt: $0.at, todayStart: start, windowDays: 7)
+    }
+  }
+
+  private var nowFraction: Double {
+    let c = Calendar.current.dateComponents([.hour, .minute], from: clock.now)
+    return (Double(c.hour ?? 0) * 60 + Double(c.minute ?? 0)) / 1440
+  }
+
+  @ViewBuilder
+  private var rhythmSection: some View {
+    let events = wheelEvents
+    if isViewingToday, events.count >= 3 {
+      DrawerSection("When you have caffeine", padding: .tight) {
+        TimeOfDayWheel(events: events, accent: accent, windowDays: 7, nowFraction: nowFraction)
+          .frame(maxWidth: .infinity)
+      }
+    }
   }
 }
