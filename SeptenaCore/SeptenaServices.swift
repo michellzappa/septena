@@ -1743,7 +1743,6 @@ final class CannabisMutator {
                 grams: Double? = nil,
                 // Free-form text defaults to "" so the field registers with
                 // CloudKit on first in-app write. See GutMutator for details.
-                effect: String? = "",
                 note: String? = "") -> CannabisEventEntity {
     let id = uniqueEntryID()
     // Vape entries auto-fill grams from the constant when not supplied.
@@ -1753,7 +1752,6 @@ final class CannabisMutator {
                                      method: method,
                                      hit: hit,
                                      grams: resolvedGrams,
-                                     effect: effect,
                                      note: note)
     entity.occurredAt = EventTimestamp.from(date: date, time: time)
     context.insert(entity)
@@ -1767,14 +1765,12 @@ final class CannabisMutator {
                    method: String? = nil,
                    hit: Int?? = nil,
                    grams: Double?? = nil,
-                   effect: String?? = nil,
                    note: String?? = nil) {
     guard let entity = fetchEntry(id: id) else { return }
     if let date { entity.date = date }
     if let method { entity.method = method }
     if let hit { entity.hit = hit }
     if let grams { entity.grams = grams }
-    if let effect { entity.effect = effect }
     if let note { entity.note = note }
     // `time` STRING retired: fold a day/time change into the canonical occurredAt.
     if date != nil || time != nil {

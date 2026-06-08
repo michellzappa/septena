@@ -759,7 +759,6 @@ final class CannabisEventEntity {
   var strain: String?
   var hit: Int?
   var grams: Double?
-  var effect: String?
   var note: String?
   var updatedAt: Date
   var cloudKitSystemFields: Data?
@@ -770,7 +769,6 @@ final class CannabisEventEntity {
        strain: String? = nil,
        hit: Int? = nil,
        grams: Double? = nil,
-       effect: String? = nil,
        note: String? = nil,
        updatedAt: Date = .now,
        cloudKitSystemFields: Data? = nil) {
@@ -780,7 +778,6 @@ final class CannabisEventEntity {
     self.strain = strain
     self.hit = hit
     self.grams = grams
-    self.effect = effect
     self.note = note
     self.updatedAt = updatedAt
     self.cloudKitSystemFields = cloudKitSystemFields
@@ -1508,7 +1505,6 @@ enum CannabisEventCloudKitSchema {
     static let strain = "strain"
     static let hit = "hit"
     static let grams = "grams"
-    static let effect = "effect"
     static let note = "note"
     static let occurredAt = "occurredAt"
   }
@@ -2139,7 +2135,6 @@ extension CannabisEventEntity: ChecklistCloudKitBackedEntity {
     record[CannabisEventCloudKitSchema.Field.strain] = strain
     record[CannabisEventCloudKitSchema.Field.hit] = hit
     record[CannabisEventCloudKitSchema.Field.grams] = grams
-    record[CannabisEventCloudKitSchema.Field.effect] = effect
     record[CannabisEventCloudKitSchema.Field.note] = note
     record[CannabisEventCloudKitSchema.Field.occurredAt] = occurredAt as NSDate
     return record
@@ -2151,7 +2146,6 @@ extension CannabisEventEntity: ChecklistCloudKitBackedEntity {
     strain = optionalChecklistString(record[CannabisEventCloudKitSchema.Field.strain])
     hit = record[CannabisEventCloudKitSchema.Field.hit] as? Int
     grams = record[CannabisEventCloudKitSchema.Field.grams] as? Double
-    effect = optionalChecklistString(record[CannabisEventCloudKitSchema.Field.effect])
     note = optionalChecklistString(record[CannabisEventCloudKitSchema.Field.note])
     if let v = record[CannabisEventCloudKitSchema.Field.occurredAt] as? Date { occurredAt = v }
     updatedAt = .now

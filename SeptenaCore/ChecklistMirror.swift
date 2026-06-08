@@ -223,6 +223,38 @@ enum ChecklistMirror {
     return streak
   }
 
+  /// All completion dates (YYYY-MM-DD) for a single chore, de-duplicated and
+  /// sorted ascending. Pure read — the raw material the chore detail view
+  /// derives cadence + stats from. One "complete" event per marked day; an
+  /// uncompleted day leaves no event, so absence here means never done.
+  static func choreCompletionDates(context: ModelContext, choreID: String) -> [String] {
+    let completeAction = "complete"
+    let events = (try? context.fetch(FetchDescriptor<ChoreEventEntity>(
+      predicate: #Predicate { $0.choreID == choreID && $0.action == completeAction }
+    ))) ?? []
+    return Array(Set(events.map(\.date))).sorted()
+  }
+
+  /// Dates a habit was marked done (YYYY-MM-DD, de-duplicated, ascending).
+  /// Pure read — raw material for the habit detail view's streak/history/
+  /// consistency stats. Absence of a date means it was never done that day.
+  static func habitCompletionDates(context: ModelContext, habitID: String) -> [String] {
+    let states = (try? context.fetch(FetchDescriptor<HabitDayStateEntity>(
+      predicate: #Predicate { $0.habitID == habitID && $0.done == true }
+    ))) ?? []
+    return Array(Set(states.map(\.date))).sorted()
+  }
+
+  /// Dates a supplement was marked taken (YYYY-MM-DD, de-duplicated, ascending).
+  /// Pure read — counterpart to `habitCompletionDates` for the supplement
+  /// detail view.
+  static func supplementCompletionDates(context: ModelContext, supplementID: String) -> [String] {
+    let states = (try? context.fetch(FetchDescriptor<SupplementDayStateEntity>(
+      predicate: #Predicate { $0.supplementID == supplementID && $0.done == true }
+    ))) ?? []
+    return Array(Set(states.map(\.date))).sorted()
+  }
+
   static func loadSupplementsHistory(context: ModelContext, days: Int) -> SupplementHistoryResponse {
     let today = SeptenaDate.today
     guard let todayDate = SeptenaDate.parse(today) else {
@@ -804,7 +836,6 @@ enum ChecklistMirror {
       entity.strain = row.strain
       entity.hit = row.hit
       entity.grams = row.grams
-      entity.effect = row.effect
       entity.note = row.note
       entity.occurredAt = EventTimestamp.from(date: row.date, time: row.time)
       entity.updatedAt = .now
@@ -826,7 +857,7 @@ enum ChecklistMirror {
       if let g = e.grams { totalG += g }
       return CannabisEntry(id: e.id, time: EventTimestamp.hhmm(from: e.occurredAt), method: e.method,
                            strain: e.strain, hit: e.hit, grams: e.grams,
-                           note: e.note, effect: e.effect)
+                           note: e.note)
     }
     return CannabisDayResponse(date: date,
                                entries: entries,

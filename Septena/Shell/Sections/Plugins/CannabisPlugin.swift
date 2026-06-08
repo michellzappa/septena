@@ -20,7 +20,7 @@ enum CannabisPlugin: SectionPlugin {
       intro: "A private log for vape and edible sessions — when, how much, and how it landed.",
       bullets: [
         .init("Two quick logs",
-              "Vape or edible from the section's + menu. Strain and effect are optional fields.",
+              "Vape or edible from the section's + menu. Hit count and note are optional.",
               icon: "leaf"),
         .init("Strains as you go",
               "Add strain names from the destination view when you identify them. Nothing is pre-seeded.",
@@ -55,7 +55,7 @@ enum CannabisPlugin: SectionPlugin {
           .req("method", "string", "vape | edible"),
           .opt("strain", "string", "legacy — no longer set in-app"),
           .opt("hit", "int"), .opt("grams", "double"),
-          .opt("effect", "string"), .opt("note", "string"),
+          .opt("note", "string"),
         ]),
       ],
       collect: { ctx in
@@ -82,17 +82,17 @@ enum CannabisPlugin: SectionPlugin {
   static var mcpSkill: SectionSkill? {
     SectionSkill(
       key: "cannabis",
-      summary: "Log cannabis intake (vape/edible) with effect.",
+      summary: "Log cannabis intake (vape/edible).",
       tools: [
         SectionSkill.Tool("cannabis_events_list",  "By day or range. Defaults to last 7 days",
               inputs: "optional: date, from, to, limit"),
         SectionSkill.Tool("cannabis_event_log",    "Log an intake",
-              inputs: "required: method (vape|edible) · optional: date (default today), time (HH:MM:SS), hit (count for vape), grams (for edibles), effect (free-form, e.g. relaxed/creative), note"),
+              inputs: "required: method (vape|edible) · optional: date (default today), time (HH:MM:SS), hit (count for vape), grams (for edibles), note"),
         SectionSkill.Tool("cannabis_event_delete", "Remove an event",
               inputs: "required: id"),
       ],
       body: """
-      `effect` is subjective free-form: "relaxed", "creative", "couch-locked".
+      A session is one vape or edible. Count sessions rather than dose.
       """
     )
   }
@@ -146,7 +146,7 @@ private struct CannabisDetailContent: View {
   compact([
     "id": e.id, "date": e.date, "time": EventTimestamp.hhmm(from: e.occurredAt), "method": e.method,
     "strain": e.strain, "hit": e.hit, "grams": e.grams,
-    "effect": e.effect, "note": e.note,
+    "note": e.note,
     "updatedAt": isoDate(e.updatedAt),
   ])
 }

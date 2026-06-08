@@ -1124,7 +1124,6 @@ struct CannabisEntry: Codable, Identifiable, Hashable {
   var hit: Int?
   var grams: Double?
   var note: String?
-  var effect: String?
 }
 
 struct CannabisDayResponse: Codable {
@@ -1278,7 +1277,6 @@ struct CannabisExportEntry: Codable, Hashable {
   let strain: String?
   let hit: Int?
   let grams: Double?
-  let effect: String?
   let note: String?
 }
 

@@ -197,7 +197,6 @@ enum CoachContextBuilder {
         if let st = x.strain, !st.isEmpty { s += " · \(st)" }
         if let h = x.hit { s += " · \(h) hits" }
         if let g = x.grams { s += " · \(num(g))g" }
-        if let e = x.effect, !e.isEmpty { s += " · \(e)" }
         if let n = x.note, !n.isEmpty { s += " — \(n)" }
         return s
       }

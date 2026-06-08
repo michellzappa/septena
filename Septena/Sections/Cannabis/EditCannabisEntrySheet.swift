@@ -31,7 +31,6 @@ struct EditCannabisEntrySheet: View {
   @State private var method: String = "vape"
   @State private var hit: Int = 1
   @State private var note: String = ""
-  @State private var effect: String = ""
 
   private static let methods: [(String, String)] = [
     ("vape", "Vape"),
@@ -71,10 +70,6 @@ struct EditCannabisEntrySheet: View {
         TextField("Note", text: $note, axis: .vertical)
           .lineLimit(1...4)
       }
-      Section("Effect") {
-        TextField("Effect", text: $effect, axis: .vertical)
-          .lineLimit(1...4)
-      }
     }
   }
 
@@ -82,12 +77,11 @@ struct EditCannabisEntrySheet: View {
     guard let original else {
       // Create mode: pre-fill from preset, then smart-default hit from the
       // most recent entry of the same method so the common path is one tap.
-      // Effect/note stay empty — those are per-session.
+      // Note stays empty — it's per-session.
       method = presetMethod ?? "vape"
       let lastSame = lastEntry(method: method)
       hit = lastSame?.hit ?? 1
       note = ""
-      effect = ""
       let dayFmt = DateFormatter(); dayFmt.dateFormat = "yyyy-MM-dd"
       let day = dayFmt.date(from: date) ?? Date()
       let now = Date()
@@ -102,7 +96,6 @@ struct EditCannabisEntrySheet: View {
     method = original.method
     hit = original.hit ?? 1
     note = original.note ?? ""
-    effect = original.effect ?? ""
     when = EventTimestamp.from(date: date, time: original.time)
   }
 
@@ -132,10 +125,6 @@ struct EditCannabisEntrySheet: View {
       let t = note.trimmingCharacters(in: .whitespacesAndNewlines)
       return t.isEmpty ? nil : t
     }()
-    let effectValue: String? = {
-      let t = effect.trimmingCharacters(in: .whitespacesAndNewlines)
-      return t.isEmpty ? nil : t
-    }()
 
     let hitValue: Int? = method == "vape" ? hit : nil
     // Recompute grams from the method on edit — switching to edible clears
@@ -156,7 +145,6 @@ struct EditCannabisEntrySheet: View {
                              method: method,
                              hit: .some(hitValue),
                              grams: .some(gramsValue),
-                             effect: .some(effectValue),
                              note: .some(noteValue))
         AddInfoSection.cannabis.notifyTilesChanged()
       }
@@ -175,7 +163,6 @@ struct EditCannabisEntrySheet: View {
                                        method: method,
                                        hit: hitValue,
                                        grams: gramsValue,
-                                       effect: effectValue,
                                        note: noteValue)
         newID = entity.id
         newGrams = entity.grams
@@ -192,8 +179,7 @@ struct EditCannabisEntrySheet: View {
       strain: original?.strain,
       hit: method == "vape" ? hit : nil,
       grams: method == "vape" ? savedGrams : nil,
-      note: noteValue,
-      effect: effectValue
+      note: noteValue
     )
     onSave(rebuilt)
   }

@@ -315,7 +315,6 @@ These six are the task backend, written by `SeptenaCore/CloudKit/*Record.swift`.
 | `strain` | String | `String?` | Yes | |
 | `hit` | Int(64) | `Int?` | Yes | |
 | `grams` | Double | `Double?` | Yes | |
-| `effect` | String | `String?` | Yes | |
 | `note` | String | `String?` | Yes | |
 | `occurredAt` | Timestamp | `Date` | No | **⚠ PENDING PROD DEPLOY** · default `.distantPast` |
 

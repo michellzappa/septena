@@ -162,7 +162,7 @@ actor DashboardReader {
     if let last = (try? ctx.fetch(lastVape))?.first {
       m.cannabisLastVape = CannabisEntry(id: last.id, time: EventTimestamp.hhmm(from: last.occurredAt), method: last.method,
                                          strain: last.strain, hit: last.hit, grams: last.grams,
-                                         note: last.note, effect: last.effect)
+                                         note: last.note)
     }
     // Nutrition: 30-day meal history feeds menu recommendations + search.
     let since = SeptenaDate.format(
