@@ -106,6 +106,37 @@ final class TaskMutator {
     cloudBackend.delete(id: id)
   }
 
+  // MARK: - Conversation (Task Conversations — docs/TASK_CONVERSATIONS_PHASE0.md)
+
+  func conversation(id: String) -> TaskConvo? {
+    cloudBackend?.conversation(id: id)
+  }
+
+  @discardableResult
+  func appendConvoTurn(id: String, _ turn: ConvoTurn) -> Int {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] appendConvoTurn called before CK bound — dropping", nil)
+      return 0
+    }
+    return cloudBackend.appendConvoTurn(id: id, turn)
+  }
+
+  func setConvoAcceptance(id: String, _ line: String) {
+    cloudBackend?.setConvoAcceptance(id: id, line)
+  }
+
+  func setConvoEndState(id: String, _ state: ConvoEndState, note: String?) {
+    cloudBackend?.setConvoEndState(id: id, state, note: note)
+  }
+
+  func setConvoAssignee(id: String, _ assignee: ConvoAssignee?) {
+    cloudBackend?.setConvoAssignee(id: id, assignee)
+  }
+
+  func pendingReasoning(limit: Int) -> [TaskEntity] {
+    cloudBackend?.pendingReasoning(limit: limit) ?? []
+  }
+
   func moveToToday(id: String, today: Bool = true) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] moveToToday called before CK bound — dropping", nil)

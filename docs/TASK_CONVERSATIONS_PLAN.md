@@ -1,5 +1,12 @@
 # Task Conversations — Plan
 
+**Goal (north star):** take the user from a *simple input* — a brain-dumped
+title — to *meaningful progress on every task*, by having AI ground it in real
+context, ask the few questions that clarify meaning and narrow scope, and route
+each task to its meaningful next move. **Progress ≠ completion:** the loop
+guarantees a next move for every task type, including the ones AI can't do
+itself.
+
 Turn every task page into a short agent-driven exchange that points toward a
 solution. Not a chatbot bolted onto tasks — a **decision machine**: the agent
 grounds the task, then hands you the smallest possible choice. Free text is the
@@ -34,7 +41,9 @@ capture        you brain-dump a title
 ❶ CONFIRM      agent plays back its reading as a choice card. HARD GATE.
   ↓            no grounding, no work, until you tap "yes, that one".
 ❷ GROUND       agent gathers context (file:line, links, people, sibling tasks)
-  ↓
+  ↓            — and discovers the task's SIZE.
+  ├─ if epic ─▶ ❸ʹ SCOPE   decompose into subtasks / MVP-first / defer-as-note.
+  ↓                        sets endState=`decomposed`; children run their own loop.
 ❸ DECIDE       agent collapses the open question to 2–4 options + "Other",
   ↓            authors the acceptance line, hands you the card
   ↓
@@ -42,6 +51,10 @@ capture        you brain-dump a title
   ↓
    END         a terminal end-state is recorded (§4)
 ```
+
+**The loop is a state machine, not a fixed pipeline.** Grounding routes the path
+— a single-loop task goes straight to ❸; an epic branches to ❸ʹ. Turns-to-
+resolution is data-dependent (see non-negotiable #6).
 
 ## 2. Non-negotiables (each one cost us a wrong turn in the dry-run)
 
@@ -71,6 +84,14 @@ capture        you brain-dump a title
    (which gutter is canonical, what "Protocols" should become) stay yours. The
    agent pre-computes the trade-offs so the call takes one tap.
 
+6. **Size is discovered, not given — never assume question → build.** `confirm`
+   resolves *meaning*; `ground` reveals *size*. The `Protocols` dry-run proved
+   it: one confirm tap → a 15-surface section build (`docs/ADDING_A_SECTION.md`).
+   When grounding finds an epic, the loop branches to `scope` (decompose /
+   MVP-first / defer-as-note) and **must not march to `work`.** This is the
+   confirm-gate one level up: confirm guards meaning, scope guards size; both are
+   "discover before you act."
+
 ## 3. Data shape
 
 Split hard between **stored facts** and **derived view-state**. Only the left
@@ -84,26 +105,46 @@ column touches CloudKit.
 | `acceptance` | `String?` | agent | one falsifiable line; written during ❸ |
 | `context` | `[ContextRef]` | agent | grounding: `file:line`, URLs, people, sibling task ids |
 | `thread` | `[Turn]` | both | the decision log, below |
+| `subtasks` | `[TaskRef]` | agent (on `scope`) | children an epic decomposed into; each runs its own loop |
+| `assignee` | `me \| local \| claude` | user (override) | default = router-decided; user can **mark for Claude** to force it into the async queue (see §6) |
+| `artifact` | `Artifact?` | agent | what the agent *produced* (`agent_assisted`): research, a table, a draft. CloudKit-backed like any field |
+| `handoff` | `Handoff?` | agent | the human last-mile, rendered as the terminal action button: `{instruction, actionType: open_url\|compose\|call\|none, payload?}` |
 | `endState` | `EndState?` | set at terminal only | §4 |
 
-`Turn` (the decision-log unit — structured, not prose):
+Two completion bars (do not conflate): **`acceptance` = the agent is done**
+(deliverable met); **task `status` = the human is done** (last mile complete).
+`agent_assisted` reaches `acceptance` while `status` stays open until the
+`handoff` action is taken.
+
+`Turn` (the decision-log unit — structured, not prose; corrected by the `2zzxx2`
+and `Protocols` dry-runs):
 
 ```
 Turn {
-  role:    user | agent
-  question: String?        // agent turns: the prompt
+  seq:      Int
+  role:     user | provider           // propose vs choose are SEPARATE turns
+  step:     confirm | ground | scope | decide | work
+  provider: onDevice | claude | null  // null = deterministic `compute`
+  confidence: Double?                 // provider turns; the escalation trigger
+  question: String?        // provider turns: the prompt
   options:  [String]?      // the buttons offered
-  chosen:   String?        // which button (or)
-  otherText: String?       // the free-text escape hatch
-  note:     String?        // user turns / agent narration
+  chosen:   String?        // user turns: which button…
+  otherText: String?       // …or the free-text escape hatch
+  inReplyTo: Int?          // user turn → the proposal turn it answers
+  note:     String?        // narration
   ts:       Date
 }
 ```
+
+`confirmedIntent`/`acceptance` are **denormalized "current value" caches** of what
+the thread already records — quick to read, never the source of truth. `confirm`
+writes the turn *and* `confirmedIntent` in one atomic mutator save.
 
 ### Derived (computed, never stored)
 
 - `disposition` — re-evaluated per turn: `agent_doable | agent_assisted |
   human_only | decision_needed | needs_verify | reference`
+- `size` — `single | epic`, decided by `confirm`+`ground`; `epic` routes to `scope`
 - `stage` — `open → clarifying → in_progress → awaiting_human → {terminal}`
 - `pendingReasoning` — derived: a step no *sync* provider could resolve. Drives
   the queue an *async* provider (today: the user's Claude) drains (§6).
@@ -118,12 +159,29 @@ Fresh task defaults to 🟡 — not because work is blocked, but because *intent
 ## 4. End-states (open enum — runtime keeps minting new ones)
 
 `agent_done` · `human_done` · `agent_assisted_done` · `needs_verify` (agent
-shipped, human must eyeball — appeared unbidden in the dry-run when the fix
-touched a SwiftUI `List`) · `wont_do` · `open`.
+shipped, human must eyeball — appeared unbidden in the `2zzxx2` dry-run when the
+fix touched a SwiftUI `List`) · `decomposed` (an epic that became `subtasks[]`;
+the parent's work now lives in the children — surfaced by the `Protocols`
+dry-run) · `reminder_set` / `promoted_to_today` (`human_only` hand-offs — the
+agent can't act, so it curates attention; see below) · `wont_do` · `open`.
+Terminal states carry an optional `endStateNote` (e.g. `needs_verify`: *what* to
+verify).
 
-The enum is deliberately not closed. The page padding task's honest end-state
-(`agent_doable → needs_verify`) was not in the original list; the model surfaced
-it. Treat the enum as append-only.
+**Conversation end-state ≠ task status** (the `Pay Gemeente` dry-run). A
+`human_only` task reaches a *conversation* terminal (`reminder_set`) while its
+*task* `status` stays `open` until the human acts. Two axes — never overload
+task status with the conversation's end-state.
+
+**The agent curates attention on tasks it can't do.** For `human_only`, value =
+surfacing the right lingering/timely tasks onto **Today** (= set `scheduled =
+today`, per the today-boolean-retirement direction), or a reminder via the
+existing local-notifications layer. **Bounded by a Today budget** — rank by
+timeliness × importance, promote only the top few, hard daily cap (user-tunable).
+"Curate, don't flood" is the load-bearing constraint; same shape as the
+anti-stuck budget (§6).
+
+The enum is deliberately not closed. Two of these (`needs_verify`, `decomposed`)
+were not in the original list; the dry-runs surfaced them. Treat as append-only.
 
 ## 5. One interaction contract, pluggable model providers
 
@@ -201,6 +259,30 @@ requests **park in a reasoning queue and resolve when that provider connects.**
 sync providers grow capable, more steps resolve inline and the queue shrinks —
 no protocol change. **Turn-based / cadence-bound is therefore the interim cost of
 *async* providers**, accepted for now, not a property of the system forever.
+
+**Mark-for-Claude = user-initiated routing (the queue's second feeder).** Beyond
+the system's confidence-based escalation, the user can set `assignee = claude` to
+push a task into `tasks_pending_reasoning` proactively — "don't step this
+locally, my Claude takes it." Symmetric to the agent curating Today (bounded):
+the agent hands the human a focused Today; the human hands the agent a marked
+queue; each side **pulls**. The mark is also a per-task tempo choice
+(foreground/stepwise vs handed-off/async).
+
+*How far does a marked task run unattended?* **To the next gate that genuinely
+needs the human** — the provider drains confirm→ground→decide→*reversible* work,
+self-deciding what it's confident about, and bounces back to a 🟡 card only at a
+genuine taste fork or an irreversible/outward action (the `handoff`). Carve-out:
+marking raises autonomy but **does not waive the confirm-gate when meaning is
+ambiguous** — an unclear title still returns 🟡 "what did you mean?", never a
+guess. Self-confirm when confident; bounce when meaning or stakes are real.
+
+**Two tempos, and the foreground one is action-based.** Foreground =
+**press-to-advance**: nothing auto-runs; every step ends in a button (a choice
+card to pick, or a `handoff` to act on), and the user advances one step per
+press. Full control, no surprise, and a press resolves inline whenever the
+chosen provider is `sync` (incl. a limited local model). Background = the
+scheduled drain (§ above) for bulk/overnight — the only place async matters. This
+is the answer to "how automatic?": foreground zero-auto, background batched.
 
 **The loop (provider-neutral):**
 

@@ -98,6 +98,18 @@ enum TasksPlugin: SectionPlugin {
               inputs: "optional: status (active|done|cancelled|all), limit"),
         SectionSkill.Tool("tasks_list_areas",    "Resolve area name → id",
               inputs: "optional: limit"),
+        SectionSkill.Tool("tasks_pending_reasoning", "Your work queue: tasks marked for Claude or stuck on a low-confidence step. Start here",
+              inputs: "optional: limit"),
+        SectionSkill.Tool("tasks_thread_get",    "Read a task's conversation (TaskConvo: confirmedIntent, acceptance, thread, artifact, handoff, endState, assignee)",
+              inputs: "required: id"),
+        SectionSkill.Tool("tasks_thread_append", "Append one turn. Propose (provider turn: question+options) and choose (user turn: chosen+inReplyTo) are SEPARATE — never invent the user's choice. A confirm turn with chosen sets confirmedIntent (resolved intent in note)",
+              inputs: "required: id, turn{role(user|provider), step(confirm|ground|scope|decide|work)} · optional in turn: provider, confidence, question, options, chosen, otherText, inReplyTo, note"),
+        SectionSkill.Tool("tasks_set_acceptance", "The agent-done bar (your deliverable). Distinct from task completion = the human-done bar",
+              inputs: "required: id, acceptance"),
+        SectionSkill.Tool("tasks_set_endstate",  "Record the conversation's terminal end-state (agent_done|human_done|agent_assisted_done|needs_verify|decomposed|reminder_set|promoted_to_today|wont_do|open)",
+              inputs: "required: id, endState · optional: note"),
+        SectionSkill.Tool("tasks_set_assignee",  "Route a task: me|local|claude, or null for router-decided. claude marks it for the reasoning queue",
+              inputs: "required: id, assignee"),
       ],
       body: """
       ### View routing — important

@@ -126,6 +126,73 @@ final class CloudKitTasksBackend: TasksBackend {
     NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
   }
 
+  // MARK: Conversation (Task Conversations — docs/TASK_CONVERSATIONS_PHASE0.md)
+
+  /// Decoded conversation for a task; nil if the task is unknown.
+  func conversation(id: String) -> TaskConvo? {
+    fetch(id: id).map(\.conversation)
+  }
+
+  /// Append a turn (assigning its `seq`) and persist + sync. A `confirm`-step
+  /// turn carrying a `chosen` also caches `confirmedIntent` in the SAME save —
+  /// the richer `note` wins over the bare button label. Returns the seq.
+  @discardableResult
+  func appendConvoTurn(id: String, _ turn: ConvoTurn) -> Int {
+    guard let entity = fetch(id: id) else { return 0 }
+    var convo = entity.conversation
+    var t = turn
+    t.seq = convo.nextSeq
+    convo.thread.append(t)
+    if t.step == .confirm, let chosen = t.chosen {
+      convo.confirmedIntent = t.note ?? chosen
+    }
+    entity.conversation = convo
+    commitAndPush(entity, op: "convo.append")
+    return t.seq
+  }
+
+  func setConvoAcceptance(id: String, _ line: String) {
+    guard let entity = fetch(id: id) else { return }
+    var convo = entity.conversation
+    convo.acceptance = line
+    entity.conversation = convo
+    commitAndPush(entity, op: "convo.acceptance")
+  }
+
+  func setConvoEndState(id: String, _ state: ConvoEndState, note: String?) {
+    guard let entity = fetch(id: id) else { return }
+    var convo = entity.conversation
+    convo.endState = state
+    convo.endStateNote = note
+    entity.conversation = convo
+    commitAndPush(entity, op: "convo.endState")
+  }
+
+  func setConvoAssignee(id: String, _ assignee: ConvoAssignee?) {
+    guard let entity = fetch(id: id) else { return }
+    var convo = entity.conversation
+    convo.assignee = assignee
+    entity.conversation = convo
+    commitAndPush(entity, op: "convo.assignee")
+  }
+
+  /// Tasks awaiting reasoning: explicitly marked for Claude, OR whose last
+  /// provider turn was low-confidence — and not yet terminal. Client-side
+  /// filter (the CK schema is auto-managed; no server query on the blob).
+  func pendingReasoning(limit: Int) -> [TaskEntity] {
+    let all = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
+    let pending = all.filter { entity in
+      guard entity.conversationJSON != nil else { return false }
+      let c = entity.conversation
+      guard !c.isTerminal else { return false }
+      if c.assignee == .claude { return true }
+      if let last = c.thread.last(where: { $0.role == .provider }),
+         let conf = last.confidence, conf < 0.5 { return true }
+      return false
+    }
+    return Array(pending.prefix(limit))
+  }
+
   // MARK: Mutations
 
   @discardableResult

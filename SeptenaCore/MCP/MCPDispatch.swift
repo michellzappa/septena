@@ -135,6 +135,12 @@ enum MCPDispatch {
     case "tasks_move_to_today": return tasksMoveToToday(args)
     case "tasks_list_projects": return tasksListProjects(args)
     case "tasks_list_areas":    return tasksListAreas(args)
+    case "tasks_thread_get":        return try tasksThreadGet(args)
+    case "tasks_thread_append":     return try tasksThreadAppend(args)
+    case "tasks_set_acceptance":    return try tasksSetAcceptance(args)
+    case "tasks_set_endstate":      return try tasksSetEndState(args)
+    case "tasks_set_assignee":      return try tasksSetAssignee(args)
+    case "tasks_pending_reasoning": return tasksPendingReasoning(args)
 
     // ---- Goals ----
     case "goals_list":          return goalsList()
@@ -268,6 +274,91 @@ enum MCPDispatch {
     return ["id": id, "updated": updated]
   }
 
+  // MARK: - Task Conversations (docs/TASK_CONVERSATIONS_PHASE0.md)
+
+  private static func tasksThreadGet(_ args: MCPArgs) throws -> Any {
+    let id = try args.requireString("id")
+    guard let convo = SeptenaServices.shared.taskMutator.conversation(id: id) else {
+      throw MCPError.badArgument("unknown task id '\(id)'")
+    }
+    let data = try JSONEncoder.taskConvo.encode(convo)
+    let obj = (try? JSONSerialization.jsonObject(with: data)) ?? [:]
+    return ["id": id, "conversation": obj]
+  }
+
+  private static func tasksThreadAppend(_ args: MCPArgs) throws -> Any {
+    let id = try args.requireString("id")
+    guard let raw = args.object("turn") else { throw MCPError.badArgument("missing 'turn' object") }
+    let t = MCPArgs(raw)
+    guard let role = t.string("role").flatMap(ConvoTurn.Role.init(rawValue:)) else {
+      throw MCPError.badArgument("turn.role must be 'user' or 'provider'")
+    }
+    guard let step = t.string("step").flatMap(ConvoTurn.Step.init(rawValue:)) else {
+      throw MCPError.badArgument("turn.step must be confirm|ground|scope|decide|work")
+    }
+    let turn = ConvoTurn(
+      seq: 0,                                          // assigned by the mutator
+      role: role,
+      step: step,
+      provider: t.string("provider").flatMap(ConvoTurn.Provider.init(rawValue:)),
+      confidence: t.double("confidence"),
+      question: t.string("question"),
+      options: t.stringArray("options"),
+      chosen: t.string("chosen"),
+      otherText: t.string("otherText"),
+      inReplyTo: t.int("inReplyTo"),
+      note: t.string("note"),
+      ts: Date()
+    )
+    let seq = SeptenaServices.shared.taskMutator.appendConvoTurn(id: id, turn)
+    return ["id": id, "seq": seq]
+  }
+
+  private static func tasksSetAcceptance(_ args: MCPArgs) throws -> Any {
+    let id = try args.requireString("id")
+    let line = try args.requireString("acceptance")
+    SeptenaServices.shared.taskMutator.setConvoAcceptance(id: id, line)
+    return ["id": id, "acceptance": line]
+  }
+
+  private static func tasksSetEndState(_ args: MCPArgs) throws -> Any {
+    let id = try args.requireString("id")
+    let raw = try args.requireString("endState")
+    guard let state = ConvoEndState(rawValue: raw) else {
+      throw MCPError.badArgument("unknown endState '\(raw)'")
+    }
+    SeptenaServices.shared.taskMutator.setConvoEndState(id: id, state, note: args.string("note"))
+    return ["id": id, "endState": raw]
+  }
+
+  private static func tasksSetAssignee(_ args: MCPArgs) throws -> Any {
+    let id = try args.requireString("id")
+    guard args.present("assignee") else { throw MCPError.badArgument("missing 'assignee'") }
+    let assignee: ConvoAssignee?
+    if let s = args.string("assignee") {
+      guard let a = ConvoAssignee(rawValue: s) else {
+        throw MCPError.badArgument("assignee must be me|local|claude, or null")
+      }
+      assignee = a
+    } else {
+      assignee = nil                                   // explicit null → router-decided
+    }
+    SeptenaServices.shared.taskMutator.setConvoAssignee(id: id, assignee)
+    return ["id": id, "assignee": assignee?.rawValue ?? "auto"]
+  }
+
+  private static func tasksPendingReasoning(_ args: MCPArgs) -> Any {
+    let limit = args.int("limit") ?? 50
+    let rows = SeptenaServices.shared.taskMutator.pendingReasoning(limit: limit).map { e -> [String: Any] in
+      var row: [String: Any] = ["id": e.id, "title": e.title]
+      let c = e.conversation
+      if let ci = c.confirmedIntent { row["confirmedIntent"] = ci }
+      if let a = c.assignee { row["assignee"] = a.rawValue }
+      return row
+    }
+    return ["tasks": rows]
+  }
+
   private static func tasksDefer(_ args: MCPArgs) throws -> Any {
     let id = try args.requireString("id")
     guard let until = try args.date("until") else { throw MCPError.badArgument("missing 'until'") }
@@ -311,8 +402,18 @@ enum MCPDispatch {
   // MARK: - Goals
 
   private static func goalsList() -> Any {
-    ["goals": LocalCache.goals(in: ctx).map {
-      ["id": $0.id, "text": $0.text, "sections": $0.sections, "created": $0.created]
+    ["goals": LocalCache.goals(in: ctx).map { g -> [String: Any] in
+      var d: [String: Any] = ["id": g.id, "text": g.text, "sections": g.sections, "created": g.created]
+      // Measurement attachment (quant goals) so an agent sees targets, ranges
+      // and progress — not just the title. Omitted on free-text goals.
+      // metricTargetUpper present ⇒ a "between" range band [target, upper].
+      if let v = g.metricKey { d["metricKey"] = v }
+      if let v = g.metricWindow { d["metricWindow"] = v }
+      if let v = g.metricComparator { d["metricComparator"] = v }
+      if let v = g.metricTarget { d["metricTarget"] = v }
+      if let v = g.metricTargetUpper { d["metricTargetUpper"] = v }
+      if let v = g.metricBaseline { d["metricBaseline"] = v }
+      return d
     }]
   }
 

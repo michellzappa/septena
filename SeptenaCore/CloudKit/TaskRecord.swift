@@ -37,6 +37,11 @@ static let encryptedNotes = "notes"
     /// Plaintext replacement for cross-surface access. CloudKit field
     /// types are immutable, so this cannot reuse the legacy `notes` name.
 static let notesText = "notesText"
+    /// Task Conversations state (`TaskConvo` JSON). Plaintext STRING so the
+    /// gateway's CloudKit Web Services can read/write it (encrypted fields are
+    /// invisible there — same reason `notesText` exists). Additive; dev-only
+    /// until the conversations feature ships.
+static let conversationJSON = "conversationJSON"
 static let recurrenceUnit = "recurrenceUnit"
 static let recurrenceInterval = "recurrenceInterval"
 static let recurrenceAfterCompletion = "recurrenceAfterCompletion"
@@ -120,6 +125,10 @@ extension TaskEntity {
     // write a STRING there fails even after a zone reset.
     record[TaskCloudKitSchema.Field.notesText] = notes
 
+    // Task Conversations blob (plaintext). Only written once a conversation
+    // exists, so we don't author empty strings onto every task record.
+    record[TaskCloudKitSchema.Field.conversationJSON] = conversationJSON
+
     // Provenance + cue. `source`/`sourceClient` round-trip the gateway's
     // stamp (nil for human-authored rows). `createdAt` only writes once it
     // holds a real value — never clobber a server timestamp with the
@@ -169,6 +178,8 @@ func apply(_ record: CKRecord) {
     // that haven't been re-saved since the plaintext switch.
     notes = optionalTaskString(record[TaskCloudKitSchema.Field.notesText])
       ?? optionalTaskString(record.encryptedValues[TaskCloudKitSchema.Field.encryptedNotes])
+
+    conversationJSON = optionalTaskString(record[TaskCloudKitSchema.Field.conversationJSON])
 
     // Provenance + cue. Tolerant of absence (records authored before the
     // schema learned these fields, or human rows that never set source).

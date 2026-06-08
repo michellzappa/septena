@@ -28,6 +28,10 @@ final class TaskEntity {
   var area: String?
   var project: String?
   var notes: String?
+  /// Task Conversations state (`TaskConvo` as JSON). PLAINTEXT, gateway-readable.
+  /// nil until the first turn. Written only via `TaskMutator`; decode/encode via
+  /// the `conversation` accessor. See `TaskConvo.swift`.
+  var conversationJSON: String?
   var recurrenceUnit: String?
   var recurrenceInterval: Int
   var recurrenceAfterCompletion: Bool
@@ -98,6 +102,7 @@ final class TaskEntity {
        area: String? = nil,
        project: String? = nil,
        notes: String? = nil,
+       conversationJSON: String? = nil,
        recurrenceUnit: String? = nil,
        recurrenceInterval: Int = 1,
        recurrenceAfterCompletion: Bool = true,
@@ -125,6 +130,7 @@ final class TaskEntity {
     self.area = area
     self.project = project
     self.notes = notes
+    self.conversationJSON = conversationJSON
     self.recurrenceUnit = recurrenceUnit
     self.recurrenceInterval = recurrenceInterval
     self.recurrenceAfterCompletion = recurrenceAfterCompletion
@@ -459,8 +465,13 @@ final class GoalEntity {
   // existing row (free-text goals stay free-text).
   var metricKey: String?           // e.g. "training.session_count"
   var metricWindow: String?        // e.g. "calendarWeek"
-  var metricComparator: String?    // "gte" | "lte"
+  var metricComparator: String?    // "gte" | "lte" | "eq" | "range"
   var metricTarget: Double?
+  /// Upper bound for a `range` ("between") comparator — `metricTarget` is the
+  /// lower bound, this the upper, and the goal is met when the current value
+  /// sits inside [target, upper]. Nil for one-sided comparators (unchanged
+  /// behavior). Additive, like `metricBaseline`.
+  var metricTargetUpper: Double?
   /// Optional starting value the user entered when the goal was created.
   /// Used for "latest"-window metrics (body weight, body fat, muscle %) so
   /// the progress bar can show distance-traveled from baseline toward
@@ -480,7 +491,8 @@ final class GoalEntity {
        metricWindow: String? = nil,
        metricComparator: String? = nil,
        metricTarget: Double? = nil,
-       metricBaseline: Double? = nil) {
+       metricBaseline: Double? = nil,
+       metricTargetUpper: Double? = nil) {
     self.id = id
     self.text = text
     self.sections = sections
@@ -493,6 +505,7 @@ final class GoalEntity {
     self.metricComparator = metricComparator
     self.metricTarget = metricTarget
     self.metricBaseline = metricBaseline
+    self.metricTargetUpper = metricTargetUpper
   }
 }
 
@@ -1318,7 +1331,8 @@ extension Goal {
               metricWindow: e.metricWindow,
               metricComparator: e.metricComparator,
               metricTarget: e.metricTarget,
-              metricBaseline: e.metricBaseline)
+              metricBaseline: e.metricBaseline,
+              metricTargetUpper: e.metricTargetUpper)
   }
 }
 
@@ -2865,5 +2879,44 @@ enum LoggedEvents {
   static func timeSinceLast(sectionKey: String, in context: ModelContext, now: Date = Date()) -> TimeInterval? {
     mostRecent(sectionKey: sectionKey, in: context).map { now.timeIntervalSince($0.occurredAt) }
   }
+
+  /// Public, `Sendable` projection of every timestamped event at/after `date`,
+  /// newest first. The cross-module entry point for time-of-day visualization
+  /// (the homepage rhythm wheel) — keeps the `any LoggedEvent` protocol
+  /// internal while handing the app module only flat, value-type rows.
+  ///
+  /// Unlike `since` (which scans *all* history then filters), this predicates
+  /// each fetch on the stored instant, so it touches only the window — a
+  /// 7-day window stays fast regardless of how much total history exists.
+  public static func timed(since date: Date, in context: ModelContext) -> [TimedEvent] {
+    var out: [TimedEvent] = []
+    func grab<E: PersistentModel & LoggedEvent>(_ desc: FetchDescriptor<E>) {
+      let rows = (try? context.fetch(desc)) ?? []
+      out.append(contentsOf: rows.map {
+        TimedEvent(id: $0.id, sectionKey: $0.sectionKey, occurredAt: $0.occurredAt)
+      })
+    }
+    grab(FetchDescriptor<CaffeineEventEntity>(predicate: #Predicate { $0.occurredAt >= date }))
+    grab(FetchDescriptor<CannabisEventEntity>(predicate: #Predicate { $0.occurredAt >= date }))
+    grab(FetchDescriptor<GutEventEntity>(predicate: #Predicate { $0.occurredAt >= date }))
+    grab(FetchDescriptor<MoodEventEntity>(predicate: #Predicate { $0.occurredAt >= date }))
+    grab(FetchDescriptor<ChoreEventEntity>(predicate: #Predicate { $0.occurredAt >= date }))
+    grab(FetchDescriptor<HabitDayStateEntity>(predicate: #Predicate { $0.occurredAt >= date }))
+    grab(FetchDescriptor<SupplementDayStateEntity>(predicate: #Predicate { $0.occurredAt >= date }))
+    grab(FetchDescriptor<ExerciseEntryEntity>(predicate: #Predicate { $0.occurredAt >= date }))
+    // Nutrition stores its instant as `loggedAt` (occurredAt is a computed alias).
+    grab(FetchDescriptor<NutritionEntryEntity>(predicate: #Predicate { $0.loggedAt >= date }))
+    return out.sorted { $0.occurredAt > $1.occurredAt }
+  }
+}
+
+/// A flattened, `Sendable` logged event for cross-module viz — the section it
+/// belongs to and the instant it happened. Carries only what a time-of-day
+/// plot needs, so the storage entities and the `LoggedEvent` protocol stay
+/// inside SeptenaCore.
+public struct TimedEvent: Sendable, Identifiable {
+  public let id: String
+  public let sectionKey: String
+  public let occurredAt: Date
 }
 
