@@ -134,6 +134,16 @@ enum NutritionPlugin: SectionPlugin {
                  sectionKey: "nutrition",
                  window: "today",
                  unitLabel: "g"),
+      GoalMetric(key: "nutrition.fat_sum",
+                 label: "Fat (today)",
+                 sectionKey: "nutrition",
+                 window: "today",
+                 unitLabel: "g"),
+      GoalMetric(key: "nutrition.carbs_sum",
+                 label: "Carbs (today)",
+                 sectionKey: "nutrition",
+                 window: "today",
+                 unitLabel: "g"),
       GoalMetric(key: "nutrition.fiber_sum",
                  label: "Fiber (today)",
                  sectionKey: "nutrition",
@@ -164,6 +174,10 @@ enum NutritionPlugin: SectionPlugin {
     switch metric.key {
     case "nutrition.protein_sum":
       return entries.reduce(0.0) { $0 + $1.proteinG }
+    case "nutrition.fat_sum":
+      return entries.reduce(0.0) { $0 + $1.fatG }
+    case "nutrition.carbs_sum":
+      return entries.reduce(0.0) { $0 + $1.carbsG }
     case "nutrition.fiber_sum":
       return entries.reduce(0.0) { $0 + ($1.fiberG ?? 0) }
     case "nutrition.kcal_sum":
@@ -184,14 +198,11 @@ private struct NutritionDetailContent: View {
   private var heatmapMetricRaw: String = NutritionHeatmapMetric.protein.rawValue
 
   var body: some View {
-    if let m = store.macros {
-      Section("Macro ranges") {
-        sectionDetailRow("Protein", "\(Int(m.protein.min))–\(Int(m.protein.max)) g")
-        sectionDetailRow("Fat",     "\(Int(m.fat.min))–\(Int(m.fat.max)) g")
-        sectionDetailRow("Carbs",   "\(Int(m.carbs.min))–\(Int(m.carbs.max)) g")
-        sectionDetailRow("Calories","\(Int(m.kcal.min))–\(Int(m.kcal.max)) kcal")
-      }
-    }
+    // Macro target *ranges* now live in goals (range goals tagged
+    // "nutrition") — set them in the Nutrition section's goals strip or under
+    // the Food coach, where they show live progress. The old read-only
+    // "Macro ranges" mirror that lived here has moved out; this pane keeps the
+    // tile config (colors / visibility) and fasting, which aren't goals.
     MacroTilesEditor(initialPrefs: MacroCatalog.reconcile(
       store.serverSettings?.nutrition?.macroTiles ?? MacroCatalog.defaultTilePrefs()))
     Section {

@@ -110,8 +110,13 @@ enum CoachContextBuilder {
   }
 
   private static func goalCaption(_ p: GoalMetricProgress) -> String {
-    let cmp = p.comparator == "lte" ? "≤" : (p.comparator == "eq" ? "=" : "≥")
-    var s = "\(num(p.current)) / \(cmp) \(num(p.target)) \(p.unitLabel)"
+    var s: String
+    if p.isRange, let upper = p.targetUpper {
+      s = "\(num(p.current)), aiming \(num(p.target))–\(num(upper)) \(p.unitLabel)"
+    } else {
+      let cmp = p.comparator == "lte" ? "≤" : (p.comparator == "eq" ? "=" : "≥")
+      s = "\(num(p.current)) / \(cmp) \(num(p.target)) \(p.unitLabel)"
+    }
     if p.hit { s += " (met)" }
     return s
   }
