@@ -255,6 +255,39 @@ enum ChecklistMirror {
     return Array(Set(states.map(\.date))).sorted()
   }
 
+  /// Per-habit completion rate over the trailing `days` window (default 30),
+  /// as a 0–100 percentage of days done. One query for the whole stack
+  /// (grouped client-side) so a checklist can show every row's rate without a
+  /// fetch per row. Habits with no done days in the window are simply absent
+  /// (treat as 0). Same denominator as the detail view's "last 30 days".
+  static func habitCompletionRates(context: ModelContext, days: Int = 30) -> [String: Int] {
+    let today = SeptenaDate.today
+    guard let todayDate = SeptenaDate.parse(today) else { return [:] }
+    let start = Calendar.current.date(byAdding: .day, value: -(days - 1), to: todayDate)
+      .flatMap(SeptenaDate.format) ?? today
+    let states = (try? context.fetch(FetchDescriptor<HabitDayStateEntity>(
+      predicate: #Predicate { $0.date >= start && $0.date <= today && $0.done == true }
+    ))) ?? []
+    let perHabit = Dictionary(grouping: states, by: \.habitID)
+      .mapValues { Set($0.map(\.date)).count }
+    return perHabit.mapValues { Int(round(Double($0) * 100 / Double(days))) }
+  }
+
+  /// Per-supplement completion rate over the trailing `days` window — the
+  /// supplement counterpart to `habitCompletionRates`.
+  static func supplementCompletionRates(context: ModelContext, days: Int = 30) -> [String: Int] {
+    let today = SeptenaDate.today
+    guard let todayDate = SeptenaDate.parse(today) else { return [:] }
+    let start = Calendar.current.date(byAdding: .day, value: -(days - 1), to: todayDate)
+      .flatMap(SeptenaDate.format) ?? today
+    let states = (try? context.fetch(FetchDescriptor<SupplementDayStateEntity>(
+      predicate: #Predicate { $0.date >= start && $0.date <= today && $0.done == true }
+    ))) ?? []
+    let perSupp = Dictionary(grouping: states, by: \.supplementID)
+      .mapValues { Set($0.map(\.date)).count }
+    return perSupp.mapValues { Int(round(Double($0) * 100 / Double(days))) }
+  }
+
   static func loadSupplementsHistory(context: ModelContext, days: Int) -> SupplementHistoryResponse {
     let today = SeptenaDate.today
     guard let todayDate = SeptenaDate.parse(today) else {

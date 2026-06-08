@@ -19,6 +19,9 @@ struct SupplementsDestinationView: View {
   @State private var viewingDate: String = SeptenaDate.today
   /// Past-day state for `viewingDate`. Loaded when not viewing today.
   @State private var pastDay: SupplementsDayResponse? = nil
+  /// Per-supplement 30-day completion rate (id → percent), shown in each row's
+  /// trailing slot instead of the time-of-day. One query on load + after writes.
+  @State private var rates: [String: Int] = [:]
 
   /// Per-bucket fold state for *today*. `nil` means "follow the clock" — the
   /// current time bucket is open with its countdown, the other time buckets
@@ -44,8 +47,10 @@ struct SupplementsDestinationView: View {
     .task {
       model.paintFromCache()
       await model.load()
+      loadRates()
     }
     .sectionReload(on: viewingDate, onDataChange: true) { await reloadPastDay() }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in loadRates() }
     // Tapping a supplement opens its detail "infobox" (streak + history +
     // consistency); the row's checkbox still marks it taken. "Edit" swaps to
     // the editor for the same supplement.
@@ -152,7 +157,7 @@ struct SupplementsDestinationView: View {
   private func todayRow(_ supp: SupplementDayItem) -> some View {
     Button { viewing = supp } label: {
       SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator, tint: accent,
-                    onDelete: { delete(supp) })
+                    onDelete: { delete(supp) }, completionRate: rates[supp.id] ?? 0)
     }
     .buttonStyle(.plain)
     .transition(.opacity)
@@ -238,6 +243,10 @@ struct SupplementsDestinationView: View {
         if next { Haptics.success() } else { Haptics.tap() }
       }
     )
+  }
+
+  private func loadRates() {
+    rates = ChecklistMirror.supplementCompletionRates(context: modelContext)
   }
 
   private func reloadPastDay() async {

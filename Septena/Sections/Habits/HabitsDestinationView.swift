@@ -28,6 +28,10 @@ struct HabitsDestinationView: View {
   /// `viewingDate != today` so we don't drag NextItemsModel off the
   /// "today" track.
   @State private var pastDay: HabitsDayResponse? = nil
+  /// Per-habit 30-day completion rate (id → percent), shown in each row's
+  /// trailing slot instead of the time-of-day. Computed in one query on load
+  /// and after any write.
+  @State private var rates: [String: Int] = [:]
 
   /// Per-bucket fold state for *today*. `nil` means "follow the clock" — the
   /// current bucket is open with its countdown, the others tuck behind their
@@ -63,8 +67,10 @@ struct HabitsDestinationView: View {
     .task {
       model.paintFromCache()
       await model.load()
+      loadRates()
     }
     .sectionReload(on: viewingDate, onDataChange: true) { await reloadPastDay() }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in loadRates() }
     // Tapping a habit opens its detail "infobox" (streak + history +
     // consistency); the row's checkbox still checks it off. "Edit" in the
     // detail swaps to the editor for the same habit.
@@ -158,6 +164,10 @@ struct HabitsDestinationView: View {
     )
   }
 
+  private func loadRates() {
+    rates = ChecklistMirror.habitCompletionRates(context: modelContext)
+  }
+
   private func reloadPastDay() async {
     guard !isViewingToday else { pastDay = nil; return }
     let date = viewingDate
@@ -212,7 +222,7 @@ struct HabitsDestinationView: View {
           ForEach(all) { habit in
             Button { viewing = habit } label: {
               HabitRow(habit: habit, model: model, checklistMutator: checklistMutator, tint: accent,
-                       onDelete: { delete(habit) })
+                       onDelete: { delete(habit) }, completionRate: rates[habit.id] ?? 0)
             }
             .buttonStyle(.plain)
             .transition(.opacity)

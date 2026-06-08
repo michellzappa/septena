@@ -1001,6 +1001,11 @@ struct HabitRow: View {
   let checklistMutator: ChecklistMutator
   let tint: Color
   var onDelete: (() -> Void)? = nil
+  /// When set (the Habits checklist passes it), the row's trailing slot shows
+  /// this 30-day completion rate (NN%) instead of the time-of-day — a
+  /// glanceable consistency read on every habit. nil elsewhere (Next feed),
+  /// where the time-of-day stays.
+  var completionRate: Int? = nil
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
   @Environment(\.a11yMotion) private var motion
@@ -1019,6 +1024,8 @@ struct HabitRow: View {
       trailing: {
         if habit.skipped {
           StatusBadge(text: "Skipped")
+        } else if let rate = completionRate {
+          CompletionRateBadge(percent: rate)
         } else if let t = habit.time {
           Text(t).font(.septenaMeta).foregroundStyle(Theme.inkSecondary)
         }
@@ -1079,6 +1086,10 @@ struct SupplementRow: View {
   let checklistMutator: ChecklistMutator
   let tint: Color
   var onDelete: (() -> Void)? = nil
+  /// 30-day completion rate shown in the trailing slot (instead of the
+  /// time-of-day) when the Supplements checklist passes it. nil in the Next
+  /// feed, where the time stays.
+  var completionRate: Int? = nil
   @Environment(\.a11yMotion) private var motion
   @Environment(SectionTheme.self) private var theme
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
@@ -1106,7 +1117,9 @@ struct SupplementRow: View {
       leadingEmoji: supplement.emoji ?? "•",
       title: supplement.name,
       trailing: {
-        if let t = supplement.time {
+        if let rate = completionRate {
+          CompletionRateBadge(percent: rate)
+        } else if let t = supplement.time {
           Text(t).font(.septenaMeta).foregroundStyle(Theme.inkSecondary)
         }
       },
@@ -1262,6 +1275,19 @@ struct StatusBadge: View {
       .padding(.horizontal, 8)
       .padding(.vertical, 3)
       .background(Theme.mutedSurface, in: Capsule())
+  }
+}
+
+/// Trailing "NN%" consistency read for a habit/supplement checklist row —
+/// the 30-day completion rate, shown where the time-of-day otherwise sits.
+/// Sits quietly in the row's meta slot; uses a monospaced-digit figure so the
+/// percentages line up down the list.
+struct CompletionRateBadge: View {
+  let percent: Int
+  var body: some View {
+    Text("\(percent)%")
+      .font(.septenaMeta.monospacedDigit())
+      .foregroundStyle(Theme.inkSecondary)
   }
 }
 
