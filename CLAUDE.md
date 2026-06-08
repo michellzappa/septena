@@ -97,11 +97,11 @@ watch). The classic bug: a section with a manifest row + destination but **no
    three-tier iconography rule, row anatomy, spacing, motion). When it conflicts
    with code, the code is wrong.
 3. `docs/CloudKitSchema.md` — field-by-field record-type table.
-4. `IDENTIFIERS.md` — stable id/title model and wire contracts across app,
+4. `docs/IDENTIFIERS.md` — stable id/title model and wire contracts across app,
    CloudKit, and the MCP gateway.
 5. `README.md` — full architecture narrative.
-6. `*_HANDOFF.md`, `*_PLAN.md`, `docs/BET1_*` — historical migration/feature
-   notes. **Often stale; verify against code before acting.**
+6. `docs/*_HANDOFF.md`, `docs/*_PLAN.md`, `docs/BET1_*` — historical
+   migration/feature notes. **Often stale; verify against code before acting.**
 
 ## Layout map
 
@@ -117,6 +117,10 @@ watch). The classic bug: a section with a manifest row + destination but **no
 
 ## Conventions
 
+- **All documentation lives in `docs/`.** Any new `.md` — plan, handoff, spec,
+  design note, feature write-up — goes in `docs/`, never the repo root. Root is
+  reserved for the canonical set only: `README.md`, `CLAUDE.md`, `SECURITY.md`,
+  `LICENSE`, `NOTICE`, `project.yml`. Reference docs by their `docs/…` path.
 - Match surrounding code: comment density, naming, idiom.
 - Don't add FastAPI/server client code — the repo is CloudKit-first; remaining
   FastAPI references are migration history slated for cleanup.

@@ -4,7 +4,7 @@ import SwiftData
 // MARK: - Shared id helpers
 //
 // ⚠️  IDENTIFIER MODEL — applies to ALL label-style entities project-wide.
-//     Read [IDENTIFIERS.md](IDENTIFIERS.md) before adding a new entity type.
+//     Read [IDENTIFIERS.md](docs/IDENTIFIERS.md) before adding a new entity type.
 //     Do not invent a per-type id scheme.
 //
 //   • `id`   — frozen at creation, base32 shortid. Internal stable key,

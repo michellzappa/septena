@@ -4,7 +4,7 @@ Septena is a private life operating system for Apple platforms. It brings tasks,
 
 The product principle is simple: every life domain is a section, every section can be enabled or hidden without deleting data, and every write should land in the local SwiftData mirror first, then sync through CloudKit.
 
-> Status (2026-05-30): Septena is CloudKit-first. The general FastAPI client path has been removed from this repo; remaining FastAPI references are migration history, export DTO compatibility, or comments that still need cleanup. `TRAINING_MIGRATION_HANDOFF.md` and `NUTRITION_MIGRATION_HANDOFF.md` are historical migration notes — verify them against code before treating them as live truth.
+> Status (2026-05-30): Septena is CloudKit-first. The general FastAPI client path has been removed from this repo; remaining FastAPI references are migration history, export DTO compatibility, or comments that still need cleanup. `docs/TRAINING_MIGRATION_HANDOFF.md` and `docs/NUTRITION_MIGRATION_HANDOFF.md` are historical migration notes — verify them against code before treating them as live truth.
 
 ## Stack
 
@@ -213,8 +213,8 @@ From `project.yml` and entitlements:
 
 - `docs/DesignSpec.md` - the canonical design system (typography, color, iconography, row anatomy, spacing, motion); code should conform.
 - `docs/BACKLOG.md` - tracked, non-urgent work.
-- `IDENTIFIERS.md` - the stable id/title model and wire contracts across the app, CloudKit, and the MCP gateway.
-- `TRAINING_MIGRATION_HANDOFF.md` / `NUTRITION_MIGRATION_HANDOFF.md` - historical section-migration notes; verify against code before acting.
+- `docs/IDENTIFIERS.md` - the stable id/title model and wire contracts across the app, CloudKit, and the MCP gateway.
+- `docs/TRAINING_MIGRATION_HANDOFF.md` / `docs/NUTRITION_MIGRATION_HANDOFF.md` - historical section-migration notes; verify against code before acting.
 
 ## License
 
