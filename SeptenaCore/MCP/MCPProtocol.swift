@@ -109,6 +109,38 @@ struct MCPArgs {
   }
 }
 
+// MARK: - JSON sanitization
+
+/// Coerces an arbitrary `Any` value tree into a guaranteed-valid JSON object.
+/// The load-bearing case is non-finite `Double`s (NaN / ±Infinity), which
+/// `JSONSerialization` rejects by raising an uncatchable Obj-C exception. Any
+/// numeric field sourced from logged data (grams, macros, weight, distance…)
+/// could be NaN, so every payload passes through here before serialization.
+enum JSONSafe {
+  static func coerce(_ value: Any) -> Any {
+    switch value {
+    case let dict as [String: Any]:
+      return dict.mapValues(coerce)
+    case let array as [Any]:
+      return array.map(coerce)
+    case let b as Bool:        // before Int/NSNumber so true/false stay boolean
+      return b
+    case let i as Int:
+      return i
+    case let d as Double:
+      return d.isFinite ? d : NSNull()
+    case let f as Float:
+      return Double(f).isFinite ? Double(f) : NSNull()
+    case let n as NSNumber:
+      return n.doubleValue.isFinite ? n : NSNull()
+    case is String, is NSNull:
+      return value
+    default:
+      return String(describing: value)
+    }
+  }
+}
+
 // MARK: - JSON-RPC response builders
 
 enum JSONRPC {
@@ -128,9 +160,16 @@ enum JSONRPC {
   /// to a JSON string inside a single text content block — the shape Claude
   /// expects and the gateway also emits.
   static func toolResult(_ payload: Any, isError: Bool = false) -> [String: Any] {
+    // CRITICAL: sanitize before serializing. JSONSerialization.data raises an
+    // uncatchable Obj-C NSInvalidArgumentException on an invalid object (most
+    // commonly a non-finite Double — NaN/±Inf — from logged numeric data),
+    // which `try?` does NOT catch and which wedges the calling (main) actor
+    // forever. `coerce` guarantees a valid tree; `isValidJSONObject` is the
+    // belt-and-suspenders guard so we never call the throwing API blind.
+    let safe = JSONSafe.coerce(payload)
     let text: String
-    if let data = try? JSONSerialization.data(withJSONObject: payload,
-                                               options: [.sortedKeys]),
+    if JSONSerialization.isValidJSONObject(safe),
+       let data = try? JSONSerialization.data(withJSONObject: safe, options: [.sortedKeys]),
        let s = String(data: data, encoding: .utf8) {
       text = s
     } else {

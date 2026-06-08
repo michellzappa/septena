@@ -206,6 +206,7 @@ enum MCPDispatch {
 
   private static var today: String { SeptenaDate.today }
   private static var nowHHMM: String { SeptenaDate.nowHHMM }
+  private static var nowHHMMSS: String { SeptenaDate.nowHHMMSS }
 
   private static func ymd(daysBack: Int) -> String {
     let d = Calendar.current.date(byAdding: .day, value: -daysBack, to: Date()) ?? Date()
@@ -514,15 +515,17 @@ enum MCPDispatch {
       .filter { $0.date >= from && $0.date <= to }
       .sorted { $0.occurredAt > $1.occurredAt }
       .prefix(limit) ?? []
-    return ["events": rows.map {
-      ["id": $0.id, "date": $0.date, "method": $0.method,
-       "beans": $0.beans ?? "", "grams": $0.grams ?? 0, "note": $0.note ?? ""]
+    // Explicit element type so `e.id` resolves to the stored `var id: String`
+    // rather than @Model's synthesized `persistentModelID` (PersistentIdentifier).
+    return ["events": rows.map { (e: CaffeineEventEntity) -> [String: Any] in
+      ["id": e.id, "date": e.date, "method": e.method,
+       "beans": e.beans ?? "", "grams": e.grams ?? 0, "note": e.note ?? ""]
     }]
   }
 
   private static func caffeineLog(_ args: MCPArgs) throws -> Any {
     let e = SeptenaServices.shared.caffeineMutator.addEntry(
-      date: args.string("date") ?? today, time: args.string("time") ?? nowHHMM,
+      date: args.string("date") ?? today, time: args.string("time") ?? nowHHMMSS,
       method: try args.requireString("method"), beans: args.string("beans"),
       grams: args.double("grams"), note: args.string("note") ?? "")
     return ["id": e.id, "date": e.date, "method": e.method]
@@ -537,15 +540,17 @@ enum MCPDispatch {
       .filter { $0.date >= from && $0.date <= to }
       .sorted { $0.occurredAt > $1.occurredAt }
       .prefix(limit) ?? []
-    return ["events": rows.map {
-      ["id": $0.id, "date": $0.date, "method": $0.method, "strain": $0.strain ?? "",
-       "hit": $0.hit ?? 0, "grams": $0.grams ?? 0, "note": $0.note ?? ""]
+    // Explicit element type so `e.id` is the stored String, not @Model's
+    // synthesized persistentModelID. See caffeineList.
+    return ["events": rows.map { (e: CannabisEventEntity) -> [String: Any] in
+      ["id": e.id, "date": e.date, "method": e.method, "strain": e.strain ?? "",
+       "hit": e.hit ?? 0, "grams": e.grams ?? 0, "note": e.note ?? ""]
     }]
   }
 
   private static func cannabisLog(_ args: MCPArgs) throws -> Any {
     let e = SeptenaServices.shared.cannabisMutator.addEntry(
-      date: args.string("date") ?? today, time: args.string("time") ?? nowHHMM,
+      date: args.string("date") ?? today, time: args.string("time") ?? nowHHMMSS,
       method: try args.requireString("method"), hit: args.int("hit"),
       grams: args.double("grams"), note: args.string("note") ?? "")
     return ["id": e.id, "date": e.date, "method": e.method]
@@ -560,16 +565,17 @@ enum MCPDispatch {
       .filter { $0.date >= from && $0.date <= to }
       .sorted { $0.occurredAt > $1.occurredAt }
       .prefix(limit) ?? []
-    return ["events": rows.map {
-      ["id": $0.id, "date": $0.date, "bristol": $0.bristol, "blood": $0.blood != 0,
-       "volume": $0.volume ?? "", "discomfortLevel": $0.discomfortLevel ?? "", "note": $0.note ?? ""]
+    // Explicit element type so `e.id` is the stored String (see caffeineList).
+    return ["events": rows.map { (e: GutEventEntity) -> [String: Any] in
+      ["id": e.id, "date": e.date, "bristol": e.bristol, "blood": e.blood != 0,
+       "volume": e.volume ?? "", "discomfortLevel": e.discomfortLevel ?? "", "note": e.note ?? ""]
     }]
   }
 
   private static func gutLog(_ args: MCPArgs) throws -> Any {
     guard let bristol = args.int("bristol") else { throw MCPError.badArgument("missing 'bristol'") }
     let e = SeptenaServices.shared.gutMutator.addEntry(
-      date: args.string("date") ?? today, time: args.string("time") ?? nowHHMM,
+      date: args.string("date") ?? today, time: args.string("time") ?? nowHHMMSS,
       bristol: bristol, blood: (args.bool("blood") ?? false) ? 1 : 0,
       volume: args.string("volume"), discomfortLevel: args.string("discomfortLevel") ?? "",
       discomfortStart: args.string("discomfortStart"), discomfortEnd: args.string("discomfortEnd"),
@@ -707,9 +713,9 @@ enum MCPDispatch {
       .filter { includeArchived || !$0.archived }
       .sorted { $0.sortIndex < $1.sortIndex }
       .prefix(limit) ?? []
-    return ["exercises": rows.map {
-      ["id": $0.id, "name": $0.name, "type": $0.type, "subgroup": $0.subgroup ?? "",
-       "archived": $0.archived]
+    return ["exercises": rows.map { (e: ExerciseDefinitionEntity) -> [String: Any] in
+      ["id": e.id, "name": e.name, "type": e.type, "subgroup": e.subgroup ?? "",
+       "archived": e.archived]
     }]
   }
 
@@ -728,7 +734,7 @@ enum MCPDispatch {
     let entries = nutritionEntities(today, today)
     let total = entries.compactMap(\.waterMl).reduce(0, +)
     let waterOnly = entries.filter { $0.foods == "Water" }
-      .map { ["id": $0.id, "ml": $0.waterMl ?? 0] }
+      .map { (e: NutritionEntryEntity) -> [String: Any] in ["id": e.id, "ml": e.waterMl ?? 0] }
     return ["date": today, "totalMl": total, "entries": waterOnly]
   }
 
@@ -755,9 +761,9 @@ enum MCPDispatch {
       .filter { category == nil || $0.category == category }
       .sorted { $0.sortIndex < $1.sortIndex }
       .prefix(limit) ?? []
-    return ["items": rows.map {
-      ["id": $0.id, "name": $0.name, "category": $0.category, "emoji": $0.emoji,
-       "low": $0.low, "lastBought": $0.lastBought ?? ""]
+    return ["items": rows.map { (e: GroceryItemEntity) -> [String: Any] in
+      ["id": e.id, "name": e.name, "category": e.category, "emoji": e.emoji,
+       "low": e.low, "lastBought": e.lastBought ?? ""]
     }]
   }
 

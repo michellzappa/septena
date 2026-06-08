@@ -39,6 +39,14 @@ final class LocalMCPServer {
   private var listener: NWListener?
   var isRunning: Bool { listener != nil }
 
+  /// Dedicated network queue. The listener and every connection run here —
+  /// NOT on `.main` — so HTTP receive/parse/send never contend with the app's
+  /// SwiftUI rendering on the main thread. (Running on main caused callbacks to
+  /// stall under load: connections piled up in CLOSE_WAIT and the server
+  /// wedged after a handful of requests.) Only the actual data access hops to
+  /// the main actor, inside `MCPDispatch.handle`.
+  private let netQueue = DispatchQueue(label: "cloud.septena.localmcp", qos: .userInitiated, attributes: .concurrent)
+
   private init() {}
 
   // MARK: - Lifecycle
@@ -69,13 +77,13 @@ final class LocalMCPServer {
       if case let .hostPort(host, _) = conn.endpoint,
          let bytes = NWHostBytes(host),
          MCPAddressGuard.allows(host: bytes, scope: scope) {
-        conn.start(queue: .main)
+        conn.start(queue: self?.netQueue ?? .global())
         self?.receive(on: conn, buffer: Data())
       } else {
         conn.cancel()
       }
     }
-    l.start(queue: .main)
+    l.start(queue: netQueue)
     listener = l
     SeptenaLog.info("[LocalMCP] listening on :\(port) scope=\(MCPAccessScope.current.rawValue)")
   }
@@ -101,7 +109,9 @@ final class LocalMCPServer {
 
       if let (headers, body, complete) = Self.parse(buf) {
         if complete {
-          Task { @MainActor in await self.handle(headers: headers, body: body, conn: conn) }
+          // Run off-main; only the data access inside MCPDispatch.handle hops
+          // to the main actor. Keeps the netQueue free to accept/close sockets.
+          Task { await self.handle(headers: headers, body: body, conn: conn) }
           return
         }
       }
@@ -165,7 +175,17 @@ final class LocalMCPServer {
 
   nonisolated private func respond(_ conn: NWConnection, status: String, json: [String: Any]?) {
     var bodyData = Data()
-    if let json { bodyData = (try? JSONSerialization.data(withJSONObject: json)) ?? Data() }
+    if let json {
+      // Guard against the uncatchable Obj-C exception JSONSerialization raises
+      // on an invalid object (e.g. a stray NaN). Validate first; on the off
+      // chance it's still invalid, emit a JSON error rather than wedging.
+      if JSONSerialization.isValidJSONObject(json),
+         let d = try? JSONSerialization.data(withJSONObject: json) {
+        bodyData = d
+      } else {
+        bodyData = Data(#"{"error":"response serialization failed"}"#.utf8)
+      }
+    }
     var head = "HTTP/1.1 \(status)\r\n"
     head += "Content-Type: application/json\r\n"
     head += "Content-Length: \(bodyData.count)\r\n"
