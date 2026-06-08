@@ -187,7 +187,14 @@ struct TimeOfDayWheel: View {
       for e in shownEvents.sorted(by: { $0.daysAgo > $1.daysAgo }) {
         let count = Double(density[Int(e.fraction * Double(slots)) % slots] ?? 1)
         let norm = maxCount > 1 ? (count - 1) / (maxCount - 1) : 0
-        let dotR: CGFloat = effectiveWindow == 1 ? 5 : (2.2 + norm * 6.3)
+        // Today mode mirrors the horizontal day-timeline's bubble sizing
+        // exactly — `min(8, 5 + (count-1))` diameter (5pt single, +1pt per
+        // extra event in the slot, capped at 8) — so the two of-today views
+        // read the same. Week mode keeps its relative-to-busiest-slot scaling
+        // for the denser overlay (there's no timeline equivalent of a week).
+        let dotR: CGFloat = effectiveWindow == 1
+          ? min(8, 4 + count) / 2
+          : (2.2 + norm * 6.3)
         let p = point(e.fraction, dotRing)
         let rect = CGRect(x: p.x - dotR, y: p.y - dotR, width: dotR * 2, height: dotR * 2)
         ctx.fill(Path(ellipseIn: rect), with: .color((e.color ?? accent).opacity(fade(e.daysAgo))))
