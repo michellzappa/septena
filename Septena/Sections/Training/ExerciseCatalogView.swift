@@ -53,7 +53,7 @@ struct ExerciseCatalogView: View {
       muscleFilterStrip
       ForEach(filtered) { entity in
         NavigationLink {
-          ExerciseDetailView(entity: entity)
+          ExerciseStatsView(entity: entity)
         } label: {
           exerciseRow(entity)
         }
