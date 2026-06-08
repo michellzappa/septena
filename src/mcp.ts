@@ -6,7 +6,7 @@ import type { Env } from "./env.js";
 // must always match package.json so a deployed Worker maps to a tagged release.
 const SERVER_VERSION = pkg.version;
 import { CloudKitClient, CloudKitError } from "./cloudkit.js";
-import { getCkTokenForAccessToken, touchAccessToken } from "./storage.js";
+import { getCkTokenForAccessToken, touchAccessToken, putUserSections, getUserSections } from "./storage.js";
 import { logEvent } from "./util.js";
 
 // Throttle lastUsedAt writes: at most one KV write per token per interval.
@@ -479,16 +479,41 @@ export async function mcpHandler(c: Context<{ Bindings: Env }>) {
             : order.length > 0
               ? order.filter(k => enabledKeys.has(k))
               : Array.from(enabledKeys);
+          // Cache the freshly-computed manifest so a later auth-expired
+          // tools/list can serve it instead of hard-401'ing (see catch).
+          if (userRecordName) {
+            c.executionCtx.waitUntil(putUserSections(c.env, userRecordName, filtered));
+          }
         } catch (err) {
-          // Auth expiry must still surface as 401 so the client re-auths.
-          if (err instanceof CloudKitError && err.isAuthExpired) throw err;
-          // Any other CloudKit hiccup: degrade to globals only. Still a
-          // non-empty manifest (so the connector doesn't look dead), but we
-          // never leak section tools when we can't confirm what's enabled.
-          logEvent("tools_list_degraded", {
-            error: err instanceof Error ? err.message : String(err),
-          });
-          filtered = [];
+          if (err instanceof CloudKitError && err.isAuthExpired) {
+            // Auth expiry during tools/list. Re-throwing → hard 401 → claude.ai
+            // flips the connector to a *sticky* disconnected state that only a
+            // manual reconnect clears (the daily-disconnect symptom). When the
+            // bearer is identity-bound the lapse is transient — the app re-mints
+            // the user's token on foreground — so keep the connector alive by
+            // serving the last-known section manifest from cache (globals-only
+            // if we have none). The next tools/list after the push refreshes it.
+            if (userRecordName) {
+              const cached = await getUserSections(c.env, userRecordName);
+              logEvent("tools_list_auth_expired_degraded", {
+                cached: cached !== null,
+                count: cached?.length ?? 0,
+              });
+              filtered = cached ?? [];
+            } else {
+              // Legacy bootstrap-only bearer: no identity to self-heal through,
+              // so the spec-correct discovery 401 (re-run OAuth) is the only fix.
+              throw err;
+            }
+          } else {
+            // Any other CloudKit hiccup: degrade to globals only. Still a
+            // non-empty manifest (so the connector doesn't look dead), but we
+            // never leak section tools when we can't confirm what's enabled.
+            logEvent("tools_list_degraded", {
+              error: err instanceof Error ? err.message : String(err),
+            });
+            filtered = [];
+          }
         }
         const tools = buildToolList(filtered);
         // Tool count + names per request: a partial manifest (e.g. task

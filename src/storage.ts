@@ -97,6 +97,45 @@ export async function getUserCkToken(
   return { ckWebAuthToken, refreshedAt: rec.refreshedAt };
 }
 
+// ---- Per-user section manifest cache ----
+// The last-known list of enabled+ordered section keys, recomputed and stored
+// on every successful tools/list. When a later tools/list hits an expired
+// ckWebAuthToken, we serve this cache instead of re-throwing — a re-throw
+// becomes a hard 401 that flips claude.ai to a *sticky* disconnected state
+// (the daily-reconnect symptom). Serving the cache keeps the connector alive
+// through the ~8h token lapse; the next call after the app re-mints refreshes
+// it. Not a credential and not user life-data — just which sections are on —
+// so it's stored plaintext with a self-cleaning TTL for abandoned users.
+
+const SECTIONS_PREFIX = "sections:";
+const SECTIONS_TTL_SECONDS = 30 * 24 * 60 * 60; // 30d; refreshed on every success
+
+export async function putUserSections(
+  env: Env,
+  userRecordName: string,
+  sectionKeys: string[],
+): Promise<void> {
+  await env.TOKENS.put(
+    `${SECTIONS_PREFIX}${userRecordName}`,
+    JSON.stringify(sectionKeys),
+    { expirationTtl: SECTIONS_TTL_SECONDS },
+  );
+}
+
+export async function getUserSections(
+  env: Env,
+  userRecordName: string,
+): Promise<string[] | null> {
+  const raw = await env.TOKENS.get(`${SECTIONS_PREFIX}${userRecordName}`);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed.filter(k => typeof k === "string") as string[]) : null;
+  } catch {
+    return null;
+  }
+}
+
 // ---- Access tokens ----
 // A bearer binds to a CloudKit user (`userRecordName`) and resolves to
 // that user's latest app-pushed token. `ckWebAuthTokenEnc` is kept as a
