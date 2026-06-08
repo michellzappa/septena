@@ -968,8 +968,8 @@ struct TaskListView: View {
 
   // MARK: - Unscheduled grouping (by project / area)
 
-  /// Renders `items` clustered by their project (preferred) or area, with
-  /// inline headers that push the corresponding sidebar destination.
+  /// Renders `items` clustered by their project (preferred) or area, using
+  /// real SwiftUI sections so group titles are headers, not selectable rows.
   @ViewBuilder
   private var groupedOpenItems: some View {
     let base = (filter == .today) ? items + review : items
@@ -990,19 +990,23 @@ struct TaskListView: View {
     ForEach(areas) { area in
       let areaTasks = byArea[area.id] ?? []
       if !areaTasks.isEmpty {
-        groupHeader(icon: "square.stack.3d.up.fill",
-                    title: area.title,
-                    onTap: { nav.path = [.area(area)] })
-          .asListRow()
-        ForEach(areaTasks) { task in row(task).asTaskRow(id: task.id) }
+        Section {
+          ForEach(areaTasks) { task in row(task).asTaskRow(id: task.id) }
+        } header: {
+          groupHeader(icon: "square.stack.3d.up.fill",
+                      title: area.title,
+                      onTap: { nav.path = [.area(area)] })
+        }
       }
       ForEach(projects.filter { $0.area == area.id }) { project in
         if let tasks = byProject[project.id], !tasks.isEmpty {
-          groupHeader(icon: nil,
-                      title: project.title,
-                      onTap: { nav.path = [.project(project)] })
-            .asListRow()
-          ForEach(tasks) { task in row(task).asTaskRow(id: task.id) }
+          Section {
+            ForEach(tasks) { task in row(task).asTaskRow(id: task.id) }
+          } header: {
+            groupHeader(icon: nil,
+                        title: project.title,
+                        onTap: { nav.path = [.project(project)] })
+          }
         }
       }
     }
@@ -1010,11 +1014,13 @@ struct TaskListView: View {
     // Top-level projects (no area).
     ForEach(projects.filter { $0.area == nil }) { project in
       if let tasks = byProject[project.id], !tasks.isEmpty {
-        groupHeader(icon: nil,
-                    title: project.title,
-                    onTap: { nav.path = [.project(project)] })
-          .asListRow()
-        ForEach(tasks) { task in row(task).asTaskRow(id: task.id) }
+        Section {
+          ForEach(tasks) { task in row(task).asTaskRow(id: task.id) }
+        } header: {
+          groupHeader(icon: nil,
+                      title: project.title,
+                      onTap: { nav.path = [.project(project)] })
+        }
       }
     }
   }
@@ -1057,12 +1063,23 @@ struct TaskListView: View {
                            title: String,
                            onTap: (() -> Void)? = nil) -> some View {
     groupHeaderBody(icon: icon, title: title, onTap: onTap)
+      .textCase(nil)
+      .selectionDisabled()
   }
 
   private func groupHeaderBody(icon: String?, title: String, onTap: (() -> Void)? = nil) -> some View {
     // Same icon column width and same icon→text gap as task rows so
     // every icon sits at one X and every text starts at one X.
-    VStack(alignment: .leading, spacing: 0) {
+    #if os(macOS)
+    let headerTopPadding: CGFloat = 32
+    let headerHorizontalCorrection: CGFloat = 0
+    let titleLeadingCorrection: CGFloat = -6
+    #else
+    let headerTopPadding: CGFloat = 18
+    let headerHorizontalCorrection: CGFloat = -16
+    let titleLeadingCorrection: CGFloat = 0
+    #endif
+    return VStack(alignment: .leading, spacing: 0) {
       HStack(spacing: Theme.iconTextGap) {
         if icon == "square.stack.3d.up.fill" {
           // Area dot is intentionally bumped past task-row icon size — it's a
@@ -1084,7 +1101,7 @@ struct TaskListView: View {
         // clicks in empty horizontal space don't navigate.
         if let onTap {
           GroupHeaderLabel(title: title, hasChevron: true, action: onTap)
-            .padding(.leading, -6)
+            .padding(.leading, titleLeadingCorrection)
         } else {
           Text(title)
             .scaledFont(size: Theme.groupHeaderFontSize, weight: .semibold)
@@ -1093,11 +1110,12 @@ struct TaskListView: View {
         Spacer()
       }
       .padding(.horizontal, Theme.hPadding)
+      .padding(.horizontal, headerHorizontalCorrection)
       // ~2 lines of whitespace above each project/area cluster header so
       // groups visually break apart in mixed list views (Unscheduled, Today,
       // Upcoming). Without this gap, a header reads as the next row of the
       // previous group instead of the start of a new one.
-      .padding(.top, 32)
+      .padding(.top, headerTopPadding)
       .padding(.bottom, 6)
 
       // Hairline beneath project/area cluster headers — separates the title
@@ -1118,8 +1136,11 @@ struct TaskListView: View {
   private var groupedUpcomingItems: some View {
     let buckets = upcomingBuckets()
     ForEach(buckets, id: \.key) { bucket in
-      groupHeader(icon: "calendar", title: bucket.label).asListRow()
-      ForEach(bucket.tasks) { task in row(task).asTaskRow(id: task.id) }
+      Section {
+        ForEach(bucket.tasks) { task in row(task).asTaskRow(id: task.id) }
+      } header: {
+        groupHeader(icon: "calendar", title: bucket.label)
+      }
     }
   }
 

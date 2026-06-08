@@ -211,7 +211,7 @@ enum Theme {
   static let cardActionIconSize: CGFloat = 18
   // Matches `title2` (= septenaSectionTitle, the Next feed's section titles)
   // so Today/Tasks group headers read at the same size as Next.
-  static let groupHeaderFontSize: CGFloat = 22
+  static let groupHeaderFontSize: CGFloat = 20
   #endif
 
   /// Vertical padding inside a task / log row. Single source of truth so
@@ -317,7 +317,7 @@ extension Font {
 
   // MARK: UI body (SF Pro)
   static let septenaSidebarRow   = Font.system(.body)
-  static let septenaTaskTitle    = Font.system(.body)
+  static let septenaTaskTitle    = Font.system(size: 16)
   static let septenaNotes        = Font.system(.subheadline)
   static let septenaButton       = Font.system(.subheadline, weight: .semibold)
   static let septenaLabel        = Font.system(.footnote, weight: .medium)
