@@ -35,10 +35,21 @@ struct CoachCitation: Identifiable, Hashable {
 }
 
 /// A change the coach proposes. NEVER executed by the model — it surfaces
-/// as a confirmable chip that the user accepts, and the accept routes
-/// through the section's existing mutator (the write-boundary invariant).
+/// as a confirmable card that the user accepts, and the accept routes through
+/// `GoalMutator` (the write-boundary invariant). "Read always, write only with
+/// the user's permission, through the UX."
 struct CoachProposedAction: Identifiable, Hashable {
   let id = UUID()
-  let section: String     // section key the action belongs to
-  let title: String       // e.g. "Add a rest day Thursday"
+  var section: String     // section key the action belongs to
+  var title: String       // human summary, e.g. "Commit: Protein 140–170 g/day"
+
+  // Structured goal payload. On accept: if a goal already exists for
+  // `metricKey`, its target is moved (edit); otherwise a new goal is created.
+  var goalText: String = ""
+  var sections: [String] = []
+  var metricKey: String? = nil
+  var metricWindow: String? = nil
+  var metricComparator: String? = nil   // "gte" | "lte" | "eq" | "range"
+  var metricTarget: Double? = nil
+  var metricUpper: Double? = nil
 }

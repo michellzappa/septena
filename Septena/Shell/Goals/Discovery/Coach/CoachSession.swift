@@ -127,4 +127,45 @@ final class CoachSession {
   func proposeGoal() async -> String? {
     await backend.proposeGoal()
   }
+
+  /// Ask the model for a structured commitment, validate its metric against
+  /// the catalog (never trust a hallucinated key), and append it as a
+  /// confirm-gated card. Returns the action, or nil if nothing usable came
+  /// back. The model proposes; the UI's Confirm is what writes.
+  @discardableResult
+  func proposeCommitment() async -> CoachProposedAction? {
+    let scopeKeys = Set(domain.sectionKeys ?? [])
+    let metrics = GoalMetricCatalog.metrics(for: scopeKeys)
+    guard let out = await backend.proposeCommitment(metricKeys: metrics.map(\.key)) else { return nil }
+    let text = out.goal.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !text.isEmpty else { return nil }
+
+    var action = CoachProposedAction(section: domain.sectionKeys?.first ?? "goals",
+                                     title: text, goalText: text)
+
+    // Trust a metric only if it's a real catalog key, the comparator is known,
+    // and a range carries a sane upper. Otherwise it's a plain-text commitment.
+    let validComparators: Set<String> = ["gte", "lte", "eq", "range"]
+    if out.measurable,
+       let metric = GoalMetricCatalog.metric(for: out.metricKey),
+       validComparators.contains(out.comparator),
+       (out.comparator != "range" || out.upper > out.lower) {
+      action.metricKey = metric.key
+      action.metricWindow = metric.window
+      action.metricComparator = out.comparator
+      action.metricTarget = out.lower
+      action.metricUpper = out.comparator == "range" ? out.upper : nil
+      action.sections = [metric.sectionKey]
+      action.section = metric.sectionKey
+    } else {
+      action.sections = domain.sectionKeys?.first.map { [$0] } ?? []
+    }
+
+    // Display-only (not persisted) — an ephemeral affordance; once accepted it
+    // becomes a real, persisted goal.
+    messages.append(Message(role: .coach,
+                            text: "Here's a commitment from our chat — add it?",
+                            actions: [action]))
+    return action
+  }
 }

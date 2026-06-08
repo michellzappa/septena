@@ -25,7 +25,12 @@ struct CoachChatView: View {
   @State private var draft = ""
   @State private var makingGoal = false
   @State private var showingPrompt = false
+  /// Proposed-commitment cards the user has accepted / dismissed (by action id).
+  @State private var acceptedActions: Set<UUID> = []
+  @State private var dismissedActions: Set<UUID> = []
   @FocusState private var inputFocused: Bool
+
+  private var goalMutator: GoalMutator { SeptenaServices.shared.goalMutator }
 
   var body: some View {
     Group {
@@ -59,11 +64,19 @@ struct CoachChatView: View {
               Label("View prompt", systemImage: "doc.text.magnifyingglass")
             }
             Button {
-              makeGoal(session)
+              makeCommitment(session)
             } label: {
-              Label("Turn this chat into a goal", systemImage: "target")
+              Label("Propose a commitment", systemImage: "target")
             }
             .disabled(!hasUserMessage(session) || session.isThinking || makingGoal || !session.isLive)
+
+            Divider()
+            Button(role: .destructive) {
+              session.clearTranscript()
+            } label: {
+              Label("Clear conversation", systemImage: "trash")
+            }
+            .disabled(session.isThinking)
           }
         } label: {
           Image(systemName: makingGoal ? "hourglass" : "ellipsis.circle")
@@ -265,21 +278,99 @@ struct CoachChatView: View {
     }
   }
 
-  /// Proposed actions as confirmable chips. The accept handler is a TODO:
-  /// it must route through the section's mutator, never write directly.
+  /// Confirm-gated commitment cards. The model only proposes; tapping "Add"
+  /// is what writes — through `GoalMutator` (the write-boundary invariant).
+  @ViewBuilder
   private func actionChips(_ actions: [CoachProposedAction]) -> some View {
-    FlowChips(actions) { action in
-      Button {
-        // TODO(reasoning-backend): route through the section mutator.
-      } label: {
-        Label(action.title, systemImage: "plus.circle")
-          .font(.caption.weight(.medium))
-          .padding(.horizontal, 12).padding(.vertical, 7)
-          .background(domain.accent.opacity(0.14), in: Capsule())
+    VStack(alignment: .leading, spacing: 8) {
+      ForEach(actions) { action in
+        if !dismissedActions.contains(action.id) {
+          commitmentCard(action)
+        }
       }
-      .buttonStyle(.plain)
-      .foregroundStyle(domain.accent)
     }
+  }
+
+  private func commitmentCard(_ action: CoachProposedAction) -> some View {
+    let accepted = acceptedActions.contains(action.id)
+    return VStack(alignment: .leading, spacing: 8) {
+      HStack(spacing: 8) {
+        Image(systemName: "target").foregroundStyle(domain.accent)
+        Text(action.goalText)
+          .font(.subheadline.weight(.medium))
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      if let detail = metricDetail(action) {
+        Text(detail).font(.caption).foregroundStyle(.secondary)
+      }
+      if accepted {
+        Label("Added to your goals", systemImage: "checkmark.circle.fill")
+          .font(.caption.weight(.medium))
+          .foregroundStyle(domain.accent)
+      } else {
+        HStack(spacing: 8) {
+          Button { accept(action) } label: { Text("Add").fontWeight(.semibold) }
+            .buttonStyle(.borderedProminent)
+            .tint(domain.accent)
+          Button { dismissedActions.insert(action.id) } label: { Text("Dismiss") }
+            .buttonStyle(.bordered)
+        }
+        .font(.caption)
+      }
+    }
+    .padding(12)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(domain.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(domain.accent.opacity(0.3), lineWidth: 1))
+  }
+
+  /// Human caption for the proposed measurement, e.g. "Target 140–170 g".
+  private func metricDetail(_ a: CoachProposedAction) -> String? {
+    guard let key = a.metricKey, let target = a.metricTarget else { return nil }
+    let unit = GoalMetricCatalog.metric(for: key)?.unitLabel ?? ""
+    let existing = LocalCache.goals(in: context).contains { $0.metricKey == key }
+    let verb = existing ? "Update target to" : "Target"
+    if a.metricComparator == "range", let upper = a.metricUpper {
+      return "\(verb) \(num(target))–\(num(upper)) \(unit)"
+    }
+    let cmp = a.metricComparator == "lte" ? "≤" : (a.metricComparator == "eq" ? "=" : "≥")
+    return "\(verb) \(cmp) \(num(target)) \(unit)"
+  }
+
+  private func num(_ v: Double) -> String {
+    v == v.rounded() ? String(Int(v)) : String(format: "%.1f", v)
+  }
+
+  /// Apply an accepted commitment. If a goal already carries this metric, move
+  /// its target (edit); otherwise create a new goal. Always via the mutator.
+  private func accept(_ a: CoachProposedAction) {
+    let clean = a.goalText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !clean.isEmpty else { return }
+    if let key = a.metricKey,
+       let existing = LocalCache.goals(in: context).first(where: { $0.metricKey == key }) {
+      // Edit: keep the user's own goal text/sections, just move the target.
+      goalMutator.updateGoalMetric(id: existing.id,
+                                   metricKey: key,
+                                   window: a.metricWindow,
+                                   comparator: a.metricComparator,
+                                   target: a.metricTarget,
+                                   baseline: existing.metricBaseline,
+                                   upper: a.metricUpper)
+    } else {
+      let goal = goalMutator.createGoal(text: clean)
+      goalMutator.updateGoal(id: goal.id, text: clean, sections: a.sections)
+      if let key = a.metricKey {
+        goalMutator.updateGoalMetric(id: goal.id,
+                                     metricKey: key,
+                                     window: a.metricWindow,
+                                     comparator: a.metricComparator,
+                                     target: a.metricTarget,
+                                     baseline: nil,
+                                     upper: a.metricUpper)
+      }
+    }
+    acceptedActions.insert(a.id)
+    Haptics.success()
   }
 
   private func citationRow(_ citations: [CoachCitation]) -> some View {
@@ -340,18 +431,13 @@ struct CoachChatView: View {
     Task { await session.send(text) }
   }
 
-  /// Distill the conversation into a DraftGoal and hand it back to the
-  /// Discovery flow for the user to confirm. No direct write — the goal is
-  /// reviewed and saved through the normal Goals path.
-  private func makeGoal(_ session: CoachSession) {
+  /// Ask the coach for a structured commitment and surface it as a confirm
+  /// card in the transcript. The card's "Add" is the only thing that writes.
+  private func makeCommitment(_ session: CoachSession) {
     makingGoal = true
     Task {
-      let text = await session.proposeGoal()
+      _ = await session.proposeCommitment()
       makingGoal = false
-      guard let text, !text.isEmpty else { return }
-      let sections = (domain.sectionKeys ?? CoachContextBuilder.supportedKeys)
-        .filter { !mutedKeys.contains($0) }
-      onFinish([DraftGoal(text: text, sections: sections, kind: .commitment)])
     }
   }
 }

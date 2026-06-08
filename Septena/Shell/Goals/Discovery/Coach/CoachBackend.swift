@@ -19,6 +19,12 @@ protocol CoachBackend {
 
   /// Summarize the conversation into one adoptable goal sentence, or nil.
   func proposeGoal() async -> String?
+
+  /// Propose ONE structured commitment from the conversation. `metricKeys`
+  /// are the measurement keys the coach may attach (from the goal catalog,
+  /// scoped to this coach's sections). Returns nil if nothing fits. The
+  /// proposal is NEVER executed by the model — the UI confirm-gates it.
+  func proposeCommitment(metricKeys: [String]) async -> CoachCommitmentOut?
 }
 
 @Generable
@@ -26,6 +32,19 @@ private struct FollowUpsOut: Codable { let questions: [String] }
 
 @Generable
 private struct GoalOut: Codable { let goal: String }
+
+/// Structured commitment the model proposes. Flat, non-optional fields with
+/// sentinels (empty string / 0) so guided generation always fills them; the
+/// session validates `metricKey` against the catalog before trusting it.
+@Generable
+struct CoachCommitmentOut: Codable {
+  let goal: String         // imperative, concrete, under 12 words
+  let measurable: Bool     // true if one of the provided metric keys fits
+  let metricKey: String    // EXACT key from the provided list, or ""
+  let comparator: String   // "gte" | "lte" | "eq" | "range", or ""
+  let lower: Double        // primary/lower target
+  let upper: Double        // upper bound (range only; else 0)
+}
 
 /// Today's backend: Apple Foundation Models, fully on-device. Holds ONE
 /// `LanguageModelSession` for the conversation (it retains its transcript
@@ -99,6 +118,25 @@ final class FoundationModelsBackend: CoachBackend {
     let text = out?.content.goal.trimmingCharacters(in: .whitespacesAndNewlines)
     return (text?.isEmpty == false) ? text : nil
   }
+
+  func proposeCommitment(metricKeys: [String]) async -> CoachCommitmentOut? {
+    let keyList = metricKeys.isEmpty
+      ? "(none available — keep it a plain text commitment, measurable=false)"
+      : metricKeys.joined(separator: ", ")
+    let prompt = """
+      Turn our conversation into ONE specific commitment the person could adopt. \
+      Imperative, concrete, under 12 words.
+
+      If it can be measured by one of these metric keys, set measurable=true, \
+      metricKey to the EXACT key, comparator to one of gte/lte/eq/range, lower to \
+      the target number (and upper as well when comparator is range, e.g. a \
+      "between X and Y" band). Otherwise set measurable=false, metricKey="", \
+      comparator="", lower=0, upper=0.
+
+      Available metric keys: \(keyList)
+      """
+    return try? await session.respond(to: prompt, generating: CoachCommitmentOut.self).content
+  }
 }
 
 /// Fallback when no model is available (Simulator, ineligible device,
@@ -113,6 +151,7 @@ final class EchoBackend: CoachBackend {
   }
   func suggestFollowUps() async -> [String] { [] }
   func proposeGoal() async -> String? { nil }
+  func proposeCommitment(metricKeys: [String]) async -> CoachCommitmentOut? { nil }
 }
 
 @MainActor
