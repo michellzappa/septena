@@ -105,6 +105,13 @@ enum SettingsKey {
   /// flipped by the in-app "mock unlock" toggle in the paywall. Gates the
   /// Correlations homepage layout; turning it off re-locks Plus features.
   static let plusUnlocked     = "septena.plus.unlocked"
+  /// macOS-only: run an in-process loopback MCP server so a local Claude Code
+  /// instance can read/write Septena without the hosted gateway. Off by
+  /// default. The key strings live in SeptenaCore (`MCPDefaultsKey`) so the
+  /// `LocalMCPServer` and this facade can't drift.
+  static let localMcpEnabled  = MCPDefaultsKey.enabled
+  /// macOS-only: bearer token Claude Code sends to the local MCP server.
+  static let localMcpToken    = MCPDefaultsKey.token
 }
 
 /// Where a homepage tap on the Tasks tile lands. `drawer` shows today's
@@ -476,6 +483,7 @@ struct SettingsView: View {
     case welcome
     case notifications
     case motionGallery
+    case localMcp
     case section(String)
   }
 
@@ -582,7 +590,15 @@ struct SettingsView: View {
   #endif
 
   private var staticDestinations: [SettingsDestination] {
-    [.general, .integrations, .importExport, .skills, .manageSections, .motionGallery, .privacy, .about]
+    var dests: [SettingsDestination] =
+      [.general, .integrations, .importExport, .skills, .manageSections, .motionGallery]
+    #if os(macOS)
+    // The loopback MCP server only runs on the Mac (long-lived desktop
+    // process a local Claude Code can dial); the row never appears on iOS.
+    dests.append(.localMcp)
+    #endif
+    dests += [.privacy, .about]
+    return dests
   }
 
   /// Per-section sidebar rows, ordered by the user's saved `sectionOrder`
@@ -646,6 +662,7 @@ struct SettingsView: View {
     case .privacy:      return "Privacy"
     case .about:        return "About"
     case .motionGallery: return "Motion Gallery"
+    case .localMcp:     return "Local MCP Server"
     case .manageSections: return "Manage Sections"
     case .section(let key):
       return SectionManifest.displayLabel(
@@ -674,6 +691,7 @@ struct SettingsView: View {
     case .privacy:      return "hand.raised"
     case .about:        return "info.circle"
     case .motionGallery: return "wand.and.rays"
+    case .localMcp:     return "server.rack"
     case .manageSections: return "square.grid.2x2"
     case .section:      return ""  // unreachable; sectionRow handles section dests
     }
@@ -717,6 +735,11 @@ struct SettingsView: View {
     case .privacy:           PrivacySettingsPane()
     case .about:             AboutSettingsPane()
     case .motionGallery:     MotionGalleryPane()
+    #if os(macOS)
+    case .localMcp:          LocalMCPSettingsPane()
+    #else
+    case .localMcp:          EmptyView()   // row is macOS-only; never reached on iOS
+    #endif
     case .manageSections:    ManageSectionsPane()
     case .section(let key):  SectionDetailPane(sectionKey: key)
     }

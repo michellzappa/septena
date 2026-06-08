@@ -155,6 +155,11 @@ struct SeptenaApp: App {
           #endif
           #if os(macOS)
           MacAppDelegate.ckEngine = ckEngine
+          // Resume the local MCP server if the user left it enabled. Mutators
+          // are bound now (start() above), so it's safe to serve writes.
+          if UserDefaults.standard.bool(forKey: MCPDefaultsKey.enabled) {
+            try? LocalMCPServer.shared.start()
+          }
           #endif
           // `SectionTheme.init` and `SettingsStore.init` already hydrated
           // tile order + accent colors from disk synchronously, so the
