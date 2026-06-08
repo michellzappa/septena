@@ -759,3 +759,72 @@ enum EventTimestamp {
     return f.string(from: instant)
   }
 }
+
+/// Event entities whose `occurredAt` can be repaired from their `date` string.
+/// Empty conformances — the stored properties already exist; this just gives
+/// `OccurredAtBackfill` a uniform handle to fix them.
+protocol OccurredAtRepairable: AnyObject {
+  var date: String { get }
+  var occurredAt: Date { get set }
+}
+
+extension CaffeineEventEntity: OccurredAtRepairable {}
+extension CannabisEventEntity: OccurredAtRepairable {}
+extension GutEventEntity: OccurredAtRepairable {}
+extension MoodEventEntity: OccurredAtRepairable {}
+extension ChoreEventEntity: OccurredAtRepairable {}
+extension HabitDayStateEntity: OccurredAtRepairable {}
+extension SupplementDayStateEntity: OccurredAtRepairable {}
+extension ExerciseEntryEntity: OccurredAtRepairable {}
+
+/// One-shot, local-only repair for event rows created before the `occurredAt`
+/// migration: their instant is the `.distantPast` sentinel, which sorts them to
+/// the dawn of time and pins hour-of-day at 00:00 — skewing learned-time
+/// medians and the unified timeline. The legacy `time` STRING is gone, so the
+/// best recoverable instant is local noon of the row's `date`, exactly what
+/// `EventTimestamp.from(date:, time: nil)` yields.
+///
+/// Not pushed to CloudKit: legacy records carry no `occurredAt` value, so a
+/// re-fetch can't clobber the local fix, and the only consumers (learned-time
+/// suggestions, the timeline) are local. Gated by a UserDefaults version flag
+/// so it runs once per device; runs after the initial CloudKit fetch so rows
+/// synced on a fresh install are present. (Nutrition/hydration are excluded —
+/// they key on `loggedAt`, which is always populated, never `.distantPast`.)
+@MainActor
+enum OccurredAtBackfill {
+  private static let versionKey = "events.occurredAtBackfill.v2"
+
+  static func runIfNeeded(context: ModelContext, defaults: UserDefaults = .standard) {
+    guard !defaults.bool(forKey: versionKey) else { return }
+    var fixed = 0
+    fixed += repair(CaffeineEventEntity.self, context: context)
+    fixed += repair(CannabisEventEntity.self, context: context)
+    fixed += repair(GutEventEntity.self, context: context)
+    fixed += repair(MoodEventEntity.self, context: context)
+    fixed += repair(ChoreEventEntity.self, context: context)
+    fixed += repair(HabitDayStateEntity.self, context: context)
+    fixed += repair(SupplementDayStateEntity.self, context: context)
+    fixed += repair(ExerciseEntryEntity.self, context: context)
+    if fixed > 0 {
+      do {
+        try context.save()
+      } catch {
+        // Leave the gate unset so a later launch retries the repair.
+        SeptenaLog.error("OccurredAtBackfill.save", error)
+        return
+      }
+    }
+    defaults.set(true, forKey: versionKey)
+  }
+
+  private static func repair<E: PersistentModel & OccurredAtRepairable>(
+    _ type: E.Type, context: ModelContext) -> Int {
+    guard let rows = try? context.fetch(FetchDescriptor<E>()) else { return 0 }
+    var n = 0
+    for row in rows where row.occurredAt == .distantPast {
+      row.occurredAt = EventTimestamp.from(date: row.date, time: nil)
+      n += 1
+    }
+    return n
+  }
+}
