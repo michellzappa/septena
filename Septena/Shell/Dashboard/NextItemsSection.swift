@@ -1025,7 +1025,7 @@ struct HabitRow: View {
         if habit.skipped {
           StatusBadge(text: "Skipped")
         } else if let rate = completionRate {
-          CompletionRateBadge(percent: rate)
+          CompletionRateBadge(percent: rate, tint: tint)
         } else if let t = habit.time {
           Text(t).font(.septenaMeta).foregroundStyle(Theme.inkSecondary)
         }
@@ -1118,7 +1118,7 @@ struct SupplementRow: View {
       title: supplement.name,
       trailing: {
         if let rate = completionRate {
-          CompletionRateBadge(percent: rate)
+          CompletionRateBadge(percent: rate, tint: tint)
         } else if let t = supplement.time {
           Text(t).font(.septenaMeta).foregroundStyle(Theme.inkSecondary)
         }
@@ -1278,16 +1278,21 @@ struct StatusBadge: View {
   }
 }
 
-/// Trailing "NN%" consistency read for a habit/supplement checklist row —
-/// the 30-day completion rate, shown where the time-of-day otherwise sits.
-/// Sits quietly in the row's meta slot; uses a monospaced-digit figure so the
-/// percentages line up down the list.
+/// Trailing consistency read for a habit/supplement checklist row — the 30-day
+/// completion rate as a tiny progress ring, where the time-of-day otherwise
+/// sits. Reuses `ProjectProgressIcon` (the tasks/projects ring) so the
+/// "how full" language is shared, tuned smaller + thicker for a row's meta
+/// slot. The exact percent lives one tap away in the detail's "last 30 days"
+/// tile; here it's just a glance — and a VoiceOver label.
 struct CompletionRateBadge: View {
   let percent: Int
+  var tint: Color = Theme.inkSecondary
   var body: some View {
-    Text("\(percent)%")
-      .font(.septenaMeta.monospacedDigit())
-      .foregroundStyle(Theme.inkSecondary)
+    ProjectProgressIcon(progress: Double(percent) / 100,
+                        tint: tint,
+                        diameter: 14,
+                        lineWidth: 2.5)
+      .accessibilityLabel("\(percent) percent done, last 30 days")
   }
 }
 
