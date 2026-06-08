@@ -30,6 +30,12 @@ import {
   updateTask, updateTaskJsonSchema, type UpdateTaskInput,
   deferTask, deferTaskJsonSchema,
   moveToToday, moveToTodayJsonSchema,
+  threadGet, threadGetJsonSchema,
+  threadAppend, threadAppendJsonSchema,
+  setAcceptance, setAcceptanceJsonSchema,
+  setEndState, setEndStateJsonSchema,
+  setAssignee, setAssigneeJsonSchema,
+  pendingReasoning, pendingReasoningJsonSchema,
 } from "./tools/writeTasks.js";
 import {
   listGoals, listGoalsJsonSchema,
@@ -178,6 +184,36 @@ const GLOBAL_TOOLS: Tool[] = [
     name: "tasks_move_to_today",
     description: "Pin a task to Today (sets today=true, clears scheduled).",
     inputSchema: moveToTodayJsonSchema,
+  },
+  {
+    name: "tasks_thread_get",
+    description: "Read a task's conversation (TaskConvo: confirmedIntent, acceptance, thread of turns, artifact, handoff, endState, assignee).",
+    inputSchema: threadGetJsonSchema,
+  },
+  {
+    name: "tasks_thread_append",
+    description: "Append one turn to a task's conversation. Provider turns propose (question+options); user turns choose (chosen+inReplyTo). A confirm-step turn carrying a chosen also sets confirmedIntent — put the resolved intent sentence in note.",
+    inputSchema: threadAppendJsonSchema,
+  },
+  {
+    name: "tasks_set_acceptance",
+    description: "Set the agent-done bar (what 'done' means for the agent's deliverable). Distinct from task completion, which is the human's bar.",
+    inputSchema: setAcceptanceJsonSchema,
+  },
+  {
+    name: "tasks_set_endstate",
+    description: "Record the conversation's terminal end-state.",
+    inputSchema: setEndStateJsonSchema,
+  },
+  {
+    name: "tasks_set_assignee",
+    description: "Route a task: me | local | claude, or null to let the router decide. Setting claude marks it for the reasoning queue.",
+    inputSchema: setAssigneeJsonSchema,
+  },
+  {
+    name: "tasks_pending_reasoning",
+    description: "List tasks awaiting reasoning: marked for Claude, or whose last provider turn was low-confidence, and not yet terminal.",
+    inputSchema: pendingReasoningJsonSchema,
   },
   {
     name: "goals_list",
@@ -652,6 +688,30 @@ async function callTool(
     }
     case "tasks_move_to_today": {
       const result = await moveToToday(client, (params.arguments ?? {}) as unknown as { id: string });
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    case "tasks_thread_get": {
+      const result = await threadGet(client, (params.arguments ?? {}) as unknown as { id: string });
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    case "tasks_thread_append": {
+      const result = await threadAppend(client, (params.arguments ?? {}) as unknown as Parameters<typeof threadAppend>[1]);
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    case "tasks_set_acceptance": {
+      const result = await setAcceptance(client, (params.arguments ?? {}) as unknown as { id: string; acceptance: string });
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    case "tasks_set_endstate": {
+      const result = await setEndState(client, (params.arguments ?? {}) as unknown as { id: string; endState: string; note?: string });
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    case "tasks_set_assignee": {
+      const result = await setAssignee(client, (params.arguments ?? {}) as unknown as { id: string; assignee: "me" | "local" | "claude" | null });
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    case "tasks_pending_reasoning": {
+      const result = await pendingReasoning(client, (params.arguments ?? {}) as unknown as { limit?: number });
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
     case "goals_list": {

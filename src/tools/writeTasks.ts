@@ -220,3 +220,217 @@ export async function deferTask(client: CloudKitClient, input: { id: string; unt
 export async function moveToToday(client: CloudKitClient, input: { id: string }) {
   return updateTask(client, { id: input.id, today: true, scheduled: null });
 }
+
+// ---- Task Conversations ----
+//
+// LOCKSTEP with the in-app server (app repo: SeptenaCore/MCP/MCPDispatch.swift +
+// MCPToolCatalog.swift) and the shape in SeptenaCore/TaskConvo.swift. Any change
+// here must land there too, or the two MCP surfaces silently diverge. Spec:
+// docs/TASK_CONVERSATIONS_PLAN.md / _PHASE0.md in the app repo.
+//
+// The whole conversation is ONE plaintext `conversationJSON` field on the Task
+// record — plaintext so Web Services can read/write it (encrypted fields are
+// invisible here, same reason `notesText` exists). These verbs read-modify-write
+// that blob. The field auto-registers in the dev CloudKit schema on the app's
+// first native write; gateway writes assume it exists (dev-only until ship).
+
+export interface ConvoTurn {
+  seq: number;
+  role: "user" | "provider";          // propose (provider) vs choose (user) are separate turns
+  step: "confirm" | "ground" | "scope" | "decide" | "work";
+  provider?: "onDevice" | "claude";   // omitted = deterministic compute (no model)
+  confidence?: number;                // provider turns; the escalation trigger
+  question?: string;
+  options?: string[];
+  chosen?: string;
+  otherText?: string;
+  inReplyTo?: number;                 // user turn → the proposal turn (seq) it answers
+  note?: string;
+  ts: string;                         // ISO-8601 (matches the app's coders)
+}
+
+export interface TaskConvo {
+  confirmedIntent?: string;
+  acceptance?: string;
+  thread: ConvoTurn[];
+  subtasks: string[];
+  artifact?: { kind: string; title: string; body: string; refs?: string[] };
+  handoff?: { instruction: string; actionType: "open_url" | "compose" | "call" | "none"; payload?: string };
+  endState?: string;
+  endStateNote?: string;
+  assignee?: "me" | "local" | "claude";
+}
+
+function decodeConvo(fields: Record<string, { value: unknown }> | null): TaskConvo {
+  const raw = fields?.conversationJSON?.value;
+  if (typeof raw !== "string" || raw.length === 0) return { thread: [], subtasks: [] };
+  try {
+    const c = JSON.parse(raw) as Partial<TaskConvo>;
+    return { ...c, thread: c.thread ?? [], subtasks: c.subtasks ?? [] };
+  } catch {
+    return { thread: [], subtasks: [] };
+  }
+}
+
+async function readConvo(client: CloudKitClient, id: string): Promise<TaskConvo> {
+  const fields = await lookupRecord(client, id);
+  if (!fields) throw new Error(`Task not found: ${id}`);
+  return decodeConvo(fields);
+}
+
+async function writeConvo(client: CloudKitClient, id: string, convo: TaskConvo): Promise<void> {
+  await modifyRecords(client, [
+    {
+      operationType: "forceUpdate",
+      record: { recordType: "Task", recordName: id, fields: { conversationJSON: { value: JSON.stringify(convo) } } },
+    },
+  ]);
+}
+
+function isTerminalConvo(c: TaskConvo): boolean {
+  return c.endState !== undefined && c.endState !== "open";
+}
+
+function nextSeq(c: TaskConvo): number {
+  return c.thread.reduce((m, t) => Math.max(m, t.seq), 0) + 1;
+}
+
+export const threadGetJsonSchema = {
+  type: "object",
+  required: ["id"],
+  properties: { id: { type: "string" } },
+} as const;
+
+export const threadAppendJsonSchema = {
+  type: "object",
+  required: ["id", "turn"],
+  properties: {
+    id: { type: "string" },
+    turn: {
+      type: "object",
+      required: ["role", "step"],
+      properties: {
+        role: { type: "string", enum: ["user", "provider"] },
+        step: { type: "string", enum: ["confirm", "ground", "scope", "decide", "work"] },
+        provider: { type: "string", enum: ["onDevice", "claude"] },
+        confidence: { type: "number" },
+        question: { type: "string" },
+        options: { type: "array", items: { type: "string" } },
+        chosen: { type: "string" },
+        otherText: { type: "string" },
+        inReplyTo: { type: "integer" },
+        note: { type: "string" },
+      },
+    },
+  },
+} as const;
+
+export const setAcceptanceJsonSchema = {
+  type: "object",
+  required: ["id", "acceptance"],
+  properties: { id: { type: "string" }, acceptance: { type: "string" } },
+} as const;
+
+export const setEndStateJsonSchema = {
+  type: "object",
+  required: ["id", "endState"],
+  properties: {
+    id: { type: "string" },
+    endState: {
+      type: "string",
+      enum: ["agent_done", "human_done", "agent_assisted_done", "needs_verify", "decomposed", "reminder_set", "promoted_to_today", "wont_do", "open"],
+    },
+    note: { type: "string", description: "e.g. needs_verify: what to verify" },
+  },
+} as const;
+
+export const setAssigneeJsonSchema = {
+  type: "object",
+  required: ["id", "assignee"],
+  properties: {
+    id: { type: "string" },
+    assignee: { type: ["string", "null"], enum: ["me", "local", "claude"] },
+  },
+} as const;
+
+export const pendingReasoningJsonSchema = {
+  type: "object",
+  properties: { limit: { type: "integer" } },
+} as const;
+
+export async function threadGet(client: CloudKitClient, input: { id: string }) {
+  const conversation = await readConvo(client, input.id);
+  return { id: input.id, conversation };
+}
+
+export async function threadAppend(
+  client: CloudKitClient,
+  input: { id: string; turn: Omit<ConvoTurn, "seq" | "ts"> & { ts?: string } },
+) {
+  const convo = await readConvo(client, input.id);
+  const turn: ConvoTurn = { ...input.turn, seq: nextSeq(convo), ts: input.turn.ts ?? new Date().toISOString() };
+  convo.thread.push(turn);
+  // A confirm-step turn carrying a `chosen` also caches confirmedIntent in the
+  // SAME write (richer `note` wins over the bare button label). Mirrors the app.
+  if (turn.step === "confirm" && turn.chosen) {
+    convo.confirmedIntent = turn.note ?? turn.chosen;
+  }
+  await writeConvo(client, input.id, convo);
+  return { id: input.id, seq: turn.seq };
+}
+
+export async function setAcceptance(client: CloudKitClient, input: { id: string; acceptance: string }) {
+  const convo = await readConvo(client, input.id);
+  convo.acceptance = input.acceptance;
+  await writeConvo(client, input.id, convo);
+  return { id: input.id, acceptance: input.acceptance };
+}
+
+export async function setEndState(client: CloudKitClient, input: { id: string; endState: string; note?: string }) {
+  const convo = await readConvo(client, input.id);
+  convo.endState = input.endState;
+  convo.endStateNote = input.note;
+  await writeConvo(client, input.id, convo);
+  return { id: input.id, endState: input.endState };
+}
+
+export async function setAssignee(
+  client: CloudKitClient,
+  input: { id: string; assignee: "me" | "local" | "claude" | null },
+) {
+  const convo = await readConvo(client, input.id);
+  convo.assignee = input.assignee ?? undefined;
+  await writeConvo(client, input.id, convo);
+  return { id: input.id, assignee: input.assignee ?? "auto" };
+}
+
+// Tasks awaiting reasoning: explicitly marked for Claude, OR whose last provider
+// turn was low-confidence — and not yet terminal. Client-side filter on the blob
+// (CKQuery can't reach into JSON). Mirrors the in-app `pendingReasoning`.
+export async function pendingReasoning(client: CloudKitClient, input: { limit?: number }) {
+  const limit = input.limit ?? 50;
+  const res = await client.queryRecords({
+    recordType: "Task",
+    filterBy: [{ fieldName: "status", comparator: "EQUALS" as const, fieldValue: { value: "open" } }],
+    fetchAll: true,
+  });
+  const tasks: Array<{ id: string; title: string; confirmedIntent?: string; assignee?: string }> = [];
+  for (const r of res.records) {
+    const raw = r.fields.conversationJSON?.value;
+    if (typeof raw !== "string" || raw.length === 0) continue;
+    const c = decodeConvo(r.fields);
+    if (isTerminalConvo(c)) continue;
+    const lastProvider = [...c.thread].reverse().find((t) => t.role === "provider");
+    const lowConf = lastProvider?.confidence !== undefined && lastProvider.confidence < 0.5;
+    if (c.assignee === "claude" || lowConf) {
+      tasks.push({
+        id: r.recordName,
+        title: (r.fields.title?.value as string) ?? "",
+        confirmedIntent: c.confirmedIntent,
+        assignee: c.assignee,
+      });
+      if (tasks.length >= limit) break;
+    }
+  }
+  return { tasks };
+}

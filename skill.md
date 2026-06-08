@@ -18,6 +18,7 @@ The tool list is **dynamic**: on `tools/list` the gateway reads the user's `Sett
 | Group | Tools |
 |---|---|
 | Tasks | `tasks_list`, `tasks_create`, `tasks_update`, `tasks_complete`, `tasks_defer`, `tasks_move_to_today`, `tasks_list_projects`, `tasks_list_areas` |
+| Task Conversations | `tasks_thread_get`, `tasks_thread_append`, `tasks_set_acceptance`, `tasks_set_endstate`, `tasks_set_assignee`, `tasks_pending_reasoning` |
 | Goals | `goals_list`, `goals_create`, `goals_update`, `goals_delete` |
 | Settings/Sections | `settings_get`, `settings_update`, `sections_list`, `sections_update` |
 
@@ -51,6 +52,34 @@ The tool list is **dynamic**: on `tools/list` the gateway reads the user's `Sett
 - Views: `today`, `inbox`, `upcoming`, `anytime`, `someday`, `completed`. **`anytime` is NOT "all tasks"** — it excludes inbox-only items.
 - `tasks_complete` will **error on recurring tasks** — tell the user to complete those in the app so the next occurrence spawns correctly.
 - Resolve `area`/`project` names → ids via `tasks_list_areas` / `tasks_list_projects` before creating/updating.
+
+#### Task Conversations (agent-driven resolution)
+
+A task can hold a persisted **conversation** that drives it toward a solution. You are the
+async reasoning provider: pull the queue, ground the task, and hand the user the smallest
+possible choice. The loop is `confirm → ground → (scope if epic) → decide → work → end`.
+
+- **`tasks_pending_reasoning`** — your work queue: tasks marked for you or stuck on a
+  low-confidence step. Start here.
+- **`tasks_thread_get(id)`** — read the full `TaskConvo` (confirmedIntent, acceptance,
+  thread, artifact, handoff, endState, assignee) before acting.
+- **`tasks_thread_append(id, turn)`** — append one turn. **Propose and choose are separate
+  turns**: a `provider` turn carries `question` + `options` (offer 2–4 + let the user pick);
+  a later `user` turn carries `chosen` + `inReplyTo`. **Never invent the user's choice** —
+  append the provider turn and stop. A `confirm`-step turn with a `chosen` also sets
+  `confirmedIntent` (put the resolved intent sentence in `note`).
+- **Confirm first, always.** Don't ground or work until the user has confirmed what the task
+  means — append a `confirm` provider turn with readings as options. Don't assume meaning.
+- **Don't assume size.** If grounding reveals an epic (e.g. "build a section"), use a `scope`
+  step (decompose / MVP / defer) — don't march to `work`.
+- **`tasks_set_acceptance(id, line)`** — the **agent-done** bar (your deliverable). Distinct
+  from task completion, which is the **human-done** bar. Set `tasks_set_endstate` (e.g.
+  `agent_done`, `needs_verify`, `decomposed`, `reminder_set`) when the conversation is
+  terminal; the task itself stays open until the human acts.
+- **`tasks_set_assignee(id, "claude"|"local"|"me"|null)`** — routing. `claude` marks a task
+  for your queue; `null` lets the router decide.
+- This mirrors the in-app on-device provider exactly (same shape, same verbs). Keep behavior
+  identical so the two surfaces never disagree.
 
 #### View routing (critical)
 A task's visibility depends on these three fields:
