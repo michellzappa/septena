@@ -2258,6 +2258,7 @@
       }
     },
     "Free-text intentions tagged with section keys" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -2276,6 +2277,9 @@
           }
         }
       }
+    },
+    "Free-text intentions. Tag with sections so your coaches have context for what you're working toward." : {
+
     },
     "From Reminders" : {
       "localizations" : {
@@ -3524,6 +3528,9 @@
         }
       }
     },
+    "Only a Claude Code running on this Mac can connect." : {
+
+    },
     "Open" : {
       "localizations" : {
         "pt-BR" : {
@@ -4593,6 +4600,9 @@
           }
         }
       }
+    },
+    "Talk to your %@ coach" : {
+
     },
     "Tap + to add a supplement." : {
       "localizations" : {

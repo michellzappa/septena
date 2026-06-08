@@ -13,6 +13,11 @@ enum GoalsPlugin: SectionPlugin {
     [LogAction(id: "new", title: "New goal", systemImage: "plus")]
   }
 
+  // The section surfaces as "Coach": the top-level destination is the coach
+  // grid (goals live under each coach). The key stays "goals" — only the
+  // surface/label changed.
+  static func destinationView() -> AnyView? { AnyView(CoachView()) }
+
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(SectionExplainerView(
       sectionKey: "goals",

@@ -48,13 +48,12 @@ struct GoalsView: View {
   }
 
   /// Mirrors WeekDashboardView's grid: iPhone compact = 1 col, iPad regular
-  /// = 3 cols, macOS = adaptive ~280pt tiles.
+  /// = 3 cols, macOS = adaptive ~280pt tiles. (Shared with the Coach grid.)
   private var columns: [GridItem] {
     #if os(iOS)
-    let count = (hSize == .regular) ? 3 : 1
-    return Array(repeating: GridItem(.flexible(), spacing: 14), count: count)
+    return GoalGrid.columns(regularWidth: hSize == .regular)
     #else
-    return [GridItem(.adaptive(minimum: 280), spacing: 14)]
+    return GoalGrid.columns(regularWidth: true)
     #endif
   }
 
@@ -180,33 +179,7 @@ struct GoalsView: View {
   }
 
   private func saveDrafts(_ drafts: [DraftGoal]) {
-    var created: [Goal] = []
-    for draft in drafts where draft.include {
-      let clean = draft.text.trimmingCharacters(in: .whitespacesAndNewlines)
-      guard !clean.isEmpty else { continue }
-
-      let goal = goalMutator.createGoal(text: clean)
-      goalMutator.updateGoal(id: goal.id, text: clean, sections: draft.sections)
-      if let metricKey = draft.metricKey {
-        goalMutator.updateGoalMetric(id: goal.id,
-                                     metricKey: metricKey,
-                                     window: draft.metricWindow,
-                                     comparator: draft.metricComparator,
-                                     target: draft.metricTarget,
-                                     baseline: draft.metricBaseline)
-      }
-
-      var updated = goal
-      updated.text = clean
-      updated.sections = draft.sections
-      updated.metricKey = draft.metricKey
-      updated.metricWindow = draft.metricWindow
-      updated.metricComparator = draft.metricComparator
-      updated.metricTarget = draft.metricTarget
-      updated.metricBaseline = draft.metricBaseline
-      created.append(updated)
-    }
-
+    let created = GoalDrafts.save(drafts, mutator: goalMutator)
     if !created.isEmpty {
       goals.insert(contentsOf: created, at: 0)
       Haptics.success()

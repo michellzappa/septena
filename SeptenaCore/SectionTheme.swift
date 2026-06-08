@@ -81,7 +81,7 @@ final class SectionTheme {
     .init(key: "body",        label: "Body",        color: "#ec4899"),
     .init(key: "gut",         label: "Gut",         color: "#b45309"),
     .init(key: "activity",    label: "Activity",    color: "#06b6d4"),
-    .init(key: "goals",       label: "Goals",       color: "#8b5cf6"),
+    .init(key: "goals",       label: "Coach",       color: "#8b5cf6"),
   ]
 
   /// Neutral fallback — inherits from the asset catalog's AccentColor.

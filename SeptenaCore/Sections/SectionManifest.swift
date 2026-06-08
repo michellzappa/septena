@@ -150,7 +150,7 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
     "gut":         "circle.bottomhalf.filled",
     "mood":        "face.smiling",
     "activity":    "figure.walk",
-    "goals":       "target",
+    "goals":       "bubble.left",
     "hydration":   "drop.fill",
     "github":      "chevron.left.forwardslash.chevron.right",
     "insights":    "chart.dots.scatter",
@@ -414,8 +414,8 @@ public extension SectionManifest {
     // in Manage Sections so the user can disable / re-enable it.
     .init(
       key: "goals",
-      defaultLabel: String(localized: "Goals", comment: "Section name"),
-      shortDescription: String(localized: "Free-text intentions tagged with section keys", comment: "Section description"),
+      defaultLabel: String(localized: "Coach", comment: "Section name"),
+      shortDescription: String(localized: "On-device coaches over your goals and logged data", comment: "Section description"),
       activation: .optional,
       onboarding: .hidden,
       supportsTab: false,

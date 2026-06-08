@@ -171,10 +171,9 @@ struct RootTabView: View {
         .tabItem { Label("Tasks", systemImage: "checkmark") }
         .tag(SeptenaTab.tasks)
 
-      GoalsView()
+      CoachView()
         .tabItem {
-          Label("Goals", systemImage: "smallcircle.filled.circle")
-            .environment(\.symbolVariants, .none)
+          Label("Coach", systemImage: "bubble.left")
         }
         .tag(SeptenaTab.goals)
     }

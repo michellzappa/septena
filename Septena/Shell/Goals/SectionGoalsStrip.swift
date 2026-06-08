@@ -42,9 +42,18 @@ struct SectionGoalsStrip: View {
   /// double-tag). Kept static so the drawer's goals toolbar toggle can gate
   /// its visibility on the exact same rule the strip renders by.
   static func matches(_ entity: GoalEntity, sectionKey: String) -> Bool {
-    if entity.sections.contains(sectionKey) { return true }
+    matches(entity, in: [sectionKey])
+  }
+
+  /// Key-set form of `matches`: a goal belongs to a scope if any of its
+  /// section tags — or its metric's implied section — is in `keys`. Used by
+  /// the Coach destination to gather "goals for this coach" across the
+  /// several sections a coach spans.
+  static func matches(_ entity: GoalEntity, in keys: Set<String>) -> Bool {
+    if entity.sections.contains(where: keys.contains) { return true }
     if let key = entity.metricKey,
-       GoalMetricCatalog.sectionKey(for: key) == sectionKey {
+       let implied = GoalMetricCatalog.sectionKey(for: key),
+       keys.contains(implied) {
       return true
     }
     return false
