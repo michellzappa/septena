@@ -169,6 +169,25 @@ enum SettingsMirror {
     }
   }
 
+  /// Publishes this device's current timezone into the synced Settings `time`
+  /// block as `home_timezone`, so the hosted MCP gateway — which has no device
+  /// to read — resolves the user's real zone instead of silently defaulting to
+  /// UTC. The device is the authoritative source for *home*; gateway-owned
+  /// `travel_mode` / `travel_timezone` are preserved untouched. Idempotent:
+  /// `upsert` only pushes when the encoded payload actually changes, so the
+  /// no-change common case is a cheap local read. Creates the settings record
+  /// if the user has none yet (decode of `{}` yields all-nil/defaulted fields).
+  static func publishDeviceTimezone(context: ModelContext, engine: CKEngine? = nil) {
+    let deviceID = TimeZone.current.identifier
+    guard var settings = loadSettings(context: context)
+      ?? (try? decoder.decode(AppSettings.self, from: Data("{}".utf8))) else { return }
+    guard settings.time?.homeTimezone != deviceID else { return }
+    settings.time = AppTimeSettings(homeTimezone: deviceID,
+                                    travelMode: settings.time?.travelMode,
+                                    travelTimezone: settings.time?.travelTimezone)
+    upsert(settings: settings, context: context, engine: engine)
+  }
+
   static func upsert(settings: AppSettings,
                      context: ModelContext,
                      engine: CKEngine? = nil) {
