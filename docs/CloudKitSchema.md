@@ -223,8 +223,9 @@ These six are the task backend, written by `SeptenaCore/CloudKit/*Record.swift`.
 | `metricKey` | String | `String?` | Yes | optional measurement attachment |
 | `metricWindow` | String | `String?` | Yes | |
 | `metricComparator` | String | `String?` | Yes | |
-| `metricTarget` | Double | `Double?` | Yes | |
+| `metricTarget` | Double | `Double?` | Yes | lower bound when comparator=range |
 | `metricBaseline` | Double | `Double?` | Yes | |
+| `metricTargetUpper` | Double | `Double?` | Yes | upper bound for `range` ("between"); **NEW — pending Prod deploy** |
 | `reservedString1`, `reservedString2`, `reservedDate1`, `reservedInt1` | — | reserved | — | |
 
 #### CoachVoice  — recordName `coachVoice:{coachKey}`

@@ -321,8 +321,10 @@ struct EditGoalSheet: View {
   // segmented control so adding the next metric only needs a new case.
   @State private var trackMetric: Bool
   @State private var metricKey: String
-  @State private var metricComparator: String   // "gte" | "lte" | "eq"
+  @State private var metricComparator: String   // "gte" | "lte" | "eq" | "range"
   @State private var metricTargetText: String
+  /// Upper bound, used only when the comparator is "range" (Between).
+  @State private var metricUpperText: String
   /// Optional starting value for the progress bar. Empty string = no
   /// baseline; the bar falls back to the simple current/target math.
   @State private var metricBaselineText: String
@@ -351,6 +353,7 @@ struct EditGoalSheet: View {
                        ?? "")
     _metricComparator = State(initialValue: goal.metricComparator ?? "gte")
     _metricTargetText = State(initialValue: goal.metricTarget.map { Self.formatTarget($0) } ?? "3")
+    _metricUpperText = State(initialValue: goal.metricTargetUpper.map { Self.formatTarget($0) } ?? "")
     _metricBaselineText = State(initialValue: goal.metricBaseline.map { Self.formatTarget($0) } ?? "")
   }
 
@@ -418,10 +421,11 @@ struct EditGoalSheet: View {
                 Text("At least").tag("gte")
                 Text("At most").tag("lte")
                 Text("Exactly").tag("eq")
+                Text("Between").tag("range")
               }
               .pickerStyle(.segmented)
               HStack {
-                Text("Target")
+                Text(metricComparator == "range" ? "Lower" : "Target")
                 Spacer()
                 TextField("3", text: $metricTargetText)
                   #if os(iOS)
@@ -432,6 +436,22 @@ struct EditGoalSheet: View {
                 if let unit = GoalMetricCatalog.metric(for: metricKey)?.unitLabel {
                   Text(unit)
                     .foregroundStyle(.secondary)
+                }
+              }
+              if metricComparator == "range" {
+                HStack {
+                  Text("Upper")
+                  Spacer()
+                  TextField("0", text: $metricUpperText)
+                    #if os(iOS)
+                    .keyboardType(.decimalPad)
+                    #endif
+                    .multilineTextAlignment(.trailing)
+                    .frame(maxWidth: 80)
+                  if let unit = GoalMetricCatalog.metric(for: metricKey)?.unitLabel {
+                    Text(unit)
+                      .foregroundStyle(.secondary)
+                  }
                 }
               }
               HStack {
@@ -522,13 +542,16 @@ struct EditGoalSheet: View {
     // Window is baked into each catalog entry for v1, not user-picked.
     let metricWindow = GoalMetricCatalog.metric(for: metricKey)?.window ?? "calendarWeek"
     let parsedBaseline = Double(metricBaselineText.replacingOccurrences(of: ",", with: "."))
+    let parsedUpper = Double(metricUpperText.replacingOccurrences(of: ",", with: "."))
+    let upperToStore = metricComparator == "range" ? parsedUpper : nil
     if willTrack, let target = parsedTarget {
       mutator.updateGoalMetric(id: goal.id,
                                metricKey: metricKey,
                                window: metricWindow,
                                comparator: metricComparator,
                                target: target,
-                               baseline: parsedBaseline)
+                               baseline: parsedBaseline,
+                               upper: upperToStore)
     } else {
       mutator.updateGoalMetric(id: goal.id,
                                metricKey: nil,
@@ -548,12 +571,14 @@ struct EditGoalSheet: View {
       updated.metricComparator = metricComparator
       updated.metricTarget = target
       updated.metricBaseline = parsedBaseline
+      updated.metricTargetUpper = upperToStore
     } else {
       updated.metricKey = nil
       updated.metricWindow = nil
       updated.metricComparator = nil
       updated.metricTarget = nil
       updated.metricBaseline = nil
+      updated.metricTargetUpper = nil
     }
     onUpdate(updated)
     dismiss()

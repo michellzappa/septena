@@ -55,8 +55,12 @@ enum GoalMetricCatalog {
 struct GoalMetricProgress {
   let current: Double
   let target: Double
-  let comparator: String  // "gte" | "lte" | "eq"
+  let comparator: String  // "gte" | "lte" | "eq" | "range"
   let unitLabel: String
+  /// Upper bound for a `range` goal (`target` is the lower bound). Nil for
+  /// one-sided comparators. When present, the goal is a maintenance band and
+  /// the UI renders a band-with-marker rather than a fill bar.
+  let targetUpper: Double?
   /// Optional starting value. When present (and meaningful for the
   /// comparator), `fraction` measures distance traveled from baseline
   /// toward target instead of raw current/target. Nil = use the simple
@@ -77,7 +81,26 @@ struct GoalMetricProgress {
   ///        no-baseline math (eq is a maintenance shape)
   ///
   /// Target = 0 stays specially handled either way.
+  /// Whether this is a two-sided maintenance band.
+  var isRange: Bool { comparator == "range" && targetUpper != nil }
+
+  /// For a band: the visible 0…1 fractions of the band edges and the current
+  /// marker, over a domain padded so an out-of-band reading still shows. nil
+  /// for non-range goals.
+  var band: (lower: Double, upper: Double, marker: Double)? {
+    guard isRange, let upper = targetUpper, upper > target else { return nil }
+    let span = upper - target
+    let pad = max(span * 0.5, 1)
+    let domainMin = Swift.min(target - pad, current)
+    let domainMax = Swift.max(upper + pad, current)
+    let width = domainMax - domainMin
+    guard width > 0 else { return nil }
+    func f(_ v: Double) -> Double { Swift.min(1, Swift.max(0, (v - domainMin) / width)) }
+    return (f(target), f(upper), f(current))
+  }
+
   var fraction: Double {
+    if isRange { return hit ? 1 : 0 }   // range renders a band, not a fill
     if target == 0 {
       switch comparator {
       case "gte": return 1
@@ -112,6 +135,9 @@ struct GoalMetricProgress {
   var hit: Bool {
     switch comparator {
     case "lte": return current <= target
+    case "range":
+      guard let upper = targetUpper else { return current >= target }
+      return current >= target && current <= upper
     case "eq":
       let tolerance = max(1.0, target * 0.05)
       return abs(current - target) <= tolerance
@@ -143,6 +169,7 @@ enum GoalMetricEvaluator {
                               target: target,
                               comparator: comparator,
                               unitLabel: metric.unitLabel,
+                              targetUpper: goal.metricTargetUpper,
                               baseline: goal.metricBaseline)
   }
 }

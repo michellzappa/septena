@@ -1442,7 +1442,8 @@ final class GoalMutator {
                         window: String?,
                         comparator: String?,
                         target: Double?,
-                        baseline: Double?) {
+                        baseline: Double?,
+                        upper: Double? = nil) {
     guard let entity = fetchGoal(id: id) else { return }
     if let metricKey {
       entity.metricKey = metricKey
@@ -1450,12 +1451,16 @@ final class GoalMutator {
       entity.metricComparator = comparator
       entity.metricTarget = target
       entity.metricBaseline = baseline
+      // Upper bound only meaningful for the range comparator; clear otherwise
+      // so a goal switched away from "between" doesn't keep a stale ceiling.
+      entity.metricTargetUpper = (comparator == "range") ? upper : nil
     } else {
       entity.metricKey = nil
       entity.metricWindow = nil
       entity.metricComparator = nil
       entity.metricTarget = nil
       entity.metricBaseline = nil
+      entity.metricTargetUpper = nil
     }
     entity.updatedAt = .now
     commit(entity, op: "update metric")

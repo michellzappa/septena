@@ -1612,6 +1612,8 @@ struct Goal: Identifiable, Codable, Hashable {
   var metricComparator: String? = nil
   var metricTarget: Double? = nil
   var metricBaseline: Double? = nil
+  /// Upper bound for a `range` comparator (`metricTarget` is the lower bound).
+  var metricTargetUpper: Double? = nil
 }
 
 // MARK: - Date helpers (Septena uses YYYY-MM-DD strings)

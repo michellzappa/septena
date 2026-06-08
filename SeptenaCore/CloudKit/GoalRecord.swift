@@ -36,6 +36,7 @@ enum GoalCloudKitSchema {
     static let metricComparator = "metricComparator"
     static let metricTarget = "metricTarget"
     static let metricBaseline = "metricBaseline"
+    static let metricTargetUpper = "metricTargetUpper"   // upper bound for `range`
 
     // Reserved for foreseeable additions without bumping the record type.
     static let reservedString1 = "reservedString1"
@@ -77,6 +78,7 @@ extension GoalEntity {
     record[GoalCloudKitSchema.Field.metricComparator] = metricComparator
     record[GoalCloudKitSchema.Field.metricTarget] = metricTarget
     record[GoalCloudKitSchema.Field.metricBaseline] = metricBaseline
+    record[GoalCloudKitSchema.Field.metricTargetUpper] = metricTargetUpper
     return record
   }
 }
@@ -94,6 +96,7 @@ extension GoalEntity {
     metricComparator = optionalGoalString(record[GoalCloudKitSchema.Field.metricComparator])
     metricTarget = record[GoalCloudKitSchema.Field.metricTarget] as? Double
     metricBaseline = record[GoalCloudKitSchema.Field.metricBaseline] as? Double
+    metricTargetUpper = record[GoalCloudKitSchema.Field.metricTargetUpper] as? Double
     updatedAt = .now
     captureCloudKitSystemFields(from: record)
   }
