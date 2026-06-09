@@ -93,9 +93,9 @@ struct TasksDestinationView: View {
     }
     .tint(accent)
     .task { reload() }
-    // Host the composer here so it stacks on top of the drawer sheet, pops in,
-    // and dismisses back to the drawer.
-    .taskComposerCover(isPresented: composerBinding) { composerCard }
+    // Host the composer here so it stacks on top of the drawer sheet and
+    // dismisses back to it.
+    .taskComposerSheet(isPresented: composerBinding) { composerCard }
   }
 
   @ViewBuilder

@@ -29,13 +29,21 @@ struct TaskComposerCard: View {
   @Environment(\.modelContext) private var modelContext
   @State private var draft = TaskDraft()
   @State private var seeded = false
-  /// Drives the fade/pop-in (the cover present animation is suppressed, so this
-  /// is the entrance the user sees).
-  @State private var shown = false
   @FocusState private var titleFocused: Bool
   /// SuggestionEngine's learned area/project pick for the current title (the
   /// "Suggested" chip). Recomputed as the title changes; create-mode only.
   @State private var suggestedList: SuggestionEngine.Suggestion?
+  /// True once the conversation has pulled the sheet to `.large` (edit mode).
+  /// The compact detent is sized to the fields; expanding hands the lower half
+  /// to the transcript. Drag between the two is the system's.
+  @State private var expanded = false
+  /// Measured height of the fields region (everything above the conversation),
+  /// used as the compact detent so the sheet opens sized to its contents.
+  @State private var fieldsHeight: CGFloat = 0
+  /// Guards the commit-on-dismiss path so an explicit Save doesn't double-write.
+  @State private var didFinish = false
+  /// Scroll target for the conversation, so tapping its header glides it up.
+  private let convoAnchor = "conversation"
 
   private var isEditing: Bool {
     if case .edit = mode { return true }
@@ -50,85 +58,102 @@ struct TaskComposerCard: View {
   }
 
   var body: some View {
-    // Vertically centered: with the keyboard up, SwiftUI's avoidance lifts the
-    // card so it settles midway (just above the keyboard) instead of pinned to
-    // the very top. The card is compact enough to fit; expanding a date/repeat
-    // pill drops the keyboard (see onInteractStart), freeing room to grow.
-    ZStack {
-      // Dimmed scrim — tapping outside commits the task (Reminders-style) when
-      // there's something to save, otherwise just closes (no phantom task).
-      Color.black.opacity(0.22)
-        .ignoresSafeArea()
-        .contentShape(Rectangle())
-        .onTapGesture { dismissSaving() }
+    // One scrolling space, two heights. The fields sit at the top; in edit mode
+    // the conversation lives below them in the SAME scroll. The sheet opens at a
+    // compact detent sized to the fields (so it reads as a quick-edit card) and
+    // grows to `.large` — pulling the transcript into view — when the user taps
+    // the conversation header or drags the sheet up. The fields stay editable at
+    // the top throughout: it's one object, not two surfaces.
+    ScrollViewReader { proxy in
+      ScrollView {
+        VStack(alignment: .leading, spacing: 12) {
+          // Fields region — its measured height becomes the compact detent.
+          VStack(alignment: .leading, spacing: 12) {
+            header
 
-      VStack(alignment: .leading, spacing: 12) {
-        header
+            VStack(alignment: .leading, spacing: 8) {
+              TextField("What needs doing?", text: $draft.title, axis: .vertical)
+                .textFieldStyle(.plain)
+                .font(.septenaTaskTitle)
+                .focused($titleFocused)
+                .lineLimit(1...4)
+                // macOS: a vertical-axis field doesn't insert a newline on plain
+                // Return (Option-Return does) — it fires onSubmit, so the iOS
+                // newline-as-save trick below never triggers. Commit here instead.
+                .onSubmit { if draft.canSave { commit() } }
 
-        VStack(alignment: .leading, spacing: 8) {
-          TextField("What needs doing?", text: $draft.title, axis: .vertical)
-            .textFieldStyle(.plain)
-            .font(.septenaTaskTitle)
-            .focused($titleFocused)
-            .lineLimit(1...4)
-            // macOS: a vertical-axis field doesn't insert a newline on plain
-            // Return (Option-Return does) — it fires onSubmit, so the iOS
-            // newline-as-save trick below never triggers. Commit here instead.
-            .onSubmit { if draft.canSave { commit() } }
+              Divider()
 
-          Divider()
+              // Optional notes — room to paste or explain context.
+              TextField("Notes", text: $draft.notes, axis: .vertical)
+                .textFieldStyle(.plain)
+                .font(.septenaNotes)
+                .foregroundStyle(Theme.inkSecondary)
+                .lineLimit(3...10)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Theme.secondaryGroupedBackground,
+                        in: RoundedRectangle(cornerRadius: 18, style: .continuous))
 
-          // Optional notes — room to paste or explain context.
-          TextField("Notes", text: $draft.notes, axis: .vertical)
-            .textFieldStyle(.plain)
-            .font(.septenaNotes)
-            .foregroundStyle(Theme.inkSecondary)
-            .lineLimit(3...10)
+            quickEntryChips
+
+            TaskAttributeBar(
+              draft: $draft,
+              areas: areas,
+              projects: projects,
+              accent: accent,
+              onInteractStart: { titleFocused = false }
+            )
+          }
+          .background(
+            GeometryReader { g in
+              Color.clear.preference(key: FieldsHeightKey.self, value: g.size.height)
+            }
+          )
+
+          // The agent exchange, in the same scroll. Tapping its header (or
+          // dragging the sheet up) grows the sheet to `.large` and scrolls it
+          // into view. Edit mode only — a not-yet-created task has no
+          // id/conversation. docs/TASK_CONVERSATIONS_PHASE1.md.
+          if case .edit(let task) = mode {
+            ConversationSection(task: task, accent: accent, expanded: $expanded) {
+              expand(via: proxy)
+            }
+            .id(convoAnchor)
+          }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(Theme.secondaryGroupedBackground,
-                    in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-
-        quickEntryChips
-
-        TaskAttributeBar(
-          draft: $draft,
-          areas: areas,
-          projects: projects,
-          accent: accent,
-          onInteractStart: { titleFocused = false }
-        )
-
-        // The agent exchange lives with the task, below the fields (edit mode
-        // only — a not-yet-created task has no id/conversation). Renders nothing
-        // until a conversation exists. docs/TASK_CONVERSATIONS_PHASE1.md.
-        if case .edit(let task) = mode {
-          ConversationCard(taskID: task.id, initial: task.conversation)
-        }
+        .padding(16)
       }
-      .padding(16)
-      // White (paper) glass: tint the translucent material with the system
-      // background so it reads white in light mode instead of picking up the
-      // dim scrim as gray. Stays adaptive — near-black in dark mode.
-      .background {
-        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
-        shape.fill(.ultraThinMaterial)
-          .overlay(shape.fill(Theme.paperBackground.opacity(0.6)))
-      }
-      .overlay(
-        RoundedRectangle(cornerRadius: 22, style: .continuous)
-          .strokeBorder(Color.white.opacity(0.12))
-      )
-      .shadow(color: .black.opacity(0.20), radius: 22, y: 10)
-      .padding(.horizontal, 14)
     }
-    .opacity(shown ? 1 : 0)
+    .scrollDismissesKeyboard(.interactively)
+    .onPreferenceChange(FieldsHeightKey.self) { fieldsHeight = $0 }
+    #if os(iOS)
+    .presentationDetents(detentSet, selection: detentSelection)
+    .presentationDragIndicator(.visible)
+    .presentationContentInteraction(.scrolls)
+    #endif
+    .presentationBackground {
+      // White (paper) glass: tint the translucent material with the system
+      // background so it reads white in light mode. Adaptive — near-black in dark.
+      Rectangle().fill(.ultraThinMaterial)
+        .overlay(Rectangle().fill(Theme.paperBackground.opacity(0.6)))
+        .ignoresSafeArea()
+    }
     #if os(macOS)
-    // Escape cancels — close without saving (the scrim tap commits; Esc doesn't).
+    // No detents on macOS — Escape cancels without saving.
     .onExitCommand { onDismiss() }
+    .frame(minWidth: 420, minHeight: 480)
     #endif
     .onAppear(perform: seed)
+    // Swipe-down / outside dismissal commits the task (Reminders-style) when
+    // there's something to save — matching the old scrim-tap behaviour. The
+    // guard stops an explicit Save (which already persisted) from double-writing.
+    .onDisappear {
+      guard !didFinish, draft.canSave else { return }
+      persist()
+      onDone()
+    }
     .onChange(of: draft.title) { _, newValue in
       // The title wraps (axis: .vertical) so long titles show in full instead
       // of truncating — but it stays single-line in spirit: a Return inserts a
@@ -314,8 +339,6 @@ struct TaskComposerCard: View {
   private func seed() {
     guard !seeded else { return }
     seeded = true
-    // Fade/pop the card in (the cover present animation is suppressed).
-    withAnimation(.snappy(duration: 0.24)) { shown = true }
     switch mode {
     case .create(let filter):
       draft = TaskDraft(filter: filter)
@@ -325,9 +348,8 @@ struct TaskComposerCard: View {
         allTasks: LocalCache.allTasks(in: modelContext),
         projects: projects, areas: areas
       )
-      // Focus after the present animation settles — inside a fullScreenCover an
-      // immediate focus is dropped before the field joins the responder chain,
-      // so the keyboard wouldn't come up on open.
+      // Focus after the sheet settles — an immediate focus is dropped before the
+      // field joins the responder chain, so the keyboard wouldn't come up.
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { titleFocused = true }
     case .edit(let task):
       draft = TaskDraft(task: task)
@@ -336,9 +358,9 @@ struct TaskComposerCard: View {
     }
   }
 
-  private func commit() {
-    guard draft.canSave else { return }
-    Haptics.tick()
+  /// Writes the draft through the mutator. Split from `finish()` so the
+  /// commit-on-dismiss path (onDisappear) can persist without re-closing.
+  private func persist() {
     switch mode {
     case .create:
       // Apply any quick-entry tokens the user didn't tap, then create. The
@@ -350,19 +372,54 @@ struct TaskComposerCard: View {
     case .edit(let task):
       draft.update(task, via: mutator)
     }
+  }
+
+  private func commit() {
+    guard draft.canSave else { return }
+    Haptics.tick()
+    persist()
     finish()
   }
 
-  /// Tap-outside behaviour: commit when there's something worth saving,
-  /// otherwise just close so an empty draft never creates a phantom task.
-  private func dismissSaving() {
-    if draft.canSave { commit() } else { onDismiss() }
-  }
-
-  /// Reload the caller's list and close.
+  /// Reload the caller's list and close. Sets `didFinish` so the onDisappear
+  /// commit-on-dismiss guard doesn't write a second time.
   private func finish() {
+    didFinish = true
     onDone()
     onDismiss()
+  }
+
+  // MARK: - Detents
+
+  /// Pull the sheet to `.large` and glide the conversation into view.
+  private func expand(via proxy: ScrollViewProxy) {
+    titleFocused = false
+    withAnimation(.snappy(duration: 0.28)) {
+      expanded = true
+      proxy.scrollTo(convoAnchor, anchor: .top)
+    }
+  }
+
+  #if os(iOS)
+  /// Compact detent = the measured fields height (sized to contents); `.medium`
+  /// until the first measurement lands. `.large` is the expanded conversation
+  /// reach. The set must contain whatever `detentSelection` currently returns.
+  private var compactDetent: PresentationDetent {
+    fieldsHeight > 1 ? .height(fieldsHeight + 40) : .medium
+  }
+  private var detentSet: Set<PresentationDetent> { [compactDetent, .large] }
+  private var detentSelection: Binding<PresentationDetent> {
+    Binding(get: { expanded ? .large : compactDetent },
+            set: { expanded = ($0 == .large) })
+  }
+  #endif
+}
+
+/// Carries the fields region's height up so the compact detent can size to it.
+private struct FieldsHeightKey: PreferenceKey {
+  static var defaultValue: CGFloat = 0
+  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+    value = max(value, nextValue())
   }
 }
 
@@ -727,46 +784,15 @@ private struct InlineRepeatPanel: View {
 // MARK: - Presentation
 
 extension View {
-  /// Present the composer above the *current* context — including a sheet/drawer
-  /// it's launched from — with a pop, not a slide. Hosting the cover on the
-  /// launching view (rather than the app root) means it stacks on top of any
-  /// sheet that view lives in, so the sheet survives underneath. The cover's
-  /// bottom-slide is suppressed (the present/dismiss toggle runs in a
-  /// non-animated transaction) and the card fades itself in. macOS (no
-  /// full-screen covers) falls back to an in-place overlay.
-  func taskComposerCover<Card: View>(
+  /// Present the composer as a bottom sheet (a centered modal on macOS). The
+  /// composer card owns its own `.presentationDetents`, so it opens compact —
+  /// sized to its fields — and grows to `.large` when its conversation expands.
+  /// Presented on the launching view so it stacks above any sheet/drawer that
+  /// view lives in (e.g. the Tasks dashboard drawer), which survives underneath.
+  func taskComposerSheet<Card: View>(
     isPresented: Binding<Bool>,
     @ViewBuilder card: @escaping () -> Card
   ) -> some View {
-    modifier(TaskComposerCover(isPresented: isPresented, card: card))
-  }
-}
-
-private struct TaskComposerCover<Card: View>: ViewModifier {
-  @Binding var isPresented: Bool
-  @ViewBuilder var card: () -> Card
-  /// Internal mirror so we can toggle the cover in a non-animated transaction
-  /// (killing the slide) regardless of how the caller flips `isPresented`.
-  @State private var coverUp = false
-
-  func body(content: Content) -> some View {
-    #if os(iOS)
-    content
-      .fullScreenCover(isPresented: $coverUp) {
-        card().presentationBackground(.clear)
-      }
-      .onChange(of: isPresented) { _, now in
-        var txn = Transaction(); txn.disablesAnimations = true
-        withTransaction(txn) { coverUp = now }
-      }
-      .onChange(of: coverUp) { _, now in
-        // Cover closed (the card called its dismiss) — sync the source flag.
-        if !now, isPresented { isPresented = false }
-      }
-    #else
-    content
-      .overlay { if isPresented { card() } }
-      .animation(.snappy(duration: 0.22), value: isPresented)
-    #endif
+    sheet(isPresented: isPresented) { card() }
   }
 }

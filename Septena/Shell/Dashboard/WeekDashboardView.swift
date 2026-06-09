@@ -2405,8 +2405,8 @@ struct WeekDashboardView: View {
       .presentationDragIndicator(.visible)
       #endif
     }
-    // Tasks-tile "Create in Inbox…" — the composer, popped over the homepage.
-    .taskComposerCover(isPresented: $creatingTask) {
+    // Tasks-tile "Create in Inbox…" — the composer, as a sheet over the homepage.
+    .taskComposerSheet(isPresented: $creatingTask) {
       TaskComposerCard(
         mode: .create(.inbox),
         areas: LocalCache.areas(in: modelContext),

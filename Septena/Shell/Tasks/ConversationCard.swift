@@ -15,7 +15,6 @@ struct ConversationCard: View {
   @State private var convo: TaskConvo
   @State private var showOther = false
   @State private var otherText = ""
-  @State private var showInfo = false
 
   /// Seed `convo` from the already-loaded task so the card paints on the FIRST
   /// frame (no fetch-on-open lag); `onAppear`/`.septenaTasksChanged` then refresh
@@ -29,19 +28,9 @@ struct ConversationCard: View {
     Group {
       if convo.hasStarted {
         VStack(alignment: .leading, spacing: 10) {
-          HStack {
-            Label("Conversation", systemImage: "bubble.left.and.bubble.right")
-              .font(.caption).foregroundStyle(.secondary)
-            Spacer()
-            Button { showInfo = true } label: {
-              Image(systemName: "info.circle").font(.caption)
-            }
-            .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
-            .help("How AI helps with your tasks")
-          }
-
-          // Persistent transcript — never collapses after an exchange.
+          // Persistent transcript — never collapses after an exchange. The
+          // title + ⓘ chrome lives on the hosting ConversationSection, so the
+          // card itself is pure exchange content.
           ForEach(convo.thread, id: \.seq) { transcriptRow($0) }
 
           // Agent deliverable (agent_assisted) — what Claude produced.
@@ -73,7 +62,6 @@ struct ConversationCard: View {
     }
     .onAppear(perform: reload)
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in reload() }
-    .sheet(isPresented: $showInfo) { AIExplainerView() }
   }
 
   // MARK: Transcript
@@ -223,6 +211,112 @@ struct ConversationCard: View {
   }
 }
 
+/// The conversation as it lives inside the task composer's scroll: a tappable
+/// header (badge + one-line summary + ⓘ + chevron) followed by the persistent
+/// `ConversationCard` and the `AskAIButton` (shown only before a conversation
+/// exists). The header drives the sheet's detents — tapping it asks the composer
+/// to grow to `.large` and scroll here; tapping again collapses back. The card
+/// itself always renders below, so at the compact detent it simply sits below
+/// the fold (drag the sheet up and it's there). One object, two heights.
+struct ConversationSection: View {
+  let task: SeptenaTask
+  let accent: Color
+  @Binding var expanded: Bool
+  /// Grow the sheet to `.large` and scroll the conversation into view.
+  let onExpand: () -> Void
+
+  @State private var convo: TaskConvo
+  @State private var showInfo = false
+
+  init(task: SeptenaTask, accent: Color, expanded: Binding<Bool>,
+       onExpand: @escaping () -> Void) {
+    self.task = task
+    self.accent = accent
+    _expanded = expanded
+    self.onExpand = onExpand
+    _convo = State(initialValue: task.conversation)
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      header
+      ConversationCard(taskID: task.id, initial: convo)
+      AskAIButton(task: task)
+    }
+    .padding(14)
+    .background(Theme.secondaryGroupedBackground,
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
+      convo = SeptenaServices.shared.taskMutator.conversation(id: task.id) ?? convo
+    }
+    .sheet(isPresented: $showInfo) { AIExplainerView() }
+  }
+
+  private var header: some View {
+    HStack(spacing: 10) {
+      Button { toggle() } label: {
+        HStack(spacing: 10) {
+          Image(systemName: convo.hasStarted ? "bubble.left.and.bubble.right.fill" : "sparkles")
+            .font(.callout).foregroundStyle(accent)
+            .frame(width: 22)
+          VStack(alignment: .leading, spacing: 1) {
+            Text(summary.title).font(.subheadline).foregroundStyle(Theme.inkPrimary)
+            Text(summary.detail).font(.caption).foregroundStyle(Theme.inkSecondary)
+              .lineLimit(1)
+          }
+          Spacer(minLength: 6)
+          if let badge = summary.badge { badgeGlyph(badge) }
+          Image(systemName: expanded ? "chevron.down" : "chevron.up")
+            .font(.caption).foregroundStyle(.tertiary)
+        }
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+
+      Button { showInfo = true } label: {
+        Image(systemName: "info.circle").font(.callout)
+      }
+      .buttonStyle(.borderless).foregroundStyle(.secondary)
+      .help("How AI helps with your tasks")
+    }
+  }
+
+  /// Collapsed → ask the composer to grow + scroll; expanded → collapse back.
+  private func toggle() {
+    if expanded { withAnimation(.snappy(duration: 0.28)) { expanded = false } }
+    else { onExpand() }
+  }
+
+  /// Title / one-line detail / optional badge for the current convo state.
+  private var summary: (title: String, detail: String, badge: ConvoBadge?) {
+    guard convo.hasStarted else {
+      return ("Talk it through with AI", "Confirm what you mean, then pick", nil)
+    }
+    let badge = deriveConvo(convo).badge
+    if convo.hasOpenProviderQuestion, let q = convo.thread.last?.question {
+      return ("Conversation", q, badge)
+    }
+    if convo.isTerminal {
+      let resolved = convo.endState != .wontDo
+      return ("Conversation", resolved ? "Resolved" : "Won't do", badge)
+    }
+    if convo.handoff != nil { return ("Conversation", "Ready for you", badge) }
+    return ("Conversation", "Claude is working…", badge)
+  }
+
+  private func badgeGlyph(_ b: ConvoBadge) -> some View {
+    let spec: (name: String, color: Color) = {
+      switch b {
+      case .needsYou: return ("circle.fill", .yellow)
+      case .working:  return ("circle.fill", .blue)
+      case .done:     return ("checkmark.circle.fill", .green)
+      case .wontDo:   return ("circle.slash", .gray)
+      }
+    }()
+    return Image(systemName: spec.name).font(.caption2).foregroundStyle(spec.color)
+  }
+}
+
 /// Plain-language explainer of how AI works around tasks. Copy source of truth:
 /// docs/AI_TASKS_EXPLAINER.md (the website reuses it later). Opened from the ⓘ on
 /// the Conversation card; reusable from Settings too.
@@ -322,6 +416,52 @@ struct AIExplainerView: View {
       Image(systemName: "circle.fill").font(.caption2).foregroundStyle(color)
       Text(text).font(.callout)
     }
+  }
+}
+
+/// Kicks off a conversation on a fresh task — runs the on-device first step
+/// (via `ConversationEngine`, which routes per the AI dial). Shows only when no
+/// conversation exists yet; once a turn lands, the card takes over. Press-to-
+/// advance: nothing runs until tapped.
+struct AskAIButton: View {
+  let task: SeptenaTask
+  @State private var hasStarted: Bool
+  @State private var working = false
+
+  init(task: SeptenaTask) {
+    self.task = task
+    _hasStarted = State(initialValue: task.conversation.hasStarted)
+  }
+
+  var body: some View {
+    Group {
+      if !hasStarted {
+        Button(action: run) {
+          HStack(spacing: 6) {
+            if working { ProgressView().controlSize(.small) }
+            else { Image(systemName: "sparkles") }
+            Text(working ? "Thinking…" : "Ask AI")
+          }
+          .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .disabled(working || !OnDeviceAI.isAvailable)
+      }
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in refresh() }
+  }
+
+  private func run() {
+    working = true
+    Task {
+      _ = await ConversationEngine.advance(task: task)
+      working = false
+      refresh()
+    }
+  }
+
+  private func refresh() {
+    hasStarted = SeptenaServices.shared.taskMutator.conversation(id: task.id)?.hasStarted ?? false
   }
 }
 

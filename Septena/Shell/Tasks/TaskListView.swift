@@ -336,13 +336,12 @@ struct TaskListView: View {
         startCreate()
       }
     }
-    // Floating liquid-glass composer — used for BOTH create (tab + / ⌘N /
-    // sidebar) and edit (row tap / (i) button). One card, anchored near the
-    // top rather than a bottom sheet, so opening the keyboard can never push it
-    // to full height; it floats above the dimmed list. Commits through
+    // The composer — used for BOTH create (tab + / ⌘N / sidebar) and edit (row
+    // tap / (i) button). A bottom sheet that opens compact (sized to its fields)
+    // and grows to `.large` when a task's conversation expands. Commits through
     // `TaskDraft` so the Things-style scheduled/today/list mapping lives in one
     // place.
-    .overlay {
+    .taskComposerSheet(isPresented: composerBinding) {
       if let mode = composerMode {
         TaskComposerCard(
           mode: mode,
@@ -352,10 +351,8 @@ struct TaskListView: View {
           onDismiss: closeComposer,
           onDone: { Task { await load() } }
         )
-        .transition(.opacity)
       }
     }
-    .animation(.snappy(duration: 0.2), value: composerIsOpen)
   }
 
   /// The composer presents create when `+`/⌘N is tripped, otherwise edit when
@@ -367,6 +364,9 @@ struct TaskListView: View {
     return nil
   }
   private var composerIsOpen: Bool { creating || editingDetail != nil }
+  private var composerBinding: Binding<Bool> {
+    Binding(get: { composerIsOpen }, set: { if !$0 { closeComposer() } })
+  }
   private func closeComposer() {
     creating = false
     editingDetail = nil

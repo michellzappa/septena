@@ -1972,6 +1972,9 @@
         }
       }
     },
+    "Conversation" : {
+
+    },
     "Copied" : {
       "localizations" : {
         "pt-BR" : {
@@ -5565,6 +5568,9 @@
       }
     },
     "Some to-dos need a moment of thinking before you can act. Septena can talk that through with AI — right on the task." : {
+
+    },
+    "Some to-dos need a moment of thinking first. Talk it through with AI — it confirms what you mean, then offers a few options to tap." : {
 
     },
     "Someday" : {
