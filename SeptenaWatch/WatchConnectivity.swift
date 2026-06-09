@@ -230,6 +230,12 @@ final class WatchConnectivity {
         switch block.recordType {
         case "CaffeineEvent": try await saveCaffeineEvent(method: value, date: date)
         case "CannabisEvent": try await saveCannabisEvent(method: value, date: date)
+        case "NutritionEntry":
+          // hydration: the choice value is millilitres of water.
+          if let ml = Double(value) { try await saveWaterEntry(ml: ml) }
+        case "GutEvent":
+          // gut: the choice value is the Bristol type (1–7).
+          if let bristol = Int(value) { try await saveGutEvent(bristol: bristol, date: date) }
         default:
           assertionFailure("No watch quick-log writer for '\(block.recordType)'")
         }
@@ -331,6 +337,41 @@ final class WatchConnectivity {
     try await db.save(record)
   }
 
+  // MARK: - Task capture
+
+  /// Quick-capture a task to the Inbox (no project/area, not Today), written
+  /// straight to the `Task` record type the phone mirrors. Inbox tasks don't
+  /// surface in the watch's today-scoped Next list, so there's nothing to
+  /// insert locally — a success haptic confirms the write was queued; the
+  /// iOS `CKSyncEngine` reconciles it into the Inbox on next fetch.
+  func addInboxTask(title: String) {
+    let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    WKInterfaceDevice.current().play(.success)
+    let date = today
+    Task {
+      do { try await saveInboxTask(title: trimmed, date: date) }
+      catch { }
+    }
+  }
+
+  /// Writes a fresh open `Task` record. Field names/values mirror
+  /// `TaskCloudKitSchema` + `TasksBackend.create`: status "open", `created`
+  /// today, `today` 0, app provenance. No area/project ⇒ Inbox.
+  private func saveInboxTask(title: String, date: String) async throws {
+    let id       = String(UUID().uuidString.lowercased().prefix(8))
+    let recordID = CKRecord.ID(recordName: id, zoneID: ckZoneID)
+    let record   = CKRecord(recordType: "Task", recordID: recordID)
+    record["title"]        = title
+    record["status"]       = "open"
+    record["created"]      = date
+    record["today"]        = 0
+    record["source"]       = "app"
+    record["sourceClient"] = "watch"
+    record["createdAt"]    = Date()
+    try await db.save(record)
+  }
+
   // MARK: - Quick-log CloudKit writers
   //
   // Each suggestion log is a fresh event record (UUID id), mirroring the
@@ -356,6 +397,38 @@ final class WatchConnectivity {
     let record   = CKRecord(recordType: "CannabisEvent", recordID: recordID)
     record["date"]       = date
     record["method"]     = method
+    record["note"]       = ""
+    record["occurredAt"] = Date()
+    try await db.save(record)
+  }
+
+  /// A water log — a macro-free `NutritionEntry`. Mirrors the phone's hydration
+  /// quick-actions (`PlatformDelegates` / `HydrationIntents`): emoji 💧, the
+  /// `["Water"]` foods marker (stored as the single line "Water"), zero macros,
+  /// and the amount in `waterMl`. Time-of-day lives in `loggedAt`.
+  private func saveWaterEntry(ml: Double) async throws {
+    let eventID  = String(UUID().uuidString.lowercased().prefix(8))
+    let recordID = CKRecord.ID(recordName: "nutrition-entry:\(eventID)", zoneID: ckZoneID)
+    let record   = CKRecord(recordType: "NutritionEntry", recordID: recordID)
+    record["loggedAt"] = Date()
+    record["emoji"]    = "💧"
+    record["foods"]    = "Water"   // the phone's HydrationPlugin.waterFoodsMarker
+    record["note"]     = ""
+    record["source"]   = "manual"
+    record["proteinG"] = 0
+    record["fatG"]     = 0
+    record["carbsG"]   = 0
+    record["waterMl"]  = ml
+    try await db.save(record)
+  }
+
+  private func saveGutEvent(bristol: Int, date: String) async throws {
+    let eventID  = String(UUID().uuidString.lowercased().prefix(8))
+    let recordID = CKRecord.ID(recordName: "gut-event:\(eventID)", zoneID: ckZoneID)
+    let record   = CKRecord(recordType: "GutEvent", recordID: recordID)
+    record["date"]       = date
+    record["bristol"]    = bristol
+    record["blood"]      = 0
     record["note"]       = ""
     record["occurredAt"] = Date()
     try await db.save(record)

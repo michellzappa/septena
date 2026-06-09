@@ -302,7 +302,9 @@ struct NextItemRow: View {
   private var iconColor: Color {
     if done { return .green }
     if isSuggestion { return .orange }
-    return item.overdue ? .red : .secondary
+    // Overdue is carried by the trailing warning marker (below), not by
+    // reddening the kind glyph — matches the widget's chore treatment.
+    return .secondary
   }
 
   private var kindIcon: String {
@@ -373,19 +375,38 @@ private struct CaptureSheet: View {
 
   var body: some View {
     NavigationStack {
-      List(SuggestionBlocks.all, id: \.kind) { block in
+      List {
+        // Quick-capture a task to the Inbox — a text entry, not a log, so it
+        // leads the menu rather than sitting among the loggables.
         NavigationLink {
-          input(for: block)
+          AddInboxTaskView(conn: conn, onDone: onDone)
         } label: {
           Label {
-            Text(title(block.kind))
+            Text("Add to Inbox")
           } icon: {
-            Image(systemName: symbol(block.kind))
-              .foregroundStyle(WatchSectionTint.color(forSectionKey: block.sectionKey,
+            Image(systemName: "tray.and.arrow.down")
+              .foregroundStyle(WatchSectionTint.color(forSectionKey: "tasks",
                                                       colors: conn.sectionColors))
           }
         }
         .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
+
+        // On-demand loggables (caffeine / cannabis / mood), from the shared
+        // SuggestionBlocks table.
+        ForEach(SuggestionBlocks.all, id: \.kind) { block in
+          NavigationLink {
+            input(for: block)
+          } label: {
+            Label {
+              Text(title(block.kind))
+            } icon: {
+              Image(systemName: symbol(block.kind))
+                .foregroundStyle(WatchSectionTint.color(forSectionKey: block.sectionKey,
+                                                        colors: conn.sectionColors))
+            }
+          }
+          .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
+        }
       }
       .listStyle(.plain)
       .navigationTitle("Capture")
@@ -419,13 +440,48 @@ private struct CaptureSheet: View {
     kind.prefix(1).uppercased() + kind.dropFirst()
   }
 
+  // Mirrors the phone's per-section iconography (`SectionManifest.iconByKey`).
   private func symbol(_ kind: String) -> String {
     switch kind {
-    case "caffeine": return "cup.and.saucer"
-    case "cannabis": return "leaf"
-    case "mood":     return "face.smiling"
-    default:         return "plus.circle"
+    case "caffeine":  return "cup.and.saucer"
+    case "cannabis":  return "leaf"
+    case "mood":      return "face.smiling"
+    case "hydration": return "drop.fill"
+    case "gut":       return "circle.bottomhalf.filled"
+    default:          return "plus.circle"
     }
+  }
+}
+
+/// Text entry for a quick Inbox task. The watch keyboard offers dictation /
+/// scribble; committing writes an open `Task` (no project/area, not Today) the
+/// phone mirrors into the Inbox.
+private struct AddInboxTaskView: View {
+  let conn: WatchConnectivity
+  let onDone: () -> Void
+  @State private var text = ""
+
+  private var trimmed: String {
+    text.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  var body: some View {
+    List {
+      TextField("Task", text: $text)
+        .onSubmit(commit)
+      Button(action: commit) {
+        Label("Add to Inbox", systemImage: "tray.and.arrow.down")
+      }
+      .disabled(trimmed.isEmpty)
+    }
+    .navigationTitle("New To-Do")
+    .navigationBarTitleDisplayMode(.inline)
+  }
+
+  private func commit() {
+    guard !trimmed.isEmpty else { return }
+    conn.addInboxTask(title: trimmed)
+    onDone()
   }
 }
 

@@ -12,9 +12,10 @@
 // input contract live here once, so the phone and watch can't disagree.
 //
 // Adding a kind is a one-row edit — the same discipline as `NextBlocks`.
-// Deferred for v1 (no coherent zero-/low-input wrist write yet):
+// Still deferred (no coherent zero-/low-input wrist write yet):
 //   • training  — `ExerciseEntry` needs a named exercise, not just a type.
-//   • fastBreak — `NutritionEntry` needs macros.
+//   • fastBreak — a *meal* `NutritionEntry` needs macros. (Water is the macro-
+//     free subset of nutrition and ships below as `hydration`.)
 // Both slot in here as one row once a wrist input model is designed.
 //
 // Dependency-free on purpose (no SwiftData / SwiftUI) so it compiles into the
@@ -69,6 +70,25 @@ public enum SuggestionBlocks {
           ])),
     .init(kind: "mood", sectionKey: "mood", recordType: "MoodEvent",
           input: .moodGrid),
+    // Water — the macro-free nutrition write. The choice `value` is the
+    // amount in millilitres (parsed by the writer), not a `method`.
+    .init(kind: "hydration", sectionKey: "hydration", recordType: "NutritionEntry",
+          input: .choice([
+            .init(value: "250", label: "250 ml", symbol: "drop"),
+            .init(value: "500", label: "500 ml", symbol: "waterbottle"),
+          ])),
+    // Gut — Bristol stool scale 1–7. The choice `value` is the Bristol type
+    // (parsed by the writer), not a `method`. Labels mirror the phone's.
+    .init(kind: "gut", sectionKey: "gut", recordType: "GutEvent",
+          input: .choice([
+            .init(value: "1", label: "Hard pellets"),
+            .init(value: "2", label: "Lumpy sausage"),
+            .init(value: "3", label: "Cracked sausage"),
+            .init(value: "4", label: "Smooth sausage"),
+            .init(value: "5", label: "Soft blobs"),
+            .init(value: "6", label: "Fluffy mush"),
+            .init(value: "7", label: "Liquid"),
+          ])),
   ]
 
   /// Constant-time lookup by suggestion sub-kind.
