@@ -109,9 +109,11 @@ struct ExerciseStatsView: View {
 
     d.recentTitle = "Recent sets"
     d.recent = rows.prefix(12).map { row in
+      // Clean two-column split: WHEN on the left (date over time), WHAT on
+      // the right (results). No mixing temporal + metric data in one column.
       LogRecent(title: LogDetailFormat.longDay(row.date),
-                detail: detailLine(row),
-                trailing: LogDetailFormat.relativeDay(row.date))
+                detail: clockTime(row),
+                trailing: detailLine(row))
     }
     return d
   }
@@ -156,6 +158,21 @@ struct ExerciseStatsView: View {
 
   private static func formatDistance(_ m: Double) -> String {
     m >= 1000 ? "\((m / 1000).decimalString(1)) km" : "\(Int(m)) m"
+  }
+
+  private static let clockFormatter: DateFormatter = {
+    let f = DateFormatter(); f.dateFormat = "HH:mm"; f.timeZone = .current; return f
+  }()
+
+  /// Time-of-day for a logged set (HH:mm, local). Prefers the canonical
+  /// `occurredAt` instant; falls back to parsing `loggedAt`. nil when neither
+  /// is set, so the row just shows date · metrics.
+  private static func clockTime(_ e: ExerciseEntryEntity) -> String? {
+    if e.occurredAt > .distantPast { return clockFormatter.string(from: e.occurredAt) }
+    if let ls = e.loggedAt, let d = ISO8601DateFormatter().date(from: ls) {
+      return clockFormatter.string(from: d)
+    }
+    return nil
   }
 
   private static func detailLine(_ e: ExerciseEntryEntity) -> String? {
