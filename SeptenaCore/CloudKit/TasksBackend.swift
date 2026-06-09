@@ -88,9 +88,10 @@ final class CloudKitTasksBackend: TasksBackend {
   // MARK: Local helpers
 
   private func fetch(id: String) -> TaskEntity? {
-    let descriptor = FetchDescriptor<TaskEntity>(
+    var descriptor = FetchDescriptor<TaskEntity>(
       predicate: #Predicate { $0.id == id }
     )
+    descriptor.fetchLimit = 1   // point-lookup: stop at the first match, never materialize the whole table
     return try? context.fetch(descriptor).first
   }
 

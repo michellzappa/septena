@@ -12,16 +12,34 @@ import SwiftUI
 struct ConversationCard: View {
   let taskID: String
 
-  @State private var convo = TaskConvo()
+  @State private var convo: TaskConvo
   @State private var showOther = false
   @State private var otherText = ""
+  @State private var showInfo = false
+
+  /// Seed `convo` from the already-loaded task so the card paints on the FIRST
+  /// frame (no fetch-on-open lag); `onAppear`/`.septenaTasksChanged` then refresh
+  /// it (a single by-id read) to pick up turns appended after open.
+  init(taskID: String, initial: TaskConvo = TaskConvo()) {
+    self.taskID = taskID
+    _convo = State(initialValue: initial)
+  }
 
   var body: some View {
     Group {
       if convo.hasStarted {
         VStack(alignment: .leading, spacing: 10) {
-          Label("Conversation", systemImage: "bubble.left.and.bubble.right")
-            .font(.caption).foregroundStyle(.secondary)
+          HStack {
+            Label("Conversation", systemImage: "bubble.left.and.bubble.right")
+              .font(.caption).foregroundStyle(.secondary)
+            Spacer()
+            Button { showInfo = true } label: {
+              Image(systemName: "info.circle").font(.caption)
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .help("How AI helps with your tasks")
+          }
 
           // Persistent transcript — never collapses after an exchange.
           ForEach(convo.thread, id: \.seq) { transcriptRow($0) }
@@ -55,6 +73,7 @@ struct ConversationCard: View {
     }
     .onAppear(perform: reload)
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in reload() }
+    .sheet(isPresented: $showInfo) { AIExplainerView() }
   }
 
   // MARK: Transcript
@@ -204,26 +223,83 @@ struct ConversationCard: View {
   }
 }
 
+/// Plain-language explainer of how AI works around tasks. Copy source of truth:
+/// docs/AI_TASKS_EXPLAINER.md (the website reuses it later). Opened from the ⓘ on
+/// the Conversation card; reusable from Settings too.
+struct AIExplainerView: View {
+  @Environment(\.dismiss) private var dismiss
+
+  var body: some View {
+    NavigationStack {
+      ScrollView {
+        VStack(alignment: .leading, spacing: 18) {
+          Text("Some to-dos need a moment of thinking before you can act. Septena can talk that through with AI — right on the task.")
+            .font(.headline)
+
+          rule("It asks before it does anything.",
+               "The AI never guesses what a vague task means. It shows you a couple of readings; you tap the right one. Nothing happens until you do.")
+          rule("You answer by tapping, not typing.",
+               "Each step is a question with a few buttons (plus “Other…”). One tap moves it forward — a conversation made of choices, not a chat box.")
+          rule("It does what it can, hands you the rest.",
+               "If the AI can do the work — look something up, draft, compare — it does, and shows the result. If only you can finish it (pay, send, decide), it gives you one clear button.")
+
+          VStack(alignment: .leading, spacing: 6) {
+            Text("Whose turn?").font(.subheadline).fontWeight(.semibold)
+            legend(.yellow, "Your turn — a question is waiting")
+            legend(.blue, "AI's turn — it's working")
+            legend(.green, "Done")
+          }
+
+          VStack(alignment: .leading, spacing: 6) {
+            Label("It's your AI — we never see your data", systemImage: "lock.fill")
+              .font(.subheadline).fontWeight(.semibold)
+            Text("Septena never runs AI on your tasks and never reads them. The intelligence is your own — your Claude, or on-device — connected by you. Your tasks live only in your private iCloud. Turn the AI off and the app works exactly the same, minus the conversations.")
+              .font(.callout).foregroundStyle(.secondary)
+          }
+          .padding(12)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .background(Theme.secondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+          Text("Nothing important happens on its own. The AI fills in small, reversible stuff; anything that's a real decision or can't be undone always waits for your tap.")
+            .font(.callout).foregroundStyle(.secondary)
+        }
+        .padding(20)
+      }
+      .navigationTitle("How AI helps")
+      .septenaInlineTitle()
+      .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+    }
+  }
+
+  @ViewBuilder private func rule(_ title: String, _ body: String) -> some View {
+    VStack(alignment: .leading, spacing: 3) {
+      Text(title).font(.subheadline).fontWeight(.semibold)
+      Text(body).font(.callout).foregroundStyle(.secondary)
+    }
+  }
+
+  @ViewBuilder private func legend(_ color: Color, _ text: String) -> some View {
+    HStack(spacing: 8) {
+      Image(systemName: "circle.fill").font(.caption2).foregroundStyle(color)
+      Text(text).font(.callout)
+    }
+  }
+}
+
 /// Plain ball-in-court indicator for a task row's trailing slot — 🟡/🔵/✅/⚫.
 /// Reads the convo by id on appear (only visible rows fetch) and refreshes on
 /// `.septenaTasksChanged`. Renders nothing without a conversation. The exchange
 /// itself opens with the task (in the composer) — this is just the signal.
 struct ConvoBadgeView: View {
-  let taskID: String
-  @State private var badge: ConvoBadge?
+  /// The conversation carried on the already-loaded `SeptenaTask` — no
+  /// fetch-by-id per row. Refreshes when the list rebuilds its tasks (which it
+  /// does on `.septenaTasksChanged`).
+  let convo: TaskConvo
 
   var body: some View {
-    Group {
-      if let badge { glyph(badge) }
+    if convo.hasStarted, let badge = deriveConvo(convo).badge {
+      glyph(badge)
     }
-    .onAppear(perform: load)
-    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in load() }
-  }
-
-  private func load() {
-    guard let convo = SeptenaServices.shared.taskMutator.conversation(id: taskID),
-          convo.hasStarted else { badge = nil; return }
-    badge = deriveConvo(convo).badge
   }
 
   private func glyph(_ b: ConvoBadge) -> some View {

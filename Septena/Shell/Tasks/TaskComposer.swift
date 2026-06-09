@@ -104,7 +104,7 @@ struct TaskComposerCard: View {
         // only — a not-yet-created task has no id/conversation). Renders nothing
         // until a conversation exists. docs/TASK_CONVERSATIONS_PHASE1.md.
         if case .edit(let task) = mode {
-          ConversationCard(taskID: task.id)
+          ConversationCard(taskID: task.id, initial: task.conversation)
         }
       }
       .padding(16)

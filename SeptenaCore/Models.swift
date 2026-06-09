@@ -84,6 +84,12 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// dragged (order falls back to `createdAt`).
   var position: Double = 0
 
+  /// The task's conversation (Task Conversations), decoded from the entity in
+  /// `init(_:)`. Rides alongside, not the wire (excluded from CodingKeys), so the
+  /// row badge and the editor card read it from the already-loaded task —
+  /// NO second fetch-by-id per row. `TaskConvo()` (empty) for tasks without one.
+  var conversation: TaskConvo = TaskConvo()
+
   /// True while this row should glow as a freshly agent-created item the
   /// user hasn't engaged yet. Provenance (`source`) is permanent; this cue
   /// is transient — it clears on `acknowledgedAt` and auto-decays after

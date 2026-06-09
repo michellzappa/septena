@@ -1241,6 +1241,7 @@ extension SeptenaTask {
     acknowledgedAt = e.acknowledgedAt
     createdAt = e.createdAt
     position = e.position
+    conversation = e.conversation
   }
 
   /// Manual-order sort key — see `TaskOrder.key`.

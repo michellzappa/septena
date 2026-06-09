@@ -273,7 +273,7 @@ struct TaskRow: View {
   }
 
   @ViewBuilder private var trailing: some View {
-    ConvoBadgeView(taskID: task.id)
+    ConvoBadgeView(convo: task.conversation)
     if hasNotes {
       Image(systemName: "text.alignleft")
         .scaledFont(size: 12)
