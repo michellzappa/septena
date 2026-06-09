@@ -408,8 +408,18 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
     },
     {
       name: "training_exercises_list",
-      description: "List exercise catalog (definitions). Filter by type (strength|cardio|mobility|core) or archived state.",
+      description: "List exercise catalog (definitions), including muscle tags (primaryMuscle / secondaryMuscles). Filter by type (strength|cardio|mobility|core) or archived state.",
       inputSchema: listExercisesJsonSchema,
+    },
+    {
+      name: "training_exercise_create",
+      description: "Add an exercise definition to the catalog. id defaults to a slug of the name.",
+      inputSchema: createExerciseJsonSchema,
+    },
+    {
+      name: "training_exercise_update",
+      description: "Edit an exercise definition — set muscle tags, rename, retype, archive. Use to clean up / backfill muscle groups one exercise at a time. Pass primaryMuscle: \"\" to clear it.",
+      inputSchema: updateExerciseJsonSchema,
     },
   ],
   hydration: [

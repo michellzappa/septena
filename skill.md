@@ -156,14 +156,21 @@ tasks_list(view: "inbox")
 
 ### Training
 Three record types work together:
-- **ExerciseDefinition** — the catalog. Stable slug `id` (`chest-press`), `name` (`Chest press`), `type` (`strength|cardio|mobility|core`).
+- **ExerciseDefinition** — the catalog. Stable slug `id` (`chest-press`), `name` (`Chest press`), `type` (`strength|cardio|mobility|core`), plus muscle tags `primaryMuscle` + `secondaryMuscles`.
 - **SessionType** — routine template. id is the key (`upper`, `lower`, `cardio`). Lists exercises in that session.
 - **ExerciseEntry** — logged set. References `sessionType` by **id** and `exercise` by **canonical name** (not id — easy footgun).
+
+**Muscle groups** — `primaryMuscle` / `secondaryMuscles` must be one of these 10 exact values:
+`chest, back, shoulders, biceps, triceps, quads, hamstrings, glutes, calves, core` (note: `quads`, not `quadriceps`). Cardio/mobility usually have none. Invalid values are rejected.
 
 Logging workflow:
 1. `training_sessions_list()` → find sessionType id
 2. `training_exercises_list({type: "strength"})` → find canonical exercise name
 3. `training_entry_log({sessionType, exercise, weight, sets, reps})` for strength, or `{durationMin, distanceM}` for cardio
+
+Backfilling / fixing muscle tags (per-exercise):
+1. `training_exercises_list()` → read current `primaryMuscle` (absent = unassigned)
+2. `training_exercise_update({id, primaryMuscle, secondaryMuscles})` → set them; pass `primaryMuscle: ""` to clear a wrong tag
 
 ```
 # "3 sets of 8 chest press at 80kg"
@@ -171,6 +178,9 @@ training_entry_log(sessionType: "upper", exercise: "Chest press", weight: 80, se
 
 # "Ran 5k in 24 min"
 training_entry_log(sessionType: "cardio", exercise: "Run", durationMin: 24, distanceM: 5000)
+
+# Fix a mis-tagged machine: Calf Press → calves
+training_exercise_update(id: "calf-press", primaryMuscle: "calves")
 ```
 
 ### Hydration

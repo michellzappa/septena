@@ -28,6 +28,22 @@ function optStrArray(v: unknown): string[] {
   return [];
 }
 
+// The 10 canonical muscle groups — must stay in lockstep with the iOS
+// `Muscle` enum (SeptenaCore/Models.swift). Note: 'quads', not 'quadriceps'.
+export const VALID_MUSCLES = [
+  "chest", "back", "shoulders", "biceps", "triceps",
+  "quads", "hamstrings", "glutes", "calves", "core",
+] as const;
+const MUSCLE_SET = new Set<string>(VALID_MUSCLES);
+
+/** Throw on any muscle value that isn't one of the 10 canonical groups. */
+function assertMuscle(value: string): string {
+  if (!MUSCLE_SET.has(value)) {
+    throw new Error(`invalid muscle '${value}'. Valid: ${VALID_MUSCLES.join(", ")}`);
+  }
+  return value;
+}
+
 type ModifyOp =
   | { operationType: "create" | "forceUpdate"; record: { recordType: string; recordName: string; fields: Record<string, { value: unknown }> } }
   | { operationType: "delete"; record: { recordName: string } };
@@ -148,8 +164,8 @@ export const createExerciseJsonSchema = {
     id:               { type: "string", description: "Optional slug id. Defaults to slugified name." },
     subgroup:         { type: "string", description: "Free-form grouping (e.g. 'push', 'pull')." },
     aliases:          { type: "array", items: { type: "string" } },
-    primaryMuscle:    { type: "string", description: "Muscle enum value, e.g. 'chest', 'quadriceps'." },
-    secondaryMuscles: { type: "array", items: { type: "string" } },
+    primaryMuscle:    { type: "string", enum: VALID_MUSCLES, description: "Primary muscle group. One of: chest, back, shoulders, biceps, triceps, quads, hamstrings, glutes, calves, core." },
+    secondaryMuscles: { type: "array", items: { type: "string", enum: VALID_MUSCLES } },
   },
 } as const;
 
@@ -161,8 +177,8 @@ export const updateExerciseJsonSchema = {
     type:             { type: "string", enum: ["strength", "cardio", "mobility", "core"] },
     subgroup:         { type: ["string", "null"] },
     aliases:          { type: "array", items: { type: "string" } },
-    primaryMuscle:    { type: ["string", "null"] },
-    secondaryMuscles: { type: "array", items: { type: "string" } },
+    primaryMuscle:    { type: ["string", "null"], description: "Primary muscle group (chest, back, shoulders, biceps, triceps, quads, hamstrings, glutes, calves, core). Pass \"\" or null to clear." },
+    secondaryMuscles: { type: "array", items: { type: "string", enum: VALID_MUSCLES } },
     archived:         { type: "boolean" },
   },
 } as const;
@@ -462,6 +478,8 @@ export async function listExercises(client: CloudKitClient, input: ListExercises
 }
 
 export async function createExercise(client: CloudKitClient, input: CreateExerciseInput) {
+  if (input.primaryMuscle) assertMuscle(input.primaryMuscle);
+  (input.secondaryMuscles ?? []).forEach(assertMuscle);
   const id = input.id ?? slugify(input.name);
   const fields: Record<string, { value: unknown }> = {
     name:      { value: input.name },
@@ -487,6 +505,10 @@ export async function createExercise(client: CloudKitClient, input: CreateExerci
 }
 
 export async function updateExercise(client: CloudKitClient, input: UpdateExerciseInput) {
+  // Validate muscles up front so a typo can't dirty the catalog. "" / null is
+  // allowed for primaryMuscle (clears it).
+  if (input.primaryMuscle) assertMuscle(input.primaryMuscle);
+  (input.secondaryMuscles ?? []).forEach(assertMuscle);
   const fields: Record<string, { value: unknown }> = {};
   const updated: string[] = [];
   if (input.name !== undefined)             { fields.name = { value: input.name }; updated.push("name"); }
