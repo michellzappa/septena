@@ -95,14 +95,14 @@ struct TasksDestinationView: View {
     .task { reload() }
     // Host the composer here so it stacks on top of the drawer sheet and
     // dismisses back to it.
-    .taskComposerSheet(isPresented: composerBinding) { composerCard }
+    .taskComposerDrawer(isPresented: composerBinding) { composerCard }
   }
 
   @ViewBuilder
   private var composerCard: some View {
     if let mode = composerMode {
       TaskComposerCard(mode: mode, areas: areas, projects: projects, accent: accent,
-                       onDismiss: closeComposer, onDone: { reload() })
+                       onDone: { reload() })
     }
   }
   private var composerMode: TaskComposerCard.Mode? {

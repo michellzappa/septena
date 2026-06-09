@@ -1,12 +1,14 @@
 import SwiftUI
 
-// The liquid-glass task composer — one floating card used for both creating
-// and editing a task. Title + notes sit at the top; the electives (Today,
-// When, Deadline, Repeat, List) are glass pills underneath. A pill shows its
-// glyph + label when unset and its glyph + value (accent-tinted glass) when
-// set. Tapping a date/repeat pill expands its editor inline inside the card;
-// the longer List picker opens as a sheet. See docs/DesignSpec.md §5.5 —
-// glass is the floating-control material; content rows stay on system fills.
+// The task composer — one form used for both creating and editing a task,
+// hosted by the app's standard `AdaptiveEditScaffold` + `.adaptiveDetail`
+// (a sheet on iPhone, a docked inspector on iPad/macOS — like every other edit
+// drawer). Title + notes sit at the top; the electives (Today, When, Deadline,
+// Repeat, List) are glass pills underneath. A pill shows its glyph + label when
+// unset and its glyph + value (accent-tinted glass) when set. Tapping a
+// date/repeat pill expands its editor inline; the List picker opens as a sheet.
+// In edit mode the agent conversation is a section in the scroll. See
+// docs/DesignSpec.md §5.5 — glass is the floating-control material.
 
 // MARK: - Composer card
 
@@ -20,30 +22,20 @@ struct TaskComposerCard: View {
   let areas: [Area]
   let projects: [Project]
   let accent: Color
-  /// Close the card (animated by the caller).
-  let onDismiss: () -> Void
-  /// Fired after a successful create/edit so the list reloads.
+  /// Fired after a successful create/edit (or a terminal action) so the list
+  /// reloads. Closing is owned by the scaffold / `.adaptiveDetail`, not here.
   let onDone: () -> Void
 
   @Environment(TaskMutator.self) private var mutator
   @Environment(\.modelContext) private var modelContext
+  @Environment(\.dismiss) private var dismiss
+  @Environment(\.adaptiveDetailClose) private var adaptiveClose
   @State private var draft = TaskDraft()
   @State private var seeded = false
   @FocusState private var titleFocused: Bool
   /// SuggestionEngine's learned area/project pick for the current title (the
   /// "Suggested" chip). Recomputed as the title changes; create-mode only.
   @State private var suggestedList: SuggestionEngine.Suggestion?
-  /// True once the conversation has pulled the sheet to `.large` (edit mode).
-  /// The compact detent is sized to the fields; expanding hands the lower half
-  /// to the transcript. Drag between the two is the system's.
-  @State private var expanded = false
-  /// Measured height of the fields region (everything above the conversation),
-  /// used as the compact detent so the sheet opens sized to its contents.
-  @State private var fieldsHeight: CGFloat = 0
-  /// Guards the commit-on-dismiss path so an explicit Save doesn't double-write.
-  @State private var didFinish = false
-  /// Scroll target for the conversation, so tapping its header glides it up.
-  private let convoAnchor = "conversation"
 
   private var isEditing: Bool {
     if case .edit = mode { return true }
@@ -51,109 +43,50 @@ struct TaskComposerCard: View {
   }
 
   private var headerTitle: String { isEditing ? "Edit To-Do" : "New Task" }
+  private var saveTitle: String { isEditing ? "Save" : "Add" }
 
-  private var destinationLabel: String {
-    if case .create = mode { return draft.listLabel(areas: areas, projects: projects) }
-    return ""
-  }
+  /// Close through the docked-inspector hook with a sheet `dismiss()` fallback —
+  /// the same close path `AdaptiveEditScaffold` uses, so terminal actions match.
+  private func close() { (adaptiveClose ?? { dismiss() })() }
 
   var body: some View {
-    // One scrolling space, two heights. The fields sit at the top; in edit mode
-    // the conversation lives below them in the SAME scroll. The sheet opens at a
-    // compact detent sized to the fields (so it reads as a quick-edit card) and
-    // grows to `.large` — pulling the transcript into view — when the user taps
-    // the conversation header or drags the sheet up. The fields stay editable at
-    // the top throughout: it's one object, not two surfaces.
-    ScrollViewReader { proxy in
+    // The standard adaptive edit drawer: a grouped sheet on iPhone, a docked
+    // inspector on iPad/macOS, Cancel/Save chrome owned by the scaffold. The
+    // content is a plain scroll — no custom detents — so it scrolls like every
+    // other edit form. Save persists + reloads; the scaffold then closes.
+    AdaptiveEditScaffold(
+      title: headerTitle,
+      saveTitle: saveTitle,
+      accent: accent,
+      canSave: draft.canSave,
+      onSave: { persist(); onDone() }
+    ) {
       ScrollView {
-        VStack(alignment: .leading, spacing: 12) {
-          // Fields region — its measured height becomes the compact detent.
-          VStack(alignment: .leading, spacing: 12) {
-            header
+        VStack(alignment: .leading, spacing: 14) {
+          titleNotesCard
 
-            VStack(alignment: .leading, spacing: 8) {
-              TextField("What needs doing?", text: $draft.title, axis: .vertical)
-                .textFieldStyle(.plain)
-                .font(.septenaTaskTitle)
-                .focused($titleFocused)
-                .lineLimit(1...4)
-                // macOS: a vertical-axis field doesn't insert a newline on plain
-                // Return (Option-Return does) — it fires onSubmit, so the iOS
-                // newline-as-save trick below never triggers. Commit here instead.
-                .onSubmit { if draft.canSave { commit() } }
+          quickEntryChips
 
-              Divider()
-
-              // Optional notes — room to paste or explain context.
-              TextField("Notes", text: $draft.notes, axis: .vertical)
-                .textFieldStyle(.plain)
-                .font(.septenaNotes)
-                .foregroundStyle(Theme.inkSecondary)
-                .lineLimit(3...10)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(Theme.secondaryGroupedBackground,
-                        in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-
-            quickEntryChips
-
-            TaskAttributeBar(
-              draft: $draft,
-              areas: areas,
-              projects: projects,
-              accent: accent,
-              onInteractStart: { titleFocused = false }
-            )
-          }
-          .background(
-            GeometryReader { g in
-              Color.clear.preference(key: FieldsHeightKey.self, value: g.size.height)
-            }
+          TaskAttributeBar(
+            draft: $draft,
+            areas: areas,
+            projects: projects,
+            accent: accent,
+            onInteractStart: { titleFocused = false }
           )
 
-          // The agent exchange, in the same scroll. Tapping its header (or
-          // dragging the sheet up) grows the sheet to `.large` and scrolls it
-          // into view. Edit mode only — a not-yet-created task has no
-          // id/conversation. docs/TASK_CONVERSATIONS_PHASE1.md.
+          // Edit mode only — a not-yet-created task has no id/conversation.
+          // docs/TASK_CONVERSATIONS_PHASE1.md.
           if case .edit(let task) = mode {
-            ConversationSection(task: task, accent: accent, expanded: $expanded) {
-              expand(via: proxy)
-            }
-            .id(convoAnchor)
+            ConversationSection(task: task, accent: accent)
+            terminalActions(task)
           }
         }
         .padding(16)
       }
+      .scrollDismissesKeyboard(.interactively)
     }
-    .scrollDismissesKeyboard(.interactively)
-    .onPreferenceChange(FieldsHeightKey.self) { fieldsHeight = $0 }
-    #if os(iOS)
-    .presentationDetents(detentSet, selection: detentSelection)
-    .presentationDragIndicator(.visible)
-    .presentationContentInteraction(.scrolls)
-    #endif
-    .presentationBackground {
-      // White (paper) glass: tint the translucent material with the system
-      // background so it reads white in light mode. Adaptive — near-black in dark.
-      Rectangle().fill(.ultraThinMaterial)
-        .overlay(Rectangle().fill(Theme.paperBackground.opacity(0.6)))
-        .ignoresSafeArea()
-    }
-    #if os(macOS)
-    // No detents on macOS — Escape cancels without saving.
-    .onExitCommand { onDismiss() }
-    .frame(minWidth: 420, minHeight: 480)
-    #endif
     .onAppear(perform: seed)
-    // Swipe-down / outside dismissal commits the task (Reminders-style) when
-    // there's something to save — matching the old scrim-tap behaviour. The
-    // guard stops an explicit Save (which already persisted) from double-writing.
-    .onDisappear {
-      guard !didFinish, draft.canSave else { return }
-      persist()
-      onDone()
-    }
     .onChange(of: draft.title) { _, newValue in
       // The title wraps (axis: .vertical) so long titles show in full instead
       // of truncating — but it stays single-line in spirit: a Return inserts a
@@ -168,6 +101,66 @@ struct TaskComposerCard: View {
     }
   }
 
+  // MARK: - Title / notes
+
+  private var titleNotesCard: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      TextField("What needs doing?", text: $draft.title, axis: .vertical)
+        .textFieldStyle(.plain)
+        .font(.septenaTaskTitle)
+        .focused($titleFocused)
+        .lineLimit(1...4)
+        // macOS: a vertical-axis field fires onSubmit on plain Return (the iOS
+        // newline-as-save trick never triggers there) — commit here instead.
+        .onSubmit { if draft.canSave { commit() } }
+
+      Divider()
+
+      // Optional notes — room to paste or explain context.
+      TextField("Notes", text: $draft.notes, axis: .vertical)
+        .textFieldStyle(.plain)
+        .font(.septenaNotes)
+        .foregroundStyle(Theme.inkSecondary)
+        .lineLimit(3...10)
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 12)
+    .background(Theme.secondaryGroupedBackground,
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+  }
+
+  // MARK: - Terminal actions (edit mode)
+
+  /// Complete / Cancel / Delete, at the bottom of the scroll (the scaffold owns
+  /// the toolbar, so these standard destructive rows replace the old … menu).
+  @ViewBuilder
+  private func terminalActions(_ task: SeptenaTask) -> some View {
+    VStack(spacing: 0) {
+      actionRow("Complete", "checkmark.circle") { mutator.complete(id: task.id) }
+      Divider().padding(.leading, 14)
+      actionRow("Cancel Task", "xmark.circle") { mutator.cancel(id: task.id) }
+      Divider().padding(.leading, 14)
+      actionRow("Delete To-Do", "trash", destructive: true) { mutator.delete(id: task.id) }
+    }
+    .background(Theme.secondaryGroupedBackground,
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+  }
+
+  private func actionRow(_ title: String, _ icon: String, destructive: Bool = false,
+                         _ action: @escaping () -> Void) -> some View {
+    Button(role: destructive ? .destructive : nil) {
+      action(); onDone(); close()
+    } label: {
+      Label(title, systemImage: icon)
+        .font(.septenaSidebarRow)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14).padding(.vertical, 12)
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .foregroundStyle(destructive ? Theme.overdueRed : Theme.inkPrimary)
+  }
+
   private func updateSuggestion() {
     guard case .create = mode else { return }
     if draft.projectId != nil || draft.areaId != nil {
@@ -175,60 +168,6 @@ struct TaskComposerCard: View {
     } else {
       suggestedList = SuggestionEngine.shared.suggest(forText: draft.title)
     }
-  }
-
-  // MARK: - Header
-
-  @ViewBuilder
-  private var header: some View {
-    HStack(spacing: 8) {
-      Text(headerTitle)
-        .font(.septenaSectionTitle)
-        .foregroundStyle(Theme.inkPrimary)
-      Spacer()
-      if case .create = mode {
-        Text("Adding to \(destinationLabel)")
-          .font(.septenaMeta)
-          .foregroundStyle(Theme.inkSecondary)
-      } else if case .edit(let task) = mode {
-        Menu {
-          // Conclude the task right from the editor — completes and closes.
-          Button { mutator.complete(id: task.id); finish() } label: {
-            Label("Complete", systemImage: "checkmark.circle")
-          }
-          // "Move to Someday" now lives in the When control. This menu keeps
-          // the terminal actions.
-          Button { mutator.cancel(id: task.id); finish() } label: {
-            Label("Cancel Task", systemImage: "xmark.circle")
-          }
-          Divider()
-          Button(role: .destructive) { mutator.delete(id: task.id); finish() } label: {
-            Label("Delete To-Do", systemImage: "trash")
-          }
-        } label: {
-          Image(systemName: "ellipsis.circle")
-            .font(.system(size: 20))
-            .foregroundStyle(Theme.inkSecondary)
-        }
-      }
-      // Confirm / save — top-right, just past the … menu, instead of crammed
-      // into the title row.
-      confirmButton
-    }
-  }
-
-  /// Commits the draft and closes. Create shows an up-arrow, edit a checkmark;
-  /// dims until there's a savable title.
-  private var confirmButton: some View {
-    Button(action: commit) {
-      Image(systemName: isEditing ? "checkmark.circle.fill" : "arrow.up.circle.fill")
-        .font(.system(size: 26))
-        .symbolRenderingMode(.hierarchical)
-        .foregroundStyle(draft.canSave ? accent : Theme.inkSecondary.opacity(0.4))
-    }
-    .buttonStyle(.plain)
-    .disabled(!draft.canSave)
-    .accessibilityLabel(isEditing ? "Save" : "Add Task")
   }
 
   // MARK: - Quick entry
@@ -358,8 +297,8 @@ struct TaskComposerCard: View {
     }
   }
 
-  /// Writes the draft through the mutator. Split from `finish()` so the
-  /// commit-on-dismiss path (onDisappear) can persist without re-closing.
+  /// Writes the draft through the mutator. The scaffold's Save runs this then
+  /// closes; the title-newline path runs it through `commit()`.
   private func persist() {
     switch mode {
     case .create:
@@ -374,52 +313,14 @@ struct TaskComposerCard: View {
     }
   }
 
+  /// Persist + reload + close (the Return-to-save path; the scaffold's Save
+  /// button does the same via its own close).
   private func commit() {
     guard draft.canSave else { return }
     Haptics.tick()
     persist()
-    finish()
-  }
-
-  /// Reload the caller's list and close. Sets `didFinish` so the onDisappear
-  /// commit-on-dismiss guard doesn't write a second time.
-  private func finish() {
-    didFinish = true
     onDone()
-    onDismiss()
-  }
-
-  // MARK: - Detents
-
-  /// Pull the sheet to `.large` and glide the conversation into view.
-  private func expand(via proxy: ScrollViewProxy) {
-    titleFocused = false
-    withAnimation(.snappy(duration: 0.28)) {
-      expanded = true
-      proxy.scrollTo(convoAnchor, anchor: .top)
-    }
-  }
-
-  #if os(iOS)
-  /// Compact detent = the measured fields height (sized to contents); `.medium`
-  /// until the first measurement lands. `.large` is the expanded conversation
-  /// reach. The set must contain whatever `detentSelection` currently returns.
-  private var compactDetent: PresentationDetent {
-    fieldsHeight > 1 ? .height(fieldsHeight + 40) : .medium
-  }
-  private var detentSet: Set<PresentationDetent> { [compactDetent, .large] }
-  private var detentSelection: Binding<PresentationDetent> {
-    Binding(get: { expanded ? .large : compactDetent },
-            set: { expanded = ($0 == .large) })
-  }
-  #endif
-}
-
-/// Carries the fields region's height up so the compact detent can size to it.
-private struct FieldsHeightKey: PreferenceKey {
-  static var defaultValue: CGFloat = 0
-  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-    value = max(value, nextValue())
+    close()
   }
 }
 
@@ -490,12 +391,11 @@ struct TaskAttributeBar: View {
     }
   }
 
-  /// The List pill shows its destination only when explicitly filed somewhere
-  /// (so an unset pill reads "List", not "Inbox").
+  /// The List pill always names its destination — "Inbox" by default, the area
+  /// or project once filed. (This replaces the old "Adding to …" header caption;
+  /// the pill is tinted only when explicitly filed, see its `isSet`.)
   private var listValue: String? {
-    (draft.areaId != nil || draft.projectId != nil)
-      ? draft.listLabel(areas: areas, projects: projects)
-      : nil
+    draft.listLabel(areas: areas, projects: projects)
   }
 
   /// "When" folds in Today and Someday: a task pinned to today (no date) reads
@@ -578,7 +478,9 @@ private struct AttributePill: View {
       HStack(spacing: 5) {
         Image(systemName: icon)
           .font(.system(size: 12, weight: .semibold))
-        Text(isSet ? (value ?? label) : label)
+        // Text follows the value when one exists (so the List pill can read
+        // "Inbox" while still untinted); tint stays driven by `isSet`.
+        Text(value ?? label)
           .font(.septenaLabel)
           .lineLimit(1)
       }
@@ -784,15 +686,15 @@ private struct InlineRepeatPanel: View {
 // MARK: - Presentation
 
 extension View {
-  /// Present the composer as a bottom sheet (a centered modal on macOS). The
-  /// composer card owns its own `.presentationDetents`, so it opens compact —
-  /// sized to its fields — and grows to `.large` when its conversation expands.
-  /// Presented on the launching view so it stacks above any sheet/drawer that
-  /// view lives in (e.g. the Tasks dashboard drawer), which survives underneath.
-  func taskComposerSheet<Card: View>(
+  /// Present the composer as the app's standard adaptive edit drawer — a sheet
+  /// on iPhone, a docked inspector on iPad/macOS — the same `.adaptiveDetail`
+  /// primitive every other section's edit form uses. The composer's
+  /// `AdaptiveEditScaffold` supplies the Cancel/Save chrome and closes through
+  /// the injected hook.
+  func taskComposerDrawer<Card: View>(
     isPresented: Binding<Bool>,
     @ViewBuilder card: @escaping () -> Card
   ) -> some View {
-    sheet(isPresented: isPresented) { card() }
+    adaptiveDetail(isPresented: isPresented) { card() }
   }
 }

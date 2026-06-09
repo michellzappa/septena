@@ -337,18 +337,16 @@ struct TaskListView: View {
       }
     }
     // The composer — used for BOTH create (tab + / ⌘N / sidebar) and edit (row
-    // tap / (i) button). A bottom sheet that opens compact (sized to its fields)
-    // and grows to `.large` when a task's conversation expands. Commits through
-    // `TaskDraft` so the Things-style scheduled/today/list mapping lives in one
-    // place.
-    .taskComposerSheet(isPresented: composerBinding) {
+    // tap / (i) button). The app's standard adaptive edit drawer (sheet on
+    // iPhone, inspector on iPad/macOS). Commits through `TaskDraft` so the
+    // Things-style scheduled/today/list mapping lives in one place.
+    .taskComposerDrawer(isPresented: composerBinding) {
       if let mode = composerMode {
         TaskComposerCard(
           mode: mode,
           areas: areas,
           projects: projects,
           accent: theme.color(for: "tasks"),
-          onDismiss: closeComposer,
           onDone: { Task { await load() } }
         )
       }

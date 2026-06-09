@@ -2405,14 +2405,13 @@ struct WeekDashboardView: View {
       .presentationDragIndicator(.visible)
       #endif
     }
-    // Tasks-tile "Create in Inbox…" — the composer, as a sheet over the homepage.
-    .taskComposerSheet(isPresented: $creatingTask) {
+    // Tasks-tile "Create in Inbox…" — the composer, as the standard edit drawer.
+    .taskComposerDrawer(isPresented: $creatingTask) {
       TaskComposerCard(
         mode: .create(.inbox),
         areas: LocalCache.areas(in: modelContext),
         projects: LocalCache.projects(in: modelContext),
         accent: theme.color(for: "tasks"),
-        onDismiss: { creatingTask = false },
         onDone: { Task { await refreshTasks() } }
       )
     }

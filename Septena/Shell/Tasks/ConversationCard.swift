@@ -211,29 +211,21 @@ struct ConversationCard: View {
   }
 }
 
-/// The conversation as it lives inside the task composer's scroll: a tappable
-/// header (badge + one-line summary + ⓘ + chevron) followed by the persistent
-/// `ConversationCard` and the `AskAIButton` (shown only before a conversation
-/// exists). The header drives the sheet's detents — tapping it asks the composer
-/// to grow to `.large` and scroll here; tapping again collapses back. The card
-/// itself always renders below, so at the compact detent it simply sits below
-/// the fold (drag the sheet up and it's there). One object, two heights.
+/// The conversation as a normal section inside the task composer's scroll: a
+/// summary header (icon + one-line status + badge + ⓘ) over the persistent
+/// `ConversationCard` and the `AskAIButton` (the latter shows only before a
+/// conversation exists). It scrolls with the rest of the drawer — no special
+/// expand mechanic; it's just another section, like every other edit form.
 struct ConversationSection: View {
   let task: SeptenaTask
   let accent: Color
-  @Binding var expanded: Bool
-  /// Grow the sheet to `.large` and scroll the conversation into view.
-  let onExpand: () -> Void
 
   @State private var convo: TaskConvo
   @State private var showInfo = false
 
-  init(task: SeptenaTask, accent: Color, expanded: Binding<Bool>,
-       onExpand: @escaping () -> Void) {
+  init(task: SeptenaTask, accent: Color) {
     self.task = task
     self.accent = accent
-    _expanded = expanded
-    self.onExpand = onExpand
     _convo = State(initialValue: task.conversation)
   }
 
@@ -254,37 +246,22 @@ struct ConversationSection: View {
 
   private var header: some View {
     HStack(spacing: 10) {
-      Button { toggle() } label: {
-        HStack(spacing: 10) {
-          Image(systemName: convo.hasStarted ? "bubble.left.and.bubble.right.fill" : "sparkles")
-            .font(.callout).foregroundStyle(accent)
-            .frame(width: 22)
-          VStack(alignment: .leading, spacing: 1) {
-            Text(summary.title).font(.subheadline).foregroundStyle(Theme.inkPrimary)
-            Text(summary.detail).font(.caption).foregroundStyle(Theme.inkSecondary)
-              .lineLimit(1)
-          }
-          Spacer(minLength: 6)
-          if let badge = summary.badge { badgeGlyph(badge) }
-          Image(systemName: expanded ? "chevron.down" : "chevron.up")
-            .font(.caption).foregroundStyle(.tertiary)
-        }
-        .contentShape(Rectangle())
+      Image(systemName: convo.hasStarted ? "bubble.left.and.bubble.right.fill" : "sparkles")
+        .font(.callout).foregroundStyle(accent)
+        .frame(width: 22)
+      VStack(alignment: .leading, spacing: 1) {
+        Text(summary.title).font(.subheadline).foregroundStyle(Theme.inkPrimary)
+        Text(summary.detail).font(.caption).foregroundStyle(Theme.inkSecondary)
+          .lineLimit(1)
       }
-      .buttonStyle(.plain)
-
+      Spacer(minLength: 6)
+      if let badge = summary.badge { badgeGlyph(badge) }
       Button { showInfo = true } label: {
         Image(systemName: "info.circle").font(.callout)
       }
       .buttonStyle(.borderless).foregroundStyle(.secondary)
       .help("How AI helps with your tasks")
     }
-  }
-
-  /// Collapsed → ask the composer to grow + scroll; expanded → collapse back.
-  private func toggle() {
-    if expanded { withAnimation(.snappy(duration: 0.28)) { expanded = false } }
-    else { onExpand() }
   }
 
   /// Title / one-line detail / optional badge for the current convo state.
