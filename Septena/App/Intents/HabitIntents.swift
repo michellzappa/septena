@@ -66,6 +66,7 @@ struct HabitEntityQuery: EntityQuery {
   @MainActor
   func suggestedEntities() async throws -> [HabitEntity] {
     await SeptenaServices.shared.start()
+    guard SeptenaServices.shared.isSectionEnabled("habits") else { return [] }
     return Self.catalog()
   }
 
@@ -96,7 +97,7 @@ struct MarkHabitDoneIntent: SectionLogIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult & ProvidesDialog {
-    await prepareSection()
+    try await requireSection()
     SeptenaServices.shared.checklistMutator.toggleHabit(
       id: habit.id, date: SeptenaDate.today, done: true)
     return .result(dialog: "Marked \(habit.title) as done.")
@@ -117,7 +118,7 @@ struct AddHabitIntent: SectionLogIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult & ProvidesDialog {
-    await prepareSection()
+    try await requireSection()
     _ = SeptenaServices.shared.checklistMutator.createHabit(
       name: name, bucket: bucket.rawValue)
     return .result(dialog: "Added \(name) to your habits.")

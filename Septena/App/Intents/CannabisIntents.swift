@@ -70,7 +70,7 @@ struct LogCannabisIntent: SectionLogIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult & ProvidesDialog {
-    await prepareSection()
+    try await requireSection()
     // Vape defaults to a single hit, as in-app.
     let resolvedHit = method == .vape ? (hits ?? 1) : hits
     SeptenaServices.shared.cannabisMutator.addEntry(

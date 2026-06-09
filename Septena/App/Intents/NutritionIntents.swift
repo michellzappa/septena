@@ -59,7 +59,7 @@ struct LogMealIntent: SectionLogIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult & ProvidesDialog {
-    await prepareSection()
+    try await requireSection()
     let items = foods
       .split(whereSeparator: { $0.isNewline || $0 == "," })
       .map { $0.trimmingCharacters(in: .whitespaces) }

@@ -70,12 +70,12 @@ enum MCPDispatch {
   /// order. A section enabled but absent from the order is NOT exposed, so a
   /// half-configured section can't leak its tools. No sections at all ⇒ empty
   /// (globals only), never "everything".
+  ///
+  /// Delegates to `SeptenaServices.enabledSectionKeys()` so the MCP tool list
+  /// and the App Intents surface (`SectionLogIntent.requireSection`) share ONE
+  /// gate and can't drift.
   private static func enabledSections() -> Set<String> {
-    let sections = SettingsMirror.loadSections(context: ctx)
-    let enabled = Set(sections.filter(\.isEnabled).map(\.key))
-    let order = SettingsMirror.loadSettings(context: ctx)?.sectionOrder ?? []
-    guard !order.isEmpty else { return enabled }
-    return Set(order.filter(enabled.contains))
+    SeptenaServices.shared.enabledSectionKeys()
   }
 
   // MARK: - Startup gating

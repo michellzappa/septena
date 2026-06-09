@@ -47,6 +47,7 @@ struct GroceryItemChoiceQuery: EntityQuery {
   @MainActor
   func suggestedEntities() async throws -> [GroceryItemChoice] {
     await SeptenaServices.shared.start()
+    guard SeptenaServices.shared.isSectionEnabled("groceries") else { return [] }
     return Self.catalog()
   }
 
@@ -91,6 +92,7 @@ struct GroceryCategoryChoiceQuery: EntityQuery {
   @MainActor
   func suggestedEntities() async throws -> [GroceryCategoryChoice] {
     await SeptenaServices.shared.start()
+    guard SeptenaServices.shared.isSectionEnabled("groceries") else { return [] }
     return Self.catalog()
   }
 
@@ -123,7 +125,7 @@ struct MarkGroceryLowIntent: SectionLogIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult & ProvidesDialog {
-    await prepareSection()
+    try await requireSection()
     SeptenaServices.shared.groceryMutator.setLow(id: item.id, low: true)
     return .result(dialog: "Added \(item.title) to your shopping list.")
   }
@@ -149,7 +151,7 @@ struct AddGroceryItemIntent: SectionLogIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult & ProvidesDialog {
-    await prepareSection()
+    try await requireSection()
     let mutator = SeptenaServices.shared.groceryMutator
     let categoryID = category?.id ?? Self.fallbackCategoryID(using: mutator)
     _ = mutator.addItem(name: name, category: categoryID)

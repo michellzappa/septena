@@ -44,6 +44,7 @@ struct CaffeineBeanChoiceQuery: EntityQuery {
   @MainActor
   func suggestedEntities() async throws -> [CaffeineBeanChoice] {
     await SeptenaServices.shared.start()
+    guard SeptenaServices.shared.isSectionEnabled("caffeine") else { return [] }
     return Self.catalog()
   }
 
@@ -112,7 +113,7 @@ struct LogCaffeineIntent: SectionLogIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult & ProvidesDialog {
-    await prepareSection()
+    try await requireSection()
     // `beans` is stored as the bean's display name (matching the in-app
     // quick-log path), not its id; the AppEntity id only stabilizes
     // resolution across renames.

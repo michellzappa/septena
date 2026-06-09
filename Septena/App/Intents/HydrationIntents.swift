@@ -30,7 +30,7 @@ struct LogWaterIntent: SectionLogIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult & ProvidesDialog {
-    await prepareSection()
+    try await requireSection()
     // Mirrors HydrationDestinationView.commit(ml:) exactly: a water-only
     // NutritionEntryEntity (foods == ["Water"], macros 0) via the shared
     // NutritionMutator — hydration has no mutator of its own.

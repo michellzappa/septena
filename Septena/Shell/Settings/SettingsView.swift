@@ -484,6 +484,7 @@ struct SettingsView: View {
     case notifications
     case motionGallery
     case localMcp
+    case ai
     case section(String)
   }
 
@@ -591,7 +592,7 @@ struct SettingsView: View {
 
   private var staticDestinations: [SettingsDestination] {
     var dests: [SettingsDestination] =
-      [.general, .integrations, .importExport, .skills, .manageSections, .motionGallery]
+      [.general, .ai, .integrations, .importExport, .skills, .manageSections, .motionGallery]
     #if os(macOS)
     // The loopback MCP server only runs on the Mac (long-lived desktop
     // process a local Claude Code can dial); the row never appears on iOS.
@@ -658,6 +659,7 @@ struct SettingsView: View {
     case .integrations: return "Integrations"
     case .importExport: return "Import & Export"
     case .skills:       return "Skills"
+    case .ai:           return "AI"
     case .siriShortcuts: return "Siri & Shortcuts"
     case .privacy:      return "Privacy"
     case .about:        return "About"
@@ -687,6 +689,7 @@ struct SettingsView: View {
     case .integrations: return "app.connected.to.app.below.fill"
     case .importExport: return "square.and.arrow.up.on.square"
     case .skills:       return "sparkles"
+    case .ai:           return "brain.head.profile"
     case .siriShortcuts: return "mic"
     case .privacy:      return "hand.raised"
     case .about:        return "info.circle"
@@ -731,6 +734,7 @@ struct SettingsView: View {
     case .integrations:      IntegrationsSettingsPane()
     case .importExport:      ImportExportSettingsPane()
     case .skills:            SkillsSettingsPane()
+    case .ai:                AISettingsPane()
     case .siriShortcuts:     SiriShortcutsSettingsPane()
     case .privacy:           PrivacySettingsPane()
     case .about:             AboutSettingsPane()
@@ -2684,6 +2688,11 @@ struct ManageSectionsPane: View {
                                      enabled: enabled,
                                      context: modelContext,
                                      engine: ckEngine)
+    #if os(iOS)
+    // Section toggled in-session — refresh App Shortcut suggestions so its
+    // items stop appearing in Siri / Spotlight (or re-appear when enabled).
+    SeptenaShortcuts.updateAppShortcutParameters()
+    #endif
     store.sections = store.sections.map { config in
       config.key == key
         ? SectionConfig(key: config.key,

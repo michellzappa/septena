@@ -44,6 +44,7 @@ struct ChoreEntityQuery: EntityQuery {
   @MainActor
   func suggestedEntities() async throws -> [ChoreEntity] {
     await SeptenaServices.shared.start()
+    guard SeptenaServices.shared.isSectionEnabled("chores") else { return [] }
     return Self.catalog()
   }
 
@@ -74,7 +75,7 @@ struct CompleteChoreIntent: SectionLogIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult & ProvidesDialog {
-    await prepareSection()
+    try await requireSection()
     SeptenaServices.shared.checklistMutator.completeChore(
       id: chore.id, date: SeptenaDate.today)
     return .result(dialog: "Marked \(chore.title) complete.")
@@ -99,7 +100,7 @@ struct AddChoreIntent: SectionLogIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult & ProvidesDialog {
-    await prepareSection()
+    try await requireSection()
     _ = SeptenaServices.shared.checklistMutator.createChore(
       name: name, cadenceDays: cadenceDays)
     return .result(dialog: "Added \(name) to your chores.")

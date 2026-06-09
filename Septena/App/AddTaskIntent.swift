@@ -19,7 +19,7 @@ struct AddTaskIntent: SectionLogIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult & ProvidesDialog {
-    await prepareSection()
+    try await requireSection()
     _ = SeptenaServices.shared.taskMutator.create(title: taskTitle)
     return .result(dialog: "Added “\(taskTitle)” to Septena.")
   }

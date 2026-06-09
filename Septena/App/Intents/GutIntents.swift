@@ -77,7 +77,7 @@ struct LogGutEntryIntent: SectionLogIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult & ProvidesDialog {
-    await prepareSection()
+    try await requireSection()
     SeptenaServices.shared.gutMutator.addEntry(
       date: SeptenaDate.today,
       time: nowTimeString(),

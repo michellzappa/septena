@@ -2,7 +2,12 @@
 
 Prioritized backlog for the App Intents surface. Companion to
 `docs/CORE_AI_iOS27_PREP.md` (Appendix B is the summary; this is the actionable
-list). Planning only — no code until the Xcode 27 beta is installed.
+list).
+
+**Update 2026-06-09:** the Tasks + section-gating pass (AI-1/2/3/5/6/7) is
+implemented on the current SDK (no iOS 27 beta APIs) and builds green on both the
+iOS and macOS schemes. Disabled-section policy chosen = **refuse politely**.
+Remaining items (AI-4, AI-8, P2) are still open.
 
 ## Why this matters now
 
@@ -31,28 +36,33 @@ list). Planning only — no code until the Xcode 27 beta is installed.
 
 ## Status snapshot
 
-- 17 intents across 13 loggable sections; every loggable section has ≥1 primary
-  log intent. Coverage is *good for logging*, *thin for Tasks*, with one
-  parity divergence (Mood).
-- 18 manifest sections total; read-only/derived (sleep, github, insights) need
-  no log intent. `body`/`activity` unevaluated.
+- **20 intents** across 13 loggable sections — Tasks now has Add + Complete +
+  Move-to-Today + Defer (`Septena/App/Intents/TaskIntents.swift`). Every
+  loggable section has ≥1 primary log intent.
+- App Intents now mirror MCP's enabled-section gate: a disabled section's
+  intents **refuse** (`SectionLogIntent.requireSection()`) and its pickers go
+  empty (`EntityQuery.suggestedEntities()`), both via the shared
+  `SeptenaServices.isSectionEnabled(_:)` / `enabledSectionKeys()` — the same set
+  `MCPDispatch` uses, so the two surfaces can't drift.
+- Remaining: Mood MCP parity (AI-4, cross-repo), `body`/`activity` eval (AI-8),
+  P2 polish. 18 manifest sections total; sleep/github/insights stay read-only.
 
 ## Priority table
 
-| ID | Item | Pri | Effort | Depends |
-|----|------|-----|--------|---------|
-| AI-1 | Task `AppEntity` + `EntityQuery` | P0 | M | — |
-| AI-2 | `CompleteTaskIntent` | P0 | S | AI-1 |
-| AI-3 | `MoveToTodayIntent` + `DeferTaskIntent` | P0 | S | AI-1 |
-| AI-4 | Mood MCP parity (`mood_events_list` + `mood_event_log`) | P0 | M | — |
-| AI-5 | Shared "loggable AND enabled" gate | P1 | M | — |
-| AI-6 | `updateAppShortcutParameters()` on section toggle | P1 | S | AI-5 |
-| AI-7 | Disabled-section policy (refuse vs re-enable) | P1 | S | AI-5 + decision |
-| AI-8 | Evaluate `body`/`activity` loggability | P1 | S | — |
-| AI-9 | Read-intents (water/meal/today summaries) | P2 | M | AI-1 (today) |
-| AI-10 | Re-curate the 10 zero-config phrases | P2 | S | AI-2/3 |
-| AI-11 | Secondary write parity (update/uncomplete) | P2 | S | — |
-| AI-12 | Widget / Control Center / interactive surfaces | P2 | M | AI-1 |
+| ID | Item | Pri | Effort | Depends | Status |
+|----|------|-----|--------|---------|--------|
+| AI-1 | Task `AppEntity` + `EntityQuery` (`TaskChoice`) | P0 | M | — | ✅ done |
+| AI-2 | `CompleteTaskIntent` | P0 | S | AI-1 | ✅ done |
+| AI-3 | `MoveTaskToTodayIntent` + `DeferTaskIntent` | P0 | S | AI-1 | ✅ done |
+| AI-4 | Mood MCP parity (`mood_events_list` + `mood_event_log`) | P0 | M | — | ⬜ open (cross-repo) |
+| AI-5 | Shared "loggable AND enabled" gate | P1 | M | — | ✅ done (`isSectionEnabled`) |
+| AI-6 | `updateAppShortcutParameters()` on section toggle | P1 | S | AI-5 | ✅ done (launch + toggle) |
+| AI-7 | Disabled-section policy → **refuse politely** | P1 | S | AI-5 + decision | ✅ done |
+| AI-8 | Evaluate `body`/`activity` loggability | P1 | S | — | ⬜ open |
+| AI-9 | Read-intents (water/meal/today summaries) | P2 | M | AI-1 (today) | ⬜ open |
+| AI-10 | Re-curate the 10 zero-config phrases | P2 | S | AI-2/3 | ⬜ open |
+| AI-11 | Secondary write parity (update/uncomplete) | P2 | S | — | ⬜ open |
+| AI-12 | Widget / Control Center / interactive surfaces | P2 | M | AI-1 | ⬜ open |
 
 ---
 

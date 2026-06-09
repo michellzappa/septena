@@ -1,4 +1,5 @@
 import AppIntents
+import Foundation
 
 // App Intents spine — every loggable section action becomes a Shortcut, a
 // Siri phrase, and a Spotlight result through this one pattern.
@@ -29,21 +30,36 @@ extension SectionLogIntent {
   var manifest: SectionManifest { SectionManifest.byKey[Self.sectionKey]! }
 
   /// Run before every mutation. Boots the CloudKit-backed stack
-  /// (idempotent; safe on a cold background launch) and turns the section
-  /// on if it was off.
+  /// (idempotent; safe on a cold background launch), then REFUSES if the
+  /// section is turned off.
   ///
   /// ENABLEMENT. App Shortcuts are extracted statically by the OS at
   /// install/update time, so the *set* of shortcuts can't be filtered by the
   /// runtime `SectionEntity.isEnabled` flag — the system wouldn't see the
-  /// change. Enablement is honored here at run time instead: logging to a
-  /// section is implicit consent to use it, and a disable never drops data,
-  /// so we silently re-enable rather than refuse. The surfaces that DO
-  /// reflect data live are the parameter pickers (`EntityQuery` reads the
-  /// real catalog) and, later, Spotlight entity indexing.
+  /// change. We honor enablement at run time instead, and we mirror MCP: a
+  /// disabled section's tools simply aren't available. Rather than silently
+  /// re-enabling on use, we throw `SectionDisabledError`, which Siri /
+  /// Shortcuts surface as a spoken reason. The other surface that reflects
+  /// this is the parameter picker — each `EntityQuery.suggestedEntities()`
+  /// returns nothing for a disabled section. `.always` sections (tasks, goals)
+  /// are locked on and always pass.
   @MainActor
-  func prepareSection() async {
+  func requireSection() async throws {
     await SeptenaServices.shared.start()
-    SeptenaServices.shared.ensureSectionEnabled(Self.sectionKey)
+    guard SeptenaServices.shared.isSectionEnabled(Self.sectionKey) else {
+      throw SectionDisabledError(label: manifest.defaultLabel)
+    }
+  }
+}
+
+/// Thrown by `requireSection()` when an intent targets a section the user has
+/// turned off. Conforms to `CustomLocalizedStringResourceConvertible` so Siri
+/// and the Shortcuts app present the reason to the person instead of a generic
+/// failure.
+struct SectionDisabledError: Error, CustomLocalizedStringResourceConvertible {
+  let label: String
+  var localizedStringResource: LocalizedStringResource {
+    "\(label) is turned off in Septena. Turn it on to use this action."
   }
 }
 

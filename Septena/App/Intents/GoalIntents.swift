@@ -21,7 +21,7 @@ struct AddGoalIntent: SectionLogIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult & ProvidesDialog {
-    await prepareSection()
+    try await requireSection()
     _ = SeptenaServices.shared.goalMutator.createGoal(text: text)
     return .result(dialog: "Added \(text) to your goals.")
   }

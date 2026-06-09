@@ -44,6 +44,7 @@ struct SupplementEntityQuery: EntityQuery {
   @MainActor
   func suggestedEntities() async throws -> [SupplementEntity] {
     await SeptenaServices.shared.start()
+    guard SeptenaServices.shared.isSectionEnabled("supplements") else { return [] }
     return Self.catalog()
   }
 
@@ -74,7 +75,7 @@ struct MarkSupplementTakenIntent: SectionLogIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult & ProvidesDialog {
-    await prepareSection()
+    try await requireSection()
     SeptenaServices.shared.checklistMutator.toggleSupplement(
       id: supplement.id, date: SeptenaDate.today, done: true)
     return .result(dialog: "Marked \(supplement.title) as taken.")
@@ -92,7 +93,7 @@ struct AddSupplementIntent: SectionLogIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult & ProvidesDialog {
-    await prepareSection()
+    try await requireSection()
     _ = SeptenaServices.shared.checklistMutator.createSupplement(name: name)
     return .result(dialog: "Added \(name) to your supplements.")
   }

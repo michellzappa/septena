@@ -81,6 +81,40 @@ final class SeptenaServices {
       engine: ckEngine)
   }
 
+  /// The section keys that are active right now — `isEnabled` AND, when
+  /// `section_order` is non-empty, present in that order. The single gate
+  /// shared by the MCP tool list (`MCPDispatch`) and the App Intents surface
+  /// (`SectionLogIntent.requireSection`) so both honor the SAME enabled-section
+  /// rule. Mirrors the gateway's tools/list rule: a half-configured section
+  /// (enabled but absent from the order) is NOT active, and no sections at all
+  /// ⇒ empty, never "everything".
+  func enabledSectionKeys() -> Set<String> {
+    let context = LocalStore.shared.container.mainContext
+    let sections = SettingsMirror.loadSections(context: context)
+    let enabled = Set(sections.filter(\.isEnabled).map(\.key))
+    let order = SettingsMirror.loadSettings(context: context)?.sectionOrder ?? []
+    guard !order.isEmpty else { return enabled }
+    return Set(order.filter(enabled.contains))
+  }
+
+  /// Section keys whose actions are ALWAYS available — the App Intents twin of
+  /// MCP's GLOBAL tools. `MCPToolCatalog.global` exposes tasks + goals
+  /// regardless of section enablement (they're structural, not life-domain
+  /// logs), so their intents must stay available too even if the user hides the
+  /// section. Everything else is a life-domain that gates on enablement.
+  static let alwaysAvailableSectionKeys: Set<String> = ["tasks", "goals"]
+
+  /// Whether a section may be written to right now. Always-on for `.always`
+  /// sections and the MCP-global keys (tasks, goals); every other section must
+  /// be in `enabledSectionKeys()`. App Intents call this to refuse politely
+  /// when a section is off — matching MCP, which simply doesn't advertise a
+  /// disabled section's tools.
+  func isSectionEnabled(_ key: String) -> Bool {
+    if SectionManifest.byKey[key]?.activation == .always { return true }
+    if SeptenaServices.alwaysAvailableSectionKeys.contains(key) { return true }
+    return enabledSectionKeys().contains(key)
+  }
+
   /// Idempotent. First caller wires CKEngine's record provider / apply
   /// closures, binds the three mutators, and starts the engine.
   /// Subsequent callers await the same in-flight (or completed) work

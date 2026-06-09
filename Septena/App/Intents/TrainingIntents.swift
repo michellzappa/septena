@@ -45,6 +45,7 @@ struct ExerciseEntityQuery: EntityQuery {
   @MainActor
   func suggestedEntities() async throws -> [ExerciseChoice] {
     await SeptenaServices.shared.start()
+    guard SeptenaServices.shared.isSectionEnabled("training") else { return [] }
     return Self.catalog()
   }
 
@@ -87,6 +88,7 @@ struct TrainingSessionTypeQuery: EntityQuery {
   @MainActor
   func suggestedEntities() async throws -> [TrainingSessionTypeChoice] {
     await SeptenaServices.shared.start()
+    guard SeptenaServices.shared.isSectionEnabled("training") else { return [] }
     return Self.catalog()
   }
 
@@ -135,7 +137,7 @@ struct LogTrainingIntent: SectionLogIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult & ProvidesDialog {
-    await prepareSection()
+    try await requireSection()
     // `exercise.id` IS the canonical name (see ExerciseChoice), so it maps
     // straight onto `exercise:`. When the caller omits a session type, infer a
     // sensible default from the exercise's kind (cardio/mobility/strength)

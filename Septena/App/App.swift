@@ -127,6 +127,12 @@ struct SeptenaApp: App {
           // dynamic shortcut list so the Home Screen long-press menu
           // matches what they picked in Settings.
           QuickActionsApplier.apply()
+          // Best-effort: re-extract App Shortcut parameter suggestions so a
+          // section disabled since last launch (here, on another device, or
+          // via MCP) no longer offers its items in Siri / Spotlight. Not
+          // load-bearing — disabled sections refuse in `requireSection()` and
+          // their `suggestedEntities` return empty when the picker is shown.
+          SeptenaShortcuts.updateAppShortcutParameters()
           #endif
           // Diagnostic snapshot of the local store at launch. Surfaces
           // migration corruption / partial-state situations in the

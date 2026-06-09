@@ -111,7 +111,7 @@ struct LogMoodIntent: SectionLogIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult & ProvidesDialog {
-    await prepareSection()
+    try await requireSection()
     let coords = quadrant.coordinates
     let trimmedEmotion = emotion?.trimmingCharacters(in: .whitespacesAndNewlines)
     let word = (trimmedEmotion?.isEmpty ?? true) ? quadrant.defaultEmotion : trimmedEmotion!
