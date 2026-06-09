@@ -11,39 +11,41 @@ import SwiftUI
 // target so the convo types / mutator resolve without an import.
 struct ConversationCard: View {
   let taskID: String
+  let accent: Color
 
   @State private var convo: TaskConvo
   @State private var showOther = false
   @State private var otherText = ""
+  @State private var showInfo = false
 
   /// Seed `convo` from the already-loaded task so the card paints on the FIRST
   /// frame (no fetch-on-open lag); `onAppear`/`.septenaTasksChanged` then refresh
   /// it (a single by-id read) to pick up turns appended after open.
-  init(taskID: String, initial: TaskConvo = TaskConvo()) {
+  init(taskID: String, initial: TaskConvo = TaskConvo(), accent: Color = .accentColor) {
     self.taskID = taskID
+    self.accent = accent
     _convo = State(initialValue: initial)
   }
 
   var body: some View {
     Group {
       if convo.hasStarted {
-        VStack(alignment: .leading, spacing: 10) {
-          // Persistent transcript — never collapses after an exchange. The
-          // title + ⓘ chrome lives on the hosting ConversationSection, so the
-          // card itself is pure exchange content.
-          ForEach(convo.thread, id: \.seq) { transcriptRow($0) }
+        VStack(alignment: .leading, spacing: 12) {
+          // Resolved turns sit above as a compact history; the current open
+          // question is promoted to a prominent title over its option pills.
+          ForEach(historyTurns, id: \.seq) { transcriptRow($0) }
 
           // Agent deliverable (agent_assisted) — what Claude produced.
           if let artifact = convo.artifact { artifactBlock(artifact) }
 
           if let q = openQuestion {
-            optionButtons(for: q)
+            questionBlock(q)
           } else if let handoff = convo.handoff {
             handoffButton(handoff)            // human last-mile — show even when the agent's side is done
           } else if convo.isTerminal {
             terminalRow
           } else {
-            Label("Claude is working…", systemImage: "circle.dotted")
+            Label("Claude is working…", systemImage: "ellipsis.bubble")
               .font(.caption).foregroundStyle(.secondary)
           }
 
@@ -55,23 +57,27 @@ struct ConversationCard: View {
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(Theme.secondaryGroupedBackground,
-                    in: RoundedRectangle(cornerRadius: 18, style: .continuous))
       }
     }
     .onAppear(perform: reload)
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in reload() }
+    .sheet(isPresented: $showInfo) { AIExplainerView() }
   }
 
-  // MARK: Transcript
+  /// Everything except the current open question (which renders as the title).
+  private var historyTurns: [ConvoTurn] {
+    guard let q = openQuestion else { return convo.thread }
+    return convo.thread.filter { $0.seq != q.seq }
+  }
+
+  // MARK: Transcript (resolved history)
 
   @ViewBuilder private func transcriptRow(_ t: ConvoTurn) -> some View {
     if t.role == .provider {
       if let q = t.question {
-        row(icon: "sparkles", tint: .purple, text: q, font: .subheadline)
+        row(icon: "bubble.left", tint: .secondary, text: q, font: .subheadline)
       } else if let note = t.note {
-        row(icon: "sparkles", tint: .secondary, text: note, font: .caption, dim: true)
+        row(icon: "bubble.left", tint: .secondary, text: note, font: .caption, dim: true)
       }
     } else if let answer = t.chosen ?? t.otherText {
       row(icon: "checkmark.circle.fill", tint: .green, text: answer, font: .subheadline, weight: .medium)
@@ -89,20 +95,30 @@ struct ConversationCard: View {
     }
   }
 
-  // MARK: Open question
+  // MARK: Open question — the prominent title + option pills
 
-  @ViewBuilder private func optionButtons(for q: ConvoTurn) -> some View {
-    VStack(alignment: .leading, spacing: 6) {
-      ForEach(q.options ?? [], id: \.self) { option in
-        Button { choose(option, replyTo: q.seq, step: q.step) } label: {
-          Text(option).frame(maxWidth: .infinity, alignment: .leading)
+  @ViewBuilder private func questionBlock(_ q: ConvoTurn) -> some View {
+    VStack(alignment: .leading, spacing: 10) {
+      // The question IS the title: chat glyph beside it, ⓘ explainer trailing.
+      HStack(alignment: .top, spacing: 8) {
+        Image(systemName: "bubble.left.and.bubble.right.fill")
+          .font(.subheadline).foregroundStyle(accent)
+        Text(q.question ?? "").font(.headline).foregroundStyle(.primary)
+        Spacer(minLength: 6)
+        Button { showInfo = true } label: { Image(systemName: "info.circle").font(.subheadline) }
+          .buttonStyle(.borderless).foregroundStyle(.secondary)
+          .help("How AI helps with your tasks")
+      }
+
+      // Options as content-width pills (wrap), with "Other" opening a field.
+      FlowLayout(spacing: 8) {
+        ForEach(q.options ?? [], id: \.self) { option in
+          Button { choose(option, replyTo: q.seq, step: q.step) } label: { Text(option) }
+            .buttonStyle(.bordered).buttonBorderShape(.capsule).tint(accent)
         }
-        .buttonStyle(.bordered)
+        Button { withAnimation { showOther.toggle() } } label: { Text("Other…") }
+          .buttonStyle(.bordered).buttonBorderShape(.capsule)
       }
-      Button { withAnimation { showOther.toggle() } } label: {
-        Label("Other…", systemImage: "square.and.pencil")
-      }
-      .buttonStyle(.borderless).font(.caption)
 
       if showOther {
         HStack {
@@ -110,6 +126,7 @@ struct ConversationCard: View {
             .textFieldStyle(.roundedBorder)
             .onSubmit { submitOther(replyTo: q.seq, step: q.step) }
           Button("Send") { submitOther(replyTo: q.seq, step: q.step) }
+            .buttonStyle(.borderedProminent)
             .disabled(otherText.trimmingCharacters(in: .whitespaces).isEmpty)
         }
       }
@@ -211,86 +228,20 @@ struct ConversationCard: View {
   }
 }
 
-/// The conversation as a normal section inside the task composer's scroll: a
-/// summary header (icon + one-line status + badge + ⓘ) over the persistent
-/// `ConversationCard` and the `AskAIButton` (the latter shows only before a
-/// conversation exists). It scrolls with the rest of the drawer — no special
-/// expand mechanic; it's just another section, like every other edit form.
+/// The conversation as a normal section inside the task composer's scroll: the
+/// `ConversationCard` (open question promoted to a title over its option pills),
+/// and the `AskAIButton` shown only before a conversation exists. No header
+/// chrome and no card box — it's inline content that scrolls with the drawer and
+/// runs full-width, like the rest of the form.
 struct ConversationSection: View {
   let task: SeptenaTask
   let accent: Color
 
-  @State private var convo: TaskConvo
-  @State private var showInfo = false
-
-  init(task: SeptenaTask, accent: Color) {
-    self.task = task
-    self.accent = accent
-    _convo = State(initialValue: task.conversation)
-  }
-
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
-      header
-      ConversationCard(taskID: task.id, initial: convo)
+      ConversationCard(taskID: task.id, initial: task.conversation, accent: accent)
       AskAIButton(task: task)
     }
-    .padding(14)
-    .background(Theme.secondaryGroupedBackground,
-                in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
-      convo = SeptenaServices.shared.taskMutator.conversation(id: task.id) ?? convo
-    }
-    .sheet(isPresented: $showInfo) { AIExplainerView() }
-  }
-
-  private var header: some View {
-    HStack(spacing: 10) {
-      Image(systemName: convo.hasStarted ? "bubble.left.and.bubble.right.fill" : "sparkles")
-        .font(.callout).foregroundStyle(accent)
-        .frame(width: 22)
-      VStack(alignment: .leading, spacing: 1) {
-        Text(summary.title).font(.subheadline).foregroundStyle(Theme.inkPrimary)
-        Text(summary.detail).font(.caption).foregroundStyle(Theme.inkSecondary)
-          .lineLimit(1)
-      }
-      Spacer(minLength: 6)
-      if let badge = summary.badge { badgeGlyph(badge) }
-      Button { showInfo = true } label: {
-        Image(systemName: "info.circle").font(.callout)
-      }
-      .buttonStyle(.borderless).foregroundStyle(.secondary)
-      .help("How AI helps with your tasks")
-    }
-  }
-
-  /// Title / one-line detail / optional badge for the current convo state.
-  private var summary: (title: String, detail: String, badge: ConvoBadge?) {
-    guard convo.hasStarted else {
-      return ("Talk it through with AI", "Confirm what you mean, then pick", nil)
-    }
-    let badge = deriveConvo(convo).badge
-    if convo.hasOpenProviderQuestion, let q = convo.thread.last?.question {
-      return ("Conversation", q, badge)
-    }
-    if convo.isTerminal {
-      let resolved = convo.endState != .wontDo
-      return ("Conversation", resolved ? "Resolved" : "Won't do", badge)
-    }
-    if convo.handoff != nil { return ("Conversation", "Ready for you", badge) }
-    return ("Conversation", "Claude is working…", badge)
-  }
-
-  private func badgeGlyph(_ b: ConvoBadge) -> some View {
-    let spec: (name: String, color: Color) = {
-      switch b {
-      case .needsYou: return ("circle.fill", .yellow)
-      case .working:  return ("circle.fill", .blue)
-      case .done:     return ("checkmark.circle.fill", .green)
-      case .wontDo:   return ("circle.slash", .gray)
-      }
-    }()
-    return Image(systemName: spec.name).font(.caption2).foregroundStyle(spec.color)
   }
 }
 
@@ -359,7 +310,7 @@ struct AIExplainerView: View {
       Step(icon: "questionmark.bubble", title: "Confirm", desc: "AI asks what you actually mean. Nothing happens until you tap.", runs: "On-device", tint: .green),
       Step(icon: "doc.text.magnifyingglass", title: "Ground", desc: "It pulls the relevant context from your own data.", runs: "On-device", tint: .green),
       Step(icon: "checklist", title: "Decide", desc: "It offers a few options; you pick. A hard call may use the cloud.", runs: "On-device ↗", tint: .blue),
-      Step(icon: "wand.and.stars", title: "Work", desc: "It does what it can — a draft, a comparison. Web / your Claude only if a step needs it.", runs: "On-device ↗", tint: .blue),
+      Step(icon: "hammer", title: "Work", desc: "It does what it can — a draft, a comparison. Web / your Claude only if a step needs it.", runs: "On-device ↗", tint: .blue),
       Step(icon: "hand.point.right", title: "Hand off", desc: "Anything only you can do (pay, send) becomes one clear button.", runs: "You", tint: .gray),
     ]
   }
@@ -416,8 +367,8 @@ struct AskAIButton: View {
         Button(action: run) {
           HStack(spacing: 6) {
             if working { ProgressView().controlSize(.small) }
-            else { Image(systemName: "sparkles") }
-            Text(working ? "Thinking…" : "Ask AI")
+            else { Image(systemName: "bubble.left.and.bubble.right") }
+            Text(working ? "Thinking…" : "Talk it through with AI")
           }
           .frame(maxWidth: .infinity)
         }

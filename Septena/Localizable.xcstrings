@@ -1979,9 +1979,6 @@
         }
       }
     },
-    "Conversation" : {
-
-    },
     "Copied" : {
       "localizations" : {
         "pt-BR" : {
@@ -4618,6 +4615,9 @@
           }
         }
       }
+    },
+    "Other…" : {
+
     },
     "p=%@" : {
       "shouldTranslate" : false

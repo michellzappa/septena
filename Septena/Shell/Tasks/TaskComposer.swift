@@ -210,7 +210,7 @@ struct TaskComposerCard: View {
         }
         if let s = suggestion {
           chip(icon: s.kind == .project ? "number" : "folder",
-               leading: "sparkles", text: s.title) { applySuggestedList() }
+               leading: "lightbulb", text: s.title) { applySuggestedList() }
         }
       }
       .transition(.opacity)
@@ -218,7 +218,7 @@ struct TaskComposerCard: View {
   }
 
   /// A small glass action chip: a leading hint glyph (`plus` to add a parsed
-  /// token, `sparkles` for the smart suggestion), the field's icon, and a label.
+  /// token, `lightbulb` for the smart suggestion), the field's icon, and a label.
   private func chip(icon: String, leading: String, text: String,
                     _ action: @escaping () -> Void) -> some View {
     Button(action: action) {
