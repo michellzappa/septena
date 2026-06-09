@@ -51,6 +51,7 @@
 		116F32431DCC98176BC52830 /* ChoresDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E31867A580D7D96DFB20391B /* ChoresDestinationView.swift */; };
 		1205F7E14E321EB6B9CB6F13 /* LocaleFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05BCC1A109F5CA85CA8D3477 /* LocaleFormatting.swift */; };
 		1215F09AD126AB4364B57041 /* NextFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848DD768C118B7BDF4E27FC4 /* NextFeed.swift */; };
+		12177ED82961204B251988C5 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AF3B8630E404CA38C14B10AC /* InfoPlist.xcstrings */; };
 		1418ABD39D3C3BF52077A9A6 /* CommitMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B6D3C89DD47424084AE32D1 /* CommitMotion.swift */; };
 		1482821460D8B8050C19084C /* Fraunces-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = A46A4C109CF7C73318332FD0 /* Fraunces-OFL.txt */; };
 		14A026D5D1BAFF0B4943D0E0 /* GutBristolRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52B5EEA9B508AB5AAB6152F8 /* GutBristolRecorder.swift */; };
@@ -234,6 +235,7 @@
 		5A120FD37C3102D6C9AF279A /* CoachMiniApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 473849A78E0E577B6653610D /* CoachMiniApp.swift */; };
 		5A6DFBAB575054F0FBA4B916 /* MoodQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 089893F59A6C1D2025AD8A2C /* MoodQuickAddMenu.swift */; };
 		5A716FE6E840C821D45C22D7 /* HydrationIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = D78BBADF69CAD2C6D2605053 /* HydrationIntents.swift */; };
+		5AB6DCD8964000E8587CA140 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AF3B8630E404CA38C14B10AC /* InfoPlist.xcstrings */; };
 		5B33966B1FD021C5BE96C2B9 /* MoodCommitAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1AB58A3A36A898E92890EBA /* MoodCommitAnimation.swift */; };
 		5C2CAF18F7F1BB26F040A597 /* CKEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3A43D786998D198C9BCA480 /* CKEngine.swift */; };
 		5C2CD4D9D3DDF4D8E9CBBB2F /* SelectablePillsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EFFFB78909D8812C2A1C7D0 /* SelectablePillsView.swift */; };
@@ -907,6 +909,7 @@
 		AC8097428CC41A32EA96B120 /* MacroTargetMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroTargetMigration.swift; sourceTree = "<group>"; };
 		ACEBFC5E297AA01C582EE1A5 /* CaffeineDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaffeineDestinationView.swift; sourceTree = "<group>"; };
 		AD295FAB7B881CAC43EE8C34 /* Outbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Outbox.swift; sourceTree = "<group>"; };
+		AF3B8630E404CA38C14B10AC /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		AF9E152DA345E00295EC4F58 /* SyncIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncIndicator.swift; sourceTree = "<group>"; };
 		AFF7884F079CD77F2AA126F9 /* EditCaffeineEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditCaffeineEntrySheet.swift; sourceTree = "<group>"; };
 		B1122B52B5A42A03C8EECA08 /* AddSupplementPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddSupplementPage.swift; sourceTree = "<group>"; };
@@ -1149,6 +1152,7 @@
 				C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */,
 				5B49A0D20B2ECD672137900F /* Info-Mac.plist */,
 				31313A0E804B33A3E43FC1F6 /* Info.plist */,
+				AF3B8630E404CA38C14B10AC /* InfoPlist.xcstrings */,
 				82B033F3BFB3BA4D616AA595 /* Localizable.xcstrings */,
 				784D3E7D8D933961200812D6 /* PrivacyInfo.xcprivacy */,
 				64938CD07808787BDFD1780F /* App */,
@@ -2009,6 +2013,7 @@
 				207AC8DAC92253CDCFE9ADD9 /* Fraunces-OFL.txt in Resources */,
 				6E613152F22C42599AE4AAEC /* Fraunces-Regular.ttf in Resources */,
 				36325B1E6E5A771C01028105 /* Info.plist in Resources */,
+				12177ED82961204B251988C5 /* InfoPlist.xcstrings in Resources */,
 				C1167F10A74CFA8D5CA55A4B /* Localizable.xcstrings in Resources */,
 				F46ED9D5CAC9DA26811E4246 /* PrivacyInfo.xcprivacy in Resources */,
 			);
@@ -2033,6 +2038,7 @@
 				1482821460D8B8050C19084C /* Fraunces-OFL.txt in Resources */,
 				A5A083B827BC6B45473A9F3A /* Fraunces-Regular.ttf in Resources */,
 				3D19536CFB66987D6D5C7642 /* Info-Mac.plist in Resources */,
+				5AB6DCD8964000E8587CA140 /* InfoPlist.xcstrings in Resources */,
 				C85119F5342B35E8A92658D3 /* Localizable.xcstrings in Resources */,
 				E515D9DFB7D4891875B26EF4 /* PrivacyInfo.xcprivacy in Resources */,
 			);
