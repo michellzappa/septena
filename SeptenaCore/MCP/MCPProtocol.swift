@@ -123,15 +123,14 @@ enum JSONSafe {
       return dict.mapValues(coerce)
     case let array as [Any]:
       return array.map(coerce)
-    case let b as Bool:        // before Int/NSNumber so true/false stay boolean
-      return b
-    case let i as Int:
-      return i
-    case let d as Double:
-      return d.isFinite ? d : NSNull()
-    case let f as Float:
-      return Double(f).isFinite ? Double(f) : NSNull()
     case let n as NSNumber:
+      // Catches native Swift Bool/Int/Double AND JSONSerialization-parsed
+      // numbers (e.g. a re-encoded TaskConvo read by tasks_thread_get).
+      // Classify by CFType, NOT `as Bool`: a parsed integer 1/0 ALSO casts
+      // `as Bool` via NSNumber bridging, which would emit `true`/`false` for
+      // ints — the bug that turned Task-Conversations seq/inReplyTo of 1 into
+      // `true`. Real booleans are CFBoolean; non-finite Doubles (NaN/±Inf) → null.
+      if CFGetTypeID(n) == CFBooleanGetTypeID() { return n.boolValue }
       return n.doubleValue.isFinite ? n : NSNull()
     case is String, is NSNull:
       return value
