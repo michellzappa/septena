@@ -7,6 +7,8 @@ import SwiftData
 
 @MainActor
 enum GutPlugin: SectionPlugin {
+  static var producesTimedEvents: Bool { true }
+
   static var manifest: SectionManifest {
     SectionManifest.byKey["gut"]!
   }

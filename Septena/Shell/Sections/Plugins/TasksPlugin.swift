@@ -3,6 +3,8 @@ import SwiftData
 
 @MainActor
 enum TasksPlugin: SectionPlugin {
+  static var producesTimedEvents: Bool { true }
+
   static var manifest: SectionManifest {
     SectionManifest.byKey["tasks"]!
   }

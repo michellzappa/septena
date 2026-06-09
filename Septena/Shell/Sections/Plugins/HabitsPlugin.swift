@@ -3,6 +3,8 @@ import SwiftData
 
 @MainActor
 enum HabitsPlugin: SectionPlugin {
+  static var producesTimedEvents: Bool { true }
+
   static var manifest: SectionManifest {
     SectionManifest.byKey["habits"]!
   }

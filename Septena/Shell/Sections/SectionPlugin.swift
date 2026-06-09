@@ -122,6 +122,16 @@ protocol SectionPlugin {
   /// sections are still catalogued engine-side in `legacyCatalog` during the
   /// migration; new sections declare here). Only called for ACTIVE sections.
   static func correlationFeatures(context: ModelContext) -> [CorrelationFeature]
+
+  /// Whether this section emits *time-of-day* data — timestamped instant
+  /// events (a `LoggedEvent` entity), duration bands (sleep), or completion
+  /// timestamps (tasks). The homepage Wheel mode uses this to decide which
+  /// sections get a rhythm tile: a section with no timed source (Body,
+  /// Groceries, GitHub, …) has nothing to plot on a 24-hour dial, so it's
+  /// dropped rather than shown as a dead glyph. Default `false`; sections opt
+  /// in alongside their `LoggedEvent` conformance. Activity is a future
+  /// candidate once it exposes timestamped samples.
+  static var producesTimedEvents: Bool { get }
 }
 
 /// Description of one "+" toolbar action declared by a plugin. The
@@ -361,6 +371,9 @@ extension SectionPlugin {
   /// Default: section contributes no correlation features. Sections opt in
   /// by overriding this with at least one `CorrelationFeature`.
   static func correlationFeatures(context: ModelContext) -> [CorrelationFeature] { [] }
+
+  /// Default: no time-of-day data. Timed sections override to `true`.
+  static var producesTimedEvents: Bool { false }
 }
 
 /// Single source of truth for which plugins exist. Sections not in this

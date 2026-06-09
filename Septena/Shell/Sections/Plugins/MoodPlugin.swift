@@ -12,6 +12,8 @@ import SwiftData
 
 @MainActor
 enum MoodPlugin: SectionPlugin {
+  static var producesTimedEvents: Bool { true }
+
   static var manifest: SectionManifest {
     // Force-unwrap is safe: manifest entry for "mood" ships in the
     // catalog. A compile-time check would be nicer; will switch to a
