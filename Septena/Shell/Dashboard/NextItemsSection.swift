@@ -487,20 +487,10 @@ final class NextItemsModel {
 }
 
 // MARK: - Open subview (rendered above tasks-done)
-
-/// UserDefaults keys + defaults for the per-section "carry over missed
-/// items" toggle (a.k.a. linger): keep an item on the Next list after its
-/// time-of-day bucket has passed, until it's done. Per-device by design —
-/// it's a glance-filter preference, so it stays out of the CloudKit schema.
-/// The toggle lives in each section's settings (`detailPaneContent`); these
-/// keys are the shared contract between that toggle and the Next filters.
-/// Defaults preserve shipped behavior: supplements linger, habits stay strict.
-enum NextLinger {
-  static let supplementsKey = "next.linger.supplements"
-  static let supplementsDefault = true
-  static let habitsKey = "next.linger.habits"
-  static let habitsDefault = false
-}
+//
+// `NextLinger` (the "carry over missed items" keys/defaults) now lives in
+// SeptenaCore/NextWire.swift so the iOS Next list, the watch, and the widget
+// snapshot filter all share one contract.
 
 struct NextOpenSection: View {
   var model: NextItemsModel

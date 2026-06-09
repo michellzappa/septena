@@ -24,7 +24,17 @@ enum WatchSnapshotPublisher {
     // user's saved section order) comes from the one shared builder, so the
     // watch snapshot can never diverge from the app's Next list.
     let items = NextFeed.flat(context: context, date: date)
-    let response = NextItemsResponse(date: date, bucket: "", items: items)
+    // Carry this phone's current linger prefs in the payload so the watch and
+    // widget filter to the current bucket exactly as this phone's Next list does
+    // (App Group defaults are per-device, so they can't reach the watch otherwise).
+    let defaults = UserDefaults.standard
+    let lingerHabits = defaults.object(forKey: NextLinger.habitsKey) as? Bool
+      ?? NextLinger.habitsDefault
+    let lingerSupplements = defaults.object(forKey: NextLinger.supplementsKey) as? Bool
+      ?? NextLinger.supplementsDefault
+    let response = NextItemsResponse(date: date, bucket: "", items: items,
+                                     lingerHabits: lingerHabits,
+                                     lingerSupplements: lingerSupplements)
     guard let payload = try? JSONEncoder().encode(response) else { return }
 
     // Nudge the iOS "Next" home/lock-screen widget to re-read the snapshot.
