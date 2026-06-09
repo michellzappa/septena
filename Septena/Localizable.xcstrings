@@ -537,6 +537,86 @@
         }
       }
     },
+    "%lld months" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld month"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld months"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld mês"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld meses"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld weeks" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld week"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld weeks"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld semana"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld semanas"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "•" : {
       "shouldTranslate" : false
     },
@@ -676,6 +756,16 @@
         }
       }
     },
+    "Activities, topics, and moments that consistently pull you in." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atividades, temas e momentos que sempre te atraem."
+          }
+        }
+      }
+    },
     "Activity" : {
       "localizations" : {
         "pt-BR" : {
@@ -702,6 +792,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Adicionar"
+          }
+        }
+      }
+    },
+    "Add %lld categories" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Add %lld category"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Add %lld categories"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Adicionar %lld categoria"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Adicionar %lld categorias"
+                }
+              }
+            }
           }
         }
       }
@@ -1437,6 +1567,16 @@
         }
       }
     },
+    "Capabilities that could become offers, services, products, or roles." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capacidades que podem virar ofertas, serviços, produtos ou funções."
+          }
+        }
+      }
+    },
     "Carbs" : {
       "localizations" : {
         "pt-BR" : {
@@ -1513,6 +1653,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Escolha até 4 seções para exibir quando você mantém o ícone do app pressionado na Tela de Início."
+          }
+        }
+      }
+    },
+    "Choose what matters most, then turn it into concrete goals." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha o que mais importa e transforme em metas concretas."
           }
         }
       }
@@ -1754,6 +1904,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Painel de correlações, ícones de app personalizados e mais."
+          }
+        }
+      }
+    },
+    "Courage" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coragem"
           }
         }
       }
@@ -2030,6 +2190,16 @@
         }
       }
     },
+    "Doing the hard thing" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fazer o que é difícil"
+          }
+        }
+      }
+    },
     "Don't Repeat" : {
       "localizations" : {
         "pt-BR" : {
@@ -2070,6 +2240,16 @@
         }
       }
     },
+    "Drafting commitments..." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rascunhando compromissos..."
+          }
+        }
+      }
+    },
     "Drag to reorder. Toggle to show or hide a tile on the Nutrition dashboard. Tap a swatch to change its color." : {
       "localizations" : {
         "pt-BR" : {
@@ -2106,6 +2286,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Seco"
+          }
+        }
+      }
+    },
+    "Duty to others" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dever para com os outros"
           }
         }
       }
@@ -2250,7 +2440,18 @@
         }
       }
     },
+    "Every %@" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A cada %@"
+          }
+        }
+      }
+    },
     "Every %@ %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2272,6 +2473,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Exatamente"
+          }
+        }
+      }
+    },
+    "Examined Week" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Semana examinada"
           }
         }
       }
@@ -2412,6 +2623,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Descubra o que realmente move o seu dia — quais hábitos, insumos e rotinas acompanham melhor sono, humor, recuperação e mais. Correlações reais entre tudo o que você registra, calculadas de forma privada no dispositivo."
+          }
+        }
+      }
+    },
+    "Finding the through-line..." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encontrando o fio condutor..."
           }
         }
       }
@@ -3075,12 +3296,32 @@
         }
       }
     },
+    "Judgment & foresight" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discernimento e previsão"
+          }
+        }
+      }
+    },
     "Jump to Today" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ir para Hoje"
+          }
+        }
+      }
+    },
+    "Justice" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Justiça"
           }
         }
       }
@@ -3331,6 +3572,16 @@
         }
       }
     },
+    "Map what you love, do well, can offer, and want to serve." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mapeie o que você ama, faz bem, pode oferecer e quer servir."
+          }
+        }
+      }
+    },
     "MCP" : {
       "localizations" : {
         "pt-BR" : {
@@ -3401,6 +3652,16 @@
         }
       }
     },
+    "Mixed" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Misto"
+          }
+        }
+      }
+    },
     "ml" : {
       "shouldTranslate" : false
     },
@@ -3420,6 +3681,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Desbloqueio fictício. Nenhuma compra é feita ainda."
+          }
+        }
+      }
+    },
+    "Moderation & self-governance" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moderação e autogoverno"
           }
         }
       }
@@ -3477,6 +3748,16 @@
     "n=%@" : {
       "shouldTranslate" : false
     },
+    "Needs, communities, or problems you feel responsible to support." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Necessidades, comunidades ou problemas que você sente responsabilidade de apoiar."
+          }
+        }
+      }
+    },
     "Never" : {
       "localizations" : {
         "pt-BR" : {
@@ -3513,6 +3794,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Próximo"
+          }
+        }
+      }
+    },
+    "Next instance %@ after the previous scheduled date." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próxima instância %@ depois da data agendada anterior."
+          }
+        }
+      }
+    },
+    "Next instance %@ after you mark this done." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próxima instância %@ depois de você marcar isto."
           }
         }
       }
@@ -3563,6 +3864,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "sem dados"
+          }
+        }
+      }
+    },
+    "No data" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem dados"
           }
         }
       }
@@ -4120,6 +4431,16 @@
         }
       }
     },
+    "Purpose" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Propósito"
+          }
+        }
+      }
+    },
     "Quads" : {
       "localizations" : {
         "pt-BR" : {
@@ -4466,6 +4787,16 @@
         }
       }
     },
+    "See your last 7 days reflected against temperance, wisdom, courage, and justice." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Veja seus últimos 7 dias refletidos diante de temperança, sabedoria, coragem e justiça."
+          }
+        }
+      }
+    },
     "Septena" : {
       "localizations" : {
         "pt-BR" : {
@@ -4731,6 +5062,16 @@
         }
       }
     },
+    "Skills, traits, and strengths other people rely on you for." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Habilidades, traços e forças pelos quais as pessoas contam com você."
+          }
+        }
+      }
+    },
     "Skip" : {
       "localizations" : {
         "pt-BR" : {
@@ -4837,12 +5178,32 @@
         }
       }
     },
+    "Steady" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Firme"
+          }
+        }
+      }
+    },
     "Steps and movement (HealthKit)" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Passos e movimento (HealthKit)"
+          }
+        }
+      }
+    },
+    "Strained" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sob tensão"
           }
         }
       }
@@ -4975,6 +5336,16 @@
         }
       }
     },
+    "Tagging sections..." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marcando seções..."
+          }
+        }
+      }
+    },
     "Talk to your %@ coach" : {
       "localizations" : {
         "pt-BR" : {
@@ -5101,6 +5472,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Azul-petróleo"
+          }
+        }
+      }
+    },
+    "Temperance" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Temperança"
           }
         }
       }
@@ -5364,6 +5745,46 @@
         }
       }
     },
+    "Training %lld sessions this week" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Training %lld session this week"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Training %lld sessions this week"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessão de treino esta semana"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessões de treino esta semana"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Tranquil" : {
       "localizations" : {
         "pt-BR" : {
@@ -5530,6 +5951,16 @@
         }
       }
     },
+    "Values" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valores"
+          }
+        }
+      }
+    },
     "Version %@ (%@)" : {
       "localizations" : {
         "en" : {
@@ -5646,6 +6077,46 @@
         }
       }
     },
+    "What are you good at?" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No que você é bom?"
+          }
+        }
+      }
+    },
+    "What can you be paid for?" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pelo que você pode ser pago?"
+          }
+        }
+      }
+    },
+    "What do you love?" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O que você ama?"
+          }
+        }
+      }
+    },
+    "What does the world need?" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Do que o mundo precisa?"
+          }
+        }
+      }
+    },
     "What moves your day — cross-section correlations" : {
       "localizations" : {
         "pt-BR" : {
@@ -5682,6 +6153,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "A janela controla até quando o CorrelationEngine puxa dados. O filtro de seção limita quais pares preditor → alvo são exibidos — os pares são mantidos se qualquer um dos lados corresponder."
+          }
+        }
+      }
+    },
+    "Wisdom" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sabedoria"
           }
         }
       }
@@ -5826,486 +6307,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Δ = média com − média sem"
-          }
-        }
-      }
-    },
-    "What do you love?" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O que você ama?"
-          }
-        }
-      }
-    },
-    "What are you good at?" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No que você é bom?"
-          }
-        }
-      }
-    },
-    "What can you be paid for?" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pelo que você pode ser pago?"
-          }
-        }
-      }
-    },
-    "What does the world need?" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Do que o mundo precisa?"
-          }
-        }
-      }
-    },
-    "Activities, topics, and moments that consistently pull you in." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Atividades, temas e momentos que sempre te atraem."
-          }
-        }
-      }
-    },
-    "Skills, traits, and strengths other people rely on you for." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Habilidades, traços e forças pelos quais as pessoas contam com você."
-          }
-        }
-      }
-    },
-    "Capabilities that could become offers, services, products, or roles." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Capacidades que podem virar ofertas, serviços, produtos ou funções."
-          }
-        }
-      }
-    },
-    "Needs, communities, or problems you feel responsible to support." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Necessidades, comunidades ou problemas que você sente responsabilidade de apoiar."
-          }
-        }
-      }
-    },
-    "Temperance" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Temperança"
-          }
-        }
-      }
-    },
-    "Wisdom" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sabedoria"
-          }
-        }
-      }
-    },
-    "Courage" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Coragem"
-          }
-        }
-      }
-    },
-    "Justice" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Justiça"
-          }
-        }
-      }
-    },
-    "Moderation & self-governance" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Moderação e autogoverno"
-          }
-        }
-      }
-    },
-    "Judgment & foresight" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Discernimento e previsão"
-          }
-        }
-      }
-    },
-    "Doing the hard thing" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fazer o que é difícil"
-          }
-        }
-      }
-    },
-    "Duty to others" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dever para com os outros"
-          }
-        }
-      }
-    },
-    "Steady" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Firme"
-          }
-        }
-      }
-    },
-    "Mixed" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Misto"
-          }
-        }
-      }
-    },
-    "Strained" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sob tensão"
-          }
-        }
-      }
-    },
-    "No data" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sem dados"
-          }
-        }
-      }
-    },
-    "Values" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Valores"
-          }
-        }
-      }
-    },
-    "Choose what matters most, then turn it into concrete goals." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Escolha o que mais importa e transforme em metas concretas."
-          }
-        }
-      }
-    },
-    "Purpose" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Propósito"
-          }
-        }
-      }
-    },
-    "Map what you love, do well, can offer, and want to serve." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mapeie o que você ama, faz bem, pode oferecer e quer servir."
-          }
-        }
-      }
-    },
-    "Examined Week" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Semana examinada"
-          }
-        }
-      }
-    },
-    "See your last 7 days reflected against temperance, wisdom, courage, and justice." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Veja seus últimos 7 dias refletidos diante de temperança, sabedoria, coragem e justiça."
-          }
-        }
-      }
-    },
-    "Finding the through-line..." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Encontrando o fio condutor..."
-          }
-        }
-      }
-    },
-    "Drafting commitments..." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rascunhando compromissos..."
-          }
-        }
-      }
-    },
-    "Tagging sections..." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Marcando seções..."
-          }
-        }
-      }
-    },
-    "%lld weeks" : {
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld week"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld weeks"
-                }
-              }
-            }
-          }
-        },
-        "pt-BR" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld semana"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld semanas"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "%lld months" : {
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld month"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld months"
-                }
-              }
-            }
-          }
-        },
-        "pt-BR" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld mês"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld meses"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "Add %lld categories" : {
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Add %lld category"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Add %lld categories"
-                }
-              }
-            }
-          }
-        },
-        "pt-BR" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Adicionar %lld categoria"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Adicionar %lld categorias"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "Training %lld sessions this week" : {
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Training %lld session this week"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Training %lld sessions this week"
-                }
-              }
-            }
-          }
-        },
-        "pt-BR" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld sessão de treino esta semana"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld sessões de treino esta semana"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "Next instance %@ after you mark this done." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Próxima instância %@ depois de você marcar isto."
-          }
-        }
-      }
-    },
-    "Next instance %@ after the previous scheduled date." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Próxima instância %@ depois da data agendada anterior."
-          }
-        }
-      }
-    },
-    "Every %@" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A cada %@"
           }
         }
       }
