@@ -824,19 +824,24 @@ struct WeekDashboardView: View {
 
   private var todayTimeline: some View {
     let isWide = timelineWidth >= Self.wideTimelineThreshold
+    // Respect enabled sections, same as the rhythm wheel — a disabled section
+    // contributes nothing to the rail. Calendar isn't a toggleable section, so
+    // it stays (gated only by calendar access).
+    let enabled = Set(visibleDomains.map(\.rawValue))
+    func on(_ key: String) -> Bool { enabled.contains(key) }
     return WeekDashboardTimelineCard(
       date: clock.today,
-      oura: ouraNights.first,
-      caffeine: caffeineToday?.entries ?? [],
-      cannabis: cannabisToday?.entries ?? [],
-      nutrition: todayNutrition,
-      gut: gutToday?.entries ?? [],
-      mood: moodToday?.entries ?? [],
-      habits: dailies.habits,
-      supplements: dailies.supplements,
-      chores: dailies.chores,
-      training: recentTraining,
-      tasks: completedTasks,
+      oura: on("sleep") ? ouraNights.first : nil,
+      caffeine: on("caffeine") ? (caffeineToday?.entries ?? []) : [],
+      cannabis: on("cannabis") ? (cannabisToday?.entries ?? []) : [],
+      nutrition: on("nutrition") ? todayNutrition : [],
+      gut: on("gut") ? (gutToday?.entries ?? []) : [],
+      mood: on("mood") ? (moodToday?.entries ?? []) : [],
+      habits: on("habits") ? dailies.habits : [],
+      supplements: on("supplements") ? dailies.supplements : [],
+      chores: on("chores") ? dailies.chores : [],
+      training: on("training") ? recentTraining : [],
+      tasks: on("tasks") ? completedTasks : [],
       calendar: dailies.calendarEvents,
       macroColors: macroColors,
       fullDay: isWide
