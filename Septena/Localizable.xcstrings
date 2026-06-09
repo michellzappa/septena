@@ -6310,6 +6310,193 @@
           }
         }
       }
+    },
+    "Add Task" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar tarefa"
+          }
+        }
+      }
+    },
+    "Add Habit" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar hábito"
+          }
+        }
+      }
+    },
+    "Add Chore" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar afazer"
+          }
+        }
+      }
+    },
+    "Add Supplement" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar suplemento"
+          }
+        }
+      }
+    },
+    "Add Goal" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar meta"
+          }
+        }
+      }
+    },
+    "Add Grocery Item" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar item de compras"
+          }
+        }
+      }
+    },
+    "Complete Chore" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Concluir afazer"
+          }
+        }
+      }
+    },
+    "Mark Habit Done" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marcar hábito como feito"
+          }
+        }
+      }
+    },
+    "Mark Supplement Taken" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marcar suplemento como tomado"
+          }
+        }
+      }
+    },
+    "Mark Grocery Low" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marcar item acabando"
+          }
+        }
+      }
+    },
+    "Log Caffeine" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrar cafeína"
+          }
+        }
+      }
+    },
+    "Log Cannabis" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrar cannabis"
+          }
+        }
+      }
+    },
+    "Log Gut Entry" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrar evento intestinal"
+          }
+        }
+      }
+    },
+    "Log Mood" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrar humor"
+          }
+        }
+      }
+    },
+    "Log Water" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrar água"
+          }
+        }
+      }
+    },
+    "Log Workout" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrar treino"
+          }
+        }
+      }
+    },
+    "Log a Meal" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrar refeição"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
