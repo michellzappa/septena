@@ -331,33 +331,55 @@ private struct QuickLogSheet: View {
   let onDone: () -> Void
 
   var body: some View {
-    let block = item.logKind.flatMap { SuggestionBlocks.byKind[$0] }
     NavigationStack {
       Group {
-        switch block?.input {
-        case .choice(let choices):
-          QuickLogChoiceList(
-            choices: choices,
-            tint: WatchSectionTint.color(forSectionKey: block!.sectionKey, colors: conn.sectionColors)
-          ) { value in
-            conn.logChoice(kind: block!.kind, value: value, itemID: item.id)
-            onDone()
-          }
-        case .moodGrid:
-          MoodQuadrantGrid { emotion in
-            conn.logMood(quadrant: emotion.quadrant, emotion: emotion.word,
-                         arousal: emotion.arousal, valence: emotion.valence,
-                         itemID: item.id)
-            onDone()
-          }
-        case .none:
+        if let block = item.logKind.flatMap({ SuggestionBlocks.byKind[$0] }) {
+          // Same shared input as the on-demand + path; the suggestion's id is
+          // the optimistic-hide target.
+          CaptureInput(block: block, itemID: item.id, conn: conn, onDone: onDone)
+        } else {
           Text("Unavailable")
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
       }
-      .navigationTitle(block.map { _ in "Log" } ?? "Log")
+      .navigationTitle("Log")
       .navigationBarTitleDisplayMode(.inline)
+    }
+  }
+}
+
+// MARK: - Capture input (shared)
+
+/// The minimal input for one capturable, plus the write on pick. The single
+/// home for the `SuggestionBlocks.Input` → view → `conn` dispatch, used by both
+/// the suggestion-tap path (`QuickLogSheet`) and the on-demand + path
+/// (`CaptureSheet`). The two differ only in `itemID`.
+private struct CaptureInput: View {
+  let block: SuggestionBlocks.Block
+  /// Optimistic-hide target: the suggestion's id on the tap path, or a stable
+  /// "adhoc:<kind>" on the + path (matches no row — it only names the write).
+  let itemID: String
+  let conn: WatchConnectivity
+  let onDone: () -> Void
+
+  var body: some View {
+    switch block.input {
+    case .choice(let choices):
+      QuickLogChoiceList(
+        choices: choices,
+        tint: WatchSectionTint.color(forSectionKey: block.sectionKey, colors: conn.sectionColors)
+      ) { value in
+        conn.logChoice(kind: block.kind, value: value, itemID: itemID)
+        onDone()
+      }
+    case .moodGrid:
+      MoodQuadrantGrid { emotion in
+        conn.logMood(quadrant: emotion.quadrant, emotion: emotion.word,
+                     arousal: emotion.arousal, valence: emotion.valence,
+                     itemID: itemID)
+        onDone()
+      }
     }
   }
 }
@@ -395,7 +417,7 @@ private struct CaptureSheet: View {
         // SuggestionBlocks table.
         ForEach(SuggestionBlocks.all, id: \.kind) { block in
           NavigationLink {
-            input(for: block)
+            CaptureInput(block: block, itemID: "adhoc:\(block.kind)", conn: conn, onDone: onDone)
           } label: {
             Label {
               Text(title(block.kind))
@@ -411,28 +433,6 @@ private struct CaptureSheet: View {
       .listStyle(.plain)
       .navigationTitle("Capture")
       .navigationBarTitleDisplayMode(.inline)
-    }
-  }
-
-  @ViewBuilder
-  private func input(for block: SuggestionBlocks.Block) -> some View {
-    let itemID = "adhoc:\(block.kind)"
-    switch block.input {
-    case .choice(let choices):
-      QuickLogChoiceList(
-        choices: choices,
-        tint: WatchSectionTint.color(forSectionKey: block.sectionKey, colors: conn.sectionColors)
-      ) { value in
-        conn.logChoice(kind: block.kind, value: value, itemID: itemID)
-        onDone()
-      }
-    case .moodGrid:
-      MoodQuadrantGrid { emotion in
-        conn.logMood(quadrant: emotion.quadrant, emotion: emotion.word,
-                     arousal: emotion.arousal, valence: emotion.valence,
-                     itemID: itemID)
-        onDone()
-      }
     }
   }
 
@@ -460,6 +460,7 @@ private struct AddInboxTaskView: View {
   let conn: WatchConnectivity
   let onDone: () -> Void
   @State private var text = ""
+  @FocusState private var focused: Bool
 
   private var trimmed: String {
     text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -468,6 +469,7 @@ private struct AddInboxTaskView: View {
   var body: some View {
     List {
       TextField("Task", text: $text)
+        .focused($focused)
         .onSubmit(commit)
       Button(action: commit) {
         Label("Add to Inbox", systemImage: "tray.and.arrow.down")
@@ -476,6 +478,8 @@ private struct AddInboxTaskView: View {
     }
     .navigationTitle("New To-Do")
     .navigationBarTitleDisplayMode(.inline)
+    // Open straight into text entry — no tap on the field first.
+    .onAppear { focused = true }
   }
 
   private func commit() {
