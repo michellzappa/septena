@@ -26,8 +26,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select Xcode 26
-        run: sudo xcode-select -switch /Applications/Xcode_26.app
+      # The macos-26 image's default /Applications/Xcode.app is already a 26.x
+      # toolchain (currently 26.4.1), which satisfies project.yml's 26.0 pins.
+      # Don't hard-code a patch version (e.g. Xcode_26.0.1.app) — those get
+      # pruned from the image over time and would break this step.
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -switch /Applications/Xcode.app
+          xcodebuild -version
 
       - name: Install XcodeGen
         run: brew install xcodegen
