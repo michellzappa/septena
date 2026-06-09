@@ -12,6 +12,8 @@ struct LogEntryRow: View {
   var detail: String? = nil
   var trailing: String? = nil
   var accessory: AnyView? = nil
+  /// Optional leading glyph (e.g. a status dot) shown before the title.
+  var leading: AnyView? = nil
   /// Section accent for the selection wash (see `isSelected`).
   var tint: Color = Theme.inkPrimary
   /// Highlight this row while its edit modal is open.
@@ -55,6 +57,7 @@ struct LogEntryRow: View {
            detail: detail,
            trailing: trailing,
            accessory: accessory,
+           leading: leading,
            tint: tint,
            isSelected: isSelected)
   }

@@ -14,6 +14,9 @@ import SwiftData
 
 struct MoodDestinationView: View {
   @Environment(\.modelContext) private var modelContext
+  @Environment(SectionTheme.self) private var theme
+
+  private var accent: Color { theme.color(for: "mood") }
 
   @State private var today: MoodDayResponse? = nil
   @State private var monthEntries: [MoodEntry] = []
@@ -52,22 +55,18 @@ struct MoodDestinationView: View {
   @ViewBuilder
   private var todaySection: some View {
     if let today, today.entries.count > 0 {
-      DrawerSection(isViewingToday ? "All logs today" : "Logs") {
+      DrawerSection(isViewingToday ? "All logs today" : "Logs", padding: .none) {
         ForEach(today.entries.reversed()) { entry in
-          Button { editing = entry } label: { EntryRow(entry: entry) }
-            .buttonStyle(.plain)
-            .contextMenu {
-              Button { editing = entry } label: {
-                Label("Edit", systemImage: "pencil")
-              }
-              Button(role: .destructive) {
-                SeptenaServices.shared.moodMutator.deleteEntry(id: entry.id)
-                Haptics.warning()
-                Task { await reload() }
-              } label: {
-                Label("Delete", systemImage: "trash")
-              }
-            }
+          LogEntryRow(
+            title: entry.emotion,
+            detail: entry.note?.isEmpty == false ? entry.note : nil,
+            trailing: String(entry.time.prefix(5)),
+            leading: quadrantDot(entry),
+            tint: accent,
+            isSelected: editing?.id == entry.id,
+            onEdit: { editing = entry },
+            onDelete: { delete(entry) }
+          )
         }
       }
     } else if !loading {
@@ -87,6 +86,21 @@ struct MoodDestinationView: View {
         QuadrantBreakdownView(entries: monthEntries)
       }
     }
+  }
+
+  /// Leading quadrant-color dot — the row's only section-specific glyph.
+  private func quadrantDot(_ entry: MoodEntry) -> AnyView {
+    AnyView(
+      Circle()
+        .fill((MoodQuadrant(rawValue: entry.quadrant)?.color ?? .gray).opacity(0.85))
+        .frame(width: 12, height: 12)
+    )
+  }
+
+  private func delete(_ entry: MoodEntry) {
+    SeptenaServices.shared.moodMutator.deleteEntry(id: entry.id)
+    Haptics.warning()
+    Task { await reload() }
   }
 
   private func reload() async {
@@ -118,30 +132,6 @@ struct MoodDestinationView: View {
                 quadrant: $0.quadrant, arousal: $0.arousal, valence: $0.valence,
                 emotion: $0.emotion, note: $0.note)
     }
-  }
-}
-
-// MARK: - Single entry row
-
-private struct EntryRow: View {
-  let entry: MoodEntry
-  var body: some View {
-    HStack(spacing: 12) {
-      Circle()
-        .fill((MoodQuadrant(rawValue: entry.quadrant)?.color ?? .gray).opacity(0.85))
-        .frame(width: 12, height: 12)
-      VStack(alignment: .leading, spacing: 2) {
-        Text(entry.emotion).font(.subheadline.weight(.medium))
-        if let n = entry.note, !n.isEmpty {
-          Text(n).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-        }
-      }
-      Spacer()
-      Text(String(entry.time.prefix(5)))
-        .font(.caption.monospacedDigit())
-        .foregroundStyle(.secondary)
-    }
-    .padding(.vertical, 2)
   }
 }
 
