@@ -2,6 +2,22 @@ import SwiftUI
 import SwiftData
 import EventKit
 
+/// Shared date formatters — hoisted out of the (now generic) view, since
+/// generic types can't hold static stored properties.
+private enum RhythmFmt {
+  static let ymd: DateFormatter = {
+    let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.timeZone = .current
+    return f
+  }()
+  static let isoLocal: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+    f.timeZone = .current
+    f.locale = Locale(identifier: "en_US_POSIX")
+    return f
+  }()
+}
+
 /// Rhythm homepage renderer — the holistic counterpart to the per-section
 /// detail wheel. One big 24-hour dial overlays *every* enabled section's
 /// timestamped events from the trailing 7 days, each dot tinted its section
@@ -13,12 +29,15 @@ import EventKit
 /// (`LoggedEvents.timed(since:)`), not the per-day `HistorySeries` the other
 /// layout modes consume — which is exactly why the wheel is a holistic mode
 /// and not a per-domain grid.
-struct RhythmHomepageView: View {
+struct RhythmHomepageView<MenuContent: View>: View {
   let items: [HomepageDomainData]
   /// Oura nights (already loaded by the dashboard) — sleep plots as a band
   /// (bedtime → wake) rather than a dot, since it's a duration, not an instant.
   var sleepNights: [OuraNight] = []
   let onTap: (DomainTapAction) -> Void
+  /// Long-press / right-click quick-add menu per section — same plumbing as
+  /// the other renderers. Caller hands back `EmptyView` for menu-less sections.
+  @ViewBuilder let menuContent: (HomepageDomain) -> MenuContent
 
   @Environment(\.modelContext) private var modelContext
   @Environment(DayClock.self) private var clock
@@ -26,16 +45,15 @@ struct RhythmHomepageView: View {
 
   @State private var events: [TimeOfDayWheel.Event] = []
   @State private var bands: [TimeOfDayWheel.Band] = []
+  /// Per-section buckets feeding the tile mini wheels. The big overlay dial is
+  /// just the flattened union of these, so the two never disagree.
+  @State private var eventsBySection: [String: [TimeOfDayWheel.Event]] = [:]
+  @State private var bandsBySection: [String: [TimeOfDayWheel.Band]] = [:]
   /// Today's calendar events as time-block pills — shown only in the
   /// today-focused view (tap the dial), where a day's schedule is legible.
   @State private var calendarBands: [TimeOfDayWheel.Band] = []
 
   private let windowDays = 7
-
-  private static let ymdFormatter: DateFormatter = {
-    let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; f.timeZone = .current
-    return f
-  }()
 
   /// Section accent + title + tap, keyed for fast lookup while mapping the
   /// flat event list and building the legend.
@@ -87,19 +105,18 @@ struct RhythmHomepageView: View {
     }
   }
 
-  /// Section identity tiles — Rings-style cells stripped to just the colored
-  /// glyph + name (no value), so the section's color lives here instead of an
-  /// improvised legend. One per section present on the dial; tap opens it.
+  /// Section tiles — Rings-style cells, each carrying a mini wheel of *that one
+  /// section's* trailing-7-day rhythm in its accent, so the strip is small
+  /// multiples that decompose the overlay above. Sections with no timed data
+  /// this window fall back to the colored glyph (still a stable color key +
+  /// launcher). One per enabled section; tap opens it.
   private var sectionTiles: some View {
     let columns = [GridItem(.adaptive(minimum: 104), spacing: 8)]
-    // Every enabled section gets a tile (like Rings) so the strip is a stable
-    // color key + launcher, whether or not that section has events this window.
     return LazyVGrid(columns: columns, spacing: 8) {
-      ForEach(items, id: \.domain) { item in
+      ForEach(timedItems, id: \.domain) { item in
         Button { onTap(item.tap) } label: {
           VStack(spacing: 6) {
-            SectionGlyph(icon: SectionManifest.byKey[item.domain.rawValue]?.iconSymbol ?? "circle.fill",
-                         accent: item.accent)
+            tileMark(for: item)
             Text(item.title)
               .font(.caption.weight(.semibold))
               .foregroundStyle(.primary)
@@ -112,7 +129,33 @@ struct RhythmHomepageView: View {
           .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .contextMenu { menuContent(item.domain) }
       }
+    }
+  }
+
+  /// Sections that can plot on a 24-hour dial — those whose plugin declares
+  /// `producesTimedEvents`. Drops dial-less sections (Body, Groceries, GitHub,
+  /// …) so the strip never shows a tile that can only ever be a dead glyph.
+  private var timedItems: [HomepageDomainData] {
+    items.filter {
+      SectionRegistry.plugin(forKey: $0.domain.rawValue)?.producesTimedEvents ?? false
+    }
+  }
+
+  /// A section tile's mark: its own mini wheel when it has timed events/bands
+  /// this window, else the colored glyph.
+  @ViewBuilder
+  private func tileMark(for item: HomepageDomainData) -> some View {
+    let key = item.domain.rawValue
+    let ev = eventsBySection[key] ?? []
+    let bd = bandsBySection[key] ?? []
+    if ev.isEmpty && bd.isEmpty {
+      SectionGlyph(icon: SectionManifest.byKey[key]?.iconSymbol ?? "circle.fill",
+                   accent: item.accent)
+    } else {
+      TimeOfDayWheel(events: ev, accent: item.accent, bands: bd,
+                     windowDays: windowDays, diameter: 84, compact: true)
     }
   }
 
@@ -127,36 +170,37 @@ struct RhythmHomepageView: View {
     let timed = LoggedEvents.timed(since: weekStart, in: modelContext)
       .filter { visible.contains($0.sectionKey) && $0.sectionKey != "training" }
 
-    var mapped: [TimeOfDayWheel.Event] = []
+    // Bucket events/bands by section so each tile can draw its own mini wheel;
+    // the overlay dial is the flattened union of the buckets.
+    var evBuckets: [String: [TimeOfDayWheel.Event]] = [:]
     for t in timed {
       guard let e = TimeOfDayWheel.Event(
         id: t.id, occurredAt: t.occurredAt, todayStart: start,
         windowDays: windowDays, color: colors[t.sectionKey]
       ) else { continue }
-      mapped.append(e)
+      evBuckets[t.sectionKey, default: []].append(e)
     }
     // Tasks aren't `LoggedEvent`s — add completed tasks as dots so the wheel
     // matches the timeline (which plots done tasks at their completedAt time).
     if visible.contains("tasks") {
-      mapped.append(contentsOf: taskEvents(todayStart: start, color: colors["tasks"]))
+      let te = taskEvents(todayStart: start, color: colors["tasks"])
+      if !te.isEmpty { evBuckets["tasks", default: []].append(contentsOf: te) }
     }
-    events = mapped
 
-    var allBands = sleepBands(todayStart: start, visible: visible, sleepColor: colors["sleep"])
+    var bandBuckets: [String: [TimeOfDayWheel.Band]] = [:]
+    let sleep = sleepBands(todayStart: start, visible: visible, sleepColor: colors["sleep"])
+    if !sleep.isEmpty { bandBuckets["sleep"] = sleep }
     if visible.contains("training") {
-      allBands += trainingBands(todayStart: start, weekStart: weekStart, color: colors["training"])
+      let train = trainingBands(todayStart: start, weekStart: weekStart, color: colors["training"])
+      if !train.isEmpty { bandBuckets["training"] = train }
     }
-    bands = allBands
+
+    eventsBySection = evBuckets
+    bandsBySection = bandBuckets
+    events = evBuckets.values.flatMap { $0 }
+    bands = bandBuckets.values.flatMap { $0 }
     calendarBands = todayCalendarBands()
   }
-
-  private static let isoLocalFormatter: DateFormatter = {
-    let f = DateFormatter()
-    f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-    f.timeZone = .current
-    f.locale = Locale(identifier: "en_US_POSIX")
-    return f
-  }()
 
   /// Completed tasks as dots, placed at their local `completedAt` time —
   /// mirrors `DayTimelineView`'s task handling. The `Event` init bounds them to
@@ -165,7 +209,7 @@ struct RhythmHomepageView: View {
     let desc = FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.statusRaw == "done" })
     let rows = (try? modelContext.fetch(desc)) ?? []
     return rows.compactMap { t in
-      guard let cs = t.completedAt, let when = Self.isoLocalFormatter.date(from: cs) else { return nil }
+      guard let cs = t.completedAt, let when = RhythmFmt.isoLocal.date(from: cs) else { return nil }
       return TimeOfDayWheel.Event(id: t.id, occurredAt: when, todayStart: todayStart,
                                   windowDays: windowDays, color: color)
     }
@@ -182,7 +226,7 @@ struct RhythmHomepageView: View {
     let cal = Calendar.current
     var out: [TimeOfDayWheel.Band] = []
     for (dateStr, dayRows) in Dictionary(grouping: rows, by: \.date) {
-      guard let d = Self.ymdFormatter.date(from: dateStr) else { continue }
+      guard let d = RhythmFmt.ymd.date(from: dateStr) else { continue }
       let daysAgo = cal.dateComponents([.day], from: cal.startOfDay(for: d), to: todayStart).day ?? 0
       guard daysAgo >= 0, daysAgo < windowDays else { continue }
       // Per-entry spans (start hour → start + duration), then merge near ones.
@@ -247,7 +291,7 @@ struct RhythmHomepageView: View {
     return sleepNights.compactMap { n in
       guard let b = Self.frac(fromHHmm: n.bedtime),
             let w = Self.frac(fromHHmm: n.wakeTime),
-            let d = Self.ymdFormatter.date(from: n.date) else { return nil }
+            let d = RhythmFmt.ymd.date(from: n.date) else { return nil }
       let daysAgo = cal.dateComponents([.day], from: cal.startOfDay(for: d), to: todayStart).day ?? 0
       guard daysAgo >= 0, daysAgo < windowDays else { return nil }
       return TimeOfDayWheel.Band(id: n.id, start: b, end: w, daysAgo: daysAgo, color: sleepColor)

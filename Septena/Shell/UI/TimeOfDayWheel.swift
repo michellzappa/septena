@@ -52,6 +52,11 @@ struct TimeOfDayWheel: View {
   var nowFraction: Double? = nil
   /// Square side of the dial.
   var diameter: CGFloat = 240
+  /// Compact tile rendering (the homepage Wheel mode's per-section mini wheels):
+  /// drops the hour labels, scope chip, "now" hand and the heavy white disc, and
+  /// locks to the full-week overlay (no tap-to-toggle — a thumbnail isn't an
+  /// interactive control). Ticks stay as a faint frame so the angles still read.
+  var compact: Bool = false
 
   // Brightest (today) → faintest (oldest day in the window).
   private let maxOpacity: Double = 0.92
@@ -77,9 +82,16 @@ struct TimeOfDayWheel: View {
   /// week's data is always loaded; the tap just reveals it.
   @State private var todayOnly = true
 
-  private var effectiveWindow: Int { todayOnly ? 1 : windowDays }
-  private var shownEvents: [Event] { todayOnly ? events.filter { $0.daysAgo == 0 } : events }
-  private var shownBands: [Band] { todayOnly ? bands.filter { $0.daysAgo == 0 } : bands }
+  /// The resolved focus: compact tiles always show the full week (the overlay
+  /// *is* the point of a thumbnail); the full dial honors the tap toggle.
+  private var focusToday: Bool { compact ? false : todayOnly }
+  /// Outer margin for the labels/disc — collapses in compact so the dial fills
+  /// its tile.
+  private var margin: CGFloat { compact ? 5 : 20 }
+
+  private var effectiveWindow: Int { focusToday ? 1 : windowDays }
+  private var shownEvents: [Event] { focusToday ? events.filter { $0.daysAgo == 0 } : events }
+  private var shownBands: [Band] { focusToday ? bands.filter { $0.daysAgo == 0 } : bands }
 
   private func fade(_ daysAgo: Int) -> Double {
     let w = effectiveWindow
@@ -96,15 +108,19 @@ struct TimeOfDayWheel: View {
       // White "clock face": a filled disc whose edge lands exactly on the
       // tick ring, so the hour numbers sit *outside* it on the page (like a
       // real clock face). The 20pt inset matches the Canvas `ringR` margin.
-      Circle()
-        .fill(Theme.cardSurface)
-        .overlay(Circle().strokeBorder(Theme.inkSecondary.opacity(0.18), lineWidth: 1))
-        .shadow(color: .black.opacity(0.07), radius: 5, y: 2)
-        .padding(20)
+      // Skipped in compact — the thumbnail sits directly on its tile card, so a
+      // second filled disc + shadow would read as a double card.
+      if !compact {
+        Circle()
+          .fill(Theme.cardSurface)
+          .overlay(Circle().strokeBorder(Theme.inkSecondary.opacity(0.18), lineWidth: 1.5))
+          .shadow(color: .black.opacity(0.07), radius: 5, y: 2)
+          .padding(20)
+      }
       Canvas { ctx, size in
       let side = min(size.width, size.height)
       let center = CGPoint(x: size.width / 2, y: size.height / 2)
-      let ringR = side / 2 - 20            // margin for the bolder labels
+      let ringR = side / 2 - margin        // margin for the bolder labels
       guard ringR > 8 else { return }
 
       func point(_ fraction: Double, _ r: CGFloat) -> CGPoint {
@@ -127,19 +143,32 @@ struct TimeOfDayWheel: View {
         return p
       }
 
-      // No separate track ring here — the white disc's edge (above) *is* the
-      // outer circle, landing on `ringR`.
+      // The clock's outline + ticks. On compact tiles these read as neutral
+      // (the section accent is carried by the dots), so the frame doesn't
+      // double up on color; the full dial keeps the accent frame.
+      let lineColor = compact ? Theme.inkSecondary : accent
 
-      // Hour ticks — quarter-marks longest/darkest, 3-hour marks medium.
+      // Full dial: the white disc's edge (above) *is* the outer circle. Compact
+      // has no disc, so draw a frame ring here to anchor the angles. Matches the
+      // disc border's 1.5pt weight.
+      if compact {
+        ctx.stroke(Path(ellipseIn: CGRect(x: center.x - ringR, y: center.y - ringR,
+                                          width: ringR * 2, height: ringR * 2)),
+                   with: .color(lineColor.opacity(0.22)), lineWidth: 1.5)
+      }
+
+      // Hour ticks — quarter-marks longest/darkest, 3-hour marks medium. Compact
+      // keeps only the four quarter ticks so the thumbnail stays uncluttered.
       for h in 0..<24 {
         let f = Double(h) / 24
         let major = (h % 6 == 0)
         let mid = (h % 3 == 0)
+        if compact && !major { continue }
         var tick = Path()
-        tick.move(to: point(f, ringR - (major ? 11 : mid ? 7 : 4)))
+        tick.move(to: point(f, ringR - (major ? (compact ? 5 : 11) : mid ? 7 : 4)))
         tick.addLine(to: point(f, ringR))
         ctx.stroke(tick,
-                   with: .color(accent.opacity(major ? 0.55 : mid ? 0.30 : 0.18)),
+                   with: .color(lineColor.opacity(major ? 0.55 : mid ? 0.30 : 0.18)),
                    lineWidth: major ? 2 : 1)
       }
 
@@ -158,9 +187,12 @@ struct TimeOfDayWheel: View {
 
       // Quadrant labels just outside the disc, on the page background — softer
       // (secondary) so they frame the dial without competing with the data.
-      for h in [0, 6, 12, 18] {
-        ctx.draw(Text(hourLabel(h)).font(.caption.weight(.semibold)).foregroundStyle(.secondary),
-                 at: point(Double(h) / 24, ringR + 12))
+      // Compact thumbnails drop them (no room, and the four ticks suffice).
+      if !compact {
+        for h in [0, 6, 12, 18] {
+          ctx.draw(Text(hourLabel(h)).font(.caption.weight(.semibold)).foregroundStyle(.secondary),
+                   at: point(Double(h) / 24, ringR + 12))
+        }
       }
 
       // "Now" hand — a faint radial hairline.
@@ -192,31 +224,53 @@ struct TimeOfDayWheel: View {
         // extra event in the slot, capped at 8) — so the two of-today views
         // read the same. Week mode keeps its relative-to-busiest-slot scaling
         // for the denser overlay (there's no timeline equivalent of a week).
+        // Week mode: max radius trimmed 30% (8.5 → ~5.95) so dense clusters
+        // read as firm dots, not heavy blobs. Floor stays at 2.2 for one-offs.
         let dotR: CGFloat = effectiveWindow == 1
           ? min(8, 4 + count) / 2
-          : (2.2 + norm * 6.3)
+          : (2.2 + norm * 3.75)
         let p = point(e.fraction, dotRing)
         let rect = CGRect(x: p.x - dotR, y: p.y - dotR, width: dotR * 2, height: dotR * 2)
         ctx.fill(Path(ellipseIn: rect), with: .color((e.color ?? accent).opacity(fade(e.daysAgo))))
       }
 
       // Center scope chip — names the current view and signals the dial is
-      // tappable ("Today" ⇄ "7 days").
-      let scope = todayOnly ? "Today" : "\(windowDays) days"
-      ctx.draw(Text(scope).font(.caption2.weight(.medium)).foregroundStyle(.secondary),
-               at: center)
+      // tappable ("Today" ⇄ "7 days"). Compact thumbnails are non-interactive,
+      // so no chip.
+      if !compact {
+        let scope = todayOnly ? "Today" : "\(windowDays) days"
+        ctx.draw(Text(scope).font(.caption2.weight(.medium)).foregroundStyle(.secondary),
+                 at: center)
+      }
     }
     }
     .frame(width: diameter, height: diameter)
     .contentShape(Circle())
-    .onTapGesture { todayOnly.toggle() }
+    .modifier(WheelTapToggle(enabled: !compact) { todayOnly.toggle() })
     .accessibilityElement()
-    .accessibilityAddTraits(.isButton)
+    .accessibilityAddTraits(compact ? [] : .isButton)
     .accessibilityLabel(Text("Time-of-day wheel"))
-    .accessibilityValue(Text(todayOnly
+    .accessibilityValue(Text(focusToday
       ? "Today, \(shownEvents.count) events"
       : "\(events.count) events over the last \(windowDays) days"))
-    .accessibilityHint(Text("Double tap to switch between today and the last \(windowDays) days"))
+    .accessibilityHint(compact
+      ? Text("")
+      : Text("Double tap to switch between today and the last \(windowDays) days"))
+  }
+}
+
+/// Attaches the today/week tap toggle only when `enabled`. Compact tiles live
+/// inside a launcher `Button`, so a child tap gesture there would swallow the
+/// tile's tap — this keeps the thumbnail inert.
+private struct WheelTapToggle: ViewModifier {
+  let enabled: Bool
+  let action: () -> Void
+  func body(content: Content) -> some View {
+    if enabled {
+      content.onTapGesture(perform: action)
+    } else {
+      content
+    }
   }
 }
 
