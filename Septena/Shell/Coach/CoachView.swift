@@ -17,6 +17,7 @@ import SwiftData
 struct CoachView: View {
   @Environment(\.modelContext) private var context
   @Environment(SectionTheme.self) private var theme
+  @Environment(NavigationState.self) private var nav
   #if os(iOS)
   @Environment(\.horizontalSizeClass) private var hSize
   #endif
@@ -31,7 +32,9 @@ struct CoachView: View {
 
   private var columns: [GridItem] {
     #if os(iOS)
-    return GoalGrid.columns(regularWidth: hSize == .regular)
+    // 2-up on iPhone (tiles don't need full width), 3-up on iPad regular.
+    let count = (hSize == .regular) ? 3 : 2
+    return Array(repeating: GridItem(.flexible(), spacing: 14), count: count)
     #else
     return GoalGrid.columns(regularWidth: true)
     #endif
@@ -54,14 +57,10 @@ struct CoachView: View {
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif
-      .toolbar {
-        ToolbarItem(placement: .primaryAction) {
-          Button { addGoal() } label: { Label("New goal", systemImage: "plus") }
-            .buttonStyle(.glassProminent)
-            .tint(theme.color(for: "goals"))
-            .keyboardShortcut("n", modifiers: .command)
-        }
-      }
+      // Home-page chrome consistent with Week / Next / Tasks: a top-left "…"
+      // menu (Settings today). No top-right "+" — goals are added from the
+      // Goals band's own affordance, the section strips, or the coach.
+      .toolbar { homeToolbar }
       .navigationDestination(for: CoachDomain.self) { domain in
         CoachDetailView(domain: domain)
       }
@@ -87,6 +86,28 @@ struct CoachView: View {
         activeExercise = nil
       }
     }
+  }
+
+  // MARK: - Home chrome
+
+  @ToolbarContentBuilder
+  private var homeToolbar: some ToolbarContent {
+    #if os(iOS)
+    ToolbarItem(placement: .topBarLeading) { homeMenu }
+    #else
+    ToolbarItem(placement: .primaryAction) { homeMenu }
+    #endif
+  }
+
+  private var homeMenu: some View {
+    Menu {
+      Button { nav.showSettings = true } label: {
+        Label("Settings", systemImage: "gearshape")
+      }
+    } label: {
+      Image(systemName: "ellipsis.circle")
+    }
+    .accessibilityLabel("More")
   }
 
   // MARK: - Bands
@@ -132,7 +153,18 @@ struct CoachView: View {
   @ViewBuilder
   private var goalsBand: some View {
     VStack(alignment: .leading, spacing: 12) {
-      bandHeader("Goals", "Free-text intentions; tag them so a coach picks them up.")
+      HStack(alignment: .top) {
+        bandHeader("Goals", "Free-text intentions; tag them so a coach picks them up.")
+        Spacer(minLength: 8)
+        if !goals.isEmpty {
+          Button(action: addGoal) {
+            Label("Add", systemImage: "plus").font(.subheadline.weight(.medium))
+          }
+          .buttonStyle(.plain)
+          .tint(theme.color(for: "goals"))
+          .keyboardShortcut("n", modifiers: .command)
+        }
+      }
       if goals.isEmpty {
         ContentUnavailableView {
           Label("No Goals Yet", systemImage: "target")
