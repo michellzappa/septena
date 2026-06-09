@@ -261,6 +261,27 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_ENTITLEMENTS: SeptenaWidgets/SeptenaWidgets.entitlements
 
+  # Hermetic unit tests for pure SeptenaCore logic. SeptenaCore is NOT a
+  # framework — it's source compiled into each app target — so there's nothing
+  # to @testable import. Instead this standalone macOS test bundle recompiles
+  # the self-contained, Foundation-only logic files directly. No host app, no
+  # simulator, no SwiftData/CloudKit — runs in milliseconds.
+  # INVARIANT: only add files here that import nothing beyond Foundation, or the
+  # bundle won't link. Files with SwiftData/SwiftUI deps don't belong.
+  SeptenaCoreTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: SeptenaCoreTests
+        excludes:
+          - "**/.DS_Store"
+      - path: SeptenaCore/Fasting.swift
+      - path: SeptenaCore/DateParser.swift
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.coretests
+
   SeptenaUITests:
     type: bundle.ui-testing
     platform: iOS
@@ -313,3 +334,14 @@ schemes:
         SeptenaMac: all
     run:
       config: Debug
+
+  # Standalone unit-test scheme. Runs fast (no host app):
+  #   xcodebuild test -scheme SeptenaCoreTests -destination 'platform=macOS'
+  SeptenaCoreTests:
+    build:
+      targets:
+        SeptenaCoreTests: all
+    test:
+      config: Debug
+      targets:
+        - SeptenaCoreTests

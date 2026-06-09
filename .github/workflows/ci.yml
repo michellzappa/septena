@@ -1,0 +1,54 @@
+name: CI
+
+# Build gate: regenerate the Xcode project from project.yml (the source of
+# truth) and compile all three schemes. This is what catches the repo's most
+# common breakage — target-membership drift across iOS / macOS / watchOS, where
+# a single-sourced file (NextBlocks, NextWire, DayBucket) stops compiling on one
+# platform. It does NOT run tests; there's no unit-test target yet.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build (iOS / macOS / watchOS)
+    runs-on: macos-26  # Xcode 26 / 26.0 SDKs; matches project.yml deploymentTarget
+    env:
+      # Build only — no signing on CI (the app targets carry CloudKit / app-group
+      # entitlements and a DEVELOPMENT_TEAM that can't be provisioned here).
+      SIGNING: CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        run: sudo xcode-select -switch /Applications/Xcode_26.app
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      # project.yml is the source of truth — always regenerate, then build from
+      # the fresh project. (We deliberately don't diff-check the committed
+      # .xcodeproj: XcodeGen output isn't byte-stable across versions/runs, so
+      # that check produces false failures. The build steps are the real gate.)
+      - name: Generate project
+        run: xcodegen generate
+
+      - name: Build Septena (iOS)
+        run: xcodebuild -scheme Septena -destination 'generic/platform=iOS' -configuration Debug $SIGNING build
+
+      - name: Build SeptenaMac (macOS)
+        run: xcodebuild -scheme SeptenaMac -destination 'platform=macOS' -configuration Debug $SIGNING build
+
+      - name: Build SeptenaWatch (watchOS)
+        run: xcodebuild -scheme SeptenaWatch -destination 'generic/platform=watchOS' -configuration Debug $SIGNING build
+
+      # Hermetic unit tests for pure SeptenaCore logic — standalone macOS bundle,
+      # no host app, runs in well under a second.
+      - name: Test SeptenaCore logic
+        run: xcodebuild test -scheme SeptenaCoreTests -destination 'platform=macOS' $SIGNING
