@@ -8,13 +8,15 @@ This plan took Septena from *zero* UI localization to a regen-safe String Catalo
 
 ## pt-BR pilot status (current)
 
-**Catalog: 589 keys · 552 translatable · 537 translated to pt-BR · 15 untranslated (catalog-only) · 37 don't-translate.**
+**Catalog: 662 keys · 625 translatable · 610 translated to pt-BR · 15 untranslated (catalog-only) · 37 don't-translate.**
 
 **Done — the whole in-app experience is pt-BR:**
 - **Infra** — String Catalog wired via `project.yml` / `CFBundleLocalizations` (regen-safe, xcodegen auto-populates `knownRegions`); languages en/fr/de/es/pt-BR.
 - **Chrome** — tab bar, dashboard (all 3 layouts via `HomepageDomainData.title`), welcome greeting (AI prompt writes in the app language) + fallbacks, day buckets, task filters + recurrence, mood (quadrants + blurbs + 36 emotion words via `displayWord`), macros, settings + layout enums, app-icon + accent colors (16), muscle groups, Today/Yesterday, Discover flows (Values/Ikigai/Virtue).
 - **Section names** — `SectionManifest.displayLabel(key:stored:)` translate-on-display: canonical English in data, localized on UX, **user renames preserved verbatim**. Wired through all ~10 display sites.
 - **Formatting** — `Double.decimalString()` across ~54 number sites (→ `3,5`); `setLocalizedDateFormatFromTemplate` for `MMM d` (→ `6 de jun`). Storage formats untouched.
+- **Notifications** — all local notifications fire localized (`String(localized:)` at fire time): section-name titles, the four scheduled-notification descriptor names, action labels, and bodies across Habits / Hydration / Sleep / Chores. Habits nudge uses a String Catalog plural (one/other); Chores nudge selects between two localized messages (singular name-only vs. count+name).
+- **App Intents** — Siri/Shortcuts surface fully localized: 17 intent titles + 15 `typeDisplayRepresentation` parameter labels + 9 AppEnum case labels (meal types, gut volume, cannabis methods). Dynamic `DisplayRepresentation(title:)` stays verbatim — user data.
 
 **Convention (the structure):** one canonical `Septena/Localizable.xcstrings`; chrome → `String(localized: "…", comment: "Feature: context")` co-located in the owning type; **data English, UX translated on top, user-entered values verbatim.**
 
