@@ -90,7 +90,7 @@ enum MCPDispatch {
 
   /// Tools that only read the local mirror — no startup wait required.
   private static let readOnlyTools: Set<String> = [
-    "tasks_list", "tasks_list_projects", "tasks_list_areas",
+    "tasks_list", "tasks_get", "tasks_list_projects", "tasks_list_areas",
     "goals_list", "settings_get", "sections_list",
     "habits_list", "supplements_list", "chores_list",
     "caffeine_events_list", "cannabis_events_list", "gut_events_list",
@@ -128,6 +128,7 @@ enum MCPDispatch {
     switch name {
     // ---- Tasks ----
     case "tasks_list":          return tasksList(args)
+    case "tasks_get":           return try tasksGet(args)
     case "tasks_create":        return try tasksCreate(args)
     case "tasks_complete":      return tasksComplete(args)
     case "tasks_update":        return try tasksUpdate(args)
@@ -242,7 +243,47 @@ enum MCPDispatch {
     case "completed": filter = .logbook
     default: filter = .today
     }
-    return ["tasks": LocalCache.tasks(in: ctx, filter: filter).prefix(limit).map(taskJSON)]
+    // Truncation signal so a caller knows there's more beyond `limit` (the
+    // classic "scanned completed to 400, missed #481, concluded deleted"
+    // misread). `total` is the full count for the view; `truncated` whether
+    // the returned page leaves rows behind.
+    let all = LocalCache.tasks(in: ctx, filter: filter)
+    return [
+      "tasks": all.prefix(limit).map(taskJSON),
+      "total": all.count,
+      "truncated": all.count > limit,
+    ]
+  }
+
+  /// One-call "where is this task, what's its state?" — every core field plus a
+  /// compact conversation summary, regardless of which view (or none) the task
+  /// lives in. Use `tasks_thread_get` for the full turn-by-turn conversation.
+  private static func tasksGet(_ args: MCPArgs) throws -> Any {
+    let id = try args.requireString("id")
+    let desc = FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.id == id })
+    guard let e = try? ctx.fetch(desc).first else {
+      throw MCPError.badArgument("unknown task id '\(id)'")
+    }
+    var out: [String: Any] = ["id": e.id, "title": e.title, "status": e.status.rawValue, "today": e.today]
+    if let v = e.scheduled { out["scheduled"] = v }
+    if let v = e.due { out["due"] = v }
+    if let v = e.area { out["area"] = v }
+    if let v = e.project { out["project"] = v }
+    if let v = e.completedAt { out["completedAt"] = v }
+    if let v = e.source { out["source"] = v }
+    let c = e.conversation
+    var convo: [String: Any] = [
+      "turns": c.thread.count,
+      "hasArtifact": c.artifact != nil,
+      "hasHandoff": c.handoff != nil,
+      "pendingReasoning": c.isPendingReasoning(),
+    ]
+    if let v = c.confirmedIntent { convo["confirmedIntent"] = v }
+    if let v = c.acceptance { convo["acceptance"] = v }
+    if let v = c.assignee { convo["assignee"] = v.rawValue }
+    if let v = c.endState { convo["endState"] = v.rawValue }
+    out["convo"] = convo
+    return out
   }
 
   private static func tasksCreate(_ args: MCPArgs) throws -> Any {
