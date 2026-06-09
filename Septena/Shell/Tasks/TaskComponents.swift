@@ -294,7 +294,15 @@ struct TaskRow: View {
   @ViewBuilder private var trailingDate: some View {
     let cal = Calendar.current
     let today = cal.startOfDay(for: Date())
-    if let due = task.due.flatMap(SeptenaDate.parse) {
+    // Completed tasks show WHEN they were done (the Completed view reads as a
+    // dated archive); the date prefix strips the time off `completedAt`.
+    if task.status == .done, let done = task.completedAt.flatMap({ SeptenaDate.parse(String($0.prefix(10))) }) {
+      HStack(spacing: 4) {
+        Image(systemName: "checkmark").scaledFont(size: 11)
+        Text(Self.shortDate(done)).font(.septenaMeta)
+      }
+      .foregroundStyle(Theme.inkSecondary)
+    } else if let due = task.due.flatMap(SeptenaDate.parse) {
       let dueDay = cal.startOfDay(for: due)
       if dueDay <= today {
         Text(cal.isDateInToday(due) ? "Today" : Self.shortDate(due))

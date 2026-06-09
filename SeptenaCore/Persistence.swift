@@ -2653,7 +2653,7 @@ enum LocalCache {
       return ka != kb ? ka < kb : a.id < b.id
     }
     let today = SeptenaDate.today
-    return ordered.compactMap { e -> SeptenaTask? in
+    let result = ordered.compactMap { e -> SeptenaTask? in
       // Hide rows the user has deleted locally; the outbox drainer will
       // either confirm the deletion (row removed) or resurrect them if
       // the server rejects.
@@ -2690,6 +2690,12 @@ enum LocalCache {
         return SeptenaTask(e)
       }
     }
+    // The Completed (logbook) view reads as an archive — most-recently-completed
+    // first. Every other view keeps manual/creation order (TaskOrder.key).
+    if case .logbook = filter {
+      return result.sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
+    }
+    return result
   }
 
   @MainActor

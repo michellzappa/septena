@@ -116,7 +116,7 @@ struct QuickFindView: View {
         kind: .task(done: t.status == .done, today: t.today),
         title: t.title,
         subtitle: taskSubtitle(t),
-        score: s + (t.status == .done ? -3 : 0),
+        score: s + (t.status == .done ? -1 : 0),
         route: routeForTask(t)
       ))
     }
@@ -192,7 +192,7 @@ struct QuickFindView: View {
     if let aid = t.area, let a = areas.first(where: { $0.id == aid }) {
       return a.title
     }
-    if t.status == .done { return "Logbook" }
+    if t.status == .done { return "Completed" }
     if t.isOnToday { return "Today" }
     return nil
   }

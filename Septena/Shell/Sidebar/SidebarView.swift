@@ -372,7 +372,7 @@ struct SidebarRootView: View {
                     count: counts?.somedayCount),
       SmartListSpec(route: .filter(.logbook),
                     icon: "checkmark", color: .gray,
-                    title: "Logbook",
+                    title: "Completed",
                     count: nil),
     ]
   }
