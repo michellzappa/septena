@@ -46,7 +46,7 @@ interface TaskOut {
 export async function listTasks(
   client: CloudKitClient,
   input: ListTasksInput,
-): Promise<{ tasks: TaskOut[] }> {
+): Promise<{ tasks: TaskOut[]; total: number; truncated: boolean }> {
   const view = input.view ?? "today";
   const limit = input.limit ?? 100;
 
@@ -84,12 +84,26 @@ export async function listTasks(
     completedAt: optionalString(r.fields.completedAt?.value),
   }));
 
+  // Truncation signal so a caller knows there's more beyond `limit` (the
+  // classic "I scanned `completed` to 400, missed #481, concluded deleted"
+  // misread). For client-filtered views we hold the whole filtered set, so
+  // `total` is exact. For capped views CloudKit's continuationMarker tells us
+  // definitively whether more rows exist past the page; `total` there is the
+  // count returned (≥ when truncated, exact when not).
+  let truncated: boolean;
+  let total: number;
   if (needsClientFilter) {
     const tz = await getEffectiveTimezone(client);
     const todayStr = todayYMD(tz);
-    tasks = tasks.filter((t) => matchesView(t, view, todayStr)).slice(0, limit);
+    const matched = tasks.filter((t) => matchesView(t, view, todayStr));
+    total = matched.length;
+    truncated = matched.length > limit;
+    tasks = matched.slice(0, limit);
+  } else {
+    truncated = !!res.continuationMarker;
+    total = tasks.length;
   }
-  return { tasks };
+  return { tasks, total, truncated };
 }
 
 function optionalString(value: unknown): string | undefined {

@@ -363,6 +363,49 @@ export async function threadGet(client: CloudKitClient, input: { id: string }) {
   return { id: input.id, conversation };
 }
 
+export const getTaskJsonSchema = {
+  type: "object",
+  required: ["id"],
+  properties: { id: { type: "string" } },
+} as const;
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+// One-call "where is this task, what's its state?" — every core field plus a
+// compact conversation summary, regardless of which view (or none) the task
+// lives in. Use tasks_thread_get for the full turn-by-turn conversation.
+export async function getTask(client: CloudKitClient, input: { id: string }) {
+  const fields = await lookupRecord(client, input.id);
+  if (!fields) throw new Error(`Task not found: ${input.id}`);
+  const convo = decodeConvo(fields);
+  const lastProvider = [...convo.thread].reverse().find((t) => t.role === "provider");
+  const lowConf = lastProvider?.confidence !== undefined && lastProvider.confidence < 0.5;
+  return {
+    id: input.id,
+    title: (fields.title?.value as string) ?? "",
+    status: (fields.status?.value as string) ?? "open",
+    today: ((fields.today?.value as number) ?? 0) !== 0,
+    scheduled: optionalString(fields.scheduled?.value),
+    due: optionalString(fields.deadline?.value),
+    area: optionalString(fields.area?.value),
+    project: optionalString(fields.project?.value),
+    completedAt: optionalString(fields.completedAt?.value),
+    source: optionalString(fields.source?.value),
+    convo: {
+      confirmedIntent: convo.confirmedIntent,
+      acceptance: convo.acceptance,
+      assignee: convo.assignee,
+      endState: convo.endState,
+      turns: convo.thread.length,
+      hasArtifact: !!convo.artifact,
+      hasHandoff: !!convo.handoff,
+      pendingReasoning: !isTerminalConvo(convo) && (convo.assignee === "claude" || lowConf),
+    },
+  };
+}
+
 export async function threadAppend(
   client: CloudKitClient,
   input: { id: string; turn: Omit<ConvoTurn, "seq" | "ts"> & { ts?: string } },

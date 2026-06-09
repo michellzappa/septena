@@ -30,6 +30,7 @@ import {
   updateTask, updateTaskJsonSchema, type UpdateTaskInput,
   deferTask, deferTaskJsonSchema,
   moveToToday, moveToTodayJsonSchema,
+  getTask, getTaskJsonSchema,
   threadGet, threadGetJsonSchema,
   threadAppend, threadAppendJsonSchema,
   setAcceptance, setAcceptanceJsonSchema,
@@ -149,8 +150,14 @@ const GLOBAL_TOOLS: Tool[] = [
   {
     name: "tasks_list",
     description:
-      "List Septena tasks for a given view (today, inbox, upcoming, anytime, someday, completed).",
+      "List Septena tasks for a given view (today, inbox, upcoming, anytime, someday, completed). Returns {tasks, total, truncated}; truncated=true means more rows exist beyond limit.",
     inputSchema: listTasksJsonSchema,
+  },
+  {
+    name: "tasks_get",
+    description:
+      "Inspect a single task by id: title, status, area, project, scheduled, due, today, completedAt, source, and a compact conversation summary. One call answers 'where is this task and what's its state?' regardless of view or status.",
+    inputSchema: getTaskJsonSchema,
   },
   {
     name: "tasks_list_projects",
@@ -656,6 +663,10 @@ async function callTool(
   switch (params.name) {
     case "tasks_list": {
       const result = await listTasks(client, (params.arguments ?? {}) as ListTasksInput);
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    case "tasks_get": {
+      const result = await getTask(client, (params.arguments ?? {}) as unknown as { id: string });
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
     case "tasks_list_projects": {

@@ -17,7 +17,7 @@ The tool list is **dynamic**: on `tools/list` the gateway reads the user's `Sett
 
 | Group | Tools |
 |---|---|
-| Tasks | `tasks_list`, `tasks_create`, `tasks_update`, `tasks_complete`, `tasks_defer`, `tasks_move_to_today`, `tasks_list_projects`, `tasks_list_areas` |
+| Tasks | `tasks_list`, `tasks_get`, `tasks_create`, `tasks_update`, `tasks_complete`, `tasks_defer`, `tasks_move_to_today`, `tasks_list_projects`, `tasks_list_areas` |
 | Task Conversations | `tasks_thread_get`, `tasks_thread_append`, `tasks_set_acceptance`, `tasks_set_artifact`, `tasks_set_handoff`, `tasks_set_endstate`, `tasks_set_assignee`, `tasks_pending_reasoning` |
 | Goals | `goals_list`, `goals_create`, `goals_update`, `goals_delete` |
 | Settings/Sections | `settings_get`, `settings_update`, `sections_list`, `sections_update` |
@@ -50,6 +50,8 @@ The tool list is **dynamic**: on `tools/list` the gateway reads the user's `Sett
 
 ### Tasks
 - Views: `today`, `inbox`, `upcoming`, `anytime`, `someday`, `completed`. **`anytime` is NOT "all tasks"** — it excludes inbox-only items.
+- `tasks_list` returns `{tasks, total, truncated}` — **`truncated: true` means more rows exist beyond `limit`**, so don't conclude a task is missing/deleted from a capped page; raise `limit` or use `tasks_get`.
+- **`tasks_get(id)`** — one call for "where is this task, what's its state?": title, status, area, project, scheduled, due, today, completedAt, source, plus a compact convo summary. Works regardless of view or status; use this instead of scanning lists to locate a known id.
 - `tasks_complete` will **error on recurring tasks** — tell the user to complete those in the app so the next occurrence spawns correctly.
 - Resolve `area`/`project` names → ids via `tasks_list_areas` / `tasks_list_projects` before creating/updating.
 
