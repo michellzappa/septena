@@ -32,7 +32,7 @@ struct NextComplicationView: View {
   }
 }
 
-// MARK: - Corner: glyph shortcut + count along the bezel
+// MARK: - Corner: glyph shortcut only
 
 private struct CornerView: View {
   let data: NextComplicationData
@@ -40,9 +40,6 @@ private struct CornerView: View {
   var body: some View {
     Image("DiscsMark")
       .font(.title2)
-      .widgetLabel {
-        Text(data.remaining == 0 ? "All done" : "\(data.remaining) left")
-      }
   }
 }
 
