@@ -7,11 +7,14 @@ import SwiftData
 struct GutDestinationView: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var clock
 
   @State private var today: GutDayResponse? = nil
   @State private var loading = true
   @State private var editing: GutEntry? = nil
   @State private var creating: Bool = false
+  /// Trailing-7-day event instants for the rhythm wheel (see `rhythmSection`).
+  @State private var weekPoints: [WheelPoint] = []
   /// The day the drawer is viewing. Bound to `SectionDrawer`'s
   /// `currentDate` slot so the user can step prev/next from the date
   /// strip and `reload()` re-fetches for that day. Defaults to today.
@@ -20,6 +23,9 @@ struct GutDestinationView: View {
   private var gut: GutMutator { SeptenaServices.shared.gutMutator }
 
   private var accent: Color { theme.color(for: "gut") }
+
+  /// The rhythm wheel is a today-only affordance (a past-day view is odd).
+  private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
 
   var body: some View {
     SectionDrawer(sectionKey: "gut",
@@ -45,6 +51,7 @@ struct GutDestinationView: View {
             .padding(.vertical, 12)
         }
       }
+      rhythmSection
     }
     .tint(accent)
     .sectionReload(on: viewingDate, onDataChange: true) { await reload() }
@@ -95,6 +102,59 @@ struct GutDestinationView: View {
     today = await MirrorReader.shared.read {
       ChecklistMirror.loadGutDay(context: $0, date: date)
     }
+    await reloadWeek()
     loading = false
+  }
+
+  // MARK: - Rhythm wheel
+  //
+  // A 24-hour dial of *when* movements land over the trailing 7 days, faded by
+  // recency — gut regularity is a time-of-day signal. See `TimeOfDayWheel`.
+  // Today only, and only with enough events to read a pattern.
+
+  private struct WheelPoint: Identifiable, Sendable {
+    let id: String
+    let at: Date
+  }
+
+  /// Start of *today* in the local calendar, from the shared day clock so it
+  /// honors day-rollover. Falls back to the device midnight if unparseable.
+  private var todayStart: Date {
+    SeptenaDate.parse(clock.today).map { Calendar.current.startOfDay(for: $0) }
+      ?? Calendar.current.startOfDay(for: clock.now)
+  }
+
+  private func reloadWeek() async {
+    let weekStart = Calendar.current.date(byAdding: .day, value: -6, to: todayStart) ?? todayStart
+    weekPoints = await MirrorReader.shared.read { ctx in
+      let desc = FetchDescriptor<GutEventEntity>(
+        predicate: #Predicate { $0.occurredAt >= weekStart },
+        sortBy: [SortDescriptor(\.occurredAt)]
+      )
+      return ((try? ctx.fetch(desc)) ?? []).map { WheelPoint(id: $0.id, at: $0.occurredAt) }
+    }
+  }
+
+  private var wheelEvents: [TimeOfDayWheel.Event] {
+    let start = todayStart
+    return weekPoints.compactMap {
+      TimeOfDayWheel.Event(id: $0.id, occurredAt: $0.at, todayStart: start, windowDays: 7)
+    }
+  }
+
+  private var nowFraction: Double {
+    let c = Calendar.current.dateComponents([.hour, .minute], from: clock.now)
+    return (Double(c.hour ?? 0) * 60 + Double(c.minute ?? 0)) / 1440
+  }
+
+  @ViewBuilder
+  private var rhythmSection: some View {
+    let events = wheelEvents
+    if isViewingToday, events.count >= 3 {
+      DrawerSection("When movements happen", padding: .tight) {
+        TimeOfDayWheel(events: events, accent: accent, windowDays: 7, nowFraction: nowFraction)
+          .frame(maxWidth: .infinity)
+      }
+    }
   }
 }

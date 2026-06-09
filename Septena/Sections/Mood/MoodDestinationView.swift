@@ -15,11 +15,14 @@ import SwiftData
 struct MoodDestinationView: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var clock
 
   private var accent: Color { theme.color(for: "mood") }
 
   @State private var today: MoodDayResponse? = nil
   @State private var monthEntries: [MoodEntry] = []
+  /// Trailing-7-day check-in instants (with quadrant) for the rhythm wheel.
+  @State private var weekPoints: [WheelPoint] = []
   @State private var addingNew = false
   @State private var editing: MoodEntry? = nil
   @State private var loading = true
@@ -37,6 +40,7 @@ struct MoodDestinationView: View {
       todaySection
       if isViewingToday {
         breakdownSection
+        rhythmSection
       }
     }
     .sectionReload(on: viewingDate, onDataChange: true) { await reload() }
@@ -88,6 +92,60 @@ struct MoodDestinationView: View {
     }
   }
 
+  // MARK: - Rhythm wheel
+  //
+  // A 24-hour dial of *when* you check in over the trailing 7 days, each dot
+  // tinted its mood quadrant and faded by recency — surfaces the diurnal swing.
+  // See `TimeOfDayWheel`. Today only, and only with enough events to read.
+
+  private struct WheelPoint: Identifiable, Sendable {
+    let id: String
+    let at: Date
+    let quadrant: String
+  }
+
+  private var todayStart: Date {
+    SeptenaDate.parse(clock.today).map { Calendar.current.startOfDay(for: $0) }
+      ?? Calendar.current.startOfDay(for: clock.now)
+  }
+
+  private func reloadWeek() async {
+    let weekStart = Calendar.current.date(byAdding: .day, value: -6, to: todayStart) ?? todayStart
+    weekPoints = await MirrorReader.shared.read { ctx in
+      let desc = FetchDescriptor<MoodEventEntity>(
+        predicate: #Predicate { $0.occurredAt >= weekStart },
+        sortBy: [SortDescriptor(\.occurredAt)]
+      )
+      return ((try? ctx.fetch(desc)) ?? []).map {
+        WheelPoint(id: $0.id, at: $0.occurredAt, quadrant: $0.quadrant)
+      }
+    }
+  }
+
+  private var wheelEvents: [TimeOfDayWheel.Event] {
+    let start = todayStart
+    return weekPoints.compactMap { p in
+      TimeOfDayWheel.Event(id: p.id, occurredAt: p.at, todayStart: start, windowDays: 7,
+                           color: MoodQuadrant(rawValue: p.quadrant)?.color)
+    }
+  }
+
+  private var nowFraction: Double {
+    let c = Calendar.current.dateComponents([.hour, .minute], from: clock.now)
+    return (Double(c.hour ?? 0) * 60 + Double(c.minute ?? 0)) / 1440
+  }
+
+  @ViewBuilder
+  private var rhythmSection: some View {
+    let events = wheelEvents
+    if events.count >= 3 {
+      DrawerSection("When you check in", padding: .tight) {
+        TimeOfDayWheel(events: events, accent: accent, windowDays: 7, nowFraction: nowFraction)
+          .frame(maxWidth: .infinity)
+      }
+    }
+  }
+
   /// Leading quadrant-color dot — the row's only section-specific glyph.
   private func quadrantDot(_ entry: MoodEntry) -> AnyView {
     AnyView(
@@ -116,6 +174,7 @@ struct MoodDestinationView: View {
     if let month = result.month {
       monthEntries = month
     }
+    if isViewingToday { await reloadWeek() }
     loading = false
   }
 

@@ -8,10 +8,13 @@ import SwiftData
 struct CannabisDestinationView: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var clock
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
   @State private var today: CannabisDayResponse? = nil
   @State private var loading = true
+  /// Trailing-7-day event instants for the rhythm wheel (see `rhythmSection`).
+  @State private var weekPoints: [WheelPoint] = []
   @State private var editing: CannabisEntry? = nil
   /// Driven by `CannabisPlugin.logActions`: tapping "Log vape" / "Log
   /// edible" sets this to the method id; the sheet opens in create mode
@@ -61,6 +64,7 @@ struct CannabisDestinationView: View {
             .padding(.vertical, 12)
         }
       }
+      rhythmSection
     }
     .tint(accent)
     .sectionReload(on: viewingDate, onDataChange: true) { await reload() }
@@ -165,6 +169,59 @@ struct CannabisDestinationView: View {
     today = await MirrorReader.shared.read {
       ChecklistMirror.loadCannabisDay(context: $0, date: date)
     }
+    await reloadWeek()
     loading = false
+  }
+
+  // MARK: - Rhythm wheel
+  //
+  // A 24-hour dial of *when* cannabis lands over the trailing 7 days, faded by
+  // recency. See `TimeOfDayWheel`. Only on today and only with enough events to
+  // read a pattern. Mirrors the caffeine section.
+
+  private struct WheelPoint: Identifiable, Sendable {
+    let id: String
+    let at: Date
+  }
+
+  /// Start of *today* in the local calendar, from the shared day clock so it
+  /// honors day-rollover. Falls back to the device midnight if unparseable.
+  private var todayStart: Date {
+    SeptenaDate.parse(clock.today).map { Calendar.current.startOfDay(for: $0) }
+      ?? Calendar.current.startOfDay(for: clock.now)
+  }
+
+  private func reloadWeek() async {
+    let weekStart = Calendar.current.date(byAdding: .day, value: -6, to: todayStart) ?? todayStart
+    weekPoints = await MirrorReader.shared.read { ctx in
+      let desc = FetchDescriptor<CannabisEventEntity>(
+        predicate: #Predicate { $0.occurredAt >= weekStart },
+        sortBy: [SortDescriptor(\.occurredAt)]
+      )
+      return ((try? ctx.fetch(desc)) ?? []).map { WheelPoint(id: $0.id, at: $0.occurredAt) }
+    }
+  }
+
+  private var wheelEvents: [TimeOfDayWheel.Event] {
+    let start = todayStart
+    return weekPoints.compactMap {
+      TimeOfDayWheel.Event(id: $0.id, occurredAt: $0.at, todayStart: start, windowDays: 7)
+    }
+  }
+
+  private var nowFraction: Double {
+    let c = Calendar.current.dateComponents([.hour, .minute], from: clock.now)
+    return (Double(c.hour ?? 0) * 60 + Double(c.minute ?? 0)) / 1440
+  }
+
+  @ViewBuilder
+  private var rhythmSection: some View {
+    let events = wheelEvents
+    if isViewingToday, events.count >= 3 {
+      DrawerSection("When you use cannabis", padding: .tight) {
+        TimeOfDayWheel(events: events, accent: accent, windowDays: 7, nowFraction: nowFraction)
+          .frame(maxWidth: .infinity)
+      }
+    }
   }
 }
