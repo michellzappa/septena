@@ -1,12 +1,36 @@
 # Localization Plan — Septena (FR / DE / ES …)
 
-**Status:** Phase 0 in progress · **Scope (v1):** French, German, Spanish · iPhone + Mac first (Watch/Widgets deferred) · **Created:** 2026-06-04
+**Status:** **pt-BR pilot — in-app localization complete.** · Pilot language: Brazilian Portuguese (pt-BR) · iPhone + Mac · **Created:** 2026-06-04 · **Updated:** 2026-06-09
 
-This plan takes Septena from *zero* UI localization to a regen-safe, multi-language foundation, then through extraction, formatting, translation, and store metadata. It is grounded in an audit of the actual codebase — see "Current state" before trusting any generic localization advice.
+This plan took Septena from *zero* UI localization to a regen-safe String Catalog and a fully-localized in-app experience in pt-BR. The audit further down is historical; **"pt-BR pilot status"** below is where things actually stand.
 
 ---
 
-## Current state (audited)
+## pt-BR pilot status (current)
+
+**Catalog: 589 keys · 552 translatable · 537 translated to pt-BR · 15 untranslated (catalog-only) · 37 don't-translate.**
+
+**Done — the whole in-app experience is pt-BR:**
+- **Infra** — String Catalog wired via `project.yml` / `CFBundleLocalizations` (regen-safe, xcodegen auto-populates `knownRegions`); languages en/fr/de/es/pt-BR.
+- **Chrome** — tab bar, dashboard (all 3 layouts via `HomepageDomainData.title`), welcome greeting (AI prompt writes in the app language) + fallbacks, day buckets, task filters + recurrence, mood (quadrants + blurbs + 36 emotion words via `displayWord`), macros, settings + layout enums, app-icon + accent colors (16), muscle groups, Today/Yesterday, Discover flows (Values/Ikigai/Virtue).
+- **Section names** — `SectionManifest.displayLabel(key:stored:)` translate-on-display: canonical English in data, localized on UX, **user renames preserved verbatim**. Wired through all ~10 display sites.
+- **Formatting** — `Double.decimalString()` across ~54 number sites (→ `3,5`); `setLocalizedDateFormatFromTemplate` for `MMM d` (→ `6 de jun`). Storage formats untouched.
+
+**Convention (the structure):** one canonical `Septena/Localizable.xcstrings`; chrome → `String(localized: "…", comment: "Feature: context")` co-located in the owning type; **data English, UX translated on top, user-entered values verbatim.**
+
+**Below the line — deliberately deferred (low-value / not in-app):**
+1. **15 catalog-only strings** untranslated (coach-voice UI, time-of-day wheel, custom-instruction + connector help) — translation only, no code.
+2. **Coach chat subsystem** (`Discovery/Coach/*`) — many words, rarely-seen.
+3. **Deep Insights analytics** + the copy-to-Claude markdown export (LLM-facing; English is correct).
+4. **Error-state messages** — Withings / CloudKit Migration / Import.
+5. **Interpolated Discovery fallback copy** (Values/Ikigai ViewModels) — needs format-string restructuring.
+6. **6 plural hacks** (`count == 1 ? "" : "s"`) → catalog `%lld` rules.
+7. **Widgets / Watch / Live Activity** — each needs its own `.xcstrings` (Phase 1b).
+8. **fr / de / es** — declared but empty; the wrap work is done, so these are now pure translation passes (harder to QA than pt-BR).
+
+---
+
+## Current state (audited) — HISTORICAL (pre-work baseline, 2026-06-04)
 
 - **No UI localization infrastructure.** No `.xcstrings`, `.strings`, or `.lproj` anywhere. The project is en-only today: `developmentRegion = en`, `knownRegions = (Base, en)`.
 - **App Intents are already localized** — Siri/Shortcuts intents use `LocalizedStringResource` throughout `Septena/App/Intents/`. That surface is half-done.
