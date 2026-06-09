@@ -169,8 +169,7 @@ struct AreaDetailView: View {
   private func projectRow(_ project: Project) -> some View {
     HStack(alignment: .center, spacing: Theme.iconTextGap) {
       ProjectProgressIcon(progress: projectProgress[project.id] ?? 0,
-                          tint: theme.accent,
-                          diameter: Theme.areaRowRingDiameter)
+                          tint: theme.accent)
         .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
 
       Text(project.title)

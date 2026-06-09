@@ -1207,8 +1207,11 @@ struct ProjectProgressIcon: View {
   var diameter: CGFloat? = nil
   var lineWidth: CGFloat? = nil
 
-  private var resolvedDiameter: CGFloat { diameter ?? Theme.sidebarIconSize * 0.95 }
-  private var resolvedLineWidth: CGFloat { lineWidth ?? 1.6 }
+  // House ring: small + thick. Shared with the habit/supplement completion
+  // ring (`CompletionRateBadge`) so projects and habits read identically.
+  // Call sites that want a larger header glyph pass explicit overrides.
+  private var resolvedDiameter: CGFloat { diameter ?? 14 }
+  private var resolvedLineWidth: CGFloat { lineWidth ?? 2.5 }
 
   var body: some View {
     let clamped = max(0, min(1, progress))
