@@ -992,8 +992,13 @@ struct MasonryLayout: Layout {
   }
 
   private func columnCount(for width: CGFloat) -> Int {
-    guard width > 0 else { return 1 }
-    let fit = Int(floor((width + spacing) / (minColumnWidth + spacing)))
+    // SwiftUI can propose an infinite width (e.g. inside a ScrollView), which
+    // `width > 0` happily passes — `Int(floor(.infinity))` then traps. Bail out
+    // for any non-finite width, and guard the divisor against zero.
+    guard width.isFinite, width > 0 else { return 1 }
+    let denominator = minColumnWidth + spacing
+    guard denominator > 0 else { return 1 }
+    let fit = Int(floor((width + spacing) / denominator))
     return max(1, min(maxColumns, fit))
   }
 
