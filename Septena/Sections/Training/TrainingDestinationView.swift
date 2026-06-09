@@ -122,6 +122,7 @@ struct TrainingDestinationView: View {
         }
         z2CardioSection
         strengthVolumeSection   // merged headline + 8-week trend in one card
+        muscleLoadSection       // per-muscle sets, trailing 7 days
         progressionSection
         ForEach(defaultSessions, id: \.key) { block in
           sessionBlockView(block)
@@ -597,6 +598,107 @@ struct TrainingDestinationView: View {
         .padding(.vertical, 12)
       }
     }
+  }
+
+  // MARK: - Muscle load (per-muscle sets, trailing 7 days)
+
+  /// Weekly per-muscle set target. ~10–12 direct sets/muscle/week is the
+  /// hypertrophy meta-analysis sweet spot; 12 matches the strength-volume
+  /// card's whole-body target and the reference "growth zone" tools.
+  private static let muscleSetsTarget = 12
+
+  /// Sets logged per muscle over the trailing 7 days. Counts an entry's
+  /// `sets` toward its exercise's **primary** muscle only (secondary muscles
+  /// excluded in v1). Exercises with no muscle tag (cardio, mobility) drop
+  /// out naturally, so this is implicitly strength + core. Resolution:
+  /// entry name → ExerciseDefinitionEntity (by `exerciseKey`) → primaryMuscle.
+  private func muscleSetsThisWeek() -> [Muscle: Int] {
+    let defs = (try? modelContext.fetch(FetchDescriptor<ExerciseDefinitionEntity>())) ?? []
+    var muscleByKey: [String: Muscle] = [:]
+    for def in defs {
+      guard let m = Muscle.resolve(def.primaryMuscle) else { continue }
+      // Index by both id and name so either form of a logged name resolves.
+      let idKey = exerciseKey(def.id), nameKey = exerciseKey(def.name)
+      if muscleByKey[idKey] == nil { muscleByKey[idKey] = m }
+      if muscleByKey[nameKey] == nil { muscleByKey[nameKey] = m }
+    }
+    let cutoff = sinceDate(daysBack: 6)   // today + previous 6 = trailing 7
+    var totals: [Muscle: Int] = [:]
+    for e in entries where e.date >= cutoff {
+      guard let name = e.exercise,
+            let muscle = muscleByKey[exerciseKey(name)],
+            let s = e.sets.flatMap(Int.init), s > 0 else { continue }
+      totals[muscle, default: 0] += s
+    }
+    return totals
+  }
+
+  /// Per-muscle "sets this week" card — every muscle group as a row with a
+  /// bar toward the weekly target, so under-trained groups (empty bars) are
+  /// as legible as the worked ones. Anatomical order (`Muscle.allCases`)
+  /// clusters push / pull / legs / core. Hidden until there's any data.
+  @ViewBuilder
+  private var muscleLoadSection: some View {
+    let totals = muscleSetsThisWeek()
+    if totals.values.contains(where: { $0 > 0 }) {
+      let target = Self.muscleSetsTarget
+      let worked = totals.values.filter { $0 > 0 }.count
+      let summary = "Muscle load, trailing 7 days. \(worked) of 16 muscle groups worked. "
+        + Muscle.allCases.map { "\($0.label) \(totals[$0] ?? 0) sets" }.joined(separator: ", ")
+      DrawerSection("Muscle load") {
+        VStack(alignment: .leading, spacing: 10) {
+          NavigationLink {
+            MuscleBalanceView()
+          } label: {
+            HStack {
+              Text("Sets per muscle").font(.subheadline.weight(.semibold))
+              Spacer()
+              Text("last 7 days").font(.caption2).foregroundStyle(.secondary)
+              Image(systemName: "chevron.right")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.tertiary)
+            }
+            .contentShape(Rectangle())
+          }
+          .buttonStyle(.plain)
+          ForEach(Muscle.allCases) { muscle in
+            muscleRow(muscle, sets: totals[muscle] ?? 0, target: target)
+          }
+        }
+        .a11yCombineKeepingChildren(summary)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+      }
+    }
+  }
+
+  private func muscleRow(_ muscle: Muscle, sets: Int, target: Int) -> some View {
+    let fraction = min(1, Double(sets) / Double(target))
+    // Untrained groups read muted; worked-but-under-target use a softened
+    // accent; at/over target use full accent — the at-a-glance "gap" cue.
+    let barColor: Color = sets == 0 ? Theme.inkSecondary.opacity(0.18)
+                        : sets >= target ? accent
+                        : accent.opacity(0.55)
+    return HStack(spacing: 10) {
+      Text(muscle.label)
+        .font(.caption)
+        .foregroundStyle(sets == 0 ? Theme.inkSecondary : Theme.inkPrimary)
+        .frame(width: 88, alignment: .leading)
+      GeometryReader { geo in
+        ZStack(alignment: .leading) {
+          Capsule().fill(Theme.inkSecondary.opacity(0.10))
+          Capsule().fill(barColor)
+            .frame(width: max(sets > 0 ? 6 : 0, geo.size.width * fraction))
+        }
+      }
+      .frame(height: 8)
+      Text("\(sets)")
+        .font(.caption.monospacedDigit())
+        .foregroundStyle(sets == 0 ? Theme.inkSecondary : Theme.inkPrimary)
+        .frame(width: 24, alignment: .trailing)
+    }
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("\(muscle.label): \(sets) of \(target) sets")
   }
 
   // MARK: - Volume / intensity trend (8 weeks)

@@ -360,6 +360,8 @@
 		8F125E184B7657ECFB340240 /* MCPDispatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9944B4E8F1540B42EC6CCC17 /* MCPDispatch.swift */; };
 		8F36E77E81D7EAC78F51D64A /* NewNutritionEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C180106D47D0477F75695A /* NewNutritionEntrySheet.swift */; };
 		8FD9821A7417D82FD513B6C8 /* GoalIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98C45208BFF39C4FE467347B /* GoalIntents.swift */; };
+		9017AA6714B901E0D9BA3853 /* MuscleBalanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDD710B85C7B41BA8A364A94 /* MuscleBalanceView.swift */; };
+		901C13D8693318AA56D4E595 /* MuscleBalanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDD710B85C7B41BA8A364A94 /* MuscleBalanceView.swift */; };
 		9056B762F0365C38DEA0F888 /* CorrelationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F0DA5FA7D3E03C2DB1DE7C7 /* CorrelationEngine.swift */; };
 		90F0CDB55D4821C478EC6714 /* IkigaiViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 277E998B7BA4B19B1AEFB2C6 /* IkigaiViewModel.swift */; };
 		911BBE60AA8F4BC48D129BE3 /* GoalMetricEvaluator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 840FCA6D0B9D2B9E543E4BA9 /* GoalMetricEvaluator.swift */; };
@@ -999,6 +1001,7 @@
 		DB960188319E54312A616C00 /* HabitsQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitsQuickAddMenu.swift; sourceTree = "<group>"; };
 		DC6D99C71711BDA3C35CBB4F /* StatStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatStrip.swift; sourceTree = "<group>"; };
 		DD7F8E063810C0BD81EF824C /* ExerciseStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseStatsView.swift; sourceTree = "<group>"; };
+		DDD710B85C7B41BA8A364A94 /* MuscleBalanceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MuscleBalanceView.swift; sourceTree = "<group>"; };
 		DDF849796A16A3E2ED3FC2F5 /* NextWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextWidget.swift; sourceTree = "<group>"; };
 		DE7BD5841409D69626291279 /* TrainingPRCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingPRCalculator.swift; sourceTree = "<group>"; };
 		DFD8EA98B891BB43A0CE4640 /* DayClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayClock.swift; sourceTree = "<group>"; };
@@ -1279,6 +1282,7 @@
 				A708921A7D5F315781CFCF71 /* ExerciseLibrarySheet.swift */,
 				6D3250962535171689FCDA30 /* ExercisePickerSheet.swift */,
 				DD7F8E063810C0BD81EF824C /* ExerciseStatsView.swift */,
+				DDD710B85C7B41BA8A364A94 /* MuscleBalanceView.swift */,
 				21B54F8682AE8C22E352630E /* RoutineCatalogView.swift */,
 				71127DDB09DDF4AADA870825 /* RoutineDetailView.swift */,
 				4F9F5509B06FAD96E79B08D4 /* SessionCompleteSheet.swift */,
@@ -2333,6 +2337,7 @@
 				AF64B18251F2EE3C868C7337 /* MoodPlugin.swift in Sources */,
 				5A6DFBAB575054F0FBA4B916 /* MoodQuickAddMenu.swift in Sources */,
 				09D5D1C810DA4F7024ED8DA9 /* MoodVocabulary.swift in Sources */,
+				9017AA6714B901E0D9BA3853 /* MuscleBalanceView.swift in Sources */,
 				8C4B8E2EEE2504ED9E24D5EA /* NavigationState.swift in Sources */,
 				C9730A8D5FCB43EAC9A6C304 /* NewNutritionEntrySheet.swift in Sources */,
 				849CF6F207AA1DE7D27C4B51 /* NextBlocks.swift in Sources */,
@@ -2668,6 +2673,7 @@
 				E1CBA01ED10A916CD8BC355F /* MoodPlugin.swift in Sources */,
 				6F104C934A5BF6230CC8C1F9 /* MoodQuickAddMenu.swift in Sources */,
 				91D7DEF6095D3B1E3692B3DE /* MoodVocabulary.swift in Sources */,
+				901C13D8693318AA56D4E595 /* MuscleBalanceView.swift in Sources */,
 				EE902B419406F504517110B8 /* NavigationState.swift in Sources */,
 				8F36E77E81D7EAC78F51D64A /* NewNutritionEntrySheet.swift in Sources */,
 				B381B4AFB3CF25BE405853CC /* NextBlocks.swift in Sources */,
