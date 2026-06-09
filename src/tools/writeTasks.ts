@@ -404,6 +404,70 @@ export async function setAssignee(
   return { id: input.id, assignee: input.assignee ?? "auto" };
 }
 
+export const setArtifactJsonSchema = {
+  type: "object",
+  required: ["id", "artifact"],
+  properties: {
+    id: { type: "string" },
+    artifact: {
+      type: "object",
+      required: ["title"],
+      properties: {
+        kind: { type: "string", description: "e.g. availability-table, draft-email, summary" },
+        title: { type: "string" },
+        body: { type: "string" },
+        refs: { type: "array", items: { type: "string" } },
+      },
+    },
+  },
+} as const;
+
+export const setHandoffJsonSchema = {
+  type: "object",
+  required: ["id", "handoff"],
+  properties: {
+    id: { type: "string" },
+    handoff: {
+      type: "object",
+      required: ["instruction"],
+      properties: {
+        instruction: { type: "string" },
+        actionType: { type: "string", enum: ["open_url", "compose", "call", "none"] },
+        payload: { type: "string", description: "URL / email / phone for the action" },
+      },
+    },
+  },
+} as const;
+
+export async function setArtifact(
+  client: CloudKitClient,
+  input: { id: string; artifact: { kind?: string; title: string; body?: string; refs?: string[] } },
+) {
+  const convo = await readConvo(client, input.id);
+  convo.artifact = {
+    kind: input.artifact.kind ?? "note",
+    title: input.artifact.title,
+    body: input.artifact.body ?? "",
+    refs: input.artifact.refs,
+  };
+  await writeConvo(client, input.id, convo);
+  return { id: input.id, artifact: input.artifact.title };
+}
+
+export async function setHandoff(
+  client: CloudKitClient,
+  input: { id: string; handoff: { instruction: string; actionType?: "open_url" | "compose" | "call" | "none"; payload?: string } },
+) {
+  const convo = await readConvo(client, input.id);
+  convo.handoff = {
+    instruction: input.handoff.instruction,
+    actionType: input.handoff.actionType ?? "none",
+    payload: input.handoff.payload,
+  };
+  await writeConvo(client, input.id, convo);
+  return { id: input.id, handoff: input.handoff.instruction };
+}
+
 // Tasks awaiting reasoning: explicitly marked for Claude, OR whose last provider
 // turn was low-confidence — and not yet terminal. Client-side filter on the blob
 // (CKQuery can't reach into JSON). Mirrors the in-app `pendingReasoning`.

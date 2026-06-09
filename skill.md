@@ -18,7 +18,7 @@ The tool list is **dynamic**: on `tools/list` the gateway reads the user's `Sett
 | Group | Tools |
 |---|---|
 | Tasks | `tasks_list`, `tasks_create`, `tasks_update`, `tasks_complete`, `tasks_defer`, `tasks_move_to_today`, `tasks_list_projects`, `tasks_list_areas` |
-| Task Conversations | `tasks_thread_get`, `tasks_thread_append`, `tasks_set_acceptance`, `tasks_set_endstate`, `tasks_set_assignee`, `tasks_pending_reasoning` |
+| Task Conversations | `tasks_thread_get`, `tasks_thread_append`, `tasks_set_acceptance`, `tasks_set_artifact`, `tasks_set_handoff`, `tasks_set_endstate`, `tasks_set_assignee`, `tasks_pending_reasoning` |
 | Goals | `goals_list`, `goals_create`, `goals_update`, `goals_delete` |
 | Settings/Sections | `settings_get`, `settings_update`, `sections_list`, `sections_update` |
 
@@ -72,6 +72,11 @@ possible choice. The loop is `confirm → ground → (scope if epic) → decide 
   means — append a `confirm` provider turn with readings as options. Don't assume meaning.
 - **Don't assume size.** If grounding reveals an epic (e.g. "build a section"), use a `scope`
   step (decompose / MVP / defer) — don't march to `work`.
+- **`tasks_set_artifact(id, {title, body, kind?, refs?})`** — attach what you PRODUCED
+  (a comparison, a draft, a summary). Renders as a block in the task.
+- **`tasks_set_handoff(id, {instruction, actionType, payload?})`** — the human's last-mile
+  action, rendered as a tappable button (`open_url`/`compose`/`call`/`none`). Use for
+  `agent_assisted`: you did the work, the user does the final step.
 - **`tasks_set_acceptance(id, line)`** — the **agent-done** bar (your deliverable). Distinct
   from task completion, which is the **human-done** bar. Set `tasks_set_endstate` (e.g.
   `agent_done`, `needs_verify`, `decomposed`, `reminder_set`) when the conversation is

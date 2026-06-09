@@ -35,6 +35,8 @@ import {
   setAcceptance, setAcceptanceJsonSchema,
   setEndState, setEndStateJsonSchema,
   setAssignee, setAssigneeJsonSchema,
+  setArtifact, setArtifactJsonSchema,
+  setHandoff, setHandoffJsonSchema,
   pendingReasoning, pendingReasoningJsonSchema,
 } from "./tools/writeTasks.js";
 import {
@@ -209,6 +211,16 @@ const GLOBAL_TOOLS: Tool[] = [
     name: "tasks_set_assignee",
     description: "Route a task: me | local | claude, or null to let the router decide. Setting claude marks it for the reasoning queue.",
     inputSchema: setAssigneeJsonSchema,
+  },
+  {
+    name: "tasks_set_artifact",
+    description: "Attach the agent's deliverable to a task (agent_assisted): the research/table/draft you produced. Distinct from the handoff (the human's last-mile action).",
+    inputSchema: setArtifactJsonSchema,
+  },
+  {
+    name: "tasks_set_handoff",
+    description: "Set the human last-mile, rendered as a tappable action button. The agent is done; the task stays open until the human does this.",
+    inputSchema: setHandoffJsonSchema,
   },
   {
     name: "tasks_pending_reasoning",
@@ -708,6 +720,14 @@ async function callTool(
     }
     case "tasks_set_assignee": {
       const result = await setAssignee(client, (params.arguments ?? {}) as unknown as { id: string; assignee: "me" | "local" | "claude" | null });
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    case "tasks_set_artifact": {
+      const result = await setArtifact(client, (params.arguments ?? {}) as unknown as Parameters<typeof setArtifact>[1]);
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    case "tasks_set_handoff": {
+      const result = await setHandoff(client, (params.arguments ?? {}) as unknown as Parameters<typeof setHandoff>[1]);
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
     case "tasks_pending_reasoning": {
