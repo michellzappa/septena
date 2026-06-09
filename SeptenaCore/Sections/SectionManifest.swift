@@ -150,7 +150,7 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
     "gut":         "circle.bottomhalf.filled",
     "mood":        "face.smiling",
     "activity":    "figure.walk",
-    "goals":       "bubble.left.and.bubble.right",
+    "goals":       "smallcircle.filled.circle",
     "hydration":   "drop.fill",
     "github":      "chevron.left.forwardslash.chevron.right",
     "insights":    "chart.dots.scatter",
