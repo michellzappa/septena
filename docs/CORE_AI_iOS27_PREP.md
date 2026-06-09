@@ -178,7 +178,17 @@ through existing mutators. Fits the Task Conversations design.
 Vision pose estimation or a custom `.aimodel` for rep counting/form. Highest
 effort, no current video capture path — park unless prioritized.
 
-## 5. Track C — System MCP & assistant positioning *(strategic — verify in beta)*
+## 5. Track C — System MCP & assistant positioning *(SPECULATIVE — see status)*
+
+> **STATUS (checked against shipped docs, 2026-06-09):** "Siri/Core AI calls
+> your app's MCP server" is **NOT** in the iOS 27 or Xcode 27 release notes.
+> MCP in Apple's shipped docs is **Xcode/developer-tooling only** (LLDB
+> `lldb-mcp`, the Xcode MCP server, String Catalog tools, Agent Client Protocol,
+> plugin-defined MCP servers). iOS 27 release notes don't mention MCP at all;
+> App Intents remains the only documented Siri surface. The only signal for
+> system MCP-in-App-Intents is reverse-engineered **iOS 26.1 beta code** (Sept
+> 2025, via 9to5Mac/AppleInsider) — in development, undocumented. **Treat
+> Track C as a bet, not a roadmap; do Track C0 (App Intents) regardless.**
 
 Septena already has the rare asset everyone else will be scrambling to build: a
 working MCP server over its own data (`MCPToolCatalog` + `MCPDispatch` +
@@ -277,13 +287,23 @@ CloudKit; MCP/App Intents are façades over them.
 
 ---
 
-### Appendix — confirmed vs news
+### Appendix — confirmed vs news (re-checked against release notes 2026-06-09)
 
-- **Confirmed from Apple docs:** all Core AI types + workflow (§1a); Foundation
+- **Confirmed — framework docs:** all Core AI types + workflow (§1a); Foundation
   Models PCC / multimodal / dynamic-profile / executor symbols + 26.0 floor /
   watchOS 27 (§1b).
-- **News, verify in beta:** Gemini-distilled bigger model, fine-tuning, system
-  MCP client + Siri 2.0 routing, Extensions provider picker (§1c, Track C).
+- **Confirmed — Xcode 27 release notes:** Core AI is real (model viewer, Metal
+  execution + known issues); Foundation Models Instrument; MCP **as IDE tooling
+  only** (LLDB `lldb-mcp`, Xcode MCP server, String Catalog tools, Agent Client
+  Protocol, plugin MCP servers); Gemini in the *coding assistant*; SDKs ship
+  iOS/iPadOS/macOS/tvOS/visionOS 27, Swift 6.4.
+- **Confirmed — iOS 27 release notes:** Private Cloud Compute (HomeKit, Apple
+  Intelligence Report). App Intents/Siri known issues (W-1/W-2/W-3 in the App
+  Intents backlog). **No MCP mention at all.**
+- **NOT in any shipped doc (rumor/contradicted):** "Siri/Core AI calls your
+  app's MCP server" — only iOS 26.1 beta code analysis (Sept 2025). Gemini-as-
+  Siri, bigger on-device model, on-device fine-tuning, Extensions provider
+  picker — WWDC coverage, not release-noted. Treat as bets (§1c, Track C).
 
 ---
 
