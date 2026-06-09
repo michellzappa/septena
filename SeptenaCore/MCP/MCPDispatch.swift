@@ -958,14 +958,16 @@ enum MCPDispatch {
       throw MCPError.badArgument(
         "no exercise with id '\(id)' — call training_exercises_list to find the id")
     }
-    // primaryMuscle: absent = leave; "" = clear; value = validate + set.
+    // primaryMuscle: absent = leave; "" = clear; value = validate + set. Read
+    // from raw args, not args.string(), because the latter collapses "" → nil
+    // and we'd lose the explicit clear signal the tool documents.
     var primary: String?? = nil
-    if let pm = args.string("primaryMuscle") {
+    if let pm = args.raw["primaryMuscle"] as? String {
       primary = pm.isEmpty ? .some(nil) : .some(try checkedMuscle(pm))
     }
     let secondary = try args.stringArray("secondaryMuscles")?.map { try checkedMuscle($0) }
     var subgroup: String?? = nil
-    if let sg = args.string("subgroup") { subgroup = .some(sg.isEmpty ? nil : sg) }
+    if let sg = args.raw["subgroup"] as? String { subgroup = .some(sg.isEmpty ? nil : sg) }
     let type = try args.string("type").map { try checkedExerciseType($0) }
     SeptenaServices.shared.trainingMutator.updateExerciseDefinition(
       id: id, name: args.string("name"), type: type, subgroup: subgroup,
