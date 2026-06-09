@@ -47,8 +47,10 @@ struct TrainingLiveActivityWidget: Widget {
       } compactLeading: {
         Image(systemName: "figure.strengthtraining.traditional")
       } compactTrailing: {
-        Text("\(context.state.doneCount)/\(max(context.state.totalCount, 1))")
+        Text(timerInterval: context.attributes.startedAt...Date.distantFuture,
+             countsDown: false)
           .font(.caption2.monospacedDigit())
+          .frame(maxWidth: 44)
       } minimal: {
         Image(systemName: "figure.strengthtraining.traditional")
       }
