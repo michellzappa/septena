@@ -690,7 +690,7 @@ private struct InlineRepeatPanel: View {
       .pickerStyle(.segmented)
 
       Stepper(value: interval, in: 1...99) {
-        Text("Every \(interval.wrappedValue) \(unitNoun(plural: interval.wrappedValue != 1))")
+        Text("Every \(intervalLabel())")
           .font(.septenaSidebarRow)
           .foregroundStyle(Theme.inkPrimary)
       }
@@ -713,11 +713,13 @@ private struct InlineRepeatPanel: View {
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous))
   }
 
-  private func unitNoun(plural: Bool) -> String {
+  /// Pluralized "N days/weeks/months" via the String Catalog (one/other).
+  private func intervalLabel() -> String {
+    let n = interval.wrappedValue
     switch recurrence?.unit ?? .week {
-    case .day:   return plural ? "days" : "day"
-    case .week:  return plural ? "weeks" : "week"
-    case .month: return plural ? "months" : "month"
+    case .day:   return String(localized: "\(n) days")
+    case .week:  return String(localized: "\(n) weeks")
+    case .month: return String(localized: "\(n) months")
     }
   }
 }

@@ -252,7 +252,7 @@ enum VirtueSummarizer {
     let priorWeekly = Double(Set(fetchByDate(ExerciseEntryEntity.self, priorFrom, priorTo, context).map(\.date)).count) / 3.0
     if sessions > 0 || priorWeekly >= 0.5 {
       let minutes = training.compactMap(\.durationMin).reduce(0, +)
-      var text = "Training \(sessions) session\(sessions == 1 ? "" : "s") this week"
+      var text = String(localized: "Training \(sessions) sessions this week")
       if minutes > 0 { text += ", \(Int(minutes.rounded())) active min" }
       if priorWeekly >= 0.5 { text += " (vs ~\(oneDecimal(priorWeekly))/wk the prior 3 weeks)" }
       let valence: Valence = (sessions == 0 && priorWeekly >= 1) ? .strain : (sessions >= 2 ? .good : .neutral)

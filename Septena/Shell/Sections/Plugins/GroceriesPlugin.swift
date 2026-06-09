@@ -219,7 +219,7 @@ private struct GroceriesOnboardingView: View {
   }
 
   private var actionTitle: String {
-    selected.isEmpty ? "Done" : "Add \(selected.count) categor\(selected.count == 1 ? "y" : "ies")"
+    selected.isEmpty ? String(localized: "Done") : String(localized: "Add \(selected.count) categories")
   }
 
   private func addAndFinish() {

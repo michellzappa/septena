@@ -619,12 +619,12 @@ struct RecurrencePickerSheet: View {
             .foregroundStyle(Theme.inkPrimary)
           Spacer()
           Stepper(value: $interval, in: 1...99) {
-            Text("\(interval) \(unitNoun(plural: interval != 1))")
+            Text(intervalLabel())
               .font(.septenaSidebarRow)
               .foregroundStyle(Theme.inkSecondary)
           }
           .labelsHidden()
-          Text("\(interval) \(unitNoun(plural: interval != 1))")
+          Text(intervalLabel())
             .font(.septenaSidebarRow)
             .foregroundStyle(Theme.inkSecondary)
         }
@@ -638,8 +638,8 @@ struct RecurrencePickerSheet: View {
               .font(.septenaSidebarRow)
               .foregroundStyle(Theme.inkPrimary)
             Text(afterCompletion
-                 ? "Next instance \(interval) \(unitNoun(plural: interval != 1)) after you mark this done."
-                 : "Next instance \(interval) \(unitNoun(plural: interval != 1)) after the previous scheduled date.")
+                 ? "Next instance \(intervalLabel()) after you mark this done."
+                 : "Next instance \(intervalLabel()) after the previous scheduled date.")
               .font(.caption)
               .foregroundStyle(Theme.inkSecondary)
               .fixedSize(horizontal: false, vertical: true)
@@ -694,11 +694,12 @@ struct RecurrencePickerSheet: View {
     }
   }
 
-  private func unitNoun(plural: Bool) -> String {
+  /// Pluralized "N days/weeks/months" via the String Catalog (one/other).
+  private func intervalLabel() -> String {
     switch unit {
-    case .day:   return plural ? "days" : "day"
-    case .week:  return plural ? "weeks" : "week"
-    case .month: return plural ? "months" : "month"
+    case .day:   return String(localized: "\(interval) days")
+    case .week:  return String(localized: "\(interval) weeks")
+    case .month: return String(localized: "\(interval) months")
     }
   }
 }
