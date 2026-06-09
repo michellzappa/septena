@@ -34,6 +34,30 @@ it gives you one clear button to do that.
 - 🔵 **AI's turn** — it's working on it
 - ✅ **Done**
 
+## The steps, one by one (what actually happens)
+
+```
+ Capture  →  Confirm  →  Ground  →   Decide   →    Work     →  Hand off
+ (you)      (on-device) (on-device) (on-device↗) (on-device↗)   (you)
+                                      ↗ = leaves the device only if a step needs more
+```
+
+1. **Capture** — *you.* Jot the task; a few words is fine.
+2. **Confirm** — *on-device.* AI asks what you actually mean. Nothing happens until you tap.
+3. **Ground** — *on-device.* It pulls the relevant context from your own data.
+4. **Decide** — *on-device, or cloud if needed.* It offers a few options; you pick. Only a genuinely hard call reaches for Private Cloud Compute or your Claude.
+5. **Work** — *on-device, or your Claude.* It does what it can (a draft, a comparison). The web or your Claude is used only when a step truly needs it.
+6. **Hand off** — *you.* Anything only you can do (pay, send, decide) becomes one clear button.
+
+On **Automatic**, every step runs **on your device first**; it leaves the device
+only for the specific steps on-device can't do — never wholesale.
+
+## Some help is always on-device
+Beyond conversations, Septena learns small things **locally** — like the
+**"Move to…" suggestion** that figures out where a task belongs from your own
+history (and the inbox triage behind it). That's a model trained on your device,
+on your data; it never leaves, with or without the conversation feature.
+
 ## The part that matters most: it's *your* AI
 
 **Septena never runs AI on your tasks, and never reads them.** The intelligence is

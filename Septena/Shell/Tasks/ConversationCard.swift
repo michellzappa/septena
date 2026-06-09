@@ -236,18 +236,28 @@ struct AIExplainerView: View {
           Text("Some to-dos need a moment of thinking before you can act. Septena can talk that through with AI — right on the task.")
             .font(.headline)
 
-          rule("It asks before it does anything.",
-               "The AI never guesses what a vague task means. It shows you a couple of readings; you tap the right one. Nothing happens until you do.")
-          rule("You answer by tapping, not typing.",
-               "Each step is a question with a few buttons (plus “Other…”). One tap moves it forward — a conversation made of choices, not a chat box.")
-          rule("It does what it can, hands you the rest.",
-               "If the AI can do the work — look something up, draft, compare — it does, and shows the result. If only you can finish it (pay, send, decide), it gives you one clear button.")
+          VStack(alignment: .leading, spacing: 0) {
+            Text("How a task conversation moves")
+              .font(.subheadline).fontWeight(.semibold).padding(.bottom, 10)
+            ForEach(Array(steps.enumerated()), id: \.offset) { i, s in
+              stepRow(s, isLast: i == steps.count - 1)
+            }
+            Text("On Automatic, every step runs on your device first — it leaves only for the steps on-device can't do (↗), never wholesale.")
+              .font(.caption2).foregroundStyle(.secondary).padding(.top, 6)
+          }
 
           VStack(alignment: .leading, spacing: 6) {
             Text("Whose turn?").font(.subheadline).fontWeight(.semibold)
             legend(.yellow, "Your turn — a question is waiting")
             legend(.blue, "AI's turn — it's working")
             legend(.green, "Done")
+          }
+
+          VStack(alignment: .leading, spacing: 6) {
+            Label("Some help is always on your device", systemImage: "iphone")
+              .font(.subheadline).fontWeight(.semibold)
+            Text("Beyond conversations, Septena learns small things locally — like the “Move to…” suggestion that figures out where a task belongs from your own history. That model trains on your device and never leaves it.")
+              .font(.callout).foregroundStyle(.secondary)
           }
 
           VStack(alignment: .leading, spacing: 6) {
@@ -271,10 +281,39 @@ struct AIExplainerView: View {
     }
   }
 
-  @ViewBuilder private func rule(_ title: String, _ body: String) -> some View {
-    VStack(alignment: .leading, spacing: 3) {
-      Text(title).font(.subheadline).fontWeight(.semibold)
-      Text(body).font(.callout).foregroundStyle(.secondary)
+  private struct Step { let icon: String; let title: String; let desc: String; let runs: String; let tint: Color }
+  private var steps: [Step] {
+    [
+      Step(icon: "square.and.pencil", title: "Capture", desc: "You jot the task — a few words is fine.", runs: "You", tint: .gray),
+      Step(icon: "questionmark.bubble", title: "Confirm", desc: "AI asks what you actually mean. Nothing happens until you tap.", runs: "On-device", tint: .green),
+      Step(icon: "doc.text.magnifyingglass", title: "Ground", desc: "It pulls the relevant context from your own data.", runs: "On-device", tint: .green),
+      Step(icon: "checklist", title: "Decide", desc: "It offers a few options; you pick. A hard call may use the cloud.", runs: "On-device ↗", tint: .blue),
+      Step(icon: "wand.and.stars", title: "Work", desc: "It does what it can — a draft, a comparison. Web / your Claude only if a step needs it.", runs: "On-device ↗", tint: .blue),
+      Step(icon: "hand.point.right", title: "Hand off", desc: "Anything only you can do (pay, send) becomes one clear button.", runs: "You", tint: .gray),
+    ]
+  }
+
+  @ViewBuilder private func stepRow(_ s: Step, isLast: Bool) -> some View {
+    HStack(alignment: .top, spacing: 12) {
+      VStack(spacing: 0) {
+        Image(systemName: s.icon).font(.callout).foregroundStyle(s.tint)
+          .frame(width: 28, height: 28)
+          .background(s.tint.opacity(0.12), in: Circle())
+        if !isLast {
+          Rectangle().fill(.quaternary).frame(width: 1.5).frame(maxHeight: .infinity)
+        }
+      }
+      VStack(alignment: .leading, spacing: 2) {
+        HStack {
+          Text(s.title).font(.subheadline).fontWeight(.semibold)
+          Spacer()
+          Text(s.runs).font(.caption2).foregroundStyle(s.tint)
+            .padding(.horizontal, 6).padding(.vertical, 2)
+            .background(s.tint.opacity(0.12), in: Capsule())
+        }
+        Text(s.desc).font(.footnote).foregroundStyle(.secondary)
+      }
+      .padding(.bottom, isLast ? 0 : 14)
     }
   }
 
