@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 // App-wide logger + a couple of shared error / notification types that
 // the rest of the codebase relies on. These used to live in
@@ -32,22 +33,54 @@ extension Notification.Name {
 
 // MARK: - Logger
 
+/// Single source of truth for unified logging. Everything in the app logs
+/// under the one `subsystem` so the console can be filtered to just Septena
+/// (Xcode console filter / Console.app: filter `subsystem` == this string),
+/// cutting through Apple's framework noise (`nw_path_necp_*`, CoreData, etc.).
+///
+/// Use a pre-defined category logger (`Log.cloudKit.error(…)`) or vend an
+/// ad-hoc one with `Log.category("Foo")`. `os.Logger` is essentially free at
+/// call sites — `.debug`/`.info` aren't persisted in Release, `.error`/`.fault`
+/// survive to device logs — so no manual DEBUG gating is needed.
+enum Log {
+  /// The one subsystem string. Matches the app's primary bundle id so it reads
+  /// naturally in Console.app's subsystem column.
+  static let subsystem = "com.septena.cloud"
+
+  static let app            = Logger(subsystem: subsystem, category: "App")
+  static let persistence    = Logger(subsystem: subsystem, category: "Persistence")
+  static let cloudKit       = Logger(subsystem: subsystem, category: "CKEngine")
+  static let schemaSeed     = Logger(subsystem: subsystem, category: "SchemaSeed")
+  static let migration      = Logger(subsystem: subsystem, category: "TasksMigrator")
+  static let notifications  = Logger(subsystem: subsystem, category: "Notifications")
+  static let claudeGateway  = Logger(subsystem: subsystem, category: "ClaudeGateway")
+  static let liveActivity   = Logger(subsystem: subsystem, category: "LiveActivity")
+  static let welcome        = Logger(subsystem: subsystem, category: "Welcome")
+
+  /// Ad-hoc logger when none of the pre-defined categories fit.
+  static func category(_ name: String) -> Logger {
+    Logger(subsystem: subsystem, category: name)
+  }
+}
+
+/// Back-compat general-purpose facade. Pre-dates `Log`; kept so existing
+/// `SeptenaLog.info/error` call sites keep working, now routed through the
+/// unified `os.Logger` (category "General") instead of bare `print()`.
 enum SeptenaLog {
-  #if DEBUG
-  static var enabled = true
-  #else
-  static var enabled = false
-  #endif
+  private static let logger = Logger(subsystem: Log.subsystem, category: "General")
 
   static func info(_ msg: @autoclosure () -> String) {
-    guard enabled else { return }
-    print("[Septena] \(msg())")
+    let text = msg()
+    logger.info("\(text, privacy: .public)")
   }
 
   static func error(_ msg: @autoclosure () -> String, _ error: Error? = nil) {
-    guard enabled else { return }
-    if let error { print("[Septena] ❌ \(msg()) → \(error.localizedDescription)") }
-    else { print("[Septena] ❌ \(msg())") }
+    let text = msg()
+    if let error {
+      logger.error("\(text, privacy: .public) → \(error.localizedDescription, privacy: .public)")
+    } else {
+      logger.error("\(text, privacy: .public)")
+    }
   }
 }
 

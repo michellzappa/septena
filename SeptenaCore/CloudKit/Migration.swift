@@ -173,7 +173,7 @@ enum MigrationError: LocalizedError {
 
 @MainActor
 final class TasksMigrator {
-  private let logger = Logger(subsystem: "com.septena.cloud", category: "TasksMigrator")
+  private let logger = Log.migration
   private let context: ModelContext
   private let engine: CKEngine
 

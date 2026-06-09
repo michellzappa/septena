@@ -1,5 +1,6 @@
 import SwiftUI
 import FoundationModels
+import os
 
 // Centered greeting at the top of the dashboard home.
 //
@@ -162,9 +163,7 @@ struct WelcomeHeader: View {
     line = ""
 
     guard OnDeviceAI.isAvailable, !name.isEmpty else {
-      #if DEBUG
-      print("[Welcome] not generating — available=\(OnDeviceAI.isAvailable), name=\(name.isEmpty ? "empty" : "set"), reason=\(OnDeviceAI.unavailableReason ?? "n/a")")
-      #endif
+      Log.welcome.debug("not generating — available=\(OnDeviceAI.isAvailable), name=\(name.isEmpty ? "empty" : "set", privacy: .public), reason=\(OnDeviceAI.unavailableReason ?? "n/a", privacy: .public)")
       return
     }
     WelcomeGenerator.prewarm()
@@ -311,13 +310,9 @@ private enum WelcomeGenerator {
         let raw = try await LanguageModelSession().respond(to: request, options: options).content
         let cleaned = sanitize(raw)
         if !namesWrongWeekday(cleaned, today: today) { return cleaned }
-        #if DEBUG
-        print("[Welcome] rejected wrong-weekday line (attempt \(attempt)): \(cleaned)")
-        #endif
+        Log.welcome.debug("rejected wrong-weekday line (attempt \(attempt)): \(cleaned, privacy: .public)")
       } catch {
-        #if DEBUG
-        print("[Welcome] generation failed: \(error)")
-        #endif
+        Log.welcome.debug("generation failed: \(error.localizedDescription, privacy: .public)")
         return nil
       }
     }

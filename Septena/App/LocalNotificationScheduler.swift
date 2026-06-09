@@ -59,7 +59,7 @@ final class LocalNotificationScheduler {
     let plan: NotificationPlan
   }
 
-  private static let logger = Logger(subsystem: "com.septena.cloud", category: "Notifications")
+  private static let logger = Log.notifications
 
   private weak var contextRef: ModelContext?
   private var observers: [NSObjectProtocol] = []

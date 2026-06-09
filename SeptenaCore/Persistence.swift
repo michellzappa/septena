@@ -1,5 +1,6 @@
 import CloudKit
 import Foundation
+import os
 import SwiftData
 
 // Local SwiftData mirror of the Septena server. Server stays authoritative;
@@ -2588,12 +2589,12 @@ final class LocalStore {
       // print() unconditionally so the underlying error survives release
       // builds and shows up in Console.app / device logs — `try!` on the
       // recovery path would otherwise trap before any diagnostic emerges.
-      Swift.print("[Septena] ❌ ModelContainer init failed (1/2): \(firstError)")
+      Log.persistence.fault("ModelContainer init failed (1/2): \(firstError.localizedDescription, privacy: .public)")
       Self.wipeAllKnownStores()
       do {
         container = try ModelContainer(for: schema, configurations: [config])
       } catch let secondError {
-        Swift.print("[Septena] ❌ ModelContainer init failed (2/2) after wipe: \(secondError)")
+        Log.persistence.fault("ModelContainer init failed (2/2) after wipe: \(secondError.localizedDescription, privacy: .public)")
         fatalError("LocalStore unrecoverable: \(secondError)")
       }
     }
@@ -2624,7 +2625,7 @@ final class LocalStore {
           let f = dir.appendingPathComponent("\(base).\(suffix)")
           if fm.fileExists(atPath: f.path) {
             try? fm.removeItem(at: f)
-            Swift.print("[Septena] wiped \(f.lastPathComponent)")
+            Log.persistence.notice("wiped \(f.lastPathComponent, privacy: .public)")
           }
         }
       }

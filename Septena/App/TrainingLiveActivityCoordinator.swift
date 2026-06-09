@@ -1,6 +1,7 @@
 #if os(iOS) && canImport(ActivityKit)
 import ActivityKit
 import Foundation
+import os
 
 @MainActor
 final class TrainingLiveActivityCoordinator {
@@ -59,7 +60,7 @@ final class TrainingLiveActivityCoordinator {
         pushType: nil
       )
     } catch {
-      print("[TrainingLiveActivity] start failed: \(error)")
+      Log.liveActivity.error("start failed: \(error.localizedDescription, privacy: .public)")
     }
   }
 

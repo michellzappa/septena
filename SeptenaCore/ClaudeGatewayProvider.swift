@@ -34,7 +34,7 @@ import AppKit
 public final class ClaudeGatewayProvider {
   public static let shared = ClaudeGatewayProvider()
 
-  private let logger = Logger(subsystem: "com.septena.cloud", category: "ClaudeGateway")
+  private let logger = Log.claudeGateway
 
   // MARK: Configuration
   private static let gatewayBaseURL = "https://mcp.septena.app"

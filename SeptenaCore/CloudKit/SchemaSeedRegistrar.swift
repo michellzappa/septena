@@ -31,7 +31,7 @@ import OSLog
 enum SchemaSeedRegistrar {
   static let userDefaultsKey = "schema.seedMissingFields.v1"
 
-  private static let logger = Logger(subsystem: "com.septena.cloud", category: "SchemaSeed")
+  private static let logger = Log.schemaSeed
 
   private static let tempZoneID = CKRecordZone.ID(
     zoneName: "schema-seed-temp",

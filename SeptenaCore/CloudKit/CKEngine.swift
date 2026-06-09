@@ -44,7 +44,7 @@ static var zoneID: CKRecordZone.ID {
 @MainActor
 @Observable
 final class CKEngine {
-  private let logger = Logger(subsystem: "com.septena.cloud", category: "CKEngine")
+  private let logger = Log.cloudKit
   /// Exposed read-only so DEBUG diagnostics can query userRecordID — both
   /// devices must report the same one or they're hitting different
   /// private databases entirely.
