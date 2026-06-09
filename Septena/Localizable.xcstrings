@@ -1006,12 +1006,78 @@
         }
       }
     },
+    "Add Chore" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar afazer"
+          }
+        }
+      }
+    },
+    "Add Goal" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar meta"
+          }
+        }
+      }
+    },
+    "Add Grocery Item" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar item de compras"
+          }
+        }
+      }
+    },
+    "Add Habit" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar hábito"
+          }
+        }
+      }
+    },
     "Add items to build your pantry and shopping list." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Adicione itens para montar sua despensa e lista de compras."
+          }
+        }
+      }
+    },
+    "Add Supplement" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar suplemento"
+          }
+        }
+      }
+    },
+    "Add Task" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar tarefa"
           }
         }
       }
@@ -1753,6 +1819,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Atividade de commits como mapa de contribuições"
+          }
+        }
+      }
+    },
+    "Complete Chore" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Concluir afazer"
           }
         }
       }
@@ -3462,6 +3539,17 @@
         }
       }
     },
+    "Log a Meal" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrar refeição"
+          }
+        }
+      }
+    },
     "Log a meal and it'll show up here for one-tap re-logging." : {
       "localizations" : {
         "pt-BR" : {
@@ -3472,12 +3560,78 @@
         }
       }
     },
+    "Log Caffeine" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrar cafeína"
+          }
+        }
+      }
+    },
+    "Log Cannabis" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrar cannabis"
+          }
+        }
+      }
+    },
+    "Log Gut Entry" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrar evento intestinal"
+          }
+        }
+      }
+    },
     "Log meals, coffee, mood, or other timestamped sections and your daily rhythm shows up here." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Registre refeições, café, humor ou outras seções com horário e seu ritmo diário aparece aqui."
+          }
+        }
+      }
+    },
+    "Log Mood" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrar humor"
+          }
+        }
+      }
+    },
+    "Log Water" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrar água"
+          }
+        }
+      }
+    },
+    "Log Workout" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registrar treino"
           }
         }
       }
@@ -3578,6 +3732,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mapeie o que você ama, faz bem, pode oferecer e quer servir."
+          }
+        }
+      }
+    },
+    "Mark Grocery Low" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marcar item acabando"
+          }
+        }
+      }
+    },
+    "Mark Habit Done" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marcar hábito como feito"
+          }
+        }
+      }
+    },
+    "Mark Supplement Taken" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marcar suplemento como tomado"
           }
         }
       }
@@ -4058,6 +4245,9 @@
           }
         }
       }
+    },
+    "Nothing important happens on its own. The AI fills in small, reversible stuff; anything that's a real decision or can't be undone always waits for your tap." : {
+
     },
     "Nothing left for today" : {
       "localizations" : {
@@ -4857,6 +5047,9 @@
         }
       }
     },
+    "Septena never runs AI on your tasks and never reads them. The intelligence is your own — your Claude, or on-device — connected by you. Your tasks live only in your private iCloud. Turn the AI off and the app works exactly the same, minus the conversations." : {
+
+    },
     "Septena pulls steps, exercise minutes, VO2 max, HRV and resting heart rate from HealthKit. Data never leaves your phone." : {
       "localizations" : {
         "pt-BR" : {
@@ -5137,6 +5330,9 @@
           }
         }
       }
+    },
+    "Some to-dos need a moment of thinking before you can act. Septena can talk that through with AI — right on the task." : {
+
     },
     "Someday" : {
       "localizations" : {
@@ -6147,6 +6343,9 @@
         }
       }
     },
+    "Whose turn?" : {
+
+    },
     "Window controls how far back CorrelationEngine pulls data. Section filter limits which predictor → target pairs render — pairs are kept if either side matches." : {
       "localizations" : {
         "pt-BR" : {
@@ -6307,193 +6506,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Δ = média com − média sem"
-          }
-        }
-      }
-    },
-    "Add Task" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adicionar tarefa"
-          }
-        }
-      }
-    },
-    "Add Habit" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adicionar hábito"
-          }
-        }
-      }
-    },
-    "Add Chore" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adicionar afazer"
-          }
-        }
-      }
-    },
-    "Add Supplement" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adicionar suplemento"
-          }
-        }
-      }
-    },
-    "Add Goal" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adicionar meta"
-          }
-        }
-      }
-    },
-    "Add Grocery Item" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adicionar item de compras"
-          }
-        }
-      }
-    },
-    "Complete Chore" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Concluir afazer"
-          }
-        }
-      }
-    },
-    "Mark Habit Done" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Marcar hábito como feito"
-          }
-        }
-      }
-    },
-    "Mark Supplement Taken" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Marcar suplemento como tomado"
-          }
-        }
-      }
-    },
-    "Mark Grocery Low" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Marcar item acabando"
-          }
-        }
-      }
-    },
-    "Log Caffeine" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registrar cafeína"
-          }
-        }
-      }
-    },
-    "Log Cannabis" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registrar cannabis"
-          }
-        }
-      }
-    },
-    "Log Gut Entry" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registrar evento intestinal"
-          }
-        }
-      }
-    },
-    "Log Mood" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registrar humor"
-          }
-        }
-      }
-    },
-    "Log Water" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registrar água"
-          }
-        }
-      }
-    },
-    "Log Workout" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registrar treino"
-          }
-        }
-      }
-    },
-    "Log a Meal" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registrar refeição"
           }
         }
       }

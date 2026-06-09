@@ -1,53 +1,147 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "CFBundleDisplayName" : {
+      "comment" : "Bundle display name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Septena"
+          }
+        }
+      }
+    },
+    "CFBundleName" : {
+      "comment" : "Bundle name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Septena"
+          }
+        }
+      }
+    },
     "NSCalendarsFullAccessUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Septena shows upcoming events from your calendars on the Week dashboard." } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Septena mostra eventos futuros dos seus calendários no painel da Semana." } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Septena shows upcoming events from your calendars on the Week dashboard."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Septena mostra eventos futuros dos seus calendários no painel da Semana."
+          }
+        }
       }
     },
     "NSCalendarsUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Septena shows upcoming events from your calendars on the Week dashboard." } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Septena mostra eventos futuros dos seus calendários no painel da Semana." } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Septena shows upcoming events from your calendars on the Week dashboard."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Septena mostra eventos futuros dos seus calendários no painel da Semana."
+          }
+        }
       }
     },
     "NSHealthShareUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Septena reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device." } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Septena lê suas métricas de atividade e recuperação (passos, exercício, VO2, VFC, frequência cardíaca de repouso) para que o bloco Atividade possa mostrá-las no painel da Semana. Os dados ficam no seu dispositivo." } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Septena reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Septena lê suas métricas de atividade e recuperação (passos, exercício, VO2, VFC, frequência cardíaca de repouso) para que o bloco Atividade possa mostrá-las no painel da Semana. Os dados ficam no seu dispositivo."
+          }
+        }
       }
     },
     "NSHealthUpdateUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Septena saves your mood check-ins and nutrition entries (meals, macros, water) to HealthKit so they appear in the Health app alongside your other data. Data stays on your device." } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Septena salva seus check-ins de humor e entradas de nutrição (refeições, macros, água) no HealthKit para que apareçam no app Saúde junto aos seus outros dados. Os dados ficam no seu dispositivo." } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Septena saves your mood check-ins and nutrition entries (meals, macros, water) to HealthKit so they appear in the Health app alongside your other data. Data stays on your device."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Septena salva seus check-ins de humor e entradas de nutrição (refeições, macros, água) no HealthKit para que apareçam no app Saúde junto aos seus outros dados. Os dados ficam no seu dispositivo."
+          }
+        }
       }
     },
     "NSPhotoLibraryUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Septena attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device." } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Septena anexa fotos às suas refeições e mostra as miniaturas no seu registro de nutrição. As fotos ficam no seu dispositivo." } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Septena attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Septena anexa fotos às suas refeições e mostra as miniaturas no seu registro de nutrição. As fotos ficam no seu dispositivo."
+          }
+        }
       }
     },
     "NSRemindersFullAccessUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Septena imports tasks from your Reminders lists into the Inbox." } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Septena importa tarefas das suas listas de Lembretes para a Caixa de entrada." } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Septena imports tasks from your Reminders lists into the Inbox."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Septena importa tarefas das suas listas de Lembretes para a Caixa de entrada."
+          }
+        }
       }
     },
     "NSRemindersUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Septena imports tasks from your Reminders lists into the Inbox." } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O Septena importa tarefas das suas listas de Lembretes para a Caixa de entrada." } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Septena imports tasks from your Reminders lists into the Inbox."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Septena importa tarefas das suas listas de Lembretes para a Caixa de entrada."
+          }
+        }
       }
     }
   },
