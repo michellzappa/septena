@@ -122,8 +122,10 @@ struct RhythmHomepageView: View {
     let visible = Set(items.map { $0.domain.rawValue })
     let colors = byKey.mapValues { $0.accent }
 
+    // Training renders as session pills (durations), not dots — pull it out of
+    // the instant-event stream and add it to the bands below instead.
     let timed = LoggedEvents.timed(since: weekStart, in: modelContext)
-      .filter { visible.contains($0.sectionKey) }
+      .filter { visible.contains($0.sectionKey) && $0.sectionKey != "training" }
 
     var mapped: [TimeOfDayWheel.Event] = []
     for t in timed {
@@ -133,9 +135,82 @@ struct RhythmHomepageView: View {
       ) else { continue }
       mapped.append(e)
     }
+    // Tasks aren't `LoggedEvent`s — add completed tasks as dots so the wheel
+    // matches the timeline (which plots done tasks at their completedAt time).
+    if visible.contains("tasks") {
+      mapped.append(contentsOf: taskEvents(todayStart: start, color: colors["tasks"]))
+    }
     events = mapped
-    bands = sleepBands(todayStart: start, visible: visible, sleepColor: colors["sleep"])
+
+    var allBands = sleepBands(todayStart: start, visible: visible, sleepColor: colors["sleep"])
+    if visible.contains("training") {
+      allBands += trainingBands(todayStart: start, weekStart: weekStart, color: colors["training"])
+    }
+    bands = allBands
     calendarBands = todayCalendarBands()
+  }
+
+  private static let isoLocalFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+    f.timeZone = .current
+    f.locale = Locale(identifier: "en_US_POSIX")
+    return f
+  }()
+
+  /// Completed tasks as dots, placed at their local `completedAt` time —
+  /// mirrors `DayTimelineView`'s task handling. The `Event` init bounds them to
+  /// the window.
+  private func taskEvents(todayStart: Date, color: Color?) -> [TimeOfDayWheel.Event] {
+    let desc = FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.statusRaw == "done" })
+    let rows = (try? modelContext.fetch(desc)) ?? []
+    return rows.compactMap { t in
+      guard let cs = t.completedAt, let when = Self.isoLocalFormatter.date(from: cs) else { return nil }
+      return TimeOfDayWheel.Event(id: t.id, occurredAt: when, todayStart: todayStart,
+                                  windowDays: windowDays, color: color)
+    }
+  }
+
+  /// Each day's training as a session pill (bedtime-style band), grouping the
+  /// day's exercise rows and merging gaps under 0.75h — the same session idea
+  /// `DayTimelineView` draws as a bar. Faded by recency like the other bands.
+  private func trainingBands(todayStart: Date, weekStart: Date, color: Color?) -> [TimeOfDayWheel.Band] {
+    guard let color else { return [] }
+    let rows = (try? modelContext.fetch(
+      FetchDescriptor<ExerciseEntryEntity>(predicate: #Predicate { $0.occurredAt >= weekStart })
+    )) ?? []
+    let cal = Calendar.current
+    var out: [TimeOfDayWheel.Band] = []
+    for (dateStr, dayRows) in Dictionary(grouping: rows, by: \.date) {
+      guard let d = Self.ymdFormatter.date(from: dateStr) else { continue }
+      let daysAgo = cal.dateComponents([.day], from: cal.startOfDay(for: d), to: todayStart).day ?? 0
+      guard daysAgo >= 0, daysAgo < windowDays else { continue }
+      // Per-entry spans (start hour → start + duration), then merge near ones.
+      let spans = dayRows.compactMap { e -> (Double, Double)? in
+        guard e.occurredAt > .distantPast else { return nil }
+        let c = cal.dateComponents([.hour, .minute], from: e.occurredAt)
+        let startH = Double(c.hour ?? 0) + Double(c.minute ?? 0) / 60
+        return (startH, startH + (e.durationMin ?? 0) / 60)
+      }.sorted { $0.0 < $1.0 }
+      var merged: [(Double, Double)] = []
+      for s in spans {
+        if var last = merged.last, s.0 <= last.1 + 0.75 {
+          last.1 = max(last.1, s.1); merged[merged.count - 1] = last
+        } else {
+          merged.append(s)
+        }
+      }
+      for (i, m) in merged.enumerated() {
+        out.append(TimeOfDayWheel.Band(
+          id: "\(dateStr)-train-\(i)",
+          start: m.0 / 24,
+          end: min(max(m.1, m.0 + 0.05) / 24, 0.9999),
+          daysAgo: daysAgo,
+          color: color
+        ))
+      }
+    }
+    return out
   }
 
   /// Today's (non-all-day) calendar events as bedtime-style pills — start →
