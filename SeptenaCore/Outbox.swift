@@ -133,6 +133,14 @@ final class TaskMutator {
     cloudBackend?.setConvoAssignee(id: id, assignee)
   }
 
+  func setConvoArtifact(id: String, _ artifact: ConvoArtifact) {
+    cloudBackend?.setConvoArtifact(id: id, artifact)
+  }
+
+  func setConvoHandoff(id: String, _ handoff: ConvoHandoff) {
+    cloudBackend?.setConvoHandoff(id: id, handoff)
+  }
+
   func pendingReasoning(limit: Int) -> [TaskEntity] {
     cloudBackend?.pendingReasoning(limit: limit) ?? []
   }

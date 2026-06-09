@@ -140,6 +140,8 @@ enum MCPDispatch {
     case "tasks_set_acceptance":    return try tasksSetAcceptance(args)
     case "tasks_set_endstate":      return try tasksSetEndState(args)
     case "tasks_set_assignee":      return try tasksSetAssignee(args)
+    case "tasks_set_artifact":      return try tasksSetArtifact(args)
+    case "tasks_set_handoff":       return try tasksSetHandoff(args)
     case "tasks_pending_reasoning": return tasksPendingReasoning(args)
 
     // ---- Goals ----
@@ -345,6 +347,33 @@ enum MCPDispatch {
     }
     SeptenaServices.shared.taskMutator.setConvoAssignee(id: id, assignee)
     return ["id": id, "assignee": assignee?.rawValue ?? "auto"]
+  }
+
+  private static func tasksSetArtifact(_ args: MCPArgs) throws -> Any {
+    let id = try args.requireString("id")
+    guard let raw = args.object("artifact") else { throw MCPError.badArgument("missing 'artifact' object") }
+    let a = MCPArgs(raw)
+    let artifact = ConvoArtifact(
+      kind: a.string("kind") ?? "note",
+      title: try a.requireString("title"),
+      body: a.string("body") ?? "",
+      refs: a.stringArray("refs")
+    )
+    SeptenaServices.shared.taskMutator.setConvoArtifact(id: id, artifact)
+    return ["id": id, "artifact": artifact.title]
+  }
+
+  private static func tasksSetHandoff(_ args: MCPArgs) throws -> Any {
+    let id = try args.requireString("id")
+    guard let raw = args.object("handoff") else { throw MCPError.badArgument("missing 'handoff' object") }
+    let h = MCPArgs(raw)
+    let actionRaw = h.string("actionType") ?? "none"
+    guard let action = ConvoHandoff.ActionType(rawValue: actionRaw) else {
+      throw MCPError.badArgument("handoff.actionType must be open_url|compose|call|none")
+    }
+    let handoff = ConvoHandoff(instruction: try h.requireString("instruction"), actionType: action, payload: h.string("payload"))
+    SeptenaServices.shared.taskMutator.setConvoHandoff(id: id, handoff)
+    return ["id": id, "handoff": handoff.instruction]
   }
 
   private static func tasksPendingReasoning(_ args: MCPArgs) -> Any {

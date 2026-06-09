@@ -176,20 +176,29 @@ final class CloudKitTasksBackend: TasksBackend {
     commitAndPush(entity, op: "convo.assignee")
   }
 
+  func setConvoArtifact(id: String, _ artifact: ConvoArtifact) {
+    guard let entity = fetch(id: id) else { return }
+    var convo = entity.conversation
+    convo.artifact = artifact
+    entity.conversation = convo
+    commitAndPush(entity, op: "convo.artifact")
+  }
+
+  func setConvoHandoff(id: String, _ handoff: ConvoHandoff) {
+    guard let entity = fetch(id: id) else { return }
+    var convo = entity.conversation
+    convo.handoff = handoff
+    entity.conversation = convo
+    commitAndPush(entity, op: "convo.handoff")
+  }
+
   /// Tasks awaiting reasoning: explicitly marked for Claude, OR whose last
   /// provider turn was low-confidence — and not yet terminal. Client-side
   /// filter (the CK schema is auto-managed; no server query on the blob).
   func pendingReasoning(limit: Int) -> [TaskEntity] {
     let all = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
-    let pending = all.filter { entity in
-      guard entity.conversationJSON != nil else { return false }
-      let c = entity.conversation
-      guard !c.isTerminal else { return false }
-      if c.assignee == .claude { return true }
-      if let last = c.thread.last(where: { $0.role == .provider }),
-         let conf = last.confidence, conf < 0.5 { return true }
-      return false
-    }
+    // Shared rule with the badge (deriveConvo) — see TaskConvo.isPendingReasoning().
+    let pending = all.filter { $0.conversationJSON != nil && $0.conversation.isPendingReasoning() }
     return Array(pending.prefix(limit))
   }
 

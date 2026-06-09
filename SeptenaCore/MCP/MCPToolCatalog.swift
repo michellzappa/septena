@@ -130,6 +130,27 @@ enum MCPToolCatalog {
                 "id": ["type": "string"],
                 "assignee": ["type": ["string", "null"], "enum": ["me", "local", "claude"]],
               ]]),
+      MCPTool(name: "tasks_set_artifact",
+              description: "Attach the agent's deliverable to a task (agent_assisted): the research/table/draft you produced. Distinct from the handoff (the human's last-mile action).",
+              inputSchema: ["type": "object", "required": ["id", "artifact"], "properties": [
+                "id": ["type": "string"],
+                "artifact": ["type": "object", "required": ["title"], "properties": [
+                  "kind": ["type": "string", "description": "e.g. availability-table, draft-email, summary"],
+                  "title": ["type": "string"],
+                  "body": ["type": "string"],
+                  "refs": ["type": "array", "items": ["type": "string"]],
+                ]],
+              ]]),
+      MCPTool(name: "tasks_set_handoff",
+              description: "Set the human last-mile, rendered as a tappable action button. The agent is done; the task stays open until the human does this.",
+              inputSchema: ["type": "object", "required": ["id", "handoff"], "properties": [
+                "id": ["type": "string"],
+                "handoff": ["type": "object", "required": ["instruction"], "properties": [
+                  "instruction": ["type": "string"],
+                  "actionType": ["type": "string", "enum": ["open_url", "compose", "call", "none"]],
+                  "payload": ["type": "string", "description": "URL / email / phone for the action"],
+                ]],
+              ]]),
       MCPTool(name: "tasks_pending_reasoning",
               description: "List tasks awaiting reasoning: marked for Claude, or whose last provider turn was low-confidence, and not yet terminal.",
               inputSchema: ["type": "object", "properties": [

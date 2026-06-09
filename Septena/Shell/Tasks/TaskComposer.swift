@@ -99,6 +99,13 @@ struct TaskComposerCard: View {
           accent: accent,
           onInteractStart: { titleFocused = false }
         )
+
+        // The agent exchange lives with the task, below the fields (edit mode
+        // only — a not-yet-created task has no id/conversation). Renders nothing
+        // until a conversation exists. docs/TASK_CONVERSATIONS_PHASE1.md.
+        if case .edit(let task) = mode {
+          ConversationCard(taskID: task.id)
+        }
       }
       .padding(16)
       // White (paper) glass: tint the translucent material with the system
