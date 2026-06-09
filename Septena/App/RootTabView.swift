@@ -188,7 +188,7 @@ struct RootTabView: View {
 
       CoachView()
         .tabItem {
-          Label("Coaches", systemImage: "bubble.left.and.bubble.right")
+          Label("Coach", systemImage: "smallcircle.filled.circle")
             .environment(\.symbolVariants, .none)
         }
         .tag(SeptenaTab.goals)

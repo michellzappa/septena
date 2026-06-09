@@ -26,9 +26,14 @@ struct CoachView: View {
 
   @State private var goals: [Goal] = []
   @State private var availableSections: [SectionConfig] = []
-  @State private var subtitles: [CoachDomain: String] = [:]
+  @State private var coachPills: [CoachDomain: [CoachAreaPill]] = [:]
   @State private var editing: Goal? = nil
   @State private var activeExercise: AnyDiscoveryMiniApp? = nil
+  /// The coach currently open. On iPhone it presents as a bottom-sheet
+  /// drawer (matching how the Week dashboard opens a section); on iPad /
+  /// macOS it pushes as a full pane. The two bindings below split this one
+  /// piece of state across the two idioms.
+  @State private var activeCoach: CoachDomain? = nil
 
   private var columns: [GridItem] {
     #if os(iOS)
@@ -38,6 +43,30 @@ struct CoachView: View {
     #else
     return GoalGrid.columns(regularWidth: true)
     #endif
+  }
+
+  /// True when a coach should open as a pushed full pane rather than a modal
+  /// bottom sheet — anywhere with room for it. macOS always; iOS only at
+  /// regular width (iPad / large multitasking). Mirrors the Week dashboard.
+  private var usesPushNavigation: Bool {
+    #if os(macOS)
+    return true
+    #else
+    return hSize == .regular
+    #endif
+  }
+
+  /// Drives the `.navigationDestination` push; nil on compact so the sheet
+  /// path owns presentation there.
+  private var coachPushBinding: Binding<CoachDomain?> {
+    Binding(get: { usesPushNavigation ? activeCoach : nil },
+            set: { if usesPushNavigation { activeCoach = $0 } })
+  }
+
+  /// Drives the bottom-sheet drawer; the inverse of `coachPushBinding`.
+  private var coachSheetBinding: Binding<CoachDomain?> {
+    Binding(get: { usesPushNavigation ? nil : activeCoach },
+            set: { if !usesPushNavigation { activeCoach = $0 } })
   }
 
   var body: some View {
@@ -53,6 +82,20 @@ struct CoachView: View {
         .padding(.bottom, 24)
       }
       .background(Theme.groupedBackground)
+      // While a bottom-sheet coach drawer is open, a tap anywhere on the
+      // landing behind it dismisses the drawer (standard popover-style
+      // tap-away) instead of falling through to a tile and opening another
+      // coach — the drawer keeps its translucent, non-dimmed backdrop, so
+      // this transparent layer is what turns the whole backdrop into a
+      // dismiss target. Compact only; on push navigation there's no floating
+      // drawer to dismiss.
+      .overlay {
+        if !usesPushNavigation, activeCoach != nil {
+          Color.clear
+            .contentShape(Rectangle())
+            .onTapGesture { activeCoach = nil }
+        }
+      }
       .navigationTitle("Coach")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
@@ -61,7 +104,9 @@ struct CoachView: View {
       // menu (Settings today). No top-right "+" — goals are added from the
       // Goals band's own affordance, the section strips, or the coach.
       .toolbar { homeToolbar }
-      .navigationDestination(for: CoachDomain.self) { domain in
+      // Regular width (iPad / macOS): push the coach as a full pane inside
+      // this NavigationStack — a real screen with a back button.
+      .navigationDestination(item: coachPushBinding) { domain in
         CoachDetailView(domain: domain)
       }
       .task { refresh() }
@@ -85,6 +130,16 @@ struct CoachView: View {
         if !created.isEmpty { goals.insert(contentsOf: created, at: 0); Haptics.success() }
         activeExercise = nil
       }
+    }
+    // Compact (iPhone): the coach opens as a bottom-sheet drawer so the Coach
+    // landing stays present underneath — the same idiom the Week dashboard
+    // uses for a section. Its own NavigationStack hosts the drawer's title;
+    // `sectionDrawerPresentation()` owns the detents / translucent backdrop.
+    .sheet(item: coachSheetBinding) { domain in
+      NavigationStack {
+        CoachDetailView(domain: domain)
+      }
+      .sectionDrawerPresentation()
     }
   }
 
@@ -117,10 +172,14 @@ struct CoachView: View {
       bandHeader("Coaches", "On-device coaches that reflect your logged data back to you.")
       LazyVGrid(columns: columns, spacing: 14) {
         ForEach(CoachDomain.allCases) { domain in
-          NavigationLink(value: domain) {
+          Button {
+            activeCoach = domain
+            Haptics.tick()
+          } label: {
             CoachTile(systemImage: domain.systemImage,
                       title: domain.title,
-                      subtitle: subtitles[domain] ?? domain.blurb,
+                      subtitle: domain.blurb,            // shown only when no pills
+                      pills: coachPills[domain] ?? [],
                       accent: domain.accent)
           }
           .buttonStyle(.plain)
@@ -205,15 +264,16 @@ struct CoachView: View {
     goals = LocalCache.goals(in: context)
     availableSections = SettingsMirror.loadSections(context: context)
       .filter { $0.key != "goals" }
-    var next: [CoachDomain: String] = [:]
+    var next: [CoachDomain: [CoachAreaPill]] = [:]
     for domain in CoachDomain.allCases {
       let pills = CoachContextBuilder.availability(for: domain, window: .week, context: context)
       guard !pills.isEmpty else { continue }
-      let entries = pills.reduce(0) { $0 + $1.count }
-      let areas = pills.count
-      next[domain] = "\(areas) area\(areas == 1 ? "" : "s") · \(entries) entr\(entries == 1 ? "y" : "ies") this week"
+      next[domain] = pills.map {
+        CoachAreaPill(id: $0.id, label: $0.label, systemImage: $0.systemImage,
+                      count: $0.count, accent: theme.color(for: $0.id))
+      }
     }
-    subtitles = next
+    coachPills = next
   }
 
   private func addGoal() {
