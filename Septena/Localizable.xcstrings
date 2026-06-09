@@ -202,6 +202,12 @@
             "state" : "new",
             "value" : "%1$@ events over the last %2$@ days"
           }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ eventos nos últimos %2$@ dias"
+          }
         }
       }
     },
@@ -311,6 +317,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@ will sound **%2$@**. The facts discipline — cite real numbers, never invent data — always applies."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ vai soar **%2$@**. A disciplina dos fatos — citar números reais, nunca inventar dados — sempre se aplica."
           }
         }
       }
@@ -672,7 +684,16 @@
         }
       }
     },
-    "Add" : {},
+    "Add" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar"
+          }
+        }
+      }
+    },
     "Add %lld chores" : {
       "localizations" : {
         "en" : {
@@ -1053,7 +1074,16 @@
         }
       }
     },
-    "Appended to how this coach talks." : {},
+    "Appended to how this coach talks." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anexado ao jeito como este coach fala."
+          }
+        }
+      }
+    },
     "Apple" : {
       "localizations" : {
         "pt-BR" : {
@@ -1269,7 +1299,16 @@
         }
       }
     },
-    "Between" : {},
+    "Between" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entre"
+          }
+        }
+      }
+    },
     "Biceps" : {
       "localizations" : {
         "pt-BR" : {
@@ -1763,7 +1802,16 @@
         }
       }
     },
-    "Custom instruction" : {},
+    "Custom instruction" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instrução personalizada"
+          }
+        }
+      }
+    },
     "Custom…" : {
       "localizations" : {
         "pt-BR" : {
@@ -1960,7 +2008,16 @@
         }
       }
     },
-    "Dismiss" : {},
+    "Dismiss" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dispensar"
+          }
+        }
+      }
+    },
     "Don't Repeat" : {
       "localizations" : {
         "pt-BR" : {
@@ -1991,7 +2048,16 @@
         }
       }
     },
-    "Double tap to switch between today and the last %@ days" : {},
+    "Double tap to switch between today and the last %@ days" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toque duas vezes para alternar entre hoje e os últimos %@ dias"
+          }
+        }
+      }
+    },
     "Drag to reorder. Toggle to show or hide a tile on the Nutrition dashboard. Tap a swatch to change its color." : {
       "localizations" : {
         "pt-BR" : {
@@ -2092,7 +2158,16 @@
         }
       }
     },
-    "Either way, an AI reads and writes the same private data — and everything it touches is marked." : {},
+    "Either way, an AI reads and writes the same private data — and everything it touches is marked." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De qualquer forma, uma IA lê e grava os mesmos dados privados — e tudo o que ela toca é marcado."
+          }
+        }
+      }
+    },
     "elapsed" : {
       "localizations" : {
         "pt-BR" : {
@@ -3067,7 +3142,16 @@
         }
       }
     },
-    "Layout picks how the homepage renders — Histogram, Sparkline, Heatmap, Rings, or Wheel. Insights tunes the cross-section correlation explorer." : {},
+    "Layout picks how the homepage renders — Histogram, Sparkline, Heatmap, Rings, or Wheel. Insights tunes the cross-section correlation explorer." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O layout escolhe como a tela inicial é exibida — Histograma, Minigráfico, Mapa de calor, Anéis ou Roda. Insights ajusta o explorador de correlações entre seções."
+          }
+        }
+      }
+    },
     "Learning your rhythm — a couple more completions and Septena will predict the next one." : {
       "localizations" : {
         "pt-BR" : {
@@ -3135,7 +3219,16 @@
         }
       }
     },
-    "Log meals, coffee, mood, or other timestamped sections and your daily rhythm shows up here." : {},
+    "Log meals, coffee, mood, or other timestamped sections and your daily rhythm shows up here." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registre refeições, café, humor ou outras seções com horário e seu ritmo diário aparece aqui."
+          }
+        }
+      }
+    },
     "Logbook" : {
       "localizations" : {
         "pt-BR" : {
@@ -5170,7 +5263,16 @@
         }
       }
     },
-    "Time-of-day wheel" : {},
+    "Time-of-day wheel" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Roda das horas do dia"
+          }
+        }
+      }
+    },
     "today" : {
       "localizations" : {
         "pt-BR" : {
@@ -5230,7 +5332,16 @@
         }
       }
     },
-    "Tone" : {},
+    "Tone" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tom"
+          }
+        }
+      }
+    },
     "Training" : {
       "localizations" : {
         "pt-BR" : {
@@ -5387,7 +5498,16 @@
         }
       }
     },
-    "Upper" : {},
+    "Upper" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Superior"
+          }
+        }
+      }
+    },
     "Used to personalize the greeting. With Apple Intelligence it's freshly written through the day." : {
       "localizations" : {
         "pt-BR" : {
@@ -5637,7 +5757,16 @@
         }
       }
     },
-    "Your data stays in your private iCloud. Connecting an AI just opens a door into it — one you control and can revoke." : {},
+    "Your data stays in your private iCloud. Connecting an AI just opens a door into it — one you control and can revoke." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seus dados ficam no seu iCloud privado. Conectar uma IA apenas abre uma porta para eles — uma porta que você controla e pode revogar."
+          }
+        }
+      }
+    },
     "Your name personalizes the home greeting and this profile. It syncs across your devices via iCloud." : {
       "localizations" : {
         "pt-BR" : {
