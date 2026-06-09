@@ -2386,12 +2386,19 @@ final class TrainingMutator {
                                 name: String? = nil,
                                 type: String? = nil,
                                 subgroup: String?? = nil,
-                                aliases: [String]? = nil) {
+                                aliases: [String]? = nil,
+                                primaryMuscle: String?? = nil,
+                                secondaryMuscles: [String]? = nil,
+                                archived: Bool? = nil) {
     guard let entity = fetchDefinition(id: id) else { return }
     if let name { entity.name = name }
     if let type { entity.type = type }
     if let subgroup { entity.subgroup = subgroup }
     if let aliases { entity.aliases = aliases }
+    // Double-optional: nil = leave as-is, .some(nil) = clear the muscle.
+    if let primaryMuscle { entity.primaryMuscle = primaryMuscle }
+    if let secondaryMuscles { entity.secondaryMuscles = secondaryMuscles }
+    if let archived { entity.archived = archived }
     entity.updatedAt = .now
     commitDefinition(entity, op: "update")
   }

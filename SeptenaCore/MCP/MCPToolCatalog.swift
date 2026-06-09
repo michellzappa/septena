@@ -33,6 +33,14 @@ enum MCPToolCatalog {
 
   private static let emptySchema: [String: Any] = ["type": "object", "properties": [:] as [String: Any]]
 
+  /// The 10 canonical muscle-group values (mirrors `Muscle.allCases`). Kept as
+  /// a literal here so the catalog has no dependency direction issue; the
+  /// dispatch-side validator (`validMuscles`) derives the same set from the enum.
+  private static let muscleEnum = [
+    "chest", "back", "shoulders", "biceps", "triceps",
+    "quads", "hamstrings", "glutes", "calves", "core",
+  ]
+
   // MARK: - Global tools (always exposed)
 
   static var global: [MCPTool] {
@@ -375,11 +383,33 @@ enum MCPToolCatalog {
                             "properties": (["id": ["type": "string"]] as [String: Any])
                               .merging(trainingWriteProps(includeKeys: true)) { a, _ in a }]),
       MCPTool(name: "training_exercises_list",
-              description: "List exercise catalog (definitions). Filter by type (strength|cardio|mobility|core) or archived state.",
+              description: "List exercise catalog (definitions), including muscle tags (primaryMuscle / secondaryMuscles). Filter by type (strength|cardio|mobility|core) or archived state.",
               inputSchema: ["type": "object", "properties": [
                 "type": ["type": "string", "enum": ["strength", "cardio", "mobility", "core"], "description": "Filter by exercise type."],
                 "archived": ["type": "boolean", "description": "Include archived. Defaults to false."],
                 "limit": ["type": "integer", "default": 200],
+              ]]),
+      MCPTool(name: "training_exercise_create",
+              description: "Add an exercise definition to the catalog. id defaults to a slug of the name.",
+              inputSchema: ["type": "object", "required": ["name", "type"], "properties": [
+                "name": ["type": "string", "description": "Canonical display name, e.g. 'Chest press'."],
+                "type": ["type": "string", "enum": ["strength", "cardio", "mobility", "core"]],
+                "subgroup": ["type": "string", "description": "Free-form grouping, e.g. 'push'/'pull'/'upper'."],
+                "aliases": ["type": "array", "items": ["type": "string"]],
+                "primaryMuscle": ["type": "string", "enum": muscleEnum, "description": "Primary muscle group."],
+                "secondaryMuscles": ["type": "array", "items": ["type": "string", "enum": muscleEnum]],
+              ]]),
+      MCPTool(name: "training_exercise_update",
+              description: "Edit an exercise definition — set muscle tags, rename, retype, archive. Use to clean up / backfill muscle groups one exercise at a time. Pass primaryMuscle: \"\" to clear it.",
+              inputSchema: ["type": "object", "required": ["id"], "properties": [
+                "id": ["type": "string", "description": "Exercise slug id (from training_exercises_list)."],
+                "name": ["type": "string"],
+                "type": ["type": "string", "enum": ["strength", "cardio", "mobility", "core"]],
+                "subgroup": ["type": "string"],
+                "aliases": ["type": "array", "items": ["type": "string"]],
+                "primaryMuscle": ["type": "string", "description": "One of: \(muscleEnum.joined(separator: ", ")). Empty string clears it."],
+                "secondaryMuscles": ["type": "array", "items": ["type": "string", "enum": muscleEnum]],
+                "archived": ["type": "boolean"],
               ]]),
     ],
     "hydration": [

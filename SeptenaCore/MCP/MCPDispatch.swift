@@ -195,6 +195,8 @@ enum MCPDispatch {
     case "training_entry_log":     return try trainingLog(args)
     case "training_entry_update":  return try trainingUpdate(args)
     case "training_exercises_list": return trainingExercises(args)
+    case "training_exercise_create": return try trainingExerciseCreate(args)
+    case "training_exercise_update": return try trainingExerciseUpdate(args)
 
     // ---- Hydration ----
     case "hydration_log":       return try hydrationLog(args)
@@ -885,9 +887,91 @@ enum MCPDispatch {
       .sorted { $0.sortIndex < $1.sortIndex }
       .prefix(limit) ?? []
     return ["exercises": rows.map { (e: ExerciseDefinitionEntity) -> [String: Any] in
-      ["id": e.id, "name": e.name, "type": e.type, "subgroup": e.subgroup ?? "",
-       "archived": e.archived]
+      var out: [String: Any] = [
+        "id": e.id, "name": e.name, "type": e.type, "subgroup": e.subgroup ?? "",
+        "archived": e.archived, "secondaryMuscles": e.secondaryMuscles,
+        "aliases": e.aliases, "sortIndex": e.sortIndex,
+      ]
+      // Omit primaryMuscle when unassigned so the agent can tell "no muscle
+      // set" (backfill candidate) from a real assignment.
+      if let pm = e.primaryMuscle { out["primaryMuscle"] = pm }
+      return out
     }]
+  }
+
+  /// The 10 canonical muscle-group raw values (see `Muscle`). Shared by the
+  /// create/update validators so a typo ("quadriceps") can't dirty the data.
+  private static let validMuscles: Set<String> = Set(Muscle.allCases.map(\.rawValue))
+
+  private static func checkedMuscle(_ value: String) throws -> String {
+    guard validMuscles.contains(value) else {
+      throw MCPError.badArgument(
+        "invalid muscle '\(value)'. Valid: \(validMuscles.sorted().joined(separator: ", "))")
+    }
+    return value
+  }
+
+  private static let validExerciseTypes = ["strength", "cardio", "mobility", "core"]
+
+  private static func checkedExerciseType(_ value: String) throws -> String {
+    guard validExerciseTypes.contains(value) else {
+      throw MCPError.badArgument(
+        "invalid type '\(value)'. Valid: \(validExerciseTypes.joined(separator: ", "))")
+    }
+    return value
+  }
+
+  private static func exerciseDefinitionJSON(_ id: String) -> [String: Any] {
+    guard let e = (try? ctx.fetch(FetchDescriptor<ExerciseDefinitionEntity>(
+      predicate: #Predicate { $0.id == id })))?.first else { return ["id": id] }
+    var out: [String: Any] = [
+      "id": e.id, "name": e.name, "type": e.type, "subgroup": e.subgroup ?? "",
+      "archived": e.archived, "secondaryMuscles": e.secondaryMuscles, "aliases": e.aliases,
+    ]
+    out["primaryMuscle"] = e.primaryMuscle ?? NSNull()
+    return out
+  }
+
+  private static func trainingExerciseCreate(_ args: MCPArgs) throws -> Any {
+    let name = try args.requireString("name")
+    let type = try checkedExerciseType(try args.requireString("type"))
+    let primary: String? = try args.string("primaryMuscle").flatMap {
+      $0.isEmpty ? nil : try checkedMuscle($0)
+    }
+    let secondary = try args.stringArray("secondaryMuscles")?.map { try checkedMuscle($0) }
+    let entity = SeptenaServices.shared.trainingMutator.addExerciseDefinition(
+      name: name, type: type, subgroup: args.string("subgroup"))
+    let aliases = args.stringArray("aliases")
+    if primary != nil || secondary != nil || aliases != nil {
+      SeptenaServices.shared.trainingMutator.updateExerciseDefinition(
+        id: entity.id, aliases: aliases,
+        primaryMuscle: primary.map { Optional($0) },
+        secondaryMuscles: secondary)
+    }
+    return exerciseDefinitionJSON(entity.id)
+  }
+
+  private static func trainingExerciseUpdate(_ args: MCPArgs) throws -> Any {
+    let id = try args.requireString("id")
+    guard ((try? ctx.fetch(FetchDescriptor<ExerciseDefinitionEntity>(
+      predicate: #Predicate { $0.id == id })))?.first) != nil else {
+      throw MCPError.badArgument(
+        "no exercise with id '\(id)' — call training_exercises_list to find the id")
+    }
+    // primaryMuscle: absent = leave; "" = clear; value = validate + set.
+    var primary: String?? = nil
+    if let pm = args.string("primaryMuscle") {
+      primary = pm.isEmpty ? .some(nil) : .some(try checkedMuscle(pm))
+    }
+    let secondary = try args.stringArray("secondaryMuscles")?.map { try checkedMuscle($0) }
+    var subgroup: String?? = nil
+    if let sg = args.string("subgroup") { subgroup = .some(sg.isEmpty ? nil : sg) }
+    let type = try args.string("type").map { try checkedExerciseType($0) }
+    SeptenaServices.shared.trainingMutator.updateExerciseDefinition(
+      id: id, name: args.string("name"), type: type, subgroup: subgroup,
+      aliases: args.stringArray("aliases"), primaryMuscle: primary,
+      secondaryMuscles: secondary, archived: args.bool("archived"))
+    return exerciseDefinitionJSON(id)
   }
 
   // MARK: - Hydration (backed by Nutrition)
