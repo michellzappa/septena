@@ -160,8 +160,8 @@ Three record types work together:
 - **SessionType** — routine template. id is the key (`upper`, `lower`, `cardio`). Lists exercises in that session.
 - **ExerciseEntry** — logged set. References `sessionType` by **id** and `exercise` by **canonical name** (not id — easy footgun).
 
-**Muscle groups** — `primaryMuscle` / `secondaryMuscles` must be one of these 10 exact values:
-`chest, back, shoulders, biceps, triceps, quads, hamstrings, glutes, calves, core` (note: `quads`, not `quadriceps`). Cardio/mobility usually have none. Invalid values are rejected.
+**Muscle groups** — `primaryMuscle` / `secondaryMuscles` must be one of these 16 exact values:
+`chest, frontDelts, sideDelts, rearDelts, triceps, lats, upperBack, biceps, forearms, quads, hamstrings, glutes, calves, adductors, abs, lowerBack` (camelCase exactly; `quads`, not `quadriceps`). Cardio/mobility usually have none. Invalid values are rejected.
 
 Logging workflow:
 1. `training_sessions_list()` → find sessionType id

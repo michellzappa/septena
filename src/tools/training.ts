@@ -28,11 +28,14 @@ function optStrArray(v: unknown): string[] {
   return [];
 }
 
-// The 10 canonical muscle groups — must stay in lockstep with the iOS
-// `Muscle` enum (SeptenaCore/Models.swift). Note: 'quads', not 'quadriceps'.
+// The 16 canonical muscle groups — must stay in lockstep with the iOS
+// `Muscle` enum (SeptenaCore/Models.swift). camelCase exactly; 'quads', not
+// 'quadriceps'. See docs/MUSCLE_TAXONOMY_16.md in the app repo.
 export const VALID_MUSCLES = [
-  "chest", "back", "shoulders", "biceps", "triceps",
-  "quads", "hamstrings", "glutes", "calves", "core",
+  "chest", "frontDelts", "sideDelts", "rearDelts", "triceps",
+  "lats", "upperBack", "biceps", "forearms",
+  "quads", "hamstrings", "glutes", "calves", "adductors",
+  "abs", "lowerBack",
 ] as const;
 const MUSCLE_SET = new Set<string>(VALID_MUSCLES);
 
@@ -164,7 +167,7 @@ export const createExerciseJsonSchema = {
     id:               { type: "string", description: "Optional slug id. Defaults to slugified name." },
     subgroup:         { type: "string", description: "Free-form grouping (e.g. 'push', 'pull')." },
     aliases:          { type: "array", items: { type: "string" } },
-    primaryMuscle:    { type: "string", enum: VALID_MUSCLES, description: "Primary muscle group. One of: chest, back, shoulders, biceps, triceps, quads, hamstrings, glutes, calves, core." },
+    primaryMuscle:    { type: "string", enum: VALID_MUSCLES, description: "Primary muscle group (one of the 16 canonical values)." },
     secondaryMuscles: { type: "array", items: { type: "string", enum: VALID_MUSCLES } },
   },
 } as const;
@@ -177,7 +180,7 @@ export const updateExerciseJsonSchema = {
     type:             { type: "string", enum: ["strength", "cardio", "mobility", "core"] },
     subgroup:         { type: ["string", "null"] },
     aliases:          { type: "array", items: { type: "string" } },
-    primaryMuscle:    { type: ["string", "null"], description: "Primary muscle group (chest, back, shoulders, biceps, triceps, quads, hamstrings, glutes, calves, core). Pass \"\" or null to clear." },
+    primaryMuscle:    { type: ["string", "null"], description: "Primary muscle group (one of the 16 canonical values). Pass \"\" or null to clear." },
     secondaryMuscles: { type: "array", items: { type: "string", enum: VALID_MUSCLES } },
     archived:         { type: "boolean" },
   },
