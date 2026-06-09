@@ -15,12 +15,24 @@ struct AddInfoRow: View {
   let title: String
   var subtitle: String? = nil
   var systemImage: String? = nil
+  /// Leading number pill (e.g. a Bristol type). Takes the leading slot in
+  /// place of `systemImage` — a tinted capsule that reads as the option's
+  /// identifier, not decoration.
+  var leadingNumber: Int? = nil
   var tint: Color = .secondary
   var accessory: AddInfoRowAccessory = .none
 
   var body: some View {
     HStack(spacing: 12) {
-      if let systemImage {
+      if let leadingNumber {
+        Text("\(leadingNumber)")
+          .font(.callout.weight(.semibold).monospacedDigit())
+          .foregroundStyle(tint)
+          .padding(.horizontal, 9)
+          .padding(.vertical, 3)
+          .background(tint.opacity(0.15), in: Capsule())
+          .accessibilityLabel("Number \(leadingNumber)")
+      } else if let systemImage {
         Image(systemName: systemImage)
           .font(.body.weight(.medium))
           .foregroundStyle(tint)
