@@ -1723,14 +1723,16 @@ enum ChecklistMirror {
     }
 
     // Supplements: open (not done). Server returns a flat list — keep
-    // declaration order.
+    // declaration order. Each is tagged with its optional bucket in
+    // `subtitle` (nil = "anytime") so a downstream consumer can narrow to the
+    // current time-of-day window — same scheme as habits (see `itemsForBucket`).
     if let supps = loadSupplementsDay(context: context, date: date) {
       for s in supps.items where !s.done {
         items.append(NextItem(
           id: s.id,
           kind: "supplement",
           title: s.emoji.map { "\($0) \(s.name)" } ?? s.name,
-          subtitle: nil,
+          subtitle: s.bucket,
           trailing: nil,
           overdue: false,
           sortKey: sortKey
