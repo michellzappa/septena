@@ -1324,10 +1324,6 @@ final class TrainingDraftStore {
   /// Currently active draft. Nil when no session is in flight.
   var draft: DraftSession?
 
-  /// Ephemeral rest-timer end time — not persisted; cleared on Skip or
-  /// timeout. nil when no rest is running.
-  var restEndsAt: Date? = nil
-
   init() {
     if let data = UserDefaults.standard.data(forKey: Self.key),
        let decoded = try? JSONDecoder().decode(DraftSession.self, from: data) {
@@ -1752,23 +1748,6 @@ final class TrainingDraftStore {
     return paces.reduce(0, +) / Double(paces.count)
   }
 
-  // MARK: - Rest timer (ephemeral)
-
-  private static let defaultRestSeconds: TimeInterval = 90
-
-  /// Begin a rest countdown. Stored as an absolute end-time so it stays
-  /// accurate across backgrounding (the bar recomputes from the clock).
-  func startRest(seconds: TimeInterval = TrainingDraftStore.defaultRestSeconds) {
-    restEndsAt = Date().addingTimeInterval(seconds)
-  }
-
-  /// Nudge the running rest up/down, clamped so it can't go negative.
-  func adjustRest(by delta: TimeInterval) {
-    guard let end = restEndsAt else { return }
-    restEndsAt = max(end.addingTimeInterval(delta), Date())
-  }
-
-  func skipRest() { restEndsAt = nil }
 }
 
 // MARK: - Session logger UI
@@ -1932,51 +1911,59 @@ struct TrainingSessionView: View {
     if let d = store.draft {
       ScrollViewReader { proxy in
         List {
+          // Each row is a free-standing pill on a plain list: clear row
+          // backgrounds + hidden separators stop the list chrome from
+          // fusing the cards into one grouped slab, so the open card reads
+          // as its own raised pill rather than a bubble nested in a list.
           statsHeader(d)
-          Section {
-            ForEach(orderedEntries(d), id: \.exercise) { e in
-              // `index` must be the entry's real slot in `draft.entries`
-              // (store mutations key off it), even though the rows render
-              // in completed-first order.
-              let idx = d.entries.firstIndex { $0.exercise == e.exercise } ?? 0
-              TrainingExerciseCard(
-                index: idx,
-                entry: e,
-                accent: accent,
-                openExercise: $openExercise,
-                onAdvance: { target in
-                  // Auto-advance: open the next pending card and bring it
-                  // into view. Done here (not on every openExercise change)
-                  // so a manual tap doesn't yank the list around.
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+          ForEach(orderedEntries(d), id: \.exercise) { e in
+            // `index` must be the entry's real slot in `draft.entries`
+            // (store mutations key off it), even though the rows render
+            // in completed-first order.
+            let idx = d.entries.firstIndex { $0.exercise == e.exercise } ?? 0
+            TrainingExerciseCard(
+              index: idx,
+              entry: e,
+              accent: accent,
+              openExercise: $openExercise,
+              onAdvance: { target in
+                // Auto-advance: open the next pending card and bring it
+                // into view. Done here (not on every openExercise change)
+                // so a manual tap doesn't yank the list around.
+                withAnimation(.easeInOut(duration: 0.25)) {
                   openExercise = target
                   if let target {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                      proxy.scrollTo(target, anchor: .top)
-                    }
+                    proxy.scrollTo(target, anchor: .top)
                   }
                 }
-              )
-              .id(e.exercise)
-              .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
-            }
+              }
+            )
+            .id(e.exercise)
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets(top: 5, leading: 12, bottom: 5, trailing: 12))
           }
-          Section {
-            Button {
-              showAdd = true
-            } label: {
-              Label("Add exercise", systemImage: "plus.circle.fill")
-                .font(.septenaCardTitle)
-                .foregroundStyle(accent)
-            }
-            .buttonStyle(.plain)
-            .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+          Button {
+            showAdd = true
+          } label: {
+            Label("Add exercise", systemImage: "plus.circle.fill")
+              .font(.septenaCardTitle)
+              .foregroundStyle(accent)
           }
+          .buttonStyle(.plain)
+          .listRowSeparator(.hidden)
+          .listRowBackground(Color.clear)
+          .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
         }
-        #if os(iOS)
-        .listStyle(.insetGrouped)
-        #else
-        .listStyle(.inset)
-        #endif
+        .listStyle(.plain)
+        // Plain list defaults to a white scroll background, which left the
+        // white pills with zero contrast. Swap in the grouped grey canvas so
+        // each card reads as a raised pill.
+        .scrollContentBackground(.hidden)
+        .background(Theme.groupedBackground)
         .onAppear { tick = Date() }
         #if os(iOS)
         .toolbar {
@@ -1987,18 +1974,6 @@ struct TrainingSessionView: View {
           }
         }
         #endif
-        .safeAreaInset(edge: .bottom) {
-          if let end = store.restEndsAt {
-            RestTimerBar(
-              endsAt: end,
-              accent: accent,
-              onAdjust: { store.adjustRest(by: $0) },
-              onSkip: { store.skipRest() }
-            )
-            .padding(.horizontal, 12)
-            .padding(.bottom, 6)
-          }
-        }
         .sheet(isPresented: $showAdd) {
           if let current = store.draft {
             ExercisePickerSheet(
@@ -2025,7 +2000,9 @@ struct TrainingSessionView: View {
     let cardio = d.entries
       .filter { $0.status == .done && $0.isCardio }
       .reduce(0.0) { $0 + ($1.durationMin ?? 0) }
-    return Section {
+    let done = d.doneCount
+    let total = max(d.totalCount, 1)
+    return VStack(alignment: .leading, spacing: 12) {
       // Spread the three stats edge-to-edge rather than clustering them on
       // the left — Spacers between each give the even, full-width spacing.
       HStack(alignment: .top) {
@@ -2035,8 +2012,7 @@ struct TrainingSessionView: View {
         Spacer()
         stat(value: "\(Int(lifted))", label: "lifted", unit: "kg")
       }
-      let done = d.doneCount
-      let total = max(d.totalCount, 1)
+      Divider()
       VStack(alignment: .leading, spacing: 6) {
         HStack {
           Text("PROGRESS")
@@ -2051,6 +2027,13 @@ struct TrainingSessionView: View {
           .tint(accent)
       }
     }
+    // Own card surface — on a plain list the grouped-section background is
+    // gone, so the header has to draw its own pill like the exercise rows.
+    .padding(16)
+    .background(
+      RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+        .fill(Theme.cardSurface)
+    )
   }
 
   private func stat(value: String, label: String, unit: String? = nil) -> some View {
@@ -2163,65 +2146,6 @@ struct TrainingSessionView: View {
 /// logged. Drives off an absolute end-time so backgrounding doesn't drift
 /// it; a success haptic fires and the bar clears itself at zero. ±15s and
 /// Skip give quick manual control.
-private struct RestTimerBar: View {
-  let endsAt: Date
-  let accent: Color
-  let onAdjust: (TimeInterval) -> Void
-  let onSkip: () -> Void
-
-  var body: some View {
-    TimelineView(.periodic(from: .now, by: 1)) { ctx in
-      let remaining = max(0, endsAt.timeIntervalSince(ctx.date))
-      HStack(spacing: 12) {
-        Image(systemName: "timer")
-          .scaledFont(size: 15, weight: .semibold)
-          .foregroundStyle(accent)
-        Text(timeString(remaining))
-          .font(.system(.title3, design: .rounded).weight(.bold))
-          .monospacedDigit()
-          .foregroundStyle(Theme.inkPrimary)
-        Spacer()
-        adjustButton("−15") { onAdjust(-15) }
-        adjustButton("+15") { onAdjust(15) }
-        Button(action: onSkip) {
-          Text("Skip").font(.subheadline.weight(.semibold))
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(accent)
-      }
-      .padding(.horizontal, 16)
-      .padding(.vertical, 10)
-      .background(Theme.cardSurface, in: Capsule())
-      .overlay(Capsule().stroke(accent.opacity(0.3), lineWidth: 1))
-      .shadow(color: .black.opacity(0.10), radius: 6, y: 2)
-      .onChange(of: remaining <= 0) { _, done in
-        if done {
-          Haptics.success()
-          onSkip()
-        }
-      }
-    }
-  }
-
-  private func adjustButton(_ label: String, action: @escaping () -> Void) -> some View {
-    Button(action: action) {
-      Text(label)
-        .font(.caption.weight(.bold))
-        .monospacedDigit()
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(accent.opacity(0.14), in: Capsule())
-        .foregroundStyle(accent)
-    }
-    .buttonStyle(.plain)
-  }
-
-  private func timeString(_ t: TimeInterval) -> String {
-    let s = Int(t.rounded())
-    return String(format: "%d:%02d", s / 60, s % 60)
-  }
-}
-
 // MARK: - Exercise card
 
 /// Expandable per-exercise card in the active session. Collapsed shows the
@@ -2270,27 +2194,39 @@ struct TrainingExerciseCard: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       header
-      if expanded { editor }
+      // Editor blooms with the card: the height animation + `.clipShape`
+      // grow the pill, while a top-anchored scale + fade make the content
+      // itself expand into the new space rather than just being unmasked.
+      // Anchored to .top so it grows downward in step with the card, not
+      // sliding (which read as disjoint before).
+      if expanded {
+        editor.transition(.scale(scale: 0.97, anchor: .top).combined(with: .opacity))
+      }
     }
     .padding(12)
     .background(
       RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-        .fill(expanded ? accent.opacity(0.12) : Theme.cardSurface)
+        .fill(Theme.cardSurface)
     )
+    // Clip the content/fill to the pill so the editor wipes in with the
+    // height animation — applied BEFORE the stroke overlay so the 2pt
+    // outline draws on top and isn't clipped to half-width.
+    .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
     .overlay(
-      // Subtle accent stroke when open — bright-light gym test: bg
-      // tint alone can vanish against a sunlit screen, the stroke
-      // makes the open card readable at a glance.
+      // Active cue is the outline alone (no bg tint) — a 2pt accent stroke
+      // when open, invisible when collapsed.
       RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-        .stroke(accent.opacity(expanded ? 0.45 : 0), lineWidth: 1.5)
+        .stroke(accent.opacity(expanded ? 0.45 : 0), lineWidth: 2)
     )
     .opacity(opacityFor(entry.status))
     .contentShape(Rectangle())
     .onTapGesture {
-      // No animation on expand/collapse — at the gym you want the
-      // editor to be there or not, no in-between motion. Opening this
-      // card closes whichever other one was open.
-      openExercise = expanded ? nil : entry.exercise
+      // Animated expand/collapse drawer — gated through `motion.run` so
+      // Reduce Motion still snaps instantly. Opening this card closes
+      // whichever other one was open.
+      motion.run(.easeInOut(duration: 0.22)) {
+        openExercise = expanded ? nil : entry.exercise
+      }
     }
     .onAppear {
       if entry.isCardio, avgPace == nil {
@@ -2670,11 +2606,6 @@ struct TrainingExerciseCard: View {
         if !wasDone {
           Haptics.success()
           celebrate += 1
-          // Rest timer only for resistance work — a single cardio block
-          // has nothing to rest between.
-          if !entry.isCardio && !entry.isMobility {
-            store.startRest()
-          }
         }
         if entry.status != .failed {
           // First completion advances to the next pending exercise;
@@ -2703,18 +2634,23 @@ struct TrainingExerciseCard: View {
       // between sets, so it earns the space (and "27.5 kg" no longer
       // truncates the way it did three-across). Sets/reps, which rarely
       // change, sit two-across below.
-      steppedField(label: "Weight", unit: "kg", step: 2.5,
+      // "kg" lives in the label, not inline with the value — keeps the big
+      // numeric field clean for the value + ± buttons.
+      steppedField(label: "Weight (kg)", step: 2.5,
                    value: Binding(
                      get: { entry.weight.map { fmt($0) } ?? "" },
                      set: { setWeight($0) }
                    ))
+      // Two-across, so the ±buttons get the narrower 40pt target — matching
+      // cardio's Meters/Level row — otherwise the wide 60pt buttons crowd
+      // out the value in these half-width fields.
       HStack(spacing: 8) {
-        steppedField(label: "Sets", step: 1,
+        steppedField(label: "Sets", step: 1, buttonWidth: 40,
                      value: Binding(
                        get: { entry.sets.map(String.init) ?? "" },
                        set: { setSets(Int($0)) }
                      ))
-        steppedField(label: "Reps", step: 1,
+        steppedField(label: "Reps", step: 1, buttonWidth: 40,
                      value: Binding(
                        get: { entry.reps ?? "" },
                        set: { setReps($0) }
@@ -2868,11 +2804,15 @@ struct TrainingExerciseCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 9)
-        // Card-surface (white in light mode, dark-mode safe) so the field
-        // pops against the expanded tile's accent-tinted background — the
-        // grey muted surface washed out against the accent.
-        .background(Theme.cardSurface,
+        // Inset grey field on the now-white card (the card dropped its accent
+        // tint, so a white field would vanish). Subtle fill + hairline stroke
+        // give the value an obvious box to live in.
+        .background(Color.primary.opacity(0.05),
                     in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+          RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .stroke(Color.primary.opacity(0.10), lineWidth: 1)
+        )
         stepButton("plus", width: buttonWidth) { bump(value, by: step) }
       }
     }
