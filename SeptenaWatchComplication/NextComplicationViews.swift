@@ -38,8 +38,15 @@ private struct CornerView: View {
   let data: NextComplicationData
 
   var body: some View {
-    Image("DiscsMark")
-      .font(.title2)
+    // No count label curls around the corner anymore, so the glyph is free to
+    // fill the whole tappable area instead of sitting at title2 size. Uses the
+    // full-color asset (like the circular family), opting out of the watch
+    // face's monochrome tint so the disc colors survive.
+    Image("DiscsColor")
+      .resizable()
+      .scaledToFit()
+      .scaleEffect(0.8)
+      .widgetAccentable(false)
   }
 }
 
