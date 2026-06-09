@@ -40,7 +40,7 @@ enum SleepPlugin: SectionPlugin {
     // Exempt from quiet hours — it's *about* the 21:00–08:00 window, so it
     // must survive the filter that silences everything else at night.
     [NotificationDescriptor(id: "sleep.bedtime", sectionKey: "sleep",
-                            title: "Bedtime wind-down",
+                            title: String(localized: "Bedtime wind-down", comment: "Scheduled notification name"),
                             priority: 1, quietHoursExempt: true)]
   }
 
@@ -58,8 +58,8 @@ enum SleepPlugin: SectionPlugin {
     let fireMinute = usual - windDownLead
     let h = (usual / 60) % 24, m = usual % 60
     let bedLabel = String(format: "%02d:%02d", h, m)
-    return NotificationPlan(descriptorID: descriptorID, title: "Sleep",
-                            body: "Wind down — your usual bedtime is around \(bedLabel).",
+    return NotificationPlan(descriptorID: descriptorID, title: String(localized: "Sleep"),
+                            body: String(localized: "Wind down — your usual bedtime is around \(bedLabel)."),
                             threadID: "sleep", minuteOfDay: fireMinute)
   }
 }

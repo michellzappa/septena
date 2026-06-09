@@ -109,8 +109,8 @@ enum ChoresPlugin: SectionPlugin {
 
   static var notificationDescriptors: [NotificationDescriptor] {
     [NotificationDescriptor(
-      id: "chores.overdue", sectionKey: "chores", title: "Overdue chore digest",
-      actions: [NotificationAction(id: NotificationActionID.choreComplete, title: "✓ Mark done")],
+      id: "chores.overdue", sectionKey: "chores", title: String(localized: "Overdue chore digest", comment: "Scheduled notification name"),
+      actions: [NotificationAction(id: NotificationActionID.choreComplete, title: String(localized: "✓ Mark done"))],
       priority: 10)]
   }
 
@@ -137,11 +137,11 @@ enum ChoresPlugin: SectionPlugin {
                                                fallback: 18 * 60)
     let n = overdue.count
     let body = n == 1
-      ? "“\(top.name)” is overdue — mark it if you’ve done it."
-      : "\(n) chores overdue — “\(top.name)” is the latest. Mark it if it’s done."
+      ? String(localized: "“\(top.name)” is overdue — mark it if you’ve done it.", comment: "Chore reminder (one)")
+      : String(localized: "\(n) chores overdue — “\(top.name)” is the latest. Mark it if it’s done.", comment: "Chore reminder (many)")
     // The "✓ Mark done" action completes the single most-overdue chore; for
     // the rest the next reconcile re-surfaces them (or the user opens the app).
-    return NotificationPlan(descriptorID: descriptorID, title: "Chores",
+    return NotificationPlan(descriptorID: descriptorID, title: String(localized: "Chores"),
                             body: body, threadID: "chores", minuteOfDay: minute,
                             userInfo: [NotificationUserInfoKey.choreID: top.id])
   }

@@ -153,7 +153,7 @@ enum HabitsPlugin: SectionPlugin {
     // No inline action — habits get checked off one at a time, not in a batch,
     // so the nudge just opens the app. Tap-to-open only.
     [NotificationDescriptor(
-      id: "habits.incomplete", sectionKey: "habits", title: "Habits reminder",
+      id: "habits.incomplete", sectionKey: "habits", title: String(localized: "Habits reminder", comment: "Scheduled notification name"),
       priority: 20)]
   }
 
@@ -178,10 +178,8 @@ enum HabitsPlugin: SectionPlugin {
     let minute = NextScoring.learnedLateMinute(dateTimes: dateTimes,
                                                today: today, fallback: 20 * 60)
     let n = pending.count
-    let body = n == 1
-      ? "1 habit left today — mark it if it’s done."
-      : "\(n) habits left today — mark any you’ve done."
-    return NotificationPlan(descriptorID: descriptorID, title: "Habits",
+    let body = String(localized: "\(n) habits left today", comment: "Habit reminder body (plural)")
+    return NotificationPlan(descriptorID: descriptorID, title: String(localized: "Habits"),
                             body: body, threadID: "habits", minuteOfDay: minute)
   }
 }

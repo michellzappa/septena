@@ -90,7 +90,7 @@ enum HydrationPlugin: SectionPlugin {
 
   static var notificationDescriptors: [NotificationDescriptor] {
     [NotificationDescriptor(
-      id: "hydration.behind", sectionKey: "hydration", title: "Behind-on-water nudge",
+      id: "hydration.behind", sectionKey: "hydration", title: String(localized: "Behind-on-water nudge", comment: "Scheduled notification name"),
       actions: [
         NotificationAction(id: NotificationActionID.hydrationAdd250, title: "💧 +250 ml"),
         NotificationAction(id: NotificationActionID.hydrationAdd500, title: "+500 ml"),
@@ -114,8 +114,8 @@ enum HydrationPlugin: SectionPlugin {
     guard dayMl < target else { return nil }   // hit the target → suppress
 
     // A late-afternoon check-in: enough of the day left to act on it.
-    return NotificationPlan(descriptorID: descriptorID, title: "Hydration",
-                            body: "You’re at \(dayMl) of \(target) ml — log a glass?",
+    return NotificationPlan(descriptorID: descriptorID, title: String(localized: "Hydration"),
+                            body: String(localized: "You’re at \(dayMl) of \(target) ml — log a glass?"),
                             threadID: "hydration", hour: 17, minute: 0)
   }
 }
