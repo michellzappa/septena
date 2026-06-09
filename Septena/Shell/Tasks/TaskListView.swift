@@ -873,13 +873,18 @@ struct TaskListView: View {
   }
 
   private func rankedSuggestions(for target: ActionTarget) -> [SuggestionEngine.Suggestion]? {
-    guard case let .single(task) = target,
-          filter == .inbox,
-          task.status == .open,
-          let top = suggestionEngine.topSuggestion(for: task.id) else {
-      return nil
+    guard case let .single(task) = target, task.status == .open else { return nil }
+    // Inbox keeps its richer pre-ranked list (computed in `load()`).
+    if filter == .inbox, let top = suggestionEngine.topSuggestion(for: task.id) {
+      return suggestionEngine.suggestions[task.id] ?? [top]
     }
-    return suggestionEngine.suggestions[task.id] ?? [top]
+    // Any other view: classify the title on demand against the trained model,
+    // but only offer a destination the task ISN'T already filed under (no
+    // "Move to <where it already lives>").
+    guard let s = suggestionEngine.suggest(forText: task.title) else { return nil }
+    let alreadyThere = (s.kind == .area && task.area == s.id)
+      || (s.kind == .project && task.project == s.id)
+    return alreadyThere ? nil : [s]
   }
 
   // MARK: - Selection
@@ -1338,10 +1343,17 @@ struct TaskListView: View {
     // Refresh the inbox suggestion engine from local data. LocalCache
     // returns every status, so the engine sees the full corpus for
     // ranking.
+    // Inbox gets the richer per-task ranked suggestions; every other view
+    // (except the all-done Logbook) still trains the model so a row's context
+    // menu can suggest a destination on demand via `suggest(forText:)`.
     if filter == .inbox {
       let allTasks = LocalCache.allTasks(in: modelContext)
       suggestionEngine.refresh(inbox: local,
                                allTasks: allTasks,
+                               projects: projects,
+                               areas: areas)
+    } else if filter != .logbook {
+      suggestionEngine.prepare(allTasks: LocalCache.allTasks(in: modelContext),
                                projects: projects,
                                areas: areas)
     }
