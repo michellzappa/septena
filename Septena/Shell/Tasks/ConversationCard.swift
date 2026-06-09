@@ -31,8 +31,8 @@ struct ConversationCard: View {
 
           if let q = openQuestion {
             optionButtons(for: q)
-          } else if let handoff = convo.handoff, !convo.isTerminal {
-            handoffButton(handoff)            // your last-mile action
+          } else if let handoff = convo.handoff {
+            handoffButton(handoff)            // human last-mile — show even when the agent's side is done
           } else if convo.isTerminal {
             terminalRow
           } else {
