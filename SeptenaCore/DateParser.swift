@@ -51,9 +51,15 @@ struct SeptenaDateParser {
     ]
 
     for (pattern, rule) in patterns {
-      if lower.contains(pattern) {
-        // Extract full phrase after pattern
-        if let range = lower.range(of: pattern) {
+      if let range = lower.range(of: pattern) {
+        // Only treat trailing text as a new token when the pattern ended at a
+        // word boundary (space-suffixed pattern, whitespace, or end of string).
+        // Otherwise "every mon" would match "every monday" and append the
+        // leftover "day", yielding "every monday day".
+        let endsAtBoundary = pattern.hasSuffix(" ")
+          || range.upperBound == lower.endIndex
+          || lower[range.upperBound].isWhitespace
+        if endsAtBoundary {
           let after = String(lower[range.upperBound...]).trimmingCharacters(in: .whitespaces)
           if !after.isEmpty && !after.contains(" ") {
             return rule + " " + after
