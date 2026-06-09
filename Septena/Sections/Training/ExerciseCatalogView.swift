@@ -51,28 +51,33 @@ struct ExerciseCatalogView: View {
   var body: some View {
     List {
       muscleFilterStrip
-      ForEach(filtered) { entity in
-        NavigationLink {
-          ExerciseStatsView(entity: entity)
-        } label: {
-          exerciseRow(entity)
-        }
-        .swipeActions(edge: .trailing) {
-          if entity.archived {
-            Button("Unarchive") {
-              TrainingConfigStore.setExerciseDefinitionArchived(id: entity.id, archived: false, context: context)
-            }.tint(.blue)
-          } else {
-            Button("Archive") {
-              TrainingConfigStore.setExerciseDefinitionArchived(id: entity.id, archived: true, context: context)
-            }.tint(.orange)
-          }
-        }
-        .contextMenu {
-          Button(role: .destructive) {
-            TrainingConfigStore.deleteExerciseDefinition(id: entity.id, context: context)
+      // Exercises live in their own Section so the grouped card's rounded
+      // top lands on the first exercise row — otherwise the (clear-backed)
+      // filter strip row consumes the rounding and the list reads square.
+      Section {
+        ForEach(filtered) { entity in
+          NavigationLink {
+            ExerciseStatsView(entity: entity)
           } label: {
-            Label("Delete permanently", systemImage: "trash")
+            exerciseRow(entity)
+          }
+          .swipeActions(edge: .trailing) {
+            if entity.archived {
+              Button("Unarchive") {
+                TrainingConfigStore.setExerciseDefinitionArchived(id: entity.id, archived: false, context: context)
+              }.tint(.blue)
+            } else {
+              Button("Archive") {
+                TrainingConfigStore.setExerciseDefinitionArchived(id: entity.id, archived: true, context: context)
+              }.tint(.orange)
+            }
+          }
+          .contextMenu {
+            Button(role: .destructive) {
+              TrainingConfigStore.deleteExerciseDefinition(id: entity.id, context: context)
+            } label: {
+              Label("Delete permanently", systemImage: "trash")
+            }
           }
         }
       }
@@ -104,31 +109,31 @@ struct ExerciseCatalogView: View {
 
   @ViewBuilder
   private var muscleFilterStrip: some View {
-    ScrollView(.horizontal, showsIndicators: false) {
-      HStack(spacing: 8) {
-        filterChip(label: "All", isSelected: muscleFilter == .all) {
-          muscleFilter = .all
-        }
-        ForEach(Muscle.allCases) { muscle in
-          filterChip(label: muscle.label,
-                     isSelected: muscleFilter == .muscle(muscle)) {
-            muscleFilter = muscleFilter == .muscle(muscle) ? .all : .muscle(muscle)
-          }
-        }
-        // "Other" lives at the end as a low-pressure escape hatch for
-        // exercises without a primary muscle (mobility, conditioning,
-        // adductors/abductors, complexes). Only shown when there's at
-        // least one such row so it doesn't appear on tidy catalogs.
-        if hasUnassigned {
-          filterChip(label: "Other", isSelected: muscleFilter == .unassigned) {
-            muscleFilter = muscleFilter == .unassigned ? .all : .unassigned
-          }
+    // Wrapping flow rather than a horizontal scroll: 16 muscle groups don't
+    // fit one row, and wrapping shows them all at a glance instead of hiding
+    // half off-screen.
+    FlowLayout(spacing: 8) {
+      filterChip(label: "All", isSelected: muscleFilter == .all) {
+        muscleFilter = .all
+      }
+      ForEach(Muscle.allCases) { muscle in
+        filterChip(label: muscle.label,
+                   isSelected: muscleFilter == .muscle(muscle)) {
+          muscleFilter = muscleFilter == .muscle(muscle) ? .all : .muscle(muscle)
         }
       }
-      .padding(.horizontal, 4)
-      .padding(.vertical, 6)
+      // "Other" lives at the end as a low-pressure escape hatch for
+      // exercises without a primary muscle (mobility, conditioning,
+      // complexes). Only shown when there's at least one such row so it
+      // doesn't appear on tidy catalogs.
+      if hasUnassigned {
+        filterChip(label: "Other", isSelected: muscleFilter == .unassigned) {
+          muscleFilter = muscleFilter == .unassigned ? .all : .unassigned
+        }
+      }
     }
-    .listRowInsets(EdgeInsets())
+    .padding(.vertical, 6)
+    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
     .listRowBackground(Color.clear)
   }
 
@@ -177,7 +182,9 @@ struct ExerciseCatalogView: View {
   }
 
   private func musclePill(_ raw: String, isPrimary: Bool) -> some View {
-    Text(raw.capitalized)
+    // Use the enum label (multi-word raw values like "frontDelts" don't
+    // capitalize cleanly); fall back to the raw string for any legacy value.
+    Text(Muscle.resolve(raw)?.label ?? raw.capitalized)
       .font(.caption2)
       .padding(.horizontal, 5)
       .padding(.vertical, 2)

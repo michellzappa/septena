@@ -107,9 +107,10 @@ enum TrainingPlugin: SectionPlugin {
       ### Model
       Training has three record types that work together:
       - **ExerciseDefinition** — the catalog. Each has a stable slug `id` ('chest-press'), `name` ('Chest press'), `type` (strength/cardio/...), optional muscle tags.
-        `primaryMuscle` + `secondaryMuscles` must be one of these 10 exact values:
-        `chest, back, shoulders, biceps, triceps, quads, hamstrings, glutes, calves, core`
-        (note: 'quads' not 'quadriceps'). Cardio/mobility usually have none. To
+        `primaryMuscle` + `secondaryMuscles` must be one of these 16 exact values:
+        `chest, frontDelts, sideDelts, rearDelts, triceps, lats, upperBack, biceps,
+        forearms, quads, hamstrings, glutes, calves, adductors, abs, lowerBack`
+        (camelCase exactly; 'quads' not 'quadriceps'). Cardio/mobility usually have none. To
         backfill, read with `training_exercises_list` then set per exercise with
         `training_exercise_update({id, primaryMuscle, secondaryMuscles})`; pass
         `primaryMuscle: ""` to clear a wrong tag.

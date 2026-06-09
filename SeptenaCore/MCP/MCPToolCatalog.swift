@@ -33,12 +33,14 @@ enum MCPToolCatalog {
 
   private static let emptySchema: [String: Any] = ["type": "object", "properties": [:] as [String: Any]]
 
-  /// The 10 canonical muscle-group values (mirrors `Muscle.allCases`). Kept as
+  /// The 16 canonical muscle-group values (mirrors `Muscle.allCases`). Kept as
   /// a literal here so the catalog has no dependency direction issue; the
   /// dispatch-side validator (`validMuscles`) derives the same set from the enum.
   private static let muscleEnum = [
-    "chest", "back", "shoulders", "biceps", "triceps",
-    "quads", "hamstrings", "glutes", "calves", "core",
+    "chest", "frontDelts", "sideDelts", "rearDelts", "triceps",
+    "lats", "upperBack", "biceps", "forearms",
+    "quads", "hamstrings", "glutes", "calves", "adductors",
+    "abs", "lowerBack",
   ]
 
   // MARK: - Global tools (always exposed)

@@ -1709,23 +1709,51 @@ enum SeptenaDate {
 
 /// Coarse muscle-group taxonomy. 10 fixed values — deliberate; adding fine
 /// anatomy is Phase 3 scope. Used for filter chips in the catalog editor.
+/// The 16-group muscle taxonomy. `rawValue` is permanent — stored in CloudKit
+/// (free-string field) and emitted in the MCP `primaryMuscle`/`secondaryMuscles`
+/// enums. `allCases` order is anatomical (push → pull → legs → core) and drives
+/// the grouped exercise picker and the per-muscle "sets this week" card.
+/// See docs/MUSCLE_TAXONOMY_16.md.
 enum Muscle: String, Codable, CaseIterable, Hashable, Identifiable, Sendable {
-  case chest, back, shoulders, biceps, triceps
-  case quads, hamstrings, glutes, calves, core
+  // Push
+  case chest, frontDelts, sideDelts, rearDelts, triceps
+  // Pull
+  case lats, upperBack, biceps, forearms
+  // Legs
+  case quads, hamstrings, glutes, calves, adductors
+  // Core
+  case abs, lowerBack
+
   var id: String { rawValue }
+
   var label: String {
     switch self {
     case .chest:      return String(localized: "Chest", comment: "Muscle group")
-    case .back:       return String(localized: "Back", comment: "Muscle group")
-    case .shoulders:  return String(localized: "Shoulders", comment: "Muscle group")
-    case .biceps:     return String(localized: "Biceps", comment: "Muscle group")
+    case .frontDelts: return String(localized: "Front Delts", comment: "Muscle group")
+    case .sideDelts:  return String(localized: "Side Delts", comment: "Muscle group")
+    case .rearDelts:  return String(localized: "Rear Delts", comment: "Muscle group")
     case .triceps:    return String(localized: "Triceps", comment: "Muscle group")
+    case .lats:       return String(localized: "Lats", comment: "Muscle group")
+    case .upperBack:  return String(localized: "Upper Back", comment: "Muscle group")
+    case .biceps:     return String(localized: "Biceps", comment: "Muscle group")
+    case .forearms:   return String(localized: "Forearms", comment: "Muscle group")
     case .quads:      return String(localized: "Quads", comment: "Muscle group")
     case .hamstrings: return String(localized: "Hamstrings", comment: "Muscle group")
     case .glutes:     return String(localized: "Glutes", comment: "Muscle group")
     case .calves:     return String(localized: "Calves", comment: "Muscle group")
-    case .core:       return String(localized: "Core", comment: "Muscle group")
+    case .adductors:  return String(localized: "Adductors", comment: "Muscle group")
+    case .abs:        return String(localized: "Abs", comment: "Muscle group")
+    case .lowerBack:  return String(localized: "Lower Back", comment: "Muscle group")
     }
+  }
+
+  /// Nil-safe lookup of a stored string into a `Muscle` (empty → nil). No
+  /// legacy coarse-10 fallback: existing data is migrated to the 16-group raw
+  /// values directly (per-exercise backfill), so stored values are always
+  /// current. See docs/MUSCLE_TAXONOMY_16.md.
+  static func resolve(_ raw: String?) -> Muscle? {
+    guard let raw, !raw.isEmpty else { return nil }
+    return Muscle(rawValue: raw)
   }
 }
 

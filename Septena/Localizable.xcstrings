@@ -1,12 +1,24 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "" : {},
+    "" : {
+
+    },
     "·" : {
       "shouldTranslate" : false
     },
     "· %@" : {
       "shouldTranslate" : false
+    },
+    "“%@” is overdue — mark it if you’ve done it." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” está atrasada — marque se você já fez."
+          }
+        }
+      }
     },
     "“Anytime” keeps it on the home feed all day. Pick a slot and it only appears from then on — so you’re not staring at the whole day’s stack at once." : {
       "localizations" : {
@@ -470,6 +482,16 @@
     "%@P" : {
       "shouldTranslate" : false
     },
+    "%lld chores overdue — “%@” is the latest. Mark it if it’s done." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld afazeres atrasados — “%2$@” é o mais recente. Marque se já fez."
+          }
+        }
+      }
+    },
     "%lld contributions" : {
       "localizations" : {
         "en" : {
@@ -531,6 +553,46 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld dias"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld habits left today" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld habit left today — mark it if it’s done."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld habits left today — mark any you’ve done."
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Falta %lld hábito hoje — marque se já fez."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Faltam %lld hábitos hoje — marque os que você já fez."
                 }
               }
             }
@@ -642,7 +704,9 @@
         }
       }
     },
-    "+%@" : {},
+    "+%@" : {
+
+    },
     "×%@" : {
       "shouldTranslate" : false
     },
@@ -658,6 +722,16 @@
     },
     "⏳ %@" : {
       "shouldTranslate" : false
+    },
+    "✓ Mark done" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "✓ Marcar como feito"
+          }
+        }
+      }
     },
     "1 year" : {
       "localizations" : {
@@ -1521,6 +1595,26 @@
         }
       }
     },
+    "Bedtime wind-down" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hora de desacelerar para dormir"
+          }
+        }
+      }
+    },
+    "Behind-on-water nudge" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aviso de hidratação atrasada"
+          }
+        }
+      }
+    },
     "Between" : {
       "localizations" : {
         "pt-BR" : {
@@ -1531,7 +1625,9 @@
         }
       }
     },
-    "Beyond conversations, Septena learns small things locally — like the “Move to…” suggestion that figures out where a task belongs from your own history. That model trains on your device and never leaves it." : {},
+    "Beyond conversations, Septena learns small things locally — like the “Move to…” suggestion that figures out where a task belongs from your own history. That model trains on your device and never leaves it." : {
+
+    },
     "Biceps" : {
       "localizations" : {
         "pt-BR" : {
@@ -2033,6 +2129,16 @@
         }
       }
     },
+    "Counts each set toward the exercise's primary muscle. Growth zone: %@–%@ sets/week." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Counts each set toward the exercise's primary muscle. Growth zone: %1$@–%2$@ sets/week."
+          }
+        }
+      }
+    },
     "Courage" : {
       "localizations" : {
         "pt-BR" : {
@@ -2245,7 +2351,9 @@
         }
       }
     },
-    "Developer" : {},
+    "Developer" : {
+
+    },
     "Digestion log" : {
       "localizations" : {
         "pt-BR" : {
@@ -3110,6 +3218,16 @@
         }
       }
     },
+    "Habits reminder" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lembrete de hábitos"
+          }
+        }
+      }
+    },
     "Hamstrings" : {
       "localizations" : {
         "pt-BR" : {
@@ -3220,8 +3338,12 @@
         }
       }
     },
-    "How a task conversation moves" : {},
-    "How far AI may reach" : {},
+    "How a task conversation moves" : {
+
+    },
+    "How far AI may reach" : {
+
+    },
     "How it works" : {
       "localizations" : {
         "pt-BR" : {
@@ -3599,6 +3721,9 @@
           }
         }
       }
+    },
+    "last 7 days" : {
+
     },
     "Layout picks how the homepage renders — Histogram, Sparkline, Heatmap, Rings, or Wheel. Insights tunes the cross-section correlation explorer." : {
       "localizations" : {
@@ -4429,7 +4554,9 @@
         }
       }
     },
-    "Nothing important happens on its own. The AI fills in small, reversible stuff; anything that's a real decision or can't be undone always waits for your tap." : {},
+    "Nothing important happens on its own. The AI fills in small, reversible stuff; anything that's a real decision or can't be undone always waits for your tap." : {
+
+    },
     "Nothing left for today" : {
       "localizations" : {
         "pt-BR" : {
@@ -4513,11 +4640,15 @@
         }
       }
     },
-    "Off (use the mode above)" : {},
+    "Off (use the mode above)" : {
+
+    },
     "OK" : {
       "shouldTranslate" : false
     },
-    "On Automatic, every step runs on your device first — it leaves only for the steps on-device can't do (↗), never wholesale." : {},
+    "On Automatic, every step runs on your device first — it leaves only for the steps on-device can't do (↗), never wholesale." : {
+
+    },
     "On, but nothing to nudge yet — already done today, nothing pending, or waiting out quiet hours." : {
       "localizations" : {
         "pt-BR" : {
@@ -4598,7 +4729,19 @@
         }
       }
     },
-    "Other…" : {},
+    "Other…" : {
+
+    },
+    "Overdue chore digest" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resumo de afazeres atrasados"
+          }
+        }
+      }
+    },
     "p=%@" : {
       "shouldTranslate" : false
     },
@@ -4712,7 +4855,9 @@
         }
       }
     },
-    "Pins every reasoning step to one provider — for testing only. Leave Off in normal use." : {},
+    "Pins every reasoning step to one provider — for testing only. Leave Off in normal use." : {
+
+    },
     "Pleased" : {
       "localizations" : {
         "pt-BR" : {
@@ -5232,8 +5377,12 @@
         }
       }
     },
-    "Septena never runs AI on your data and never reads it — the intelligence is your own (Apple on-device, Private Cloud Compute, or your Claude). This only sets how far a request may go." : {},
-    "Septena never runs AI on your tasks and never reads them. The intelligence is your own — your Claude, or on-device — connected by you. Your tasks live only in your private iCloud. Turn the AI off and the app works exactly the same, minus the conversations." : {},
+    "Septena never runs AI on your data and never reads it — the intelligence is your own (Apple on-device, Private Cloud Compute, or your Claude). This only sets how far a request may go." : {
+
+    },
+    "Septena never runs AI on your tasks and never reads them. The intelligence is your own — your Claude, or on-device — connected by you. Your tasks live only in your private iCloud. Turn the AI off and the app works exactly the same, minus the conversations." : {
+
+    },
     "Septena pulls steps, exercise minutes, VO2 max, HRV and resting heart rate from HealthKit. Data never leaves your phone." : {
       "localizations" : {
         "pt-BR" : {
@@ -5345,6 +5494,9 @@
         }
       }
     },
+    "Sets per muscle" : {
+
+    },
     "Settings" : {
       "comment" : "Phase 0 spike — test string, not a real translation pass",
       "localizations" : {
@@ -5405,6 +5557,7 @@
       }
     },
     "Shoulders" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -5548,7 +5701,9 @@
         }
       }
     },
-    "Some to-dos need a moment of thinking before you can act. Septena can talk that through with AI — right on the task." : {},
+    "Some to-dos need a moment of thinking before you can act. Septena can talk that through with AI — right on the task." : {
+
+    },
     "Someday" : {
       "localizations" : {
         "pt-BR" : {
@@ -6613,7 +6768,19 @@
         }
       }
     },
-    "Whose turn?" : {},
+    "Whose turn?" : {
+
+    },
+    "Wind down — your usual bedtime is around %@." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hora de desacelerar — seu horário habitual de dormir é por volta de %@."
+          }
+        }
+      }
+    },
     "Window controls how far back CorrelationEngine pulls data. Section filter limits which predictor → target pairs render — pairs are kept if either side matches." : {
       "localizations" : {
         "pt-BR" : {
@@ -6717,6 +6884,16 @@
         }
       }
     },
+    "You’re at %lld of %lld ml — log a glass?" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você está em %1$lld de %2$lld ml — registrar um copo?"
+          }
+        }
+      }
+    },
     "Your data stays in your private iCloud. Connecting an AI just opens a door into it — one you control and can revoke." : {
       "localizations" : {
         "pt-BR" : {
@@ -6774,136 +6951,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Δ = média com − média sem"
-          }
-        }
-      }
-    },
-    "Habits reminder" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lembrete de hábitos"
-          }
-        }
-      }
-    },
-    "Behind-on-water nudge" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aviso de hidratação atrasada"
-          }
-        }
-      }
-    },
-    "You’re at %lld of %lld ml — log a glass?" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Você está em %1$lld de %2$lld ml — registrar um copo?"
-          }
-        }
-      }
-    },
-    "Bedtime wind-down" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hora de desacelerar para dormir"
-          }
-        }
-      }
-    },
-    "Wind down — your usual bedtime is around %@." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hora de desacelerar — seu horário habitual de dormir é por volta de %@."
-          }
-        }
-      }
-    },
-    "Overdue chore digest" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Resumo de afazeres atrasados"
-          }
-        }
-      }
-    },
-    "✓ Mark done" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "✓ Marcar como feito"
-          }
-        }
-      }
-    },
-    "“%@” is overdue — mark it if you’ve done it." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "“%@” está atrasada — marque se você já fez."
-          }
-        }
-      }
-    },
-    "%lld chores overdue — “%@” is the latest. Mark it if it’s done." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$lld afazeres atrasados — “%2$@” é o mais recente. Marque se já fez."
-          }
-        }
-      }
-    },
-    "%lld habits left today" : {
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld habit left today — mark it if it’s done."
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld habits left today — mark any you’ve done."
-                }
-              }
-            }
-          }
-        },
-        "pt-BR" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Falta %lld hábito hoje — marque se já fez."
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Faltam %lld hábitos hoje — marque os que você já fez."
-                }
-              }
-            }
           }
         }
       }
