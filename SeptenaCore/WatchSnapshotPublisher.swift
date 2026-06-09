@@ -32,9 +32,17 @@ enum WatchSnapshotPublisher {
       ?? NextLinger.habitsDefault
     let lingerSupplements = defaults.object(forKey: NextLinger.supplementsKey) as? Bool
       ?? NextLinger.supplementsDefault
+    // The user's actual (possibly customized) section accents, so the watch
+    // tints its Next group rules to match the phone instead of a default
+    // palette. Falls back to the shipped baseline when nothing's mirrored yet.
+    let sections = SettingsMirror.loadSections(context: context)
+    let configs = sections.isEmpty ? SectionTheme.defaultPalette : sections
+    let sectionColors = Dictionary(configs.map { ($0.key, $0.color) },
+                                   uniquingKeysWith: { a, _ in a })
     let response = NextItemsResponse(date: date, bucket: "", items: items,
                                      lingerHabits: lingerHabits,
-                                     lingerSupplements: lingerSupplements)
+                                     lingerSupplements: lingerSupplements,
+                                     sectionColors: sectionColors)
     guard let payload = try? JSONEncoder().encode(response) else { return }
 
     // Nudge the iOS "Next" home/lock-screen widget to re-read the snapshot.

@@ -176,6 +176,12 @@ targets:
       - path: SeptenaCore/NextWire.swift
       - path: SeptenaCore/DayBucket.swift
       - path: SeptenaCore/NextBlocks.swift
+      # Quick-log dispatch table for actionable suggestions (caffeine/cannabis/
+      # mood) — single-sourced like NextBlocks so the wrist write can't drift.
+      - path: SeptenaCore/SuggestionBlocks.swift
+      # Canonical mood word grid, shared with the phone's MoodCatalog so the
+      # watch's 3×3 emotion picker can't diverge.
+      - path: SeptenaCore/MoodVocabulary.swift
     dependencies:
       - target: SeptenaWatchComplication
         embed: true

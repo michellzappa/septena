@@ -149,25 +149,11 @@ enum MoodCatalog {
   }
 
   /// 9 words per quadrant. Order is left→right, top→bottom in the picker.
+  /// Single-sourced in `MoodVocabulary` (SeptenaCore) so the watch's mood
+  /// picker shares the exact same words + coordinates; the localization layer
+  /// (`localizedWord`) stays here, phone-only.
   private static func words(for q: MoodQuadrant) -> [String] {
-    switch q {
-    case .hap:
-      return ["Excited",   "Elated",     "Ecstatic",
-              "Eager",     "Upbeat",     "Joyful",
-              "Focused",   "Alive",      "Content"]
-    case .han:
-      return ["Enraged",   "Panicked",   "Stressed",
-              "Angry",     "Anxious",    "Frustrated",
-              "Irritated", "Tense",      "Restless"]
-    case .lan:
-      return ["Bored",     "Discouraged","Disappointed",
-              "Sad",       "Lonely",     "Glum",
-              "Drained",   "Hopeless",   "Despondent"]
-    case .lap:
-      return ["Mellow",    "Easygoing",  "Pleased",
-              "Calm",      "Grateful",   "Loved",
-              "Relaxed",   "Serene",     "Tranquil"]
-    }
+    MoodVocabulary.words(for: q.rawValue)
   }
 
   /// Display-only localization of an emotion word. Storage and lookup keep the

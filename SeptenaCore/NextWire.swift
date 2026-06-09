@@ -14,10 +14,16 @@ struct NextItem: Codable, Identifiable, Hashable {
   var trailing: String?
   var overdue: Bool
   var sortKey: Int
+  /// For a `kind == "suggestion"` row: the suggestion's sub-kind (caffeine /
+  /// cannabis / mood) when it's quick-loggable from a tap, else nil. Looked up
+  /// in `SuggestionBlocks` by the watch to make the row interactive. Optional
+  /// and absent on every non-suggestion row, so old payloads decode unchanged.
+  var logKind: String? = nil
 
   enum CodingKeys: String, CodingKey {
     case id, kind, title, subtitle, trailing, overdue
     case sortKey = "sortKey"
+    case logKind
   }
 }
 
@@ -32,6 +38,12 @@ struct NextItemsResponse: Codable {
   /// shipped `NextLinger` defaults when absent.
   var lingerHabits: Bool? = nil
   var lingerSupplements: Bool? = nil
+  /// Per-section accent colors (section key → authored color token, e.g.
+  /// "#ef4444" / "hsl(...)"), carried so the watch can tint its Next group
+  /// rules with the user's *actual* customized colors — the watch target has
+  /// no `SectionTheme`. Optional so older payloads decode unchanged; the watch
+  /// falls back to a neutral rule when a key is absent.
+  var sectionColors: [String: String]? = nil
 }
 
 /// UserDefaults keys + defaults for the per-section "carry over missed items"

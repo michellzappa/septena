@@ -22,6 +22,9 @@ final class WatchConnectivity {
   static let shared = WatchConnectivity()
 
   var items: [NextItem] = []
+  /// Section key → authored color token from the snapshot, so the Next list
+  /// can tint its group rules with the phone's actual section accents.
+  var sectionColors: [String: String] = [:]
   var bucket: String = ""
   var isLoading = false
   var errorMessage: String?
@@ -120,8 +123,9 @@ final class WatchConnectivity {
       let filtered = response.itemsForBucket(DayBucket.current)
         .filter { !doneLocal.contains($0.id) }
 
-      self.items  = filtered
-      self.bucket = bkt
+      self.items         = filtered
+      self.sectionColors = response.sectionColors ?? [:]
+      self.bucket        = bkt
       updateComplication()
       scheduleNextRefresh()
     } catch let ckError as CKError where ckError.code == .unknownItem {
@@ -212,6 +216,60 @@ final class WatchConnectivity {
     }
   }
 
+  // MARK: - Quick-log (actionable suggestions)
+
+  /// Log a `.choice`-input suggestion (caffeine / cannabis) with the picked
+  /// method. Optimistic: hides the nudge with a success haptic, then writes the
+  /// event off the `SuggestionBlocks` descriptor (shared with the phone).
+  func logChoice(kind: String, value: String, itemID: String) {
+    guard let block = SuggestionBlocks.byKind[kind] else { return }
+    finishSuggestion(itemID)
+    let date = today
+    Task {
+      do {
+        switch block.recordType {
+        case "CaffeineEvent": try await saveCaffeineEvent(method: value, date: date)
+        case "CannabisEvent": try await saveCannabisEvent(method: value, date: date)
+        default:
+          assertionFailure("No watch quick-log writer for '\(block.recordType)'")
+        }
+      } catch {
+        // Fire-and-forget: the iOS CKSyncEngine reconciles on next open.
+      }
+    }
+  }
+
+  /// Log a mood check-in from the two-step picker (quadrant → emotion). Writes
+  /// a real `MoodEvent` at the chosen emotion's `MoodVocabulary` coordinates.
+  func logMood(quadrant: String, emotion: String, arousal: Int, valence: Int, itemID: String) {
+    finishSuggestion(itemID)
+    let date = today
+    Task {
+      do {
+        try await saveMoodEvent(quadrant: quadrant, emotion: emotion,
+                                arousal: arousal, valence: valence, date: date)
+      } catch { }
+    }
+  }
+
+  /// Shared optimistic hide for a just-logged suggestion: success haptic, mark
+  /// it done locally (so it stays hidden across refreshes), then drop it from
+  /// the list after the settle beat. Mirrors `complete()` without the
+  /// `NextBlocks` completion path — suggestions aren't completable members.
+  private func finishSuggestion(_ itemID: String) {
+    guard !completedIDs.contains(itemID) else { return }
+    let date = today
+    WKInterfaceDevice.current().play(.success)
+    completedIDs.insert(itemID)
+    markDoneLocally(id: itemID, date: date)
+    updateComplication()
+    Task { @MainActor in
+      try? await Task.sleep(nanoseconds: 1_100_000_000)
+      items.removeAll { $0.id == itemID }
+      completedIDs.remove(itemID)
+    }
+  }
+
   /// Maps a `NextBlocks`-declared event record type to its CloudKit writer.
   /// The writers stay separate because each event record has different
   /// fields; this only routes, so adding a member is a `NextBlocks` row plus
@@ -270,6 +328,52 @@ final class WatchConnectivity {
     record["time"]       = Self.timeFmt.string(from: now)
     record["occurredAt"] = now
     record["sortKey"]    = "\(date)::\(eventID)"
+    try await db.save(record)
+  }
+
+  // MARK: - Quick-log CloudKit writers
+  //
+  // Each suggestion log is a fresh event record (UUID id), mirroring the
+  // phone's mutators: time-of-day lives in `occurredAt` (the phone derives the
+  // display time from it and does NOT store a separate `time` field), and the
+  // free-form `note` is written empty so the field registers. Record names +
+  // fields match the `*CloudKitSchema` definitions so the phone mirrors them.
+
+  private func saveCaffeineEvent(method: String, date: String) async throws {
+    let eventID  = String(UUID().uuidString.lowercased().prefix(8))
+    let recordID = CKRecord.ID(recordName: "caffeine-event:\(eventID)", zoneID: ckZoneID)
+    let record   = CKRecord(recordType: "CaffeineEvent", recordID: recordID)
+    record["date"]       = date
+    record["method"]     = method
+    record["note"]       = ""
+    record["occurredAt"] = Date()
+    try await db.save(record)
+  }
+
+  private func saveCannabisEvent(method: String, date: String) async throws {
+    let eventID  = String(UUID().uuidString.lowercased().prefix(8))
+    let recordID = CKRecord.ID(recordName: "cannabis-event:\(eventID)", zoneID: ckZoneID)
+    let record   = CKRecord(recordType: "CannabisEvent", recordID: recordID)
+    record["date"]       = date
+    record["method"]     = method
+    record["note"]       = ""
+    record["occurredAt"] = Date()
+    try await db.save(record)
+  }
+
+  private func saveMoodEvent(quadrant: String, emotion: String,
+                             arousal: Int, valence: Int, date: String) async throws {
+    let eventID  = String(UUID().uuidString.lowercased().prefix(8))
+    let recordID = CKRecord.ID(recordName: "mood-event:\(eventID)", zoneID: ckZoneID)
+    let record   = CKRecord(recordType: "MoodEvent", recordID: recordID)
+    record["date"]       = date
+    record["bucket"]     = DayBucket.current.rawValue
+    record["quadrant"]   = quadrant
+    record["arousal"]    = arousal
+    record["valence"]    = valence
+    record["emotion"]    = emotion
+    record["note"]       = ""
+    record["occurredAt"] = Date()
     try await db.save(record)
   }
 

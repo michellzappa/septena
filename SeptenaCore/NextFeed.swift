@@ -106,7 +106,10 @@ enum NextEntry {
         subtitle: s.detail,
         trailing: nil,
         overdue: false,
-        sortKey: sortKey)
+        sortKey: sortKey,
+        // Tag the suggestion's sub-kind when it's quick-loggable from a tap so
+        // the watch can make the nudge interactive (see `SuggestionBlocks`).
+        logKind: SuggestionBlocks.isQuickLoggable(kind: s.kind.rawValue) ? s.kind.rawValue : nil)
     case .task(let id, let title, let subtitle, let overdue):
       return NextItem(
         id: id, kind: "task", title: title, subtitle: subtitle,
