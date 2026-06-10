@@ -2645,6 +2645,7 @@ private struct PaletteSwatchGrid: View {
 /// the SectionEntity row, so customizations (color, label) survive.
 struct ManageSectionsPane: View {
   @Environment(SettingsStore.self) private var store
+  @Environment(SectionTheme.self) private var theme
   @Environment(\.modelContext) private var modelContext
   @Environment(CKEngine.self) private var ckEngine
   @State private var pendingOnboarding: PendingOnboarding? = nil
@@ -2731,6 +2732,12 @@ struct ManageSectionsPane: View {
   private func row(for manifest: SectionManifest) -> some View {
     let enabled = isEnabled(manifest.key)
     HStack(spacing: 12) {
+      // Same tinted glyph treatment as the Settings sidebar rows, so a
+      // section's icon reads identically in both lists.
+      SectionGlyph(icon: manifest.iconSymbol,
+                   accent: theme.color(for: manifest.key),
+                   size: 29, glyphRatio: 0.38)
+        .opacity(enabled ? 1 : 0.4)
       VStack(alignment: .leading, spacing: 2) {
         Text(label(for: manifest))
           .foregroundStyle(enabled ? .primary : .secondary)
