@@ -1379,6 +1379,9 @@
         }
       }
     },
+    "Archiving hides this tracker. Its entries stay and it can be restored." : {
+
+    },
     "Area" : {
       "localizations" : {
         "pt-BR" : {
@@ -1683,6 +1686,9 @@
           }
         }
       }
+    },
+    "Both" : {
+
     },
     "Breakfast" : {
       "extractionState" : "manual",
@@ -2134,6 +2140,9 @@
           }
         }
       }
+    },
+    "Count" : {
+
     },
     "Counts each set toward the exercise's primary muscle. Growth zone: %@–%@ sets/week." : {
       "localizations" : {
@@ -3641,6 +3650,9 @@
           }
         }
       }
+    },
+    "Just log it" : {
+
     },
     "Justice" : {
       "localizations" : {
@@ -6347,6 +6359,9 @@
           }
         }
       }
+    },
+    "Track what you consume — and cut back on it. Each tracker keeps its own methods, doses, and a days-since-last streak." : {
+
     },
     "Training" : {
       "localizations" : {

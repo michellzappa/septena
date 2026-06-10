@@ -99,7 +99,7 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
   public static let todayCapableKeys: Set<String> = [
     "tasks", "habits", "supplements", "chores",
     "training", "nutrition", "hydration",
-    "caffeine", "cannabis", "gut", "mood",
+    "caffeine", "cannabis", "intake", "gut", "mood",
   ]
 
   /// Whether this section has any presence on the Today timeline.
@@ -119,7 +119,7 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
   /// share the convention; sections not in this set never instantiate
   /// the date strip.
   public static let timeTravelCapableKeys: Set<String> = [
-    "caffeine", "cannabis", "gut", "nutrition",
+    "caffeine", "cannabis", "intake", "gut", "nutrition",
     "habits", "supplements", "mood", "hydration",
   ]
 
@@ -146,6 +146,7 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
     "groceries":   "cart",
     "caffeine":    "cup.and.saucer",
     "cannabis":    "leaf",
+    "intake":      "takeoutbag.and.cup.and.straw",
     "body":        "scalemass",
     "gut":         "circle.bottomhalf.filled",
     "mood":        "face.smiling",
@@ -308,6 +309,20 @@ public extension SectionManifest {
       key: "cannabis",
       defaultLabel: String(localized: "Cannabis", comment: "Section name"),
       shortDescription: String(localized: "Intake log and dosing", comment: "Section description"),
+      activation: .optional,
+      onboarding: .optional,
+      supportsTab: true,
+      supportsDashboard: true,
+      settingsEditor: .sectionConfig
+    ),
+    // Intake — the generic consumable tracker (consumables generalization).
+    // One host section; user-defined kinds (caffeine, tea, …) are rows, not
+    // sections (Option C). Caffeine/cannabis fold into this over phases 2–4.
+    // See docs/CONSUMABLES_PLAN.md.
+    .init(
+      key: "intake",
+      defaultLabel: String(localized: "Intake", comment: "Section name"),
+      shortDescription: String(localized: "Track what you consume — and cut back on it", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
       supportsTab: true,

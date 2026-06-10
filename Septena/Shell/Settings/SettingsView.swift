@@ -459,6 +459,11 @@ struct SettingsView: View {
   @State private var path: [SettingsDestination]
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @State private var preferredCompactColumn: NavigationSplitViewColumn = .detail
+  // Intake trackers shown as top-level, section-style rows in the sidebar
+  // (presentation layer — kinds stay rows under the host `intake` section).
+  @State private var intakeKinds: [IntakeKindDTO] = []
+  @State private var managingTrackerID: String? = nil
+  @State private var addingTracker = false
 
   /// Open straight to a destination, or `nil` for the historical default
   /// (sidebar list on iPhone, `.general` detail on macOS/iPad). The
@@ -559,9 +564,20 @@ struct SettingsView: View {
         }
         .environment(\.editMode, .constant(.active))
       }
+      intakeTrackerSection()
     }
     .scrollContentBackground(.hidden)
     .background(SettingsTopGradient())
+    .task { await loadIntakeKinds() }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
+      Task { await loadIntakeKinds() }
+    }
+    .sheet(item: managingTrackerBinding) { ref in
+      IntakeManageSheet(kindID: ref.value)
+    }
+    .sheet(isPresented: $addingTracker) {
+      IntakeKindWizard(onCreated: { _ in Task { await loadIntakeKinds() } })
+    }
   }
   #else
   @ViewBuilder
@@ -586,6 +602,17 @@ struct SettingsView: View {
           }
         }
       }
+      intakeTrackerSection()
+    }
+    .task { await loadIntakeKinds() }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
+      Task { await loadIntakeKinds() }
+    }
+    .sheet(item: managingTrackerBinding) { ref in
+      IntakeManageSheet(kindID: ref.value)
+    }
+    .sheet(isPresented: $addingTracker) {
+      IntakeKindWizard(onCreated: { _ in Task { await loadIntakeKinds() } })
     }
   }
   #endif
@@ -622,6 +649,52 @@ struct SettingsView: View {
       Text(title(for: dest))
     } icon: {
       ColoredGlyph(icon: icon(for: dest), color: tint(for: dest), size: 29, glyphRatio: 0.38)
+    }
+  }
+
+  private var intakeEnabled: Bool {
+    store.sections.first { $0.key == "intake" }?.isEnabled ?? false
+  }
+
+  private func loadIntakeKinds() async {
+    intakeKinds = await MirrorReader.shared.read { IntakeReader.loadKinds(context: $0) }
+  }
+
+  /// A tracker rendered exactly like a section row (same `SectionGlyph` tinting)
+  /// so kinds present as top-level sections — Option C presentation layer.
+  private func intakeTrackerRow(_ kind: IntakeKindDTO) -> some View {
+    Label {
+      Text(kind.name)
+    } icon: {
+      SectionGlyph(icon: kind.symbol,
+                   accent: AdaptiveColor.adaptive(kind.color) ?? .secondary,
+                   size: 29, glyphRatio: 0.38)
+    }
+  }
+
+  private struct TrackerRef: Identifiable { let value: String; var id: String { value } }
+  private var managingTrackerBinding: Binding<TrackerRef?> {
+    Binding(get: { managingTrackerID.map(TrackerRef.init) },
+            set: { managingTrackerID = $0?.value })
+  }
+
+  /// The "Trackers" group of section-style rows + an add affordance. Shown when
+  /// the host `intake` section is enabled and has at least one tracker. Kept
+  /// OUT of the reorderable "Sections" group because section reorder offsets map
+  /// to the full ordered section list — interleaving non-section rows would
+  /// corrupt them.
+  @ViewBuilder
+  private func intakeTrackerSection() -> some View {
+    if intakeEnabled, !intakeKinds.isEmpty {
+      SwiftUI.Section("Trackers") {
+        ForEach(intakeKinds) { kind in
+          Button { managingTrackerID = kind.id } label: { intakeTrackerRow(kind) }
+            .buttonStyle(.plain)
+        }
+        Button { addingTracker = true } label: {
+          Label("Add tracker…", systemImage: "plus")
+        }
+      }
     }
   }
 

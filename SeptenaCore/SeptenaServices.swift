@@ -39,6 +39,7 @@ final class SeptenaServices {
   let caffeineMutator: CaffeineMutator
   let moodMutator: MoodMutator
   let cannabisMutator: CannabisMutator
+  let intakeMutator: IntakeMutator
   let groceryMutator: GroceryMutator
   let trainingMutator: TrainingMutator
   let nutritionMutator: NutritionMutator
@@ -61,6 +62,7 @@ final class SeptenaServices {
     self.caffeineMutator = CaffeineMutator(context: context, ckEngine: nil)
     self.moodMutator = MoodMutator(context: context)
     self.cannabisMutator = CannabisMutator(context: context, ckEngine: nil)
+    self.intakeMutator = IntakeMutator(context: context, ckEngine: nil)
     self.groceryMutator = GroceryMutator(context: context, ckEngine: nil)
     self.trainingMutator = TrainingMutator(context: context, ckEngine: nil)
     self.nutritionMutator = NutritionMutator(context: context, ckEngine: nil)
@@ -319,6 +321,33 @@ final class SeptenaServices {
         if recordName.hasPrefix("caffeine-bean:") {
           let id = CaffeineBeanCloudKitSchema.entityID(from: recordName)
           if let entity = try? context.fetch(FetchDescriptor<CaffeineBeanEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
+        if recordName.hasPrefix("intake-kind:") {
+          let id = IntakeKindCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<IntakeKindEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
+        if recordName.hasPrefix("intake-item:") {
+          let id = IntakeItemCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<IntakeItemEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
+        if recordName.hasPrefix("intake-event:") {
+          let id = IntakeEventCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<IntakeEventEntity>(
             predicate: #Predicate { $0.id == id }
           )).first {
             return entity.toCloudKitRecord()
@@ -616,6 +645,36 @@ final class SeptenaServices {
           } else {
             context.insert(CaffeineBeanEntity(cloudKit: record))
           }
+        case IntakeKindCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = IntakeKindCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<IntakeKindEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(IntakeKindEntity(cloudKit: record))
+          }
+        case IntakeItemCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = IntakeItemCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<IntakeItemEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(IntakeItemEntity(cloudKit: record))
+          }
+        case IntakeEventCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = IntakeEventCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<IntakeEventEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(IntakeEventEntity(cloudKit: record))
+          }
         case CannabisEventCloudKitSchema.recordType:
           batchTouchedData = true
           let id = CannabisEventCloudKitSchema.entityID(from: record.recordID.recordName)
@@ -863,6 +922,30 @@ final class SeptenaServices {
           )).first {
             context.delete(entity)
           }
+        case IntakeKindCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = IntakeKindCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<IntakeKindEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
+        case IntakeItemCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = IntakeItemCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<IntakeItemEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
+        case IntakeEventCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = IntakeEventCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<IntakeEventEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
         case CannabisEventCloudKitSchema.recordType:
           batchTouchedData = true
           let id = CannabisEventCloudKitSchema.entityID(from: recordID.recordName)
@@ -954,6 +1037,7 @@ final class SeptenaServices {
       gutMutator.bind(ckEngine: ckEngine)
       caffeineMutator.bind(ckEngine: ckEngine)
       cannabisMutator.bind(ckEngine: ckEngine)
+      intakeMutator.bind(ckEngine: ckEngine)
       groceryMutator.bind(ckEngine: ckEngine)
       trainingMutator.bind(ckEngine: ckEngine)
       nutritionMutator.bind(ckEngine: ckEngine)
@@ -1508,6 +1592,43 @@ final class GoalMutator {
     postChanged()
   }
 
+  /// The unify: an intake kind's `objective` IS a Goal on one of its metrics.
+  /// Create/update the kind's single objective-goal (identified by its metric
+  /// key prefix), or clear it when the objective is `log`. The cap for a "limit"
+  /// objective lives here as `metricTarget` — no separate field. See
+  /// docs/CONSUMABLES_PLAN.md.
+  func syncIntakeObjectiveGoal(kindID: String, kindName: String,
+                               objective: String, target: Double?) {
+    let existing = ((try? context.fetch(FetchDescriptor<GoalEntity>())) ?? [])
+      .first { $0.metricKey?.hasPrefix("intake.\(kindID).") == true }
+
+    guard let spec = IntakeObjective.goalSpec(objective) else {
+      // log → no measured objective; remove the auto-created goal if present.
+      if let existing { deleteGoal(id: existing.id) }
+      return
+    }
+
+    let text = IntakeObjective.goalText(objective, kindName: kindName)
+    let goalID: String
+    if let existing {
+      existing.text = text
+      existing.sections = ["intake"]
+      existing.updatedAt = .now
+      commit(existing, op: "update (intake objective)")
+      goalID = existing.id
+    } else {
+      let g = createGoal(text: text)
+      updateGoal(id: g.id, text: text, sections: ["intake"])
+      goalID = g.id
+    }
+    updateGoalMetric(id: goalID,
+                     metricKey: "intake.\(kindID).\(spec.metricSuffix)",
+                     window: spec.window,
+                     comparator: spec.comparator,
+                     target: target ?? spec.defaultTarget,
+                     baseline: nil)
+  }
+
   // MARK: - Helpers
 
   private func fetchGoal(id: String) -> GoalEntity? {
@@ -2054,6 +2175,359 @@ final class CannabisMutator {
   private func commitEntry(_ entity: CannabisEventEntity, op: String) {
     saveContext("CK cannabis \(op)")
     ckEngine?.noteCannabisEventChange(id: entity.id)
+    postChanged()
+  }
+
+  private func saveContext(_ label: String) {
+    do { try context.save() }
+    catch { SeptenaLog.error(label, error) }
+  }
+
+  private func postChanged() {
+    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+  }
+}
+
+
+// The single write boundary for the generic `intake` section — kinds, their
+// item catalogs, and events. Generalizes `CaffeineMutator` + `CannabisMutator`:
+// optimistic local write, CK enqueue, save, notify. Deletion posture is
+// archive-only for kinds (no hard delete); items and events keep the legacy
+// single-row delete (correction ≠ destruction). See docs/CONSUMABLES_PLAN.md.
+@MainActor
+@Observable
+final class IntakeMutator {
+  private let context: ModelContext
+  private var ckEngine: CKEngine?
+
+  init(context: ModelContext, ckEngine: CKEngine? = nil) {
+    self.context = context
+    self.ckEngine = ckEngine
+  }
+
+  func bind(ckEngine: CKEngine) { self.ckEngine = ckEngine }
+
+  // MARK: - Kinds
+
+  @discardableResult
+  func addKind(name: String,
+               symbol: String = "circle",
+               color: String = "",
+               unit: String? = nil,
+               doseStyle: String = "none",
+               countNoun: String? = nil,
+               containerNoun: String? = nil,
+               containerCap: Int? = nil,
+               catalogNoun: String? = nil,
+               flourish: String = "bloom",
+               metricMode: String = "countEvents",
+               objective: String = "log",
+               methods: [IntakeMethodRow] = [],
+               templateID: String? = nil) -> IntakeKindEntity {
+    let entity = IntakeKindEntity(id: uniqueKindID(),
+                                  name: name,
+                                  symbol: symbol,
+                                  color: color,
+                                  sortIndex: nextKindSortIndex(),
+                                  unit: unit,
+                                  doseStyle: doseStyle,
+                                  countNoun: countNoun,
+                                  containerNoun: containerNoun,
+                                  containerCap: containerCap,
+                                  catalogNoun: catalogNoun,
+                                  flourish: flourish,
+                                  metricMode: metricMode,
+                                  objective: objective,
+                                  templateID: templateID)
+    entity.methods = methods
+    context.insert(entity)
+    commitKind(entity, op: "create")
+    return entity
+  }
+
+  func updateKind(id: String,
+                  name: String? = nil,
+                  symbol: String? = nil,
+                  color: String? = nil,
+                  unit: String?? = nil,
+                  doseStyle: String? = nil,
+                  countNoun: String?? = nil,
+                  containerNoun: String?? = nil,
+                  containerCap: Int?? = nil,
+                  catalogNoun: String?? = nil,
+                  flourish: String? = nil,
+                  metricMode: String? = nil,
+                  objective: String? = nil,
+                  methods: [IntakeMethodRow]? = nil) {
+    guard let entity = fetchKind(id: id) else { return }
+    if let name { entity.name = name }
+    if let symbol { entity.symbol = symbol }
+    if let color { entity.color = color }
+    if let unit { entity.unit = unit }
+    if let doseStyle { entity.doseStyle = doseStyle }
+    if let countNoun { entity.countNoun = countNoun }
+    if let containerNoun { entity.containerNoun = containerNoun }
+    if let containerCap { entity.containerCap = containerCap }
+    if let catalogNoun { entity.catalogNoun = catalogNoun }
+    if let flourish { entity.flourish = flourish }
+    if let metricMode { entity.metricMode = metricMode }
+    if let objective { entity.objective = objective }
+    if let methods { entity.methods = methods }
+    entity.updatedAt = .now
+    commitKind(entity, op: "update")
+  }
+
+  /// Hide-don't-delete: archived kinds drop their tile/drawer/metrics; events
+  /// and items stay. `archivedAt: nil` unarchives.
+  func setKindArchived(id: String, archived: Bool) {
+    guard let entity = fetchKind(id: id) else { return }
+    entity.archivedAt = archived ? .now : nil
+    entity.updatedAt = .now
+    commitKind(entity, op: archived ? "archive" : "unarchive")
+  }
+
+  // MARK: - Items (catalog)
+
+  @discardableResult
+  func addItem(kindID: String, name: String) -> IntakeItemEntity {
+    let entity = IntakeItemEntity(id: uniqueItemID(),
+                                  kindID: kindID,
+                                  name: name,
+                                  sortIndex: nextItemSortIndex(kindID: kindID))
+    context.insert(entity)
+    commitItem(entity, op: "create")
+    return entity
+  }
+
+  func updateItem(id: String, name: String) {
+    guard let entity = fetchItem(id: id) else { return }
+    entity.name = name
+    entity.updatedAt = .now
+    commitItem(entity, op: "update")
+  }
+
+  func deleteItem(id: String) {
+    guard let entity = fetchItem(id: id) else { return }
+    context.delete(entity)
+    saveContext("CK intake-item delete")
+    ckEngine?.noteIntakeItemDeletion(id: id)
+    postChanged()
+  }
+
+  // MARK: - Events
+
+  @discardableResult
+  func addEntry(kindID: String,
+                date: String,
+                time: String,
+                method: String,
+                itemID: String? = nil,
+                amount: Double? = nil,
+                count: Int? = nil,
+                // Free-form text defaults to "" so the field registers with
+                // CloudKit on first in-app write. See GutMutator for details.
+                note: String? = "") -> IntakeEventEntity {
+    let entity = IntakeEventEntity(id: uniqueEntryID(),
+                                   kindID: kindID,
+                                   date: date,
+                                   method: method,
+                                   itemID: itemID,
+                                   amount: amount,
+                                   count: count,
+                                   note: note)
+    entity.occurredAt = EventTimestamp.from(date: date, time: time)
+    context.insert(entity)
+    commitEntry(entity, op: "create")
+    return entity
+  }
+
+  func updateEntry(id: String,
+                   date: String? = nil,
+                   time: String? = nil,
+                   method: String? = nil,
+                   itemID: String?? = nil,
+                   amount: Double?? = nil,
+                   count: Int?? = nil,
+                   note: String?? = nil) {
+    guard let entity = fetchEntry(id: id) else { return }
+    if let date { entity.date = date }
+    if let method { entity.method = method }
+    if let itemID { entity.itemID = itemID }
+    if let amount { entity.amount = amount }
+    if let count { entity.count = count }
+    if let note { entity.note = note }
+    if date != nil || time != nil {
+      let t = time ?? EventTimestamp.hhmm(from: entity.occurredAt)
+      entity.occurredAt = EventTimestamp.from(date: entity.date, time: t)
+    }
+    entity.updatedAt = .now
+    commitEntry(entity, op: "update")
+  }
+
+  func deleteEntry(id: String) {
+    guard let entity = fetchEntry(id: id) else { return }
+    context.delete(entity)
+    saveContext("CK intake-event delete")
+    ckEngine?.noteIntakeEventDeletion(id: id)
+    postChanged()
+  }
+
+  // MARK: - Migration upserts (deterministic ids)
+  //
+  // The record-level migrator writes through these so the write-boundary
+  // invariant holds for migrators too. Ids are deterministic (IntakeMigrationMap),
+  // so every upsert is idempotent and two devices converge (study §7.1).
+
+  /// Create the migration kind if absent; if present, leave it untouched — the
+  /// kind is user-owned after creation, so a re-run must not clobber edits.
+  @discardableResult
+  func upsertKind(seed: IntakeKindSeed) -> IntakeKindEntity {
+    if let existing = fetchKind(id: seed.id) { return existing }
+    let entity = IntakeKindEntity(id: seed.id,
+                                  name: seed.name,
+                                  symbol: seed.symbol,
+                                  color: seed.color,
+                                  sortIndex: nextKindSortIndex(),
+                                  unit: seed.unit,
+                                  doseStyle: seed.doseStyle,
+                                  countNoun: seed.countNoun,
+                                  containerNoun: seed.containerNoun,
+                                  containerCap: seed.containerCap,
+                                  catalogNoun: seed.catalogNoun,
+                                  flourish: seed.flourish,
+                                  metricMode: seed.metricMode,
+                                  objective: seed.objective,
+                                  templateID: seed.templateID)
+    entity.methods = seed.methods
+    context.insert(entity)
+    commitKind(entity, op: "migrate")
+    return entity
+  }
+
+  /// Upsert a catalog item by deterministic id. Name refreshes on re-run.
+  func upsertItem(id: String, kindID: String, name: String, sortIndex: Int) {
+    if let existing = fetchItem(id: id) {
+      existing.name = name
+      existing.updatedAt = .now
+      commitItem(existing, op: "migrate")
+      return
+    }
+    let entity = IntakeItemEntity(id: id, kindID: kindID, name: name, sortIndex: sortIndex)
+    context.insert(entity)
+    commitItem(entity, op: "migrate")
+  }
+
+  /// Upsert an event by deterministic id. On re-run, the legacy source wins only
+  /// when it is newer than the generic twin (else the generic side was edited
+  /// in-app and keeps its value) — study §7.1's migrate-on-sight update rule.
+  func upsertEvent(_ m: MigratedIntakeEvent) {
+    if let existing = fetchEntry(id: m.id) {
+      let legacy = m.updatedAt ?? .distantPast
+      guard legacy > existing.updatedAt else { return }
+      existing.kindID = m.kindID
+      existing.date = m.date
+      existing.method = m.method
+      existing.itemID = m.itemID
+      existing.amount = m.amount
+      existing.count = m.count
+      existing.note = m.note
+      if let occ = m.occurredAt { existing.occurredAt = occ }
+      existing.updatedAt = legacy
+      commitEntry(existing, op: "migrate")
+      return
+    }
+    let entity = IntakeEventEntity(id: m.id,
+                                   kindID: m.kindID,
+                                   date: m.date,
+                                   method: m.method,
+                                   itemID: m.itemID,
+                                   amount: m.amount,
+                                   count: m.count,
+                                   note: m.note,
+                                   updatedAt: m.updatedAt ?? .now)
+    entity.occurredAt = m.occurredAt ?? EventTimestamp.from(date: m.date, time: nil)
+    context.insert(entity)
+    commitEntry(entity, op: "migrate")
+  }
+
+  /// True when the generic twin already exists — lets the migrator skip a kind
+  /// whose events are all present (idempotent fast path).
+  func eventExists(id: String) -> Bool { fetchEntry(id: id) != nil }
+
+  // MARK: - Helpers
+
+  private func fetchKind(id: String) -> IntakeKindEntity? {
+    try? context.fetch(FetchDescriptor<IntakeKindEntity>(
+      predicate: #Predicate { $0.id == id }
+    )).first
+  }
+
+  private func fetchItem(id: String) -> IntakeItemEntity? {
+    try? context.fetch(FetchDescriptor<IntakeItemEntity>(
+      predicate: #Predicate { $0.id == id }
+    )).first
+  }
+
+  private func fetchEntry(id: String) -> IntakeEventEntity? {
+    try? context.fetch(FetchDescriptor<IntakeEventEntity>(
+      predicate: #Predicate { $0.id == id }
+    )).first
+  }
+
+  /// Opaque, name-independent kind ids — names are mutable, ids are forever
+  /// (metric keys and item links hang off them). See §3.1.
+  private func uniqueKindID() -> String {
+    var attempt = "ik-" + String(UUID().uuidString.lowercased().prefix(8))
+    while fetchKind(id: attempt) != nil {
+      attempt = "ik-" + String(UUID().uuidString.lowercased().prefix(8))
+    }
+    return attempt
+  }
+
+  private func uniqueItemID() -> String {
+    var attempt = "ii-" + String(UUID().uuidString.lowercased().prefix(8))
+    while fetchItem(id: attempt) != nil {
+      attempt = "ii-" + String(UUID().uuidString.lowercased().prefix(8))
+    }
+    return attempt
+  }
+
+  private func uniqueEntryID() -> String {
+    var attempt = String(UUID().uuidString.lowercased().prefix(8))
+    while fetchEntry(id: attempt) != nil {
+      attempt = String(UUID().uuidString.lowercased().prefix(8))
+    }
+    return attempt
+  }
+
+  private func nextKindSortIndex() -> Int {
+    ((try? context.fetch(FetchDescriptor<IntakeKindEntity>(
+      sortBy: [SortDescriptor(\.sortIndex, order: .reverse)]
+    )).first?.sortIndex) ?? -1) + 1
+  }
+
+  private func nextItemSortIndex(kindID: String) -> Int {
+    ((try? context.fetch(FetchDescriptor<IntakeItemEntity>(
+      predicate: #Predicate { $0.kindID == kindID },
+      sortBy: [SortDescriptor(\.sortIndex, order: .reverse)]
+    )).first?.sortIndex) ?? -1) + 1
+  }
+
+  private func commitKind(_ entity: IntakeKindEntity, op: String) {
+    saveContext("CK intake-kind \(op)")
+    ckEngine?.noteIntakeKindChange(id: entity.id)
+    postChanged()
+  }
+
+  private func commitItem(_ entity: IntakeItemEntity, op: String) {
+    saveContext("CK intake-item \(op)")
+    ckEngine?.noteIntakeItemChange(id: entity.id)
+    postChanged()
+  }
+
+  private func commitEntry(_ entity: IntakeEventEntity, op: String) {
+    saveContext("CK intake-event \(op)")
+    ckEngine?.noteIntakeEventChange(id: entity.id)
     postChanged()
   }
 
