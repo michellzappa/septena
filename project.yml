@@ -286,6 +286,9 @@ targets:
           - "**/.DS_Store"
       - path: SeptenaCore/Fasting.swift
       - path: SeptenaCore/DateParser.swift
+      - path: SeptenaCore/ConsumableContainer.swift
+      - path: SeptenaCore/CannabisCapsule.swift
+      - path: SeptenaCore/SuggestionBlocks.swift
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
