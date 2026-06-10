@@ -3060,6 +3060,9 @@
         }
       }
     },
+    "Goal" : {
+
+    },
     "Goals" : {
       "localizations" : {
         "pt-BR" : {
@@ -6209,6 +6212,9 @@
           }
         }
       }
+    },
+    "This creates a goal you can track. Reduce and Quit also show a days-since-last streak." : {
+
     },
     "This exercise is already logged. Removing it deletes the saved entry." : {
       "localizations" : {

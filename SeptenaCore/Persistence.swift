@@ -890,7 +890,11 @@ final class IntakeKindEntity {
   var catalogNoun: String?             // "Beans" | "Strains" | nil
   var flourish: String                 // motion token ("bloom" | "ripple" | …)
   var metricMode: String               // "countEvents" | "sumAmount"
-  var objective: String                // "log" | "limit" | "reduce" | "quit"
+  // Property-level default (not just the init default) so SwiftData lightweight
+  // migration can backfill existing IntakeKind rows when this field is added —
+  // same reason `occurredAt` carries one. Without it, adding a non-optional
+  // property to an entity that already has rows fails ModelContainer init.
+  var objective: String = "log"        // "log" | "limit" | "reduce" | "quit"
   var methodsJSON: String              // encoded [IntakeMethodRow]
   var templateID: String?
   var archivedAt: Date?                // hide-don't-delete, mirrors sections
