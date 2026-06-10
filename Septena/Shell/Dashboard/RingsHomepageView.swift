@@ -30,7 +30,7 @@ struct RingsHomepageView<MenuContent: View>: View {
 
   var body: some View {
     LazyVGrid(columns: columns, spacing: 12) {
-      ForEach(items, id: \.domain) { item in
+      ForEach(items, id: \.id) { item in
         Button { onTap(item.tap) } label: {
           RingDomainCell(data: item)
         }
@@ -74,7 +74,7 @@ private struct RingDomainCell: View {
       .a11yAnimation(Theme.Motion.standard, value: fill.value)
 
       HStack(spacing: 4) {
-        SectionGlyph(icon: SectionManifest.byKey[data.domain.rawValue]?.iconSymbol ?? "circle.fill",
+        SectionGlyph(icon: data.icon,
                      accent: data.accent)
         Text(data.title)
           .font(.caption.weight(.semibold))

@@ -59,8 +59,22 @@ enum DomainTapAction {
 /// `Color` doesn't bridge cleanly across all SwiftUI versions and we
 /// don't need it for the use sites planned. Identity comes from
 /// `domain` when needed.
-struct HomepageDomainData {
+struct HomepageDomainData: Identifiable {
   let domain: HomepageDomain
+  /// Render identity. One domain = one row was true until intake started
+  /// expanding to one row PER tracker — those all share `domain: .intake`, so
+  /// keying a ForEach on `\.domain` collapses them into the first row repeated.
+  /// Defaults to the domain; intake's per-kind rows pass "intake:<kindID>".
+  var itemID: String? = nil
+  var id: String { itemID ?? domain.rawValue }
+  /// Glyph override for rows that aren't 1=1 with a section — intake's
+  /// per-tracker rows pass the kind's own SF Symbol here. Nil = the
+  /// section's manifest icon, which is right for every other domain.
+  var iconSymbol: String? = nil
+  /// The glyph every renderer should draw for this row.
+  var icon: String {
+    iconSymbol ?? SectionManifest.byKey[domain.rawValue]?.iconSymbol ?? "circle.fill"
+  }
   let title: String
   let accent: Color
   /// Compact one-line summary used by Dense / List rows where there

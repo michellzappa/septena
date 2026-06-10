@@ -113,7 +113,7 @@ struct RhythmHomepageView<MenuContent: View>: View {
   private var sectionTiles: some View {
     let columns = [GridItem(.adaptive(minimum: 104), spacing: 8)]
     return LazyVGrid(columns: columns, spacing: 8) {
-      ForEach(timedItems, id: \.domain) { item in
+      ForEach(timedItems, id: \.id) { item in
         Button { onTap(item.tap) } label: {
           VStack(spacing: 6) {
             tileMark(for: item)
@@ -151,8 +151,7 @@ struct RhythmHomepageView<MenuContent: View>: View {
     let ev = eventsBySection[key] ?? []
     let bd = bandsBySection[key] ?? []
     if ev.isEmpty && bd.isEmpty {
-      SectionGlyph(icon: SectionManifest.byKey[key]?.iconSymbol ?? "circle.fill",
-                   accent: item.accent)
+      SectionGlyph(icon: item.icon, accent: item.accent)
     } else {
       TimeOfDayWheel(events: ev, accent: item.accent, bands: bd,
                      windowDays: windowDays, diameter: 84, compact: true)

@@ -60,6 +60,9 @@ struct IntakeTileDTO: Identifiable, Sendable, Hashable {
   let todayCount: Int
   let todayAmount: Double
   let lastEventAt: Date?
+  /// Trailing-90-day daily event counts, oldest → newest (today last).
+  /// Feeds the homepage sparkline/heatmap/tile history for this kind.
+  let dailyCounts: [Int]
 }
 
 enum IntakeReader {
@@ -151,21 +154,38 @@ enum IntakeReader {
     var counts: [String: Int] = [:]
     var sums: [String: Double] = [:]
     var lastAt: [String: Date] = [:]
+    var byDay: [String: [String: Int]] = [:]   // kindID → date → count
     for e in events {
       if e.date == date {
         counts[e.kindID, default: 0] += 1
         sums[e.kindID, default: 0] += e.amount ?? 0
       }
+      byDay[e.kindID, default: [:]][e.date, default: 0] += 1
       if let prev = lastAt[e.kindID] { if e.occurredAt > prev { lastAt[e.kindID] = e.occurredAt } }
       else { lastAt[e.kindID] = e.occurredAt }
     }
+    let window = trailingDates(endingAt: date, days: 90)
     return kinds.map { k in
-      IntakeTileDTO(id: k.id, name: k.name, symbol: k.symbol, color: k.color,
-                    unit: k.unit, objective: k.objective,
-                    showsAmount: k.doseStyle == "amount" || k.doseStyle == "both",
-                    todayCount: counts[k.id] ?? 0,
-                    todayAmount: sums[k.id] ?? 0,
-                    lastEventAt: lastAt[k.id])
+      let days = byDay[k.id] ?? [:]
+      return IntakeTileDTO(id: k.id, name: k.name, symbol: k.symbol, color: k.color,
+                           unit: k.unit, objective: k.objective,
+                           showsAmount: k.doseStyle == "amount" || k.doseStyle == "both",
+                           todayCount: counts[k.id] ?? 0,
+                           todayAmount: sums[k.id] ?? 0,
+                           lastEventAt: lastAt[k.id],
+                           dailyCounts: window.map { days[$0] ?? 0 })
+    }
+  }
+
+  /// The trailing `days` date strings ending at `end` (inclusive), oldest first.
+  private static func trailingDates(endingAt end: String, days: Int) -> [String] {
+    guard let endDate = SeptenaDate.parse(end) else { return [] }
+    let fmt = DateFormatter()
+    fmt.dateFormat = "yyyy-MM-dd"
+    fmt.locale = Locale(identifier: "en_US_POSIX")
+    let cal = Calendar.current
+    return (0..<days).reversed().compactMap { back in
+      cal.date(byAdding: .day, value: -back, to: endDate).map(fmt.string(from:))
     }
   }
 

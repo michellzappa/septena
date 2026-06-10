@@ -63,7 +63,7 @@ struct DenseHomepageView<MenuContent: View>: View {
 
       if gridColumnCount > 1 {
         LazyVGrid(columns: gridColumns, spacing: 12) {
-          ForEach(items, id: \.domain) { item in
+          ForEach(items, id: \.id) { item in
             Button { onTap(item.tap) } label: {
               DenseDomainCard(data: item)
             }
@@ -73,7 +73,7 @@ struct DenseHomepageView<MenuContent: View>: View {
         }
       } else {
         VStack(spacing: 0) {
-          ForEach(Array(items.enumerated()), id: \.element.domain) { idx, item in
+          ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
             Button {
               onTap(item.tap)
             } label: {
@@ -106,7 +106,7 @@ private struct DenseDomainRow: View {
 
   var body: some View {
     HStack(spacing: 12) {
-      SectionGlyph(icon: SectionManifest.byKey[data.domain.rawValue]?.iconSymbol ?? "circle.fill",
+      SectionGlyph(icon: data.icon,
                    accent: data.accent)
 
       VStack(alignment: .leading, spacing: 2) {
@@ -148,7 +148,7 @@ private struct DenseDomainCard: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
       HStack(spacing: 8) {
-        SectionGlyph(icon: SectionManifest.byKey[data.domain.rawValue]?.iconSymbol ?? "circle.fill",
+        SectionGlyph(icon: data.icon,
                      accent: data.accent)
         Text(data.title)
           .font(.subheadline.weight(.semibold))

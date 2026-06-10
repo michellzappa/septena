@@ -946,12 +946,14 @@ struct WeekDashboardView: View {
     }
     return HomepageDomainData(
       domain: .intake,
+      itemID: "intake:\(t.id)",
+      iconSymbol: t.symbol,
       title: t.name,
       accent: accent,
       headline: "\(t.todayCount) today",
       headlineStats: stats,
       progress: nil,
-      history: nil,
+      history: .bars(t.dailyCounts),
       tap: .openSheet(.intake)
     )
   }
@@ -2094,7 +2096,10 @@ struct WeekDashboardView: View {
        let days = intakeDaysSince(t.lastEventAt), days >= 1 {
       stats.append(.init(label: IntakeObjective.streakLabel(t.objective), value: "\(days)d"))
     }
-    return ModuleTile(title: t.name, accent: accent, stats: stats)
+    let bars = Array(t.dailyCounts.suffix(7))
+    return ModuleTile(title: t.name, accent: accent, stats: stats,
+                      history: .init(label: "7-day",
+                                     values: bars.isEmpty ? Array(repeating: 0, count: 7) : bars))
       .contentShape(Rectangle())
       .onTapGesture { open(.intake) }
   }
