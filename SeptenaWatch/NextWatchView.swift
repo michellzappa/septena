@@ -31,6 +31,15 @@ struct NextWatchView: View {
     .onChange(of: scenePhase) { _, phase in
       if phase == .active { conn.fetchNext() }
     }
+    // Day rollover: refetch the moment the calendar day flips so a watch left
+    // awake across midnight doesn't keep showing yesterday's Next. The phone
+    // does this through `DayClock`'s `.NSCalendarDayChanged` observer; the watch
+    // has no DayClock, so we listen for the same system notification directly.
+    // (Crossing midnight while backgrounded is already covered by the
+    // scenePhase-active refetch on the next foreground.)
+    .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+      conn.fetchNext()
+    }
   }
 
   @ViewBuilder
