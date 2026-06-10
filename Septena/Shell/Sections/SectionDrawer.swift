@@ -279,44 +279,48 @@ struct SectionDrawer<Content: View>: View {
 }
 
 /// The drawer's log/action toolbar control, centralized in ONE component so
-/// every drawer's action button is identical. This is the pre-refactor
-/// rendering exactly: a single action is a plain primaryAction `Button` (which
-/// the system draws as the prominent accent circle), multiple actions are a
-/// plain `Menu`. No custom button/menu style — `.glassProminent`/`.menuStyle`
-/// nest a circle inside the toolbar's own capsule (the pill), so we let the
-/// system render and only carry the section tint.
+/// every drawer's action button is identical. A single action fires on one tap
+/// (a plain `Button` the system draws as the prominent accent circle); multiple
+/// actions open an inline dropdown `Menu` — the consolidated quick-add list,
+/// each row carrying its section icon, the first row bound to ⌘N. We let the
+/// system render the toolbar control (no `.glassProminent`, which nests a circle
+/// inside the toolbar's own capsule and renders the Menu as a pill) and only
+/// carry the section tint.
 struct DrawerActionButton: View {
   let actions: [LogAction]
   let accent: Color
   let onLog: (String) -> Void
 
-  @State private var showingActions = false
-
   var body: some View {
     Group {
       if actions.count == 1, let only = actions.first {
         Button { onLog(only.id) } label: {
-          Label(only.title, systemImage: only.systemImage ?? "plus")
+          Image(systemName: only.systemImage ?? "plus")
+            .accessibilityLabel(only.title)
         }
         .keyboardShortcut("n", modifiers: .command)
       } else {
-        // Multi-action: a Button (not a Menu) so it renders as the SAME round
-        // accent control as the single-action case — a prominent Menu renders
-        // as a pill. Options are presented in an action sheet instead.
-        Button { showingActions = true } label: {
-          Image(systemName: "plus")
-        }
-        .keyboardShortcut("n", modifiers: .command)
-        .confirmationDialog("Log", isPresented: $showingActions, titleVisibility: .hidden) {
-          ForEach(actions) { action in
-            Button(action.title) { onLog(action.id) }
+        // Multi-action: an inline dropdown listing every quick-add option with
+        // its icon — the quick-menu style. First row carries ⌘N.
+        Menu {
+          ForEach(Array(actions.enumerated()), id: \.element.id) { idx, action in
+            Button {
+              onLog(action.id)
+            } label: {
+              if let img = action.systemImage {
+                Label(action.title, systemImage: img)
+              } else {
+                Text(action.title)
+              }
+            }
+            .keyboardShortcut(idx == 0 ? KeyboardShortcut("n", modifiers: .command) : nil)
           }
+        } label: {
+          Image(systemName: "plus")
+            .accessibilityLabel("Log")
         }
       }
     }
-    // One prominent accent style for whichever branch renders → identical round
-    // accent button on every drawer, floated out from the calendar/goals cluster.
-    .buttonStyle(.glassProminent)
     .tint(accent)
   }
 }
