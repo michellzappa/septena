@@ -910,15 +910,18 @@ enum IntakeMigrator {
   @discardableResult
   static func migrateLocalLegacy(context: ModelContext,
                                  mutator: IntakeMutator,
+                                 sections: Set<String> = ["caffeine", "cannabis"],
                                  caffeineMethods: [IntakeMethodRow]? = nil,
                                  cannabisName: String = "Cannabis",
                                  cannabisUsesPerCapsule: Int = 3) -> IntakeMigrationReport {
     // Heal `.distantPast` placeholders in the old format first (study §7.1).
     OccurredAtBackfill.runIfNeeded(context: context)
 
-    let caffeineEvents = (try? context.fetch(FetchDescriptor<CaffeineEventEntity>())) ?? []
-    let caffeineBeans  = (try? context.fetch(FetchDescriptor<CaffeineBeanEntity>())) ?? []
-    let cannabisEvents = (try? context.fetch(FetchDescriptor<CannabisEventEntity>())) ?? []
+    let migrateCaffeine = sections.contains("caffeine")
+    let migrateCannabis = sections.contains("cannabis")
+    let caffeineEvents = migrateCaffeine ? ((try? context.fetch(FetchDescriptor<CaffeineEventEntity>())) ?? []) : []
+    let caffeineBeans  = migrateCaffeine ? ((try? context.fetch(FetchDescriptor<CaffeineBeanEntity>())) ?? []) : []
+    let cannabisEvents = migrateCannabis ? ((try? context.fetch(FetchDescriptor<CannabisEventEntity>())) ?? []) : []
 
     // Kinds first, with the richer config.
     if !caffeineEvents.isEmpty || !caffeineBeans.isEmpty {
@@ -953,26 +956,39 @@ enum IntakeMigrator {
     for e in caffeineEvents { upsert(legacy(e), mutator: mutator) }
     for e in cannabisEvents { upsert(legacy(e), mutator: mutator) }
 
-    return verify(context: context)
+    return verify(context: context, sections: sections)
   }
 
-  /// Re-read both stores and assemble the cross-check report.
-  static func verify(context: ModelContext) -> IntakeMigrationReport {
+  /// Re-read both stores and assemble the cross-check report. `sections`
+  /// scopes the legacy side so a cannabis-only import isn't flagged as a
+  /// mismatch for caffeine rows it deliberately didn't copy.
+  static func verify(context: ModelContext,
+                     sections: Set<String> = ["caffeine", "cannabis"]) -> IntakeMigrationReport {
     var r = IntakeMigrationReport()
-    let caffeineEvents = (try? context.fetch(FetchDescriptor<CaffeineEventEntity>())) ?? []
-    let cannabisEvents = (try? context.fetch(FetchDescriptor<CannabisEventEntity>())) ?? []
+    let caffeineEvents = sections.contains("caffeine")
+      ? ((try? context.fetch(FetchDescriptor<CaffeineEventEntity>())) ?? []) : []
+    let cannabisEvents = sections.contains("cannabis")
+      ? ((try? context.fetch(FetchDescriptor<CannabisEventEntity>())) ?? []) : []
     let twins = (try? context.fetch(FetchDescriptor<IntakeEventEntity>())) ?? []
     let items = (try? context.fetch(FetchDescriptor<IntakeItemEntity>())) ?? []
 
+    // Twins are identified by their deterministic id prefix ("caffeine:",
+    // "cannabis:"), NOT by kindID — the migrated kinds also accumulate
+    // manually-logged events whose grams would skew the cross-check sums.
+    let caffeineTwins = sections.contains("caffeine")
+      ? twins.filter { $0.id.hasPrefix("caffeine:") } : []
+    let cannabisTwins = sections.contains("cannabis")
+      ? twins.filter { $0.id.hasPrefix("cannabis:") } : []
     r.caffeineLegacy = caffeineEvents.count
     r.cannabisLegacy = cannabisEvents.count
-    r.caffeineTwins = twins.filter { $0.kindID == IntakeMigrationMap.caffeineKindID }.count
-    r.cannabisTwins = twins.filter { $0.kindID == IntakeMigrationMap.cannabisKindID }.count
-    r.beanItems = items.filter { $0.kindID == IntakeMigrationMap.caffeineKindID }.count
-    r.strainItems = items.filter { $0.kindID == IntakeMigrationMap.cannabisKindID }.count
+    r.caffeineTwins = caffeineTwins.count
+    r.cannabisTwins = cannabisTwins.count
+    r.beanItems = items.filter { $0.id.hasPrefix("caffeine:") }.count
+    r.strainItems = items.filter { $0.id.hasPrefix("cannabis:") }.count
     r.legacyGrams = caffeineEvents.compactMap(\.grams).reduce(0, +)
                   + cannabisEvents.compactMap(\.grams).reduce(0, +)
-    r.twinAmount = twins.compactMap(\.amount).reduce(0, +)
+    r.twinAmount = (sections.contains("caffeine") ? caffeineTwins.compactMap(\.amount).reduce(0, +) : 0)
+                 + (sections.contains("cannabis") ? cannabisTwins.compactMap(\.amount).reduce(0, +) : 0)
     return r
   }
 

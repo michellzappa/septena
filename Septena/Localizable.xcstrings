@@ -2101,6 +2101,9 @@
         }
       }
     },
+    "Copies your old section's entries into a tracker here. Nothing is deleted — the old section keeps its data, and re-running is safe (no duplicates)." : {
+
+    },
     "Copy a prompt and paste it into an LLM along with the source data you want to import. The model returns JSON that pastes straight into Import above." : {
       "localizations" : {
         "pt-BR" : {
@@ -3769,6 +3772,9 @@
           }
         }
       }
+    },
+    "Legacy data" : {
+
     },
     "Let Claude read and write your Septena data at mcp.septena.app." : {
       "localizations" : {
