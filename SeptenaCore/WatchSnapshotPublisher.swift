@@ -39,10 +39,24 @@ enum WatchSnapshotPublisher {
     let configs = sections.isEmpty ? SectionTheme.defaultPalette : sections
     let sectionColors = Dictionary(configs.map { ($0.key, $0.color) },
                                    uniquingKeysWith: { a, _ in a })
+    // Cannabis capsule state so the watch quick-add mirrors the phone menu's
+    // Continue (Hit N) / New capsule / Edible. The cap is the user's setting
+    // (ResponseCache key matches `SettingsView.CacheKey.cannabis`), default 3.
+    // The last vape's hit prefers today's, else the most recent vape — matching
+    // the phone's `lastCannabisVape` fallback.
+    let usesPerCapsule = ResponseCache.load(CannabisConfig.self,
+                                            forKey: "settings.cannabis")?.usesPerCapsule ?? 3
+    let vapesDesc = FetchDescriptor<CannabisEventEntity>(
+      predicate: #Predicate { $0.method == "vape" },
+      sortBy: [SortDescriptor(\.occurredAt, order: .reverse)])
+    let vapes = (try? context.fetch(vapesDesc)) ?? []
+    let lastVapeHit = (vapes.first { $0.date == date } ?? vapes.first)?.hit
     let response = NextItemsResponse(date: date, bucket: "", items: items,
                                      lingerHabits: lingerHabits,
                                      lingerSupplements: lingerSupplements,
-                                     sectionColors: sectionColors)
+                                     sectionColors: sectionColors,
+                                     cannabisUsesPerCapsule: usesPerCapsule,
+                                     cannabisLastVapeHit: lastVapeHit)
     guard let payload = try? JSONEncoder().encode(response) else { return }
 
     // Nudge the iOS "Next" home/lock-screen widget to re-read the snapshot.

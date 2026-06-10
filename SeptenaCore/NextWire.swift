@@ -44,6 +44,14 @@ struct NextItemsResponse: Codable {
   /// no `SectionTheme`. Optional so older payloads decode unchanged; the watch
   /// falls back to a neutral rule when a key is absent.
   var sectionColors: [String: String]? = nil
+  /// Cannabis capsule state, carried so the watch's quick-add can offer the same
+  /// Continue (Hit N) / New capsule / Edible choices as the phone menu — the
+  /// `.choice` input model is static, so this runtime state rides the snapshot.
+  /// `cannabisUsesPerCapsule` is the configured cap (default 3 when absent);
+  /// `cannabisLastVapeHit` is the last vape's hit (today's, else most recent),
+  /// nil when there's no vape to continue. Both optional so older payloads decode.
+  var cannabisUsesPerCapsule: Int? = nil
+  var cannabisLastVapeHit: Int? = nil
 }
 
 /// UserDefaults keys + defaults for the per-section "carry over missed items"

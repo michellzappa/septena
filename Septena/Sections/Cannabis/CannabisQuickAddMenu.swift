@@ -16,16 +16,12 @@ struct CannabisQuickAddMenu: View {
   let onCommit: (_ method: String, _ hit: Int?) -> Void
   let onEditLast: (() -> Void)?
 
-  /// True when the current capsule has room — i.e. there's a last vape
-  /// today and the next hit fits under the capsule cap. When false (no
-  /// vape yet, or the last hit filled the capsule) we only offer New capsule.
+  // Capsule math is single-sourced in `CannabisCapsule` (SeptenaCore) so this
+  // menu and the watch quick-add can't disagree about the next step.
   private var hasActiveCapsule: Bool {
-    guard let h = lastVape?.hit else { return false }
-    return h >= 1 && h < usesPerCapsule
+    CannabisCapsule.hasActiveCapsule(lastHit: lastVape?.hit, usesPerCapsule: usesPerCapsule)
   }
-
-  /// Next hit within the current capsule (only meaningful when active).
-  private var continueHit: Int { (lastVape?.hit ?? 0) + 1 }
+  private var continueHit: Int { CannabisCapsule.continueHit(lastHit: lastVape?.hit) }
 
   var body: some View {
     if hasActiveCapsule {

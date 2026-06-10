@@ -366,8 +366,15 @@ private struct CaptureInput: View {
   var body: some View {
     switch block.input {
     case .choice(let choices):
+      // Cannabis is the one stateful choice: its options depend on the current
+      // capsule (Continue Hit N / New capsule / Edible), carried on the snapshot.
+      // Every other kind uses its static `SuggestionBlocks` choices.
+      let resolved = block.kind == "cannabis"
+        ? CannabisCapsule.choices(lastHit: conn.cannabisLastVapeHit,
+                                  usesPerCapsule: conn.cannabisUsesPerCapsule)
+        : choices
       QuickLogChoiceList(
-        choices: choices,
+        choices: resolved,
         tint: WatchSectionTint.color(forSectionKey: block.sectionKey, colors: conn.sectionColors)
       ) { value in
         conn.logChoice(kind: block.kind, value: value, itemID: itemID)

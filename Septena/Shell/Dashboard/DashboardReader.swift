@@ -154,6 +154,10 @@ actor DashboardReader {
                                               beans: last.beans,
                                               grams: last.grams)
     }
+    // Cannabis: the configured capsule cap (default 3) drives Continue vs. New
+    // capsule — same source the watch snapshot reads, so the two stay 1=1.
+    m.cannabisUsesPerCapsule = ResponseCache.load(CannabisConfig.self,
+                                                  forKey: "settings.cannabis")?.usesPerCapsule ?? 3
     // Cannabis: latest vape across all days drives the "Continue" row.
     let lastVape = FetchDescriptor<CannabisEventEntity>(
       predicate: #Predicate { $0.method == "vape" },

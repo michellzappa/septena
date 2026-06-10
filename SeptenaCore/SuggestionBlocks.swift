@@ -63,6 +63,11 @@ public enum SuggestionBlocks {
             .init(value: "matcha", label: "Matcha", symbol: "leaf"),
             .init(value: "other",  label: "Other",  symbol: "mug"),
           ])),
+    // Cannabis is stateful: the surface resolves these to the capsule-aware
+    // Continue (Hit N) / New capsule / Edible via `CannabisCapsule.choices` from
+    // the snapshot's capsule state (see `CaptureInput`). These static entries are
+    // the inert fallback if that state is missing; `CannabisCapsule.parse` reads
+    // both shapes.
     .init(kind: "cannabis", sectionKey: "cannabis", recordType: "CannabisEvent",
           input: .choice([
             .init(value: "vape",   label: "Vape",   symbol: "wind"),

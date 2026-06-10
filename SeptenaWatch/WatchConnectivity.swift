@@ -25,6 +25,10 @@ final class WatchConnectivity {
   /// Section key → authored color token from the snapshot, so the Next list
   /// can tint its group rules with the phone's actual section accents.
   var sectionColors: [String: String] = [:]
+  /// Cannabis capsule state from the snapshot, so the quick-add can offer the
+  /// same Continue (Hit N) / New capsule / Edible options as the phone menu.
+  var cannabisUsesPerCapsule: Int = 3
+  var cannabisLastVapeHit: Int? = nil
   var bucket: String = ""
   var isLoading = false
   var errorMessage: String?
@@ -125,6 +129,8 @@ final class WatchConnectivity {
 
       self.items         = filtered
       self.sectionColors = response.sectionColors ?? [:]
+      self.cannabisUsesPerCapsule = response.cannabisUsesPerCapsule ?? 3
+      self.cannabisLastVapeHit    = response.cannabisLastVapeHit
       self.bucket        = bkt
       updateComplication()
       scheduleNextRefresh()
@@ -229,7 +235,7 @@ final class WatchConnectivity {
       do {
         switch block.recordType {
         case "CaffeineEvent": try await saveCaffeineEvent(method: value, date: date)
-        case "CannabisEvent": try await saveCannabisEvent(method: value, date: date)
+        case "CannabisEvent": try await saveCannabisEvent(value: value, date: date)
         case "NutritionEntry":
           // hydration: the choice value is millilitres of water.
           if let ml = Double(value) { try await saveWaterEntry(ml: ml) }
@@ -391,7 +397,11 @@ final class WatchConnectivity {
     try await db.save(record)
   }
 
-  private func saveCannabisEvent(method: String, date: String) async throws {
+  /// `value` is a `CannabisCapsule` choice token ("vape:N" / "vape:1" / "edible"),
+  /// decoded into method + hit so a wrist vape lands in the current capsule just
+  /// like the phone's Continue / New capsule.
+  private func saveCannabisEvent(value: String, date: String) async throws {
+    let (method, hit) = CannabisCapsule.parse(value: value)
     let eventID  = String(UUID().uuidString.lowercased().prefix(8))
     let recordID = CKRecord.ID(recordName: "cannabis-event:\(eventID)", zoneID: ckZoneID)
     let record   = CKRecord(recordType: "CannabisEvent", recordID: recordID)
@@ -399,6 +409,7 @@ final class WatchConnectivity {
     record["method"]     = method
     record["note"]       = ""
     record["occurredAt"] = Date()
+    if let hit { record["hit"] = hit }
     try await db.save(record)
   }
 
