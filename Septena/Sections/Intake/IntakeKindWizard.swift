@@ -152,9 +152,19 @@ struct IntakeKindWizard: View {
       ForEach(methods, id: \.token) { m in
         HStack {
           Text(m.label)
-          if m.usesContainer {
-            Spacer()
-            Image(systemName: "shippingbox").foregroundStyle(.secondary)
+          Spacer()
+          if usesContainers {
+            // Explicit per-method container flag (tap to mark the method that
+            // consumes the container) — no add-order inference.
+            Button {
+              if let idx = methods.firstIndex(where: { $0.token == m.token }) {
+                methods[idx].usesContainer.toggle()
+              }
+            } label: {
+              Image(systemName: m.usesContainer ? "shippingbox.fill" : "shippingbox")
+                .foregroundStyle(m.usesContainer ? (AdaptiveColor.adaptive(color) ?? .accentColor) : .secondary)
+            }
+            .buttonStyle(.plain)
           }
         }
       }

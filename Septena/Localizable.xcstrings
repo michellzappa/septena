@@ -1822,6 +1822,9 @@
         }
       }
     },
+    "Changing the unit doesn't rewrite past entries — history reads in the new unit." : {
+
+    },
     "Checkable rows celebrate at the box — four feels separated by rhythm: one beat, two spaced beats, fall-then-thud, thud-then-close — each with a CoreHaptics pattern timed to its visual. The canvas is reserved for at-most-once-a-day moments: clearing your last Today task (Arc), habit streak milestones (Ignition), and finishing a training session (Ripple on a PR, Bloom otherwise)." : {
 
     },
@@ -2070,6 +2073,9 @@
           }
         }
       }
+    },
+    "Container" : {
+
     },
     "Content" : {
       "localizations" : {
@@ -4064,6 +4070,9 @@
         }
       }
     },
+    "Mark which method uses the container below. Changing the cap only affects future quick-adds." : {
+
+    },
     "Matcha" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4095,6 +4104,9 @@
           }
         }
       }
+    },
+    "Measurement" : {
+
     },
     "Medium" : {
       "extractionState" : "manual",
@@ -4137,6 +4149,9 @@
           }
         }
       }
+    },
+    "Methods" : {
+
     },
     "Metric" : {
       "localizations" : {
@@ -6013,6 +6028,9 @@
           }
         }
       }
+    },
+    "Tap the box to mark the container method. Deleting a method keeps its entries — they display by name." : {
+
     },
     "Tap to play" : {
       "localizations" : {

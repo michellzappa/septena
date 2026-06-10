@@ -16,8 +16,14 @@ struct IntakeManageSheet: View {
   @State private var items: [IntakeItemDTO] = []
   @State private var name = ""
   @State private var color = ""
+  @State private var symbol = ""
   @State private var objective = "log"
   @State private var objectiveTarget: Double = 3
+  @State private var doseStyle = "none"
+  @State private var unit = "g"
+  @State private var countNoun = "use"
+  @State private var containerOn = false
+  @State private var containerNoun = "container"
   @State private var containerCap = 3
   @State private var newMethod = ""
   @State private var newItem = ""
@@ -29,9 +35,10 @@ struct IntakeManageSheet: View {
       Form {
         identitySection
         goalSection
+        measurementSection
+        containerSection
         methodsSection
         if let kind, kind.hasCatalog { varietiesSection(kind) }
-        if kind?.containerCap != nil { containerSection }
         dangerSection
       }
       .navigationTitle("Manage")
@@ -52,6 +59,23 @@ struct IntakeManageSheet: View {
       TextField("Name", text: $name)
         .onSubmit { mutator.updateKind(id: kindID, name: name) }
       ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 14) {
+          ForEach(IntakeKindWizard.symbols, id: \.self) { s in
+            Image(systemName: s)
+              .font(.title3)
+              .frame(width: 38, height: 38)
+              .foregroundStyle(symbol == s ? Color.white : Color.primary)
+              .background(symbol == s ? (AdaptiveColor.adaptive(color) ?? .accentColor) : Color.secondary.opacity(0.12),
+                          in: RoundedRectangle(cornerRadius: 9))
+              .onTapGesture {
+                symbol = s
+                mutator.updateKind(id: kindID, symbol: s)
+              }
+          }
+        }
+        .padding(.vertical, 2)
+      }
+      ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: 12) {
           ForEach(IntakeKindWizard.palette, id: \.self) { hex in
             Circle()
@@ -69,14 +93,70 @@ struct IntakeManageSheet: View {
     }
   }
 
+  // Editing with history present follows the §4.2 safety rules: widening
+  // doseStyle is free, narrowing hides the field but keeps stored values;
+  // changing the unit never rewrites stored amounts.
+  private var measurementSection: some View {
+    Section {
+      Picker("How do you measure it?",
+             selection: Binding(get: { doseStyle }, set: setDoseStyle)) {
+        Text("Just log it").tag("none")
+        Text("Amount").tag("amount")
+        Text("Count").tag("count")
+        Text("Both").tag("both")
+      }
+      if doseStyle == "amount" || doseStyle == "both" {
+        TextField("Unit (g, mg, ml)", text: $unit)
+          .onSubmit { mutator.updateKind(id: kindID, unit: .some(unit)) }
+      }
+      if doseStyle == "count" || doseStyle == "both" {
+        TextField("Count name (hit, cup, puff)", text: $countNoun)
+          .onSubmit { mutator.updateKind(id: kindID, countNoun: .some(countNoun)) }
+      }
+    } header: {
+      Text("Measurement")
+    } footer: {
+      if doseStyle == "amount" || doseStyle == "both" {
+        Text("Changing the unit doesn't rewrite past entries — history reads in the new unit.")
+      }
+    }
+  }
+
+  private var containerSection: some View {
+    Section {
+      Toggle("Comes in containers with limited uses",
+             isOn: Binding(get: { containerOn }, set: setContainerOn))
+      if containerOn {
+        TextField("Container name (capsule, pack)", text: $containerNoun)
+          .onSubmit { mutator.updateKind(id: kindID, containerNoun: .some(containerNoun)) }
+        Stepper("Uses per container: \(containerCap)",
+                value: Binding(get: { containerCap }, set: setContainerCap), in: 1...50)
+      }
+    } header: {
+      Text("Container")
+    } footer: {
+      if containerOn {
+        Text("Mark which method uses the container below. Changing the cap only affects future quick-adds.")
+      }
+    }
+  }
+
   private var methodsSection: some View {
-    Section("Methods") {
+    Section {
       ForEach(kind?.methods ?? [], id: \.token) { m in
         HStack {
           Text(m.label)
-          if m.usesContainer {
-            Spacer()
-            Image(systemName: "shippingbox").foregroundStyle(.secondary)
+          Spacer()
+          if containerOn {
+            // Explicit per-method container flag — tap the box to mark this
+            // method as the one that consumes the container (vape, cigarette).
+            Button {
+              toggleContainer(token: m.token)
+            } label: {
+              Image(systemName: m.usesContainer ? "shippingbox.fill" : "shippingbox")
+                .foregroundStyle(m.usesContainer ? (AdaptiveColor.adaptive(color) ?? .accentColor) : .secondary)
+            }
+            .buttonStyle(.plain)
           }
         }
       }
@@ -90,6 +170,12 @@ struct IntakeManageSheet: View {
         TextField("Add a method", text: $newMethod)
         Button("Add") { addMethod() }
           .disabled(newMethod.trimmingCharacters(in: .whitespaces).isEmpty)
+      }
+    } header: {
+      Text("Methods")
+    } footer: {
+      if containerOn {
+        Text("Tap the box to mark the container method. Deleting a method keeps its entries — they display by name.")
       }
     }
   }
@@ -115,13 +201,38 @@ struct IntakeManageSheet: View {
     }
   }
 
-  private var containerSection: some View {
-    Section("Container") {
-      Stepper("Uses per container: \(containerCap)", value: $containerCap, in: 1...50)
-        .onChange(of: containerCap) { _, new in
-          mutator.updateKind(id: kindID, containerCap: new)
-        }
-    }
+  // MARK: Set-handlers (explicit, not .onChange — reload-seeding must not re-fire writes)
+
+  private func setDoseStyle(_ new: String) {
+    doseStyle = new
+    mutator.updateKind(id: kindID,
+                       unit: .some((new == "amount" || new == "both") ? unit : nil),
+                       doseStyle: new,
+                       countNoun: .some((new == "count" || new == "both") ? countNoun : nil))
+    Task { await reload() }
+  }
+
+  private func setContainerOn(_ on: Bool) {
+    containerOn = on
+    mutator.updateKind(id: kindID,
+                       containerNoun: .some(on ? containerNoun : nil),
+                       containerCap: .some(on ? containerCap : nil))
+    Task { await reload() }
+  }
+
+  private func setContainerCap(_ cap: Int) {
+    containerCap = cap
+    mutator.updateKind(id: kindID, containerCap: .some(cap))
+  }
+
+  /// Flip one method's "uses container" flag — the explicit control replacing
+  /// the wizard's add-order inference.
+  private func toggleContainer(token: String) {
+    guard var methods = kind?.methods,
+          let idx = methods.firstIndex(where: { $0.token == token }) else { return }
+    methods[idx].usesContainer.toggle()
+    mutator.updateKind(id: kindID, methods: methods)
+    Task { await reload() }
   }
 
   private var dangerSection: some View {
@@ -159,6 +270,12 @@ struct IntakeManageSheet: View {
     items = bundle.1
     if name.isEmpty { name = bundle.0?.name ?? "" }
     if color.isEmpty { color = bundle.0?.color ?? "" }
+    if symbol.isEmpty { symbol = bundle.0?.symbol ?? "circle" }
+    doseStyle = bundle.0?.doseStyle ?? "none"
+    if let u = bundle.0?.unit, !u.isEmpty { unit = u }
+    if let n = bundle.0?.countNoun, !n.isEmpty { countNoun = n }
+    containerOn = bundle.0?.containerCap != nil
+    if let n = bundle.0?.containerNoun, !n.isEmpty { containerNoun = n }
     if let cap = bundle.0?.containerCap { containerCap = cap }
     objective = bundle.0?.objective ?? "log"
     objectiveTarget = bundle.2 ?? IntakeObjective.goalSpec(objective)?.defaultTarget ?? 3
