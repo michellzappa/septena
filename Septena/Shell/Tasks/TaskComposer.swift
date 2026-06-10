@@ -104,29 +104,21 @@ struct TaskComposerCard: View {
   // MARK: - Title / notes
 
   private var titleNotesCard: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      TextField("What needs doing?", text: $draft.title, axis: .vertical)
-        .textFieldStyle(.plain)
-        .font(.septenaTaskTitle)
-        .focused($titleFocused)
-        .lineLimit(1...4)
-        // macOS: a vertical-axis field fires onSubmit on plain Return (the iOS
-        // newline-as-save trick never triggers there) — commit here instead.
-        .onSubmit { if draft.canSave { commit() } }
-
-      Divider()
-
-      // Optional notes — room to paste or explain context.
-      TextField("Notes", text: $draft.notes, axis: .vertical)
-        .textFieldStyle(.plain)
-        .font(.septenaNotes)
-        .foregroundStyle(Theme.inkSecondary)
-        .lineLimit(3...10)
-    }
-    .padding(.horizontal, 14)
-    .padding(.vertical, 12)
-    .background(Theme.secondaryGroupedBackground,
-                in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    // Title only — notes moved to an elective pill in the attribute bar so the
+    // card stays a single clean line; tapping the Notes pill expands an inline
+    // editor like the When / Deadline / Repeat controls.
+    TextField("What needs doing?", text: $draft.title, axis: .vertical)
+      .textFieldStyle(.plain)
+      .font(.septenaTaskTitle)
+      .focused($titleFocused)
+      .lineLimit(1...4)
+      // macOS: a vertical-axis field fires onSubmit on plain Return (the iOS
+      // newline-as-save trick never triggers there) — commit here instead.
+      .onSubmit { if draft.canSave { commit() } }
+      .padding(.horizontal, 14)
+      .padding(.vertical, 12)
+      .background(Theme.secondaryGroupedBackground,
+                  in: RoundedRectangle(cornerRadius: 18, style: .continuous))
   }
 
   // MARK: - Terminal actions (edit mode)
@@ -337,7 +329,7 @@ struct TaskAttributeBar: View {
   /// title-field keyboard before showing a calendar.
   let onInteractStart: () -> Void
 
-  enum Expanded { case when, deadline, repeatRule }
+  enum Expanded { case when, deadline, repeatRule, notes }
   @State private var expanded: Expanded?
   @State private var showingList = false
   @Namespace private var glassNS
@@ -375,6 +367,11 @@ struct TaskAttributeBar: View {
             withAnimation(.snappy(duration: 0.2)) { expanded = nil }
             showingList = true
           }
+
+          AttributePill(icon: "text.alignleft", label: "Notes",
+                        value: notesValue,
+                        isSet: notesIsSet, isActive: expanded == .notes,
+                        accent: accent, glassID: "notes", glassNS: glassNS) { toggle(.notes) }
         }
       }
 
@@ -408,6 +405,15 @@ struct TaskAttributeBar: View {
     return draft.onToday ? "Today" : nil
   }
 
+  /// The Notes pill reads its first line as a one-line preview when set (so the
+  /// rail shows what's there without expanding), and the bare "Notes" label
+  /// otherwise. `AttributePill` truncates to a single line.
+  private var notesIsSet: Bool { !draft.trimmedNotes.isEmpty }
+  private var notesValue: String? {
+    guard notesIsSet else { return nil }
+    return draft.trimmedNotes.split(whereSeparator: \.isNewline).first.map(String.init)
+  }
+
   @ViewBuilder
   private var inlineEditor: some View {
     switch expanded {
@@ -419,6 +425,9 @@ struct TaskAttributeBar: View {
         .transition(.opacity.combined(with: .move(edge: .top)))
     case .repeatRule:
       InlineRepeatPanel(recurrence: $draft.recurrence, accent: accent)
+        .transition(.opacity.combined(with: .move(edge: .top)))
+    case .notes:
+      InlineNotesPanel(notes: $draft.notes, accent: accent)
         .transition(.opacity.combined(with: .move(edge: .top)))
     case nil:
       EmptyView()
@@ -680,6 +689,42 @@ private struct InlineRepeatPanel: View {
     case .week:  return String(localized: "\(n) weeks")
     case .month: return String(localized: "\(n) months")
     }
+  }
+}
+
+// MARK: - Inline notes editor
+
+/// A multi-line notes field that writes `draft.notes`, expanded under the Notes
+/// pill. Autofocuses on appear (you tapped the pill to write), and offers a
+/// "Clear" when there's text — the same shape as the When / Deadline panels.
+private struct InlineNotesPanel: View {
+  @Binding var notes: String
+  let accent: Color
+  @FocusState private var focused: Bool
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      TextField("Notes", text: $notes, axis: .vertical)
+        .textFieldStyle(.plain)
+        .font(.septenaNotes)
+        .foregroundStyle(Theme.inkPrimary)
+        .lineLimit(3...10)
+        .focused($focused)
+
+      if !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        Button(role: .destructive) {
+          withAnimation(.snappy(duration: 0.2)) { notes = "" }
+        } label: {
+          Label("Clear", systemImage: "xmark.circle").font(.septenaLabel)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Theme.overdueRed)
+      }
+    }
+    .padding(12)
+    .background(Theme.secondaryGroupedBackground,
+                in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .onAppear { focused = true }
   }
 }
 
