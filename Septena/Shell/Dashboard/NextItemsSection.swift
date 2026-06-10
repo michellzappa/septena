@@ -1038,30 +1038,19 @@ struct HabitRow: View {
         }
       },
       onToggle: {
-        // The optimistic flip + write lives on NextItemsModel; layer the
-        // streak celebration on top here (the View can reach the environment;
-        // the model can't). `done` is the value being written.
+        // The optimistic flip + write lives on NextItemsModel. Streak
+        // milestone detection now happens at the mutator boundary
+        // (MilestoneEngine) and presents via the root MilestonePresenter —
+        // here only the everyday completion haptic remains.
         let done = !habit.done
         model.toggleHabit(habit, mutator: checklistMutator, motion: motion)
-        let streak = ChecklistMirror.habitStreak(context: modelContext, habitId: habit.id, asOf: SeptenaDate.today)
-        let accent = theme.color(for: "habits")
         if done {
-          if let m = StreakMilestones.reached(streak), HabitMilestoneStore.lastCelebrated(habit.id) < m {
-            // Milestone — the loud version: rings + streak number.
-            HabitMilestoneStore.setCelebrated(habit.id, m)
-            Haptics.success()
-            logCommit?.fire(.ignition(accent: accent, streak: streak))
-            A11y.announce("\(streak) day streak!")
-          } else {
-            // Everyday completion — the checkbox plays the `.echo` feel (the
-            // streak answering itself); here we play its matched haptic, a
-            // touch fuller as you work through this bucket of the day. Count
-            // includes the just-completed habit (model flipped it above).
-            let doneInBucket = model.habits.filter { $0.bucket == habit.bucket && $0.done }.count
-            Haptics.play(CheckFeel.echo.hapticSpec(intensity: 0.8 + Double(doneInBucket) * 0.1))
-          }
-        } else {
-          HabitMilestoneStore.reconcile(habit.id, currentStreak: streak)
+          // Everyday completion — the checkbox plays the `.echo` feel (the
+          // streak answering itself); here we play its matched haptic, a
+          // touch fuller as you work through this bucket of the day. Count
+          // includes the just-completed habit (model flipped it above).
+          let doneInBucket = model.habits.filter { $0.bucket == habit.bucket && $0.done }.count
+          Haptics.play(CheckFeel.echo.hapticSpec(intensity: 0.8 + Double(doneInBucket) * 0.1))
         }
       }
     )

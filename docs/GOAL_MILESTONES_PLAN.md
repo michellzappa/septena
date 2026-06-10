@@ -1,5 +1,25 @@
 # Goal Milestones
 
+> **STATUS: BUILT 2026-06-10** (uncommitted; iOS + macOS + watchOS schemes
+> green). Implementation notes where reality diverged from the plan:
+> - Detection runs **inside the mutators** (`ChecklistMutator.setHabitState`,
+>   `TrainingMutator.addEntry`, `WithingsStore.upsert`), so every write path
+>   (views, App Intents, MCP) detects — not just view-side call sites.
+> - **One presentation path, not two**: `MilestonePresenter` at the app root
+>   consumes the inbox on a debounced `.septenaDataChanged` (≈0.6s after the
+>   earning log — effectively inline) plus scene-activation; there is no
+>   separate inline path. Habit/training/body all present identically.
+> - Each scope writes an **`init` sentinel row** on first evaluation —
+>   without it, a scope whose grandfather pass grants nothing would look
+>   like a first pass forever.
+> - `celebrate:` parameter distinguishes live triggers from reconciles —
+>   launch/scene reconciles grant silently so CK-synced history from another
+>   device never reads as a live crossing.
+> - The legacy `StreakMilestones`/`HabitMilestoneStore` (UserDefaults)
+>   bookkeeping in LogCommit.swift was REPLACED by the engine; `IgnitionView`
+>   was generalized (headline/caption) and reused for PR/target/held30 cards
+>   via the new `LogCommitStyle.milestone` case.
+
 Turn continuously-true goal state into discrete, latched, celebrateable events.
 Today the app only *monitors* — current values, trailing windows, heatmaps. A
 milestone is the missing primitive: "the smoothed weight crossed 78kg", "first

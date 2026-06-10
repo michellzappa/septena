@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import EventKit
 import CloudKit
+import Combine
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -104,6 +105,11 @@ struct SeptenaApp: App {
               // watch-originated completions get reflected back to the watch.
               await MainActor.run {
                 WatchSnapshotPublisher.publish(context: localStore.container.mainContext)
+                // Surface milestones earned while away (background Withings
+                // ingest, logs from intents, another device's data syncing in).
+                MilestonePresenter.presentPending(
+                  milestones: services.milestoneMutator, theme: theme,
+                  logCommit: logCommit, now: dayClock.now)
               }
             }
             // Keep the Claude gateway's CloudKit token fresh. No-op unless
@@ -204,6 +210,19 @@ struct SeptenaApp: App {
           // range goals. After CK fetch above so it won't duplicate bands a
           // sibling device already migrated.
           MacroTargetMigration.runIfNeeded(context: localStore.container.mainContext)
+          // Milestone reconcile. The first pass per scope is the grandfather
+          // pass: every already-qualified rung is granted silently, so launch
+          // day never celebrates history. Runs after the CK fetch above so a
+          // sibling device's milestone rows are already folded in (the
+          // deterministic ids make the order moot, but quiet is quieter).
+          // Body goals DO celebrate here — crossings that happened while the
+          // app was away queue for the presenter below.
+          let milestones = services.milestoneMutator
+          milestones.evaluateBodyGoals(now: dayClock.now, today: dayClock.today)
+          milestones.evaluateTraining(now: dayClock.now, celebrate: false)
+          milestones.evaluateAllHabitStreaks(now: dayClock.now, today: dayClock.today)
+          MilestonePresenter.presentPending(milestones: milestones, theme: theme,
+                                            logCommit: logCommit, now: dayClock.now)
           #if DEBUG
           // One-shot, DEBUG-only: register optional CloudKit fields that
           // exist in code but were never written in Development, so they
@@ -219,6 +238,17 @@ struct SeptenaApp: App {
         .onReceive(NotificationCenter.default
           .publisher(for: .EKEventStoreChanged)) { _ in
           Task { await runRemindersAutoImport() }
+        }
+        // Detectors at the mutator boundary only WRITE milestone rows; this
+        // debounced watcher is what actually fires the celebration, within a
+        // beat of the log that earned it. One presentation path for every
+        // source — see MilestonePresenter.
+        .onReceive(NotificationCenter.default
+          .publisher(for: .septenaDataChanged)
+          .debounce(for: .seconds(0.6), scheduler: RunLoop.main)) { _ in
+          MilestonePresenter.presentPending(
+            milestones: services.milestoneMutator, theme: theme,
+            logCommit: logCommit, now: dayClock.now)
         }
         .onAppear {
           #if canImport(UIKit)

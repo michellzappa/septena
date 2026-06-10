@@ -143,6 +143,11 @@ final class WithingsStore {
       ckEngine?.noteWithingsRowChange(id: id)
     }
     NotificationCenter.default.post(name: .septenaWithingsChanged, object: nil)
+    // Body-metric goal rungs ride the ingest: a sync that moves the trailing
+    // average past a rung queues the celebration for the next foreground
+    // moment (Withings lands in the background — nobody is watching).
+    SeptenaServices.shared.milestoneMutator.evaluateBodyGoals(
+      now: .now, today: SeptenaDate.today)
   }
 
   /// N most recent days, newest-first (matches the FastAPI envelope).

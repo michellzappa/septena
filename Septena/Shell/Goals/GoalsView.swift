@@ -491,6 +491,27 @@ struct EditGoalSheet: View {
             }
           }
         }
+        // Earned milestone history — latched rungs from MilestoneEngine,
+        // newest first. Grandfathered grants (celebrated == false) appear
+        // dimmed: honest history, but they never had a moment.
+        let earned = SeptenaServices.shared.milestoneMutator.milestones(goalID: goal.id)
+        if !earned.isEmpty {
+          Section("Milestones") {
+            ForEach(earned, id: \.id) { m in
+              HStack {
+                Image(systemName: "flag.checkered")
+                  .foregroundStyle(m.celebrated ? .primary : .secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                  Text(m.label)
+                  Text(m.occurredAt, style: .date)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                }
+              }
+              .foregroundStyle(m.celebrated ? .primary : .secondary)
+            }
+          }
+        }
         Section {
           Button(role: .destructive) {
             showDeleteConfirm = true

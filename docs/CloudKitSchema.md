@@ -45,7 +45,7 @@ required for the app's own sync. They *are* required for any consumer that runs 
 ## Production deploy — the pending changelog
 
 Promotion is additive, so all that matters is: **what exists in Dev that Production
-must also have.** Three known-recent additions (all build-verified on Dev, never yet
+must also have.** Four known-recent additions (all build-verified on Dev, never yet
 promoted to Prod):
 
 | # | Change | Record type(s) | Field(s) | Type |
@@ -53,6 +53,7 @@ promoted to Prod):
 | 1 | **New field** `occurredAt` | `HabitEvent`, `SupplementEvent`, `ChoreEvent`, `GutEvent`, `CaffeineEvent`, `CannabisEvent`, `ExerciseEntry` (7 existing event types) | `occurredAt` | Timestamp(Date) |
 | 2 | **New record type** `MoodEvent` (whole type, 9 fields incl. its own `occurredAt`) | `MoodEvent` | all | — |
 | 3 | **New field** `bucket` (optional supplement time-bucket) | `SupplementDefinition` | `bucket` | String |
+| 4 | **New record type** `GoalMilestone` (whole type, 9 fields — latched achievement events) | `GoalMilestone` | all | — |
 
 `MoodEvent` reuses the CloudKit record slot vacated by the retired `AirReading` type
 (Air section removed in the same merge). It is a *new* type from Production's point of
@@ -227,6 +228,24 @@ These six are the task backend, written by `SeptenaCore/CloudKit/*Record.swift`.
 | `metricBaseline` | Double | `Double?` | Yes | |
 | `metricTargetUpper` | Double | `Double?` | Yes | upper bound for `range` ("between"); **NEW — pending Prod deploy** |
 | `reservedString1`, `reservedString2`, `reservedDate1`, `reservedInt1` | — | reserved | — | |
+
+#### GoalMilestone  — recordName `gms:{id}`  · **⚠ ENTIRE TYPE PENDING PROD DEPLOY**
+Latched achievement events (goal rungs / PRs / streak milestones — see
+`docs/GOAL_MILESTONES_PLAN.md`). Entity `id` is deterministic
+(`<scope>|<rungKey>`), so two devices detecting the same crossing write the
+same recordName — a benign same-content conflict, never a duplicate.
+| Field | CK type | Swift | Nullable | Notes |
+|---|---|---|---|---|
+| `goalID` | String | `String?` | Yes | nil for goal-less scopes (PR/XP/streak) |
+| `scope` | String | `String` | No | `goal:{id}` \| `exercise:{slug}` \| `habit:{id}` \| `training.volume` |
+| `kind` | String | `String` | No | rung\|pr\|xp\|streak |
+| `rungKey` | String | `String` | No | e.g. `kg:78`, `pr:100`, `xp:25000`, `streak:30`, `halfway`, `target`, `held30` |
+| `label` | String | `String` | No | user-facing, resolved at detection time |
+| `value` | Double | `Double` | No | the crossed value |
+| `occurredAt` | Date/Time | `Date` | No | when the crossing was detected |
+| `celebrated` | Int(64) | `Bool` | No | 0 = granted silently (grandfathered/backfill) |
+| `presentedAt` | Date/Time | `Date?` | Yes | queued-celebration shown; syncs so one device's showing silences the rest |
+| `reservedString1`, `reservedDate1`, `reservedInt1` | — | reserved | — | |
 
 #### CoachVoice  — recordName `coachVoice:{coachKey}`
 One row per coach (coachKey = CoachDomain rawValue: training/food/accountability/wholeLife/custom). The user's per-coach tone dials. **NEW — pending Prod deploy.**

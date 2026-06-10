@@ -154,12 +154,21 @@ enum HabitsPlugin: SectionPlugin {
     // so the nudge just opens the app. Tap-to-open only.
     [NotificationDescriptor(
       id: "habits.incomplete", sectionKey: "habits", title: String(localized: "Habits reminder", comment: "Scheduled notification name"),
-      priority: 20)]
+      priority: 20),
+     // "One day from a streak rung" — fires only on the day a milestone is a
+     // single log away and that log is still pending. Nudge to mark, not nag
+     // to do; outranks the generic incomplete nudge when both qualify.
+     NotificationDescriptor(
+      id: "habits.streakRung", sectionKey: "habits", title: String(localized: "Streak milestone reminder", comment: "Scheduled notification name"),
+      priority: 25)]
   }
 
   static func evaluateNotification(_ descriptorID: String,
                                    context: ModelContext,
                                    now: Date) -> NotificationPlan? {
+    if descriptorID == "habits.streakRung" {
+      return streakRungPlan(context: context, now: now)
+    }
     guard descriptorID == "habits.incomplete" else { return nil }
     let today = SeptenaDate.today
     guard let day = ChecklistMirror.loadHabitsDay(context: context, date: today) else { return nil }
@@ -180,6 +189,45 @@ enum HabitsPlugin: SectionPlugin {
     let n = pending.count
     let body = String(localized: "\(n) habits left today", comment: "Habit reminder body (plural)")
     return NotificationPlan(descriptorID: descriptorID, title: String(localized: "Habits"),
+                            body: body, threadID: "habits", minuteOfDay: minute)
+  }
+
+  /// A habit is one day from an unearned streak rung (current streak ==
+  /// rung − 1) and today's log is still pending. When several qualify, the
+  /// biggest rung wins — "one day from 100" beats "one day from 7".
+  private static func streakRungPlan(context: ModelContext,
+                                     now: Date) -> NotificationPlan? {
+    let today = SeptenaDate.today
+    guard let day = ChecklistMirror.loadHabitsDay(context: context, date: today) else { return nil }
+    let pending = day.grouped.values.flatMap { $0 }.filter { !$0.done && !$0.skipped }
+    guard !pending.isEmpty else { return nil }
+
+    let earned = Set((((try? context.fetch(FetchDescriptor<GoalMilestoneEntity>())) ?? []))
+      .filter { $0.kind == "streak" }
+      .map(\.id))
+
+    var best: (habit: String, rung: Int)? = nil
+    for item in pending {
+      let dates = ChecklistMirror.habitCompletionDates(context: context, habitID: item.id)
+      let streak = ConsistencyStats.make(dates: dates, today: today).currentStreak
+      guard let rung = MilestoneMutator.streakLadder.first(where: { $0 == streak + 1 }),
+            !earned.contains("habit:\(item.id)|streak:\(rung)") else { continue }
+      if rung > (best?.rung ?? 0) { best = (item.name, rung) }
+    }
+    guard let best else { return nil }
+
+    // Same learned wrap-up hour as the incomplete nudge — this isn't a
+    // second ping time, it's a better reason at the same moment.
+    let states = (try? context.fetch(FetchDescriptor<HabitDayStateEntity>(
+      predicate: #Predicate { $0.done == true }
+    ))) ?? []
+    let dateTimes = states.map { ($0.date, EventTimestamp.hhmm(from: $0.occurredAt)) }
+    let minute = NextScoring.learnedLateMinute(dateTimes: dateTimes,
+                                               today: today, fallback: 20 * 60)
+    let body = String(localized: "One day from a \(best.rung)-day streak — log \(best.habit) to lock it in.",
+                      comment: "Streak milestone reminder body")
+    return NotificationPlan(descriptorID: "habits.streakRung",
+                            title: String(localized: "Habits"),
                             body: body, threadID: "habits", minuteOfDay: minute)
   }
 }

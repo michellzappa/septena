@@ -45,6 +45,7 @@ final class SeptenaServices {
   let nutritionMutator: NutritionMutator
   let areasMutator: AreasMutator
   let projectsMutator: ProjectsMutator
+  let milestoneMutator: MilestoneMutator
   /// Cached start task. Holds the work of wiring CKEngine + binding
   /// mutators; replays its result to any caller. Nil until first
   /// `start()`; non-nil thereafter so repeated calls coalesce.
@@ -68,6 +69,7 @@ final class SeptenaServices {
     self.nutritionMutator = NutritionMutator(context: context, ckEngine: nil)
     self.areasMutator = AreasMutator(context: context)
     self.projectsMutator = ProjectsMutator(context: context)
+    self.milestoneMutator = MilestoneMutator(context: context, ckEngine: nil)
   }
 
   /// Idempotently enable a section as a side-effect of logging to it from
@@ -249,6 +251,15 @@ final class SeptenaServices {
         if recordName.hasPrefix("goal:") {
           let id = GoalCloudKitSchema.entityID(from: recordName)
           if let entity = try? context.fetch(FetchDescriptor<GoalEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
+        if recordName.hasPrefix("gms:") {
+          let id = GoalMilestoneCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<GoalMilestoneEntity>(
             predicate: #Predicate { $0.id == id }
           )).first {
             return entity.toCloudKitRecord()
@@ -563,6 +574,18 @@ final class SeptenaServices {
           } else {
             context.insert(GoalEntity(cloudKit: record))
           }
+        case GoalMilestoneCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = GoalMilestoneCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<GoalMilestoneEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            // Fetched milestones fold in silently — the detecting device owns
+            // the celebration moment; this device just records history.
+            context.insert(GoalMilestoneEntity(cloudKit: record))
+          }
         case CoachVoiceCloudKitSchema.recordType:
           batchTouchedData = true
           let id = CoachVoiceCloudKitSchema.entityID(from: record.recordID.recordName)
@@ -858,6 +881,14 @@ final class SeptenaServices {
           )).first {
             context.delete(entity)
           }
+        case GoalMilestoneCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = GoalMilestoneCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<GoalMilestoneEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
         case CoachVoiceCloudKitSchema.recordType:
           batchTouchedData = true
           let id = CoachVoiceCloudKitSchema.entityID(from: recordID.recordName)
@@ -1032,6 +1063,7 @@ final class SeptenaServices {
       taskMutator.bind(ckEngine: ckEngine)
       checklistMutator.bind(ckEngine: ckEngine)
       goalMutator.bind(ckEngine: ckEngine)
+      milestoneMutator.bind(ckEngine: ckEngine)
       coachVoiceMutator.bind(ckEngine: ckEngine)
       coachMessageMutator.bind(ckEngine: ckEngine)
       gutMutator.bind(ckEngine: ckEngine)
@@ -1359,6 +1391,14 @@ final class ChecklistMutator {
     state.updatedAt = .now
     if state.modelContext == nil { context.insert(state) }
     commitHabitEvent(state, op: "state")
+    // Milestone detection at the write boundary so every path (views,
+    // intents, MCP) detects. Backfills (date != today) grant silently —
+    // history stays honest but never animates.
+    if done {
+      let today = SeptenaDate.today
+      SeptenaServices.shared.milestoneMutator.evaluateHabitStreak(
+        habitID: id, now: .now, today: today, celebrate: date == today)
+    }
   }
 
   private func fetchHabitDefinition(id: String) -> HabitDefinitionEntity? {
@@ -2757,6 +2797,10 @@ final class TrainingMutator {
     entity.occurredAt = EventTimestamp.from(date: date, time: time)
     context.insert(entity)
     commitEntry(entity, op: "create")
+    // PR/XP detection at the write boundary; scoped to this exercise so the
+    // scan stays narrow. Celebration is queued — the root presenter shows it.
+    SeptenaServices.shared.milestoneMutator.evaluateTraining(
+      now: .now, exercise: entity.exercise)
     return entity
   }
 

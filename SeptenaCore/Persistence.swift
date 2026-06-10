@@ -510,6 +510,56 @@ final class GoalEntity {
   }
 }
 
+/// A latched achievement event — a goal rung crossed, a training PR, a streak
+/// milestone. Rows are written exactly once per (scope, rungKey) and never
+/// revoked: the deterministic `id` ("\(scope)|\(rungKey)") makes detection
+/// idempotent across devices, re-syncs, and re-evaluation, regardless of how
+/// often the underlying data is rewritten. `celebrated == false` rows are
+/// silent grants (grandfathered history / skipped intermediate rungs); only
+/// rows detected as a live crossing celebrate, and only on the device that
+/// detected them — CloudKit-fetched rows fold in quietly.
+@Model
+final class GoalMilestoneEntity {
+  @Attribute(.unique) var id: String   // deterministic: "<scope>|<rungKey>"
+  var goalID: String?                  // owning goal, nil for goal-less scopes (PR/XP/streak)
+  var scope: String                    // "goal:<id>" | "exercise:<slug>" | "habit:<id>" | "training.volume"
+  var kind: String                     // "rung" | "pr" | "xp" | "streak"
+  var rungKey: String                  // "kg:78" | "pr:100" | "xp:25000" | "streak:30" | "halfway" | "target" | "held30"
+  var label: String                    // user-facing, resolved at detection time
+  var value: Double                    // the crossed value (smoothed kg, PR kg, streak days…)
+  var occurredAt: Date                 // when the crossing was detected
+  var celebrated: Bool                 // false = granted silently, never animates
+  var presentedAt: Date?               // when the celebration was shown (queued path); syncs so one device's showing silences the rest
+  var updatedAt: Date
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       goalID: String? = nil,
+       scope: String,
+       kind: String,
+       rungKey: String,
+       label: String,
+       value: Double,
+       occurredAt: Date,
+       celebrated: Bool,
+       presentedAt: Date? = nil,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.goalID = goalID
+    self.scope = scope
+    self.kind = kind
+    self.rungKey = rungKey
+    self.label = label
+    self.value = value
+    self.occurredAt = occurredAt
+    self.celebrated = celebrated
+    self.presentedAt = presentedAt
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
 /// Per-coach voice settings — the user's tone dials for one coach. `id` is the
 /// coach key (CoachDomain rawValue); one row per coach. Dial values are stored
 /// as raw strings so SeptenaCore stays free of the app-side voice enums. Syncs
@@ -2896,6 +2946,7 @@ final class LocalStore {
                          ChoreDefinitionEntity.self, ChoreEventEntity.self,
                          ChoreSnapshotEntity.self,
                          GoalEntity.self,
+                         GoalMilestoneEntity.self,
                          CoachVoiceEntity.self,
                          CoachMessageEntity.self,
                          GutEventEntity.self,
