@@ -263,6 +263,10 @@ enum Theme {
     /// (see `SettleStore`). Gentle enough to read as "drifting away", not a
     /// snap. Paired with `.transition(.opacity)` on the open-list rows.
     static let settle: Animation = .easeInOut(duration: 0.35)
+    /// Check: the checkbox fill + checkmark popping in (`TaskCheckbox`).
+    /// A quick spring with a touch of overshoot — fast enough that rapid
+    /// checking never waits on it, springy enough to feel like a stamp.
+    static let check: Animation = .spring(response: 0.28, dampingFraction: 0.55)
   }
 }
 

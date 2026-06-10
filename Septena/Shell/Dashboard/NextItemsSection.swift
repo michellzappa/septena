@@ -82,7 +82,8 @@ final class TodayTasksModel {
       tasks[i].status = .open
       actedTasks.insert(task.id)
     } else {
-      Haptics.success()
+      // Done-side haptic + flourish is owned by the caller (TodayTaskRow),
+      // which fires the context-scaled `TaskCelebration` after this returns.
       mutator.complete(id: task.id)
       tasks[i].status = .done
       actedTasks.insert(task.id)
@@ -136,6 +137,9 @@ struct TodayTaskRow: View {
   var areas: [Area] = []
   var projects: [Project] = []
   @Environment(\.a11yMotion) private var motion
+  // Optional — same contract as HabitRow: hosts that don't inherit the root
+  // env skip only the visual; the toggle + haptic still run.
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
   var body: some View {
     // On the Next surface every row is already today, so no Today indicator and
@@ -147,7 +151,19 @@ struct TodayTaskRow: View {
       areas: areas,
       projects: projects,
       showsTodayIndicator: false,
-      onToggle: { model.toggle(task, mutator: mutator, motion: motion) },
+      onToggle: {
+        let completing = task.status != .done
+        model.toggle(task, mutator: mutator, motion: motion)
+        // Every row here is a Today task; if the check left nothing open
+        // (the just-checked row lingers as done), today's list is clear.
+        if completing {
+          let cleared = !model.openTasks.contains { $0.status == .open }
+          TaskCelebration.completed(isToday: true,
+                                    clearedToday: cleared,
+                                    accent: tint,
+                                    logCommit: logCommit)
+        }
+      },
       onTap: nil
     )
     // Same app-wide pattern as the other rows: long-press → menu. The

@@ -16,6 +16,9 @@ struct TasksDestinationView: View {
   @Environment(SectionTheme.self) private var theme
   @Environment(\.modelContext) private var modelContext
   @Environment(\.a11yMotion) private var motion
+  /// App-root celebration layer. Optional — completion still confirms via
+  /// haptic when a host doesn't inherit the root environment.
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
   @AppStorage(SettingsKey.todayShowCompleted) private var showCompleted: Bool = true
 
   /// Drives the "linger → fade" beat after a check (see `SettleStore`).
@@ -142,8 +145,8 @@ struct TasksDestinationView: View {
   /// of Done (see `SettleStore`). Re-checking within the window cancels the
   /// fade. Reduce Motion drops the fade but keeps the delayed move.
   private func toggle(_ task: SeptenaTask) {
-    Haptics.tick()
     if task.status == .done {
+      Haptics.tap()
       // Uncomplete — abort any in-flight fade and restore to the open list,
       // whether the row is still settling in Today or already sitting in Done.
       mutator.uncomplete(id: task.id)
@@ -176,6 +179,14 @@ struct TasksDestinationView: View {
           if showCompleted { doneTasks.insert(done, at: 0) }
         }
       }
+      // The drawer is Today-only, so every check is a Today completion;
+      // after the in-place flip "all done" means today's list is clear.
+      // (See `TaskCelebration` — motion-matched haptic + flourish.)
+      let clearedToday = !openTasks.contains { $0.status == .open }
+      TaskCelebration.completed(isToday: true,
+                                clearedToday: clearedToday,
+                                accent: accent,
+                                logCommit: logCommit)
     }
   }
 

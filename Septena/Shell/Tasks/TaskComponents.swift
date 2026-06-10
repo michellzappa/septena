@@ -45,26 +45,91 @@ struct TaskCheckbox: View {
     return Theme.inkSecondary.opacity(0.85)
   }
 
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  /// Decorative pulse honors the same opt-out as the commit flourishes
+  /// (Settings ▸ Customize). The check/uncheck state change itself still
+  /// animates via `.a11yAnimation` — that's feedback, not decoration.
+  @AppStorage(SettingsKey.loggingAnimationsEnabled) private var animationsEnabled = true
+
+  /// One-shot pulse ring thrown on check (never on uncheck / first render).
+  @State private var ringScale: CGFloat = 1
+  @State private var ringOpacity: Double = 0
+
   var body: some View {
     Button(action: onToggle) {
       ZStack {
-        if isDone {
-          RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
-            .fill(boxFillColor)
-            .frame(width: Self.boxSize, height: Self.boxSize)
-          Image(systemName: "checkmark")
-            .scaledFont(size: Self.checkSize, weight: .bold)
-            .foregroundStyle(.white)
-        } else {
-          RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
-            .strokeBorder(boxStrokeColor, lineWidth: Self.boxStroke)
-            .frame(width: Self.boxSize, height: Self.boxSize)
-        }
+        // Pulse ring — a single small ripple in the box's own geometry,
+        // fired from onChange below. Local and brief on purpose: the
+        // canvas-level celebration belongs to `CommitFlourish`, not here.
+        RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
+          .strokeBorder((tint ?? boxFillColor).opacity(ringOpacity), lineWidth: 1.5)
+          .frame(width: Self.boxSize, height: Self.boxSize)
+          .scaleEffect(ringScale)
+        // Open chrome — fades out under the arriving fill.
+        RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
+          .strokeBorder(boxStrokeColor, lineWidth: Self.boxStroke)
+          .frame(width: Self.boxSize, height: Self.boxSize)
+          .opacity(isDone ? 0 : 1)
+          .a11yAnimation(Theme.Motion.quick, value: isDone)
+        // Fill pops in with a touch of overshoot; shrinks away quietly on
+        // uncheck (undo is a correction, not a moment).
+        RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
+          .fill(boxFillColor)
+          .frame(width: Self.boxSize, height: Self.boxSize)
+          .scaleEffect(isDone ? 1 : 0.55)
+          .opacity(isDone ? 1 : 0)
+          .a11yAnimation(isDone ? Theme.Motion.check : Theme.Motion.quick, value: isDone)
+        // Check stamps in from smaller than the fill, so it reads as
+        // follow-through rather than arriving glued to the box.
+        Image(systemName: "checkmark")
+          .scaledFont(size: Self.checkSize, weight: .bold)
+          .foregroundStyle(.white)
+          .scaleEffect(isDone ? 1 : 0.25)
+          .opacity(isDone ? 1 : 0)
+          .a11yAnimation(isDone ? Theme.Motion.check : Theme.Motion.quick, value: isDone)
       }
       .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
+    .onChange(of: isDone) { _, done in
+      // Pulse only on a live check. `onChange` skips first render, so a
+      // list of already-done rows (Logbook) never fires a wall of ripples.
+      guard done, !reduceMotion, animationsEnabled else { return }
+      ringScale = 0.9
+      ringOpacity = 0.6
+      withAnimation(.easeOut(duration: 0.4)) {
+        ringScale = 1.9
+        ringOpacity = 0
+      }
+    }
+  }
+}
+
+// MARK: - Completion celebration
+//
+// Tasks' mapping onto the shared `CommitMotion` vocabulary — the per-section
+// mapping pattern (cf. `MoodQuadrant.commitMotion`, ChoreRow's `.settle`).
+// For tasks the *completion* is the reward moment (creating one is just
+// filing work), and it scales with what the check means:
+//
+//   • ordinary task          → .sink   — quiet acknowledgment
+//   • Today task             → .settle — filed off today's list
+//   • the LAST Today task    → .burst  — today's list is clear; celebrate
+//
+// Owned by the toggle call sites (same pattern as ChoreRow / HabitRow):
+// only they know their list context, so they pass `clearedToday`. The haptic
+// is motion-matched, replacing the old flat `Haptics.success()`.
+
+@MainActor
+enum TaskCelebration {
+  static func completed(isToday: Bool,
+                        clearedToday: Bool,
+                        accent: Color,
+                        logCommit: LogCommitCenter?) {
+    let motion: CommitMotion = clearedToday ? .burst : (isToday ? .settle : .sink)
+    Haptics.play(motion.hapticSpec(intensity: 1))
+    logCommit?.fire(.flourish(motion: motion, accent: accent, intensity: 1))
   }
 }
 

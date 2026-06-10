@@ -18,6 +18,9 @@ struct TaskListView: View {
   @Environment(SectionTheme.self) private var theme
   @Environment(\.modelContext) private var modelContext
   @Environment(\.a11yMotion) private var motion
+  /// App-root celebration layer. Optional — completion still confirms via
+  /// haptic when a host doesn't inherit the root environment.
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
   let filter: TaskFilter
   /// True when this view is laid out *inside* another detail screen
@@ -1226,9 +1229,23 @@ struct TaskListView: View {
   /// time the screen reloads (which happens when you leave & return).
   private func toggle(_ task: SeptenaTask) {
     let newStatus: TaskStatus = task.status == .done ? .open : .done
-    if newStatus == .done { Haptics.success() } else { Haptics.tap() }
+    if newStatus == .open { Haptics.tap() }
 
     motion.run(Theme.Motion.settle) { flipStatus(id: task.id, to: newStatus) }
+
+    // Context-scaled celebration (see `TaskCelebration`): runs after the
+    // flip so "was that the last open Today task?" reads the new state.
+    // Only the Today screen can see the whole Today set; elsewhere a
+    // today-flagged task settles without claiming to have cleared the day.
+    if newStatus == .done {
+      let clearedToday = filter == .today
+        && !items.contains { $0.status == .open }
+        && !review.contains { $0.status == .open }
+      TaskCelebration.completed(isToday: task.isOnToday || filter == .today,
+                                clearedToday: clearedToday,
+                                accent: theme.color(for: "tasks"),
+                                logCommit: logCommit)
+    }
     if newStatus == .done { sessionDoneIds.insert(task.id) }
     else                  { sessionDoneIds.remove(task.id) }
 
