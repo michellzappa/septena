@@ -71,7 +71,9 @@ enum IntakeReader {
     let events = (try? context.fetch(FetchDescriptor<IntakeEventEntity>())) ?? []
     var counts: [String: Int] = [:]
     for e in events { counts[e.kindID, default: 0] += 1 }
-    return kinds.filter { $0.archivedAt == nil }.map { dto($0, count: counts[$0.id] ?? 0) }
+    var seenIDs = Set<String>()
+    return kinds.filter { $0.archivedAt == nil && seenIDs.insert($0.id).inserted }
+      .map { dto($0, count: counts[$0.id] ?? 0) }
   }
 
   /// Every kind incl. archived, in user order — for the Settings tracker
@@ -83,7 +85,9 @@ enum IntakeReader {
     let events = (try? context.fetch(FetchDescriptor<IntakeEventEntity>())) ?? []
     var counts: [String: Int] = [:]
     for e in events { counts[e.kindID, default: 0] += 1 }
-    return kinds.map { dto($0, count: counts[$0.id] ?? 0) }
+    var seenIDs = Set<String>()
+    return kinds.filter { seenIDs.insert($0.id).inserted }
+      .map { dto($0, count: counts[$0.id] ?? 0) }
   }
 
   /// A single kind by id (archived included — the Manage sheet needs it).
@@ -136,9 +140,10 @@ enum IntakeReader {
   /// One tile per non-archived kind, with today's count/amount folded in —
   /// the homepage tile-per-kind source (Option C).
   static func loadTiles(context: ModelContext, date: String) -> [IntakeTileDTO] {
-    let kinds = (try? context.fetch(FetchDescriptor<IntakeKindEntity>(
+    var seenIDs = Set<String>()
+    let kinds = ((try? context.fetch(FetchDescriptor<IntakeKindEntity>(
       sortBy: [SortDescriptor(\.sortIndex)]
-    )))?.filter { $0.archivedAt == nil } ?? []
+    ))) ?? []).filter { $0.archivedAt == nil && seenIDs.insert($0.id).inserted }
     guard !kinds.isEmpty else { return [] }
     // One full events scan: today's counts/sums plus the last-ever instant per
     // kind (the reduce/quit "days since last" the tile surfaces).

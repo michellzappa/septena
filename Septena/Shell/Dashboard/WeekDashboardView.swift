@@ -927,7 +927,33 @@ struct WeekDashboardView: View {
   /// Activity-on-Mac when HealthKit is unavailable). Future renderers
   /// (Heatmap, List) consume this same property.
   private var visibleDomainData: [HomepageDomainData] {
-    visibleDomains.compactMap { domainData(for: $0) }
+    visibleDomains.flatMap { domain -> [HomepageDomainData] in
+      // Intake expands to one entry per kind here too, so Dense / Heatmap /
+      // Rings / Wheel show per-tracker rows, not a single aggregate.
+      if domain == .intake, !intakeTiles.isEmpty {
+        return intakeTiles.map(intakeKindDomainData)
+      }
+      return domainData(for: domain).map { [$0] } ?? []
+    }
+  }
+
+  private func intakeKindDomainData(_ t: IntakeTileDTO) -> HomepageDomainData {
+    let accent = AdaptiveColor.adaptive(t.color) ?? theme.color(for: "intake")
+    var stats: [DomainStat] = [.init(label: "Today", value: "\(t.todayCount)")]
+    if IntakeObjective.emphasizesStreak(t.objective),
+       let days = intakeDaysSince(t.lastEventAt), days >= 1 {
+      stats.append(.init(label: IntakeObjective.streakLabel(t.objective), value: "\(days)d"))
+    }
+    return HomepageDomainData(
+      domain: .intake,
+      title: t.name,
+      accent: accent,
+      headline: "\(t.todayCount) today",
+      headlineStats: stats,
+      progress: nil,
+      history: nil,
+      tap: .openSheet(.intake)
+    )
   }
 
   /// Single tap router for `HomepageDomainData.tap` actions. Phase 3
@@ -1010,8 +1036,37 @@ struct WeekDashboardView: View {
 
   @ViewBuilder
   private var tiles: some View {
-    ForEach(visibleDomains) { domain in
-      tile(for: domain)
+    ForEach(tileItems) { item in
+      tileView(for: item)
+    }
+  }
+
+  /// One grid cell per item. Intake is flattened HERE — each kind becomes its
+  /// own top-level item, so it lands in its own grid cell (a nested ForEach
+  /// returned from `tile(for:)` would collapse into a single cell instead).
+  private var tileItems: [HomeTileItem] {
+    visibleDomains.flatMap { domain -> [HomeTileItem] in
+      guard domain == .intake else { return [.domain(domain)] }
+      return intakeTiles.isEmpty ? [.domain(.intake)] : intakeTiles.map { .intakeKind($0) }
+    }
+  }
+
+  @ViewBuilder
+  private func tileView(for item: HomeTileItem) -> some View {
+    switch item {
+    case .domain(let d):     tile(for: d)
+    case .intakeKind(let t): intakeKindTile(t)
+    }
+  }
+
+  private enum HomeTileItem: Identifiable {
+    case domain(HomepageDomain)
+    case intakeKind(IntakeTileDTO)
+    var id: String {
+      switch self {
+      case .domain(let d):     return d.rawValue
+      case .intakeKind(let t): return "intake:\(t.id)"
+      }
     }
   }
 
@@ -1031,7 +1086,12 @@ struct WeekDashboardView: View {
         .filter(\.supportsDashboard)
         .compactMap { HomepageDomain(rawValue: $0.key) }
     }
+    // Dedup: a domain renders once even if the section appears twice in the
+    // enabled set (a duplicate SectionEntity would otherwise double its tiles —
+    // and double *every* intake tracker, since intake expands per kind).
+    var seen = Set<HomepageDomain>()
     return enabledKeys.compactMap { HomepageDomain(rawValue: $0) }
+      .filter { seen.insert($0).inserted }
   }
 
   @ViewBuilder
@@ -1048,7 +1108,7 @@ struct WeekDashboardView: View {
     case .groceries:   groceriesTile
     case .caffeine:    caffeineTile
     case .cannabis:    cannabisTile
-    case .intake:      intakeTilesContent
+    case .intake:      intakeEmptyTile  // only reached when there are no kinds
     case .body:        bodyTile
     case .gut:         gutTile
     case .mood:        moodTile
@@ -2020,15 +2080,6 @@ struct WeekDashboardView: View {
   // the `tiles` loop. Tapping opens the kind switcher; each kind page owns its
   // container-aware quick-add. Non-Tiles layout modes show one aggregate row
   // via `intakeDomainData()`. See docs/CONSUMABLES_PLAN.md.
-
-  @ViewBuilder
-  private var intakeTilesContent: some View {
-    if intakeTiles.isEmpty {
-      intakeEmptyTile
-    } else {
-      ForEach(intakeTiles) { tile in intakeKindTile(tile) }
-    }
-  }
 
   private func intakeKindTile(_ t: IntakeTileDTO) -> some View {
     let accent = AdaptiveColor.adaptive(t.color) ?? theme.color(for: "intake")
