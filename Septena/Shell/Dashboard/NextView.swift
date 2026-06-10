@@ -59,13 +59,12 @@ struct NextView: View {
           NextDoneSection(model: model, passive: doneModel.events)
         }
 
+        Spacer(minLength: 140)
       }
-      // Shared surface geometry (gutter + tab-bar clearance) so the rounded
-      // section "pills" (see `nextSectionCard`) sit the same distance off
-      // the screen edge as every other tab. `top: 0` because each section
-      // pads its own top with `Theme.sectionSpacing` — conditionally hidden
-      // sections must not leave gaps.
-      .septenaSurface(top: 0)
+      // Match the Tasks / Goals drawers: shared page inset (Theme.pageGutter)
+      // so the rounded section "pills" (see `nextSectionCard`) sit a consistent
+      // distance off the screen edge.
+      .padding(.horizontal, Theme.pageGutter)
     }
     .background(Theme.groupedBackground)
     .septenaInlineTitle()

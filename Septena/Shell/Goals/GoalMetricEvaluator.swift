@@ -27,11 +27,7 @@ enum GoalMetricCatalog {
   /// then per-plugin declaration order. Computed; no cache — the registry
   /// is tiny and the catalog rebuilds whenever the picker opens.
   static var all: [GoalMetric] {
-    // Source the shared main context so data-dependent metrics (intake's
-    // per-kind set) reflect live kinds. Catalog is recomputed per read (no
-    // cache), so call sites stay unchanged — none need to pass a context.
-    let ctx = LocalStore.shared.container.mainContext
-    return SectionRegistry.all.flatMap { $0.aimMetrics(context: ctx) }
+    SectionRegistry.all.flatMap { $0.aimMetrics }
   }
 
   static func metric(for key: String) -> GoalMetric? {

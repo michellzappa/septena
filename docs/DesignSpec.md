@@ -136,12 +136,6 @@ When in doubt: if a reviewer can ask "where is this defined?" and get two answer
 Shape and motion tokens live alongside the type and color tokens — like color, each has exactly one definition. Don't sprinkle magic numbers.
 
 - **Spacing scale** — `Theme.Spacing.xs/sm/md/lg/xl/xxl` (4 / 8 / 12 / 14 / 16 / 28pt). Drawer chrome (`SectionDrawer`, `DrawerSection`, `ChartCard`, `StatStrip`) consumes these; tune one place and the whole drawer system shifts in step.
-- **Surface geometry** — the four top-level tabs (Week, Next, Tasks sidebar, Coach) share one page geometry, applied through `septenaSurface()` (PlatformShims.swift), never hand-typed per view:
-  - `Theme.pageGutter` (12pt) — screen edge → content, identical on every tab.
-  - `Theme.pageTop` (12pt) — nav bar → first content block. Exception: the Next feed passes `top: 0` because its sections pad their own tops with `sectionSpacing` (conditionally hidden sections must not leave gaps).
-  - `Theme.pageBottom` (80pt iOS / 24pt macOS) — scroll-past air above the floating tab bar.
-  - `Theme.sectionSpacing` (24pt iOS / 16pt macOS) — the one gap between content groups on a surface (Week's banner/timeline/grid, Coach's bands, sidebar grid → area cards).
-  - `Theme.tileGap` (12pt) — between tiles in any surface-level grid (Week tiles, Coach bands, Tasks smart lists).
 - **Corner radius** — `Theme.cornerRadius` (22pt, the iOS-26 "soft tile") and `Theme.cornerRadiusSmall` (6pt, chips and pills).
 - **Row rhythm** — `Theme.rowVPadding`, `iconTextGap`, `checkboxTap`, and the per-platform row/sidebar heights keep the icon column and text baseline aligned across every row type.
 

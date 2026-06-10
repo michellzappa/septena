@@ -233,22 +233,6 @@ struct ClickToEditTitle: View {
 }
 
 extension View {
-  /// Shared page geometry for the four top-level surfaces (Week, Next,
-  /// Tasks sidebar, Coach). Applied to the root content stack inside the
-  /// surface's ScrollView — the single choke point for how a tab meets the
-  /// screen edges, so the four can't drift apart:
-  ///   • `Theme.pageGutter` leading/trailing,
-  ///   • `Theme.pageTop` below the nav bar (pass `top: 0` when the
-  ///     surface's sections pad their own tops, e.g. the Next feed),
-  ///   • `Theme.pageBottom` scroll-past air above the tab bar.
-  /// Backgrounds stay per-surface (the Tasks sidebar differs on macOS).
-  func septenaSurface(top: CGFloat = Theme.pageTop) -> some View {
-    self
-      .padding(.horizontal, Theme.pageGutter)
-      .padding(.top, top)
-      .padding(.bottom, Theme.pageBottom)
-  }
-
   /// Apply the Septena sheet chrome — thin-material glass background plus a
   /// large continuous corner radius so modals match the iOS 26 Liquid Glass
   /// aesthetic. Detents must still be set per-sheet.

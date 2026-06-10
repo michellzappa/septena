@@ -111,11 +111,10 @@ Each milestone lands green and shippable. Phase mapping to the study's phases
 |---|---|---|
 | **0** | Feasibility spike | ✅ DONE — both feasible |
 | **1** | `ConsumableContainer` + golden tests vs `CannabisCapsule` | ✅ DONE — `SeptenaCoreTests`, 6 tests, behavioral identity proven |
-| 2 | `IntakeKind`/`IntakeItem`/`IntakeEvent` entities + `IntakeMutator` + CK extensions + sync dispatch + `Schema` reg. No UI. | ✅ CODE-COMPLETE (iOS build green). Gated on: Dev-schema deploy of 3 record types; local mutator round-trip. Contract-fixtures file moved to milestone 6 (it describes MCP tools that don't exist till then). |
-| 3 | Record-level migrator + verification report | ✅ CODE-COMPLETE (iOS green; 11 hermetic tests on the pure id/field core). Gated on: integration round-trip vs real data (needs schema deploy). Live-sync migrate-on-sight hook wired at milestone 7 (flag-gated). |
-| 4 | Generic destination + kind wizard + Manage sheet. Behind host section, debug-only entry (no manifest row). | ✅ CODE-COMPLETE (iOS green). Reached via Settings ▸ "Intake (debug)". Launch + manual smoke-test pending. |
-| 5a | Manifest row (`intake`) + IntakePlugin (destination, onboarding+templates, per-kind `aimMetrics(context:)`, Settings pane) + registry + `aimMetrics(context:)` protocol change. | ✅ CODE-COMPLETE (iOS green + 30 hermetic tests). Section is enable-able from Manage Sections; goals can target per-kind metrics. Debug entry kept (destination route until 5b tile). |
-| 5b | Dashboard tile-per-kind in `WeekDashboardView` (`HomepageDomain.intake` returns N kind-tiles; data via MirrorReader outside the HTTP loadAll; aggregate row for non-Tiles modes) + debug entry removed. | ✅ CODE-COMPLETE (iOS green). Prod schema deploy (additive) gates the phase-2 release; `ADDING_A_SECTION.md` update still pending. |
+| 2 | `IntakeKind`/`IntakeItem`/`IntakeEvent` entities + `IntakeMutator` + CK extensions. Contract-fixtures file (study §6.1). No UI. | Dev-schema deploy of 3 record types; mutator round-trips locally |
+| 3 | Record-level migrator + verification report | Tested against fixture exports of real caffeine/cannabis data; §7.1 asserts clean (counts, per-day, sums, refs resolved) |
+| 4 | Generic destination + kind wizard + Manage sheet. Behind host section, debug-only entry (no manifest row). | UI works end-to-end for a hand-made kind |
+| 5 | Manifest row (`intake`) + tile-per-kind + quick-add/suggestions + Settings pane. `aimMetrics(context:)` change. | Prod schema deploy (additive); `ADDING_A_SECTION.md` updated |
 | 6 | MCP tools in **both** servers + skill regen + aliases (lockstep) | Gateway fixtures match in-app catalog; `skill.md` regenerated |
 | 7 | **Phase 2** cutover: caffeine template seed + migrate + flag flip + goals remap. Soak. | Worthwhile alone even if 8 never ships |
 | 8 | **Phase 3**: cannabis synthesis from own data + kind merge + hygiene sweep + CI grep gate | iOS target contains no `cannabis` (case-insensitive) |

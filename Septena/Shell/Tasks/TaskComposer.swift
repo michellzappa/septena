@@ -329,40 +329,8 @@ struct TaskAttributeBar: View {
   /// title-field keyboard before showing a calendar.
   let onInteractStart: () -> Void
 
-  /// The electives, in rail order. Each is fully described by the enum (icon /
-  /// label / how it presents); per-attribute *values* are derived from the draft
-  /// in `value(for:)` / `isSet(_:)`, and each editor lives in its own panel. So
-  /// every pill is wired identically — one `ForEach`, one `select(_:)` — and the
-  /// rail grows by adding a case, not another hand-written call.
-  enum Attribute: CaseIterable, Identifiable {
-    case when, deadline, repeatRule, list, notes
-    var id: Self { self }
-
-    var icon: String {
-      switch self {
-      case .when:       "calendar"
-      case .deadline:   "flag"
-      case .repeatRule: "repeat"
-      case .list:       "folder"
-      case .notes:      "text.alignleft"
-      }
-    }
-    var label: String {
-      switch self {
-      case .when:       "When"
-      case .deadline:   "Deadline"
-      case .repeatRule: "Repeat"
-      case .list:       "List"
-      case .notes:      "Notes"
-      }
-    }
-    /// List opens a sheet — a rich, searchable area/project picker reused across
-    /// the Tasks surfaces. Every other pill expands an inline panel under the rail.
-    var presentsSheet: Bool { self == .list }
-  }
-
-  /// The currently expanded inline pill (never `.list`, which presents a sheet).
-  @State private var expanded: Attribute?
+  enum Expanded { case when, deadline, repeatRule, notes }
+  @State private var expanded: Expanded?
   @State private var showingList = false
   @Namespace private var glassNS
 
@@ -376,12 +344,34 @@ struct TaskAttributeBar: View {
       // values change (DesignSpec §5.5) rather than cross-fading.
       GlassEffectContainer(spacing: 8) {
         FlowLayout(spacing: 8) {
-          ForEach(Attribute.allCases) { attr in
-            AttributePill(icon: attr.icon, label: attr.label,
-                          value: value(for: attr), isSet: isSet(attr),
-                          isActive: expanded == attr, accent: accent,
-                          glassID: String(describing: attr), glassNS: glassNS) { select(attr) }
+          AttributePill(icon: "calendar", label: "When",
+                        value: whenValue, isSet: whenIsSet, isActive: expanded == .when,
+                        accent: accent, glassID: "when", glassNS: glassNS) { toggle(.when) }
+
+          AttributePill(icon: "flag", label: "Deadline",
+                        value: draft.deadline.map(Self.dateLabel),
+                        isSet: draft.deadline != nil, isActive: expanded == .deadline,
+                        accent: accent, glassID: "deadline", glassNS: glassNS) { toggle(.deadline) }
+
+          AttributePill(icon: "repeat", label: "Repeat",
+                        value: draft.recurrence?.shortLabel,
+                        isSet: draft.recurrence != nil, isActive: expanded == .repeatRule,
+                        accent: accent, glassID: "repeat", glassNS: glassNS) { toggleRepeat() }
+
+          AttributePill(icon: "folder", label: "List",
+                        value: listValue,
+                        isSet: draft.areaId != nil || draft.projectId != nil,
+                        isActive: false, accent: accent,
+                        glassID: "list", glassNS: glassNS) {
+            onInteractStart()
+            withAnimation(.snappy(duration: 0.2)) { expanded = nil }
+            showingList = true
           }
+
+          AttributePill(icon: "text.alignleft", label: "Notes",
+                        value: notesValue,
+                        isSet: notesIsSet, isActive: expanded == .notes,
+                        accent: accent, glassID: "notes", glassNS: glassNS) { toggle(.notes) }
         }
       }
 
@@ -398,69 +388,69 @@ struct TaskAttributeBar: View {
     }
   }
 
-  /// The value shown on a pill (its `nil` falls back to the plain label). All
-  /// values are derived from the draft — the single read-side of the rail.
-  private func value(for attr: Attribute) -> String? {
-    switch attr {
-    // "When" folds in Today and Someday: a task pinned to today (no date) reads
-    // "Today", a future planning date reads its date, Someday reads "Someday".
-    case .when:
-      if draft.someday { return "Someday" }
-      if let s = draft.scheduled { return Self.dateLabel(s) }
-      return draft.onToday ? "Today" : nil
-    case .deadline:
-      return draft.deadline.map(Self.dateLabel)
-    case .repeatRule:
-      return draft.recurrence?.shortLabel
-    // The List pill always names its destination — "Inbox" by default, the area
-    // or project once filed (but tinted only when explicitly filed, see isSet).
-    case .list:
-      return draft.listLabel(areas: areas, projects: projects)
-    // Notes shows its first line as a one-line preview; AttributePill truncates.
-    case .notes:
-      guard isSet(.notes) else { return nil }
-      return draft.trimmedNotes.split(whereSeparator: \.isNewline).first.map(String.init)
-    }
+  /// The List pill always names its destination — "Inbox" by default, the area
+  /// or project once filed. (This replaces the old "Adding to …" header caption;
+  /// the pill is tinted only when explicitly filed, see its `isSet`.)
+  private var listValue: String? {
+    draft.listLabel(areas: areas, projects: projects)
   }
 
-  /// Whether a pill counts as "filled" — drives the accent tint.
-  private func isSet(_ attr: Attribute) -> Bool {
-    switch attr {
-    case .when:       draft.someday || draft.scheduled != nil || draft.onToday
-    case .deadline:   draft.deadline != nil
-    case .repeatRule: draft.recurrence != nil
-    case .list:       draft.areaId != nil || draft.projectId != nil
-    case .notes:      !draft.trimmedNotes.isEmpty
-    }
+  /// "When" folds in Today and Someday: a task pinned to today (no date) reads
+  /// "Today", a future planning date reads its date, the Someday bucket reads
+  /// "Someday".
+  private var whenIsSet: Bool { draft.someday || draft.scheduled != nil || draft.onToday }
+  private var whenValue: String? {
+    if draft.someday { return "Someday" }
+    if let s = draft.scheduled { return Self.dateLabel(s) }
+    return draft.onToday ? "Today" : nil
+  }
+
+  /// The Notes pill reads its first line as a one-line preview when set (so the
+  /// rail shows what's there without expanding), and the bare "Notes" label
+  /// otherwise. `AttributePill` truncates to a single line.
+  private var notesIsSet: Bool { !draft.trimmedNotes.isEmpty }
+  private var notesValue: String? {
+    guard notesIsSet else { return nil }
+    return draft.trimmedNotes.split(whereSeparator: \.isNewline).first.map(String.init)
   }
 
   @ViewBuilder
   private var inlineEditor: some View {
-    // One transition for every inline panel — they all slide down from the rail.
-    Group {
-      switch expanded {
-      case .when:       InlineWhenPanel(draft: $draft, accent: accent)
-      case .deadline:   InlineDatePanel(date: $draft.deadline, accent: accent)
-      case .repeatRule: InlineRepeatPanel(recurrence: $draft.recurrence, accent: accent)
-      case .notes:      InlineNotesPanel(notes: $draft.notes, accent: accent)
-      case .list, .none: EmptyView()
-      }
+    switch expanded {
+    case .when:
+      InlineWhenPanel(draft: $draft, accent: accent)
+        .transition(.opacity.combined(with: .move(edge: .top)))
+    case .deadline:
+      InlineDatePanel(date: $draft.deadline, accent: accent)
+        .transition(.opacity.combined(with: .move(edge: .top)))
+    case .repeatRule:
+      InlineRepeatPanel(recurrence: $draft.recurrence, accent: accent)
+        .transition(.opacity.combined(with: .move(edge: .top)))
+    case .notes:
+      InlineNotesPanel(notes: $draft.notes, accent: accent)
+        .transition(.opacity.combined(with: .move(edge: .top)))
+    case nil:
+      EmptyView()
     }
-    .transition(.opacity.combined(with: .move(edge: .top)))
   }
 
-  /// The single dispatch for every pill: sheet-backed pills open their sheet,
-  /// inline pills toggle the expanded panel. Per-attribute setup (Repeat seeding
-  /// a default, Notes autofocusing) lives in each panel's `onAppear`, so this
-  /// stays uniform.
-  private func select(_ attr: Attribute) {
+  private func toggle(_ field: Expanded) {
     onInteractStart()
     withAnimation(.snappy(duration: 0.22)) {
-      if attr.presentsSheet {
+      expanded = (expanded == field) ? nil : field
+    }
+  }
+
+  private func toggleRepeat() {
+    onInteractStart()
+    withAnimation(.snappy(duration: 0.22)) {
+      if expanded == .repeatRule {
         expanded = nil
-        showingList = true
       } else {
-        expanded = (expanded == attr) ? nil : attr
+        // Tapping Repeat turns it on with a sensible default (Things-style);
+        // the panel's "Don't Repeat" clears it.
+        if draft.recurrence == nil { draft.recurrence = Recurrence(unit: .week) }
+        expanded = .repeatRule
       }
     }
   }
@@ -689,10 +679,6 @@ private struct InlineRepeatPanel: View {
     .padding(12)
     .background(Theme.secondaryGroupedBackground,
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    // Expanding Repeat turns it on with a sensible default (Things-style); the
-    // panel's "Don't Repeat" clears it. Owned here so the rail's dispatch stays
-    // uniform — same pattern as the Notes panel autofocusing on appear.
-    .onAppear { if recurrence == nil { recurrence = Recurrence(unit: .week) } }
   }
 
   /// Pluralized "N days/weeks/months" via the String Catalog (one/other).

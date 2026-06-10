@@ -75,14 +75,6 @@ protocol SectionPlugin {
   /// a central registry. Default: `[]` (section has nothing measurable).
   static var aimMetrics: [GoalMetric] { get }
 
-  /// Runtime variant: metrics that depend on live data — e.g. the `intake`
-  /// section exposes one metric set per user-defined kind, which only exist at
-  /// runtime. The catalog calls THIS (passing the shared main context); the
-  /// default returns the static `aimMetrics`, so a section with fixed metrics
-  /// needs no change. Keys must embed a stable id (never a name) so renames
-  /// don't orphan goals.
-  static func aimMetrics(context: ModelContext) -> [GoalMetric]
-
   /// Compute the current value of one of this section's `aimMetrics`.
   /// Return `nil` for an unknown key — the dispatcher treats that as a
   /// 0 reading rather than crashing. Implementations should switch on
@@ -355,10 +347,6 @@ extension SectionPlugin {
   /// non-empty list and overriding `evaluateAim`.
   static var aimMetrics: [GoalMetric] { [] }
 
-  /// Default: the static `aimMetrics`. Only sections with data-dependent
-  /// metrics (intake) override this.
-  static func aimMetrics(context: ModelContext) -> [GoalMetric] { aimMetrics }
-
   /// Default: no evaluator. Pairs with the empty default `aimMetrics`.
   static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? { nil }
 
@@ -407,7 +395,6 @@ enum SectionRegistry {
     MoodPlugin.self,
     CaffeinePlugin.self,
     CannabisPlugin.self,
-    IntakePlugin.self,
     GutPlugin.self,
     TrainingPlugin.self,
     NutritionPlugin.self,

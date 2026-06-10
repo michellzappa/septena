@@ -152,27 +152,6 @@ enum Theme {
   /// tight (closer to a flush list) rather than a wide breathing gutter.
   static let pageGutter: CGFloat = 12
 
-  /// Vertical inset from the nav-bar edge to the first content block on the
-  /// four top-level surfaces (Week, Tasks sidebar, Coach). The Next feed is
-  /// the one exception: its sections pad their own tops with
-  /// `sectionSpacing` so conditionally-hidden sections never leave gaps.
-  /// Consumed by `septenaSurface()` — don't hand-type a page top padding.
-  static let pageTop: CGFloat = 12
-
-  /// Scroll-past clearance after the last content block on a top-level
-  /// surface — air above the floating tab bar on iOS; macOS has no floating
-  /// bar so a modest landing strip suffices. Consumed by `septenaSurface()`.
-  #if os(macOS)
-  static let pageBottom: CGFloat = 24
-  #else
-  static let pageBottom: CGFloat = 80
-  #endif
-
-  /// Gap between tiles in a surface-level grid (the Week tile grid, the
-  /// Coach bands, the Tasks smart-list grid). One token so the dashboards'
-  /// grids breathe at the same rhythm — replaces the 12/14 sprinkle.
-  static let tileGap: CGFloat = 12
-
   /// Tap-target width of the row checkbox. Reused by group-header icon
   /// columns and inline-new placeholder so the icon column lines up
   /// across every list row and section header — one X for icons, one X

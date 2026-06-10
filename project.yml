@@ -289,7 +289,6 @@ targets:
       - path: SeptenaCore/ConsumableContainer.swift
       - path: SeptenaCore/CannabisCapsule.swift
       - path: SeptenaCore/SuggestionBlocks.swift
-      - path: SeptenaCore/IntakeModel.swift
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
