@@ -927,7 +927,7 @@ struct GeneralSettingsPane: View {
         Label("Logging animations", systemImage: "sparkles")
       }
     } footer: {
-      Text("The little celebration that plays when you log something — confetti, ripples, a streak landing. Off keeps the confirming haptic but skips the motion. Reduce Motion always overrides this.")
+      Text("The little celebration that plays when you log something — confetti, ripples, a streak landing — and the checkbox feels when you check things off. Off keeps the confirming haptic but skips the motion. Reduce Motion always overrides this.")
     }
   }
 
@@ -2263,6 +2263,27 @@ struct MotionGalleryPane: View {
   @State private var streak: Int = 30
   @State private var current: Demo = .burst
   @State private var trigger: Int = 0
+  /// Live per-row state for the checkbox-feel demos below.
+  @State private var feelDone: [String: Bool] = [:]
+
+  /// One live checkbox per `CheckFeel` — the checkbox-local vocabulary the
+  /// checkable rows use instead of canvas flourishes.
+  private struct FeelDemo: Identifiable {
+    let id: String
+    let feel: CheckFeel
+    let title: String
+    let subtitle: String
+  }
+  private static let feelDemos: [FeelDemo] = [
+    .init(id: "stamp", feel: .stamp, title: "Stamp",
+          subtitle: "Tasks — crisp stamp + one pulse ring"),
+    .init(id: "echo", feel: .echo, title: "Echo",
+          subtitle: "Habits — the pulse answers itself: one more mark on the streak"),
+    .init(id: "drop", feel: .drop, title: "Drop",
+          subtitle: "Supplements — the fill falls in, lands with a soft splash"),
+    .init(id: "tuck", feel: .tuck, title: "Tuck",
+          subtitle: "Chores — stamps, dips, files the ring down the pile"),
+  ]
 
   private var accent: Color {
     Self.accents.first { $0.id == accentID }?.color ?? .green
@@ -2317,9 +2338,9 @@ struct MotionGalleryPane: View {
       case .snap:     return "Ring + flash — releasing tension (Mood HAN)"
       case .bloom:    return "Soft swell — settling (caffeine, nutrition)"
       case .sink:     return "Quiet dot — acknowledgment (gut, late-night)"
-      case .cascade:  return "Marks drop in sequence — quantity (supplements)"
-      case .tally:    return "A mark joins the row — continuity (habits)"
-      case .settle:   return "Row files onto the pile — done (chores)"
+      case .cascade:  return "Marks drop in sequence — quantity (unused; supplements check at the box)"
+      case .tally:    return "A mark joins the row — continuity (unused; habits check at the box)"
+      case .settle:   return "Row files onto the pile — done (unused; chores check at the box)"
       case .ignition: return "Rings + streak number — milestone (7/30/100/365)"
       case .ripple:   return "Experimental · full-screen sonar rings"
       case .arc:      return "Experimental · big glowing comet arc — toward a target"
@@ -2353,6 +2374,38 @@ struct MotionGalleryPane: View {
         Text("Tap to play")
       } footer: {
         Text("Each row fires the same renderer and haptic a real log uses. Under Reduce Motion the visual is suppressed (by design) — you'll still feel the haptic.")
+      }
+
+      // Checkable rows celebrate at the checkbox, never on the canvas —
+      // checking things off is the app's highest-frequency action. Each
+      // type has its own feel (see `CheckFeel`); these are live primitives.
+      Section {
+        ForEach(Self.feelDemos) { demo in
+          HStack(spacing: 12) {
+            TaskCheckbox(tint: accent,
+                         isDone: feelDone[demo.id] ?? false,
+                         feel: demo.feel,
+                         ignoresUserPreference: true,
+                         onToggle: {
+                           let next = !(feelDone[demo.id] ?? false)
+                           feelDone[demo.id] = next
+                           if next {
+                             Haptics.play(demo.feel.hapticSpec())
+                           } else {
+                             Haptics.tap()
+                           }
+                         })
+            VStack(alignment: .leading, spacing: 2) {
+              Text(demo.title).foregroundStyle(.primary)
+              Text(demo.subtitle).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+          }
+        }
+      } header: {
+        Text("Checkbox feels")
+      } footer: {
+        Text("Checkable rows celebrate at the box, each type with its own feel and a CoreHaptics pattern timed to its visual beats. Tasks additionally scale the haptic by context — ordinary, Today, or clearing the last Today task — and habit streak milestones still earn the full-screen Ignition.")
       }
 
       Section("Accent") {

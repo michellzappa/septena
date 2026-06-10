@@ -1816,6 +1816,12 @@
         }
       }
     },
+    "Checkable rows celebrate at the box, each type with its own feel and a CoreHaptics pattern timed to its visual beats. Tasks additionally scale the haptic by context — ordinary, Today, or clearing the last Today task — and habit streak milestones still earn the full-screen Ignition." : {
+
+    },
+    "Checkbox feels" : {
+
+    },
     "Chest" : {
       "localizations" : {
         "pt-BR" : {
@@ -6124,7 +6130,11 @@
         }
       }
     },
+    "The little celebration that plays when you log something — confetti, ripples, a streak landing — and the checkbox feels when you check things off. Off keeps the confirming haptic but skips the motion. Reduce Motion always overrides this." : {
+
+    },
     "The little celebration that plays when you log something — confetti, ripples, a streak landing. Off keeps the confirming haptic but skips the motion. Reduce Motion always overrides this." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {

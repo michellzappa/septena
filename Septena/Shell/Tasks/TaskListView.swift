@@ -18,9 +18,6 @@ struct TaskListView: View {
   @Environment(SectionTheme.self) private var theme
   @Environment(\.modelContext) private var modelContext
   @Environment(\.a11yMotion) private var motion
-  /// App-root celebration layer. Optional — completion still confirms via
-  /// haptic when a host doesn't inherit the root environment.
-  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
   let filter: TaskFilter
   /// True when this view is laid out *inside* another detail screen
@@ -1233,8 +1230,8 @@ struct TaskListView: View {
 
     motion.run(Theme.Motion.settle) { flipStatus(id: task.id, to: newStatus) }
 
-    // Context-scaled celebration (see `TaskCelebration`): runs after the
-    // flip so "was that the last open Today task?" reads the new state.
+    // Context-scaled completion haptic (see `TaskCelebration`): runs after
+    // the flip so "was that the last open Today task?" reads the new state.
     // Only the Today screen can see the whole Today set; elsewhere a
     // today-flagged task settles without claiming to have cleared the day.
     if newStatus == .done {
@@ -1242,9 +1239,7 @@ struct TaskListView: View {
         && !items.contains { $0.status == .open }
         && !review.contains { $0.status == .open }
       TaskCelebration.completed(isToday: task.isOnToday || filter == .today,
-                                clearedToday: clearedToday,
-                                accent: theme.color(for: "tasks"),
-                                logCommit: logCommit)
+                                clearedToday: clearedToday)
     }
     if newStatus == .done { sessionDoneIds.insert(task.id) }
     else                  { sessionDoneIds.remove(task.id) }

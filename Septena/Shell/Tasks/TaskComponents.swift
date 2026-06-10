@@ -1,5 +1,68 @@
 import SwiftUI
 
+// MARK: - Checkbox feel
+//
+// The checkbox's celebration vocabulary — the checkbox-local counterpart of
+// `CommitMotion`. Checkable rows celebrate *at the box*, never on the canvas
+// (checking things off is the app's highest-frequency action; full-screen
+// flourishes there would wear out fast). Each checkable type gets its own
+// feel so completing a habit reads differently from finishing a chore:
+//
+//   • .stamp (tasks)        — a crisp stamp + one pulse ring. Done.
+//   • .echo  (habits)       — the pulse answers itself: one more mark on the
+//                             streak, today echoed by the days behind it.
+//   • .drop  (supplements)  — the fill falls in and lands with a soft
+//                             splash. One more capsule down.
+//   • .tuck  (chores)       — stamps, dips, and files the ring downward.
+//                             Put away, onto the pile.
+//
+// Every feel lives in the box's own geometry and resolves within ~0.45s,
+// with a matched CoreHaptics pattern timed to its visual beats — quiet
+// transients and faint swells, never a flat buzz. Past-day backfill rows
+// keep the default `.stamp`: a correction shouldn't claim a streak echo.
+enum CheckFeel {
+  case stamp
+  case echo
+  case drop
+  case tuck
+
+  /// The compact haptic that pairs with this feel — same beats the visual
+  /// plays, built from quiet transients + faint swells. `intensity` nudges
+  /// loudness inside a narrow band (rows pass day-progress); the band is
+  /// clamped tight on purpose — these stay subtle at any count.
+  func hapticSpec(intensity: Double = 1) -> HapticPatternSpec {
+    let i = Float(min(1.2, max(0.7, intensity)))
+    switch self {
+    case .stamp:
+      // One crisp stamp at the check's landing, then the faintest settle.
+      return HapticPatternSpec(beats: [
+        HapticBeat(kind: .transient, time: 0.04, intensity: 0.42 * i, sharpness: 0.78),
+        HapticBeat(kind: .transient, time: 0.14, intensity: 0.16 * i, sharpness: 0.45),
+      ], fallback: .tick)
+    case .echo:
+      // Today's mark, answered by a quieter, rounder echo (visual ring +0.12s).
+      return HapticPatternSpec(beats: [
+        HapticBeat(kind: .transient, time: 0,    intensity: 0.45 * i, sharpness: 0.62),
+        HapticBeat(kind: .transient, time: 0.12, intensity: 0.22 * i, sharpness: 0.4),
+      ], fallback: .tick)
+    case .drop:
+      // A capsule falling: the faintest swell of air, then a soft round
+      // landing synced to the visual's impact squash (~0.12s).
+      return HapticPatternSpec(beats: [
+        HapticBeat(kind: .continuous, time: 0, duration: 0.1, intensity: 0.18 * i, sharpness: 0.15),
+        HapticBeat(kind: .transient, time: 0.12, intensity: 0.4 * i, sharpness: 0.3),
+      ], fallback: .tick)
+    case .tuck:
+      // Filed away: a low muted thud, then the drawer's softer close
+      // synced to the visual's dip (~0.16s).
+      return HapticPatternSpec(beats: [
+        HapticBeat(kind: .transient, time: 0,    intensity: 0.4 * i,  sharpness: 0.25),
+        HapticBeat(kind: .transient, time: 0.16, intensity: 0.26 * i, sharpness: 0.5),
+      ], fallback: .tick)
+    }
+  }
+}
+
 // MARK: - Checkbox
 
 struct TaskCheckbox: View {
@@ -16,6 +79,13 @@ struct TaskCheckbox: View {
   /// When true (and not done and not today), the checkbox stroke switches to
   /// `Theme.somedayAccent` (muted indigo) to signal a parked/deferred task.
   var isSomeday: Bool = false
+  /// Which celebration plays on check — the row's type picks it (tasks
+  /// `.stamp`, habits `.echo`, supplements `.drop`, chores `.tuck`).
+  var feel: CheckFeel = .stamp
+  /// When true, ignore the user's "Logging animations" opt-out and always
+  /// play the feel on check (Reduce Motion is still honored). Set only by
+  /// the Motion Gallery, where the whole point is to feel it on demand.
+  var ignoresUserPreference: Bool = false
   let onToggle: () -> Void
 
   // Smaller rounded square than the old circle glyph — reads as a checkbox,
@@ -46,90 +116,191 @@ struct TaskCheckbox: View {
   }
 
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  /// Decorative pulse honors the same opt-out as the commit flourishes
+  /// Decorative feel honors the same opt-out as the commit flourishes
   /// (Settings ▸ Customize). The check/uncheck state change itself still
   /// animates via `.a11yAnimation` — that's feedback, not decoration.
   @AppStorage(SettingsKey.loggingAnimationsEnabled) private var animationsEnabled = true
 
-  /// One-shot pulse ring thrown on check (never on uncheck / first render).
+  // One-shot feel state, driven imperatively from onChange (same pattern as
+  // the flourish renderers). All values rest at "invisible"; `resetFeel()`
+  // snaps them back on uncheck so a mid-animation undo can't strand them.
   @State private var ringScale: CGFloat = 1
   @State private var ringOpacity: Double = 0
+  @State private var ringDrift: CGFloat = 0    // tuck: ring files downward
+  @State private var echoScale: CGFloat = 1    // echo: the second, quieter ring
+  @State private var echoOpacity: Double = 0
+  @State private var bodyDrop: CGFloat = 0     // drop: fill falls in from above
+  @State private var bodySquash: CGFloat = 1   // drop: impact squash
+  @State private var bodyDip: CGFloat = 0      // tuck: box dips, then recovers
 
   var body: some View {
     Button(action: onToggle) {
       ZStack {
-        // Pulse ring — a single small ripple in the box's own geometry,
-        // fired from onChange below. Local and brief on purpose: the
-        // canvas-level celebration belongs to `CommitFlourish`, not here.
+        // Echo ring (habits) — the second, quieter pulse behind the main one.
+        RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
+          .strokeBorder((tint ?? boxFillColor).opacity(echoOpacity), lineWidth: 1.2)
+          .frame(width: Self.boxSize, height: Self.boxSize)
+          .scaleEffect(echoScale)
+        // Main pulse ring — every feel throws exactly one (tuck's drifts
+        // down as it fades). Local and brief on purpose: checkable rows
+        // celebrate at the box, never on the canvas.
         RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
           .strokeBorder((tint ?? boxFillColor).opacity(ringOpacity), lineWidth: 1.5)
           .frame(width: Self.boxSize, height: Self.boxSize)
           .scaleEffect(ringScale)
+          .offset(y: ringDrift)
         // Open chrome — fades out under the arriving fill.
         RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
           .strokeBorder(boxStrokeColor, lineWidth: Self.boxStroke)
           .frame(width: Self.boxSize, height: Self.boxSize)
           .opacity(isDone ? 0 : 1)
           .a11yAnimation(Theme.Motion.quick, value: isDone)
-        // Fill pops in with a touch of overshoot; shrinks away quietly on
-        // uncheck (undo is a correction, not a moment).
-        RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
-          .fill(boxFillColor)
-          .frame(width: Self.boxSize, height: Self.boxSize)
-          .scaleEffect(isDone ? 1 : 0.55)
-          .opacity(isDone ? 1 : 0)
-          .a11yAnimation(isDone ? Theme.Motion.check : Theme.Motion.quick, value: isDone)
-        // Check stamps in from smaller than the fill, so it reads as
-        // follow-through rather than arriving glued to the box.
-        Image(systemName: "checkmark")
-          .scaledFont(size: Self.checkSize, weight: .bold)
-          .foregroundStyle(.white)
-          .scaleEffect(isDone ? 1 : 0.25)
-          .opacity(isDone ? 1 : 0)
-          .a11yAnimation(isDone ? Theme.Motion.check : Theme.Motion.quick, value: isDone)
+        // Fill + check, grouped so the feel choreography (drop, squash, dip)
+        // moves them as one body. The fill pops with a touch of overshoot;
+        // the check stamps in from smaller, reading as follow-through.
+        // Uncheck shrinks away quietly (undo is a correction, not a moment).
+        ZStack {
+          RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
+            .fill(boxFillColor)
+            .frame(width: Self.boxSize, height: Self.boxSize)
+            .scaleEffect(isDone ? 1 : 0.55)
+            .opacity(isDone ? 1 : 0)
+            .a11yAnimation(isDone ? Theme.Motion.check : Theme.Motion.quick, value: isDone)
+          Image(systemName: "checkmark")
+            .scaledFont(size: Self.checkSize, weight: .bold)
+            .foregroundStyle(.white)
+            .scaleEffect(isDone ? 1 : 0.25)
+            .opacity(isDone ? 1 : 0)
+            .a11yAnimation(isDone ? Theme.Motion.check : Theme.Motion.quick, value: isDone)
+        }
+        .scaleEffect(x: 1, y: bodySquash, anchor: .bottom)
+        .offset(y: bodyDrop + bodyDip)
       }
       .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
     .onChange(of: isDone) { _, done in
-      // Pulse only on a live check. `onChange` skips first render, so a
+      // Celebrate only on a live check. `onChange` skips first render, so a
       // list of already-done rows (Logbook) never fires a wall of ripples.
-      guard done, !reduceMotion, animationsEnabled else { return }
-      ringScale = 0.9
-      ringOpacity = 0.6
-      withAnimation(.easeOut(duration: 0.4)) {
-        ringScale = 1.9
+      guard done else { resetFeel(); return }
+      guard !reduceMotion, animationsEnabled || ignoresUserPreference else { return }
+      playFeel()
+    }
+  }
+
+  /// One ring pulse from the box outward. `reach` tunes how far it travels —
+  /// the splash of a drop stays tighter than a stamp's pulse.
+  private func pulse(reach: CGFloat = 1.9) {
+    ringScale = 0.9
+    ringOpacity = 0.55
+    ringDrift = 0
+    withAnimation(.easeOut(duration: 0.4)) {
+      ringScale = reach
+      ringOpacity = 0
+    }
+  }
+
+  /// The per-feel choreography. Imperative (like the flourish renderers) so
+  /// beats can be sequenced; everything resolves within ~0.45s and ends at
+  /// rest, so nothing lingers and rapid checking never queues motion.
+  private func playFeel() {
+    switch feel {
+    case .stamp:
+      pulse()
+
+    case .echo:
+      pulse()
+      // The echo: a second, quieter ring answering the first — today's mark
+      // joined by the days behind it. Timed to the haptic's second beat.
+      Task { @MainActor in
+        try? await Task.sleep(for: .milliseconds(120))
+        echoScale = 0.9
+        echoOpacity = 0.4
+        withAnimation(.easeOut(duration: 0.35)) {
+          echoScale = 1.55
+          echoOpacity = 0
+        }
+      }
+
+    case .drop:
+      // The fill falls in from above; on landing it squashes and throws a
+      // tight splash ring, then springs back round.
+      bodyDrop = -7
+      withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { bodyDrop = 0 }
+      Task { @MainActor in
+        try? await Task.sleep(for: .milliseconds(110))
+        withAnimation(.easeOut(duration: 0.08)) { bodySquash = 0.84 }
+        pulse(reach: 1.6)
+        try? await Task.sleep(for: .milliseconds(80))
+        withAnimation(.spring(response: 0.18, dampingFraction: 0.5)) { bodySquash = 1 }
+      }
+
+    case .tuck:
+      // Filed away: the ring drifts downward as it fades — onto the pile —
+      // and the box dips after the stamp, then recovers.
+      ringScale = 0.95
+      ringOpacity = 0.5
+      ringDrift = 0
+      withAnimation(.easeOut(duration: 0.45)) {
+        ringScale = 1.35
         ringOpacity = 0
+        ringDrift = 7
+      }
+      Task { @MainActor in
+        try? await Task.sleep(for: .milliseconds(150))
+        withAnimation(.easeOut(duration: 0.1)) { bodyDip = 2.5 }
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.6).delay(0.1)) { bodyDip = 0 }
       }
     }
+  }
+
+  /// Snap every feel value back to rest, unanimated. Called on uncheck so an
+  /// undo mid-celebration can't strand a half-played ring or squash.
+  private func resetFeel() {
+    ringScale = 1
+    ringOpacity = 0
+    ringDrift = 0
+    echoScale = 1
+    echoOpacity = 0
+    bodyDrop = 0
+    bodySquash = 1
+    bodyDip = 0
   }
 }
 
 // MARK: - Completion celebration
 //
-// Tasks' mapping onto the shared `CommitMotion` vocabulary — the per-section
-// mapping pattern (cf. `MoodQuadrant.commitMotion`, ChoreRow's `.settle`).
-// For tasks the *completion* is the reward moment (creating one is just
-// filing work), and it scales with what the check means:
+// Tasks celebrate at the checkbox (the `.stamp` feel above) — never with a
+// screen-level `CommitFlourish`. What scales with context is the *haptic*:
 //
-//   • ordinary task          → .sink   — quiet acknowledgment
-//   • Today task             → .settle — filed off today's list
-//   • the LAST Today task    → .burst  — today's list is clear; celebrate
+//   • ordinary task          → the plain stamp — crisp, quiet
+//   • Today task             → stamp + a low, soft "filed" after-beat
+//   • the LAST Today task    → a compact rising triplet — the one completion
+//                              haptic with three beats, still quiet
 //
 // Owned by the toggle call sites (same pattern as ChoreRow / HabitRow):
-// only they know their list context, so they pass `clearedToday`. The haptic
-// is motion-matched, replacing the old flat `Haptics.success()`.
+// only they know their list context, so they pass `clearedToday`.
 
 @MainActor
 enum TaskCelebration {
-  static func completed(isToday: Bool,
-                        clearedToday: Bool,
-                        accent: Color,
-                        logCommit: LogCommitCenter?) {
-    let motion: CommitMotion = clearedToday ? .burst : (isToday ? .settle : .sink)
-    Haptics.play(motion.hapticSpec(intensity: 1))
-    logCommit?.fire(.flourish(motion: motion, accent: accent, intensity: 1))
+  static func completed(isToday: Bool, clearedToday: Bool) {
+    if clearedToday {
+      // Today just cleared — three beats climbing in pitch and weight.
+      Haptics.play(HapticPatternSpec(beats: [
+        HapticBeat(kind: .transient, time: 0,    intensity: 0.4,  sharpness: 0.5),
+        HapticBeat(kind: .transient, time: 0.09, intensity: 0.3,  sharpness: 0.65),
+        HapticBeat(kind: .transient, time: 0.2,  intensity: 0.55, sharpness: 0.8),
+      ], fallback: .success))
+    } else if isToday {
+      // A Today task: the stamp, then a rounder, lower "filed" beat.
+      Haptics.play(HapticPatternSpec(beats: [
+        HapticBeat(kind: .transient, time: 0.04, intensity: 0.45, sharpness: 0.7),
+        HapticBeat(kind: .transient, time: 0.16, intensity: 0.22, sharpness: 0.3),
+      ], fallback: .tick))
+    } else {
+      Haptics.play(CheckFeel.stamp.hapticSpec())
+    }
   }
 }
 
@@ -174,6 +345,10 @@ struct CheckableRow<Trailing: View>: View {
   var isDone: Bool
   var isToday: Bool = false
   var isSomeday: Bool = false
+  /// The checkbox celebration this row's type plays on check (see
+  /// `CheckFeel`). Tasks keep the default `.stamp`; habits pass `.echo`,
+  /// supplements `.drop`, chores `.tuck`.
+  var feel: CheckFeel = .stamp
   /// Strikethrough + dimmed title. Usually `isDone`, but habits fold in
   /// skipped and chores fold in deferred, so the caller decides.
   var isInactive: Bool
@@ -200,6 +375,7 @@ struct CheckableRow<Trailing: View>: View {
         isDone: isDone,
         isToday: isToday,
         isSomeday: isSomeday,
+        feel: feel,
         onToggle: onToggle
       )
       .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
