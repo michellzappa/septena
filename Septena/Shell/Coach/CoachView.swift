@@ -39,7 +39,7 @@ struct CoachView: View {
     #if os(iOS)
     // 2-up on iPhone (tiles don't need full width), 3-up on iPad regular.
     let count = (hSize == .regular) ? 3 : 2
-    return Array(repeating: GridItem(.flexible(), spacing: 14), count: count)
+    return Array(repeating: GridItem(.flexible(), spacing: Theme.tileGap), count: count)
     #else
     return GoalGrid.columns(regularWidth: true)
     #endif
@@ -72,14 +72,12 @@ struct CoachView: View {
   var body: some View {
     NavigationStack {
       ScrollView {
-        VStack(alignment: .leading, spacing: 28) {
+        VStack(alignment: .leading, spacing: Theme.sectionSpacing) {
           coachesBand
           if OnDeviceAI.isAvailable { exercisesBand }
           goalsBand
         }
-        .padding(.horizontal, Theme.pageGutter)
-        .padding(.top, Theme.Spacing.sm)
-        .padding(.bottom, 24)
+        .septenaSurface()
       }
       .background(Theme.groupedBackground)
       // While a bottom-sheet coach drawer is open, a tap anywhere on the
@@ -170,7 +168,7 @@ struct CoachView: View {
   private var coachesBand: some View {
     VStack(alignment: .leading, spacing: 12) {
       bandHeader("Coaches", "On-device coaches that reflect your logged data back to you.")
-      LazyVGrid(columns: columns, spacing: 14) {
+      LazyVGrid(columns: columns, spacing: Theme.tileGap) {
         ForEach(CoachDomain.allCases) { domain in
           Button {
             activeCoach = domain
@@ -191,7 +189,7 @@ struct CoachView: View {
   private var exercisesBand: some View {
     VStack(alignment: .leading, spacing: 12) {
       bandHeader("Exercises", "Guided reflections that turn into goals.")
-      LazyVGrid(columns: columns, spacing: 14) {
+      LazyVGrid(columns: columns, spacing: Theme.tileGap) {
         ForEach(DiscoveryRegistry.all) { exercise in
           Button {
             activeExercise = AnyDiscoveryMiniApp(descriptor: exercise)
@@ -234,7 +232,7 @@ struct CoachView: View {
         }
         .frame(maxWidth: .infinity, minHeight: 200)
       } else {
-        LazyVGrid(columns: columns, spacing: 14) {
+        LazyVGrid(columns: columns, spacing: Theme.tileGap) {
           ForEach(goals) { goal in
             Button { editing = goal } label: {
               GoalTile(goal: goal, theme: theme)

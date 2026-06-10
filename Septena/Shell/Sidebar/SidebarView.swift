@@ -169,7 +169,7 @@ struct SidebarRootView: View {
   /// top-left "…" overflow menu (and ⌘, on macOS).
   @ViewBuilder
   private var sidebarPhone: some View {
-    sidebarScrollContent(topPadding: 12, bottomPadding: 24, spacerMinLength: 40)
+    sidebarScrollContent()
     .background(Theme.sidebarBackground)
     // Empty nav bar so iOS renders its default scroll-edge fade as
     // sidebar rows pass behind the top safe area.
@@ -193,25 +193,28 @@ struct SidebarRootView: View {
   /// Settings is the discreet last item in the toolbar's overflow.
   @ViewBuilder
   private var sidebarMac: some View {
-    sidebarScrollContent(topPadding: 12, bottomPadding: 12, spacerMinLength: 24)
+    sidebarScrollContent()
     // No explicit background — NavigationSplitView renders its sidebar
     // column with the system Liquid Glass material on macOS 26 (Tahoe).
     .toolbar { macToolbar }
     .modifier(sidebarBehavior)
   }
 
-  private func sidebarScrollContent(topPadding: CGFloat,
-                                    bottomPadding: CGFloat,
-                                    spacerMinLength: CGFloat) -> some View {
+  /// Page geometry mirrors the other tabs' `septenaSurface()` rhythm —
+  /// `pageTop` under the nav bar, `sectionSpacing` between the smart-list
+  /// grid and the areas/projects cards, `pageBottom` scroll-past air.
+  /// Horizontal insets stay per-section (`smartLists` / the section cards)
+  /// because each pads itself, but both read `Theme.pageGutter`.
+  private func sidebarScrollContent() -> some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 0) {
         smartLists
-          .padding(.top, topPadding)
-          .padding(.bottom, bottomPadding)
+          .padding(.top, Theme.pageTop)
+          .padding(.bottom, Theme.sectionSpacing)
         // areasAndProjects renders its own per-section cards
         // (Mimestream-style), so no outer card wrapping here.
         areasAndProjects
-        Spacer(minLength: spacerMinLength)
+        Spacer(minLength: Theme.pageBottom)
       }
     }
   }
@@ -391,11 +394,11 @@ struct SidebarRootView: View {
         .modifier(SmartListTaskDrop(route: spec.route, mutator: taskMutator))
       }
     }
-    .padding(.horizontal, Theme.hPadding)
+    .padding(.horizontal, Theme.pageGutter)
     #else
-    LazyVGrid(columns: [GridItem(.flexible(), spacing: 12),
-                        GridItem(.flexible(), spacing: 12)],
-              spacing: 12) {
+    LazyVGrid(columns: [GridItem(.flexible(), spacing: Theme.tileGap),
+                        GridItem(.flexible(), spacing: Theme.tileGap)],
+              spacing: Theme.tileGap) {
       ForEach(smartListSpecs, id: \.title) { spec in
         Button { selectRoute(spec.route) } label: {
           SmartListTile(icon: spec.icon,
@@ -410,7 +413,7 @@ struct SidebarRootView: View {
         .buttonStyle(InertButtonStyle())
       }
     }
-    .padding(.horizontal, Theme.hPadding)
+    .padding(.horizontal, Theme.pageGutter)
     #endif
   }
 
@@ -567,17 +570,14 @@ struct SidebarRootView: View {
       .padding(.horizontal, sectionCardHPad)
     #else
     VStack(alignment: .leading, spacing: 0) { content() }
-      .padding(.horizontal, Theme.hPadding)
+      .padding(.horizontal, sectionCardHPad)
     #endif
   }
 
-  // Horizontal margin for section cards. iOS uses a Mimestream-style
-  // inset; macOS lines up with the sidebar's standard hPadding.
-  #if os(iOS)
-  private var sectionCardHPad: CGFloat { 20 }
-  #else
-  private var sectionCardHPad: CGFloat { Theme.hPadding }
-  #endif
+  // Horizontal margin for section cards — the shared page gutter, so the
+  // cards sit the same distance off the edge as the smart-list grid above
+  // and as every other tab's content.
+  private var sectionCardHPad: CGFloat { Theme.pageGutter }
 
   @ViewBuilder
   private func projectRow(_ project: Project, parent: String?) -> some View {
