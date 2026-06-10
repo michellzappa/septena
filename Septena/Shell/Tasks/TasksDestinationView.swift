@@ -16,6 +16,9 @@ struct TasksDestinationView: View {
   @Environment(SectionTheme.self) private var theme
   @Environment(\.modelContext) private var modelContext
   @Environment(\.a11yMotion) private var motion
+  /// App-root celebration layer — only used by the day-cleared `.arc`
+  /// (see `TaskCelebration`). Optional and nil-safe.
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
   @AppStorage(SettingsKey.todayShowCompleted) private var showCompleted: Bool = true
 
   /// Drives the "linger → fade" beat after a check (see `SettleStore`).
@@ -180,7 +183,8 @@ struct TasksDestinationView: View {
       // after the in-place flip "all done" means today's list is clear.
       // (See `TaskCelebration` — the context-scaled completion haptic.)
       let clearedToday = !openTasks.contains { $0.status == .open }
-      TaskCelebration.completed(isToday: true, clearedToday: clearedToday)
+      TaskCelebration.completed(isToday: true, clearedToday: clearedToday,
+                                accent: accent, logCommit: logCommit)
     }
   }
 

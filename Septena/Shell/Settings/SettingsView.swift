@@ -2293,8 +2293,7 @@ struct MotionGalleryPane: View {
   /// primitives plus `.ignition` (a sibling `LogCommitStyle`, not a
   /// CommitMotion — the habit-streak milestone).
   private enum Demo: String, CaseIterable, Identifiable {
-    case burst, snap, bloom, sink, cascade, tally, settle, ignition
-    case ripple, arc, fill, streak
+    case burst, snap, bloom, sink, ripple, arc, fill, ignition
     var id: String { rawValue }
 
     /// The CommitMotion this row plays, or nil for `.ignition`.
@@ -2304,14 +2303,10 @@ struct MotionGalleryPane: View {
       case .snap:     return .snap
       case .bloom:    return .bloom
       case .sink:     return .sink
-      case .cascade:  return .cascade
-      case .tally:    return .tally
-      case .settle:   return .settle
-      case .ignition: return nil
       case .ripple:   return .ripple
       case .arc:      return .arc
       case .fill:     return .fill
-      case .streak:   return .streak
+      case .ignition: return nil
       }
     }
 
@@ -2321,14 +2316,10 @@ struct MotionGalleryPane: View {
       case .snap:     return "Snap"
       case .bloom:    return "Bloom"
       case .sink:     return "Sink"
-      case .cascade:  return "Cascade"
-      case .tally:    return "Tally"
-      case .settle:   return "Settle"
-      case .ignition: return "Ignition"
       case .ripple:   return "Ripple"
       case .arc:      return "Arc"
       case .fill:     return "Fill"
-      case .streak:   return "Streak"
+      case .ignition: return "Ignition"
       }
     }
 
@@ -2336,16 +2327,12 @@ struct MotionGalleryPane: View {
       switch self {
       case .burst:    return "Confetti — celebratory (Mood HAP, groceries)"
       case .snap:     return "Ring + flash — releasing tension (Mood HAN)"
-      case .bloom:    return "Soft swell — settling (caffeine, nutrition)"
-      case .sink:     return "Quiet dot — acknowledgment (gut, late-night)"
-      case .cascade:  return "Marks drop in sequence — quantity (unused; supplements check at the box)"
-      case .tally:    return "A mark joins the row — continuity (unused; habits check at the box)"
-      case .settle:   return "Row files onto the pile — done (unused; chores check at the box)"
+      case .bloom:    return "Soft swell — settling (caffeine, training session)"
+      case .sink:     return "Quiet dot — acknowledgment (Mood LAN, gut)"
+      case .ripple:   return "Full-screen sonar — cannabis log, training PR payoff"
+      case .arc:      return "Comet arc — day cleared (last Today task)"
+      case .fill:     return "Full-page flood — target logs (hydration, nutrition)"
       case .ignition: return "Rings + streak number — milestone (7/30/100/365)"
-      case .ripple:   return "Experimental · full-screen sonar rings"
-      case .arc:      return "Experimental · big glowing comet arc — toward a target"
-      case .fill:     return "Experimental · full-page flood bottom→top (intensity)"
-      case .streak:   return "Experimental · full-screen glowing comet sweep"
       }
     }
   }
@@ -2405,7 +2392,7 @@ struct MotionGalleryPane: View {
       } header: {
         Text("Checkbox feels")
       } footer: {
-        Text("Checkable rows celebrate at the box, each type with its own feel and a CoreHaptics pattern timed to its visual beats. Tasks additionally scale the haptic by context — ordinary, Today, or clearing the last Today task — and habit streak milestones still earn the full-screen Ignition.")
+        Text("Checkable rows celebrate at the box — four feels separated by rhythm: one beat, two spaced beats, fall-then-thud, thud-then-close — each with a CoreHaptics pattern timed to its visual. The canvas is reserved for at-most-once-a-day moments: clearing your last Today task (Arc), habit streak milestones (Ignition), and finishing a training session (Ripple on a PR, Bloom otherwise).")
       }
 
       Section("Accent") {
@@ -2446,7 +2433,7 @@ struct MotionGalleryPane: View {
       } header: {
         Text("Parameters")
       } footer: {
-        Text("Intensity scales burst / snap / bloom / cascade / tally loudness — sink and settle ignore it. Streak drives the Ignition milestone number.")
+        Text("Intensity scales each motion's loudness — sink ignores it on purpose. Streak drives the Ignition milestone number.")
       }
     }
     .formStyle(.grouped)

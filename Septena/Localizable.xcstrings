@@ -1816,7 +1816,7 @@
         }
       }
     },
-    "Checkable rows celebrate at the box, each type with its own feel and a CoreHaptics pattern timed to its visual beats. Tasks additionally scale the haptic by context — ordinary, Today, or clearing the last Today task — and habit streak milestones still earn the full-screen Ignition." : {
+    "Checkable rows celebrate at the box — four feels separated by rhythm: one beat, two spaced beats, fall-then-thud, thud-then-close — each with a CoreHaptics pattern timed to its visual. The canvas is reserved for at-most-once-a-day moments: clearing your last Today task (Arc), habit streak milestones (Ignition), and finishing a training session (Ripple on a PR, Bloom otherwise)." : {
 
     },
     "Checkbox feels" : {
@@ -3569,6 +3569,7 @@
       }
     },
     "Intensity scales burst / snap / bloom / cascade / tally loudness — sink and settle ignore it. Streak drives the Ignition milestone number." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -3577,6 +3578,9 @@
           }
         }
       }
+    },
+    "Intensity scales each motion's loudness — sink ignores it on purpose. Streak drives the Ignition milestone number." : {
+
     },
     "iOS shows a confirmation prompt each time you switch icons." : {
       "localizations" : {

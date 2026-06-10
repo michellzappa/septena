@@ -137,7 +137,9 @@ struct SessionCompleteSheet: View {
                      trigger: celebrate)
     }
     .onAppear {
-      Haptics.success()
+      // Motion-matched: the ripple's calm rings or the bloom's soft swell,
+      // at the same intensity the visual plays — not a flat generic buzz.
+      Haptics.play(completionMotion.hapticSpec(intensity: completionIntensity))
       celebrate += 1
     }
   }

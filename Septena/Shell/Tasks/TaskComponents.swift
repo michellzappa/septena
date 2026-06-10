@@ -30,34 +30,40 @@ enum CheckFeel {
   /// plays, built from quiet transients + faint swells. `intensity` nudges
   /// loudness inside a narrow band (rows pass day-progress); the band is
   /// clamped tight on purpose — these stay subtle at any count.
+  ///
+  /// What separates the feels is *rhythm*, not loudness: stamp is one beat,
+  /// echo is two spaced beats, drop is a fall-then-thud, tuck is a thud
+  /// then a later, softer close. Each timing matches its visual exactly.
   func hapticSpec(intensity: Double = 1) -> HapticPatternSpec {
     let i = Float(min(1.2, max(0.7, intensity)))
     switch self {
     case .stamp:
-      // One crisp stamp at the check's landing, then the faintest settle.
+      // ONE beat. Crisp at the check's landing, then the faintest settle
+      // riding right behind it — reads as a single crack.
       return HapticPatternSpec(beats: [
         HapticBeat(kind: .transient, time: 0.04, intensity: 0.42 * i, sharpness: 0.78),
-        HapticBeat(kind: .transient, time: 0.14, intensity: 0.16 * i, sharpness: 0.45),
+        HapticBeat(kind: .transient, time: 0.12, intensity: 0.14 * i, sharpness: 0.45),
       ], fallback: .tick)
     case .echo:
-      // Today's mark, answered by a quieter, rounder echo (visual ring +0.12s).
+      // TWO beats, clearly spaced: today's mark, answered by a quieter,
+      // rounder echo (visual ring at +0.18s). The gap is the signature.
       return HapticPatternSpec(beats: [
         HapticBeat(kind: .transient, time: 0,    intensity: 0.45 * i, sharpness: 0.62),
-        HapticBeat(kind: .transient, time: 0.12, intensity: 0.22 * i, sharpness: 0.4),
+        HapticBeat(kind: .transient, time: 0.18, intensity: 0.24 * i, sharpness: 0.38),
       ], fallback: .tick)
     case .drop:
-      // A capsule falling: the faintest swell of air, then a soft round
-      // landing synced to the visual's impact squash (~0.12s).
+      // FALL → THUD: a faint swell of air while the fill falls, then a
+      // soft round landing synced to the impact squash (~0.15s).
       return HapticPatternSpec(beats: [
-        HapticBeat(kind: .continuous, time: 0, duration: 0.1, intensity: 0.18 * i, sharpness: 0.15),
-        HapticBeat(kind: .transient, time: 0.12, intensity: 0.4 * i, sharpness: 0.3),
+        HapticBeat(kind: .continuous, time: 0, duration: 0.13, intensity: 0.18 * i, sharpness: 0.15),
+        HapticBeat(kind: .transient, time: 0.15, intensity: 0.45 * i, sharpness: 0.3),
       ], fallback: .tick)
     case .tuck:
-      // Filed away: a low muted thud, then the drawer's softer close
-      // synced to the visual's dip (~0.16s).
+      // THUD → soft CLOSE: a low muted thud, then the drawer easing shut
+      // synced to the visual's dip (~0.22s). Slowest rhythm of the four.
       return HapticPatternSpec(beats: [
         HapticBeat(kind: .transient, time: 0,    intensity: 0.4 * i,  sharpness: 0.25),
-        HapticBeat(kind: .transient, time: 0.16, intensity: 0.26 * i, sharpness: 0.5),
+        HapticBeat(kind: .transient, time: 0.22, intensity: 0.24 * i, sharpness: 0.45),
       ], fallback: .tick)
     }
   }
@@ -202,55 +208,63 @@ struct TaskCheckbox: View {
   }
 
   /// The per-feel choreography. Imperative (like the flourish renderers) so
-  /// beats can be sequenced; everything resolves within ~0.45s and ends at
+  /// beats can be sequenced; everything resolves within ~0.6s and ends at
   /// rest, so nothing lingers and rapid checking never queues motion.
+  ///
+  /// The four are separated by RHYTHM (the same axis the haptics use):
+  /// stamp = one beat · echo = two spaced beats · drop = fall-then-thud ·
+  /// tuck = thud then a slow settle down. Loudness stays near-constant.
   private func playFeel() {
     switch feel {
     case .stamp:
+      // One beat: a single immediate pulse. The reference the others
+      // deviate from.
       pulse()
 
     case .echo:
-      pulse()
-      // The echo: a second, quieter ring answering the first — today's mark
-      // joined by the days behind it. Timed to the haptic's second beat.
+      // Two beats: the first ring tight and quick, the echo clearly
+      // separated (+0.18s), smaller and softer — today's mark answered by
+      // the days behind it. Timed to the haptic's second beat.
+      pulse(reach: 1.7)
       Task { @MainActor in
-        try? await Task.sleep(for: .milliseconds(120))
+        try? await Task.sleep(for: .milliseconds(180))
         echoScale = 0.9
         echoOpacity = 0.4
-        withAnimation(.easeOut(duration: 0.35)) {
-          echoScale = 1.55
+        withAnimation(.easeOut(duration: 0.4)) {
+          echoScale = 1.45
           echoOpacity = 0
         }
       }
 
     case .drop:
-      // The fill falls in from above; on landing it squashes and throws a
-      // tight splash ring, then springs back round.
-      bodyDrop = -7
-      withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { bodyDrop = 0 }
+      // Fall → thud: a taller fall than feels polite, so the landing reads —
+      // deep squash on impact, a tight splash, then spring back round.
+      bodyDrop = -11
+      withAnimation(.spring(response: 0.34, dampingFraction: 0.62)) { bodyDrop = 0 }
       Task { @MainActor in
-        try? await Task.sleep(for: .milliseconds(110))
-        withAnimation(.easeOut(duration: 0.08)) { bodySquash = 0.84 }
-        pulse(reach: 1.6)
-        try? await Task.sleep(for: .milliseconds(80))
-        withAnimation(.spring(response: 0.18, dampingFraction: 0.5)) { bodySquash = 1 }
+        try? await Task.sleep(for: .milliseconds(140))
+        withAnimation(.easeOut(duration: 0.08)) { bodySquash = 0.78 }
+        pulse(reach: 1.5)
+        try? await Task.sleep(for: .milliseconds(90))
+        withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) { bodySquash = 1 }
       }
 
     case .tuck:
-      // Filed away: the ring drifts downward as it fades — onto the pile —
-      // and the box dips after the stamp, then recovers.
+      // Thud → slow close: the ring drifts well downward as it fades —
+      // filed onto the pile — and the box takes a deep, unhurried dip
+      // (+0.22s, matching the haptic's close) before recovering.
       ringScale = 0.95
       ringOpacity = 0.5
       ringDrift = 0
-      withAnimation(.easeOut(duration: 0.45)) {
-        ringScale = 1.35
+      withAnimation(.easeOut(duration: 0.55)) {
+        ringScale = 1.3
         ringOpacity = 0
-        ringDrift = 7
+        ringDrift = 11
       }
       Task { @MainActor in
-        try? await Task.sleep(for: .milliseconds(150))
-        withAnimation(.easeOut(duration: 0.1)) { bodyDip = 2.5 }
-        withAnimation(.spring(response: 0.25, dampingFraction: 0.6).delay(0.1)) { bodyDip = 0 }
+        try? await Task.sleep(for: .milliseconds(180))
+        withAnimation(.easeOut(duration: 0.14)) { bodyDip = 4 }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.65).delay(0.14)) { bodyDip = 0 }
       }
     }
   }
@@ -271,27 +285,30 @@ struct TaskCheckbox: View {
 
 // MARK: - Completion celebration
 //
-// Tasks celebrate at the checkbox (the `.stamp` feel above) — never with a
-// screen-level `CommitFlourish`. What scales with context is the *haptic*:
+// Tasks celebrate at the checkbox (the `.stamp` feel above) — with ONE
+// exception that earns the canvas. The celebration-budget rule: if a moment
+// can fire twice in an hour, it never gets the screen. Clearing the last
+// open Today task fires at most once a day, so it plays `.arc` — a comet
+// arcing across the screen, the day's arc completed (Today's glyph is the
+// sun; the metaphor comes free). Everything else scales the *haptic* only:
 //
 //   • ordinary task          → the plain stamp — crisp, quiet
 //   • Today task             → stamp + a low, soft "filed" after-beat
-//   • the LAST Today task    → a compact rising triplet — the one completion
-//                              haptic with three beats, still quiet
+//   • the LAST Today task    → the `.arc` flourish + its matched sweep haptic
 //
 // Owned by the toggle call sites (same pattern as ChoreRow / HabitRow):
-// only they know their list context, so they pass `clearedToday`.
+// only they know their list context, so they pass `clearedToday`. `logCommit`
+// is nil-safe — hosts outside the root env keep the haptic, skip the visual.
 
 @MainActor
 enum TaskCelebration {
-  static func completed(isToday: Bool, clearedToday: Bool) {
+  static func completed(isToday: Bool,
+                        clearedToday: Bool,
+                        accent: Color,
+                        logCommit: LogCommitCenter?) {
     if clearedToday {
-      // Today just cleared — three beats climbing in pitch and weight.
-      Haptics.play(HapticPatternSpec(beats: [
-        HapticBeat(kind: .transient, time: 0,    intensity: 0.4,  sharpness: 0.5),
-        HapticBeat(kind: .transient, time: 0.09, intensity: 0.3,  sharpness: 0.65),
-        HapticBeat(kind: .transient, time: 0.2,  intensity: 0.55, sharpness: 0.8),
-      ], fallback: .success))
+      Haptics.play(CommitMotion.arc.hapticSpec(intensity: 1))
+      logCommit?.fire(.flourish(motion: .arc, accent: accent, intensity: 1))
     } else if isToday {
       // A Today task: the stamp, then a rounder, lower "filed" beat.
       Haptics.play(HapticPatternSpec(beats: [

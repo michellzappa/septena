@@ -18,6 +18,10 @@ struct TaskListView: View {
   @Environment(SectionTheme.self) private var theme
   @Environment(\.modelContext) private var modelContext
   @Environment(\.a11yMotion) private var motion
+  /// App-root celebration layer — only used by the day-cleared `.arc`
+  /// (see `TaskCelebration`). Optional: hosts outside the root env keep
+  /// the haptic and skip the visual.
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
   let filter: TaskFilter
   /// True when this view is laid out *inside* another detail screen
@@ -1239,7 +1243,9 @@ struct TaskListView: View {
         && !items.contains { $0.status == .open }
         && !review.contains { $0.status == .open }
       TaskCelebration.completed(isToday: task.isOnToday || filter == .today,
-                                clearedToday: clearedToday)
+                                clearedToday: clearedToday,
+                                accent: theme.color(for: "tasks"),
+                                logCommit: logCommit)
     }
     if newStatus == .done { sessionDoneIds.insert(task.id) }
     else                  { sessionDoneIds.remove(task.id) }

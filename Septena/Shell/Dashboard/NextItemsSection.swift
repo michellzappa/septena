@@ -137,6 +137,9 @@ struct TodayTaskRow: View {
   var areas: [Area] = []
   var projects: [Project] = []
   @Environment(\.a11yMotion) private var motion
+  /// App-root celebration layer — only used by the day-cleared `.arc`
+  /// (see `TaskCelebration`). Optional and nil-safe.
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
   var body: some View {
     // On the Next surface every row is already today, so no Today indicator and
@@ -155,7 +158,8 @@ struct TodayTaskRow: View {
         // (the just-checked row lingers as done), today's list is clear.
         if completing {
           let cleared = !model.openTasks.contains { $0.status == .open }
-          TaskCelebration.completed(isToday: true, clearedToday: cleared)
+          TaskCelebration.completed(isToday: true, clearedToday: cleared,
+                                    accent: tint, logCommit: logCommit)
         }
       },
       onTap: nil

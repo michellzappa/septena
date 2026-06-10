@@ -28,43 +28,29 @@ enum CommitMotion: Equatable {
   /// A single dot settling downward and fading — quiet acknowledgment,
   /// no celebration. (Mood LAN.)
   case sink
-  /// A run of marks dropping in sequence, one per unit — reads the
-  /// *quantity* logged, not just "something happened". For countable logs
-  /// (supplements taken, items cleared, a set of reps). Intensity → count.
-  case cascade
-  /// A bright mark joining a row of faint prior marks — continuity /
-  /// repetition made visible for one beat. For recurring logs (habit
-  /// toggles); the quiet everyday sibling of the `.ignition` milestone.
-  /// Intensity → how much of the prior row is suggested.
-  case tally
-  /// A row settling onto a baseline and fading — "filed onto the done
-  /// pile". For finishing a thing on a list (chores). Like `.sink`, it
-  /// ignores intensity: done is binary, restraint is the point.
-  case settle
-
-  // ── Experimental (round 2) — in the gallery to be felt; not yet wired
-  //    to any section. Promote the keepers, delete the rest. ───────────
-
   /// A full-screen sonar: huge concentric rings sweeping past the edges.
-  /// Bolder, number-free cousin of `.ignition`. Candidate for ambient logs.
+  /// Bolder, number-free cousin of `.ignition`. Ambient, body-level logs
+  /// (cannabis) and the training-PR session payoff.
   case ripple
-  /// A large glowing comet arcing across the screen — reads as motion
-  /// *toward* something. Candidate for goals / progress-to-target.
+  /// A large glowing comet arcing across the screen — an arc completed.
+  /// Tasks' one canvas moment: clearing the last open Today task (at most
+  /// once a day; Today's glyph is the sun, the comet traces its path).
   case arc
   /// A full-screen flood rising bottom→top like a gauge filling the page.
-  /// Candidate for logs with a target (hydration, macros). Intensity →
-  /// fill height.
+  /// For logs with a target (hydration, nutrition). Intensity → fill height.
   case fill
-  /// A full-screen glowing comet sweeping across the page — an alternative
-  /// "continuity" feel, distinct from `.tally`'s vertical strokes.
-  case streak
+
+  // The retired primitives (cascade, tally, settle, streak — and the round-2
+  // experiments) were deleted when the checkable rows moved to the
+  // checkbox-local `CheckFeel` vocabulary. Git history keeps the renderers
+  // if a section ever earns one back.
 }
 
 extension CommitMotion {
   /// The haptic that pairs with this motion — same character, same window.
   /// Built here in the app layer because `Haptics` (in SeptenaCore) stays
   /// motion-agnostic; `intensity` matches the loudness the visual uses.
-  /// `.sink`/`.settle` ignore intensity, exactly like their renderers.
+  /// `.sink` ignores intensity, exactly like its renderer.
   func hapticSpec(intensity: Double) -> HapticPatternSpec {
     // Clamp loudness into CoreHaptics' 0…1 intensity range.
     let i = Float(min(1.0, max(0.45, intensity)))
@@ -93,24 +79,6 @@ extension CommitMotion {
         HapticBeat(kind: .transient, time: 0,   intensity: 0.3, sharpness: 0.3),
         HapticBeat(kind: .transient, time: 0.5, intensity: 0.6, sharpness: 0.45),
       ], fallback: .tick)
-    case .cascade:
-      // One tap per mark, timed to its bounce landing (visual: k·0.07 + ~0.22).
-      let count = min(12, max(3, Int((6 * intensity).rounded())))
-      let beats = (0..<count).map { k in
-        HapticBeat(kind: .transient, time: Double(k) * 0.07 + 0.22, intensity: 0.6, sharpness: 0.7)
-      }
-      return HapticPatternSpec(beats: beats, fallback: .tap)
-    case .tally:
-      // One firm thump synced to the slam-down impact (~0.2s).
-      return HapticPatternSpec(beats: [
-        HapticBeat(kind: .transient, time: 0.2, intensity: 0.6, sharpness: 0.6),
-      ], fallback: .tick)
-    case .settle:
-      // Landing thunk as the row drops in, then a lighter check stamp.
-      return HapticPatternSpec(beats: [
-        HapticBeat(kind: .transient, time: 0.18, intensity: 0.55, sharpness: 0.3),
-        HapticBeat(kind: .transient, time: 0.36, intensity: 0.4,  sharpness: 0.6),
-      ], fallback: .tick)
     case .ripple:
       // A soft transient per ring launch — calm, low sharpness.
       return HapticPatternSpec(beats: [
@@ -129,12 +97,6 @@ extension CommitMotion {
       return HapticPatternSpec(beats: [
         HapticBeat(kind: .continuous, time: 0,    duration: 0.5, intensity: 0.5 * i, sharpness: 0.3),
         HapticBeat(kind: .transient,  time: 0.52, intensity: 0.65, sharpness: 0.6),
-      ], fallback: .tick)
-    case .streak:
-      // A transient kickoff, then a light swept swell.
-      return HapticPatternSpec(beats: [
-        HapticBeat(kind: .transient,  time: 0,    intensity: 0.55, sharpness: 0.7),
-        HapticBeat(kind: .continuous, time: 0.04, duration: 0.3, intensity: 0.35 * i, sharpness: 0.4),
       ], fallback: .tick)
     }
   }
@@ -184,13 +146,9 @@ struct CommitFlourish: View {
         case .snap:  SnapFlourish(color: accent, intensity: intensity, trigger: trigger)
         case .bloom: BloomFlourish(color: accent, intensity: intensity, trigger: trigger)
         case .sink:  SinkFlourish(color: accent, trigger: trigger)
-        case .cascade: CascadeFlourish(color: accent, intensity: intensity, trigger: trigger)
-        case .tally:   TallyFlourish(color: accent, intensity: intensity, trigger: trigger)
-        case .settle:  SettleFlourish(color: accent, trigger: trigger)
         case .ripple:  RippleFlourish(color: accent, intensity: intensity, trigger: trigger)
         case .arc:     ArcFlourish(color: accent, intensity: intensity, trigger: trigger)
         case .fill:    FillFlourish(color: accent, intensity: intensity, trigger: trigger)
-        case .streak:  StreakFlourish(color: accent, intensity: intensity, trigger: trigger)
         }
       }
     }
@@ -403,197 +361,6 @@ private struct SinkFlourish: View {
   }
 }
 
-// MARK: - cascade — marks rain down and bounce into a row (quantity)
-//
-// One dot per unit rains from above and lands with a spring bounce +
-// impact squash, staggered left→right so the eye counts them. Intensity
-// sets how many (clamped so a big log can't flood the canvas and a small
-// one still reads as a run).
-
-private struct CascadeFlourish: View {
-  let color: Color
-  var intensity: Double = 1
-  let trigger: Int
-
-  @State private var drops: [Drop] = []
-
-  private var count: Int {
-    // 6 at intensity 1; clamped to a legible run.
-    min(12, max(3, Int((6 * intensity).rounded())))
-  }
-
-  private let baseline: CGFloat = 50
-
-  var body: some View {
-    ZStack {
-      ForEach(drops) { d in
-        // Impact splash ring at the baseline.
-        Circle()
-          .strokeBorder(color.opacity(d.ringOpacity), lineWidth: 2.5)
-          .frame(width: d.size * 2.6, height: d.size * 2.6)
-          .scaleEffect(d.ringScale)
-          .offset(x: d.x, y: baseline)
-        // The falling drop.
-        Circle()
-          .fill(color.opacity(d.opacity))
-          .frame(width: d.size, height: d.size)
-          .scaleEffect(x: d.squash.width, y: d.squash.height, anchor: .bottom)
-          .offset(x: d.x, y: d.y)
-      }
-    }
-    .task(id: trigger) {
-      guard trigger > 0 else { return }
-      let n = count
-      let spread = CGFloat(n - 1) * 16
-      drops = (0..<n).map { k in
-        Drop(id: UUID(),
-             size: .random(in: 15...22),
-             x: CGFloat(k) * 32 - spread,
-             y: -150, opacity: 0,
-             squash: CGSize(width: 1, height: 1),
-             ringScale: 0.3, ringOpacity: 0)
-      }
-      for k in drops.indices {
-        let t = Double(k) * 0.07
-        // Faster, heavier fall with a livelier bounce.
-        withAnimation(.interpolatingSpring(stiffness: 240, damping: 10).delay(t)) {
-          drops[k].y = baseline
-          drops[k].opacity = 0.95
-        }
-        // Bigger impact squash, then recover.
-        withAnimation(.easeOut(duration: 0.09).delay(t + 0.22)) {
-          drops[k].squash = CGSize(width: 1.45, height: 0.6)
-        }
-        withAnimation(.easeOut(duration: 0.18).delay(t + 0.31)) {
-          drops[k].squash = CGSize(width: 1, height: 1)
-        }
-        // Splash ring: pop visible at impact, then expand + fade.
-        withAnimation(.easeOut(duration: 0.05).delay(t + 0.2)) {
-          drops[k].ringOpacity = 0.7
-        }
-        withAnimation(.easeOut(duration: 0.5).delay(t + 0.25)) {
-          drops[k].ringScale = 1.9
-          drops[k].ringOpacity = 0
-        }
-      }
-      try? await Task.sleep(for: .seconds(Double(n) * 0.07 + 0.85))
-      withAnimation(.easeOut(duration: 0.4)) {
-        for i in drops.indices { drops[i].opacity = 0 }
-      }
-      try? await Task.sleep(for: .milliseconds(420))
-      drops = []
-    }
-  }
-
-  private struct Drop: Identifiable {
-    let id: UUID
-    let size: CGFloat
-    let x: CGFloat
-    var y: CGFloat
-    var opacity: Double
-    var squash: CGSize
-    var ringScale: CGFloat
-    var ringOpacity: Double
-  }
-}
-
-// MARK: - tally — a new stroke slams into the row, the row flares, then clears
-//
-// The streak you're extending, made kinetic: the new bright stroke SLAMS
-// down from above with an overshoot, the whole row flares bright on impact,
-// then the entire group fades cleanly out (everything is driven by `shown`,
-// so nothing lingers). The everyday sibling of `.ignition` — "one more".
-
-private struct TallyFlourish: View {
-  let color: Color
-  var intensity: Double = 1
-  let trigger: Int
-
-  @State private var shown: Double = 0       // master fade — 0 at rest, cleans out
-  @State private var newDrop: CGFloat = -42  // new stroke starts above the baseline
-  @State private var newPunch: CGFloat = 1   // impact scale punch
-  @State private var flare: Double = 0       // brightness flare across the row
-
-  private var priors: Int {
-    // How much of the prior row to suggest; 4 at intensity 1.
-    min(8, max(1, Int((4 * intensity).rounded())))
-  }
-
-  var body: some View {
-    HStack(alignment: .bottom, spacing: 9) {
-      ForEach(0..<priors, id: \.self) { _ in
-        Capsule()
-          .fill(color.opacity(shown * (0.22 + 0.45 * flare)))
-          .frame(width: 6, height: 38)
-      }
-      Capsule()
-        .fill(color.opacity(shown * 0.95))
-        .frame(width: 6, height: 38)
-        .scaleEffect(x: 1, y: newPunch, anchor: .bottom)
-        .offset(y: newDrop)
-    }
-    .task(id: trigger) {
-      guard trigger > 0 else { return }
-      shown = 0; newDrop = -42; newPunch = 1; flare = 0
-      withAnimation(.easeOut(duration: 0.1)) { shown = 1 }
-      // Slam down with overshoot.
-      withAnimation(.spring(response: 0.26, dampingFraction: 0.45)) { newDrop = 0 }
-      // Impact punch + a flare rippling through the whole row.
-      withAnimation(.easeOut(duration: 0.1).delay(0.2)) { newPunch = 1.22; flare = 1 }
-      withAnimation(.easeOut(duration: 0.16).delay(0.3)) { newPunch = 1 }
-      withAnimation(.easeIn(duration: 0.35).delay(0.4)) { flare = 0 }
-      // Hold, then clean out completely.
-      withAnimation(.easeOut(duration: 0.4).delay(0.95)) { shown = 0 }
-    }
-  }
-}
-
-// MARK: - settle — a row drops in, gets checked, and files onto the pile
-//
-// A row drops from above and lands with a spring, a checkmark stamps onto
-// it, then it slides down and files away — "done, put away". Distinct from
-// `.sink` (a falling dot): this reads as a *thing* being completed and
-// filed. Ignores intensity on purpose — finishing a list item is binary.
-
-private struct SettleFlourish: View {
-  let color: Color
-  let trigger: Int
-
-  @State private var yOffset: CGFloat = -50
-  @State private var barOpacity: Double = 0
-  @State private var checkScale: CGFloat = 0
-  @State private var checkOpacity: Double = 0
-
-  var body: some View {
-    RoundedRectangle(cornerRadius: 7, style: .continuous)
-      .fill(color.opacity(barOpacity * 0.55))
-      .frame(width: 150, height: 26)
-      .overlay(
-        Image(systemName: "checkmark")
-          .font(.system(size: 14, weight: .bold))
-          .foregroundStyle(color)
-          .scaleEffect(checkScale)
-          .opacity(checkOpacity)
-          .offset(x: -54)
-      )
-      .offset(y: yOffset)
-      .task(id: trigger) {
-        guard trigger > 0 else { return }
-        yOffset = -50; barOpacity = 0; checkScale = 0; checkOpacity = 0
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.68)) {
-          yOffset = 0; barOpacity = 1
-        }
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.5).delay(0.18)) {
-          checkScale = 1; checkOpacity = 1
-        }
-        // File away: slide down and fade.
-        withAnimation(.easeIn(duration: 0.45).delay(0.72)) {
-          yOffset = 60; barOpacity = 0; checkOpacity = 0
-        }
-      }
-  }
-}
-
 // MARK: - ripple — a full-screen sonar of huge expanding rings
 //
 // Big concentric rings launch from center and sweep past the screen edges,
@@ -744,43 +511,6 @@ private struct FillFlourish: View {
       withAnimation(.easeIn(duration: 0.12)) { opacity = 1 }
       withAnimation(.easeOut(duration: 0.6)) { level = target }
       withAnimation(.easeOut(duration: 0.5).delay(0.85)) { opacity = 0 }
-    }
-  }
-}
-
-// MARK: - streak — a full-screen glowing comet sweeping across the page
-
-private struct StreakFlourish: View {
-  let color: Color
-  var intensity: Double = 1
-  let trigger: Int
-
-  @State private var progress: CGFloat = 0
-  @State private var opacity: Double = 0
-
-  var body: some View {
-    GeometryReader { geo in
-      let travel = geo.size.width + 220
-      let cx = -110 + travel * progress
-      ZStack {
-        // Long soft glow trailing the bright head.
-        Capsule()
-          .fill(color.opacity(opacity * 0.45))
-          .frame(width: 190, height: 20)
-          .blur(radius: 10)
-        Capsule()
-          .fill(color.opacity(opacity))
-          .frame(width: 66, height: 11)
-      }
-      .position(x: cx, y: geo.size.height * 0.5)
-    }
-    .ignoresSafeArea()
-    .task(id: trigger) {
-      guard trigger > 0 else { return }
-      progress = 0; opacity = 0
-      withAnimation(.easeIn(duration: 0.1)) { opacity = 0.95 }
-      withAnimation(.easeInOut(duration: 0.55)) { progress = 1 }
-      withAnimation(.easeOut(duration: 0.25).delay(0.42)) { opacity = 0 }
     }
   }
 }
