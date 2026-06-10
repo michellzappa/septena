@@ -190,9 +190,9 @@ final class WatchConnectivity {
     guard !completedIDs.contains(item.id) else { return }   // ignore double taps
     let date = today
 
-    // Confirm with a success haptic, mark it done, and keep it on screen
-    // (struck through) for a moment before it fades out.
-    WKInterfaceDevice.current().play(.success)
+    // Confirm with the section's completion feel, mark it done, and keep it
+    // on screen (struck through) for a moment before it fades out.
+    WatchCompletionFeel.forItemKind(item.kind).play()
     completedIDs.insert(item.id)
     markDoneLocally(id: item.id, date: date)   // stays hidden across refreshes
     updateComplication()
@@ -264,14 +264,15 @@ final class WatchConnectivity {
     }
   }
 
-  /// Shared optimistic hide for a just-logged suggestion: success haptic, mark
+  /// Shared optimistic hide for a just-logged suggestion: completion feel, mark
   /// it done locally (so it stays hidden across refreshes), then drop it from
   /// the list after the settle beat. Mirrors `complete()` without the
-  /// `NextBlocks` completion path — suggestions aren't completable members.
+  /// `NextBlocks` completion path — suggestions aren't completable members, so
+  /// they get the generic `.logged` beat rather than a section feel.
   private func finishSuggestion(_ itemID: String) {
     guard !completedIDs.contains(itemID) else { return }
     let date = today
-    WKInterfaceDevice.current().play(.success)
+    WatchCompletionFeel.logged.play()
     completedIDs.insert(itemID)
     markDoneLocally(id: itemID, date: date)
     updateComplication()
