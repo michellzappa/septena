@@ -30,6 +30,7 @@ enum HomepageDomain: String, CaseIterable, Hashable, Identifiable {
   case groceries
   case caffeine
   case cannabis
+  case intake
   case body
   case gut
   case mood

@@ -13,6 +13,7 @@ enum WeekDestination: String, Hashable, Identifiable {
   case habits, chores, training, supplements, sleep, nutrition
   case hydration
   case groceries, caffeine, cannabis, body, gut
+  case intake
   case mood
   case activity
   case github
@@ -147,6 +148,9 @@ struct WeekDashboardView: View {
   @State private var caffeineToday: CaffeineDayResponse? = nil
   @State private var caffeineHistory: [CaffeineHistoryPoint] = []
   @State private var caffeineLastEntry: CaffeineTimePoint? = nil
+  /// Intake (consumables) — one tile per kind. Local SwiftData, so loaded via
+  /// MirrorReader on `.septenaDataChanged`, OUTSIDE the ≤4-parallel HTTP loadAll.
+  @State private var intakeTiles: [IntakeTileDTO] = []
   @State private var cannabisToday: CannabisDayResponse? = nil
   @State private var cannabisHistory: [CannabisHistoryPoint] = []
   @State private var cannabisUsesPerCapsule: Int = 3
@@ -239,9 +243,9 @@ struct WeekDashboardView: View {
   private var columns: [GridItem] {
     #if os(iOS)
     let count = (hSize == .regular) ? 3 : 1
-    return Array(repeating: GridItem(.flexible(), spacing: 14), count: count)
+    return Array(repeating: GridItem(.flexible(), spacing: Theme.tileGap), count: count)
     #else
-    return [GridItem(.adaptive(minimum: 280), spacing: 14)]
+    return [GridItem(.adaptive(minimum: 280), spacing: Theme.tileGap)]
     #endif
   }
 
@@ -269,7 +273,7 @@ struct WeekDashboardView: View {
       },
       toolbar: { homeToolbar }
     ) {
-      VStack(spacing: 18) {
+      VStack(spacing: Theme.sectionSpacing) {
         ClaudeReconnectBanner()
         if showWelcome {
           // Self-observes DayClock so the 60s `now` tick re-renders only the
@@ -282,9 +286,7 @@ struct WeekDashboardView: View {
         if showTodayTimeline { todayTimeline }
         layoutBody
       }
-      .padding(.horizontal, Theme.pageGutter)
-      .padding(.top, 12)
-      .padding(.bottom, 80)
+      .septenaSurface()
       // While a bottom-sheet drawer is open, a tap anywhere on the dashboard
       // behind it — welcome header, today timeline, a tile, or empty space —
       // dismisses the drawer (standard popover-style tap-away). The drawer
@@ -304,6 +306,10 @@ struct WeekDashboardView: View {
       // compact, so only the bottom-sheet path below fires there.
       .navigationDestination(item: pushDest) { dest in
         pushedContent(for: dest)
+      }
+      .task { await reloadIntake() }
+      .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
+        Task { await reloadIntake() }
       }
     }
     // Compact (iPhone): navigation into a module is a bottom-sheet slide-
@@ -885,7 +891,7 @@ struct WeekDashboardView: View {
   private var layoutBody: some View {
     switch currentLayoutMode {
     case .tiles:
-      LazyVGrid(columns: columns, spacing: 14) {
+      LazyVGrid(columns: columns, spacing: Theme.tileGap) {
         tiles
       }
     case .dense:
@@ -988,7 +994,7 @@ struct WeekDashboardView: View {
     case .cannabis:    cannabisQuickAddMenu
     case .gut:         gutQuickAddMenu
     case .mood:        moodQuickAddMenu
-    case .sleep, .body, .activity, .github:
+    case .sleep, .body, .activity, .github, .intake:
       EmptyView()
     }
   }
@@ -1042,6 +1048,7 @@ struct WeekDashboardView: View {
     case .groceries:   groceriesTile
     case .caffeine:    caffeineTile
     case .cannabis:    cannabisTile
+    case .intake:      intakeTilesContent
     case .body:        bodyTile
     case .gut:         gutTile
     case .mood:        moodTile
@@ -1074,6 +1081,7 @@ struct WeekDashboardView: View {
     case .groceries:   return groceriesDomainData()
     case .caffeine:    return caffeineDomainData()
     case .cannabis:    return cannabisDomainData()
+    case .intake:      return intakeDomainData()
     case .body:        return bodyDomainData()
     case .gut:         return gutDomainData()
     case .mood:        return moodDomainData()
@@ -2005,6 +2013,70 @@ struct WeekDashboardView: View {
   }
 
   // Caffeine — today's session count + grams; 7-day session histogram.
+  // MARK: - Intake (consumables) tiles
+  //
+  // One host section, one tile per kind (Option C). `tile(for: .intake)`
+  // returns N tiles (the grid flattens the nested ForEach), so no change to
+  // the `tiles` loop. Tapping opens the kind switcher; each kind page owns its
+  // container-aware quick-add. Non-Tiles layout modes show one aggregate row
+  // via `intakeDomainData()`. See docs/CONSUMABLES_PLAN.md.
+
+  @ViewBuilder
+  private var intakeTilesContent: some View {
+    if intakeTiles.isEmpty {
+      intakeEmptyTile
+    } else {
+      ForEach(intakeTiles) { tile in intakeKindTile(tile) }
+    }
+  }
+
+  private func intakeKindTile(_ t: IntakeTileDTO) -> some View {
+    let accent = AdaptiveColor.adaptive(t.color) ?? theme.color(for: "intake")
+    var stats: [ModuleTile.Stat] = [.init(label: "Today", value: "\(t.todayCount)")]
+    if t.showsAmount, t.todayAmount > 0 {
+      stats.append(.init(label: "Total",
+                         value: String(format: "%.1f", t.todayAmount),
+                         unit: t.unit))
+    }
+    return ModuleTile(title: t.name, accent: accent, stats: stats)
+      .contentShape(Rectangle())
+      .onTapGesture { open(.intake) }
+  }
+
+  /// Shown when the section is enabled but has no kinds yet — keeps the
+  /// destination reachable so the user can create their first tracker.
+  private var intakeEmptyTile: some View {
+    ModuleTile(title: SectionManifest.byKey["intake"]?.defaultLabel ?? "Intake",
+               accent: theme.color(for: "intake"),
+               stats: [.init(label: "Trackers", value: "0")])
+      .contentShape(Rectangle())
+      .onTapGesture { open(.intake) }
+  }
+
+  /// Aggregate row for the non-Tiles layout modes (Dense / Heatmap / Rings /
+  /// Wheel), which consume `visibleDomainData` rather than `tile(for:)`.
+  private func intakeDomainData() -> HomepageDomainData {
+    let totalToday = intakeTiles.reduce(0) { $0 + $1.todayCount }
+    return HomepageDomainData(
+      domain: .intake,
+      title: SectionManifest.byKey["intake"]?.defaultLabel ?? "Intake",
+      accent: theme.color(for: "intake"),
+      headline: "\(intakeTiles.count) trackers · \(totalToday) today",
+      headlineStats: [
+        .init(label: "Trackers", value: "\(intakeTiles.count)"),
+        .init(label: "Today", value: "\(totalToday)"),
+      ],
+      progress: nil,
+      history: nil,
+      tap: .openSheet(.intake)
+    )
+  }
+
+  private func reloadIntake() async {
+    let date = clock.today
+    intakeTiles = await MirrorReader.shared.read { IntakeReader.loadTiles(context: $0, date: date) }
+  }
+
   private var caffeineTile: some View {
     let accent = theme.color(for: "caffeine")
     let sessions = caffeineToday?.sessionCount ?? 0
