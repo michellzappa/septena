@@ -60,7 +60,6 @@ private struct NextCategory: Identifiable {
   let count: Int      // open items in this category (current bucket)
   let overdue: Bool   // is the next item overdue
   var showsOverdueMarker: Bool { kind == "chore" && overdue }
-  var tintsTitleForOverdue: Bool { overdue && !showsOverdueMarker }
   var id: String { kind }
 }
 
@@ -155,12 +154,12 @@ private struct CategoryRow: View {
         .frame(width: iconFrame)
       Text(cat.title)
         .font(.system(size: titleSize, weight: .medium))
-        .foregroundStyle(cat.tintsTitleForOverdue ? Color.red : Color.primary)
+        .foregroundStyle(.primary)
         .lineLimit(1)
       if cat.showsOverdueMarker {
         Image(systemName: "exclamationmark.circle.fill")
           .font(.system(size: compact ? 8.5 : 9.5, weight: .semibold))
-          .foregroundStyle(.red)
+          .foregroundStyle(.secondary)
       }
       Spacer(minLength: 4)
       if cat.count > 1 {

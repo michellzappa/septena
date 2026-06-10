@@ -286,7 +286,7 @@ struct NextItemRow: View {
         Spacer(minLength: 0)
         Image(systemName: "exclamationmark.circle.fill")
           .font(.caption2)
-          .foregroundStyle(.red)
+          .foregroundStyle(.secondary)
       }
     }
     // Subtitle-less rows would otherwise be noticeably shorter; pad them up
