@@ -330,8 +330,7 @@ stored amounts — the UI warns that history will read in the new unit
 `containerCap` affects only future quick-add suggestions. Widening
 `doseStyle` (count → both) is free; narrowing hides the field going forward
 but keeps stored values. Deleting a kind follows section semantics: archive
-(hide surfaces, keep data), with true delete only via the existing
-export-then-purge path.
+only — see §4.3 for the full deletion posture.
 
 **Multiples ergonomics.** Kinds carry `sortIndex` (user-ordered, like beans).
 With one kind, the drawer's "+" shows that kind's methods flat — today's
@@ -339,6 +338,63 @@ caffeine feel exactly; with several, "+" nests kind → methods, and the
 container-aware "Continue (use N)" rows bubble to the top as `SuggestionBlocks`
 does now. Each kind gets a dashboard-tile toggle (default on, Option C renders
 tile-per-kind) so a six-kind power user doesn't drown the homepage.
+
+### 4.3 Settings, identity, and deletion
+
+**What Settings looks like after.** Today caffeine and cannabis are two rows
+in Settings, each opening a `SectionDetailPane` with the standard identity
+block (label, color swatch, enabled toggle, "Show in Next" toggle gated by
+`appearsInToday`) plus plugin content (beans/methods read-only;
+`usesPerCapsule`). After: **one** `intake` row with the same identity block at
+host level, and a detail pane listing kinds — name, symbol, event count,
+archived state — read-only, per the established convention that Settings
+displays and destinations edit. Kind-level controls (archive, dashboard-tile
+toggle, per-kind Show in Next) live in the kind's Manage sheet at the
+destination. The synced settings payload changes too: `CaffeineConfig` /
+`CannabisConfig` (and their `ResponseCache` keys `settings.caffeine` /
+`settings.cannabis`) retire after phase 4 — kind config is entity data, not
+settings JSON — but both keep being *emitted* during the transition for old
+builds and the watch.
+
+**One regression to design around:** "Show in Next" is per-*section*, so today
+you can hide caffeine from the timeline while keeping cannabis. With one host
+section that granularity collapses. Fix: a `showInToday` flag per kind,
+honored by the Today timeline alongside the host-level master toggle.
+
+**Identity — kinds are not sections.** There is no "this section is a
+consumable" marker anywhere, and none is needed: the host manifest key
+(`intake`) is the sole compile-time anchor, and *kinds are rows, not
+sections* — no `SectionManifest` entries, no `SectionEntity` rows, no
+`HomepageDomain` cases per kind. Everything kind-scoped hangs off the opaque
+kind id: events and items by `kindID`, metric keys
+(`consumable.<kindID>.count`), wire payload entries, dashboard tiles. The one
+`SectionEntity` row that exists belongs to the host and carries its enabled
+state and color as usual. If Option B (true dynamic sections) ever happens,
+kind ids promote cleanly to synthetic section keys (`intake:<kindID>`) —
+which is why ids must stay opaque and name-independent (§3.1).
+
+**Creating multiples: yes, unbounded, three places.** Destination empty
+state, the kind switcher's "New tracker…" row, and `consumable_kind_create`
+over MCP (§4.2). Deliberately *not* from Settings — Settings stays read-only.
+No hard cap; the per-kind dashboard toggle and nested "+" menu keep a
+many-kind setup usable.
+
+**Deletion — archive, with one calibrated exception.** The app's own
+invariant decides this: *disabling hides surfaces; it must never delete user
+data*, and in fact no bulk-delete path exists anywhere in Settings today —
+the codebase is already no-deletion by construction. Kinds therefore
+archive (`archivedAt`): tile, drawer entries, suggestions, and metrics
+disappear; events and items stay in the store and in exports; unarchiving
+restores everything. There is no `consumable_kind_delete` tool — deliberate.
+The calibrated exception is *correction*, which is not destruction:
+single-event delete exists today (`caffeine_event_delete` /
+`cannabis_event_delete`) for fixing mislogs and stays
+(`consumable_event_delete`), and item delete keeps its existing precedent
+(`caffeine_bean_delete`) — a deleted item leaves events' `itemID` dangling,
+which renders by fallback exactly like an archived method. If a true purge is
+ever wanted ("remove this substance and all trace"), that's an app-wide
+export-then-erase feature to design once for every section, not something to
+invent inside consumables.
 
 ## 5. Architecture options
 
@@ -435,6 +491,72 @@ Per `docs/ADDING_A_SECTION.md`, plus the generalization-specific work:
   Grep gate in CI: the iOS target must not contain the substring `cannabis`
   (case-insensitive) after phase 3.
 
+### 6.1 The MCP contract in detail
+
+The §6 bullet states *what* changes; this section works through the contract,
+because MCP is where generalization changes the conversation, not just code.
+
+**Tool surface.** Nine generic tools replace nine substance-specific ones
+(6 caffeine + 3 cannabis) while covering unlimited kinds — the catalog gets
+*smaller*, which matters for agent context budgets:
+
+| Tool | Inputs |
+|---|---|
+| `consumable_kinds_list` | — (returns full config per kind: methods + tokens, unit, doseStyle, containerCap + current container state, catalog noun, item count) |
+| `consumable_kind_create` | required: name · optional: symbol, unit, doseStyle, countNoun, containerCap, catalogNoun, methods[] |
+| `consumable_kind_update` | required: kind · optional: any config field (archive included) |
+| `consumable_items_list` | required: kind |
+| `consumable_item_create` / `item_delete` | kind + name / id |
+| `consumable_events_list` | required: kind · optional: date, from, to, limit (same conventions as today) |
+| `consumable_event_log` | required: kind, method (token) · optional: date, time, amount, count, item, note |
+| `consumable_event_delete` | required: id |
+
+`kind` resolves by id *or* unique case-insensitive name. Method/item
+arguments take tokens/ids but also resolve unique names — agents speak in
+user vocabulary.
+
+**One extra round trip, bought back by error design.** Today "log a v60"
+maps straight to `caffeine_event_log`; tomorrow the agent must resolve the
+kind first. Two mitigations: `consumable_kinds_list` returns *everything*
+(methods, units, container state) so resolution is one call ever per
+conversation, and every resolution failure returns the candidate list inline
+("unknown kind 'coffee' — kinds: Caffeine (ck-…), Tea (ck-…)") so a wrong
+guess self-corrects in a single round trip instead of a list-then-retry pair.
+Container math stays explicit (the agent passes `count`), but
+`kinds_list`/`events_list` expose `lastCount`/`containerCap` so the agent can
+compute "Continue (hit 3)" the same way `ConsumableContainer` does.
+
+**The skill brief becomes a meta-protocol.** Today's generated `skill.md`
+embeds substance knowledge ("Matcha doesn't need a bean reference…"). The
+generic `SectionSkill` can't mention user kinds — it's static text shipped to
+the gateway — so it teaches the protocol instead: call `kinds_list` first,
+log against tokens, prefer the user's own nouns. The substance knowledge
+("a user's own brew default") moves where it now
+belongs: the *user's* agent memory and the live `kinds_list` response,
+not compiled skill text. Regenerate via `SectionRegistry.fullSkillMarkdown()`
+and update `docs/` skills in the same change, per the CLAUDE.md lockstep rule.
+
+**Gateway specifics.** Three items beyond mirroring the tools in the Worker:
+(1) the gateway-managed `CannabisStrain` catalog tools
+(`listCannabisStrains`/`createCannabisStrain`) retire in favor of
+`consumable_items_*` — fold their records into `ConsumableItem` via a gateway
+job or leave dormant (open question 6); (2) date-range filtering for
+`consumable_events_list` stays gateway-side string filtering, same as every
+event type today — the CloudKit schema is auto-managed and Dashboard indexes
+are off-limits, and the new `date` field follows the existing `YYYY-MM-DD`
+convention precisely so this keeps working; (3) alias lifetime — the gateway
+keeps `caffeine_*`/`cannabis_*` aliases as long as desired (it ships outside
+App Review), but after the phase-2 cutover the aliases must *write generic
+records* (thin shims over the generic implementation with the kind
+pre-bound), otherwise an agent using a stale tool name forks the data.
+
+**Drift safeguard.** The two servers share no schema package today — the
+lockstep rule is enforced socially. The generic tools are a good moment to
+harden it cheaply: a JSON fixtures file (tool name → input schema → canned
+response shape) generated from the in-app catalog, vendored into the gateway
+repo, and asserted against in both test suites. Not a shared library — just a
+contract file that fails loudly when one side moves alone.
+
 ## 7. Migration plan — caffeine as the proving ground
 
 Caffeine-first is right: it's the richer section (catalog + methods + settings
@@ -471,9 +593,10 @@ editor or asks their agent to. Then the hygiene sweep (§6) removes the noun
 from the binary.
 
 **Phase 4 — retire legacy.** Remove `caffeine`/`cannabis` manifest rows,
-plugins, entities (local mirror classes stay one release for the migrator,
-then go), intents, MCP tools from the iOS binary. Gateway keeps aliases as
-long as desired. CK types remain dormant per additive-only.
+plugins, entities, intents, and MCP tools from the iOS binary. Gateway keeps
+aliases as long as desired. CK types remain dormant per additive-only. The
+migrator does NOT go with them — see §7.2: it must be record-level
+(independent of the deleted `@Model` classes) and it stays for good.
 
 Each phase is independently shippable; phase 2 alone is a worthwhile
 refactor even if phase 3 never ships.
@@ -552,6 +675,52 @@ reference resolved to an item; sum of `grams` == sum of `amount`. Surface as
 a debug-build report before the cutover flag flips, and keep the check
 runnable (it doubles as the migrate-on-sight health monitor during skew).
 
+### 7.2 Late arrivals — reinstalls, skipped versions, and hand-rebuilt kinds
+
+The phases assume a device that runs each version in order. Three paths
+don't, and all three involve *existing data arriving after the rebuild*:
+
+**Fresh install / new device on an old account.** A post-phase-4 binary signs
+into an iCloud account whose private DB still holds `CaffeineEvent` /
+`CannabisEvent` / `CaffeineBean` records (a device that never migrated, or a
+user returning after a long gap). By then the legacy `@Model` classes are
+deleted, so an entity-level migrator can't exist. Therefore the migrator must
+be **record-level from day one**: it consumes raw `CKRecord`s by record-type
+name string as `CKSyncEngine` delivers them — no SwiftData legacy classes
+required — and writes generic entities through `ConsumableMutator` with the
+same deterministic ids (§7.1). Built that way, "migration support" survives
+the code deletion indefinitely at the cost of one small file, and a reinstall
+in 2029 still inherits every 2025 coffee. This also implies the legacy record
+types stay registered with the sync engine's interest set forever (cheap;
+they're dormant for migrated users).
+
+**Skipped versions.** Same mechanism, no special casing: migrate-on-sight is
+a standing rule keyed on record type, not on app-version transitions. The
+cutover *flag* gates where new writes go; arrival-time migration never turns
+off.
+
+**Hand-rebuilt kind colliding with migrated data.** The reconstruction story
+invites this sequence: fresh install → user (or their agent) creates a
+"Cannabis" kind by hand → old CloudKit records sync in → the migrator
+creates *its* deterministic cannabis kind → two kinds, split history. Don't
+try to auto-adopt the user's kind (name matching is guesswork; method tokens
+may differ). Instead ship **kind merge** as a first-class operation: move all
+events and items from kind A to kind B (remapping method tokens by a
+user-confirmed mapping table when vocabularies differ), then archive A.
+Merge is independently useful — accidental duplicates like "Coffee" vs
+"Caffeine" will happen anyway — and it turns the collision from a bug into a
+one-tap cleanup. Surface it in the Manage sheet and as
+`consumable_kinds_merge` over MCP. Merge must also be deterministic-id-aware:
+events keep their ids (only `kindID` changes), so a re-running migrator
+doesn't resurrect the archived source kind — it sees its deterministic event
+ids already present and stands down.
+
+**Legacy exports.** The JSON import path must keep accepting the old table
+names (`caffeineBean`, `caffeineEvent`, `cannabisEvent`) forever, mapping
+them through the same field maps as §7.1 — an export taken in 2024 should
+restore into intakes losslessly. Cheap to keep: the import mapping is the
+migration mapping.
+
 ## 8. App Review posture (summary)
 
 After phase 3 the binary contains: a generic intake tracker, caffeine/tea
@@ -583,8 +752,59 @@ worth a scan of current guidelines at submission time.)
    section-keyed.)
 6. What happens to the gateway-managed `CannabisStrain` records — migrate into
    `ConsumableItem` via a gateway job, or leave dormant?
+7. Cost tracking (price per item/container — relevant for nicotine/alcohol
+   budgets) — deferred from §4.1; add as a kind aspect later or never?
+8. HealthKit: a kind whose normalized unit is mg caffeine could write
+   `dietaryCaffeine` samples (precedent: mood writes `HKStateOfMind`).
+   Opt-in per kind, future work.
+9. Widgets / live activities: neither legacy section ships one today, so
+   nothing migrates — but should per-kind quick-log widgets be part of the
+   generic build-out?
 
-## 10. Decision summary
+## 10. Pre-build checklist
+
+Decisions to lock before the first PR (each is argued above; building on an
+unconfirmed one is the only way this plan produces rework):
+
+- [ ] **Noun**: `intake` everywhere (§3.1) — confirm, then fix this doc's
+      working names.
+- [ ] **Architecture**: Option C (§5) — host section, tile-per-kind.
+- [ ] **Template set**: Caffeine + Tea + Custom only; nothing
+      review-sensitive ships (§4).
+- [ ] **Deletion posture**: archive-only kinds, no purge (§4.3).
+- [ ] **Migrator shape**: record-level, permanent, deterministic ids (§7.1,
+      §7.2) — this one is hard to retrofit, decide first.
+- [ ] **Schema review**: field tables for the three record types drafted
+      into `docs/CloudKitSchema.md` and checked against its conventions
+      (recordName formats, `occurredAt`/`date` pairing, `updatedAt`);
+      id/title contract added to `docs/IDENTIFIERS.md`.
+- [ ] **Dev-schema deploy** of the three record types before any build that
+      writes them; Prod deploy (additive) gates the phase-2 release, not the
+      merge.
+
+Build order (each lands green and shippable):
+
+1. `ConsumableContainer` + unit tests asserting behavioral identity with
+   `CannabisCapsule` (golden tests ported from its call sites).
+2. Entities + CK extensions + `ConsumableMutator` (no UI). Contract-fixtures
+   file (§6.1) generated alongside.
+3. Record-level migrator + verification report, tested against fixture
+   exports of real caffeine/cannabis data.
+4. Generic destination + kind wizard + Manage sheet, behind the host section
+   with no manifest row yet (debug-only entry).
+5. Manifest row, dashboard tiles, quick-add/suggestions, Settings pane.
+6. MCP tools in both servers + skill regen + aliases (one change, lockstep).
+7. Phase-2 cutover: caffeine template seed + migration on, flag flip, goals
+   remap. Soak.
+8. Phase-3: cannabis synthesis + kind merge + hygiene sweep + CI grep gate.
+9. Phase-4: legacy removal (migrator stays).
+
+Update `docs/ADDING_A_SECTION.md` when step 5 lands (the host section is
+also the worked example of a section whose tiles are data-driven), and keep
+the in-app skill briefs and gateway `skill.md` in sync at step 6 per
+CLAUDE.md.
+
+## 11. Decision summary
 
 Generalize via Option C: one `intake` host section, user-defined
 `ConsumableKindEntity` rows configured along the aspect axes in §4 (identity,
