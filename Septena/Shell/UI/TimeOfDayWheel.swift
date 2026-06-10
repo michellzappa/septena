@@ -157,18 +157,19 @@ struct TimeOfDayWheel: View {
                    with: .color(lineColor.opacity(0.22)), lineWidth: 1.5)
       }
 
-      // Hour ticks — quarter-marks longest/darkest, 3-hour marks medium. Compact
-      // keeps only the four quarter ticks so the thumbnail stays uncluttered.
+      // Hour ticks — quarter-marks longest/darkest, 3-hour marks medium, every
+      // other hour a short minor. Compact uses tiny ticks so the thumbnail reads
+      // the full 24-hour grid without clutter.
       for h in 0..<24 {
         let f = Double(h) / 24
         let major = (h % 6 == 0)
         let mid = (h % 3 == 0)
-        if compact && !major { continue }
+        let length: CGFloat = compact ? (major ? 5 : mid ? 3 : 2) : (major ? 11 : mid ? 7 : 5)
         var tick = Path()
-        tick.move(to: point(f, ringR - (major ? (compact ? 5 : 11) : mid ? 7 : 4)))
+        tick.move(to: point(f, ringR - length))
         tick.addLine(to: point(f, ringR))
         ctx.stroke(tick,
-                   with: .color(lineColor.opacity(major ? 0.55 : mid ? 0.30 : 0.18)),
+                   with: .color(lineColor.opacity(major ? 0.55 : mid ? 0.34 : 0.26)),
                    lineWidth: major ? 2 : 1)
       }
 
