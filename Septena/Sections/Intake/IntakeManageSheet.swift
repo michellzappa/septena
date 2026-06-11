@@ -19,6 +19,7 @@ struct IntakeManageSheet: View {
   @State private var symbol = ""
   @State private var objective = "log"
   @State private var objectiveTarget: Double = 3
+  @State private var goalWeekly = false
   @State private var doseStyle = "none"
   @State private var unit = "g"
   @State private var countNoun = "use"
@@ -261,10 +262,10 @@ struct IntakeManageSheet: View {
 
   private func reload() async {
     let id = kindID
-    let bundle = await MirrorReader.shared.read { ctx -> (IntakeKindDTO?, [IntakeItemDTO], Double?) in
+    let bundle = await MirrorReader.shared.read { ctx -> (IntakeKindDTO?, [IntakeItemDTO], (target: Double, weekly: Bool)?) in
       (IntakeReader.loadKind(context: ctx, id: id),
        IntakeReader.loadItems(context: ctx, kindID: id),
-       IntakeReader.objectiveGoalTarget(context: ctx, kindID: id))
+       IntakeReader.objectiveGoalInfo(context: ctx, kindID: id))
     }
     kind = bundle.0
     items = bundle.1
@@ -278,7 +279,9 @@ struct IntakeManageSheet: View {
     if let n = bundle.0?.containerNoun, !n.isEmpty { containerNoun = n }
     if let cap = bundle.0?.containerCap { containerCap = cap }
     objective = bundle.0?.objective ?? "log"
-    objectiveTarget = bundle.2 ?? IntakeObjective.goalSpec(objective)?.defaultTarget ?? 3
+    goalWeekly = bundle.2?.weekly ?? IntakeObjective.defaultWeekly(objective)
+    objectiveTarget = bundle.2?.target
+      ?? IntakeObjective.goalSpec(objective, weekly: goalWeekly)?.defaultTarget ?? 3
   }
 
   private var goalSection: some View {
@@ -288,8 +291,15 @@ struct IntakeManageSheet: View {
       Picker("Your goal", selection: Binding(get: { objective }, set: setObjective)) {
         ForEach(IntakeObjective.all, id: \.token) { Text($0.label).tag($0.token) }
       }
+      if IntakeObjective.supportsWindowToggle(objective) {
+        Picker("Counted", selection: Binding(get: { goalWeekly }, set: setGoalWeekly)) {
+          Text("Per day").tag(false)
+          Text("Per week").tag(true)
+        }
+        .pickerStyle(.segmented)
+      }
       if IntakeObjective.goalSpec(objective) != nil {
-        Stepper("\(IntakeObjective.targetLabel(objective)): \(Int(objectiveTarget))",
+        Stepper("\(IntakeObjective.targetLabel(objective, weekly: goalWeekly)): \(Int(objectiveTarget))",
                 value: Binding(get: { objectiveTarget }, set: setTarget), in: 1...365)
       }
     }
@@ -297,10 +307,16 @@ struct IntakeManageSheet: View {
 
   private func setObjective(_ new: String) {
     objective = new
-    let t = IntakeObjective.goalSpec(new)?.defaultTarget ?? objectiveTarget
+    goalWeekly = IntakeObjective.defaultWeekly(new)
+    let t = IntakeObjective.goalSpec(new, weekly: goalWeekly)?.defaultTarget ?? objectiveTarget
     objectiveTarget = t
     mutator.updateKind(id: kindID, objective: new)
     syncGoal(objective: new, target: t)
+  }
+
+  private func setGoalWeekly(_ weekly: Bool) {
+    goalWeekly = weekly
+    syncGoal(objective: objective, target: objectiveTarget)
   }
 
   private func setTarget(_ t: Double) {

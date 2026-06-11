@@ -55,20 +55,39 @@ public enum IntakeObjective {
     public let defaultTarget: Double
   }
 
-  public static func goalSpec(_ token: String) -> GoalSpec? {
+  /// `weekly` picks the goal's window for limit/reduce (count vs count_week —
+  /// both per-kind metrics exist); nil = the objective's natural default.
+  /// quit ignores it (a streak has no window).
+  public static func goalSpec(_ token: String, weekly: Bool? = nil) -> GoalSpec? {
     switch token {
-    case "limit":  return GoalSpec(metricSuffix: "count",           window: "today",        comparator: "lte", defaultTarget: 3)
-    case "reduce": return GoalSpec(metricSuffix: "count_week",      window: "calendarWeek", comparator: "lte", defaultTarget: 7)
-    case "quit":   return GoalSpec(metricSuffix: "days_since_last", window: "today",        comparator: "gte", defaultTarget: 30)
-    default:       return nil  // log → no goal
+    case "limit", "reduce":
+      let w = weekly ?? defaultWeekly(token)
+      return GoalSpec(metricSuffix: w ? "count_week" : "count",
+                      window: w ? "calendarWeek" : "today",
+                      comparator: "lte",
+                      defaultTarget: w ? 7 : 3)
+    case "quit":
+      return GoalSpec(metricSuffix: "days_since_last", window: "today",
+                      comparator: "gte", defaultTarget: 30)
+    default:
+      return nil  // log → no goal
     }
   }
 
-  /// Label for the goal's target number, by objective.
-  public static func targetLabel(_ token: String) -> String {
+  /// Whether the objective's goal offers the daily/weekly window toggle.
+  public static func supportsWindowToggle(_ token: String) -> Bool {
+    token == "limit" || token == "reduce"
+  }
+
+  /// The natural window per objective: a limit is a daily cap, reduction is
+  /// judged by the week.
+  public static func defaultWeekly(_ token: String) -> Bool { token == "reduce" }
+
+  /// Label for the goal's target number, by objective + window.
+  public static func targetLabel(_ token: String, weekly: Bool = false) -> String {
     switch token {
-    case "limit":  return "Daily limit"
-    case "reduce": return "Weekly target"
+    case "limit":  return weekly ? "Weekly limit" : "Daily limit"
+    case "reduce": return weekly ? "Weekly target" : "Daily target"
     case "quit":   return "Days-clean goal"
     default:       return "Target"
     }

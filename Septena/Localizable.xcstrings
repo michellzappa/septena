@@ -4821,6 +4821,12 @@
         }
       }
     },
+    "Per day" : {
+
+    },
+    "Per week" : {
+
+    },
     "Photo access is denied. Enable it in Settings → Privacy → Photos. Meal thumbnails won't show until then." : {
       "localizations" : {
         "pt-BR" : {

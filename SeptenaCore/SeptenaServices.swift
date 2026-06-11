@@ -1638,11 +1638,12 @@ final class GoalMutator {
   /// objective lives here as `metricTarget` — no separate field. See
   /// docs/CONSUMABLES_PLAN.md.
   func syncIntakeObjectiveGoal(kindID: String, kindName: String,
-                               objective: String, target: Double?) {
+                               objective: String, target: Double?,
+                               weekly: Bool? = nil) {
     let existing = ((try? context.fetch(FetchDescriptor<GoalEntity>())) ?? [])
       .first { $0.metricKey?.hasPrefix("intake.\(kindID).") == true }
 
-    guard let spec = IntakeObjective.goalSpec(objective) else {
+    guard let spec = IntakeObjective.goalSpec(objective, weekly: weekly) else {
       // log → no measured objective; remove the auto-created goal if present.
       if let existing { deleteGoal(id: existing.id) }
       return

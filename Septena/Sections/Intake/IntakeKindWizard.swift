@@ -17,6 +17,7 @@ struct IntakeKindWizard: View {
 
   @State private var objective = "log"
   @State private var objectiveTarget: Double = 3
+  @State private var objectiveWeekly = false
 
   @State private var doseStyle = "none"
   @State private var unit = "g"
@@ -112,10 +113,20 @@ struct IntakeKindWizard: View {
         ForEach(IntakeObjective.all, id: \.token) { Text($0.label).tag($0.token) }
       }
       .onChange(of: objective) { _, new in
-        if let spec = IntakeObjective.goalSpec(new) { objectiveTarget = spec.defaultTarget }
+        objectiveWeekly = IntakeObjective.defaultWeekly(new)
+        if let spec = IntakeObjective.goalSpec(new, weekly: objectiveWeekly) {
+          objectiveTarget = spec.defaultTarget
+        }
+      }
+      if IntakeObjective.supportsWindowToggle(objective) {
+        Picker("Counted", selection: $objectiveWeekly) {
+          Text("Per day").tag(false)
+          Text("Per week").tag(true)
+        }
+        .pickerStyle(.segmented)
       }
       if IntakeObjective.goalSpec(objective) != nil {
-        Stepper("\(IntakeObjective.targetLabel(objective)): \(Int(objectiveTarget))",
+        Stepper("\(IntakeObjective.targetLabel(objective, weekly: objectiveWeekly)): \(Int(objectiveTarget))",
                 value: $objectiveTarget, in: 1...365)
       }
     } header: {
@@ -213,7 +224,7 @@ struct IntakeKindWizard: View {
     // The unify: the objective creates its matching Goal (limit's cap = target).
     SeptenaServices.shared.goalMutator.syncIntakeObjectiveGoal(
       kindID: kind.id, kindName: name.trimmingCharacters(in: .whitespaces),
-      objective: objective, target: objectiveTarget)
+      objective: objective, target: objectiveTarget, weekly: objectiveWeekly)
     Haptics.success()
     onCreated(kind.id)
     dismiss()

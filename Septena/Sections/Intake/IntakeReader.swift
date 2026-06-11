@@ -189,11 +189,14 @@ enum IntakeReader {
     }
   }
 
-  /// The target of a kind's objective goal (the cap for "limit", etc.), so the
-  /// Manage/wizard target field seeds from the live goal. Nil if no goal yet.
-  static func objectiveGoalTarget(context: ModelContext, kindID: String) -> Double? {
-    ((try? context.fetch(FetchDescriptor<GoalEntity>())) ?? [])
-      .first { $0.metricKey?.hasPrefix("intake.\(kindID).") == true }?.metricTarget
+  /// A kind's objective goal as the Manage sheet seeds it: the target (the cap
+  /// for "limit") and whether it's windowed weekly (metric key suffix). Nil if
+  /// no goal yet.
+  static func objectiveGoalInfo(context: ModelContext, kindID: String) -> (target: Double, weekly: Bool)? {
+    guard let g = ((try? context.fetch(FetchDescriptor<GoalEntity>())) ?? [])
+      .first(where: { $0.metricKey?.hasPrefix("intake.\(kindID).") == true })
+    else { return nil }
+    return (g.metricTarget ?? 0, g.metricKey?.hasSuffix(".count_week") == true)
   }
 
   /// Instant of the most recent event for a kind, for the "days since last"
