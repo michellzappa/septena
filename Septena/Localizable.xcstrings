@@ -1379,6 +1379,9 @@
         }
       }
     },
+    "Apple Intelligence" : {
+
+    },
     "Archiving hides this tracker. Its entries stay and it can be restored." : {
 
     },
@@ -4289,6 +4292,9 @@
     "n=%@" : {
       "shouldTranslate" : false
     },
+    "Needs Apple Intelligence" : {
+
+    },
     "Needs, communities, or problems you feel responsible to support." : {
       "localizations" : {
         "pt-BR" : {
@@ -4570,6 +4576,9 @@
         }
       }
     },
+    "Not supported on this device." : {
+
+    },
     "Note" : {
       "localizations" : {
         "pt-BR" : {
@@ -4693,6 +4702,9 @@
       "shouldTranslate" : false
     },
     "On Automatic, every step runs on your device first — it leaves only for the steps on-device can't do (↗), never wholesale." : {
+
+    },
+    "On-device intelligence" : {
 
     },
     "On, but nothing to nudge yet — already done today, nothing pending, or waiting out quiet hours." : {
