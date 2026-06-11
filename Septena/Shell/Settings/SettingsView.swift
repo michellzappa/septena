@@ -3228,15 +3228,38 @@ struct MacroTilesEditor: View {
 private struct MacroTileRow: View {
   @Binding var pref: MacroTilePref
   var onChange: () -> Void
+  @State private var showingPicker = false
+
+  /// Hex currently stored for this tile, falling back to the catalog default.
+  private var currentHex: String {
+    pref.colorHex ?? MacroCatalog.byID[pref.id]?.defaultColorHex ?? ""
+  }
 
   var body: some View {
     let macro = MacroCatalog.byID[pref.id]
     HStack(spacing: 12) {
-      ColorPicker(selection: colorBinding, supportsOpacity: false) {
-        EmptyView()
+      // Shared 22-color grid, same picker the sections and trackers use, so
+      // macro tiles draw from the one curated palette rather than the OS
+      // full-spectrum well.
+      Button {
+        showingPicker.toggle()
+      } label: {
+        Circle()
+          .fill(AdaptiveColor.adaptive(currentHex) ?? .gray)
+          .frame(width: 26, height: 26)
+          .overlay(Circle().strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
       }
-      .labelsHidden()
-      .frame(width: 28, height: 28)
+      .buttonStyle(.plain)
+      .accessibilityLabel("Tile color")
+      .popover(isPresented: $showingPicker, arrowEdge: .leading) {
+        PaletteSwatchGrid(selectedHex: currentHex) { hex in
+          pref.colorHex = hex
+          onChange()
+          showingPicker = false
+        }
+        .padding(12)
+        .presentationCompactAdaptation(.popover)
+      }
 
       VStack(alignment: .leading, spacing: 1) {
         Text(macro?.label ?? pref.id)
@@ -3255,49 +3278,12 @@ private struct MacroTileRow: View {
       .labelsHidden()
     }
   }
-
-  /// Color picker is bound to a `Color`, but the model stores hex. Convert
-  /// both ways and fall back to the catalog's default when the user hasn't
-  /// overridden the swatch yet.
-  private var colorBinding: Binding<Color> {
-    Binding(
-      get: {
-        let hex = pref.colorHex ?? MacroCatalog.byID[pref.id]?.defaultColorHex
-        // Raw (non-adaptive): the system ColorPicker round-trips this value
-        // back through `toHexString()` on set, so an adaptive color would
-        // serialize its lifted dark-mode hex and corrupt the stored swatch.
-        return AdaptiveColor.raw(hex) ?? .gray
-      },
-      set: { newColor in
-        pref.colorHex = newColor.toHexString()
-        onChange()
-      }
-    )
-  }
-}
-
-private extension Color {
-  /// Best-effort hex string ("#rrggbb"). Falls back to "#888888" if the
-  /// underlying CGColor can't be resolved (e.g. system dynamic colors).
-  func toHexString() -> String {
-    #if canImport(UIKit)
-    let ui = UIColor(self)
-    var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-    guard ui.getRed(&r, green: &g, blue: &b, alpha: &a) else { return "#888888" }
-    let ri = Int(round(r * 255)), gi = Int(round(g * 255)), bi = Int(round(b * 255))
-    return String(format: "#%02x%02x%02x", ri, gi, bi)
-    #else
-    return "#888888"
-    #endif
-  }
 }
 
 /// Adaptive parse of a section/swatch color token, used for *display* of
 /// curated swatches and the current section accent. Routes through the shared
 /// `AdaptiveColor` resolver (handles "#rrggbb"/rgb()/hsl() and the dark-mode
-/// lift); falls back to gray on unparseable input. Editing controls that
-/// round-trip back to a hex string must use `AdaptiveColor.raw` instead — see
-/// `MacroTileRow.colorBinding`.
+/// lift); falls back to gray on unparseable input.
 private func parseHexColor(_ s: String) -> Color {
   AdaptiveColor.adaptive(s) ?? .gray
 }

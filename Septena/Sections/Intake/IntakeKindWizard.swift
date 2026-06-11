@@ -13,7 +13,7 @@ struct IntakeKindWizard: View {
 
   @State private var name = ""
   @State private var symbol = "cup.and.saucer"
-  @State private var color = Self.palette[0]
+  @State private var color = sectionPalette.first?.hex ?? "#3b82f6"
 
   @State private var objective = "log"
   @State private var objectiveTarget: Double = 3
@@ -36,8 +36,6 @@ struct IntakeKindWizard: View {
   private var mutator: IntakeMutator { SeptenaServices.shared.intakeMutator }
   private var canCreate: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty }
 
-  static let palette = ["#92400e", "#65a30d", "#0369a1", "#7c3aed",
-                        "#be123c", "#ca8a04", "#0d9488", "#475569"]
   static let symbols = ["cup.and.saucer", "leaf", "mug", "wineglass", "pills",
                         "drop", "flame", "carrot", "bolt", "heart", "pencil", "circle"]
 
@@ -92,19 +90,10 @@ struct IntakeKindWizard: View {
     }
   }
 
+  // Shared 22-color grid — same picker the section detail and the Manage sheet
+  // use, so creating a tracker offers the full palette, not a reduced subset.
   private var colorPicker: some View {
-    ScrollView(.horizontal, showsIndicators: false) {
-      HStack(spacing: 12) {
-        ForEach(Self.palette, id: \.self) { hex in
-          Circle()
-            .fill(AdaptiveColor.adaptive(hex) ?? .gray)
-            .frame(width: 26, height: 26)
-            .overlay(Circle().strokeBorder(Color.primary, lineWidth: color == hex ? 2 : 0))
-            .onTapGesture { color = hex }
-        }
-      }
-      .padding(.vertical, 2)
-    }
+    PaletteSwatchGrid(selectedHex: color) { color = $0 }
   }
 
   private var objectiveSection: some View {
