@@ -163,16 +163,6 @@ enum AppIconOption: String, CaseIterable, Identifiable {
     self == .default ? nil : rawValue
   }
 
-  /// Whether this icon sits behind Septena+. The original multicolor icon
-  /// is free; every recolor is a Plus perk for now. When we want to give
-  /// away a colorway, list it here alongside `.default`.
-  var requiresPlus: Bool {
-    switch self {
-    case .default: return false
-    default:       return true
-    }
-  }
-
   var background: Color {
     background(forDarkMode: false)
   }
@@ -1183,8 +1173,6 @@ struct CorrelationsSettingsPane: View {
 // MARK: - App Icon submenu
 
 struct AppIconSettingsPane: View {
-  @AppStorage(SettingsKey.plusUnlocked) private var plusUnlocked: Bool = false
-  @State private var showPaywall = false
   #if os(iOS)
   @State private var selectedIcon: AppIconOption = .current
   @State private var iconError: String? = nil
@@ -1212,12 +1200,6 @@ struct AppIconSettingsPane: View {
       #endif
     }
     .formStyle(.grouped)
-    .sheet(isPresented: $showPaywall) {
-      SeptenaPlusPaywall {
-        plusUnlocked = true
-        showPaywall = false
-      }
-    }
     #if os(iOS)
     .onAppear { selectedIcon = .current }
     .alert("Couldn’t Change App Icon", isPresented: Binding(
@@ -1263,7 +1245,6 @@ struct AppIconSettingsPane: View {
             } label: {
               AppIconChoiceCard(option: option,
                                 isSelected: option == selectedIcon,
-                                isLocked: option.requiresPlus && !plusUnlocked,
                                 isDisabled: iconChangeInFlight)
             }
             .buttonStyle(.plain)
@@ -1273,21 +1254,11 @@ struct AppIconSettingsPane: View {
       }
       .padding(.vertical, 4)
     } footer: {
-      if plusUnlocked {
-        Text("iOS shows a confirmation prompt each time you switch icons.")
-      } else {
-        Text("The default icon is always free. Color icons are part of Septena+. iOS shows a confirmation prompt each time you switch icons.")
-      }
+      Text("iOS shows a confirmation prompt each time you switch icons.")
     }
   }
 
   private func selectIcon(_ option: AppIconOption) {
-    // Alternate colorways are a Septena+ perk — route locked picks to the
-    // paywall instead of switching the icon. The default icon is free.
-    if option.requiresPlus && !plusUnlocked {
-      showPaywall = true
-      return
-    }
     guard option != selectedIcon, !iconChangeInFlight else { return }
     iconChangeInFlight = true
     UIApplication.shared.setAlternateIconName(option.alternateIconName) { error in
@@ -1419,147 +1390,56 @@ private struct LayoutPreviewExample: View {
   }
 }
 
-/// Fuller, static stand-in for the `.correlations` homepage layout — the
-/// same shape `CorrelationsHomepageView` draws (supplements → sleep
-/// table, a "Trusted signals" header, and a grid of dose-response tiles
-/// with mini scatter + bucket charts) but on deterministic sample data,
-/// so the Layout example (and the Septena+ paywall hero) reads like the
-/// real dashboard rather than a single summary row. Doesn't touch
-/// CorrelationEngine.
-private struct CorrelationsPreviewExample: View {
-  var body: some View {
-    VStack(alignment: .leading, spacing: 14) {
-      supplementsCard
-
-      VStack(alignment: .leading, spacing: 2) {
-        Text("Trusted signals").font(.septenaSectionTitle)
-        Text("|r| ≥ 0.30, p < 0.05, monotonic")
-          .font(.caption).foregroundStyle(.secondary)
-      }
-
-      LazyVGrid(columns: [GridItem(.flexible(), spacing: 12),
-                          GridItem(.flexible(), spacing: 12)],
-                spacing: 12) {
-        TileView(pair: CorrelationPreviewSample.magnesium, color: .indigo)
-        TileView(pair: CorrelationPreviewSample.fiber, color: .green)
-      }
-    }
+/// Static stand-in for the Septena+ multi-coach roster, used as the paywall
+/// hero. Illustrative only — three example coaches as section-tinted cards —
+/// so the value reads at a glance without faking a live screen.
+private struct CoachesPreviewExample: View {
+  private struct Coach: Identifiable {
+    let id: String
+    let name: String
+    let role: String
+    let icon: String
+    let color: Color
   }
 
-  private var supplementsCard: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      VStack(alignment: .leading, spacing: 2) {
-        Text("Supplements → Sleep score").font(.septenaSectionTitle)
-        Text("Δ = taken mean − off mean")
-          .font(.caption).foregroundStyle(.secondary)
-      }
-      VStack(spacing: 0) {
-        let rows = CorrelationPreviewSample.supplementRows
-        ForEach(rows) { row in
-          supplementRow(row)
-          if row.id != rows.last?.id {
-            Divider().padding(.leading, 28)
-          }
-        }
-      }
-      .background(
-        RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.cardSurface)
-      )
-    }
-  }
-
-  private func supplementRow(_ row: CorrelationEngine.SupplementSleepRow) -> some View {
-    let color: Color = row.meetsBar ? (row.delta >= 0 ? .green : .red) : .gray
-    return HStack(spacing: 8) {
-      Circle().fill(color).frame(width: 8, height: 8)
-      Text("\(row.emoji) \(row.label)")
-        .font(.subheadline).lineLimit(1)
-      Spacer()
-      Text("Δ \(row.delta >= 0 ? "+" : "")\(String(format: "%.1f", row.delta))")
-        .font(.caption.monospacedDigit().weight(.semibold))
-        .foregroundStyle(color)
-      Text(row.strength)
-        .font(.caption2)
-        .padding(.horizontal, 5)
-        .padding(.vertical, 1)
-        .background(color.opacity(0.15), in: Capsule())
-        .foregroundStyle(color)
-    }
-    .padding(.vertical, 8)
-    .padding(.horizontal, 12)
-  }
-}
-
-/// Deterministic sample data backing `CorrelationsPreviewExample`. Two
-/// continuous predictor → target pairs (so the mini charts show a real
-/// scatter + tertile bucket line) plus a small supplements → sleep table.
-private enum CorrelationPreviewSample {
-  static let magnesium = makePair(
-    predictor: .init(key: "mag", label: "Magnesium", section: "supplements", unit: "mg", binary: false),
-    target:    .init(key: "sleep_score", label: "Sleep score", section: "sleep", unit: "", binary: false),
-    r: 0.42, slope: 0.04, lag: 1, p: 0.014,
-    xRange: 120...420, yBase: 72, yPerX: 0.035, jitter: 3.5
-  )
-
-  static let fiber = makePair(
-    predictor: .init(key: "fiber", label: "Fiber", section: "nutrition", unit: "g", binary: false),
-    target:    .init(key: "readiness", label: "Readiness", section: "sleep", unit: "", binary: false),
-    r: 0.36, slope: 0.45, lag: 0, p: 0.028,
-    xRange: 12...46, yBase: 70, yPerX: 0.42, jitter: 3.5
-  )
-
-  static let supplementRows: [CorrelationEngine.SupplementSleepRow] = [
-    .init(supplementID: "mag", label: "Magnesium", emoji: "💊",
-          takenMean: 84.2, takenN: 41, offMean: 78.9, offN: 22),
-    .init(supplementID: "gly", label: "Glycine", emoji: "🌙",
-          takenMean: 82.6, takenN: 28, offMean: 79.4, offN: 30),
-    .init(supplementID: "theanine", label: "L-Theanine", emoji: "🍵",
-          takenMean: 80.9, takenN: 19, offMean: 80.3, offN: 33),
+  private let coaches: [Coach] = [
+    .init(id: "strength", name: "Strength Coach",
+          role: "Plans your next session from recent lifts",
+          icon: "figure.strengthtraining.traditional", color: .orange),
+    .init(id: "sleep", name: "Sleep Coach",
+          role: "Nudges your wind-down toward your target",
+          icon: "bed.double", color: .indigo),
+    .init(id: "nutrition", name: "Nutrition Coach",
+          role: "Keeps macros honest against your goals",
+          icon: "fork.knife", color: .yellow),
   ]
 
-  /// Build one evaluated pair with a scatter that trends along
-  /// `yBase + (x − min) · yPerX` plus deterministic sinusoidal jitter,
-  /// and three tertile buckets summarising it. Just enough structure for
-  /// `MiniChart` to draw points + the bucket line.
-  private static func makePair(
-    predictor: CorrelationEngine.FeatureSpec,
-    target: CorrelationEngine.FeatureSpec,
-    r: Double, slope: Double, lag: Int, p: Double,
-    xRange: ClosedRange<Double>, yBase: Double, yPerX: Double, jitter: Double
-  ) -> CorrelationEngine.EvaluatedPair {
-    let count = 34
-    let span = xRange.upperBound - xRange.lowerBound
-    let points: [CorrelationPairPoint] = (0..<count).map { i in
-      let t = Double(i) / Double(count - 1)
-      let x = xRange.lowerBound + t * span
-      let noise = sin(Double(i) * 1.9) * jitter + cos(Double(i) * 0.7) * jitter * 0.5
-      let y = yBase + (x - xRange.lowerBound) * yPerX + noise
-      return CorrelationPairPoint(date: "d\(i)", x: x, y: y)
+  var body: some View {
+    VStack(spacing: 10) {
+      ForEach(coaches) { coach in
+        HStack(spacing: 12) {
+          RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(coach.color.opacity(0.16))
+            .frame(width: 40, height: 40)
+            .overlay(
+              Image(systemName: coach.icon)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(coach.color)
+            )
+          VStack(alignment: .leading, spacing: 2) {
+            Text(coach.name).font(.subheadline.weight(.semibold))
+            Text(coach.role)
+              .font(.caption).foregroundStyle(.secondary)
+              .lineLimit(1)
+          }
+          Spacer(minLength: 0)
+        }
+        .padding(12)
+        .background(
+          RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.cardSurface)
+        )
+      }
     }
-    let lo = xRange.lowerBound + span / 3
-    let hi = xRange.lowerBound + span * 2 / 3
-    func bucket(_ contains: (Double) -> Bool, center: Double) -> CorrelationEngine.Bucket {
-      let pts = points.filter { contains($0.x) }
-      let ys = pts.map(\.y)
-      let xs = pts.map(\.x)
-      let meanY = ys.isEmpty ? yBase : ys.reduce(0, +) / Double(ys.count)
-      return CorrelationEngine.Bucket(centerX: center, meanY: meanY, n: pts.count,
-                                      xMin: xs.min() ?? center, xMax: xs.max() ?? center)
-    }
-    let buckets = [
-      bucket({ $0 < lo }, center: (xRange.lowerBound + lo) / 2),
-      bucket({ $0 >= lo && $0 < hi }, center: (lo + hi) / 2),
-      bucket({ $0 >= hi }, center: (hi + xRange.upperBound) / 2),
-    ]
-    let meanX = points.map(\.x).reduce(0, +) / Double(count)
-    let meanY = points.map(\.y).reduce(0, +) / Double(count)
-    return CorrelationEngine.EvaluatedPair(
-      spec: .init(predictor: predictor, target: target,
-                  lagPreference: lag, expected: .positive, titleOverride: nil),
-      r: r, n: count, lag: lag, p: p, slope: slope, meanX: meanX, meanY: meanY,
-      buckets: buckets, monotonic: true, expectedSign: .positive, confound: false,
-      binary: false, stateMinority: 0, stateMajority: 0, tier: .trusted, qValue: 0, points: points
-    )
   }
 }
 
@@ -1628,18 +1508,23 @@ enum SeptenaPlus {
     CGPoint(x: 0.2829, y: 0.3256),
   ]
 
-  /// The membership's perks, in display order. Cosmetic-but-valuable
-  /// extras for people who live in the app. Currently the two gated
-  /// surfaces; append here as more land.
+  /// The membership's perks, in display order. Septena+ is the multi-coach
+  /// tier: the free app gives everyone one on-device coach over their goals
+  /// and data; the membership unlocks a roster of focused coaches. Everything
+  /// else — Insights, correlations, app icons — is free.
   static let features: [SeptenaPlusFeature] = [
-    .init(id: "correlations",
-          icon: "chart.dots.scatter",
-          title: "Correlations dashboard",
-          detail: "Trusted predictor → outcome pairs across every section, with dose-response charts and a supplements → sleep table."),
-    .init(id: "appIcon",
-          icon: "app.badge",
-          title: "Custom app icons",
-          detail: "Recolor the home-screen icon across the full Septena rainbow."),
+    .init(id: "coachRoster",
+          icon: "person.2",
+          title: "A roster of coaches",
+          detail: "Go beyond the single built-in coach. Add focused coaches — strength, sleep, nutrition, and more — each with its own voice and intent."),
+    .init(id: "coachFocus",
+          icon: "scope",
+          title: "Each one stays in its lane",
+          detail: "Every coach reasons over only the sections it needs, so its guidance stays sharp and on-topic instead of one generalist spreading thin."),
+    .init(id: "coachPrivate",
+          icon: "lock.shield",
+          title: "Private and on-device",
+          detail: "Coaches run on Apple Intelligence, on your device — the same private foundation as the rest of Septena. Nothing leaves your phone."),
   ]
 }
 
@@ -1719,10 +1604,9 @@ struct SeptenaPlusBadge: View {
   }
 }
 
-/// Mock paywall for the Septena+ upgrade. Shows the live-shaped
-/// Correlations preview as the hero, the value bullets, and a clearly
-/// labelled mock unlock toggle (no purchase is made). `onUnlock` flips
-/// the entitlement and applies the gated layout.
+/// Mock paywall for the Septena+ upgrade. Shows the multi-coach roster
+/// preview as the hero, the value bullets, and a clearly labelled mock
+/// unlock toggle (no purchase is made). `onUnlock` flips the entitlement.
 struct SeptenaPlusPaywall: View {
   @Environment(\.dismiss) private var dismiss
   let onUnlock: () -> Void
@@ -1765,9 +1649,9 @@ struct SeptenaPlusPaywall: View {
       SeptenaDiscMark(size: 56)
       VStack(alignment: .leading, spacing: 6) {
         SeptenaPlusBadge()
-        Text("Make Septena yours")
+        Text("Your team of coaches")
           .font(.title2.weight(.semibold))
-        Text("Power-user features for people who live in the app, starting with the Correlations dashboard and custom app icons.")
+        Text("The free app gives you one on-device coach. Septena+ turns that into a roster — focused coaches for the parts of your life you're working on.")
           .font(.subheadline)
           .foregroundStyle(.secondary)
       }
@@ -1776,12 +1660,12 @@ struct SeptenaPlusPaywall: View {
 
   private var previewHero: some View {
     VStack(alignment: .leading, spacing: 8) {
-      Text("CORRELATIONS DASHBOARD")
+      Text("YOUR COACHES")
         .font(.caption2.weight(.semibold))
         .foregroundStyle(.secondary)
         .padding(.horizontal, 14)
         .padding(.top, 12)
-      CorrelationsPreviewExample()
+      CoachesPreviewExample()
         .padding(.horizontal, 14)
         .padding(.bottom, 14)
         .allowsHitTesting(false)
@@ -1989,7 +1873,7 @@ struct AccountSettingsPane: View {
               Text("Upgrade to \(SeptenaPlus.name)")
                 .font(.body.weight(.semibold))
                 .foregroundStyle(.primary)
-              Text("Correlations dashboard, custom app icons, and more.")
+              Text("A roster of focused, on-device coaches.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
@@ -2051,7 +1935,6 @@ private struct AppIconPreview: View {
 private struct AppIconChoiceCard: View {
   let option: AppIconOption
   let isSelected: Bool
-  let isLocked: Bool
   let isDisabled: Bool
 
   var body: some View {
@@ -2062,14 +1945,6 @@ private struct AppIconChoiceCard: View {
           Image(systemName: "checkmark.circle.fill")
             .scaledFont(size: 18, weight: .semibold)
             .foregroundStyle(.white, .green)
-            .shadow(color: .black.opacity(0.16), radius: 4, y: 1)
-            .offset(x: 5, y: -5)
-        } else if isLocked {
-          Image(systemName: "lock.fill")
-            .scaledFont(size: 10, weight: .bold)
-            .foregroundStyle(SeptenaPlus.foil)
-            .padding(4)
-            .background(SeptenaPlus.ink, in: Circle())
             .shadow(color: .black.opacity(0.16), radius: 4, y: 1)
             .offset(x: 5, y: -5)
         }

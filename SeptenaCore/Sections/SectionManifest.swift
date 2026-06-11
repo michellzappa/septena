@@ -449,13 +449,14 @@ public extension SectionManifest {
       supportsDashboard: true,
       settingsEditor: .appearance
     ),
-    // Insights is intentionally NOT a catalog section. It's a read-only
+    // Insights is intentionally NOT a catalog section (and not even an
+    // `.appFunction` manifest row — it's absent entirely). It's a read-only
     // meta-surface (cross-section correlation discovery, CorrelationEngine)
     // that owns no data of its own and has no per-day series, so it never
-    // belonged in Manage Sections alongside the real life domains. It now
-    // lives purely as a dashboard entry point (the Week toolbar button →
-    // `InsightsDestinationView`) and a Settings pane, both gated behind
-    // Septena+. See InsightsDestination.swift.
+    // belonged in Manage Sections alongside the real life domains. It lives
+    // purely as a dashboard entry point (the Week toolbar button →
+    // `InsightsDestinationView`) and a Settings pane, free for everyone.
+    // See InsightsDestination.swift.
     // Hydration — water-only log. UX over existing nutrition data:
     // every entry is a NutritionEntryEntity with `foods: ["Water"]`,
     // `waterMl > 0`, and macros at 0. Logged via the hydration quick-
