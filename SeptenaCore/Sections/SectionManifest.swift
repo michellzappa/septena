@@ -7,7 +7,7 @@ import SwiftUI
 //
 // What's here (catalog-level facts about the section itself):
 //   key, defaultLabel, shortDescription, activation, onboarding,
-//   supportsTab, supportsDashboard, settingsEditor
+//   supportsTab, supportsDashboard, settingsEditor, kind
 //
 // What's NOT here:
 //   • color   — a per-account preference. Lives in the CloudKit-backed
@@ -85,6 +85,33 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
   /// the webapp's `settings_editor` field. Drives whether the page is
   /// identity-only or includes an editable list.
   public let settingsEditor: SettingsEditor
+
+  /// Logging life domain vs. app-function. Defaults to `.loggingDomain` so
+  /// the common case stays terse; only app-functions (Coach/goals) opt in to
+  /// `.appFunction`. See `Kind`.
+  public let kind: Kind
+
+  public init(
+    key: String,
+    defaultLabel: String,
+    shortDescription: String,
+    activation: Activation,
+    onboarding: Onboarding,
+    supportsTab: Bool,
+    supportsDashboard: Bool,
+    settingsEditor: SettingsEditor,
+    kind: Kind = .loggingDomain
+  ) {
+    self.key = key
+    self.defaultLabel = defaultLabel
+    self.shortDescription = shortDescription
+    self.activation = activation
+    self.onboarding = onboarding
+    self.supportsTab = supportsTab
+    self.supportsDashboard = supportsDashboard
+    self.settingsEditor = settingsEditor
+    self.kind = kind
+  }
 
   public var id: String { key }
 
@@ -178,6 +205,20 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
       case .optional, .hidden: return false
       }
     }
+  }
+
+  /// What a manifest row fundamentally *is*. Sections are data-logging life
+  /// domains (tasks, nutrition, sleep, …) — the things the user records and
+  /// the app correlates. App-functions (Coach/goals) own no data of their
+  /// own; they register here only to reuse the plugin plumbing (routing, MCP
+  /// tools, section-tagging). The distinction drives surfacing: only
+  /// `.loggingDomain` rows appear in the Manage Sections list. Insights is
+  /// neither — it isn't in the manifest at all.
+  public enum Kind: String, Sendable, Hashable {
+    /// A data-logging life domain the user records into.
+    case loggingDomain
+    /// An app-function that registers for plumbing but logs no data.
+    case appFunction
   }
 
   public enum Activation: String, Sendable, Hashable {
@@ -433,11 +474,13 @@ public extension SectionManifest {
       supportsDashboard: true,
       settingsEditor: .none
     ),
-    // Goals — free-text intentions tagged with section keys. No
-    // homepage tile and no Today presence; surfaces inside the
-    // sections each goal is tagged with. Hidden from the future
-    // browse-catalog picker (`onboarding: .hidden`) but still listed
-    // in Manage Sections so the user can disable / re-enable it.
+    // Goals/Coach — an app-function, NOT a data-logging life domain
+    // (`kind: .appFunction`). Free-text intentions tagged with section keys;
+    // no homepage tile and no Today presence; surfaces inside the sections
+    // each goal is tagged with. It registers as a manifest row + plugin only
+    // to reuse the plumbing (CoachView routing, `goals_*` MCP tools,
+    // section-tagging) — so `.appFunction` keeps it out of the Manage
+    // Sections list while everything else keeps working.
     .init(
       key: "goals",
       defaultLabel: String(localized: "Coach", comment: "Section name"),
@@ -446,7 +489,8 @@ public extension SectionManifest {
       onboarding: .hidden,
       supportsTab: false,
       supportsDashboard: false,
-      settingsEditor: .none
+      settingsEditor: .none,
+      kind: .appFunction
     ),
   ]
 
