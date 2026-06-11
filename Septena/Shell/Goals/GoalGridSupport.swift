@@ -43,7 +43,8 @@ enum GoalDrafts {
                                  window: draft.metricWindow,
                                  comparator: draft.metricComparator,
                                  target: draft.metricTarget,
-                                 baseline: draft.metricBaseline)
+                                 baseline: draft.metricBaseline,
+                                 upper: draft.metricTargetUpper)
       }
 
       var updated = goal
@@ -54,6 +55,7 @@ enum GoalDrafts {
       updated.metricComparator = draft.metricComparator
       updated.metricTarget = draft.metricTarget
       updated.metricBaseline = draft.metricBaseline
+      updated.metricTargetUpper = draft.metricTargetUpper
       created.append(updated)
     }
     return created

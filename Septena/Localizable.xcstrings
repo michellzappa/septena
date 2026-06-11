@@ -6605,6 +6605,9 @@
         }
       }
     },
+    "Upper must be greater than the lower bound." : {
+
+    },
     "Used to personalize the greeting. With Apple Intelligence it's freshly written through the day." : {
       "localizations" : {
         "pt-BR" : {

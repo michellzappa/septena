@@ -115,7 +115,8 @@ struct GoalMetricProgress {
     // side of the target from the goal direction (e.g. lte target=22,
     // baseline=25 means we're trying to come down). If baseline matches
     // target or is already past it, fall through to the simple math.
-    if let baseline, comparator != "eq", baseline != target {
+    if let baseline, comparator != "eq",
+       comparator == "lte" ? baseline > target : baseline < target {
       let span = abs(baseline - target)
       let travelled = comparator == "lte"
         ? (baseline - current)   // lte: distance descended

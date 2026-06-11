@@ -16,6 +16,9 @@ struct DraftGoal: Identifiable, Hashable {
   var metricComparator: String? = nil
   var metricTarget: Double? = nil
   var metricBaseline: Double? = nil
+  /// Upper bound when `metricComparator == "range"` — lower bound lives in
+  /// `metricTarget`, matching GoalEntity.
+  var metricTargetUpper: Double? = nil
 }
 
 @MainActor

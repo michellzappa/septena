@@ -363,6 +363,19 @@ struct EditGoalSheet: View {
     value == value.rounded() ? String(Int(value)) : String(value)
   }
 
+  /// A "between" band needs a parseable upper strictly above the lower bound —
+  /// otherwise the stored goal could never be hit (`hit` requires
+  /// lower ≤ current ≤ upper). Blocks Save instead of silently clearing the
+  /// metric so the typed band isn't lost. An invalid *lower* keeps the existing
+  /// behavior (metric clears on save), so it doesn't block here.
+  private var rangeBlocksSave: Bool {
+    guard trackMetric, metricComparator == "range" else { return false }
+    guard let lower = Double(metricTargetText.replacingOccurrences(of: ",", with: ".")),
+          lower >= 0 else { return false }
+    guard let upper = Double(metricUpperText.replacingOccurrences(of: ",", with: ".")) else { return true }
+    return upper <= lower
+  }
+
   var body: some View {
     NavigationStack {
       Form {
@@ -455,6 +468,11 @@ struct EditGoalSheet: View {
                       .foregroundStyle(.secondary)
                   }
                 }
+                if rangeBlocksSave {
+                  Text("Upper must be greater than the lower bound.")
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+                }
               }
               HStack {
                 Text("Baseline")
@@ -536,7 +554,8 @@ struct EditGoalSheet: View {
         }
         ToolbarItem(placement: .confirmationAction) {
           Button("Save") { save() }
-            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                      || rangeBlocksSave)
         }
       }
       .confirmationDialog(
