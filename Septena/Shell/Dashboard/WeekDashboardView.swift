@@ -273,8 +273,19 @@ struct WeekDashboardView: View {
       onDayChange: {
         Task { await loadAll() }
       },
-      onDataChange: {
-        Task { await repaintAllMirrors() }
+      onDataChange: { note in
+        if let keys = note.changedSections {
+          // Scoped local mutation — reload only the touched tiles. A change
+          // with no dashboard tile (goals, coach, milestones) is a no-op
+          // here; intake has its own `.septenaDataChanged` listener below.
+          let sections = Set(keys.compactMap(DashSection.init(sectionKey:)))
+          guard !sections.isEmpty else { return }
+          Task { await refresh(sections) }
+        } else {
+          // Unscoped — CK batch arrival or settings-level change. Re-read
+          // every mirror-backed tile, same as before scoping existed.
+          Task { await repaintAllMirrors() }
+        }
       },
       onTileChange: { section in
         repaint(section: section)
@@ -317,7 +328,8 @@ struct WeekDashboardView: View {
         pushedContent(for: dest)
       }
       .task { await reloadIntake() }
-      .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
+      .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
+        guard note.affectsSection("intake") else { return }
         Task { await reloadIntake() }
       }
     }
@@ -2756,7 +2768,9 @@ private struct WeekDashboardScreen<CurrentDay: Equatable, Toolbar: ToolbarConten
   let onInitialLoad: () async -> Void
   let onTaskChange: () -> Void
   let onDayChange: () -> Void
-  let onDataChange: () -> Void
+  /// Receives the `.septenaDataChanged` notification itself so the owner
+  /// can scope the reload to `note.changedSections` (nil = refresh all).
+  let onDataChange: (Notification) -> Void
   let onTileChange: (AddInfoSection) -> Void
   @ToolbarContentBuilder let toolbar: () -> Toolbar
   @ViewBuilder let content: () -> Content
@@ -2797,8 +2811,8 @@ private struct WeekDashboardScreen<CurrentDay: Equatable, Toolbar: ToolbarConten
       // stays stuck on whatever `loadAll` saw at cold launch — entries
       // logged on another device never repaint until the user visits
       // the section.
-      .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
-        onDataChange()
+      .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
+        onDataChange(note)
       }
       // Day rollover: the dashboard is the most date-sensitive surface
       // (today's timeline, today's totals, 7-day windows ending today).
@@ -2854,6 +2868,9 @@ private struct WeekDashboardTimelineCard: View {
       macroColors: macroColors,
       fullDay: fullDay
     )
+    // Skip the body (day re-clustering) when none of the inputs changed —
+    // the dashboard re-renders far more often than the timeline data moves.
+    .equatable()
     .padding(14)
     .background(
       RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)

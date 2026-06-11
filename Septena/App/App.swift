@@ -140,14 +140,13 @@ struct SeptenaApp: App {
           // their `suggestedEntities` return empty when the picker is shown.
           SeptenaShortcuts.updateAppShortcutParameters()
           #endif
-          // Diagnostic snapshot of the local store at launch. Surfaces
-          // migration corruption / partial-state situations in the
-          // console immediately — no Inspector required.
-          LocalCache.logTaskStateSummary(in: localStore.container.mainContext)
           // Wire CKEngine's SwiftData seams, bind the mutators, start
           // the engine. Idempotent — AppIntents call the same entry
           // point, so a Siri-triggered cold launch and the scene's
-          // `.task` race safely.
+          // `.task` race safely. Local-only and fast: the awaited part of
+          // this `.task` ends right after the delegate stashing below, so
+          // the first frame paints from the SwiftData mirror without
+          // waiting on any network round-trip.
           await services.start()
           #if DEBUG
           // Screenshot / UI-test builds: load curated demo data into the
@@ -178,62 +177,76 @@ struct SeptenaApp: App {
           #endif
           // `SectionTheme.init` and `SettingsStore.init` already hydrated
           // tile order + accent colors from disk synchronously, so the
-          // first frame is correct. Pull CloudKit, then refresh the
-          // mirror-backed surfaces to absorb any remote changes.
-          try? await ckEngine.fetchChanges()
-          await theme.refresh()
-          await settingsStore.refresh()
-          // Bridge the welcome name between the CloudKit-synced settings
-          // payload and the local @AppStorage key WelcomeHeader reads:
-          // adopt an inbound name from another device, or push a
-          // pre-existing local-only name up (engine in hand here).
-          settingsStore.reconcileWelcomeName(
-            context: localStore.container.mainContext, engine: ckEngine)
-          // Same bridge for the day-bucket cutoffs: adopt an inbound value
-          // from another device, or push a pre-existing local override up.
-          settingsStore.reconcileDayBucketCutoffs(
-            context: localStore.container.mainContext, engine: ckEngine)
-          // Seed the Claude gateway token on cold launch (no-op if Claude
-          // isn't connected or a recent token is still valid).
-          await ClaudeGatewayProvider.shared.refreshIfNeeded()
-          BadgeManager.shared.start(context: localStore.container.mainContext)
-          // Behavioral nudge layer. Ask once (no-op if already decided),
-          // then start the scheduler — it reconciles now and re-reconciles
-          // on every section data-change notification, like BadgeManager.
-          // Screenshot / demo-seed builds skip the permission prompt so it
-          // doesn't cover the UI in captures.
-          if !DemoSeedMode.isOn {
-            await LocalNotificationScheduler.shared.requestAuthorizationIfNeeded()
+          // first frame is correct — let it paint NOW. Everything below
+          // (the CloudKit pull, the post-fetch refreshes/migrations, the
+          // diagnostics) runs unawaited so launch never blocks on the
+          // network or on full-table housekeeping scans. Internal order is
+          // preserved: steps that want fetched data in hand still run
+          // after `absorbRemoteChanges()` completes.
+          Task { @MainActor in
+            // Diagnostic snapshot of the local store. Surfaces migration
+            // corruption / partial-state situations in the console without
+            // an Inspector — but it's three full-table scans, so it has no
+            // business ahead of the first frame.
+            LocalCache.logTaskStateSummary(in: localStore.container.mainContext)
+            // Pull CloudKit (+ project-graph heal, occurredAt backfill,
+            // timezone publish), then refresh the mirror-backed surfaces
+            // to absorb any remote changes.
+            await services.absorbRemoteChanges()
+            await theme.refresh()
+            await settingsStore.refresh()
+            // Bridge the welcome name between the CloudKit-synced settings
+            // payload and the local @AppStorage key WelcomeHeader reads:
+            // adopt an inbound name from another device, or push a
+            // pre-existing local-only name up (engine in hand here).
+            settingsStore.reconcileWelcomeName(
+              context: localStore.container.mainContext, engine: ckEngine)
+            // Same bridge for the day-bucket cutoffs: adopt an inbound value
+            // from another device, or push a pre-existing local override up.
+            settingsStore.reconcileDayBucketCutoffs(
+              context: localStore.container.mainContext, engine: ckEngine)
+            // Seed the Claude gateway token on cold launch (no-op if Claude
+            // isn't connected or a recent token is still valid).
+            await ClaudeGatewayProvider.shared.refreshIfNeeded()
+            BadgeManager.shared.start(context: localStore.container.mainContext)
+            // Behavioral nudge layer. Ask once (no-op if already decided),
+            // then start the scheduler — it reconciles now and re-reconciles
+            // on every section data-change notification, like BadgeManager.
+            // Screenshot / demo-seed builds skip the permission prompt so it
+            // doesn't cover the UI in captures.
+            if !DemoSeedMode.isOn {
+              await LocalNotificationScheduler.shared.requestAuthorizationIfNeeded()
+            }
+            LocalNotificationScheduler.shared.start(context: localStore.container.mainContext)
+            // One-shot: lift legacy macro targets (MacrosConfig bands) into
+            // range goals. After CK fetch above so it won't duplicate bands a
+            // sibling device already migrated.
+            MacroTargetMigration.runIfNeeded(context: localStore.container.mainContext)
+            // Milestone reconcile. The first pass per scope is the grandfather
+            // pass: every already-qualified rung is granted silently, so launch
+            // day never celebrates history. Runs after the CK fetch above so a
+            // sibling device's milestone rows are already folded in (the
+            // deterministic ids make the order moot, but quiet is quieter).
+            // Body goals DO celebrate here — crossings that happened while the
+            // app was away queue for the presenter below.
+            let milestones = services.milestoneMutator
+            milestones.evaluateBodyGoals(now: dayClock.now, today: dayClock.today)
+            milestones.evaluateTraining(now: dayClock.now, celebrate: false)
+            milestones.evaluateAllHabitStreaks(now: dayClock.now, today: dayClock.today)
+            MilestonePresenter.presentPending(milestones: milestones, theme: theme,
+                                              logCommit: logCommit, now: dayClock.now)
+            #if DEBUG
+            // One-shot, DEBUG-only: register optional CloudKit fields that
+            // exist in code but were never written in Development, so they
+            // promote to Production (which won't auto-register on write).
+            // See docs/CloudKitSchema.md § Dev schema reconciliation.
+            SchemaSeedRegistrar.runIfNeeded()
+            #endif
+            #if os(iOS)
+            TrainingLiveActivityCoordinator.shared.reconcile(with: trainingDraft.draft)
+            #endif
+            await runRemindersAutoImport()
           }
-          LocalNotificationScheduler.shared.start(context: localStore.container.mainContext)
-          // One-shot: lift legacy macro targets (MacrosConfig bands) into
-          // range goals. After CK fetch above so it won't duplicate bands a
-          // sibling device already migrated.
-          MacroTargetMigration.runIfNeeded(context: localStore.container.mainContext)
-          // Milestone reconcile. The first pass per scope is the grandfather
-          // pass: every already-qualified rung is granted silently, so launch
-          // day never celebrates history. Runs after the CK fetch above so a
-          // sibling device's milestone rows are already folded in (the
-          // deterministic ids make the order moot, but quiet is quieter).
-          // Body goals DO celebrate here — crossings that happened while the
-          // app was away queue for the presenter below.
-          let milestones = services.milestoneMutator
-          milestones.evaluateBodyGoals(now: dayClock.now, today: dayClock.today)
-          milestones.evaluateTraining(now: dayClock.now, celebrate: false)
-          milestones.evaluateAllHabitStreaks(now: dayClock.now, today: dayClock.today)
-          MilestonePresenter.presentPending(milestones: milestones, theme: theme,
-                                            logCommit: logCommit, now: dayClock.now)
-          #if DEBUG
-          // One-shot, DEBUG-only: register optional CloudKit fields that
-          // exist in code but were never written in Development, so they
-          // promote to Production (which won't auto-register on write).
-          // See docs/CloudKitSchema.md § Dev schema reconciliation.
-          SchemaSeedRegistrar.runIfNeeded()
-          #endif
-          #if os(iOS)
-          TrainingLiveActivityCoordinator.shared.reconcile(with: trainingDraft.draft)
-          #endif
-          await runRemindersAutoImport()
         }
         .onReceive(NotificationCenter.default
           .publisher(for: .EKEventStoreChanged)) { _ in
@@ -245,6 +258,7 @@ struct SeptenaApp: App {
         // source — see MilestonePresenter.
         .onReceive(NotificationCenter.default
           .publisher(for: .septenaDataChanged)
+          .filter { $0.affectsSection("milestones") }
           .debounce(for: .seconds(0.6), scheduler: RunLoop.main)) { _ in
           MilestonePresenter.presentPending(
             milestones: services.milestoneMutator, theme: theme,

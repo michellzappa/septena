@@ -95,10 +95,12 @@ final class SeptenaServices {
   func enabledSectionKeys() -> Set<String> {
     let context = LocalStore.shared.container.mainContext
     let sections = SettingsMirror.loadSections(context: context)
-    let enabled = Set(sections.filter(\.isEnabled).map(\.key))
-    let order = SettingsMirror.loadSettings(context: context)?.sectionOrder ?? []
-    guard !order.isEmpty else { return enabled }
-    return Set(order.filter(enabled.contains))
+    // `sectionOrder` defines ORDERING, not membership. A section seeded after
+    // the user last saved an order (e.g. a newly shipped section like
+    // `intake`) is enabled but absent from the order — filtering on the order
+    // hid its MCP tools and App Intents entirely. Enablement is the gate;
+    // every enabled section has a real SectionEntity row.
+    return Set(sections.filter(\.isEnabled).map(\.key))
   }
 
   /// Section keys whose actions are ALWAYS available — the App Intents twin of
@@ -1054,6 +1056,9 @@ final class SeptenaServices {
           NotificationCenter.default.post(name: .septenaStructureChanged, object: nil)
         }
         if batchTouchedData {
+          // Deliberately UNSCOPED — a CK batch can touch any mix of record
+          // types (cross-device writes), so every listener refreshes. Local
+          // mutations post scoped instead (see `DataChange.post`).
           NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
         }
         batchTouchedTasks = false
@@ -1081,20 +1086,38 @@ final class SeptenaServices {
       WithingsStore.shared.bind(ckEngine: ckEngine)
       // Demo-seed (screenshot) builds stay offline — never start sync.
       if !DemoSeedMode.isOn {
+        // Start the engine (it kicks off its own background fetch) but do
+        // NOT await a server round-trip here. start() gates the first frame
+        // AND every background-launched App Intent, and the local mirror is
+        // the launch source of truth — blocking either on the network broke
+        // local-first at exactly the moment it matters most. The awaited
+        // fetch + post-fetch repairs live in `absorbRemoteChanges()`, which
+        // App.swift runs off the critical path after the first frame.
         ckEngine.start()
-        try? await ckEngine.fetchChanges()
-        // Heal dangling project references now that the initial fetch has
-        // landed (so we never stub a project that's merely mid-sync).
-        await reconcileProjectGraph(context: context)
-        // Now that synced history is present: repair pre-`occurredAt` event
-        // rows (local-only) and publish this device's timezone so the gateway
-        // resolves the user's real zone instead of defaulting to UTC.
-        OccurredAtBackfill.runIfNeeded(context: context)
-        SettingsMirror.publishDeviceTimezone(context: context, engine: ckEngine)
       }
     }
     startTask = task
     await task.value
+  }
+
+  /// Launch follow-up to `start()`: pull the server's current state, then run
+  /// the repairs that want fetched data in hand. App.swift calls this in an
+  /// unawaited task after the first frame paints — CK arrival patches the UI
+  /// through the batch notifications, so nothing waits on it. Requires
+  /// `start()` to have completed (engine created, seams wired).
+  @MainActor
+  func absorbRemoteChanges() async {
+    guard !DemoSeedMode.isOn else { return }
+    let context = LocalStore.shared.container.mainContext
+    try? await ckEngine.fetchChanges()
+    // Heal dangling project references now that the initial fetch has
+    // landed (so we never stub a project that's merely mid-sync).
+    await reconcileProjectGraph(context: context)
+    // Now that synced history is present: repair pre-`occurredAt` event
+    // rows (local-only) and publish this device's timezone so the gateway
+    // resolves the user's real zone instead of defaulting to UTC.
+    OccurredAtBackfill.runIfNeeded(context: context)
+    SettingsMirror.publishDeviceTimezone(context: context, engine: ckEngine)
   }
 
   /// Heals the project graph surfaced by the launch crosswalk. Tasks imported
@@ -1193,7 +1216,7 @@ final class ChecklistMutator {
     saveContext("CK habits delete")
     ckEngine?.noteHabitDefinitionDeletion(id: id)
     for state in states { ckEngine?.noteHabitEventDeletion(id: state.id) }
-    postChecklistChanged()
+    postChecklistChanged("habits")
   }
 
   func toggleHabit(id: String, date: String, done: Bool) {
@@ -1239,7 +1262,7 @@ final class ChecklistMutator {
     saveContext("CK supplements delete")
     ckEngine?.noteSupplementDefinitionDeletion(id: id)
     for state in states { ckEngine?.noteSupplementEventDeletion(id: state.id) }
-    postChecklistChanged()
+    postChecklistChanged("supplements")
   }
 
   func toggleSupplement(id: String, date: String, done: Bool) {
@@ -1249,7 +1272,7 @@ final class ChecklistMutator {
         context.delete(state)
         saveContext("CK supplements toggle delete")
         ckEngine?.noteSupplementEventDeletion(id: state.id)
-        postChecklistChanged()
+        postChecklistChanged("supplements")
       }
       return
     }
@@ -1308,7 +1331,7 @@ final class ChecklistMutator {
     saveContext("CK chores delete")
     ckEngine?.noteChoreDefinitionDeletion(id: id)
     for event in events { ckEngine?.noteChoreEventDeletion(id: event.id) }
-    postChecklistChanged()
+    postChecklistChanged("chores")
   }
 
   func completeChore(id: String, date: String) {
@@ -1351,7 +1374,7 @@ final class ChecklistMutator {
     context.delete(latest)
     saveContext("CK chores uncomplete")
     ckEngine?.noteChoreEventDeletion(id: latest.id)
-    postChecklistChanged()
+    postChecklistChanged("chores")
   }
 
   private func setHabitState(id: String,
@@ -1369,7 +1392,7 @@ final class ChecklistMutator {
         context.delete(state)
         saveContext("CK habits state delete")
         ckEngine?.noteHabitEventDeletion(id: state.id)
-        postChecklistChanged()
+        postChecklistChanged("habits")
       }
       return
     }
@@ -1502,37 +1525,37 @@ final class ChecklistMutator {
   private func commitHabitDefinition(_ entity: HabitDefinitionEntity, op: String) {
     saveContext("CK habits \(op)")
     ckEngine?.noteHabitDefinitionChange(id: entity.id)
-    postChecklistChanged()
+    postChecklistChanged("habits")
   }
 
   private func commitHabitEvent(_ entity: HabitDayStateEntity, op: String) {
     saveContext("CK habit event \(op)")
     ckEngine?.noteHabitEventChange(id: entity.id)
-    postChecklistChanged()
+    postChecklistChanged("habits")
   }
 
   private func commitSupplementDefinition(_ entity: SupplementDefinitionEntity, op: String) {
     saveContext("CK supplements \(op)")
     ckEngine?.noteSupplementDefinitionChange(id: entity.id)
-    postChecklistChanged()
+    postChecklistChanged("supplements")
   }
 
   private func commitSupplementEvent(_ entity: SupplementDayStateEntity, op: String) {
     saveContext("CK supplement event \(op)")
     ckEngine?.noteSupplementEventChange(id: entity.id)
-    postChecklistChanged()
+    postChecklistChanged("supplements")
   }
 
   private func commitChoreDefinition(_ entity: ChoreDefinitionEntity, op: String) {
     saveContext("CK chores \(op)")
     ckEngine?.noteChoreDefinitionChange(id: entity.id)
-    postChecklistChanged()
+    postChecklistChanged("chores")
   }
 
   private func commitChoreEvent(_ entity: ChoreEventEntity, op: String) {
     saveContext("CK chore event \(op)")
     ckEngine?.noteChoreEventChange(id: entity.id)
-    postChecklistChanged()
+    postChecklistChanged("chores")
   }
 
   private func saveContext(_ label: String) {
@@ -1543,8 +1566,13 @@ final class ChecklistMutator {
     }
   }
 
-  private func postChecklistChanged() {
-    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+  /// One mutator, three sections — callers pass the section key of the
+  /// entity they touched ("habits" / "supplements" / "chores") so listeners
+  /// showing unrelated sections skip their reload. The task surfaces
+  /// (sidebar, Tasks tile, menu bar) never cared about checklist toggles,
+  /// so no `.septenaTasksChanged` here.
+  private func postChecklistChanged(_ section: String) {
+    DataChange.post(section)
     // Keep the watch's one-shot snapshot in sync with every checklist edit.
     let ctx = context
     Task { @MainActor in WatchSnapshotPublisher.publish(context: ctx) }
@@ -1556,6 +1584,8 @@ final class ChecklistMutator {
 @MainActor
 @Observable
 final class GoalMutator {
+  /// Section key this mutator's scoped `.septenaDataChanged` posts carry.
+  static let changeScope = "goals"
   private let context: ModelContext
   private var ckEngine: CKEngine?
 
@@ -1704,7 +1734,7 @@ final class GoalMutator {
   }
 
   private func postChanged() {
-    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+    DataChange.post(Self.changeScope)
   }
 }
 
@@ -1716,6 +1746,7 @@ final class GoalMutator {
 @MainActor
 @Observable
 final class CoachVoiceMutator {
+  static let changeScope = "coach"
   private let context: ModelContext
   private var ckEngine: CKEngine?
 
@@ -1776,7 +1807,7 @@ final class CoachVoiceMutator {
   }
 
   private func postChanged() {
-    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+    DataChange.post(Self.changeScope)
   }
 }
 
@@ -1788,6 +1819,7 @@ final class CoachVoiceMutator {
 @MainActor
 @Observable
 final class CoachMessageMutator {
+  static let changeScope = "coach"
   private let context: ModelContext
   private var ckEngine: CKEngine?
 
@@ -1846,13 +1878,14 @@ final class CoachMessageMutator {
   }
 
   private func postChanged() {
-    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+    DataChange.post(Self.changeScope)
   }
 }
 
 @MainActor
 @Observable
 final class GutMutator {
+  static let changeScope = "gut"
   private let context: ModelContext
   private var ckEngine: CKEngine?
 
@@ -1958,13 +1991,14 @@ final class GutMutator {
   }
 
   private func postChanged() {
-    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+    DataChange.post(Self.changeScope)
   }
 }
 
 @MainActor
 @Observable
 final class CaffeineMutator {
+  static let changeScope = "caffeine"
   private let context: ModelContext
   private var ckEngine: CKEngine?
 
@@ -2116,13 +2150,14 @@ final class CaffeineMutator {
   }
 
   private func postChanged() {
-    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+    DataChange.post(Self.changeScope)
   }
 }
 
 @MainActor
 @Observable
 final class CannabisMutator {
+  static let changeScope = "cannabis"
   private let context: ModelContext
   private var ckEngine: CKEngine?
 
@@ -2225,7 +2260,7 @@ final class CannabisMutator {
   }
 
   private func postChanged() {
-    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+    DataChange.post(Self.changeScope)
   }
 }
 
@@ -2238,6 +2273,7 @@ final class CannabisMutator {
 @MainActor
 @Observable
 final class IntakeMutator {
+  static let changeScope = "intake"
   private let context: ModelContext
   private var ckEngine: CKEngine?
 
@@ -2578,7 +2614,7 @@ final class IntakeMutator {
   }
 
   private func postChanged() {
-    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+    DataChange.post(Self.changeScope)
   }
 }
 
@@ -2586,6 +2622,7 @@ final class IntakeMutator {
 @MainActor
 @Observable
 final class GroceryMutator {
+  static let changeScope = "groceries"
   private let context: ModelContext
   private var ckEngine: CKEngine?
 
@@ -2736,7 +2773,7 @@ final class GroceryMutator {
   }
 
   private func postChanged() {
-    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+    DataChange.post(Self.changeScope)
   }
 }
 
@@ -2749,6 +2786,7 @@ final class GroceryMutator {
 @MainActor
 @Observable
 final class TrainingMutator {
+  static let changeScope = "training"
   private let context: ModelContext
   private var ckEngine: CKEngine?
 
@@ -3049,7 +3087,7 @@ final class TrainingMutator {
   }
 
   private func postChanged() {
-    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+    DataChange.post(Self.changeScope)
   }
 }
 
@@ -3077,6 +3115,7 @@ struct TrainingEntryDraft {
 @MainActor
 @Observable
 final class NutritionMutator {
+  static let changeScope = "nutrition"
   private let context: ModelContext
   private var ckEngine: CKEngine?
 
@@ -3304,12 +3343,13 @@ final class NutritionMutator {
   }
 
   private func postChanged() {
-    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+    DataChange.post(Self.changeScope)
   }
 }
 @MainActor
 @Observable
 final class MoodMutator {
+  static let changeScope = "mood"
   private let context: ModelContext
 
   init(context: ModelContext) {
@@ -3437,6 +3477,6 @@ final class MoodMutator {
   }
 
   private func postChanged() {
-    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+    DataChange.post(Self.changeScope)
   }
 }

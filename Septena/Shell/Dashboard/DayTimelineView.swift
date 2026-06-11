@@ -17,7 +17,7 @@ import EventKit
 // Data is passed in — parents collect once and slice per date — so the
 // component is dumb and fast even when 7 stack vertically.
 
-struct DayTimelineView: View {
+struct DayTimelineView: View, Equatable {
   let date: String                    // YYYY-MM-DD
   var oura: OuraNight? = nil
   var caffeine: [CaffeineEntry] = []
@@ -42,6 +42,32 @@ struct DayTimelineView: View {
   @Environment(DayClock.self) private var clock
 
   private var isToday: Bool { date == clock.today }
+
+  /// Explicit equality over the data inputs so callers can wrap this view in
+  /// `.equatable()`. The body re-derives clusters / session pills / fasting
+  /// bands from the raw event arrays (multiple `parseHHMM` passes over the
+  /// whole day) on every evaluation — without this gate the dashboard
+  /// re-clusters the day on *any* of its state changes, even ones that
+  /// can't move a dot on the rail. Environment values (theme, clock) are
+  /// intentionally not compared: Observation invalidates the view directly
+  /// when they change, independent of this parent-driven check.
+  static func == (lhs: DayTimelineView, rhs: DayTimelineView) -> Bool {
+    lhs.date == rhs.date
+      && lhs.fullDay == rhs.fullDay
+      && lhs.oura == rhs.oura
+      && lhs.macroColors == rhs.macroColors
+      && lhs.caffeine == rhs.caffeine
+      && lhs.cannabis == rhs.cannabis
+      && lhs.nutrition == rhs.nutrition
+      && lhs.gut == rhs.gut
+      && lhs.mood == rhs.mood
+      && lhs.habits == rhs.habits
+      && lhs.supplements == rhs.supplements
+      && lhs.chores == rhs.chores
+      && lhs.training == rhs.training
+      && lhs.tasks == rhs.tasks
+      && lhs.calendar == rhs.calendar
+  }
 
   // Hoisted formatters — these run in render paths; re-allocating a
   // DateFormatter per render is expensive, so share one configured
