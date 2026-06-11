@@ -2544,6 +2544,11 @@ struct SectionsSettingsPane: View {
     return (order + trailing).compactMap { key in
       guard emitted.insert(key).inserted,
             let manifest = SectionManifest.byKey[key],
+            // `.hidden` sections (Coach/goals) are registered for their
+            // machinery — MCP tools, the Coach destination, section-tagged
+            // goals — but they aren't user-facing life domains, so they
+            // don't belong in the Manage Sections list.
+            manifest.onboarding != .hidden,
             let installed = installedByKey[key] else { return nil }
       return SectionEntry(manifest: manifest, server: installed)
     }
