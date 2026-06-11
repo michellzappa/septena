@@ -49,8 +49,11 @@ struct SupplementsDestinationView: View {
       await model.load()
       loadRates()
     }
-    .sectionReload(on: viewingDate, onDataChange: true) { await reloadPastDay() }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in loadRates() }
+    .sectionReload(on: viewingDate, onDataChange: true,
+                   forSections: ["supplements"]) { await reloadPastDay() }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
+      if note.affectsSection("supplements") { loadRates() }
+    }
     // Tapping a supplement opens its detail "infobox" (streak + history +
     // consistency); the row's checkbox still marks it taken. "Edit" swaps to
     // the editor for the same supplement.

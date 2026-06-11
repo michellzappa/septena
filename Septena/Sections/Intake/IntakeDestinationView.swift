@@ -40,7 +40,7 @@ struct IntakeDestinationView: View {
     .sheet(isPresented: $creating) {
       IntakeKindWizard(onCreated: { _ in Task { await reload() } })
     }
-    .sectionReload(onDataChange: true) { await reload() }
+    .sectionReload(onDataChange: true, forSections: ["intake"]) { await reload() }
   }
 
   private func kindRow(_ kind: IntakeKindDTO) -> some View {

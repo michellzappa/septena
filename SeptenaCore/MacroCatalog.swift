@@ -114,7 +114,7 @@ enum NutritionPrefsWriter {
     // Local UI refresh — the destination view listens for this notification
     // and re-reads tile prefs, so reorder/toggle changes appear immediately
     // without waiting for a CloudKit round-trip.
-    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+    DataChange.post("nutrition")
   }
 }
 

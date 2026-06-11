@@ -175,7 +175,9 @@ private struct HydrationDestinationView: View {
       if isViewingToday { viewingDate = newToday }
       reload()
     }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in reload() }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
+      if note.affectsSection("hydration") { reload() }
+    }
     .sheet(isPresented: $showCustom) {
       CustomAmountSheet(accent: accent) { ml in
         commit(ml: ml)

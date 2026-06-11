@@ -69,8 +69,11 @@ struct HabitsDestinationView: View {
       await model.load()
       loadRates()
     }
-    .sectionReload(on: viewingDate, onDataChange: true) { await reloadPastDay() }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in loadRates() }
+    .sectionReload(on: viewingDate, onDataChange: true,
+                   forSections: ["habits"]) { await reloadPastDay() }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
+      if note.affectsSection("habits") { loadRates() }
+    }
     // Tapping a habit opens its detail "infobox" (streak + history +
     // consistency); the row's checkbox still checks it off. "Edit" in the
     // detail swaps to the editor for the same habit.

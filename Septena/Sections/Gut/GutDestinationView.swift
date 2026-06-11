@@ -54,7 +54,8 @@ struct GutDestinationView: View {
       rhythmSection
     }
     .tint(accent)
-    .sectionReload(on: viewingDate, onDataChange: true) { await reload() }
+    .sectionReload(on: viewingDate, onDataChange: true,
+                   forSections: ["gut"]) { await reload() }
     // Adaptive: sheet on iPhone, docked inspector on iPad/macOS so editing
     // a logged entry keeps the day's log visible alongside it.
     .drawerDetail(edit: $editing, create: $creating) { entry in

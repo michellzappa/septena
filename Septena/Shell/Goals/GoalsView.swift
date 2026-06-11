@@ -64,8 +64,8 @@ struct GoalsView: View {
         content
       }
       .task { await load() }
-        .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
-          goals = LocalCache.goals(in: context)
+        .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
+          if note.affectsSection("goals") { goals = LocalCache.goals(in: context) }
         }
         .sheet(item: $editing) { goal in
           EditGoalSheet(

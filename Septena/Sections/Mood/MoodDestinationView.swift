@@ -43,7 +43,8 @@ struct MoodDestinationView: View {
         rhythmSection
       }
     }
-    .sectionReload(on: viewingDate, onDataChange: true) { await reload() }
+    .sectionReload(on: viewingDate, onDataChange: true,
+                   forSections: ["mood"]) { await reload() }
     .adaptiveDetail(isPresented: $addingNew) {
       AddMoodPage(onLogged: { Task { await reload() } })
     }

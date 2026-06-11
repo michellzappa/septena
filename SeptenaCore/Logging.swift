@@ -21,6 +21,12 @@ extension Notification.Name {
   /// supplements, chores, gut, nutrition, caffeine, cannabis, groceries).
   /// Destinations that show those sections subscribe to refresh themselves
   /// without each call site wiring its own reload.
+  ///
+  /// Posts come in two shapes (see `DataChange`):
+  ///   • scoped — userInfo carries the section keys that actually changed,
+  ///     so listeners showing unrelated sections skip their reload;
+  ///   • unscoped — no userInfo; "anything may have changed". Reserved for
+  ///     CloudKit batch arrival, section seeding, and settings-level changes.
   static let septenaDataChanged = Notification.Name("septena.dataChanged")
   /// Posted by the macOS menu bar's "New To-Do" item. ContentView
   /// listens and starts an inline draft on Inbox — same flow as ⌘N.
@@ -29,6 +35,45 @@ extension Notification.Name {
   /// connected, disconnected). The notification scheduler re-arms the
   /// pre-expiry reconnect nudge off the new `lastRefreshAt`.
   static let septenaClaudeGatewayChanged = Notification.Name("septena.claudeGatewayChanged")
+}
+
+// MARK: - Scoped data changes
+
+/// Section scoping for `.septenaDataChanged`. A mutator posts with the
+/// `SectionManifest` key(s) of the data it touched ("caffeine", "nutrition",
+/// …; plus the non-section scopes "coach" and "milestones"), and listeners
+/// that only show one section check `affectsSection` before reloading. This
+/// is what keeps a single logged supplement from refetching every dashboard
+/// tile, destination view, and open sheet in the app.
+///
+/// Unscoped posts (plain `NotificationCenter.post`, no userInfo) still mean
+/// "anything may have changed" and pass every listener's filter — CloudKit
+/// batch arrival and settings-level changes stay on that path.
+enum DataChange {
+  static let sectionsKey = "septena.changedSections"
+
+  /// Post `.septenaDataChanged` scoped to the given section keys.
+  static func post(_ sections: String...) {
+    NotificationCenter.default.post(name: .septenaDataChanged, object: nil,
+                                    userInfo: [sectionsKey: Set(sections)])
+  }
+}
+
+extension Notification {
+  /// Section keys this `.septenaDataChanged` touched; nil for an unscoped
+  /// post (treat as "everything changed").
+  var changedSections: Set<String>? {
+    userInfo?[DataChange.sectionsKey] as? Set<String>
+  }
+
+  /// Whether a listener showing `sections` should react. True when either
+  /// side is unscoped (nil) or the two sets intersect.
+  func affectsAnySection(of sections: Set<String>?) -> Bool {
+    guard let changed = changedSections, let sections else { return true }
+    return !changed.isDisjoint(with: sections)
+  }
+
+  func affectsSection(_ key: String) -> Bool { affectsAnySection(of: [key]) }
 }
 
 // MARK: - Logger

@@ -215,7 +215,8 @@ struct NutritionDestinationView: View {
       // looking at "today" — otherwise leave their selection alone.
       if isViewingToday { viewingDate = newToday }
     }
-    .sectionReload(on: clock.today, onDataChange: true) { await reload() }
+    .sectionReload(on: clock.today, onDataChange: true,
+                   forSections: ["nutrition"]) { await reload() }
     .drawerDetail(edit: $editing, create: $creating) { entry in
       EditNutritionEntrySheet(original: entry, onDone: { })
     }

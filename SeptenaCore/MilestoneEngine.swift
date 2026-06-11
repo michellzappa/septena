@@ -307,7 +307,9 @@ final class MilestoneMutator {
 
     if touched {
       save("milestones \(scope)")
-      NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+      // Scoped: only the milestone presenter (App.swift) needs to wake for
+      // a freshly latched milestone — section views don't render these rows.
+      DataChange.post("milestones")
     }
     return celebratedGrants
   }

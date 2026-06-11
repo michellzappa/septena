@@ -67,7 +67,8 @@ struct CannabisDestinationView: View {
       rhythmSection
     }
     .tint(accent)
-    .sectionReload(on: viewingDate, onDataChange: true) { await reload() }
+    .sectionReload(on: viewingDate, onDataChange: true,
+                   forSections: ["cannabis"]) { await reload() }
     .adaptiveDetail(item: $editing) { entry in
       EditCannabisEntrySheet(
         date: viewingDate,

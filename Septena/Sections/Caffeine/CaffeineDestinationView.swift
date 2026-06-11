@@ -66,7 +66,8 @@ struct CaffeineDestinationView: View {
       }
     }
     .tint(accent)
-    .sectionReload(on: viewingDate, onDataChange: true) { await reload() }
+    .sectionReload(on: viewingDate, onDataChange: true,
+                   forSections: ["caffeine"]) { await reload() }
     .sheet(isPresented: $managingTypes) {
       CaffeineTypeSheet()
         #if os(iOS)

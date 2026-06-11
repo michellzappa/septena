@@ -35,7 +35,9 @@ struct ExerciseStatsView: View {
         ExerciseDetailView(entity: entity)
       }
       .task { reload() }
-      .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in reload() }
+      .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
+        if note.affectsSection("training") { reload() }
+      }
   }
 
   private func reload() {

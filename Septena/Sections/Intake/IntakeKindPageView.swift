@@ -66,7 +66,8 @@ struct IntakeKindPageView: View {
       }
     }
     .tint(accent)
-    .sectionReload(on: viewingDate, onDataChange: true) { await reload() }
+    .sectionReload(on: viewingDate, onDataChange: true,
+                   forSections: ["intake"]) { await reload() }
     .sheet(isPresented: $managing) {
       IntakeManageSheet(kindID: kindID)
     }

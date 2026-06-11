@@ -54,8 +54,8 @@ struct BackfillSupplementsSheet: View {
       .tint(accent)
     }
     .task { reload() }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
-      reload()
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
+      if note.affectsSection("supplements") { reload() }
     }
   }
 

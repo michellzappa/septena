@@ -404,28 +404,35 @@ extension View {
   ///     starts on appear and restarts on change, replacing a separate
   ///     `.onChange(of:)`, and cancels any in-flight load on a date switch,
   ///   • on `.septenaDataChanged` when `onDataChange` is true (log drawers that
-  ///     should refresh after a write elsewhere).
+  ///     should refresh after a write elsewhere). Pass the view's section
+  ///     key(s) via `forSections` so scoped posts from *other* sections skip
+  ///     the reload; nil reloads on every data change (pre-scoping behavior).
   /// Collapses the `.task` + `.onChange` + `.onReceive` trio every drawer
   /// repeated. Accepts an `async` closure so both sync `reload()` and
   /// `paintFromCache(); await load()` shapes fit.
   func sectionReload<V: Equatable>(
     on value: V,
     onDataChange: Bool = false,
+    forSections: Set<String>? = nil,
     perform: @escaping () async -> Void
   ) -> some View {
     self
       .task(id: value) { await perform() }
-      .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
-        if onDataChange { Task { @MainActor in await perform() } }
+      .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
+        if onDataChange, note.affectsAnySection(of: forSections) {
+          Task { @MainActor in await perform() }
+        }
       }
   }
 
   /// Lifecycle variant for drawers with no observed value (no time travel).
   func sectionReload(
     onDataChange: Bool = false,
+    forSections: Set<String>? = nil,
     perform: @escaping () async -> Void
   ) -> some View {
-    sectionReload(on: 0, onDataChange: onDataChange, perform: perform)
+    sectionReload(on: 0, onDataChange: onDataChange, forSections: forSections,
+                  perform: perform)
   }
 }
 

@@ -51,8 +51,8 @@ struct BackfillChoresSheet: View {
       .tint(accent)
     }
     .task { reload() }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
-      reload()
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
+      if note.affectsSection("chores") { reload() }
     }
   }
 

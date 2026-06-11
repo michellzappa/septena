@@ -25,6 +25,28 @@ enum DashSection: CaseIterable {
     case .gut:         self = .gut
     }
   }
+
+  /// Map a `SectionManifest` key — the unit scoped `.septenaDataChanged`
+  /// posts carry — onto the dashboard's read unit. Keys with no tile here
+  /// (goals, coach, milestones; intake has its own reload path) return nil,
+  /// meaning the dashboard has nothing to refresh for that change.
+  init?(sectionKey: String) {
+    switch sectionKey {
+    case "habits":      self = .habits
+    case "chores":      self = .chores
+    case "supplements": self = .supplements
+    case "training":    self = .training
+    case "tasks":       self = .tasks
+    case "nutrition":   self = .nutrition
+    case "groceries":   self = .groceries
+    case "caffeine":    self = .caffeine
+    case "cannabis":    self = .cannabis
+    case "gut":         self = .gut
+    case "mood":        self = .mood
+    case "hydration":   self = .hydration
+    default:            return nil
+    }
+  }
 }
 
 /// Off-main SwiftData reader for the Week dashboard.

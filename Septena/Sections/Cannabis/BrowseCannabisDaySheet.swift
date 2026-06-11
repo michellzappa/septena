@@ -73,8 +73,8 @@ struct BrowseCannabisDaySheet: View {
       .tint(accent)
     }
     .task { reload() }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
-      reload()
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
+      if note.affectsSection("cannabis") { reload() }
     }
     .sheet(item: $editing) { entry in
       EditCannabisEntrySheet(

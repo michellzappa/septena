@@ -120,7 +120,7 @@ struct GroceriesDestinationView: View {
       }
     }
     .tint(accent)
-    .sectionReload(onDataChange: true) { await reload() }
+    .sectionReload(onDataChange: true, forSections: ["groceries"]) { await reload() }
     .drawerDetail(edit: $editing, create: $creating) { item in
       EditGroceryItemSheet(
         original: item,
