@@ -76,20 +76,11 @@ struct IntakeManageSheet: View {
         }
         .padding(.vertical, 2)
       }
-      ScrollView(.horizontal, showsIndicators: false) {
-        HStack(spacing: 12) {
-          ForEach(IntakeKindWizard.palette, id: \.self) { hex in
-            Circle()
-              .fill(AdaptiveColor.adaptive(hex) ?? .gray)
-              .frame(width: 26, height: 26)
-              .overlay(Circle().strokeBorder(Color.primary, lineWidth: color == hex ? 2 : 0))
-              .onTapGesture {
-                color = hex
-                mutator.updateKind(id: kindID, color: hex)
-              }
-          }
-        }
-        .padding(.vertical, 2)
+      // The app-standard accent palette (same grid the section identity
+      // editor uses), not a bespoke subset.
+      PaletteSwatchGrid(selectedHex: color) { hex in
+        color = hex
+        mutator.updateKind(id: kindID, color: hex)
       }
     }
   }
