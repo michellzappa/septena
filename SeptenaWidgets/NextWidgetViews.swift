@@ -152,7 +152,7 @@ private struct CategoryRow: View {
         .font(.system(size: iconSize))
         .foregroundStyle(.secondary)
         .frame(width: iconFrame)
-      Text(cat.title)
+      Text(displayTitle(cat.title))
         .font(.system(size: titleSize, weight: .medium))
         .foregroundStyle(.primary)
         .lineLimit(1)
@@ -198,7 +198,7 @@ private struct RectangularView: View {
         ForEach(cats.prefix(2)) { cat in
           HStack(spacing: 5) {
             Image(systemName: kindIcon(cat.kind)).font(.caption2)
-            Text(cat.title).font(.caption.weight(.medium)).lineLimit(1)
+            Text(displayTitle(cat.title)).font(.caption.weight(.medium)).lineLimit(1)
           }
         }
       }
@@ -210,7 +210,7 @@ private struct InlineView: View {
   let entry: NextEntry
 
   var body: some View {
-    Text(entry.first?.title ?? "All done")
+    Text(entry.first.map { displayTitle($0.title) } ?? "All done")
   }
 }
 
@@ -227,6 +227,21 @@ private struct CircularView: View {
         .opacity(entry.remaining == 0 ? 0 : 1)
     }
   }
+}
+
+// MARK: - Title cleanup
+
+/// Category titles arrive emoji-prefixed from the shared Next snapshot (e.g.
+/// `"☕️ Coffee"`) — the watch list leans on the glyph to tell items apart. The
+/// widget already shows a load-bearing per-kind SF Symbol, so the leading emoji
+/// is redundant noise here. Strip it for display only; the shared feed (watch +
+/// phone Next list) is left untouched.
+private func displayTitle(_ title: String) -> String {
+  guard let first = title.unicodeScalars.first,
+        first.properties.isEmojiPresentation || (first.properties.isEmoji && first.value > 0x7F),
+        let space = title.firstIndex(of: " ")
+  else { return title }
+  return String(title[title.index(after: space)...])
 }
 
 // MARK: - Category → glyph
