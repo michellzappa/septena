@@ -29,6 +29,59 @@ enum IntakePlugin: SectionPlugin {
 
   static func detailPaneContent() -> AnyView? { AnyView(IntakeDetailContent()) }
 
+  // MARK: - MCP / agent contract
+  //
+  // Deliberately a META-protocol: this text ships in the binary and the
+  // gateway skill.md, so it never names substances — the user's tracker
+  // names are user data, resolved live via intake_kinds_list.
+
+  static var mcpSkill: SectionSkill? {
+    SectionSkill(
+      key: "intake",
+      summary: "User-defined consumable trackers (coffee, tea, anything) — log events, manage varieties, and help the user stay under limits or cut back.",
+      tools: [
+        SectionSkill.Tool("intake_kinds_list", "The user's trackers with FULL config (methods + tokens, units, container state, counts). Call this first",
+              inputs: "optional: includeArchived"),
+        SectionSkill.Tool("intake_event_log", "Log an event against a tracker",
+              inputs: "required: kind (id or name), method (token or label) · optional: date, time, amount, count, item, note"),
+        SectionSkill.Tool("intake_events_list", "One tracker's events. Defaults to last 7 days",
+              inputs: "required: kind · optional: date, from, to, limit"),
+        SectionSkill.Tool("intake_event_delete", "Remove an event (correction)",
+              inputs: "required: id"),
+        SectionSkill.Tool("intake_kind_create", "Create a tracker — name alone works; every axis editable later",
+              inputs: "required: name · optional: symbol, color, unit, doseStyle (none|amount|count|both), countNoun, containerNoun, containerCap, catalogNoun, objective (log|limit|reduce|quit), target, weekly, methods[]"),
+        SectionSkill.Tool("intake_kind_update", "Edit config, archive/unarchive, or change the objective goal",
+              inputs: "required: kind · optional: any config field, archived, target, weekly"),
+        SectionSkill.Tool("intake_items_list", "A tracker's variety catalog", inputs: "required: kind"),
+        SectionSkill.Tool("intake_item_create", "Add a variety", inputs: "required: kind, name"),
+        SectionSkill.Tool("intake_item_delete", "Remove a variety", inputs: "required: id"),
+      ],
+      body: """
+      ### Protocol
+      Trackers are user-defined — names, methods, and varieties are the user's \
+      own vocabulary. Resolve first, then act:
+      ```
+      intake_kinds_list()                          → find the tracker + its method tokens
+      intake_event_log(kind: <name>, method: <token>, count: 2)
+      ```
+      A failed kind/method/item lookup returns the candidates inline — retry \
+      with one of them.
+
+      ### Container trackers
+      A kind with `containerCap` models "a container holds N uses" (a capsule, \
+      a pack). `lastContainerCountToday` tells you the current use number: log \
+      `count: lastContainerCountToday + 1` to continue, `count: 1` for a fresh \
+      container.
+
+      ### Objectives
+      Each tracker carries an objective — log | limit | reduce | quit — wired \
+      to a real goal (`target`, optional `weekly`). For reduce/quit, days-since-\
+      last is the streak that matters; prefer encouragement framing when the \
+      user is abstaining.
+      """
+    )
+  }
+
   // MARK: - Aim metrics (per kind, runtime-generated)
 
   static func aimMetrics(context: ModelContext) -> [GoalMetric] {

@@ -94,6 +94,7 @@ enum MCPDispatch {
     "goals_list", "settings_get", "sections_list",
     "habits_list", "supplements_list", "chores_list",
     "caffeine_events_list", "cannabis_events_list", "gut_events_list",
+    "intake_kinds_list", "intake_items_list", "intake_events_list",
     "nutrition_entries_list", "nutrition_day_summary",
     "training_entries_list", "training_exercises_list",
     "hydration_today", "hydration_history", "grocery_items_list",
@@ -179,6 +180,17 @@ enum MCPDispatch {
     // ---- Cannabis ----
     case "cannabis_events_list": return cannabisList(args)
     case "cannabis_event_log":   return try cannabisLog(args)
+
+    // ---- Intake (generic consumables) ----
+    case "intake_kinds_list":   return intakeKindsList(args)
+    case "intake_kind_create":  return try intakeKindCreate(args)
+    case "intake_kind_update":  return try intakeKindUpdate(args)
+    case "intake_items_list":   return try intakeItemsList(args)
+    case "intake_item_create":  return try intakeItemCreate(args)
+    case "intake_item_delete":  return try intakeItemDelete(args)
+    case "intake_events_list":  return try intakeEventsList(args)
+    case "intake_event_log":    return try intakeEventLog(args)
+    case "intake_event_delete": return try intakeEventDelete(args)
 
     // ---- Gut ----
     case "gut_events_list":     return gutList(args)
@@ -727,6 +739,201 @@ enum MCPDispatch {
       method: try args.requireString("method"), hit: args.int("hit"),
       grams: args.double("grams"), note: args.string("note") ?? "")
     return ["id": e.id, "date": e.date, "method": e.method]
+  }
+
+  // MARK: - Intake (generic consumables)
+  //
+  // The tracker ("kind") is resolved from an id OR unique case-insensitive
+  // name, and every resolution failure returns the candidate list inline so a
+  // wrong guess self-corrects in one round trip (study §6.1).
+
+  private static func resolveIntakeKind(_ args: MCPArgs) throws -> IntakeKindEntity {
+    let key = try args.requireString("kind")
+    let kinds = (try? ctx.fetch(FetchDescriptor<IntakeKindEntity>())) ?? []
+    if let exact = kinds.first(where: { $0.id == key }) { return exact }
+    let lower = key.lowercased()
+    let named = kinds.filter { $0.name.lowercased() == lower }
+    if named.count == 1 { return named[0] }
+    let candidates = kinds.filter { $0.archivedAt == nil }
+      .map { "\($0.name) (\($0.id))" }.joined(separator: ", ")
+    throw MCPError.badArgument(named.isEmpty
+      ? "unknown kind '\(key)' — kinds: \(candidates)"
+      : "ambiguous kind '\(key)' — use an id. kinds: \(candidates)")
+  }
+
+  /// Parse a `methods` array argument into rows. Token defaults to a slug of
+  /// the label so agents can pass labels only.
+  private static func intakeMethodRows(_ args: MCPArgs) -> [IntakeMethodRow]? {
+    guard let arr = args.raw["methods"] as? [[String: Any]] else { return nil }
+    let rows = arr.compactMap { m -> IntakeMethodRow? in
+      guard let label = (m["label"] as? String) ?? (m["token"] as? String) else { return nil }
+      let token = (m["token"] as? String).flatMap { $0.isEmpty ? nil : $0.lowercased() }
+        ?? IntakeMigrationMap.slug(label)
+      return IntakeMethodRow(token: token, label: label,
+                             symbol: m["symbol"] as? String,
+                             defaultAmount: (m["defaultAmount"] as? NSNumber)?.doubleValue,
+                             usesContainer: (m["usesContainer"] as? Bool) ?? false)
+    }
+    return rows.isEmpty ? nil : rows
+  }
+
+  private static func intakeKindsList(_ args: MCPArgs) -> Any {
+    let includeArchived = args.bool("includeArchived") ?? false
+    let kinds = ((try? ctx.fetch(FetchDescriptor<IntakeKindEntity>(
+      sortBy: [SortDescriptor(\.sortIndex)]))) ?? [])
+      .filter { includeArchived || $0.archivedAt == nil }
+    let events = (try? ctx.fetch(FetchDescriptor<IntakeEventEntity>())) ?? []
+    let items = (try? ctx.fetch(FetchDescriptor<IntakeItemEntity>())) ?? []
+    let todayStr = today
+    return ["kinds": kinds.map { (k: IntakeKindEntity) -> [String: Any] in
+      var lastContainer = 0
+      if let token = k.methods.first(where: { $0.usesContainer })?.token {
+        lastContainer = events
+          .filter { $0.kindID == k.id && $0.date == todayStr && $0.method == token }
+          .max(by: { $0.occurredAt < $1.occurredAt })?.count ?? 0
+      }
+      return ["id": k.id, "name": k.name, "symbol": k.symbol, "color": k.color,
+              "unit": k.unit ?? "", "doseStyle": k.doseStyle,
+              "countNoun": k.countNoun ?? "", "containerNoun": k.containerNoun ?? "",
+              "containerCap": k.containerCap ?? 0, "catalogNoun": k.catalogNoun ?? "",
+              "objective": k.objective, "archived": k.archivedAt != nil,
+              "methods": k.methods.map { ["token": $0.token, "label": $0.label,
+                                          "usesContainer": $0.usesContainer,
+                                          "defaultAmount": $0.defaultAmount ?? 0] },
+              "itemCount": items.filter { $0.kindID == k.id }.count,
+              "todayCount": events.filter { $0.kindID == k.id && $0.date == todayStr }.count,
+              "lastContainerCountToday": lastContainer]
+    }]
+  }
+
+  private static func intakeKindCreate(_ args: MCPArgs) throws -> Any {
+    let kind = SeptenaServices.shared.intakeMutator.addKind(
+      name: try args.requireString("name"),
+      symbol: args.string("symbol") ?? "circle",
+      color: args.string("color") ?? "",
+      unit: args.string("unit"),
+      doseStyle: args.string("doseStyle") ?? "none",
+      countNoun: args.string("countNoun"),
+      containerNoun: args.string("containerNoun"),
+      containerCap: args.int("containerCap"),
+      catalogNoun: args.string("catalogNoun"),
+      objective: args.string("objective") ?? "log",
+      methods: intakeMethodRows(args) ?? [])
+    if kind.objective != "log" {
+      SeptenaServices.shared.goalMutator.syncIntakeObjectiveGoal(
+        kindID: kind.id, kindName: kind.name, objective: kind.objective,
+        target: args.double("target"), weekly: args.bool("weekly"))
+    }
+    return ["id": kind.id, "name": kind.name]
+  }
+
+  private static func intakeKindUpdate(_ args: MCPArgs) throws -> Any {
+    let kind = try resolveIntakeKind(args)
+    let mutator = SeptenaServices.shared.intakeMutator
+    mutator.updateKind(
+      id: kind.id,
+      name: args.string("name"),
+      symbol: args.string("symbol"),
+      color: args.string("color"),
+      unit: args.string("unit").map { Optional($0) },
+      doseStyle: args.string("doseStyle"),
+      countNoun: args.string("countNoun").map { Optional($0) },
+      containerNoun: args.string("containerNoun").map { Optional($0) },
+      containerCap: args.int("containerCap").map { Optional($0) },
+      catalogNoun: args.string("catalogNoun").map { Optional($0) },
+      objective: args.string("objective"),
+      methods: intakeMethodRows(args))
+    if let archived = args.bool("archived") {
+      mutator.setKindArchived(id: kind.id, archived: archived)
+    }
+    if let objective = args.string("objective") {
+      SeptenaServices.shared.goalMutator.syncIntakeObjectiveGoal(
+        kindID: kind.id, kindName: args.string("name") ?? kind.name,
+        objective: objective, target: args.double("target"), weekly: args.bool("weekly"))
+    }
+    return ["id": kind.id, "name": args.string("name") ?? kind.name]
+  }
+
+  private static func intakeItemsList(_ args: MCPArgs) throws -> Any {
+    let kind = try resolveIntakeKind(args)
+    let rows = ((try? ctx.fetch(FetchDescriptor<IntakeItemEntity>(
+      sortBy: [SortDescriptor(\.sortIndex)]))) ?? [])
+      .filter { $0.kindID == kind.id && $0.archivedAt == nil }
+    return ["kind": kind.name, "items": rows.map { (i: IntakeItemEntity) -> [String: Any] in
+      ["id": i.id, "name": i.name]
+    }]
+  }
+
+  private static func intakeItemCreate(_ args: MCPArgs) throws -> Any {
+    let kind = try resolveIntakeKind(args)
+    let item = SeptenaServices.shared.intakeMutator.addItem(
+      kindID: kind.id, name: try args.requireString("name"))
+    return ["id": item.id, "name": item.name]
+  }
+
+  private static func intakeItemDelete(_ args: MCPArgs) throws -> Any {
+    SeptenaServices.shared.intakeMutator.deleteItem(id: try args.requireString("id"))
+    return ["ok": true]
+  }
+
+  private static func intakeEventsList(_ args: MCPArgs) throws -> Any {
+    let kind = try resolveIntakeKind(args)
+    let (from, to) = range(args, daysBack: 6)
+    let limit = args.int("limit") ?? 100
+    let itemNames = Dictionary(
+      ((try? ctx.fetch(FetchDescriptor<IntakeItemEntity>())) ?? []).map { ($0.id, $0.name) },
+      uniquingKeysWith: { a, _ in a })
+    let rows = ((try? ctx.fetch(FetchDescriptor<IntakeEventEntity>())) ?? [])
+      .filter { $0.kindID == kind.id && $0.date >= from && $0.date <= to }
+      .sorted { $0.occurredAt > $1.occurredAt }
+      .prefix(limit)
+    return ["kind": kind.name, "kindID": kind.id,
+            "events": rows.map { (e: IntakeEventEntity) -> [String: Any] in
+      ["id": e.id, "date": e.date, "time": EventTimestamp.hhmm(from: e.occurredAt),
+       "method": e.method, "item": e.itemID.flatMap { itemNames[$0] } ?? "",
+       "amount": e.amount ?? 0, "count": e.count ?? 0, "note": e.note ?? ""]
+    }]
+  }
+
+  private static func intakeEventLog(_ args: MCPArgs) throws -> Any {
+    let kind = try resolveIntakeKind(args)
+    let rawMethod = try args.requireString("method")
+    let lower = rawMethod.lowercased()
+    // Tokens are canonical; labels resolve too so agents can speak in the
+    // user's vocabulary. An unknown method errors with the candidate list.
+    guard let token = kind.methods.first(where: {
+      $0.token == lower || $0.label.lowercased() == lower
+    })?.token ?? (kind.methods.isEmpty ? IntakeMigrationMap.slug(rawMethod) : nil) else {
+      throw MCPError.badArgument(
+        "unknown method '\(rawMethod)' for \(kind.name) — methods: "
+        + kind.methods.map(\.token).joined(separator: ", "))
+    }
+    var itemID: String? = nil
+    if let itemArg = args.string("item") {
+      let items = ((try? ctx.fetch(FetchDescriptor<IntakeItemEntity>())) ?? [])
+        .filter { $0.kindID == kind.id }
+      itemID = items.first { $0.id == itemArg }?.id
+        ?? items.first { $0.name.lowercased() == itemArg.lowercased() }?.id
+      if itemID == nil {
+        throw MCPError.badArgument(
+          "unknown item '\(itemArg)' — items: " + items.map(\.name).joined(separator: ", "))
+      }
+    }
+    let e = SeptenaServices.shared.intakeMutator.addEntry(
+      kindID: kind.id,
+      date: args.string("date") ?? today,
+      time: args.string("time") ?? nowHHMMSS,
+      method: token,
+      itemID: itemID,
+      amount: args.double("amount"),
+      count: args.int("count"),
+      note: args.string("note") ?? "")
+    return ["id": e.id, "date": e.date, "method": e.method, "kind": kind.name]
+  }
+
+  private static func intakeEventDelete(_ args: MCPArgs) throws -> Any {
+    SeptenaServices.shared.intakeMutator.deleteEntry(id: try args.requireString("id"))
+    return ["ok": true]
   }
 
   // MARK: - Gut
