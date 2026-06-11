@@ -74,7 +74,7 @@ struct CoachView: View {
       ScrollView {
         VStack(alignment: .leading, spacing: Theme.sectionSpacing) {
           coachesBand
-          if OnDeviceAI.isAvailable { exercisesBand }
+          exercisesBand
           goalsBand
         }
         .septenaSurface()
@@ -186,23 +186,29 @@ struct CoachView: View {
     }
   }
 
+  // Band stays visible without Apple Intelligence — a placeholder explains
+  // why the exercises aren't offered instead of the band silently vanishing.
   private var exercisesBand: some View {
     VStack(alignment: .leading, spacing: 12) {
       bandHeader("Exercises", "Guided reflections that turn into goals.")
-      LazyVGrid(columns: columns, spacing: Theme.tileGap) {
-        ForEach(DiscoveryRegistry.all) { exercise in
-          Button {
-            activeExercise = AnyDiscoveryMiniApp(descriptor: exercise)
-            Haptics.tick()
-          } label: {
-            CoachTile(systemImage: exercise.systemImage,
-                      title: exercise.title,
-                      subtitle: exercise.blurb,
-                      accent: exercise.accent,
-                      actionLabel: "Begin")
+      if OnDeviceAI.isAvailable {
+        LazyVGrid(columns: columns, spacing: Theme.tileGap) {
+          ForEach(DiscoveryRegistry.all) { exercise in
+            Button {
+              activeExercise = AnyDiscoveryMiniApp(descriptor: exercise)
+              Haptics.tick()
+            } label: {
+              CoachTile(systemImage: exercise.systemImage,
+                        title: exercise.title,
+                        subtitle: exercise.blurb,
+                        accent: exercise.accent,
+                        actionLabel: "Begin")
+            }
+            .buttonStyle(.plain)
           }
-          .buttonStyle(.plain)
         }
+      } else {
+        AppleIntelligenceUnavailableCard()
       }
     }
   }

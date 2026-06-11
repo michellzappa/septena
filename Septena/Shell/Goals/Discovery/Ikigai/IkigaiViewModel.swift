@@ -87,6 +87,14 @@ final class IkigaiViewModel {
 
   func generateDrafts(availableSections: [SectionConfig] = []) async {
     guard canGenerate else { return }
+    // Entry points are availability-gated, but guard here too so a future
+    // deep link or intent can't retry a generation that can never succeed.
+    guard OnDeviceAI.isAvailable else {
+      drafts = fallbackDrafts(availableSections: availableSections)
+      phase = .failed(OnDeviceAI.unavailableReason ?? "On-device intelligence is unavailable right now.")
+      Haptics.warning()
+      return
+    }
     phase = .generating
     generationMessage = String(localized: "Finding the through-line...", comment: "Discovery generation status")
 

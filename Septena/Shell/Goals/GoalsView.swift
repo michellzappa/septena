@@ -105,6 +105,8 @@ struct GoalsView: View {
             activeMiniApp = app
             Haptics.tick()
           }
+        } else {
+          AppleIntelligenceUnavailableCard()
         }
 
         if goals.isEmpty {
