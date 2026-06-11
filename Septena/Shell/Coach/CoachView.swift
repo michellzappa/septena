@@ -62,26 +62,37 @@ struct CoachView: View {
             set: { if !usesPushNavigation { activeCoach = $0 } })
   }
 
+  /// A compact bottom-sheet coach drawer is floating over the landing. Gates
+  /// the backdrop's hit-testing so a tap-away dismisses instead of opening
+  /// another coach tile underneath.
+  private var compactCoachDrawerOpen: Bool {
+    !usesPushNavigation && activeCoach != nil
+  }
+
   var body: some View {
     NavigationStack {
-      ScrollView {
-        VStack(alignment: .leading, spacing: Theme.sectionSpacing) {
-          coachesBand
-          exercisesBand
-          goalsBand
+      ZStack {
+        ScrollView {
+          VStack(alignment: .leading, spacing: Theme.sectionSpacing) {
+            coachesBand
+            exercisesBand
+            goalsBand
+          }
+          .septenaSurface()
         }
-        .septenaSurface()
-      }
-      .background(Theme.groupedBackground)
-      // While a bottom-sheet coach drawer is open, a tap anywhere on the
-      // landing behind it dismisses the drawer (standard popover-style
-      // tap-away) instead of falling through to a tile and opening another
-      // coach — the drawer keeps its translucent, non-dimmed backdrop, so
-      // this transparent layer is what turns the whole backdrop into a
-      // dismiss target. Compact only; on push navigation there's no floating
-      // drawer to dismiss.
-      .overlay {
-        if !usesPushNavigation, activeCoach != nil {
+        .background(Theme.groupedBackground)
+        // While a bottom-sheet coach drawer floats over the landing the content
+        // behind it goes inert. Its backdrop is translucent, not dimmed, and
+        // `presentationBackgroundInteraction` keeps it live — so without this a
+        // background tap falls *through* and opens another coach instead of
+        // dismissing. Inert content leaves the transparent layer below as the
+        // only hit target on the backdrop.
+        .allowsHitTesting(!compactCoachDrawerOpen)
+
+        // A tap anywhere on the backdrop dismisses the drawer — standard
+        // popover-style tap-away. Compact only; on push navigation there's no
+        // floating drawer.
+        if compactCoachDrawerOpen {
           Color.clear
             .contentShape(Rectangle())
             .onTapGesture { activeCoach = nil }

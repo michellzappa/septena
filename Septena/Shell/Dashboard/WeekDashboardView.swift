@@ -295,31 +295,36 @@ struct WeekDashboardView: View {
       },
       toolbar: { homeToolbar }
     ) {
-      VStack(spacing: Theme.sectionSpacing) {
-        ClaudeReconnectBanner()
-        if showWelcome {
-          // Self-observes DayClock so the 60s `now` tick re-renders only the
-          // header, not the whole tile grid. (Reading `clock.now` here in the
-          // parent body would invalidate every tile each minute.)
-          WelcomeHeaderSection(dataAware: welcomeDataAware,
-                               todayTaskCount: taskCounts?.todayCount ?? 0,
-                               dailies: dailies)
+      ZStack {
+        VStack(spacing: Theme.sectionSpacing) {
+          ClaudeReconnectBanner()
+          if showWelcome {
+            // Self-observes DayClock so the 60s `now` tick re-renders only the
+            // header, not the whole tile grid. (Reading `clock.now` here in the
+            // parent body would invalidate every tile each minute.)
+            WelcomeHeaderSection(dataAware: welcomeDataAware,
+                                 todayTaskCount: taskCounts?.todayCount ?? 0,
+                                 dailies: dailies)
+          }
+          if showTodayTimeline { todayTimeline }
+          layoutBody
         }
-        if showTodayTimeline { todayTimeline }
-        layoutBody
-      }
-      .septenaSurface()
-      // While a bottom-sheet drawer is open, a tap anywhere on the dashboard
-      // behind it — welcome header, today timeline, a tile, or empty space —
-      // dismisses the drawer (standard popover-style tap-away). The drawer
-      // keeps its translucent, non-dimmed backdrop; this transparent layer
-      // just turns the whole backdrop into a dismiss target. Compact only;
-      // on push navigation there's no floating drawer to dismiss.
-      .overlay {
-        if !usesPushNavigation, sheetDest != nil {
+        .septenaSurface()
+        // While a compact drawer floats over the dashboard the content behind
+        // it goes inert. The drawer's backdrop is translucent, not dimmed, and
+        // `presentationBackgroundInteraction` keeps it live — so without this a
+        // background tap falls *through* and fires the tile/button underneath
+        // instead of dismissing. Inert content leaves the transparent layer
+        // below as the only hit target on the backdrop.
+        .allowsHitTesting(!compactDrawerOpen)
+
+        // A tap anywhere on the backdrop dismisses the drawer — standard
+        // popover-style tap-away. Compact only; on push navigation there's no
+        // floating drawer to dismiss.
+        if compactDrawerOpen {
           Color.clear
             .contentShape(Rectangle())
-            .onTapGesture { sheetDest = nil }
+            .onTapGesture { dismissCompactDrawer() }
         }
       }
       // Regular width (iPad / macOS): a section opens as a pushed full
@@ -442,6 +447,19 @@ struct WeekDashboardView: View {
       get: { usesPushNavigation ? nil : sheetDest },
       set: { if !usesPushNavigation { sheetDest = $0 } }
     )
+  }
+
+  /// A compact bottom-sheet drawer — a section (`sheetDest`) or a tracker page
+  /// (`intakeKindDest`) — is floating over the dashboard. Gates the backdrop's
+  /// hit-testing so a tap-away dismisses instead of firing a tile underneath.
+  private var compactDrawerOpen: Bool {
+    !usesPushNavigation && (sheetDest != nil || intakeKindDest != nil)
+  }
+
+  /// Closes whichever compact drawer is open (tap-away on the backdrop).
+  private func dismissCompactDrawer() {
+    sheetDest = nil
+    intakeKindDest = nil
   }
 
   // MARK: - Intake kind deep-open
