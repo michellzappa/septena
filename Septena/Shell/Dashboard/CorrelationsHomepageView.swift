@@ -272,23 +272,33 @@ struct CorrelationsHomepageView: View {
   }
 
   private func recompute() async {
+    // Same-day reopen with no data changes: serve the engine's memoized
+    // result — no Oura fetch, no stats run, the drawer paints instantly.
+    if let cached = CorrelationEngine.cachedResult(days: windowDays) {
+      apply(cached)
+      loading = false
+      return
+    }
     loading = true
     defer { loading = false }
     let oura = (try? await OuraProvider.shared.fetchHistory(days: windowDays)) ?? []
-    let r = CorrelationEngine.runEverything(
+    let r = await CorrelationEngine.runEverything(
       context: modelContext,
       ouraNights: oura,
       days: windowDays
     )
+    apply(r)
+  }
+
+  private func apply(_ r: CorrelationEngine.Result) {
     // Sort each tier by |r| desc for at-a-glance prominence.
-    let sorted = CorrelationEngine.Result(
+    result = CorrelationEngine.Result(
       evaluated: r.evaluated.sorted { $0.absR > $1.absR },
       insufficient: r.insufficient,
       supplementsTable: r.supplementsTable,
       coveredDays: r.coveredDays,
       dateRange: r.dateRange
     )
-    result = sorted
     if r.evaluated.isEmpty && r.supplementsTable.isEmpty {
       loadError = "No logged data in the last \(windowDays) days."
     } else {

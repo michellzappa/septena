@@ -33,6 +33,44 @@ struct CorrelationEngine {
   static let permutations = 200
   static let lagsToTest = [0, 1, 2]
 
+  // MARK: - Result memo
+  //
+  // A full run is pairs × lags × (regression + 200-permutation p) over up to
+  // a year of features — far too expensive to repeat on every drawer open.
+  // Cache the last result and serve it while nothing it derives from has
+  // moved: same window, same day (windows are today-anchored), and no data
+  // change since it was computed. Any in-app log bumps the stamp via the
+  // scoped/unscoped `.septenaDataChanged` posts; `.septenaOuraChanged`
+  // covers provider ingests that bypass the generic notification.
+
+  @MainActor private static var cache:
+    (days: Int, today: String, stamp: Int, result: Result)?
+  @MainActor private static var dataStamp = 0
+  @MainActor private static var stampObserversInstalled = false
+
+  @MainActor private static func installStampObserversIfNeeded() {
+    guard !stampObserversInstalled else { return }
+    stampObserversInstalled = true
+    for name: Notification.Name in [.septenaDataChanged, .septenaOuraChanged] {
+      NotificationCenter.default.addObserver(
+        forName: name, object: nil, queue: .main
+      ) { _ in
+        MainActor.assumeIsolated { dataStamp += 1 }
+      }
+    }
+  }
+
+  /// The memoized result for `days`, if still current — lets the caller skip
+  /// the Oura fetch AND the stats run on a same-day reopen. Nil after any
+  /// data change, day rollover, or for a window that wasn't the last one run.
+  @MainActor
+  static func cachedResult(days: Int) -> Result? {
+    installStampObserversIfNeeded()
+    guard let c = cache, c.days == days,
+          c.today == SeptenaDate.today, c.stamp == dataStamp else { return nil }
+    return c.result
+  }
+
   // MARK: - Feature spec / pair spec
 
   enum Direction { case positive, negative, unknown
@@ -142,7 +180,11 @@ struct CorrelationEngine {
     context: ModelContext,
     ouraNights: [OuraNight],
     days: Int = 365
-  ) -> Result {
+  ) async -> Result {
+    if let cached = cachedResult(days: days) { return cached }
+    // Snapshot the stamp BEFORE extracting, so a write that lands mid-run
+    // invalidates this result instead of being silently absorbed into it.
+    let stampAtStart = dataStamp
     let extraction = extract(context: context, ouraNights: ouraNights, days: days)
 
     // The universe is "everything you actively track," not a curated list.
@@ -186,6 +228,31 @@ struct CorrelationEngine {
                              activeSections: activeSections,
                              curated: curatedPairs())
 
+    // Everything above touched SwiftData / the plugin registry, so it stayed
+    // on the main actor — it's predicate-bounded fetches, cheap. Everything
+    // below is pure math over the extracted value types, and it's the
+    // expensive part (pairs × lags × regression + 200-permutation p-values),
+    // so it runs detached instead of freezing the UI for the whole run.
+    let featuresSnapshot = features
+    let supplements = extraction.supplements
+    let result = await Task.detached(priority: .userInitiated) {
+      evaluateStatistics(features: featuresSnapshot,
+                         allPairs: allPairs,
+                         supplements: supplements)
+    }.value
+
+    cache = (days: days, today: SeptenaDate.today,
+             stamp: stampAtStart, result: result)
+    return result
+  }
+
+  /// The statistics pass — pure functions over the extracted feature series.
+  /// No SwiftData, no UI types; safe to run off the main actor.
+  private nonisolated static func evaluateStatistics(
+    features: [String: DayFeatures],
+    allPairs: [PairSpec],
+    supplements: [(id: String, label: String, emoji: String)]
+  ) -> Result {
     var evaluated: [EvaluatedPair] = []
     var insufficient: [InsufficientPair] = []
     var seen = Set<String>()
@@ -333,7 +400,7 @@ struct CorrelationEngine {
     // Supplements → sleep score table
     let supplementsTable = supplementsSleepTable(
       features: features,
-      supplements: extraction.supplements
+      supplements: supplements
     )
 
     let dateKeys = features.keys.sorted()
