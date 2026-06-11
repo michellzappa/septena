@@ -2574,13 +2574,13 @@ struct MotionGalleryPane: View {
 
 // MARK: - Palette
 
-private struct PaletteSwatch: Identifiable {
+struct PaletteSwatch: Identifiable {
   let id: String
   let label: String
   let hex: String
 }
 
-private let sectionPalette: [PaletteSwatch] = [
+let sectionPalette: [PaletteSwatch] = [
   // Bright row — Tailwind 500
   .init(id: "red",        label: String(localized: "Red", comment: "Accent color"),        hex: "#ef4444"),
   .init(id: "orange",     label: String(localized: "Orange", comment: "Accent color"),     hex: "#f97316"),
@@ -2607,7 +2607,7 @@ private let sectionPalette: [PaletteSwatch] = [
   .init(id: "espresso",   label: "Espresso",   hex: "#44403c"),
 ]
 
-private struct PaletteSwatchGrid: View {
+struct PaletteSwatchGrid: View {
   let selectedHex: String
   let onSelect: (String) -> Void
 

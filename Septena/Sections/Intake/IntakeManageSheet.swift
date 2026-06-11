@@ -326,6 +326,7 @@ struct IntakeManageSheet: View {
 
   private func syncGoal(objective: String, target: Double) {
     SeptenaServices.shared.goalMutator.syncIntakeObjectiveGoal(
-      kindID: kindID, kindName: name, objective: objective, target: target)
+      kindID: kindID, kindName: name, objective: objective, target: target,
+      weekly: goalWeekly)
   }
 }
