@@ -241,13 +241,18 @@ struct WeekDashboardView: View {
       bodyRows: ResponseCache.load([WithingsRow].self, forKey: CacheKey.bodyRows) ?? []))
   }
 
-  /// iPhone compact: 1 column. iPad regular: 3 columns.
-  /// macOS: adaptive — packs as many ~280pt tiles as fit, so wider windows
-  /// get 4 or 5 columns automatically. LazyVGrid reflows on resize.
+  /// iPhone compact: a single fixed column. iPad regular & macOS: adaptive —
+  /// packs as many ~280pt tiles as fit, so a narrow Stage Manager / split
+  /// window stays at 2 columns while a full-screen 13" iPad or a wide Mac
+  /// window gets 4–5. LazyVGrid reflows on resize. (Previously iPad was
+  /// hard-pinned to 3 columns regardless of width, which cramped narrow
+  /// regular-width windows and under-filled wide ones.)
   private var columns: [GridItem] {
     #if os(iOS)
-    let count = (hSize == .regular) ? 3 : 1
-    return Array(repeating: GridItem(.flexible(), spacing: Theme.tileGap), count: count)
+    if hSize == .regular {
+      return [GridItem(.adaptive(minimum: 280), spacing: Theme.tileGap)]
+    }
+    return [GridItem(.flexible(), spacing: Theme.tileGap)]
     #else
     return [GridItem(.adaptive(minimum: 280), spacing: Theme.tileGap)]
     #endif
