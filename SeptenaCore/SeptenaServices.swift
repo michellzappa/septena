@@ -660,6 +660,11 @@ final class SeptenaServices {
           } else {
             context.insert(CaffeineEventEntity(cloudKit: record))
           }
+          // Migrate-on-sight (study §7.2): a legacy record arriving from an old
+          // build (the watch, a stale device) is upserted into its generic
+          // intake twin by deterministic id — the standing rule that survives
+          // the legacy classes' deletion.
+          IntakeMigrator.migrate(record: record, mutator: self.intakeMutator)
         case CaffeineBeanCloudKitSchema.recordType:
           batchTouchedData = true
           let id = CaffeineBeanCloudKitSchema.entityID(from: record.recordID.recordName)
@@ -670,6 +675,7 @@ final class SeptenaServices {
           } else {
             context.insert(CaffeineBeanEntity(cloudKit: record))
           }
+          IntakeMigrator.migrate(record: record, mutator: self.intakeMutator)
         case IntakeKindCloudKitSchema.recordType:
           batchTouchedData = true
           let id = IntakeKindCloudKitSchema.entityID(from: record.recordID.recordName)
@@ -710,6 +716,7 @@ final class SeptenaServices {
           } else {
             context.insert(CannabisEventEntity(cloudKit: record))
           }
+          IntakeMigrator.migrate(record: record, mutator: self.intakeMutator)
         case GroceryItemCloudKitSchema.recordType:
           batchTouchedData = true
           let id = GroceryItemCloudKitSchema.entityID(from: record.recordID.recordName)
