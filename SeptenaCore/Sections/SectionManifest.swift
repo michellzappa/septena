@@ -100,6 +100,7 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
     "tasks", "habits", "supplements", "chores",
     "training", "nutrition", "hydration",
     "caffeine", "cannabis", "intake", "gut", "mood",
+    "symptoms", "medications",
   ]
 
   /// Whether this section has any presence on the Today timeline.
@@ -121,6 +122,7 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
   public static let timeTravelCapableKeys: Set<String> = [
     "caffeine", "cannabis", "intake", "gut", "nutrition",
     "habits", "supplements", "mood", "hydration",
+    "symptoms", "medications",
   ]
 
   /// Whether this section's destination should render the date strip
@@ -150,6 +152,8 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
     "body":        "scalemass",
     "gut":         "circle.bottomhalf.filled",
     "mood":        "face.smiling",
+    "symptoms":    "waveform.path.ecg",
+    "medications": "cross.case",
     "activity":    "figure.walk",
     "goals":       "smallcircle.filled.circle",
     "hydration":   "drop.fill",
@@ -357,6 +361,26 @@ public extension SectionManifest {
       supportsTab: false,
       supportsDashboard: true,
       settingsEditor: .none
+    ),
+    .init(
+      key: "symptoms",
+      defaultLabel: String(localized: "Symptoms", comment: "Section name"),
+      shortDescription: String(localized: "Pain, symptoms, severity, flares and triggers", comment: "Section description"),
+      activation: .optional,
+      onboarding: .optional,
+      supportsTab: true,
+      supportsDashboard: true,
+      settingsEditor: .sectionConfig
+    ),
+    .init(
+      key: "medications",
+      defaultLabel: String(localized: "Medications", comment: "Section name"),
+      shortDescription: String(localized: "Dose logs, skips, effects and side effects", comment: "Section description"),
+      activation: .optional,
+      onboarding: .optional,
+      supportsTab: true,
+      supportsDashboard: true,
+      settingsEditor: .sectionConfig
     ),
     .init(
       key: "activity",

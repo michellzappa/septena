@@ -416,6 +416,9 @@
       },
       "shouldTranslate" : false
     },
+    "%@/10" : {
+
+    },
     "%@%@" : {
       "localizations" : {
         "en" : {
@@ -1136,6 +1139,9 @@
         }
       }
     },
+    "Add medications in Settings first." : {
+
+    },
     "Add Supplement" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1146,6 +1152,9 @@
           }
         }
       }
+    },
+    "Add symptom definitions in Settings first." : {
+
     },
     "Add Task" : {
       "extractionState" : "manual",
@@ -1385,6 +1394,12 @@
     "Apple Intelligence" : {
 
     },
+    "Archiving hides a medication from new dose logs but keeps its dose history and exports intact." : {
+
+    },
+    "Archiving hides a symptom from new logs but keeps its history and exports intact." : {
+
+    },
     "Archiving hides this tracker. Its entries stay and it can be restored." : {
 
     },
@@ -1593,6 +1608,9 @@
           }
         }
       }
+    },
+    "Bedtime" : {
+
     },
     "BEDTIME" : {
       "localizations" : {
@@ -3805,6 +3823,9 @@
         }
       }
     },
+    "Left" : {
+
+    },
     "Legacy data" : {
 
     },
@@ -4199,6 +4220,9 @@
           }
         }
       }
+    },
+    "Missed" : {
+
     },
     "Missing Areas" : {
       "localizations" : {
@@ -5278,6 +5302,9 @@
         }
       }
     },
+    "Right" : {
+
+    },
     "Rose" : {
       "localizations" : {
         "pt-BR" : {
@@ -5617,6 +5644,9 @@
         }
       }
     },
+    "Severity" : {
+
+    },
     "Shopping list" : {
       "localizations" : {
         "pt-BR" : {
@@ -5713,6 +5743,9 @@
           }
         }
       }
+    },
+    "Skipped" : {
+
     },
     "Sky" : {
       "localizations" : {
@@ -6013,6 +6046,9 @@
           }
         }
       }
+    },
+    "Taken" : {
+
     },
     "Talk to your %@ coach" : {
       "localizations" : {
@@ -6852,6 +6888,7 @@
       }
     },
     "What moves your day — cross-section correlations" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {

@@ -827,6 +827,188 @@ final class MoodEventEntity {
 }
 
 @Model
+final class SymptomDefinitionEntity {
+  @Attribute(.unique) var id: String
+  var title: String
+  var emoji: String?
+  var bodySystem: String?
+  var defaultBodyRegion: String?
+  var sortIndex: Int
+  var archived: Bool
+  var createdAt: Date
+  var updatedAt: Date
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       title: String,
+       emoji: String? = nil,
+       bodySystem: String? = nil,
+       defaultBodyRegion: String? = nil,
+       sortIndex: Int = 0,
+       archived: Bool = false,
+       createdAt: Date = .now,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.title = title
+    self.emoji = emoji
+    self.bodySystem = bodySystem
+    self.defaultBodyRegion = defaultBodyRegion
+    self.sortIndex = sortIndex
+    self.archived = archived
+    self.createdAt = createdAt
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
+@Model
+final class SymptomEventEntity {
+  @Attribute(.unique) var id: String
+  var occurredAt: Date = Date.distantPast
+  var date: String
+  var symptomID: String
+  var severity: Int
+  var durationMinutes: Int?
+  var bodyRegion: String?
+  var side: String?
+  var quality: String?
+  var triggerNote: String?
+  var reliefNote: String?
+  var note: String?
+  var source: String?
+  var updatedAt: Date
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       date: String,
+       symptomID: String,
+       severity: Int,
+       durationMinutes: Int? = nil,
+       bodyRegion: String? = nil,
+       side: String? = nil,
+       quality: String? = nil,
+       triggerNote: String? = nil,
+       reliefNote: String? = nil,
+       note: String? = nil,
+       source: String? = "manual",
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.date = date
+    self.symptomID = symptomID
+    self.severity = severity
+    self.durationMinutes = durationMinutes
+    self.bodyRegion = bodyRegion
+    self.side = side
+    self.quality = quality
+    self.triggerNote = triggerNote
+    self.reliefNote = reliefNote
+    self.note = note
+    self.source = source
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
+@Model
+final class MedicationDefinitionEntity {
+  @Attribute(.unique) var id: String
+  var title: String
+  var genericName: String?
+  var form: String?
+  var route: String?
+  var strengthValue: Double?
+  var strengthUnit: String?
+  var defaultDoseValue: Double?
+  var defaultDoseUnit: String?
+  var bucket: String?
+  var instructions: String?
+  var sortIndex: Int
+  var archived: Bool
+  var createdAt: Date
+  var updatedAt: Date
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       title: String,
+       genericName: String? = nil,
+       form: String? = nil,
+       route: String? = nil,
+       strengthValue: Double? = nil,
+       strengthUnit: String? = nil,
+       defaultDoseValue: Double? = nil,
+       defaultDoseUnit: String? = nil,
+       bucket: String? = nil,
+       instructions: String? = nil,
+       sortIndex: Int = 0,
+       archived: Bool = false,
+       createdAt: Date = .now,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.title = title
+    self.genericName = genericName
+    self.form = form
+    self.route = route
+    self.strengthValue = strengthValue
+    self.strengthUnit = strengthUnit
+    self.defaultDoseValue = defaultDoseValue
+    self.defaultDoseUnit = defaultDoseUnit
+    self.bucket = bucket
+    self.instructions = instructions
+    self.sortIndex = sortIndex
+    self.archived = archived
+    self.createdAt = createdAt
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
+@Model
+final class MedicationDoseEventEntity {
+  @Attribute(.unique) var id: String
+  var occurredAt: Date = Date.distantPast
+  var date: String
+  var medicationID: String
+  var status: String
+  var doseValue: Double?
+  var doseUnit: String?
+  var reason: String?
+  var effectNote: String?
+  var sideEffectNote: String?
+  var source: String?
+  var updatedAt: Date
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       date: String,
+       medicationID: String,
+       status: String = "taken",
+       doseValue: Double? = nil,
+       doseUnit: String? = nil,
+       reason: String? = nil,
+       effectNote: String? = nil,
+       sideEffectNote: String? = nil,
+       source: String? = "manual",
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.date = date
+    self.medicationID = medicationID
+    self.status = status
+    self.doseValue = doseValue
+    self.doseUnit = doseUnit
+    self.reason = reason
+    self.effectNote = effectNote
+    self.sideEffectNote = sideEffectNote
+    self.source = source
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
+@Model
 final class CaffeineEventEntity {
   @Attribute(.unique) var id: String
   /// Canonical UTC instant of the event. Derived from `date`/`time` via
@@ -1698,6 +1880,96 @@ enum MoodEventCloudKitSchema {
   }
 }
 
+enum SymptomDefinitionCloudKitSchema {
+  static let recordType = "SymptomDefinition"
+
+  enum Field {
+    static let title = "title"
+    static let emoji = "emoji"
+    static let bodySystem = "bodySystem"
+    static let defaultBodyRegion = "defaultBodyRegion"
+    static let sortIndex = "sortIndex"
+    static let archived = "archived"
+    static let createdAt = "createdAt"
+  }
+
+  static func recordName(for id: String) -> String { "symptom-definition:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("symptom-definition:".count))
+  }
+}
+
+enum SymptomEventCloudKitSchema {
+  static let recordType = "SymptomEvent"
+
+  enum Field {
+    static let date = "date"
+    static let symptomID = "symptomID"
+    static let severity = "severity"
+    static let durationMinutes = "durationMinutes"
+    static let bodyRegion = "bodyRegion"
+    static let side = "side"
+    static let quality = "quality"
+    static let triggerNote = "triggerNote"
+    static let reliefNote = "reliefNote"
+    static let note = "note"
+    static let source = "source"
+    static let occurredAt = "occurredAt"
+  }
+
+  static func recordName(for id: String) -> String { "symptom-event:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("symptom-event:".count))
+  }
+}
+
+enum MedicationDefinitionCloudKitSchema {
+  static let recordType = "MedicationDefinition"
+
+  enum Field {
+    static let title = "title"
+    static let genericName = "genericName"
+    static let form = "form"
+    static let route = "route"
+    static let strengthValue = "strengthValue"
+    static let strengthUnit = "strengthUnit"
+    static let defaultDoseValue = "defaultDoseValue"
+    static let defaultDoseUnit = "defaultDoseUnit"
+    static let bucket = "bucket"
+    static let instructions = "instructions"
+    static let sortIndex = "sortIndex"
+    static let archived = "archived"
+    static let createdAt = "createdAt"
+  }
+
+  static func recordName(for id: String) -> String { "medication-definition:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("medication-definition:".count))
+  }
+}
+
+enum MedicationDoseEventCloudKitSchema {
+  static let recordType = "MedicationDoseEvent"
+
+  enum Field {
+    static let date = "date"
+    static let medicationID = "medicationID"
+    static let status = "status"
+    static let doseValue = "doseValue"
+    static let doseUnit = "doseUnit"
+    static let reason = "reason"
+    static let effectNote = "effectNote"
+    static let sideEffectNote = "sideEffectNote"
+    static let source = "source"
+    static let occurredAt = "occurredAt"
+  }
+
+  static func recordName(for id: String) -> String { "medication-dose-event:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("medication-dose-event:".count))
+  }
+}
+
 enum OuraNightCloudKitSchema {
   /// One CKRecord per night. recordName is `oura-night:<yyyy-MM-dd>`
   /// so the date doubles as both the unique entity ID and the natural
@@ -2330,6 +2602,178 @@ extension MoodEventEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
+extension SymptomDefinitionEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: SymptomDefinitionCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: SymptomDefinitionCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[SymptomDefinitionCloudKitSchema.Field.title] = title
+    record[SymptomDefinitionCloudKitSchema.Field.emoji] = emoji
+    record[SymptomDefinitionCloudKitSchema.Field.bodySystem] = bodySystem
+    record[SymptomDefinitionCloudKitSchema.Field.defaultBodyRegion] = defaultBodyRegion
+    record[SymptomDefinitionCloudKitSchema.Field.sortIndex] = sortIndex
+    record[SymptomDefinitionCloudKitSchema.Field.archived] = archived ? 1 : 0
+    record[SymptomDefinitionCloudKitSchema.Field.createdAt] = createdAt as NSDate
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let value = record[SymptomDefinitionCloudKitSchema.Field.title] as? String { title = value }
+    emoji = optionalChecklistString(record[SymptomDefinitionCloudKitSchema.Field.emoji])
+    bodySystem = optionalChecklistString(record[SymptomDefinitionCloudKitSchema.Field.bodySystem])
+    defaultBodyRegion = optionalChecklistString(record[SymptomDefinitionCloudKitSchema.Field.defaultBodyRegion])
+    if let value = record[SymptomDefinitionCloudKitSchema.Field.sortIndex] as? Int { sortIndex = value }
+    if let value = record[SymptomDefinitionCloudKitSchema.Field.archived] as? Int { archived = value != 0 }
+    if let value = record[SymptomDefinitionCloudKitSchema.Field.createdAt] as? Date { createdAt = value }
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: SymptomDefinitionCloudKitSchema.entityID(from: record.recordID.recordName),
+              title: "")
+    apply(record)
+  }
+}
+
+extension SymptomEventEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: SymptomEventCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: SymptomEventCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[SymptomEventCloudKitSchema.Field.date] = date
+    record[SymptomEventCloudKitSchema.Field.symptomID] = symptomID
+    record[SymptomEventCloudKitSchema.Field.severity] = severity
+    record[SymptomEventCloudKitSchema.Field.durationMinutes] = durationMinutes
+    record[SymptomEventCloudKitSchema.Field.bodyRegion] = bodyRegion
+    record[SymptomEventCloudKitSchema.Field.side] = side
+    record[SymptomEventCloudKitSchema.Field.quality] = quality
+    record[SymptomEventCloudKitSchema.Field.triggerNote] = triggerNote
+    record[SymptomEventCloudKitSchema.Field.reliefNote] = reliefNote
+    record[SymptomEventCloudKitSchema.Field.note] = note
+    record[SymptomEventCloudKitSchema.Field.source] = source
+    record[SymptomEventCloudKitSchema.Field.occurredAt] = occurredAt as NSDate
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let value = record[SymptomEventCloudKitSchema.Field.date] as? String { date = value }
+    if let value = record[SymptomEventCloudKitSchema.Field.symptomID] as? String { symptomID = value }
+    if let value = record[SymptomEventCloudKitSchema.Field.severity] as? Int { severity = value }
+    durationMinutes = record[SymptomEventCloudKitSchema.Field.durationMinutes] as? Int
+    bodyRegion = optionalChecklistString(record[SymptomEventCloudKitSchema.Field.bodyRegion])
+    side = optionalChecklistString(record[SymptomEventCloudKitSchema.Field.side])
+    quality = optionalChecklistString(record[SymptomEventCloudKitSchema.Field.quality])
+    triggerNote = optionalChecklistString(record[SymptomEventCloudKitSchema.Field.triggerNote])
+    reliefNote = optionalChecklistString(record[SymptomEventCloudKitSchema.Field.reliefNote])
+    note = optionalChecklistString(record[SymptomEventCloudKitSchema.Field.note])
+    source = optionalChecklistString(record[SymptomEventCloudKitSchema.Field.source])
+    if let v = record[SymptomEventCloudKitSchema.Field.occurredAt] as? Date { occurredAt = v }
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: SymptomEventCloudKitSchema.entityID(from: record.recordID.recordName),
+              date: "", symptomID: "", severity: 0)
+    apply(record)
+  }
+}
+
+extension MedicationDefinitionEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: MedicationDefinitionCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: MedicationDefinitionCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[MedicationDefinitionCloudKitSchema.Field.title] = title
+    record[MedicationDefinitionCloudKitSchema.Field.genericName] = genericName
+    record[MedicationDefinitionCloudKitSchema.Field.form] = form
+    record[MedicationDefinitionCloudKitSchema.Field.route] = route
+    record[MedicationDefinitionCloudKitSchema.Field.strengthValue] = strengthValue
+    record[MedicationDefinitionCloudKitSchema.Field.strengthUnit] = strengthUnit
+    record[MedicationDefinitionCloudKitSchema.Field.defaultDoseValue] = defaultDoseValue
+    record[MedicationDefinitionCloudKitSchema.Field.defaultDoseUnit] = defaultDoseUnit
+    record[MedicationDefinitionCloudKitSchema.Field.bucket] = bucket
+    record[MedicationDefinitionCloudKitSchema.Field.instructions] = instructions
+    record[MedicationDefinitionCloudKitSchema.Field.sortIndex] = sortIndex
+    record[MedicationDefinitionCloudKitSchema.Field.archived] = archived ? 1 : 0
+    record[MedicationDefinitionCloudKitSchema.Field.createdAt] = createdAt as NSDate
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let value = record[MedicationDefinitionCloudKitSchema.Field.title] as? String { title = value }
+    genericName = optionalChecklistString(record[MedicationDefinitionCloudKitSchema.Field.genericName])
+    form = optionalChecklistString(record[MedicationDefinitionCloudKitSchema.Field.form])
+    route = optionalChecklistString(record[MedicationDefinitionCloudKitSchema.Field.route])
+    strengthValue = record[MedicationDefinitionCloudKitSchema.Field.strengthValue] as? Double
+    strengthUnit = optionalChecklistString(record[MedicationDefinitionCloudKitSchema.Field.strengthUnit])
+    defaultDoseValue = record[MedicationDefinitionCloudKitSchema.Field.defaultDoseValue] as? Double
+    defaultDoseUnit = optionalChecklistString(record[MedicationDefinitionCloudKitSchema.Field.defaultDoseUnit])
+    bucket = optionalChecklistString(record[MedicationDefinitionCloudKitSchema.Field.bucket])
+    instructions = optionalChecklistString(record[MedicationDefinitionCloudKitSchema.Field.instructions])
+    if let value = record[MedicationDefinitionCloudKitSchema.Field.sortIndex] as? Int { sortIndex = value }
+    if let value = record[MedicationDefinitionCloudKitSchema.Field.archived] as? Int { archived = value != 0 }
+    if let value = record[MedicationDefinitionCloudKitSchema.Field.createdAt] as? Date { createdAt = value }
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: MedicationDefinitionCloudKitSchema.entityID(from: record.recordID.recordName),
+              title: "")
+    apply(record)
+  }
+}
+
+extension MedicationDoseEventEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: MedicationDoseEventCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: MedicationDoseEventCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[MedicationDoseEventCloudKitSchema.Field.date] = date
+    record[MedicationDoseEventCloudKitSchema.Field.medicationID] = medicationID
+    record[MedicationDoseEventCloudKitSchema.Field.status] = status
+    record[MedicationDoseEventCloudKitSchema.Field.doseValue] = doseValue
+    record[MedicationDoseEventCloudKitSchema.Field.doseUnit] = doseUnit
+    record[MedicationDoseEventCloudKitSchema.Field.reason] = reason
+    record[MedicationDoseEventCloudKitSchema.Field.effectNote] = effectNote
+    record[MedicationDoseEventCloudKitSchema.Field.sideEffectNote] = sideEffectNote
+    record[MedicationDoseEventCloudKitSchema.Field.source] = source
+    record[MedicationDoseEventCloudKitSchema.Field.occurredAt] = occurredAt as NSDate
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let value = record[MedicationDoseEventCloudKitSchema.Field.date] as? String { date = value }
+    if let value = record[MedicationDoseEventCloudKitSchema.Field.medicationID] as? String { medicationID = value }
+    if let value = record[MedicationDoseEventCloudKitSchema.Field.status] as? String { status = value }
+    doseValue = record[MedicationDoseEventCloudKitSchema.Field.doseValue] as? Double
+    doseUnit = optionalChecklistString(record[MedicationDoseEventCloudKitSchema.Field.doseUnit])
+    reason = optionalChecklistString(record[MedicationDoseEventCloudKitSchema.Field.reason])
+    effectNote = optionalChecklistString(record[MedicationDoseEventCloudKitSchema.Field.effectNote])
+    sideEffectNote = optionalChecklistString(record[MedicationDoseEventCloudKitSchema.Field.sideEffectNote])
+    source = optionalChecklistString(record[MedicationDoseEventCloudKitSchema.Field.source])
+    if let v = record[MedicationDoseEventCloudKitSchema.Field.occurredAt] as? Date { occurredAt = v }
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: MedicationDoseEventCloudKitSchema.entityID(from: record.recordID.recordName),
+              date: "", medicationID: "", status: "taken")
+    apply(record)
+  }
+}
+
 extension OuraNightEntity: ChecklistCloudKitBackedEntity {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
@@ -2951,6 +3395,8 @@ final class LocalStore {
                          CoachMessageEntity.self,
                          GutEventEntity.self,
                          MoodEventEntity.self,
+                         SymptomDefinitionEntity.self, SymptomEventEntity.self,
+                         MedicationDefinitionEntity.self, MedicationDoseEventEntity.self,
                          CaffeineEventEntity.self, CaffeineBeanEntity.self,
                          CannabisEventEntity.self,
                          IntakeKindEntity.self, IntakeItemEntity.self,
@@ -3269,6 +3715,8 @@ extension CaffeineEventEntity: LoggedEvent { var sectionKey: String { "caffeine"
 extension CannabisEventEntity: LoggedEvent { var sectionKey: String { "cannabis" } }
 extension GutEventEntity: LoggedEvent { var sectionKey: String { "gut" } }
 extension MoodEventEntity: LoggedEvent { var sectionKey: String { "mood" } }
+extension SymptomEventEntity: LoggedEvent { var sectionKey: String { "symptoms" } }
+extension MedicationDoseEventEntity: LoggedEvent { var sectionKey: String { "medications" } }
 extension ChoreEventEntity: LoggedEvent { var sectionKey: String { "chores" } }
 extension HabitDayStateEntity: LoggedEvent { var sectionKey: String { "habits" } }
 extension SupplementDayStateEntity: LoggedEvent { var sectionKey: String { "supplements" } }
@@ -3301,6 +3749,8 @@ enum LoggedEvents {
     add(CannabisEventEntity.self)
     add(GutEventEntity.self)
     add(MoodEventEntity.self)
+    add(SymptomEventEntity.self)
+    add(MedicationDoseEventEntity.self)
     add(ChoreEventEntity.self)
     add(HabitDayStateEntity.self)
     add(SupplementDayStateEntity.self)
@@ -3371,4 +3821,3 @@ public struct TimedEvent: Sendable, Identifiable {
   public let sectionKey: String
   public let occurredAt: Date
 }
-

@@ -1,0 +1,185 @@
+import SwiftData
+import SwiftUI
+
+@MainActor
+enum SymptomsPlugin: SectionPlugin {
+  static var producesTimedEvents: Bool { true }
+
+  static var manifest: SectionManifest {
+    SectionManifest.byKey["symptoms"]!
+  }
+
+  static func destinationView() -> AnyView? {
+    AnyView(SymptomsDestinationView())
+  }
+
+  static var logActions: [LogAction] {
+    [LogAction(id: "symptom", title: "Log symptom", systemImage: "waveform.path.ecg")]
+  }
+
+  static var logFlourish: LogFlourish? {
+    LogFlourish(motion: .sink)
+  }
+
+  static func detailPaneContent() -> AnyView? {
+    AnyView(SymptomsDetailContent())
+  }
+
+  static func onboarding(complete: @escaping () -> Void) -> AnyView? {
+    AnyView(SectionExplainerView(
+      sectionKey: "symptoms",
+      title: "Symptoms",
+      intro: "Track pain, flare-ups and symptoms with severity, body area, triggers and relief notes.",
+      bullets: [
+        .init("Severity first", "Every entry stores a 0-10 score so trends stay comparable.", icon: "gauge.with.dots.needle.67percent"),
+        .init("Context fields", "Body region, side, quality, trigger and relief notes keep the log doctor-readable.", icon: "list.clipboard"),
+        .init("Insights outcome", "Symptoms flow into correlations as outcomes, so sleep, caffeine, training and meds can be tested against them.", icon: "chart.dots.scatter"),
+      ],
+      primaryActionLabel: "Start logging",
+      complete: complete
+    ))
+  }
+
+  static var exportContribution: SectionExportContribution? {
+    SectionExportContribution(
+      tables: [
+        SchemaTable(name: "symptomDefinition", purpose: "a symptom or pain type", fields: [
+          .req("id", "string"), .req("title", "string"),
+          .opt("emoji", "string"), .opt("bodySystem", "string"),
+          .opt("defaultBodyRegion", "string"), .opt("sortIndex", "int"),
+          .opt("archived", "bool"),
+        ]),
+        SchemaTable(name: "symptomEvent", purpose: "one symptom log", fields: [
+          .req("id", "string"), .req("date", "date"),
+          .req("symptomID", "string"), .req("severity", "int", "0-10"),
+          .opt("time", "time"), .opt("durationMinutes", "int"),
+          .opt("bodyRegion", "string"), .opt("side", "string"),
+          .opt("quality", "string"), .opt("triggerNote", "string"),
+          .opt("reliefNote", "string"), .opt("note", "string"),
+          .opt("source", "string"),
+        ]),
+      ],
+      collect: { ctx in
+        let defs = try ctx.fetch(FetchDescriptor<SymptomDefinitionEntity>())
+        let events = try ctx.fetch(FetchDescriptor<SymptomEventEntity>())
+        return [
+          "symptomDefinition": defs.map(symptomDefinitionExportDict),
+          "symptomEvent": events.map(symptomEventExportDict),
+        ]
+      }
+    )
+  }
+
+  static var mcpSkill: SectionSkill? {
+    SectionSkill(
+      key: "symptoms",
+      summary: "Pain and symptom severity logs.",
+      tools: [
+        SectionSkill.Tool("symptoms_list", "Definitions and recent logs", inputs: "optional: date, from, to, limit"),
+        SectionSkill.Tool("symptoms_create", "Create a symptom definition", inputs: "required: title · optional: emoji, bodySystem, defaultBodyRegion"),
+        SectionSkill.Tool("symptoms_log", "Log severity", inputs: "required: symptomID, severity (0-10) · optional: date, time, durationMinutes, bodyRegion, side, quality, triggerNote, reliefNote, note"),
+      ],
+      body: """
+      Treat symptoms as outcomes. Prefer structured severity (0-10), body \
+      region and side over burying everything in `note`; use trigger/relief \
+      notes for possible causes and interventions.
+      """
+    )
+  }
+
+  static var aimMetrics: [GoalMetric] {
+    [
+      GoalMetric(key: "symptoms.event_count",
+                 label: "Symptom events (this week)",
+                 sectionKey: "symptoms",
+                 window: "calendarWeek",
+                 unitLabel: "events"),
+      GoalMetric(key: "symptoms.peak_severity",
+                 label: "Peak symptom severity (this week)",
+                 sectionKey: "symptoms",
+                 window: "calendarWeek",
+                 unitLabel: "/10"),
+      GoalMetric(key: "symptoms.avg_severity",
+                 label: "Average symptom severity (this week)",
+                 sectionKey: "symptoms",
+                 window: "calendarWeek",
+                 unitLabel: "/10"),
+    ]
+  }
+
+  static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? {
+    guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window)
+    else { return 0 }
+    let rows = (try? context.fetch(FetchDescriptor<SymptomEventEntity>(
+      predicate: #Predicate { $0.date >= startStr && $0.date <= endStr }
+    ))) ?? []
+    switch metric.key {
+    case "symptoms.event_count":
+      return Double(rows.count)
+    case "symptoms.peak_severity":
+      return Double(rows.map(\.severity).max() ?? 0)
+    case "symptoms.avg_severity":
+      guard !rows.isEmpty else { return 0 }
+      return Double(rows.reduce(0) { $0 + $1.severity }) / Double(rows.count)
+    default:
+      return nil
+    }
+  }
+
+  static func correlationFeatures(context: ModelContext) -> [CorrelationFeature] {
+    let defs = (try? context.fetch(FetchDescriptor<SymptomDefinitionEntity>())) ?? []
+    let events = (try? context.fetch(FetchDescriptor<SymptomEventEntity>())) ?? []
+    return defs.filter { !$0.archived }.compactMap { def in
+      let matching = events.filter { $0.symptomID == def.id }
+      guard !matching.isEmpty else { return nil }
+      let grouped = Dictionary(grouping: matching, by: \.date)
+      let series = grouped.mapValues { Double($0.map(\.severity).max() ?? 0) }
+      return CorrelationFeature(key: "symptom:\(def.id)",
+                                label: def.title,
+                                section: "symptoms",
+                                unit: "/10",
+                                role: .outcome,
+                                distribution: .continuous,
+                                series: series)
+    }
+  }
+}
+
+private struct SymptomsDetailContent: View {
+  @State private var showingSheet = false
+
+  var body: some View {
+    Section {
+      Button {
+        showingSheet = true
+      } label: {
+        Label("Manage Symptoms", systemImage: "waveform.path.ecg")
+      }
+    } footer: {
+      Text("Archiving hides a symptom from new logs but keeps its history and exports intact.")
+    }
+    .sheet(isPresented: $showingSheet) {
+      SymptomDefinitionsSheet()
+    }
+  }
+}
+
+@MainActor func symptomDefinitionExportDict(_ e: SymptomDefinitionEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "title": e.title, "emoji": e.emoji,
+    "bodySystem": e.bodySystem, "defaultBodyRegion": e.defaultBodyRegion,
+    "sortIndex": e.sortIndex, "archived": e.archived,
+    "createdAt": isoDate(e.createdAt), "updatedAt": isoDate(e.updatedAt),
+  ])
+}
+
+@MainActor func symptomEventExportDict(_ e: SymptomEventEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "date": e.date, "time": EventTimestamp.hhmm(from: e.occurredAt),
+    "symptomID": e.symptomID, "severity": e.severity,
+    "durationMinutes": e.durationMinutes, "bodyRegion": e.bodyRegion,
+    "side": e.side, "quality": e.quality,
+    "triggerNote": e.triggerNote, "reliefNote": e.reliefNote,
+    "note": e.note, "source": e.source, "updatedAt": isoDate(e.updatedAt),
+  ])
+}

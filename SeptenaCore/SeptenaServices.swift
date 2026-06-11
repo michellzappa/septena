@@ -36,6 +36,8 @@ final class SeptenaServices {
   let coachVoiceMutator: CoachVoiceMutator
   let coachMessageMutator: CoachMessageMutator
   let gutMutator: GutMutator
+  let symptomsMutator: SymptomsMutator
+  let medicationsMutator: MedicationsMutator
   let caffeineMutator: CaffeineMutator
   let moodMutator: MoodMutator
   let cannabisMutator: CannabisMutator
@@ -60,6 +62,8 @@ final class SeptenaServices {
     self.coachVoiceMutator = CoachVoiceMutator(context: context, ckEngine: nil)
     self.coachMessageMutator = CoachMessageMutator(context: context, ckEngine: nil)
     self.gutMutator = GutMutator(context: context, ckEngine: nil)
+    self.symptomsMutator = SymptomsMutator(context: context, ckEngine: nil)
+    self.medicationsMutator = MedicationsMutator(context: context, ckEngine: nil)
     self.caffeineMutator = CaffeineMutator(context: context, ckEngine: nil)
     self.moodMutator = MoodMutator(context: context)
     self.cannabisMutator = CannabisMutator(context: context, ckEngine: nil)
@@ -376,6 +380,42 @@ final class SeptenaServices {
           }
           return nil
         }
+        if recordName.hasPrefix("symptom-definition:") {
+          let id = SymptomDefinitionCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<SymptomDefinitionEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
+        if recordName.hasPrefix("symptom-event:") {
+          let id = SymptomEventCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<SymptomEventEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
+        if recordName.hasPrefix("medication-definition:") {
+          let id = MedicationDefinitionCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<MedicationDefinitionEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
+        if recordName.hasPrefix("medication-dose-event:") {
+          let id = MedicationDoseEventCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<MedicationDoseEventEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
         if recordName.hasPrefix("grocery-item:") {
           let id = GroceryItemCloudKitSchema.entityID(from: recordName)
           if let entity = try? context.fetch(FetchDescriptor<GroceryItemEntity>(
@@ -627,6 +667,46 @@ final class SeptenaServices {
             entity.apply(record)
           } else {
             context.insert(MoodEventEntity(cloudKit: record))
+          }
+        case SymptomDefinitionCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = SymptomDefinitionCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<SymptomDefinitionEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(SymptomDefinitionEntity(cloudKit: record))
+          }
+        case SymptomEventCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = SymptomEventCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<SymptomEventEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(SymptomEventEntity(cloudKit: record))
+          }
+        case MedicationDefinitionCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = MedicationDefinitionCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<MedicationDefinitionEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(MedicationDefinitionEntity(cloudKit: record))
+          }
+        case MedicationDoseEventCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = MedicationDoseEventCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<MedicationDoseEventEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(MedicationDoseEventEntity(cloudKit: record))
           }
         case OuraNightCloudKitSchema.recordType:
           batchTouchedData = true
@@ -930,6 +1010,38 @@ final class SeptenaServices {
           )).first {
             context.delete(entity)
           }
+        case SymptomDefinitionCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = SymptomDefinitionCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<SymptomDefinitionEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
+        case SymptomEventCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = SymptomEventCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<SymptomEventEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
+        case MedicationDefinitionCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = MedicationDefinitionCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<MedicationDefinitionEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
+        case MedicationDoseEventCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = MedicationDoseEventCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<MedicationDoseEventEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
         case OuraNightCloudKitSchema.recordType:
           batchTouchedData = true
           let id = OuraNightCloudKitSchema.entityID(from: recordID.recordName)
@@ -1079,6 +1191,8 @@ final class SeptenaServices {
       coachVoiceMutator.bind(ckEngine: ckEngine)
       coachMessageMutator.bind(ckEngine: ckEngine)
       gutMutator.bind(ckEngine: ckEngine)
+      symptomsMutator.bind(ckEngine: ckEngine)
+      medicationsMutator.bind(ckEngine: ckEngine)
       caffeineMutator.bind(ckEngine: ckEngine)
       cannabisMutator.bind(ckEngine: ckEngine)
       intakeMutator.bind(ckEngine: ckEngine)
@@ -1989,6 +2103,338 @@ final class GutMutator {
   private func commit(_ entity: GutEventEntity, op: String) {
     saveContext("CK gut \(op)")
     ckEngine?.noteGutEventChange(id: entity.id)
+    postChanged()
+  }
+
+  private func saveContext(_ label: String) {
+    do { try context.save() }
+    catch { SeptenaLog.error(label, error) }
+  }
+
+  private func postChanged() {
+    DataChange.post(Self.changeScope)
+  }
+}
+
+@MainActor
+@Observable
+final class SymptomsMutator {
+  static let changeScope = "symptoms"
+  private let context: ModelContext
+  private var ckEngine: CKEngine?
+
+  init(context: ModelContext, ckEngine: CKEngine? = nil) {
+    self.context = context
+    self.ckEngine = ckEngine
+  }
+
+  func bind(ckEngine: CKEngine) {
+    self.ckEngine = ckEngine
+  }
+
+  @discardableResult
+  func addDefinition(title: String,
+                     emoji: String? = nil,
+                     bodySystem: String? = nil,
+                     defaultBodyRegion: String? = nil) -> SymptomDefinitionEntity {
+    let entity = SymptomDefinitionEntity(id: UUID().uuidString.lowercased(),
+                                         title: title,
+                                         emoji: emoji,
+                                         bodySystem: bodySystem,
+                                         defaultBodyRegion: defaultBodyRegion,
+                                         sortIndex: nextDefinitionSortIndex())
+    context.insert(entity)
+    commitDefinition(entity, op: "create")
+    return entity
+  }
+
+  func updateDefinition(id: String,
+                        title: String? = nil,
+                        emoji: String?? = nil,
+                        bodySystem: String?? = nil,
+                        defaultBodyRegion: String?? = nil,
+                        archived: Bool? = nil) {
+    guard let entity = fetchDefinition(id: id) else { return }
+    if let title { entity.title = title }
+    if let emoji { entity.emoji = emoji }
+    if let bodySystem { entity.bodySystem = bodySystem }
+    if let defaultBodyRegion { entity.defaultBodyRegion = defaultBodyRegion }
+    if let archived { entity.archived = archived }
+    entity.updatedAt = .now
+    commitDefinition(entity, op: "update")
+  }
+
+  @discardableResult
+  func addEvent(symptomID: String,
+                date: String,
+                time: String,
+                severity: Int,
+                durationMinutes: Int? = nil,
+                bodyRegion: String? = nil,
+                side: String? = nil,
+                quality: String? = nil,
+                triggerNote: String? = "",
+                reliefNote: String? = "",
+                note: String? = "",
+                source: String? = "manual") -> SymptomEventEntity {
+    let entity = SymptomEventEntity(id: UUID().uuidString.lowercased(),
+                                    date: date,
+                                    symptomID: symptomID,
+                                    severity: max(0, min(10, severity)),
+                                    durationMinutes: durationMinutes,
+                                    bodyRegion: bodyRegion,
+                                    side: side,
+                                    quality: quality,
+                                    triggerNote: triggerNote,
+                                    reliefNote: reliefNote,
+                                    note: note,
+                                    source: source)
+    entity.occurredAt = EventTimestamp.from(date: date, time: time)
+    context.insert(entity)
+    commitEvent(entity, op: "create")
+    return entity
+  }
+
+  func updateEvent(id: String,
+                   date: String? = nil,
+                   time: String? = nil,
+                   symptomID: String? = nil,
+                   severity: Int? = nil,
+                   durationMinutes: Int?? = nil,
+                   bodyRegion: String?? = nil,
+                   side: String?? = nil,
+                   quality: String?? = nil,
+                   triggerNote: String?? = nil,
+                   reliefNote: String?? = nil,
+                   note: String?? = nil) {
+    guard let entity = fetchEvent(id: id) else { return }
+    if let date { entity.date = date }
+    if let symptomID { entity.symptomID = symptomID }
+    if let severity { entity.severity = max(0, min(10, severity)) }
+    if let durationMinutes { entity.durationMinutes = durationMinutes }
+    if let bodyRegion { entity.bodyRegion = bodyRegion }
+    if let side { entity.side = side }
+    if let quality { entity.quality = quality }
+    if let triggerNote { entity.triggerNote = triggerNote }
+    if let reliefNote { entity.reliefNote = reliefNote }
+    if let note { entity.note = note }
+    if date != nil || time != nil {
+      let t = time ?? EventTimestamp.hhmm(from: entity.occurredAt)
+      entity.occurredAt = EventTimestamp.from(date: entity.date, time: t)
+    }
+    entity.updatedAt = .now
+    commitEvent(entity, op: "update")
+  }
+
+  func deleteEvent(id: String) {
+    guard let entity = fetchEvent(id: id) else { return }
+    context.delete(entity)
+    saveContext("CK symptoms delete")
+    ckEngine?.noteSymptomEventDeletion(id: id)
+    postChanged()
+  }
+
+  private func fetchDefinition(id: String) -> SymptomDefinitionEntity? {
+    try? context.fetch(FetchDescriptor<SymptomDefinitionEntity>(
+      predicate: #Predicate { $0.id == id }
+    )).first
+  }
+
+  private func fetchEvent(id: String) -> SymptomEventEntity? {
+    try? context.fetch(FetchDescriptor<SymptomEventEntity>(
+      predicate: #Predicate { $0.id == id }
+    )).first
+  }
+
+  private func nextDefinitionSortIndex() -> Int {
+    ((try? context.fetch(FetchDescriptor<SymptomDefinitionEntity>(
+      sortBy: [SortDescriptor(\.sortIndex, order: .reverse)]
+    )).first?.sortIndex) ?? -1) + 1
+  }
+
+  private func commitDefinition(_ entity: SymptomDefinitionEntity, op: String) {
+    saveContext("CK symptoms definition \(op)")
+    ckEngine?.noteSymptomDefinitionChange(id: entity.id)
+    postChanged()
+  }
+
+  private func commitEvent(_ entity: SymptomEventEntity, op: String) {
+    saveContext("CK symptoms event \(op)")
+    ckEngine?.noteSymptomEventChange(id: entity.id)
+    postChanged()
+  }
+
+  private func saveContext(_ label: String) {
+    do { try context.save() }
+    catch { SeptenaLog.error(label, error) }
+  }
+
+  private func postChanged() {
+    DataChange.post(Self.changeScope)
+  }
+}
+
+@MainActor
+@Observable
+final class MedicationsMutator {
+  static let changeScope = "medications"
+  private let context: ModelContext
+  private var ckEngine: CKEngine?
+
+  init(context: ModelContext, ckEngine: CKEngine? = nil) {
+    self.context = context
+    self.ckEngine = ckEngine
+  }
+
+  func bind(ckEngine: CKEngine) {
+    self.ckEngine = ckEngine
+  }
+
+  @discardableResult
+  func addDefinition(title: String,
+                     genericName: String? = nil,
+                     form: String? = nil,
+                     route: String? = nil,
+                     strengthValue: Double? = nil,
+                     strengthUnit: String? = nil,
+                     defaultDoseValue: Double? = nil,
+                     defaultDoseUnit: String? = nil,
+                     bucket: String? = nil,
+                     instructions: String? = nil) -> MedicationDefinitionEntity {
+    let entity = MedicationDefinitionEntity(id: UUID().uuidString.lowercased(),
+                                            title: title,
+                                            genericName: genericName,
+                                            form: form,
+                                            route: route,
+                                            strengthValue: strengthValue,
+                                            strengthUnit: strengthUnit,
+                                            defaultDoseValue: defaultDoseValue,
+                                            defaultDoseUnit: defaultDoseUnit,
+                                            bucket: bucket,
+                                            instructions: instructions,
+                                            sortIndex: nextDefinitionSortIndex())
+    context.insert(entity)
+    commitDefinition(entity, op: "create")
+    return entity
+  }
+
+  func updateDefinition(id: String,
+                        title: String? = nil,
+                        genericName: String?? = nil,
+                        form: String?? = nil,
+                        route: String?? = nil,
+                        strengthValue: Double?? = nil,
+                        strengthUnit: String?? = nil,
+                        defaultDoseValue: Double?? = nil,
+                        defaultDoseUnit: String?? = nil,
+                        bucket: String?? = nil,
+                        instructions: String?? = nil,
+                        archived: Bool? = nil) {
+    guard let entity = fetchDefinition(id: id) else { return }
+    if let title { entity.title = title }
+    if let genericName { entity.genericName = genericName }
+    if let form { entity.form = form }
+    if let route { entity.route = route }
+    if let strengthValue { entity.strengthValue = strengthValue }
+    if let strengthUnit { entity.strengthUnit = strengthUnit }
+    if let defaultDoseValue { entity.defaultDoseValue = defaultDoseValue }
+    if let defaultDoseUnit { entity.defaultDoseUnit = defaultDoseUnit }
+    if let bucket { entity.bucket = bucket }
+    if let instructions { entity.instructions = instructions }
+    if let archived { entity.archived = archived }
+    entity.updatedAt = .now
+    commitDefinition(entity, op: "update")
+  }
+
+  @discardableResult
+  func addDose(medicationID: String,
+               date: String,
+               time: String,
+               status: String = "taken",
+               doseValue: Double? = nil,
+               doseUnit: String? = nil,
+               reason: String? = "",
+               effectNote: String? = "",
+               sideEffectNote: String? = "",
+               source: String? = "manual") -> MedicationDoseEventEntity {
+    let entity = MedicationDoseEventEntity(id: UUID().uuidString.lowercased(),
+                                           date: date,
+                                           medicationID: medicationID,
+                                           status: status,
+                                           doseValue: doseValue,
+                                           doseUnit: doseUnit,
+                                           reason: reason,
+                                           effectNote: effectNote,
+                                           sideEffectNote: sideEffectNote,
+                                           source: source)
+    entity.occurredAt = EventTimestamp.from(date: date, time: time)
+    context.insert(entity)
+    commitDose(entity, op: "create")
+    return entity
+  }
+
+  func updateDose(id: String,
+                  date: String? = nil,
+                  time: String? = nil,
+                  medicationID: String? = nil,
+                  status: String? = nil,
+                  doseValue: Double?? = nil,
+                  doseUnit: String?? = nil,
+                  reason: String?? = nil,
+                  effectNote: String?? = nil,
+                  sideEffectNote: String?? = nil) {
+    guard let entity = fetchDose(id: id) else { return }
+    if let date { entity.date = date }
+    if let medicationID { entity.medicationID = medicationID }
+    if let status { entity.status = status }
+    if let doseValue { entity.doseValue = doseValue }
+    if let doseUnit { entity.doseUnit = doseUnit }
+    if let reason { entity.reason = reason }
+    if let effectNote { entity.effectNote = effectNote }
+    if let sideEffectNote { entity.sideEffectNote = sideEffectNote }
+    if date != nil || time != nil {
+      let t = time ?? EventTimestamp.hhmm(from: entity.occurredAt)
+      entity.occurredAt = EventTimestamp.from(date: entity.date, time: t)
+    }
+    entity.updatedAt = .now
+    commitDose(entity, op: "update")
+  }
+
+  func deleteDose(id: String) {
+    guard let entity = fetchDose(id: id) else { return }
+    context.delete(entity)
+    saveContext("CK medications delete")
+    ckEngine?.noteMedicationDoseEventDeletion(id: id)
+    postChanged()
+  }
+
+  private func fetchDefinition(id: String) -> MedicationDefinitionEntity? {
+    try? context.fetch(FetchDescriptor<MedicationDefinitionEntity>(
+      predicate: #Predicate { $0.id == id }
+    )).first
+  }
+
+  private func fetchDose(id: String) -> MedicationDoseEventEntity? {
+    try? context.fetch(FetchDescriptor<MedicationDoseEventEntity>(
+      predicate: #Predicate { $0.id == id }
+    )).first
+  }
+
+  private func nextDefinitionSortIndex() -> Int {
+    ((try? context.fetch(FetchDescriptor<MedicationDefinitionEntity>(
+      sortBy: [SortDescriptor(\.sortIndex, order: .reverse)]
+    )).first?.sortIndex) ?? -1) + 1
+  }
+
+  private func commitDefinition(_ entity: MedicationDefinitionEntity, op: String) {
+    saveContext("CK medications definition \(op)")
+    ckEngine?.noteMedicationDefinitionChange(id: entity.id)
+    postChanged()
+  }
+
+  private func commitDose(_ entity: MedicationDoseEventEntity, op: String) {
+    saveContext("CK medications dose \(op)")
+    ckEngine?.noteMedicationDoseEventChange(id: entity.id)
     postChanged()
   }
 

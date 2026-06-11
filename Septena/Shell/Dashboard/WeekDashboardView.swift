@@ -15,6 +15,8 @@ enum WeekDestination: String, Hashable, Identifiable {
   case groceries, caffeine, cannabis, body, gut
   case intake
   case mood
+  case symptoms
+  case medications
   case activity
   case github
   case insights
@@ -1104,7 +1106,7 @@ struct WeekDashboardView: View {
     case .cannabis:    cannabisQuickAddMenu
     case .gut:         gutQuickAddMenu
     case .mood:        moodQuickAddMenu
-    case .sleep, .body, .activity, .github, .intake:
+    case .sleep, .body, .activity, .github, .intake, .symptoms, .medications:
       EmptyView()
     }
   }
@@ -1196,6 +1198,8 @@ struct WeekDashboardView: View {
     case .body:        bodyTile
     case .gut:         gutTile
     case .mood:        moodTile
+    case .symptoms:    symptomsTile
+    case .medications: medicationsTile
     case .activity:    activityTile
     case .github:      githubTile
     }
@@ -1229,6 +1233,8 @@ struct WeekDashboardView: View {
     case .body:        return bodyDomainData()
     case .gut:         return gutDomainData()
     case .mood:        return moodDomainData()
+    case .symptoms:    return symptomsDomainData()
+    case .medications: return medicationsDomainData()
     case .activity:    return activityDomainData()
     case .github:      return githubDomainData()
     }
@@ -1804,6 +1810,118 @@ struct WeekDashboardView: View {
       history: .bars(bars.isEmpty ? Array(repeating: 0, count: 90) : bars),
       tap: .openSheet(.gut)
     )
+  }
+
+  private var symptomsTile: some View {
+    let data = symptomsDomainData()
+    return Button { open(.symptoms) } label: {
+      ModuleTile(
+        title: data.title,
+        accent: data.accent,
+        stats: data.headlineStats.map { .init(label: $0.label, value: $0.value, unit: $0.unit) },
+        history: .init(label: "Severity (7d)", values: symptomsHistory(days: 7))
+      )
+    }
+    .buttonStyle(.plain)
+  }
+
+  private func symptomsDomainData() -> HomepageDomainData {
+    let today = SeptenaDate.today
+    let rows = fetchSymptoms(from: lastNDays(Self.historyDays).first ?? today, to: today)
+    let todayRows = rows.filter { $0.date == today }
+    let peak = todayRows.map(\.severity).max() ?? 0
+    let avg = todayRows.isEmpty
+      ? 0
+      : Double(todayRows.reduce(0) { $0 + $1.severity }) / Double(todayRows.count)
+    let history = symptomsHistory(days: Self.historyDays)
+    return HomepageDomainData(
+      domain: .symptoms,
+      title: String(localized: "Symptoms", comment: "Section name"),
+      accent: theme.color(for: "symptoms"),
+      headline: "\(todayRows.count) · peak \(peak)",
+      headlineStats: [
+        .init(label: "Today", value: "\(todayRows.count)"),
+        .init(label: "Peak", value: "\(peak)", unit: "/10"),
+        .init(label: "Average", value: avg.decimalString(1), unit: "/10"),
+      ],
+      progress: .init(label: "Peak severity", current: Double(peak), target: 10, unit: "/10"),
+      history: .bars(history),
+      tap: .openSheet(.symptoms)
+    )
+  }
+
+  private func symptomsHistory(days: Int) -> [Int] {
+    let dates = lastNDays(days)
+    guard let start = dates.first, let end = dates.last else { return [] }
+    let rows = fetchSymptoms(from: start, to: end)
+    let grouped = Dictionary(grouping: rows, by: \.date)
+    return dates.map { grouped[$0]?.map(\.severity).max() ?? 0 }
+  }
+
+  private func fetchSymptoms(from start: String, to end: String) -> [SymptomEventEntity] {
+    let descriptor = FetchDescriptor<SymptomEventEntity>(
+      predicate: #Predicate { $0.date >= start && $0.date <= end }
+    )
+    return (try? modelContext.fetch(descriptor)) ?? []
+  }
+
+  private var medicationsTile: some View {
+    let data = medicationsDomainData()
+    return Button { open(.medications) } label: {
+      ModuleTile(
+        title: data.title,
+        accent: data.accent,
+        stats: data.headlineStats.map { .init(label: $0.label, value: $0.value, unit: $0.unit) },
+        progress: data.progress.map {
+          .init(label: $0.label, current: $0.current, target: $0.target, unit: $0.unit ?? "")
+        },
+        history: .init(label: "Taken (7d)", values: medicationsHistory(days: 7))
+      )
+    }
+    .buttonStyle(.plain)
+  }
+
+  private func medicationsDomainData() -> HomepageDomainData {
+    let today = SeptenaDate.today
+    let active = fetchMedicationDefinitions().filter { !$0.archived }
+    let rows = fetchMedicationDoses(from: lastNDays(Self.historyDays).first ?? today, to: today)
+    let todayRows = rows.filter { $0.date == today }
+    let taken = todayRows.filter { $0.status == "taken" }.count
+    let skipped = todayRows.filter { $0.status == "skipped" || $0.status == "missed" }.count
+    let target = max(active.count, 1)
+    return HomepageDomainData(
+      domain: .medications,
+      title: String(localized: "Medications", comment: "Section name"),
+      accent: theme.color(for: "medications"),
+      headline: "\(taken)/\(active.count) taken",
+      headlineStats: [
+        .init(label: "Taken", value: "\(taken)"),
+        .init(label: "Skipped", value: "\(skipped)"),
+        .init(label: "Active", value: "\(active.count)"),
+      ],
+      progress: .init(label: "Taken today", current: Double(min(taken, target)), target: Double(target)),
+      history: .bars(medicationsHistory(days: Self.historyDays)),
+      tap: .openSheet(.medications)
+    )
+  }
+
+  private func medicationsHistory(days: Int) -> [Int] {
+    let dates = lastNDays(days)
+    guard let start = dates.first, let end = dates.last else { return [] }
+    let rows = fetchMedicationDoses(from: start, to: end).filter { $0.status == "taken" }
+    let grouped = Dictionary(grouping: rows, by: \.date)
+    return dates.map { grouped[$0]?.count ?? 0 }
+  }
+
+  private func fetchMedicationDefinitions() -> [MedicationDefinitionEntity] {
+    (try? modelContext.fetch(FetchDescriptor<MedicationDefinitionEntity>())) ?? []
+  }
+
+  private func fetchMedicationDoses(from start: String, to end: String) -> [MedicationDoseEventEntity] {
+    let descriptor = FetchDescriptor<MedicationDoseEventEntity>(
+      predicate: #Predicate { $0.date >= start && $0.date <= end }
+    )
+    return (try? modelContext.fetch(descriptor)) ?? []
   }
 
   private func activityDomainData() -> HomepageDomainData? {

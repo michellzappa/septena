@@ -34,6 +34,8 @@ enum HomepageDomain: String, CaseIterable, Hashable, Identifiable {
   case body
   case gut
   case mood
+  case symptoms
+  case medications
   case activity
   case github
 

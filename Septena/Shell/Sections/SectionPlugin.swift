@@ -405,6 +405,8 @@ enum SectionRegistry {
     BodyPlugin.self,
     ActivityPlugin.self,
     MoodPlugin.self,
+    SymptomsPlugin.self,
+    MedicationsPlugin.self,
     CaffeinePlugin.self,
     CannabisPlugin.self,
     IntakePlugin.self,
