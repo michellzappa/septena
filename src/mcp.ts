@@ -78,6 +78,17 @@ import {
   deleteCaffeineBean, deleteCaffeineBeanJsonSchema,
 } from "./tools/caffeine.js";
 import {
+  listIntakeKinds, listIntakeKindsJsonSchema, type ListIntakeKindsInput,
+  createIntakeKind, createIntakeKindJsonSchema, type CreateIntakeKindInput,
+  updateIntakeKind, updateIntakeKindJsonSchema, type UpdateIntakeKindInput,
+  listIntakeItems, listIntakeItemsJsonSchema, type ListIntakeItemsInput,
+  createIntakeItem, createIntakeItemJsonSchema, type CreateIntakeItemInput,
+  deleteIntakeItem, deleteIntakeItemJsonSchema,
+  listIntakeEvents, listIntakeEventsJsonSchema, type ListIntakeEventsInput,
+  logIntakeEvent, logIntakeEventJsonSchema, type LogIntakeEventInput,
+  deleteIntakeEvent, deleteIntakeEventJsonSchema,
+} from "./tools/intake.js";
+import {
   listCannabisEvents, listCannabisEventsJsonSchema, type ListCannabisEventsInput,
   logCannabisEvent, logCannabisEventJsonSchema, type LogCannabisEventInput,
   deleteCannabisEvent, deleteCannabisEventJsonSchema,
@@ -343,6 +354,38 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
       description: "Log a new caffeine intake event (v60, matcha, or other).",
       inputSchema: logCaffeineEventJsonSchema,
     },
+  ],
+  intake: [
+    // Generic consumable tools — the tracker ("kind") is an ARGUMENT, never a
+    // tool name. Nine tools cover unlimited user-defined trackers; substance
+    // nouns live only in the user's kind names (user data).
+    { name: "intake_kinds_list",
+      description: "List the user's intake trackers (kinds) with full config: methods + tokens, dose style, unit, container cap + today's container state, catalog noun, counts. Call this FIRST, then act by id or name.",
+      inputSchema: listIntakeKindsJsonSchema },
+    { name: "intake_kind_create",
+      description: "Create a new intake tracker. Only name is required; every axis is editable later.",
+      inputSchema: createIntakeKindJsonSchema },
+    { name: "intake_kind_update",
+      description: "Update an intake tracker's config (any field) or archive/unarchive it.",
+      inputSchema: updateIntakeKindJsonSchema },
+    { name: "intake_items_list",
+      description: "List a tracker's variety catalog (beans, strains, …).",
+      inputSchema: listIntakeItemsJsonSchema },
+    { name: "intake_item_create",
+      description: "Add a variety to a tracker's catalog.",
+      inputSchema: createIntakeItemJsonSchema },
+    { name: "intake_item_delete",
+      description: "Remove a catalog variety (events keep displaying its name).",
+      inputSchema: deleteIntakeItemJsonSchema },
+    { name: "intake_events_list",
+      description: "List one tracker's logged events. Defaults to last 7 days; pass date for a single day or from/to for a range.",
+      inputSchema: listIntakeEventsJsonSchema },
+    { name: "intake_event_log",
+      description: "Log an intake event against a tracker. Method accepts a token or label from the kind's methods.",
+      inputSchema: logIntakeEventJsonSchema },
+    { name: "intake_event_delete",
+      description: "Remove one intake event (correction).",
+      inputSchema: deleteIntakeEventJsonSchema },
   ],
   cannabis: [
     {
@@ -862,6 +905,43 @@ async function callTool(
     }
     case "caffeine_bean_delete": {
       const result = await deleteCaffeineBean(client, (params.arguments ?? {}) as unknown as { id: string });
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    // ---- Intake (generic consumables) ----
+    case "intake_kinds_list": {
+      const result = await listIntakeKinds(client, (params.arguments ?? {}) as ListIntakeKindsInput);
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    case "intake_kind_create": {
+      const result = await createIntakeKind(client, (params.arguments ?? {}) as unknown as CreateIntakeKindInput);
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    case "intake_kind_update": {
+      const result = await updateIntakeKind(client, (params.arguments ?? {}) as unknown as UpdateIntakeKindInput);
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    case "intake_items_list": {
+      const result = await listIntakeItems(client, (params.arguments ?? {}) as unknown as ListIntakeItemsInput);
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    case "intake_item_create": {
+      const result = await createIntakeItem(client, (params.arguments ?? {}) as unknown as CreateIntakeItemInput);
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    case "intake_item_delete": {
+      const result = await deleteIntakeItem(client, (params.arguments ?? {}) as unknown as { id: string });
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    case "intake_events_list": {
+      const result = await listIntakeEvents(client, (params.arguments ?? {}) as unknown as ListIntakeEventsInput);
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    case "intake_event_log": {
+      const result = await logIntakeEvent(client, (params.arguments ?? {}) as unknown as LogIntakeEventInput);
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    case "intake_event_delete": {
+      const result = await deleteIntakeEvent(client, (params.arguments ?? {}) as unknown as { id: string });
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
     // ---- Cannabis ----

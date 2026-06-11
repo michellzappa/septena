@@ -30,6 +30,7 @@ The tool list is **dynamic**: on `tools/list` the gateway reads the user's `Sett
 | `supplements` | `supplements_list`, `supplements_create`, `supplements_update`, `supplements_delete`, `supplements_toggle` |
 | `chores` | `chores_list`, `chores_create`, `chores_update`, `chores_delete`, `chores_complete`, `chores_defer`, `chores_uncomplete` |
 | `caffeine` | `caffeine_events_list`, `caffeine_event_log`, `caffeine_event_delete`, `caffeine_beans_list`, `caffeine_bean_create`, `caffeine_bean_delete` |
+| `intake` | `intake_kinds_list`, `intake_kind_create`, `intake_kind_update`, `intake_items_list`, `intake_item_create`, `intake_item_delete`, `intake_events_list`, `intake_event_log`, `intake_event_delete` |
 | `cannabis` | `cannabis_events_list`, `cannabis_event_log`, `cannabis_event_delete`, `cannabis_strains_list`, `cannabis_strain_create`, `cannabis_strain_delete` |
 | `gut` | `gut_events_list`, `gut_event_log`, `gut_event_delete` |
 | `nutrition` | `nutrition_entries_list`, `nutrition_entry_log`, `nutrition_entry_update`, `nutrition_entry_delete`, `nutrition_day_summary` |
@@ -130,6 +131,27 @@ tasks_list(view: "inbox")
 - Brew methods: `v60`, `matcha`, `other`. `grams` is the bean/leaf dose in grams.
 - Workflow for "I had a matcha": call `caffeine_event_log({method: "matcha"})`. No need to specify beans for matcha unless tracking source.
 - For coffee: resolve bean via `caffeine_beans_list` first; `caffeine_bean_create({name})` if it's new.
+
+### Intake (generic consumable trackers)
+User-defined trackers ("kinds") for anything consumed — each has its own
+methods, dose style, optional container model, variety catalog, and an
+objective (log | limit | reduce | quit) wired to a real goal. Names, methods,
+and varieties are the user's own vocabulary.
+- **Resolve first, then act**: `intake_kinds_list()` returns every tracker's
+  full config (method tokens, unit, container cap + today's container state,
+  catalog noun, counts) — one call per conversation is enough. Then
+  `intake_event_log({kind, method, ...})` where `kind` is an id or unique
+  name and `method` is a token or label.
+- A failed kind/method/item lookup returns the candidates inline — retry with
+  one of them.
+- **Container kinds** (`containerCap` set): "a container holds N uses". Log
+  `count: lastContainerCountToday + 1` to continue the current container, or
+  `count: 1` for a fresh one.
+- **Objectives**: for reduce/quit kinds, days-since-last is the streak that
+  matters — prefer encouragement framing when the user is abstaining.
+- The legacy `caffeine_*` / `cannabis_*` tools are deprecated aliases over the
+  old per-substance records; prefer the `intake_*` tools once the user's data
+  is imported into trackers.
 
 ### Cannabis
 - Methods: `vape`, `edible`. `hit` = count of inhalations (for vape). `grams` for edibles.
