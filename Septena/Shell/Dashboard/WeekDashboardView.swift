@@ -2094,6 +2094,44 @@ struct WeekDashboardView: View {
                                      values: bars.isEmpty ? Array(repeating: 0, count: 7) : bars))
       .contentShape(Rectangle())
       .onTapGesture { open(.intake) }
+      .contextMenu { intakeQuickAddMenu(for: t) }
+  }
+
+  /// Long-press quick-add for a tracker tile — the same container-aware
+  /// choices its kind page builds (Continue (Hit N) / New capsule / methods),
+  /// logging directly like the caffeine tile menu does.
+  @ViewBuilder
+  private func intakeQuickAddMenu(for t: IntakeTileDTO) -> some View {
+    let methods = t.methods.map {
+      ConsumableContainer.Method(token: $0.token, label: $0.label,
+                                 symbol: $0.symbol, usesContainer: $0.usesContainer)
+    }
+    let choices = ConsumableContainer.choices(
+      lastCount: t.lastContainerCount,
+      containerCap: t.containerCap,
+      containerNoun: t.containerNoun ?? "container",
+      countNoun: t.countNoun ?? "use",
+      methods: methods)
+    ForEach(choices, id: \.value) { choice in
+      Button {
+        commitIntake(t, value: choice.value)
+      } label: {
+        Label("Log \(choice.label)", systemImage: choice.symbol ?? "plus.circle")
+      }
+    }
+  }
+
+  private func commitIntake(_ t: IntakeTileDTO, value: String) {
+    let (token, count) = ConsumableContainer.parse(value: value)
+    let method = t.methods.first { $0.token == token }
+    SeptenaServices.shared.intakeMutator.addEntry(
+      kindID: t.id,
+      date: clock.today,
+      time: EventTimestamp.hhmm(from: clock.now),
+      method: token,
+      amount: t.showsAmount ? method?.defaultAmount : nil,
+      count: count)
+    Haptics.success()
   }
 
   private func intakeDaysSince(_ date: Date?) -> Int? {

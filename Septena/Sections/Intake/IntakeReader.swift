@@ -63,6 +63,14 @@ struct IntakeTileDTO: Identifiable, Sendable, Hashable {
   /// Trailing-90-day daily event counts, oldest → newest (today last).
   /// Feeds the homepage sparkline/heatmap/tile history for this kind.
   let dailyCounts: [Int]
+  // Quick-add config for the tile's context menu — the same inputs the kind
+  // page feeds ConsumableContainer.choices.
+  let methods: [IntakeMethodRow]
+  let countNoun: String?
+  let containerNoun: String?
+  let containerCap: Int?
+  /// Today's most recent count on the container method (Continue (use N)).
+  let lastContainerCount: Int?
 }
 
 enum IntakeReader {
@@ -167,13 +175,26 @@ enum IntakeReader {
     let window = trailingDates(endingAt: date, days: 90)
     return kinds.map { k in
       let days = byDay[k.id] ?? [:]
+      let methods = k.methods
+      // Today's latest count on the container method, for "Continue (use N)".
+      var lastContainer: Int? = nil
+      if let token = methods.first(where: { $0.usesContainer })?.token {
+        lastContainer = events
+          .filter { $0.kindID == k.id && $0.date == date && $0.method == token }
+          .max(by: { $0.occurredAt < $1.occurredAt })?.count
+      }
       return IntakeTileDTO(id: k.id, name: k.name, symbol: k.symbol, color: k.color,
                            unit: k.unit, objective: k.objective,
                            showsAmount: k.doseStyle == "amount" || k.doseStyle == "both",
                            todayCount: counts[k.id] ?? 0,
                            todayAmount: sums[k.id] ?? 0,
                            lastEventAt: lastAt[k.id],
-                           dailyCounts: window.map { days[$0] ?? 0 })
+                           dailyCounts: window.map { days[$0] ?? 0 },
+                           methods: methods,
+                           countNoun: k.countNoun,
+                           containerNoun: k.containerNoun,
+                           containerCap: k.containerCap,
+                           lastContainerCount: lastContainer)
     }
   }
 
