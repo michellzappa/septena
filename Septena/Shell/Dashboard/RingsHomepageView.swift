@@ -21,7 +21,7 @@ struct RingsHomepageView<MenuContent: View>: View {
   /// Long-press / right-click quickadd menu per domain — same plumbing
   /// as the other renderers. Caller hands back `EmptyView` for domains
   /// without a menu (sleep, body, activity).
-  @ViewBuilder let menuContent: (HomepageDomain) -> MenuContent
+  @ViewBuilder let menuContent: (HomepageDomainData) -> MenuContent
 
   /// Adaptive: each ring cell wants ≥104pt, so a 390pt iPhone packs 3
   /// columns, portrait iPad ~6, Mac as many as fit. `spacing` matches the
@@ -35,7 +35,7 @@ struct RingsHomepageView<MenuContent: View>: View {
           RingDomainCell(data: item)
         }
         .buttonStyle(.plain)
-        .contextMenu { menuContent(item.domain) }
+        .contextMenu { menuContent(item) }
       }
     }
   }

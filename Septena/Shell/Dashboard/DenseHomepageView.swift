@@ -26,7 +26,7 @@ struct DenseHomepageView<MenuContent: View>: View {
   /// quickadd menus the Tiles renderer attaches via `.contextMenu`.
   /// Caller hands back `EmptyView` for domains with no menu (sleep,
   /// body, activity) and the menu is silently suppressed.
-  @ViewBuilder let menuContent: (HomepageDomain) -> MenuContent
+  @ViewBuilder let menuContent: (HomepageDomainData) -> MenuContent
 
   /// Measured at render time via a 0-height probe in the VStack below.
   /// Starts at 0; `hSize` guards against showing the grid on first
@@ -68,7 +68,7 @@ struct DenseHomepageView<MenuContent: View>: View {
               DenseDomainCard(data: item)
             }
             .buttonStyle(.plain)
-            .contextMenu { menuContent(item.domain) }
+            .contextMenu { menuContent(item) }
           }
         }
       } else {
@@ -80,7 +80,7 @@ struct DenseHomepageView<MenuContent: View>: View {
               DenseDomainRow(data: item)
             }
             .buttonStyle(.plain)
-            .contextMenu { menuContent(item.domain) }
+            .contextMenu { menuContent(item) }
 
             if idx < items.count - 1 {
               Divider().padding(.leading, 56)

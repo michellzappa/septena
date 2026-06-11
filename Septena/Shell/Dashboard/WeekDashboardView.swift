@@ -155,6 +155,8 @@ struct WeekDashboardView: View {
   /// Intake (consumables) — one tile per kind. Local SwiftData, so loaded via
   /// MirrorReader on `.septenaDataChanged`, OUTSIDE the ≤4-parallel HTTP loadAll.
   @State private var intakeTiles: [IntakeTileDTO] = []
+  /// Tracker page presented from a tile tap (push on regular, sheet on compact).
+  @State private var intakeKindDest: IntakeKindRef? = nil
   @State private var cannabisToday: CannabisDayResponse? = nil
   @State private var cannabisHistory: [CannabisHistoryPoint] = []
   @State private var cannabisUsesPerCapsule: Int = 3
@@ -327,6 +329,9 @@ struct WeekDashboardView: View {
       .navigationDestination(item: pushDest) { dest in
         pushedContent(for: dest)
       }
+      .navigationDestination(item: intakeKindPushBinding) { ref in
+        IntakeKindPageView(kindID: ref.value)
+      }
       .task { await reloadIntake() }
       .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
         guard note.affectsSection("intake") else { return }
@@ -337,6 +342,10 @@ struct WeekDashboardView: View {
     // over so the dashboard stays visually present underneath.
     .sheet(item: sheetDestBinding) { dest in
       sheetContent(for: dest)
+    }
+    .sheet(item: intakeKindSheetBinding) { ref in
+      NavigationStack { IntakeKindPageView(kindID: ref.value) }
+        .sectionDrawerPresentation()
     }
     .sheet(item: $nutritionSheet) { sheet in
       switch sheet {
@@ -433,6 +442,41 @@ struct WeekDashboardView: View {
       get: { usesPushNavigation ? nil : sheetDest },
       set: { if !usesPushNavigation { sheetDest = $0 } }
     )
+  }
+
+  // MARK: - Intake kind deep-open
+  //
+  // A tracker tile opens ITS page directly (no switcher hop) — same
+  // push-on-regular / sheet-on-compact split as `sheetDest`, but carrying a
+  // kind id (WeekDestination is a string enum and can't).
+
+  struct IntakeKindRef: Identifiable, Hashable {
+    let value: String
+    var id: String { value }
+  }
+
+  private var intakeKindPushBinding: Binding<IntakeKindRef?> {
+    Binding(
+      get: { usesPushNavigation ? intakeKindDest : nil },
+      set: { if usesPushNavigation { intakeKindDest = $0 } }
+    )
+  }
+
+  private var intakeKindSheetBinding: Binding<IntakeKindRef?> {
+    Binding(
+      get: { usesPushNavigation ? nil : intakeKindDest },
+      set: { if !usesPushNavigation { intakeKindDest = $0 } }
+    )
+  }
+
+  /// Mirror of `open(_:)` for tracker pages — same drawer tap-away rule.
+  private func openIntakeKind(_ id: String) {
+    guard usesPushNavigation || (sheetDest == nil && intakeKindDest == nil) else {
+      sheetDest = nil
+      intakeKindDest = nil
+      return
+    }
+    intakeKindDest = IntakeKindRef(value: id)
   }
 
   /// Pushed-pane content: the plugin destination rendered *bare*, with no
@@ -907,26 +951,26 @@ struct WeekDashboardView: View {
       DenseHomepageView(
         items: visibleDomainData,
         onTap: handleDomainTap,
-        menuContent: { domain in quickAddMenu(for: domain) }
+        menuContent: { item in quickAddMenu(for: item) }
       )
     case .heatmap:
       HeatmapHomepageView(
         items: visibleDomainData,
         onTap: handleDomainTap,
-        menuContent: { domain in quickAddMenu(for: domain) }
+        menuContent: { item in quickAddMenu(for: item) }
       )
     case .rings:
       RingsHomepageView(
         items: visibleDomainData,
         onTap: handleDomainTap,
-        menuContent: { domain in quickAddMenu(for: domain) }
+        menuContent: { item in quickAddMenu(for: item) }
       )
     case .wheel:
       RhythmHomepageView(
         items: visibleDomainData,
         sleepNights: ouraNights,
         onTap: handleDomainTap,
-        menuContent: { domain in quickAddMenu(for: domain) }
+        menuContent: { item in quickAddMenu(for: item) }
       )
     }
   }
@@ -963,7 +1007,7 @@ struct WeekDashboardView: View {
       headlineStats: stats,
       progress: nil,
       history: .bars(t.dailyCounts),
-      tap: .openSheet(.intake)
+      tap: .openIntakeKind(t.id)
     )
   }
 
@@ -975,6 +1019,7 @@ struct WeekDashboardView: View {
     switch tap {
     case .openSheet(let dest):     open(dest)
     case .switchToTasksTab:        openTasksFromTile()
+    case .openIntakeKind(let id):  openIntakeKind(id)
     }
   }
 
@@ -1016,6 +1061,20 @@ struct WeekDashboardView: View {
   /// activity) return `EmptyView`, which SwiftUI silently suppresses
   /// — so those rows show no menu on long-press / right-click rather
   /// than an empty popover.
+  /// Per-item variant for the Dense/Heatmap/Rings/Wheel rows: intake rows
+  /// (one per tracker) get THEIR tracker's container-aware menu; every other
+  /// row falls through to the per-domain menu.
+  @ViewBuilder
+  private func quickAddMenu(for item: HomepageDomainData) -> some View {
+    if item.domain == .intake,
+       let kindID = item.itemID?.split(separator: ":").last.map(String.init),
+       let tile = intakeTiles.first(where: { $0.id == kindID }) {
+      intakeQuickAddMenu(for: tile)
+    } else {
+      quickAddMenu(for: item.domain)
+    }
+  }
+
   @ViewBuilder
   private func quickAddMenu(for domain: HomepageDomain) -> some View {
     switch domain {
@@ -2110,7 +2169,7 @@ struct WeekDashboardView: View {
                       history: .init(label: "7-day",
                                      values: bars.isEmpty ? Array(repeating: 0, count: 7) : bars))
       .contentShape(Rectangle())
-      .onTapGesture { open(.intake) }
+      .onTapGesture { openIntakeKind(t.id) }
       .contextMenu { intakeQuickAddMenu(for: t) }
   }
 

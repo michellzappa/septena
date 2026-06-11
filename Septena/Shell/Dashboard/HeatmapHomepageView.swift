@@ -27,7 +27,7 @@ struct HeatmapHomepageView<MenuContent: View>: View {
   /// Long-press / right-click quickadd menu per domain — same plumbing
   /// as `DenseHomepageView`. Caller hands back `EmptyView` for domains
   /// without a menu (sleep, body, activity).
-  @ViewBuilder let menuContent: (HomepageDomain) -> MenuContent
+  @ViewBuilder let menuContent: (HomepageDomainData) -> MenuContent
 
   /// Measured at render time via a 0-height probe in the VStack below.
   /// Starts at 0; `hSize` guards against showing grid on first render on iPhone.
@@ -68,7 +68,7 @@ struct HeatmapHomepageView<MenuContent: View>: View {
               HeatmapDomainCard(data: item)
             }
             .buttonStyle(.plain)
-            .contextMenu { menuContent(item.domain) }
+            .contextMenu { menuContent(item) }
           }
         }
       } else {
@@ -80,7 +80,7 @@ struct HeatmapHomepageView<MenuContent: View>: View {
               HeatmapDomainRow(data: item)
             }
             .buttonStyle(.plain)
-            .contextMenu { menuContent(item.domain) }
+            .contextMenu { menuContent(item) }
 
             if idx < items.count - 1 {
               Divider().padding(.leading, 14)

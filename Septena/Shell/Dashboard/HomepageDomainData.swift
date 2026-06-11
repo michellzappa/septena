@@ -44,6 +44,9 @@ struct DomainProgress {
 enum DomainTapAction {
   case openSheet(WeekDestination)
   case switchToTasksTab
+  /// Open one intake tracker's page directly (no switcher hop) — the
+  /// per-kind tiles are peers of section tiles, so they deep-open like one.
+  case openIntakeKind(String)
 }
 
 /// Single mode-agnostic view-model for one homepage domain.

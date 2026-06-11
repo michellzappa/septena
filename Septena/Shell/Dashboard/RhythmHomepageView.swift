@@ -37,7 +37,7 @@ struct RhythmHomepageView<MenuContent: View>: View {
   let onTap: (DomainTapAction) -> Void
   /// Long-press / right-click quick-add menu per section — same plumbing as
   /// the other renderers. Caller hands back `EmptyView` for menu-less sections.
-  @ViewBuilder let menuContent: (HomepageDomain) -> MenuContent
+  @ViewBuilder let menuContent: (HomepageDomainData) -> MenuContent
 
   @Environment(\.modelContext) private var modelContext
   @Environment(DayClock.self) private var clock
@@ -129,7 +129,7 @@ struct RhythmHomepageView<MenuContent: View>: View {
           .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .contextMenu { menuContent(item.domain) }
+        .contextMenu { menuContent(item) }
       }
     }
   }
