@@ -637,8 +637,17 @@ struct SettingsView: View {
   private var sectionEntries: [SectionEntry] {
     let installedByKey = Dictionary(uniqueKeysWithValues: store.sections.map { ($0.key, $0) })
     let order = store.serverSettings?.sectionOrder ?? store.sections.map(\.key)
-    return order.compactMap { key in
-      guard let manifest = SectionManifest.byKey[key],
+    // Installed sections missing from the saved order — newly shipped sections
+    // (e.g. `intake`) whose SectionEntity was seeded after the user last saved
+    // an order. Append them at the end instead of dropping them, mirroring
+    // ManageSectionsPane.rows; without this a new section is enabled and tiled
+    // but has no Settings row.
+    let seen = Set(order)
+    let trailing = store.sections.map(\.key).filter { !seen.contains($0) }
+    var emitted = Set<String>()
+    return (order + trailing).compactMap { key in
+      guard emitted.insert(key).inserted,
+            let manifest = SectionManifest.byKey[key],
             let installed = installedByKey[key] else { return nil }
       return SectionEntry(manifest: manifest, server: installed)
     }
