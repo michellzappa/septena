@@ -11,9 +11,18 @@ import SwiftUI
 // with its own depth (and a roadmap toward hypothesis tracking + N-of-1
 // experiments) that a single homepage layout can't hold. Its homepage
 // entry point is a toolbar button on the Week dashboard (it has no per-day
-// series of its own, so it isn't a tile or a body card) + the sidebar row.
+// series of its own, so it isn't a tile or a body card).
+//
+// Insights is deliberately NOT a Manage-Sections catalog entry — it owns no
+// data and isn't a life domain. It therefore carries its own identity here
+// (title + accent) instead of reading them from the section manifest/theme.
 
 struct InsightsDestinationView: View {
+  /// Insights has no SectionEntity accent of its own. Its identity (title,
+  /// icon, tint) is defined here — a fixed violet that reads as "analysis",
+  /// distinct from the life-domain section colors.
+  static let accent = Color(red: 0.486, green: 0.227, blue: 0.929) // #7c3aed
+
   @AppStorage(SettingsKey.plusUnlocked) private var plusUnlocked: Bool = false
   @State private var showPaywall = false
   /// The Insights tuning pane (window, section filter), presented over the
@@ -22,7 +31,8 @@ struct InsightsDestinationView: View {
   @State private var showSettings = false
 
   var body: some View {
-    SectionDrawer(sectionKey: "insights", showsSettingsLink: false) {
+    SectionDrawer(sectionKey: "insights", title: "Insights",
+                  accent: Self.accent, showsSettingsLink: false) {
       if plusUnlocked {
         CorrelationsHomepageView()
       } else {
@@ -60,8 +70,7 @@ struct InsightsDestinationView: View {
 /// homepage glance tile always deep-links here; the gate lives in one place.
 private struct InsightsLockedView: View {
   let onUnlock: () -> Void
-  @Environment(SectionTheme.self) private var theme
-  private var accent: Color { theme.color(for: "insights") }
+  private let accent = InsightsDestinationView.accent
 
   var body: some View {
     VStack(spacing: 14) {

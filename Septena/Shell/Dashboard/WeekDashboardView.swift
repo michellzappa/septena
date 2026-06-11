@@ -379,28 +379,24 @@ struct WeekDashboardView: View {
     #if os(iOS)
     ToolbarItem(placement: .topBarLeading) { homeMenu }
     ToolbarItem(placement: .topBarTrailing) { SyncIndicator() }
-    if insightsEnabled { ToolbarItem(placement: .topBarTrailing) { insightsToolbarButton } }
+    ToolbarItem(placement: .topBarTrailing) { insightsToolbarButton }
     #else
     ToolbarItem(placement: .primaryAction) { homeMenu }
     ToolbarItem(placement: .primaryAction) { SyncIndicator() }
-    if insightsEnabled { ToolbarItem(placement: .primaryAction) { insightsToolbarButton } }
+    ToolbarItem(placement: .primaryAction) { insightsToolbarButton }
     #endif
   }
 
   /// Insights entry point — toolbar button (not a body tile/card: Insights
   /// has no per-day series, so it belongs in the dashboard's chrome, not its
-  /// section content). Opens the full explorer. Shown only when the user has
-  /// enabled the Insights section.
+  /// section content). Opens the full explorer. Insights is no longer a
+  /// catalog section, so this is always present — the Septena+ gate lives
+  /// inside the destination.
   private var insightsToolbarButton: some View {
     Button { open(.insights) } label: {
       Image(systemName: "chart.dots.scatter")
     }
     .accessibilityLabel("Insights")
-  }
-
-  /// True when the user has enabled the Insights section (Manage Sections).
-  private var insightsEnabled: Bool {
-    settingsStore.sections.first(where: { $0.key == "insights" })?.isEnabled ?? false
   }
 
   private var homeMenu: some View {

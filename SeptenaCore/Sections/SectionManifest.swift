@@ -154,7 +154,6 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
     "goals":       "smallcircle.filled.circle",
     "hydration":   "drop.fill",
     "github":      "chevron.left.forwardslash.chevron.right",
-    "insights":    "chart.dots.scatter",
   ]
 
   public var iconSymbol: String {
@@ -385,25 +384,13 @@ public extension SectionManifest {
       supportsDashboard: true,
       settingsEditor: .appearance
     ),
-    // Insights — read-only meta-section: cross-section correlation
-    // discovery (CorrelationEngine). Graduated from a homepage layout mode
-    // to its own destination. `supportsDashboard: false` deliberately — it
-    // has NO per-day series of its own (it's an analysis *of* the other
-    // sections), so it can't be a layout-rendered domain tile (a Sparkline/
-    // Heatmap row would have nothing to plot). Its homepage presence is a
-    // standalone hook card in WeekDashboardView (`insightsGlanceCard`),
-    // outside the layout switcher. Gated behind Septena+ in the destination.
-    // `.optional`/off-by-default — opt in from Manage Sections.
-    .init(
-      key: "insights",
-      defaultLabel: String(localized: "Insights", comment: "Section name"),
-      shortDescription: String(localized: "What moves your day — cross-section correlations", comment: "Section description"),
-      activation: .optional,
-      onboarding: .optional,
-      supportsTab: true,
-      supportsDashboard: false,
-      settingsEditor: .none
-    ),
+    // Insights is intentionally NOT a catalog section. It's a read-only
+    // meta-surface (cross-section correlation discovery, CorrelationEngine)
+    // that owns no data of its own and has no per-day series, so it never
+    // belonged in Manage Sections alongside the real life domains. It now
+    // lives purely as a dashboard entry point (the Week toolbar button →
+    // `InsightsDestinationView`) and a Settings pane, both gated behind
+    // Septena+. See InsightsDestination.swift.
     // Hydration — water-only log. UX over existing nutrition data:
     // every entry is a NutritionEntryEntity with `foods: ["Water"]`,
     // `waterMl > 0`, and macros at 0. Logged via the hydration quick-
