@@ -63,6 +63,52 @@ extension EnvironmentValues {
   }
 }
 
+private struct UsesPushNavigationKey: EnvironmentKey {
+  static let defaultValue = false
+}
+
+extension EnvironmentValues {
+  /// True when section / coach destinations should open as a pushed full pane
+  /// (with room to dock an inspector) rather than a modal bottom sheet. This
+  /// is the single source of truth for that rule — the Week dashboard, the
+  /// Coach tab, and the section-drawer inspector decision all read it instead
+  /// of recomputing from the size class, so the three can never drift.
+  /// Published once at the app root by `.resolvesAdaptiveNavigation()`.
+  var usesPushNavigation: Bool {
+    get { self[UsesPushNavigationKey.self] }
+    set { self[UsesPushNavigationKey.self] = newValue }
+  }
+}
+
+extension View {
+  /// Resolves the adaptive-navigation rule from the current horizontal size
+  /// class and publishes it into the environment as `\.usesPushNavigation`.
+  /// macOS always pushes; iOS pushes only at regular width (iPad full-screen
+  /// / large multitasking), so a compact iPad window correctly falls back to
+  /// bottom sheets. Apply once near the app root.
+  func resolvesAdaptiveNavigation() -> some View {
+    modifier(ResolveAdaptiveNavigation())
+  }
+}
+
+private struct ResolveAdaptiveNavigation: ViewModifier {
+  #if os(iOS)
+  @Environment(\.horizontalSizeClass) private var hSize
+  #endif
+
+  private var usesPush: Bool {
+    #if os(macOS)
+    return true
+    #else
+    return hSize == .regular
+    #endif
+  }
+
+  func body(content: Content) -> some View {
+    content.environment(\.usesPushNavigation, usesPush)
+  }
+}
+
 struct SectionDrawer<Content: View>: View {
   let sectionKey: String
   /// Section name shown as the inline nav-bar title. Optional — when omitted,
@@ -725,35 +771,16 @@ private struct AdaptiveEditHeader: View {
   }
 }
 
-/// True when detail content should dock as an inspector rather than present
-/// as a sheet. On regular width a section opens as a pushed full pane
-/// (WeekDashboardView.usesPushNavigation), so an inspector has room to dock
-/// and a nav bar to host its close affordance. On compact the section is a
-/// bottom sheet, so edits stay sheets too.
-private func adaptiveUseInspector(hSizeIsRegular: Bool) -> Bool {
-  #if os(macOS)
-  return true
-  #else
-  return hSizeIsRegular
-  #endif
-}
-
 private struct AdaptiveDetailItem<Item: Identifiable, DetailContent: View>: ViewModifier {
   @Binding var item: Item?
   let onDismiss: (() -> Void)?
   @ViewBuilder let detail: (Item) -> DetailContent
 
-  #if os(iOS)
-  @Environment(\.horizontalSizeClass) private var hSize
-  #endif
-
-  private var useInspector: Bool {
-    #if os(iOS)
-    return adaptiveUseInspector(hSizeIsRegular: hSize == .regular)
-    #else
-    return adaptiveUseInspector(hSizeIsRegular: true)
-    #endif
-  }
+  // Detail content docks as an inspector exactly where sections push as a
+  // full pane (regular width / macOS), so it shares the one push-navigation
+  // rule rather than recomputing from the size class. On compact the section
+  // is a bottom sheet, so edits stay sheets too.
+  @Environment(\.usesPushNavigation) private var useInspector
 
   func body(content: Content) -> some View {
     if useInspector {
@@ -789,17 +816,7 @@ private struct AdaptiveDetailFlag<DetailContent: View>: ViewModifier {
   let onDismiss: (() -> Void)?
   @ViewBuilder let detail: () -> DetailContent
 
-  #if os(iOS)
-  @Environment(\.horizontalSizeClass) private var hSize
-  #endif
-
-  private var useInspector: Bool {
-    #if os(iOS)
-    return adaptiveUseInspector(hSizeIsRegular: hSize == .regular)
-    #else
-    return adaptiveUseInspector(hSizeIsRegular: true)
-    #endif
-  }
+  @Environment(\.usesPushNavigation) private var useInspector
 
   func body(content: Content) -> some View {
     if useInspector {

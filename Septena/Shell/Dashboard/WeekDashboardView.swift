@@ -76,6 +76,10 @@ struct WeekDashboardView: View {
   #if os(iOS)
   @Environment(\.horizontalSizeClass) private var hSize
   #endif
+  /// Whether sections open as a pushed full pane vs. a modal bottom sheet.
+  /// Single source of truth, resolved once at the app root — see
+  /// `\.usesPushNavigation`.
+  @Environment(\.usesPushNavigation) private var usesPushNavigation
 
   /// Live width of the timeline's container, measured below. Drives the
   /// wide-layout treatment (cap the rail, span the full day) without
@@ -393,18 +397,6 @@ struct WeekDashboardView: View {
       Image(systemName: "ellipsis")
     }
     .accessibilityLabel("More")
-  }
-
-  /// True when sections should open as a pushed full pane rather than a
-  /// modal bottom sheet — i.e. anywhere with room for it. macOS always;
-  /// iOS only at regular width (iPad full-screen / large multitasking),
-  /// so a compact iPad window correctly falls back to the bottom sheet.
-  private var usesPushNavigation: Bool {
-    #if os(macOS)
-    return true
-    #else
-    return hSize == .regular
-    #endif
   }
 
   /// Drives the `.navigationDestination` push. Mirrors `sheetDest` only

@@ -21,6 +21,10 @@ struct CoachView: View {
   #if os(iOS)
   @Environment(\.horizontalSizeClass) private var hSize
   #endif
+  /// True when a coach opens as a pushed full pane rather than a modal bottom
+  /// sheet. Single source of truth, resolved once at the app root — see
+  /// `\.usesPushNavigation`.
+  @Environment(\.usesPushNavigation) private var usesPushNavigation
 
   private var goalMutator: GoalMutator { SeptenaServices.shared.goalMutator }
 
@@ -42,17 +46,6 @@ struct CoachView: View {
     return Array(repeating: GridItem(.flexible(), spacing: Theme.tileGap), count: count)
     #else
     return GoalGrid.columns(regularWidth: true)
-    #endif
-  }
-
-  /// True when a coach should open as a pushed full pane rather than a modal
-  /// bottom sheet — anywhere with room for it. macOS always; iOS only at
-  /// regular width (iPad / large multitasking). Mirrors the Week dashboard.
-  private var usesPushNavigation: Bool {
-    #if os(macOS)
-    return true
-    #else
-    return hSize == .regular
     #endif
   }
 

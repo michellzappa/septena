@@ -38,6 +38,11 @@ struct RootTabView: View {
     @Bindable var nav = nav
     rootTabView
       .tint(theme.accent)
+      // Resolve the push-vs-sheet rule once, here at the shell root, and
+      // publish it to every tab via `\.usesPushNavigation`. The Week
+      // dashboard, Coach tab, and section-drawer inspector all read that one
+      // value instead of each recomputing from the size class.
+      .resolvesAdaptiveNavigation()
       .environment(tabSelection)
       // Anonymous aggregate analytics — one event when the user lands on
       // a tab. `.task(id:)` re-runs only when the value changes and is
