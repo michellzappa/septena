@@ -3218,6 +3218,40 @@ enum LocalCache {
   }
 }
 
+// MARK: - StructureCache (process-wide areas/projects memo)
+
+/// Areas / projects are read eagerly by `SidebarRootView.init` and
+/// `TaskListView.init` to seed first-paint @State — and SwiftUI re-runs those
+/// inits on every parent render, discarding the fetched values for
+/// already-installed views. This memo makes the repeat constructions free:
+/// the first read per process fetches, later ones return the cached snapshot,
+/// and any structure change (local mutation or CloudKit batch — both post
+/// `.septenaStructureChanged`) drops the cache so the next read is fresh.
+@MainActor
+enum StructureCache {
+  private static var cached: (areas: [Area], projects: [Project])?
+  private static var observerInstalled = false
+
+  static func snapshot(in context: ModelContext) -> (areas: [Area], projects: [Project]) {
+    installObserverIfNeeded()
+    if let cached { return cached }
+    let snap = (areas: LocalCache.areas(in: context),
+                projects: LocalCache.projects(in: context))
+    cached = snap
+    return snap
+  }
+
+  private static func installObserverIfNeeded() {
+    guard !observerInstalled else { return }
+    observerInstalled = true
+    NotificationCenter.default.addObserver(
+      forName: .septenaStructureChanged, object: nil, queue: .main
+    ) { _ in
+      MainActor.assumeIsolated { cached = nil }
+    }
+  }
+}
+
 // MARK: - LoggedEvent (cross-section read abstraction)
 
 /// Uniform read view over every logged "event" entity, keyed on the real

@@ -131,16 +131,38 @@ enum TaskReads {
   }
 
   static func localCounts(context: ModelContext) -> TasksCounts {
-    let today = LocalCache.tasks(in: context, filter: .today).count
-    let inbox = LocalCache.tasks(in: context, filter: .inbox).count
-    let upcoming = LocalCache.tasks(in: context, filter: .upcoming).count
-    let unscheduled = LocalCache.tasks(in: context, filter: .unscheduled).count
-    let someday = LocalCache.tasks(in: context, filter: .someday).count
-    let allOpen = LocalCache.allTasks(in: context).reduce(into: 0) { acc, t in
-      if t.status == .open { acc += 1 }
+    // ONE pass over the table. This used to be five filtered
+    // `LocalCache.tasks` calls plus an `allTasks` — six full-table
+    // fetch+convert scans on the main thread, and it runs on every task
+    // change (sidebar reload + the dashboard's Tasks tile). The bucket
+    // rules mirror `LocalCache.convert`'s filter semantics — keep in sync.
+    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
+    let today = SeptenaDate.today
+    var todayN = 0, inbox = 0, upcoming = 0, unscheduled = 0, someday = 0
+    var allOpen = 0
+    for e in rows {
+      // Matches the historical openCount (an `allTasks` reduce), which
+      // did not exclude pendingDeletion rows.
+      if e.status == .open { allOpen += 1 }
+      guard !e.pendingDeletion else { continue }
+      if e.isOnToday { todayN += 1 }
+      switch e.status {
+      case .someday:
+        someday += 1
+      case .open:
+        let undated = e.scheduled == nil && e.due == nil
+        if undated, e.project == nil, e.area == nil, !e.today { inbox += 1 }
+        if !e.today {
+          if let s = e.scheduled, s > today { upcoming += 1 }
+          else if let d = e.due, d > today { upcoming += 1 }
+          if undated { unscheduled += 1 }
+        }
+      default:
+        break
+      }
     }
-    return TasksCounts(today: SeptenaDate.today,
-                       todayCount: today,
+    return TasksCounts(today: today,
+                       todayCount: todayN,
                        reviewCount: 0,
                        inboxCount: inbox,
                        upcomingCount: upcoming,

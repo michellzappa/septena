@@ -74,9 +74,11 @@ struct TaskListView: View {
     self.embedded = embedded
     self.excludeProjectedTasks = excludeProjectedTasks
     self.embeddedHeader = { AnyView(embeddedHeader()) }
-    let ctx = LocalStore.shared.container.mainContext
-    _areas = State(initialValue: LocalCache.areas(in: ctx))
-    _projects = State(initialValue: LocalCache.projects(in: ctx))
+    // Memoized: this init re-runs on every parent render (the values are
+    // discarded for installed views), so a per-construction fetch was waste.
+    let structure = StructureCache.snapshot(in: LocalStore.shared.container.mainContext)
+    _areas = State(initialValue: structure.areas)
+    _projects = State(initialValue: structure.projects)
   }
 
   init(
@@ -88,9 +90,10 @@ struct TaskListView: View {
     self.embedded = embedded
     self.excludeProjectedTasks = excludeProjectedTasks
     self.embeddedHeader = { AnyView(EmptyView()) }
-    let ctx = LocalStore.shared.container.mainContext
-    _areas = State(initialValue: LocalCache.areas(in: ctx))
-    _projects = State(initialValue: LocalCache.projects(in: ctx))
+    // Memoized — see the generic init above.
+    let structure = StructureCache.snapshot(in: LocalStore.shared.container.mainContext)
+    _areas = State(initialValue: structure.areas)
+    _projects = State(initialValue: structure.projects)
   }
 
   private var items: [SeptenaTask] {

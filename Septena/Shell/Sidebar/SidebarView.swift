@@ -4,6 +4,15 @@ import SwiftData
 // compact homepage on iPhone: the root screen IS the sidebar.
 // QuickFind + smart lists + areas/projects + Settings. See docs/reference/navigation.md.
 
+/// Process-wide memo of the sidebar's last task aggregate. SwiftUI re-runs
+/// `SidebarRootView.init` on every parent render and discards the
+/// State(initialValue:) values for installed views — without this memo each
+/// of those constructions re-scanned the full task table for nothing. The
+/// first construction per process computes it; `load()` keeps it fresh.
+@MainActor
+private enum SidebarSeed {
+  static var aggregate: SidebarRootView.Aggregate?
+}
 
 struct SidebarRootView: View {
   @Environment(NavigationState.self) private var nav
@@ -25,12 +34,23 @@ struct SidebarRootView: View {
   // Seed sidebar lists from cache before first render so the sidebar isn't
   // ever blank — areas/projects barely change, so this is effectively the
   // final answer almost every time.
+  //
+  // Seeding goes through process-wide memos (StructureCache + SidebarSeed):
+  // SwiftUI re-runs this init on every parent render and discards the
+  // State(initialValue:) values for installed views, so computing a full
+  // task-table aggregate here made every nav click pay for a scan nobody
+  // used. Only the first construction per process computes; `load()` keeps
+  // the seed fresh afterwards.
   init() {
     let ctx = LocalStore.shared.container.mainContext
-    _areas = State(initialValue: LocalCache.areas(in: ctx))
-    _projects = State(initialValue: LocalCache.projects(in: ctx))
-    let cachedTasks = LocalCache.allTasks(in: ctx)
-    let agg = Self.aggregate(tasks: cachedTasks)
+    let structure = StructureCache.snapshot(in: ctx)
+    _areas = State(initialValue: structure.areas)
+    _projects = State(initialValue: structure.projects)
+    let agg = SidebarSeed.aggregate ?? {
+      let agg = Self.aggregate(tasks: LocalCache.allTasks(in: ctx))
+      SidebarSeed.aggregate = agg
+      return agg
+    }()
     _counts = State(initialValue: agg.counts)
     _projectProgress = State(initialValue: agg.projectProgress)
     _projectOpenCount = State(initialValue: agg.projectOpenCount)
@@ -770,39 +790,33 @@ struct SidebarRootView: View {
   // MARK: - Load
 
   private func load() async {
-    // Paint sidebar from cache immediately — areas / projects rarely change,
-    // and tile counts can be rebuilt from the SwiftData task cache without a
-    // round-trip. The server response overwrites both below.
-    let cachedAreas = applyStoredOrder(to: LocalCache.areas(in: modelContext))
-    let cachedProjects = applyStoredProjectOrder(to: LocalCache.projects(in: modelContext))
-    if !cachedAreas.isEmpty { areas = cachedAreas }
-    if !cachedProjects.isEmpty { projects = cachedProjects }
-    let cachedTasks = LocalCache.allTasks(in: modelContext)
-    if !cachedTasks.isEmpty { apply(aggregate: Self.aggregate(tasks: cachedTasks)) }
-    // CloudKit is the only backend. LocalCache is authoritative —
-    // CKSyncEngine keeps SwiftData fresh.
-    async let c = TaskReads.counts(context: modelContext)
-    async let all = TaskReads.list(view: "all", context: modelContext)
-    areas = applyStoredOrder(to: LocalCache.areas(in: modelContext))
-    projects = applyStoredProjectOrder(to: LocalCache.projects(in: modelContext))
-    let serverCounts = await c
-    let items = await all.items
-    var agg = Self.aggregate(tasks: items)
-    // Per-smart-list counts come from LocalCache via TaskReads.counts.
+    // CloudKit is the only backend and LocalCache is authoritative, so the
+    // old two-phase shape (cache paint, then a "server" pass over the SAME
+    // local store) read the full task table three times per reload — plus
+    // six more scans inside the old TaskReads.counts. Now: one structure
+    // memo read, one task pass for the roll-ups, one for the counts.
+    let structure = StructureCache.snapshot(in: modelContext)
+    areas = applyStoredOrder(to: structure.areas)
+    projects = applyStoredProjectOrder(to: structure.projects)
+    let all = LocalCache.allTasks(in: modelContext).filter { $0.deletedAt == nil }
+    var agg = Self.aggregate(tasks: all)
+    // Per-smart-list counts come from the canonical filter semantics
+    // (LocalCache.convert via localCounts), not the aggregate's mirror.
     // Per-project / per-area roll-ups stay from the local aggregate.
-    agg.counts = serverCounts
+    agg.counts = TaskReads.localCounts(context: modelContext)
     apply(aggregate: agg)
+    SidebarSeed.aggregate = agg
   }
 
-  private struct Aggregate {
+  fileprivate struct Aggregate {
     var counts: TasksCounts
     var projectProgress: [String: Double]
     var projectOpenCount: [String: Int]
     var areaOpenCount: [String: Int]
   }
 
-  /// Single-pass roll-up over a task list. Called twice per load: once over
-  /// the local cache for instant paint, once over the server response.
+  /// Single-pass roll-up over a task list. Called once per load (and once
+  /// per process by init, when the SidebarSeed memo is still empty).
   private static func aggregate(tasks: [SeptenaTask]) -> Aggregate {
     // Project progress = done / (done + open). Cancelled doesn't count
     // toward either side of the ratio.
@@ -942,10 +956,14 @@ private struct SidebarBehaviorModifier: ViewModifier {
         onCreateArea: onCreateArea
       ))
       .task { reload() }
-      .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
+      // Debounced: a burst of toggles (or a CK batch fanning out per-record
+      // mutator posts) coalesces into one reload instead of one per post.
+      .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)
+        .debounce(for: .seconds(0.3), scheduler: RunLoop.main)) { _ in
         reload()
       }
-      .onReceive(NotificationCenter.default.publisher(for: .septenaStructureChanged)) { _ in
+      .onReceive(NotificationCenter.default.publisher(for: .septenaStructureChanged)
+        .debounce(for: .seconds(0.3), scheduler: RunLoop.main)) { _ in
         reload()
       }
   }
