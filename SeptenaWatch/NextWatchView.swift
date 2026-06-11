@@ -400,6 +400,43 @@ private struct CaptureInput: View {
   }
 }
 
+// MARK: - Intake capture input
+
+/// The minimal input for one intake tracker from the wire: its container-aware
+/// choices (Continue (use N) / New container / methods) via the same
+/// `ConsumableContainer` math the phone uses, then the write on pick.
+private struct IntakeCaptureInput: View {
+  let kind: IntakeKindWire
+  let conn: WatchConnectivity
+  let onDone: () -> Void
+
+  var body: some View {
+    let methods = kind.methods.map {
+      ConsumableContainer.Method(token: $0.token, label: $0.label,
+                                 symbol: $0.symbol, usesContainer: $0.usesContainer)
+    }
+    let choices = ConsumableContainer.choices(
+      lastCount: kind.lastContainerCount,
+      containerCap: kind.containerCap,
+      containerNoun: kind.containerNoun ?? "container",
+      countNoun: kind.countNoun ?? "use",
+      methods: methods)
+    // A methodless kind still gets one tappable "Log" row.
+    let resolved = choices.isEmpty
+      ? [SuggestionBlocks.Choice(value: "default", label: "Log", symbol: "plus.circle")]
+      : choices
+    QuickLogChoiceList(
+      choices: resolved,
+      tint: WatchSectionTint.color(forSectionKey: kind.id,
+                                   colors: kind.color.map { [kind.id: $0] } ?? [:])
+    ) { value in
+      conn.logIntake(kind: kind, value: value, itemID: "adhoc:intake:\(kind.id)")
+      onDone()
+    }
+    .navigationTitle(kind.name)
+  }
+}
+
 // MARK: - Capture sheet (on-demand log)
 
 /// The toolbar **+** target: pick a capturable, then collect its minimal input.
@@ -429,9 +466,27 @@ private struct CaptureSheet: View {
         }
         .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
 
-        // On-demand loggables (caffeine / cannabis / mood), from the shared
-        // SuggestionBlocks table.
-        ForEach(SuggestionBlocks.all, id: \.kind) { block in
+        // The user's intake trackers, from the snapshot wire — every enabled
+        // tracker is a + item, with container-aware choices. These supersede
+        // the static caffeine/cannabis blocks below (kept for old payloads).
+        ForEach(conn.intakeKinds, id: \.id) { kind in
+          NavigationLink {
+            IntakeCaptureInput(kind: kind, conn: conn, onDone: onDone)
+          } label: {
+            Label {
+              Text(kind.name)
+            } icon: {
+              Image(systemName: kind.symbol ?? "plus.circle")
+                .foregroundStyle(intakeTint(kind))
+            }
+          }
+          .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
+        }
+
+        // On-demand loggables (mood / hydration / gut — plus caffeine/cannabis
+        // only while no trackers ride the wire), from the shared SuggestionBlocks
+        // table.
+        ForEach(staticBlocks, id: \.kind) { block in
           NavigationLink {
             CaptureInput(block: block, itemID: "adhoc:\(block.kind)", conn: conn, onDone: onDone)
           } label: {
@@ -450,6 +505,20 @@ private struct CaptureSheet: View {
       .navigationTitle("Capture")
       .navigationBarTitleDisplayMode(.inline)
     }
+  }
+
+  /// The compiled-in loggables, minus caffeine/cannabis once intake trackers
+  /// ride the wire — the trackers ARE those sections now, and showing both
+  /// would double the rows.
+  private var staticBlocks: [SuggestionBlocks.Block] {
+    SuggestionBlocks.all.filter { block in
+      conn.intakeKinds.isEmpty || !["caffeine", "cannabis"].contains(block.kind)
+    }
+  }
+
+  private func intakeTint(_ kind: IntakeKindWire) -> Color {
+    WatchSectionTint.color(forSectionKey: kind.id,
+                           colors: kind.color.map { [kind.id: $0] } ?? [:])
   }
 
   private func title(_ kind: String) -> String {

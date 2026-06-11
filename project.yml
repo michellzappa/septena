@@ -182,6 +182,9 @@ targets:
       # Cannabis capsule/hit math, shared so the wrist quick-add's
       # Continue/New-capsule/Edible options stay 1=1 with the phone menu.
       - path: SeptenaCore/CannabisCapsule.swift
+      # Generic container math for intake trackers — the wrist + menu renders
+      # each wire kind's choices with the same logic as the phone.
+      - path: SeptenaCore/ConsumableContainer.swift
       # Canonical mood word grid, shared with the phone's MoodCatalog so the
       # watch's 3×3 emotion picker can't diverge.
       - path: SeptenaCore/MoodVocabulary.swift

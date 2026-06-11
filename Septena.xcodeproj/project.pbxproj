@@ -10,6 +10,7 @@
 		002C465DC1BF297DFED1A82A /* GroceriesQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04282C19B1BCFF16B61F4CA1 /* GroceriesQuickAddMenu.swift */; };
 		00868D16B0589C557DE9D20A /* RingsHomepageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5DE68E3B7FE05E1182EE513 /* RingsHomepageView.swift */; };
 		00E46DCD9524EDAC4FCD3467 /* NotificationKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A1CF28130DC18463097263 /* NotificationKit.swift */; };
+		00FC97C66DE226B12A6E481F /* ConsumableContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1665DD6AC090E7B02FACAC4 /* ConsumableContainer.swift */; };
 		0126EAEAED912393740E6BF9 /* AIPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63575F69CDDCCE079FDAEE04 /* AIPolicy.swift */; };
 		0139A2BF409AD0CFD4AA7E80 /* SettingsMirror.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5439F75303F906465F9F2C6 /* SettingsMirror.swift */; };
 		019D58E673D55023001D1BCC /* ConsumableContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1665DD6AC090E7B02FACAC4 /* ConsumableContainer.swift */; };
@@ -2582,6 +2583,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				EA6B46AB47FE206C511C1471 /* CannabisCapsule.swift in Sources */,
+				00FC97C66DE226B12A6E481F /* ConsumableContainer.swift in Sources */,
 				7E0DAB605158CED4DB2249C9 /* DayBucket.swift in Sources */,
 				BCAC9CE622C5BB7AA0BE0BB9 /* MoodVocabulary.swift in Sources */,
 				0D173098848C45F953F3F0DF /* NextBlocks.swift in Sources */,

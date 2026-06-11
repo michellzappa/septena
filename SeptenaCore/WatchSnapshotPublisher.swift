@@ -51,12 +51,41 @@ enum WatchSnapshotPublisher {
       sortBy: [SortDescriptor(\.occurredAt, order: .reverse)])
     let vapes = (try? context.fetch(vapesDesc)) ?? []
     let lastVapeHit = (vapes.first { $0.date == date } ?? vapes.first)?.hit
+    // Enabled intake trackers, so the wrist + menu always offers every tracker
+    // with container-aware choices. The legacy cannabis fields above keep being
+    // emitted for old watch builds until the legacy purge.
+    let kindRows = ((try? context.fetch(FetchDescriptor<IntakeKindEntity>(
+      sortBy: [SortDescriptor(\.sortIndex)]))) ?? [])
+      .filter { $0.archivedAt == nil }
+    var intakeKinds: [IntakeKindWire] = []
+    if !kindRows.isEmpty {
+      let todaysEvents = (try? context.fetch(FetchDescriptor<IntakeEventEntity>(
+        predicate: #Predicate { $0.date == date }))) ?? []
+      intakeKinds = kindRows.map { k in
+        var last: Int? = nil
+        if let token = k.methods.first(where: { $0.usesContainer })?.token {
+          last = todaysEvents
+            .filter { $0.kindID == k.id && $0.method == token }
+            .max(by: { $0.occurredAt < $1.occurredAt })?.count
+        }
+        return IntakeKindWire(
+          id: k.id, name: k.name, symbol: k.symbol, color: k.color,
+          countNoun: k.countNoun, containerNoun: k.containerNoun,
+          containerCap: k.containerCap, lastContainerCount: last,
+          showsAmount: k.doseStyle == "amount" || k.doseStyle == "both",
+          methods: k.methods.map {
+            .init(token: $0.token, label: $0.label, symbol: $0.symbol,
+                  defaultAmount: $0.defaultAmount, usesContainer: $0.usesContainer)
+          })
+      }
+    }
     let response = NextItemsResponse(date: date, bucket: "", items: items,
                                      lingerHabits: lingerHabits,
                                      lingerSupplements: lingerSupplements,
                                      sectionColors: sectionColors,
                                      cannabisUsesPerCapsule: usesPerCapsule,
-                                     cannabisLastVapeHit: lastVapeHit)
+                                     cannabisLastVapeHit: lastVapeHit,
+                                     intakeKinds: intakeKinds.isEmpty ? nil : intakeKinds)
     guard let payload = try? JSONEncoder().encode(response) else { return }
 
     // Nudge the iOS "Next" home/lock-screen widget to re-read the snapshot.

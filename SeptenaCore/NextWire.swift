@@ -52,6 +52,38 @@ struct NextItemsResponse: Codable {
   /// nil when there's no vape to continue. Both optional so older payloads decode.
   var cannabisUsesPerCapsule: Int? = nil
   var cannabisLastVapeHit: Int? = nil
+  /// The user's enabled intake trackers, carried so the watch's + menu always
+  /// offers every tracker — with container-aware choices — without compiled-in
+  /// rows. Supersedes the static caffeine/cannabis blocks (kept for old
+  /// payloads/builds until the legacy purge). Optional so older payloads decode.
+  var intakeKinds: [IntakeKindWire]? = nil
+}
+
+/// One enabled intake tracker on the wire: enough config for a remote surface
+/// (watch) to render its quick-log choices via `ConsumableContainer.choices`
+/// and write an `IntakeEvent` record. Mirrors the kind's config; everything
+/// optional-with-defaults so the wire stays additive.
+struct IntakeKindWire: Codable, Hashable {
+  var id: String
+  var name: String
+  var symbol: String? = nil
+  var color: String? = nil
+  var countNoun: String? = nil
+  var containerNoun: String? = nil
+  var containerCap: Int? = nil
+  /// Today's most recent count on the container method ("Continue (use N)").
+  var lastContainerCount: Int? = nil
+  /// Whether logging should carry the method's default amount.
+  var showsAmount: Bool? = nil
+  var methods: [Method] = []
+
+  struct Method: Codable, Hashable {
+    var token: String
+    var label: String
+    var symbol: String? = nil
+    var defaultAmount: Double? = nil
+    var usesContainer: Bool = false
+  }
 }
 
 /// UserDefaults keys + defaults for the per-section "carry over missed items"

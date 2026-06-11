@@ -29,6 +29,9 @@ final class WatchConnectivity {
   /// same Continue (Hit N) / New capsule / Edible options as the phone menu.
   var cannabisUsesPerCapsule: Int = 3
   var cannabisLastVapeHit: Int? = nil
+  /// The user's enabled intake trackers from the snapshot — the + menu offers
+  /// one quick-log row per tracker, with container-aware choices.
+  var intakeKinds: [IntakeKindWire] = []
   var bucket: String = ""
   var isLoading = false
   var errorMessage: String?
@@ -131,6 +134,7 @@ final class WatchConnectivity {
       self.sectionColors = response.sectionColors ?? [:]
       self.cannabisUsesPerCapsule = response.cannabisUsesPerCapsule ?? 3
       self.cannabisLastVapeHit    = response.cannabisLastVapeHit
+      self.intakeKinds   = response.intakeKinds ?? []
       self.bucket        = bkt
       updateComplication()
       scheduleNextRefresh()
@@ -245,6 +249,22 @@ final class WatchConnectivity {
         default:
           assertionFailure("No watch quick-log writer for '\(block.recordType)'")
         }
+      } catch {
+        // Fire-and-forget: the iOS CKSyncEngine reconciles on next open.
+      }
+    }
+  }
+
+  /// Log against an intake tracker from the wire. `value` is a
+  /// `ConsumableContainer` choice token ("<method>:N" / bare method), so a
+  /// wrist log lands in the current container exactly like the phone's
+  /// Continue / New container rows.
+  func logIntake(kind: IntakeKindWire, value: String, itemID: String) {
+    finishSuggestion(itemID)
+    let date = today
+    Task {
+      do {
+        try await saveIntakeEvent(kind: kind, value: value, date: date)
       } catch {
         // Fire-and-forget: the iOS CKSyncEngine reconciles on next open.
       }
@@ -411,6 +431,28 @@ final class WatchConnectivity {
     record["note"]       = ""
     record["occurredAt"] = Date()
     if let hit { record["hit"] = hit }
+    try await db.save(record)
+  }
+
+  /// One intake event against a tracker. Record name + fields match
+  /// `IntakeEventCloudKitSchema` so the phone mirrors it like its own writes.
+  /// Amount rides along only when the kind tracks amounts and the method has a
+  /// default — the wrist never asks for a number.
+  private func saveIntakeEvent(kind: IntakeKindWire, value: String, date: String) async throws {
+    let (method, count) = ConsumableContainer.parse(value: value)
+    let eventID  = String(UUID().uuidString.lowercased().prefix(8))
+    let recordID = CKRecord.ID(recordName: "intake-event:\(eventID)", zoneID: ckZoneID)
+    let record   = CKRecord(recordType: "IntakeEvent", recordID: recordID)
+    record["kindID"]     = kind.id
+    record["date"]       = date
+    record["method"]     = method
+    record["note"]       = ""
+    record["occurredAt"] = Date()
+    if let count { record["count"] = count }
+    if kind.showsAmount == true,
+       let amount = kind.methods.first(where: { $0.token == method })?.defaultAmount {
+      record["amount"] = amount
+    }
     try await db.save(record)
   }
 
