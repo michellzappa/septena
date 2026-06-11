@@ -220,6 +220,23 @@ enum IntakeReader {
     return (g.metricTarget ?? 0, g.metricKey?.hasSuffix(".count_week") == true)
   }
 
+  /// One event instant for the rhythm wheel — a Sendable id+time pair so the
+  /// read can cross the MirrorReader actor boundary.
+  struct IntakeInstant: Sendable, Hashable, Identifiable {
+    let id: String
+    let at: Date
+  }
+
+  /// Event instants for a kind since `since`, oldest first — feeds the
+  /// time-of-day rhythm wheel (the trailing-7-day "when do I reach for this").
+  static func weekInstants(context: ModelContext, kindID: String, since: Date) -> [IntakeInstant] {
+    let rows = (try? context.fetch(FetchDescriptor<IntakeEventEntity>(
+      predicate: #Predicate { $0.kindID == kindID && $0.occurredAt >= since },
+      sortBy: [SortDescriptor(\.occurredAt)]
+    ))) ?? []
+    return rows.map { IntakeInstant(id: $0.id, at: $0.occurredAt) }
+  }
+
   /// Instant of the most recent event for a kind, for the "days since last"
   /// reduction signal. Nil if never logged.
   static func lastEventInstant(context: ModelContext, kindID: String) -> Date? {
