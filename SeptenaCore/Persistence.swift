@@ -3041,55 +3041,73 @@ enum LocalCache {
     // date, so a task stays exactly where the user put it. Sorted in memory
     // (not the FetchDescriptor) because the key is computed, and `id` is the
     // stable tie-break for rows that share a key.
+    //
+    // Filter BEFORE sorting, and capture each row's (key, id) once during
+    // the filter pass. Reading `@Model` properties goes through SwiftData's
+    // accessor machinery, so evaluating `TaskOrder.key` inside the sort
+    // comparator cost ~4·n·log n model reads over the FULL table on every
+    // call — this runs synchronously on the main thread on every sidebar
+    // click (TaskListView's `items` getter + `load()`), which is where the
+    // macOS click latency came from. Filtering first sorts only the rows
+    // the view keeps, over plain tuple fields.
     guard let rows = try? context.fetch(FetchDescriptor<TaskEntity>()) else { return [] }
-    let ordered = rows.sorted { a, b in
-      let ka = TaskOrder.key(a), kb = TaskOrder.key(b)
-      return ka != kb ? ka < kb : a.id < b.id
-    }
     let today = SeptenaDate.today
-    let result = ordered.compactMap { e -> SeptenaTask? in
-      // Hide rows the user has deleted locally; the outbox drainer will
-      // either confirm the deletion (row removed) or resurrect them if
-      // the server rejects.
-      if e.pendingDeletion { return nil }
-      switch filter {
-      case .today:
-        // Single source of truth — see `TaskEntity.isOnToday`.
-        return e.isOnToday ? SeptenaTask(e) : nil
-      case .inbox:
-        guard e.status == .open,
-              e.project == nil, e.area == nil,
-              e.scheduled == nil, e.due == nil, !e.today else { return nil }
-        return SeptenaTask(e)
-      case .upcoming:
-        guard e.status == .open, !e.today else { return nil }
-        if let s = e.scheduled, s > today { return SeptenaTask(e) }
-        if let d = e.due, d > today { return SeptenaTask(e) }
-        return nil
-      case .unscheduled:
-        guard e.status == .open, !e.today,
-              e.scheduled == nil, e.due == nil else { return nil }
-        return SeptenaTask(e)
-      case .someday:
-        guard e.status == .someday else { return nil }
-        return SeptenaTask(e)
-      case .logbook:
-        guard e.status == .done else { return nil }
-        return SeptenaTask(e)
-      case .project(let pid):
-        guard e.project == pid else { return nil }
-        return SeptenaTask(e)
-      case .area(let aid):
-        guard e.area == aid else { return nil }
-        return SeptenaTask(e)
+    let result = rows
+      .compactMap { e -> (key: Double, id: String, task: SeptenaTask)? in
+        guard let task = convert(e, filter: filter, today: today) else { return nil }
+        return (TaskOrder.key(e), e.id, task)
       }
-    }
+      .sorted { a, b in a.key != b.key ? a.key < b.key : a.id < b.id }
+      .map(\.task)
     // The Completed (logbook) view reads as an archive — most-recently-completed
     // first. Every other view keeps manual/creation order (TaskOrder.key).
     if case .logbook = filter {
       return result.sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
     }
     return result
+  }
+
+  /// One row through the filter: nil when the row doesn't belong to `filter`,
+  /// the wire DTO when it does. Extracted from the inline closure above so
+  /// the (key, id) decoration stays readable.
+  @MainActor
+  private static func convert(_ e: TaskEntity, filter: TaskFilter,
+                              today: String) -> SeptenaTask? {
+    // Hide rows the user has deleted locally; the outbox drainer will
+    // either confirm the deletion (row removed) or resurrect them if
+    // the server rejects.
+    if e.pendingDeletion { return nil }
+    switch filter {
+    case .today:
+      // Single source of truth — see `TaskEntity.isOnToday`.
+      return e.isOnToday ? SeptenaTask(e) : nil
+    case .inbox:
+      guard e.status == .open,
+            e.project == nil, e.area == nil,
+            e.scheduled == nil, e.due == nil, !e.today else { return nil }
+      return SeptenaTask(e)
+    case .upcoming:
+      guard e.status == .open, !e.today else { return nil }
+      if let s = e.scheduled, s > today { return SeptenaTask(e) }
+      if let d = e.due, d > today { return SeptenaTask(e) }
+      return nil
+    case .unscheduled:
+      guard e.status == .open, !e.today,
+            e.scheduled == nil, e.due == nil else { return nil }
+      return SeptenaTask(e)
+    case .someday:
+      guard e.status == .someday else { return nil }
+      return SeptenaTask(e)
+    case .logbook:
+      guard e.status == .done else { return nil }
+      return SeptenaTask(e)
+    case .project(let pid):
+      guard e.project == pid else { return nil }
+      return SeptenaTask(e)
+    case .area(let aid):
+      guard e.area == aid else { return nil }
+      return SeptenaTask(e)
+    }
   }
 
   @MainActor
