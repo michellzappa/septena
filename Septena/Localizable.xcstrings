@@ -1219,6 +1219,9 @@
         }
       }
     },
+    "AI provider override" : {
+
+    },
     "Alcohol" : {
       "localizations" : {
         "pt-BR" : {
@@ -1935,6 +1938,15 @@
         }
       }
     },
+    "Claude moved to its own pane — see Claude & AI for the hosted gateway and local MCP server." : {
+
+    },
+    "Claude reads and writes your data through the hosted gateway at mcp.septena.app." : {
+
+    },
+    "Claude reads and writes your data through the hosted gateway at mcp.septena.app. The local MCP server lets Claude Code on this Mac connect directly, with no gateway hop." : {
+
+    },
     "Claude session expired" : {
       "localizations" : {
         "pt-BR" : {
@@ -2066,6 +2078,9 @@
           }
         }
       }
+    },
+    "Connections" : {
+
     },
     "Connector address" : {
       "localizations" : {
@@ -2381,6 +2396,12 @@
     "Developer" : {
 
     },
+    "Developer and recovery tools. Safe to ignore in normal use." : {
+
+    },
+    "Diagnostics" : {
+
+    },
     "Digestion log" : {
       "localizations" : {
         "pt-BR" : {
@@ -2413,6 +2434,7 @@
       }
     },
     "Disabled sections stay in the central store. Toggling one off hides it on the dashboard and sidebar, but never deletes any data or your color and label customizations." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -3033,6 +3055,7 @@
       }
     },
     "Gentle reminders to mark what you’ve done — habits, chores, hydration, bedtime. They fire around when you usually log, and stay quiet once it’s done. See everything that’s scheduled — and turn individual nudges on or off — under Scheduled Notifications." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -3786,6 +3809,7 @@
 
     },
     "Let Claude read and write your Septena data at mcp.septena.app." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -4279,6 +4303,9 @@
         }
       }
     },
+    "Motion Gallery tunes the logging flourishes. Data Tools re-pulls records from CloudKit and generates LLM import prompts." : {
+
+    },
     "n < %@ — too noisy to plot" : {
       "localizations" : {
         "pt-BR" : {
@@ -4695,7 +4722,7 @@
         }
       }
     },
-    "Off (use the mode above)" : {
+    "Off (use the AI mode)" : {
 
     },
     "OK" : {
@@ -6017,6 +6044,9 @@
         }
       }
     },
+    "Tap a section to set its color, turn it on or off, and tune what it tracks. Drag to reorder how sections appear on the home tab. Disabled sections stay here with your data intact." : {
+
+    },
     "Tap a word to refine, or just Log" : {
       "localizations" : {
         "pt-BR" : {
@@ -6160,6 +6190,9 @@
           }
         }
       }
+    },
+    "The briefs that teach a model how to use each section through the connection — tools, conventions, examples." : {
+
     },
     "The copied text includes the connection preamble + this section's brief — paste it into an MCP client's system prompt or a Claude conversation to teach it how to use the section." : {
       "localizations" : {

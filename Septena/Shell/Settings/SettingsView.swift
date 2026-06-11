@@ -448,8 +448,9 @@ final class SettingsStore {
 
 struct SettingsView: View {
   @Environment(\.dismiss) private var dismiss
-  @Environment(\.modelContext) private var modelContext
-  @Environment(CKEngine.self) private var ckEngine
+  // `store` resolves section titles for the navigation bar; section reorder and
+  // writes now live in the leaf panes (SectionsSettingsPane / SectionDetailPane),
+  // so SettingsView no longer needs modelContext or the CK engine directly.
   @Environment(SettingsStore.self) private var store
   @State private var selection: SettingsDestination?
   /// iPhone-only navigation path. Seeded from `initialDestination` so the
@@ -459,17 +460,12 @@ struct SettingsView: View {
   @State private var path: [SettingsDestination]
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @State private var preferredCompactColumn: NavigationSplitViewColumn = .detail
-  // Intake trackers shown as top-level, section-style rows in the sidebar
-  // (presentation layer — kinds stay rows under the host `intake` section).
-  @State private var intakeKinds: [IntakeKindDTO] = []
-  @State private var managingTrackerID: String? = nil
-  @State private var addingTracker = false
 
   /// Open straight to a destination, or `nil` for the historical default
   /// (sidebar list on iPhone, `.general` detail on macOS/iPad). The
   /// "Customize <Section>" footer in `SectionDrawer` passes `.section(key)`.
   init(initialDestination: SettingsDestination? = nil) {
-    _selection = State(initialValue: initialDestination ?? .general)
+    _selection = State(initialValue: initialDestination ?? .sections)
     _path = State(initialValue: initialDestination.map { [$0] } ?? [])
   }
 
@@ -478,18 +474,22 @@ struct SettingsView: View {
   /// `store.sections` list.
   enum SettingsDestination: Hashable {
     case account
-    case general, integrations, importExport, skills, siriShortcuts, privacy, about
-    case manageSections
-    case quickActions
-    case appIcon
-    case layout
-    case correlations
-    case timeOfDay
-    case welcome
-    case notifications
-    case motionGallery
-    case localMcp
-    case ai
+    // Root rows (Apple-style intent groups), in sidebar order.
+    case sections        // collapsed per-section list (absorbs Manage Sections)
+    case home            // homepage: layout, timeline, welcome, insights
+    case notifications   // promoted to root
+    case general         // time of day, app icon, quick actions, animations
+    case claudeAI        // unified AI reach + Claude gateway + local MCP + skills
+    case connections     // Apple + service integrations (was Integrations)
+    case privacy
+    case data            // import / export (was Import & Export)
+    case about
+    case advanced        // dev + diagnostics, reached from About
+    // Sub-panes reached from the hubs above.
+    case layout, correlations, timeOfDay, welcome
+    case quickActions, appIcon
+    case skills, localMcp, motionGallery, dataTools
+    case siriShortcuts
     case section(String)
   }
 
@@ -516,9 +516,17 @@ struct SettingsView: View {
         .navigationTitle("Settings")
     } detail: {
       NavigationStack {
-        let dest = selection ?? .general
+        let dest = selection ?? .sections
         pane(for: dest)
           .navigationTitle(title(for: dest))
+          // The hub panes (Home, Sections, Claude & AI, …) push their
+          // sub-panes via `NavigationLink(value:)`; the detail column needs
+          // its own resolver for those to open (the sidebar only drives the
+          // root `selection`).
+          .navigationDestination(for: SettingsDestination.self) { sub in
+            pane(for: sub)
+              .navigationTitle(title(for: sub))
+          }
       }
     }
     // Fixed sheet size on macOS. With only minimums the sheet grew and
@@ -536,6 +544,11 @@ struct SettingsView: View {
     #endif
   }
 
+  // The root sidebar is a short, fixed list of intent groups (Apple's iOS-18
+  // model). Per-section rows and intake trackers no longer live here — they
+  // moved one level down into the Sections pane (and, for trackers, the Intake
+  // section's own detail), so the root stays scannable regardless of how many
+  // sections the user has enabled.
   #if os(iOS)
   @ViewBuilder
   private var sidebarList: some View {
@@ -550,34 +563,9 @@ struct SettingsView: View {
           NavigationLink(value: dest) { staticRow(dest) }
         }
       }
-      if !sectionEntries.isEmpty {
-        SwiftUI.Section("Sections") {
-          ForEach(sectionEntries) { entry in
-            NavigationLink(value: SettingsDestination.section(entry.key)) {
-              sectionRow(entry)
-            }
-          }
-          .onMove { from, to in
-            store.moveSections(fromOffsets: from, toOffset: to,
-                               context: modelContext, engine: ckEngine)
-          }
-        }
-        .environment(\.editMode, .constant(.active))
-      }
-      intakeTrackerSection()
     }
     .scrollContentBackground(.hidden)
     .background(SettingsTopGradient())
-    .task { await loadIntakeKinds() }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
-      Task { await loadIntakeKinds() }
-    }
-    .sheet(item: managingTrackerBinding) { ref in
-      IntakeManageSheet(kindID: ref.value)
-    }
-    .sheet(isPresented: $addingTracker) {
-      IntakeKindWizard(onCreated: { _ in Task { await loadIntakeKinds() } })
-    }
   }
   #else
   @ViewBuilder
@@ -591,66 +579,15 @@ struct SettingsView: View {
           staticRow(dest).tag(dest)
         }
       }
-      if !sectionEntries.isEmpty {
-        SwiftUI.Section("Sections") {
-          ForEach(sectionEntries) { entry in
-            sectionRow(entry).tag(SettingsDestination.section(entry.key))
-          }
-          .onMove { from, to in
-            store.moveSections(fromOffsets: from, toOffset: to,
-                               context: modelContext, engine: ckEngine)
-          }
-        }
-      }
-      intakeTrackerSection()
-    }
-    .task { await loadIntakeKinds() }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
-      Task { await loadIntakeKinds() }
-    }
-    .sheet(item: managingTrackerBinding) { ref in
-      IntakeManageSheet(kindID: ref.value)
-    }
-    .sheet(isPresented: $addingTracker) {
-      IntakeKindWizard(onCreated: { _ in Task { await loadIntakeKinds() } })
     }
   }
   #endif
 
   private var staticDestinations: [SettingsDestination] {
-    var dests: [SettingsDestination] =
-      [.general, .ai, .integrations, .importExport, .skills, .manageSections, .motionGallery]
-    #if os(macOS)
-    // The loopback MCP server only runs on the Mac (long-lived desktop
-    // process a local Claude Code can dial); the row never appears on iOS.
-    dests.append(.localMcp)
-    #endif
-    dests += [.privacy, .about]
-    return dests
-  }
-
-  /// Per-section sidebar rows, ordered by the user's saved `sectionOrder`
-  /// (from the CloudKit-mirrored `AppSettings`), filtered to sections
-  /// present in both the local manifest and the installed `SectionEntity`
-  /// set. Disabled sections are still listed so the user can tap in to
-  /// re-enable them; `sectionRow` renders them visually muted.
-  private var sectionEntries: [SectionEntry] {
-    let installedByKey = Dictionary(uniqueKeysWithValues: store.sections.map { ($0.key, $0) })
-    let order = store.serverSettings?.sectionOrder ?? store.sections.map(\.key)
-    // Installed sections missing from the saved order — newly shipped sections
-    // (e.g. `intake`) whose SectionEntity was seeded after the user last saved
-    // an order. Append them at the end instead of dropping them, mirroring
-    // ManageSectionsPane.rows; without this a new section is enabled and tiled
-    // but has no Settings row.
-    let seen = Set(order)
-    let trailing = store.sections.map(\.key).filter { !seen.contains($0) }
-    var emitted = Set<String>()
-    return (order + trailing).compactMap { key in
-      guard emitted.insert(key).inserted,
-            let manifest = SectionManifest.byKey[key],
-            let installed = installedByKey[key] else { return nil }
-      return SectionEntry(manifest: manifest, server: installed)
-    }
+    // Nine intent groups, Apple-style. Local MCP folds into Claude & AI;
+    // Advanced folds into About — neither is a root row.
+    [.sections, .home, .notifications, .general, .claudeAI,
+     .connections, .privacy, .data, .about]
   }
 
   private func staticRow(_ dest: SettingsDestination) -> some View {
@@ -658,67 +595,6 @@ struct SettingsView: View {
       Text(title(for: dest))
     } icon: {
       ColoredGlyph(icon: icon(for: dest), color: tint(for: dest), size: 29, glyphRatio: 0.38)
-    }
-  }
-
-  private var intakeEnabled: Bool {
-    store.sections.first { $0.key == "intake" }?.isEnabled ?? false
-  }
-
-  private func loadIntakeKinds() async {
-    intakeKinds = await MirrorReader.shared.read { IntakeReader.loadKinds(context: $0) }
-  }
-
-  /// A tracker rendered exactly like a section row (same `SectionGlyph` tinting)
-  /// so kinds present as top-level sections — Option C presentation layer.
-  private func intakeTrackerRow(_ kind: IntakeKindDTO) -> some View {
-    Label {
-      Text(kind.name)
-    } icon: {
-      SectionGlyph(icon: kind.symbol,
-                   accent: AdaptiveColor.adaptive(kind.color) ?? .secondary,
-                   size: 29, glyphRatio: 0.38)
-    }
-  }
-
-  private struct TrackerRef: Identifiable { let value: String; var id: String { value } }
-  private var managingTrackerBinding: Binding<TrackerRef?> {
-    Binding(get: { managingTrackerID.map(TrackerRef.init) },
-            set: { managingTrackerID = $0?.value })
-  }
-
-  /// The "Trackers" group of section-style rows + an add affordance. Shown when
-  /// the host `intake` section is enabled and has at least one tracker. Kept
-  /// OUT of the reorderable "Sections" group because section reorder offsets map
-  /// to the full ordered section list — interleaving non-section rows would
-  /// corrupt them.
-  @ViewBuilder
-  private func intakeTrackerSection() -> some View {
-    if intakeEnabled, !intakeKinds.isEmpty {
-      SwiftUI.Section("Trackers") {
-        ForEach(intakeKinds) { kind in
-          Button { managingTrackerID = kind.id } label: { intakeTrackerRow(kind) }
-            .buttonStyle(.plain)
-        }
-        Button { addingTracker = true } label: {
-          Label("Add tracker…", systemImage: "plus")
-        }
-      }
-    }
-  }
-
-  private func sectionRow(_ entry: SectionEntry) -> some View {
-    // Reuse the homepage's per-section glyph *and its tinted treatment*
-    // (`SectionGlyph`) so a section's icon reads identically in the
-    // Dense/Heatmap tiles and here in the Settings sidebar. `calendar`
-    // isn't a homepage domain — fall back to its own symbol; anything
-    // else unknown falls back to a neutral dot.
-    Label {
-      Text(entry.label)
-        .foregroundStyle(entry.isEnabled ? .primary : .secondary)
-    } icon: {
-      SectionGlyph(icon: sectionIcon(for: entry.key), accent: entry.accent, size: 29, glyphRatio: 0.38)
-        .opacity(entry.isEnabled ? 1 : 0.4)
     }
   }
 
@@ -730,7 +606,10 @@ struct SettingsView: View {
   private func title(for dest: SettingsDestination) -> String {
     switch dest {
     case .account:      return "Account"
-    case .general:      return "Customize"
+    case .sections:     return "Sections"
+    case .home:         return "Home"
+    case .general:      return "General"
+    case .claudeAI:     return "Claude & AI"
     case .quickActions: return "Quick Actions"
     case .appIcon:      return "App Icon"
     case .layout:       return "Layout"
@@ -738,16 +617,16 @@ struct SettingsView: View {
     case .timeOfDay:    return "Time of Day"
     case .welcome:      return "Welcome"
     case .notifications: return "Notifications"
-    case .integrations: return "Integrations"
-    case .importExport: return "Import & Export"
+    case .connections:  return "Connections"
+    case .data:         return "Data"
     case .skills:       return "Skills"
-    case .ai:           return "AI"
     case .siriShortcuts: return "Siri & Shortcuts"
     case .privacy:      return "Privacy"
     case .about:        return "About"
+    case .advanced:     return "Advanced"
+    case .dataTools:    return "Data Tools"
     case .motionGallery: return "Motion Gallery"
     case .localMcp:     return "Local MCP Server"
-    case .manageSections: return "Manage Sections"
     case .section(let key):
       return SectionManifest.displayLabel(
         key: key,
@@ -755,12 +634,15 @@ struct SettingsView: View {
     }
   }
 
-  // Icon + tint helpers are only used for the static rows on top —
-  // section rows render their own color-dot label via `sectionRow`.
+  // Icon + tint helpers feed the root sidebar rows; sub-panes carry their
+  // own Label glyphs at their navigation links.
   private func icon(for dest: SettingsDestination) -> String {
     switch dest {
     case .account:      return "person.crop.circle"
+    case .sections:     return "square.grid.2x2"
+    case .home:         return "house"
     case .general:      return "slider.horizontal.3"
+    case .claudeAI:     return "brain.head.profile"
     case .quickActions: return "bolt"
     case .appIcon:      return "app.badge"
     case .layout:       return "square.grid.2x2"
@@ -768,17 +650,17 @@ struct SettingsView: View {
     case .timeOfDay:    return "clock"
     case .welcome:      return "sun.horizon"
     case .notifications: return "bell.badge"
-    case .integrations: return "app.connected.to.app.below.fill"
-    case .importExport: return "square.and.arrow.up.on.square"
-    case .skills:       return "sparkles"
-    case .ai:           return "brain.head.profile"
+    case .connections:  return "app.connected.to.app.below.fill"
+    case .data:         return "externaldrive"
+    case .skills:       return "book.closed"
     case .siriShortcuts: return "mic"
     case .privacy:      return "hand.raised"
     case .about:        return "info.circle"
+    case .advanced:     return "wrench.and.screwdriver"
+    case .dataTools:    return "stethoscope"
     case .motionGallery: return "wand.and.rays"
     case .localMcp:     return "server.rack"
-    case .manageSections: return "square.grid.2x2"
-    case .section:      return ""  // unreachable; sectionRow handles section dests
+    case .section:      return "circle.fill"
     }
   }
 
@@ -805,7 +687,10 @@ struct SettingsView: View {
   private func pane(for dest: SettingsDestination) -> some View {
     switch dest {
     case .account:           AccountSettingsPane()
+    case .sections:          SectionsSettingsPane()
+    case .home:              HomeSettingsPane()
     case .general:           GeneralSettingsPane()
+    case .claudeAI:          ClaudeAISettingsPane()
     case .quickActions:      QuickActionsSettingsPane()
     case .appIcon:           AppIconSettingsPane()
     case .layout:            LayoutSettingsPane()
@@ -813,20 +698,20 @@ struct SettingsView: View {
     case .timeOfDay:         TimeOfDaySettingsPane()
     case .welcome:           WelcomeSettingsPane()
     case .notifications:     NotificationsOverviewPane()
-    case .integrations:      IntegrationsSettingsPane()
-    case .importExport:      ImportExportSettingsPane()
+    case .connections:       IntegrationsSettingsPane()
+    case .data:              ImportExportSettingsPane(mode: .full)
+    case .dataTools:         ImportExportSettingsPane(mode: .dataTools)
     case .skills:            SkillsSettingsPane()
-    case .ai:                AISettingsPane()
     case .siriShortcuts:     SiriShortcutsSettingsPane()
     case .privacy:           PrivacySettingsPane()
     case .about:             AboutSettingsPane()
+    case .advanced:          AdvancedSettingsPane()
     case .motionGallery:     MotionGalleryPane()
     #if os(macOS)
     case .localMcp:          LocalMCPSettingsPane()
     #else
-    case .localMcp:          EmptyView()   // row is macOS-only; never reached on iOS
+    case .localMcp:          EmptyView()   // folded into Claude & AI; macOS-only
     #endif
-    case .manageSections:    ManageSectionsPane()
     case .section(let key):  SectionDetailPane(sectionKey: key)
     }
   }
@@ -929,15 +814,14 @@ struct PrivacySettingsPane: View {
   }
 }
 
-// MARK: - General
+// MARK: - Home (homepage configuration)
 
-struct GeneralSettingsPane: View {
+/// Everything that shapes the home tab, pulled out of the old "Customize"
+/// junk drawer: how it renders (Layout, Insights), the greeting (Welcome),
+/// and the day-timeline strip.
+struct HomeSettingsPane: View {
   @AppStorage(SettingsKey.homepageShowTodayTimeline)
   private var showTodayTimeline: Bool = true
-  @AppStorage(SettingsKey.notificationsEnabled)
-  private var notificationsEnabled: Bool = true
-  @AppStorage(SettingsKey.loggingAnimationsEnabled)
-  private var loggingAnimationsEnabled: Bool = true
 
   var body: some View {
     Form {
@@ -953,14 +837,6 @@ struct GeneralSettingsPane: View {
       }
 
       Section {
-        NavigationLink(value: SettingsView.SettingsDestination.timeOfDay) {
-          Label("Time of Day", systemImage: "clock")
-        }
-      } footer: {
-        Text("Set when morning, afternoon, and evening begin — used across Habits, Supplements, the “Now” marker, and the greeting.")
-      }
-
-      Section {
         NavigationLink(value: SettingsView.SettingsDestination.welcome) {
           Label("Welcome", systemImage: "sun.horizon")
         }
@@ -968,9 +844,36 @@ struct GeneralSettingsPane: View {
         Text("The greeting at the top of the home tab — your name, tone, and how aware of your day it is.")
       }
 
-      homepageTimelineSection
-      loggingAnimationsSection
-      notificationsSection
+      Section {
+        Toggle(isOn: $showTodayTimeline) {
+          Label("Show Today timeline", systemImage: "clock")
+        }
+      } footer: {
+        Text("Renders the day-timeline strip above the homepage layout.")
+      }
+    }
+    .formStyle(.grouped)
+  }
+}
+
+// MARK: - General (app behavior)
+
+/// The small, honest catch-all Apple keeps too: time boundaries, the app icon,
+/// Home Screen quick actions, and the logging-animation switch. Notifications
+/// graduated to its own root row; homepage settings moved to Home.
+struct GeneralSettingsPane: View {
+  @AppStorage(SettingsKey.loggingAnimationsEnabled)
+  private var loggingAnimationsEnabled: Bool = true
+
+  var body: some View {
+    Form {
+      Section {
+        NavigationLink(value: SettingsView.SettingsDestination.timeOfDay) {
+          Label("Time of Day", systemImage: "clock")
+        }
+      } footer: {
+        Text("Set when morning, afternoon, and evening begin — used across Habits, Supplements, the “Now” marker, and the greeting.")
+      }
 
       #if os(iOS)
       Section {
@@ -987,48 +890,17 @@ struct GeneralSettingsPane: View {
           Label("App Icon", systemImage: "app.badge")
         }
       }
+
+      Section {
+        Toggle(isOn: $loggingAnimationsEnabled) {
+          Label("Logging animations", systemImage: "party.popper")
+        }
+      } footer: {
+        Text("The little celebration that plays when you log something — confetti, ripples, a streak landing — and the checkbox feels when you check things off. Off keeps the confirming haptic but skips the motion. Reduce Motion always overrides this.")
+      }
     }
     .formStyle(.grouped)
   }
-
-  @ViewBuilder
-  private var homepageTimelineSection: some View {
-    Section {
-      Toggle(isOn: $showTodayTimeline) {
-        Label("Show Today timeline", systemImage: "clock")
-      }
-    } footer: {
-      Text("Renders the day-timeline strip above the homepage layout.")
-    }
-  }
-
-  @ViewBuilder
-  private var loggingAnimationsSection: some View {
-    Section {
-      Toggle(isOn: $loggingAnimationsEnabled) {
-        Label("Logging animations", systemImage: "sparkles")
-      }
-    } footer: {
-      Text("The little celebration that plays when you log something — confetti, ripples, a streak landing — and the checkbox feels when you check things off. Off keeps the confirming haptic but skips the motion. Reduce Motion always overrides this.")
-    }
-  }
-
-  @ViewBuilder
-  private var notificationsSection: some View {
-    Section {
-      Toggle(isOn: $notificationsEnabled) {
-        Label("Notifications", systemImage: "bell.badge")
-      }
-      if notificationsEnabled {
-        NavigationLink(value: SettingsView.SettingsDestination.notifications) {
-          Label("Scheduled Notifications", systemImage: "bell.and.waves.left.and.right")
-        }
-      }
-    } footer: {
-      Text("Gentle reminders to mark what you’ve done — habits, chores, hydration, bedtime. They fire around when you usually log, and stay quiet once it’s done. See everything that’s scheduled — and turn individual nudges on or off — under Scheduled Notifications.")
-    }
-  }
-
 }
 
 // MARK: - Welcome (dedicated page)
@@ -1082,7 +954,7 @@ struct WelcomeSettingsPane: View {
           }
 
           Toggle(isOn: $welcomeDataAware) {
-            Label("Aware of your day", systemImage: "sparkles")
+            Label("Aware of your day", systemImage: "sun.max")
           }
         } footer: {
           Text("“Aware of your day” lets the greeting nod to what's left on today's list and what's coming up next on your calendar.")
@@ -2646,194 +2518,81 @@ struct PaletteSwatchGrid: View {
   }
 }
 
-// MARK: - Manage Sections pane
+// MARK: - Sections pane (collapsed app-style list)
 
-/// Master list of every section in `SectionManifest.all` with per-row
-/// enable/disable toggles. `.always` sections render as locked. Toggling
-/// here writes through `SettingsMirror.setSectionEnabled` — never deletes
-/// the SectionEntity row, so customizations (color, label) survive.
-struct ManageSectionsPane: View {
+/// The single "Sections" pane — Apple's iOS-18 "Apps" move. Every installed
+/// section in the user's saved order; tap a row to open its detail page (color,
+/// enabled, Show in Next, per-section settings). Drag to reorder, which drives
+/// the dashboard and sidebar order. Disabled sections stay in the list (muted,
+/// "Off") so they can be re-enabled from their detail page. The per-section
+/// enable toggle — and its onboarding-on-enable flow — now lives in
+/// `SectionDetailPane`, so there is one enable path instead of two.
+struct SectionsSettingsPane: View {
   @Environment(SettingsStore.self) private var store
-  @Environment(SectionTheme.self) private var theme
   @Environment(\.modelContext) private var modelContext
   @Environment(CKEngine.self) private var ckEngine
-  @State private var pendingOnboarding: PendingOnboarding? = nil
 
-  /// Identifiable wrapper so `.sheet(item:)` can drive presentation
-  /// from the key alone — the plugin is looked up at render time.
-  private struct PendingOnboarding: Identifiable {
-    let key: String
-    var id: String { key }
-  }
-
-  private var rows: [SectionManifest] {
+  /// Installed sections in the user's saved order, with newly seeded sections
+  /// (not yet in `sectionOrder`) appended. Includes disabled sections. The
+  /// row offsets line up with what `store.moveSections` expects.
+  private var entries: [SectionEntry] {
+    let installedByKey = Dictionary(uniqueKeysWithValues: store.sections.map { ($0.key, $0) })
     let order = store.serverSettings?.sectionOrder ?? store.sections.map(\.key)
-    let orderedKeys = order.compactMap { SectionManifest.byKey[$0]?.key }
-    let orderedSet = Set(orderedKeys)
-    let trailing = SectionManifest.all
-      .filter { !orderedSet.contains($0.key) }
-      .map(\.key)
-    return (orderedKeys + trailing).compactMap { SectionManifest.byKey[$0] }
-  }
-
-  private func isEnabled(_ key: String) -> Bool {
-    store.sections.first(where: { $0.key == key })?.isEnabled ?? true
+    let seen = Set(order)
+    let trailing = store.sections.map(\.key).filter { !seen.contains($0) }
+    var emitted = Set<String>()
+    return (order + trailing).compactMap { key in
+      guard emitted.insert(key).inserted,
+            let manifest = SectionManifest.byKey[key],
+            let installed = installedByKey[key] else { return nil }
+      return SectionEntry(manifest: manifest, server: installed)
+    }
   }
 
   var body: some View {
     Form {
       Section {
-        ForEach(rows) { manifest in
-          row(for: manifest)
+        ForEach(entries) { entry in
+          NavigationLink(value: SettingsView.SettingsDestination.section(entry.key)) {
+            row(for: entry)
+          }
+        }
+        .onMove { from, to in
+          store.moveSections(fromOffsets: from, toOffset: to,
+                             context: modelContext, engine: ckEngine)
         }
       } footer: {
-        Text("Disabled sections stay in the central store. Toggling one off hides it on the dashboard and sidebar, but never deletes any data or your color and label customizations.")
+        Text("Tap a section to set its color, turn it on or off, and tune what it tracks. Drag to reorder how sections appear on the home tab. Disabled sections stay here with your data intact.")
       }
     }
     .formStyle(.grouped)
-    .sheet(item: $pendingOnboarding) { pending in
-      onboardingSheet(for: pending.key)
-    }
+    #if os(iOS)
+    .toolbar { EditButton() }
+    #endif
   }
 
-  /// Resolve the plugin for `key` and present its onboarding view. The
-  /// view is responsible for calling `complete()` to finish the flow;
-  /// any other dismissal (swipe down, Cancel button if the plugin
-  /// provides one) leaves the section disabled.
-  @ViewBuilder
-  private func onboardingSheet(for key: String) -> some View {
-    if let plugin = SectionRegistry.plugin(forKey: key),
-       let view = plugin.onboarding(complete: {
-         completeOnboarding(key: key)
-       }) {
-      view
-    } else {
-      // Defensive — shouldn't happen because we only set
-      // `pendingOnboarding` after confirming the plugin offers one.
-      Text("No onboarding available.")
-        .padding()
-    }
-  }
-
-  private func completeOnboarding(key: String) {
-    SettingsMirror.setSectionHasOnboarded(key,
-                                          hasOnboarded: true,
-                                          context: modelContext,
-                                          engine: ckEngine)
-    SettingsMirror.setSectionEnabled(key,
-                                     enabled: true,
-                                     context: modelContext,
-                                     engine: ckEngine)
-    store.sections = store.sections.map { config in
-      config.key == key
-        ? SectionConfig(key: config.key,
-                        label: config.label,
-                        color: config.color,
-                        isEnabled: true,
-                        showInToday: config.showInToday,
-                        hasOnboarded: true)
-        : config
-    }
-    pendingOnboarding = nil
-  }
-
-  @ViewBuilder
-  private func row(for manifest: SectionManifest) -> some View {
-    let enabled = isEnabled(manifest.key)
+  private func row(for entry: SectionEntry) -> some View {
     HStack(spacing: 12) {
-      // Same tinted glyph treatment as the Settings sidebar rows, so a
-      // section's icon reads identically in both lists.
-      SectionGlyph(icon: manifest.iconSymbol,
-                   accent: theme.color(for: manifest.key),
+      SectionGlyph(icon: entry.manifest.iconSymbol, accent: entry.accent,
                    size: 29, glyphRatio: 0.38)
-        .opacity(enabled ? 1 : 0.4)
+        .opacity(entry.isEnabled ? 1 : 0.4)
       VStack(alignment: .leading, spacing: 2) {
-        Text(label(for: manifest))
-          .foregroundStyle(enabled ? .primary : .secondary)
-        if !manifest.shortDescription.isEmpty {
-          Text(manifest.shortDescription)
+        Text(entry.label)
+          .foregroundStyle(entry.isEnabled ? .primary : .secondary)
+        if !entry.manifest.shortDescription.isEmpty {
+          Text(entry.manifest.shortDescription)
             .font(.caption)
             .foregroundStyle(.secondary)
         }
       }
       Spacer()
-      setupButton(for: manifest.key)
-      if manifest.canDisable {
-        Toggle("Enabled", isOn: Binding(
-          get: { enabled },
-          set: { setEnabled(manifest.key, $0) }
-        ))
-        .labelsHidden()
-      } else {
-        Text("Always on")
+      if !entry.isEnabled {
+        Text("Off")
           .font(.caption)
           .foregroundStyle(.secondary)
       }
     }
   }
-
-  /// Manual onboarding trigger. Visible only when the section's plugin
-  /// declares an `onboarding(complete:)` view — for everything else,
-  /// the section has no setup flow to run. Tapping reuses the same
-  /// presentation path the off → on toggle uses.
-  @ViewBuilder
-  private func setupButton(for key: String) -> some View {
-    if let plugin = SectionRegistry.plugin(forKey: key),
-       plugin.onboarding(complete: {}) != nil {
-      Button {
-        pendingOnboarding = PendingOnboarding(key: key)
-      } label: {
-        Image(systemName: "wand.and.stars")
-          .font(.callout)
-          .foregroundStyle(.tint)
-      }
-      .buttonStyle(.borderless)
-      .accessibilityLabel("Run setup")
-    }
-  }
-
-  private func label(for manifest: SectionManifest) -> String {
-    let server = store.sections.first(where: { $0.key == manifest.key })?.label ?? ""
-    return SectionManifest.displayLabel(key: manifest.key, stored: server)
-  }
-
-  private func setEnabled(_ key: String, _ enabled: Bool) {
-    // Off → on transition: if the section has a plugin onboarding flow
-    // and either hasn't been onboarded yet OR the plugin opts into
-    // re-presenting on every enable, route through the sheet
-    // instead of enabling directly. The sheet's completion handler
-    // does the enable + hasOnboarded write.
-    if enabled,
-       let config = store.sections.first(where: { $0.key == key }),
-       !config.isEnabled,
-       let plugin = SectionRegistry.plugin(forKey: key),
-       plugin.onboarding(complete: {}) != nil,
-       (!config.hasOnboarded || plugin.alwaysShowOnboarding) {
-      pendingOnboarding = PendingOnboarding(key: key)
-      return
-    }
-
-    SettingsMirror.setSectionEnabled(key,
-                                     enabled: enabled,
-                                     context: modelContext,
-                                     engine: ckEngine)
-    #if os(iOS)
-    // Section toggled in-session — refresh App Shortcut suggestions so its
-    // items stop appearing in Siri / Spotlight (or re-appear when enabled).
-    SeptenaShortcuts.updateAppShortcutParameters()
-    #endif
-    store.sections = store.sections.map { config in
-      config.key == key
-        ? SectionConfig(key: config.key,
-                        label: config.label,
-                        color: config.color,
-                        isEnabled: enabled,
-                        showInToday: config.showInToday,
-                        hasOnboarded: config.hasOnboarded)
-        : config
-    }
-  }
-
 }
 
 // MARK: - Section detail pane
@@ -2845,6 +2604,10 @@ struct SectionDetailPane: View {
   @Environment(SectionTheme.self) private var theme
   let sectionKey: String
   @State private var showingColorPicker = false
+  /// Drives the starter-onboarding sheet when the user flips Enabled on for a
+  /// section whose plugin offers one. Moved here from the old Manage Sections
+  /// pane so there is a single enable path.
+  @State private var pendingOnboarding = false
   // showingSupplementSheet moved into SupplementsPlugin's detailPaneContent.
 
   // Per-section preferences and sheets now live inside each plugin's
@@ -2885,6 +2648,34 @@ struct SectionDetailPane: View {
       skillAndDataSection
     }
     .formStyle(.grouped)
+    .sheet(isPresented: $pendingOnboarding) { onboardingSheet }
+  }
+
+  /// The section plugin's starter-onboarding view, shown when enabling a
+  /// section that offers one. Completion writes hasOnboarded + enabled.
+  @ViewBuilder
+  private var onboardingSheet: some View {
+    if let plugin = SectionRegistry.plugin(forKey: sectionKey),
+       let view = plugin.onboarding(complete: { completeOnboarding() }) {
+      view
+    } else {
+      Text("No onboarding available.").padding()
+    }
+  }
+
+  private func completeOnboarding() {
+    SettingsMirror.setSectionHasOnboarded(sectionKey, hasOnboarded: true,
+                                          context: modelContext, engine: ckEngine)
+    SettingsMirror.setSectionEnabled(sectionKey, enabled: true,
+                                     context: modelContext, engine: ckEngine)
+    store.sections = store.sections.map { config in
+      config.key == sectionKey
+        ? SectionConfig(key: config.key, label: config.label, color: config.color,
+                        isEnabled: true, showInToday: config.showInToday,
+                        hasOnboarded: true)
+        : config
+    }
+    pendingOnboarding = false
   }
 
   /// Bottom-of-page row, shared by every section. Two entries:
@@ -2900,7 +2691,7 @@ struct SectionDetailPane: View {
         NavigationLink {
           SectionSkillView(sectionKey: sectionKey)
         } label: {
-          Label("Section Skill", systemImage: "sparkles")
+          Label("Section Skill", systemImage: "book.closed")
         }
       }
       sectionExportRow
@@ -3065,10 +2856,27 @@ struct SectionDetailPane: View {
   }
 
   private func setEnabled(_ enabled: Bool) {
+    // Off → on for a section whose plugin offers starter onboarding (and that
+    // hasn't been onboarded yet, or opts into re-presenting): route through the
+    // sheet, which does the enable + hasOnboarded write on completion.
+    if enabled,
+       let config = server, !config.isEnabled,
+       let plugin = SectionRegistry.plugin(forKey: sectionKey),
+       plugin.onboarding(complete: {}) != nil,
+       (!config.hasOnboarded || plugin.alwaysShowOnboarding) {
+      pendingOnboarding = true
+      return
+    }
+
     SettingsMirror.setSectionEnabled(sectionKey,
                                      enabled: enabled,
                                      context: modelContext,
                                      engine: ckEngine)
+    #if os(iOS)
+    // Refresh App Shortcut suggestions so this section's items leave / re-enter
+    // Siri + Spotlight in step with its enabled state.
+    SeptenaShortcuts.updateAppShortcutParameters()
+    #endif
     store.sections = store.sections.map { config in
       config.key == sectionKey
         ? SectionConfig(key: config.key,
@@ -3231,7 +3039,7 @@ struct NotificationsOverviewPane: View {
       if notificationsEnabled {
         Section {
           Toggle(isOn: $claudeNudgeEnabled) {
-            Label("Keep Claude connected", systemImage: "sparkles")
+            Label("Keep Claude connected", systemImage: "antenna.radiowaves.left.and.right")
           }
         } header: {
           Label("Connections", systemImage: "link")
@@ -3510,7 +3318,6 @@ struct IntegrationsSettingsPane: View {
   @State private var withingsProvider = WithingsProvider.shared
   @State private var githubProvider = GitHubProvider.shared
   @State private var photosBridge = PhotosBridge.shared
-  @State private var claudeProvider = ClaudeGatewayProvider.shared
   var body: some View {
     Form {
       Section {
@@ -3636,39 +3443,8 @@ struct IntegrationsSettingsPane: View {
 
       } header: {
         Text("Services")
-      }
-
-      // Claude — keeps the Septena MCP gateway supplied with a live
-      // CloudKit token so Claude can read/write your data without you
-      // re-authorizing every few hours. The gateway stores only the
-      // rotating token, never your data.
-      Section {
-        NavigationLink {
-          ClaudeGatewayDetail()
-            .navigationTitle("Claude")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-        } label: {
-          HStack {
-            Label {
-              Text("Claude")
-            } icon: {
-              Image("ClaudeMark")
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 20, height: 20)
-            }
-            .foregroundStyle(.primary)
-            Spacer()
-            Text(claudeProvider.isEnabled ? "Connected" : "Connect")
-              .font(.subheadline)
-              .foregroundStyle(claudeProvider.isEnabled ? Color.green : .secondary)
-          }
-        }
       } footer: {
-        Text("Let Claude read and write your Septena data at mcp.septena.app.")
+        Text("Claude moved to its own pane — see Claude & AI for the hosted gateway and local MCP server.")
       }
     }
     .formStyle(.grouped)
@@ -4334,7 +4110,7 @@ private struct GitHubIntegrationDetail: View {
 /// the app then re-mints on foreground so Claude keeps working without
 /// the user re-authorizing every ~8h. The gateway holds only the rotating
 /// token, never the user's data.
-private struct ClaudeGatewayDetail: View {
+struct ClaudeGatewayDetail: View {
   @State private var provider = ClaudeGatewayProvider.shared
   @State private var urlCopied = false
 
@@ -4390,7 +4166,7 @@ private struct ClaudeGatewayDetail: View {
       if provider.isEnabled {
         Section {
           HStack {
-            Label("Status", systemImage: "sparkles")
+            Label("Status", systemImage: "antenna.radiowaves.left.and.right")
             Spacer()
             Text(provider.needsReauth ? "Reconnect needed" : (provider.lastError == nil ? "Connected" : "Needs attention"))
               .foregroundStyle(provider.needsReauth || provider.lastError != nil ? .orange : .green)
@@ -4661,6 +4437,14 @@ struct AboutSettingsPane: View {
       Section {
         infoRow("Platform", platformLabel)
       }
+
+      Section {
+        NavigationLink(value: SettingsView.SettingsDestination.advanced) {
+          Label("Advanced", systemImage: "wrench.and.screwdriver")
+        }
+      } footer: {
+        Text("Developer and recovery tools. Safe to ignore in normal use.")
+      }
     }
     .formStyle(.grouped)
   }
@@ -4694,6 +4478,49 @@ struct AboutSettingsPane: View {
         .foregroundStyle(.secondary)
         .font(.callout.monospacedDigit())
     }
+  }
+}
+
+// MARK: - Advanced (developer + diagnostics)
+
+/// The one quiet door, reached from About, for surfaces that aren't part of the
+/// everyday consumer flow: the motion test bench, data recovery tools, and the
+/// macOS reasoning-provider override. Keeps the main panes App-Store clean
+/// without deleting tools the developer (and the occasional power user) needs.
+struct AdvancedSettingsPane: View {
+  #if os(macOS)
+  @AppStorage(AIPolicy.devForceProviderKey) private var devForce = ""
+  #endif
+
+  var body: some View {
+    Form {
+      Section {
+        NavigationLink(value: SettingsView.SettingsDestination.motionGallery) {
+          Label("Motion Gallery", systemImage: "wand.and.rays")
+        }
+        NavigationLink(value: SettingsView.SettingsDestination.dataTools) {
+          Label("Data Tools", systemImage: "stethoscope")
+        }
+      } header: {
+        Text("Diagnostics")
+      } footer: {
+        Text("Motion Gallery tunes the logging flourishes. Data Tools re-pulls records from CloudKit and generates LLM import prompts.")
+      }
+
+      #if os(macOS)
+      Section {
+        Picker("Force provider", selection: $devForce) {
+          Text("Off (use the AI mode)").tag("")
+          ForEach(AIProviderKind.allCases, id: \.self) { Text($0.label).tag($0.rawValue) }
+        }
+      } header: {
+        Text("AI provider override")
+      } footer: {
+        Text("Pins every reasoning step to one provider — for testing only. Leave Off in normal use.")
+      }
+      #endif
+    }
+    .formStyle(.grouped)
   }
 }
 
@@ -4986,6 +4813,14 @@ private let exportableSectionKeys: [String] = [
 ]
 
 struct ImportExportSettingsPane: View {
+  /// Which face of this pane to render. `.full` is the everyday "Data" pane
+  /// (export / import / format reference); `.dataTools` is the power-user
+  /// surface (CloudKit repair + LLM schema prompts) that lives under
+  /// About ▸ Advanced. Both share one struct so the import/export state and
+  /// helpers aren't duplicated.
+  enum Mode { case full, dataTools }
+  var mode: Mode = .full
+
   @Environment(SettingsStore.self) private var store
   @Environment(CKEngine.self) private var ckEngine
   @State private var exportError: String? = nil
@@ -5006,11 +4841,15 @@ struct ImportExportSettingsPane: View {
 
   var body: some View {
     Form {
-      exportSection
-      importSection
-      repairSection
-      schemaPromptsSection
-      formatSection
+      switch mode {
+      case .full:
+        exportSection
+        importSection
+        formatSection
+      case .dataTools:
+        repairSection
+        schemaPromptsSection
+      }
     }
     .formStyle(.grouped)
     .sheet(isPresented: $showingPaste) {

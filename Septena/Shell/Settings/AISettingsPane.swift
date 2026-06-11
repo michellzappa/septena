@@ -3,24 +3,21 @@ import SwiftUI
 import UIKit
 #endif
 
-// The single global "how far AI may reach" dial (`AIMode`) + a link to the
-// explainer, and a macOS-only developer provider override. Per-function model
-// config is deliberately NOT offered — the router picks per step by capability;
-// this is the user's one policy lever. Model: SeptenaCore/AIPolicy.swift.
+// The unified "Claude & AI" pane: the one place the user answers "what can AI
+// (and Claude) do with my data?" Combines the global reach dial (`AIMode`) and
+// on-device status board with the connections that carry data to a model — the
+// hosted Claude gateway and the macOS local MCP server — plus the MCP skill
+// briefs. The macOS developer provider-override moved to About ▸ Advanced.
 //
-// Also the status board for the on-device engine: Apple Intelligence is a
-// capability the app can only observe, never request, so this row (not
-// Integrations, which is for connectable data sources) is where the user
-// learns whether it works here and why not. Availability is a live system
-// property (model downloads finish, the user flips the toggle), so it's
-// re-sampled on appear and on scene activation rather than cached.
-struct AISettingsPane: View {
+// Apple Intelligence is a capability the app can only observe, never request,
+// so this pane is where the user learns whether it works here and why not.
+// Availability is a live system property (model downloads finish, the user
+// flips the toggle), so it's re-sampled on appear and on scene activation.
+struct ClaudeAISettingsPane: View {
   @AppStorage(AIPolicy.modeKey) private var mode: AIMode = .auto
-  #if os(macOS)
-  @AppStorage(AIPolicy.devForceProviderKey) private var devForce = ""
-  #endif
   @State private var showExplainer = false
   @State private var aiStatus: OnDeviceAI.Status = .unknown
+  @State private var claudeProvider = ClaudeGatewayProvider.shared
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.openURL) private var openURL
 
@@ -62,23 +59,68 @@ struct AISettingsPane: View {
         }
       }
 
-      #if os(macOS)
-      Section {
-        Picker("Force provider", selection: $devForce) {
-          Text("Off (use the mode above)").tag("")
-          ForEach(AIProviderKind.allCases, id: \.self) { Text($0.label).tag($0.rawValue) }
-        }
-      } header: {
-        Text("Developer")
-      } footer: {
-        Text("Pins every reasoning step to one provider — for testing only. Leave Off in normal use.")
-      }
-      #endif
+      connectionsSection
+      skillsSection
     }
     .sheet(isPresented: $showExplainer) { AIExplainerView() }
     .onAppear { aiStatus = OnDeviceAI.status }
     .onChange(of: scenePhase) { _, phase in
       if phase == .active { aiStatus = OnDeviceAI.status }
+    }
+  }
+
+  // MARK: - Connections (Claude gateway + local MCP)
+
+  private var connectionsSection: some View {
+    Section {
+      NavigationLink {
+        ClaudeGatewayDetail()
+          .navigationTitle("Claude")
+          #if os(iOS)
+          .navigationBarTitleDisplayMode(.inline)
+          #endif
+      } label: {
+        HStack {
+          Label {
+            Text("Claude")
+          } icon: {
+            Image("ClaudeMark")
+              .renderingMode(.template)
+              .resizable()
+              .scaledToFit()
+              .frame(width: 20, height: 20)
+          }
+          .foregroundStyle(.primary)
+          Spacer()
+          Text(claudeProvider.isEnabled ? "Connected" : "Connect")
+            .font(.subheadline)
+            .foregroundStyle(claudeProvider.isEnabled ? Color.green : .secondary)
+        }
+      }
+
+      #if os(macOS)
+      NavigationLink(value: SettingsView.SettingsDestination.localMcp) {
+        Label("Local MCP Server", systemImage: "server.rack")
+      }
+      #endif
+    } header: {
+      Text("Connections")
+    } footer: {
+      #if os(macOS)
+      Text("Claude reads and writes your data through the hosted gateway at mcp.septena.app. The local MCP server lets Claude Code on this Mac connect directly, with no gateway hop.")
+      #else
+      Text("Claude reads and writes your data through the hosted gateway at mcp.septena.app.")
+      #endif
+    }
+  }
+
+  private var skillsSection: some View {
+    Section {
+      NavigationLink(value: SettingsView.SettingsDestination.skills) {
+        Label("MCP Skills", systemImage: "book.closed")
+      }
+    } footer: {
+      Text("The briefs that teach a model how to use each section through the connection — tools, conventions, examples.")
     }
   }
 
