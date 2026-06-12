@@ -332,7 +332,10 @@ enum RhythmData {
             let d = RhythmFmt.ymd.date(from: n.date) else { return nil }
       let daysAgo = cal.dateComponents([.day], from: cal.startOfDay(for: d), to: todayStart).day ?? 0
       guard daysAgo >= 0, daysAgo < windowDays else { return nil }
-      return TimeOfDayWheel.Band(id: n.id, start: b, end: w, daysAgo: daysAgo, color: sleepColor)
+      // Thin like the calendar pills — a night is context, not a headline;
+      // the heavy stroke made sleep dominate the dial.
+      return TimeOfDayWheel.Band(id: n.id, start: b, end: w, daysAgo: daysAgo,
+                                 color: sleepColor, thin: true)
     }
   }
 

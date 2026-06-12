@@ -60,15 +60,13 @@ struct WeekDashboardView: View {
   /// that resets back to Tiles. Phases 3-5 land the actual renderers.
   @AppStorage(SettingsKey.homepageLayout)
   private var homepageLayoutRaw: String = HomepageLayoutMode.tiles.rawValue
-  @AppStorage(SettingsKey.homepageShowTodayTimeline)
-  private var showTodayTimeline: Bool = true
   @AppStorage(SettingsKey.homepageShowWelcome)
   private var showWelcome: Bool = true
-  /// The front-door hero: today as a living 24-hour dial (`DayDialHero`),
-  /// between the greeting and the layout grid. Hidden in the Wheel layout
-  /// mode, which already renders the same dial as its body.
-  @AppStorage(SettingsKey.homepageShowDayDial)
-  private var showDayDial: Bool = true
+  /// "Today at a glance" between the greeting and the layout grid: the
+  /// circular Day dial hero, the linear timeline strip, or hidden
+  /// (`DayViewStyle`, Settings ▸ Home).
+  @AppStorage(SettingsKey.homepageDayView)
+  private var dayViewRaw: String = DayViewStyle.dial.rawValue
   @AppStorage(SettingsKey.welcomeDataAware)
   private var welcomeDataAware: Bool = false
   /// Fasting tracking master toggle + heatmap metric preference. When
@@ -302,14 +300,20 @@ struct WeekDashboardView: View {
                                  todayTaskCount: taskCounts?.todayCount ?? 0,
                                  dailies: dailies)
           }
-          // The hero dial — today across every section on one clock face,
-          // under the day's ambient light. Skipped in Wheel mode (whose
-          // body is already this dial) so the dashboard never shows two.
-          if showDayDial && currentLayoutMode != .wheel {
-            DayDialHero(visibleSections: Set(visibleDomains.map(\.rawValue)),
-                        sleepNights: ouraNights)
+          // The day view — today at a glance, circular or linear. The dial
+          // is skipped in Wheel mode (whose body is already this dial) so
+          // the dashboard never shows two.
+          switch DayViewStyle(rawValue: dayViewRaw) ?? .dial {
+          case .dial:
+            if currentLayoutMode != .wheel {
+              DayDialHero(visibleSections: Set(visibleDomains.map(\.rawValue)),
+                          sleepNights: ouraNights)
+            }
+          case .linear:
+            todayTimeline
+          case .hidden:
+            EmptyView()
           }
-          if showTodayTimeline { todayTimeline }
           layoutBody
         }
         .septenaSurface()

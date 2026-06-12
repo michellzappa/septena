@@ -18,6 +18,32 @@ import SwiftData
 // day's light; the wheel's `heroDate` rim wash paints the same phases on
 // the face itself.
 
+/// How the front door renders "today at a glance" between the greeting and
+/// the layout grid: the circular day dial, the linear timeline strip, or
+/// neither. One picker (Settings ▸ Home) — replaced the old pair of
+/// independent show-dial / show-timeline toggles, since they're two shapes
+/// of the same information.
+enum DayViewStyle: String, CaseIterable, Identifiable {
+  case dial, linear, hidden
+  var id: String { rawValue }
+
+  var label: String {
+    switch self {
+    case .dial:   return String(localized: "Dial")
+    case .linear: return String(localized: "Timeline")
+    case .hidden: return String(localized: "Hidden")
+    }
+  }
+
+  var icon: String {
+    switch self {
+    case .dial:   return "dial.medium"
+    case .linear: return "timeline.selection"
+    case .hidden: return "eye.slash"
+    }
+  }
+}
+
 struct DayDialHero: View {
   /// Section keys currently visible on the homepage — drives which sections
   /// plot, mirroring the Rhythm mode's visibility rule.
@@ -35,6 +61,10 @@ struct DayDialHero: View {
   /// Same opt-out the commit flourishes honor — gates the dot blooms only;
   /// the dial itself (and its data) always renders.
   @AppStorage(SettingsKey.loggingAnimationsEnabled) private var animationsEnabled = true
+  /// The dial's today ⇄ week window (the wheel owns the tap; same shared
+  /// key) — picks the halo style so the two glow treatments can be compared
+  /// live: today = the full sky band, week = the current hour's light.
+  @AppStorage(TimeOfDayWheel.windowDefaultsKey) private var todayOnly = true
 
   @State private var snapshot = RhythmData.Snapshot()
   /// One-shot ring pulses over dots that just landed (see `reload`).
@@ -83,11 +113,18 @@ struct DayDialHero: View {
       }
       .allowsHitTesting(false)
     }
-    // The glow is a background so it bleeds past the dial (toward the
-    // greeting above) without claiming layout height.
+    // The light is a background so it bleeds past the dial (toward the
+    // greeting above) without claiming layout height: a wide soft backwash
+    // (AmbientGlow) for depth, plus a halo hugging the disc edge
+    // (AmbientHalo) so the face reads as lit, not flat — and survives dark
+    // mode, where the halo carries most of the effect.
     .background {
-      AmbientGlow()
-        .frame(width: 460, height: 460)
+      ZStack {
+        AmbientGlow()
+          .frame(width: 460, height: 460)
+        AmbientHalo(diameter: dialDiameter - 2 * TimeOfDayWheel.fullMargin,
+                    style: todayOnly ? .sky : .now)
+      }
     }
     // Publish the dot ring's circle (global coords) so the `.arc` comet can
     // orbit the dial instead of sweeping the screen. Cleared on disappear —
@@ -100,7 +137,12 @@ struct DayDialHero: View {
     }
     .onDisappear { logCommit?.dayDialAnchor = nil }
     .frame(maxWidth: .infinity)
-    .task(id: clock.today) { reload() }
+    .task(id: clock.today) {
+      reload()
+      // One coarse fix per launch/rollover while "Sunrise from location" is
+      // on — keeps the solar times tracking travel without any monitoring.
+      SolarLocationFetcher.shared.refreshIfEnabled()
+    }
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
       reload()
     }

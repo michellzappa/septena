@@ -44,17 +44,22 @@ enum SettingsKey {
   /// Default (`tiles`) preserves the existing card-grid behaviour, so
   /// users with no setting see no change.
   static let homepageLayout   = "septena.homepage.layout"
-  /// Whether the day-timeline strip renders above the homepage layout.
-  /// Default on; users who want a denser dashboard can hide it.
-  static let homepageShowTodayTimeline = "septena.homepage.showTodayTimeline"
+  /// How the front door shows "today at a glance" between the greeting and
+  /// the layout: the circular Day dial, the linear timeline strip, or
+  /// hidden. Raw value of `DayViewStyle`; default dial. Replaced the old
+  /// show-timeline / show-dial boolean pair.
+  static let homepageDayView = "septena.homepage.dayView"
+  /// Anchor the Day dial's sky (solar ring + glow) to real sunrise/sunset,
+  /// computed on-device from one coarse location fix (see SolarClock).
+  /// Off (default) → the fixed design day.
+  static let solarFromLocation = "septena.solar.fromLocation"
+  /// The stored coarse coordinate (rounded to ~0.1°) feeding SolarClock.
+  static let solarLatitude = "septena.solar.lat"
+  static let solarLongitude = "septena.solar.lon"
   /// Whether the time-of-day welcome (greeting + subtitle) renders at the
   /// very top of the homepage. Default on; mirrors the webapp's overview
   /// dashboard header.
   static let homepageShowWelcome = "septena.homepage.showWelcome"
-  /// Whether the Day dial hero (today on a 24-hour clock face, under the
-  /// ambient time-of-day light) renders between the greeting and the layout.
-  /// Default on — it's the front door's signature object.
-  static let homepageShowDayDial = "septena.homepage.showDayDial"
   /// Optional first name used to personalise the homepage welcome greeting.
   /// Local-only (@AppStorage); not synced to CloudKit.
   static let welcomeName = "septena.homepage.welcomeName"
@@ -481,6 +486,10 @@ struct SettingsView: View {
 
   var body: some View {
     #if os(iOS)
+    // Presented as a drawer: a grab handle on top, swipe-down to dismiss, no
+    // explicit close button (the user prefers the tab-on-top affordance over a
+    // "Done" toolbar item). The drag indicator lives here so every call site
+    // that presents SettingsView in a sheet gets it for free.
     NavigationStack(path: $path) {
       sidebarList
         .navigationTitle("Settings")
@@ -489,12 +498,8 @@ struct SettingsView: View {
             .navigationTitle(title(for: dest))
             .navigationBarTitleDisplayMode(.inline)
         }
-        .toolbar {
-          ToolbarItem(placement: .confirmationAction) {
-            Button("Done") { dismiss() }
-          }
-        }
     }
+    .presentationDragIndicator(.visible)
     #else
     NavigationSplitView(columnVisibility: $columnVisibility,
                         preferredCompactColumn: $preferredCompactColumn) {
@@ -812,12 +817,12 @@ struct PrivacySettingsPane: View {
 
 /// Everything that shapes the home tab, pulled out of the old "Customize"
 /// junk drawer: how it renders (Layout, Insights), the greeting (Welcome),
-/// and the day-timeline strip.
+/// and the day view.
 struct HomeSettingsPane: View {
-  @AppStorage(SettingsKey.homepageShowTodayTimeline)
-  private var showTodayTimeline: Bool = true
-  @AppStorage(SettingsKey.homepageShowDayDial)
-  private var showDayDial: Bool = true
+  @AppStorage(SettingsKey.homepageDayView)
+  private var dayViewRaw: String = DayViewStyle.dial.rawValue
+  @AppStorage(SettingsKey.solarFromLocation)
+  private var solarFromLocation: Bool = false
 
   var body: some View {
     Form {
@@ -841,14 +846,28 @@ struct HomeSettingsPane: View {
       }
 
       Section {
-        Toggle(isOn: $showDayDial) {
-          Label("Show Day dial", systemImage: "dial.medium")
+        Picker(selection: Binding(
+          get: { DayViewStyle(rawValue: dayViewRaw) ?? .dial },
+          set: { dayViewRaw = $0.rawValue }
+        )) {
+          ForEach(DayViewStyle.allCases) { style in
+            Label(style.label, systemImage: style.icon).tag(style)
+          }
+        } label: {
+          Text("Day view")
         }
-        Toggle(isOn: $showTodayTimeline) {
-          Label("Show Today timeline", systemImage: "clock")
+        .pickerStyle(.inline)
+        .labelsHidden()
+        Toggle(isOn: $solarFromLocation) {
+          Label("Sunrise from location", systemImage: "sun.horizon.fill")
         }
+        .onChange(of: solarFromLocation) { _, on in
+          if on { SolarLocationFetcher.shared.refreshIfEnabled() }
+        }
+      } header: {
+        Text("Day view")
       } footer: {
-        Text("The Day dial is today on a 24-hour clock face — every section's logs as dots, sleep as an arc, under the day's ambient light. The Today timeline is the horizontal strip version.")
+        Text("Today at a glance, between the greeting and the layout. Dial is the 24-hour clock face — every section's logs as dots, sleep as an arc, under the sky's light. Timeline is the same day as a horizontal strip. Sunrise from location places dawn and dusk at your real sunrise and sunset, computed on this device from one approximate location fix — your location never leaves the device.")
       }
     }
     .formStyle(.grouped)

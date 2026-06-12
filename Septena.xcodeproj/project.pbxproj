@@ -229,6 +229,7 @@
 		5480C8D91B5B539C4728B321 /* GoalsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 207D112EFCEB89F2F0D1DBE5 /* GoalsPlugin.swift */; };
 		54C233A5563549B5083DF380 /* FoundationModels.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9E48AFEC976A22FEF321AE70 /* FoundationModels.framework */; };
 		552BD8D05534BBE582041BE4 /* TimeOfDayWheel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 729A9E0B1243570301EBC253 /* TimeOfDayWheel.swift */; };
+		55EA2A17835A1384B386E08D /* SolarClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2085456E2239FA343DA34D32 /* SolarClock.swift */; };
 		560C8807DC6FECD5E6E42A0F /* ConvoDerived.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80DEE8B28CA8C41A6CA85016 /* ConvoDerived.swift */; };
 		56D71037B585C83AC45D16CC /* PurposeSuggestions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C38A953AE520D739651C6766 /* PurposeSuggestions.swift */; };
 		56E87EA383673A4ACE86F2CD /* BadgeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EC7C9D9CAC52C91AFE79AE7 /* BadgeManager.swift */; };
@@ -629,6 +630,7 @@
 		EE902B419406F504517110B8 /* NavigationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C59B083F7F5C67ABE440868 /* NavigationState.swift */; };
 		EF6F6DC70A2A20577E2BDCBD /* HealthKitBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F61B77A80F53A6EEEBBC90EA /* HealthKitBridge.swift */; };
 		EFA74ED84CC5C35B6F51D0D3 /* ConsistencyStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E4AE35AB6070F3A880EC04 /* ConsistencyStats.swift */; };
+		EFC89B6F74CF8A5AD952F07D /* SolarClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2085456E2239FA343DA34D32 /* SolarClock.swift */; };
 		EFE1FEDBA1BFF8D046A0261C /* SleepDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9859683174B5C2A84764D99C /* SleepDestinationView.swift */; };
 		F0C1672EFEBA715B2830BC62 /* TrainingPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA54AD462A4486F31EBBDFC4 /* TrainingPlugin.swift */; };
 		F21704F2D348D306CBC132AB /* SuggestionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6DD7C05D998EF1301A6410D /* SuggestionEngine.swift */; };
@@ -782,6 +784,7 @@
 		1F13269D0CDB1EB49B2351D6 /* TaskDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
 		1FDD99A14104B857C0AD4661 /* IntakeModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntakeModel.swift; sourceTree = "<group>"; };
 		207D112EFCEB89F2F0D1DBE5 /* GoalsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsPlugin.swift; sourceTree = "<group>"; };
+		2085456E2239FA343DA34D32 /* SolarClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolarClock.swift; sourceTree = "<group>"; };
 		21A8FE1B8B5D5A1B17969276 /* GoalMetricProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalMetricProgressView.swift; sourceTree = "<group>"; };
 		21B54F8682AE8C22E352630E /* RoutineCatalogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineCatalogView.swift; sourceTree = "<group>"; };
 		23D4FD6096AAAF4FF35B1824 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -1724,6 +1727,7 @@
 				112DA7513628EF825585692E /* MilestonePresenter.swift */,
 				F79D2478011E9353A0DF90AC /* ModuleTile.swift */,
 				13011C553B04F0ACEFD189CD /* PlatformShims.swift */,
+				2085456E2239FA343DA34D32 /* SolarClock.swift */,
 				AF9E152DA345E00295EC4F58 /* SyncIndicator.swift */,
 				7F911216C13CBFC7E330714A /* Theme.swift */,
 				729A9E0B1243570301EBC253 /* TimeOfDayWheel.swift */,
@@ -2453,6 +2457,7 @@
 				1D075925DFF88985F673FD7F /* SiriShortcutsSettingsPane.swift in Sources */,
 				A90F8338D53AE42BA5F3FA33 /* SleepDestinationView.swift in Sources */,
 				29BCD4B4754BFB299B32292B /* SleepPlugin.swift in Sources */,
+				55EA2A17835A1384B386E08D /* SolarClock.swift in Sources */,
 				31E3CDE53B537BC61FA86E4B /* StatGrid.swift in Sources */,
 				8359B508D0CAB2AD17E004A9 /* StatStrip.swift in Sources */,
 				4576C2F0D4BCB0983D18B3DE /* SuggestionBlocks.swift in Sources */,
@@ -2795,6 +2800,7 @@
 				85732A2FE6393B89E0A992BC /* SiriShortcutsSettingsPane.swift in Sources */,
 				EFE1FEDBA1BFF8D046A0261C /* SleepDestinationView.swift in Sources */,
 				637C82B79BB177B96BD557E1 /* SleepPlugin.swift in Sources */,
+				EFC89B6F74CF8A5AD952F07D /* SolarClock.swift in Sources */,
 				036EA94AAE4126D6277D46B8 /* StatGrid.swift in Sources */,
 				41FA57763B555A0445F34644 /* StatStrip.swift in Sources */,
 				B56035BEC42CF42BCF4E3310 /* SuggestionBlocks.swift in Sources */,

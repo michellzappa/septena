@@ -40,17 +40,35 @@ sun glyph for Today, the `.arc` comet, `TimeOfDayWheel`).
   matched-geometry tile→destination transitions, live idle details, ghost-state
   empty states replacing `ContentUnavailableView`.
 
-## Celebration budget (shipped same session)
+## Celebration budget (shipped same session; tightened after device test)
 
-The screen-level flourish vocabulary is now reserved for *earned* moments:
+The screen-level flourish vocabulary is reserved for *earned* moments. The
+user's calibration (2026-06-12, after testing): everyday logs should be
+**quiet** (tick + announce via `SectionLog.quietLog`), with one earned
+canvas moment per section where one exists.
 
-- Nutrition + hydration demoted from per-log full-page `.fill` to calm
-  `.bloom` (the celebration-budget rule in `TaskComponents` applied to logs).
-- The `.fill` flood is **reserved for the glass that crosses the daily
-  hydration target** — once a day, both commit sites (destination +
-  dashboard quick-add). The hydration sibling of the tasks `.arc` rule.
-- Nutrition gets no crossing payoff on purpose: no single target to cross
-  (multi-axis range goals; kcal often unknown at log time).
+- **Nutrition**: only the day's FIRST meal — breaking the overnight fast —
+  plays `.bloom`; every later meal is quiet. Policy lives in ONE place:
+  `NutritionPlugin.commitMeal(loggedAt:…)`, which all six new-meal call
+  sites route through. Water-only rows don't break a fast; past-day
+  backfill never celebrates. First-meal check reads the local mirror at
+  commit time.
+- **Hydration**: every glass is QUIET; the `.fill` flood plays only for the
+  glass that crosses the daily target — once a day, both commit sites,
+  crossing computed from the local mirror (`HydrationPlugin.waterMl`),
+  never display state (the stale-cache misfire bug).
+- **Intake**: `.snap` for every tracker log (user pick). Per-kind stored
+  `flourish` tokens are dormant — `IntakeKindPageView.motion(for:)` returns
+  `.snap` unconditionally. VISIBILITY FIX: on iPhone the kind page is a
+  sheet, which covers the root `LogCommitOverlay`, so the page hosts its
+  own `CommitFlourish` overlay (`flourishTrigger`) and passes
+  `logCommit: nil` — this is the general pattern for any log surface that
+  presents as a sheet and doesn't dismiss on commit.
+- **Gut / Medications / Symptoms**: `.sink` retired (read as "nothing
+  happening") → `.snap`.
+- **Training**: per-set canvas burst REMOVED (haptic + icon bounce remain);
+  session-complete is the one moment — `.burst` always, intensity still
+  scaled by PRs / volume.
 - Tile gauges carry the everyday feedback instead: `Theme.Motion.gauge`
   spring (travel + overshoot), numeric count-up on the same curve, and a
   traveling glint across the newly-added span of the progress bar
@@ -101,6 +119,102 @@ The screen-level flourish vocabulary is now reserved for *earned* moments:
 4. **Center shows the date.** In hero today-focus the scope chip gives way to
    weekday-over-day-number (watch-face style); the week overlay keeps the
    "7 days" chip so the toggled state stays labeled.
+
+### Round 2 (user feedback, same day)
+
+- **Sun + moon landmarks** (hero, today view only): the midnight and noon
+  numerals become `moon.fill` (top — midnight is at the top of this dial)
+  and `sun.max.fill` (bottom), tinted from the AmbientLight palette. Week
+  overlay keeps all four numerals.
+- **Date hub**: a 30pt card-surface disc under the date but over the
+  now-hand, so the hand reads as truncated at the hub — a watch's center
+  cap. (The small 6pt hub in non-hero center was added by a parallel
+  session; same chrome.)
+- **Sleep bands thin** (4pt, like calendar pills) — a night is context,
+  not a headline.
+- **`DayViewStyle` setting** (Settings ▸ Home): Dial / Timeline / Hidden
+  picker (`homepageDayView` key) replaced the two independent
+  show-dial/show-timeline toggles — circular and linear are two shapes of
+  the same information, so it's one choice now. Linear = the existing
+  `DayTimelineView` strip.
+
+### Round 3 (user feedback, same day)
+
+- **Solar ring replaces the phase arcs**: the user disliked the 4-segment
+  colored rim → now one Watch-Solar-style conic band
+  (`AmbientLight.solarRing`, stop locations = day fractions, stroked at
+  -90° so midnight lands top): near-black night, sky-blue day, dawn/dusk
+  gradient transitions "indicating" morning and evening.
+- **`AmbientHalo`**: a two-ring blurred glow hugging the disc edge, phase-
+  tinted, *stronger in dark mode* (the flat-in-dark complaint) — composes
+  with the wide `AmbientGlow` backwash behind the hero.
+- **Sun/moon moved to wake/bedtime**: markers now ride the solar ring at
+  today's Oura `wakeTime` (sun) and `bedtime` (moon) — the same night the
+  linear `DayTimelineView` uses for its markers; quadrant numerals
+  restored at 0/6/12/18. Card-surface "pucks" lift the glyphs off the
+  band. No night synced → no markers (honest, like the timeline).
+
+### Round 5d — glow A/B on the window tap (user feedback, same day)
+
+- `AmbientHalo` gained `Style`: `.sky` (full solar-band gradient around the
+  circle) vs `.now` (uniform glow in the current hour's sampled light).
+  The hero keys it off the dial's today⇄week window (shared
+  `TimeOfDayWheel.windowDefaultsKey` @AppStorage), so TAPPING THE DIAL
+  compares the two glow treatments live — today = sky band, week = now
+  light. Once a winner is picked, collapse Style back to one case.
+- The center hub disc now draws in EVERY full-dial window (week + non-hero
+  included), holding the scope chip — the now-hand is capped everywhere.
+
+### Round 5c — face cleaned, tap restored (user feedback, same day)
+
+- Solar ring stroke REMOVED from inside the face — the sky band now lives
+  only in the blurred `AmbientHalo` behind the dial ("just bg is nice").
+  The wheel no longer takes `solarTimes`; SolarClock feeds the halo alone.
+- The "…" window menu (added by a parallel session) replaced with the
+  original tap-on-dial toggle (today ⇄ 7 days); `todayOnly` stays
+  @AppStorage so the choice persists and all dials flip together. The
+  center scope chip returns on non-hero dials / hero-week so the current
+  window is visible again without the menu naming it.
+
+### Round 5b — halo wears the whole gradient (user feedback, same day)
+
+- `AmbientHalo` now strokes the solar ring's OWN gradient (AngularGradient,
+  same -90° start) blurred — the night side glows indigo, day side blue,
+  dawn edge orange, in the same angular positions as the band. Not a
+  single sampled color anymore (that was the misread of "merge the blur
+  with the sky"); the wide `AmbientGlow` backwash keeps the sampled
+  sky-at-now color as the room light.
+
+### Round 5 — markers dropped (user feedback, same day)
+
+- Sun/moon wake/bedtime markers (and their pucks) REMOVED: redundant once
+  the sleep arc shows the night and the solar ring shows the sky. The
+  `sunFraction`/`moonFraction` wheel params and the hero's Oura-night
+  lookup went with them; `RhythmData.frac` is private again. The linear
+  `DayTimelineView` keeps its own sun/moon — different geometry, still
+  earns them.
+
+### Round 4 — one sky model (user feedback, same day)
+
+- **The glow IS the sky now.** `AmbientLight` keeps ONE stop table
+  (night/dawn/day/dusk colors at hours anchored to sunrise/sunset);
+  `solarRing(times:)` strokes it, `sky(at:)` *samples* it at the current
+  minute — and `AmbientGlow` + `AmbientHalo` wear that sampled color. At
+  07:00 the blur behind the dial is dawn-orange, at noon sky-blue, at
+  23:00 night-indigo, drifting continuously through the transitions. The
+  old four-phase tint pairs are gone from the glow path (the `Phase` enum
+  survives only for the sun/moon marker tints).
+- **Real sunrise/sunset, opt-in** (`SolarClock` + `SolarLocationFetcher`,
+  `Septena/Shell/UI/SolarClock.swift`): NOAA approximation computed
+  on-device from ONE coarse location fix (kilometer accuracy, rounded to
+  ~0.1° ≈ 11 km before storing — useless for tracking), cached per day,
+  refreshed once per launch/rollover while enabled. Toggle: Settings ▸
+  Home ▸ "Sunrise from location" (`solarFromLocation`; lat/lon under
+  `septena.solar.*`). Off / denied / polar edge → the fixed design day
+  (up 6:30, down 19:00) that matches the pre-location tuning.
+  `NSLocationWhenInUseUsageDescription` added to both app targets +
+  InfoPlist.xcstrings. The ring's dawn/dusk stops and the sampled glow
+  both move with the real times, so the whole sky model shifts together.
 
 ## Next steps (in order)
 

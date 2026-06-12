@@ -214,6 +214,7 @@
       }
     },
     "%@ entries · %@ days" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -287,6 +288,16 @@
     },
     "%@ ml" : {
       "shouldTranslate" : false
+    },
+    "%@ records · %@ types" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ records · %2$@ types"
+          }
+        }
+      }
     },
     "%@ ref%@" : {
       "localizations" : {
@@ -797,9 +808,6 @@
           }
         }
       }
-    },
-    "24 hours" : {
-
     },
     "30 days" : {
       "localizations" : {
@@ -2411,6 +2419,9 @@
         }
       }
     },
+    "Day view" : {
+
+    },
     "Default" : {
       "localizations" : {
         "pt-BR" : {
@@ -2579,7 +2590,6 @@
       }
     },
     "Double tap to switch between today and the last %@ days" : {
-      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -5182,6 +5192,7 @@
       }
     },
     "Re-pulls every nutrition entry and daily summary from CloudKit and merges them into the local store. Use if this device's protein/kcal history looks empty even though entries exist on another device." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -5190,6 +5201,9 @@
           }
         }
       }
+    },
+    "Re-pulls every record in this account's CloudKit zone and merges it into the local store. Use if a section's history looks empty on this device even though the data exists on another one. Cloud truth wins for any record that differs locally." : {
+
     },
     "Read Apple Health on this device" : {
       "localizations" : {
@@ -6296,9 +6310,6 @@
         }
       }
     },
-    "The Day dial is today on a 24-hour clock face — every section's logs as dots, sleep as an arc, under the day's ambient light. The Today timeline is the horizontal strip version." : {
-
-    },
     "The default icon is always free. Color icons are part of Septena+. iOS shows a confirmation prompt each time you switch icons." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -6515,6 +6526,9 @@
           }
         }
       }
+    },
+    "Today at a glance, between the greeting and the layout. Dial is the 24-hour clock face — every section's logs as dots, sleep as an arc, under the sky's light. Timeline is the same day as a horizontal strip. Sunrise from location places dawn and dusk at your real sunrise and sunset, computed on this device from one approximate location fix — your location never leaves the device." : {
+
     },
     "Token" : {
       "localizations" : {
@@ -6976,9 +6990,6 @@
           }
         }
       }
-    },
-    "Wheel window" : {
-
     },
     "When on, pending items in the source list import automatically and are removed from Reminders. Runs on app launch and whenever Reminders changes." : {
       "localizations" : {
