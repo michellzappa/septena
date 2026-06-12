@@ -2,11 +2,11 @@
 
 The de-facto design system, written down. Derived from what the app already does — not aspirational. When something here conflicts with code, the code is wrong, not the spec.
 
-_Last verified against code: 2026-06-09._
+_Last verified against code: 2026-06-12._
 
 ## 1. Section model
 
-A **section** is the unit of vertical scope: Tasks, Training, Nutrition, Sleep, Habits, Chores, Supplements, Groceries, Caffeine, Cannabis, Gut, Hydration, Mood, Activity, Body, Goals.
+A **section** is the unit of vertical scope: Tasks, Goals, Training, Nutrition, Hydration, Sleep, Habits, Chores, Supplements, Groceries, Intake, Caffeine, Cannabis, Gut, Mood, Symptoms, Medications, Activity, and Body.
 
 Each section's identity is declared once in [SectionManifest.swift](../SeptenaCore/Sections/SectionManifest.swift):
 
@@ -14,7 +14,7 @@ Each section's identity is declared once in [SectionManifest.swift](../SeptenaCo
 - `defaultLabel` — display name (user-overridable via `SectionEntity`)
 - `iconSymbol` — **SF Symbol name**, sole source of section iconography
 - `accent color` — hex in [SectionTheme.swift](../SeptenaCore/SectionTheme.swift) `defaultPalette`
-- `activation`, `onboarding`, `supportsTab`, `supportsDashboard`, `settingsEditor`
+- `activation`, `onboarding`, `supportsDashboard`, `settingsEditor`
 
 New sections register here. Nothing else should encode section identity.
 

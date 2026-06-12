@@ -819,6 +819,9 @@
     "A roster of focused, on-device coaches." : {
 
     },
+    "Ache" : {
+
+    },
     "Activated · Negative" : {
       "localizations" : {
         "pt-BR" : {
@@ -976,6 +979,7 @@
       }
     },
     "Add %lld sources" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -1443,6 +1447,9 @@
         }
       }
     },
+    "As needed" : {
+
+    },
     "Ask Siri" : {
       "localizations" : {
         "pt-BR" : {
@@ -1760,6 +1767,9 @@
         }
       }
     },
+    "Burning" : {
+
+    },
     "Caffeine" : {
       "localizations" : {
         "pt-BR" : {
@@ -1980,6 +1990,7 @@
       }
     },
     "Coffee, beans, brewing methods" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -2147,9 +2158,6 @@
         }
       }
     },
-    "Copies your old section's entries into a tracker here. Nothing is deleted — the old section keeps its data, and re-running is safe (no duplicates)." : {
-
-    },
     "Copy a prompt and paste it into an LLM along with the source data you want to import. The model returns JSON that pastes straight into Import above." : {
       "localizations" : {
         "pt-BR" : {
@@ -2214,6 +2222,9 @@
           }
         }
       }
+    },
+    "Cramp" : {
+
     },
     "Create a Personal Access Token at cloud.ouraring.com/personal-access-tokens, then paste it here. Tokens stay on this device (Keychain) and are never sent to any Septena server." : {
       "localizations" : {
@@ -2282,6 +2293,7 @@
       }
     },
     "Custom…" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -3621,6 +3633,7 @@
       }
     },
     "Intake log and dosing" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -3831,9 +3844,6 @@
       }
     },
     "Left" : {
-
-    },
-    "Legacy data" : {
 
     },
     "Let Claude read and write your Septena data at mcp.septena.app." : {
@@ -4445,6 +4455,7 @@
       }
     },
     "No bean presets yet — add some in Caffeine settings." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -5015,6 +5026,9 @@
     "PR" : {
       "shouldTranslate" : false
     },
+    "Pressure" : {
+
+    },
     "PROGRESS" : {
       "localizations" : {
         "pt-BR" : {
@@ -5094,6 +5108,9 @@
           }
         }
       }
+    },
+    "Quick add" : {
+
     },
     "Quiet" : {
       "localizations" : {
@@ -5656,6 +5673,9 @@
     "Severity" : {
 
     },
+    "Sharp" : {
+
+    },
     "Shopping list" : {
       "localizations" : {
         "pt-BR" : {
@@ -5866,6 +5886,9 @@
           }
         }
       }
+    },
+    "Starter medications" : {
+
     },
     "Starter symptoms" : {
 
@@ -6393,6 +6416,9 @@
         }
       }
     },
+    "Throbbing" : {
+
+    },
     "Time of day" : {
       "localizations" : {
         "pt-BR" : {
@@ -6423,6 +6449,9 @@
           }
         }
       }
+    },
+    "Tingling" : {
+
     },
     "today" : {
       "localizations" : {
@@ -6663,6 +6692,9 @@
         }
       }
     },
+    "Unset" : {
+
+    },
     "Upbeat" : {
       "localizations" : {
         "pt-BR" : {
@@ -6704,6 +6736,12 @@
       }
     },
     "Upper must be greater than the lower bound." : {
+
+    },
+    "Use custom medication for exact prescription names and strengths." : {
+
+    },
+    "Use generic placeholders when exact prescriptions should be entered manually later." : {
 
     },
     "Used to personalize the greeting. With Apple Intelligence it's freshly written through the day." : {

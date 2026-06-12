@@ -32,7 +32,7 @@ target shape; the Console's Production schema must be a subset of it after deplo
 |---|---|
 | Container | `iCloud.com.septena.cloud` |
 | Database | **Private** (per-user) for everything below |
-| Sync zone | `septena-v1` (custom zone, driven by `CKSyncEngine`) — holds **all 26 user record types** |
+| Sync zone | `septena-v1` (custom zone, driven by `CKSyncEngine`) — holds the app's user record types |
 | Out-of-band | `WatchSnapshot` lives in the **default zone**, written directly (NOT via the sync engine) |
 
 Sync uses **zone-change fetches, not `CKQuery`** — so queryable/indexable fields are *not*
@@ -45,8 +45,8 @@ required for the app's own sync. They *are* required for any consumer that runs 
 ## Production deploy — the pending changelog
 
 Promotion is additive, so all that matters is: **what exists in Dev that Production
-must also have.** Four known-recent additions (all build-verified on Dev, never yet
-promoted to Prod):
+must also have.** Known-recent additions (all app-backed, never yet promoted to Prod
+unless the Console already shows them):
 
 | # | Change | Record type(s) | Field(s) | Type |
 |---|---|---|---|---|
@@ -54,6 +54,8 @@ promoted to Prod):
 | 2 | **New record type** `MoodEvent` (whole type, 9 fields incl. its own `occurredAt`) | `MoodEvent` | all | — |
 | 3 | **New field** `bucket` (optional supplement time-bucket) | `SupplementDefinition` | `bucket` | String |
 | 4 | **New record type** `GoalMilestone` (whole type, 9 fields — latched achievement events) | `GoalMilestone` | all | — |
+| 5 | **New record types** for Symptoms | `SymptomDefinition`, `SymptomEvent` | all | — |
+| 6 | **New record types** for Medications | `MedicationDefinition`, `MedicationDoseEvent` | all | — |
 
 `MoodEvent` reuses the CloudKit record slot vacated by the retired `AirReading` type
 (Air section removed in the same merge). It is a *new* type from Production's point of
@@ -79,6 +81,8 @@ view regardless.
 
 - [ ] `occurredAt : Timestamp` present on all 7 event types **and** `MoodEvent`
 - [ ] `MoodEvent` record type exists with all 9 fields
+- [ ] `SymptomDefinition` and `SymptomEvent` record types exist with all fields
+- [ ] `MedicationDefinition` and `MedicationDoseEvent` record types exist with all fields
 - [ ] `SupplementDefinition.bucket : String` present
 - [ ] No type was promoted with a **different** field type than this manifest (additive
       mistakes can't be undone — if types diverge, the field is permanently wrong in Prod)
@@ -387,6 +391,66 @@ One row per message; a coach's transcript = all rows with that `coachKey`. **NEW
 | `emotion` | String | `String` | No | |
 | `note` | String | `String?` | Yes | |
 | `occurredAt` | Timestamp | `Date` | No | default `.distantPast` |
+
+#### SymptomDefinition  — `symptom-definition:{id}`  · **⚠ ENTIRE TYPE PENDING PROD DEPLOY**
+| Field | CK type | Swift | Nullable | Notes |
+|---|---|---|---|---|
+| `title` | String | `String` | No | |
+| `emoji` | String | `String?` | Yes | user-owned optional glyph |
+| `bodySystem` | String | `String?` | Yes | |
+| `defaultBodyRegion` | String | `String?` | Yes | |
+| `sortIndex` | Int(64) | `Int` | No | |
+| `archived` | Int(64) | `Bool` | No | default `false` |
+| `createdAt` | Timestamp | `Date` | No | |
+
+#### SymptomEvent  — `symptom-event:{id}`  · **⚠ ENTIRE TYPE PENDING PROD DEPLOY**
+| Field | CK type | Swift | Nullable | Notes |
+|---|---|---|---|---|
+| `date` | String | `String` | No | |
+| `symptomID` | String | `String` | No | ref-by-string to `SymptomDefinition.id` |
+| `severity` | Int(64) | `Int` | No | clamped 0...10 |
+| `durationMinutes` | Int(64) | `Int?` | Yes | |
+| `bodyRegion` | String | `String?` | Yes | |
+| `side` | String | `String?` | Yes | left/right/both by convention |
+| `quality` | String | `String?` | Yes | |
+| `triggerNote` | String | `String?` | Yes | |
+| `reliefNote` | String | `String?` | Yes | |
+| `note` | String | `String?` | Yes | |
+| `source` | String | `String?` | Yes | manual/mcp/etc. |
+| `occurredAt` | Timestamp | `Date` | No | event timestamp |
+
+#### MedicationDefinition  — `medication-definition:{id}`  · **⚠ ENTIRE TYPE PENDING PROD DEPLOY**
+| Field | CK type | Swift | Nullable | Notes |
+|---|---|---|---|---|
+| `title` | String | `String` | No | |
+| `genericName` | String | `String?` | Yes | |
+| `form` | String | `String?` | Yes | tablet/capsule/liquid/etc. by convention |
+| `route` | String | `String?` | Yes | oral/topical/etc. by convention |
+| `strengthValue` | Double | `Double?` | Yes | |
+| `strengthUnit` | String | `String?` | Yes | |
+| `defaultDoseValue` | Double | `Double?` | Yes | |
+| `defaultDoseUnit` | String | `String?` | Yes | |
+| `bucket` | String | `String?` | Yes | morning/midday/evening/bedtime/anytime |
+| `scheduleKind` | String | `String?` | Yes | `daily` or `asNeeded`; defaults daily in app |
+| `targetDosesPerDay` | Int(64) | `Int?` | Yes | defaults 1 in app for daily meds |
+| `instructions` | String | `String?` | Yes | |
+| `sortIndex` | Int(64) | `Int` | No | |
+| `archived` | Int(64) | `Bool` | No | default `false` |
+| `createdAt` | Timestamp | `Date` | No | |
+
+#### MedicationDoseEvent  — `medication-dose-event:{id}`  · **⚠ ENTIRE TYPE PENDING PROD DEPLOY**
+| Field | CK type | Swift | Nullable | Notes |
+|---|---|---|---|---|
+| `date` | String | `String` | No | |
+| `medicationID` | String | `String` | No | ref-by-string to `MedicationDefinition.id` |
+| `status` | String | `String` | No | taken/skipped/missed |
+| `doseValue` | Double | `Double?` | Yes | |
+| `doseUnit` | String | `String?` | Yes | |
+| `reason` | String | `String?` | Yes | |
+| `effectNote` | String | `String?` | Yes | |
+| `sideEffectNote` | String | `String?` | Yes | |
+| `source` | String | `String?` | Yes | manual/mcp/etc. |
+| `occurredAt` | Timestamp | `Date` | No | event timestamp |
 
 ### Wearables (read-only providers) — zone `septena-v1`
 
