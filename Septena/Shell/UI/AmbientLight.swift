@@ -52,16 +52,14 @@ enum AmbientLight {
   // glow *samples* it at "now", so the light behind the dial is always
   // literally the sky's color at the current hour.
 
-  // Day is TRANSPARENT: daylight adds no cast at all — the glass band is
-  // just plain glass through the day. (Sky-blue painted the hero blue;
-  // opaque white read as an HDR burn under the blur.) The sky only ever
-  // ADDS light: night darkens, dawn and dusk warm — the rest is absence,
-  // which is what daylight looks like on glass.
+  // Monochrome night logic, no color. Day is TRANSPARENT (plain glass —
+  // sky-blue painted the hero blue, opaque white read as an HDR burn). Night
+  // is a neutral DARK shade. The band simply carries night as a dark arc
+  // that fades to clear over the daylight hours — a "this part of the circle
+  // is night" cue, not a warm dawn/dusk wash (which read as orange blobs).
   private typealias SkyStop = (r: Double, g: Double, b: Double, a: Double)
-  private static let nightStop: SkyStop = (0.07, 0.09, 0.20, 1.0)
+  private static let nightStop: SkyStop = (0.08, 0.09, 0.12, 1.0)
   private static let dayStop: SkyStop   = (1.00, 1.00, 1.00, 0.0)
-  private static let dawnStop: SkyStop  = (1.00, 0.64, 0.42, 1.0)
-  private static let duskStop: SkyStop  = (1.00, 0.48, 0.32, 1.0)
 
   /// The sky's color stops over the day, in HOURS (0..24). Sunrise/sunset
   /// are clamped into a sane visual band so an extreme computed time (or a
@@ -69,14 +67,14 @@ enum AmbientLight {
   private static func skyStops(times: SolarClock.Times) -> [(hour: Double, stop: SkyStop)] {
     let sr = min(10, max(4, times.sunriseHour))
     let ss = min(22, max(15, times.sunsetHour))
+    // Dark through the night, ramping straight to clear across ~3h around
+    // sunrise and back around sunset — a luminance fade, no warm waypoint.
     return [
       (0, nightStop),
-      (sr - 2, nightStop),
-      (sr, dawnStop),
-      (sr + 2, dayStop),
-      (ss - 2.5, dayStop),
-      (ss, duskStop),
-      (min(23.9, ss + 2.5), nightStop),
+      (sr - 1.5, nightStop),
+      (sr + 1.5, dayStop),
+      (ss - 1.5, dayStop),
+      (min(23.9, ss + 1.5), nightStop),
       (24, nightStop),
     ]
   }

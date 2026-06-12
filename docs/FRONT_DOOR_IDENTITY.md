@@ -167,17 +167,19 @@ no). Also: the **sky day stop went transparent** (`SkyStop` gained an alpha
 channel) so daylight adds nothing and only night/dawn/dusk tint the band —
 fixing the earlier blue-cast and white-burn.
 
-**The fix (round 14):** the glass is now HAND-DRAWN edge lighting
-(`AnnulusGlass`), not the material. One top light source →
-  • a body curvature gradient (lit top, shadowed underside),
-  • a crisp outer rim: bright catch-light at top → dark refracted edge at
-    bottom,
-  • the inner hole-wall rim lit the OPPOSITE way (shadow lip top, lit lip
-    bottom) → reads as glass thickness around the open center,
-  • a soft upper sheen.
-`.ultraThinMaterial` stays only as a faint translucent base; a shape shadow
-lifts it off the page. On a flat background, **edges and curvature sell
-glass, not blur.**
+**Round 14 tried hand-drawn bevels** (`AnnulusGlass`: body gradient + crisp
+lit rims) — which read as forced skeuomorphism ("is this liquidglass?" —
+no, it was the faux-3D look iOS retired).
+
+**Final (round 15):** use REAL Liquid Glass —
+`Color.clear.glassEffect(.regular.interactive(), in: AnnulusShape(...))` —
+and accept that it's **subtle by design over a flat page.** Liquid Glass is
+a refraction material: it comes alive over content/color behind it and
+during MOTION, not as static airbrushed depth. The under-glass machinery
+(ticks, sleep bands) gives it texture to bend and the tilt parallax gives
+it motion. The hand-drawn bevel and the `.ultraThinMaterial` base are gone.
+Lesson for the whole app: **don't fake glass with highlights — trust the
+material, and give it content + motion to work with.**
 
 ### Round 9 — glass sandwich + bigger hole (user feedback, same day)
 

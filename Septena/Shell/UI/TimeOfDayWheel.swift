@@ -140,6 +140,45 @@ struct TimeOfDayWheel: View {
     return minOpacity + (maxOpacity - minOpacity) * pow(1 - t, 1.7)
   }
 
+  /// One plotted event dot — position (in the dial's `side`×`side` space),
+  /// diameter, section color, recency opacity. The single source for both
+  /// the Canvas flat fills and the hero's glass beads.
+  struct DotMark: Identifiable {
+    let id: String
+    let center: CGPoint
+    let diameter: CGFloat
+    let color: Color
+    let opacity: Double
+  }
+
+  /// Lay out the shown events as dots. Density (events sharing a 30-min
+  /// slot) grows the dot: today uses the day-timeline's bubble sizing
+  /// (5pt single → 8pt capped), week scales relative to the busiest slot.
+  func dotMarks(side: CGFloat) -> [DotMark] {
+    let center = CGPoint(x: side / 2, y: side / 2)
+    let ringR = side / 2 - margin
+    guard ringR > 8 else { return [] }
+    let dotRing = ringR * 0.82
+    func point(_ f: Double, _ r: CGFloat) -> CGPoint {
+      let a = f * 2 * .pi
+      return CGPoint(x: center.x + r * CGFloat(sin(a)),
+                     y: center.y - r * CGFloat(cos(a)))
+    }
+    let slots = 48
+    var density: [Int: Int] = [:]
+    for e in shownEvents { density[Int(e.fraction * Double(slots)) % slots, default: 0] += 1 }
+    let maxCount = Double(density.values.max() ?? 1)
+    // Oldest first so today lands on top.
+    return shownEvents.sorted { $0.daysAgo > $1.daysAgo }.map { e in
+      let count = Double(density[Int(e.fraction * Double(slots)) % slots] ?? 1)
+      let norm = maxCount > 1 ? (count - 1) / (maxCount - 1) : 0
+      let dotR: CGFloat = effectiveWindow == 1 ? min(8, 4 + count) / 2 : (2.2 + norm * 3.75)
+      return DotMark(id: e.id, center: point(e.fraction, dotRing),
+                     diameter: dotR * 2, color: e.color ?? accent,
+                     opacity: fade(e.daysAgo))
+    }
+  }
+
   var body: some View {
     ZStack {
       // The clock face. Non-hero dials get the flat card-surface disc here
@@ -238,20 +277,17 @@ struct TimeOfDayWheel: View {
       }
       }
 
-      // The hero's glass donut — between machinery and data. The base is
-      // `.ultraThinMaterial` for the adaptive translucency + a faint blur
-      // of the machinery beneath; but the GLASS itself is the hand-drawn
-      // `AnnulusGlass` lighting on top — over a flat page the system blur
-      // materials have nothing to refract and read as plain gray, so the
-      // curvature body + crisp lit rims are what sell it. The shape's own
-      // shadow lifts the donut off the page (hole edge included).
+      // The hero's glass donut — between machinery and data — is REAL
+      // Liquid Glass: `.glassEffect` masked to the annulus. It's a
+      // refraction material, so it's calm and subtle over a flat page (by
+      // design) and comes alive on motion — the tilt parallax behind it,
+      // the colored dots and under-glass machinery it bends. No hand-drawn
+      // bevel: faking depth with airbrushed highlights read as forced
+      // skeuomorphism. Trust the material.
       if !compact && heroDate != nil {
-        AnnulusShape(holeFraction: Self.heroHoleFraction)
-          .fill(.ultraThinMaterial)
-          .overlay {
-            AnnulusGlass(holeFraction: Self.heroHoleFraction)
-          }
-          .shadow(color: .black.opacity(0.12), radius: 11, y: 4)
+        Color.clear
+          .glassEffect(.regular.interactive(),
+                       in: AnnulusShape(holeFraction: Self.heroHoleFraction))
           .padding(20)
       }
 
@@ -296,35 +332,35 @@ struct TimeOfDayWheel: View {
         ctx.stroke(hand, with: .color(accent.opacity(0.6)), lineWidth: 1)
       }
 
-      // Local density (within the shown window): events sharing a 30-minute
-      // slot grow the dot, so a repeated time-of-day reads as a bigger blob.
-      let slots = 48
-      var density: [Int: Int] = [:]
-      for e in shownEvents {
-        density[Int(e.fraction * Double(slots)) % slots, default: 0] += 1
-      }
-      let maxCount = Double(density.values.max() ?? 1)
-
-      // Dots, oldest first so today lands on top. In today-only mode density
-      // isn't meaningful (one day rarely repeats a time), so dots take a
-      // comfortable fixed size; in week mode size is *relative* to the busiest
-      // slot — a one-off is the smallest dot, the most-repeated the biggest.
-      for e in shownEvents.sorted(by: { $0.daysAgo > $1.daysAgo }) {
-        let count = Double(density[Int(e.fraction * Double(slots)) % slots] ?? 1)
-        let norm = maxCount > 1 ? (count - 1) / (maxCount - 1) : 0
-        // Today mode mirrors the horizontal day-timeline's bubble sizing
-        // exactly — `min(8, 5 + (count-1))` diameter (5pt single, +1pt per
-        // extra event in the slot, capped at 8) — so the two of-today views
-        // read the same. Week mode keeps its relative-to-busiest-slot scaling
-        // for the denser overlay (there's no timeline equivalent of a week).
-        // Week mode: max radius trimmed 30% (8.5 → ~5.95) so dense clusters
-        // read as firm dots, not heavy blobs. Floor stays at 2.2 for one-offs.
-        let dotR: CGFloat = effectiveWindow == 1
-          ? min(8, 4 + count) / 2
-          : (2.2 + norm * 3.75)
-        let p = point(e.fraction, dotRing)
-        let rect = CGRect(x: p.x - dotR, y: p.y - dotR, width: dotR * 2, height: dotR * 2)
-        ctx.fill(Path(ellipseIn: rect), with: .color((e.color ?? accent).opacity(fade(e.daysAgo))))
+      // Dots. The hero's today view draws them as glossy GLASS DROPLETS —
+      // a bright section-colored marble with a white catch-light top-left,
+      // luminous rather than the dark lens a tinted glassEffect becomes at
+      // bead size over a light page. Every other dial keeps a flat fill.
+      let glossy = heroDate != nil && effectiveWindow == 1
+      for m in dotMarks(side: side) {
+        // Droplets read better with a little more heft than the flat dots.
+        let r = m.diameter / 2 * (glossy ? 1.4 : 1)
+        let rect = CGRect(x: m.center.x - r, y: m.center.y - r,
+                          width: r * 2, height: r * 2)
+        if glossy {
+          // Highlight pooled toward the top-left light; the body keeps the
+          // section color so the bead stays recognizable at a glance.
+          let hp = CGPoint(x: m.center.x - r * 0.35, y: m.center.y - r * 0.4)
+          let body = Gradient(stops: [
+            .init(color: .white.opacity(0.85 * m.opacity), location: 0.0),
+            .init(color: m.color.opacity(m.opacity),       location: 0.45),
+            .init(color: m.color.opacity(m.opacity),       location: 1.0),
+          ])
+          ctx.fill(Path(ellipseIn: rect),
+                   with: .radialGradient(body, center: hp,
+                                         startRadius: 0, endRadius: r * 1.5))
+          // A small crisp specular pip.
+          let sr = r * 0.30
+          let srect = CGRect(x: hp.x - sr, y: hp.y - sr, width: sr * 2, height: sr * 2)
+          ctx.fill(Path(ellipseIn: srect), with: .color(.white.opacity(0.75 * m.opacity)))
+        } else {
+          ctx.fill(Path(ellipseIn: rect), with: .color(m.color.opacity(m.opacity)))
+        }
       }
 
       // Center. The hero's glass donut leaves the middle genuinely OPEN —
@@ -397,70 +433,6 @@ struct AnnulusShape: Shape {
              startAngle: .zero, endAngle: .degrees(360), clockwise: true)
     p.closeSubpath()
     return p
-  }
-}
-
-/// Hand-drawn glass treatment for the hero donut — the cues that read as a
-/// curved glass band over a FLAT page, where the system blur materials have
-/// nothing behind them to refract and collapse to plain gray. Everything
-/// assumes one light source at the top:
-///   • a tonal BODY gradient — lit on top, a faint shadow on the underside
-///     — so the band reads as a rounded (convex) cross-section,
-///   • a crisp OUTER rim: a bright catch-light at the top curving down to a
-///     dark refracted edge at the bottom,
-///   • a crisp INNER rim (the hole's wall): the OPPOSITE — a shadowed lip at
-///     the top, a lit lip at the bottom, because the inner wall faces inward,
-///   • a soft sheen pooling in the upper band.
-/// Pure decoration; hit-testing off. This — not the base material — is what
-/// makes the donut read as glass.
-struct AnnulusGlass: View {
-  var holeFraction: CGFloat
-  @Environment(\.colorScheme) private var scheme
-
-  var body: some View {
-    GeometryReader { geo in
-      let side = min(geo.size.width, geo.size.height)
-      let holeD = side * holeFraction
-      let dark = scheme == .dark
-      ZStack {
-        // Band body — convex cross-section: lighter where it faces the top
-        // light, a faint shadow underneath. This is what gives the band
-        // dimension over a flat page.
-        AnnulusShape(holeFraction: holeFraction)
-          .fill(LinearGradient(
-            colors: [.white.opacity(dark ? 0.12 : 0.32),
-                     .white.opacity(0.0),
-                     .black.opacity(dark ? 0.12 : 0.06)],
-            startPoint: .top, endPoint: .bottom))
-        // Sheen pooling in the upper band.
-        AnnulusShape(holeFraction: holeFraction)
-          .fill(LinearGradient(
-            colors: [.white.opacity(dark ? 0.18 : 0.30), .clear],
-            startPoint: .top, endPoint: .center))
-        // Outer rim — the money cue: a crisp bright catch-light at the top
-        // fading to a dark refracted edge at the bottom.
-        Circle()
-          .strokeBorder(LinearGradient(
-            colors: [.white.opacity(0.95),
-                     .white.opacity(0.22),
-                     .black.opacity(0.20)],
-            startPoint: .top, endPoint: .bottom), lineWidth: 1.5)
-        // Inner wall (hole) — opposite lighting: a shadowed lip at the top,
-        // a lit lip at the bottom. The double-edge is what reads as glass
-        // THICKNESS around the open center.
-        Circle()
-          .stroke(LinearGradient(
-            colors: [.black.opacity(0.18),
-                     .white.opacity(0.10),
-                     .white.opacity(0.72)],
-            startPoint: .top, endPoint: .bottom), lineWidth: 1.5)
-          .frame(width: holeD, height: holeD)
-      }
-      .frame(width: side, height: side)
-      .position(x: geo.size.width / 2, y: geo.size.height / 2)
-    }
-    .allowsHitTesting(false)
-    .accessibilityHidden(true)
   }
 }
 
