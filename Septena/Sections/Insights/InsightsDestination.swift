@@ -23,10 +23,15 @@ struct InsightsDestinationView: View {
   /// distinct from the life-domain section colors.
   static let accent = Color(red: 0.486, green: 0.227, blue: 0.929) // #7c3aed
 
-  /// The Insights tuning pane (window, section filter), presented over the
-  /// drawer. Its canonical home is Customize → Insights; this leading-edge
-  /// shortcut opens the same page without leaving the explorer.
+  /// The Insights tuning pane (window, section filter). Its canonical home
+  /// is Customize → Insights; this leading-edge shortcut opens the same page
+  /// without leaving the explorer. iOS presents it as a sheet over the
+  /// drawer; macOS routes through the shared Settings window.
+  #if os(macOS)
+  @Environment(NavigationState.self) private var nav
+  #else
   @State private var showSettings = false
+  #endif
 
   var body: some View {
     SectionDrawer(sectionKey: "insights", title: "Insights",
@@ -41,14 +46,21 @@ struct InsightsDestinationView: View {
       #endif
       ToolbarItem(placement: placement) {
         Button {
+          #if os(macOS)
+          nav.settingsDestination = .correlations
+          nav.showSettings = true
+          #else
           showSettings = true
+          #endif
         } label: {
           Label("Insights Settings", systemImage: "slider.horizontal.3")
         }
       }
     }
+    #if os(iOS)
     .sheet(isPresented: $showSettings) {
       SettingsView(initialDestination: .correlations)
     }
+    #endif
   }
 }

@@ -379,6 +379,33 @@ struct SeptenaApp: App {
       Image("Discs")
     }
     .menuBarExtraStyle(.menu)
+
+    // Settings as a first-class window rather than a sheet, so it carries
+    // native traffic lights and closes like any window (the user's
+    // expectation on macOS). Opened by RootTabView when `showSettings`
+    // flips; a fixed window id means repeat opens reuse the one window.
+    // `.contentSize` resizability pins it to SettingsView's own frame and
+    // drops the zoom button — there's nothing to maximize into.
+    Window("Settings", id: "settings") {
+      SettingsView(initialDestination: navigation.settingsDestination)
+        // A separate scene gets its own environment — replicate the main
+        // WindowGroup's chain above so SettingsView resolves SettingsStore /
+        // CKEngine / NavigationState / SectionTheme. Keep the two in sync.
+        .environment(navigation)
+        .environment(theme)
+        .environment(trainingDraft)
+        .environment(settingsStore)
+        .environment(taskMutator)
+        .environment(checklistMutator)
+        .environment(areasMutator)
+        .environment(projectsMutator)
+        .environment(dayClock)
+        .environment(ckEngine)
+        .environment(logCommit)
+        .modelContainer(localStore.container)
+    }
+    .windowResizability(.contentSize)
+    .defaultPosition(.center)
     #endif
   }
 

@@ -446,6 +446,11 @@ struct SettingsView: View {
   // writes now live in the leaf panes (SectionsSettingsPane / SectionDetailPane),
   // so SettingsView no longer needs modelContext or the CK engine directly.
   @Environment(SettingsStore.self) private var store
+  #if os(macOS)
+  // Settings runs in its own (reused) window on macOS; this drives the
+  // deep-link → pane sync in the macOS branch of `body`.
+  @Environment(NavigationState.self) private var nav
+  #endif
   @State private var selection: SettingsDestination?
   /// iPhone-only navigation path. Seeded from `initialDestination` so the
   /// sheet can open already pushed to a specific pane (e.g. a section's
@@ -530,13 +535,19 @@ struct SettingsView: View {
     // internally instead — matching the fixed-frame QuickFind / AddInfo
     // sheets.
     .frame(width: 820, height: 600)
-    // No "Done" button on macOS: the split view fills the whole sheet so
-    // both columns reach the bottom edge, and Escape dismisses it (the
-    // native expectation for a settings window). A `.toolbar`
-    // confirmationAction here would instead render a detached button band
-    // below the split view, rounding the columns off above it and leaving
-    // a dead gap so neither the sidebar nor the detail reached the bottom.
+    // No "Done" button on macOS: Settings is its own window (see App.swift),
+    // so the split view fills the whole frame and the window's traffic
+    // lights close it. Escape closes it too. A `.toolbar` confirmationAction
+    // would instead render a detached button band below the split view,
+    // rounding the columns off above it and leaving a dead gap.
     .onExitCommand { dismiss() }
+    // The window is reused across opens, so seed the pane from the contextual
+    // deep-link target ("Customize <Section>", the Insights gear) and clear
+    // it when the window closes so the next plain open lands on the root.
+    .onChange(of: nav.settingsDestination) { _, dest in
+      if let dest { selection = dest }
+    }
+    .onDisappear { nav.settingsDestination = nil }
     #endif
   }
 

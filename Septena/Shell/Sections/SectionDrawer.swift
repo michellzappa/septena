@@ -177,7 +177,13 @@ struct SectionDrawer<Content: View>: View {
 
   /// Whether the deep-linked Settings sheet (this section's pane) is open.
   /// Presented over the drawer so closing it returns the user here.
+  #if os(macOS)
+  // macOS opens the deep-linked section Settings in the shared Settings
+  // window (traffic-lit) rather than a chrome-less sheet over the drawer.
+  @Environment(NavigationState.self) private var nav
+  #else
   @State private var showingSettings = false
+  #endif
 
   private var resolvedAccent: Color {
     accent ?? theme.color(for: sectionKey)
@@ -235,7 +241,14 @@ struct SectionDrawer<Content: View>: View {
           }
           if showsSettingsLink, !isTimeTraveling,
              !resolvedTitle.isEmpty, SectionManifest.byKey[sectionKey] != nil {
-            SectionSettingsLink(sectionTitle: resolvedTitle) { showingSettings = true }
+            SectionSettingsLink(sectionTitle: resolvedTitle) {
+              #if os(macOS)
+              nav.settingsDestination = .section(sectionKey)
+              nav.showSettings = true
+              #else
+              showingSettings = true
+              #endif
+            }
           }
         }
       }
@@ -255,11 +268,14 @@ struct SectionDrawer<Content: View>: View {
     // input. We use a switch over the Optional so SwiftUI's view
     // identity stays stable per branch.
     .modifier(OptionalSearchable(text: searchText, prompt: searchPrompt))
-    // Deep-linked section Settings, presented over the drawer so closing it
-    // returns the user here (the chosen "keep drawer underneath" behavior).
+    // Deep-linked section Settings. iOS presents it over the drawer so
+    // closing returns the user here; macOS routes to the shared Settings
+    // window (see the SectionSettingsLink action above).
+    #if os(iOS)
     .sheet(isPresented: $showingSettings) {
       SettingsView(initialDestination: .section(sectionKey))
     }
+    #endif
     // The section name is the standard inline nav-bar title — plain text in
     // the system's default place, identical on every drawer. Kept inline
     // (not a big editorial heading) so the drawer top stays compact.

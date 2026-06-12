@@ -32,6 +32,9 @@ enum SeptenaTab: Hashable {
 struct RootTabView: View {
   @Environment(NavigationState.self) private var nav
   @Environment(SectionTheme.self) private var theme
+  #if os(macOS)
+  @Environment(\.openWindow) private var openWindow
+  #endif
   @State private var tabSelection = TabSelection()
 
   var body: some View {
@@ -51,12 +54,22 @@ struct RootTabView: View {
       .task(id: tabSelection.current) {
         await PlausibleClient.shared.track(screen: tabSelection.current.analyticsName)
       }
-      // App-global Settings sheet. Lives at the TabView level so the
-      // top-left "…" menu on every home view opens it, and so the
-      // sidebar row in Tasks does too.
+      // App-global Settings. Lives at the TabView level so the top-left
+      // "…" menu on every home view opens it, and so the sidebar row in
+      // Tasks does too. On iOS it's a sheet; on macOS the same `showSettings`
+      // flag opens the dedicated `"settings"` Window (declared in App.swift)
+      // so the surface carries real traffic lights and closes like a window.
+      #if os(iOS)
       .sheet(isPresented: $nav.showSettings) {
         SettingsView()
       }
+      #else
+      .onChange(of: nav.showSettings) { _, open in
+        guard open else { return }
+        openWindow(id: "settings")
+        nav.showSettings = false
+      }
+      #endif
       // App-global Quick Find palette. Mounted here so the magnifyingglass
       // button in every home view's top-right opens it, regardless of tab.
       .sheet(isPresented: $nav.showQuickFind) {

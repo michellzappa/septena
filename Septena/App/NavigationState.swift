@@ -47,9 +47,18 @@ final class NavigationState {
   /// `.detailOnly` collapses the sidebar so detail content runs edge-to-edge.
   var sidebarVisibility: NavigationSplitViewVisibility = .all
 
-  /// Drives the Settings sheet. Flipped from the sidebar's Settings button
-  /// and the macOS toolbar gear; the sheet closes via its own Done button.
+  /// Drives Settings. Flipped from the sidebar's Settings button, the menu
+  /// bar, and the home toolbars. On iOS it presents a sheet (closed with
+  /// "Done"); on macOS RootTabView observes this flag and opens the
+  /// dedicated `"settings"` Window instead, which carries its own traffic
+  /// lights so it closes like any window.
   var showSettings = false
+
+  /// Optional deep-link target for the Settings surface — set alongside
+  /// `showSettings` by the contextual entry points ("Customize <Section>",
+  /// the Insights gear) so Settings opens already pushed to that pane.
+  /// `nil` opens the default root (Sections). Cleared on dismiss.
+  var settingsDestination: SettingsView.SettingsDestination?
 
 /// Drives the Quick Find palette (Command-Shift-F). A floating sheet over the
   /// main window; selecting a result routes via `path` and dismisses itself.
