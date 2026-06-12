@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Septena · App Store viz</title>
+<style>
+  :root {
+    --ink:#1c1917; --soft:#8a8378; --paper:#faf9f7; --card:#ffffff;
+    --accent:#336bd1; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444;
+    --line:#e9e5de;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--paper); color:var(--ink);
+    font:15px/1.5 -apple-system,"SF Pro Text","Helvetica Neue",sans-serif; padding:32px 40px 80px; }
+  h1 { font:600 30px/1.2 Georgia,serif; }  h1 i { color:var(--accent); }
+  h2 { font:600 18px/1.3 -apple-system,sans-serif; margin:44px 0 14px; }
+  .meta-line { color:var(--soft); font:12px/1.4 ui-monospace,Menlo,monospace; margin-top:6px; }
+  .badges { display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+  .pill { font:600 12px/1 ui-monospace,monospace; padding:7px 12px; border-radius:999px; border:1px solid var(--line); background:var(--card); }
+  .pill.ok { color:var(--ok); border-color:color-mix(in oklab,var(--ok) 40%,transparent); }
+  .pill.err { color:var(--err); border-color:color-mix(in oklab,var(--err) 40%,transparent); }
+  .pill.warn { color:var(--warn); border-color:color-mix(in oklab,var(--warn) 40%,transparent); }
+
+  .tabs { display:flex; gap:10px; margin:26px 0 0; flex-wrap:wrap; }
+  .tab { cursor:pointer; padding:10px 16px; border-radius:14px; border:1px solid var(--line); background:var(--card); }
+  .tab b { display:block; font-size:14px; } .tab span { font:11px/1.4 ui-monospace,monospace; color:var(--soft); }
+  .tab.sel { border-color:var(--accent); box-shadow:0 0 0 2px color-mix(in oklab,var(--accent) 25%,transparent); }
+  .tab.slot { opacity:.45; }
+
+  .views { display:flex; gap:8px; margin:18px 0 12px; }
+  .view { cursor:pointer; font:600 12px/1 -apple-system,sans-serif; padding:8px 14px; border-radius:999px; border:1px solid var(--line); background:var(--card); color:var(--soft); }
+  .view.sel { color:#fff; background:var(--accent); border-color:var(--accent); }
+
+  .strip { display:flex; gap:18px; overflow-x:auto; padding:18px 4px 22px; }
+  .shotcard { flex:none; width:248px; }
+  .shotcard img { width:100%; border-radius:22px; border:1px solid var(--line); box-shadow:0 14px 34px -12px rgb(0 0 0 / .25); cursor:zoom-in; display:block; }
+  .shotcard .cap { margin-top:8px; font:11px/1.5 ui-monospace,monospace; color:var(--soft); word-break:break-all; }
+  .dim { font:600 10px/1 ui-monospace,monospace; padding:4px 8px; border-radius:999px; }
+  .dim.ok { color:var(--ok); background:color-mix(in oklab,var(--ok) 12%,white); }
+  .dim.bad { color:var(--err); background:color-mix(in oklab,var(--err) 12%,white); }
+  .empty { color:var(--soft); padding:30px; border:1px dashed var(--line); border-radius:18px; font-size:13px; }
+
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:14px; }
+  .field { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:16px 18px; }
+  .field .k { display:flex; justify-content:space-between; align-items:baseline; }
+  .field .k b { font-size:13px; text-transform:uppercase; letter-spacing:.06em; }
+  .count { font:600 12px/1 ui-monospace,monospace; }
+  .bar { height:4px; border-radius:99px; background:var(--line); margin:10px 0 12px; overflow:hidden; }
+  .bar i { display:block; height:100%; border-radius:99px; }
+  .val { font-size:13px; color:#3f3a33; white-space:pre-wrap; max-height:72px; overflow:hidden; }
+  .field.open .val { max-height:none; }
+  .more { font:600 11px/1 -apple-system,sans-serif; color:var(--accent); cursor:pointer; margin-top:8px; display:inline-block; }
+
+  .issues li { list-style:none; padding:9px 0; border-bottom:1px solid var(--line); font-size:13.5px; }
+  .lb { position:fixed; inset:0; background:rgb(0 0 0 / .8); display:none; align-items:center; justify-content:center; cursor:zoom-out; z-index:9; }
+  .lb img { max-height:94vh; max-width:94vw; border-radius:18px; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Septena <i>· App Store</i></h1>
+  <div class="meta-line" id="metaline">loading manifest…</div>
+  <div class="badges" id="badges"></div>
+</header>
+
+<div class="tabs" id="tabs"></div>
+<div class="views" id="views"></div>
+<div class="strip" id="strip"></div>
+
+<h2>Store listing copy <span style="font-weight:400;color:var(--soft)">(edit docs/APPSTORE.md, then npm run all)</span></h2>
+<div class="grid" id="fields"></div>
+
+<h2>Issues</h2>
+<ul class="issues" id="issues"></ul>
+
+<div class="lb" id="lb" onclick="this.style.display='none'"><img id="lbimg"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let M, devKey = null, view = "composites";
+
+async function boot() {
+  M = await (await fetch("manifest.json", { cache: "no-store" })).json();
+  devKey = (M.devices.find(d => d.active) ?? M.devices[0]).key;
+  $("title").innerHTML = `${M.app.name} <i>· App Store</i>`;
+  $("metaline").textContent = `${M.app.bundleId} · manifest ${new Date(M.generatedAt).toLocaleString()}`;
+  renderBadges(); renderTabs(); renderViews(); renderStrip(); renderFields(); renderIssues();
+}
+
+const errs = () => M.issues.filter(i => i.level === "error").length;
+const warns = () => M.issues.filter(i => i.level === "warn").length;
+
+function renderBadges() {
+  const metaOk = M.metadata.every(p => p.planned || p.fields.every(f => f.ok));
+  $("badges").innerHTML =
+    `<span class="pill ${metaOk ? "ok" : "err"}">metadata ${metaOk ? "✓" : "✗"}</span>` +
+    `<span class="pill ${errs() ? "err" : "ok"}">${errs()} errors</span>` +
+    `<span class="pill ${warns() ? "warn" : "ok"}">${warns()} warnings</span>`;
+}
+
+function renderTabs() {
+  $("tabs").innerHTML = M.devices.map(d => `
+    <div class="tab ${d.key === devKey ? "sel" : ""} ${d.active ? "" : "slot"}" onclick="devKey='${d.key}';renderTabs();renderStrip()">
+      <b>${d.label}</b><span>${d.width}×${d.height}${d.active ? ` · ${d.shots.length} shots` : " · slot"}</span>
+    </div>`).join("");
+}
+
+function renderViews() {
+  const opts = [["composites", "Composites"], ["light", "Raw · light"], ["dark", "Raw · dark"]];
+  $("views").innerHTML = opts.map(([v, l]) =>
+    `<span class="view ${view === v ? "sel" : ""}" onclick="view='${v}';renderViews();renderStrip()">${l}</span>`).join("");
+}
+
+function renderStrip() {
+  const d = M.devices.find(x => x.key === devKey);
+  const items = view === "composites" ? d.shots : d.raw[view] ?? [];
+  if (!items.length) {
+    const hint = view === "composites"
+      ? (d.active ? "No composites yet — npm run render" : `Inactive slot — ${d.captureNote}`)
+      : `No raw ${view} captures — scripts/screenshots.sh ${view} && npm run shots:sync`;
+    $("strip").innerHTML = `<div class="empty">${hint}</div>`;
+    return;
+  }
+  $("strip").innerHTML = items.map(s => `
+    <div class="shotcard">
+      <img src="../${s.path}" loading="lazy" onclick="$('lbimg').src=this.src;$('lb').style.display='flex'">
+      <div class="cap">${s.file}${s.w ? ` <span class="dim ${s.ok ? "ok" : "bad"}">${s.w}×${s.h}</span>` : ""}</div>
+    </div>`).join("");
+}
+
+function renderFields() {
+  $("fields").innerHTML = M.metadata.flatMap(p => p.fields
+    .filter(f => f.field !== "status")
+    .map(f => {
+      const pct = f.limit ? Math.min(100, f.count / f.limit * 100) : 0;
+      const color = !f.ok ? "var(--err)" : pct > 88 ? "var(--warn)" : "var(--ok)";
+      const long = f.value.length > 160;
+      return `<div class="field ${p.planned ? "" : ""}" style="${p.planned ? "opacity:.45" : ""}">
+        <div class="k"><b>${p.platform} · ${f.field}</b>
+          <span class="count" style="color:${color}">${f.count}${f.limit ? " / " + f.limit : ""}</span></div>
+        ${f.limit ? `<div class="bar"><i style="width:${pct}%;background:${color}"></i></div>` : `<div style="height:10px"></div>`}
+        <div class="val">${f.value.replace(/</g, "&lt;")}</div>
+        ${long ? `<span class="more" onclick="this.parentElement.classList.toggle('open');this.textContent=this.textContent==='show all'?'collapse':'show all'">show all</span>` : ""}
+      </div>`;
+    })).join("");
+}
+
+function renderIssues() {
+  $("issues").innerHTML = M.issues.length
+    ? M.issues.map(i => `<li>${i.level === "error" ? "✗" : "⚠"} ${i.msg}</li>`).join("")
+    : `<li style="color:var(--ok)">✓ clean — ready for fastlane deliver</li>`;
+}
+
+boot().catch(e => $("metaline").textContent = "manifest.json missing — run: npm run all  (" + e.message + ")");
+</script>
+</body>
+</html>

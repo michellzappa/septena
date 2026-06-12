@@ -1,0 +1,8 @@
+node_modules/
+build/
+raw/
+screenshots/
+screenshots-mac/
+metadata/
+metadata-mac/
+viz/manifest.json

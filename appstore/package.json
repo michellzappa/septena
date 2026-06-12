@@ -1,0 +1,18 @@
+{
+  "name": "septena-appstore",
+  "private": true,
+  "type": "module",
+  "description": "App Store packaging: metadata gen, marketing panel render, validation, viz. See docs/APPSTORE.md.",
+  "scripts": {
+    "shots:sync": "./sync-shots.sh",
+    "metadata": "node metadata.mjs",
+    "render": "node render.mjs",
+    "validate": "node validate.mjs",
+    "all": "node metadata.mjs && node render.mjs && node validate.mjs",
+    "viz": "npm run all && node serve.mjs",
+    "postinstall": "playwright install chromium"
+  },
+  "devDependencies": {
+    "playwright": "^1.60.0"
+  }
+}
