@@ -2,8 +2,8 @@ import SwiftUI
 import SwiftData
 
 // Time-of-day action suggestions for the Next view. Mirrors the webapp's
-// `hooks/use-next-actions.ts` engine: for each contributing section (caffeine,
-// cannabis, training, nutrition) we read the last ~14 days of history, find
+// `hooks/use-next-actions.ts` engine: for each contributing section (intake,
+// training, nutrition) we read the last ~14 days of history, find
 // the user's median "first time" for that activity, and surface a card when
 // `now >= usual - 45m` AND the activity hasn't happened yet today.
 //
@@ -16,16 +16,15 @@ import SwiftData
 
 struct NextSuggestion: Identifiable, Hashable {
   enum Kind: String, Hashable {
-    case caffeine, cannabis, training, fastBreak, mood
+    case training, fastBreak, mood, intake
 
     /// Section accent key for `SectionTheme.color(for:)`.
     var sectionKey: String {
       switch self {
-      case .caffeine:  return "caffeine"
-      case .cannabis:  return "cannabis"
       case .training:  return "training"
       case .fastBreak: return "nutrition"
       case .mood:      return "mood"
+      case .intake:    return "intake"
       }
     }
   }
@@ -44,6 +43,11 @@ struct NextSuggestion: Identifiable, Hashable {
   /// primary sort in the Now bucket — webapp sorts by time of day first,
   /// score only breaks ties when neither side has a time.
   let proposedMinutes: Int?
+  /// For `.intake` nudges: the tracker id + its container-aware quick-log
+  /// choices, so the row logs inline (the watch-style pick) instead of
+  /// navigating. Empty for every other kind.
+  var intakeKindID: String? = nil
+  var intakeChoices: [SuggestionBlocks.Choice] = []
 }
 
 // MARK: - Math (pure)
@@ -291,14 +295,6 @@ final class NextSuggestionsModel {
     let since14 = daysAgoISO(14)
     let since30 = daysAgoISO(30)
 
-    let cafEntries = (try? ctx.fetch(FetchDescriptor<CaffeineEventEntity>(
-      predicate: #Predicate { $0.date >= since14 }
-    ))) ?? []
-    let cafToday = ChecklistMirror.loadCaffeineDay(context: ctx, date: today)
-    let canEntries = (try? ctx.fetch(FetchDescriptor<CannabisEventEntity>(
-      predicate: #Predicate { $0.date >= since14 }
-    ))) ?? []
-    let canToday = ChecklistMirror.loadCannabisDay(context: ctx, date: today)
     let nut = ChecklistMirror.loadNutritionEntries(context: ctx, since: since14)
     let tr: [ExerciseEntry]? = ChecklistMirror.loadTrainingEntries(context: ctx, since: since30)
     let sw: SuggestedWorkoutResponse? = ChecklistMirror.loadSuggestedWorkout(context: ctx)
@@ -316,32 +312,9 @@ final class NextSuggestionsModel {
     let moodLoggedThisBucket = ChecklistMirror.loadMoodDay(context: ctx, date: today)
       .byBucket[moodBucket.rawValue] != nil
 
-    let cafTimePoints: [CaffeineTimePoint] = cafEntries.compactMap { e in
-      let hhmm = EventTimestamp.hhmm(from: e.occurredAt)
-      let parts = hhmm.split(separator: ":")
-      guard let hh = parts.first.flatMap({ Int($0) }) else { return nil }
-      let mm = parts.dropFirst().first.flatMap { Int($0) } ?? 0
-      return CaffeineTimePoint(date: e.date, time: hhmm,
-                               hour: Double(hh) + Double(mm) / 60.0,
-                               method: e.method, beans: e.beans, grams: e.grams)
-    }
-    let canTimePoints: [CannabisTimePoint] = canEntries.compactMap { e in
-      let hhmm = EventTimestamp.hhmm(from: e.occurredAt)
-      let parts = hhmm.split(separator: ":")
-      guard let hh = parts.first.flatMap({ Int($0) }) else { return nil }
-      let mm = parts.dropFirst().first.flatMap { Int($0) } ?? 0
-      return CannabisTimePoint(date: e.date, time: hhmm,
-                               hour: Double(hh) + Double(mm) / 60.0,
-                               method: e.method, strain: e.strain, hit: e.hit)
-    }
-
-    return compute(
+    var out = compute(
       today: today,
       isToday: true,
-      caffeineHistory: cafTimePoints,
-      caffeineToday: cafToday.entries,
-      cannabisHistory: canTimePoints,
-      cannabisToday: canToday.entries,
       nutrition: nut,
       training: tr ?? [],
       workout: sw?.suggested,
@@ -351,6 +324,88 @@ final class NextSuggestionsModel {
       moodLoggedThisBucket: moodLoggedThisBucket,
       now: now
     )
+    // Per-tracker intake nudges — the generic successor to the old caffeine
+    // per-substance first/next rules. Reads each active
+    // kind's learned rhythm and carries the container-aware choices so the row
+    // logs inline. Lives here (not in pure `compute`) because the kind list is
+    // dynamic and needs the live store.
+    out += intakeSuggestions(context: ctx, today: today, now: now)
+    return out
+  }
+
+  /// One nudge per active intake tracker whose learned first-use time (or
+  /// within-day cadence, once logged) is due. Container kinds carry their
+  /// Continue/New/method choices; simple kinds carry their method list.
+  static func intakeSuggestions(context ctx: ModelContext, today: String, now: Date) -> [NextSuggestion] {
+    let kinds = ((try? ctx.fetch(FetchDescriptor<IntakeKindEntity>())) ?? [])
+      .filter { $0.archivedAt == nil }
+    guard !kinds.isEmpty else { return [] }
+    let since14 = daysAgoISO(14)
+    let recent = (try? ctx.fetch(FetchDescriptor<IntakeEventEntity>(
+      predicate: #Predicate { $0.date >= since14 }))) ?? []
+    guard !recent.isEmpty else { return [] }
+    let byKind = Dictionary(grouping: recent, by: \.kindID)
+
+    let cal = Calendar.current
+    let nowMinutes = cal.component(.hour, from: now) * 60 + cal.component(.minute, from: now)
+    var out: [NextSuggestion] = []
+
+    for kind in kinds {
+      let evs = byKind[kind.id] ?? []
+      guard !evs.isEmpty else { continue }
+      let history = evs.map { (date: $0.date, time: EventTimestamp.hhmm(from: $0.occurredAt)) }
+      let todays = evs.filter { $0.date == today }
+
+      // Container-aware choices, computed once for whichever nudge fires.
+      let methods = kind.methods.map {
+        ConsumableContainer.Method(token: $0.token, label: $0.label,
+                                   symbol: $0.symbol, usesContainer: $0.usesContainer)
+      }
+      let lastCount: Int? = {
+        guard let token = kind.methods.first(where: { $0.usesContainer })?.token else { return nil }
+        return todays.filter { $0.method == token }.max(by: { $0.occurredAt < $1.occurredAt })?.count
+      }()
+      let choices = ConsumableContainer.choices(
+        lastCount: lastCount, containerCap: kind.containerCap,
+        containerNoun: kind.containerNoun ?? "container",
+        countNoun: kind.countNoun ?? "use", methods: methods)
+
+      func nudge(idSuffix: String, due: Int, baseScore: Double, detail: String) -> NextSuggestion {
+        NextSuggestion(
+          id: "intake:\(kind.id):\(idSuffix)", kind: .intake,
+          title: "Log \(kind.name)", emoji: nil, symbol: kind.symbol,
+          detail: detail,
+          score: baseScore + NextScoring.timingScore(usual: due, nowMinutes: nowMinutes, isToday: true),
+          proposedMinutes: due,
+          intakeKindID: kind.id, intakeChoices: choices)
+      }
+
+      // First use of the day.
+      let firstUsual = NextScoring.median(
+        NextScoring.firstDailyTimes(dateTimes: history, beforeDay: today))
+      if todays.isEmpty, let usual = firstUsual, nowMinutes >= usual - 45 {
+        out.append(nudge(idSuffix: "first", due: usual, baseScore: 33,
+                         detail: "Usually \(NextScoring.relativeMinutes(target: usual, now: nowMinutes))"))
+        continue   // never the first AND next nudge at once
+      }
+
+      // Next use — learned within-day rhythm, capped by typical count + curfew.
+      let cadence = Cadence.withinDay(dateTimes: history, before: today)
+      let curfew = NextScoring.median(
+        NextScoring.lastDailyTimes(dateTimes: history, beforeDay: today))
+      if !todays.isEmpty,
+         let cadence, cadence.isConfident,
+         todays.count < cadence.typicalCount,
+         let lastToday = todays.compactMap({ NextScoring.parseHHMM(EventTimestamp.hhmm(from: $0.occurredAt)) }).max() {
+        let next = cadence.next(after: lastToday)
+        let beforeCurfew = curfew.map { next <= $0 } ?? true
+        if beforeCurfew, nowMinutes >= next - 45 {
+          out.append(nudge(idSuffix: "next", due: next, baseScore: 29,
+                           detail: "\(todays.count + 1) today · usually \(NextScoring.relativeMinutes(target: next, now: nowMinutes))"))
+        }
+      }
+    }
+    return out
   }
 
   /// Suggestions minus the ones the user skipped today — what actually renders.
@@ -392,10 +447,6 @@ final class NextSuggestionsModel {
   static func compute(
     today: String,
     isToday: Bool,
-    caffeineHistory: [CaffeineTimePoint],
-    caffeineToday: [CaffeineEntry],
-    cannabisHistory: [CannabisTimePoint],
-    cannabisToday: [CannabisEntry],
     nutrition: [NutritionEntry],
     training: [ExerciseEntry],
     workout: SuggestedWorkout?,
@@ -408,86 +459,6 @@ final class NextSuggestionsModel {
     let cal = Calendar.current
     let nowMinutes = cal.component(.hour, from: now) * 60 + cal.component(.minute, from: now)
     var out: [NextSuggestion] = []
-
-    // Caffeine — first cup
-    let firstCaffeineUsual = NextScoring.median(
-      NextScoring.firstDailyTimes(
-        dateTimes: caffeineHistory.map { (date: $0.date, time: $0.time) },
-        beforeDay: today
-      )
-    )
-    if caffeineToday.isEmpty, isToday,
-       let usual = firstCaffeineUsual,
-       nowMinutes >= usual - 45 {
-      out.append(NextSuggestion(
-        id: "caffeine:first",
-        kind: .caffeine,
-        title: "Log caffeine",
-        emoji: "☕️",
-        symbol: nil,
-        detail: "Usually \(NextScoring.relativeMinutes(target: usual, now: nowMinutes))",
-        score: 34 + NextScoring.timingScore(usual: usual, nowMinutes: nowMinutes, isToday: isToday),
-        proposedMinutes: usual
-      ))
-    }
-
-    // Caffeine — next cup. Once the first cup is logged, the first-cup rule
-    // goes quiet; the learned within-day rhythm takes over. Suggest cup N+1 a
-    // median-gap after the last one, but stop at two learned ceilings: the
-    // typical cups/day count, and the typical "last cup" time (curfew) so we
-    // never nudge an evening coffee.
-    let caffeineCadence = Cadence.withinDay(
-      dateTimes: caffeineHistory.map { (date: $0.date, time: $0.time) },
-      before: today
-    )
-    let caffeineCurfew = NextScoring.median(
-      NextScoring.lastDailyTimes(
-        dateTimes: caffeineHistory.map { (date: $0.date, time: $0.time) },
-        beforeDay: today
-      )
-    )
-    let lastCupToday = caffeineToday.compactMap { NextScoring.parseHHMM($0.time) }.max()
-    if !caffeineToday.isEmpty, isToday,
-       let cadence = caffeineCadence, cadence.isConfident,
-       caffeineToday.count < cadence.typicalCount,
-       let lastCup = lastCupToday {
-      let nextCup = cadence.next(after: lastCup)
-      let beforeCurfew = caffeineCurfew.map { nextCup <= $0 } ?? true
-      if beforeCurfew, nowMinutes >= nextCup - 45 {
-        out.append(NextSuggestion(
-          id: "caffeine:next",
-          kind: .caffeine,
-          title: "Log caffeine",
-          emoji: "☕️",
-          symbol: nil,
-          detail: "Cup \(caffeineToday.count + 1) · usually \(NextScoring.relativeMinutes(target: nextCup, now: nowMinutes))",
-          score: 30 + NextScoring.timingScore(usual: nextCup, nowMinutes: nowMinutes, isToday: isToday),
-          proposedMinutes: nextCup
-        ))
-      }
-    }
-
-    // Cannabis — first session
-    let firstCannabisUsual = NextScoring.median(
-      NextScoring.firstDailyTimes(
-        dateTimes: cannabisHistory.map { (date: $0.date, time: $0.time) },
-        beforeDay: today
-      )
-    )
-    if cannabisToday.isEmpty, isToday,
-       let usual = firstCannabisUsual,
-       nowMinutes >= usual - 45 {
-      out.append(NextSuggestion(
-        id: "cannabis:first",
-        kind: .cannabis,
-        title: "Log cannabis",
-        emoji: "🌿",
-        symbol: nil,
-        detail: "Usually \(NextScoring.relativeMinutes(target: usual, now: nowMinutes))",
-        score: 32 + NextScoring.timingScore(usual: usual, nowMinutes: nowMinutes, isToday: isToday),
-        proposedMinutes: usual
-      ))
-    }
 
     // Training — only when we haven't trained today and the server has a
     // suggested workout type. The webapp combines a base score, the
@@ -661,46 +632,32 @@ private struct NextSuggestionRow: View {
   let tint: Color
 
   @Environment(\.rowHInset) private var rowHInset
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
   var body: some View {
-    Button {
-      Haptics.tap()
-      perform()
-    } label: {
-      HStack(spacing: Theme.iconTextGap) {
-        // Filled tinted circle with the suggestion's emoji — mirrors the
-        // section-accent dot the existing log rows wear, but bigger so the
-        // glyph reads as the row's verb at a glance.
-        ZStack {
-          Circle().fill(tint.opacity(0.18))
-          if let symbol = suggestion.symbol {
-            Image(systemName: symbol)
-              .scaledFont(size: 13, weight: .semibold)
-              .foregroundStyle(tint)
-          } else {
-            Text(suggestion.emoji ?? "•").font(.body)
+    Group {
+      // Intake nudges log inline — tapping reveals the tracker's container-
+      // aware choices (Continue · use N / New / methods) and writes on pick,
+      // the same affordance the watch wrist offers. Everything else navigates.
+      if suggestion.kind == .intake, !suggestion.intakeChoices.isEmpty {
+        Menu {
+          ForEach(suggestion.intakeChoices, id: \.value) { choice in
+            Button {
+              commitIntake(choice.value)
+            } label: {
+              Label(choice.label, systemImage: choice.symbol ?? "plus")
+            }
           }
-        }
-        .frame(width: 26, height: 26)
-
-        VStack(alignment: .leading, spacing: 2) {
-          Text(suggestion.title)
-            .font(.septenaTaskTitle)
-            .foregroundStyle(Theme.inkPrimary)
-          Text(suggestion.detail)
-            .font(.septenaMeta)
-            .foregroundStyle(Theme.inkSecondary)
-        }
-        Spacer()
-        Image(systemName: "chevron.right")
-          .font(.septenaMeta)
-          .foregroundStyle(Theme.inkSecondary)
+        } label: { rowLabel }
+        .buttonStyle(.plain)
+      } else {
+        Button {
+          Haptics.tap()
+          perform()
+        } label: { rowLabel }
+        .buttonStyle(.plain)
       }
-      .padding(.horizontal, rowHInset)
-      .padding(.vertical, Theme.rowVPadding + 2)
-      .contentShape(Rectangle())
     }
-    .buttonStyle(.plain)
     .contextMenu {
       Button {
         model.toggleSkip(suggestion.id)
@@ -710,14 +667,52 @@ private struct NextSuggestionRow: View {
     }
   }
 
+  private var rowLabel: some View {
+    HStack(spacing: Theme.iconTextGap) {
+      // Filled tinted circle with the suggestion's emoji — mirrors the
+      // section-accent dot the existing log rows wear, but bigger so the
+      // glyph reads as the row's verb at a glance.
+      ZStack {
+        Circle().fill(tint.opacity(0.18))
+        if let symbol = suggestion.symbol {
+          Image(systemName: symbol)
+            .scaledFont(size: 13, weight: .semibold)
+            .foregroundStyle(tint)
+        } else {
+          Text(suggestion.emoji ?? "•").font(.body)
+        }
+      }
+      .frame(width: 26, height: 26)
+
+      VStack(alignment: .leading, spacing: 2) {
+        Text(suggestion.title)
+          .font(.septenaTaskTitle)
+          .foregroundStyle(Theme.inkPrimary)
+        Text(suggestion.detail)
+          .font(.septenaMeta)
+          .foregroundStyle(Theme.inkSecondary)
+      }
+      Spacer()
+      Image(systemName: suggestion.kind == .intake ? "plus.circle" : "chevron.right")
+        .font(.septenaMeta)
+        .foregroundStyle(Theme.inkSecondary)
+    }
+    .padding(.horizontal, rowHInset)
+    .padding(.vertical, Theme.rowVPadding + 2)
+    .contentShape(Rectangle())
+  }
+
+  private func commitIntake(_ value: String) {
+    guard let kindID = suggestion.intakeKindID else { return }
+    Haptics.tap()
+    IntakeNudgeLog.commit(kindID: kindID, value: value, logCommit: logCommit)
+    // Optimistically hide this nudge; the dataChanged recompute reconciles
+    // (a still-due "next" nudge has its own id and can reappear).
+    model.toggleSkip(suggestion.id)
+  }
+
   private func perform() {
     switch suggestion.kind {
-    case .caffeine:
-      nav.addInfoRequestedSection = .caffeine
-      nav.showAddInfo = true
-    case .cannabis:
-      nav.addInfoRequestedSection = .cannabis
-      nav.showAddInfo = true
     case .fastBreak:
       nav.addInfoRequestedSection = .nutrition
       nav.showAddInfo = true
@@ -730,6 +725,33 @@ private struct NextSuggestionRow: View {
       // TrainingSessionView reads the active draft out of TrainingDraftStore;
       // routing the suggested type is handled by the existing Start flow.
       nav.showTrainingSession = true
+    case .intake:
+      break   // handled inline by the Menu above; never routed through perform
+    }
+  }
+}
+
+/// Inline commit for an intake nudge — mirrors `IntakeKindPageView`'s fast
+/// path so the wrist/menu/nudge all write identically (and fire the tracker's
+/// own flourish). Resolves the live kind by id, parses the choice token, and
+/// logs through the mutator inside a `SectionLog` so haptic + motion fire once.
+@MainActor
+private enum IntakeNudgeLog {
+  static func commit(kindID: String, value: String, logCommit: LogCommitCenter?) {
+    let ctx = LocalStore.shared.container.mainContext
+    guard let kind = ((try? ctx.fetch(FetchDescriptor<IntakeKindEntity>(
+      predicate: #Predicate { $0.id == kindID }))) ?? []).first else { return }
+    let (token, count) = ConsumableContainer.parse(value: value)
+    let method = kind.methods.first { $0.token == token }
+    let showsAmount = kind.doseStyle == "amount" || kind.doseStyle == "both"
+    let amount = showsAmount ? method?.defaultAmount : nil
+    let accent = AdaptiveColor.adaptive(kind.color) ?? .secondary
+    SectionLog.newLog(section: "intake", accent: accent,
+                      motion: IntakeKindPageView.motion(for: kind.flourish),
+                      announce: "Logged \(kind.name).", logCommit: logCommit) {
+      _ = SeptenaServices.shared.intakeMutator.addEntry(
+        kindID: kindID, date: SeptenaDate.today,
+        time: SeptenaDate.nowHHMM, method: token, amount: amount, count: count)
     }
   }
 }

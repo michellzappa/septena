@@ -768,8 +768,6 @@ protocol OccurredAtRepairable: AnyObject {
   var occurredAt: Date { get set }
 }
 
-extension CaffeineEventEntity: OccurredAtRepairable {}
-extension CannabisEventEntity: OccurredAtRepairable {}
 extension GutEventEntity: OccurredAtRepairable {}
 extension MoodEventEntity: OccurredAtRepairable {}
 extension ChoreEventEntity: OccurredAtRepairable {}
@@ -797,8 +795,6 @@ enum OccurredAtBackfill {
   static func runIfNeeded(context: ModelContext, defaults: UserDefaults = .standard) {
     guard !defaults.bool(forKey: versionKey) else { return }
     var fixed = 0
-    fixed += repair(CaffeineEventEntity.self, context: context)
-    fixed += repair(CannabisEventEntity.self, context: context)
     fixed += repair(GutEventEntity.self, context: context)
     fixed += repair(MoodEventEntity.self, context: context)
     fixed += repair(ChoreEventEntity.self, context: context)
@@ -829,219 +825,85 @@ enum OccurredAtBackfill {
   }
 }
 
-// MARK: - Intake migration (caffeine/cannabis → generic intake)
+// MARK: - Gut → Symptoms migration (discomfort + blood → symptom events)
 
-/// Post-migration cross-check (study §7.1 "Verification"). Surfaced as a
-/// debug-build report before the cutover flag flips; doubles as the
-/// migrate-on-sight health monitor during the old-build skew window.
-struct IntakeMigrationReport: Sendable {
-  var caffeineLegacy = 0
-  var caffeineTwins = 0
-  var cannabisLegacy = 0
-  var cannabisTwins = 0
-  var beanItems = 0
-  var strainItems = 0
-  var legacyGrams = 0.0
-  var twinAmount = 0.0
-
-  /// Counts match per section and dose sums agree (within float epsilon).
-  var ok: Bool {
-    caffeineLegacy == caffeineTwins &&
-    cannabisLegacy == cannabisTwins &&
-    abs(legacyGrams - twinAmount) < 0.0001
-  }
-
-  var summary: String {
-    "caffeine \(caffeineTwins)/\(caffeineLegacy) · cannabis \(cannabisTwins)/\(cannabisLegacy) · "
-    + "beans \(beanItems) · strains \(strainItems) · "
-    + "grams Σ\(String(format: "%.3f", legacyGrams))→\(String(format: "%.3f", twinAmount)) · "
-    + (ok ? "OK" : "MISMATCH")
-  }
-}
-
-/// The record-level migrator. Reads legacy caffeine/cannabis data — from raw
-/// `CKRecord`s (so it survives deletion of the legacy `@Model` classes in phase
-/// 4) or from the local mirror at kickoff — and upserts generic intake twins
-/// through `IntakeMutator` with deterministic ids (study §7.1, §7.2). The pure
-/// id/field logic lives in `IntakeMigrationMap` (IntakeModel.swift); this is the
-/// CloudKit/SwiftData-bound shell around it.
+/// One-shot, local-only migration that lifts the symptom-shaped fields out of
+/// the Gut bowel-movement log (`discomfortLevel`, `blood`) into standalone
+/// Symptoms events. The gut rows are left untouched here — stripping those
+/// fields is a separate, later step, so this stays lossless and reversible.
+/// Deterministic ids (`GutSymptomMap`) make it idempotent; gated by a
+/// UserDefaults flag so it runs once per device, after the initial CloudKit
+/// fetch so synced gut rows are present. See docs/GUT_SYMPTOMS_MIGRATION_PLAN.
 @MainActor
-enum IntakeMigrator {
-  /// Legacy record types the migrator consumes. They stay registered with the
-  /// sync engine forever (cheap; dormant for migrated users) so a reinstall in
-  /// future years still inherits old data.
-  static let legacyRecordTypes: Set<String> = [
-    CaffeineEventCloudKitSchema.recordType,
-    CaffeineBeanCloudKitSchema.recordType,
-    CannabisEventCloudKitSchema.recordType,
-  ]
+enum GutSymptomMigrator {
+  private static let versionKey = "gut.symptomMigration.v1"
 
-  // MARK: Record-level (migrate-on-sight)
-
-  /// Upsert the generic twin of one legacy `CKRecord`. Safe to call repeatedly
-  /// and from the live sync path. Kinds use default seeds here (a full-scan with
-  /// settings access seeds the richer config first; `upsertKind` is
-  /// create-if-missing so whichever runs first wins).
-  static func migrate(record: CKRecord, mutator: IntakeMutator) {
-    switch record.recordType {
-    case CaffeineBeanCloudKitSchema.recordType:
-      mutator.upsertKind(seed: IntakeMigrationMap.caffeineSeed())
-      let beanID = CaffeineBeanCloudKitSchema.entityID(from: record.recordID.recordName)
-      let name = record[CaffeineBeanCloudKitSchema.Field.name] as? String ?? ""
-      let sort = record[CaffeineBeanCloudKitSchema.Field.sortIndex] as? Int ?? 0
-      mutator.upsertItem(id: IntakeMigrationMap.itemID(section: "caffeine", key: beanID),
-                         kindID: IntakeMigrationMap.caffeineKindID, name: name, sortIndex: sort)
-    case CaffeineEventCloudKitSchema.recordType:
-      mutator.upsertKind(seed: IntakeMigrationMap.caffeineSeed())
-      if let legacy = legacyEvent(from: record) { upsert(legacy, mutator: mutator) }
-    case CannabisEventCloudKitSchema.recordType:
-      mutator.upsertKind(seed: IntakeMigrationMap.cannabisSeed(usesPerCapsule: 3, observedMethods: []))
-      if let legacy = legacyEvent(from: record) { upsert(legacy, mutator: mutator) }
-    default:
-      break
-    }
-  }
-
-  // MARK: Local full-scan (migration kickoff)
-
-  /// Migrate everything in the local mirror once. Reads kind config from the
-  /// caller (settings live there) so the seeded kinds match today exactly;
-  /// returns a verification report. Idempotent — re-running upserts.
   @discardableResult
-  static func migrateLocalLegacy(context: ModelContext,
-                                 mutator: IntakeMutator,
-                                 sections: Set<String> = ["caffeine", "cannabis"],
-                                 caffeineMethods: [IntakeMethodRow]? = nil,
-                                 cannabisName: String = "Cannabis",
-                                 cannabisUsesPerCapsule: Int = 3) -> IntakeMigrationReport {
-    // Heal `.distantPast` placeholders in the old format first (study §7.1).
-    OccurredAtBackfill.runIfNeeded(context: context)
+  static func runIfNeeded(context: ModelContext,
+                          mutator: SymptomsMutator,
+                          defaults: UserDefaults = .standard) -> Int {
+    guard !defaults.bool(forKey: versionKey) else { return 0 }
+    guard let rows = try? context.fetch(FetchDescriptor<GutEventEntity>()) else { return 0 }
 
-    let migrateCaffeine = sections.contains("caffeine")
-    let migrateCannabis = sections.contains("cannabis")
-    let caffeineEvents = migrateCaffeine ? ((try? context.fetch(FetchDescriptor<CaffeineEventEntity>())) ?? []) : []
-    let caffeineBeans  = migrateCaffeine ? ((try? context.fetch(FetchDescriptor<CaffeineBeanEntity>())) ?? []) : []
-    let cannabisEvents = migrateCannabis ? ((try? context.fetch(FetchDescriptor<CannabisEventEntity>())) ?? []) : []
+    // Resolve each target definition lazily and at most once.
+    var discomfortDefID: String?
+    var bloodDefID: String?
+    var created = 0
 
-    // Kinds first, with the richer config.
-    if !caffeineEvents.isEmpty || !caffeineBeans.isEmpty {
-      mutator.upsertKind(seed: IntakeMigrationMap.caffeineSeed(methods: caffeineMethods))
+    for row in rows {
+      let hasDiscomfort = GutSymptomMap.discomfortSeverity(row.discomfortLevel) != nil
+      let trimmed = row.note?.trimmingCharacters(in: .whitespacesAndNewlines)
+      let note = (trimmed?.isEmpty == false) ? trimmed : nil
+
+      if let severity = GutSymptomMap.discomfortSeverity(row.discomfortLevel) {
+        let defID = discomfortDefID ?? mutator.ensureDefinition(
+          title: GutSymptomMap.discomfortTitle, emoji: "🫄",
+          bodySystem: "Digestive", defaultBodyRegion: "Abdomen",
+          fallbackID: GutSymptomMap.discomfortDefinitionID)
+        discomfortDefID = defID
+        mutator.upsertMigratedEvent(
+          id: GutSymptomMap.discomfortEventID(gutID: row.id),
+          symptomID: defID, date: row.date, occurredAt: row.occurredAt,
+          severity: severity,
+          durationMinutes: discomfortMinutes(start: row.discomfortStart, end: row.discomfortEnd),
+          note: note, source: "migrated-gut")
+        created += 1
+      }
+
+      if let severity = GutSymptomMap.bloodSeverity(row.blood) {
+        let defID = bloodDefID ?? mutator.ensureDefinition(
+          title: GutSymptomMap.bloodTitle, emoji: "🩸",
+          bodySystem: "Digestive", defaultBodyRegion: "Rectum",
+          fallbackID: GutSymptomMap.bloodDefinitionID)
+        bloodDefID = defID
+        // The free-text note rides the discomfort event when present, so the
+        // blood event carries a neutral marker instead of duplicating it.
+        let bloodNote = hasDiscomfort ? "with BM" : (note ?? "with BM")
+        mutator.upsertMigratedEvent(
+          id: GutSymptomMap.bloodEventID(gutID: row.id),
+          symptomID: defID, date: row.date, occurredAt: row.occurredAt,
+          severity: severity, durationMinutes: nil,
+          note: bloodNote, source: "migrated-gut")
+        created += 1
+      }
     }
-    if !cannabisEvents.isEmpty {
-      let observed = Array(Set(cannabisEvents.map(\.method)))
-      mutator.upsertKind(seed: IntakeMigrationMap.cannabisSeed(
-        name: cannabisName, usesPerCapsule: cannabisUsesPerCapsule, observedMethods: observed))
-    }
 
-    // Beans → items.
-    for bean in caffeineBeans {
-      mutator.upsertItem(id: IntakeMigrationMap.itemID(section: "caffeine", key: bean.id),
-                         kindID: IntakeMigrationMap.caffeineKindID,
-                         name: bean.name, sortIndex: bean.sortIndex)
-    }
-
-    // Distinct non-empty strains → items (cannabis has no separate catalog record).
-    var strainSlugs = Set<String>()
-    for e in cannabisEvents {
-      guard let raw = e.strain, !raw.isEmpty else { continue }
-      let key = IntakeMigrationMap.slug(raw)
-      guard !strainSlugs.contains(key) else { continue }
-      strainSlugs.insert(key)
-      mutator.upsertItem(id: IntakeMigrationMap.itemID(section: "cannabis", key: key),
-                         kindID: IntakeMigrationMap.cannabisKindID,
-                         name: raw, sortIndex: 0)
-    }
-
-    // Events.
-    for e in caffeineEvents { upsert(legacy(e), mutator: mutator) }
-    for e in cannabisEvents { upsert(legacy(e), mutator: mutator) }
-
-    return verify(context: context, sections: sections)
+    SeptenaLog.info("GutSymptomMigrator: upserted \(created) symptom events from \(rows.count) gut rows")
+    defaults.set(true, forKey: versionKey)
+    return created
   }
 
-  /// Re-read both stores and assemble the cross-check report. `sections`
-  /// scopes the legacy side so a cannabis-only import isn't flagged as a
-  /// mismatch for caffeine rows it deliberately didn't copy.
-  static func verify(context: ModelContext,
-                     sections: Set<String> = ["caffeine", "cannabis"]) -> IntakeMigrationReport {
-    var r = IntakeMigrationReport()
-    let caffeineEvents = sections.contains("caffeine")
-      ? ((try? context.fetch(FetchDescriptor<CaffeineEventEntity>())) ?? []) : []
-    let cannabisEvents = sections.contains("cannabis")
-      ? ((try? context.fetch(FetchDescriptor<CannabisEventEntity>())) ?? []) : []
-    let twins = (try? context.fetch(FetchDescriptor<IntakeEventEntity>())) ?? []
-    let items = (try? context.fetch(FetchDescriptor<IntakeItemEntity>())) ?? []
-
-    // Twins are identified by their deterministic id prefix ("caffeine:",
-    // "cannabis:"), NOT by kindID — the migrated kinds also accumulate
-    // manually-logged events whose grams would skew the cross-check sums.
-    let caffeineTwins = sections.contains("caffeine")
-      ? twins.filter { $0.id.hasPrefix("caffeine:") } : []
-    let cannabisTwins = sections.contains("cannabis")
-      ? twins.filter { $0.id.hasPrefix("cannabis:") } : []
-    r.caffeineLegacy = caffeineEvents.count
-    r.cannabisLegacy = cannabisEvents.count
-    r.caffeineTwins = caffeineTwins.count
-    r.cannabisTwins = cannabisTwins.count
-    r.beanItems = items.filter { $0.id.hasPrefix("caffeine:") }.count
-    r.strainItems = items.filter { $0.id.hasPrefix("cannabis:") }.count
-    r.legacyGrams = caffeineEvents.compactMap(\.grams).reduce(0, +)
-                  + cannabisEvents.compactMap(\.grams).reduce(0, +)
-    r.twinAmount = (sections.contains("caffeine") ? caffeineTwins.compactMap(\.amount).reduce(0, +) : 0)
-                 + (sections.contains("cannabis") ? cannabisTwins.compactMap(\.amount).reduce(0, +) : 0)
-    return r
-  }
-
-  // MARK: Field extraction
-
-  private static func upsert(_ legacy: LegacyIntakeEvent, mutator: IntakeMutator) {
-    mutator.upsertEvent(IntakeMigrationMap.map(legacy))
-  }
-
-  private static func legacy(_ e: CaffeineEventEntity) -> LegacyIntakeEvent {
-    LegacyIntakeEvent(section: IntakeMigrationMap.caffeineSection, legacyID: e.id,
-                      date: e.date, method: e.method, note: e.note, grams: e.grams,
-                      beanOrStrain: e.beans, hit: nil,
-                      occurredAt: e.occurredAt == .distantPast ? nil : e.occurredAt,
-                      updatedAt: e.updatedAt)
-  }
-
-  private static func legacy(_ e: CannabisEventEntity) -> LegacyIntakeEvent {
-    LegacyIntakeEvent(section: IntakeMigrationMap.cannabisSection, legacyID: e.id,
-                      date: e.date, method: e.method, note: e.note, grams: e.grams,
-                      beanOrStrain: e.strain, hit: e.hit,
-                      occurredAt: e.occurredAt == .distantPast ? nil : e.occurredAt,
-                      updatedAt: e.updatedAt)
-  }
-
-  private static func legacyEvent(from record: CKRecord) -> LegacyIntakeEvent? {
-    switch record.recordType {
-    case CaffeineEventCloudKitSchema.recordType:
-      return LegacyIntakeEvent(
-        section: IntakeMigrationMap.caffeineSection,
-        legacyID: CaffeineEventCloudKitSchema.entityID(from: record.recordID.recordName),
-        date: record[CaffeineEventCloudKitSchema.Field.date] as? String ?? "",
-        method: record[CaffeineEventCloudKitSchema.Field.method] as? String ?? "other",
-        note: record[CaffeineEventCloudKitSchema.Field.note] as? String,
-        grams: record[CaffeineEventCloudKitSchema.Field.grams] as? Double,
-        beanOrStrain: record[CaffeineEventCloudKitSchema.Field.beans] as? String,
-        hit: nil,
-        occurredAt: record[CaffeineEventCloudKitSchema.Field.occurredAt] as? Date,
-        updatedAt: nil)
-    case CannabisEventCloudKitSchema.recordType:
-      return LegacyIntakeEvent(
-        section: IntakeMigrationMap.cannabisSection,
-        legacyID: CannabisEventCloudKitSchema.entityID(from: record.recordID.recordName),
-        date: record[CannabisEventCloudKitSchema.Field.date] as? String ?? "",
-        method: record[CannabisEventCloudKitSchema.Field.method] as? String ?? "vape",
-        note: record[CannabisEventCloudKitSchema.Field.note] as? String,
-        grams: record[CannabisEventCloudKitSchema.Field.grams] as? Double,
-        beanOrStrain: record[CannabisEventCloudKitSchema.Field.strain] as? String,
-        hit: record[CannabisEventCloudKitSchema.Field.hit] as? Int,
-        occurredAt: record[CannabisEventCloudKitSchema.Field.occurredAt] as? Date,
-        updatedAt: nil)
-    default:
-      return nil
+  /// Minutes between the ISO discomfort-window bounds, when both parse.
+  private static func discomfortMinutes(start: String?, end: String?) -> Int? {
+    guard let start, let end else { return nil }
+    let fmt = ISO8601DateFormatter()
+    fmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    var s = fmt.date(from: start); var e = fmt.date(from: end)
+    if s == nil || e == nil {
+      let alt = ISO8601DateFormatter(); alt.formatOptions = [.withInternetDateTime]
+      s = s ?? alt.date(from: start); e = e ?? alt.date(from: end)
     }
+    guard let s, let e, e > s else { return nil }
+    return Int((e.timeIntervalSince(s) / 60).rounded())
   }
 }

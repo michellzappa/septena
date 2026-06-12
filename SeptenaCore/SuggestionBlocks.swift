@@ -36,7 +36,7 @@ public enum SuggestionBlocks {
 
   /// The input a surface gathers before writing the event.
   public enum Input: Sendable, Hashable {
-    /// Pick one option (e.g. caffeine method, cannabis method). The chosen
+    /// Pick one option (e.g. a consumable method). The chosen
     /// `Choice.value` is written to the event's `method` field.
     case choice([Choice])
     /// The two-step mood picker: a 2×2 valence/arousal quadrant grid, then the
@@ -57,22 +57,6 @@ public enum SuggestionBlocks {
 
   /// THE source of truth: one row per quick-loggable suggestion kind.
   public static let all: [Block] = [
-    .init(kind: "caffeine", sectionKey: "caffeine", recordType: "CaffeineEvent",
-          input: .choice([
-            .init(value: "v60",    label: "V60",    symbol: "cup.and.saucer"),
-            .init(value: "matcha", label: "Matcha", symbol: "leaf"),
-            .init(value: "other",  label: "Other",  symbol: "mug"),
-          ])),
-    // Cannabis is stateful: the surface resolves these to the capsule-aware
-    // Continue (Hit N) / New capsule / Edible via `CannabisCapsule.choices` from
-    // the snapshot's capsule state (see `CaptureInput`). These static entries are
-    // the inert fallback if that state is missing; `CannabisCapsule.parse` reads
-    // both shapes.
-    .init(kind: "cannabis", sectionKey: "cannabis", recordType: "CannabisEvent",
-          input: .choice([
-            .init(value: "vape",   label: "Vape",   symbol: "wind"),
-            .init(value: "edible", label: "Edible", symbol: "birthday.cake"),
-          ])),
     .init(kind: "mood", sectionKey: "mood", recordType: "MoodEvent",
           input: .moodGrid),
     // Water — the macro-free nutrition write. The choice `value` is the

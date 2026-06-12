@@ -232,12 +232,6 @@ func noteOuraNightChange(id: String) { noteChange(recordName: OuraNightCloudKitS
 func noteOuraNightDeletion(id: String) { noteDeletion(recordName: OuraNightCloudKitSchema.recordName(for: id), kind: "ouraNight") }
 func noteWithingsRowChange(id: String) { noteChange(recordName: WithingsRowCloudKitSchema.recordName(for: id), kind: "withingsRow") }
 func noteWithingsRowDeletion(id: String) { noteDeletion(recordName: WithingsRowCloudKitSchema.recordName(for: id), kind: "withingsRow") }
-func noteCaffeineEventChange(id: String) { noteChange(recordName: CaffeineEventCloudKitSchema.recordName(for: id), kind: "caffeineEvent") }
-func noteCaffeineEventDeletion(id: String) { noteDeletion(recordName: CaffeineEventCloudKitSchema.recordName(for: id), kind: "caffeineEvent") }
-func noteCaffeineBeanChange(id: String) { noteChange(recordName: CaffeineBeanCloudKitSchema.recordName(for: id), kind: "caffeineBean") }
-func noteCaffeineBeanDeletion(id: String) { noteDeletion(recordName: CaffeineBeanCloudKitSchema.recordName(for: id), kind: "caffeineBean") }
-func noteCannabisEventChange(id: String) { noteChange(recordName: CannabisEventCloudKitSchema.recordName(for: id), kind: "cannabisEvent") }
-func noteCannabisEventDeletion(id: String) { noteDeletion(recordName: CannabisEventCloudKitSchema.recordName(for: id), kind: "cannabisEvent") }
 func noteIntakeKindChange(id: String) { noteChange(recordName: IntakeKindCloudKitSchema.recordName(for: id), kind: "intakeKind") }
 func noteIntakeKindDeletion(id: String) { noteDeletion(recordName: IntakeKindCloudKitSchema.recordName(for: id), kind: "intakeKind") }
 func noteIntakeItemChange(id: String) { noteChange(recordName: IntakeItemCloudKitSchema.recordName(for: id), kind: "intakeItem") }
@@ -346,8 +340,9 @@ func noteCoachMessageDeletion(id: String) { noteDeletion(recordName: CoachMessag
   /// may reject even broad queries when `recordName` is not marked
   /// queryable. Zone-change fetches are the native custom-zone replay API
   /// and return all current live records without those indexes.
-  func fetchAllRecords(recordTypes: [CKRecord.RecordType]) async throws -> [CKRecord] {
-    let acceptedTypes = Set(recordTypes)
+  /// Pass `nil` to replay every record type in the zone.
+  func fetchAllRecords(recordTypes: [CKRecord.RecordType]? = nil) async throws -> [CKRecord] {
+    let acceptedTypes = recordTypes.map(Set.init)
     var token: CKServerChangeToken?
     var moreComing = true
     var recordsByID: [CKRecord.ID: CKRecord] = [:]
@@ -363,7 +358,7 @@ func noteCoachMessageDeletion(id: String) { noteDeletion(recordName: CoachMessag
         switch result {
         case .success(let modification):
           let record = modification.record
-          if acceptedTypes.contains(record.recordType) {
+          if acceptedTypes?.contains(record.recordType) ?? true {
             recordsByID[recordID] = record
           }
         case .failure(let error):

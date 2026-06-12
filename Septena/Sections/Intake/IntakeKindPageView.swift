@@ -125,7 +125,7 @@ struct IntakeKindPageView: View {
     if count != nil || !needsInput {
       let amount = kind.showsAmount ? method?.defaultAmount : nil
       // Commit flourish — the tracker's OWN motion (bloom / ripple / …), the
-      // "motion matches the logged data" delight the old caffeine/cannabis
+      // "motion matches the logged data" delight the old consumable
       // drawers had. Routes through SectionLog so haptic + flourish fire once.
       SectionLog.newLog(section: "intake", accent: accent,
                         motion: Self.motion(for: kind.flourish),
@@ -142,7 +142,7 @@ struct IntakeKindPageView: View {
   }
 
   /// The kind's stored `flourish` token → commit motion. Same vocabulary the
-  /// plugins declare (caffeine bloom, cannabis ripple).
+  /// plugins declare (each kind's flourish).
   static func motion(for flourish: String) -> CommitMotion {
     switch flourish {
     case "ripple": return .ripple
@@ -196,7 +196,7 @@ struct IntakeKindPageView: View {
   // MARK: Rhythm wheel
   //
   // A 24-hour dial of *when* this tracker lands over the trailing 7 days, faded
-  // by recency (shared `TimeOfDayWheel`, same as the old caffeine/cannabis
+  // by recency (shared `TimeOfDayWheel`, same as the old consumable
   // drawers). Only on today and only with enough events to read a pattern.
 
   private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
@@ -253,8 +253,8 @@ struct IntakeKindPageView: View {
   }
 
   /// Capsule-slots accessory: the shared `ProjectProgressIcon` ring filled to
-  /// `count / cap` plus an "N/cap" caption — the modern take on cannabis's old
-  /// `●●○` hit dots, for any container tracker.
+  /// `count / cap` plus an "N/cap" caption — the modern take on the container
+  /// accessory's old `●●○` hit dots, for any container tracker.
   private func capsuleAccessory(_ e: IntakeEntryDTO) -> AnyView? {
     guard isContainerEntry(e), let cap = kind?.containerCap, let count = e.count else { return nil }
     return AnyView(

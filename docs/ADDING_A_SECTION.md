@@ -17,8 +17,8 @@ minimal section (no entity of its own; it's a UX layer over Nutrition's
 
 | Concern | File | Type |
 | --- | --- | --- |
-| Catalog facts (key, label, activation, which surfaces it supports) | `SeptenaCore/Sections/SectionManifest.swift` | `SectionManifest` row in `.all` |
-| Behaviour (destination view, onboarding, MCP skill, flourish, goals) | `Septena/Shell/Sections/Plugins/<Name>Plugin.swift` | `SectionPlugin` conformer, registered in `SectionRegistry.all` |
+| Catalog facts (key, label, activation, dashboard support, settings mode) | `SeptenaCore/Sections/SectionManifest.swift` | `SectionManifest` row in `.all` |
+| Behaviour (destination view, onboarding, MCP skill brief, flourish, goals) | `Septena/Shell/Sections/Plugins/<Name>Plugin.swift` | `SectionPlugin` conformer, registered in `SectionRegistry.all` |
 
 `SectionManifest` lives in **SeptenaCore** (UI-free). The plugin lives in the
 **app target** because it constructs SwiftUI views. They're joined by the
@@ -39,7 +39,7 @@ depend on what the section does.
 - `defaultLabel`, `shortDescription`.
 - `activation` — `.always` / `.optional` / `.integration`.
 - `onboarding` — `.core` (on by default) / `.optional` / `.hidden`.
-- `supportsTab`, `supportsDashboard`.
+- `supportsDashboard` — whether the Week dashboard should reserve a tile.
 - `settingsEditor` — `.none` / `.appearance` / `.sectionConfig`.
 
 Also add the SF Symbol to `iconByKey` (same file). New sections are
@@ -55,7 +55,7 @@ manual install — **no separate Settings or ordering wiring is needed.**
 `SectionRegistry.all` in `SectionPlugin.swift`. Everything below is a slot on
 this protocol (most have no-op defaults).
 
-### 3. Destination view — **required** (if `supportsDashboard`/`supportsTab`)
+### 3. Destination view — **required** (if the section opens from dashboard/settings)
 
 `static func destinationView() -> AnyView?`. **Wrap the content in
 `SectionDrawer`** (not a bare `List`/`ScrollView`) so you inherit the standard
@@ -63,6 +63,12 @@ nav chrome, the goals strip, the "+" toolbar, and — when you pass
 `currentDate` — time travel (see surface 7). Group content into
 `DrawerSection { ... }` cards; use `LogEntryRow` for log rows. See
 `GutDestinationView` / `HydrationDestinationView` for the idiom.
+
+Create/edit forms should be presented with `.drawerDetail(edit:create:)` (or
+the lower-level adaptive detail modifiers) and hosted by `AdaptiveEditScaffold`.
+The form supplies `canSave` and `onSave`; the scaffold owns cancel/save chrome
+and dismissal. New log writes should go through `SectionLog.newLog(...)` so the
+same save path triggers dashboard flourishes and confirmation affordances.
 
 ### 4. Dashboard tile — **required** (if `supportsDashboard`)
 
@@ -101,9 +107,11 @@ Two patterns:
 
 ### 6. Today timeline — **optional**
 
-Add the key to `SectionManifest.todayCapableKeys` and feed the section's
-today entries into `WeekDashboardTimelineCard` (the `todayTimeline` builder in
-`WeekDashboardView`).
+Add the key to `SectionManifest.todayCapableKeys` and feed the section's today
+entries into `WeekDashboardTimelineCard` (the `todayTimeline` builder in
+`WeekDashboardView`). Simple log sections can use `DayTimelineExtraEvent`
+instead of adding a dedicated entity array to `DayTimelineView`; pass the event
+id/date/time plus `sectionKey` and the timeline will use the section accent.
 
 ### 7. Time travel — **optional**
 
@@ -117,10 +125,17 @@ without threading `currentDate` does nothing — the date strip is a
 
 ### 8. MCP / agent skill — **optional**
 
-`static var mcpSkill: SectionSkill?` on the plugin (declare tools + a markdown
-brief inline; never in the legacy `SectionSkill.all`). The gateway repo's
-`skill.md` is generated from `SectionRegistry.fullSkillMarkdown()`, so keep the
-brief in sync with the actual MCP tools.
+`static var mcpSkill: SectionSkill?` on the plugin declares the human-facing
+brief only; it does **not** make tools callable. For app-local MCP, add matching
+tool schemas in `SeptenaCore/MCP/MCPToolCatalog.swift`, dispatch/read-write
+handlers in `SeptenaCore/MCP/MCPDispatch.swift`, and include list tools in
+`readOnlyTools` when they only read the local mirror. If the hosted gateway is
+expected to expose the same section, mirror the schema and handlers there too.
+
+The gateway repo's `skill.md` is generated from
+`SectionRegistry.fullSkillMarkdown()`, so keep the plugin brief in sync with the
+actual MCP tools. A section with only `mcpSkill` text is documented for agents
+but not executable.
 
 ### 9. Settings detail pane — **optional**
 
@@ -146,6 +161,9 @@ Route writes through `SectionLog.newLog` to fire it.
 ### 13. Import/Export — **optional**
 
 `exportContribution` — schema tables + a collect closure. Skipped if nil.
+This covers export and the schema prompt only. Import is separate: if the
+section's data cannot be restored by an existing generic importer, add an
+explicit import/apply path before calling the section import-ready.
 
 ### 14. Next feed membership — **optional**
 
@@ -190,12 +208,12 @@ surface 14.)
 | Quick-add | ▫️ | `AddInfoSection` **or** self-refresh menu |
 | Today timeline | ▫️ | `todayCapableKeys` + timeline card |
 | Time travel | ▫️ | `timeTravelCapableKeys` + drawer `currentDate` |
-| MCP skill | ▫️ | plugin `mcpSkill` |
+| MCP skill + tools | ▫️ | plugin `mcpSkill`, `MCPToolCatalog`, `MCPDispatch` |
 | Settings detail pane | ▫️ | plugin `detailPaneContent()` |
 | Onboarding | ▫️ | plugin `onboarding()` |
 | Aim metrics | ▫️ | plugin `aimMetrics` / `evaluateAim` |
 | Flourish | ▫️ | plugin `logFlourish` + `SectionLog` |
-| Import/Export | ▫️ | plugin `exportContribution` |
+| Import/Export | ▫️ | plugin `exportContribution` + importer if restore is supported |
 | Next feed | ▫️ | `NextBlocks.all` (+ iOS render case, watch writer) |
 | Watch | ▫️ bespoke | `SeptenaWatch/` |
 

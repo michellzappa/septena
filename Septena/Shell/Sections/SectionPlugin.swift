@@ -407,8 +407,6 @@ enum SectionRegistry {
     MoodPlugin.self,
     SymptomsPlugin.self,
     MedicationsPlugin.self,
-    CaffeinePlugin.self,
-    CannabisPlugin.self,
     IntakePlugin.self,
     GutPlugin.self,
     TrainingPlugin.self,
@@ -424,4 +422,29 @@ enum SectionRegistry {
   static func plugin(forKey key: String) -> (any SectionPlugin.Type)? {
     byKey[key]
   }
+
+  #if DEBUG
+  /// Debug-only parity guard between the two stringly-joined sources of
+  /// truth for a section: its identity (`SectionManifest.all`, in
+  /// SeptenaCore) and its behavior (`SectionRegistry.all`, here). The join
+  /// is a runtime string `key` with no compile-time link, and every plugin
+  /// force-unwraps `SectionManifest.byKey[key]!`, so a drift either way is a
+  /// latent crash. Called once at launch (`App` `.task`); asserts so the
+  /// mismatch surfaces in dev, not as a field crash in front of a user.
+  ///
+  /// Invariant: every manifest row has exactly one plugin and vice versa.
+  /// (Insights is intentionally neither — it's absent from both.)
+  static func assertManifestParity() {
+    let pluginKeys = Set(all.map { $0.manifest.key })
+    let manifestKeys = Set(SectionManifest.all.map(\.key))
+
+    let pluginsMissingManifest = pluginKeys.subtracting(manifestKeys)
+    assert(pluginsMissingManifest.isEmpty,
+           "SectionRegistry plugins with no SectionManifest row: \(pluginsMissingManifest.sorted())")
+
+    let manifestMissingPlugin = manifestKeys.subtracting(pluginKeys)
+    assert(manifestMissingPlugin.isEmpty,
+           "SectionManifest rows with no SectionRegistry plugin (will never render behavior): \(manifestMissingPlugin.sorted())")
+  }
+  #endif
 }

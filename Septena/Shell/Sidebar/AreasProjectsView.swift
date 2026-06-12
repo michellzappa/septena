@@ -570,6 +570,7 @@ struct RepoEditorSheet: View {
       }
       .onAppear { focused = true }
     }
+    .macSheetFrame(width: 460, height: 200)
   }
 }
 
@@ -603,6 +604,7 @@ struct AreaPickerSheet: View {
         }
       }
     }
+    .macSheetFrame(width: 460, height: 480)
   }
 
   @ViewBuilder

@@ -104,7 +104,7 @@ struct SeptenaApp: App {
               // Republish the watch snapshot after pulling — this is also how
               // watch-originated completions get reflected back to the watch.
               await MainActor.run {
-                WatchSnapshotPublisher.publish(context: localStore.container.mainContext)
+                WatchSnapshotPublisher.schedule(context: localStore.container.mainContext)
                 // Surface milestones earned while away (background Withings
                 // ingest, logs from intents, another device's data syncing in).
                 MilestonePresenter.presentPending(
@@ -149,6 +149,9 @@ struct SeptenaApp: App {
           // waiting on any network round-trip.
           await services.start()
           #if DEBUG
+          // Catch section identity↔behavior drift in dev: every manifest row
+          // must have a plugin and vice versa (the join is a runtime string).
+          SectionRegistry.assertManifestParity()
           // Screenshot / UI-test builds: load curated demo data into the
           // in-memory store. No-op in release (DemoSeedMode.isOn is false).
           if DemoSeedMode.isOn {

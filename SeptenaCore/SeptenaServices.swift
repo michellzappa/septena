@@ -39,9 +39,7 @@ final class SeptenaServices {
   let activityMutator: ActivityMutator
   let symptomsMutator: SymptomsMutator
   let medicationsMutator: MedicationsMutator
-  let caffeineMutator: CaffeineMutator
   let moodMutator: MoodMutator
-  let cannabisMutator: CannabisMutator
   let intakeMutator: IntakeMutator
   let groceryMutator: GroceryMutator
   let trainingMutator: TrainingMutator
@@ -66,9 +64,7 @@ final class SeptenaServices {
     self.activityMutator = ActivityMutator(context: context, ckEngine: nil)
     self.symptomsMutator = SymptomsMutator(context: context, ckEngine: nil)
     self.medicationsMutator = MedicationsMutator(context: context, ckEngine: nil)
-    self.caffeineMutator = CaffeineMutator(context: context, ckEngine: nil)
     self.moodMutator = MoodMutator(context: context)
-    self.cannabisMutator = CannabisMutator(context: context, ckEngine: nil)
     self.intakeMutator = IntakeMutator(context: context, ckEngine: nil)
     self.groceryMutator = GroceryMutator(context: context, ckEngine: nil)
     self.trainingMutator = TrainingMutator(context: context, ckEngine: nil)
@@ -336,24 +332,6 @@ final class SeptenaServices {
           }
           return nil
         }
-        if recordName.hasPrefix("caffeine-event:") {
-          let id = CaffeineEventCloudKitSchema.entityID(from: recordName)
-          if let entity = one(FetchDescriptor<CaffeineEventEntity>(
-            predicate: #Predicate { $0.id == id }
-          )) {
-            return entity.toCloudKitRecord()
-          }
-          return nil
-        }
-        if recordName.hasPrefix("caffeine-bean:") {
-          let id = CaffeineBeanCloudKitSchema.entityID(from: recordName)
-          if let entity = one(FetchDescriptor<CaffeineBeanEntity>(
-            predicate: #Predicate { $0.id == id }
-          )) {
-            return entity.toCloudKitRecord()
-          }
-          return nil
-        }
         if recordName.hasPrefix("intake-kind:") {
           let id = IntakeKindCloudKitSchema.entityID(from: recordName)
           if let entity = one(FetchDescriptor<IntakeKindEntity>(
@@ -375,15 +353,6 @@ final class SeptenaServices {
         if recordName.hasPrefix("intake-event:") {
           let id = IntakeEventCloudKitSchema.entityID(from: recordName)
           if let entity = one(FetchDescriptor<IntakeEventEntity>(
-            predicate: #Predicate { $0.id == id }
-          )) {
-            return entity.toCloudKitRecord()
-          }
-          return nil
-        }
-        if recordName.hasPrefix("cannabis-event:") {
-          let id = CannabisEventCloudKitSchema.entityID(from: recordName)
-          if let entity = one(FetchDescriptor<CannabisEventEntity>(
             predicate: #Predicate { $0.id == id }
           )) {
             return entity.toCloudKitRecord()
@@ -749,32 +718,6 @@ final class SeptenaServices {
             context.insert(WithingsRowEntity(cloudKit: record))
           }
           NotificationCenter.default.post(name: .septenaWithingsChanged, object: nil)
-        case CaffeineEventCloudKitSchema.recordType:
-          batchTouchedData = true
-          let id = CaffeineEventCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = one(FetchDescriptor<CaffeineEventEntity>(
-            predicate: #Predicate { $0.id == id }
-          )) {
-            entity.apply(record)
-          } else {
-            context.insert(CaffeineEventEntity(cloudKit: record))
-          }
-          // Migrate-on-sight (study §7.2): a legacy record arriving from an old
-          // build (the watch, a stale device) is upserted into its generic
-          // intake twin by deterministic id — the standing rule that survives
-          // the legacy classes' deletion.
-          IntakeMigrator.migrate(record: record, mutator: self.intakeMutator)
-        case CaffeineBeanCloudKitSchema.recordType:
-          batchTouchedData = true
-          let id = CaffeineBeanCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = one(FetchDescriptor<CaffeineBeanEntity>(
-            predicate: #Predicate { $0.id == id }
-          )) {
-            entity.apply(record)
-          } else {
-            context.insert(CaffeineBeanEntity(cloudKit: record))
-          }
-          IntakeMigrator.migrate(record: record, mutator: self.intakeMutator)
         case IntakeKindCloudKitSchema.recordType:
           batchTouchedData = true
           let id = IntakeKindCloudKitSchema.entityID(from: record.recordID.recordName)
@@ -805,17 +748,6 @@ final class SeptenaServices {
           } else {
             context.insert(IntakeEventEntity(cloudKit: record))
           }
-        case CannabisEventCloudKitSchema.recordType:
-          batchTouchedData = true
-          let id = CannabisEventCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = one(FetchDescriptor<CannabisEventEntity>(
-            predicate: #Predicate { $0.id == id }
-          )) {
-            entity.apply(record)
-          } else {
-            context.insert(CannabisEventEntity(cloudKit: record))
-          }
-          IntakeMigrator.migrate(record: record, mutator: self.intakeMutator)
         case GroceryItemCloudKitSchema.recordType:
           batchTouchedData = true
           let id = GroceryItemCloudKitSchema.entityID(from: record.recordID.recordName)
@@ -1087,22 +1019,6 @@ final class SeptenaServices {
           )).first {
             context.delete(entity)
           }
-        case CaffeineEventCloudKitSchema.recordType:
-          batchTouchedData = true
-          let id = CaffeineEventCloudKitSchema.entityID(from: recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<CaffeineEventEntity>(
-            predicate: #Predicate { $0.id == id }
-          )).first {
-            context.delete(entity)
-          }
-        case CaffeineBeanCloudKitSchema.recordType:
-          batchTouchedData = true
-          let id = CaffeineBeanCloudKitSchema.entityID(from: recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<CaffeineBeanEntity>(
-            predicate: #Predicate { $0.id == id }
-          )).first {
-            context.delete(entity)
-          }
         case IntakeKindCloudKitSchema.recordType:
           batchTouchedData = true
           let id = IntakeKindCloudKitSchema.entityID(from: recordID.recordName)
@@ -1123,14 +1039,6 @@ final class SeptenaServices {
           batchTouchedData = true
           let id = IntakeEventCloudKitSchema.entityID(from: recordID.recordName)
           if let entity = try? context.fetch(FetchDescriptor<IntakeEventEntity>(
-            predicate: #Predicate { $0.id == id }
-          )).first {
-            context.delete(entity)
-          }
-        case CannabisEventCloudKitSchema.recordType:
-          batchTouchedData = true
-          let id = CannabisEventCloudKitSchema.entityID(from: recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<CannabisEventEntity>(
             predicate: #Predicate { $0.id == id }
           )).first {
             context.delete(entity)
@@ -1231,8 +1139,6 @@ final class SeptenaServices {
       activityMutator.bind(ckEngine: ckEngine)
       symptomsMutator.bind(ckEngine: ckEngine)
       medicationsMutator.bind(ckEngine: ckEngine)
-      caffeineMutator.bind(ckEngine: ckEngine)
-      cannabisMutator.bind(ckEngine: ckEngine)
       intakeMutator.bind(ckEngine: ckEngine)
       groceryMutator.bind(ckEngine: ckEngine)
       trainingMutator.bind(ckEngine: ckEngine)
@@ -1276,6 +1182,10 @@ final class SeptenaServices {
     // rows (local-only) and publish this device's timezone so the gateway
     // resolves the user's real zone instead of defaulting to UTC.
     OccurredAtBackfill.runIfNeeded(context: context)
+    // Lift the symptom-shaped gut fields (discomfort, blood) into standalone
+    // Symptoms events. Local-only, idempotent, gated once-per-device; runs
+    // after the fetch so synced gut rows are present.
+    GutSymptomMigrator.runIfNeeded(context: context, mutator: symptomsMutator)
     SettingsMirror.publishDeviceTimezone(context: context, engine: ckEngine)
   }
 
@@ -1733,8 +1643,10 @@ final class ChecklistMutator {
   private func postChecklistChanged(_ section: String) {
     DataChange.post(section)
     // Keep the watch's one-shot snapshot in sync with every checklist edit.
+    // Debounced: ticking several items in a row coalesces to one rebuild +
+    // CloudKit write instead of one per toggle.
     let ctx = context
-    Task { @MainActor in WatchSnapshotPublisher.publish(context: ctx) }
+    Task { @MainActor in WatchSnapshotPublisher.schedule(context: ctx) }
   }
 }
 
@@ -2061,25 +1973,20 @@ final class GutMutator {
   func addEntry(date: String,
                 time: String,
                 bristol: Int,
-                blood: Int = 0,
-                volume: String? = nil,
                 // Free-form text defaults to "" rather than nil so the first
-                // in-app entry registers these fields with CloudKit, enabling
-                // the MCP gateway (which uses Web Services API) to write to
-                // them. Enum / time fields stay nil — empty isn't a valid value.
-                discomfortLevel: String? = "",
-                discomfortStart: String? = nil,
-                discomfortEnd: String? = nil,
+                // in-app entry registers the field with CloudKit, enabling the
+                // MCP gateway (which uses Web Services API) to write to it.
+                volume: String? = nil,
                 note: String? = "") -> GutEventEntity {
     let id = uniqueID()
+    // Symptom-shaped fields (blood, discomfort) are retired from Gut — they
+    // live in Symptoms now (docs/GUT_SYMPTOMS_MIGRATION_PLAN). New rows leave
+    // the dormant storage at its empty defaults; the GutSymptomMigrator still
+    // reads legacy values off existing rows.
     let entity = GutEventEntity(id: id,
                                 date: date,
                                 bristol: bristol,
-                                blood: blood,
                                 volume: volume,
-                                discomfortLevel: discomfortLevel,
-                                discomfortStart: discomfortStart,
-                                discomfortEnd: discomfortEnd,
                                 note: note)
     entity.occurredAt = EventTimestamp.from(date: date, time: time)
     context.insert(entity)
@@ -2091,20 +1998,12 @@ final class GutMutator {
                    date: String? = nil,
                    time: String? = nil,
                    bristol: Int? = nil,
-                   blood: Int? = nil,
                    volume: String?? = nil,
-                   discomfortLevel: String?? = nil,
-                   discomfortStart: String?? = nil,
-                   discomfortEnd: String?? = nil,
                    note: String?? = nil) {
     guard let entity = fetch(id: id) else { return }
     if let date { entity.date = date }
     if let bristol { entity.bristol = bristol }
-    if let blood { entity.blood = blood }
     if let volume { entity.volume = volume }
-    if let discomfortLevel { entity.discomfortLevel = discomfortLevel }
-    if let discomfortStart { entity.discomfortStart = discomfortStart }
-    if let discomfortEnd { entity.discomfortEnd = discomfortEnd }
     if let note { entity.note = note }
     // `time` STRING retired: fold a day/time change into the canonical
     // occurredAt, deriving the unspecified half from the existing instant.
@@ -2383,6 +2282,71 @@ final class SymptomsMutator {
   private func postChanged() {
     DataChange.post(Self.changeScope)
   }
+
+  // MARK: - Migration upserts (deterministic ids)
+  //
+  // The Gut → Symptoms migrator writes through these so the write-boundary
+  // invariant holds for migrators too. Definitions match by title first (so a
+  // starter the user already added is reused, never duplicated); events upsert
+  // on a deterministic id derived from the source gut row.
+
+  /// Id of a definition titled `title` (case-insensitive), creating one with
+  /// `fallbackID` if none exists. Idempotent across launches and devices.
+  @discardableResult
+  func ensureDefinition(title: String,
+                        emoji: String?,
+                        bodySystem: String?,
+                        defaultBodyRegion: String?,
+                        fallbackID: String) -> String {
+    let all = (try? context.fetch(FetchDescriptor<SymptomDefinitionEntity>())) ?? []
+    if let existing = all.first(where: { $0.title.lowercased() == title.lowercased() }) {
+      return existing.id
+    }
+    let entity = SymptomDefinitionEntity(id: fallbackID,
+                                         title: title,
+                                         emoji: emoji,
+                                         bodySystem: bodySystem,
+                                         defaultBodyRegion: defaultBodyRegion,
+                                         sortIndex: nextDefinitionSortIndex())
+    context.insert(entity)
+    commitDefinition(entity, op: "migrate")
+    return fallbackID
+  }
+
+  /// Create-or-update a migrated symptom event keyed on a deterministic id, so a
+  /// re-run (or a late-arriving gut row) converges instead of duplicating.
+  func upsertMigratedEvent(id: String,
+                           symptomID: String,
+                           date: String,
+                           occurredAt: Date,
+                           severity: Int,
+                           durationMinutes: Int?,
+                           note: String?,
+                           source: String) {
+    let clamped = max(0, min(10, severity))
+    if let existing = fetchEvent(id: id) {
+      existing.symptomID = symptomID
+      existing.date = date
+      existing.occurredAt = occurredAt
+      existing.severity = clamped
+      existing.durationMinutes = durationMinutes
+      existing.note = note
+      existing.source = source
+      existing.updatedAt = .now
+      commitEvent(existing, op: "migrate")
+      return
+    }
+    let entity = SymptomEventEntity(id: id,
+                                    date: date,
+                                    symptomID: symptomID,
+                                    severity: clamped,
+                                    durationMinutes: durationMinutes,
+                                    note: note,
+                                    source: source)
+    entity.occurredAt = occurredAt
+    context.insert(entity)
+    commitEvent(entity, op: "migrate")
+  }
 }
 
 @MainActor
@@ -2411,6 +2375,8 @@ final class MedicationsMutator {
                      defaultDoseValue: Double? = nil,
                      defaultDoseUnit: String? = nil,
                      bucket: String? = nil,
+                     scheduleKind: String? = "daily",
+                     targetDosesPerDay: Int? = 1,
                      instructions: String? = nil) -> MedicationDefinitionEntity {
     let entity = MedicationDefinitionEntity(id: UUID().uuidString.lowercased(),
                                             title: title,
@@ -2422,6 +2388,8 @@ final class MedicationsMutator {
                                             defaultDoseValue: defaultDoseValue,
                                             defaultDoseUnit: defaultDoseUnit,
                                             bucket: bucket,
+                                            scheduleKind: scheduleKind,
+                                            targetDosesPerDay: targetDosesPerDay,
                                             instructions: instructions,
                                             sortIndex: nextDefinitionSortIndex())
     context.insert(entity)
@@ -2439,6 +2407,8 @@ final class MedicationsMutator {
                         defaultDoseValue: Double?? = nil,
                         defaultDoseUnit: String?? = nil,
                         bucket: String?? = nil,
+                        scheduleKind: String?? = nil,
+                        targetDosesPerDay: Int?? = nil,
                         instructions: String?? = nil,
                         archived: Bool? = nil) {
     guard let entity = fetchDefinition(id: id) else { return }
@@ -2451,6 +2421,8 @@ final class MedicationsMutator {
     if let defaultDoseValue { entity.defaultDoseValue = defaultDoseValue }
     if let defaultDoseUnit { entity.defaultDoseUnit = defaultDoseUnit }
     if let bucket { entity.bucket = bucket }
+    if let scheduleKind { entity.scheduleKind = scheduleKind }
+    if let targetDosesPerDay { entity.targetDosesPerDay = targetDosesPerDay }
     if let instructions { entity.instructions = instructions }
     if let archived { entity.archived = archived }
     entity.updatedAt = .now
@@ -2559,279 +2531,10 @@ final class MedicationsMutator {
   }
 }
 
-@MainActor
-@Observable
-final class CaffeineMutator {
-  static let changeScope = "caffeine"
-  private let context: ModelContext
-  private var ckEngine: CKEngine?
-
-  init(context: ModelContext, ckEngine: CKEngine? = nil) {
-    self.context = context
-    self.ckEngine = ckEngine
-  }
-
-  func bind(ckEngine: CKEngine) {
-    self.ckEngine = ckEngine
-  }
-
-  // MARK: - Entries
-
-  @discardableResult
-  func addEntry(date: String,
-                time: String,
-                method: String,
-                beans: String? = nil,
-                grams: Double? = nil,
-                // Free-form text defaults to "" so the field registers with
-                // CloudKit on first in-app write. See GutMutator for details.
-                note: String? = "") -> CaffeineEventEntity {
-    let id = uniqueEntryID()
-    let entity = CaffeineEventEntity(id: id,
-                                     date: date,
-                                     method: method,
-                                     beans: beans,
-                                     grams: grams,
-                                     note: note)
-    entity.occurredAt = EventTimestamp.from(date: date, time: time)
-    context.insert(entity)
-    commitEntry(entity, op: "create")
-    return entity
-  }
-
-  func updateEntry(id: String,
-                   date: String? = nil,
-                   time: String? = nil,
-                   method: String? = nil,
-                   beans: String?? = nil,
-                   grams: Double?? = nil,
-                   note: String?? = nil) {
-    guard let entity = fetchEntry(id: id) else { return }
-    if let date { entity.date = date }
-    if let method { entity.method = method }
-    if let beans { entity.beans = beans }
-    if let grams { entity.grams = grams }
-    if let note { entity.note = note }
-    // `time` STRING retired: fold a day/time change into the canonical occurredAt.
-    if date != nil || time != nil {
-      let t = time ?? EventTimestamp.hhmm(from: entity.occurredAt)
-      entity.occurredAt = EventTimestamp.from(date: entity.date, time: t)
-    }
-    entity.updatedAt = .now
-    commitEntry(entity, op: "update")
-  }
-
-  func deleteEntry(id: String) {
-    guard let entity = fetchEntry(id: id) else { return }
-    context.delete(entity)
-    saveContext("CK caffeine delete")
-    ckEngine?.noteCaffeineEventDeletion(id: id)
-    postChanged()
-  }
-
-  // MARK: - Beans catalog
-
-  @discardableResult
-  func addBean(name: String) -> CaffeineBeanEntity {
-    let id = uniqueBeanID(for: name)
-    let entity = CaffeineBeanEntity(id: id, name: name, sortIndex: nextBeanSortIndex())
-    context.insert(entity)
-    commitBean(entity, op: "create")
-    return entity
-  }
-
-  func updateBean(id: String, name: String) {
-    guard let entity = fetchBean(id: id) else { return }
-    entity.name = name
-    entity.updatedAt = .now
-    commitBean(entity, op: "update")
-  }
-
-  func deleteBean(id: String) {
-    guard let entity = fetchBean(id: id) else { return }
-    context.delete(entity)
-    saveContext("CK caffeine-bean delete")
-    ckEngine?.noteCaffeineBeanDeletion(id: id)
-    postChanged()
-  }
-
-  // MARK: - Helpers
-
-  private func fetchEntry(id: String) -> CaffeineEventEntity? {
-    try? context.fetch(FetchDescriptor<CaffeineEventEntity>(
-      predicate: #Predicate { $0.id == id }
-    )).first
-  }
-
-  private func fetchBean(id: String) -> CaffeineBeanEntity? {
-    try? context.fetch(FetchDescriptor<CaffeineBeanEntity>(
-      predicate: #Predicate { $0.id == id }
-    )).first
-  }
-
-  private func uniqueEntryID() -> String {
-    var attempt = String(UUID().uuidString.lowercased().prefix(8))
-    while fetchEntry(id: attempt) != nil {
-      attempt = String(UUID().uuidString.lowercased().prefix(8))
-    }
-    return attempt
-  }
-
-  private func uniqueBeanID(for name: String) -> String {
-    let base = name.lowercased()
-      .replacingOccurrences(of: " ", with: "-")
-      .filter { $0.isLetter || $0.isNumber || $0 == "-" }
-    var attempt = base.isEmpty ? IDShortcode.generate(length: 4) : base
-    var n = 2
-    while fetchBean(id: attempt) != nil {
-      attempt = "\(base)-\(n)"
-      n += 1
-    }
-    return attempt
-  }
-
-  private func nextBeanSortIndex() -> Int {
-    ((try? context.fetch(FetchDescriptor<CaffeineBeanEntity>(
-      sortBy: [SortDescriptor(\.sortIndex, order: .reverse)]
-    )).first?.sortIndex) ?? -1) + 1
-  }
-
-  private func commitEntry(_ entity: CaffeineEventEntity, op: String) {
-    saveContext("CK caffeine \(op)")
-    ckEngine?.noteCaffeineEventChange(id: entity.id)
-    postChanged()
-  }
-
-  private func commitBean(_ entity: CaffeineBeanEntity, op: String) {
-    saveContext("CK caffeine-bean \(op)")
-    ckEngine?.noteCaffeineBeanChange(id: entity.id)
-    postChanged()
-  }
-
-  private func saveContext(_ label: String) {
-    do { try context.save() }
-    catch { SeptenaLog.error(label, error) }
-  }
-
-  private func postChanged() {
-    DataChange.post(Self.changeScope)
-  }
-}
-
-@MainActor
-@Observable
-final class CannabisMutator {
-  static let changeScope = "cannabis"
-  private let context: ModelContext
-  private var ckEngine: CKEngine?
-
-  /// Per-use weight for vape entries. The legacy server auto-computed this
-  /// from a capsule lifecycle (uses-remaining counter); on CK we keep it
-  /// simple and use a constant — user confirmed 0.05g per use is always
-  /// correct for their hardware.
-  static let gramsPerVapeUse: Double = 0.05
-
-  init(context: ModelContext, ckEngine: CKEngine? = nil) {
-    self.context = context
-    self.ckEngine = ckEngine
-  }
-
-  func bind(ckEngine: CKEngine) {
-    self.ckEngine = ckEngine
-  }
-
-  // MARK: - Entries
-
-  @discardableResult
-  func addEntry(date: String,
-                time: String,
-                method: String,
-                hit: Int? = nil,
-                grams: Double? = nil,
-                // Free-form text defaults to "" so the field registers with
-                // CloudKit on first in-app write. See GutMutator for details.
-                note: String? = "") -> CannabisEventEntity {
-    let id = uniqueEntryID()
-    // Vape entries auto-fill grams from the constant when not supplied.
-    let resolvedGrams = grams ?? (method == "vape" ? Self.gramsPerVapeUse : nil)
-    let entity = CannabisEventEntity(id: id,
-                                     date: date,
-                                     method: method,
-                                     hit: hit,
-                                     grams: resolvedGrams,
-                                     note: note)
-    entity.occurredAt = EventTimestamp.from(date: date, time: time)
-    context.insert(entity)
-    commitEntry(entity, op: "create")
-    return entity
-  }
-
-  func updateEntry(id: String,
-                   date: String? = nil,
-                   time: String? = nil,
-                   method: String? = nil,
-                   hit: Int?? = nil,
-                   grams: Double?? = nil,
-                   note: String?? = nil) {
-    guard let entity = fetchEntry(id: id) else { return }
-    if let date { entity.date = date }
-    if let method { entity.method = method }
-    if let hit { entity.hit = hit }
-    if let grams { entity.grams = grams }
-    if let note { entity.note = note }
-    // `time` STRING retired: fold a day/time change into the canonical occurredAt.
-    if date != nil || time != nil {
-      let t = time ?? EventTimestamp.hhmm(from: entity.occurredAt)
-      entity.occurredAt = EventTimestamp.from(date: entity.date, time: t)
-    }
-    entity.updatedAt = .now
-    commitEntry(entity, op: "update")
-  }
-
-  func deleteEntry(id: String) {
-    guard let entity = fetchEntry(id: id) else { return }
-    context.delete(entity)
-    saveContext("CK cannabis delete")
-    ckEngine?.noteCannabisEventDeletion(id: id)
-    postChanged()
-  }
-
-  // MARK: - Helpers
-
-  private func fetchEntry(id: String) -> CannabisEventEntity? {
-    try? context.fetch(FetchDescriptor<CannabisEventEntity>(
-      predicate: #Predicate { $0.id == id }
-    )).first
-  }
-
-  private func uniqueEntryID() -> String {
-    var attempt = String(UUID().uuidString.lowercased().prefix(8))
-    while fetchEntry(id: attempt) != nil {
-      attempt = String(UUID().uuidString.lowercased().prefix(8))
-    }
-    return attempt
-  }
-
-  private func commitEntry(_ entity: CannabisEventEntity, op: String) {
-    saveContext("CK cannabis \(op)")
-    ckEngine?.noteCannabisEventChange(id: entity.id)
-    postChanged()
-  }
-
-  private func saveContext(_ label: String) {
-    do { try context.save() }
-    catch { SeptenaLog.error(label, error) }
-  }
-
-  private func postChanged() {
-    DataChange.post(Self.changeScope)
-  }
-}
-
-
 // The single write boundary for the generic `intake` section — kinds, their
-// item catalogs, and events. Generalizes `CaffeineMutator` + `CannabisMutator`:
-// optimistic local write, CK enqueue, save, notify. Deletion posture is
+// item catalogs, and events (the generalization that retired the per-substance
+// per-substance mutators): optimistic local write, CK enqueue, save, notify.
+// Deletion posture is
 // archive-only for kinds (no hard delete); items and events keep the legacy
 // single-row delete (correction ≠ destruction). See docs/CONSUMABLES_PLAN.md.
 @MainActor
@@ -3013,14 +2716,11 @@ final class IntakeMutator {
     postChanged()
   }
 
-  // MARK: - Migration upserts (deterministic ids)
-  //
-  // The record-level migrator writes through these so the write-boundary
-  // invariant holds for migrators too. Ids are deterministic (IntakeMigrationMap),
-  // so every upsert is idempotent and two devices converge (study §7.1).
+  // MARK: - Kind creation (idempotent)
 
-  /// Create the migration kind if absent; if present, leave it untouched — the
-  /// kind is user-owned after creation, so a re-run must not clobber edits.
+  /// Create a kind from a template seed if absent; if present, leave it
+  /// untouched — the kind is user-owned after creation, so re-running must not
+  /// clobber edits. Drives the first-enable template picker.
   @discardableResult
   func upsertKind(seed: IntakeKindSeed) -> IntakeKindEntity {
     if let existing = fetchKind(id: seed.id) { return existing }
@@ -3041,59 +2741,9 @@ final class IntakeMutator {
                                   templateID: seed.templateID)
     entity.methods = seed.methods
     context.insert(entity)
-    commitKind(entity, op: "migrate")
+    commitKind(entity, op: "create")
     return entity
   }
-
-  /// Upsert a catalog item by deterministic id. Name refreshes on re-run.
-  func upsertItem(id: String, kindID: String, name: String, sortIndex: Int) {
-    if let existing = fetchItem(id: id) {
-      existing.name = name
-      existing.updatedAt = .now
-      commitItem(existing, op: "migrate")
-      return
-    }
-    let entity = IntakeItemEntity(id: id, kindID: kindID, name: name, sortIndex: sortIndex)
-    context.insert(entity)
-    commitItem(entity, op: "migrate")
-  }
-
-  /// Upsert an event by deterministic id. On re-run, the legacy source wins only
-  /// when it is newer than the generic twin (else the generic side was edited
-  /// in-app and keeps its value) — study §7.1's migrate-on-sight update rule.
-  func upsertEvent(_ m: MigratedIntakeEvent) {
-    if let existing = fetchEntry(id: m.id) {
-      let legacy = m.updatedAt ?? .distantPast
-      guard legacy > existing.updatedAt else { return }
-      existing.kindID = m.kindID
-      existing.date = m.date
-      existing.method = m.method
-      existing.itemID = m.itemID
-      existing.amount = m.amount
-      existing.count = m.count
-      existing.note = m.note
-      if let occ = m.occurredAt { existing.occurredAt = occ }
-      existing.updatedAt = legacy
-      commitEntry(existing, op: "migrate")
-      return
-    }
-    let entity = IntakeEventEntity(id: m.id,
-                                   kindID: m.kindID,
-                                   date: m.date,
-                                   method: m.method,
-                                   itemID: m.itemID,
-                                   amount: m.amount,
-                                   count: m.count,
-                                   note: m.note,
-                                   updatedAt: m.updatedAt ?? .now)
-    entity.occurredAt = m.occurredAt ?? EventTimestamp.from(date: m.date, time: nil)
-    context.insert(entity)
-    commitEntry(entity, op: "migrate")
-  }
-
-  /// True when the generic twin already exists — lets the migrator skip a kind
-  /// whose events are all present (idempotent fast path).
-  func eventExists(id: String) -> Bool { fetchEntry(id: id) != nil }
 
   // MARK: - Helpers
 

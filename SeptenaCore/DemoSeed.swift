@@ -51,7 +51,6 @@ public enum DemoSeed {
     seedChores(ctx, &rng)
     seedNutrition(ctx, &rng, trainDay: trainDay)
     seedTraining(ctx, &rng, trainDay: trainDay)
-    seedCaffeine(ctx, grams: caffGrams, late: caffLate)
     seedSleep(ctx, &rng, scores: sleep)
     seedMood(ctx, &rng, scores: sleep)
     seedBody(ctx, &rng)
@@ -252,21 +251,6 @@ public enum DemoSeed {
     }
   }
 
-  private static func seedCaffeine(_ ctx: ModelContext, grams: [Double?], late: [Bool]) {
-    for d in 0..<days {
-      guard let g = grams[d] else { continue }
-      let date = day(-d)
-      let am = CaffeineEventEntity(id: "demo-caf-\(d)", date: date,
-                                   method: d % 4 == 0 ? "matcha" : "v60", grams: g)
-      am.occurredAt = at(-d, 7, 40); ctx.insert(am)
-      if late[d] {
-        let pm = CaffeineEventEntity(id: "demo-caf-\(d)-pm", date: date, method: "v60",
-                                     grams: Double(Int(g) - 4))
-        pm.occurredAt = at(-d, 15, 10); ctx.insert(pm)
-      }
-    }
-  }
-
   private static func seedSleep(_ ctx: ModelContext, _ rng: inout SeededRNG, scores: [Int]) {
     for d in 0..<days {
       let s = scores[d]
@@ -353,7 +337,7 @@ public enum DemoSeed {
       ("Sleep 7+ hours most nights", ["sleep"]),
       ("Hit 120g protein on training days", ["nutrition", "training"]),
       ("Walk every morning", ["habits"]),
-      ("Cut back on afternoon coffee", ["caffeine", "sleep"]),
+      ("Cut back on afternoon coffee", ["intake", "sleep"]),
       ("Read 20 pages before bed", ["habits"]),
       ("Down to 75 kg", ["body"]),
     ]
@@ -379,28 +363,25 @@ public enum DemoSeed {
   }
 
   /// Paint every section from the brand palette AND enable the full dashboard.
-  /// The manifest enables only ~6 sections by default; here we turn on all 14
+  /// The manifest enables only ~6 sections by default; here we turn on the
   /// dashboard domains (`HomepageDomain` cases) so the demo reads like a power
-  /// user who tracks everything. Cannabis stays off (no data + not featured);
-  /// goals is a tab, not a tile. `visibleDomains` shows enabled sections, so
+  /// user who tracks everything. `visibleDomains` shows enabled sections, so
   /// flipping `isEnabled` is all it takes. SectionEntity.id is the section key.
   private static func seedSections(_ ctx: ModelContext) {
     let palette: [String: String] = [
       "tasks": "#ef4444", "habits": "#22c55e", "training": "#f97316", "chores": "#a855f7",
       "supplements": "#3b82f6", "sleep": "#6366f1", "nutrition": "#f59e0b", "groceries": "#84cc16",
-      "caffeine": "#92400e", "cannabis": "#65a30d", "body": "#ec4899", "gut": "#b45309",
+      "intake": "#92400e", "body": "#ec4899", "gut": "#b45309",
       "activity": "#06b6d4", "goals": "#8b5cf6", "hydration": "#0ea5e9", "mood": "#f43f5e",
     ]
     let show: Set<String> = [
       "tasks", "habits", "training", "chores", "supplements", "sleep", "nutrition",
-      "hydration", "groceries", "caffeine", "body", "gut", "mood", "activity",
+      "hydration", "groceries", "intake", "body", "gut", "mood", "activity",
     ]
     for r in (try? ctx.fetch(FetchDescriptor<SectionEntity>())) ?? [] {
       if let c = palette[r.id] { r.color = c }
       if show.contains(r.id) {
         r.isEnabled = true; r.showInToday = true; r.hasOnboarded = true
-      } else if r.id == "cannabis" {
-        r.isEnabled = false
       }
     }
   }

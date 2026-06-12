@@ -2,7 +2,7 @@ import SwiftUI
 
 // One log entry row inside a section drawer's "Today" stack. Replaces
 // the Button + LogRow + .contextMenu(Edit / Delete) trio that every
-// event-log section (Gut, Caffeine, Cannabis, Mood, Training) re-rolled
+// event-log section (Gut, Intake, Mood, Training) re-rolled
 // by hand. Designed to be dropped into `DrawerSection(padding: .none)`
 // where LogRow's intrinsic h/v padding provides the row's own breathing
 // room — no additional outer padding needed.
@@ -67,7 +67,7 @@ struct LogEntryRow: View {
   VStack(spacing: 0) {
     LogEntryRow(
       title: "Type 4 · smooth",
-      detail: "blood 0",
+      detail: "medium",
       trailing: "07:42",
       onEdit: {},
       onDelete: {}

@@ -132,6 +132,7 @@ struct ExercisePickerSheet: View {
         selected = Set(preselected)
       }
     }
+    .macSheetFrame()
   }
 
   private func rowView(_ entity: ExerciseDefinitionEntity) -> some View {

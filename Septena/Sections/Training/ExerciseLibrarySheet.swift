@@ -52,6 +52,7 @@ struct ExerciseLibrarySheet: View {
         }
       }
     }
+    .macSheetFrame()
   }
 
   private var addLabel: String {

@@ -25,10 +25,6 @@ final class WatchConnectivity {
   /// Section key → authored color token from the snapshot, so the Next list
   /// can tint its group rules with the phone's actual section accents.
   var sectionColors: [String: String] = [:]
-  /// Cannabis capsule state from the snapshot, so the quick-add can offer the
-  /// same Continue (Hit N) / New capsule / Edible options as the phone menu.
-  var cannabisUsesPerCapsule: Int = 3
-  var cannabisLastVapeHit: Int? = nil
   /// The user's enabled intake trackers from the snapshot — the + menu offers
   /// one quick-log row per tracker, with container-aware choices.
   var intakeKinds: [IntakeKindWire] = []
@@ -132,8 +128,6 @@ final class WatchConnectivity {
 
       self.items         = filtered
       self.sectionColors = response.sectionColors ?? [:]
-      self.cannabisUsesPerCapsule = response.cannabisUsesPerCapsule ?? 3
-      self.cannabisLastVapeHit    = response.cannabisLastVapeHit
       self.intakeKinds   = response.intakeKinds ?? []
       self.bucket        = bkt
       updateComplication()
@@ -228,9 +222,9 @@ final class WatchConnectivity {
 
   // MARK: - Quick-log (actionable suggestions)
 
-  /// Log a `.choice`-input suggestion (caffeine / cannabis) with the picked
-  /// method. Optimistic: hides the nudge with a success haptic, then writes the
-  /// event off the `SuggestionBlocks` descriptor (shared with the phone).
+  /// Log a `.choice`-input suggestion (hydration / gut) with the picked value.
+  /// Optimistic: hides the nudge with a success haptic, then writes the event
+  /// off the `SuggestionBlocks` descriptor (shared with the phone).
   func logChoice(kind: String, value: String, itemID: String) {
     guard let block = SuggestionBlocks.byKind[kind] else { return }
     finishSuggestion(itemID)
@@ -238,8 +232,6 @@ final class WatchConnectivity {
     Task {
       do {
         switch block.recordType {
-        case "CaffeineEvent": try await saveCaffeineEvent(method: value, date: date)
-        case "CannabisEvent": try await saveCannabisEvent(value: value, date: date)
         case "NutritionEntry":
           // hydration: the choice value is millilitres of water.
           if let ml = Double(value) { try await saveWaterEntry(ml: ml) }
@@ -407,33 +399,6 @@ final class WatchConnectivity {
   // free-form `note` is written empty so the field registers. Record names +
   // fields match the `*CloudKitSchema` definitions so the phone mirrors them.
 
-  private func saveCaffeineEvent(method: String, date: String) async throws {
-    let eventID  = String(UUID().uuidString.lowercased().prefix(8))
-    let recordID = CKRecord.ID(recordName: "caffeine-event:\(eventID)", zoneID: ckZoneID)
-    let record   = CKRecord(recordType: "CaffeineEvent", recordID: recordID)
-    record["date"]       = date
-    record["method"]     = method
-    record["note"]       = ""
-    record["occurredAt"] = Date()
-    try await db.save(record)
-  }
-
-  /// `value` is a `CannabisCapsule` choice token ("vape:N" / "vape:1" / "edible"),
-  /// decoded into method + hit so a wrist vape lands in the current capsule just
-  /// like the phone's Continue / New capsule.
-  private func saveCannabisEvent(value: String, date: String) async throws {
-    let (method, hit) = CannabisCapsule.parse(value: value)
-    let eventID  = String(UUID().uuidString.lowercased().prefix(8))
-    let recordID = CKRecord.ID(recordName: "cannabis-event:\(eventID)", zoneID: ckZoneID)
-    let record   = CKRecord(recordType: "CannabisEvent", recordID: recordID)
-    record["date"]       = date
-    record["method"]     = method
-    record["note"]       = ""
-    record["occurredAt"] = Date()
-    if let hit { record["hit"] = hit }
-    try await db.save(record)
-  }
-
   /// One intake event against a tracker. Record name + fields match
   /// `IntakeEventCloudKitSchema` so the phone mirrors it like its own writes.
   /// Amount rides along only when the kind tracks amounts and the method has a
@@ -482,7 +447,6 @@ final class WatchConnectivity {
     let record   = CKRecord(recordType: "GutEvent", recordID: recordID)
     record["date"]       = date
     record["bristol"]    = bristol
-    record["blood"]      = 0
     record["note"]       = ""
     record["occurredAt"] = Date()
     try await db.save(record)

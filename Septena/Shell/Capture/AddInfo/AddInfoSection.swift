@@ -12,7 +12,7 @@ enum AddInfoVerb: Hashable {
 }
 
 enum AddInfoSection: String, CaseIterable, Identifiable, Hashable {
-  case training, nutrition, caffeine, cannabis
+  case training, nutrition
   case habits, supplements, chores, gut
   case tasks, groceries
 
@@ -22,8 +22,6 @@ enum AddInfoSection: String, CaseIterable, Identifiable, Hashable {
     switch self {
     case .training:    return "Start Training"
     case .nutrition:   return "Log Meal"
-    case .caffeine:    return "Log Caffeine"
-    case .cannabis:    return "Log Cannabis"
     case .habits:      return "Log Habit"
     case .supplements: return "Log Supplement"
     case .chores:      return "Log Chore"
@@ -36,8 +34,7 @@ enum AddInfoSection: String, CaseIterable, Identifiable, Hashable {
   var verb: AddInfoVerb {
     switch self {
     case .training:                                                       return .start
-    case .caffeine, .cannabis,
-         .habits, .supplements, .chores, .gut:                           return .log
+    case .habits, .supplements, .chores, .gut:                            return .log
     case .nutrition, .tasks, .groceries:                                  return .add
     }
   }
@@ -58,8 +55,6 @@ enum AddInfoSection: String, CaseIterable, Identifiable, Hashable {
     switch self {
     case .training:    return "Search sessions…"
     case .nutrition:   return "Search meals…"
-    case .caffeine:    return "Search beans…"
-    case .cannabis:    return "Cannabis…"
     case .habits:      return "Search or add habit…"
     case .supplements: return "Search supplements…"
     case .chores:      return "Search or add chore…"
@@ -88,7 +83,7 @@ enum AddInfoSection: String, CaseIterable, Identifiable, Hashable {
   /// Stable order for the root Actions group. Mirrors the webapp's
   /// homepage-tile order (training first, capture-style add at the end).
   static let actionOrder: [AddInfoSection] = [
-    .training, .nutrition, .caffeine, .cannabis,
+    .training, .nutrition,
     .habits, .supplements, .chores, .gut,
     .tasks, .groceries,
   ]

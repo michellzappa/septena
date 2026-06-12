@@ -6,8 +6,8 @@ import SwiftUI
 // else leaves the device through this path.
 //
 // Payload: screen name (e.g. "nutrition"), app version, build, platform.
-// Never sends anything the user has logged — no foods, no caffeine, no
-// cannabis, no notes — and no cross-session identifier; Plausible's daily-
+// Never sends anything the user has logged — no foods, no intake, no
+// notes — and no cross-session identifier; Plausible's daily-
 // rotated visitor hash means even Plausible can't link Monday to Tuesday.
 //
 // Disabled in DEBUG so dev builds never hit the dashboard, and gated by

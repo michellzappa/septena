@@ -798,6 +798,9 @@
         }
       }
     },
+    "24 hours" : {
+
+    },
     "30 days" : {
       "localizations" : {
         "pt-BR" : {
@@ -838,6 +841,9 @@
       }
     },
     "A roster of focused, on-device coaches." : {
+
+    },
+    "Ache" : {
 
     },
     "Activated · Negative" : {
@@ -1001,6 +1007,7 @@
       }
     },
     "Add %lld sources" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -1468,6 +1475,9 @@
         }
       }
     },
+    "As needed" : {
+
+    },
     "Ask Siri" : {
       "localizations" : {
         "pt-BR" : {
@@ -1785,6 +1795,9 @@
         }
       }
     },
+    "Burning" : {
+
+    },
     "Caffeine" : {
       "localizations" : {
         "pt-BR" : {
@@ -1811,16 +1824,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Panturrilhas"
-          }
-        }
-      }
-    },
-    "Cannabis" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cannabis"
           }
         }
       }
@@ -2005,6 +2008,7 @@
       }
     },
     "Coffee, beans, brewing methods" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -2172,9 +2176,6 @@
         }
       }
     },
-    "Copies your old section's entries into a tracker here. Nothing is deleted — the old section keeps its data, and re-running is safe (no duplicates)." : {
-
-    },
     "Copy a prompt and paste it into an LLM along with the source data you want to import. The model returns JSON that pastes straight into Import above." : {
       "localizations" : {
         "pt-BR" : {
@@ -2239,6 +2240,9 @@
           }
         }
       }
+    },
+    "Cramp" : {
+
     },
     "Create a Personal Access Token at cloud.ouraring.com/personal-access-tokens, then paste it here. Tokens stay on this device (Keychain) and are never sent to any Septena server." : {
       "localizations" : {
@@ -2307,6 +2311,7 @@
       }
     },
     "Custom…" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -2574,6 +2579,7 @@
       }
     },
     "Double tap to switch between today and the last %@ days" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -3652,6 +3658,7 @@
       }
     },
     "Intake log and dosing" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -3864,9 +3871,6 @@
     "Left" : {
 
     },
-    "Legacy data" : {
-
-    },
     "Let Claude read and write your Septena data at mcp.septena.app." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -3932,28 +3936,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Registre uma refeição e ela aparecerá aqui para registrar de novo com um toque."
-          }
-        }
-      }
-    },
-    "Log Caffeine" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registrar cafeína"
-          }
-        }
-      }
-    },
-    "Log Cannabis" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registrar cannabis"
           }
         }
       }
@@ -4471,16 +4453,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bom trabalho."
-          }
-        }
-      }
-    },
-    "No bean presets yet — add some in Caffeine settings." : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nenhum preset de grãos ainda — adicione alguns nos ajustes de Cafeína."
           }
         }
       }
@@ -5043,6 +5015,9 @@
     "PR" : {
       "shouldTranslate" : false
     },
+    "Pressure" : {
+
+    },
     "PROGRESS" : {
       "localizations" : {
         "pt-BR" : {
@@ -5135,6 +5110,9 @@
           }
         }
       }
+    },
+    "Quick add" : {
+
     },
     "Quiet" : {
       "localizations" : {
@@ -5709,6 +5687,9 @@
     "Severity" : {
 
     },
+    "Sharp" : {
+
+    },
     "Shopping list" : {
       "localizations" : {
         "pt-BR" : {
@@ -5919,6 +5900,12 @@
           }
         }
       }
+    },
+    "Starter medications" : {
+
+    },
+    "Starter symptoms" : {
+
     },
     "Stats" : {
       "extractionState" : "stale",
@@ -6453,6 +6440,9 @@
         }
       }
     },
+    "Throbbing" : {
+
+    },
     "Time of day" : {
       "localizations" : {
         "pt-BR" : {
@@ -6483,6 +6473,9 @@
           }
         }
       }
+    },
+    "Tingling" : {
+
     },
     "today" : {
       "localizations" : {
@@ -6723,6 +6716,9 @@
         }
       }
     },
+    "Unset" : {
+
+    },
     "Upbeat" : {
       "localizations" : {
         "pt-BR" : {
@@ -6764,6 +6760,12 @@
       }
     },
     "Upper must be greater than the lower bound." : {
+
+    },
+    "Use custom medication for exact prescription names and strengths." : {
+
+    },
+    "Use generic placeholders when exact prescriptions should be entered manually later." : {
 
     },
     "Used to personalize the greeting. With Apple Intelligence it's freshly written through the day." : {
@@ -6974,6 +6976,9 @@
           }
         }
       }
+    },
+    "Wheel window" : {
+
     },
     "When on, pending items in the source list import automatically and are removed from Reminders. Runs on app launch and whenever Reminders changes." : {
       "localizations" : {

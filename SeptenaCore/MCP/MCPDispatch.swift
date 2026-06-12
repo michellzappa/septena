@@ -93,7 +93,8 @@ enum MCPDispatch {
     "tasks_list", "tasks_get", "tasks_list_projects", "tasks_list_areas",
     "goals_list", "settings_get", "sections_list",
     "habits_list", "supplements_list", "chores_list",
-    "caffeine_events_list", "cannabis_events_list", "gut_events_list",
+    "gut_events_list",
+    "symptoms_list", "medications_list",
     "intake_kinds_list", "intake_items_list", "intake_events_list",
     "nutrition_entries_list", "nutrition_day_summary",
     "training_entries_list", "training_exercises_list",
@@ -173,14 +174,6 @@ enum MCPDispatch {
     case "chores_complete":     return try choresComplete(args)
     case "chores_uncomplete":   return try choresUncomplete(args)
 
-    // ---- Caffeine ----
-    case "caffeine_events_list": return caffeineList(args)
-    case "caffeine_event_log":   return try caffeineLog(args)
-
-    // ---- Cannabis ----
-    case "cannabis_events_list": return cannabisList(args)
-    case "cannabis_event_log":   return try cannabisLog(args)
-
     // ---- Intake (generic consumables) ----
     case "intake_kinds_list":   return intakeKindsList(args)
     case "intake_kind_create":  return try intakeKindCreate(args)
@@ -195,6 +188,16 @@ enum MCPDispatch {
     // ---- Gut ----
     case "gut_events_list":     return gutList(args)
     case "gut_event_log":       return try gutLog(args)
+
+    // ---- Symptoms ----
+    case "symptoms_list":       return symptomsList(args)
+    case "symptoms_create":     return try symptomsCreate(args)
+    case "symptoms_log":        return try symptomsLog(args)
+
+    // ---- Medications ----
+    case "medications_list":    return medicationsList(args)
+    case "medications_create":  return try medicationsCreate(args)
+    case "medications_log":     return try medicationsLog(args)
 
     // ---- Nutrition ----
     case "nutrition_entries_list": return nutritionList(args)
@@ -715,56 +718,6 @@ enum MCPDispatch {
     return ["id": id, "date": date]
   }
 
-  // MARK: - Caffeine
-
-  private static func caffeineList(_ args: MCPArgs) -> Any {
-    let (from, to) = range(args, daysBack: 6)
-    let limit = args.int("limit") ?? 100
-    let rows = (try? ctx.fetch(FetchDescriptor<CaffeineEventEntity>()))?
-      .filter { $0.date >= from && $0.date <= to }
-      .sorted { $0.occurredAt > $1.occurredAt }
-      .prefix(limit) ?? []
-    // Explicit element type so `e.id` resolves to the stored `var id: String`
-    // rather than @Model's synthesized `persistentModelID` (PersistentIdentifier).
-    return ["events": rows.map { (e: CaffeineEventEntity) -> [String: Any] in
-      ["id": e.id, "date": e.date, "method": e.method,
-       "beans": e.beans ?? "", "grams": e.grams ?? 0, "note": e.note ?? ""]
-    }]
-  }
-
-  private static func caffeineLog(_ args: MCPArgs) throws -> Any {
-    let e = SeptenaServices.shared.caffeineMutator.addEntry(
-      date: args.string("date") ?? today, time: args.string("time") ?? nowHHMMSS,
-      method: try args.requireString("method"), beans: args.string("beans"),
-      grams: args.double("grams"), note: args.string("note") ?? "")
-    return ["id": e.id, "date": e.date, "method": e.method]
-  }
-
-  // MARK: - Cannabis
-
-  private static func cannabisList(_ args: MCPArgs) -> Any {
-    let (from, to) = range(args, daysBack: 6)
-    let limit = args.int("limit") ?? 100
-    let rows = (try? ctx.fetch(FetchDescriptor<CannabisEventEntity>()))?
-      .filter { $0.date >= from && $0.date <= to }
-      .sorted { $0.occurredAt > $1.occurredAt }
-      .prefix(limit) ?? []
-    // Explicit element type so `e.id` is the stored String, not @Model's
-    // synthesized persistentModelID. See caffeineList.
-    return ["events": rows.map { (e: CannabisEventEntity) -> [String: Any] in
-      ["id": e.id, "date": e.date, "method": e.method, "strain": e.strain ?? "",
-       "hit": e.hit ?? 0, "grams": e.grams ?? 0, "note": e.note ?? ""]
-    }]
-  }
-
-  private static func cannabisLog(_ args: MCPArgs) throws -> Any {
-    let e = SeptenaServices.shared.cannabisMutator.addEntry(
-      date: args.string("date") ?? today, time: args.string("time") ?? nowHHMMSS,
-      method: try args.requireString("method"), hit: args.int("hit"),
-      grams: args.double("grams"), note: args.string("note") ?? "")
-    return ["id": e.id, "date": e.date, "method": e.method]
-  }
-
   // MARK: - Intake (generic consumables)
   //
   // The tracker ("kind") is resolved from an id OR unique case-insensitive
@@ -792,7 +745,7 @@ enum MCPDispatch {
     let rows = arr.compactMap { m -> IntakeMethodRow? in
       guard let label = (m["label"] as? String) ?? (m["token"] as? String) else { return nil }
       let token = (m["token"] as? String).flatMap { $0.isEmpty ? nil : $0.lowercased() }
-        ?? IntakeMigrationMap.slug(label)
+        ?? IntakeTemplates.slug(label)
       return IntakeMethodRow(token: token, label: label,
                              symbol: m["symbol"] as? String,
                              defaultAmount: (m["defaultAmount"] as? NSNumber)?.doubleValue,
@@ -927,7 +880,7 @@ enum MCPDispatch {
     // user's vocabulary. An unknown method errors with the candidate list.
     guard let token = kind.methods.first(where: {
       $0.token == lower || $0.label.lowercased() == lower
-    })?.token ?? (kind.methods.isEmpty ? IntakeMigrationMap.slug(rawMethod) : nil) else {
+    })?.token ?? (kind.methods.isEmpty ? IntakeTemplates.slug(rawMethod) : nil) else {
       throw MCPError.badArgument(
         "unknown method '\(rawMethod)' for \(kind.name) — methods: "
         + kind.methods.map(\.token).joined(separator: ", "))
@@ -969,10 +922,11 @@ enum MCPDispatch {
       .filter { $0.date >= from && $0.date <= to }
       .sorted { $0.occurredAt > $1.occurredAt }
       .prefix(limit) ?? []
-    // Explicit element type so `e.id` is the stored String (see caffeineList).
+    // Explicit element type so `e.id` resolves to the stored `var id: String`
+    // rather than @Model's synthesized `persistentModelID`.
     return ["events": rows.map { (e: GutEventEntity) -> [String: Any] in
-      ["id": e.id, "date": e.date, "bristol": e.bristol, "blood": e.blood != 0,
-       "volume": e.volume ?? "", "discomfortLevel": e.discomfortLevel ?? "", "note": e.note ?? ""]
+      ["id": e.id, "date": e.date, "bristol": e.bristol,
+       "volume": e.volume ?? "", "note": e.note ?? ""]
     }]
   }
 
@@ -980,11 +934,187 @@ enum MCPDispatch {
     guard let bristol = args.int("bristol") else { throw MCPError.badArgument("missing 'bristol'") }
     let e = SeptenaServices.shared.gutMutator.addEntry(
       date: args.string("date") ?? today, time: args.string("time") ?? nowHHMMSS,
-      bristol: bristol, blood: (args.bool("blood") ?? false) ? 1 : 0,
-      volume: args.string("volume"), discomfortLevel: args.string("discomfortLevel") ?? "",
-      discomfortStart: args.string("discomfortStart"), discomfortEnd: args.string("discomfortEnd"),
-      note: args.string("note") ?? "")
+      bristol: bristol,
+      volume: args.string("volume"), note: args.string("note") ?? "")
     return ["id": e.id, "date": e.date, "bristol": e.bristol]
+  }
+
+  // MARK: - Symptoms
+
+  private static func symptomDefinitions() -> [SymptomDefinitionEntity] {
+    ((try? ctx.fetch(FetchDescriptor<SymptomDefinitionEntity>(
+      sortBy: [SortDescriptor(\.sortIndex)]))) ?? [])
+  }
+
+  private static func symptomsList(_ args: MCPArgs) -> Any {
+    let (from, to) = range(args, daysBack: 6)
+    let limit = args.int("limit") ?? 100
+    let definitions = symptomDefinitions()
+    let titleByID = Dictionary(uniqueKeysWithValues: definitions.map { ($0.id, $0.title) })
+    let events = ((try? ctx.fetch(FetchDescriptor<SymptomEventEntity>())) ?? [])
+      .filter { $0.date >= from && $0.date <= to }
+      .sorted { $0.occurredAt > $1.occurredAt }
+      .prefix(limit)
+    return [
+      "definitions": definitions.map { (d: SymptomDefinitionEntity) -> [String: Any] in
+        [
+          "id": d.id,
+          "title": d.title,
+          "emoji": d.emoji ?? "",
+          "bodySystem": d.bodySystem ?? "",
+          "defaultBodyRegion": d.defaultBodyRegion ?? "",
+          "archived": d.archived,
+        ]
+      },
+      "events": events.map { (e: SymptomEventEntity) -> [String: Any] in
+        var out: [String: Any] = [
+          "id": e.id,
+          "date": e.date,
+          "time": EventTimestamp.hhmm(from: e.occurredAt),
+          "symptomID": e.symptomID,
+          "symptom": titleByID[e.symptomID] ?? "",
+          "severity": e.severity,
+        ]
+        if let v = e.durationMinutes { out["durationMinutes"] = v }
+        if let v = e.bodyRegion { out["bodyRegion"] = v }
+        if let v = e.side { out["side"] = v }
+        if let v = e.quality { out["quality"] = v }
+        if let v = e.triggerNote { out["triggerNote"] = v }
+        if let v = e.reliefNote { out["reliefNote"] = v }
+        if let v = e.note { out["note"] = v }
+        return out
+      },
+    ]
+  }
+
+  private static func symptomsCreate(_ args: MCPArgs) throws -> Any {
+    let d = SeptenaServices.shared.symptomsMutator.addDefinition(
+      title: try args.requireString("title"),
+      emoji: args.string("emoji"),
+      bodySystem: args.string("bodySystem"),
+      defaultBodyRegion: args.string("defaultBodyRegion"))
+    return ["id": d.id, "title": d.title]
+  }
+
+  private static func symptomsLog(_ args: MCPArgs) throws -> Any {
+    let symptomID = try args.requireString("symptomID")
+    guard symptomDefinitions().contains(where: { $0.id == symptomID && !$0.archived }) else {
+      throw MCPError.badArgument("unknown active symptomID '\(symptomID)' — call symptoms_list")
+    }
+    guard let severity = args.int("severity") else {
+      throw MCPError.badArgument("missing 'severity'")
+    }
+    let e = SeptenaServices.shared.symptomsMutator.addEvent(
+      symptomID: symptomID,
+      date: args.string("date") ?? today,
+      time: args.string("time") ?? nowHHMMSS,
+      severity: severity,
+      durationMinutes: args.int("durationMinutes"),
+      bodyRegion: args.string("bodyRegion"),
+      side: args.string("side"),
+      quality: args.string("quality"),
+      triggerNote: args.string("triggerNote") ?? "",
+      reliefNote: args.string("reliefNote") ?? "",
+      note: args.string("note") ?? "",
+      source: "mcp")
+    return ["id": e.id, "date": e.date, "symptomID": e.symptomID, "severity": e.severity]
+  }
+
+  // MARK: - Medications
+
+  private static func medicationDefinitions() -> [MedicationDefinitionEntity] {
+    ((try? ctx.fetch(FetchDescriptor<MedicationDefinitionEntity>(
+      sortBy: [SortDescriptor(\.sortIndex)]))) ?? [])
+  }
+
+  private static func medicationsList(_ args: MCPArgs) -> Any {
+    let (from, to) = range(args, daysBack: 6)
+    let limit = args.int("limit") ?? 100
+    let definitions = medicationDefinitions()
+    let titleByID = Dictionary(uniqueKeysWithValues: definitions.map { ($0.id, $0.title) })
+    let doses = ((try? ctx.fetch(FetchDescriptor<MedicationDoseEventEntity>())) ?? [])
+      .filter { $0.date >= from && $0.date <= to }
+      .sorted { $0.occurredAt > $1.occurredAt }
+      .prefix(limit)
+    return [
+      "definitions": definitions.map { (d: MedicationDefinitionEntity) -> [String: Any] in
+        var out: [String: Any] = [
+          "id": d.id,
+          "title": d.title,
+          "bucket": d.bucket ?? "",
+          "scheduleKind": d.scheduleKind ?? "daily",
+          "targetDosesPerDay": d.targetDosesPerDay ?? 1,
+          "archived": d.archived,
+        ]
+        if let v = d.genericName { out["genericName"] = v }
+        if let v = d.form { out["form"] = v }
+        if let v = d.route { out["route"] = v }
+        if let v = d.strengthValue { out["strengthValue"] = v }
+        if let v = d.strengthUnit { out["strengthUnit"] = v }
+        if let v = d.defaultDoseValue { out["defaultDoseValue"] = v }
+        if let v = d.defaultDoseUnit { out["defaultDoseUnit"] = v }
+        if let v = d.instructions { out["instructions"] = v }
+        return out
+      },
+      "doses": doses.map { (e: MedicationDoseEventEntity) -> [String: Any] in
+        var out: [String: Any] = [
+          "id": e.id,
+          "date": e.date,
+          "time": EventTimestamp.hhmm(from: e.occurredAt),
+          "medicationID": e.medicationID,
+          "medication": titleByID[e.medicationID] ?? "",
+          "status": e.status,
+        ]
+        if let v = e.doseValue { out["doseValue"] = v }
+        if let v = e.doseUnit { out["doseUnit"] = v }
+        if let v = e.reason { out["reason"] = v }
+        if let v = e.effectNote { out["effectNote"] = v }
+        if let v = e.sideEffectNote { out["sideEffectNote"] = v }
+        return out
+      },
+    ]
+  }
+
+  private static func medicationsCreate(_ args: MCPArgs) throws -> Any {
+    let d = SeptenaServices.shared.medicationsMutator.addDefinition(
+      title: try args.requireString("title"),
+      genericName: args.string("genericName"),
+      form: args.string("form"),
+      route: args.string("route"),
+      strengthValue: args.double("strengthValue"),
+      strengthUnit: args.string("strengthUnit"),
+      defaultDoseValue: args.double("defaultDoseValue"),
+      defaultDoseUnit: args.string("defaultDoseUnit"),
+      bucket: args.string("bucket"),
+      scheduleKind: args.string("scheduleKind") ?? "daily",
+      targetDosesPerDay: args.int("targetDosesPerDay") ?? 1,
+      instructions: args.string("instructions"))
+    return ["id": d.id, "title": d.title]
+  }
+
+  private static let validMedicationStatuses = ["taken", "skipped", "missed"]
+
+  private static func medicationsLog(_ args: MCPArgs) throws -> Any {
+    let medicationID = try args.requireString("medicationID")
+    guard medicationDefinitions().contains(where: { $0.id == medicationID && !$0.archived }) else {
+      throw MCPError.badArgument("unknown active medicationID '\(medicationID)' — call medications_list")
+    }
+    let status = try args.requireString("status")
+    guard validMedicationStatuses.contains(status) else {
+      throw MCPError.badArgument("status must be taken|skipped|missed")
+    }
+    let e = SeptenaServices.shared.medicationsMutator.addDose(
+      medicationID: medicationID,
+      date: args.string("date") ?? today,
+      time: args.string("time") ?? nowHHMMSS,
+      status: status,
+      doseValue: args.double("doseValue"),
+      doseUnit: args.string("doseUnit"),
+      reason: args.string("reason") ?? "",
+      effectNote: args.string("effectNote") ?? "",
+      sideEffectNote: args.string("sideEffectNote") ?? "",
+      source: "mcp")
+    return ["id": e.id, "date": e.date, "medicationID": e.medicationID, "status": e.status]
   }
 
   // MARK: - Nutrition

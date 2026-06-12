@@ -95,38 +95,6 @@ struct SectionGoalsStrip: View {
   }
 }
 
-// MARK: - Toolbar toggle
-
-/// The `target` toolbar affordance that reveals/hides `SectionGoalsStrip`.
-/// Lives next to the drawer's "+" button (just to its left). Renders
-/// nothing when the host section has no tagged goals, so a section without
-/// goals shows no button at all — matching the strip's own empty behavior.
-/// Runs its own lightweight `@Query` so the host `SectionDrawer` stays
-/// SwiftData-agnostic and the visibility stays reactive to goal edits.
-struct SectionGoalsToggleButton: View {
-  let sectionKey: String
-  @Binding var isExpanded: Bool
-  let accent: Color
-
-  @Query private var allGoals: [GoalEntity]
-
-  private var hasGoals: Bool {
-    allGoals.contains { SectionGoalsStrip.matches($0, sectionKey: sectionKey) }
-  }
-
-  var body: some View {
-    if hasGoals {
-      Button {
-        withAnimation(.snappy) { isExpanded.toggle() }
-      } label: {
-        Image(systemName: "target")
-      }
-      .tint(accent)
-      .accessibilityLabel(isExpanded ? "Hide goals" : "Show goals")
-    }
-  }
-}
-
 // MARK: - Row
 
 /// Outlined card used inside the strip. The host List row chrome is

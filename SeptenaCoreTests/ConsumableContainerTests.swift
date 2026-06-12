@@ -1,18 +1,18 @@
 import Testing
 import Foundation
 
-// Golden tests for SeptenaCore/ConsumableContainer.swift. The contract that
-// matters: fed the cannabis config, the generic container must produce output
-// byte-identical to the legacy `CannabisCapsule` it replaces — because the
-// watch and phone quick-add both render those exact choices today and the
-// migrator will reconstruct cannabis by feeding this config. If these ever
-// diverge, the wrist list silently changes for existing users.
+// Golden tests for SeptenaCore/ConsumableContainer.swift — the "capsule / hit"
+// math behind every container-style intake tracker (cannabis being the original
+// shape). The watch and phone quick-add both render these exact choices, so a
+// regression silently changes the wrist list for existing users. The expected
+// rows are spelled out here as the contract (they were once an equivalence check
+// against the now-deleted `CannabisCapsule`; the contract is the same).
 
 @Suite struct ConsumableContainerTests {
 
-  // The cannabis kind as the migrator will synthesize it: a container "vape"
-  // method (cap 3) plus a capsule-free "edible". Symbols/nouns reproduce
-  // `CannabisCapsule`'s hardcoded ones exactly — these live in config now.
+  // A container "vape" method (cap 3) plus a capsule-free "edible" — the shape
+  // the migrator synthesizes for the legacy cannabis kind. Symbols/nouns live
+  // in config now rather than being hardcoded in a per-substance helper.
   private static let cannabisMethods: [ConsumableContainer.Method] = [
     .init(token: "vape",   label: "Vape",   symbol: "wind",        usesContainer: true),
     .init(token: "edible", label: "Edible", symbol: "circle.fill", usesContainer: false),
@@ -28,18 +28,27 @@ import Foundation
     )
   }
 
-  // The whole point: identical choices across the full state space the watch
-  // can be in — no last hit, a filled/partial/over-cap last hit, hit zero.
-  @Test func matchesCannabisCapsuleAcrossStates() {
-    for lastHit in [nil, 0, 1, 2, 3, 4] as [Int?] {
-      let legacy  = CannabisCapsule.choices(lastHit: lastHit, usesPerCapsule: 3)
-      let generic = cannabisChoices(lastCount: lastHit, cap: 3)
-      #expect(generic == legacy, "lastHit=\(String(describing: lastHit))")
+  // The full state space the watch can be in — no last hit, an inactive zero, a
+  // partial hit (offers Continue), the hit that filled the cap, and an over-cap
+  // value. Continue appears only while the capsule has room (1 ≤ last < cap).
+  @Test func capsuleChoicesAcrossStates() {
+    let newAndEdible: [SuggestionBlocks.Choice] = [
+      .init(value: "vape:1", label: "New capsule", symbol: "plus.circle"),
+      .init(value: "edible", label: "Edible",      symbol: "circle.fill"),
+    ]
+    func continueRow(_ hit: Int) -> SuggestionBlocks.Choice {
+      .init(value: "vape:\(hit)", label: "Continue (Hit \(hit))", symbol: "arrow.clockwise")
     }
+    #expect(cannabisChoices(lastCount: nil, cap: 3) == newAndEdible)
+    #expect(cannabisChoices(lastCount: 0,   cap: 3) == newAndEdible)
+    #expect(cannabisChoices(lastCount: 1,   cap: 3) == [continueRow(2)] + newAndEdible)
+    #expect(cannabisChoices(lastCount: 2,   cap: 3) == [continueRow(3)] + newAndEdible)
+    #expect(cannabisChoices(lastCount: 3,   cap: 3) == newAndEdible)
+    #expect(cannabisChoices(lastCount: 4,   cap: 3) == newAndEdible)
   }
 
   // The exact rows for the two interesting states, spelled out so a regression
-  // shows up as a readable diff rather than just "!= legacy".
+  // shows up as a readable diff rather than just "!= expected".
   @Test func activeCapsuleOffersContinueNewEdible() {
     let out = cannabisChoices(lastCount: 1, cap: 3)
     #expect(out == [
@@ -65,22 +74,32 @@ import Foundation
     ])
   }
 
-  // Helper-level identity, since call sites use these directly (CannabisQuickAddMenu).
-  @Test func activeAndContinueMatchLegacy() {
-    for lastHit in [nil, 0, 1, 2, 3, 4] as [Int?] {
-      #expect(ConsumableContainer.hasActiveContainer(lastCount: lastHit, containerCap: 3)
-              == CannabisCapsule.hasActiveCapsule(lastHit: lastHit, usesPerCapsule: 3))
-      #expect(ConsumableContainer.continueCount(lastCount: lastHit)
-              == CannabisCapsule.continueHit(lastHit: lastHit))
-    }
+  // Helper-level contract (used directly by the quick-add menus): a last count
+  // in [1, cap) means the capsule has room; continueCount is the next hit.
+  @Test func activeAndContinueContract() {
+    #expect(ConsumableContainer.hasActiveContainer(lastCount: nil, containerCap: 3) == false)
+    #expect(ConsumableContainer.hasActiveContainer(lastCount: 0,   containerCap: 3) == false)
+    #expect(ConsumableContainer.hasActiveContainer(lastCount: 1,   containerCap: 3) == true)
+    #expect(ConsumableContainer.hasActiveContainer(lastCount: 2,   containerCap: 3) == true)
+    #expect(ConsumableContainer.hasActiveContainer(lastCount: 3,   containerCap: 3) == false)
+    #expect(ConsumableContainer.hasActiveContainer(lastCount: 4,   containerCap: 3) == false)
+    #expect(ConsumableContainer.continueCount(lastCount: nil) == 1)
+    #expect(ConsumableContainer.continueCount(lastCount: 0)   == 1)
+    #expect(ConsumableContainer.continueCount(lastCount: 2)   == 3)
+    #expect(ConsumableContainer.continueCount(lastCount: 4)   == 5)
   }
 
-  @Test func parseRoundTripsLikeLegacy() {
-    for value in ["vape:1", "vape:2", "edible", "vape", "v60", "matcha:9"] {
-      let legacy  = CannabisCapsule.parse(value: value)
-      let generic = ConsumableContainer.parse(value: value)
-      #expect(generic.method == legacy.method)
-      #expect(generic.count == legacy.hit)
+  // Decode `choices` values back into (method, count). Tolerant of a bare
+  // "vape" / "edible" (no count) so older payloads still write something.
+  @Test func parseDecodesValues() {
+    let cases: [(value: String, method: String, count: Int?)] = [
+      ("vape:1", "vape", 1), ("vape:2", "vape", 2), ("edible", "edible", nil),
+      ("vape", "vape", nil), ("v60", "v60", nil), ("matcha:9", "matcha", 9),
+    ]
+    for c in cases {
+      let got = ConsumableContainer.parse(value: c.value)
+      #expect(got.method == c.method, "value=\(c.value)")
+      #expect(got.count == c.count, "value=\(c.value)")
     }
   }
 

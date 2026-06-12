@@ -135,8 +135,8 @@ enum IntakeReader {
   }
 
   /// The most recent count today for the container method — feeds
-  /// ConsumableContainer's "Continue (use N)" the way CannabisCapsule reads
-  /// `cannabisLastVapeHit`.
+  /// ConsumableContainer's "Continue (use N)" row (the next hit/use in the
+  /// open container).
   static func lastContainerCount(context: ModelContext, kindID: String,
                                  containerToken: String, date: String) -> Int? {
     let rows = (try? context.fetch(FetchDescriptor<IntakeEventEntity>(

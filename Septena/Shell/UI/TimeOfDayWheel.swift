@@ -56,9 +56,10 @@ struct TimeOfDayWheel: View {
   /// Square side of the dial.
   var diameter: CGFloat = 240
   /// Compact tile rendering (the homepage Wheel mode's per-section mini wheels):
-  /// drops the hour labels, scope chip, "now" hand and the heavy white disc, and
-  /// locks to the full-week overlay (no tap-to-toggle — a thumbnail isn't an
-  /// interactive control). Ticks stay as a faint frame so the angles still read.
+  /// drops the hour labels, "…" menu, center hub, "now" hand and the heavy white
+  /// disc, and locks to the full-week overlay (no window picker — a thumbnail
+  /// isn't an interactive control). Ticks stay as a faint frame so the angles
+  /// still read.
   var compact: Bool = false
   /// Hero treatment (`DayDialHero`): set to the day being shown. Paints the
   /// `AmbientLight` phases as a faint rim wash just inside the tick ring —
@@ -100,10 +101,12 @@ struct TimeOfDayWheel: View {
     return "\(h)\(hour < 12 ? "a" : "p")"
   }
 
-  /// Tap toggles between just today (the default — a dense week can be
-  /// confusing, so the dial opens focused on today) and the full window. The
-  /// week's data is always loaded; the tap just reveals it.
-  @State private var todayOnly = true
+  /// The "…" menu picks the window: just today (the default — a dense week can
+  /// be confusing, so the dial opens focused on today) or the full window. The
+  /// week's data is always loaded; the menu just reveals it. Stored in
+  /// `@AppStorage` under one shared key, so flipping the window on any dial
+  /// flips every other dial too (and the choice persists across launches).
+  @AppStorage("timeOfDayWheel.todayOnly") private var todayOnly = true
 
   /// The resolved focus: compact tiles always show the full week (the overlay
   /// *is* the point of a thumbnail); the full dial honors the tap toggle.
@@ -279,9 +282,9 @@ struct TimeOfDayWheel: View {
       }
 
       // Center: the hero dial shows its date while focused on today (a clock
-      // face shows its day — weekday over day number, watch-face style); the
-      // week overlay and the non-hero dial keep the scope chip, which names
-      // the current view and signals the dial is tappable ("Today" ⇄ "7 days").
+      // face shows its day — weekday over day number, watch-face style).
+      // Otherwise a small hub disc caps where the "now" hand and converging
+      // marks meet (the "…" menu now names the window, so no scope text here).
       // Compact thumbnails are non-interactive, so nothing.
       if !compact {
         if let heroDate, todayOnly {
@@ -299,40 +302,53 @@ struct TimeOfDayWheel: View {
             at: CGPoint(x: center.x, y: center.y + 8)
           )
         } else {
-          let scope = todayOnly ? "Today" : "\(windowDays) days"
-          ctx.draw(Text(scope).font(.caption2.weight(.medium)).foregroundStyle(.secondary),
-                   at: center)
+          let hubR: CGFloat = 6
+          let hub = CGRect(x: center.x - hubR, y: center.y - hubR,
+                           width: hubR * 2, height: hubR * 2)
+          ctx.fill(Path(ellipseIn: hub), with: .color(Theme.cardSurface))
+          ctx.stroke(Path(ellipseIn: hub),
+                     with: .color(Theme.inkSecondary.opacity(0.18)), lineWidth: 1)
         }
       }
     }
     }
     .frame(width: diameter, height: diameter)
-    .contentShape(Circle())
-    .modifier(WheelTapToggle(enabled: !compact) { todayOnly.toggle() })
     .accessibilityElement()
-    .accessibilityAddTraits(compact ? [] : .isButton)
     .accessibilityLabel(Text("Time-of-day wheel"))
     .accessibilityValue(Text(focusToday
       ? "Today, \(shownEvents.count) events"
       : "\(events.count) events over the last \(windowDays) days"))
-    .accessibilityHint(compact
-      ? Text("")
-      : Text("Double tap to switch between today and the last \(windowDays) days"))
-  }
-}
-
-/// Attaches the today/week tap toggle only when `enabled`. Compact tiles live
-/// inside a launcher `Button`, so a child tap gesture there would swallow the
-/// tile's tap — this keeps the thumbnail inert.
-private struct WheelTapToggle: ViewModifier {
-  let enabled: Bool
-  let action: () -> Void
-  func body(content: Content) -> some View {
-    if enabled {
-      content.onTapGesture(perform: action)
-    } else {
-      content
+    // The dial is a centered square; widen to fill the row so the "…" picker
+    // pins to the section's true top-right corner, not the square's. Compact
+    // thumbnails live inside a launcher Button and stay inert (no picker) —
+    // they keep their fixed tile size and always show the full-week overlay.
+    .frame(maxWidth: compact ? nil : .infinity)
+    .overlay(alignment: .topTrailing) {
+      if !compact { windowMenu }
     }
+  }
+
+  private var windowMenu: some View {
+    Menu {
+      // Inline picker → the two windows show as flat, checkmarked rows inside
+      // the system's translucent menu, rather than nested under a "Window ▸"
+      // submenu.
+      Picker("Window", selection: $todayOnly) {
+        Text("24 hours").tag(true)
+        Text("\(windowDays) days").tag(false)
+      }
+      .pickerStyle(.inline)
+    } label: {
+      Image(systemName: "ellipsis.circle")
+        .font(.callout)
+        .foregroundStyle(.secondary)
+        .padding(6)
+        .contentShape(Rectangle())
+    }
+    .menuStyle(.borderlessButton)
+    .menuIndicator(.hidden)
+    .fixedSize()
+    .accessibilityLabel(Text("Wheel window"))
   }
 }
 

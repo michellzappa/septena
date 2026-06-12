@@ -3,7 +3,7 @@ import SwiftUI
 // Read-only historical row. Sibling to TaskRow / HabitRow / ChoreRow, used
 // by modules whose entries are *records* rather than checkable items
 // (training entries today; sleep logs, nutrition meals, weight reads,
-// cannabis sessions, etc later). No checkbox, no swipe actions, no
+// intake logs, etc later). No checkbox, no swipe actions, no
 // completion state — just a title, optional detail line, and trailing
 // metadata.
 

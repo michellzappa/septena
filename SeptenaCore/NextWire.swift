@@ -14,8 +14,8 @@ struct NextItem: Codable, Identifiable, Hashable {
   var trailing: String?
   var overdue: Bool
   var sortKey: Int
-  /// For a `kind == "suggestion"` row: the suggestion's sub-kind (caffeine /
-  /// cannabis / mood) when it's quick-loggable from a tap, else nil. Looked up
+  /// For a `kind == "suggestion"` row: the suggestion's sub-kind (intake /
+  /// mood) when it's quick-loggable from a tap, else nil. Looked up
   /// in `SuggestionBlocks` by the watch to make the row interactive. Optional
   /// and absent on every non-suggestion row, so old payloads decode unchanged.
   var logKind: String? = nil
@@ -44,18 +44,9 @@ struct NextItemsResponse: Codable {
   /// no `SectionTheme`. Optional so older payloads decode unchanged; the watch
   /// falls back to a neutral rule when a key is absent.
   var sectionColors: [String: String]? = nil
-  /// Cannabis capsule state, carried so the watch's quick-add can offer the same
-  /// Continue (Hit N) / New capsule / Edible choices as the phone menu — the
-  /// `.choice` input model is static, so this runtime state rides the snapshot.
-  /// `cannabisUsesPerCapsule` is the configured cap (default 3 when absent);
-  /// `cannabisLastVapeHit` is the last vape's hit (today's, else most recent),
-  /// nil when there's no vape to continue. Both optional so older payloads decode.
-  var cannabisUsesPerCapsule: Int? = nil
-  var cannabisLastVapeHit: Int? = nil
   /// The user's enabled intake trackers, carried so the watch's + menu always
   /// offers every tracker — with container-aware choices — without compiled-in
-  /// rows. Supersedes the static caffeine/cannabis blocks (kept for old
-  /// payloads/builds until the legacy purge). Optional so older payloads decode.
+  /// rows. Optional so older payloads decode.
   var intakeKinds: [IntakeKindWire]? = nil
 }
 

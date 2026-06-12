@@ -1,6 +1,6 @@
 # Septena
 
-Septena is a private life operating system for Apple platforms. It brings tasks, goals, training, nutrition, hydration, sleep, mood, supplements, habits, chores, groceries, gut, caffeine, cannabis, activity, and body metrics into one CloudKit-backed app.
+Septena is a private life operating system for Apple platforms. It brings tasks, goals, training, nutrition, hydration, sleep, mood, symptoms, medications, supplements, habits, chores, groceries, gut, intake trackers, activity, and body metrics into one CloudKit-backed app.
 
 The product principle is simple: every life domain is a section, every section can be enabled or hidden without deleting data, and every write should land in the local SwiftData mirror first, then sync through CloudKit.
 
@@ -120,10 +120,13 @@ Current sections:
 | **Chores** | Recurring household tasks, completions, deferrals. |
 | **Supplements** | Supplement definitions and daily state. |
 | **Groceries** | Shopping items and categories. |
+| **Intake** | User-defined consumable trackers with methods, catalogs, and event logs. |
 | **Caffeine** | Drink entries, beans/config, half-life style tracking. |
 | **Cannabis** | Strains, methods, dose/use entries. |
 | **Gut** | Digestive events and Bristol-style logging. |
 | **Mood** | Mood/energy check-ins and history. |
+| **Symptoms** | Symptom definitions, severity logs, duration, location, triggers, and relief notes. |
+| **Medications** | Medication definitions, daily/as-needed schedules, dose logs, skips, effects, and side effects. |
 | **Body** | Weight/body-composition rows, Withings integration. |
 | **Activity** | HealthKit movement/recovery metrics. |
 

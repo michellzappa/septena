@@ -839,6 +839,7 @@ struct DatePickerSheet: View {
         }
       }
     }
+    .macSheetFrame(width: 420, height: Self.sheetHeight + 60)
   }
 }
 
@@ -958,6 +959,7 @@ struct RecurrencePickerSheet: View {
         }
       }
     }
+    .macSheetFrame(width: 420, height: 380)
   }
 
   /// Pluralized "N days/weeks/months" via the String Catalog (one/other).
@@ -1028,6 +1030,7 @@ struct MovePickerSheet: View {
         }
       }
     }
+    .macSheetFrame(width: 460, height: 520)
   }
 
   // MARK: - Filtering

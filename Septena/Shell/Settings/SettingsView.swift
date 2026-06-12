@@ -18,7 +18,7 @@ import UIKit
 //   • About           — version / links
 //   ── Sections ────────────────────────────
 //   • Tasks           — badge, today toggle, task sort + identity
-//   • Training, Nutrition, Sleep, Habits, Cannabis, Caffeine, …
+//   • Training, Nutrition, Sleep, Habits, Intake, …
 //                     — identity + (where applicable) catalog data
 //
 // Per-section rows are driven by `SectionManifest.all` filtered against
@@ -257,8 +257,6 @@ enum AppIconOption: String, CaseIterable, Identifiable {
 final class SettingsStore {
   var serverSettings: AppSettings? = nil
   var sections: [SectionConfig] = []
-  var caffeine: CaffeineConfig? = nil
-  var cannabis: CannabisConfig? = nil
   var macros: MacrosConfig? = nil
   var sessionTypes: [SessionTypeConfig] = []
   var chores: [ChoreItem] = []
@@ -275,8 +273,6 @@ final class SettingsStore {
   private enum CacheKey {
     static let serverSettings = "settings.serverSettings"
     static let sections       = "settings.sections"
-    static let caffeine       = "settings.caffeine"
-    static let cannabis       = "settings.cannabis"
     static let macros         = "settings.macros"
     static let sessionTypes   = "settings.sessionTypes"
     static let chores         = "settings.chores"
@@ -301,8 +297,6 @@ final class SettingsStore {
     } else if let v = ResponseCache.load([SectionConfig].self, forKey: CacheKey.sections) {
       sections = v
     }
-    if let v = ResponseCache.load(CaffeineConfig.self, forKey: CacheKey.caffeine) { caffeine = v }
-    if let v = ResponseCache.load(CannabisConfig.self, forKey: CacheKey.cannabis) { cannabis = v }
     if let v = ResponseCache.load(MacrosConfig.self, forKey: CacheKey.macros) { macros = v }
     if let v = ResponseCache.load([SessionTypeConfig].self, forKey: CacheKey.sessionTypes) { sessionTypes = v }
     if let v = ResponseCache.load([ChoreItem].self, forKey: CacheKey.chores) { chores = v }
@@ -425,13 +419,6 @@ final class SettingsStore {
     let macs: MacrosConfig? = NutritionPrefs.loadMacrosConfig()
     let st: [SessionTypeConfig]? = ChecklistMirror.loadSessionTypes(context: context)
     let ch: [ChoreItem]? = ChecklistMirror.loadChores(context: context)
-    let cf: CaffeineConfig = {
-      let beans = ChecklistMirror.loadCaffeineBeans(context: context)
-      return CaffeineConfig(beans: beans)
-    }()
-    let cn = CannabisConfig(usesPerCapsule: 3)
-    caffeine = cf; ResponseCache.save(cf, forKey: CacheKey.caffeine)
-    cannabis = cn; ResponseCache.save(cn, forKey: CacheKey.cannabis)
     if let macs { macros = macs; ResponseCache.save(macs, forKey: CacheKey.macros) }
     if let st { sessionTypes = st; ResponseCache.save(st, forKey: CacheKey.sessionTypes) }
     if let ch { chores = ch; ResponseCache.save(ch, forKey: CacheKey.chores) }
@@ -794,7 +781,7 @@ struct PrivacySettingsPane: View {
       }
 
       Section("What is never sent") {
-        bullet("Anything you log — food, caffeine, cannabis, supplements, sleep, mood, notes. None of it leaves your device through analytics.")
+        bullet("Anything you log — food, intake, supplements, sleep, mood, notes. None of it leaves your device through analytics.")
         bullet("Any identifier that links events to you, or links today's session to yesterday's.")
         bullet("Your IP address. The analytics provider uses it briefly to derive your country, then discards it.")
       }
@@ -1158,8 +1145,7 @@ struct CorrelationsSettingsPane: View {
     ("supplements", "Supplements"),
     ("training",    "Training"),
     ("nutrition",   "Nutrition"),
-    ("caffeine",    "Caffeine"),
-    ("cannabis",    "Cannabis"),
+    ("intake",      "Intake"),
     ("gut",         "Gut"),
     ("sleep",       "Sleep"),
   ]
@@ -2178,9 +2164,9 @@ struct MotionGalleryPane: View {
       switch self {
       case .burst:    return "Confetti — celebratory (Mood HAP, groceries)"
       case .snap:     return "Ring + flash — releasing tension (Mood HAN)"
-      case .bloom:    return "Soft swell — settling (caffeine, training session)"
+      case .bloom:    return "Soft swell — settling (intake, training session)"
       case .sink:     return "Quiet dot — acknowledgment (Mood LAN, gut)"
-      case .ripple:   return "Full-screen sonar — cannabis log, training PR payoff"
+      case .ripple:   return "Full-screen sonar — intake log, training PR payoff"
       case .arc:      return "Comet arc — day cleared (last Today task)"
       case .fill:     return "Full-page flood — target logs (hydration, nutrition)"
       case .ignition: return "Rings + streak number — milestone (7/30/100/365)"
@@ -2336,7 +2322,7 @@ struct MotionGalleryPane: View {
 // color, description) comes from the local `SectionManifest`; the user's
 // installed `SectionEntity` (label/color) overrides the defaults when
 // present. Per-key content below uses cached catalog data from
-// `SettingsStore` — caffeine beans, cannabis strains, etc. Sections
+// `SettingsStore` — intake catalogs, etc. Sections
 // without catalog data show identity only. Tasks is special-cased to
 // host the local task prefs (badge, today, sort) that used to live in
 // a top-level Tasks pane.
@@ -2550,7 +2536,7 @@ struct SectionDetailPane: View {
       skillAndDataSection
     }
     .formStyle(.grouped)
-    .sheet(isPresented: $pendingOnboarding) { onboardingSheet }
+    .sheet(isPresented: $pendingOnboarding) { onboardingSheet.macSheetFrame() }
   }
 
   /// The section plugin's starter-onboarding view, shown when enabling a
@@ -4697,7 +4683,7 @@ private let importExportEnvelopeVersion = 1
 /// sidebar.
 private let exportableSectionKeys: [String] = [
   "tasks", "training", "nutrition", "habits", "chores",
-  "supplements", "groceries", "caffeine", "cannabis", "gut",
+  "supplements", "groceries", "gut",
 ]
 
 struct ImportExportSettingsPane: View {
@@ -4718,12 +4704,12 @@ struct ImportExportSettingsPane: View {
   @State private var showingPaste = false
   @State private var showingFilePicker = false
   @State private var pasteBuffer: String = ""
-  @State private var nutritionRepairState: RepairState = .idle
+  @State private var repairState: RepairState = .idle
 
   enum RepairState: Equatable {
     case idle
     case running
-    case success(entryCount: Int, summaryCount: Int)
+    case success(recordCount: Int, typeCount: Int)
     case failure(message: String)
   }
 
@@ -4925,30 +4911,32 @@ struct ImportExportSettingsPane: View {
 
   // MARK: Repair
 
-  // One-shot re-pull for record types whose history may be missing locally
+  // One-shot re-pull for records whose history may be missing locally
   // because CKSyncEngine's incremental fetch token advanced past records
-  // the device couldn't yet decode (e.g. nutrition records arrived while
-  // this Mac was running a build that didn't have the
-  // `case NutritionEntryCloudKitSchema.recordType` arm in
-  // `applyFetchedRecord`). `fetchAllRecords` does a fresh nil-token zone
-  // replay so historical records are redelivered regardless of the engine
-  // checkpoint.
+  // the device couldn't yet decode (a record type arrived while this
+  // device was running a build without the matching arm in
+  // `applyFetchedRecord` — it happened with nutrition, then again with
+  // intake). `fetchAllRecords` does a fresh nil-token zone replay so
+  // every live record is redelivered regardless of the engine
+  // checkpoint, and the absorb path upserts idempotently. Whole-zone on
+  // purpose: a per-type picker would just recreate this bug for the
+  // next record type.
   @ViewBuilder
   private var repairSection: some View {
     Section {
       Button {
-        Task { await repairNutritionFromCloudKit() }
+        Task { await repairFromCloudKit() }
       } label: {
         HStack {
-          Label("Repair nutrition from CloudKit", systemImage: "stethoscope")
+          Label("Repair data from CloudKit", systemImage: "stethoscope")
           Spacer()
-          switch nutritionRepairState {
+          switch repairState {
           case .idle:
             EmptyView()
           case .running:
             ProgressView().controlSize(.small)
-          case .success(let entries, let summaries):
-            Text("\(entries) entries · \(summaries) days")
+          case .success(let records, let types):
+            Text("\(records) records · \(types) types")
               .font(.caption.monospacedDigit())
               .foregroundStyle(.secondary)
           case .failure:
@@ -4957,8 +4945,8 @@ struct ImportExportSettingsPane: View {
           }
         }
       }
-      .disabled(nutritionRepairState == .running)
-      if case .failure(let message) = nutritionRepairState {
+      .disabled(repairState == .running)
+      if case .failure(let message) = repairState {
         Text(message)
           .font(.caption)
           .foregroundStyle(.red)
@@ -4966,31 +4954,22 @@ struct ImportExportSettingsPane: View {
     } header: {
       Text("Repair")
     } footer: {
-      Text("Re-pulls every nutrition entry and daily summary from CloudKit and merges them into the local store. Use if this device's protein/kcal history looks empty even though entries exist on another device.")
+      Text("Re-pulls every record in this account's CloudKit zone and merges it into the local store. Use if a section's history looks empty on this device even though the data exists on another one. Cloud truth wins for any record that differs locally.")
     }
   }
 
-  private func repairNutritionFromCloudKit() async {
-    nutritionRepairState = .running
+  private func repairFromCloudKit() async {
+    repairState = .running
     do {
-      let records = try await ckEngine.fetchAllRecords(recordTypes: [
-        NutritionEntryCloudKitSchema.recordType,
-        NutritionDailySummaryCloudKitSchema.recordType,
-      ])
-      var entries = 0
-      var summaries = 0
+      let records = try await ckEngine.fetchAllRecords()
       for record in records {
         ckEngine.applyFetchedRecord?(record)
-        if record.recordType == NutritionEntryCloudKitSchema.recordType {
-          entries += 1
-        } else if record.recordType == NutritionDailySummaryCloudKitSchema.recordType {
-          summaries += 1
-        }
       }
       ckEngine.applyDidFinishBatch?()
-      nutritionRepairState = .success(entryCount: entries, summaryCount: summaries)
+      let types = Set(records.map(\.recordType)).count
+      repairState = .success(recordCount: records.count, typeCount: types)
     } catch {
-      nutritionRepairState = .failure(message: error.localizedDescription)
+      repairState = .failure(message: error.localizedDescription)
     }
   }
 
@@ -5379,8 +5358,6 @@ enum ImportExportService {
         for r in rows { try upsertSupplementDefinition(r, ctx: ctx, engine: engine); applied += 1 }
       case "choreDefinition":
         for r in rows { try upsertChoreDefinition(r, ctx: ctx, engine: engine); applied += 1 }
-      case "caffeineBean":
-        for r in rows { try upsertCaffeineBean(r, ctx: ctx, engine: engine); applied += 1 }
       case "groceryCategory":
         for r in rows { try upsertGroceryCategory(r, ctx: ctx, engine: engine); applied += 1 }
       case "groceryItem":
@@ -5472,22 +5449,6 @@ private func upsertChoreDefinition(_ r: [String: Any],
   e.sortIndex = r["sortIndex"] as? Int ?? 0
   e.updatedAt = .now
   engine.noteChoreDefinitionChange(id: id)
-}
-
-@MainActor
-private func upsertCaffeineBean(_ r: [String: Any],
-                                ctx: ModelContext,
-                                engine: CKEngine) throws {
-  guard let id = r["id"] as? String, let name = r["name"] as? String
-  else { throw ImportExportService.ImportError.malformed("caffeineBean row missing id/name") }
-  let existing = try ctx.fetch(FetchDescriptor<CaffeineBeanEntity>(
-    predicate: #Predicate { $0.id == id })).first
-  let e = existing ?? CaffeineBeanEntity(id: id, name: name)
-  if existing == nil { ctx.insert(e) }
-  e.name = name
-  e.sortIndex = r["sortIndex"] as? Int ?? 0
-  e.updatedAt = .now
-  engine.noteCaffeineBeanChange(id: id)
 }
 
 @MainActor

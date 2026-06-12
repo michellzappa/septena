@@ -12,7 +12,7 @@ struct NextWatchView: View {
         .navigationTitle(conn.bucket.isEmpty ? "Next" : conn.bucket.capitalized)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-          // Capture a loggable (caffeine / cannabis / mood) on demand, not just
+          // Capture a loggable (intake / mood) on demand, not just
           // when its suggestion happens to lead the feed.
           ToolbarItem(placement: .topBarTrailing) {
             Button { capturing = true } label: {
@@ -110,7 +110,7 @@ struct NextWatchView: View {
 /// suggestions share one band, like the phone's single `NextSuggestionsSection`.
 private enum WatchSectionTint {
   /// Group key — the unit the list draws a rule between. Suggestions collapse
-  /// to one group regardless of their `logKind` (caffeine / cannabis / mood).
+  /// to one group regardless of their `logKind` (intake / mood).
   static func key(for item: NextItem) -> String {
     switch item.kind {
     case "suggestion": return "suggestion"
@@ -130,7 +130,7 @@ private enum WatchSectionTint {
   }
 
   /// Resolve a section's accent straight from its key (e.g. the Capture sheet's
-  /// caffeine / cannabis / mood rows). Neutral when the section has no color.
+  /// intake / mood rows). Neutral when the section has no color.
   static func color(forSectionKey key: String, colors: [String: String]) -> Color {
     guard let token = colors[key], let c = parse(token) else { return .secondary }
     return c
@@ -332,7 +332,7 @@ struct NextItemRow: View {
 
 /// Presented when a quick-loggable suggestion is tapped. Resolves the shared
 /// `SuggestionBlocks` descriptor and shows the right minimal input — a method
-/// list (caffeine / cannabis) or the mood quadrant grid. Picking writes the
+/// list (intake) or the mood quadrant grid. Picking writes the
 /// event and dismisses.
 private struct QuickLogSheet: View {
   let item: NextItem
@@ -375,15 +375,8 @@ private struct CaptureInput: View {
   var body: some View {
     switch block.input {
     case .choice(let choices):
-      // Cannabis is the one stateful choice: its options depend on the current
-      // capsule (Continue Hit N / New capsule / Edible), carried on the snapshot.
-      // Every other kind uses its static `SuggestionBlocks` choices.
-      let resolved = block.kind == "cannabis"
-        ? CannabisCapsule.choices(lastHit: conn.cannabisLastVapeHit,
-                                  usesPerCapsule: conn.cannabisUsesPerCapsule)
-        : choices
       QuickLogChoiceList(
-        choices: resolved,
+        choices: choices,
         tint: WatchSectionTint.color(forSectionKey: block.sectionKey, colors: conn.sectionColors)
       ) { value in
         conn.logChoice(kind: block.kind, value: value, itemID: itemID)
@@ -467,8 +460,7 @@ private struct CaptureSheet: View {
         .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
 
         // The user's intake trackers, from the snapshot wire — every enabled
-        // tracker is a + item, with container-aware choices. These supersede
-        // the static caffeine/cannabis blocks below (kept for old payloads).
+        // tracker is a + item, with container-aware choices.
         ForEach(conn.intakeKinds, id: \.id) { kind in
           NavigationLink {
             IntakeCaptureInput(kind: kind, conn: conn, onDone: onDone)
@@ -483,9 +475,8 @@ private struct CaptureSheet: View {
           .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
         }
 
-        // On-demand loggables (mood / hydration / gut — plus caffeine/cannabis
-        // only while no trackers ride the wire), from the shared SuggestionBlocks
-        // table.
+        // On-demand loggables (mood / hydration / gut), from the shared
+        // SuggestionBlocks table.
         ForEach(staticBlocks, id: \.kind) { block in
           NavigationLink {
             CaptureInput(block: block, itemID: "adhoc:\(block.kind)", conn: conn, onDone: onDone)
@@ -507,13 +498,11 @@ private struct CaptureSheet: View {
     }
   }
 
-  /// The compiled-in loggables, minus caffeine/cannabis once intake trackers
-  /// ride the wire — the trackers ARE those sections now, and showing both
-  /// would double the rows.
+  /// The compiled-in loggables (mood / hydration / gut). Consumables are
+  /// driven entirely by the wire's intake trackers now, so there are no
+  /// static consumable blocks to filter out.
   private var staticBlocks: [SuggestionBlocks.Block] {
-    SuggestionBlocks.all.filter { block in
-      conn.intakeKinds.isEmpty || !["caffeine", "cannabis"].contains(block.kind)
-    }
+    SuggestionBlocks.all
   }
 
   private func intakeTint(_ kind: IntakeKindWire) -> Color {
@@ -528,8 +517,6 @@ private struct CaptureSheet: View {
   // Mirrors the phone's per-section iconography (`SectionManifest.iconByKey`).
   private func symbol(_ kind: String) -> String {
     switch kind {
-    case "caffeine":  return "cup.and.saucer"
-    case "cannabis":  return "leaf"
     case "mood":      return "face.smiling"
     case "hydration": return "drop.fill"
     case "gut":       return "circle.bottomhalf.filled"

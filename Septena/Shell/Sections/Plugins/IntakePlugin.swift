@@ -145,6 +145,53 @@ enum IntakePlugin: SectionPlugin {
       return nil
     }
   }
+
+  /// Per-kind daily correlation signals — the generic successor to the old
+  /// static per-substance features. Every active tracker contributes an
+  /// events/day lever; amount-tracking kinds add a dose/day lever. The smart
+  /// engine auto-pairs these against outcomes (sleep, readiness, …), so a
+  /// user's "matcha" or "nicotine" tracker correlates with no engine edit.
+  static func correlationFeatures(context: ModelContext) -> [CorrelationFeature] {
+    let kinds = ((try? context.fetch(FetchDescriptor<IntakeKindEntity>())) ?? [])
+      .filter { $0.archivedAt == nil }
+    guard !kinds.isEmpty else { return [] }
+    let events = (try? context.fetch(FetchDescriptor<IntakeEventEntity>())) ?? []
+    guard !events.isEmpty else { return [] }
+    let byKind = Dictionary(grouping: events, by: \.kindID)
+
+    return kinds.flatMap { k -> [CorrelationFeature] in
+      let evs = byKind[k.id] ?? []
+      guard !evs.isEmpty else { return [] }
+
+      var countSeries: [String: Double] = [:]
+      for e in evs { countSeries[e.date, default: 0] += 1 }
+      var out = [CorrelationFeature(
+        key: "intake_\(k.id)_count",
+        label: "\(k.name) \(k.countNoun.map { $0.lowercased() + "s" } ?? "count")",
+        section: "intake",
+        unit: "",
+        role: .lever,
+        distribution: .count,
+        series: countSeries)]
+
+      if k.metricMode == "sumAmount", let unit = k.unit {
+        var amountSeries: [String: Double] = [:]
+        var any = false
+        for e in evs { if let a = e.amount { amountSeries[e.date, default: 0] += a; any = true } }
+        if any {
+          out.append(CorrelationFeature(
+            key: "intake_\(k.id)_amount",
+            label: "\(k.name) \(unit)",
+            section: "intake",
+            unit: unit,
+            role: .lever,
+            distribution: .continuous,
+            series: amountSeries))
+        }
+      }
+      return out
+    }
+  }
 }
 
 // MARK: - First-enable onboarding (template picker)
@@ -289,12 +336,9 @@ private struct IntakeOnboardingView: View {
 /// presented as sections in the UX while staying rows under the host section
 /// (Option C — presentation layer). See docs/CONSUMABLES_PLAN.md.
 private struct IntakeDetailContent: View {
-  @Environment(SettingsStore.self) private var store
   @State private var kinds: [IntakeKindDTO] = []
   @State private var managingID: String? = nil
   @State private var creating = false
-  @State private var migrationSummary: String? = nil
-  @State private var migrating = false
 
   private var mutator: IntakeMutator { SeptenaServices.shared.intakeMutator }
   private var active: [IntakeKindDTO] { kinds.filter { !$0.archived } }
@@ -332,7 +376,6 @@ private struct IntakeDetailContent: View {
           }
         }
       }
-      legacyImportSection
     }
     .task { await reload() }
     .sheet(item: managingBinding) { id in IntakeManageSheet(kindID: id.value) }
@@ -366,52 +409,5 @@ private struct IntakeDetailContent: View {
 
   private func reload() async {
     kinds = await MirrorReader.shared.read { IntakeReader.loadAllKinds(context: $0) }
-  }
-
-  // MARK: Legacy import (milestone-7 kickoff)
-
-  /// Copy-only, idempotent import of the legacy caffeine/cannabis sections
-  /// into intake trackers. Legacy records are never modified or deleted;
-  /// re-running upserts by deterministic id (no duplicates). The report
-  /// below is the §7.1 verification — trust the import only when it says OK.
-  private var legacyImportSection: some View {
-    Section {
-      Button {
-        runImport(["cannabis"])
-      } label: {
-        Label("Import cannabis history", systemImage: "square.and.arrow.down")
-      }
-      .disabled(migrating)
-      Button {
-        runImport(["caffeine"])
-      } label: {
-        Label("Import caffeine history", systemImage: "square.and.arrow.down")
-      }
-      .disabled(migrating)
-      if let migrationSummary {
-        Text(migrationSummary)
-          .font(.caption.monospaced())
-          .foregroundStyle(.secondary)
-          .textSelection(.enabled)
-      }
-    } header: {
-      Text("Legacy data")
-    } footer: {
-      Text("Copies your old section's entries into a tracker here. Nothing is deleted — the old section keeps its data, and re-running is safe (no duplicates).")
-    }
-  }
-
-  private func runImport(_ sections: Set<String>) {
-    migrating = true
-    let cap = store.cannabis?.usesPerCapsule ?? 3
-    let context = LocalStore.shared.container.mainContext
-    let report = IntakeMigrator.migrateLocalLegacy(
-      context: context,
-      mutator: mutator,
-      sections: sections,
-      cannabisUsesPerCapsule: cap)
-    migrationSummary = report.summary
-    migrating = false
-    Task { await reload() }
   }
 }

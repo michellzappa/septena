@@ -16,8 +16,31 @@ enum WatchSnapshotPublisher {
   static let recordName = "watch-next-snapshot"
   private static let containerID = "iCloud.com.septena.cloud"
 
+  /// The in-flight debounced publish, if any. Cancelled and rescheduled by
+  /// each `schedule` call so a burst collapses to one build + write.
+  @MainActor private static var pending: Task<Void, Never>?
+
+  /// Coalesce a burst of mutations (ticking five habits in a row) into a single
+  /// snapshot build + CloudKit write. The full payload is a snapshot, so only
+  /// the last build in a burst matters — the intermediates would each rebuild
+  /// the entire Next feed (a `NextFeed.flat` that runs the suggestions engine
+  /// over 14–30 days of history) and fire a CloudKit read-modify-write, all
+  /// wasted. Mutation paths and app-foreground route here instead of calling
+  /// `publish` directly.
+  @MainActor
+  static func schedule(context: ModelContext, date: String = SeptenaDate.today) {
+    pending?.cancel()
+    pending = Task { @MainActor in
+      try? await Task.sleep(for: .milliseconds(1200))
+      guard !Task.isCancelled else { return }
+      pending = nil
+      publish(context: context, date: date)
+    }
+  }
+
   /// Compute on the main actor (SwiftData read), then save off-main. Best-effort:
-  /// a failed write is retried by the next mutation / foreground.
+  /// a failed write is retried by the next mutation / foreground. Prefer
+  /// `schedule` from mutation paths so rapid edits don't each pay the full cost.
   @MainActor
   static func publish(context: ModelContext, date: String = SeptenaDate.today) {
     // The full Next feed (suggestions + tasks/chores/habits/supplements in the
@@ -39,21 +62,8 @@ enum WatchSnapshotPublisher {
     let configs = sections.isEmpty ? SectionTheme.defaultPalette : sections
     let sectionColors = Dictionary(configs.map { ($0.key, $0.color) },
                                    uniquingKeysWith: { a, _ in a })
-    // Cannabis capsule state so the watch quick-add mirrors the phone menu's
-    // Continue (Hit N) / New capsule / Edible. The cap is the user's setting
-    // (ResponseCache key matches `SettingsView.CacheKey.cannabis`), default 3.
-    // The last vape's hit prefers today's, else the most recent vape — matching
-    // the phone's `lastCannabisVape` fallback.
-    let usesPerCapsule = ResponseCache.load(CannabisConfig.self,
-                                            forKey: "settings.cannabis")?.usesPerCapsule ?? 3
-    let vapesDesc = FetchDescriptor<CannabisEventEntity>(
-      predicate: #Predicate { $0.method == "vape" },
-      sortBy: [SortDescriptor(\.occurredAt, order: .reverse)])
-    let vapes = (try? context.fetch(vapesDesc)) ?? []
-    let lastVapeHit = (vapes.first { $0.date == date } ?? vapes.first)?.hit
     // Enabled intake trackers, so the wrist + menu always offers every tracker
-    // with container-aware choices. The legacy cannabis fields above keep being
-    // emitted for old watch builds until the legacy purge.
+    // with container-aware choices.
     let kindRows = ((try? context.fetch(FetchDescriptor<IntakeKindEntity>(
       sortBy: [SortDescriptor(\.sortIndex)]))) ?? [])
       .filter { $0.archivedAt == nil }
@@ -79,19 +89,10 @@ enum WatchSnapshotPublisher {
           })
       }
     }
-    // Old watch builds read the two legacy cannabis fields. Prefer the migrated
-    // intake tracker as their source (it outlives the legacy entities — after
-    // the legacy purge it is the ONLY source); fall back to the legacy reads
-    // above while those still exist.
-    let cannabisKind = intakeKinds.first { $0.id == IntakeMigrationMap.cannabisKindID }
-    let wireCap = cannabisKind?.containerCap ?? usesPerCapsule
-    let wireLastHit = cannabisKind != nil ? cannabisKind?.lastContainerCount : lastVapeHit
     let response = NextItemsResponse(date: date, bucket: "", items: items,
                                      lingerHabits: lingerHabits,
                                      lingerSupplements: lingerSupplements,
                                      sectionColors: sectionColors,
-                                     cannabisUsesPerCapsule: wireCap,
-                                     cannabisLastVapeHit: wireLastHit,
                                      intakeKinds: intakeKinds.isEmpty ? nil : intakeKinds)
     guard let payload = try? JSONEncoder().encode(response) else { return }
 

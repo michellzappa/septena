@@ -26,18 +26,7 @@ enum SymptomsPlugin: SectionPlugin {
   }
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
-    AnyView(SectionExplainerView(
-      sectionKey: "symptoms",
-      title: "Symptoms",
-      intro: "Track pain, flare-ups and symptoms with severity, body area, triggers and relief notes.",
-      bullets: [
-        .init("Severity first", "Every entry stores a 0-10 score so trends stay comparable.", icon: "gauge.with.dots.needle.67percent"),
-        .init("Context fields", "Body region, side, quality, trigger and relief notes keep the log doctor-readable.", icon: "list.clipboard"),
-        .init("Insights outcome", "Symptoms flow into correlations as outcomes, so sleep, caffeine, training and meds can be tested against them.", icon: "chart.dots.scatter"),
-      ],
-      primaryActionLabel: "Start logging",
-      complete: complete
-    ))
+    AnyView(SymptomsOnboardingView(complete: complete))
   }
 
   static var exportContribution: SectionExportContribution? {
@@ -161,6 +150,136 @@ private struct SymptomsDetailContent: View {
     .sheet(isPresented: $showingSheet) {
       SymptomDefinitionsSheet()
     }
+  }
+}
+
+struct SymptomStarter: Identifiable, Hashable {
+  let id: String
+  let title: String
+  let emoji: String
+  let bodySystem: String
+  let region: String
+
+  static let all: [SymptomStarter] = [
+    .init(id: "starter-headache", title: "Headache", emoji: "🤕", bodySystem: "Neurological", region: "Head"),
+    .init(id: "starter-migraine", title: "Migraine", emoji: "🧠", bodySystem: "Neurological", region: "Head"),
+    .init(id: "starter-fatigue", title: "Fatigue", emoji: "🪫", bodySystem: "General", region: "Whole body"),
+    .init(id: "starter-nausea", title: "Nausea", emoji: "🤢", bodySystem: "Digestive", region: "Stomach"),
+    .init(id: "starter-abdominal-pain", title: "Abdominal pain", emoji: "🫃", bodySystem: "Digestive", region: "Abdomen"),
+    .init(id: "starter-abdominal-discomfort", title: "Abdominal discomfort", emoji: "🫄", bodySystem: "Digestive", region: "Abdomen"),
+    .init(id: "starter-bloating", title: "Bloating", emoji: "🎈", bodySystem: "Digestive", region: "Abdomen"),
+    .init(id: "starter-gas", title: "Gas", emoji: "💨", bodySystem: "Digestive", region: "Abdomen"),
+    .init(id: "starter-cramps", title: "Cramps", emoji: "🌀", bodySystem: "Digestive", region: "Abdomen"),
+    .init(id: "starter-reflux", title: "Reflux", emoji: "🔥", bodySystem: "Digestive", region: "Chest"),
+    .init(id: "starter-blood-stool", title: "Blood in stool", emoji: "🩸", bodySystem: "Digestive", region: "Rectum"),
+    .init(id: "starter-back-pain", title: "Back pain", emoji: "🦴", bodySystem: "Musculoskeletal", region: "Back"),
+    .init(id: "starter-joint-pain", title: "Joint pain", emoji: "🦵", bodySystem: "Musculoskeletal", region: "Joints"),
+    .init(id: "starter-sore-throat", title: "Sore throat", emoji: "🗣️", bodySystem: "Respiratory", region: "Throat"),
+    .init(id: "starter-congestion", title: "Congestion", emoji: "👃", bodySystem: "Respiratory", region: "Nose"),
+    .init(id: "starter-anxiety", title: "Anxiety", emoji: "🌫️", bodySystem: "Mental", region: "Chest"),
+  ]
+}
+
+private struct SymptomsOnboardingView: View {
+  let complete: () -> Void
+  @Environment(SectionTheme.self) private var theme
+  @Environment(\.modelContext) private var modelContext
+  @State private var selected: Set<String> = []
+  @State private var existingTitles: Set<String> = []
+
+  private var accent: Color { theme.color(for: "symptoms") }
+  private var mutator: SymptomsMutator { SeptenaServices.shared.symptomsMutator }
+
+  var body: some View {
+    NavigationStack {
+      Form {
+        Section {
+          SectionOnboardingHero(
+            sectionKey: "symptoms",
+            title: "Symptoms",
+            intro: "Pick the symptoms you want ready for one-tap logging. Each log still captures severity, time and optional context."
+          )
+          .onboardingHeroSection()
+        }
+        Section {
+          ForEach(SymptomStarter.all) { starter in
+            starterRow(starter)
+          }
+        } header: {
+          Text("Starter symptoms")
+        }
+      }
+      .formStyle(.grouped)
+      #if os(iOS)
+      .navigationBarTitleDisplayMode(.inline)
+      #endif
+      .safeAreaInset(edge: .bottom) { bottomBar }
+      .onAppear { loadExisting() }
+    }
+  }
+
+  @ViewBuilder
+  private func starterRow(_ starter: SymptomStarter) -> some View {
+    let exists = existingTitles.contains(starter.title.lowercased())
+    let isSelected = selected.contains(starter.id)
+    Button {
+      guard !exists else { return }
+      if isSelected { selected.remove(starter.id) } else { selected.insert(starter.id) }
+    } label: {
+      HStack(spacing: 12) {
+        Text(starter.emoji).font(.title3).opacity(exists ? 0.4 : 1)
+        VStack(alignment: .leading, spacing: 2) {
+          Text(starter.title)
+            .foregroundStyle(exists ? .secondary : .primary)
+            .strikethrough(exists, color: .secondary)
+          Text(starter.region)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        Spacer()
+        if exists {
+          Text("Already added").font(.caption).foregroundStyle(.secondary)
+        } else {
+          Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+            .font(.title3)
+            .foregroundStyle(isSelected ? accent : Color.secondary.opacity(0.6))
+        }
+      }
+    }
+    .buttonStyle(.plain)
+    .disabled(exists)
+  }
+
+  private var bottomBar: some View {
+    HStack(spacing: 12) {
+      Button("Skip") { complete() }
+        .buttonStyle(.bordered)
+      Spacer()
+      Button(actionTitle) { addAndFinish() }
+        .buttonStyle(.borderedProminent)
+        .tint(accent)
+    }
+    .padding()
+    .background(.bar)
+  }
+
+  private var actionTitle: String {
+    selected.isEmpty ? String(localized: "Done") : String(localized: "Add \(selected.count) symptoms")
+  }
+
+  private func loadExisting() {
+    let rows = (try? modelContext.fetch(FetchDescriptor<SymptomDefinitionEntity>())) ?? []
+    existingTitles = Set(rows.map { $0.title.lowercased() })
+  }
+
+  private func addAndFinish() {
+    for starter in SymptomStarter.all where selected.contains(starter.id) && !existingTitles.contains(starter.title.lowercased()) {
+      mutator.addDefinition(title: starter.title,
+                            emoji: starter.emoji,
+                            bodySystem: starter.bodySystem,
+                            defaultBodyRegion: starter.region)
+    }
+    complete()
   }
 }
 

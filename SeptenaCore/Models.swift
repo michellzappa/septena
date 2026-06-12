@@ -1072,103 +1072,6 @@ let DEFAULT_GROCERY_CATEGORIES: [GroceryCategory] = [
   GroceryCategory(id: "other",     name: "Other"),
 ]
 
-// MARK: - Caffeine
-
-struct CaffeineEntry: Codable, Identifiable, Hashable {
-  let id: String
-  let time: String
-  var method: String        // "v60" | "matcha" | "other"
-  var beans: String?
-  var grams: Double?
-  var note: String?
-}
-
-struct CaffeineDayResponse: Codable {
-  let date: String
-  let entries: [CaffeineEntry]
-  let sessionCount: Int
-  var totalG: Double?
-
-  enum CodingKeys: String, CodingKey {
-    case date, entries
-    case sessionCount = "session_count"
-    case totalG       = "total_g"
-  }
-}
-
-struct CaffeineHistoryPoint: Codable, Hashable {
-  let date: String
-  let sessions: Int
-  var totalG: Double?
-
-  enum CodingKeys: String, CodingKey {
-    case date, sessions
-    case totalG = "total_g"
-  }
-}
-
-struct CaffeineHistoryResponse: Codable {
-  let daily: [CaffeineHistoryPoint]
-}
-
-struct CaffeineTimePoint: Codable, Hashable {
-  let date: String
-  let time: String
-  let hour: Double
-  let method: String
-  var beans: String?
-  var grams: Double?
-}
-
-// MARK: - Cannabis
-
-struct CannabisEntry: Codable, Identifiable, Hashable {
-  let id: String
-  let time: String
-  var method: String        // "vape" | "edible"
-  var strain: String?
-  var hit: Int?
-  var grams: Double?
-  var note: String?
-}
-
-struct CannabisDayResponse: Codable {
-  let date: String
-  let entries: [CannabisEntry]
-  let sessionCount: Int
-  var totalG: Double?
-
-  enum CodingKeys: String, CodingKey {
-    case date, entries
-    case sessionCount = "session_count"
-    case totalG       = "total_g"
-  }
-}
-
-struct CannabisHistoryPoint: Codable, Hashable {
-  let date: String
-  let sessions: Int
-  var totalG: Double?
-
-  enum CodingKeys: String, CodingKey {
-    case date, sessions
-    case totalG = "total_g"
-  }
-}
-
-struct CannabisHistoryResponse: Codable {
-  let daily: [CannabisHistoryPoint]
-}
-
-struct CannabisTimePoint: Codable, Hashable {
-  let date: String
-  let time: String
-  let hour: Double
-  let method: String
-  var strain: String?
-  var hit: Int?
-}
-
 // MARK: - Body (Withings)
 
 /// One Withings weigh-in. From `/api/health/withings`.
@@ -1258,36 +1161,6 @@ struct GutHistoryResponse: Codable {
 
 struct GutExportResponse: Codable {
   let entries: [GutEntry]
-}
-
-struct CaffeineExportEntry: Codable, Hashable {
-  let id: String
-  let date: String
-  let time: String
-  let method: String
-  let beans: String?
-  let grams: Double?
-  let note: String?
-}
-
-struct CaffeineExportResponse: Codable {
-  let entries: [CaffeineExportEntry]
-  let beans: [CaffeineBean]
-}
-
-struct CannabisExportEntry: Codable, Hashable {
-  let id: String
-  let date: String
-  let time: String
-  let method: String
-  let strain: String?
-  let hit: Int?
-  let grams: Double?
-  let note: String?
-}
-
-struct CannabisExportResponse: Codable {
-  let entries: [CannabisExportEntry]
 }
 
 /// One exercise in the user-editable catalog. Drives the logger's
@@ -1513,61 +1386,7 @@ struct HKSyncSettings: Codable {
 // `NextItem` / `NextItemsResponse` and the `itemsForBucket` helper now live in
 // `SeptenaCore/NextWire.swift` (shared by the app, Mac, watch, and widget).
 
-// MARK: - Add Info: config DTOs (caffeine / cannabis / training)
-
-/// One preset bean from `/api/caffeine/config`.
-struct CaffeineBean: Codable, Identifiable, Hashable {
-  let id: String
-  var name: String
-
-  init(id: String, name: String) {
-    self.id = id
-    self.name = name
-  }
-
-  init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    id = try c.decode(String.self, forKey: .id)
-    name = try c.decodeIfPresent(String.self, forKey: .name) ?? id
-  }
-
-  enum CodingKeys: String, CodingKey { case id, name }
-}
-
-struct CaffeineConfig: Codable, Hashable {
-  var beans: [CaffeineBean]
-  var methods: [String]?
-
-  init(beans: [CaffeineBean], methods: [String]? = nil) {
-    self.beans = beans
-    self.methods = methods
-  }
-
-  init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    beans = (try? c.decode([CaffeineBean].self, forKey: .beans)) ?? []
-    methods = try c.decodeIfPresent([String].self, forKey: .methods)
-  }
-
-  enum CodingKeys: String, CodingKey { case beans, methods }
-}
-
-struct CannabisConfig: Codable, Hashable {
-  var usesPerCapsule: Int
-
-  init(usesPerCapsule: Int) {
-    self.usesPerCapsule = usesPerCapsule
-  }
-
-  init(from decoder: Decoder) throws {
-    let c = try decoder.container(keyedBy: CodingKeys.self)
-    usesPerCapsule = (try? c.decode(Int.self, forKey: .usesPerCapsule)) ?? 3
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case usesPerCapsule = "uses_per_capsule"
-  }
-}
+// MARK: - Add Info: config DTOs (training)
 
 struct SuggestedWorkout: Codable, Hashable {
   let type: String
@@ -2077,7 +1896,7 @@ public struct CorrelationPairPoint: Hashable {
 
 // MARK: - Mood
 
-/// One logged check-in. Mirrors the Caffeine/Cannabis event shape so the
+/// One logged check-in. Mirrors the intake event shape so the
 /// dashboard heatmap and section views can share the same patterns.
 public struct MoodEntry: Codable, Identifiable, Hashable {
   public let id: String

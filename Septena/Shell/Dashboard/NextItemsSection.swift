@@ -771,7 +771,7 @@ private struct NextMasonry<Block: View>: View {
 //   • the checklist trio (chores / habits / supplements) from `NextItemsModel`,
 //     so an item the user just ticked off appears here the instant its settle
 //     beat ends (live session state, no refetch);
-//   • passive logs (caffeine, cannabis, gut, mood, meals, training, completed
+//   • passive logs (intake, gut, mood, meals, training, completed
 //     tasks) from `NextDoneModel`, read off the local mirror.
 // Newest at top, so the freshest completion lands right under the open list.
 
@@ -842,19 +842,6 @@ final class NextDoneModel {
                        sectionKey: "sleep", moodQuadrant: nil))
     }
 
-    for e in ChecklistMirror.loadCaffeineDay(context: ctx, date: date).entries {
-      out.append(.init(id: "caf-\(e.id)", hour: DoneEvent.hour(from: e.time) ?? -1,
-                       time: e.time, label: caffeineLabel(e.method),
-                       detail: e.grams.map { "\(Int($0))g" } ?? e.beans,
-                       sectionKey: "caffeine", moodQuadrant: nil))
-    }
-
-    for e in ChecklistMirror.loadCannabisDay(context: ctx, date: date).entries {
-      out.append(.init(id: "can-\(e.id)", hour: DoneEvent.hour(from: e.time) ?? -1,
-                       time: e.time, label: cannabisLabel(e.method),
-                       detail: e.strain, sectionKey: "cannabis", moodQuadrant: nil))
-    }
-
     for e in ChecklistMirror.loadGutDay(context: ctx, date: date).entries {
       out.append(.init(id: "gut-\(e.id)", hour: DoneEvent.hour(from: e.time) ?? -1,
                        time: e.time, label: "Gut event",
@@ -897,29 +884,12 @@ final class NextDoneModel {
 
     return out
   }
-
-  private static func caffeineLabel(_ m: String) -> String {
-    switch m {
-    case "v60":    return "V60"
-    case "matcha": return "Matcha"
-    case "other":  return "Caffeine"
-    default:       return m.capitalized
-    }
-  }
-
-  private static func cannabisLabel(_ m: String) -> String {
-    switch m {
-    case "vape":   return "Vape"
-    case "edible": return "Edible"
-    default:       return m.capitalized
-    }
-  }
 }
 
 struct NextDoneSection: View {
   /// Live session state for the checklist trio (chores / habits / supplements).
   var model: NextItemsModel
-  /// Today's passive logs (caffeine / cannabis / gut / mood / meals /
+  /// Today's passive logs (intake / gut / mood / meals /
   /// training / completed tasks).
   var passive: [DoneEvent]
   @Environment(SectionTheme.self) private var theme

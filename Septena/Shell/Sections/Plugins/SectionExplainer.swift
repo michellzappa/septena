@@ -5,7 +5,7 @@ import SwiftUI
 // each rolling their own NavigationStack + close button.
 //
 // Visual language matches the selection-based onboardings (Caffeine,
-// Habits, Chores, Cannabis, Groceries, Supplements, Training):
+// Habits, Chores, Intake, Groceries, Supplements, Training):
 //   - Hero header: large accent-tinted section glyph + title + intro
 //   - Grouped Form with one Section per bullet (lead = header,
 //     optional SF Symbol on the row, body inside)

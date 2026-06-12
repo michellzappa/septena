@@ -79,7 +79,7 @@ struct SectionDisabledError: Error, CustomLocalizedStringResourceConvertible {
 /// 17 already appear there and in Spotlight). The only thing curated here is
 /// which 10 ship with a phrase out of the box, chosen purely by how often the
 /// action gets logged — one primary log action per section. No action is held
-/// back for being "sensitive": cannabis is treated exactly like any other log.
+/// back for being "sensitive": every log is treated the same; nothing is singled out as sensitive.
 /// The 7 without a built-in phrase are the 5 catalog "Add" setup actions plus
 /// the two lowest-frequency primaries (Chores, Goals, Gut rotate here).
 /// Rebalance by swapping an `AppShortcut(...)` block in/out — keep total ≤10.
@@ -131,18 +131,6 @@ struct SeptenaShortcuts: AppShortcutsProvider {
       shortTitle: "Log Water",
       systemImageName: "drop.fill"
     )
-    // 4 — Caffeine
-    AppShortcut(
-      intent: LogCaffeineIntent(),
-      phrases: [
-        "Log coffee in \(.applicationName)",
-        "Log caffeine in \(.applicationName)",
-        "Log a coffee in \(.applicationName)",
-        "Log matcha in \(.applicationName)",
-      ],
-      shortTitle: "Log Caffeine",
-      systemImageName: "cup.and.saucer"
-    )
     // 5 — Nutrition
     AppShortcut(
       intent: LogMealIntent(),
@@ -176,17 +164,6 @@ struct SeptenaShortcuts: AppShortcutsProvider {
       ],
       shortTitle: "Mark Grocery Low",
       systemImageName: "cart"
-    )
-    // 8 — Cannabis
-    AppShortcut(
-      intent: LogCannabisIntent(),
-      phrases: [
-        "Log cannabis in \(.applicationName)",
-        "Log a session in \(.applicationName)",
-        "Log a vape in \(.applicationName)",
-      ],
-      shortTitle: "Log Cannabis",
-      systemImageName: "leaf"
     )
     // 9 — Training
     AppShortcut(
