@@ -37,9 +37,14 @@ enum HydrationPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(HydrationDestinationView()) }
 
-  // Water toward your daily target → a full-page fill; its level scales
-  // with the amount (see HydrationDestinationView.commit, intensity from ml).
-  static var logFlourish: LogFlourish? { LogFlourish(motion: .fill) }
+  // Every glass gets the calm `.bloom`, not the full-page `.fill` flood —
+  // you log water many times a day, and by the "celebration budget" rule
+  // (TaskComponents) a high-frequency moment never earns the canvas. The
+  // `.fill` flood is *reserved* for the one glass that crosses the daily
+  // target (see HydrationDestinationView.commit) — a once-a-day payoff that
+  // actually means "you hit your goal," the hydration sibling of the tasks
+  // `.arc` rule. Everyday glasses bloom; the goal glass floods.
+  static var logFlourish: LogFlourish? { LogFlourish(motion: .bloom) }
 
   // MARK: - First-enable onboarding
 
@@ -297,14 +302,29 @@ private struct HydrationDestinationView: View {
   // MARK: Logic
 
   private func commit(ml: Int) {
-    // Bloom reach scales with the amount — a 500ml glass is the calibrated
-    // 1.0; clamped so a sip still reads and a big bottle can't overpower.
-    let intensity = min(1.4, max(0.6, Double(ml) / 500))
+    // Does THIS glass take you from under your target to at/over it? That's
+    // the earned moment: it plays the full-page `.fill` flood, once. Only on
+    // today (the target is a "today" goal) and only on the crossing — the
+    // next glass after you've hit the goal blooms like the rest.
+    let crossed = isViewingToday
+      && targetMl > 0
+      && dayMl < targetMl
+      && dayMl + ml >= targetMl
+
+    // The crossing floods near-full; an everyday glass blooms, its reach
+    // scaling gently with the amount (a 500ml glass is the calibrated 1.0).
+    let motion: CommitMotion? = crossed ? .fill : nil   // nil → plugin's `.bloom`
+    let intensity = crossed ? 1.4 : min(1.4, max(0.6, Double(ml) / 500))
+    let announce = crossed
+      ? "Hydration goal reached — \(dayMl + ml) of \(targetMl) ml."
+      : "Logged \(ml) ml of water."
+
     SectionLog.newLog(
       section: "hydration",
       accent: accent,
+      motion: motion,
       intensity: intensity,
-      announce: "Logged \(ml) ml of water.",
+      announce: announce,
       logCommit: logCommit
     ) {
       _ = mutator.addEntry(

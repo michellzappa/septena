@@ -37,6 +37,9 @@ struct TimeOfDayWheel: View {
     let end: Double
     let daysAgo: Int
     var color: Color? = nil
+    /// Half-weight stroke — calendar events render thinner than logged
+    /// durations (sleep, fasting), matching the day timeline's thin pills.
+    var thin: Bool = false
   }
 
   let events: [Event]
@@ -57,6 +60,26 @@ struct TimeOfDayWheel: View {
   /// locks to the full-week overlay (no tap-to-toggle — a thumbnail isn't an
   /// interactive control). Ticks stay as a faint frame so the angles still read.
   var compact: Bool = false
+  /// Hero treatment (`DayDialHero`): set to the day being shown. Paints the
+  /// `AmbientLight` phases as a faint rim wash just inside the tick ring —
+  /// dawn warm, dusk ember, night indigo — so the face itself carries the
+  /// day's light, and replaces the center scope chip with the date while
+  /// focused on today (a clock face shows its day). The week overlay keeps
+  /// the "7 days" chip so that state stays labeled. Ignored when `compact`.
+  var heroDate: Date? = nil
+
+  /// Margin between the dial's square and its tick ring (full rendering).
+  /// Shared with `dotRing(forDiameter:)` so external geometry — the `.arc`
+  /// comet orbiting the hero dial — lands exactly on the drawn ring.
+  static let fullMargin: CGFloat = 20
+
+  /// Radius of the ring the dots and bands sit on, for a full (non-compact)
+  /// dial of `diameter`. The Canvas derives the same value from its live
+  /// size; this exists so `DayDialHero` can publish the circle the `.arc`
+  /// flourish traces (`DayDialAnchor`).
+  static func dotRing(forDiameter d: CGFloat) -> CGFloat {
+    (d / 2 - fullMargin) * 0.82
+  }
 
   // Brightest (today) → faintest (oldest day in the window).
   private let maxOpacity: Double = 0.92
@@ -87,7 +110,7 @@ struct TimeOfDayWheel: View {
   private var focusToday: Bool { compact ? false : todayOnly }
   /// Outer margin for the labels/disc — collapses in compact so the dial fills
   /// its tile.
-  private var margin: CGFloat { compact ? 5 : 20 }
+  private var margin: CGFloat { compact ? 5 : Self.fullMargin }
 
   private var effectiveWindow: Int { focusToday ? 1 : windowDays }
   private var shownEvents: [Event] { focusToday ? events.filter { $0.daysAgo == 0 } : events }
@@ -157,6 +180,26 @@ struct TimeOfDayWheel: View {
                    with: .color(lineColor.opacity(0.22)), lineWidth: 1.5)
       }
 
+      // Ambient rim (hero only) — the AmbientLight phases painted as a faint
+      // wash just inside the tick ring: dawn warm, midday near-silent, dusk
+      // ember, night indigo. Drawn under the ticks so the marks read as
+      // sitting on lit glass. The face itself then says where night is — the
+      // dial wears the same light the glow behind it casts.
+      if heroDate != nil && !compact {
+        let rimR = ringR - 7
+        let phases: [(start: Double, end: Double, phase: AmbientLight.Phase, alpha: Double)] = [
+          (5 / 24.0, 8 / 24.0, .dawn, 0.20),
+          (8 / 24.0, 17 / 24.0, .day, 0.07),
+          (17 / 24.0, 21 / 24.0, .dusk, 0.20),
+          (21 / 24.0, 5 / 24.0, .night, 0.16),   // wraps midnight
+        ]
+        for seg in phases {
+          ctx.stroke(arc(seg.start, seg.end, rimR),
+                     with: .color(seg.phase.tint.inner.opacity(seg.alpha)),
+                     style: StrokeStyle(lineWidth: 4))
+        }
+      }
+
       // Hour ticks — quarter-marks longest/darkest, 3-hour marks medium, every
       // other hour a short minor. Compact uses tiny ticks so the thumbnail reads
       // the full 24-hour grid without clutter.
@@ -183,7 +226,7 @@ struct TimeOfDayWheel: View {
       for b in bandsToDraw.sorted(by: { $0.daysAgo > $1.daysAgo }) {
         ctx.stroke(arc(b.start, b.end, dotRing),
                    with: .color((b.color ?? accent).opacity(fade(b.daysAgo) * 0.55)),
-                   style: StrokeStyle(lineWidth: 9, lineCap: .round))
+                   style: StrokeStyle(lineWidth: b.thin ? 4 : 9, lineCap: .round))
       }
 
       // Quadrant labels just outside the disc, on the page background — softer
@@ -235,13 +278,31 @@ struct TimeOfDayWheel: View {
         ctx.fill(Path(ellipseIn: rect), with: .color((e.color ?? accent).opacity(fade(e.daysAgo))))
       }
 
-      // Center scope chip — names the current view and signals the dial is
-      // tappable ("Today" ⇄ "7 days"). Compact thumbnails are non-interactive,
-      // so no chip.
+      // Center: the hero dial shows its date while focused on today (a clock
+      // face shows its day — weekday over day number, watch-face style); the
+      // week overlay and the non-hero dial keep the scope chip, which names
+      // the current view and signals the dial is tappable ("Today" ⇄ "7 days").
+      // Compact thumbnails are non-interactive, so nothing.
       if !compact {
-        let scope = todayOnly ? "Today" : "\(windowDays) days"
-        ctx.draw(Text(scope).font(.caption2.weight(.medium)).foregroundStyle(.secondary),
-                 at: center)
+        if let heroDate, todayOnly {
+          ctx.draw(
+            Text(heroDate.formatted(.dateTime.weekday(.abbreviated)).uppercased())
+              .font(.caption2.weight(.semibold))
+              .foregroundStyle(.secondary),
+            at: CGPoint(x: center.x, y: center.y - 11)
+          )
+          ctx.draw(
+            Text(heroDate.formatted(.dateTime.day()))
+              .font(.system(.title3, design: .rounded).weight(.semibold))
+              .monospacedDigit()
+              .foregroundStyle(.primary),
+            at: CGPoint(x: center.x, y: center.y + 8)
+          )
+        } else {
+          let scope = todayOnly ? "Today" : "\(windowDays) days"
+          ctx.draw(Text(scope).font(.caption2.weight(.medium)).foregroundStyle(.secondary),
+                   at: center)
+        }
       }
     }
     }

@@ -159,54 +159,91 @@ struct RhythmHomepageView<MenuContent: View>: View {
   }
 
   private func reload() async {
-    let start = todayStart
-    let weekStart = Calendar.current.date(byAdding: .day, value: -(windowDays - 1), to: start) ?? start
-    let visible = Set(items.map { $0.domain.rawValue })
-    let colors = byKey.mapValues { $0.accent }
+    let snap = RhythmData.load(
+      visible: Set(items.map { $0.domain.rawValue }),
+      colors: byKey.mapValues { $0.accent },
+      sleepNights: sleepNights,
+      todayStart: todayStart,
+      now: clock.now,
+      windowDays: windowDays,
+      calendarFallback: theme.color(for: "calendar"),
+      context: modelContext
+    )
+    eventsBySection = snap.eventsBySection
+    bandsBySection = snap.bandsBySection
+    events = snap.events
+    bands = snap.bands
+    calendarBands = snap.calendarBands
+  }
+}
+
+// MARK: - Shared rhythm snapshot loader
+
+/// The one cross-section "rhythm" fetch (§8): both 24-hour dials — the Rhythm
+/// homepage mode above and the front-door `DayDialHero` — load through here,
+/// so the two can never disagree about what a day's dots and bands are.
+@MainActor
+enum RhythmData {
+  struct Snapshot {
+    var eventsBySection: [String: [TimeOfDayWheel.Event]] = [:]
+    var bandsBySection: [String: [TimeOfDayWheel.Band]] = [:]
+    var calendarBands: [TimeOfDayWheel.Band] = []
+    var events: [TimeOfDayWheel.Event] { eventsBySection.values.flatMap { $0 } }
+    var bands: [TimeOfDayWheel.Band] { bandsBySection.values.flatMap { $0 } }
+  }
+
+  static func load(visible: Set<String>,
+                   colors: [String: Color],
+                   sleepNights: [OuraNight],
+                   todayStart: Date,
+                   now: Date,
+                   windowDays: Int,
+                   calendarFallback: Color,
+                   context: ModelContext) -> Snapshot {
+    let weekStart = Calendar.current.date(byAdding: .day, value: -(windowDays - 1), to: todayStart) ?? todayStart
 
     // Training renders as session pills (durations), not dots — pull it out of
     // the instant-event stream and add it to the bands below instead.
-    let timed = LoggedEvents.timed(since: weekStart, in: modelContext)
+    let timed = LoggedEvents.timed(since: weekStart, in: context)
       .filter { visible.contains($0.sectionKey) && $0.sectionKey != "training" }
 
     // Bucket events/bands by section so each tile can draw its own mini wheel;
     // the overlay dial is the flattened union of the buckets.
-    var evBuckets: [String: [TimeOfDayWheel.Event]] = [:]
+    var snap = Snapshot()
     for t in timed {
       guard let e = TimeOfDayWheel.Event(
-        id: t.id, occurredAt: t.occurredAt, todayStart: start,
+        id: t.id, occurredAt: t.occurredAt, todayStart: todayStart,
         windowDays: windowDays, color: colors[t.sectionKey]
       ) else { continue }
-      evBuckets[t.sectionKey, default: []].append(e)
+      snap.eventsBySection[t.sectionKey, default: []].append(e)
     }
     // Tasks aren't `LoggedEvent`s — add completed tasks as dots so the wheel
     // matches the timeline (which plots done tasks at their completedAt time).
     if visible.contains("tasks") {
-      let te = taskEvents(todayStart: start, color: colors["tasks"])
-      if !te.isEmpty { evBuckets["tasks", default: []].append(contentsOf: te) }
+      let te = taskEvents(todayStart: todayStart, windowDays: windowDays,
+                          color: colors["tasks"], context: context)
+      if !te.isEmpty { snap.eventsBySection["tasks", default: []].append(contentsOf: te) }
     }
 
-    var bandBuckets: [String: [TimeOfDayWheel.Band]] = [:]
-    let sleep = sleepBands(todayStart: start, visible: visible, sleepColor: colors["sleep"])
-    if !sleep.isEmpty { bandBuckets["sleep"] = sleep }
+    let sleep = sleepBands(nights: sleepNights, todayStart: todayStart, windowDays: windowDays,
+                           visible: visible, sleepColor: colors["sleep"])
+    if !sleep.isEmpty { snap.bandsBySection["sleep"] = sleep }
     if visible.contains("training") {
-      let train = trainingBands(todayStart: start, weekStart: weekStart, color: colors["training"])
-      if !train.isEmpty { bandBuckets["training"] = train }
+      let train = trainingBands(todayStart: todayStart, weekStart: weekStart,
+                                windowDays: windowDays, color: colors["training"], context: context)
+      if !train.isEmpty { snap.bandsBySection["training"] = train }
     }
-
-    eventsBySection = evBuckets
-    bandsBySection = bandBuckets
-    events = evBuckets.values.flatMap { $0 }
-    bands = bandBuckets.values.flatMap { $0 }
-    calendarBands = todayCalendarBands()
+    snap.calendarBands = todayCalendarBands(now: now, fallback: calendarFallback)
+    return snap
   }
 
   /// Completed tasks as dots, placed at their local `completedAt` time —
   /// mirrors `DayTimelineView`'s task handling. The `Event` init bounds them to
   /// the window.
-  private func taskEvents(todayStart: Date, color: Color?) -> [TimeOfDayWheel.Event] {
+  private static func taskEvents(todayStart: Date, windowDays: Int,
+                                 color: Color?, context: ModelContext) -> [TimeOfDayWheel.Event] {
     let desc = FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.statusRaw == "done" })
-    let rows = (try? modelContext.fetch(desc)) ?? []
+    let rows = (try? context.fetch(desc)) ?? []
     return rows.compactMap { t in
       guard let cs = t.completedAt, let when = RhythmFmt.isoLocal.date(from: cs) else { return nil }
       return TimeOfDayWheel.Event(id: t.id, occurredAt: when, todayStart: todayStart,
@@ -217,9 +254,10 @@ struct RhythmHomepageView<MenuContent: View>: View {
   /// Each day's training as a session pill (bedtime-style band), grouping the
   /// day's exercise rows and merging gaps under 0.75h — the same session idea
   /// `DayTimelineView` draws as a bar. Faded by recency like the other bands.
-  private func trainingBands(todayStart: Date, weekStart: Date, color: Color?) -> [TimeOfDayWheel.Band] {
+  private static func trainingBands(todayStart: Date, weekStart: Date, windowDays: Int,
+                                    color: Color?, context: ModelContext) -> [TimeOfDayWheel.Band] {
     guard let color else { return [] }
-    let rows = (try? modelContext.fetch(
+    let rows = (try? context.fetch(
       FetchDescriptor<ExerciseEntryEntity>(predicate: #Predicate { $0.occurredAt >= weekStart })
     )) ?? []
     let cal = Calendar.current
@@ -260,12 +298,11 @@ struct RhythmHomepageView<MenuContent: View>: View {
   /// end fractions of the local day, each in its own calendar's color. Empty
   /// when calendar access isn't granted (no prompt from here). Clamped to the
   /// day so a multi-day event reads as a single block.
-  private func todayCalendarBands() -> [TimeOfDayWheel.Band] {
+  private static func todayCalendarBands(now: Date, fallback: Color) -> [TimeOfDayWheel.Band] {
     guard CalendarBridge.shared.access == .granted else { return [] }
     let cal = Calendar.current
-    let dayStart = cal.startOfDay(for: clock.now)
+    let dayStart = cal.startOfDay(for: now)
     guard let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart) else { return [] }
-    let fallback = theme.color(for: "calendar")
     return CalendarBridge.shared.todayEvents().compactMap { e in
       guard !e.isAllDay else { return nil }
       let s = max(e.startDate, dayStart)
@@ -277,19 +314,21 @@ struct RhythmHomepageView<MenuContent: View>: View {
         start: s.timeIntervalSince(dayStart) / 86400,
         end: f.timeIntervalSince(dayStart) / 86400,
         daysAgo: 0,
-        color: color
+        color: color,
+        thin: true
       )
     }
   }
 
   /// Each recent night's sleep as a bedtime→wake arc, faded by recency. Only
   /// when the sleep section is enabled and we have a color for it.
-  private func sleepBands(todayStart: Date, visible: Set<String>, sleepColor: Color?) -> [TimeOfDayWheel.Band] {
+  private static func sleepBands(nights: [OuraNight], todayStart: Date, windowDays: Int,
+                                 visible: Set<String>, sleepColor: Color?) -> [TimeOfDayWheel.Band] {
     guard visible.contains("sleep"), let sleepColor else { return [] }
     let cal = Calendar.current
-    return sleepNights.compactMap { n in
-      guard let b = Self.frac(fromHHmm: n.bedtime),
-            let w = Self.frac(fromHHmm: n.wakeTime),
+    return nights.compactMap { n in
+      guard let b = frac(fromHHmm: n.bedtime),
+            let w = frac(fromHHmm: n.wakeTime),
             let d = RhythmFmt.ymd.date(from: n.date) else { return nil }
       let daysAgo = cal.dateComponents([.day], from: cal.startOfDay(for: d), to: todayStart).day ?? 0
       guard daysAgo >= 0, daysAgo < windowDays else { return nil }

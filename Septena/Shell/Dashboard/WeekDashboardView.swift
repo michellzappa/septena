@@ -64,6 +64,11 @@ struct WeekDashboardView: View {
   private var showTodayTimeline: Bool = true
   @AppStorage(SettingsKey.homepageShowWelcome)
   private var showWelcome: Bool = true
+  /// The front-door hero: today as a living 24-hour dial (`DayDialHero`),
+  /// between the greeting and the layout grid. Hidden in the Wheel layout
+  /// mode, which already renders the same dial as its body.
+  @AppStorage(SettingsKey.homepageShowDayDial)
+  private var showDayDial: Bool = true
   @AppStorage(SettingsKey.welcomeDataAware)
   private var welcomeDataAware: Bool = false
   /// Fasting tracking master toggle + heatmap metric preference. When
@@ -307,6 +312,13 @@ struct WeekDashboardView: View {
             WelcomeHeaderSection(dataAware: welcomeDataAware,
                                  todayTaskCount: taskCounts?.todayCount ?? 0,
                                  dailies: dailies)
+          }
+          // The hero dial — today across every section on one clock face,
+          // under the day's ambient light. Skipped in Wheel mode (whose
+          // body is already this dial) so the dashboard never shows two.
+          if showDayDial && currentLayoutMode != .wheel {
+            DayDialHero(visibleSections: Set(visibleDomains.map(\.rawValue)),
+                        sleepNights: ouraNights)
           }
           if showTodayTimeline { todayTimeline }
           layoutBody
@@ -2926,16 +2938,25 @@ struct WeekDashboardView: View {
   }
 
   /// Log a glass from the tile's quick-add menu. Mirrors the destination
-  /// view's commit (water-only Nutrition entry + bloom flourish scaled to
-  /// the amount), then self-refreshes the tile.
+  /// view's commit exactly: an everyday glass blooms (reach scaled to the
+  /// amount); the glass that crosses today's target floods once with `.fill`.
+  /// Then self-refreshes the tile.
   private func commitHydration(ml: Int) {
     let accent = theme.color(for: "hydration")
-    let intensity = min(1.4, max(0.6, Double(ml) / 500))
+    let crossed = hydrationTargetMl > 0
+      && hydrationToday < hydrationTargetMl
+      && hydrationToday + ml >= hydrationTargetMl
+    let motion: CommitMotion? = crossed ? .fill : nil   // nil → plugin's `.bloom`
+    let intensity = crossed ? 1.4 : min(1.4, max(0.6, Double(ml) / 500))
+    let announce = crossed
+      ? "Hydration goal reached — \(hydrationToday + ml) of \(hydrationTargetMl) ml."
+      : "Logged \(ml) ml of water."
     SectionLog.newLog(
       section: "hydration",
       accent: accent,
+      motion: motion,
       intensity: intensity,
-      announce: "Logged \(ml) ml of water.",
+      announce: announce,
       logCommit: logCommit
     ) {
       _ = SeptenaServices.shared.nutritionMutator.addEntry(

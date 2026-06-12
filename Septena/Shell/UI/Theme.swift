@@ -288,6 +288,12 @@ enum Theme {
     /// A quick spring with a touch of overshoot — fast enough that rapid
     /// checking never waits on it, springy enough to feel like a stamp.
     static let check: Animation = .spring(response: 0.28, dampingFraction: 0.55)
+    /// Gauge fill: a tile's progress bar sweeping to a new value after a log
+    /// (`ModuleTile.ProgressRow`). Slower and looser than `.check` so the bar
+    /// visibly *travels* and settles with a touch of overshoot — the motion
+    /// itself reads as "filling," which is what carries the feedback on a bar
+    /// too thin for a glow. Pairs with the numeric count-up on the value.
+    static let gauge: Animation = .spring(response: 0.5, dampingFraction: 0.68)
   }
 }
 

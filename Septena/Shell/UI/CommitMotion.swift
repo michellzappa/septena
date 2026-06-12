@@ -131,6 +131,12 @@ struct CommitFlourish: View {
   /// render (Reduce Motion is still honored). Set only by the Motion Gallery,
   /// where the whole point is to feel a motion on demand.
   var ignoresUserPreference: Bool = false
+  /// The hero day dial's circle (global coords), when it's on screen. Only
+  /// `.arc` consumes it: the comet then orbits the dial — completing the
+  /// circle the dial draws all day — instead of sweeping the screen. Passed
+  /// solely by the root `LogCommitOverlay`; every other call site leaves it
+  /// nil and keeps the screen-relative arc.
+  var dialAnchor: DayDialAnchor? = nil
 
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   /// User opt-out for logging animations (Settings ▸ Customize). Absent → on.
@@ -147,7 +153,8 @@ struct CommitFlourish: View {
         case .bloom: BloomFlourish(color: accent, intensity: intensity, trigger: trigger)
         case .sink:  SinkFlourish(color: accent, trigger: trigger)
         case .ripple:  RippleFlourish(color: accent, intensity: intensity, trigger: trigger)
-        case .arc:     ArcFlourish(color: accent, intensity: intensity, trigger: trigger)
+        case .arc:     ArcFlourish(color: accent, intensity: intensity, trigger: trigger,
+                                   dialAnchor: dialAnchor)
         case .fill:    FillFlourish(color: accent, intensity: intensity, trigger: trigger)
         }
       }
@@ -404,11 +411,19 @@ private struct RippleFlourish: View {
 }
 
 // MARK: - arc — a large glowing comet arcing across the screen (toward a target)
+//
+// Two geometries, one comet. Default: the screen-wide sweep (left → over the
+// top → right). When the hero day dial is on screen (`dialAnchor`), the comet
+// instead orbits the dial's own ring — one full clockwise revolution from
+// midnight back to midnight — so clearing the last Today task visibly
+// completes the circle the dial draws all day. Same envelope, same haptic.
 
 private struct ArcFlourish: View {
   let color: Color
   var intensity: Double = 1
   let trigger: Int
+  /// The hero dial's circle in global coordinates, when visible. See above.
+  var dialAnchor: DayDialAnchor? = nil
 
   @State private var t: CGFloat = 0
   @State private var opacity: Double = 0
@@ -420,35 +435,110 @@ private struct ArcFlourish: View {
                   height: -CGFloat(sin(theta)) * radius)
   }
 
+  /// Point on the dial orbit at progress `t` — full clockwise revolution,
+  /// midnight (top) → midnight, matching the wheel's angle convention.
+  private func orbitPoint(_ t: CGFloat, center: CGPoint, radius: CGFloat) -> CGPoint {
+    let a = Double(t) * 2 * .pi
+    return CGPoint(x: center.x + radius * CGFloat(sin(a)),
+                   y: center.y - radius * CGFloat(cos(a)))
+  }
+
   var body: some View {
     GeometryReader { geo in
-      // Span most of the screen width.
-      let radius = min(geo.size.width, geo.size.height) * 0.45
-      ZStack {
-        // Soft glow underlay + crisp trail on top.
-        ArcTrail(progress: t, radius: radius)
-          .stroke(color.opacity(opacity * 0.5),
-                  style: StrokeStyle(lineWidth: 7, lineCap: .round))
-          .blur(radius: 5)
-        ArcTrail(progress: t, radius: radius)
-          .stroke(color.opacity(opacity * 0.9),
-                  style: StrokeStyle(lineWidth: 3, lineCap: .round))
-        Circle()
-          .fill(color.opacity(opacity))
-          .frame(width: 22, height: 22)
-          .blur(radius: 0.5)
-          .offset(point(t, radius))
+      if let orbit = resolvedOrbit(in: geo) {
+        // Orbit the dial: glow underlay + crisp trail + a head sized to the
+        // dial's scale (16pt vs the screen sweep's 22).
+        ZStack {
+          OrbitTrail(progress: t, center: orbit.center, radius: orbit.radius)
+            .stroke(color.opacity(opacity * 0.5),
+                    style: StrokeStyle(lineWidth: 6, lineCap: .round))
+            .blur(radius: 4)
+          OrbitTrail(progress: t, center: orbit.center, radius: orbit.radius)
+            .stroke(color.opacity(opacity * 0.9),
+                    style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+          Circle()
+            .fill(color.opacity(opacity))
+            .frame(width: 16, height: 16)
+            .blur(radius: 0.5)
+            .position(orbitPoint(t, center: orbit.center, radius: orbit.radius))
+        }
+        .frame(width: geo.size.width, height: geo.size.height)
+      } else {
+        // Span most of the screen width.
+        let radius = min(geo.size.width, geo.size.height) * 0.45
+        ZStack {
+          // Soft glow underlay + crisp trail on top.
+          ArcTrail(progress: t, radius: radius)
+            .stroke(color.opacity(opacity * 0.5),
+                    style: StrokeStyle(lineWidth: 7, lineCap: .round))
+            .blur(radius: 5)
+          ArcTrail(progress: t, radius: radius)
+            .stroke(color.opacity(opacity * 0.9),
+                    style: StrokeStyle(lineWidth: 3, lineCap: .round))
+          Circle()
+            .fill(color.opacity(opacity))
+            .frame(width: 22, height: 22)
+            .blur(radius: 0.5)
+            .offset(point(t, radius))
+        }
+        .frame(width: geo.size.width, height: geo.size.height)
       }
-      .frame(width: geo.size.width, height: geo.size.height)
     }
     .ignoresSafeArea()
     .task(id: trigger) {
       guard trigger > 0 else { return }
       t = 0; opacity = 0
+      // The full revolution gets a touch more time than the half-screen
+      // sweep so its perceived speed matches.
+      let travel: Double = dialAnchor != nil ? 0.8 : 0.6
       withAnimation(.easeIn(duration: 0.12)) { opacity = 1 }
-      withAnimation(.easeInOut(duration: 0.6)) { t = 1 }
-      withAnimation(.easeOut(duration: 0.4).delay(0.55)) { opacity = 0 }
+      withAnimation(.easeInOut(duration: travel)) { t = 1 }
+      withAnimation(.easeOut(duration: 0.4).delay(travel - 0.05)) { opacity = 0 }
     }
+  }
+
+  /// The anchor converted into this view's coordinates — or nil when there
+  /// is no anchor or its circle isn't actually within the visible canvas
+  /// (scrolled away / stale frame), which falls back to the screen sweep.
+  private func resolvedOrbit(in geo: GeometryProxy) -> DayDialAnchor? {
+    guard let dialAnchor else { return nil }
+    let frame = geo.frame(in: .global)
+    let local = CGPoint(x: dialAnchor.center.x - frame.minX,
+                        y: dialAnchor.center.y - frame.minY)
+    let circle = CGRect(x: local.x - dialAnchor.radius,
+                        y: local.y - dialAnchor.radius,
+                        width: dialAnchor.radius * 2,
+                        height: dialAnchor.radius * 2)
+    let canvas = CGRect(origin: .zero, size: geo.size).insetBy(dx: -24, dy: -24)
+    guard canvas.intersects(circle) else { return nil }
+    return DayDialAnchor(center: local, radius: dialAnchor.radius)
+  }
+}
+
+/// Trailing segment of the dial orbit — same point math as `orbitPoint` so
+/// the comet and its tail always align. The tail spans the last ~22% of the
+/// revolution, shorter than the screen arc's (a tight circle reads cleaner
+/// with less smear).
+private struct OrbitTrail: Shape {
+  var progress: CGFloat
+  let center: CGPoint
+  let radius: CGFloat
+  var animatableData: CGFloat {
+    get { progress }
+    set { progress = newValue }
+  }
+  func path(in rect: CGRect) -> Path {
+    var p = Path()
+    let start = max(0, progress - 0.22)
+    let steps = 32
+    for k in 0...steps {
+      let s = start + (progress - start) * CGFloat(k) / CGFloat(steps)
+      let a = Double(s) * 2 * .pi
+      let pt = CGPoint(x: center.x + radius * CGFloat(sin(a)),
+                       y: center.y - radius * CGFloat(cos(a)))
+      if k == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
+    }
+    return p
   }
 }
 

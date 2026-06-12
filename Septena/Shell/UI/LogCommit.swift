@@ -37,6 +37,16 @@ enum LogCommitStyle: Equatable {
 
 // MARK: - Center (the fire API)
 
+/// The hero day dial's circle in *global* coordinates, published by
+/// `DayDialHero` while it's on screen. The `.arc` flourish orbits this circle
+/// when it can — clearing the last Today task then visibly completes the
+/// ring the dial draws all day — and falls back to its screen-wide sweep
+/// when the dial isn't visible (other tabs, hero hidden, scrolled away).
+struct DayDialAnchor: Equatable {
+  var center: CGPoint
+  var radius: CGFloat
+}
+
 /// Injected into the environment at the app root. Any user-log action calls
 /// `fire(_:)`; the single `LogCommitOverlay` watches `trigger` and replays.
 @MainActor
@@ -46,6 +56,11 @@ final class LogCommitCenter {
   private(set) var style: LogCommitStyle?
   /// Replay counter — same contract as `CommitFlourish`'s `trigger`.
   private(set) var trigger: Int = 0
+  /// Where the hero day dial currently sits (global coords), or nil when it
+  /// isn't on screen. Written by `DayDialHero`; read by the overlay only
+  /// while an `.arc` flourish renders, so routine scroll updates don't
+  /// invalidate anything.
+  var dayDialAnchor: DayDialAnchor?
 
   /// Fire a celebration. Safe to call from any foreground user-log site;
   /// the overlay itself no-ops under Reduce Motion. Pair it with a haptic
@@ -76,7 +91,10 @@ struct LogCommitOverlay: View {
         switch style {
         case .flourish(let motion, let accent, let intensity):
           CommitFlourish(motion: motion, accent: accent,
-                         intensity: intensity, trigger: center.trigger)
+                         intensity: intensity, trigger: center.trigger,
+                         // Only the root overlay knows about the hero dial;
+                         // in-sheet flourishes keep the screen-relative arc.
+                         dialAnchor: motion == .arc ? center.dayDialAnchor : nil)
         case .ignition(let accent, let streak):
           IgnitionView(accent: accent, streak: streak, trigger: center.trigger)
         case .milestone(let accent, let headline, let caption):

@@ -51,6 +51,10 @@ enum SettingsKey {
   /// very top of the homepage. Default on; mirrors the webapp's overview
   /// dashboard header.
   static let homepageShowWelcome = "septena.homepage.showWelcome"
+  /// Whether the Day dial hero (today on a 24-hour clock face, under the
+  /// ambient time-of-day light) renders between the greeting and the layout.
+  /// Default on — it's the front door's signature object.
+  static let homepageShowDayDial = "septena.homepage.showDayDial"
   /// Optional first name used to personalise the homepage welcome greeting.
   /// Local-only (@AppStorage); not synced to CloudKit.
   static let welcomeName = "septena.homepage.welcomeName"
@@ -814,6 +818,8 @@ struct PrivacySettingsPane: View {
 struct HomeSettingsPane: View {
   @AppStorage(SettingsKey.homepageShowTodayTimeline)
   private var showTodayTimeline: Bool = true
+  @AppStorage(SettingsKey.homepageShowDayDial)
+  private var showDayDial: Bool = true
 
   var body: some View {
     Form {
@@ -837,11 +843,14 @@ struct HomeSettingsPane: View {
       }
 
       Section {
+        Toggle(isOn: $showDayDial) {
+          Label("Show Day dial", systemImage: "dial.medium")
+        }
         Toggle(isOn: $showTodayTimeline) {
           Label("Show Today timeline", systemImage: "clock")
         }
       } footer: {
-        Text("Renders the day-timeline strip above the homepage layout.")
+        Text("The Day dial is today on a 24-hour clock face — every section's logs as dots, sleep as an arc, under the day's ambient light. The Today timeline is the horizontal strip version.")
       }
     }
     .formStyle(.grouped)

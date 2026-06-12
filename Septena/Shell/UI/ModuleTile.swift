@@ -100,8 +100,10 @@ struct ModuleTile: View {
               .foregroundStyle(accent)
               // Quick-add updates the value; .numericText() tween the
               // digit transition (5 → 6, 14 → 15) instead of a hard cut.
+              // Rolls on the gauge spring so the number's bounce matches the
+              // bar's fill — they move as one when a log lands.
               .contentTransition(.numericText())
-              .a11yAnimation(Theme.Motion.standard, value: stat.value)
+              .a11yAnimation(Theme.Motion.gauge, value: stat.value)
             if let unit = stat.unit {
               Text(unit)
                 .font(.subheadline)
@@ -119,6 +121,31 @@ private struct ProgressRow: View {
   let progress: ModuleTile.ProgressBar
   let accent: Color
 
+  /// The settled fill fraction. Animated toward `targetFrac` on the gauge
+  /// spring so the bar travels and overshoots into place rather than
+  /// snapping. Seeded once (without animation) so opening the dashboard
+  /// doesn't flash every bar filling from empty.
+  @State private var fillFrac: CGFloat = 0
+  /// Leading edge of the "just added" highlight — a brighter segment that
+  /// sweeps across the span between the old and new fill on a grow. This is
+  /// the glow re-expressed as motion *along* the bar, so it reads on a
+  /// 6pt-tall gauge where an area glow can't.
+  @State private var hlStart: CGFloat = 0
+  @State private var hlEnd: CGFloat = 0
+  @State private var hlOpacity: Double = 0
+  /// First value is applied unanimated (initial load / cache hydrate / cell
+  /// recycle); only later changes animate + highlight.
+  @State private var seeded = false
+
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  /// Same opt-out the commit flourishes honor (Settings ▸ Customize). Off →
+  /// the bar still moves to the right value, just without the travel/glint.
+  @AppStorage(SettingsKey.loggingAnimationsEnabled) private var animationsEnabled = true
+
+  private var targetFrac: CGFloat {
+    max(0, min(1, CGFloat(progress.current / max(progress.target, 0.0001))))
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
       HStack {
@@ -130,6 +157,8 @@ private struct ProgressRow: View {
         Text("\(format(progress.current))/\(format(progress.target))\(progress.unit)")
           .font(.caption.monospacedDigit())
           .foregroundStyle(.secondary)
+          .contentTransition(.numericText())
+          .a11yAnimation(Theme.Motion.gauge, value: progress.current)
       }
       // Custom capsule progress — SwiftUI's stock ProgressView on macOS
       // ignores `.tint` and falls back to the system control accent,
@@ -137,19 +166,39 @@ private struct ProgressRow: View {
       // color. Hand-drawn capsules give consistent accent on both
       // platforms with no extra style work.
       GeometryReader { geo in
-        let frac = max(0, min(1, progress.current / max(progress.target, 0.0001)))
         let safeW: CGFloat = (geo.size.width.isFinite && geo.size.width > 0) ? geo.size.width : 0
         ZStack(alignment: .leading) {
           Capsule(style: .continuous).fill(accent.opacity(0.18))
           Capsule(style: .continuous)
             .fill(accent)
-            .frame(width: safeW * frac)
-            // Tween the bar width when current/target change — quick-add
-            // commits a new value, the bar slides instead of snapping.
-            .a11yAnimation(Theme.Motion.standard, value: frac)
+            .frame(width: safeW * fillFrac)
+          // The traveling glint over the newly-added span. White at low
+          // opacity reads as a brightening of the accent beneath it.
+          Capsule(style: .continuous)
+            .fill(Color.white.opacity(hlOpacity))
+            .frame(width: max(0, safeW * (hlEnd - hlStart)))
+            .offset(x: safeW * hlStart)
+            .blendMode(.plusLighter)
+            .allowsHitTesting(false)
         }
       }
       .frame(height: 6)
+    }
+    .onAppear {
+      // Seed the settled fill without motion the first time the row mounts
+      // (it may mount with a cached non-zero value), so nothing flash-fills.
+      if !seeded { seeded = true; fillFrac = targetFrac }
+    }
+    .onChange(of: targetFrac) { old, new in
+      guard seeded else { seeded = true; fillFrac = new; return }
+      guard !reduceMotion, animationsEnabled else { fillFrac = new; return }
+      withAnimation(Theme.Motion.gauge) { fillFrac = new }
+      // Only a grow earns the glint (a log added something); a correction
+      // downward just slides back quietly.
+      guard new > old else { return }
+      hlStart = old; hlEnd = old; hlOpacity = 0.55
+      withAnimation(.easeOut(duration: 0.55)) { hlEnd = new }
+      withAnimation(.easeOut(duration: 0.65)) { hlOpacity = 0 }
     }
   }
 

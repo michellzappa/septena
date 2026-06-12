@@ -15,10 +15,17 @@ enum NutritionPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(NutritionDestinationView()) }
 
-  // A meal toward your daily macros → a full-page fill. Fixed intensity:
-  // kcal is often unknown at log time (quick re-logs, search), so there's
-  // no reliable magnitude axis to scale the level by.
-  static var logFlourish: LogFlourish? { LogFlourish(motion: .fill) }
+  // A meal logs many times a day — by the app's own "celebration budget"
+  // rule (TaskComponents), a moment that fires that often never earns the
+  // canvas. So an everyday meal gets the calm `.bloom` (the same gentle
+  // motion caffeine uses), not the full-page `.fill` flood. The in-context
+  // confirmation is the new row sliding into the list + the tile gauge
+  // advancing; the flourish is just a soft, subtle grace note on top.
+  //
+  // Nutrition has no single daily target to "cross" (macros are multi-axis
+  // range goals and kcal is often unknown at log time), so unlike hydration
+  // there's no earned full-`fill` moment to reserve — every meal blooms.
+  static var logFlourish: LogFlourish? { LogFlourish(motion: .bloom) }
 
   static var logActions: [LogAction] {
     [LogAction(id: "log", title: "Log meal", systemImage: "plus")]
