@@ -1925,29 +1925,62 @@ struct WeekDashboardView: View {
   }
 
   private func activityDomainData() -> HomepageDomainData? {
-    let bridge = HealthKitBridge.shared
-    guard bridge.isAvailable else { return nil }
+    guard let snap = activitySnapshot() else { return nil }
     let stepsTarget = 8000
     return HomepageDomainData(
       domain: .activity,
       title: String(localized: "Activity", comment: "Section name"),
       accent: theme.color(for: "activity"),
-      headline: "\(bridge.stepsToday) steps · \(bridge.exerciseMinutesToday) min",
+      headline: "\(snap.steps) steps · \(snap.exMin) min",
       headlineStats: [
-        .init(label: "Steps", value: "\(bridge.stepsToday)"),
+        .init(label: "Steps", value: "\(snap.steps)"),
         .init(label: "Active",
-              value: "\(Int(bridge.activeKcalToday))",
+              value: "\(Int(snap.kcal))",
               unit: "kcal"),
         .init(label: "Exercise",
-              value: "\(bridge.exerciseMinutesToday)",
+              value: "\(snap.exMin)",
               unit: "m"),
       ],
       progress: .init(label: "Steps target",
-                      current: Double(min(bridge.stepsToday, stepsTarget)),
+                      current: Double(min(snap.steps, stepsTarget)),
                       target: Double(stepsTarget)),
-      history: .bars(bridge.stepsHistory),
+      history: .bars(snap.bars),
       tap: .openSheet(.activity)
     )
+  }
+
+  /// Today's numbers + trailing-7-day step bars for the Activity surfaces.
+  /// Prefers the live HealthKit snapshot on iOS; falls back to the synced
+  /// `ActivityDayEntity` rows so macOS (no HealthKit) and a cold cache still
+  /// render. Returns nil only when there's genuinely nothing to show.
+  private struct ActivitySnapshot {
+    let steps: Int
+    let kcal: Double
+    let exMin: Int
+    let bars: [Int]   // trailing 7 days, oldest → newest
+  }
+
+  private func activitySnapshot() -> ActivitySnapshot? {
+    let bridge = HealthKitBridge.shared
+    let dates = lastNDays(7)
+    let rows = fetchActivityDays(from: dates.first ?? "", to: dates.last ?? "")
+    guard bridge.isAvailable || !rows.isEmpty else { return nil }
+    let byDate = Dictionary(rows.map { ($0.date, $0) }, uniquingKeysWith: { a, _ in a })
+    let today = dates.last ?? SeptenaDate.today
+    let todayRow = byDate[today]
+    let steps = bridge.isAvailable ? bridge.stepsToday           : (todayRow?.stepCount ?? 0)
+    let kcal  = bridge.isAvailable ? bridge.activeKcalToday      : (todayRow?.activeKcal ?? 0)
+    let exMin = bridge.isAvailable ? bridge.exerciseMinutesToday : (todayRow?.exerciseMinutes ?? 0)
+    let bars  = bridge.isAvailable ? Array(bridge.stepsHistory.suffix(7))
+                                   : dates.map { byDate[$0]?.stepCount ?? 0 }
+    return ActivitySnapshot(steps: steps, kcal: kcal, exMin: exMin, bars: bars)
+  }
+
+  private func fetchActivityDays(from start: String, to end: String) -> [ActivityDayEntity] {
+    let descriptor = FetchDescriptor<ActivityDayEntity>(
+      predicate: #Predicate { $0.date >= start && $0.date <= end }
+    )
+    return (try? modelContext.fetch(descriptor)) ?? []
   }
 
   /// Setting that decides whether tapping the Tasks tile drops a Today
@@ -2581,27 +2614,28 @@ struct WeekDashboardView: View {
   // isn't available (Mac). Real per-day step bars from the last 7 days.
   @ViewBuilder
   private var activityTile: some View {
-    let bridge = HealthKitBridge.shared
-    if bridge.isAvailable {
-      let accent = theme.color(for: "activity")
-      let stepsTarget = 8000
-      Button { open(.activity) } label: {
-        ModuleTile(
-          title: String(localized: "Activity", comment: "Section name"),
-          accent: accent,
-          stats: [
-            .init(label: "Steps",    value: "\(bridge.stepsToday)"),
-            .init(label: "Active",   value: "\(Int(bridge.activeKcalToday))", unit: "kcal"),
-            .init(label: "Exercise", value: "\(bridge.exerciseMinutesToday)", unit: "m")
-          ],
-          progress: .init(label: "Steps target",
-                          current: Double(min(bridge.stepsToday, stepsTarget)),
-                          target: Double(stepsTarget)),
-          history: .init(label: "7-day steps",
-                         values: Array(bridge.stepsHistory.suffix(7)))
-        )
+    Group {
+      if let snap = activitySnapshot() {
+        let accent = theme.color(for: "activity")
+        let stepsTarget = 8000
+        Button { open(.activity) } label: {
+          ModuleTile(
+            title: String(localized: "Activity", comment: "Section name"),
+            accent: accent,
+            stats: [
+              .init(label: "Steps",    value: "\(snap.steps)"),
+              .init(label: "Active",   value: "\(Int(snap.kcal))", unit: "kcal"),
+              .init(label: "Exercise", value: "\(snap.exMin)", unit: "m")
+            ],
+            progress: .init(label: "Steps target",
+                            current: Double(min(snap.steps, stepsTarget)),
+                            target: Double(stepsTarget)),
+            history: .init(label: "7-day steps",
+                           values: snap.bars)
+          )
+        }
+        .buttonStyle(.plain)
       }
-      .buttonStyle(.plain)
     }
   }
 

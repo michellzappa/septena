@@ -1,42 +1,111 @@
 import SwiftUI
+import SwiftData
+import Charts
 
 // Activity mini-app — Apple Health (HealthKit) sourced directly from the
-// device. First module wired to a native on-device source for data the
-// webapp also exposes (via /api/health/apple); going direct gives us
-// privacy + freshness and skips the FastAPI proxy entirely.
+// device, then persisted as one ActivityDayEntity per day and synced through
+// CloudKit. The step chart therefore reads from SwiftData (works on macOS,
+// which has no HealthKit), while the live vitals + access flows stay iOS-only.
 
 struct ActivityDestinationView: View {
   @Environment(SectionTheme.self) private var theme
 
   @State private var bridge = HealthKitBridge.shared
+  @State private var range: HistoryRange = .ninety
+
+  // The persisted, synced history. Present on every platform once a phone has
+  // ingested at least once — this is what gives macOS a non-empty view.
+  @Query(sort: \ActivityDayEntity.date) private var days: [ActivityDayEntity]
 
   private var accent: Color { theme.color(for: "activity") }
 
+  enum HistoryRange: Int, CaseIterable, Identifiable {
+    case thirty = 30, ninety = 90, year = 365
+    var id: Int { rawValue }
+    var label: String {
+      switch self {
+      case .thirty: return "30d"
+      case .ninety: return "90d"
+      case .year:   return "1y"
+      }
+    }
+  }
+
   var body: some View {
     SectionDrawer(sectionKey: "activity") {
+      // History chart first — the primary content, derived from synced data.
+      if !steppedDays.isEmpty {
+        history
+      }
+
+      // Live, on-device extras. iOS shows vitals + the access flows; on macOS
+      // (always `.denied`) we only fall back to the "not available" notice
+      // when there's no synced history to show instead.
       switch bridge.access {
-      case .granted:       grantedBody
+      case .granted:       vitals
       case .notDetermined: askForAccess
-      case .denied:        deniedNotice
+      case .denied:        if steppedDays.isEmpty { deniedNotice }
       }
     }
     .tint(accent)
     .task { await bridge.refresh() }
   }
 
-  // MARK: - States
+  // MARK: - History
+
+  /// Rows within the selected window that actually have a step count.
+  private var windowed: [ActivityDayEntity] {
+    let start = Calendar.current.date(byAdding: .day, value: -(range.rawValue - 1), to: Date())
+    let cutoff = SeptenaDate.format(start) ?? ""
+    return days.filter { $0.date >= cutoff }
+  }
+
+  private var steppedDays: [ActivityDayEntity] {
+    windowed.filter { ($0.stepCount ?? 0) > 0 }
+  }
+
+  private var averageSteps: Int {
+    let counts = steppedDays.compactMap(\.stepCount)
+    guard !counts.isEmpty else { return 0 }
+    return counts.reduce(0, +) / counts.count
+  }
 
   @ViewBuilder
-  private var grantedBody: some View {
-    vitals
-    DrawerSection("Last 7 days · steps", padding: .none) {
-      ForEach(Array(zip(weekdayLabels, bridge.stepsHistory).enumerated()), id: \.offset) { _, pair in
-        LogRow(title: pair.0,
-               detail: nil,
-               trailing: pair.1 > 0 ? "\(pair.1)" : "—")
+  private var history: some View {
+    DrawerSection {
+      VStack(alignment: .leading, spacing: 12) {
+        Picker("Range", selection: $range) {
+          ForEach(HistoryRange.allCases) { Text($0.label).tag($0) }
+        }
+        .pickerStyle(.segmented)
+
+        Text("\(averageSteps) avg steps · \(steppedDays.count) active days")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .monospacedDigit()
+
+        Chart(steppedDays, id: \.date) { row in
+          if let d = SeptenaDate.parse(row.date) {
+            AreaMark(x: .value("Day", d, unit: .day),
+                     y: .value("Steps", row.stepCount ?? 0))
+              .foregroundStyle(accent.opacity(0.15))
+              .interpolationMethod(.monotone)
+              .accessibilityHidden(true)
+            LineMark(x: .value("Day", d, unit: .day),
+                     y: .value("Steps", row.stepCount ?? 0))
+              .foregroundStyle(accent)
+              .interpolationMethod(.monotone)
+              .accessibilityLabel(SeptenaDate.friendlyLabel(row.date))
+              .accessibilityValue("\(row.stepCount ?? 0) steps")
+          }
+        }
+        .chartYAxis { AxisMarks(position: .leading) }
+        .frame(height: 180)
       }
     }
   }
+
+  // MARK: - States
 
   private var askForAccess: some View {
     DrawerSection {
@@ -61,7 +130,7 @@ struct ActivityDestinationView: View {
         if !bridge.isAvailable {
           Text("HealthKit isn't available on this device")
             .font(.septenaCardTitle)
-          Text("Activity tracking runs on iPhone / iPad. Open Septena there to see steps and recovery metrics.")
+          Text("Activity tracking runs on iPhone / iPad. Open Septena there to start syncing steps and recovery metrics.")
             .font(.subheadline)
             .foregroundStyle(.secondary)
         } else {
@@ -101,15 +170,6 @@ struct ActivityDestinationView: View {
       Text(label)
       Spacer()
       Text(value).foregroundStyle(.secondary).monospacedDigit()
-    }
-  }
-
-  /// Last 7 days oldest → newest as weekday names ("Mon", "Tue", …).
-  private var weekdayLabels: [String] {
-    let cal = Calendar.current
-    let fmt = DateFormatter(); fmt.dateFormat = "EEE"
-    return (0..<7).reversed().compactMap { offset in
-      cal.date(byAdding: .day, value: -offset, to: Date()).map(fmt.string(from:))
     }
   }
 }

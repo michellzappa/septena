@@ -45,7 +45,7 @@ required for the app's own sync. They *are* required for any consumer that runs 
 ## Production deploy — the pending changelog
 
 Promotion is additive, so all that matters is: **what exists in Dev that Production
-must also have.** Four known-recent additions (all build-verified on Dev, never yet
+must also have.** These known-recent additions (all build-verified on Dev, never yet
 promoted to Prod):
 
 | # | Change | Record type(s) | Field(s) | Type |
@@ -54,6 +54,7 @@ promoted to Prod):
 | 2 | **New record type** `MoodEvent` (whole type, 9 fields incl. its own `occurredAt`) | `MoodEvent` | all | — |
 | 3 | **New field** `bucket` (optional supplement time-bucket) | `SupplementDefinition` | `bucket` | String |
 | 4 | **New record type** `GoalMilestone` (whole type, 9 fields — latched achievement events) | `GoalMilestone` | all | — |
+| 5 | **New record type** `ActivityDaySum` (read-once HealthKit daily summaries — steps / active kcal / exercise minutes) | `ActivityDaySum` | all | — |
 
 `MoodEvent` reuses the CloudKit record slot vacated by the retired `AirReading` type
 (Air section removed in the same merge). It is a *new* type from Production's point of
@@ -511,6 +512,20 @@ devices. No separate `date` field is stored.
 | `cholesterolMg` | Double | `Double?` | Yes | |
 | `potassiumMg` | Double | `Double?` | Yes | |
 | `waterMl` | Double | `Double?` | Yes | |
+
+### Activity — zone `septena-v1`
+
+#### ActivityDaySum  (recordType `ActivityDaySum`) — `activity-day:{yyyy-MM-dd}`  · **⚠ ENTIRE TYPE PENDING PROD DEPLOY**
+Read-once daily HealthKit movement summaries. Written by the iOS ingest only
+(`HealthKitBridge.ingestActivityHistory`); the day string is the identity so
+iPhone + iPad converge on one record per day. macOS reads these via sync (it has
+no HealthKit of its own).
+| Field | CK type | Swift | Nullable | Notes |
+|---|---|---|---|---|
+| `date` | String | `String` | No | `yyyy-MM-dd` |
+| `stepCount` | Int(64) | `Int?` | Yes | nil when HealthKit had no step data that day |
+| `activeKcal` | Double | `Double?` | Yes | active energy burned |
+| `exerciseMinutes` | Int(64) | `Int?` | Yes | Apple exercise minutes |
 
 ### Groceries — zone `septena-v1`
 

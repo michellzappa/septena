@@ -36,6 +36,7 @@ final class SeptenaServices {
   let coachVoiceMutator: CoachVoiceMutator
   let coachMessageMutator: CoachMessageMutator
   let gutMutator: GutMutator
+  let activityMutator: ActivityMutator
   let symptomsMutator: SymptomsMutator
   let medicationsMutator: MedicationsMutator
   let caffeineMutator: CaffeineMutator
@@ -62,6 +63,7 @@ final class SeptenaServices {
     self.coachVoiceMutator = CoachVoiceMutator(context: context, ckEngine: nil)
     self.coachMessageMutator = CoachMessageMutator(context: context, ckEngine: nil)
     self.gutMutator = GutMutator(context: context, ckEngine: nil)
+    self.activityMutator = ActivityMutator(context: context, ckEngine: nil)
     self.symptomsMutator = SymptomsMutator(context: context, ckEngine: nil)
     self.medicationsMutator = MedicationsMutator(context: context, ckEngine: nil)
     self.caffeineMutator = CaffeineMutator(context: context, ckEngine: nil)
@@ -479,6 +481,15 @@ final class SeptenaServices {
           }
           return nil
         }
+        if recordName.hasPrefix("activity-day:") {
+          let id = ActivityDayCloudKitSchema.entityID(from: recordName)
+          if let entity = try? context.fetch(FetchDescriptor<ActivityDayEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
         if recordName == SettingsCloudKitSchema.singletonID {
           if let entity = try? context.fetch(FetchDescriptor<SettingsEntity>(
             predicate: #Predicate { $0.id == settingsSingletonID }
@@ -867,6 +878,16 @@ final class SeptenaServices {
           } else {
             context.insert(NutritionDailySummaryEntity(cloudKit: record))
           }
+        case ActivityDayCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = ActivityDayCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<ActivityDayEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            entity.apply(record)
+          } else {
+            context.insert(ActivityDayEntity(cloudKit: record))
+          }
         default:
           SeptenaLog.info("[CKEngine] applyFetched: unknown recordType \(record.recordType) id=\(record.recordID.recordName)")
         }
@@ -1162,6 +1183,14 @@ final class SeptenaServices {
           )).first {
             context.delete(entity)
           }
+        case ActivityDayCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = ActivityDayCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<ActivityDayEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
         default:
           SeptenaLog.info("[CKEngine] applyDeleted: unknown recordType \(recordType) id=\(recordID.recordName)")
         }
@@ -1191,6 +1220,7 @@ final class SeptenaServices {
       coachVoiceMutator.bind(ckEngine: ckEngine)
       coachMessageMutator.bind(ckEngine: ckEngine)
       gutMutator.bind(ckEngine: ckEngine)
+      activityMutator.bind(ckEngine: ckEngine)
       symptomsMutator.bind(ckEngine: ckEngine)
       medicationsMutator.bind(ckEngine: ckEngine)
       caffeineMutator.bind(ckEngine: ckEngine)
@@ -2113,6 +2143,79 @@ final class GutMutator {
 
   private func postChanged() {
     DataChange.post(Self.changeScope)
+  }
+}
+
+/// Write boundary for the HealthKit-sourced daily activity mirror. Unlike the
+/// other mutators it takes no user input — the only caller is the iOS ingest
+/// in `HealthKitBridge`. Its one job beyond the usual local-write + CK-queue is
+/// the unchanged-skip in `upsert`: the ingest re-reads a trailing window on
+/// every refresh, so without it each refresh would re-dirty `updatedAt` and
+/// re-upload the whole window to CloudKit forever.
+@MainActor
+@Observable
+final class ActivityMutator {
+  static let changeScope = "activity"
+  private let context: ModelContext
+  private var ckEngine: CKEngine?
+
+  init(context: ModelContext, ckEngine: CKEngine? = nil) {
+    self.context = context
+    self.ckEngine = ckEngine
+  }
+
+  func bind(ckEngine: CKEngine) { self.ckEngine = ckEngine }
+
+  /// Idempotent daily upsert. Creates a row on first sight of a day with any
+  /// data, updates it when a value changed, and does nothing (no save, no CK
+  /// queue, no notification) when the values match what's already stored.
+  @discardableResult
+  func upsert(date: String,
+              steps: Int?,
+              activeKcal: Double?,
+              exerciseMinutes: Int?) -> ActivityDayEntity? {
+    let existing = fetch(id: date)
+    // An all-nil day carries no signal; never create an empty record.
+    if existing == nil, steps == nil, activeKcal == nil, exerciseMinutes == nil {
+      return nil
+    }
+    if let entity = existing,
+       entity.stepCount == steps,
+       Self.sameKcal(entity.activeKcal, activeKcal),
+       entity.exerciseMinutes == exerciseMinutes {
+      return entity   // unchanged — skip
+    }
+    let entity = existing ?? ActivityDayEntity(id: date, date: date)
+    entity.stepCount = steps
+    entity.activeKcal = activeKcal
+    entity.exerciseMinutes = exerciseMinutes
+    entity.updatedAt = .now
+    if existing == nil { context.insert(entity) }
+    saveContext("CK activity upsert")
+    ckEngine?.noteActivityDayChange(id: entity.id)
+    DataChange.post(Self.changeScope)
+    return entity
+  }
+
+  /// Energy is a Double from a statistics sum; treat sub-kcal jitter as equal
+  /// so floating-point noise doesn't trigger spurious re-uploads.
+  private static func sameKcal(_ a: Double?, _ b: Double?) -> Bool {
+    switch (a, b) {
+    case (nil, nil):       return true
+    case let (x?, y?):     return abs(x - y) < 0.5
+    default:               return false
+    }
+  }
+
+  private func fetch(id: String) -> ActivityDayEntity? {
+    try? context.fetch(FetchDescriptor<ActivityDayEntity>(
+      predicate: #Predicate { $0.id == id }
+    )).first
+  }
+
+  private func saveContext(_ label: String) {
+    do { try context.save() }
+    catch { SeptenaLog.error(label, error) }
   }
 }
 

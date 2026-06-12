@@ -251,6 +251,12 @@ final class HealthKitBridge {
     hrv = hrvRes
     restingHR = rhrRes
     hasLoaded = true
+
+    // Persist + sync the daily history. Kicked off un-awaited so the live
+    // snapshot (above) and the UI stay as fast as before; the mutator's
+    // unchanged-skip makes re-reading the trailing window each refresh cheap.
+    Task { await ingestActivityHistory(daysBack: 14) }
+    backfillActivityHistoryIfNeeded()
     #else
     hasLoaded = true
     #endif
@@ -309,6 +315,38 @@ final class HealthKitBridge {
     }
   }
 
+  /// Per-day sums keyed by "yyyy-MM-dd" over a trailing window, via one
+  /// statistics-collection query. Days with no samples are omitted (their sum
+  /// would be 0 and we never persist an empty row). Used by the cloud-history
+  /// ingest, which needs real calendar dates rather than a fixed-length array.
+  private func dailySums(_ id: HKQuantityTypeIdentifier,
+                         unit: HKUnit,
+                         daysBack: Int) async -> [String: Double] {
+    guard let type = HKQuantityType.quantityType(forIdentifier: id) else { return [:] }
+    let cal = Calendar.current
+    let anchor = cal.startOfDay(for: Date())
+    let start = cal.date(byAdding: .day, value: -(daysBack - 1), to: anchor) ?? anchor
+    let end = cal.date(byAdding: .day, value: 1, to: anchor) ?? anchor
+    let q = HKStatisticsCollectionQuery(quantityType: type,
+                                        quantitySamplePredicate: nil,
+                                        options: .cumulativeSum,
+                                        anchorDate: anchor,
+                                        intervalComponents: DateComponents(day: 1))
+    return await withCheckedContinuation { cont in
+      q.initialResultsHandler = { _, results, _ in
+        var out: [String: Double] = [:]
+        results?.enumerateStatistics(from: start, to: end) { stat, _ in
+          if let sum = stat.sumQuantity()?.doubleValue(for: unit), sum > 0,
+             let key = SeptenaDate.format(stat.startDate) {
+            out[key] = sum
+          }
+        }
+        cont.resume(returning: out)
+      }
+      store.execute(q)
+    }
+  }
+
   /// Most recent quantity sample's value. Used for vitals (VO2, HRV, RHR)
   /// where "today's total" isn't meaningful.
   private func latest(_ id: HKQuantityTypeIdentifier, unit: HKUnit) async -> Double? {
@@ -326,6 +364,56 @@ final class HealthKitBridge {
     }
   }
   #endif
+
+  // MARK: - Cloud history ingest
+  //
+  // HealthKit is per-device and macOS has none, so we read each day from the
+  // phone's store ONCE and persist a tiny day-keyed record that syncs through
+  // CloudKit to every surface (Mac tile, history chart, correlations). Past
+  // days are effectively immutable; today's row is rewritten through the day
+  // and freezes at rollover.
+
+  /// Sentinel for the one-time deep backfill. Device-local (UserDefaults) on
+  /// purpose: the backfill reads THIS device's HealthKit, so "already done"
+  /// is a per-device fact, not account data.
+  private static let backfillKey = "activity.import.v1"
+
+  /// Read steps / active energy / exercise minutes per day over a trailing
+  /// window and upsert each through `ActivityMutator`. iOS only.
+  func ingestActivityHistory(daysBack: Int) async {
+    #if canImport(HealthKit)
+    guard isAvailable else { return }
+    async let stepsD = dailySums(.stepCount,          unit: .count(),       daysBack: daysBack)
+    async let kcalD  = dailySums(.activeEnergyBurned, unit: .kilocalorie(), daysBack: daysBack)
+    async let exMinD = dailySums(.appleExerciseTime,  unit: .minute(),      daysBack: daysBack)
+    let (steps, kcal, exMin) = await (stepsD, kcalD, exMinD)
+
+    let days = Set(steps.keys).union(kcal.keys).union(exMin.keys)
+    guard !days.isEmpty else { return }
+
+    let mutator = SeptenaServices.shared.activityMutator
+    for day in days.sorted() {
+      mutator.upsert(date: day,
+                     steps: steps[day].map { Int($0.rounded()) },
+                     activeKcal: kcal[day],
+                     exerciseMinutes: exMin[day].map { Int($0.rounded()) })
+    }
+    #endif
+  }
+
+  /// One-time deep ingest of the trailing year, gated by `backfillKey` and run
+  /// at background priority so it never touches the launch critical path. The
+  /// flag is set only on completion, so a killed run retries next launch.
+  private func backfillActivityHistoryIfNeeded() {
+    #if canImport(HealthKit)
+    guard isAvailable,
+          !UserDefaults.standard.bool(forKey: Self.backfillKey) else { return }
+    Task(priority: .background) {
+      await ingestActivityHistory(daysBack: 365)
+      UserDefaults.standard.set(true, forKey: Self.backfillKey)
+    }
+    #endif
+  }
 
   // MARK: - Nutrition
 

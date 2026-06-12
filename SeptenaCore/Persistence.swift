@@ -1592,6 +1592,39 @@ final class NutritionDailySummaryEntity {
   }
 }
 
+/// One read-once daily summary of HealthKit movement (steps / active energy /
+/// exercise minutes). The day string IS the identity, so the iPhone and iPad
+/// (both fed by the same iCloud Health sync) converge on one record per day
+/// rather than duplicating. Past days are effectively immutable, which is what
+/// makes this worth persisting + syncing: ingest each day from HealthKit once
+/// and every surface — including macOS, which has no HealthKit — reads it back.
+@Model
+final class ActivityDayEntity {
+  @Attribute(.unique) var id: String   // yyyy-MM-dd in the device TZ at ingest
+  var date: String                      // same string, kept for symmetry/query
+  var stepCount: Int?                   // nil when HealthKit had no step data
+  var activeKcal: Double?
+  var exerciseMinutes: Int?
+  var updatedAt: Date                   // only moves when a value actually changed
+  var cloudKitSystemFields: Data?
+
+  init(id: String,
+       date: String,
+       stepCount: Int? = nil,
+       activeKcal: Double? = nil,
+       exerciseMinutes: Int? = nil,
+       updatedAt: Date = .now,
+       cloudKitSystemFields: Data? = nil) {
+    self.id = id
+    self.date = date
+    self.stepCount = stepCount
+    self.activeKcal = activeKcal
+    self.exerciseMinutes = exerciseMinutes
+    self.updatedAt = updatedAt
+    self.cloudKitSystemFields = cloudKitSystemFields
+  }
+}
+
 // MARK: - DTO ↔ Entity bridging
 
 extension SeptenaTask {
@@ -2296,6 +2329,22 @@ enum NutritionDailySummaryCloudKitSchema {
   static func recordName(for id: String) -> String { "nutrition-day:\(id)" }
   static func entityID(from recordName: String) -> String {
     String(recordName.dropFirst("nutrition-day:".count))
+  }
+}
+
+enum ActivityDayCloudKitSchema {
+  static let recordType = "ActivityDaySum"
+
+  enum Field {
+    static let date            = "date"
+    static let stepCount       = "stepCount"
+    static let activeKcal      = "activeKcal"
+    static let exerciseMinutes = "exerciseMinutes"
+  }
+
+  static func recordName(for id: String) -> String { "activity-day:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("activity-day:".count))
   }
 }
 
@@ -3374,6 +3423,36 @@ extension NutritionDailySummaryEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
+extension ActivityDayEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: ActivityDayCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: ActivityDayCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[ActivityDayCloudKitSchema.Field.date]            = date
+    record[ActivityDayCloudKitSchema.Field.stepCount]       = stepCount
+    record[ActivityDayCloudKitSchema.Field.activeKcal]      = activeKcal
+    record[ActivityDayCloudKitSchema.Field.exerciseMinutes] = exerciseMinutes
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let v = record[ActivityDayCloudKitSchema.Field.date] as? String { date = v }
+    stepCount       = record[ActivityDayCloudKitSchema.Field.stepCount]       as? Int
+    activeKcal      = record[ActivityDayCloudKitSchema.Field.activeKcal]      as? Double
+    exerciseMinutes = record[ActivityDayCloudKitSchema.Field.exerciseMinutes] as? Int
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: ActivityDayCloudKitSchema.entityID(from: record.recordID.recordName),
+              date: "")
+    apply(record)
+  }
+}
+
 // MARK: - LocalStore
 
 @MainActor
@@ -3405,6 +3484,7 @@ final class LocalStore {
                          ExerciseEntryEntity.self, ExerciseDefinitionEntity.self,
                          SessionTypeEntity.self,
                          NutritionEntryEntity.self, NutritionDailySummaryEntity.self,
+                         ActivityDayEntity.self,
                          OuraNightEntity.self,
                          WithingsRowEntity.self])
     // Explicitly opt OUT of NSPersistentCloudKitContainer mirroring. Having
