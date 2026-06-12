@@ -6,7 +6,7 @@
 `queryByDateRange` (src/cloudkit.ts) currently fetches the **full** match-all
 record set for the type and filters the YMD window in JS. This is correct and
 the only safe option today, but cost is O(total history) per query — every
-"last 7 days" call paginates the entire `ExerciseEntry`/`CaffeineEvent`/… table.
+"last 7 days" call paginates the entire `ExerciseEntry`/`IntakeEvent`/… table.
 Fine for now (hundreds–low-thousands of rows); revisit when any type's history
 makes the full scan slow.
 

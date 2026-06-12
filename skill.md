@@ -1,6 +1,6 @@
 ---
 name: septena
-description: Use the Septena MCP at mcp.septena.app to read and write the user's personal life data — tasks, projects, areas, goals, habits, supplements, chores, caffeine, cannabis, gut events, and nutrition (meals/macros). Triggers when the user asks about their tasks, today's plan, what they ate, habits done today, supplements logged, chore status, coffee/matcha consumption, gut/digestive logs, or any "septena" data.
+description: Use the Septena MCP at mcp.septena.app to read and write the user's personal life data — tasks, projects, areas, goals, habits, supplements, chores, intake trackers, symptoms, medications, gut events, and nutrition (meals/macros). Triggers when the user asks about their tasks, today's plan, what they ate, habits done today, supplements logged, chore status, symptoms or pain logged, medications taken, gut/digestive logs, or any "septena" data.
 ---
 
 # Septena MCP
@@ -29,9 +29,9 @@ The tool list is **dynamic**: on `tools/list` the gateway reads the user's `Sett
 | `habits` | `habits_list`, `habits_create`, `habits_update`, `habits_delete`, `habits_toggle` |
 | `supplements` | `supplements_list`, `supplements_create`, `supplements_update`, `supplements_delete`, `supplements_toggle` |
 | `chores` | `chores_list`, `chores_create`, `chores_update`, `chores_delete`, `chores_complete`, `chores_defer`, `chores_uncomplete` |
-| `caffeine` | `caffeine_events_list`, `caffeine_event_log`, `caffeine_event_delete`, `caffeine_beans_list`, `caffeine_bean_create`, `caffeine_bean_delete` |
 | `intake` | `intake_kinds_list`, `intake_kind_create`, `intake_kind_update`, `intake_items_list`, `intake_item_create`, `intake_item_delete`, `intake_events_list`, `intake_event_log`, `intake_event_delete` |
-| `cannabis` | `cannabis_events_list`, `cannabis_event_log`, `cannabis_event_delete`, `cannabis_strains_list`, `cannabis_strain_create`, `cannabis_strain_delete` |
+| `symptoms` | `symptoms_list`, `symptoms_create`, `symptoms_log` |
+| `medications` | `medications_list`, `medications_create`, `medications_log` |
 | `gut` | `gut_events_list`, `gut_event_log`, `gut_event_delete` |
 | `nutrition` | `nutrition_entries_list`, `nutrition_entry_log`, `nutrition_entry_update`, `nutrition_entry_delete`, `nutrition_day_summary` |
 | `training` | `training_entries_list`, `training_entry_log`, `training_entry_update`, `training_entry_delete`, `training_session_retag`, `training_exercises_list`, `training_exercise_create`, `training_exercise_update`, `training_exercise_delete`, `training_sessions_list`, `training_session_create`, `training_session_update`, `training_session_delete` |
@@ -44,7 +44,7 @@ The tool list is **dynamic**: on `tools/list` the gateway reads the user's `Sett
 - **Date ranges**: event-list tools (`*_events_list`, `nutrition_entries_list`) accept either `date` (single day) or `from`/`to` (inclusive range). Omitting both returns the **last 7 days**.
 - **Times** are `HH:MM:SS` (24-hour) for health events, `HH:MM` for habits/supplements. Default to "now" when not given.
 - **IDs** are short, opaque strings. Always echo back the `id` from a create call before referencing in update/delete.
-- **Catalog vs. event pattern**: caffeine/cannabis have a *catalog* (beans, strains) and *events* that reference catalog ids. Always call `*_beans_list` or `*_strains_list` first to resolve a name → id before logging an event with that bean/strain.
+- **Catalog/definition vs. event pattern**: `intake` trackers have a *catalog* (kinds + items), and `symptoms`/`medications` have *definitions*, each referenced by id from their events. Always call the relevant `*_list` first to resolve a name → id before logging an event against it.
 - **Definition vs. day-state pattern**: habits, supplements, and chores have *definitions* (the thing) and per-date *state*. `*_list` returns definitions with today's state merged in. `*_toggle` writes the state. Don't try to create a new definition just to mark something done.
 
 ## Specific guidance
@@ -127,11 +127,6 @@ tasks_list(view: "inbox")
 - Chores have a `cadence_days` field; the list endpoint replays 180 days of events to compute "next due."
 - When creating new definitions, set a clear short `title` and (optionally) a single-character `emoji`.
 
-### Caffeine
-- Brew methods: `v60`, `matcha`, `other`. `grams` is the bean/leaf dose in grams.
-- Workflow for "I had a matcha": call `caffeine_event_log({method: "matcha"})`. No need to specify beans for matcha unless tracking source.
-- For coffee: resolve bean via `caffeine_beans_list` first; `caffeine_bean_create({name})` if it's new.
-
 ### Intake (generic consumable trackers)
 User-defined trackers ("kinds") for anything consumed — each has its own
 methods, dose style, optional container model, variety catalog, and an
@@ -149,13 +144,28 @@ and varieties are the user's own vocabulary.
   `count: 1` for a fresh one.
 - **Objectives**: for reduce/quit kinds, days-since-last is the streak that
   matters — prefer encouragement framing when the user is abstaining.
-- The legacy `caffeine_*` / `cannabis_*` tools are deprecated aliases over the
-  old per-substance records; prefer the `intake_*` tools once the user's data
-  is imported into trackers.
+- Caffeine, cannabis, nicotine and the like are now **intake trackers**, not
+  dedicated sections — log them with `intake_event_log` against the user's
+  matching kind, never a per-substance tool.
 
-### Cannabis
-- Methods: `vape`, `edible`. `hit` = count of inhalations (for vape). `grams` for edibles.
-- `effect` is free-form subjective ("relaxed", "creative", "couch-locked", etc.).
+### Symptoms
+- Definitions (the symptom) + events (a severity log). Call `symptoms_list`
+  first to resolve a name → `symptomID`, then `symptoms_log({symptomID, severity})`.
+- Treat symptoms as **outcomes**. Prefer structured `severity` (0–10),
+  `bodyRegion` and `side` over burying everything in `note`; use
+  `triggerNote`/`reliefNote` for possible causes and interventions.
+- `symptoms_create({title})` for a new symptom the user names that isn't listed.
+- Cramping, discomfort and blood belong here (not gut events).
+
+### Medications
+- Definitions (the drug) + dose events. Call `medications_list` first to resolve
+  a name → `medicationID`, then `medications_log({medicationID, status})`.
+- `status` is `taken | skipped | missed`: use `skipped` for an intentional skip
+  and `missed` when the dose should have happened but did not.
+- Medication logs are **interventions / adherence data**, distinct from
+  supplement habits — don't fold them into `supplements_*`.
+- `medications_create({title})` for a new medication; strength, dose, schedule
+  (`daily`|`asNeeded`) and instructions are optional.
 
 ### Gut
 - `bristol` is the Bristol Stool Scale (1=hard pellets, 7=watery) — **required**.
@@ -269,8 +279,17 @@ grocery_item_set_low(id, low: false)
 2. For each: `habits_toggle({id, done: true})`.
 
 **"I had a v60 with the Ethiopian beans"**
-1. `caffeine_beans_list()` — find the bean whose name matches "Ethiopian".
-2. `caffeine_event_log({method: "v60", beans: "<beanId>", grams: 18})` (typical v60 dose; ask if unsure).
+1. `intake_kinds_list()` — find the user's coffee/caffeine tracker (`kind`) and its method tokens.
+2. `intake_items_list({kind})` — resolve the "Ethiopian" bean → item id.
+3. `intake_event_log({kind, method: "v60", item: "<itemId>"})`.
+
+**"Took my ibuprofen"**
+1. `medications_list()` — resolve "ibuprofen" → `medicationID`.
+2. `medications_log({medicationID, status: "taken"})`.
+
+**"Splitting headache, about a 7"**
+1. `symptoms_list()` — find or (via `symptoms_create({title: "Headache"})`) make the symptom → `symptomID`.
+2. `symptoms_log({symptomID, severity: 7})`.
 
 **"How's my chore list looking?"**
 1. `chores_list()` — returns each chore with computed `dueDate` and `lastCompletedAt`.

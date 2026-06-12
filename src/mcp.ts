@@ -70,14 +70,6 @@ import {
   uncompleteChore, uncompleteChoreJsonSchema, type UncompleteChoreInput,
 } from "./tools/chores.js";
 import {
-  listCaffeineEvents, listCaffeineEventsJsonSchema, type ListCaffeineEventsInput,
-  logCaffeineEvent, logCaffeineEventJsonSchema, type LogCaffeineEventInput,
-  deleteCaffeineEvent, deleteCaffeineEventJsonSchema,
-  listCaffeineBeans, listCaffeineBeansJsonSchema,
-  createCaffeineBean, createCaffeineBeanJsonSchema, type CreateCaffeineBeanInput,
-  deleteCaffeineBean, deleteCaffeineBeanJsonSchema,
-} from "./tools/caffeine.js";
-import {
   listIntakeKinds, listIntakeKindsJsonSchema, type ListIntakeKindsInput,
   createIntakeKind, createIntakeKindJsonSchema, type CreateIntakeKindInput,
   updateIntakeKind, updateIntakeKindJsonSchema, type UpdateIntakeKindInput,
@@ -89,13 +81,15 @@ import {
   deleteIntakeEvent, deleteIntakeEventJsonSchema,
 } from "./tools/intake.js";
 import {
-  listCannabisEvents, listCannabisEventsJsonSchema, type ListCannabisEventsInput,
-  logCannabisEvent, logCannabisEventJsonSchema, type LogCannabisEventInput,
-  deleteCannabisEvent, deleteCannabisEventJsonSchema,
-  listCannabisStrains, listCannabisStrainJsonSchema,
-  createCannabisStrain, createCannabisStrainJsonSchema, type CreateCannabisStrainInput,
-  deleteCannabisStrain, deleteCannabisStrainJsonSchema,
-} from "./tools/cannabis.js";
+  listSymptoms, listSymptomsJsonSchema, type ListSymptomsInput,
+  createSymptom, createSymptomJsonSchema, type CreateSymptomInput,
+  logSymptom, logSymptomJsonSchema, type LogSymptomInput,
+} from "./tools/symptoms.js";
+import {
+  listMedications, listMedicationsJsonSchema, type ListMedicationsInput,
+  createMedication, createMedicationJsonSchema, type CreateMedicationInput,
+  logMedication, logMedicationJsonSchema, type LogMedicationInput,
+} from "./tools/medications.js";
 import {
   listGutEvents, listGutEventsJsonSchema, type ListGutEventsInput,
   logGutEvent, logGutEventJsonSchema, type LogGutEventInput,
@@ -343,16 +337,38 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
       inputSchema: uncompleteChoreJsonSchema,
     },
   ],
-  caffeine: [
+  symptoms: [
     {
-      name: "caffeine_events_list",
-      description: "List caffeine intake events. Defaults to last 7 days; pass date for a single day or from/to for a range.",
-      inputSchema: listCaffeineEventsJsonSchema,
+      name: "symptoms_list",
+      description: "List symptom definitions plus logged events. Defaults to the last 7 days of events; pass date for a single day or from/to for a range. Call this FIRST to get a symptomID, then log by id.",
+      inputSchema: listSymptomsJsonSchema,
     },
     {
-      name: "caffeine_event_log",
-      description: "Log a new caffeine intake event (v60, matcha, or other).",
-      inputSchema: logCaffeineEventJsonSchema,
+      name: "symptoms_create",
+      description: "Create a new symptom definition. Only title is required.",
+      inputSchema: createSymptomJsonSchema,
+    },
+    {
+      name: "symptoms_log",
+      description: "Log a symptom event against a definition (severity 0–10). symptomID must be an active symptom from symptoms_list.",
+      inputSchema: logSymptomJsonSchema,
+    },
+  ],
+  medications: [
+    {
+      name: "medications_list",
+      description: "List medication definitions plus logged doses. Defaults to the last 7 days of doses; pass date for a single day or from/to for a range. Call this FIRST to get a medicationID, then log by id.",
+      inputSchema: listMedicationsJsonSchema,
+    },
+    {
+      name: "medications_create",
+      description: "Create a new medication definition. Only title is required; strength, dose, schedule and instructions are optional.",
+      inputSchema: createMedicationJsonSchema,
+    },
+    {
+      name: "medications_log",
+      description: "Log a medication dose against a definition (status taken|skipped|missed). medicationID must be an active medication from medications_list.",
+      inputSchema: logMedicationJsonSchema,
     },
   ],
   intake: [
@@ -386,18 +402,6 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
     { name: "intake_event_delete",
       description: "Remove one intake event (correction).",
       inputSchema: deleteIntakeEventJsonSchema },
-  ],
-  cannabis: [
-    {
-      name: "cannabis_events_list",
-      description: "List cannabis intake events. Defaults to last 7 days; pass date for a single day or from/to for a range.",
-      inputSchema: listCannabisEventsJsonSchema,
-    },
-    {
-      name: "cannabis_event_log",
-      description: "Log a new cannabis intake event (vape or edible).",
-      inputSchema: logCannabisEventJsonSchema,
-    },
   ],
   gut: [
     {
@@ -882,29 +886,17 @@ async function callTool(
       const result = await uncompleteChore(client, (params.arguments ?? {}) as unknown as UncompleteChoreInput);
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
-    // ---- Caffeine ----
-    case "caffeine_events_list": {
-      const result = await listCaffeineEvents(client, (params.arguments ?? {}) as ListCaffeineEventsInput);
+    // ---- Symptoms ----
+    case "symptoms_list": {
+      const result = await listSymptoms(client, (params.arguments ?? {}) as ListSymptomsInput);
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
-    case "caffeine_event_log": {
-      const result = await logCaffeineEvent(client, (params.arguments ?? {}) as unknown as LogCaffeineEventInput);
+    case "symptoms_create": {
+      const result = await createSymptom(client, (params.arguments ?? {}) as unknown as CreateSymptomInput);
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
-    case "caffeine_event_delete": {
-      const result = await deleteCaffeineEvent(client, (params.arguments ?? {}) as unknown as { id: string });
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
-    case "caffeine_beans_list": {
-      const result = await listCaffeineBeans(client);
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
-    case "caffeine_bean_create": {
-      const result = await createCaffeineBean(client, (params.arguments ?? {}) as unknown as CreateCaffeineBeanInput);
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
-    case "caffeine_bean_delete": {
-      const result = await deleteCaffeineBean(client, (params.arguments ?? {}) as unknown as { id: string });
+    case "symptoms_log": {
+      const result = await logSymptom(client, (params.arguments ?? {}) as unknown as LogSymptomInput);
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
     // ---- Intake (generic consumables) ----
@@ -944,29 +936,17 @@ async function callTool(
       const result = await deleteIntakeEvent(client, (params.arguments ?? {}) as unknown as { id: string });
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
-    // ---- Cannabis ----
-    case "cannabis_events_list": {
-      const result = await listCannabisEvents(client, (params.arguments ?? {}) as ListCannabisEventsInput);
+    // ---- Medications ----
+    case "medications_list": {
+      const result = await listMedications(client, (params.arguments ?? {}) as ListMedicationsInput);
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
-    case "cannabis_event_log": {
-      const result = await logCannabisEvent(client, (params.arguments ?? {}) as unknown as LogCannabisEventInput);
+    case "medications_create": {
+      const result = await createMedication(client, (params.arguments ?? {}) as unknown as CreateMedicationInput);
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
-    case "cannabis_event_delete": {
-      const result = await deleteCannabisEvent(client, (params.arguments ?? {}) as unknown as { id: string });
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
-    case "cannabis_strains_list": {
-      const result = await listCannabisStrains(client);
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
-    case "cannabis_strain_create": {
-      const result = await createCannabisStrain(client, (params.arguments ?? {}) as unknown as CreateCannabisStrainInput);
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
-    case "cannabis_strain_delete": {
-      const result = await deleteCannabisStrain(client, (params.arguments ?? {}) as unknown as { id: string });
+    case "medications_log": {
+      const result = await logMedication(client, (params.arguments ?? {}) as unknown as LogMedicationInput);
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
     // ---- Gut ----
