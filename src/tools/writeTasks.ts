@@ -1,6 +1,31 @@
 import type { CloudKitClient } from "../cloudkit.js";
 import { logEvent } from "../util.js";
 import { getEffectiveTimezone, localServerTimestamp } from "../tz.js";
+import { listAreas } from "./listAreas.js";
+import { listProjects } from "./listProjects.js";
+
+// Reject writes that point a task at an area/project id with no matching
+// container. CloudKit stores the FK string verbatim, so an unknown id becomes a
+// dangling reference that never surfaces under any real area/project. Empty /
+// undefined (clearing the field) is always allowed. Thrown as a plain Error so
+// the calling model sees it as a tool error and can self-correct against
+// tasks_list_areas / tasks_list_projects.
+async function validateContainer(
+  client: CloudKitClient,
+  kind: "area" | "project",
+  id: string | null | undefined,
+): Promise<void> {
+  if (!id) return;
+  const valid =
+    kind === "area"
+      ? (await listAreas(client, { limit: 500 })).areas
+      : (await listProjects(client, { status: "all", limit: 500 })).projects;
+  if (valid.some((c) => c.id === id)) return;
+  const known = valid.map((c) => `${c.id} (${c.title})`).join(", ");
+  throw new Error(
+    `unknown ${kind} id '${id}'. Use tasks_list_${kind}s for valid ids. Known: ${known}`,
+  );
+}
 
 // Mutators for Task records. Uses CKWS records/modify with forceUpdate.
 // Identity for new tasks: base32-6 shortid per identifiers.md.
@@ -119,6 +144,8 @@ export interface UpdateTaskInput {
 // ---- Implementations ----
 
 export async function createTask(client: CloudKitClient, input: CreateTaskInput) {
+  await validateContainer(client, "area", input.area);
+  await validateContainer(client, "project", input.project);
   const id = newTaskId();
   const fields: Record<string, { value: unknown }> = {
     title: { value: input.title },
@@ -184,6 +211,8 @@ export async function completeTask(client: CloudKitClient, input: { id: string }
 }
 
 export async function updateTask(client: CloudKitClient, input: UpdateTaskInput) {
+  await validateContainer(client, "area", input.area);
+  await validateContainer(client, "project", input.project);
   const fields: Record<string, { value: unknown }> = {};
   const updated: string[] = [];
   if (input.title !== undefined) { fields.title = { value: input.title }; updated.push("title"); }
