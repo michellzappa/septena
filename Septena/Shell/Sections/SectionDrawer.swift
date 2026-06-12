@@ -163,6 +163,14 @@ struct SectionDrawer<Content: View>: View {
   /// (`sectionDrawerPresentation()`) so the iPhone sheet reads `.glass` while
   /// the iPad/macOS pane stays `.solid`.
   @Environment(\.drawerSurfaceStyle) private var surfaceStyle
+  /// True on the pushed-pane surfaces (macOS always, iPad regular width) where a
+  /// hardware keyboard is the norm — gates the ←/→ day-stepping shortcut.
+  @Environment(\.usesPushNavigation) private var usesPushNavigation
+
+  /// Holds keyboard focus on the drawer body so ←/→ step the viewed day even
+  /// with Full Keyboard Access off (programmatic focus, per the keyboard-nav
+  /// convention — a plain `.focusable()` wouldn't receive keys without FKA).
+  @FocusState private var dayNavFocused: Bool
 
   /// Whether the goals strip is currently revealed. Collapsed by default —
   /// the goals live behind the `target` toolbar toggle and appear on cue,
@@ -207,6 +215,27 @@ struct SectionDrawer<Content: View>: View {
   private var isTimeTraveling: Bool {
     guard let currentDate else { return false }
     return currentDate.wrappedValue != SeptenaDate.today
+  }
+
+  /// Whether ←/→ day-stepping is live: a day-scoped drawer on a pushed pane
+  /// (Mac / iPad regular width). Compact iPhone sheets keep the tap-only
+  /// time-travel picker.
+  private var dayKeyNavEnabled: Bool {
+    currentDate != nil && usesPushNavigation
+  }
+
+  /// Step the viewed day by `delta` days, clamping the forward edge at today —
+  /// time travel reviews the past, never the future. ← goes back, → forward.
+  private func stepDay(_ delta: Int) {
+    guard let currentDate,
+          let day = SeptenaDate.parse(currentDate.wrappedValue),
+          let moved = Calendar.current.date(byAdding: .day, value: delta, to: day)
+    else { return }
+    let today = Calendar.current.startOfDay(for: Date())
+    let clamped = min(Calendar.current.startOfDay(for: moved), today)
+    if let str = SeptenaDate.format(clamped), str != currentDate.wrappedValue {
+      currentDate.wrappedValue = str
+    }
   }
 
   var body: some View {
@@ -259,6 +288,23 @@ struct SectionDrawer<Content: View>: View {
     // Surface fill driven by the injected style: opaque grouped background on
     // a solid host, clear on the glass (translucent-sheet) host.
     .background(surfaceStyle.scrollFill)
+    // ←/→ step the viewed day back / forward on the pushed panes (Mac, iPad
+    // regular width). Programmatic focus (not a bare `.focusable`) so the keys
+    // land with Full Keyboard Access off; we draw no chrome, so suppress the
+    // focus halo. A focused TextField (e.g. the search field) consumes ←/→ for
+    // its cursor first, so day-stepping never fights text editing.
+    .focusable(dayKeyNavEnabled)
+    .focusEffectDisabled()
+    .focused($dayNavFocused)
+    .task(id: dayKeyNavEnabled) { if dayKeyNavEnabled { dayNavFocused = true } }
+    .onKeyPress(.leftArrow) {
+      guard dayKeyNavEnabled else { return .ignored }
+      stepDay(-1); return .handled
+    }
+    .onKeyPress(.rightArrow) {
+      guard dayKeyNavEnabled else { return .ignored }
+      stepDay(1); return .handled
+    }
     // Time-travel picker. Attached to the body (not the toolbar item) so
     // presentation is stable on iOS; gated on `currentDate` so non
     // day-scoped drawers never build it.

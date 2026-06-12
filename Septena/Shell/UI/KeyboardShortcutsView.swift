@@ -57,6 +57,8 @@ enum KeyboardShortcutsCatalogue {
     ]),
     KeyboardShortcutGroup(title: "Edit & section sheets", shortcuts: [
       KeyboardShortcut2(keys: ["⌘", "N"], label: "Quick-add in an open section"),
+      KeyboardShortcut2(keys: ["←"], label: "Time travel: previous day"),
+      KeyboardShortcut2(keys: ["→"], label: "Time travel: next day"),
       KeyboardShortcut2(keys: ["return"], label: "Save the open edit form"),
       KeyboardShortcut2(keys: ["esc"], label: "Cancel the open edit form"),
     ]),
