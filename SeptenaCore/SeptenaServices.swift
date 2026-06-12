@@ -169,6 +169,14 @@ final class SeptenaServices {
       var batchTouchedStructure = false
       var batchTouchedData = false
 
+      // Single-row lookup for the CK closures below: every fetch here
+      // resolves a unique id, so cap at one match and stop scanning.
+      func one<E: PersistentModel>(_ descriptor: FetchDescriptor<E>) -> E? {
+        var d = descriptor
+        d.fetchLimit = 1
+        return (try? context.fetch(d))?.first
+      }
+
       // Single dispatcher for outbound records. CK record IDs are
       // zone-wide, so Area/Project record names are type-prefixed to
       // avoid natural-id collisions like area "septena" and project
@@ -177,331 +185,331 @@ final class SeptenaServices {
         let recordName = recordID.recordName
         if recordName.hasPrefix("area:") {
           let id = AreaCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<AreaEntity>(
+          if let entity = one(FetchDescriptor<AreaEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("project:") {
           let id = ProjectCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<ProjectEntity>(
+          if let entity = one(FetchDescriptor<ProjectEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("section:") {
           let id = SectionCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<SectionEntity>(
+          if let entity = one(FetchDescriptor<SectionEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("habit-def:") {
           let id = HabitDefinitionCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<HabitDefinitionEntity>(
+          if let entity = one(FetchDescriptor<HabitDefinitionEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("habit-event:") {
           let id = HabitEventCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<HabitDayStateEntity>(
+          if let entity = one(FetchDescriptor<HabitDayStateEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("supplement-def:") {
           let id = SupplementDefinitionCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<SupplementDefinitionEntity>(
+          if let entity = one(FetchDescriptor<SupplementDefinitionEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("supplement-event:") {
           let id = SupplementEventCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<SupplementDayStateEntity>(
+          if let entity = one(FetchDescriptor<SupplementDayStateEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("chore-def:") {
           let id = ChoreDefinitionCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<ChoreDefinitionEntity>(
+          if let entity = one(FetchDescriptor<ChoreDefinitionEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("chore-event:") {
           let id = ChoreEventCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<ChoreEventEntity>(
+          if let entity = one(FetchDescriptor<ChoreEventEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("goal:") {
           let id = GoalCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<GoalEntity>(
+          if let entity = one(FetchDescriptor<GoalEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("gms:") {
           let id = GoalMilestoneCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<GoalMilestoneEntity>(
+          if let entity = one(FetchDescriptor<GoalMilestoneEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("coachVoice:") {
           let id = CoachVoiceCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<CoachVoiceEntity>(
+          if let entity = one(FetchDescriptor<CoachVoiceEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("coachMsg:") {
           let id = CoachMessageCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<CoachMessageEntity>(
+          if let entity = one(FetchDescriptor<CoachMessageEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("gut-event:") {
           let id = GutEventCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<GutEventEntity>(
+          if let entity = one(FetchDescriptor<GutEventEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("mood-event:") {
           let id = MoodEventCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<MoodEventEntity>(
+          if let entity = one(FetchDescriptor<MoodEventEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("oura-night:") {
           let id = OuraNightCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<OuraNightEntity>(
+          if let entity = one(FetchDescriptor<OuraNightEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("withings-row:") {
           let id = WithingsRowCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<WithingsRowEntity>(
+          if let entity = one(FetchDescriptor<WithingsRowEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("caffeine-event:") {
           let id = CaffeineEventCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<CaffeineEventEntity>(
+          if let entity = one(FetchDescriptor<CaffeineEventEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("caffeine-bean:") {
           let id = CaffeineBeanCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<CaffeineBeanEntity>(
+          if let entity = one(FetchDescriptor<CaffeineBeanEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("intake-kind:") {
           let id = IntakeKindCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<IntakeKindEntity>(
+          if let entity = one(FetchDescriptor<IntakeKindEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("intake-item:") {
           let id = IntakeItemCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<IntakeItemEntity>(
+          if let entity = one(FetchDescriptor<IntakeItemEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("intake-event:") {
           let id = IntakeEventCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<IntakeEventEntity>(
+          if let entity = one(FetchDescriptor<IntakeEventEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("cannabis-event:") {
           let id = CannabisEventCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<CannabisEventEntity>(
+          if let entity = one(FetchDescriptor<CannabisEventEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("symptom-definition:") {
           let id = SymptomDefinitionCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<SymptomDefinitionEntity>(
+          if let entity = one(FetchDescriptor<SymptomDefinitionEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("symptom-event:") {
           let id = SymptomEventCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<SymptomEventEntity>(
+          if let entity = one(FetchDescriptor<SymptomEventEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("medication-definition:") {
           let id = MedicationDefinitionCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<MedicationDefinitionEntity>(
+          if let entity = one(FetchDescriptor<MedicationDefinitionEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("medication-dose-event:") {
           let id = MedicationDoseEventCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<MedicationDoseEventEntity>(
+          if let entity = one(FetchDescriptor<MedicationDoseEventEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("grocery-item:") {
           let id = GroceryItemCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<GroceryItemEntity>(
+          if let entity = one(FetchDescriptor<GroceryItemEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("grocery-cat:") {
           let id = GroceryCategoryCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<GroceryCategoryEntity>(
+          if let entity = one(FetchDescriptor<GroceryCategoryEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("exercise-entry:") {
           let id = ExerciseEntryCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(
+          if let entity = one(FetchDescriptor<ExerciseEntryEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("exercise-def:") {
           let id = ExerciseDefinitionCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>(
+          if let entity = one(FetchDescriptor<ExerciseDefinitionEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("session-type:") {
           let id = SessionTypeCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<SessionTypeEntity>(
+          if let entity = one(FetchDescriptor<SessionTypeEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("nutrition-entry:") {
           let id = NutritionEntryCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<NutritionEntryEntity>(
+          if let entity = one(FetchDescriptor<NutritionEntryEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("nutrition-day:") {
           let id = NutritionDailySummaryCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<NutritionDailySummaryEntity>(
+          if let entity = one(FetchDescriptor<NutritionDailySummaryEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName.hasPrefix("activity-day:") {
           let id = ActivityDayCloudKitSchema.entityID(from: recordName)
-          if let entity = try? context.fetch(FetchDescriptor<ActivityDayEntity>(
+          if let entity = one(FetchDescriptor<ActivityDayEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         if recordName == SettingsCloudKitSchema.singletonID {
-          if let entity = try? context.fetch(FetchDescriptor<SettingsEntity>(
+          if let entity = one(FetchDescriptor<SettingsEntity>(
             predicate: #Predicate { $0.id == settingsSingletonID }
-          )).first {
+          )) {
             return entity.toCloudKitRecord()
           }
           return nil
         }
         let id = recordName
-        if let entity = try? context.fetch(FetchDescriptor<TaskEntity>(
+        if let entity = one(FetchDescriptor<TaskEntity>(
           predicate: #Predicate { $0.id == id }
-        )).first {
+        )) {
           return entity.toCloudKitRecord()
         }
         return nil
@@ -511,9 +519,9 @@ final class SeptenaServices {
         case TaskCloudKitSchema.recordType:
           batchTouchedTasks = true
           let id = record.recordID.recordName
-          if let entity = try? context.fetch(FetchDescriptor<TaskEntity>(
+          if let entity = one(FetchDescriptor<TaskEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(TaskEntity(cloudKit: record))
@@ -521,9 +529,9 @@ final class SeptenaServices {
         case ProjectCloudKitSchema.recordType:
           batchTouchedStructure = true
           let id = ProjectCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<ProjectEntity>(
+          if let entity = one(FetchDescriptor<ProjectEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(ProjectEntity(cloudKit: record))
@@ -531,18 +539,18 @@ final class SeptenaServices {
         case AreaCloudKitSchema.recordType:
           batchTouchedStructure = true
           let id = AreaCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<AreaEntity>(
+          if let entity = one(FetchDescriptor<AreaEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(AreaEntity(cloudKit: record))
           }
         case SettingsCloudKitSchema.recordType:
           batchTouchedData = true
-          if let entity = try? context.fetch(FetchDescriptor<SettingsEntity>(
+          if let entity = one(FetchDescriptor<SettingsEntity>(
             predicate: #Predicate { $0.id == settingsSingletonID }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(SettingsEntity(cloudKit: record))
@@ -550,9 +558,9 @@ final class SeptenaServices {
         case SectionCloudKitSchema.recordType:
           batchTouchedData = true
           let id = SectionCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<SectionEntity>(
+          if let entity = one(FetchDescriptor<SectionEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(SectionEntity(cloudKit: record))
@@ -560,9 +568,9 @@ final class SeptenaServices {
         case HabitDefinitionCloudKitSchema.recordType:
           batchTouchedData = true
           let id = HabitDefinitionCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<HabitDefinitionEntity>(
+          if let entity = one(FetchDescriptor<HabitDefinitionEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(HabitDefinitionEntity(cloudKit: record))
@@ -570,9 +578,9 @@ final class SeptenaServices {
         case HabitEventCloudKitSchema.recordType:
           batchTouchedData = true
           let id = HabitEventCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<HabitDayStateEntity>(
+          if let entity = one(FetchDescriptor<HabitDayStateEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(HabitDayStateEntity(cloudKit: record))
@@ -580,9 +588,9 @@ final class SeptenaServices {
         case SupplementDefinitionCloudKitSchema.recordType:
           batchTouchedData = true
           let id = SupplementDefinitionCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<SupplementDefinitionEntity>(
+          if let entity = one(FetchDescriptor<SupplementDefinitionEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(SupplementDefinitionEntity(cloudKit: record))
@@ -590,9 +598,9 @@ final class SeptenaServices {
         case SupplementEventCloudKitSchema.recordType:
           batchTouchedData = true
           let id = SupplementEventCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<SupplementDayStateEntity>(
+          if let entity = one(FetchDescriptor<SupplementDayStateEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(SupplementDayStateEntity(cloudKit: record))
@@ -600,9 +608,9 @@ final class SeptenaServices {
         case ChoreDefinitionCloudKitSchema.recordType:
           batchTouchedData = true
           let id = ChoreDefinitionCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<ChoreDefinitionEntity>(
+          if let entity = one(FetchDescriptor<ChoreDefinitionEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(ChoreDefinitionEntity(cloudKit: record))
@@ -610,9 +618,9 @@ final class SeptenaServices {
         case ChoreEventCloudKitSchema.recordType:
           batchTouchedData = true
           let id = ChoreEventCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<ChoreEventEntity>(
+          if let entity = one(FetchDescriptor<ChoreEventEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(ChoreEventEntity(cloudKit: record))
@@ -620,9 +628,9 @@ final class SeptenaServices {
         case GoalCloudKitSchema.recordType:
           batchTouchedData = true
           let id = GoalCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<GoalEntity>(
+          if let entity = one(FetchDescriptor<GoalEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(GoalEntity(cloudKit: record))
@@ -630,9 +638,9 @@ final class SeptenaServices {
         case GoalMilestoneCloudKitSchema.recordType:
           batchTouchedData = true
           let id = GoalMilestoneCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<GoalMilestoneEntity>(
+          if let entity = one(FetchDescriptor<GoalMilestoneEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             // Fetched milestones fold in silently — the detecting device owns
@@ -642,9 +650,9 @@ final class SeptenaServices {
         case CoachVoiceCloudKitSchema.recordType:
           batchTouchedData = true
           let id = CoachVoiceCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<CoachVoiceEntity>(
+          if let entity = one(FetchDescriptor<CoachVoiceEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(CoachVoiceEntity(cloudKit: record))
@@ -652,9 +660,9 @@ final class SeptenaServices {
         case CoachMessageCloudKitSchema.recordType:
           batchTouchedData = true
           let id = CoachMessageCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<CoachMessageEntity>(
+          if let entity = one(FetchDescriptor<CoachMessageEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(CoachMessageEntity(cloudKit: record))
@@ -662,9 +670,9 @@ final class SeptenaServices {
         case GutEventCloudKitSchema.recordType:
           batchTouchedData = true
           let id = GutEventCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<GutEventEntity>(
+          if let entity = one(FetchDescriptor<GutEventEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(GutEventEntity(cloudKit: record))
@@ -672,9 +680,9 @@ final class SeptenaServices {
         case MoodEventCloudKitSchema.recordType:
           batchTouchedData = true
           let id = MoodEventCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<MoodEventEntity>(
+          if let entity = one(FetchDescriptor<MoodEventEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(MoodEventEntity(cloudKit: record))
@@ -682,9 +690,9 @@ final class SeptenaServices {
         case SymptomDefinitionCloudKitSchema.recordType:
           batchTouchedData = true
           let id = SymptomDefinitionCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<SymptomDefinitionEntity>(
+          if let entity = one(FetchDescriptor<SymptomDefinitionEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(SymptomDefinitionEntity(cloudKit: record))
@@ -692,9 +700,9 @@ final class SeptenaServices {
         case SymptomEventCloudKitSchema.recordType:
           batchTouchedData = true
           let id = SymptomEventCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<SymptomEventEntity>(
+          if let entity = one(FetchDescriptor<SymptomEventEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(SymptomEventEntity(cloudKit: record))
@@ -702,9 +710,9 @@ final class SeptenaServices {
         case MedicationDefinitionCloudKitSchema.recordType:
           batchTouchedData = true
           let id = MedicationDefinitionCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<MedicationDefinitionEntity>(
+          if let entity = one(FetchDescriptor<MedicationDefinitionEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(MedicationDefinitionEntity(cloudKit: record))
@@ -712,9 +720,9 @@ final class SeptenaServices {
         case MedicationDoseEventCloudKitSchema.recordType:
           batchTouchedData = true
           let id = MedicationDoseEventCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<MedicationDoseEventEntity>(
+          if let entity = one(FetchDescriptor<MedicationDoseEventEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(MedicationDoseEventEntity(cloudKit: record))
@@ -722,9 +730,9 @@ final class SeptenaServices {
         case OuraNightCloudKitSchema.recordType:
           batchTouchedData = true
           let id = OuraNightCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<OuraNightEntity>(
+          if let entity = one(FetchDescriptor<OuraNightEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(OuraNightEntity(cloudKit: record))
@@ -733,9 +741,9 @@ final class SeptenaServices {
         case WithingsRowCloudKitSchema.recordType:
           batchTouchedData = true
           let id = WithingsRowCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<WithingsRowEntity>(
+          if let entity = one(FetchDescriptor<WithingsRowEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(WithingsRowEntity(cloudKit: record))
@@ -744,9 +752,9 @@ final class SeptenaServices {
         case CaffeineEventCloudKitSchema.recordType:
           batchTouchedData = true
           let id = CaffeineEventCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<CaffeineEventEntity>(
+          if let entity = one(FetchDescriptor<CaffeineEventEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(CaffeineEventEntity(cloudKit: record))
@@ -759,9 +767,9 @@ final class SeptenaServices {
         case CaffeineBeanCloudKitSchema.recordType:
           batchTouchedData = true
           let id = CaffeineBeanCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<CaffeineBeanEntity>(
+          if let entity = one(FetchDescriptor<CaffeineBeanEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(CaffeineBeanEntity(cloudKit: record))
@@ -770,9 +778,9 @@ final class SeptenaServices {
         case IntakeKindCloudKitSchema.recordType:
           batchTouchedData = true
           let id = IntakeKindCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<IntakeKindEntity>(
+          if let entity = one(FetchDescriptor<IntakeKindEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(IntakeKindEntity(cloudKit: record))
@@ -780,9 +788,9 @@ final class SeptenaServices {
         case IntakeItemCloudKitSchema.recordType:
           batchTouchedData = true
           let id = IntakeItemCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<IntakeItemEntity>(
+          if let entity = one(FetchDescriptor<IntakeItemEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(IntakeItemEntity(cloudKit: record))
@@ -790,9 +798,9 @@ final class SeptenaServices {
         case IntakeEventCloudKitSchema.recordType:
           batchTouchedData = true
           let id = IntakeEventCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<IntakeEventEntity>(
+          if let entity = one(FetchDescriptor<IntakeEventEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(IntakeEventEntity(cloudKit: record))
@@ -800,9 +808,9 @@ final class SeptenaServices {
         case CannabisEventCloudKitSchema.recordType:
           batchTouchedData = true
           let id = CannabisEventCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<CannabisEventEntity>(
+          if let entity = one(FetchDescriptor<CannabisEventEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(CannabisEventEntity(cloudKit: record))
@@ -811,9 +819,9 @@ final class SeptenaServices {
         case GroceryItemCloudKitSchema.recordType:
           batchTouchedData = true
           let id = GroceryItemCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<GroceryItemEntity>(
+          if let entity = one(FetchDescriptor<GroceryItemEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(GroceryItemEntity(cloudKit: record))
@@ -821,9 +829,9 @@ final class SeptenaServices {
         case GroceryCategoryCloudKitSchema.recordType:
           batchTouchedData = true
           let id = GroceryCategoryCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<GroceryCategoryEntity>(
+          if let entity = one(FetchDescriptor<GroceryCategoryEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(GroceryCategoryEntity(cloudKit: record))
@@ -831,9 +839,9 @@ final class SeptenaServices {
         case ExerciseEntryCloudKitSchema.recordType:
           batchTouchedData = true
           let id = ExerciseEntryCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(
+          if let entity = one(FetchDescriptor<ExerciseEntryEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(ExerciseEntryEntity(cloudKit: record))
@@ -841,9 +849,9 @@ final class SeptenaServices {
         case ExerciseDefinitionCloudKitSchema.recordType:
           batchTouchedData = true
           let id = ExerciseDefinitionCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>(
+          if let entity = one(FetchDescriptor<ExerciseDefinitionEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(ExerciseDefinitionEntity(cloudKit: record))
@@ -851,9 +859,9 @@ final class SeptenaServices {
         case SessionTypeCloudKitSchema.recordType:
           batchTouchedData = true
           let id = SessionTypeCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<SessionTypeEntity>(
+          if let entity = one(FetchDescriptor<SessionTypeEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(SessionTypeEntity(cloudKit: record))
@@ -861,9 +869,9 @@ final class SeptenaServices {
         case NutritionEntryCloudKitSchema.recordType:
           batchTouchedData = true
           let id = NutritionEntryCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<NutritionEntryEntity>(
+          if let entity = one(FetchDescriptor<NutritionEntryEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(NutritionEntryEntity(cloudKit: record))
@@ -871,9 +879,9 @@ final class SeptenaServices {
         case NutritionDailySummaryCloudKitSchema.recordType:
           batchTouchedData = true
           let id = NutritionDailySummaryCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<NutritionDailySummaryEntity>(
+          if let entity = one(FetchDescriptor<NutritionDailySummaryEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(NutritionDailySummaryEntity(cloudKit: record))
@@ -881,9 +889,9 @@ final class SeptenaServices {
         case ActivityDayCloudKitSchema.recordType:
           batchTouchedData = true
           let id = ActivityDayCloudKitSchema.entityID(from: record.recordID.recordName)
-          if let entity = try? context.fetch(FetchDescriptor<ActivityDayEntity>(
+          if let entity = one(FetchDescriptor<ActivityDayEntity>(
             predicate: #Predicate { $0.id == id }
-          )).first {
+          )) {
             entity.apply(record)
           } else {
             context.insert(ActivityDayEntity(cloudKit: record))
