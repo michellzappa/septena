@@ -2708,16 +2708,25 @@ struct WeekDashboardView: View {
   }
 
   /// Log a glass from the tile's quick-add menu. Mirrors the destination
-  /// view's commit (water-only Nutrition entry + bloom flourish scaled to
-  /// the amount), then self-refreshes the tile.
+  /// view's commit exactly: an everyday glass blooms (reach scaled to the
+  /// amount); the glass that crosses today's target floods once with `.fill`.
+  /// Then self-refreshes the tile.
   private func commitHydration(ml: Int) {
     let accent = theme.color(for: "hydration")
-    let intensity = min(1.4, max(0.6, Double(ml) / 500))
+    let crossed = hydrationTargetMl > 0
+      && hydrationToday < hydrationTargetMl
+      && hydrationToday + ml >= hydrationTargetMl
+    let motion: CommitMotion? = crossed ? .fill : nil   // nil → plugin's `.bloom`
+    let intensity = crossed ? 1.4 : min(1.4, max(0.6, Double(ml) / 500))
+    let announce = crossed
+      ? "Hydration goal reached — \(hydrationToday + ml) of \(hydrationTargetMl) ml."
+      : "Logged \(ml) ml of water."
     SectionLog.newLog(
       section: "hydration",
       accent: accent,
+      motion: motion,
       intensity: intensity,
-      announce: "Logged \(ml) ml of water.",
+      announce: announce,
       logCommit: logCommit
     ) {
       _ = SeptenaServices.shared.nutritionMutator.addEntry(
