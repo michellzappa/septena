@@ -44,29 +44,21 @@ import {
   listGoals, listGoalsJsonSchema,
   createGoal, createGoalJsonSchema, type CreateGoalInput,
   updateGoal, updateGoalJsonSchema, type UpdateGoalInput,
-  deleteGoal, deleteGoalJsonSchema,
 } from "./tools/goals.js";
 import {
   listHabits, listHabitsJsonSchema, type ListHabitsInput,
   createHabit, createHabitJsonSchema, type CreateHabitInput,
-  updateHabit, updateHabitJsonSchema, type UpdateHabitInput,
-  deleteHabit, deleteHabitJsonSchema,
   toggleHabit, toggleHabitJsonSchema, type ToggleHabitInput,
 } from "./tools/habits.js";
 import {
   listSupplements, listSupplementsJsonSchema, type ListSupplementsInput,
   createSupplement, createSupplementJsonSchema, type CreateSupplementInput,
-  updateSupplement, updateSupplementJsonSchema, type UpdateSupplementInput,
-  deleteSupplement, deleteSupplementJsonSchema,
   toggleSupplement, toggleSupplementJsonSchema, type ToggleSupplementInput,
 } from "./tools/supplements.js";
 import {
   listChores, listChoresJsonSchema,
   createChore, createChoreJsonSchema, type CreateChoreInput,
-  updateChore, updateChoreJsonSchema, type UpdateChoreInput,
-  deleteChore, deleteChoreJsonSchema,
   completeChore, completeChoreJsonSchema, type CompleteChoreInput,
-  deferChore, deferChoreJsonSchema, type DeferChoreInput,
   uncompleteChore, uncompleteChoreJsonSchema, type UncompleteChoreInput,
 } from "./tools/chores.js";
 import {
@@ -93,29 +85,20 @@ import {
 import {
   listGutEvents, listGutEventsJsonSchema, type ListGutEventsInput,
   logGutEvent, logGutEventJsonSchema, type LogGutEventInput,
-  deleteGutEvent, deleteGutEventJsonSchema,
 } from "./tools/gut.js";
 import {
   listNutritionEntries, listNutritionEntriesJsonSchema, type ListNutritionEntriesInput,
   logNutritionEntry, logNutritionEntryJsonSchema, type LogNutritionEntryInput,
   updateNutritionEntry, updateNutritionEntryJsonSchema, type UpdateNutritionEntryInput,
-  deleteNutritionEntry, deleteNutritionEntryJsonSchema,
   getNutritionDaySummary, getNutritionDaySummaryJsonSchema, type GetNutritionDaySummaryInput,
 } from "./tools/nutrition.js";
 import {
   listTrainingEntries, listTrainingEntriesJsonSchema, type ListTrainingEntriesInput,
   logTrainingEntry, logTrainingEntryJsonSchema, type LogTrainingEntryInput,
   updateTrainingEntry, updateTrainingEntryJsonSchema, type UpdateTrainingEntryInput,
-  deleteTrainingEntry, deleteTrainingEntryJsonSchema,
-  retagTrainingSession, retagTrainingSessionJsonSchema, type RetagTrainingSessionInput,
   listExercises, listExercisesJsonSchema, type ListExercisesInput,
   createExercise, createExerciseJsonSchema, type CreateExerciseInput,
   updateExercise, updateExerciseJsonSchema, type UpdateExerciseInput,
-  deleteExercise, deleteExerciseJsonSchema,
-  listSessionTypes, listSessionTypesJsonSchema, type ListSessionTypesInput,
-  createSessionType, createSessionTypeJsonSchema, type CreateSessionTypeInput,
-  updateSessionType, updateSessionTypeJsonSchema, type UpdateSessionTypeInput,
-  deleteSessionType, deleteSessionTypeJsonSchema,
 } from "./tools/training.js";
 import {
   logHydration, logHydrationJsonSchema, type LogHydrationInput,
@@ -125,12 +108,7 @@ import {
 import {
   listGroceryItems, listGroceryItemsJsonSchema, type ListGroceryItemsInput,
   createGroceryItem, createGroceryItemJsonSchema, type CreateGroceryItemInput,
-  updateGroceryItem, updateGroceryItemJsonSchema, type UpdateGroceryItemInput,
   setGroceryLow, setGroceryLowJsonSchema, type SetGroceryLowInput,
-  deleteGroceryItem, deleteGroceryItemJsonSchema,
-  listGroceryCategories, listGroceryCategoriesJsonSchema, type ListGroceryCategoriesInput,
-  createGroceryCategory, createGroceryCategoryJsonSchema, type CreateGroceryCategoryInput,
-  deleteGroceryCategory, deleteGroceryCategoryJsonSchema,
 } from "./tools/grocery.js";
 
 // Hand-rolled MCP JSON-RPC over HTTP. The full Streamable HTTP transport
@@ -814,24 +792,12 @@ async function callTool(
       const result = await updateGoal(client, (params.arguments ?? {}) as unknown as UpdateGoalInput);
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
-    case "goals_delete": {
-      const result = await deleteGoal(client, (params.arguments ?? {}) as unknown as { id: string });
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
     case "habits_list": {
       const result = await listHabits(client, (params.arguments ?? {}) as ListHabitsInput);
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
     case "habits_create": {
       const result = await createHabit(client, (params.arguments ?? {}) as unknown as CreateHabitInput);
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
-    case "habits_update": {
-      const result = await updateHabit(client, (params.arguments ?? {}) as unknown as UpdateHabitInput);
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
-    case "habits_delete": {
-      const result = await deleteHabit(client, (params.arguments ?? {}) as unknown as { id: string });
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
     case "habits_toggle": {
@@ -846,14 +812,6 @@ async function callTool(
       const result = await createSupplement(client, (params.arguments ?? {}) as unknown as CreateSupplementInput);
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
-    case "supplements_update": {
-      const result = await updateSupplement(client, (params.arguments ?? {}) as unknown as UpdateSupplementInput);
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
-    case "supplements_delete": {
-      const result = await deleteSupplement(client, (params.arguments ?? {}) as unknown as { id: string });
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
     case "supplements_toggle": {
       const result = await toggleSupplement(client, (params.arguments ?? {}) as unknown as ToggleSupplementInput);
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
@@ -866,20 +824,8 @@ async function callTool(
       const result = await createChore(client, (params.arguments ?? {}) as unknown as CreateChoreInput);
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
-    case "chores_update": {
-      const result = await updateChore(client, (params.arguments ?? {}) as unknown as UpdateChoreInput);
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
-    case "chores_delete": {
-      const result = await deleteChore(client, (params.arguments ?? {}) as unknown as { id: string });
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
     case "chores_complete": {
       const result = await completeChore(client, (params.arguments ?? {}) as unknown as CompleteChoreInput);
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
-    case "chores_defer": {
-      const result = await deferChore(client, (params.arguments ?? {}) as unknown as DeferChoreInput);
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
     case "chores_uncomplete": {
@@ -958,10 +904,6 @@ async function callTool(
       const result = await logGutEvent(client, (params.arguments ?? {}) as unknown as LogGutEventInput);
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
-    case "gut_event_delete": {
-      const result = await deleteGutEvent(client, (params.arguments ?? {}) as unknown as { id: string });
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
     // ---- Nutrition ----
     case "nutrition_entries_list": {
       const result = await listNutritionEntries(client, (params.arguments ?? {}) as ListNutritionEntriesInput);
@@ -973,10 +915,6 @@ async function callTool(
     }
     case "nutrition_entry_update": {
       const result = await updateNutritionEntry(client, (params.arguments ?? {}) as unknown as UpdateNutritionEntryInput);
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
-    case "nutrition_entry_delete": {
-      const result = await deleteNutritionEntry(client, (params.arguments ?? {}) as unknown as { id: string });
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
     case "nutrition_day_summary": {
@@ -996,14 +934,6 @@ async function callTool(
       const result = await updateTrainingEntry(client, (params.arguments ?? {}) as unknown as UpdateTrainingEntryInput);
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
-    case "training_entry_delete": {
-      const result = await deleteTrainingEntry(client, (params.arguments ?? {}) as unknown as { id: string });
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
-    case "training_session_retag": {
-      const result = await retagTrainingSession(client, (params.arguments ?? {}) as unknown as RetagTrainingSessionInput);
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
     case "training_exercises_list": {
       const result = await listExercises(client, (params.arguments ?? {}) as ListExercisesInput);
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
@@ -1014,26 +944,6 @@ async function callTool(
     }
     case "training_exercise_update": {
       const result = await updateExercise(client, (params.arguments ?? {}) as unknown as UpdateExerciseInput);
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
-    case "training_exercise_delete": {
-      const result = await deleteExercise(client, (params.arguments ?? {}) as unknown as { id: string });
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
-    case "training_sessions_list": {
-      const result = await listSessionTypes(client, (params.arguments ?? {}) as ListSessionTypesInput);
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
-    case "training_session_create": {
-      const result = await createSessionType(client, (params.arguments ?? {}) as unknown as CreateSessionTypeInput);
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
-    case "training_session_update": {
-      const result = await updateSessionType(client, (params.arguments ?? {}) as unknown as UpdateSessionTypeInput);
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
-    case "training_session_delete": {
-      const result = await deleteSessionType(client, (params.arguments ?? {}) as unknown as { id: string });
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
     // ---- Hydration ----
@@ -1058,28 +968,8 @@ async function callTool(
       const result = await createGroceryItem(client, (params.arguments ?? {}) as unknown as CreateGroceryItemInput);
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
-    case "grocery_item_update": {
-      const result = await updateGroceryItem(client, (params.arguments ?? {}) as unknown as UpdateGroceryItemInput);
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
     case "grocery_item_set_low": {
       const result = await setGroceryLow(client, (params.arguments ?? {}) as unknown as SetGroceryLowInput);
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
-    case "grocery_item_delete": {
-      const result = await deleteGroceryItem(client, (params.arguments ?? {}) as unknown as { id: string });
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
-    case "grocery_categories_list": {
-      const result = await listGroceryCategories(client, (params.arguments ?? {}) as ListGroceryCategoriesInput);
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
-    case "grocery_category_create": {
-      const result = await createGroceryCategory(client, (params.arguments ?? {}) as unknown as CreateGroceryCategoryInput);
-      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
-    }
-    case "grocery_category_delete": {
-      const result = await deleteGroceryCategory(client, (params.arguments ?? {}) as unknown as { id: string });
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
     default:

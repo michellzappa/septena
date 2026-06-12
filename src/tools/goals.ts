@@ -66,12 +66,6 @@ export const updateGoalJsonSchema = {
   },
 } as const;
 
-export const deleteGoalJsonSchema = {
-  type: "object",
-  required: ["id"],
-  properties: { id: { type: "string" } },
-} as const;
-
 // ---- Types ----
 
 export interface CreateGoalInput { text: string; sections?: string[] }
@@ -142,9 +136,4 @@ export async function updateGoal(client: CloudKitClient, input: UpdateGoalInput)
     record: { recordType: "Goal", recordName: `goal:${input.id}`, fields },
   }]);
   return { id: input.id, updated };
-}
-
-export async function deleteGoal(client: CloudKitClient, input: { id: string }) {
-  await modify(client, [{ operationType: "delete", record: { recordName: `goal:${input.id}` } }]);
-  return { id: input.id, deleted: true };
 }

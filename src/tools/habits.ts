@@ -47,23 +47,6 @@ export const createHabitJsonSchema = {
   },
 } as const;
 
-export const updateHabitJsonSchema = {
-  type: "object",
-  required: ["id"],
-  properties: {
-    id: { type: "string" },
-    title: { type: "string" },
-    bucket: { type: "string", enum: ["morning", "evening", "anytime"] },
-    emoji: { type: ["string", "null"] },
-  },
-} as const;
-
-export const deleteHabitJsonSchema = {
-  type: "object",
-  required: ["id"],
-  properties: { id: { type: "string" } },
-} as const;
-
 export const toggleHabitJsonSchema = {
   type: "object",
   required: ["id", "done"],
@@ -79,7 +62,6 @@ export const toggleHabitJsonSchema = {
 
 export interface ListHabitsInput { date?: string }
 export interface CreateHabitInput { title: string; bucket: string; emoji?: string }
-export interface UpdateHabitInput { id: string; title?: string; bucket?: string; emoji?: string | null }
 export interface ToggleHabitInput { id: string; date?: string; done: boolean; skipped?: boolean }
 
 // ---- Implementations ----
@@ -145,34 +127,6 @@ export async function createHabit(client: CloudKitClient, input: CreateHabitInpu
     record: { recordType: "HabitDefinition", recordName: `habit-def:${id}`, fields },
   }]);
   return { id, title: input.title, bucket: input.bucket };
-}
-
-export async function updateHabit(client: CloudKitClient, input: UpdateHabitInput) {
-  const fields: Record<string, { value: unknown }> = {};
-  const updated: string[] = [];
-  if (input.title !== undefined) { fields.title = { value: input.title }; updated.push("title"); }
-  if (input.bucket !== undefined) { fields.bucket = { value: input.bucket }; updated.push("bucket"); }
-  if (input.emoji !== undefined) { fields.emoji = { value: input.emoji ?? "" }; updated.push("emoji"); }
-  if (!updated.length) return { id: input.id, updated: [] };
-  await modify(client, [{
-    operationType: "forceUpdate",
-    record: { recordType: "HabitDefinition", recordName: `habit-def:${input.id}`, fields },
-  }]);
-  return { id: input.id, updated };
-}
-
-export async function deleteHabit(client: CloudKitClient, input: { id: string }) {
-  const eventsRes = await client.queryRecords({
-    recordType: "HabitEvent",
-    filterBy: [{ fieldName: "habitID", comparator: "EQUALS", fieldValue: { value: input.id } }],
-    resultsLimit: 500,
-  });
-  const ops: ModifyOp[] = [
-    ...eventsRes.records.map((r) => ({ operationType: "delete" as const, record: { recordName: r.recordName } })),
-    { operationType: "delete", record: { recordName: `habit-def:${input.id}` } },
-  ];
-  await modify(client, ops);
-  return { id: input.id, deletedEvents: eventsRes.records.length };
 }
 
 export async function toggleHabit(client: CloudKitClient, input: ToggleHabitInput) {

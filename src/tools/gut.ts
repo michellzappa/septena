@@ -51,12 +51,6 @@ export const logGutEventJsonSchema = {
   },
 } as const;
 
-export const deleteGutEventJsonSchema = {
-  type: "object",
-  required: ["id"],
-  properties: { id: { type: "string", description: "GutEvent id." } },
-} as const;
-
 // ---- Types ----
 
 export interface ListGutEventsInput { date?: string; from?: string; to?: string; limit?: number }
@@ -119,11 +113,4 @@ export async function logGutEvent(client: CloudKitClient, input: LogGutEventInpu
   return droppedFields.length > 0
     ? { id, date, time, bristol: input.bristol, droppedFields }
     : { id, date, time, bristol: input.bristol };
-}
-
-export async function deleteGutEvent(client: CloudKitClient, input: { id: string }) {
-  const res = await modify(client, [{ operationType: "delete", record: { recordName: `gut-event:${input.id}` } }]);
-  const code = res.records[0]?.serverErrorCode;
-  if (code && code !== "NOT_FOUND") throw new Error(res.records[0]?.reason ?? code);
-  return { id: input.id };
 }

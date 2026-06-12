@@ -98,7 +98,7 @@ export const logTrainingEntryJsonSchema = {
   properties: {
     date:        { type: "string", description: "YYYY-MM-DD. Defaults to today." },
     time:        { type: "string", description: "HH:MM session start. Defaults to now." },
-    sessionType: { type: "string", description: "SessionType id (e.g. 'upper', 'lower', 'cardio'). List via training_sessions_list." },
+    sessionType: { type: "string", description: "SessionType id (e.g. 'upper', 'lower', 'cardio')." },
     exercise:    { type: "string", description: "Canonical exercise NAME (not id) — e.g. 'Chest press'. List via training_exercises_list." },
     weight:      { type: "number", description: "Weight in kg (for strength)." },
     sets:        { type: "string", description: "Integer or 'AMRAP'." },
@@ -130,20 +130,6 @@ export const updateTrainingEntryJsonSchema = {
     level:       { type: ["number", "null"] },
     note:        { type: ["string", "null"] },
     concludedAt: { type: ["string", "null"] },
-  },
-} as const;
-
-export const deleteTrainingEntryJsonSchema = {
-  type: "object", required: ["id"],
-  properties: { id: { type: "string", description: "ExerciseEntry id." } },
-} as const;
-
-export const retagTrainingSessionJsonSchema = {
-  type: "object",
-  required: ["date", "sessionType"],
-  properties: {
-    date:        { type: "string", description: "YYYY-MM-DD — every ExerciseEntry on this date will be retagged." },
-    sessionType: { type: "string", description: "New sessionType for all entries that day ('upper' | 'lower' | 'cardio' | 'yoga' | …). Pass '' to clear." },
   },
 } as const;
 
@@ -186,50 +172,6 @@ export const updateExerciseJsonSchema = {
   },
 } as const;
 
-export const deleteExerciseJsonSchema = {
-  type: "object", required: ["id"],
-  properties: { id: { type: "string", description: "ExerciseDefinition id (slug)." } },
-} as const;
-
-// ---- SessionType (routine template) ----
-
-export const listSessionTypesJsonSchema = {
-  type: "object",
-  properties: {
-    archived: { type: "boolean", description: "Include archived. Defaults to false." },
-    limit:    { type: "integer", default: 100 },
-  },
-} as const;
-
-export const createSessionTypeJsonSchema = {
-  type: "object",
-  required: ["id", "label"],
-  properties: {
-    id:        { type: "string", description: "Canonical key (e.g. 'upper', 'lower', 'cardio'). Lower-snake-case." },
-    label:    { type: "string", description: "Display label (e.g. 'Upper Body')." },
-    emoji:    { type: "string" },
-    exercises: { type: "array", items: { type: "string" }, description: "Canonical exercise names that belong to this session." },
-    kind:     { type: "string", description: "SessionKind enum value (free-form for now)." },
-  },
-} as const;
-
-export const updateSessionTypeJsonSchema = {
-  type: "object", required: ["id"],
-  properties: {
-    id:        { type: "string" },
-    label:    { type: "string" },
-    emoji:    { type: ["string", "null"] },
-    exercises: { type: "array", items: { type: "string" } },
-    kind:     { type: ["string", "null"] },
-    archived: { type: "boolean" },
-  },
-} as const;
-
-export const deleteSessionTypeJsonSchema = {
-  type: "object", required: ["id"],
-  properties: { id: { type: "string", description: "SessionType id." } },
-} as const;
-
 // ============================================================================
 // Types
 // ============================================================================
@@ -243,7 +185,6 @@ export interface LogTrainingEntryInput {
   note?: string; concludedAt?: string;
 }
 export interface UpdateTrainingEntryInput extends Partial<LogTrainingEntryInput> { id: string }
-export interface RetagTrainingSessionInput { date: string; sessionType: string }
 export interface ListExercisesInput { type?: string; archived?: boolean; limit?: number }
 export interface CreateExerciseInput {
   name: string; type: string; id?: string; subgroup?: string;
@@ -252,14 +193,6 @@ export interface CreateExerciseInput {
 export interface UpdateExerciseInput {
   id: string; name?: string; type?: string; subgroup?: string | null;
   aliases?: string[]; primaryMuscle?: string | null; secondaryMuscles?: string[]; archived?: boolean;
-}
-export interface ListSessionTypesInput { archived?: boolean; limit?: number }
-export interface CreateSessionTypeInput {
-  id: string; label: string; emoji?: string; exercises?: string[]; kind?: string;
-}
-export interface UpdateSessionTypeInput {
-  id: string; label?: string; emoji?: string | null;
-  exercises?: string[]; kind?: string | null; archived?: boolean;
 }
 
 // ============================================================================
@@ -400,51 +333,6 @@ export async function updateTrainingEntry(client: CloudKitClient, input: UpdateT
   return { id: input.id, updated };
 }
 
-/// Bulk-retag every ExerciseEntry on a given date. The data model has no
-/// dedicated TrainingSession record — a "session" is the logical bucket of
-/// entries sharing (date, sessionType). This tool lets callers operate at
-/// the session level without fanning out per-entry updates themselves.
-export async function retagTrainingSession(client: CloudKitClient, input: RetagTrainingSessionInput) {
-  // Query by `date EQUALS` directly. listTrainingEntries() uses a
-  // ___createTime match-all filter which isn't indexed on ExerciseEntry,
-  // and date GTE/LTE isn't allowed either — but EQUALS on the STRING
-  // date field works even with minimal indexing.
-  const res = await client.queryRecords({
-    recordType: "ExerciseEntry",
-    filterBy: [
-      { fieldName: "date", comparator: "EQUALS" as const, fieldValue: { value: input.date } },
-    ] as never,
-    resultsLimit: 200,
-  });
-  const ids = res.records.map((r) => r.recordName.replace(/^exercise-entry:/, ""));
-  if (!ids.length) return { date: input.date, sessionType: input.sessionType, updated: 0, ids: [] };
-
-  const ops = ids.map((rawId) => ({
-    operationType: "forceUpdate" as const,
-    record: {
-      recordType: "ExerciseEntry",
-      recordName: `exercise-entry:${rawId}`,
-      fields: { sessionType: { value: input.sessionType } },
-    },
-  }));
-  const modRes = await modify(client, ops);
-  const failed = modRes.records.filter((r) => r.serverErrorCode).map((r) => r.reason ?? r.serverErrorCode);
-  if (failed.length) throw new Error(`retag failed: ${failed.join("; ")}`);
-  return {
-    date: input.date,
-    sessionType: input.sessionType,
-    updated: ids.length,
-    ids,
-  };
-}
-
-export async function deleteTrainingEntry(client: CloudKitClient, input: { id: string }) {
-  const res = await modify(client, [{ operationType: "delete", record: { recordName: `exercise-entry:${input.id}` } }]);
-  const code = res.records[0]?.serverErrorCode;
-  if (code && code !== "NOT_FOUND") throw new Error(res.records[0]?.reason ?? code);
-  return { id: input.id };
-}
-
 // ============================================================================
 // ExerciseDefinition implementations
 // ============================================================================
@@ -531,90 +419,4 @@ export async function updateExercise(client: CloudKitClient, input: UpdateExerci
   const code = res.records[0]?.serverErrorCode;
   if (code) throw new Error(res.records[0]?.reason ?? code);
   return { id: input.id, updated };
-}
-
-export async function deleteExercise(client: CloudKitClient, input: { id: string }) {
-  const res = await modify(client, [{ operationType: "delete", record: { recordName: `exercise-def:${input.id}` } }]);
-  const code = res.records[0]?.serverErrorCode;
-  if (code && code !== "NOT_FOUND") throw new Error(res.records[0]?.reason ?? code);
-  return { id: input.id };
-}
-
-// ============================================================================
-// SessionType implementations
-// ============================================================================
-
-export async function listSessionTypes(client: CloudKitClient, input: ListSessionTypesInput) {
-  const filters: Array<{ fieldName: string; comparator: string; fieldValue: { value: unknown } }> = [];
-  if (input.archived === undefined || input.archived === false) {
-    filters.push({ fieldName: "archived", comparator: "EQUALS", fieldValue: { value: 0 } });
-  }
-
-  const res = await client.queryRecords({
-    recordType: "SessionType",
-    filterBy: filters.length ? (filters as never) : undefined,
-    sortBy: [{ fieldName: "sortIndex", ascending: true }],
-    resultsLimit: input.limit ?? 100,
-  });
-
-  const sessions = res.records.map((r) => ({
-    id:        r.recordName.replace(/^session-type:/, ""),
-    label:     optStr(r.fields.label?.value) ?? "",
-    emoji:     optStr(r.fields.emoji?.value),
-    exercises: optStrArray(r.fields.exercises?.value),
-    kind:      optStr(r.fields.kind?.value),
-    archived:  ((r.fields.archived?.value as number) ?? 0) !== 0,
-    sortIndex: (r.fields.sortIndex?.value as number) ?? 0,
-  }));
-
-  return { sessions };
-}
-
-export async function createSessionType(client: CloudKitClient, input: CreateSessionTypeInput) {
-  const fields: Record<string, { value: unknown }> = {
-    label:     { value: input.label },
-    exercises: { value: input.exercises ?? [] },
-    archived:  { value: 0 },
-    sortIndex: { value: 0 },
-  };
-  if (input.emoji) fields.emoji = { value: input.emoji };
-  if (input.kind)  fields.kind  = { value: input.kind };
-
-  const { droppedFields } = await client.createWithFieldFallback({
-    recordType: "SessionType",
-    recordName: `session-type:${input.id}`,
-    fields,
-    protectedFields: ["label"],
-  });
-
-  return droppedFields.length > 0
-    ? { id: input.id, label: input.label, droppedFields }
-    : { id: input.id, label: input.label };
-}
-
-export async function updateSessionType(client: CloudKitClient, input: UpdateSessionTypeInput) {
-  const fields: Record<string, { value: unknown }> = {};
-  const updated: string[] = [];
-  if (input.label !== undefined)     { fields.label = { value: input.label }; updated.push("label"); }
-  if (input.emoji !== undefined)     { fields.emoji = { value: input.emoji ?? "" }; updated.push("emoji"); }
-  if (input.exercises !== undefined) { fields.exercises = { value: input.exercises }; updated.push("exercises"); }
-  if (input.kind !== undefined)      { fields.kind = { value: input.kind ?? "" }; updated.push("kind"); }
-  if (input.archived !== undefined)  { fields.archived = { value: input.archived ? 1 : 0 }; updated.push("archived"); }
-
-  if (!updated.length) return { id: input.id, updated: [] };
-
-  const res = await modify(client, [{
-    operationType: "forceUpdate",
-    record: { recordType: "SessionType", recordName: `session-type:${input.id}`, fields },
-  }]);
-  const code = res.records[0]?.serverErrorCode;
-  if (code) throw new Error(res.records[0]?.reason ?? code);
-  return { id: input.id, updated };
-}
-
-export async function deleteSessionType(client: CloudKitClient, input: { id: string }) {
-  const res = await modify(client, [{ operationType: "delete", record: { recordName: `session-type:${input.id}` } }]);
-  const code = res.records[0]?.serverErrorCode;
-  if (code && code !== "NOT_FOUND") throw new Error(res.records[0]?.reason ?? code);
-  return { id: input.id };
 }

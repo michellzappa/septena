@@ -19,24 +19,24 @@ The tool list is **dynamic**: on `tools/list` the gateway reads the user's `Sett
 |---|---|
 | Tasks | `tasks_list`, `tasks_get`, `tasks_create`, `tasks_update`, `tasks_complete`, `tasks_defer`, `tasks_move_to_today`, `tasks_list_projects`, `tasks_list_areas` |
 | Task Conversations | `tasks_thread_get`, `tasks_thread_append`, `tasks_set_acceptance`, `tasks_set_artifact`, `tasks_set_handoff`, `tasks_set_endstate`, `tasks_set_assignee`, `tasks_pending_reasoning` |
-| Goals | `goals_list`, `goals_create`, `goals_update`, `goals_delete` |
+| Goals | `goals_list`, `goals_create`, `goals_update` |
 | Settings/Sections | `settings_get`, `settings_update`, `sections_list`, `sections_update` |
 
 ### Section-gated (only visible if section is active)
 
 | Section key | Tools |
 |---|---|
-| `habits` | `habits_list`, `habits_create`, `habits_update`, `habits_delete`, `habits_toggle` |
-| `supplements` | `supplements_list`, `supplements_create`, `supplements_update`, `supplements_delete`, `supplements_toggle` |
-| `chores` | `chores_list`, `chores_create`, `chores_update`, `chores_delete`, `chores_complete`, `chores_defer`, `chores_uncomplete` |
+| `habits` | `habits_list`, `habits_create`, `habits_toggle` |
+| `supplements` | `supplements_list`, `supplements_create`, `supplements_toggle` |
+| `chores` | `chores_list`, `chores_create`, `chores_complete`, `chores_uncomplete` |
 | `intake` | `intake_kinds_list`, `intake_kind_create`, `intake_kind_update`, `intake_items_list`, `intake_item_create`, `intake_item_delete`, `intake_events_list`, `intake_event_log`, `intake_event_delete` |
 | `symptoms` | `symptoms_list`, `symptoms_create`, `symptoms_log` |
 | `medications` | `medications_list`, `medications_create`, `medications_log` |
-| `gut` | `gut_events_list`, `gut_event_log`, `gut_event_delete` |
-| `nutrition` | `nutrition_entries_list`, `nutrition_entry_log`, `nutrition_entry_update`, `nutrition_entry_delete`, `nutrition_day_summary` |
-| `training` | `training_entries_list`, `training_entry_log`, `training_entry_update`, `training_entry_delete`, `training_session_retag`, `training_exercises_list`, `training_exercise_create`, `training_exercise_update`, `training_exercise_delete`, `training_sessions_list`, `training_session_create`, `training_session_update`, `training_session_delete` |
+| `gut` | `gut_events_list`, `gut_event_log` |
+| `nutrition` | `nutrition_entries_list`, `nutrition_entry_log`, `nutrition_entry_update`, `nutrition_day_summary` |
+| `training` | `training_entries_list`, `training_entry_log`, `training_entry_update`, `training_exercises_list`, `training_exercise_create`, `training_exercise_update` |
 | `hydration` | `hydration_log`, `hydration_today`, `hydration_history` |
-| `groceries` | `grocery_items_list`, `grocery_item_create`, `grocery_item_update`, `grocery_item_set_low`, `grocery_item_delete`, `grocery_categories_list`, `grocery_category_create`, `grocery_category_delete` |
+| `groceries` | `grocery_items_list`, `grocery_item_create`, `grocery_item_set_low` |
 
 ## Conventions across all tools
 
@@ -196,9 +196,8 @@ Three record types work together:
 `chest, frontDelts, sideDelts, rearDelts, triceps, lats, upperBack, biceps, forearms, quads, hamstrings, glutes, calves, adductors, abs, lowerBack` (camelCase exactly; `quads`, not `quadriceps`). Cardio/mobility usually have none. Invalid values are rejected.
 
 Logging workflow:
-1. `training_sessions_list()` → find sessionType id
-2. `training_exercises_list({type: "strength"})` → find canonical exercise name
-3. `training_entry_log({sessionType, exercise, weight, sets, reps})` for strength, or `{durationMin, distanceM}` for cardio
+1. `training_exercises_list({type: "strength"})` → find canonical exercise name
+2. `training_entry_log({sessionType, exercise, weight, sets, reps})` for strength, or `{durationMin, distanceM}` for cardio (pass the sessionType id, e.g. `upper`, `lower`, `cardio`)
 
 Backfilling / fixing muscle tags (per-exercise):
 1. `training_exercises_list()` → read current `primaryMuscle` (absent = unassigned)
@@ -240,8 +239,6 @@ hydration_history({ days: 7 })
 Day-to-day workflow is `grocery_item_set_low(id, low)`:
 - `low: true` → marks the item as out / needs buying
 - `low: false` → clears flag AND auto-stamps `lastBought = today`
-
-Don't use `grocery_item_update` for this — the convenience tool handles the lastBought stamping.
 
 ```
 # "I'm out of milk"

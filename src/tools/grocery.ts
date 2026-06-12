@@ -47,20 +47,8 @@ export const createGroceryItemJsonSchema = {
   required: ["name", "category"],
   properties: {
     name:     { type: "string" },
-    category: { type: "string", description: "GroceryCategory id (resolve via grocery_categories_list)." },
+    category: { type: "string", description: "GroceryCategory id." },
     emoji:    { type: "string" },
-  },
-} as const;
-
-export const updateGroceryItemJsonSchema = {
-  type: "object", required: ["id"],
-  properties: {
-    id:         { type: "string" },
-    name:       { type: "string" },
-    category:   { type: "string" },
-    emoji:      { type: "string" },
-    low:        { type: "boolean", description: "Marked-low flag. Use grocery_item_set_low for the day-to-day workflow." },
-    lastBought: { type: ["string", "null"], description: "YYYY-MM-DD or null to clear." },
   },
 } as const;
 
@@ -72,38 +60,13 @@ export const setGroceryLowJsonSchema = {
   },
 } as const;
 
-export const deleteGroceryItemJsonSchema = {
-  type: "object", required: ["id"],
-  properties: { id: { type: "string" } },
-} as const;
-
-// ---- GroceryCategory ----
-
-export const listGroceryCategoriesJsonSchema = {
-  type: "object",
-  properties: { limit: { type: "integer", default: 100 } },
-} as const;
-
-export const createGroceryCategoryJsonSchema = {
-  type: "object", required: ["name"],
-  properties: { name: { type: "string" } },
-} as const;
-
-export const deleteGroceryCategoryJsonSchema = {
-  type: "object", required: ["id"],
-  properties: { id: { type: "string" } },
-} as const;
-
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface ListGroceryItemsInput { low?: boolean; category?: string; limit?: number }
 export interface CreateGroceryItemInput { name: string; category: string; emoji?: string }
-export interface UpdateGroceryItemInput { id: string; name?: string; category?: string; emoji?: string; low?: boolean; lastBought?: string | null }
 export interface SetGroceryLowInput { id: string; low: boolean }
-export interface ListGroceryCategoriesInput { limit?: number }
-export interface CreateGroceryCategoryInput { name: string }
 
 // ============================================================================
 // GroceryItem implementations
@@ -160,26 +123,6 @@ export async function createGroceryItem(client: CloudKitClient, input: CreateGro
     : { id, name: input.name, category: input.category };
 }
 
-export async function updateGroceryItem(client: CloudKitClient, input: UpdateGroceryItemInput) {
-  const fields: Record<string, { value: unknown }> = {};
-  const updated: string[] = [];
-  if (input.name !== undefined)       { fields.name       = { value: input.name }; updated.push("name"); }
-  if (input.category !== undefined)   { fields.category   = { value: input.category }; updated.push("category"); }
-  if (input.emoji !== undefined)      { fields.emoji      = { value: input.emoji }; updated.push("emoji"); }
-  if (input.low !== undefined)        { fields.low        = { value: input.low ? 1 : 0 }; updated.push("low"); }
-  if (input.lastBought !== undefined) { fields.lastBought = { value: input.lastBought ?? "" }; updated.push("lastBought"); }
-
-  if (!updated.length) return { id: input.id, updated: [] };
-
-  const res = await modify(client, [{
-    operationType: "forceUpdate",
-    record: { recordType: "GroceryItem", recordName: `grocery-item:${input.id}`, fields },
-  }]);
-  const code = res.records[0]?.serverErrorCode;
-  if (code) throw new Error(res.records[0]?.reason ?? code);
-  return { id: input.id, updated };
-}
-
 /// Convenience: the most common grocery workflow. `low=true` marks the
 /// item as out / running low. `low=false` clears the flag and stamps
 /// lastBought to today (restock signal).
@@ -200,51 +143,4 @@ export async function setGroceryLow(client: CloudKitClient, input: SetGroceryLow
   const code = res.records[0]?.serverErrorCode;
   if (code) throw new Error(res.records[0]?.reason ?? code);
   return { id: input.id, low: input.low, ...(input.low ? {} : { lastBought: today }) };
-}
-
-export async function deleteGroceryItem(client: CloudKitClient, input: { id: string }) {
-  const res = await modify(client, [{ operationType: "delete", record: { recordName: `grocery-item:${input.id}` } }]);
-  const code = res.records[0]?.serverErrorCode;
-  if (code && code !== "NOT_FOUND") throw new Error(res.records[0]?.reason ?? code);
-  return { id: input.id };
-}
-
-// ============================================================================
-// GroceryCategory implementations
-// ============================================================================
-
-export async function listGroceryCategories(client: CloudKitClient, input: ListGroceryCategoriesInput) {
-  const res = await client.queryRecords({
-    recordType: "GroceryCategory",
-    sortBy: [{ fieldName: "sortIndex", ascending: true }],
-    resultsLimit: input.limit ?? 100,
-  });
-  const categories = res.records.map((r) => ({
-    id:        r.recordName.replace(/^grocery-cat:/, ""),
-    name:      optStr(r.fields.name?.value) ?? "",
-    sortIndex: (r.fields.sortIndex?.value as number) ?? 0,
-  }));
-  return { categories };
-}
-
-export async function createGroceryCategory(client: CloudKitClient, input: CreateGroceryCategoryInput) {
-  const id = newId(4);
-  const res = await modify(client, [{
-    operationType: "create",
-    record: {
-      recordType: "GroceryCategory",
-      recordName: `grocery-cat:${id}`,
-      fields: { name: { value: input.name }, sortIndex: { value: 0 } },
-    },
-  }]);
-  const code = res.records[0]?.serverErrorCode;
-  if (code) throw new Error(res.records[0]?.reason ?? code);
-  return { id, name: input.name };
-}
-
-export async function deleteGroceryCategory(client: CloudKitClient, input: { id: string }) {
-  const res = await modify(client, [{ operationType: "delete", record: { recordName: `grocery-cat:${input.id}` } }]);
-  const code = res.records[0]?.serverErrorCode;
-  if (code && code !== "NOT_FOUND") throw new Error(res.records[0]?.reason ?? code);
-  return { id: input.id };
 }

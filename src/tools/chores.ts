@@ -13,14 +13,6 @@ function sortKey(tz: string): string {
   return `${todayYMD(tz)}::${Date.now().toFixed(0).padStart(20, "0")}`;
 }
 
-function nextSaturday(from: string): string {
-  const d = new Date(`${from}T12:00:00Z`);
-  const day = d.getUTCDay(); // 0=Sun, 6=Sat
-  const delta = day === 6 ? 7 : (6 - day);
-  d.setUTCDate(d.getUTCDate() + delta);
-  return d.toISOString().slice(0, 10);
-}
-
 function optStr(v: unknown): string | undefined {
   return typeof v === "string" && v.length > 0 ? v : undefined;
 }
@@ -79,39 +71,12 @@ export const createChoreJsonSchema = {
   },
 } as const;
 
-export const updateChoreJsonSchema = {
-  type: "object",
-  required: ["id"],
-  properties: {
-    id: { type: "string" },
-    title: { type: "string" },
-    cadenceDays: { type: "integer", minimum: 1 },
-    emoji: { type: ["string", "null"] },
-  },
-} as const;
-
-export const deleteChoreJsonSchema = {
-  type: "object",
-  required: ["id"],
-  properties: { id: { type: "string" } },
-} as const;
-
 export const completeChoreJsonSchema = {
   type: "object",
   required: ["id"],
   properties: {
     id: { type: "string" },
     date: { type: "string", description: "YYYY-MM-DD. Defaults to today." },
-  },
-} as const;
-
-export const deferChoreJsonSchema = {
-  type: "object",
-  required: ["id", "mode"],
-  properties: {
-    id: { type: "string" },
-    mode: { type: "string", enum: ["day", "weekend"], description: "'day' = tomorrow, 'weekend' = next Saturday" },
-    date: { type: "string", description: "YYYY-MM-DD reference date. Defaults to today." },
   },
 } as const;
 
@@ -127,9 +92,7 @@ export const uncompleteChoreJsonSchema = {
 // ---- Types ----
 
 export interface CreateChoreInput { title: string; cadenceDays: number; emoji?: string }
-export interface UpdateChoreInput { id: string; title?: string; cadenceDays?: number; emoji?: string | null }
 export interface CompleteChoreInput { id: string; date?: string }
-export interface DeferChoreInput { id: string; mode: "day" | "weekend"; date?: string }
 export interface UncompleteChoreInput { id: string; date?: string }
 
 // ---- Implementations ----
@@ -217,34 +180,6 @@ export async function createChore(client: CloudKitClient, input: CreateChoreInpu
   return { id, title: input.title, cadenceDays: input.cadenceDays };
 }
 
-export async function updateChore(client: CloudKitClient, input: UpdateChoreInput) {
-  const fields: Record<string, { value: unknown }> = {};
-  const updated: string[] = [];
-  if (input.title !== undefined) { fields.title = { value: input.title }; updated.push("title"); }
-  if (input.cadenceDays !== undefined) { fields.cadenceDays = { value: input.cadenceDays }; updated.push("cadenceDays"); }
-  if (input.emoji !== undefined) { fields.emoji = { value: input.emoji ?? "" }; updated.push("emoji"); }
-  if (!updated.length) return { id: input.id, updated: [] };
-  await modify(client, [{
-    operationType: "forceUpdate",
-    record: { recordType: "ChoreDefinition", recordName: `chore-def:${input.id}`, fields },
-  }]);
-  return { id: input.id, updated };
-}
-
-export async function deleteChore(client: CloudKitClient, input: { id: string }) {
-  const eventsRes = await client.queryRecords({
-    recordType: "ChoreEvent",
-    filterBy: [{ fieldName: "choreID", comparator: "EQUALS", fieldValue: { value: input.id } }],
-    resultsLimit: 500,
-  });
-  const ops: ModifyOp[] = [
-    ...eventsRes.records.map((r) => ({ operationType: "delete" as const, record: { recordName: r.recordName } })),
-    { operationType: "delete", record: { recordName: `chore-def:${input.id}` } },
-  ];
-  await modify(client, ops);
-  return { id: input.id, deletedEvents: eventsRes.records.length };
-}
-
 export async function completeChore(client: CloudKitClient, input: CompleteChoreInput) {
   const tz = await getEffectiveTimezone(client);
   const date = input.date ?? todayYMD(tz);
@@ -267,29 +202,6 @@ export async function completeChore(client: CloudKitClient, input: CompleteChore
     protectedFields: ["choreID", "action", "date", "sortKey"],
   });
   return { id: input.id, date, action: "complete" };
-}
-
-export async function deferChore(client: CloudKitClient, input: DeferChoreInput) {
-  const tz = await getEffectiveTimezone(client);
-  const date = input.date ?? todayYMD(tz);
-  const newDueDate = input.mode === "weekend" ? nextSaturday(date) : addDaysYMD(date, 1);
-  const eventID = `chore:${date}:${input.id}:${newId(6)}`;
-  const fields: Record<string, { value: unknown }> = {
-    choreID: { value: input.id },
-    action: { value: "defer" },
-    date: { value: date },
-    newDueDate: { value: newDueDate },
-    reason: { value: input.mode },
-    sortKey: { value: sortKey(tz) },
-    occurredAt: { value: localToEpochMs(date, undefined, tz) },
-  };
-  await client.createWithFieldFallback({
-    recordType: "ChoreEvent",
-    recordName: `chore-event:${eventID}`,
-    fields,
-    protectedFields: ["choreID", "action", "date", "newDueDate", "sortKey"],
-  });
-  return { id: input.id, date, newDueDate, action: "defer" };
 }
 
 export async function uncompleteChore(client: CloudKitClient, input: UncompleteChoreInput) {

@@ -103,12 +103,6 @@ export const updateNutritionEntryJsonSchema = {
   },
 } as const;
 
-export const deleteNutritionEntryJsonSchema = {
-  type: "object",
-  required: ["id"],
-  properties: { id: { type: "string", description: "NutritionEntry id." } },
-} as const;
-
 export const getNutritionDaySummaryJsonSchema = {
   type: "object",
   properties: {
@@ -257,13 +251,6 @@ export async function updateNutritionEntry(client: CloudKitClient, input: Update
   const code = res.records[0]?.serverErrorCode;
   if (code) throw new Error(res.records[0]?.reason ?? code);
   return { id: input.id, updated };
-}
-
-export async function deleteNutritionEntry(client: CloudKitClient, input: { id: string }) {
-  const res = await modify(client, [{ operationType: "delete", record: { recordName: `nutrition-entry:${input.id}` } }]);
-  const code = res.records[0]?.serverErrorCode;
-  if (code && code !== "NOT_FOUND") throw new Error(res.records[0]?.reason ?? code);
-  return { id: input.id };
 }
 
 export async function getNutritionDaySummary(client: CloudKitClient, input: GetNutritionDaySummaryInput) {

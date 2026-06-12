@@ -46,22 +46,6 @@ export const createSupplementJsonSchema = {
   },
 } as const;
 
-export const updateSupplementJsonSchema = {
-  type: "object",
-  required: ["id"],
-  properties: {
-    id: { type: "string" },
-    title: { type: "string" },
-    emoji: { type: ["string", "null"] },
-  },
-} as const;
-
-export const deleteSupplementJsonSchema = {
-  type: "object",
-  required: ["id"],
-  properties: { id: { type: "string" } },
-} as const;
-
 export const toggleSupplementJsonSchema = {
   type: "object",
   required: ["id", "done"],
@@ -76,7 +60,6 @@ export const toggleSupplementJsonSchema = {
 
 export interface ListSupplementsInput { date?: string }
 export interface CreateSupplementInput { title: string; emoji?: string }
-export interface UpdateSupplementInput { id: string; title?: string; emoji?: string | null }
 export interface ToggleSupplementInput { id: string; date?: string; done: boolean }
 
 // ---- Implementations ----
@@ -138,33 +121,6 @@ export async function createSupplement(client: CloudKitClient, input: CreateSupp
     record: { recordType: "SupplementDefinition", recordName: `supplement-def:${id}`, fields },
   }]);
   return { id, title: input.title };
-}
-
-export async function updateSupplement(client: CloudKitClient, input: UpdateSupplementInput) {
-  const fields: Record<string, { value: unknown }> = {};
-  const updated: string[] = [];
-  if (input.title !== undefined) { fields.title = { value: input.title }; updated.push("title"); }
-  if (input.emoji !== undefined) { fields.emoji = { value: input.emoji ?? "" }; updated.push("emoji"); }
-  if (!updated.length) return { id: input.id, updated: [] };
-  await modify(client, [{
-    operationType: "forceUpdate",
-    record: { recordType: "SupplementDefinition", recordName: `supplement-def:${input.id}`, fields },
-  }]);
-  return { id: input.id, updated };
-}
-
-export async function deleteSupplement(client: CloudKitClient, input: { id: string }) {
-  const eventsRes = await client.queryRecords({
-    recordType: "SupplementEvent",
-    filterBy: [{ fieldName: "supplementID", comparator: "EQUALS", fieldValue: { value: input.id } }],
-    resultsLimit: 500,
-  });
-  const ops: ModifyOp[] = [
-    ...eventsRes.records.map((r) => ({ operationType: "delete" as const, record: { recordName: r.recordName } })),
-    { operationType: "delete", record: { recordName: `supplement-def:${input.id}` } },
-  ];
-  await modify(client, ops);
-  return { id: input.id, deletedEvents: eventsRes.records.length };
 }
 
 export async function toggleSupplement(client: CloudKitClient, input: ToggleSupplementInput) {
