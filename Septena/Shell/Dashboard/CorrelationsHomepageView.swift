@@ -15,6 +15,7 @@ struct CorrelationsHomepageView: View {
 
   @State private var result: CorrelationEngine.Result? = nil
   @State private var loading = true
+  @State private var loadingStage = "Preparing insights..."
   @State private var loadError: String? = nil
   @State private var focused: CorrelationEngine.EvaluatedPair? = nil
   @State private var insufficientExpanded = false
@@ -45,6 +46,9 @@ struct CorrelationsHomepageView: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
+      if loading {
+        loadingStatus
+      }
       if loading && result == nil {
         ProgressView()
           .frame(maxWidth: .infinity, minHeight: 120)
@@ -75,6 +79,25 @@ struct CorrelationsHomepageView: View {
         .frame(minWidth: 560, minHeight: 520)
         #endif
     }
+  }
+
+  private var loadingStatus: some View {
+    HStack(spacing: 10) {
+      ProgressView()
+        .controlSize(.small)
+      VStack(alignment: .leading, spacing: 2) {
+        Text("Generating insights")
+          .font(.caption.weight(.medium))
+        Text(loadingStage)
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+      }
+      Spacer()
+    }
+    .padding(10)
+    .background(
+      RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.cardSurface)
+    )
   }
 
   @ViewBuilder
@@ -372,22 +395,62 @@ struct CorrelationsHomepageView: View {
   }
 
   private func recompute() async {
+    setLoadingStage("Checking cached insights...")
+    log("start windowDays=\(windowDays)")
     // Same-day reopen with no data changes: serve the engine's memoized
     // result — no Oura fetch, no stats run, the drawer paints instantly.
     if let cached = CorrelationEngine.cachedResult(days: windowDays) {
+      log("cache hit evaluated=\(cached.evaluated.count) insufficient=\(cached.insufficient.count)")
       apply(cached)
       loading = false
+      setLoadingStage("Loaded cached insights.")
       return
     }
     loading = true
+    loadError = nil
     defer { loading = false }
-    let oura = (try? await OuraProvider.shared.fetchHistory(days: windowDays)) ?? []
+    setLoadingStage("Fetching sleep history...")
+    let oura = await fetchOuraHistory(days: windowDays)
+    log("oura fetched nights=\(oura.count)")
+    setLoadingStage("Comparing local signals...")
     let r = await CorrelationEngine.runEverything(
       context: modelContext,
       ouraNights: oura,
       days: windowDays
     )
+    setLoadingStage("Rendering \(r.evaluated.count) insights...")
+    log("done evaluated=\(r.evaluated.count) insufficient=\(r.insufficient.count) supplements=\(r.supplementsTable.count)")
     apply(r)
+  }
+
+  private func fetchOuraHistory(days: Int) async -> [OuraNight] {
+    await withTaskGroup(of: [OuraNight]?.self) { group in
+      group.addTask {
+        (try? await OuraProvider.shared.fetchHistory(days: days)) ?? []
+      }
+      group.addTask {
+        try? await Task.sleep(nanoseconds: 8_000_000_000)
+        return nil
+      }
+      let first = await group.next() ?? nil
+      group.cancelAll()
+      if let rows = first { return rows }
+      log("oura fetch timed out after 8s; continuing with local-only signals")
+      return []
+    }
+  }
+
+  private func setLoadingStage(_ stage: String) {
+    loadingStage = stage
+    log(stage)
+  }
+
+  private func log(_ message: String) {
+    let line = "[Insights] \(message)"
+    SeptenaLog.info(line)
+    #if DEBUG
+    print(line)
+    #endif
   }
 
   private func apply(_ r: CorrelationEngine.Result) {

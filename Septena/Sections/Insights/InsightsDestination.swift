@@ -38,6 +38,9 @@ struct InsightsDestinationView: View {
                   accent: Self.accent, showsSettingsLink: false) {
       CorrelationsHomepageView()
     }
+    .onAppear {
+      log("destination appeared")
+    }
     .toolbar {
       #if os(iOS)
       let placement: ToolbarItemPlacement = .topBarLeading
@@ -61,6 +64,14 @@ struct InsightsDestinationView: View {
     .sheet(isPresented: $showSettings) {
       SettingsView(initialDestination: .correlations)
     }
+    #endif
+  }
+
+  private func log(_ message: String) {
+    let line = "[Insights] \(message)"
+    SeptenaLog.info(line)
+    #if DEBUG
+    print(line)
     #endif
   }
 }

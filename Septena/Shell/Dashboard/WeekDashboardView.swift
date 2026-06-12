@@ -400,7 +400,10 @@ struct WeekDashboardView: View {
   /// catalog section, so this is always present — the Septena+ gate lives
   /// inside the destination.
   private var insightsToolbarButton: some View {
-    Button { open(.insights) } label: {
+    Button {
+      logInsightsOpen("toolbar tapped")
+      open(.insights)
+    } label: {
       Image(systemName: "chart.dots.scatter")
     }
     .accessibilityLabel("Insights")
@@ -507,10 +510,15 @@ struct WeekDashboardView: View {
   /// into "real screen" on iPad / macOS.
   @ViewBuilder
   private func pushedContent(for dest: WeekDestination) -> some View {
-    if let view = SectionRegistry.plugin(forKey: dest.rawValue)?.destinationView() {
-      view
-    } else {
-      EmptyView()
+    switch dest {
+    case .insights:
+      InsightsDestinationView()
+    default:
+      if let view = SectionRegistry.plugin(forKey: dest.rawValue)?.destinationView() {
+        view
+      } else {
+        EmptyView()
+      }
     }
   }
 
@@ -525,10 +533,15 @@ struct WeekDashboardView: View {
       // plugin's `destinationView()` (Tasks included, via the shared
       // SectionDrawer). Calendar is an integration, not a section — its data
       // surfaces inline in Today/Next, so it has no dedicated view here.
-      if let view = SectionRegistry.plugin(forKey: dest.rawValue)?.destinationView() {
-        view
-      } else {
-        EmptyView()
+      switch dest {
+      case .insights:
+        InsightsDestinationView()
+      default:
+        if let view = SectionRegistry.plugin(forKey: dest.rawValue)?.destinationView() {
+          view
+        } else {
+          EmptyView()
+        }
       }
     }
     // All sheet/presentation chrome (detents, translucent background, glass
@@ -1013,11 +1026,28 @@ struct WeekDashboardView: View {
   /// not forwarded to open a new section. (On iPad/macOS push navigation
   /// there's no overlay to dismiss, so swap to the tapped section directly.)
   private func open(_ dest: WeekDestination) {
+    if dest == .insights {
+      logInsightsOpen("open requested usesPushNavigation=\(usesPushNavigation) sheetDest=\(sheetDest?.rawValue ?? "nil")")
+    }
     guard usesPushNavigation || sheetDest == nil else {
+      if dest == .insights {
+        logInsightsOpen("compact drawer already open; dismissed existing drawer")
+      }
       sheetDest = nil
       return
     }
     sheetDest = dest
+    if dest == .insights {
+      logInsightsOpen("presentation state set")
+    }
+  }
+
+  private func logInsightsOpen(_ message: String) {
+    let line = "[Insights] \(message)"
+    SeptenaLog.info(line)
+    #if DEBUG
+    print(line)
+    #endif
   }
 
   /// Single entry point for "user tapped the Tasks tile on the homepage."

@@ -182,10 +182,12 @@ struct CorrelationEngine {
     days: Int = 365
   ) async -> Result {
     if let cached = cachedResult(days: days) { return cached }
+    SeptenaLog.info("[Insights] engine start days=\(days) ouraNights=\(ouraNights.count)")
     // Snapshot the stamp BEFORE extracting, so a write that lands mid-run
     // invalidates this result instead of being silently absorbed into it.
     let stampAtStart = dataStamp
     let extraction = extract(context: context, ouraNights: ouraNights, days: days)
+    SeptenaLog.info("[Insights] extracted days=\(extraction.features.count) habits=\(extraction.habits.count) supplements=\(extraction.supplements.count)")
 
     // The universe is "everything you actively track," not a curated list.
     // Active sections come straight from the enabled SectionEntity set; an
@@ -227,6 +229,7 @@ struct CorrelationEngine {
                              availableKeys: availableKeys,
                              activeSections: activeSections,
                              curated: curatedPairs())
+    SeptenaLog.info("[Insights] features=\(availableKeys.count) candidatePairs=\(allPairs.count) activeSections=\(activeSections.count)")
 
     // Everything above touched SwiftData / the plugin registry, so it stayed
     // on the main actor — it's predicate-bounded fetches, cheap. Everything
@@ -240,6 +243,7 @@ struct CorrelationEngine {
                          allPairs: allPairs,
                          supplements: supplements)
     }.value
+    SeptenaLog.info("[Insights] stats done evaluated=\(result.evaluated.count) insufficient=\(result.insufficient.count)")
 
     cache = (days: days, today: SeptenaDate.today,
              stamp: stampAtStart, result: result)

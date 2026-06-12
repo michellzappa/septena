@@ -3123,6 +3123,9 @@
         }
       }
     },
+    "Generating insights" : {
+
+    },
     "Gentle reminders to mark what you’ve done — habits, chores, hydration, bedtime. They fire around when you usually log, and stay quiet once it’s done. See everything that’s scheduled — and turn individual nudges on or off — under Scheduled Notifications." : {
       "extractionState" : "stale",
       "localizations" : {
