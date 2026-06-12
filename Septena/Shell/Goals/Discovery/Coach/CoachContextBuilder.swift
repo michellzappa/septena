@@ -40,7 +40,7 @@ enum CoachContextBuilder {
   /// (sectionKeys == nil) sees this whole list; other presets pick a slice.
   static let supportedKeys = ["training", "nutrition", "hydration", "supplements",
                               "sleep", "body", "mood", "gut", "tasks", "chores",
-                              "habits"]
+                              "habits", "intake"]
 
   /// A compact facts block for the preset + window, safe to paste into a
   /// prompt. `excluding` drops sections the user toggled off — the model
@@ -143,6 +143,7 @@ enum CoachContextBuilder {
     switch key {
     case "training":  return ("Training", trainingRecords(r, ctx))
     case "nutrition": return ("Nutrition", nutritionRecords(r, ctx))
+    case "intake":    return ("Intake", intakeRecords(r, ctx))
     case "gut":       return ("Gut", gutRecords(r, ctx))
     case "mood":      return ("Mood", moodRecords(r, ctx))
     case "sleep":     return ("Sleep", sleepRecords(r, ctx))
@@ -180,13 +181,26 @@ enum CoachContextBuilder {
       }
   }
 
+  private static func intakeRecords(_ r: Range, _ ctx: ModelContext) -> [String] {
+    let kindName = Dictionary(uniqueKeysWithValues:
+      ((try? ctx.fetch(FetchDescriptor<IntakeKindEntity>())) ?? []).map { ($0.id, $0.name) })
+    return fetchDated(IntakeEventEntity.self, r, ctx) { $0.date }
+      .sorted { $0.occurredAt > $1.occurredAt }
+      .map { x in
+        var s = "\(stamp(x.date, x.occurredAt)) · \(kindName[x.kindID] ?? "intake") · \(x.method)"
+        if let a = x.amount { s += " · \(num(a))" }
+        if let c = x.count { s += " · \(c)" }
+        if let n = x.note, !n.isEmpty { s += " — \(n)" }
+        return s
+      }
+  }
+
   private static func gutRecords(_ r: Range, _ ctx: ModelContext) -> [String] {
     fetchDated(GutEventEntity.self, r, ctx) { $0.date }
       .sorted { $0.occurredAt > $1.occurredAt }
       .map { x in
-        var s = "\(stamp(x.date, x.occurredAt)) · Bristol \(x.bristol) · \(x.blood != 0 ? "blood" : "no blood")"
+        var s = "\(stamp(x.date, x.occurredAt)) · Bristol \(x.bristol)"
         if let v = x.volume, !v.isEmpty { s += " · \(v)" }
-        if let d = x.discomfortLevel, !d.isEmpty { s += " · discomfort \(d)" }
         if let n = x.note, !n.isEmpty { s += " — \(n)" }
         return s
       }
@@ -304,6 +318,7 @@ enum CoachContextBuilder {
     case "gut":         return gut(w, r, ctx)
     case "tasks":       return tasks(r, ctx)
     case "chores":      return chores(w, r, ctx)
+    case "intake":      return intake(w, r, ctx)
     default:            return []
     }
   }
@@ -385,8 +400,7 @@ enum CoachContextBuilder {
     guard !gut.isEmpty else { return [] }
     let days = Set(gut.map(\.date)).count
     let avgBristol = Double(gut.reduce(0) { $0 + $1.bristol }) / Double(gut.count)
-    let anyBlood = gut.contains { $0.blood != 0 }
-    return ["- Gut: \(gut.count) entries over \(days)/\(w.days) days (avg Bristol \(oneDecimal(avgBristol)), \(anyBlood ? "blood noted" : "no blood"))"]
+    return ["- Gut: \(gut.count) entries over \(days)/\(w.days) days (avg Bristol \(oneDecimal(avgBristol)))"]
   }
 
   private static func tasks(_ r: Range, _ ctx: ModelContext) -> [String] {
@@ -405,6 +419,30 @@ enum CoachContextBuilder {
       .filter { $0.action.lowercased().hasPrefix("complet") }
     guard !chores.isEmpty else { return [] }
     return ["- Chores: \(chores.count) completed over \(w.days) days"]
+  }
+
+  /// One line per active intake tracker — the generic successor to the old
+  /// per-substance caffeine/cannabis facts. Each kind's name comes from user
+  /// data, so the coach reasons about "Matcha" or "Nicotine" with no edit.
+  private static func intake(_ w: CoachWindow, _ r: Range, _ ctx: ModelContext) -> [String] {
+    let kinds = ((try? ctx.fetch(FetchDescriptor<IntakeKindEntity>())) ?? [])
+      .filter { $0.archivedAt == nil }
+      .sorted { $0.sortIndex < $1.sortIndex }
+    guard !kinds.isEmpty else { return [] }
+    let byKind = Dictionary(grouping: fetchDated(IntakeEventEntity.self, r, ctx) { $0.date },
+                            by: \.kindID)
+    return kinds.compactMap { k -> String? in
+      let evs = byKind[k.id] ?? []
+      guard !evs.isEmpty else { return nil }
+      let days = Set(evs.map(\.date)).count
+      let perDay = Double(evs.count) / Double(w.days)
+      var line = "\(k.name): \(oneDecimal(perDay))/day, \(days)/\(w.days) days"
+      if k.metricMode == "sumAmount", let unit = k.unit {
+        let total = evs.compactMap(\.amount).reduce(0, +)
+        if total > 0 { line += ", \(oneDecimal(total))\(unit) total" }
+      }
+      return "- \(line)"
+    }
   }
 
   /// Definition-count × window-days vs. logged "done" days → adherence %.
@@ -438,6 +476,7 @@ enum CoachContextBuilder {
     case "gut":         return fetchDated(GutEventEntity.self, r, ctx) { $0.date }.count
     case "tasks":       return fetchCompletedTasks(r, ctx).count
     case "chores":      return fetchDated(ChoreEventEntity.self, r, ctx) { $0.date }.filter { $0.action.lowercased().hasPrefix("complet") }.count
+    case "intake":      return fetchDated(IntakeEventEntity.self, r, ctx) { $0.date }.count
     default:            return 0
     }
   }
@@ -449,6 +488,7 @@ enum CoachContextBuilder {
     case "sleep": return "Sleep"; case "mood": return "Mood"; case "body": return "Body"
     case "habits": return "Habits"; case "gut": return "Gut"
     case "tasks": return "Tasks"; case "chores": return "Chores"
+    case "intake": return "Intake"
     default: return key.capitalized
     }
   }
@@ -460,6 +500,7 @@ enum CoachContextBuilder {
     case "sleep": return "bed.double"; case "mood": return "face.smiling"; case "body": return "scalemass"
     case "habits": return "repeat"; case "gut": return "stethoscope"
     case "tasks": return "checklist"; case "chores": return "house.fill"
+    case "intake": return "takeoutbag.and.cup.and.straw"
     default: return "circle.fill"
     }
   }

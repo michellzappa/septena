@@ -168,6 +168,31 @@ enum VirtueSummarizer {
       if let section { sections.insert(section) }
     }
 
+    // ── Intake → Temperance (consumption self-governance) ──────────
+    // One signal per active tracker. Valence keys off the user's own
+    // objective: trackers they've set to limit/reduce/quit read as strain
+    // when used most days; plain logs stay neutral (the generic successor
+    // to the old caffeine/cannabis heuristics).
+    let intakeKinds = fetchAll(IntakeKindEntity.self, context).filter { $0.archivedAt == nil }
+    if !intakeKinds.isEmpty {
+      let byKind = Dictionary(grouping: fetchByDate(IntakeEventEntity.self, fromStr, toStr, context),
+                              by: \.kindID)
+      for k in intakeKinds.sorted(by: { $0.sortIndex < $1.sortIndex }) {
+        let evs = byKind[k.id] ?? []
+        guard !evs.isEmpty else { continue }
+        let days = Set(evs.map(\.date)).count
+        let perDay = Double(evs.count) / 7.0
+        var text = "\(k.name) \(oneDecimal(perDay))/day, \(days)/7 days"
+        if k.metricMode == "sumAmount", let unit = k.unit {
+          let total = evs.compactMap(\.amount).reduce(0, +)
+          if total > 0 { text += ", \(oneDecimal(total))\(unit)" }
+        }
+        let reducing = ["limit", "reduce", "quit"].contains(k.objective)
+        let valence: Valence = reducing ? (days >= 5 ? .strain : .neutral) : .neutral
+        add(.temperance, text, valence, section: "intake")
+      }
+    }
+
     // ── Habits → Temperance (self-governance / ordered routine) ─────
     let habitDefs = fetchAll(HabitDefinitionEntity.self, context)
     if !habitDefs.isEmpty {
@@ -211,9 +236,8 @@ enum VirtueSummarizer {
     if !gut.isEmpty {
       let days = Set(gut.map(\.date)).count
       let avgBristol = Double(gut.reduce(0) { $0 + $1.bristol }) / Double(gut.count)
-      let anyBlood = gut.contains { $0.blood != 0 }
-      let text = "Gut tracked \(gut.count)× over \(days)/7 days (avg Bristol \(oneDecimal(avgBristol)), \(anyBlood ? "blood noted" : "no blood"))"
-      add(.wisdom, text, anyBlood ? .neutral : .good, section: "gut")
+      let text = "Gut tracked \(gut.count)× over \(days)/7 days (avg Bristol \(oneDecimal(avgBristol)))"
+      add(.wisdom, text, .good, section: "gut")
     }
 
     // ── Training → Courage (the body / discomfort) ──────────────────
@@ -274,7 +298,7 @@ enum VirtueSummarizer {
                      hasData: populated.contains(virtue))
     }
 
-    let allSupported = ["habits", "nutrition", "supplements",
+    let allSupported = ["intake", "habits", "nutrition", "supplements",
                         "gut", "training", "tasks", "chores"]
     let missing = allSupported.filter { !sections.contains($0) }
 
@@ -381,6 +405,7 @@ enum VirtueSummarizer {
 // entity without a per-type switch. Conformances are declared here so
 // adding a new event type to the summary is a one-line extension.
 private protocol DateStringed { var dateKey: String { get } }
+extension IntakeEventEntity: DateStringed { var dateKey: String { date } }
 extension GutEventEntity: DateStringed { var dateKey: String { date } }
 extension ExerciseEntryEntity: DateStringed { var dateKey: String { date } }
 extension ChoreEventEntity: DateStringed { var dateKey: String { date } }

@@ -145,6 +145,53 @@ enum IntakePlugin: SectionPlugin {
       return nil
     }
   }
+
+  /// Per-kind daily correlation signals — the generic successor to the old
+  /// static caffeine/cannabis features. Every active tracker contributes an
+  /// events/day lever; amount-tracking kinds add a dose/day lever. The smart
+  /// engine auto-pairs these against outcomes (sleep, readiness, …), so a
+  /// user's "matcha" or "nicotine" tracker correlates with no engine edit.
+  static func correlationFeatures(context: ModelContext) -> [CorrelationFeature] {
+    let kinds = ((try? context.fetch(FetchDescriptor<IntakeKindEntity>())) ?? [])
+      .filter { $0.archivedAt == nil }
+    guard !kinds.isEmpty else { return [] }
+    let events = (try? context.fetch(FetchDescriptor<IntakeEventEntity>())) ?? []
+    guard !events.isEmpty else { return [] }
+    let byKind = Dictionary(grouping: events, by: \.kindID)
+
+    return kinds.flatMap { k -> [CorrelationFeature] in
+      let evs = byKind[k.id] ?? []
+      guard !evs.isEmpty else { return [] }
+
+      var countSeries: [String: Double] = [:]
+      for e in evs { countSeries[e.date, default: 0] += 1 }
+      var out = [CorrelationFeature(
+        key: "intake_\(k.id)_count",
+        label: "\(k.name) \(k.countNoun.map { $0.lowercased() + "s" } ?? "count")",
+        section: "intake",
+        unit: "",
+        role: .lever,
+        distribution: .count,
+        series: countSeries)]
+
+      if k.metricMode == "sumAmount", let unit = k.unit {
+        var amountSeries: [String: Double] = [:]
+        var any = false
+        for e in evs { if let a = e.amount { amountSeries[e.date, default: 0] += a; any = true } }
+        if any {
+          out.append(CorrelationFeature(
+            key: "intake_\(k.id)_amount",
+            label: "\(k.name) \(unit)",
+            section: "intake",
+            unit: unit,
+            role: .lever,
+            distribution: .continuous,
+            series: amountSeries))
+        }
+      }
+      return out
+    }
+  }
 }
 
 // MARK: - First-enable onboarding (template picker)
