@@ -4682,12 +4682,12 @@ struct ImportExportSettingsPane: View {
   @State private var showingPaste = false
   @State private var showingFilePicker = false
   @State private var pasteBuffer: String = ""
-  @State private var nutritionRepairState: RepairState = .idle
+  @State private var repairState: RepairState = .idle
 
   enum RepairState: Equatable {
     case idle
     case running
-    case success(entryCount: Int, summaryCount: Int)
+    case success(recordCount: Int, typeCount: Int)
     case failure(message: String)
   }
 
@@ -4889,30 +4889,32 @@ struct ImportExportSettingsPane: View {
 
   // MARK: Repair
 
-  // One-shot re-pull for record types whose history may be missing locally
+  // One-shot re-pull for records whose history may be missing locally
   // because CKSyncEngine's incremental fetch token advanced past records
-  // the device couldn't yet decode (e.g. nutrition records arrived while
-  // this Mac was running a build that didn't have the
-  // `case NutritionEntryCloudKitSchema.recordType` arm in
-  // `applyFetchedRecord`). `fetchAllRecords` does a fresh nil-token zone
-  // replay so historical records are redelivered regardless of the engine
-  // checkpoint.
+  // the device couldn't yet decode (a record type arrived while this
+  // device was running a build without the matching arm in
+  // `applyFetchedRecord` — it happened with nutrition, then again with
+  // intake). `fetchAllRecords` does a fresh nil-token zone replay so
+  // every live record is redelivered regardless of the engine
+  // checkpoint, and the absorb path upserts idempotently. Whole-zone on
+  // purpose: a per-type picker would just recreate this bug for the
+  // next record type.
   @ViewBuilder
   private var repairSection: some View {
     Section {
       Button {
-        Task { await repairNutritionFromCloudKit() }
+        Task { await repairFromCloudKit() }
       } label: {
         HStack {
-          Label("Repair nutrition from CloudKit", systemImage: "stethoscope")
+          Label("Repair data from CloudKit", systemImage: "stethoscope")
           Spacer()
-          switch nutritionRepairState {
+          switch repairState {
           case .idle:
             EmptyView()
           case .running:
             ProgressView().controlSize(.small)
-          case .success(let entries, let summaries):
-            Text("\(entries) entries · \(summaries) days")
+          case .success(let records, let types):
+            Text("\(records) records · \(types) types")
               .font(.caption.monospacedDigit())
               .foregroundStyle(.secondary)
           case .failure:
@@ -4921,8 +4923,8 @@ struct ImportExportSettingsPane: View {
           }
         }
       }
-      .disabled(nutritionRepairState == .running)
-      if case .failure(let message) = nutritionRepairState {
+      .disabled(repairState == .running)
+      if case .failure(let message) = repairState {
         Text(message)
           .font(.caption)
           .foregroundStyle(.red)
@@ -4930,31 +4932,22 @@ struct ImportExportSettingsPane: View {
     } header: {
       Text("Repair")
     } footer: {
-      Text("Re-pulls every nutrition entry and daily summary from CloudKit and merges them into the local store. Use if this device's protein/kcal history looks empty even though entries exist on another device.")
+      Text("Re-pulls every record in this account's CloudKit zone and merges it into the local store. Use if a section's history looks empty on this device even though the data exists on another one. Cloud truth wins for any record that differs locally.")
     }
   }
 
-  private func repairNutritionFromCloudKit() async {
-    nutritionRepairState = .running
+  private func repairFromCloudKit() async {
+    repairState = .running
     do {
-      let records = try await ckEngine.fetchAllRecords(recordTypes: [
-        NutritionEntryCloudKitSchema.recordType,
-        NutritionDailySummaryCloudKitSchema.recordType,
-      ])
-      var entries = 0
-      var summaries = 0
+      let records = try await ckEngine.fetchAllRecords()
       for record in records {
         ckEngine.applyFetchedRecord?(record)
-        if record.recordType == NutritionEntryCloudKitSchema.recordType {
-          entries += 1
-        } else if record.recordType == NutritionDailySummaryCloudKitSchema.recordType {
-          summaries += 1
-        }
       }
       ckEngine.applyDidFinishBatch?()
-      nutritionRepairState = .success(entryCount: entries, summaryCount: summaries)
+      let types = Set(records.map(\.recordType)).count
+      repairState = .success(recordCount: records.count, typeCount: types)
     } catch {
-      nutritionRepairState = .failure(message: error.localizedDescription)
+      repairState = .failure(message: error.localizedDescription)
     }
   }
 

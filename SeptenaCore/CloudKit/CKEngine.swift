@@ -338,8 +338,9 @@ func noteCoachMessageDeletion(id: String) { noteDeletion(recordName: CoachMessag
   /// may reject even broad queries when `recordName` is not marked
   /// queryable. Zone-change fetches are the native custom-zone replay API
   /// and return all current live records without those indexes.
-  func fetchAllRecords(recordTypes: [CKRecord.RecordType]) async throws -> [CKRecord] {
-    let acceptedTypes = Set(recordTypes)
+  /// Pass `nil` to replay every record type in the zone.
+  func fetchAllRecords(recordTypes: [CKRecord.RecordType]? = nil) async throws -> [CKRecord] {
+    let acceptedTypes = recordTypes.map(Set.init)
     var token: CKServerChangeToken?
     var moreComing = true
     var recordsByID: [CKRecord.ID: CKRecord] = [:]
@@ -355,7 +356,7 @@ func noteCoachMessageDeletion(id: String) { noteDeletion(recordName: CoachMessag
         switch result {
         case .success(let modification):
           let record = modification.record
-          if acceptedTypes.contains(record.recordType) {
+          if acceptedTypes?.contains(record.recordType) ?? true {
             recordsByID[recordID] = record
           }
         case .failure(let error):
