@@ -103,8 +103,8 @@ struct AddNutritionPage: View {
   }
 
   private func duplicate(_ entry: NutritionEntry) {
-    SectionLog.newLog(
-      section: "nutrition",
+    NutritionPlugin.commitMeal(
+      loggedAt: .now,
       accent: AddInfoSection.nutrition.accent(theme: theme),
       announce: "Logged \(entry.foods.first ?? "meal").",
       logCommit: logCommit

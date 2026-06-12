@@ -282,8 +282,8 @@ struct NutritionDestinationView: View {
 
   /// Re-log an existing meal at the current moment.
   private func logAgainNow(_ entry: NutritionEntry) {
-    SectionLog.newLog(
-      section: "nutrition",
+    NutritionPlugin.commitMeal(
+      loggedAt: .now,
       accent: accent,
       announce: "Logged \(entry.foods.first ?? "meal").",
       logCommit: logCommit

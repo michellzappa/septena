@@ -693,6 +693,17 @@ enum SectionLog {
     write()
     Haptics.tick()
   }
+
+  /// A NEW log that deliberately stays off the canvas: the everyday repeats
+  /// of a high-frequency section (water before the target glass, meals after
+  /// the fast-breaking one). Write + a light tick + the announce — the same
+  /// confirmation contract as a flourish under Reduce Motion, chosen here as
+  /// policy rather than accessibility.
+  static func quietLog(announce: String? = nil, write: () -> Void) {
+    write()
+    Haptics.tick()
+    if let announce { A11y.announce(announce) }
+  }
 }
 
 extension View {

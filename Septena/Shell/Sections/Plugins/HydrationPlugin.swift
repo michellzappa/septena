@@ -57,14 +57,14 @@ enum HydrationPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(HydrationDestinationView()) }
 
-  // Every glass gets the calm `.bloom`, not the full-page `.fill` flood —
-  // you log water many times a day, and by the "celebration budget" rule
-  // (TaskComponents) a high-frequency moment never earns the canvas. The
-  // `.fill` flood is *reserved* for the one glass that crosses the daily
-  // target (see HydrationDestinationView.commit) — a once-a-day payoff that
-  // actually means "you hit your goal," the hydration sibling of the tasks
-  // `.arc` rule. Everyday glasses bloom; the goal glass floods.
-  static var logFlourish: LogFlourish? { LogFlourish(motion: .bloom) }
+  // No everyday flourish at all — water is the app's most frequent log, and
+  // an ordinary glass commits quietly (`SectionLog.quietLog`: tick +
+  // announce, no canvas). The `.fill` flood is *reserved* for the one glass
+  // that crosses the daily target — a once-a-day payoff that actually means
+  // "you hit your goal," the hydration sibling of the tasks `.arc` rule.
+  // Both commit sites (the destination below + the dashboard tile quick-add)
+  // pass `.fill` explicitly on the crossing, so no plugin default is needed.
+  static var logFlourish: LogFlourish? { nil }
 
   // MARK: - First-enable onboarding
 
@@ -323,30 +323,16 @@ private struct HydrationDestinationView: View {
 
   private func commit(ml: Int) {
     // Does THIS glass take you from under your target to at/over it? That's
-    // the earned moment: it plays the full-page `.fill` flood, once. Only on
-    // today (the target is a "today" goal) and only on the crossing — the
-    // next glass after you've hit the goal blooms like the rest.
+    // the one earned moment: it plays the full-page `.fill` flood, once.
+    // Only on today (the target is a "today" goal) and only on the crossing.
+    // Every other glass commits quietly — tick + announce, no canvas; water
+    // is too frequent to celebrate.
     let crossed = isViewingToday
       && targetMl > 0
       && dayMl < targetMl
       && dayMl + ml >= targetMl
 
-    // The crossing floods near-full; an everyday glass blooms, its reach
-    // scaling gently with the amount (a 500ml glass is the calibrated 1.0).
-    let motion: CommitMotion? = crossed ? .fill : nil   // nil → plugin's `.bloom`
-    let intensity = crossed ? 1.4 : min(1.4, max(0.6, Double(ml) / 500))
-    let announce = crossed
-      ? "Hydration goal reached — \(dayMl + ml) of \(targetMl) ml."
-      : "Logged \(ml) ml of water."
-
-    SectionLog.newLog(
-      section: "hydration",
-      accent: accent,
-      motion: motion,
-      intensity: intensity,
-      announce: announce,
-      logCommit: logCommit
-    ) {
+    let write = {
       _ = mutator.addEntry(
         loggedAt: .now,
         emoji: "💧",
@@ -356,6 +342,19 @@ private struct HydrationDestinationView: View {
         waterMl: Double(ml)
       )
       reload()
+    }
+    if crossed {
+      SectionLog.newLog(
+        section: "hydration",
+        accent: accent,
+        motion: .fill,
+        intensity: 1.4,
+        announce: "Hydration goal reached — \(dayMl + ml) of \(targetMl) ml.",
+        logCommit: logCommit,
+        write: write
+      )
+    } else {
+      SectionLog.quietLog(announce: "Logged \(ml) ml of water.", write: write)
     }
   }
 

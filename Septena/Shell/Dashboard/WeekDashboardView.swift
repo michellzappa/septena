@@ -2592,8 +2592,8 @@ struct WeekDashboardView: View {
 
   /// Duplicate a meal at the current time via NutritionMutator.
   private func commitNutritionDuplicate(_ entry: NutritionEntry) {
-    SectionLog.newLog(
-      section: "nutrition",
+    NutritionPlugin.commitMeal(
+      loggedAt: .now,
       accent: theme.color(for: "nutrition"),
       announce: "Logged \(entry.foods.first ?? "meal").",
       logCommit: logCommit
@@ -2754,9 +2754,10 @@ struct WeekDashboardView: View {
   }
 
   /// Log a glass from the tile's quick-add menu. Mirrors the destination
-  /// view's commit exactly: an everyday glass blooms (reach scaled to the
-  /// amount); the glass that crosses today's target floods once with `.fill`.
-  /// Then self-refreshes the tile.
+  /// view's commit exactly: ONLY the glass that crosses today's target gets
+  /// the canvas (`.fill`, once a day); every other glass commits quietly
+  /// (tick + announce — water is too frequent to celebrate). Then
+  /// self-refreshes the tile.
   ///
   /// The crossing check reads today's REAL total from the local mirror, not
   /// `hydrationToday` — that display state is seeded from a cache whose
@@ -2769,19 +2770,7 @@ struct WeekDashboardView: View {
     let crossed = hydrationTargetMl > 0
       && todayMl < hydrationTargetMl
       && todayMl + ml >= hydrationTargetMl
-    let motion: CommitMotion? = crossed ? .fill : nil   // nil → plugin's `.bloom`
-    let intensity = crossed ? 1.4 : min(1.4, max(0.6, Double(ml) / 500))
-    let announce = crossed
-      ? "Hydration goal reached — \(todayMl + ml) of \(hydrationTargetMl) ml."
-      : "Logged \(ml) ml of water."
-    SectionLog.newLog(
-      section: "hydration",
-      accent: accent,
-      motion: motion,
-      intensity: intensity,
-      announce: announce,
-      logCommit: logCommit
-    ) {
+    let write = {
       _ = SeptenaServices.shared.nutritionMutator.addEntry(
         loggedAt: .now,
         emoji: "💧",
@@ -2791,6 +2780,19 @@ struct WeekDashboardView: View {
         waterMl: Double(ml)
       )
       Task { await refreshHydration() }
+    }
+    if crossed {
+      SectionLog.newLog(
+        section: "hydration",
+        accent: accent,
+        motion: .fill,
+        intensity: 1.4,
+        announce: "Hydration goal reached — \(todayMl + ml) of \(hydrationTargetMl) ml.",
+        logCommit: logCommit,
+        write: write
+      )
+    } else {
+      SectionLog.quietLog(announce: "Logged \(ml) ml of water.", write: write)
     }
   }
 

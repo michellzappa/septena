@@ -133,8 +133,8 @@ struct NewNutritionEntrySheet: View {
     guard !foods.isEmpty else { return }
     let emojiValue = emoji.trimmingCharacters(in: .whitespacesAndNewlines)
 
-    SectionLog.newLog(
-      section: "nutrition",
+    NutritionPlugin.commitMeal(
+      loggedAt: time,
       accent: theme.color(for: "nutrition"),
       announce: "Logged \(foods.first ?? "meal").",
       logCommit: logCommit

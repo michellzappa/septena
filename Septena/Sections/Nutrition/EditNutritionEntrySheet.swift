@@ -235,8 +235,8 @@ struct EditNutritionEntrySheet: View {
         AddInfoSection.nutrition.notifyTilesChanged()
       }
     } else {
-      SectionLog.newLog(
-        section: "nutrition",
+      NutritionPlugin.commitMeal(
+        loggedAt: time,
         accent: theme.color(for: "nutrition"),
         announce: "Logged \(foods.first ?? "meal").",
         logCommit: logCommit
