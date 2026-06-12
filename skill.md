@@ -159,8 +159,8 @@ and varieties are the user's own vocabulary.
 
 ### Gut
 - `bristol` is the Bristol Stool Scale (1=hard pellets, 7=watery) — **required**.
-- `blood` is boolean. `volume` is `small | medium | large`.
-- `discomfortStart` / `discomfortEnd` are `HH:MM` — log a window if the user describes cramping or pain.
+- `volume` is `small | medium | large`.
+- Cramping, discomfort and blood are symptoms, not gut events — log them with `symptoms_log` so they get severity and their own timeline.
 
 ### Nutrition
 - `foods` is the **only required field** on log — a newline-separated list like `"2 eggs\ntoast with butter\nblack coffee"`.

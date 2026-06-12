@@ -407,7 +407,7 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
     },
     {
       name: "gut_event_log",
-      description: "Log a new gut event with Bristol Stool Scale type and optional discomfort details.",
+      description: "Log a new gut event with Bristol Stool Scale type. Cramping, discomfort or blood are symptoms — log them with symptoms_log instead.",
       inputSchema: logGutEventJsonSchema,
     },
   ],

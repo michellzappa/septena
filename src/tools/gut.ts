@@ -46,11 +46,7 @@ export const logGutEventJsonSchema = {
     date:             { type: "string",  description: "YYYY-MM-DD. Defaults to today." },
     time:             { type: "string",  description: "HH:MM or HH:MM:SS. Defaults to now." },
     bristol:          { type: "integer", minimum: 1, maximum: 7, description: "Bristol Stool Scale type (1–7)." },
-    blood:            { type: "boolean", description: "Blood present." },
     volume:           { type: "string",  enum: ["small", "medium", "large"] },
-    discomfortLevel:  { type: "string",  description: "Subjective discomfort descriptor." },
-    discomfortStart:  { type: "string",  description: "HH:MM when discomfort began." },
-    discomfortEnd:    { type: "string",  description: "HH:MM when discomfort ended." },
     note:             { type: "string" },
   },
 } as const;
@@ -68,11 +64,7 @@ export interface LogGutEventInput {
   date?: string;
   time?: string;
   bristol: number;
-  blood?: boolean;
   volume?: string;
-  discomfortLevel?: string;
-  discomfortStart?: string;
-  discomfortEnd?: string;
   note?: string;
 }
 
@@ -96,11 +88,7 @@ export async function listGutEvents(client: CloudKitClient, input: ListGutEvents
     date:            optStr(r.fields.date?.value)  ?? "",
     time:            optStr(r.fields.time?.value)  ?? (typeof r.fields.occurredAt?.value === "number" ? epochMsToHHMM(r.fields.occurredAt.value as number, tz) : ""),
     bristol:         (r.fields.bristol?.value  as number) ?? 0,
-    blood:           ((r.fields.blood?.value   as number) ?? 0) !== 0,
     volume:          optStr(r.fields.volume?.value),
-    discomfortLevel: optStr(r.fields.discomfortLevel?.value),
-    discomfortStart: optStr(r.fields.discomfortStart?.value),
-    discomfortEnd:   optStr(r.fields.discomfortEnd?.value),
     note:            optStr(r.fields.note?.value),
   }));
 
@@ -115,14 +103,10 @@ export async function logGutEvent(client: CloudKitClient, input: LogGutEventInpu
   const fields: Record<string, { value: unknown }> = {
     date:    { value: date },
     bristol: { value: input.bristol },
-    blood:   { value: input.blood ? 1 : 0 },
     // canonical instant; legacy `time` STRING retired (derive from occurredAt).
     occurredAt: { value: localToEpochMs(date, time, tz) },
   };
   if (input.volume)           fields.volume           = { value: input.volume };
-  if (input.discomfortLevel)  fields.discomfortLevel  = { value: input.discomfortLevel };
-  if (input.discomfortStart)  fields.discomfortStart  = { value: input.discomfortStart };
-  if (input.discomfortEnd)    fields.discomfortEnd    = { value: input.discomfortEnd };
   if (input.note)             fields.note             = { value: input.note };
 
   const { droppedFields } = await client.createWithFieldFallback({
