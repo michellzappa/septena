@@ -12,6 +12,17 @@ struct NextView: View {
   @State private var suggestionsModel = NextSuggestionsModel()
   @State private var doneModel = NextDoneModel()
 
+  /// Section keys whose `.septenaDataChanged` posts the suggestions engine
+  /// actually consumes (`NextSuggestionsModel.computeAll`). Includes both the
+  /// legacy consumable keys and the generalized `intake` key so scoping stays
+  /// correct across the consumables purge.
+  private static let suggestionKeys: Set<String> =
+    ["caffeine", "cannabis", "intake", "nutrition", "training", "mood"]
+  /// Section keys the Done Today log (`NextDoneModel.collect`) reads. Same
+  /// consumables, plus gut; tasks ride the separate `.septenaTasksChanged` path.
+  private static let doneLogKeys: Set<String> =
+    ["caffeine", "cannabis", "intake", "nutrition", "training", "mood", "gut"]
+
   /// Anything finished today — the trio's live done splits OR a passive log
   /// (caffeine, meals, mood, …). Drives both the empty state and whether the
   /// "Done Today" log renders.
@@ -89,12 +100,17 @@ struct NextView: View {
     // Passive logs (mood check-in, caffeine, meals, …) post .septenaDataChanged
     // via their mutators. Reload the suggestions so a just-logged mood daypart
     // drops its "How are you feeling?" prompt, and the done log so the entry
-    // lands in "Done Today".
-    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
+    // lands in "Done Today". Scoped: both `load()`s rerun the suggestions /
+    // done engines over 14–30 days of history, so a post that touches neither
+    // surface's inputs (a habit toggle, a grocery edit) must not trigger them.
+    // An unscoped post (CK batch) has nil sections and passes both filters.
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
+      let forSuggestions = note.affectsAnySection(of: Self.suggestionKeys)
+      let forDone = note.affectsAnySection(of: Self.doneLogKeys)
+      guard forSuggestions || forDone else { return }
       Task {
-        async let a: () = suggestionsModel.load()
-        async let b: () = doneModel.load()
-        _ = await (a, b)
+        if forSuggestions { await suggestionsModel.load() }
+        if forDone { await doneModel.load() }
       }
     }
     // Day rollover (midnight crossed while the app was alive, or session
