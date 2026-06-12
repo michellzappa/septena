@@ -7,7 +7,7 @@ import SwiftUI
 //
 // What's here (catalog-level facts about the section itself):
 //   key, defaultLabel, shortDescription, activation, onboarding,
-//   supportsTab, supportsDashboard, settingsEditor, kind
+//   supportsDashboard, settingsEditor, kind
 //
 // What's NOT here:
 //   • color   — a per-account preference. Lives in the CloudKit-backed
@@ -46,8 +46,8 @@ import SwiftUI
 //                                     quickAddMenu, state, cache, loadAll)
 //   • Settings + ordering ........... automatic once the row is seeded
 //   • Today timeline ................ opt in via `todayCapableKeys` (below)
-//   • Time travel ................... opt in via `timeTravelCapableKeys` (below)
-//                                     AND thread `SectionDrawer(currentDate:)`
+//   • Time travel ................... thread `SectionDrawer(currentDate:)` in
+//                                     the destination (no manifest flag)
 //
 // The classic gap: a row + destination but NO `HomepageDomain` case —
 // the section is reachable from Settings yet never renders a tile.
@@ -76,9 +76,9 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
   /// keeps it routable but out of the picker (legacy / dev sections).
   public let onboarding: Onboarding
 
-  /// Surfaces this section can appear on. Informational today; will
-  /// drive per-section visibility toggles in the per-section page.
-  public let supportsTab: Bool
+  /// Whether the section reserves a homepage dashboard tile. Drives tile
+  /// order/visibility on the Week dashboard (paired with a `HomepageDomain`
+  /// case). See also the `HomepageDomain` ↔ `supportsDashboard` parity note.
   public let supportsDashboard: Bool
 
   /// What kind of per-section settings page this section shows. Mirrors
@@ -97,7 +97,6 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
     shortDescription: String,
     activation: Activation,
     onboarding: Onboarding,
-    supportsTab: Bool,
     supportsDashboard: Bool,
     settingsEditor: SettingsEditor,
     kind: Kind = .loggingDomain
@@ -107,7 +106,6 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
     self.shortDescription = shortDescription
     self.activation = activation
     self.onboarding = onboarding
-    self.supportsTab = supportsTab
     self.supportsDashboard = supportsDashboard
     self.settingsEditor = settingsEditor
     self.kind = kind
@@ -133,30 +131,6 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
   /// Whether this section has any presence on the Today timeline.
   public var appearsInToday: Bool {
     SectionManifest.todayCapableKeys.contains(key)
-  }
-
-  /// Sections whose destination supports "time travel" — i.e. a date
-  /// strip in the SectionDrawer that lets the user browse logs/events
-  /// on a past day. When the date strip is on a past day, the
-  /// destination drops its "today" affordances (goals strip, summary
-  /// tiles, heatmaps, infographics) and renders only that day's logs.
-  ///
-  /// Mirrors the `todayCapableKeys` pattern: kept as a static set so
-  /// the manifest init blocks stay terse, and so a section opts in
-  /// with a one-line edit here. The drawer + each opted-in destination
-  /// share the convention; sections not in this set never instantiate
-  /// the date strip.
-  public static let timeTravelCapableKeys: Set<String> = [
-    "caffeine", "cannabis", "intake", "gut", "nutrition",
-    "habits", "supplements", "mood", "hydration",
-    "symptoms", "medications",
-  ]
-
-  /// Whether this section's destination should render the date strip
-  /// and time-travel UI. Read by destinations to decide whether to
-  /// thread a `viewingDate` state through SectionDrawer.
-  public var supportsTimeTravel: Bool {
-    SectionManifest.timeTravelCapableKeys.contains(key)
   }
 
   /// SF Symbol used by every surface that renders the section as a row
@@ -265,7 +239,6 @@ public extension SectionManifest {
       // the enum for future hypothetical "infrastructure" sections.
       activation: .optional,
       onboarding: .core,
-      supportsTab: true,
       supportsDashboard: true,
       settingsEditor: .none
     ),
@@ -275,7 +248,6 @@ public extension SectionManifest {
       shortDescription: String(localized: "Sessions, exercises, weekly Z2", comment: "Section description"),
       activation: .optional,
       onboarding: .core,
-      supportsTab: true,
       supportsDashboard: true,
       settingsEditor: .sectionConfig
     ),
@@ -285,7 +257,6 @@ public extension SectionManifest {
       shortDescription: String(localized: "Macros and calorie ranges", comment: "Section description"),
       activation: .optional,
       onboarding: .core,
-      supportsTab: true,
       supportsDashboard: true,
       settingsEditor: .sectionConfig
     ),
@@ -295,7 +266,6 @@ public extension SectionManifest {
       shortDescription: String(localized: "Bed and wake times, nightly duration", comment: "Section description"),
       activation: .optional,
       onboarding: .core,
-      supportsTab: true,
       supportsDashboard: true,
       settingsEditor: .appearance
     ),
@@ -305,7 +275,6 @@ public extension SectionManifest {
       shortDescription: String(localized: "Daily routines and streaks", comment: "Section description"),
       activation: .optional,
       onboarding: .core,
-      supportsTab: true,
       supportsDashboard: true,
       settingsEditor: .sectionConfig
     ),
@@ -315,7 +284,6 @@ public extension SectionManifest {
       shortDescription: String(localized: "Recurring household tasks", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
-      supportsTab: true,
       supportsDashboard: true,
       settingsEditor: .sectionConfig
     ),
@@ -325,7 +293,6 @@ public extension SectionManifest {
       shortDescription: String(localized: "Daily supplements log", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
-      supportsTab: true,
       supportsDashboard: true,
       settingsEditor: .sectionConfig
     ),
@@ -335,7 +302,6 @@ public extension SectionManifest {
       shortDescription: String(localized: "Shopping list and pantry", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
-      supportsTab: true,
       supportsDashboard: true,
       settingsEditor: .sectionConfig
     ),
@@ -345,7 +311,6 @@ public extension SectionManifest {
       shortDescription: String(localized: "Coffee, beans, brewing methods", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
-      supportsTab: true,
       supportsDashboard: true,
       settingsEditor: .sectionConfig
     ),
@@ -355,7 +320,6 @@ public extension SectionManifest {
       shortDescription: String(localized: "Intake log and dosing", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
-      supportsTab: true,
       supportsDashboard: true,
       settingsEditor: .sectionConfig
     ),
@@ -369,7 +333,6 @@ public extension SectionManifest {
       shortDescription: String(localized: "Track what you consume — and cut back on it", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
-      supportsTab: true,
       supportsDashboard: true,
       settingsEditor: .sectionConfig
     ),
@@ -379,7 +342,6 @@ public extension SectionManifest {
       shortDescription: String(localized: "Weight, body fat, measurements", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
-      supportsTab: true,
       supportsDashboard: true,
       settingsEditor: .appearance
     ),
@@ -389,7 +351,6 @@ public extension SectionManifest {
       shortDescription: String(localized: "Digestion log", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
-      supportsTab: false,
       supportsDashboard: true,
       settingsEditor: .none
     ),
@@ -399,7 +360,6 @@ public extension SectionManifest {
       shortDescription: String(localized: "Three-times-a-day affect check-ins", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
-      supportsTab: false,
       supportsDashboard: true,
       settingsEditor: .none
     ),
@@ -409,7 +369,6 @@ public extension SectionManifest {
       shortDescription: String(localized: "Pain, symptoms, severity, flares and triggers", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
-      supportsTab: true,
       supportsDashboard: true,
       settingsEditor: .sectionConfig
     ),
@@ -419,7 +378,6 @@ public extension SectionManifest {
       shortDescription: String(localized: "Dose logs, skips, effects and side effects", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
-      supportsTab: true,
       supportsDashboard: true,
       settingsEditor: .sectionConfig
     ),
@@ -429,7 +387,6 @@ public extension SectionManifest {
       shortDescription: String(localized: "Steps and movement (HealthKit)", comment: "Section description"),
       activation: .integration,
       onboarding: .optional,
-      supportsTab: false,
       supportsDashboard: true,
       settingsEditor: .appearance
     ),
@@ -445,7 +402,6 @@ public extension SectionManifest {
       shortDescription: String(localized: "Commit activity as a contribution heatmap", comment: "Section description"),
       activation: .integration,
       onboarding: .optional,
-      supportsTab: true,
       supportsDashboard: true,
       settingsEditor: .appearance
     ),
@@ -471,7 +427,6 @@ public extension SectionManifest {
       shortDescription: String(localized: "Water intake against a daily target", comment: "Section description"),
       activation: .optional,
       onboarding: .core,
-      supportsTab: false,
       supportsDashboard: true,
       settingsEditor: .none
     ),
@@ -488,7 +443,6 @@ public extension SectionManifest {
       shortDescription: String(localized: "On-device coaches over your goals and logged data", comment: "Section description"),
       activation: .optional,
       onboarding: .hidden,
-      supportsTab: false,
       supportsDashboard: false,
       settingsEditor: .none,
       kind: .appFunction
