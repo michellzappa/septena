@@ -301,12 +301,30 @@ enum MCPDispatch {
   }
 
   private static func tasksCreate(_ args: MCPArgs) throws -> Any {
+    try validateContainer("area", args.string("area"))
+    try validateContainer("project", args.string("project"))
     let t = SeptenaServices.shared.taskMutator.create(
       title: try args.requireString("title"),
       area: args.string("area"), project: args.string("project"),
       scheduled: try args.date("scheduled"), due: try args.date("due"),
       today: args.bool("today") ?? false)
     return ["id": t.id, "title": t.title]
+  }
+
+  /// Reject writes that point a task at an `area`/`project` id with no matching
+  /// container — the mutator stores the string verbatim, so an unknown id becomes
+  /// a dangling reference that never surfaces under any real area/project. `nil`
+  /// or empty (clearing the field) is always allowed. Surfaced as `badArgument`
+  /// so the calling model can self-correct against `tasks_list_areas/projects`.
+  private static func validateContainer(_ kind: String, _ id: String?) throws {
+    guard let id, !id.isEmpty else { return }
+    let valid: [(String, String)] = kind == "area"
+      ? LocalCache.areas(in: ctx).map { ($0.id, $0.title) }
+      : LocalCache.projects(in: ctx).map { ($0.id, $0.title) }
+    guard !valid.contains(where: { $0.0 == id }) else { return }
+    let known = valid.map { "\($0.0) (\($0.1))" }.joined(separator: ", ")
+    throw MCPError.badArgument(
+      "unknown \(kind) id '\(id)'. Use tasks_list_\(kind)s for valid ids. Known: \(known)")
   }
 
   private static func tasksComplete(_ args: MCPArgs) -> Any {
@@ -325,8 +343,14 @@ enum MCPDispatch {
     }
     if args.present("scheduled") { m.schedule(id: id, date: try args.date("scheduled")); updated.append("scheduled") }
     if args.present("due") { m.setDue(id: id, date: try args.date("due")); updated.append("due") }
-    if args.present("area") { m.moveToArea(id: id, area: args.string("area")); updated.append("area") }
-    if args.present("project") { m.moveToProject(id: id, project: args.string("project")); updated.append("project") }
+    if args.present("area") {
+      try validateContainer("area", args.string("area"))
+      m.moveToArea(id: id, area: args.string("area")); updated.append("area")
+    }
+    if args.present("project") {
+      try validateContainer("project", args.string("project"))
+      m.moveToProject(id: id, project: args.string("project")); updated.append("project")
+    }
     if args.string("status") == "cancelled" { m.cancel(id: id); updated.append("status") }
     return ["id": id, "updated": updated]
   }

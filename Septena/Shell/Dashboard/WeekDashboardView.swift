@@ -2941,15 +2941,22 @@ struct WeekDashboardView: View {
   /// view's commit exactly: an everyday glass blooms (reach scaled to the
   /// amount); the glass that crosses today's target floods once with `.fill`.
   /// Then self-refreshes the tile.
+  ///
+  /// The crossing check reads today's REAL total from the local mirror, not
+  /// `hydrationToday` — that display state is seeded from a cache whose
+  /// "today" can be yesterday (launch after rollover) and lags drawer logs,
+  /// which mis-fired the once-a-day flood on ordinary glasses.
   private func commitHydration(ml: Int) {
     let accent = theme.color(for: "hydration")
+    let dayStart = Calendar.current.startOfDay(for: clock.now)
+    let todayMl = HydrationPlugin.waterMl(onDayStarting: dayStart, in: modelContext)
     let crossed = hydrationTargetMl > 0
-      && hydrationToday < hydrationTargetMl
-      && hydrationToday + ml >= hydrationTargetMl
+      && todayMl < hydrationTargetMl
+      && todayMl + ml >= hydrationTargetMl
     let motion: CommitMotion? = crossed ? .fill : nil   // nil → plugin's `.bloom`
     let intensity = crossed ? 1.4 : min(1.4, max(0.6, Double(ml) / 500))
     let announce = crossed
-      ? "Hydration goal reached — \(hydrationToday + ml) of \(hydrationTargetMl) ml."
+      ? "Hydration goal reached — \(todayMl + ml) of \(hydrationTargetMl) ml."
       : "Logged \(ml) ml of water."
     SectionLog.newLog(
       section: "hydration",

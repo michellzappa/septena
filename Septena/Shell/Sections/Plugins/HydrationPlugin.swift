@@ -35,6 +35,26 @@ enum HydrationPlugin: SectionPlugin {
       && entry.carbsG == 0
   }
 
+  /// The day's total water (water-only logs + meal-attached water) straight
+  /// from the local mirror — the same sum the destination view shows.
+  ///
+  /// This is the commit-time truth for the goal-crossing check. Display
+  /// state must never gate it: the dashboard's `hydrationToday` is seeded
+  /// from a cache whose "today" may be yesterday (launch after rollover) and
+  /// can lag drawer logs — a stale base there mis-fires the once-a-day
+  /// `.fill` flood on an ordinary glass.
+  @MainActor
+  static func waterMl(onDayStarting dayStart: Date,
+                      in context: ModelContext) -> Int {
+    guard let dayEnd = Calendar.current.date(byAdding: .day, value: 1, to: dayStart)
+    else { return 0 }
+    let descriptor = FetchDescriptor<NutritionEntryEntity>(
+      predicate: #Predicate { $0.loggedAt >= dayStart && $0.loggedAt < dayEnd }
+    )
+    let rows = (try? context.fetch(descriptor)) ?? []
+    return rows.reduce(0) { $0 + Int($1.waterMl ?? 0) }
+  }
+
   static func destinationView() -> AnyView? { AnyView(HydrationDestinationView()) }
 
   // Every glass gets the calm `.bloom`, not the full-page `.fill` flood —

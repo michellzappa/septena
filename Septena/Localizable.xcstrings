@@ -6080,6 +6080,9 @@
         }
       }
     },
+    "Symptoms" : {
+
+    },
     "Synthesize your map" : {
       "localizations" : {
         "pt-BR" : {
@@ -6144,6 +6147,9 @@
       }
     },
     "Tap a section to set its color, turn it on or off, and tune what it tracks. Drag to reorder how sections appear on the home tab. Disabled sections stay here with your data intact." : {
+
+    },
+    "Tap a symptom to rename it — the new name updates every logged entry automatically." : {
 
     },
     "Tap a word to refine, or just Log" : {
