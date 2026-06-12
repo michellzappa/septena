@@ -143,6 +143,9 @@ watch). The classic bug: a section with a manifest row + destination but **no
 - `SeptenaWatch/` + `SeptenaWatchComplication/` — watch app & complications
   (**hand-wired per section**, not manifest-driven, except the shared Next feed).
 - `SeptenaWidgets/`, `SeptenaLiveActivitiesExtension/` — extensions.
+- `appstore/` — App Store packaging: copy lives in `docs/APPSTORE.md`, panel
+  visuals in `appstore/panels.config.mjs`; `npm run viz` renders + validates +
+  opens the review webapp; `fastlane deliver` uploads. See `docs/APPSTORE.md`.
 
 ## Conventions
 

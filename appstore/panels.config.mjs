@@ -38,7 +38,7 @@ export const panels = {
       sub: "The trailing seven days — tasks, training, sleep, mood — in one glance.",
       shot: { src: "06-Week-heatmap", width: 0.74, rotate: 2, offsetY: 0.14 },
       overlays: [
-        { icon: "✓", title: "Streaks & heatmaps", sub: "per section, per day", tint: S.habits, x: 0.04, y: 0.56, rotate: -2 },
+        { icon: "spark", title: "Streaks & heatmaps", sub: "per section, per day", tint: S.habits, x: 0.04, y: 0.56, rotate: -2 },
       ],
     },
     {
@@ -48,7 +48,7 @@ export const panels = {
       sub: "One Next feed, identical on iPhone, Apple Watch, and widgets.",
       shot: { src: "03-Next", width: 0.74, rotate: -2, offsetY: 0.14 },
       overlays: [
-        { icon: "⌚", title: "Same feed on your wrist", sub: "watch app + complications", tint: S.sleep, x: 0.36, y: 0.6, rotate: 2 },
+        { icon: "watch", title: "Same feed on your wrist", sub: "watch app + complications", tint: S.sleep, x: 0.36, y: 0.6, rotate: 2 },
       ],
     },
     {

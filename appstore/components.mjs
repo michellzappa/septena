@@ -73,12 +73,26 @@ function placeholderScreen(src, tint) {
 }
 
 // ------------------------------------------------------------------ overlays
+// Icons are inline SVGs (24×24 viewBox, currentColor) so they render
+// identically everywhere — no reliance on an emoji font. Add to taste.
+const ICONS = {
+  check: `<path d="M4 13l5 5L20 7" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>`,
+  watch: `<rect x="7" y="6" width="10" height="12" rx="3.4" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M9.5 6l.7-3h3.6l.7 3M9.5 18l.7 3h3.6l.7-3" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/>`,
+  spark: `<path d="M4 17l4-6 4 3 4-8 4 5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>`,
+  lock: `<rect x="5.5" y="10.5" width="13" height="9.5" rx="2.6" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M8.5 10.5V8a3.5 3.5 0 017 0v2.5" fill="none" stroke="currentColor" stroke-width="2.6"/>`,
+  bolt: `<path d="M13 2L5 14h6l-1 8 8-12h-6l1-8z" fill="currentColor"/>`,
+};
+const icon = (name) =>
+  ICONS[name]
+    ? `<svg viewBox="0 0 24 24" width="46" height="46">${ICONS[name]}</svg>`
+    : esc(name ?? "✓");
+
 function overlays(list = []) {
   return list.map((o) => {
     const tint = o.tint ?? theme.accent;
     return `
     <div class="card" style="left:${o.x * 100}%; top:${o.y * 100}%; width:${o.w ?? 560}px; transform: rotate(${o.rotate ?? 0}deg);">
-      <span class="card-ic" style="background: color-mix(in oklab, ${tint} 14%, white); color:${tint};">${esc(o.icon ?? "✓")}</span>
+      <span class="card-ic" style="background: color-mix(in oklab, ${tint} 14%, white); color:${tint};">${icon(o.icon)}</span>
       <span class="card-tx"><b>${esc(o.title ?? "")}</b>${o.sub ? `<i>${esc(o.sub)}</i>` : ""}</span>
     </div>`;
   }).join("");

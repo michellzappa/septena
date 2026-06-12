@@ -66,7 +66,12 @@ for (const device of activeDevices()) {
   mkdirSync(buildDir, { recursive: true });
 
   // Clear this device class's previous renders (other classes share en-US/).
-  for (const f of readdirSync(outDir)) if (f.includes(`_${device.key}_`)) unlinkSync(join(outDir, f));
+  // Same-named files are overwritten anyway; this only catches renamed or
+  // removed panels. Some environments forbid deletes — warn, don't die.
+  for (const f of readdirSync(outDir)) if (f.includes(`_${device.key}_`)) {
+    try { unlinkSync(join(outDir, f)); }
+    catch { console.log(`⚠ could not remove stale ${f} (will overwrite same-named renders)`); }
+  }
 
   await page.setViewportSize({ width: device.width, height: device.height });
   for (const [i, panel] of list.entries()) {
