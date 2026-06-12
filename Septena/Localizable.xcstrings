@@ -714,6 +714,7 @@
       "shouldTranslate" : false
     },
     "|r| ≥ 0.30, p < 0.05, monotonic" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -814,6 +815,9 @@
           }
         }
       }
+    },
+    "A roster of focused, on-device coaches." : {
+
     },
     "Activated · Negative" : {
       "localizations" : {
@@ -2167,6 +2171,7 @@
       }
     },
     "CORRELATIONS DASHBOARD" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -2177,6 +2182,7 @@
       }
     },
     "Correlations dashboard, custom app icons, and more." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -2952,6 +2958,7 @@
       }
     },
     "Find what actually moves your day — which habits, inputs, and routines track with better sleep, mood, recovery, and more. Real correlations across everything you log, computed privately on-device." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -4066,6 +4073,7 @@
       }
     },
     "Make Septena yours" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -4994,6 +5002,7 @@
       }
     },
     "Power-user features for people who live in the app, starting with the Correlations dashboard and custom app icons." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -5858,6 +5867,9 @@
         }
       }
     },
+    "Starter symptoms" : {
+
+    },
     "Stats" : {
       "localizations" : {
         "pt-BR" : {
@@ -6241,6 +6253,7 @@
       }
     },
     "The default icon is always free. Color icons are part of Septena+. iOS shows a confirmation prompt each time you switch icons." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -6249,6 +6262,9 @@
           }
         }
       }
+    },
+    "The free app gives you one on-device coach. Septena+ turns that into a roster — focused coaches for the parts of your life you're working on." : {
+
     },
     "The greeting at the top of the home tab — your name, tone, and how aware of your day it is." : {
       "localizations" : {
@@ -6637,6 +6653,7 @@
       }
     },
     "Unlock with Septena+" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -7044,6 +7061,9 @@
         }
       }
     },
+    "YOUR COACHES" : {
+
+    },
     "Your data stays in your private iCloud. Connecting an AI just opens a door into it — one you control and can revoke." : {
       "localizations" : {
         "pt-BR" : {
@@ -7074,6 +7094,9 @@
         }
       }
     },
+    "Your team of coaches" : {
+
+    },
     "Zone 2 cardio" : {
       "localizations" : {
         "pt-BR" : {
@@ -7096,6 +7119,7 @@
       "shouldTranslate" : false
     },
     "Δ = taken mean − off mean" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
