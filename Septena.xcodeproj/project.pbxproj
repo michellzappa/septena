@@ -213,6 +213,7 @@
 		50CF4B051F95F41ABD93209E /* TrainingLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2A2AA1777B672AFC02F29BF /* TrainingLiveActivity.swift */; };
 		50ECC944A3D81BCEB7923CED /* WatchSnapshotPublisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EDE23D823F6238C9977BF16 /* WatchSnapshotPublisher.swift */; };
 		513C8B1D41E5BA85B785129C /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E25F81FE5AA4B6BBC056275 /* DateParser.swift */; };
+		51A6415FF1CADAFF53FF6315 /* GutSymptomMigrationMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = A752F956A678D4C282D192DE /* GutSymptomMigrationMap.swift */; };
 		51B5D785192F411E5AAF941B /* GoalRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA64E4CD9F48DE7AFFA52D84 /* GoalRecord.swift */; };
 		5211F3474CA946655E003F5C /* QuickActionsApplier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 460C571ECD796E1777AD12C1 /* QuickActionsApplier.swift */; };
 		52883300FBE8C0D226A43368 /* CommitMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B6D3C89DD47424084AE32D1 /* CommitMotion.swift */; };
@@ -299,6 +300,7 @@
 		71678943B22806A1D2F2CD9D /* DemoSeedMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF00EC44C1E78BE7E1417CDF /* DemoSeedMode.swift */; };
 		726977B8AE616E5BE9B85B66 /* GoalMilestoneRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 545368C5D91673E810519444 /* GoalMilestoneRecord.swift */; };
 		72CC45D5A8CEC1C0A3B6EA39 /* MoodIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 675F31A4511CBADB2FB97B81 /* MoodIntents.swift */; };
+		72DE86EBB0B6CEE689289481 /* GutSymptomMigrationMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = A752F956A678D4C282D192DE /* GutSymptomMigrationMap.swift */; };
 		7397EB4533BA4D026F9F7662 /* CalendarBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7027B881D1D8B1B09B105034 /* CalendarBridge.swift */; };
 		7435B6913FC111EAE946DBBB /* ValuesMiniApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABBBBE8B556E5C9946CFB630 /* ValuesMiniApp.swift */; };
 		74E631E4D6B41796BBE7B3FA /* AreaRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = C729259A5867D99CC64AA9C3 /* AreaRecord.swift */; };
@@ -375,6 +377,7 @@
 		91D7DEF6095D3B1E3692B3DE /* MoodVocabulary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10378514592526AAE3B3A2CF /* MoodVocabulary.swift */; };
 		921F9AFC29BAD699FCD24DBC /* CoachVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41CEBC3677C82F8744114F96 /* CoachVoice.swift */; };
 		92F25DBCB85C19C91F51ADB7 /* EditNutritionEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C79C561E59D69B3653B65047 /* EditNutritionEntrySheet.swift */; };
+		93181199685C9F32D417D69D /* GutSymptomMapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD54B4876728BD8A34F0E248 /* GutSymptomMapTests.swift */; };
 		933FEAF27E7304E27A956B84 /* AddGroceryPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50371A7532E006FCD529D414 /* AddGroceryPage.swift */; };
 		94702073666C4968D36B96C5 /* RemindersBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561130AE996F0E92FE02767D /* RemindersBridge.swift */; };
 		9487FE0DD2DC6FC6F602F4F8 /* AddInfoSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8762C7A4DFED340274D8BD37 /* AddInfoSection.swift */; };
@@ -611,6 +614,7 @@
 		E952E27D2FD074C1473A4292 /* LogCommit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B5E07B2C36076D991E0F0C1 /* LogCommit.swift */; };
 		E9970D5068FD243A6FF27686 /* GoalsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40D9EAAB80FD7F9FAC57F20B /* GoalsView.swift */; };
 		E9D604A78C243E8ED46607A4 /* TaskReads.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CBF0DAD74F9392D507229CE /* TaskReads.swift */; };
+		E9F99B7A66CD24B118A9E8E1 /* GutSymptomMigrationMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = A752F956A678D4C282D192DE /* GutSymptomMigrationMap.swift */; };
 		E9FE8C1F55C7F682DDC5E73B /* MoodCommitAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1AB58A3A36A898E92890EBA /* MoodCommitAnimation.swift */; };
 		EA56ADCFD84CE200C7CEF2A9 /* ConsistencyHeatmap.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0E984505A489247AADAB293 /* ConsistencyHeatmap.swift */; };
 		EA65F0CD9A0BEE74119CF7F5 /* ExercisePickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D3250962535171689FCDA30 /* ExercisePickerSheet.swift */; };
@@ -951,6 +955,7 @@
 		A47ACBC76B98315A93EB462E /* CoachTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachTile.swift; sourceTree = "<group>"; };
 		A4C5E5E15422EB17DB5D3960 /* EditGroceryItemSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditGroceryItemSheet.swift; sourceTree = "<group>"; };
 		A708921A7D5F315781CFCF71 /* ExerciseLibrarySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseLibrarySheet.swift; sourceTree = "<group>"; };
+		A752F956A678D4C282D192DE /* GutSymptomMigrationMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GutSymptomMigrationMap.swift; sourceTree = "<group>"; };
 		ABBBBE8B556E5C9946CFB630 /* ValuesMiniApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValuesMiniApp.swift; sourceTree = "<group>"; };
 		AC8097428CC41A32EA96B120 /* MacroTargetMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroTargetMigration.swift; sourceTree = "<group>"; };
 		AD295FAB7B881CAC43EE8C34 /* Outbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Outbox.swift; sourceTree = "<group>"; };
@@ -1071,6 +1076,7 @@
 		FB380FE69F57820927B8BD3D /* TasksPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksPlugin.swift; sourceTree = "<group>"; };
 		FBA5CADFC4205866897E4F8C /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
 		FC732C2F50FC1EC9308BA218 /* DefaultExerciseLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultExerciseLibrary.swift; sourceTree = "<group>"; };
+		FD54B4876728BD8A34F0E248 /* GutSymptomMapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GutSymptomMapTests.swift; sourceTree = "<group>"; };
 		FD5AAD8DD0E25AF940E3237C /* AddInfoRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddInfoRow.swift; sourceTree = "<group>"; };
 		FD90B8D1D8A0A978D1CE744C /* MenuBarMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarMenu.swift; sourceTree = "<group>"; };
 		FF00EC44C1E78BE7E1417CDF /* DemoSeedMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoSeedMode.swift; sourceTree = "<group>"; };
@@ -1625,6 +1631,7 @@
 				71304188F87157FA7687FF57 /* ConsumableContainerTests.swift */,
 				A2E72A113E9D2B6BD889AEA1 /* DateParserTests.swift */,
 				8AA5BDDAF414C995743611BD /* FastingTests.swift */,
+				FD54B4876728BD8A34F0E248 /* GutSymptomMapTests.swift */,
 				17419338109BD8D053FEEC49 /* IntakeMigrationTests.swift */,
 			);
 			path = SeptenaCoreTests;
@@ -1787,6 +1794,7 @@
 				FF00EC44C1E78BE7E1417CDF /* DemoSeedMode.swift */,
 				5835F104E8DFAA668ACCF9A5 /* Fasting.swift */,
 				C7BAA3E1C2D19A55758017FC /* GitHubProvider.swift */,
+				A752F956A678D4C282D192DE /* GutSymptomMigrationMap.swift */,
 				53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */,
 				F61B77A80F53A6EEEBBC90EA /* HealthKitBridge.swift */,
 				1FDD99A14104B857C0AD4661 /* IntakeModel.swift */,
@@ -2187,6 +2195,8 @@
 				B08A83A13042A84398779AB4 /* DateParserTests.swift in Sources */,
 				F4F3805C73E352D7CAB13041 /* Fasting.swift in Sources */,
 				49179FE2F47C3E6E124DB9F7 /* FastingTests.swift in Sources */,
+				93181199685C9F32D417D69D /* GutSymptomMapTests.swift in Sources */,
+				72DE86EBB0B6CEE689289481 /* GutSymptomMigrationMap.swift in Sources */,
 				24B5A98E7DF98E156AE94FDD /* IntakeMigrationTests.swift in Sources */,
 				6C96FAA16B587D8CF6130E21 /* IntakeModel.swift in Sources */,
 				38E799575ED55AAB2060FA74 /* SuggestionBlocks.swift in Sources */,
@@ -2314,6 +2324,7 @@
 				861CF9D8C7AD0B6D0CE51593 /* GutIntents.swift in Sources */,
 				E13166B735F6109781FB1178 /* GutPlugin.swift in Sources */,
 				C340BAAC69B40F5B9CD987BD /* GutQuickAddMenu.swift in Sources */,
+				E9F99B7A66CD24B118A9E8E1 /* GutSymptomMigrationMap.swift in Sources */,
 				E90B3F7C8D89992B2398B06A /* HabitIntents.swift in Sources */,
 				CC74FC02CD22EC7F0A3AC8AF /* HabitsDestinationView.swift in Sources */,
 				0FEC34A8DE1AC32545F489C4 /* HabitsPlugin.swift in Sources */,
@@ -2655,6 +2666,7 @@
 				4F9CA8B2EC990DCACD80245E /* GutIntents.swift in Sources */,
 				E7DC28B1ABC0A9F666FD6462 /* GutPlugin.swift in Sources */,
 				E680A3EF175E9F47A1C8D641 /* GutQuickAddMenu.swift in Sources */,
+				51A6415FF1CADAFF53FF6315 /* GutSymptomMigrationMap.swift in Sources */,
 				D2943E437F80E794F2D7797B /* HabitIntents.swift in Sources */,
 				2E71534FB75930353C9B6320 /* HabitsDestinationView.swift in Sources */,
 				DE2DC97811EBF7E4B01C3261 /* HabitsPlugin.swift in Sources */,

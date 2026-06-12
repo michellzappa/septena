@@ -825,6 +825,89 @@ enum OccurredAtBackfill {
   }
 }
 
+// MARK: - Gut → Symptoms migration (discomfort + blood → symptom events)
+
+/// One-shot, local-only migration that lifts the symptom-shaped fields out of
+/// the Gut bowel-movement log (`discomfortLevel`, `blood`) into standalone
+/// Symptoms events. The gut rows are left untouched here — stripping those
+/// fields is a separate, later step, so this stays lossless and reversible.
+/// Deterministic ids (`GutSymptomMap`) make it idempotent; gated by a
+/// UserDefaults flag so it runs once per device, after the initial CloudKit
+/// fetch so synced gut rows are present. See docs/GUT_SYMPTOMS_MIGRATION_PLAN.
+@MainActor
+enum GutSymptomMigrator {
+  private static let versionKey = "gut.symptomMigration.v1"
+
+  @discardableResult
+  static func runIfNeeded(context: ModelContext,
+                          mutator: SymptomsMutator,
+                          defaults: UserDefaults = .standard) -> Int {
+    guard !defaults.bool(forKey: versionKey) else { return 0 }
+    guard let rows = try? context.fetch(FetchDescriptor<GutEventEntity>()) else { return 0 }
+
+    // Resolve each target definition lazily and at most once.
+    var discomfortDefID: String?
+    var bloodDefID: String?
+    var created = 0
+
+    for row in rows {
+      let hasDiscomfort = GutSymptomMap.discomfortSeverity(row.discomfortLevel) != nil
+      let trimmed = row.note?.trimmingCharacters(in: .whitespacesAndNewlines)
+      let note = (trimmed?.isEmpty == false) ? trimmed : nil
+
+      if let severity = GutSymptomMap.discomfortSeverity(row.discomfortLevel) {
+        let defID = discomfortDefID ?? mutator.ensureDefinition(
+          title: GutSymptomMap.discomfortTitle, emoji: "🫄",
+          bodySystem: "Digestive", defaultBodyRegion: "Abdomen",
+          fallbackID: GutSymptomMap.discomfortDefinitionID)
+        discomfortDefID = defID
+        mutator.upsertMigratedEvent(
+          id: GutSymptomMap.discomfortEventID(gutID: row.id),
+          symptomID: defID, date: row.date, occurredAt: row.occurredAt,
+          severity: severity,
+          durationMinutes: discomfortMinutes(start: row.discomfortStart, end: row.discomfortEnd),
+          note: note, source: "migrated-gut")
+        created += 1
+      }
+
+      if let severity = GutSymptomMap.bloodSeverity(row.blood) {
+        let defID = bloodDefID ?? mutator.ensureDefinition(
+          title: GutSymptomMap.bloodTitle, emoji: "🩸",
+          bodySystem: "Digestive", defaultBodyRegion: "Rectum",
+          fallbackID: GutSymptomMap.bloodDefinitionID)
+        bloodDefID = defID
+        // The free-text note rides the discomfort event when present, so the
+        // blood event carries a neutral marker instead of duplicating it.
+        let bloodNote = hasDiscomfort ? "with BM" : (note ?? "with BM")
+        mutator.upsertMigratedEvent(
+          id: GutSymptomMap.bloodEventID(gutID: row.id),
+          symptomID: defID, date: row.date, occurredAt: row.occurredAt,
+          severity: severity, durationMinutes: nil,
+          note: bloodNote, source: "migrated-gut")
+        created += 1
+      }
+    }
+
+    SeptenaLog.info("GutSymptomMigrator: upserted \(created) symptom events from \(rows.count) gut rows")
+    defaults.set(true, forKey: versionKey)
+    return created
+  }
+
+  /// Minutes between the ISO discomfort-window bounds, when both parse.
+  private static func discomfortMinutes(start: String?, end: String?) -> Int? {
+    guard let start, let end else { return nil }
+    let fmt = ISO8601DateFormatter()
+    fmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    var s = fmt.date(from: start); var e = fmt.date(from: end)
+    if s == nil || e == nil {
+      let alt = ISO8601DateFormatter(); alt.formatOptions = [.withInternetDateTime]
+      s = s ?? alt.date(from: start); e = e ?? alt.date(from: end)
+    }
+    guard let s, let e, e > s else { return nil }
+    return Int((e.timeIntervalSince(s) / 60).rounded())
+  }
+}
+
 // MARK: - Intake migration (caffeine/cannabis → generic intake)
 
 /// The record-level migrator. Reads legacy caffeine/cannabis data — from raw

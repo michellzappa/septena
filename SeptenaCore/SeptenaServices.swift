@@ -1157,6 +1157,10 @@ final class SeptenaServices {
     // rows (local-only) and publish this device's timezone so the gateway
     // resolves the user's real zone instead of defaulting to UTC.
     OccurredAtBackfill.runIfNeeded(context: context)
+    // Lift the symptom-shaped gut fields (discomfort, blood) into standalone
+    // Symptoms events. Local-only, idempotent, gated once-per-device; runs
+    // after the fetch so synced gut rows are present.
+    GutSymptomMigrator.runIfNeeded(context: context, mutator: symptomsMutator)
     SettingsMirror.publishDeviceTimezone(context: context, engine: ckEngine)
   }
 
@@ -1944,25 +1948,20 @@ final class GutMutator {
   func addEntry(date: String,
                 time: String,
                 bristol: Int,
-                blood: Int = 0,
-                volume: String? = nil,
                 // Free-form text defaults to "" rather than nil so the first
-                // in-app entry registers these fields with CloudKit, enabling
-                // the MCP gateway (which uses Web Services API) to write to
-                // them. Enum / time fields stay nil — empty isn't a valid value.
-                discomfortLevel: String? = "",
-                discomfortStart: String? = nil,
-                discomfortEnd: String? = nil,
+                // in-app entry registers the field with CloudKit, enabling the
+                // MCP gateway (which uses Web Services API) to write to it.
+                volume: String? = nil,
                 note: String? = "") -> GutEventEntity {
     let id = uniqueID()
+    // Symptom-shaped fields (blood, discomfort) are retired from Gut — they
+    // live in Symptoms now (docs/GUT_SYMPTOMS_MIGRATION_PLAN). New rows leave
+    // the dormant storage at its empty defaults; the GutSymptomMigrator still
+    // reads legacy values off existing rows.
     let entity = GutEventEntity(id: id,
                                 date: date,
                                 bristol: bristol,
-                                blood: blood,
                                 volume: volume,
-                                discomfortLevel: discomfortLevel,
-                                discomfortStart: discomfortStart,
-                                discomfortEnd: discomfortEnd,
                                 note: note)
     entity.occurredAt = EventTimestamp.from(date: date, time: time)
     context.insert(entity)
@@ -1974,20 +1973,12 @@ final class GutMutator {
                    date: String? = nil,
                    time: String? = nil,
                    bristol: Int? = nil,
-                   blood: Int? = nil,
                    volume: String?? = nil,
-                   discomfortLevel: String?? = nil,
-                   discomfortStart: String?? = nil,
-                   discomfortEnd: String?? = nil,
                    note: String?? = nil) {
     guard let entity = fetch(id: id) else { return }
     if let date { entity.date = date }
     if let bristol { entity.bristol = bristol }
-    if let blood { entity.blood = blood }
     if let volume { entity.volume = volume }
-    if let discomfortLevel { entity.discomfortLevel = discomfortLevel }
-    if let discomfortStart { entity.discomfortStart = discomfortStart }
-    if let discomfortEnd { entity.discomfortEnd = discomfortEnd }
     if let note { entity.note = note }
     // `time` STRING retired: fold a day/time change into the canonical
     // occurredAt, deriving the unspecified half from the existing instant.
@@ -2192,6 +2183,71 @@ final class SymptomsMutator {
 
   private func postChanged() {
     DataChange.post(Self.changeScope)
+  }
+
+  // MARK: - Migration upserts (deterministic ids)
+  //
+  // The Gut → Symptoms migrator writes through these so the write-boundary
+  // invariant holds for migrators too. Definitions match by title first (so a
+  // starter the user already added is reused, never duplicated); events upsert
+  // on a deterministic id derived from the source gut row.
+
+  /// Id of a definition titled `title` (case-insensitive), creating one with
+  /// `fallbackID` if none exists. Idempotent across launches and devices.
+  @discardableResult
+  func ensureDefinition(title: String,
+                        emoji: String?,
+                        bodySystem: String?,
+                        defaultBodyRegion: String?,
+                        fallbackID: String) -> String {
+    let all = (try? context.fetch(FetchDescriptor<SymptomDefinitionEntity>())) ?? []
+    if let existing = all.first(where: { $0.title.lowercased() == title.lowercased() }) {
+      return existing.id
+    }
+    let entity = SymptomDefinitionEntity(id: fallbackID,
+                                         title: title,
+                                         emoji: emoji,
+                                         bodySystem: bodySystem,
+                                         defaultBodyRegion: defaultBodyRegion,
+                                         sortIndex: nextDefinitionSortIndex())
+    context.insert(entity)
+    commitDefinition(entity, op: "migrate")
+    return fallbackID
+  }
+
+  /// Create-or-update a migrated symptom event keyed on a deterministic id, so a
+  /// re-run (or a late-arriving gut row) converges instead of duplicating.
+  func upsertMigratedEvent(id: String,
+                           symptomID: String,
+                           date: String,
+                           occurredAt: Date,
+                           severity: Int,
+                           durationMinutes: Int?,
+                           note: String?,
+                           source: String) {
+    let clamped = max(0, min(10, severity))
+    if let existing = fetchEvent(id: id) {
+      existing.symptomID = symptomID
+      existing.date = date
+      existing.occurredAt = occurredAt
+      existing.severity = clamped
+      existing.durationMinutes = durationMinutes
+      existing.note = note
+      existing.source = source
+      existing.updatedAt = .now
+      commitEvent(existing, op: "migrate")
+      return
+    }
+    let entity = SymptomEventEntity(id: id,
+                                    date: date,
+                                    symptomID: symptomID,
+                                    severity: clamped,
+                                    durationMinutes: durationMinutes,
+                                    note: note,
+                                    source: source)
+    entity.occurredAt = occurredAt
+    context.insert(entity)
+    commitEvent(entity, op: "migrate")
   }
 }
 

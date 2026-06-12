@@ -2,8 +2,9 @@ import SwiftUI
 import SwiftData
 
 // Digestive event log. The Bristol stool scale labels and the
-// detail-line construction (volume, blood, note) live here with the
-// rest of the section's contract.
+// detail-line construction (volume, note) live here with the rest of the
+// section's contract. Symptom-shaped signals (discomfort, blood) now live in
+// the Symptoms section — see docs/GUT_SYMPTOMS_MIGRATION_PLAN.
 
 @MainActor
 enum GutPlugin: SectionPlugin {
@@ -18,10 +19,8 @@ enum GutPlugin: SectionPlugin {
       tables: [
         SchemaTable(name: "gutEvent", purpose: "one bowel-movement log", fields: [
           .req("id", "string"), .req("date", "date"), .req("time", "time"),
-          .req("bristol", "int", "1–7"), .req("blood", "int", "0–3"),
-          .opt("volume", "string"), .opt("discomfortLevel", "string"),
-          .opt("discomfortStart", "time"), .opt("discomfortEnd", "time"),
-          .opt("note", "string"),
+          .req("bristol", "int", "1–7"),
+          .opt("volume", "string"), .opt("note", "string"),
         ]),
       ],
       collect: { ctx in
@@ -52,8 +51,8 @@ enum GutPlugin: SectionPlugin {
       intro: "A private digestive event log. Useful for tracking down a food sensitivity, recovering from antibiotics, or just spotting patterns.",
       bullets: [
         .init("Bristol Stool Scale", "1 = hard pellets, 7 = watery. Required for every entry.", icon: "ruler"),
-        .init("Volume + blood", "Small / medium / large; blood as a count. Both optional.", icon: "drop"),
-        .init("Discomfort window", "Optional HH:MM start / end when cramping or pain matters.", icon: "clock.badge.exclamationmark"),
+        .init("Volume", "Small / medium / large. Optional.", icon: "drop"),
+        .init("Symptoms live in Symptoms", "Log cramping, discomfort or blood in the Symptoms section, where they get severity and their own timeline.", icon: "waveform.path.ecg"),
       ],
       primaryActionLabel: "Start logging",
       complete: complete
@@ -85,14 +84,14 @@ enum GutPlugin: SectionPlugin {
         SectionSkill.Tool("gut_events_list",  "By day or range. Defaults to last 7 days",
               inputs: "optional: date, from, to, limit"),
         SectionSkill.Tool("gut_event_log",    "Log an event",
-              inputs: "required: bristol (1-7) · optional: date (default today), time (HH:MM:SS), blood (boolean), volume (small|medium|large), discomfortLevel (free-form), discomfortStart (HH:MM), discomfortEnd (HH:MM), note"),
+              inputs: "required: bristol (1-7) · optional: date (default today), time (HH:MM:SS), volume (small|medium|large), note"),
         SectionSkill.Tool("gut_event_delete", "Remove an event",
               inputs: "required: id"),
       ],
       body: """
       `bristol` is the Bristol Stool Scale (1 = hard pellets, 7 = watery) and \
-      is required. Log `discomfortStart`/`discomfortEnd` as `HH:MM` when the \
-      user describes cramping or pain.
+      is required. Cramping, discomfort and blood are symptoms, not gut events \
+      — log them with `symptoms_log` so they get severity and their own timeline.
       """
     )
   }
@@ -103,16 +102,6 @@ enum GutPlugin: SectionPlugin {
     [
       GoalMetric(key: "gut.event_count",
                  label: "Gut events (this week)",
-                 sectionKey: "gut",
-                 window: "calendarWeek",
-                 unitLabel: "events"),
-      GoalMetric(key: "gut.blood_count",
-                 label: "Gut events with blood (this week)",
-                 sectionKey: "gut",
-                 window: "calendarWeek",
-                 unitLabel: "events"),
-      GoalMetric(key: "gut.discomfort_count",
-                 label: "Gut events with discomfort (this week)",
                  sectionKey: "gut",
                  window: "calendarWeek",
                  unitLabel: "events"),
@@ -133,20 +122,6 @@ enum GutPlugin: SectionPlugin {
         predicate: #Predicate { $0.date >= startStr && $0.date <= endStr }
       )
       return Double((try? context.fetch(descriptor).count) ?? 0)
-    case "gut.blood_count":
-      let descriptor = FetchDescriptor<GutEventEntity>(
-        predicate: #Predicate {
-          $0.date >= startStr && $0.date <= endStr && $0.blood > 0
-        }
-      )
-      return Double((try? context.fetch(descriptor).count) ?? 0)
-    case "gut.discomfort_count":
-      let descriptor = FetchDescriptor<GutEventEntity>(
-        predicate: #Predicate {
-          $0.date >= startStr && $0.date <= endStr && $0.discomfortLevel != nil
-        }
-      )
-      return Double((try? context.fetch(descriptor).count) ?? 0)
     case "gut.bristol_avg":
       // 0 when no events this week — reads as "no data" against any
       // target rather than misleadingly perfect.
@@ -165,10 +140,7 @@ enum GutPlugin: SectionPlugin {
 @MainActor func gutEventExportDict(_ e: GutEventEntity) -> [String: Any] {
   compact([
     "id": e.id, "date": e.date, "time": EventTimestamp.hhmm(from: e.occurredAt),
-    "bristol": e.bristol, "blood": e.blood, "volume": e.volume,
-    "discomfortLevel": e.discomfortLevel,
-    "discomfortStart": e.discomfortStart,
-    "discomfortEnd": e.discomfortEnd,
+    "bristol": e.bristol, "volume": e.volume,
     "note": e.note, "updatedAt": isoDate(e.updatedAt),
   ])
 }

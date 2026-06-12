@@ -293,6 +293,7 @@ targets:
       - path: SeptenaCore/CannabisCapsule.swift
       - path: SeptenaCore/SuggestionBlocks.swift
       - path: SeptenaCore/IntakeModel.swift
+      - path: SeptenaCore/GutSymptomMigrationMap.swift
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES

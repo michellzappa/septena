@@ -2,7 +2,7 @@ import SwiftUI
 
 // Bristol-scale capture. Static labels (1–7) — the server has no /config
 // endpoint we depend on; the webapp does the same. Tap logs with the
-// current time and blood=0; full editor lives outside the palette.
+// current time; full editor lives outside the palette.
 
 private struct BristolEntry: Identifiable {
   let id: Int

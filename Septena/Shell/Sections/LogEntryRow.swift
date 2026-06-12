@@ -67,7 +67,7 @@ struct LogEntryRow: View {
   VStack(spacing: 0) {
     LogEntryRow(
       title: "Type 4 · smooth",
-      detail: "blood 0",
+      detail: "medium",
       trailing: "07:42",
       onEdit: {},
       onDelete: {}

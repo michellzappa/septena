@@ -447,7 +447,6 @@ final class WatchConnectivity {
     let record   = CKRecord(recordType: "GutEvent", recordID: recordID)
     record["date"]       = date
     record["bristol"]    = bristol
-    record["blood"]      = 0
     record["note"]       = ""
     record["occurredAt"] = Date()
     try await db.save(record)

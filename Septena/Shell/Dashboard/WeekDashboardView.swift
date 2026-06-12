@@ -1686,21 +1686,18 @@ struct WeekDashboardView: View {
 
   private func gutDomainData() -> HomepageDomainData {
     let count = gutToday?.movementCount ?? 0
-    let discomfort = gutToday?.totalDiscomfortH ?? 0
+    let avgBristol = Self.avgBristol(gutToday?.entries ?? [])
     let bars = gutHistory.map { $0.movements }
     let dailyTarget = 2
     return HomepageDomainData(
       domain: .gut,
       title: String(localized: "Gut", comment: "Section name"),
       accent: theme.color(for: "gut"),
-      headline: discomfort > 0
-        ? "\(count) · \(String(format: "%.1f", discomfort))h disc."
-        : "\(count)",
+      headline: "\(count)",
       headlineStats: [
         .init(label: "Today", value: "\(count)"),
-        .init(label: "Discomfort",
-              value: String(format: "%.1f", discomfort),
-              unit: "h"),
+        .init(label: "Avg Bristol",
+              value: avgBristol.map { String(format: "%.1f", $0) } ?? "—"),
       ],
       progress: .init(label: "Today / typical",
                       current: Double(min(count, dailyTarget)),
@@ -2345,15 +2342,15 @@ struct WeekDashboardView: View {
   private var gutTile: some View {
     let accent = theme.color(for: "gut")
     let count = gutToday?.movementCount ?? 0
-    let discomfort = gutToday?.totalDiscomfortH ?? 0
+    let avgBristol = Self.avgBristol(gutToday?.entries ?? [])
     let bars = Array(gutHistory.map { $0.movements }.suffix(7))
     let dailyTarget = 2
     return ModuleTile(
       title: String(localized: "Gut", comment: "Section name"),
       accent: accent,
       stats: [
-        .init(label: "Today",      value: "\(count)"),
-        .init(label: "Discomfort", value: String(format: "%.1f", discomfort), unit: "h")
+        .init(label: "Today",       value: "\(count)"),
+        .init(label: "Avg Bristol", value: avgBristol.map { String(format: "%.1f", $0) } ?? "—")
       ],
       progress: .init(label: "Today / typical",
                       current: Double(min(count, dailyTarget)),
@@ -2368,8 +2365,8 @@ struct WeekDashboardView: View {
   }
 
   // Bristol scale is a fixed 7-item enum — the menu IS the complete UX,
-  // no "More…" sheet fallback. Matches AddGutPage's commit semantics:
-  // `blood: 0` by default; full editor lives in GutDestinationView.
+  // no "More…" sheet fallback. Matches AddGutPage's commit semantics;
+  // the full editor lives in GutDestinationView.
   @ViewBuilder private var gutQuickAddMenu: some View {
     let hasLast = !(gutToday?.entries.isEmpty ?? true)
     GutQuickAddMenu(
@@ -2378,6 +2375,12 @@ struct WeekDashboardView: View {
       hasLastEntry: hasLast,
       onEditLast: hasLast ? { open(.gut) } : nil
     )
+  }
+
+  /// Mean Bristol score across today's movements, or nil when none logged.
+  private static func avgBristol(_ entries: [GutEntry]) -> Double? {
+    guard !entries.isEmpty else { return nil }
+    return Double(entries.reduce(0) { $0 + $1.bristol }) / Double(entries.count)
   }
 
   private func commitGut(bristol: Int) {

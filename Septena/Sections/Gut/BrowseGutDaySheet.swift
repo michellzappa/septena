@@ -110,10 +110,6 @@ struct BrowseGutDaySheet: View {
   private func detailLine(_ e: GutEntry) -> String? {
     var parts: [String] = []
     if let v = e.volume { parts.append(v) }
-    if e.blood > 0 { parts.append("blood \(e.blood)") }
-    if let h = e.discomfortHours, h > 0, let lvl = e.discomfortLevel {
-      parts.append("\(lvl) \("\(h.decimalString(1))h")")
-    }
     if let n = e.note, !n.isEmpty { parts.append(n) }
     return parts.isEmpty ? nil : parts.joined(separator: " · ")
   }

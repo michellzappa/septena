@@ -24,17 +24,11 @@ struct EditGutEntrySheet: View {
   // you backfill a forgotten log onto the right day.
   @State private var when: Date = Date()
   @State private var bristol: Int = 4
-  @State private var blood: Int = 0
   @State private var volume: String = ""       // "" | small | medium | large
-  @State private var discomfortLevel: String = ""  // "" | low | med | high
-  @State private var discomfortHoursString: String = ""
   @State private var note: String = ""
 
   private static let volumes: [(String, String)] = [
     ("", "—"), ("small", "Small"), ("medium", "Medium"), ("large", "Large"),
-  ]
-  private static let discomfortLevels: [(String, String)] = [
-    ("", "—"), ("low", "Low"), ("med", "Med"), ("high", "High"),
   ]
 
   private var navTitle: String { isCreating ? "New gut entry" : "Edit gut entry" }
@@ -59,11 +53,6 @@ struct EditGutEntrySheet: View {
             Text("Type \(bristol) · \(bristolShort(bristol))")
           }
         }
-        Section("Blood") {
-          Stepper(value: $blood, in: 0...3) {
-            Text(blood == 0 ? "None" : "Level \(blood)")
-          }
-        }
         Section("Volume") {
           Picker("Volume", selection: $volume) {
             ForEach(Self.volumes, id: \.0) { v in
@@ -71,18 +60,6 @@ struct EditGutEntrySheet: View {
             }
           }
           .pickerStyle(.segmented)
-        }
-        Section("Discomfort") {
-          Picker("Level", selection: $discomfortLevel) {
-            ForEach(Self.discomfortLevels, id: \.0) { l in
-              Text(l.1).tag(l.0)
-            }
-          }
-          .pickerStyle(.segmented)
-          TextField("Hours", text: $discomfortHoursString)
-            #if os(iOS)
-            .keyboardType(.decimalPad)
-            #endif
         }
         Section("Note") {
           TextField("Note", text: $note, axis: .vertical)
@@ -110,10 +87,7 @@ struct EditGutEntrySheet: View {
       // the host's date. Everything else stays empty so the user can
       // accept-and-go without confirming defaults they didn't pick.
       bristol = 4
-      blood = 0
       volume = ""
-      discomfortLevel = ""
-      discomfortHoursString = ""
       note = ""
       let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
       let day = fmt.date(from: date) ?? Date()
@@ -127,12 +101,7 @@ struct EditGutEntrySheet: View {
       return
     }
     bristol = original.bristol
-    blood = original.blood
     volume = original.volume ?? ""
-    discomfortLevel = original.discomfortLevel ?? ""
-    discomfortHoursString = original.discomfortHours.map {
-      $0 == $0.rounded() ? String(Int($0)) : $0.decimalString()
-    } ?? ""
     note = original.note ?? ""
     when = EventTimestamp.from(date: original.date, time: original.time)
   }
@@ -142,34 +111,11 @@ struct EditGutEntrySheet: View {
     let timeFmt = DateFormatter(); timeFmt.dateFormat = "HH:mm"
     let newDate = dayFmt.string(from: when)
     let hhmm = timeFmt.string(from: when)
-    let hoursValue: Double? = {
-      let t = discomfortHoursString.trimmingCharacters(in: .whitespacesAndNewlines)
-        .replacingOccurrences(of: ",", with: ".")
-      return Double(t)
-    }()
     let noteValue: String? = {
       let t = note.trimmingCharacters(in: .whitespacesAndNewlines)
       return t.isEmpty ? nil : t
     }()
     let volumeValue: String? = volume.isEmpty ? nil : volume
-    let discomfortLvlValue: String? = discomfortLevel.isEmpty ? nil : discomfortLevel
-
-    // Translate the hours-string into start/end timestamps. The server's
-    // old PUT-handler did this server-side; on CK we own that math.
-    var startISO: String? = nil
-    var endISO: String? = nil
-    if let h = hoursValue, h > 0 {
-      let calFmt = DateFormatter()
-      calFmt.dateFormat = "yyyy-MM-dd'T'HH:mm"
-      calFmt.calendar = Calendar(identifier: .gregorian)
-      calFmt.locale = Locale(identifier: "en_US_POSIX")
-      calFmt.timeZone = TimeZone.current
-      if let start = calFmt.date(from: "\(newDate)T\(hhmm)") {
-        let end = start.addingTimeInterval(h * 3600)
-        startISO = calFmt.string(from: start)
-        endISO = calFmt.string(from: end)
-      }
-    }
 
     // Both branches funnel through SectionLog (quiet edit, restrained sink
     // for a new log). Dismissal is owned by AdaptiveEditScaffold.
@@ -181,11 +127,7 @@ struct EditGutEntrySheet: View {
           date: newDate,
           time: hhmm,
           bristol: bristol,
-          blood: blood,
           volume: .some(volumeValue),
-          discomfortLevel: .some(discomfortLvlValue),
-          discomfortStart: .some(startISO),
-          discomfortEnd: .some(endISO),
           note: .some(noteValue)
         )
         GutBristolRecorder.record(bristol)
@@ -200,11 +142,7 @@ struct EditGutEntrySheet: View {
           date: newDate,
           time: hhmm,
           bristol: bristol,
-          blood: blood,
           volume: volumeValue,
-          discomfortLevel: discomfortLvlValue,
-          discomfortStart: startISO,
-          discomfortEnd: endISO,
           note: noteValue
         )
         newID = entity.id
@@ -214,17 +152,19 @@ struct EditGutEntrySheet: View {
       savedID = newID
     }
 
+    // Symptom-shaped fields (blood, discomfort) are retired from Gut — the
+    // rebuilt display row carries their empty defaults.
     let rebuilt = GutEntry(
       id: savedID,
       date: newDate,
       time: hhmm,
       bristol: bristol,
-      blood: blood,
+      blood: 0,
       volume: volumeValue,
-      discomfortLevel: discomfortLvlValue,
-      discomfortStart: startISO,
-      discomfortEnd: endISO,
-      discomfortHours: hoursValue,
+      discomfortLevel: nil,
+      discomfortStart: nil,
+      discomfortEnd: nil,
+      discomfortHours: nil,
       note: noteValue
     )
     onSave(rebuilt)

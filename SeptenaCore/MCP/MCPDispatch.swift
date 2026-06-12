@@ -901,8 +901,8 @@ enum MCPDispatch {
     // Explicit element type so `e.id` resolves to the stored `var id: String`
     // rather than @Model's synthesized `persistentModelID`.
     return ["events": rows.map { (e: GutEventEntity) -> [String: Any] in
-      ["id": e.id, "date": e.date, "bristol": e.bristol, "blood": e.blood != 0,
-       "volume": e.volume ?? "", "discomfortLevel": e.discomfortLevel ?? "", "note": e.note ?? ""]
+      ["id": e.id, "date": e.date, "bristol": e.bristol,
+       "volume": e.volume ?? "", "note": e.note ?? ""]
     }]
   }
 
@@ -910,10 +910,8 @@ enum MCPDispatch {
     guard let bristol = args.int("bristol") else { throw MCPError.badArgument("missing 'bristol'") }
     let e = SeptenaServices.shared.gutMutator.addEntry(
       date: args.string("date") ?? today, time: args.string("time") ?? nowHHMMSS,
-      bristol: bristol, blood: (args.bool("blood") ?? false) ? 1 : 0,
-      volume: args.string("volume"), discomfortLevel: args.string("discomfortLevel") ?? "",
-      discomfortStart: args.string("discomfortStart"), discomfortEnd: args.string("discomfortEnd"),
-      note: args.string("note") ?? "")
+      bristol: bristol,
+      volume: args.string("volume"), note: args.string("note") ?? "")
     return ["id": e.id, "date": e.date, "bristol": e.bristol]
   }
 
