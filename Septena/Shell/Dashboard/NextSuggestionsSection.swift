@@ -16,13 +16,11 @@ import SwiftData
 
 struct NextSuggestion: Identifiable, Hashable {
   enum Kind: String, Hashable {
-    case caffeine, cannabis, training, fastBreak, mood
+    case training, fastBreak, mood
 
     /// Section accent key for `SectionTheme.color(for:)`.
     var sectionKey: String {
       switch self {
-      case .caffeine:  return "caffeine"
-      case .cannabis:  return "cannabis"
       case .training:  return "training"
       case .fastBreak: return "nutrition"
       case .mood:      return "mood"
@@ -291,14 +289,6 @@ final class NextSuggestionsModel {
     let since14 = daysAgoISO(14)
     let since30 = daysAgoISO(30)
 
-    let cafEntries = (try? ctx.fetch(FetchDescriptor<CaffeineEventEntity>(
-      predicate: #Predicate { $0.date >= since14 }
-    ))) ?? []
-    let cafToday = ChecklistMirror.loadCaffeineDay(context: ctx, date: today)
-    let canEntries = (try? ctx.fetch(FetchDescriptor<CannabisEventEntity>(
-      predicate: #Predicate { $0.date >= since14 }
-    ))) ?? []
-    let canToday = ChecklistMirror.loadCannabisDay(context: ctx, date: today)
     let nut = ChecklistMirror.loadNutritionEntries(context: ctx, since: since14)
     let tr: [ExerciseEntry]? = ChecklistMirror.loadTrainingEntries(context: ctx, since: since30)
     let sw: SuggestedWorkoutResponse? = ChecklistMirror.loadSuggestedWorkout(context: ctx)
@@ -316,32 +306,9 @@ final class NextSuggestionsModel {
     let moodLoggedThisBucket = ChecklistMirror.loadMoodDay(context: ctx, date: today)
       .byBucket[moodBucket.rawValue] != nil
 
-    let cafTimePoints: [CaffeineTimePoint] = cafEntries.compactMap { e in
-      let hhmm = EventTimestamp.hhmm(from: e.occurredAt)
-      let parts = hhmm.split(separator: ":")
-      guard let hh = parts.first.flatMap({ Int($0) }) else { return nil }
-      let mm = parts.dropFirst().first.flatMap { Int($0) } ?? 0
-      return CaffeineTimePoint(date: e.date, time: hhmm,
-                               hour: Double(hh) + Double(mm) / 60.0,
-                               method: e.method, beans: e.beans, grams: e.grams)
-    }
-    let canTimePoints: [CannabisTimePoint] = canEntries.compactMap { e in
-      let hhmm = EventTimestamp.hhmm(from: e.occurredAt)
-      let parts = hhmm.split(separator: ":")
-      guard let hh = parts.first.flatMap({ Int($0) }) else { return nil }
-      let mm = parts.dropFirst().first.flatMap { Int($0) } ?? 0
-      return CannabisTimePoint(date: e.date, time: hhmm,
-                               hour: Double(hh) + Double(mm) / 60.0,
-                               method: e.method, strain: e.strain, hit: e.hit)
-    }
-
     return compute(
       today: today,
       isToday: true,
-      caffeineHistory: cafTimePoints,
-      caffeineToday: cafToday.entries,
-      cannabisHistory: canTimePoints,
-      cannabisToday: canToday.entries,
       nutrition: nut,
       training: tr ?? [],
       workout: sw?.suggested,
@@ -392,10 +359,6 @@ final class NextSuggestionsModel {
   static func compute(
     today: String,
     isToday: Bool,
-    caffeineHistory: [CaffeineTimePoint],
-    caffeineToday: [CaffeineEntry],
-    cannabisHistory: [CannabisTimePoint],
-    cannabisToday: [CannabisEntry],
     nutrition: [NutritionEntry],
     training: [ExerciseEntry],
     workout: SuggestedWorkout?,
@@ -408,86 +371,6 @@ final class NextSuggestionsModel {
     let cal = Calendar.current
     let nowMinutes = cal.component(.hour, from: now) * 60 + cal.component(.minute, from: now)
     var out: [NextSuggestion] = []
-
-    // Caffeine — first cup
-    let firstCaffeineUsual = NextScoring.median(
-      NextScoring.firstDailyTimes(
-        dateTimes: caffeineHistory.map { (date: $0.date, time: $0.time) },
-        beforeDay: today
-      )
-    )
-    if caffeineToday.isEmpty, isToday,
-       let usual = firstCaffeineUsual,
-       nowMinutes >= usual - 45 {
-      out.append(NextSuggestion(
-        id: "caffeine:first",
-        kind: .caffeine,
-        title: "Log caffeine",
-        emoji: "☕️",
-        symbol: nil,
-        detail: "Usually \(NextScoring.relativeMinutes(target: usual, now: nowMinutes))",
-        score: 34 + NextScoring.timingScore(usual: usual, nowMinutes: nowMinutes, isToday: isToday),
-        proposedMinutes: usual
-      ))
-    }
-
-    // Caffeine — next cup. Once the first cup is logged, the first-cup rule
-    // goes quiet; the learned within-day rhythm takes over. Suggest cup N+1 a
-    // median-gap after the last one, but stop at two learned ceilings: the
-    // typical cups/day count, and the typical "last cup" time (curfew) so we
-    // never nudge an evening coffee.
-    let caffeineCadence = Cadence.withinDay(
-      dateTimes: caffeineHistory.map { (date: $0.date, time: $0.time) },
-      before: today
-    )
-    let caffeineCurfew = NextScoring.median(
-      NextScoring.lastDailyTimes(
-        dateTimes: caffeineHistory.map { (date: $0.date, time: $0.time) },
-        beforeDay: today
-      )
-    )
-    let lastCupToday = caffeineToday.compactMap { NextScoring.parseHHMM($0.time) }.max()
-    if !caffeineToday.isEmpty, isToday,
-       let cadence = caffeineCadence, cadence.isConfident,
-       caffeineToday.count < cadence.typicalCount,
-       let lastCup = lastCupToday {
-      let nextCup = cadence.next(after: lastCup)
-      let beforeCurfew = caffeineCurfew.map { nextCup <= $0 } ?? true
-      if beforeCurfew, nowMinutes >= nextCup - 45 {
-        out.append(NextSuggestion(
-          id: "caffeine:next",
-          kind: .caffeine,
-          title: "Log caffeine",
-          emoji: "☕️",
-          symbol: nil,
-          detail: "Cup \(caffeineToday.count + 1) · usually \(NextScoring.relativeMinutes(target: nextCup, now: nowMinutes))",
-          score: 30 + NextScoring.timingScore(usual: nextCup, nowMinutes: nowMinutes, isToday: isToday),
-          proposedMinutes: nextCup
-        ))
-      }
-    }
-
-    // Cannabis — first session
-    let firstCannabisUsual = NextScoring.median(
-      NextScoring.firstDailyTimes(
-        dateTimes: cannabisHistory.map { (date: $0.date, time: $0.time) },
-        beforeDay: today
-      )
-    )
-    if cannabisToday.isEmpty, isToday,
-       let usual = firstCannabisUsual,
-       nowMinutes >= usual - 45 {
-      out.append(NextSuggestion(
-        id: "cannabis:first",
-        kind: .cannabis,
-        title: "Log cannabis",
-        emoji: "🌿",
-        symbol: nil,
-        detail: "Usually \(NextScoring.relativeMinutes(target: usual, now: nowMinutes))",
-        score: 32 + NextScoring.timingScore(usual: usual, nowMinutes: nowMinutes, isToday: isToday),
-        proposedMinutes: usual
-      ))
-    }
 
     // Training — only when we haven't trained today and the server has a
     // suggested workout type. The webapp combines a base score, the
@@ -712,12 +595,6 @@ private struct NextSuggestionRow: View {
 
   private func perform() {
     switch suggestion.kind {
-    case .caffeine:
-      nav.addInfoRequestedSection = .caffeine
-      nav.showAddInfo = true
-    case .cannabis:
-      nav.addInfoRequestedSection = .cannabis
-      nav.showAddInfo = true
     case .fastBreak:
       nav.addInfoRequestedSection = .nutrition
       nav.showAddInfo = true

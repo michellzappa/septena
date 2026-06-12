@@ -375,15 +375,8 @@ private struct CaptureInput: View {
   var body: some View {
     switch block.input {
     case .choice(let choices):
-      // Cannabis is the one stateful choice: its options depend on the current
-      // capsule (Continue Hit N / New capsule / Edible), carried on the snapshot.
-      // Every other kind uses its static `SuggestionBlocks` choices.
-      let resolved = block.kind == "cannabis"
-        ? CannabisCapsule.choices(lastHit: conn.cannabisLastVapeHit,
-                                  usesPerCapsule: conn.cannabisUsesPerCapsule)
-        : choices
       QuickLogChoiceList(
-        choices: resolved,
+        choices: choices,
         tint: WatchSectionTint.color(forSectionKey: block.sectionKey, colors: conn.sectionColors)
       ) { value in
         conn.logChoice(kind: block.kind, value: value, itemID: itemID)
@@ -507,13 +500,11 @@ private struct CaptureSheet: View {
     }
   }
 
-  /// The compiled-in loggables, minus caffeine/cannabis once intake trackers
-  /// ride the wire — the trackers ARE those sections now, and showing both
-  /// would double the rows.
+  /// The compiled-in loggables (mood / hydration / gut). Consumables are
+  /// driven entirely by the wire's intake trackers now, so there are no
+  /// static consumable blocks to filter out.
   private var staticBlocks: [SuggestionBlocks.Block] {
-    SuggestionBlocks.all.filter { block in
-      conn.intakeKinds.isEmpty || !["caffeine", "cannabis"].contains(block.kind)
-    }
+    SuggestionBlocks.all
   }
 
   private func intakeTint(_ kind: IntakeKindWire) -> Color {
@@ -528,8 +519,6 @@ private struct CaptureSheet: View {
   // Mirrors the phone's per-section iconography (`SectionManifest.iconByKey`).
   private func symbol(_ kind: String) -> String {
     switch kind {
-    case "caffeine":  return "cup.and.saucer"
-    case "cannabis":  return "leaf"
     case "mood":      return "face.smiling"
     case "hydration": return "drop.fill"
     case "gut":       return "circle.bottomhalf.filled"

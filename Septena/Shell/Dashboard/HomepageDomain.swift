@@ -28,8 +28,6 @@ enum HomepageDomain: String, CaseIterable, Hashable, Identifiable {
   case nutrition
   case hydration
   case groceries
-  case caffeine
-  case cannabis
   case intake
   case body
   case gut

@@ -90,13 +90,6 @@ extension CorrelationEngine {
     "kcal":           .init(label: "Calories",       section: "nutrition", unit: "kcal", role: .lever, distribution: .continuous),
     "last_meal_hour": .init(label: "Last meal hour", section: "nutrition", unit: "h",    role: .lever, distribution: .continuous),
     "fasting_window": .init(label: "Fasting window", section: "nutrition", unit: "h",    role: .lever, distribution: .continuous),
-    // Caffeine — levers
-    "caffeine_g":         .init(label: "Caffeine grams",     section: "caffeine", unit: "g", role: .lever, distribution: .continuous),
-    "caffeine_cups":      .init(label: "Caffeine cups",      section: "caffeine", unit: "",  role: .lever, distribution: .count),
-    "last_caffeine_hour": .init(label: "Last caffeine hour", section: "caffeine", unit: "h", role: .lever, distribution: .continuous),
-    // Cannabis — levers
-    "cannabis_sessions": .init(label: "Cannabis sessions", section: "cannabis", unit: "", role: .lever, distribution: .count),
-    "cannabis_g":        .init(label: "Cannabis grams",    section: "cannabis", unit: "g", role: .lever, distribution: .continuous),
     // Habits — lever (aggregate; per-habit binaries are added dynamically)
     "habit_completion":  .init(label: "Habit completion",  section: "habits",   unit: "%", role: .lever, distribution: .continuous),
     // Gut — outcomes

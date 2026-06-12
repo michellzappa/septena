@@ -124,7 +124,7 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
   public static let todayCapableKeys: Set<String> = [
     "tasks", "habits", "supplements", "chores",
     "training", "nutrition", "hydration",
-    "caffeine", "cannabis", "intake", "gut", "mood",
+    "intake", "gut", "mood",
     "symptoms", "medications",
   ]
 
@@ -147,8 +147,6 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
     "sleep":       "bed.double",
     "nutrition":   "fork.knife",
     "groceries":   "cart",
-    "caffeine":    "cup.and.saucer",
-    "cannabis":    "leaf",
     "intake":      "takeoutbag.and.cup.and.straw",
     "body":        "scalemass",
     "gut":         "circle.bottomhalf.filled",
@@ -305,28 +303,10 @@ public extension SectionManifest {
       supportsDashboard: true,
       settingsEditor: .sectionConfig
     ),
-    .init(
-      key: "caffeine",
-      defaultLabel: String(localized: "Caffeine", comment: "Section name"),
-      shortDescription: String(localized: "Coffee, beans, brewing methods", comment: "Section description"),
-      activation: .optional,
-      onboarding: .optional,
-      supportsDashboard: true,
-      settingsEditor: .sectionConfig
-    ),
-    .init(
-      key: "cannabis",
-      defaultLabel: String(localized: "Cannabis", comment: "Section name"),
-      shortDescription: String(localized: "Intake log and dosing", comment: "Section description"),
-      activation: .optional,
-      onboarding: .optional,
-      supportsDashboard: true,
-      settingsEditor: .sectionConfig
-    ),
     // Intake — the generic consumable tracker (consumables generalization).
     // One host section; user-defined kinds (caffeine, tea, …) are rows, not
-    // sections (Option C). Caffeine/cannabis fold into this over phases 2–4.
-    // See docs/CONSUMABLES_PLAN.md.
+    // sections (Option C). The legacy caffeine/cannabis sections were retired
+    // into this; their CK records migrate on sight. See docs/CONSUMABLES_PLAN.md.
     .init(
       key: "intake",
       defaultLabel: String(localized: "Intake", comment: "Section name"),

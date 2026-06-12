@@ -40,7 +40,7 @@ enum CoachContextBuilder {
   /// (sectionKeys == nil) sees this whole list; other presets pick a slice.
   static let supportedKeys = ["training", "nutrition", "hydration", "supplements",
                               "sleep", "body", "mood", "gut", "tasks", "chores",
-                              "habits", "caffeine", "cannabis"]
+                              "habits"]
 
   /// A compact facts block for the preset + window, safe to paste into a
   /// prompt. `excluding` drops sections the user toggled off — the model
@@ -143,8 +143,6 @@ enum CoachContextBuilder {
     switch key {
     case "training":  return ("Training", trainingRecords(r, ctx))
     case "nutrition": return ("Nutrition", nutritionRecords(r, ctx))
-    case "caffeine":  return ("Caffeine", caffeineRecords(r, ctx))
-    case "cannabis":  return ("Cannabis", cannabisRecords(r, ctx))
     case "gut":       return ("Gut", gutRecords(r, ctx))
     case "mood":      return ("Mood", moodRecords(r, ctx))
     case "sleep":     return ("Sleep", sleepRecords(r, ctx))
@@ -178,31 +176,6 @@ enum CoachContextBuilder {
         s += " · \(Int(kcalOf(f).rounded()))kcal \(Int(f.proteinG.rounded()))P/\(Int(f.fatG.rounded()))F/\(Int(f.carbsG.rounded()))C"
         if let fib = f.fiberG, fib > 0 { s += " fiber \(Int(fib.rounded()))g" }
         if let n = f.note, !n.isEmpty { s += " — \(n)" }
-        return s
-      }
-  }
-
-  private static func caffeineRecords(_ r: Range, _ ctx: ModelContext) -> [String] {
-    fetchDated(CaffeineEventEntity.self, r, ctx) { $0.date }
-      .sorted { $0.occurredAt > $1.occurredAt }
-      .map { x in
-        var s = "\(stamp(x.date, x.occurredAt)) · \(x.method)"
-        if let b = x.beans, !b.isEmpty { s += " · \(b)" }
-        if let g = x.grams { s += " · \(num(g))g" }
-        if let n = x.note, !n.isEmpty { s += " — \(n)" }
-        return s
-      }
-  }
-
-  private static func cannabisRecords(_ r: Range, _ ctx: ModelContext) -> [String] {
-    fetchDated(CannabisEventEntity.self, r, ctx) { $0.date }
-      .sorted { $0.occurredAt > $1.occurredAt }
-      .map { x in
-        var s = "\(stamp(x.date, x.occurredAt)) · \(x.method)"
-        if let st = x.strain, !st.isEmpty { s += " · \(st)" }
-        if let h = x.hit { s += " · \(h) hits" }
-        if let g = x.grams { s += " · \(num(g))g" }
-        if let n = x.note, !n.isEmpty { s += " — \(n)" }
         return s
       }
   }
@@ -331,8 +304,6 @@ enum CoachContextBuilder {
     case "gut":         return gut(w, r, ctx)
     case "tasks":       return tasks(r, ctx)
     case "chores":      return chores(w, r, ctx)
-    case "caffeine":    return caffeine(w, r, ctx)
-    case "cannabis":    return cannabis(w, r, ctx)
     default:            return []
     }
   }
@@ -436,26 +407,6 @@ enum CoachContextBuilder {
     return ["- Chores: \(chores.count) completed over \(w.days) days"]
   }
 
-  private static func caffeine(_ w: CoachWindow, _ r: Range, _ ctx: ModelContext) -> [String] {
-    let caffeine = fetchDated(CaffeineEventEntity.self, r, ctx) { $0.date }
-    guard !caffeine.isEmpty else { return [] }
-    let days = Set(caffeine.map(\.date)).count
-    let perDay = Double(caffeine.count) / Double(w.days)
-    let late = caffeine.filter { (hour(of: EventTimestamp.hhmm(from: $0.occurredAt)) ?? 0) >= 16 }.count
-    var text = "Caffeine: \(oneDecimal(perDay))/day, \(days)/\(w.days) days"
-    text += late == 0 ? ", none after 16:00" : ", \(late) after 16:00"
-    return ["- \(text)"]
-  }
-
-  private static func cannabis(_ w: CoachWindow, _ r: Range, _ ctx: ModelContext) -> [String] {
-    let cannabis = fetchDated(CannabisEventEntity.self, r, ctx) { $0.date }
-    guard !cannabis.isEmpty else { return [] }
-    let days = Set(cannabis.map(\.date)).count
-    let perDay = Double(cannabis.count) / Double(w.days)
-    let hits = cannabis.reduce(0) { $0 + ($1.hit ?? 0) }
-    return ["- Cannabis: \(oneDecimal(perDay))/day, \(days)/\(w.days) days, \(hits) hits"]
-  }
-
   /// Definition-count × window-days vs. logged "done" days → adherence %.
   /// Shared by supplements and habits, which have the same shape.
   private static func adherence<Def: PersistentModel, State: PersistentModel>(
@@ -487,8 +438,6 @@ enum CoachContextBuilder {
     case "gut":         return fetchDated(GutEventEntity.self, r, ctx) { $0.date }.count
     case "tasks":       return fetchCompletedTasks(r, ctx).count
     case "chores":      return fetchDated(ChoreEventEntity.self, r, ctx) { $0.date }.filter { $0.action.lowercased().hasPrefix("complet") }.count
-    case "caffeine":    return fetchDated(CaffeineEventEntity.self, r, ctx) { $0.date }.count
-    case "cannabis":    return fetchDated(CannabisEventEntity.self, r, ctx) { $0.date }.count
     default:            return 0
     }
   }
@@ -500,7 +449,6 @@ enum CoachContextBuilder {
     case "sleep": return "Sleep"; case "mood": return "Mood"; case "body": return "Body"
     case "habits": return "Habits"; case "gut": return "Gut"
     case "tasks": return "Tasks"; case "chores": return "Chores"
-    case "caffeine": return "Caffeine"; case "cannabis": return "Cannabis"
     default: return key.capitalized
     }
   }
@@ -512,7 +460,6 @@ enum CoachContextBuilder {
     case "sleep": return "bed.double"; case "mood": return "face.smiling"; case "body": return "scalemass"
     case "habits": return "repeat"; case "gut": return "stethoscope"
     case "tasks": return "checklist"; case "chores": return "house.fill"
-    case "caffeine": return "cup.and.saucer.fill"; case "cannabis": return "leaf.fill"
     default: return "circle.fill"
     }
   }

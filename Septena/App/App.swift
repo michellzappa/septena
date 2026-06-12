@@ -104,7 +104,7 @@ struct SeptenaApp: App {
               // Republish the watch snapshot after pulling — this is also how
               // watch-originated completions get reflected back to the watch.
               await MainActor.run {
-                WatchSnapshotPublisher.publish(context: localStore.container.mainContext)
+                WatchSnapshotPublisher.schedule(context: localStore.container.mainContext)
                 // Surface milestones earned while away (background Withings
                 // ingest, logs from intents, another device's data syncing in).
                 MilestonePresenter.presentPending(

@@ -779,7 +779,7 @@ final class MoodEventEntity {
   /// `EventTimestamp` on write; `.distantPast` only on pre-migration rows.
   var occurredAt: Date = Date.distantPast
   /// `YYYY-MM-DD` of the logged moment, in local time. Indexed for fast
-  /// day-scoped queries — mirrors CaffeineEventEntity.
+  /// day-scoped queries — mirrors the other logged-event entities.
   var date: String
   /// Bucket derived from `occurredAt` at write: morning (<12), afternoon (12–17),
   /// evening (≥17). Stored so dashboard heatmaps can slice without re-parsing.
@@ -923,6 +923,8 @@ final class MedicationDefinitionEntity {
   var defaultDoseValue: Double?
   var defaultDoseUnit: String?
   var bucket: String?
+  var scheduleKind: String?
+  var targetDosesPerDay: Int?
   var instructions: String?
   var sortIndex: Int
   var archived: Bool
@@ -940,6 +942,8 @@ final class MedicationDefinitionEntity {
        defaultDoseValue: Double? = nil,
        defaultDoseUnit: String? = nil,
        bucket: String? = nil,
+       scheduleKind: String? = "daily",
+       targetDosesPerDay: Int? = 1,
        instructions: String? = nil,
        sortIndex: Int = 0,
        archived: Bool = false,
@@ -956,6 +960,8 @@ final class MedicationDefinitionEntity {
     self.defaultDoseValue = defaultDoseValue
     self.defaultDoseUnit = defaultDoseUnit
     self.bucket = bucket
+    self.scheduleKind = scheduleKind
+    self.targetDosesPerDay = targetDosesPerDay
     self.instructions = instructions
     self.sortIndex = sortIndex
     self.archived = archived
@@ -1008,95 +1014,10 @@ final class MedicationDoseEventEntity {
   }
 }
 
-@Model
-final class CaffeineEventEntity {
-  @Attribute(.unique) var id: String
-  /// Canonical UTC instant of the event. Derived from `date`/`time` via
-  /// `EventTimestamp` on write; `.distantPast` only on pre-migration rows.
-  var occurredAt: Date = Date.distantPast
-  var date: String
-  var method: String   // "v60" | "matcha" | "other"
-  var beans: String?
-  var grams: Double?
-  var note: String?
-  var updatedAt: Date
-  var cloudKitSystemFields: Data?
-
-  init(id: String,
-       date: String,
-       method: String,
-       beans: String? = nil,
-       grams: Double? = nil,
-       note: String? = nil,
-       updatedAt: Date = .now,
-       cloudKitSystemFields: Data? = nil) {
-    self.id = id
-    self.date = date
-    self.method = method
-    self.beans = beans
-    self.grams = grams
-    self.note = note
-    self.updatedAt = updatedAt
-    self.cloudKitSystemFields = cloudKitSystemFields
-  }
-}
-
-@Model
-final class CaffeineBeanEntity {
-  @Attribute(.unique) var id: String
-  var name: String
-  var sortIndex: Int
-  var updatedAt: Date
-  var cloudKitSystemFields: Data?
-
-  init(id: String,
-       name: String,
-       sortIndex: Int = 0,
-       updatedAt: Date = .now,
-       cloudKitSystemFields: Data? = nil) {
-    self.id = id
-    self.name = name
-    self.sortIndex = sortIndex
-    self.updatedAt = updatedAt
-    self.cloudKitSystemFields = cloudKitSystemFields
-  }
-}
-
-@Model
-final class CannabisEventEntity {
-  @Attribute(.unique) var id: String
-  /// Canonical UTC instant of the event. Derived from `date`/`time` via
-  /// `EventTimestamp` on write; `.distantPast` only on pre-migration rows.
-  var occurredAt: Date = Date.distantPast
-  var date: String
-  var method: String   // "vape" | "edible"
-  var strain: String?
-  var hit: Int?
-  var grams: Double?
-  var note: String?
-  var updatedAt: Date
-  var cloudKitSystemFields: Data?
-
-  init(id: String,
-       date: String,
-       method: String,
-       strain: String? = nil,
-       hit: Int? = nil,
-       grams: Double? = nil,
-       note: String? = nil,
-       updatedAt: Date = .now,
-       cloudKitSystemFields: Data? = nil) {
-    self.id = id
-    self.date = date
-    self.method = method
-    self.strain = strain
-    self.hit = hit
-    self.grams = grams
-    self.note = note
-    self.updatedAt = updatedAt
-    self.cloudKitSystemFields = cloudKitSystemFields
-  }
-}
+// Legacy CaffeineEventEntity / CaffeineBeanEntity / CannabisEventEntity removed
+// (sections retired into `intake`). The *CloudKitSchema enums below are KEPT so
+// the record-level migrate-on-sight path (IntakeMigrator) still reads legacy
+// CKRecords arriving from old builds.
 
 // MARK: - Intake (consumables generalization)
 //
@@ -1936,6 +1857,8 @@ enum MedicationDefinitionCloudKitSchema {
     static let defaultDoseValue = "defaultDoseValue"
     static let defaultDoseUnit = "defaultDoseUnit"
     static let bucket = "bucket"
+    static let scheduleKind = "scheduleKind"
+    static let targetDosesPerDay = "targetDosesPerDay"
     static let instructions = "instructions"
     static let sortIndex = "sortIndex"
     static let archived = "archived"
@@ -2700,6 +2623,8 @@ extension MedicationDefinitionEntity: ChecklistCloudKitBackedEntity {
     record[MedicationDefinitionCloudKitSchema.Field.defaultDoseValue] = defaultDoseValue
     record[MedicationDefinitionCloudKitSchema.Field.defaultDoseUnit] = defaultDoseUnit
     record[MedicationDefinitionCloudKitSchema.Field.bucket] = bucket
+    record[MedicationDefinitionCloudKitSchema.Field.scheduleKind] = scheduleKind
+    record[MedicationDefinitionCloudKitSchema.Field.targetDosesPerDay] = targetDosesPerDay
     record[MedicationDefinitionCloudKitSchema.Field.instructions] = instructions
     record[MedicationDefinitionCloudKitSchema.Field.sortIndex] = sortIndex
     record[MedicationDefinitionCloudKitSchema.Field.archived] = archived ? 1 : 0
@@ -2717,6 +2642,8 @@ extension MedicationDefinitionEntity: ChecklistCloudKitBackedEntity {
     defaultDoseValue = record[MedicationDefinitionCloudKitSchema.Field.defaultDoseValue] as? Double
     defaultDoseUnit = optionalChecklistString(record[MedicationDefinitionCloudKitSchema.Field.defaultDoseUnit])
     bucket = optionalChecklistString(record[MedicationDefinitionCloudKitSchema.Field.bucket])
+    scheduleKind = optionalChecklistString(record[MedicationDefinitionCloudKitSchema.Field.scheduleKind]) ?? scheduleKind
+    if let value = record[MedicationDefinitionCloudKitSchema.Field.targetDosesPerDay] as? Int { targetDosesPerDay = value }
     instructions = optionalChecklistString(record[MedicationDefinitionCloudKitSchema.Field.instructions])
     if let value = record[MedicationDefinitionCloudKitSchema.Field.sortIndex] as? Int { sortIndex = value }
     if let value = record[MedicationDefinitionCloudKitSchema.Field.archived] as? Int { archived = value != 0 }
@@ -2860,65 +2787,6 @@ extension WithingsRowEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension CaffeineEventEntity: ChecklistCloudKitBackedEntity {
-  func toCloudKitRecord() -> CKRecord {
-    let record = decodedCloudKitRecord() ?? CKRecord(
-      recordType: CaffeineEventCloudKitSchema.recordType,
-      recordID: CKRecord.ID(recordName: CaffeineEventCloudKitSchema.recordName(for: id),
-                            zoneID: SeptenaCloudKit.zoneID)
-    )
-    record[CaffeineEventCloudKitSchema.Field.date] = date
-    record[CaffeineEventCloudKitSchema.Field.method] = method
-    record[CaffeineEventCloudKitSchema.Field.beans] = beans
-    record[CaffeineEventCloudKitSchema.Field.grams] = grams
-    record[CaffeineEventCloudKitSchema.Field.note] = note
-    record[CaffeineEventCloudKitSchema.Field.occurredAt] = occurredAt as NSDate
-    return record
-  }
-
-  func apply(_ record: CKRecord) {
-    if let value = record[CaffeineEventCloudKitSchema.Field.date] as? String { date = value }
-    if let value = record[CaffeineEventCloudKitSchema.Field.method] as? String { method = value }
-    beans = optionalChecklistString(record[CaffeineEventCloudKitSchema.Field.beans])
-    grams = record[CaffeineEventCloudKitSchema.Field.grams] as? Double
-    note = optionalChecklistString(record[CaffeineEventCloudKitSchema.Field.note])
-    if let v = record[CaffeineEventCloudKitSchema.Field.occurredAt] as? Date { occurredAt = v }
-    updatedAt = .now
-    captureCloudKitSystemFields(from: record)
-  }
-
-  convenience init(cloudKit record: CKRecord) {
-    self.init(id: CaffeineEventCloudKitSchema.entityID(from: record.recordID.recordName),
-              date: "", method: "v60")
-    apply(record)
-  }
-}
-
-extension CaffeineBeanEntity: ChecklistCloudKitBackedEntity {
-  func toCloudKitRecord() -> CKRecord {
-    let record = decodedCloudKitRecord() ?? CKRecord(
-      recordType: CaffeineBeanCloudKitSchema.recordType,
-      recordID: CKRecord.ID(recordName: CaffeineBeanCloudKitSchema.recordName(for: id),
-                            zoneID: SeptenaCloudKit.zoneID)
-    )
-    record[CaffeineBeanCloudKitSchema.Field.name] = name
-    record[CaffeineBeanCloudKitSchema.Field.sortIndex] = sortIndex
-    return record
-  }
-
-  func apply(_ record: CKRecord) {
-    if let value = record[CaffeineBeanCloudKitSchema.Field.name] as? String { name = value }
-    if let value = record[CaffeineBeanCloudKitSchema.Field.sortIndex] as? Int { sortIndex = value }
-    updatedAt = .now
-    captureCloudKitSystemFields(from: record)
-  }
-
-  convenience init(cloudKit record: CKRecord) {
-    self.init(id: CaffeineBeanCloudKitSchema.entityID(from: record.recordID.recordName), name: "")
-    apply(record)
-  }
-}
-
 extension IntakeKindEntity: ChecklistCloudKitBackedEntity {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
@@ -3036,42 +2904,6 @@ extension IntakeEventEntity: ChecklistCloudKitBackedEntity {
   convenience init(cloudKit record: CKRecord) {
     self.init(id: IntakeEventCloudKitSchema.entityID(from: record.recordID.recordName),
               kindID: "", date: "", method: "")
-    apply(record)
-  }
-}
-
-extension CannabisEventEntity: ChecklistCloudKitBackedEntity {
-  func toCloudKitRecord() -> CKRecord {
-    let record = decodedCloudKitRecord() ?? CKRecord(
-      recordType: CannabisEventCloudKitSchema.recordType,
-      recordID: CKRecord.ID(recordName: CannabisEventCloudKitSchema.recordName(for: id),
-                            zoneID: SeptenaCloudKit.zoneID)
-    )
-    record[CannabisEventCloudKitSchema.Field.date] = date
-    record[CannabisEventCloudKitSchema.Field.method] = method
-    record[CannabisEventCloudKitSchema.Field.strain] = strain
-    record[CannabisEventCloudKitSchema.Field.hit] = hit
-    record[CannabisEventCloudKitSchema.Field.grams] = grams
-    record[CannabisEventCloudKitSchema.Field.note] = note
-    record[CannabisEventCloudKitSchema.Field.occurredAt] = occurredAt as NSDate
-    return record
-  }
-
-  func apply(_ record: CKRecord) {
-    if let value = record[CannabisEventCloudKitSchema.Field.date] as? String { date = value }
-    if let value = record[CannabisEventCloudKitSchema.Field.method] as? String { method = value }
-    strain = optionalChecklistString(record[CannabisEventCloudKitSchema.Field.strain])
-    hit = record[CannabisEventCloudKitSchema.Field.hit] as? Int
-    grams = record[CannabisEventCloudKitSchema.Field.grams] as? Double
-    note = optionalChecklistString(record[CannabisEventCloudKitSchema.Field.note])
-    if let v = record[CannabisEventCloudKitSchema.Field.occurredAt] as? Date { occurredAt = v }
-    updatedAt = .now
-    captureCloudKitSystemFields(from: record)
-  }
-
-  convenience init(cloudKit record: CKRecord) {
-    self.init(id: CannabisEventCloudKitSchema.entityID(from: record.recordID.recordName),
-              date: "", method: "vape")
     apply(record)
   }
 }
@@ -3397,8 +3229,6 @@ final class LocalStore {
                          MoodEventEntity.self,
                          SymptomDefinitionEntity.self, SymptomEventEntity.self,
                          MedicationDefinitionEntity.self, MedicationDoseEventEntity.self,
-                         CaffeineEventEntity.self, CaffeineBeanEntity.self,
-                         CannabisEventEntity.self,
                          IntakeKindEntity.self, IntakeItemEntity.self,
                          IntakeEventEntity.self,
                          GroceryItemEntity.self, GroceryCategoryEntity.self,
@@ -3711,8 +3541,6 @@ protocol LoggedEvent {
   var sectionKey: String { get }
 }
 
-extension CaffeineEventEntity: LoggedEvent { var sectionKey: String { "caffeine" } }
-extension CannabisEventEntity: LoggedEvent { var sectionKey: String { "cannabis" } }
 extension GutEventEntity: LoggedEvent { var sectionKey: String { "gut" } }
 extension MoodEventEntity: LoggedEvent { var sectionKey: String { "mood" } }
 extension SymptomEventEntity: LoggedEvent { var sectionKey: String { "symptoms" } }
@@ -3745,8 +3573,6 @@ enum LoggedEvents {
       let rows = (try? context.fetch(FetchDescriptor<E>())) ?? []
       out.append(contentsOf: rows.map { $0 as any LoggedEvent })
     }
-    add(CaffeineEventEntity.self)
-    add(CannabisEventEntity.self)
     add(GutEventEntity.self)
     add(MoodEventEntity.self)
     add(SymptomEventEntity.self)
@@ -3798,8 +3624,6 @@ enum LoggedEvents {
         TimedEvent(id: $0.id, sectionKey: $0.sectionKey, occurredAt: $0.occurredAt)
       })
     }
-    grab(FetchDescriptor<CaffeineEventEntity>(predicate: #Predicate { $0.occurredAt >= date }))
-    grab(FetchDescriptor<CannabisEventEntity>(predicate: #Predicate { $0.occurredAt >= date }))
     grab(FetchDescriptor<GutEventEntity>(predicate: #Predicate { $0.occurredAt >= date }))
     grab(FetchDescriptor<MoodEventEntity>(predicate: #Predicate { $0.occurredAt >= date }))
     grab(FetchDescriptor<ChoreEventEntity>(predicate: #Predicate { $0.occurredAt >= date }))

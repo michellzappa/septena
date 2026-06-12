@@ -168,34 +168,6 @@ enum VirtueSummarizer {
       if let section { sections.insert(section) }
     }
 
-    // ── Caffeine → Temperance ───────────────────────────────────────
-    let caffeine = fetchByDate(CaffeineEventEntity.self, fromStr, toStr, context)
-    if !caffeine.isEmpty {
-      let days = Set(caffeine.map(\.date)).count
-      let perDay = Double(caffeine.count) / 7.0
-      let late = caffeine.filter { (hour(of: EventTimestamp.hhmm(from: $0.occurredAt)) ?? 0) >= 16 }.count
-      var text = "Coffee \(oneDecimal(perDay))/day, \(days)/7 days"
-      text += late == 0 ? ", none after 16:00" : ", \(late) after 16:00"
-      let valence: Valence = (perDay <= 3 && late == 0) ? .good : (perDay <= 4 ? .neutral : .strain)
-      add(.temperance, text, valence, section: "caffeine")
-    }
-
-    // ── Cannabis → Temperance ───────────────────────────────────────
-    let cannabis = fetchByDate(CannabisEventEntity.self, fromStr, toStr, context)
-    if !cannabis.isEmpty {
-      let dayKeys = Set(cannabis.map(\.date))
-      let days = dayKeys.count
-      let perDay = Double(cannabis.count) / 7.0
-      let hits = cannabis.reduce(0) { $0 + ($1.hit ?? 0) }
-      let morningDays = dayKeys.filter { day in
-        (cannabis.filter { $0.date == day }.compactMap { hour(of: EventTimestamp.hhmm(from: $0.occurredAt)) }.min() ?? 99) < 11
-      }.count
-      var text = "Cannabis \(oneDecimal(perDay))/day, \(days)/7 days, \(hits) hits"
-      if morningDays > 0 { text += "; first use before 11:00 on \(morningDays)/\(days) days" }
-      let dailyMorning = days >= 6 && Double(morningDays) >= Double(days) * 0.6
-      add(.temperance, text, dailyMorning ? .strain : .neutral, section: "cannabis")
-    }
-
     // ── Habits → Temperance (self-governance / ordered routine) ─────
     let habitDefs = fetchAll(HabitDefinitionEntity.self, context)
     if !habitDefs.isEmpty {
@@ -302,7 +274,7 @@ enum VirtueSummarizer {
                      hasData: populated.contains(virtue))
     }
 
-    let allSupported = ["caffeine", "cannabis", "habits", "nutrition", "supplements",
+    let allSupported = ["habits", "nutrition", "supplements",
                         "gut", "training", "tasks", "chores"]
     let missing = allSupported.filter { !sections.contains($0) }
 
@@ -409,8 +381,6 @@ enum VirtueSummarizer {
 // entity without a per-type switch. Conformances are declared here so
 // adding a new event type to the summary is a one-line extension.
 private protocol DateStringed { var dateKey: String { get } }
-extension CaffeineEventEntity: DateStringed { var dateKey: String { date } }
-extension CannabisEventEntity: DateStringed { var dateKey: String { date } }
 extension GutEventEntity: DateStringed { var dateKey: String { date } }
 extension ExerciseEntryEntity: DateStringed { var dateKey: String { date } }
 extension ChoreEventEntity: DateStringed { var dateKey: String { date } }

@@ -253,8 +253,6 @@ enum AppIconOption: String, CaseIterable, Identifiable {
 final class SettingsStore {
   var serverSettings: AppSettings? = nil
   var sections: [SectionConfig] = []
-  var caffeine: CaffeineConfig? = nil
-  var cannabis: CannabisConfig? = nil
   var macros: MacrosConfig? = nil
   var sessionTypes: [SessionTypeConfig] = []
   var chores: [ChoreItem] = []
@@ -271,8 +269,6 @@ final class SettingsStore {
   private enum CacheKey {
     static let serverSettings = "settings.serverSettings"
     static let sections       = "settings.sections"
-    static let caffeine       = "settings.caffeine"
-    static let cannabis       = "settings.cannabis"
     static let macros         = "settings.macros"
     static let sessionTypes   = "settings.sessionTypes"
     static let chores         = "settings.chores"
@@ -297,8 +293,6 @@ final class SettingsStore {
     } else if let v = ResponseCache.load([SectionConfig].self, forKey: CacheKey.sections) {
       sections = v
     }
-    if let v = ResponseCache.load(CaffeineConfig.self, forKey: CacheKey.caffeine) { caffeine = v }
-    if let v = ResponseCache.load(CannabisConfig.self, forKey: CacheKey.cannabis) { cannabis = v }
     if let v = ResponseCache.load(MacrosConfig.self, forKey: CacheKey.macros) { macros = v }
     if let v = ResponseCache.load([SessionTypeConfig].self, forKey: CacheKey.sessionTypes) { sessionTypes = v }
     if let v = ResponseCache.load([ChoreItem].self, forKey: CacheKey.chores) { chores = v }
@@ -421,13 +415,6 @@ final class SettingsStore {
     let macs: MacrosConfig? = NutritionPrefs.loadMacrosConfig()
     let st: [SessionTypeConfig]? = ChecklistMirror.loadSessionTypes(context: context)
     let ch: [ChoreItem]? = ChecklistMirror.loadChores(context: context)
-    let cf: CaffeineConfig = {
-      let beans = ChecklistMirror.loadCaffeineBeans(context: context)
-      return CaffeineConfig(beans: beans)
-    }()
-    let cn = CannabisConfig(usesPerCapsule: 3)
-    caffeine = cf; ResponseCache.save(cf, forKey: CacheKey.caffeine)
-    cannabis = cn; ResponseCache.save(cn, forKey: CacheKey.cannabis)
     if let macs { macros = macs; ResponseCache.save(macs, forKey: CacheKey.macros) }
     if let st { sessionTypes = st; ResponseCache.save(st, forKey: CacheKey.sessionTypes) }
     if let ch { chores = ch; ResponseCache.save(ch, forKey: CacheKey.chores) }
@@ -777,7 +764,7 @@ struct PrivacySettingsPane: View {
       }
 
       Section("What is never sent") {
-        bullet("Anything you log — food, caffeine, cannabis, supplements, sleep, mood, notes. None of it leaves your device through analytics.")
+        bullet("Anything you log — food, intake, supplements, sleep, mood, notes. None of it leaves your device through analytics.")
         bullet("Any identifier that links events to you, or links today's session to yesterday's.")
         bullet("Your IP address. The analytics provider uses it briefly to derive your country, then discards it.")
       }
@@ -1136,8 +1123,7 @@ struct CorrelationsSettingsPane: View {
     ("supplements", "Supplements"),
     ("training",    "Training"),
     ("nutrition",   "Nutrition"),
-    ("caffeine",    "Caffeine"),
-    ("cannabis",    "Cannabis"),
+    ("intake",      "Intake"),
     ("gut",         "Gut"),
     ("sleep",       "Sleep"),
   ]
@@ -2156,9 +2142,9 @@ struct MotionGalleryPane: View {
       switch self {
       case .burst:    return "Confetti — celebratory (Mood HAP, groceries)"
       case .snap:     return "Ring + flash — releasing tension (Mood HAN)"
-      case .bloom:    return "Soft swell — settling (caffeine, training session)"
+      case .bloom:    return "Soft swell — settling (intake, training session)"
       case .sink:     return "Quiet dot — acknowledgment (Mood LAN, gut)"
-      case .ripple:   return "Full-screen sonar — cannabis log, training PR payoff"
+      case .ripple:   return "Full-screen sonar — intake log, training PR payoff"
       case .arc:      return "Comet arc — day cleared (last Today task)"
       case .fill:     return "Full-page flood — target logs (hydration, nutrition)"
       case .ignition: return "Rings + streak number — milestone (7/30/100/365)"
@@ -4675,7 +4661,7 @@ private let importExportEnvelopeVersion = 1
 /// sidebar.
 private let exportableSectionKeys: [String] = [
   "tasks", "training", "nutrition", "habits", "chores",
-  "supplements", "groceries", "caffeine", "cannabis", "gut",
+  "supplements", "groceries", "gut",
 ]
 
 struct ImportExportSettingsPane: View {
@@ -5357,8 +5343,6 @@ enum ImportExportService {
         for r in rows { try upsertSupplementDefinition(r, ctx: ctx, engine: engine); applied += 1 }
       case "choreDefinition":
         for r in rows { try upsertChoreDefinition(r, ctx: ctx, engine: engine); applied += 1 }
-      case "caffeineBean":
-        for r in rows { try upsertCaffeineBean(r, ctx: ctx, engine: engine); applied += 1 }
       case "groceryCategory":
         for r in rows { try upsertGroceryCategory(r, ctx: ctx, engine: engine); applied += 1 }
       case "groceryItem":
@@ -5450,22 +5434,6 @@ private func upsertChoreDefinition(_ r: [String: Any],
   e.sortIndex = r["sortIndex"] as? Int ?? 0
   e.updatedAt = .now
   engine.noteChoreDefinitionChange(id: id)
-}
-
-@MainActor
-private func upsertCaffeineBean(_ r: [String: Any],
-                                ctx: ModelContext,
-                                engine: CKEngine) throws {
-  guard let id = r["id"] as? String, let name = r["name"] as? String
-  else { throw ImportExportService.ImportError.malformed("caffeineBean row missing id/name") }
-  let existing = try ctx.fetch(FetchDescriptor<CaffeineBeanEntity>(
-    predicate: #Predicate { $0.id == id })).first
-  let e = existing ?? CaffeineBeanEntity(id: id, name: name)
-  if existing == nil { ctx.insert(e) }
-  e.name = name
-  e.sortIndex = r["sortIndex"] as? Int ?? 0
-  e.updatedAt = .now
-  engine.noteCaffeineBeanChange(id: id)
 }
 
 @MainActor

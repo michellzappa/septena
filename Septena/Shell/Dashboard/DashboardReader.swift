@@ -6,7 +6,7 @@ import Foundation
 /// touches one case; a full reload (`loadAll`) touches `allCases`.
 enum DashSection: CaseIterable {
   case habits, chores, supplements, training, tasks
-  case nutrition, groceries, caffeine, cannabis, gut, mood, hydration
+  case nutrition, groceries, gut, mood, hydration
 
   /// Map a capture section (the unit tile quick-adds notify in) onto the
   /// dashboard's read unit. `AddInfoSection` has no mood/hydration cases —
@@ -20,8 +20,6 @@ enum DashSection: CaseIterable {
     case .tasks:       self = .tasks
     case .nutrition:   self = .nutrition
     case .groceries:   self = .groceries
-    case .caffeine:    self = .caffeine
-    case .cannabis:    self = .cannabis
     case .gut:         self = .gut
     }
   }
@@ -39,8 +37,6 @@ enum DashSection: CaseIterable {
     case "tasks":       self = .tasks
     case "nutrition":   self = .nutrition
     case "groceries":   self = .groceries
-    case "caffeine":    self = .caffeine
-    case "cannabis":    self = .cannabis
     case "gut":         self = .gut
     case "mood":        self = .mood
     case "hydration":   self = .hydration
@@ -76,10 +72,6 @@ actor DashboardReader {
     var nutritionTarget: MacrosConfig?
     var macroColors: MacroColors?
     var groceries: [GroceryItem] = []
-    var caffeineToday: CaffeineDayResponse?
-    var caffeineHistory: [CaffeineHistoryPoint] = []
-    var cannabisToday: CannabisDayResponse?
-    var cannabisHistory: [CannabisHistoryPoint] = []
     var gutToday: GutDayResponse?
     var gutHistory: [GutHistoryPoint] = []
     var moodToday: MoodDayResponse?
@@ -91,9 +83,6 @@ actor DashboardReader {
   /// inputs, the session catalog. Loaded on a separate hop because the
   /// tiles don't need it for first paint (only when a context menu opens).
   struct MenuExtras {
-    var caffeineLastEntry: CaffeineTimePoint?
-    var cannabisUsesPerCapsule: Int = 3
-    var cannabisLastVape: CannabisEntry?
     var nutritionHistory: [NutritionEntry] = []
     var trainingSessionTypes: [SessionTypeConfig] = []
     var trainingSuggestedId: String?
@@ -132,14 +121,6 @@ actor DashboardReader {
     if sections.contains(.groceries) {
       s.groceries = ChecklistMirror.loadGroceryItems(context: ctx)
     }
-    if sections.contains(.caffeine) {
-      s.caffeineToday = ChecklistMirror.loadCaffeineDay(context: ctx, date: today)
-      s.caffeineHistory = ChecklistMirror.loadCaffeineHistory(context: ctx, days: days).daily
-    }
-    if sections.contains(.cannabis) {
-      s.cannabisToday = ChecklistMirror.loadCannabisDay(context: ctx, date: today)
-      s.cannabisHistory = ChecklistMirror.loadCannabisHistory(context: ctx, days: days).daily
-    }
     if sections.contains(.gut) {
       s.gutToday = ChecklistMirror.loadGutDay(context: ctx, date: today)
       s.gutHistory = ChecklistMirror.loadGutHistory(context: ctx, days: days).daily
@@ -154,42 +135,12 @@ actor DashboardReader {
     return s
   }
 
-  /// Second-wave QuickAdd menu data. Reads the two raw event entities
-  /// directly (only the latest of each is needed) and the recommendation
-  /// inputs, all on the actor's context.
+  /// Second-wave QuickAdd menu data. Reads the recommendation inputs (meal
+  /// history, training catalog) on the actor's context.
   func menuExtras(today: String) -> MenuExtras {
     var m = MenuExtras()
     let ctx = modelContext
 
-    // Caffeine: only the last entry powers the menu's Repeat action.
-    let lastCaffeine = FetchDescriptor<CaffeineEventEntity>(
-      sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
-    )
-    if let last = (try? ctx.fetch(lastCaffeine))?.first {
-      let hhmm = EventTimestamp.hhmm(from: last.occurredAt)
-      let hh = hhmm.split(separator: ":").first.flatMap { Int($0) } ?? 0
-      let mm = hhmm.split(separator: ":").dropFirst().first.flatMap { Int($0) } ?? 0
-      m.caffeineLastEntry = CaffeineTimePoint(date: last.date,
-                                              time: hhmm,
-                                              hour: Double(hh) + Double(mm) / 60.0,
-                                              method: last.method,
-                                              beans: last.beans,
-                                              grams: last.grams)
-    }
-    // Cannabis: the configured capsule cap (default 3) drives Continue vs. New
-    // capsule — same source the watch snapshot reads, so the two stay 1=1.
-    m.cannabisUsesPerCapsule = ResponseCache.load(CannabisConfig.self,
-                                                  forKey: "settings.cannabis")?.usesPerCapsule ?? 3
-    // Cannabis: latest vape across all days drives the "Continue" row.
-    let lastVape = FetchDescriptor<CannabisEventEntity>(
-      predicate: #Predicate { $0.method == "vape" },
-      sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
-    )
-    if let last = (try? ctx.fetch(lastVape))?.first {
-      m.cannabisLastVape = CannabisEntry(id: last.id, time: EventTimestamp.hhmm(from: last.occurredAt), method: last.method,
-                                         strain: last.strain, hit: last.hit, grams: last.grams,
-                                         note: last.note)
-    }
     // Nutrition: 30-day meal history feeds menu recommendations + search.
     let since = SeptenaDate.format(
       Calendar.current.date(byAdding: .day, value: -30, to: Date())

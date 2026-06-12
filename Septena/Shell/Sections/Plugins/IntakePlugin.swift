@@ -289,12 +289,9 @@ private struct IntakeOnboardingView: View {
 /// presented as sections in the UX while staying rows under the host section
 /// (Option C — presentation layer). See docs/CONSUMABLES_PLAN.md.
 private struct IntakeDetailContent: View {
-  @Environment(SettingsStore.self) private var store
   @State private var kinds: [IntakeKindDTO] = []
   @State private var managingID: String? = nil
   @State private var creating = false
-  @State private var migrationSummary: String? = nil
-  @State private var migrating = false
 
   private var mutator: IntakeMutator { SeptenaServices.shared.intakeMutator }
   private var active: [IntakeKindDTO] { kinds.filter { !$0.archived } }
@@ -332,7 +329,6 @@ private struct IntakeDetailContent: View {
           }
         }
       }
-      legacyImportSection
     }
     .task { await reload() }
     .sheet(item: managingBinding) { id in IntakeManageSheet(kindID: id.value) }
@@ -366,52 +362,5 @@ private struct IntakeDetailContent: View {
 
   private func reload() async {
     kinds = await MirrorReader.shared.read { IntakeReader.loadAllKinds(context: $0) }
-  }
-
-  // MARK: Legacy import (milestone-7 kickoff)
-
-  /// Copy-only, idempotent import of the legacy caffeine/cannabis sections
-  /// into intake trackers. Legacy records are never modified or deleted;
-  /// re-running upserts by deterministic id (no duplicates). The report
-  /// below is the §7.1 verification — trust the import only when it says OK.
-  private var legacyImportSection: some View {
-    Section {
-      Button {
-        runImport(["cannabis"])
-      } label: {
-        Label("Import cannabis history", systemImage: "square.and.arrow.down")
-      }
-      .disabled(migrating)
-      Button {
-        runImport(["caffeine"])
-      } label: {
-        Label("Import caffeine history", systemImage: "square.and.arrow.down")
-      }
-      .disabled(migrating)
-      if let migrationSummary {
-        Text(migrationSummary)
-          .font(.caption.monospaced())
-          .foregroundStyle(.secondary)
-          .textSelection(.enabled)
-      }
-    } header: {
-      Text("Legacy data")
-    } footer: {
-      Text("Copies your old section's entries into a tracker here. Nothing is deleted — the old section keeps its data, and re-running is safe (no duplicates).")
-    }
-  }
-
-  private func runImport(_ sections: Set<String>) {
-    migrating = true
-    let cap = store.cannabis?.usesPerCapsule ?? 3
-    let context = LocalStore.shared.container.mainContext
-    let report = IntakeMigrator.migrateLocalLegacy(
-      context: context,
-      mutator: mutator,
-      sections: sections,
-      cannabisUsesPerCapsule: cap)
-    migrationSummary = report.summary
-    migrating = false
-    Task { await reload() }
   }
 }

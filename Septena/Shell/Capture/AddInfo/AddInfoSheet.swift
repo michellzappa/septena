@@ -59,8 +59,6 @@ struct AddInfoSheet: View {
     case .supplements: AddSupplementPage(router: router)
     case .chores:      AddChorePage(router: router)
     case .nutrition:   AddNutritionPage(router: router)
-    case .caffeine:    AddCaffeinePage(router: router)
-    case .cannabis:    AddCannabisPage(router: router)
     case .gut:         AddGutPage(router: router)
     case .training:    AddTrainingPage(router: router)
     }

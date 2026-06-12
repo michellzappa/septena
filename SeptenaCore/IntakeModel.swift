@@ -324,8 +324,8 @@ public enum IntakeMigrationMap {
   }
 
   /// The caffeine kind, seeded from the Caffeine template (study §7.1). Methods
-  /// default to today's static set; the migrator overrides with the user's
-  /// `CaffeineConfig.methods` when present.
+  /// default to today's static set; the migrator can override with observed
+  /// methods when present.
   public static func caffeineSeed(methods: [IntakeMethodRow]? = nil) -> IntakeKindSeed {
     IntakeKindSeed(
       id: caffeineKindID, name: "Caffeine", symbol: "cup.and.saucer", color: "#92400e",

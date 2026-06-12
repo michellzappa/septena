@@ -131,18 +131,6 @@ struct SeptenaShortcuts: AppShortcutsProvider {
       shortTitle: "Log Water",
       systemImageName: "drop.fill"
     )
-    // 4 — Caffeine
-    AppShortcut(
-      intent: LogCaffeineIntent(),
-      phrases: [
-        "Log coffee in \(.applicationName)",
-        "Log caffeine in \(.applicationName)",
-        "Log a coffee in \(.applicationName)",
-        "Log matcha in \(.applicationName)",
-      ],
-      shortTitle: "Log Caffeine",
-      systemImageName: "cup.and.saucer"
-    )
     // 5 — Nutrition
     AppShortcut(
       intent: LogMealIntent(),
@@ -176,17 +164,6 @@ struct SeptenaShortcuts: AppShortcutsProvider {
       ],
       shortTitle: "Mark Grocery Low",
       systemImageName: "cart"
-    )
-    // 8 — Cannabis
-    AppShortcut(
-      intent: LogCannabisIntent(),
-      phrases: [
-        "Log cannabis in \(.applicationName)",
-        "Log a session in \(.applicationName)",
-        "Log a vape in \(.applicationName)",
-      ],
-      shortTitle: "Log Cannabis",
-      systemImageName: "leaf"
     )
     // 9 — Training
     AppShortcut(

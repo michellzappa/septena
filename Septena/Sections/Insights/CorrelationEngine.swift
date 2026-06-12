@@ -507,34 +507,6 @@ struct CorrelationEngine {
       }
     }
 
-    // --- Caffeine (grams, cups, last hour)
-    if let events = try? context.fetch(FetchDescriptor<CaffeineEventEntity>(
-      predicate: #Predicate { $0.date >= cutoffStr }
-    )) {
-      for e in events {
-        var f = bag[e.date] ?? DayFeatures()
-        if let g = e.grams { f.values["caffeine_g", default: 0] += g }
-        f.values["caffeine_cups", default: 0] += 1
-        if let h = hourOfDay(EventTimestamp.hhmm(from: e.occurredAt)) {
-          let prev = f.values["last_caffeine_hour"] ?? -1
-          f.values["last_caffeine_hour"] = max(prev, h)
-        }
-        bag[e.date] = f
-      }
-    }
-
-    // --- Cannabis (sessions, grams)
-    if let events = try? context.fetch(FetchDescriptor<CannabisEventEntity>(
-      predicate: #Predicate { $0.date >= cutoffStr }
-    )) {
-      for e in events {
-        var f = bag[e.date] ?? DayFeatures()
-        f.values["cannabis_sessions", default: 0] += 1
-        if let g = e.grams { f.values["cannabis_g", default: 0] += g }
-        bag[e.date] = f
-      }
-    }
-
     // --- Habits (completion % + per-habit binary)
     var habitsMeta: [(id: String, label: String, emoji: String)] = []
     if let defs = try? context.fetch(FetchDescriptor<HabitDefinitionEntity>()) {
@@ -639,9 +611,6 @@ struct CorrelationEngine {
     let kcalF       = FeatureSpec(key: "kcal",              label: "Calories",          section: "nutrition", unit: "kcal",binary: false)
     let lastMealH   = FeatureSpec(key: "last_meal_hour",    label: "Last meal hour",    section: "nutrition", unit: "h",   binary: false)
     let fasting     = FeatureSpec(key: "fasting_window",    label: "Fasting window",    section: "nutrition", unit: "h",   binary: false)
-    let caffG       = FeatureSpec(key: "caffeine_g",        label: "Caffeine grams",    section: "caffeine",  unit: "g",   binary: false)
-    let caffLastH   = FeatureSpec(key: "last_caffeine_hour",label: "Last caffeine hour",section: "caffeine",  unit: "h",   binary: false)
-    let cannSess    = FeatureSpec(key: "cannabis_sessions", label: "Cannabis sessions", section: "cannabis",  unit: "",    binary: false)
     let habitPct    = FeatureSpec(key: "habit_completion",  label: "Habit completion",  section: "habits",    unit: "%",   binary: false)
     let totalH      = FeatureSpec(key: "total_h",           label: "Sleep hours",       section: "sleep",     unit: "h",   binary: false)
     let sleepScore  = FeatureSpec(key: "sleep_score",       label: "Sleep score",       section: "sleep",     unit: "",    binary: false)
@@ -660,12 +629,9 @@ struct CorrelationEngine {
 
     return [
       P(trainingVol, tSleepScore, 0, .positive),
-      P(cannSess,    tSleepScore, 0, .negative),
       P(totalH,      tHRV,        0, .positive),
-      P(cannSess,    tHRV,        0, .negative),
       P(proteinG,    tReadiness,  0, .positive),
       P(sleepScore,  tTrainNext,  1, .positive, "Sleep score → Next-day training"),
-      P(caffLastH,   tSleepScore, 0, .negative),
       P(fasting,     tReadiness,  0, .unknown),
       P(cardioMin,   tRHR,        0, .negative),
       P(lastMealH,   tSleepScore, 0, .negative),
@@ -673,7 +639,6 @@ struct CorrelationEngine {
       P(trainingVol, tSleepScore, 0, .positive, "Strength volume → Sleep score"),
       P(cardioMin,   tSleepScore, 0, .positive),
       P(mobilityMin, tSleepScore, 0, .positive),
-      P(caffG,       tSleepScore, 0, .negative),
       P(fiberG,      tBristol,    1, .positive, "Fiber (prev day) → Bristol"),
       P(fiber3d,     tBristol,    1, .positive),
       P(kcalF,       tSleepScore, 0, .unknown),
