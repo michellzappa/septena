@@ -16,7 +16,10 @@ import WatchKit
 //   • .echo  (habits)       — two spaced beats: today, answered by the streak.
 //   • .drop  (supplements)  — a soft beat then a landing: one more capsule down.
 //   • .tuck  (chores)       — a beat then a later, softer close: filed away.
-//   • .logged (suggestions) — one beat for a quick-log nudge (no section kind).
+//   • .logged (suggestions) — a single quiet click: the wrist cousin of the
+//     phone's quiet tick. Everyday quick-logs are acknowledged, not
+//     celebrated (the celebration-budget rule); `.success` stays reserved
+//     for the check-feels above.
 //
 // Kind → feel mirrors the phone's `CheckFeel` assignment and routes off the
 // shared `NextBlocks` kinds (`task` / `habit` / `supplement` / `chore`), so
@@ -46,8 +49,10 @@ enum WatchCompletionFeel {
   func play() {
     let device = WKInterfaceDevice.current()
     switch self {
-    case .stamp, .logged:
-      device.play(.success)                          // one crisp beat
+    case .stamp:
+      device.play(.success)                          // one crisp beat — done
+    case .logged:
+      device.play(.click)                            // quiet acknowledgment
     case .echo:
       device.play(.click)                            // today's mark…
       Self.after(0.18) { $0.play(.click) }           // …echoed by the streak
