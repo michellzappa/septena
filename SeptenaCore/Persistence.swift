@@ -3845,9 +3845,28 @@ enum LoggedEvents {
   }
 
   /// Events at or after `date`, newest first; optionally scoped to one section.
+  /// Predicates each fetch on the stored instant (like `timed`), so only the
+  /// window is materialized regardless of how much total history exists.
   static func since(_ date: Date, sectionKey: String? = nil, in context: ModelContext) -> [any LoggedEvent] {
-    all(in: context)
-      .filter { $0.occurredAt >= date && (sectionKey == nil || $0.sectionKey == sectionKey) }
+    var out: [any LoggedEvent] = []
+    func add<E: PersistentModel & LoggedEvent>(_ desc: FetchDescriptor<E>) {
+      let rows = (try? context.fetch(desc)) ?? []
+      out.append(contentsOf: rows.map { $0 as any LoggedEvent })
+    }
+    add(FetchDescriptor<CaffeineEventEntity>(predicate: #Predicate { $0.occurredAt >= date }))
+    add(FetchDescriptor<CannabisEventEntity>(predicate: #Predicate { $0.occurredAt >= date }))
+    add(FetchDescriptor<GutEventEntity>(predicate: #Predicate { $0.occurredAt >= date }))
+    add(FetchDescriptor<MoodEventEntity>(predicate: #Predicate { $0.occurredAt >= date }))
+    add(FetchDescriptor<SymptomEventEntity>(predicate: #Predicate { $0.occurredAt >= date }))
+    add(FetchDescriptor<MedicationDoseEventEntity>(predicate: #Predicate { $0.occurredAt >= date }))
+    add(FetchDescriptor<ChoreEventEntity>(predicate: #Predicate { $0.occurredAt >= date }))
+    add(FetchDescriptor<HabitDayStateEntity>(predicate: #Predicate { $0.occurredAt >= date }))
+    add(FetchDescriptor<SupplementDayStateEntity>(predicate: #Predicate { $0.occurredAt >= date }))
+    add(FetchDescriptor<ExerciseEntryEntity>(predicate: #Predicate { $0.occurredAt >= date }))
+    // Nutrition stores its instant as `loggedAt` (occurredAt is a computed alias).
+    add(FetchDescriptor<NutritionEntryEntity>(predicate: #Predicate { $0.loggedAt >= date }))
+    return out
+      .filter { sectionKey == nil || $0.sectionKey == sectionKey }
       .sorted { $0.occurredAt > $1.occurredAt }
   }
 
