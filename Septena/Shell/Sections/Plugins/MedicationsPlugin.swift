@@ -41,6 +41,8 @@ enum MedicationsPlugin: SectionPlugin {
           .opt("route", "string"), .opt("strengthValue", "number"),
           .opt("strengthUnit", "string"), .opt("defaultDoseValue", "number"),
           .opt("defaultDoseUnit", "string"), .opt("bucket", "string"),
+          .opt("scheduleKind", "string", "daily|asNeeded"),
+          .opt("targetDosesPerDay", "int"),
           .opt("instructions", "string"), .opt("sortIndex", "int"),
           .opt("archived", "bool"),
         ]),
@@ -70,7 +72,7 @@ enum MedicationsPlugin: SectionPlugin {
       summary: "Medication definitions and dose logs.",
       tools: [
         SectionSkill.Tool("medications_list", "Definitions and dose logs", inputs: "optional: date, from, to, limit"),
-        SectionSkill.Tool("medications_create", "Create a medication definition", inputs: "required: title · optional: genericName, form, route, defaultDoseValue, defaultDoseUnit, bucket, instructions"),
+        SectionSkill.Tool("medications_create", "Create a medication definition", inputs: "required: title · optional: genericName, form, route, defaultDoseValue, defaultDoseUnit, bucket, scheduleKind (daily|asNeeded), targetDosesPerDay, instructions"),
         SectionSkill.Tool("medications_log", "Log a dose", inputs: "required: medicationID, status (taken|skipped|missed) · optional: date, time, doseValue, doseUnit, reason, effectNote, sideEffectNote"),
       ],
       body: """
@@ -131,12 +133,13 @@ enum MedicationsPlugin: SectionPlugin {
     let defs = (try? context.fetch(FetchDescriptor<MedicationDefinitionEntity>(
       predicate: #Predicate { $0.archived == false }
     ))) ?? []
-    guard !defs.isEmpty else { return nil }
+    let routineDefs = defs.filter { ($0.scheduleKind ?? "daily") == "daily" }
+    guard !routineDefs.isEmpty else { return nil }
     let rows = (try? context.fetch(FetchDescriptor<MedicationDoseEventEntity>(
       predicate: #Predicate { $0.date == today }
     ))) ?? []
     let takenIDs = Set(rows.filter { $0.status == "taken" }.map(\.medicationID))
-    let pending = defs.filter { !takenIDs.contains($0.id) }
+    let pending = routineDefs.filter { !takenIDs.contains($0.id) }
     guard !pending.isEmpty else { return nil }
     let body = pending.count == 1
       ? "\(pending[0].title) has no taken dose logged today."
@@ -194,16 +197,17 @@ struct MedicationStarter: Identifiable, Hashable {
   let doseValue: Double?
   let doseUnit: String?
   let bucket: String?
+  let scheduleKind: String
 
   static let all: [MedicationStarter] = [
-    .init(id: "starter-acetaminophen", title: "Acetaminophen", genericName: nil, form: "tablet", route: "oral", doseValue: 500, doseUnit: "mg", bucket: nil),
-    .init(id: "starter-ibuprofen", title: "Ibuprofen", genericName: nil, form: "tablet", route: "oral", doseValue: 200, doseUnit: "mg", bucket: nil),
-    .init(id: "starter-antihistamine", title: "Antihistamine", genericName: nil, form: "tablet", route: "oral", doseValue: nil, doseUnit: nil, bucket: "evening"),
-    .init(id: "starter-ssri", title: "SSRI", genericName: nil, form: "tablet", route: "oral", doseValue: nil, doseUnit: "mg", bucket: "morning"),
-    .init(id: "starter-blood-pressure", title: "Blood pressure medication", genericName: nil, form: "tablet", route: "oral", doseValue: nil, doseUnit: nil, bucket: "morning"),
-    .init(id: "starter-thyroid", title: "Thyroid medication", genericName: nil, form: "tablet", route: "oral", doseValue: nil, doseUnit: "mcg", bucket: "morning"),
-    .init(id: "starter-inhaler", title: "Rescue inhaler", genericName: nil, form: "inhaler", route: "inhaled", doseValue: nil, doseUnit: "puffs", bucket: nil),
-    .init(id: "starter-birth-control", title: "Birth control", genericName: nil, form: "tablet", route: "oral", doseValue: 1, doseUnit: "pill", bucket: "evening"),
+    .init(id: "starter-acetaminophen", title: "Acetaminophen", genericName: nil, form: "tablet", route: "oral", doseValue: 500, doseUnit: "mg", bucket: nil, scheduleKind: "asNeeded"),
+    .init(id: "starter-ibuprofen", title: "Ibuprofen", genericName: nil, form: "tablet", route: "oral", doseValue: 200, doseUnit: "mg", bucket: nil, scheduleKind: "asNeeded"),
+    .init(id: "starter-antihistamine", title: "Antihistamine", genericName: nil, form: "tablet", route: "oral", doseValue: nil, doseUnit: nil, bucket: "evening", scheduleKind: "daily"),
+    .init(id: "starter-ssri", title: "SSRI", genericName: nil, form: "tablet", route: "oral", doseValue: nil, doseUnit: "mg", bucket: "morning", scheduleKind: "daily"),
+    .init(id: "starter-blood-pressure", title: "Blood pressure medication", genericName: nil, form: "tablet", route: "oral", doseValue: nil, doseUnit: nil, bucket: "morning", scheduleKind: "daily"),
+    .init(id: "starter-thyroid", title: "Thyroid medication", genericName: nil, form: "tablet", route: "oral", doseValue: nil, doseUnit: "mcg", bucket: "morning", scheduleKind: "daily"),
+    .init(id: "starter-inhaler", title: "Rescue inhaler", genericName: nil, form: "inhaler", route: "inhaled", doseValue: nil, doseUnit: "puffs", bucket: nil, scheduleKind: "asNeeded"),
+    .init(id: "starter-birth-control", title: "Birth control", genericName: nil, form: "tablet", route: "oral", doseValue: 1, doseUnit: "pill", bucket: "evening", scheduleKind: "daily"),
   ]
 }
 
@@ -311,6 +315,7 @@ private struct MedicationsOnboardingView: View {
       parts.append(unit)
     }
     if let bucket = starter.bucket { parts.append(bucket) }
+    parts.append(starter.scheduleKind == "asNeeded" ? "as needed" : "daily")
     return parts.joined(separator: " · ")
   }
 
@@ -322,7 +327,9 @@ private struct MedicationsOnboardingView: View {
                             route: starter.route,
                             defaultDoseValue: starter.doseValue,
                             defaultDoseUnit: starter.doseUnit,
-                            bucket: starter.bucket)
+                            bucket: starter.bucket,
+                            scheduleKind: starter.scheduleKind,
+                            targetDosesPerDay: starter.scheduleKind == "daily" ? 1 : nil)
     }
     complete()
   }
@@ -334,7 +341,8 @@ private struct MedicationsOnboardingView: View {
     "form": e.form, "route": e.route,
     "strengthValue": e.strengthValue, "strengthUnit": e.strengthUnit,
     "defaultDoseValue": e.defaultDoseValue, "defaultDoseUnit": e.defaultDoseUnit,
-    "bucket": e.bucket, "instructions": e.instructions,
+    "bucket": e.bucket, "scheduleKind": e.scheduleKind,
+    "targetDosesPerDay": e.targetDosesPerDay, "instructions": e.instructions,
     "sortIndex": e.sortIndex, "archived": e.archived,
     "createdAt": isoDate(e.createdAt), "updatedAt": isoDate(e.updatedAt),
   ])

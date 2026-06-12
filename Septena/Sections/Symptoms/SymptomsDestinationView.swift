@@ -61,12 +61,7 @@ struct SymptomsDestinationView: View {
     .tint(accent)
     .sectionReload(on: viewingDate, onDataChange: true,
                    forSections: ["symptoms"]) {}
-    .sheet(isPresented: $creating) {
-      SymptomEventEditor(date: viewingDate,
-                         definitions: activeDefinitions,
-                         event: nil)
-    }
-    .sheet(item: $editing) { event in
+    .drawerDetail(edit: $editing, create: $creating) { event in
       SymptomEventEditor(date: viewingDate,
                          definitions: activeDefinitions,
                          event: event)
@@ -106,7 +101,8 @@ struct SymptomsDestinationView: View {
 }
 
 private struct SymptomEventEditor: View {
-  @Environment(\.dismiss) private var dismiss
+  @Environment(SectionTheme.self) private var theme
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
   let date: String
   let definitions: [SymptomDefinitionEntity]
   let event: SymptomEventEntity?
@@ -125,93 +121,87 @@ private struct SymptomEventEditor: View {
   @State private var showingAdvanced = false
 
   private var mutator: SymptomsMutator { SeptenaServices.shared.symptomsMutator }
+  private var accent: Color { theme.color(for: "symptoms") }
   private var selectedDefinition: SymptomDefinitionEntity? {
     definitions.first { $0.id == symptomID }
   }
 
   var body: some View {
-    NavigationStack {
-      Form {
-        if definitions.isEmpty {
-          ContentUnavailableView("No symptoms yet",
-                                 systemImage: "waveform.path.ecg",
-                                 description: Text("Add symptom definitions in Settings first."))
-          Button {
-            showingDefinitions = true
-          } label: {
-            Label("Create symptoms", systemImage: "plus")
+    AdaptiveEditScaffold(title: event == nil ? "Log Symptom" : "Edit Symptom",
+                         accent: accent,
+                         canSave: !symptomID.isEmpty,
+                         onSave: save) {
+      Form { formContent }
+        .task { seed() }
+        .onChange(of: symptomID) { _, _ in
+          if event == nil, bodyRegion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            bodyRegion = selectedDefinition?.defaultBodyRegion ?? ""
           }
-        } else {
-          Section("Symptom") {
-            Picker("Symptom", selection: $symptomID) {
-              ForEach(definitions) { def in
-                Text(def.title).tag(def.id)
-              }
-            }
-            DatePicker("Time", selection: $time, displayedComponents: .hourAndMinute)
-            VStack(alignment: .leading, spacing: 8) {
-              HStack {
-                Text("Severity")
-                Spacer()
-                Text("\(Int(severity))/10")
-                  .font(.body.monospacedDigit())
-                  .foregroundStyle(.secondary)
-              }
-              Slider(value: $severity, in: 0...10, step: 1)
-            }
-            TextField("Body region", text: $bodyRegion)
-            TextField("Note", text: $note, axis: .vertical)
-          }
+        }
+        .sheet(isPresented: $showingDefinitions) {
+          SymptomDefinitionsSheet()
+        }
+    }
+  }
 
-          Section {
-            DisclosureGroup("More context", isExpanded: $showingAdvanced) {
-              TextField("Duration minutes", text: $duration)
-                #if os(iOS)
-                .keyboardType(.numberPad)
-                #endif
-              Picker("Side", selection: $side) {
-                Text("None").tag("none")
-                Text("Left").tag("left")
-                Text("Right").tag("right")
-                Text("Both").tag("both")
-              }
-              Picker("Quality", selection: $quality) {
-                Text("Unset").tag("")
-                Text("Ache").tag("ache")
-                Text("Sharp").tag("sharp")
-                Text("Burning").tag("burning")
-                Text("Throbbing").tag("throbbing")
-                Text("Pressure").tag("pressure")
-                Text("Cramp").tag("cramp")
-                Text("Tingling").tag("tingling")
-              }
-              TextField("Trigger", text: $triggerNote, axis: .vertical)
-              TextField("Relief", text: $reliefNote, axis: .vertical)
-            }
+  @ViewBuilder
+  private var formContent: some View {
+    if definitions.isEmpty {
+      ContentUnavailableView("No symptoms yet",
+                             systemImage: "waveform.path.ecg",
+                             description: Text("Add symptom definitions in Settings first."))
+      Button {
+        showingDefinitions = true
+      } label: {
+        Label("Create symptoms", systemImage: "plus")
+      }
+    } else {
+      Section("Symptom") {
+        Picker("Symptom", selection: $symptomID) {
+          ForEach(definitions) { def in
+            Text(def.title).tag(def.id)
           }
         }
-      }
-      .navigationTitle(event == nil ? "Log Symptom" : "Edit Symptom")
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
+        DatePicker("Time", selection: $time, displayedComponents: .hourAndMinute)
+        VStack(alignment: .leading, spacing: 8) {
+          HStack {
+            Text("Severity")
+            Spacer()
+            Text("\(Int(severity))/10")
+              .font(.body.monospacedDigit())
+              .foregroundStyle(.secondary)
+          }
+          Slider(value: $severity, in: 0...10, step: 1)
         }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Save") { save() }
-            .disabled(symptomID.isEmpty)
-        }
+        TextField("Body region", text: $bodyRegion)
+        TextField("Note", text: $note, axis: .vertical)
       }
-      .task { seed() }
-      .onChange(of: symptomID) { _, _ in
-        if event == nil, bodyRegion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-          bodyRegion = selectedDefinition?.defaultBodyRegion ?? ""
+
+      Section {
+        DisclosureGroup("More context", isExpanded: $showingAdvanced) {
+          TextField("Duration minutes", text: $duration)
+            #if os(iOS)
+            .keyboardType(.numberPad)
+            #endif
+          Picker("Side", selection: $side) {
+            Text("None").tag("none")
+            Text("Left").tag("left")
+            Text("Right").tag("right")
+            Text("Both").tag("both")
+          }
+          Picker("Quality", selection: $quality) {
+            Text("Unset").tag("")
+            Text("Ache").tag("ache")
+            Text("Sharp").tag("sharp")
+            Text("Burning").tag("burning")
+            Text("Throbbing").tag("throbbing")
+            Text("Pressure").tag("pressure")
+            Text("Cramp").tag("cramp")
+            Text("Tingling").tag("tingling")
+          }
+          TextField("Trigger", text: $triggerNote, axis: .vertical)
+          TextField("Relief", text: $reliefNote, axis: .vertical)
         }
-      }
-      .sheet(isPresented: $showingDefinitions) {
-        SymptomDefinitionsSheet()
       }
     }
   }
@@ -243,32 +233,38 @@ private struct SymptomEventEditor: View {
     let timeString = EventTimestamp.hhmm(from: time)
     let minutes = Int(duration.trimmingCharacters(in: .whitespacesAndNewlines))
     if let event {
-      mutator.updateEvent(id: event.id,
-                          date: date,
-                          time: timeString,
-                          symptomID: symptomID,
-                          severity: Int(severity),
-                          durationMinutes: minutes,
-                          bodyRegion: nilIfEmpty(bodyRegion),
-                          side: nilIfEmpty(side),
-                          quality: nilIfEmpty(quality),
-                          triggerNote: nilIfEmpty(triggerNote),
-                          reliefNote: nilIfEmpty(reliefNote),
-                          note: nilIfEmpty(note))
+      SectionLog.edit {
+        mutator.updateEvent(id: event.id,
+                            date: date,
+                            time: timeString,
+                            symptomID: symptomID,
+                            severity: Int(severity),
+                            durationMinutes: minutes,
+                            bodyRegion: nilIfEmpty(bodyRegion),
+                            side: nilIfEmpty(side),
+                            quality: nilIfEmpty(quality),
+                            triggerNote: nilIfEmpty(triggerNote),
+                            reliefNote: nilIfEmpty(reliefNote),
+                            note: nilIfEmpty(note))
+      }
     } else {
-      mutator.addEvent(symptomID: symptomID,
-                       date: date,
-                       time: timeString,
-                       severity: Int(severity),
-                       durationMinutes: minutes,
-                       bodyRegion: nilIfEmpty(bodyRegion),
-                       side: nilIfEmpty(side),
-                       quality: nilIfEmpty(quality),
-                       triggerNote: nilIfEmpty(triggerNote),
-                       reliefNote: nilIfEmpty(reliefNote),
-                       note: nilIfEmpty(note))
+      SectionLog.newLog(section: "symptoms",
+                        accent: accent,
+                        announce: "Logged symptom.",
+                        logCommit: logCommit) {
+        mutator.addEvent(symptomID: symptomID,
+                         date: date,
+                         time: timeString,
+                         severity: Int(severity),
+                         durationMinutes: minutes,
+                         bodyRegion: nilIfEmpty(bodyRegion),
+                         side: nilIfEmpty(side),
+                         quality: nilIfEmpty(quality),
+                         triggerNote: nilIfEmpty(triggerNote),
+                         reliefNote: nilIfEmpty(reliefNote),
+                         note: nilIfEmpty(note))
+      }
     }
-    dismiss()
   }
 }
 

@@ -12,7 +12,7 @@ import EventKit
 enum WeekDestination: String, Hashable, Identifiable {
   case habits, chores, training, supplements, sleep, nutrition
   case hydration
-  case groceries, caffeine, cannabis, body, gut
+  case groceries, body, gut
   case intake
   case mood
   case symptoms
@@ -151,18 +151,11 @@ struct WeekDashboardView: View {
   /// Which Nutrition sub-sheet is currently presented from the menu.
   @State private var nutritionSheet: NutritionSheet? = nil
   @State private var groceries: [GroceryItem] = []
-  @State private var caffeineToday: CaffeineDayResponse? = nil
-  @State private var caffeineHistory: [CaffeineHistoryPoint] = []
-  @State private var caffeineLastEntry: CaffeineTimePoint? = nil
   /// Intake (consumables) — one tile per kind. Local SwiftData, so loaded via
   /// MirrorReader on `.septenaDataChanged`, OUTSIDE the ≤4-parallel HTTP loadAll.
   @State private var intakeTiles: [IntakeTileDTO] = []
   /// Tracker page presented from a tile tap (push on regular, sheet on compact).
   @State private var intakeKindDest: IntakeKindRef? = nil
-  @State private var cannabisToday: CannabisDayResponse? = nil
-  @State private var cannabisHistory: [CannabisHistoryPoint] = []
-  @State private var cannabisUsesPerCapsule: Int = 3
-  @State private var cannabisLastVape: CannabisEntry? = nil
   @State private var bodyRows: [WithingsRow] = []
   /// GitHub contribution calendar (read-only, per-device token). Drives the
   /// GitHub tile's commit counts; the destination view fetches its own copy.
@@ -219,10 +212,6 @@ struct WeekDashboardView: View {
       _todayKcalSum    = State(initialValue: v.reduce(0) { $0 + $1.kcal })
     }
     if let v = ResponseCache.load([GroceryItem].self, forKey: CacheKey.groceries) { _groceries = State(initialValue: v) }
-    if let v = ResponseCache.load(CaffeineDayResponse.self, forKey: CacheKey.caffeineToday) { _caffeineToday = State(initialValue: v) }
-    if let v = ResponseCache.load([CaffeineHistoryPoint].self, forKey: CacheKey.caffeineHistory) { _caffeineHistory = State(initialValue: v) }
-    if let v = ResponseCache.load(CannabisDayResponse.self, forKey: CacheKey.cannabisToday) { _cannabisToday = State(initialValue: v) }
-    if let v = ResponseCache.load([CannabisHistoryPoint].self, forKey: CacheKey.cannabisHistory) { _cannabisHistory = State(initialValue: v) }
     if let v = ResponseCache.load([WithingsRow].self, forKey: CacheKey.bodyRows) { _bodyRows = State(initialValue: v) }
     if let v = ResponseCache.load(GitHubContributions.self, forKey: CacheKey.github) { _githubContributions = State(initialValue: v) }
     if let v = ResponseCache.load(GutDayResponse.self, forKey: CacheKey.gutToday) { _gutToday = State(initialValue: v) }
@@ -551,10 +540,6 @@ struct WeekDashboardView: View {
     static let nutritionTarget    = "week.nutritionTarget"
     static let todayNutrition     = "week.todayNutrition"
     static let groceries          = "week.groceries"
-    static let caffeineToday      = "week.caffeineToday"
-    static let caffeineHistory    = "week.caffeineHistory"
-    static let cannabisToday      = "week.cannabisToday"
-    static let cannabisHistory    = "week.cannabisHistory"
     static let bodyRows           = "week.bodyRows"
     static let github             = "week.github"
     static let gutToday           = "week.gutToday"
@@ -588,10 +573,6 @@ struct WeekDashboardView: View {
       todayKcalSum    = v.reduce(0) { $0 + $1.kcal }
     }
     if let v = ResponseCache.load([GroceryItem].self, forKey: CacheKey.groceries) { groceries = v }
-    if let v = ResponseCache.load(CaffeineDayResponse.self, forKey: CacheKey.caffeineToday) { caffeineToday = v }
-    if let v = ResponseCache.load([CaffeineHistoryPoint].self, forKey: CacheKey.caffeineHistory) { caffeineHistory = v }
-    if let v = ResponseCache.load(CannabisDayResponse.self, forKey: CacheKey.cannabisToday) { cannabisToday = v }
-    if let v = ResponseCache.load([CannabisHistoryPoint].self, forKey: CacheKey.cannabisHistory) { cannabisHistory = v }
     if let v = ResponseCache.load([WithingsRow].self, forKey: CacheKey.bodyRows) { bodyRows = v }
     if let v = ResponseCache.load(GitHubContributions.self, forKey: CacheKey.github) { githubContributions = v }
     if let v = ResponseCache.load(GutDayResponse.self, forKey: CacheKey.gutToday) { gutToday = v }
@@ -671,22 +652,6 @@ struct WeekDashboardView: View {
     if sections.contains(.groceries) {
       groceries = s.groceries
       ResponseCache.save(s.groceries, forKey: CacheKey.groceries)
-    }
-    if sections.contains(.caffeine) {
-      if let d = s.caffeineToday {
-        caffeineToday = d
-        ResponseCache.save(d, forKey: CacheKey.caffeineToday)
-      }
-      caffeineHistory = s.caffeineHistory
-      ResponseCache.save(s.caffeineHistory, forKey: CacheKey.caffeineHistory)
-    }
-    if sections.contains(.cannabis) {
-      if let d = s.cannabisToday {
-        cannabisToday = d
-        ResponseCache.save(d, forKey: CacheKey.cannabisToday)
-      }
-      cannabisHistory = s.cannabisHistory
-      ResponseCache.save(s.cannabisHistory, forKey: CacheKey.cannabisHistory)
     }
     if sections.contains(.gut) {
       if let d = s.gutToday {
@@ -785,9 +750,6 @@ struct WeekDashboardView: View {
   private func loadMenuExtras() {
     Task {
       let m = await reader.menuExtras(today: SeptenaDate.today)
-      caffeineLastEntry = m.caffeineLastEntry
-      cannabisUsesPerCapsule = m.cannabisUsesPerCapsule
-      cannabisLastVape = m.cannabisLastVape
       nutritionHistory = m.nutritionHistory
       trainingSessionTypes = m.trainingSessionTypes
       trainingSuggestedId = m.trainingSuggestedId
@@ -815,20 +777,6 @@ struct WeekDashboardView: View {
 
   private func repaint(section: AddInfoSection) {
     switch section {
-    case .cannabis:
-      if let v = ResponseCache.load(CannabisDayResponse.self, forKey: CacheKey.cannabisToday) {
-        cannabisToday = v
-      }
-      if let v = ResponseCache.load([CannabisHistoryPoint].self, forKey: CacheKey.cannabisHistory) {
-        cannabisHistory = v
-      }
-    case .caffeine:
-      if let v = ResponseCache.load(CaffeineDayResponse.self, forKey: CacheKey.caffeineToday) {
-        caffeineToday = v
-      }
-      if let v = ResponseCache.load([CaffeineHistoryPoint].self, forKey: CacheKey.caffeineHistory) {
-        caffeineHistory = v
-      }
     case .gut:
       if let v = ResponseCache.load(GutDayResponse.self, forKey: CacheKey.gutToday) {
         gutToday = v
@@ -903,12 +851,11 @@ struct WeekDashboardView: View {
     // contributes nothing to the rail. Calendar isn't a toggleable section, so
     // it stays (gated only by calendar access).
     let enabled = Set(visibleDomains.map(\.rawValue))
+    let extraEvents = todayTimelineExtraEvents(enabled: enabled)
     func on(_ key: String) -> Bool { enabled.contains(key) }
     return WeekDashboardTimelineCard(
       date: clock.today,
       oura: on("sleep") ? ouraNights.first : nil,
-      caffeine: on("caffeine") ? (caffeineToday?.entries ?? []) : [],
-      cannabis: on("cannabis") ? (cannabisToday?.entries ?? []) : [],
       nutrition: on("nutrition") ? todayNutrition : [],
       gut: on("gut") ? (gutToday?.entries ?? []) : [],
       mood: on("mood") ? (moodToday?.entries ?? []) : [],
@@ -917,6 +864,7 @@ struct WeekDashboardView: View {
       chores: on("chores") ? dailies.chores : [],
       training: on("training") ? recentTraining : [],
       tasks: on("tasks") ? completedTasks : [],
+      extras: extraEvents,
       calendar: dailies.calendarEvents,
       macroColors: macroColors,
       fullDay: isWide
@@ -1102,8 +1050,6 @@ struct WeekDashboardView: View {
     case .nutrition:   nutritionQuickAddMenu
     case .hydration:   hydrationQuickAddMenu
     case .groceries:   groceriesQuickAddMenu
-    case .caffeine:    caffeineQuickAddMenu
-    case .cannabis:    cannabisQuickAddMenu
     case .gut:         gutQuickAddMenu
     case .mood:        moodQuickAddMenu
     case .sleep, .body, .activity, .github, .intake, .symptoms, .medications:
@@ -1192,8 +1138,6 @@ struct WeekDashboardView: View {
     case .nutrition:   nutritionTile
     case .hydration:   hydrationTile
     case .groceries:   groceriesTile
-    case .caffeine:    caffeineTile
-    case .cannabis:    cannabisTile
     case .intake:      intakeEmptyTile  // only reached when there are no kinds
     case .body:        bodyTile
     case .gut:         gutTile
@@ -1227,8 +1171,6 @@ struct WeekDashboardView: View {
     case .nutrition:   return nutritionDomainData()
     case .hydration:   return hydrationDomainData()
     case .groceries:   return groceriesDomainData()
-    case .caffeine:    return caffeineDomainData()
-    case .cannabis:    return cannabisDomainData()
     case .intake:      return intakeDomainData()
     case .body:        return bodyDomainData()
     case .gut:         return gutDomainData()
@@ -1648,50 +1590,6 @@ struct WeekDashboardView: View {
     )
   }
 
-  private func caffeineDomainData() -> HomepageDomainData {
-    let sessions = caffeineToday?.sessionCount ?? 0
-    let grams = caffeineToday?.totalG ?? 0
-    let bars = caffeineHistory.map { $0.sessions }
-    let dailyLimit = 3
-    return HomepageDomainData(
-      domain: .caffeine,
-      title: String(localized: "Caffeine", comment: "Section name"),
-      accent: theme.color(for: "caffeine"),
-      headline: "\(sessions) · \(String(format: "%.1f", grams))g",
-      headlineStats: [
-        .init(label: "Today", value: "\(sessions)"),
-        .init(label: "Grams", value: String(format: "%.1f", grams), unit: "g"),
-      ],
-      progress: .init(label: "Today / limit",
-                      current: Double(min(sessions, dailyLimit)),
-                      target: Double(dailyLimit)),
-      history: .bars(bars.isEmpty ? Array(repeating: 0, count: 90) : bars),
-      tap: .openSheet(.caffeine)
-    )
-  }
-
-  private func cannabisDomainData() -> HomepageDomainData {
-    let sessions = cannabisToday?.sessionCount ?? 0
-    let grams = cannabisToday?.totalG ?? 0
-    let bars = cannabisHistory.map { $0.sessions }
-    let dailyLimit = 2
-    return HomepageDomainData(
-      domain: .cannabis,
-      title: String(localized: "Cannabis", comment: "Section name"),
-      accent: theme.color(for: "cannabis"),
-      headline: "\(sessions) · \(String(format: "%.2f", grams))g",
-      headlineStats: [
-        .init(label: "Today", value: "\(sessions)"),
-        .init(label: "Grams", value: String(format: "%.2f", grams), unit: "g"),
-      ],
-      progress: .init(label: "Today / limit",
-                      current: Double(min(sessions, dailyLimit)),
-                      target: Double(dailyLimit)),
-      history: .bars(bars.isEmpty ? Array(repeating: 0, count: 90) : bars),
-      tap: .openSheet(.cannabis)
-    )
-  }
-
   private func bodyDomainData() -> HomepageDomainData {
     let latest = bodyRows.first
     let weight = latest?.weightKg
@@ -1865,6 +1763,29 @@ struct WeekDashboardView: View {
     return (try? modelContext.fetch(descriptor)) ?? []
   }
 
+  private func todayTimelineExtraEvents(enabled: Set<String>) -> [DayTimelineExtraEvent] {
+    var out: [DayTimelineExtraEvent] = []
+    if enabled.contains("symptoms") {
+      out += fetchSymptoms(from: clock.today, to: clock.today).map {
+        DayTimelineExtraEvent(
+          id: $0.id,
+          date: $0.date,
+          time: EventTimestamp.hhmm(from: $0.occurredAt),
+          sectionKey: "symptoms")
+      }
+    }
+    if enabled.contains("medications") {
+      out += fetchMedicationDoses(from: clock.today, to: clock.today).map {
+        DayTimelineExtraEvent(
+          id: $0.id,
+          date: $0.date,
+          time: EventTimestamp.hhmm(from: $0.occurredAt),
+          sectionKey: "medications")
+      }
+    }
+    return out
+  }
+
   private var medicationsTile: some View {
     let data = medicationsDomainData()
     return Button { open(.medications) } label: {
@@ -1888,18 +1809,19 @@ struct WeekDashboardView: View {
     let todayRows = rows.filter { $0.date == today }
     let taken = todayRows.filter { $0.status == "taken" }.count
     let skipped = todayRows.filter { $0.status == "skipped" || $0.status == "missed" }.count
-    let target = max(active.count, 1)
+    let routine = active.filter { ($0.scheduleKind ?? "daily") == "daily" }
+    let target = max(routine.count, 1)
     return HomepageDomainData(
       domain: .medications,
       title: String(localized: "Medications", comment: "Section name"),
       accent: theme.color(for: "medications"),
-      headline: "\(taken)/\(active.count) taken",
+      headline: routine.isEmpty ? "\(taken) taken" : "\(taken)/\(routine.count) taken",
       headlineStats: [
         .init(label: "Taken", value: "\(taken)"),
         .init(label: "Skipped", value: "\(skipped)"),
         .init(label: "Active", value: "\(active.count)"),
       ],
-      progress: .init(label: "Taken today", current: Double(min(taken, target)), target: Double(target)),
+      progress: routine.isEmpty ? nil : .init(label: "Taken today", current: Double(min(taken, target)), target: Double(target)),
       history: .bars(medicationsHistory(days: Self.historyDays)),
       tap: .openSheet(.medications)
     )
@@ -2274,7 +2196,6 @@ struct WeekDashboardView: View {
     return GroceryStockHistory.series(days: 30)
   }
 
-  // Caffeine — today's session count + grams; 7-day session histogram.
   // MARK: - Intake (consumables) tiles
   //
   // One host section, one tile per kind (Option C). `tile(for: .intake)`
@@ -2382,114 +2303,6 @@ struct WeekDashboardView: View {
   private func reloadIntake() async {
     let date = clock.today
     intakeTiles = await MirrorReader.shared.read { IntakeReader.loadTiles(context: $0, date: date) }
-  }
-
-  private var caffeineTile: some View {
-    let accent = theme.color(for: "caffeine")
-    let sessions = caffeineToday?.sessionCount ?? 0
-    let grams = caffeineToday?.totalG ?? 0
-    let bars = Array(caffeineHistory.map { $0.sessions }.suffix(7))
-    let dailyLimit = 3   // soft default until Settings.targets is wired
-    return ModuleTile(
-      title: String(localized: "Caffeine", comment: "Section name"),
-      accent: accent,
-      stats: [
-        .init(label: "Today", value: "\(sessions)"),
-        .init(label: "Grams", value: String(format: "%.1f", grams), unit: "g")
-      ],
-      progress: .init(label: "Today / limit",
-                      current: Double(min(sessions, dailyLimit)),
-                      target: Double(dailyLimit)),
-      history: .init(label: "7-day sessions",
-                     values: bars.isEmpty
-                       ? Array(repeating: 0, count: 7) : bars)
-    )
-    .contentShape(Rectangle())
-    .onTapGesture { open(.caffeine) }
-    .contextMenu { caffeineQuickAddMenu }
-  }
-
-  @ViewBuilder private var caffeineQuickAddMenu: some View {
-    CaffeineQuickAddMenu(
-      lastEntry: caffeineLastEntry,
-      onCommit: { method, beans, grams in
-        commitCaffeine(method: method, beans: beans, grams: grams)
-      },
-      onEditLast: caffeineLastEntry == nil ? nil : { open(.caffeine) }
-    )
-  }
-
-  private func commitCaffeine(method: String, beans: String?, grams: Double?) {
-    CaffeineCommit.logNew(
-      method: method, beans: beans, grams: grams,
-      accent: theme.color(for: "caffeine"),
-      logCommit: logCommit)
-  }
-
-  // Cannabis — same shape as caffeine.
-  private var cannabisTile: some View {
-    let accent = theme.color(for: "cannabis")
-    let sessions = cannabisToday?.sessionCount ?? 0
-    let grams = cannabisToday?.totalG ?? 0
-    let bars = Array(cannabisHistory.map { $0.sessions }.suffix(7))
-    let dailyLimit = 2
-    return ModuleTile(
-      title: String(localized: "Cannabis", comment: "Section name"),
-      accent: accent,
-      stats: [
-        .init(label: "Today", value: "\(sessions)"),
-        .init(label: "Grams", value: String(format: "%.2f", grams), unit: "g")
-      ],
-      progress: .init(label: "Today / limit",
-                      current: Double(min(sessions, dailyLimit)),
-                      target: Double(dailyLimit)),
-      history: .init(label: "7-day sessions",
-                     values: bars.isEmpty
-                       ? Array(repeating: 0, count: 7) : bars)
-    )
-    .contentShape(Rectangle())
-    .onTapGesture { open(.cannabis) }
-    .contextMenu { cannabisQuickAddMenu }
-  }
-
-  /// Last vape entry across all days — mirrors the webapp's 30-day lookback
-  /// so yesterday's strain/capsule is visible on the menu when there's been
-  /// no vape today. Populated by `loadAll()` via a SwiftData fetch and
-  /// refreshed after each commit so the "Continue · Hit N" counter advances.
-  private var lastCannabisVape: CannabisEntry? {
-    cannabisToday?.entries.reversed().first { $0.method == "vape" } ?? cannabisLastVape
-  }
-
-  /// Edit-last opens the destination view (rather
-  /// than threading an EditCannabisEntrySheet through the dashboard)
-  /// since the destination already has that affordance.
-  @ViewBuilder private var cannabisQuickAddMenu: some View {
-    CannabisQuickAddMenu(
-      lastVape: lastCannabisVape,
-      usesPerCapsule: cannabisUsesPerCapsule,
-      onCommit: { method, hit in
-        commitCannabis(method: method, hit: hit)
-      },
-      onEditLast: lastCannabisVape == nil ? nil : { open(.cannabis) }
-    )
-  }
-
-  private func commitCannabis(method: String, hit: Int?) {
-    SectionLog.newLog(
-      section: "cannabis",
-      accent: theme.color(for: "cannabis"),
-      announce: "Logged \(method == "edible" ? "edible" : "vape").",
-      logCommit: logCommit
-    ) {
-      SeptenaServices.shared.cannabisMutator.addEntry(
-        date: SeptenaDate.today, time: SeptenaDate.nowHHMM,
-        method: method, hit: hit)
-      // Refresh tile state from the freshly-mutated SwiftData store so the
-      // "Continue · Hit N" counter advances immediately.
-      cannabisToday = ChecklistMirror.loadCannabisDay(context: modelContext, date: SeptenaDate.today)
-      ResponseCache.save(cannabisToday, forKey: CacheKey.cannabisToday)
-      AddInfoSection.cannabis.notifyTilesChanged()
-    }
   }
 
   // Body — latest Withings weigh-in + bidirectional weight chart.
@@ -3027,8 +2840,6 @@ private struct WeekDashboardScreen<CurrentDay: Equatable, Toolbar: ToolbarConten
 private struct WeekDashboardTimelineCard: View {
   let date: String
   let oura: OuraNight?
-  let caffeine: [CaffeineEntry]
-  let cannabis: [CannabisEntry]
   let nutrition: [NutritionEntry]
   let gut: [GutEntry]
   let mood: [MoodEntry]
@@ -3037,6 +2848,7 @@ private struct WeekDashboardTimelineCard: View {
   let chores: [ChoreItem]
   let training: [ExerciseEntry]
   let tasks: [SeptenaTask]
+  let extras: [DayTimelineExtraEvent]
   let calendar: [EKEvent]
   let macroColors: MacroColors?
   var fullDay: Bool = false
@@ -3045,8 +2857,6 @@ private struct WeekDashboardTimelineCard: View {
     DayTimelineView(
       date: date,
       oura: oura,
-      caffeine: caffeine,
-      cannabis: cannabis,
       nutrition: nutrition,
       gut: gut,
       mood: mood,
@@ -3055,6 +2865,7 @@ private struct WeekDashboardTimelineCard: View {
       chores: chores,
       training: training,
       tasks: tasks,
+      extras: extras,
       calendar: calendar,
       macroColors: macroColors,
       fullDay: fullDay

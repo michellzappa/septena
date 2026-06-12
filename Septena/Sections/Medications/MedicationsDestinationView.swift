@@ -68,12 +68,7 @@ struct MedicationsDestinationView: View {
     .tint(accent)
     .sectionReload(on: viewingDate, onDataChange: true,
                    forSections: ["medications"]) {}
-    .sheet(isPresented: $creating) {
-      MedicationDoseEditor(date: viewingDate,
-                           definitions: activeDefinitions,
-                           dose: nil)
-    }
-    .sheet(item: $editing) { dose in
+    .drawerDetail(edit: $editing, create: $creating) { dose in
       MedicationDoseEditor(date: viewingDate,
                            definitions: activeDefinitions,
                            dose: dose)
@@ -111,7 +106,8 @@ struct MedicationsDestinationView: View {
 }
 
 private struct MedicationDoseEditor: View {
-  @Environment(\.dismiss) private var dismiss
+  @Environment(SectionTheme.self) private var theme
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
   let date: String
   let definitions: [MedicationDefinitionEntity]
   let dose: MedicationDoseEventEntity?
@@ -128,73 +124,67 @@ private struct MedicationDoseEditor: View {
   @State private var showingAdvanced = false
 
   private var mutator: MedicationsMutator { SeptenaServices.shared.medicationsMutator }
+  private var accent: Color { theme.color(for: "medications") }
   private var selectedDefinition: MedicationDefinitionEntity? {
     definitions.first { $0.id == medicationID }
   }
 
   var body: some View {
-    NavigationStack {
-      Form {
-        if definitions.isEmpty {
-          ContentUnavailableView("No medications yet",
-                                 systemImage: "cross.case",
-                                 description: Text("Add medications in Settings first."))
-          Button {
-            showingDefinitions = true
-          } label: {
-            Label("Create medications", systemImage: "plus")
-          }
-        } else {
-          Section("Dose") {
-            Picker("Medication", selection: $medicationID) {
-              ForEach(definitions) { def in
-                Text(def.title).tag(def.id)
-              }
-            }
-            DatePicker("Time", selection: $time, displayedComponents: .hourAndMinute)
-            Picker("Status", selection: $status) {
-              Text("Taken").tag("taken")
-              Text("Skipped").tag("skipped")
-              Text("Missed").tag("missed")
-            }
-            .pickerStyle(.segmented)
-            TextField("Dose value", text: $doseValue)
-              #if os(iOS)
-              .keyboardType(.decimalPad)
-              #endif
-            TextField("Dose unit", text: $doseUnit)
-          }
+    AdaptiveEditScaffold(title: dose == nil ? "Log Dose" : "Edit Dose",
+                         accent: accent,
+                         canSave: !medicationID.isEmpty,
+                         onSave: save) {
+      Form { formContent }
+        .task { seed() }
+        .onChange(of: medicationID) { _, _ in
+          guard dose == nil, let def = selectedDefinition else { return }
+          doseValue = def.defaultDoseValue.map { $0.decimalString(2) } ?? ""
+          doseUnit = def.defaultDoseUnit ?? ""
+        }
+        .sheet(isPresented: $showingDefinitions) {
+          MedicationDefinitionsSheet()
+        }
+    }
+  }
 
-          Section {
-            DisclosureGroup("Notes and effects", isExpanded: $showingAdvanced) {
-              TextField(status == "taken" ? "Context" : "Reason", text: $reason, axis: .vertical)
-              TextField("Effect", text: $effectNote, axis: .vertical)
-              TextField("Side effect", text: $sideEffectNote, axis: .vertical)
-            }
+  @ViewBuilder
+  private var formContent: some View {
+    if definitions.isEmpty {
+      ContentUnavailableView("No medications yet",
+                             systemImage: "cross.case",
+                             description: Text("Add medications in Settings first."))
+      Button {
+        showingDefinitions = true
+      } label: {
+        Label("Create medications", systemImage: "plus")
+      }
+    } else {
+      Section("Dose") {
+        Picker("Medication", selection: $medicationID) {
+          ForEach(definitions) { def in
+            Text(def.title).tag(def.id)
           }
         }
-      }
-      .navigationTitle(dose == nil ? "Log Dose" : "Edit Dose")
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
+        DatePicker("Time", selection: $time, displayedComponents: .hourAndMinute)
+        Picker("Status", selection: $status) {
+          Text("Taken").tag("taken")
+          Text("Skipped").tag("skipped")
+          Text("Missed").tag("missed")
         }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Save") { save() }
-            .disabled(medicationID.isEmpty)
+        .pickerStyle(.segmented)
+        TextField("Dose value", text: $doseValue)
+          #if os(iOS)
+          .keyboardType(.decimalPad)
+          #endif
+        TextField("Dose unit", text: $doseUnit)
+      }
+
+      Section {
+        DisclosureGroup("Notes and effects", isExpanded: $showingAdvanced) {
+          TextField(status == "taken" ? "Context" : "Reason", text: $reason, axis: .vertical)
+          TextField("Effect", text: $effectNote, axis: .vertical)
+          TextField("Side effect", text: $sideEffectNote, axis: .vertical)
         }
-      }
-      .task { seed() }
-      .onChange(of: medicationID) { _, _ in
-        guard dose == nil, let def = selectedDefinition else { return }
-        doseValue = def.defaultDoseValue.map { $0.decimalString(2) } ?? ""
-        doseUnit = def.defaultDoseUnit ?? ""
-      }
-      .sheet(isPresented: $showingDefinitions) {
-        MedicationDefinitionsSheet()
       }
     }
   }
@@ -226,28 +216,34 @@ private struct MedicationDoseEditor: View {
     let timeString = EventTimestamp.hhmm(from: time)
     let value = Double(doseValue.trimmingCharacters(in: .whitespacesAndNewlines))
     if let dose {
-      mutator.updateDose(id: dose.id,
-                         date: date,
-                         time: timeString,
-                         medicationID: medicationID,
-                         status: status,
-                         doseValue: value,
-                         doseUnit: nilIfEmpty(doseUnit),
-                         reason: nilIfEmpty(reason),
-                         effectNote: nilIfEmpty(effectNote),
-                         sideEffectNote: nilIfEmpty(sideEffectNote))
+      SectionLog.edit {
+        mutator.updateDose(id: dose.id,
+                           date: date,
+                           time: timeString,
+                           medicationID: medicationID,
+                           status: status,
+                           doseValue: value,
+                           doseUnit: nilIfEmpty(doseUnit),
+                           reason: nilIfEmpty(reason),
+                           effectNote: nilIfEmpty(effectNote),
+                           sideEffectNote: nilIfEmpty(sideEffectNote))
+      }
     } else {
-      mutator.addDose(medicationID: medicationID,
-                      date: date,
-                      time: timeString,
-                      status: status,
-                      doseValue: value,
-                      doseUnit: nilIfEmpty(doseUnit),
-                      reason: nilIfEmpty(reason),
-                      effectNote: nilIfEmpty(effectNote),
-                      sideEffectNote: nilIfEmpty(sideEffectNote))
+      SectionLog.newLog(section: "medications",
+                        accent: accent,
+                        announce: "Logged medication dose.",
+                        logCommit: logCommit) {
+        mutator.addDose(medicationID: medicationID,
+                        date: date,
+                        time: timeString,
+                        status: status,
+                        doseValue: value,
+                        doseUnit: nilIfEmpty(doseUnit),
+                        reason: nilIfEmpty(reason),
+                        effectNote: nilIfEmpty(effectNote),
+                        sideEffectNote: nilIfEmpty(sideEffectNote))
+      }
     }
-    dismiss()
   }
 }
 
@@ -265,6 +261,8 @@ struct MedicationDefinitionsSheet: View {
   @State private var defaultDoseValue = ""
   @State private var defaultDoseUnit = ""
   @State private var bucket = "anytime"
+  @State private var scheduleKind = "daily"
+  @State private var targetDosesPerDay = "1"
   @State private var instructions = ""
   @State private var showingAdvanced = false
 
@@ -289,6 +287,17 @@ struct MedicationDefinitionsSheet: View {
             .keyboardType(.decimalPad)
             #endif
           TextField("Default dose unit", text: $defaultDoseUnit)
+          Picker("Schedule", selection: $scheduleKind) {
+            Text("Daily").tag("daily")
+            Text("As needed").tag("asNeeded")
+          }
+          .pickerStyle(.segmented)
+          if scheduleKind == "daily" {
+            TextField("Doses per day", text: $targetDosesPerDay)
+              #if os(iOS)
+              .keyboardType(.numberPad)
+              #endif
+          }
           Picker("Bucket", selection: $bucket) {
             Text("Anytime").tag("anytime")
             Text("Morning").tag("morning")
@@ -356,6 +365,7 @@ struct MedicationDefinitionsSheet: View {
       let unit = def.defaultDoseUnit.map { " \($0)" } ?? ""
       parts.append("\(value.decimalString(2))\(unit)")
     }
+    parts.append(def.scheduleKind == "asNeeded" ? "as needed" : "daily")
     if let bucket = def.bucket, !bucket.isEmpty { parts.append(bucket) }
     return parts.isEmpty ? "No default dose" : parts.joined(separator: " · ")
   }
@@ -370,6 +380,8 @@ struct MedicationDefinitionsSheet: View {
                           defaultDoseValue: Double(defaultDoseValue.trimmingCharacters(in: .whitespacesAndNewlines)),
                           defaultDoseUnit: nilIfEmpty(defaultDoseUnit),
                           bucket: bucket == "anytime" ? nil : bucket,
+                          scheduleKind: scheduleKind,
+                          targetDosesPerDay: scheduleKind == "daily" ? Int(targetDosesPerDay.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 1 : nil,
                           instructions: nilIfEmpty(instructions))
     title = ""
     genericName = ""
@@ -380,6 +392,8 @@ struct MedicationDefinitionsSheet: View {
     defaultDoseValue = ""
     defaultDoseUnit = ""
     bucket = "anytime"
+    scheduleKind = "daily"
+    targetDosesPerDay = "1"
     instructions = ""
   }
 
@@ -394,7 +408,9 @@ struct MedicationDefinitionsSheet: View {
                             route: starter.route,
                             defaultDoseValue: starter.doseValue,
                             defaultDoseUnit: starter.doseUnit,
-                            bucket: starter.bucket)
+                            bucket: starter.bucket,
+                            scheduleKind: starter.scheduleKind,
+                            targetDosesPerDay: starter.scheduleKind == "daily" ? 1 : nil)
       Haptics.success()
     } label: {
       HStack(spacing: 12) {
@@ -426,6 +442,7 @@ struct MedicationDefinitionsSheet: View {
       parts.append(unit)
     }
     if let bucket = starter.bucket { parts.append(bucket) }
+    parts.append(starter.scheduleKind == "asNeeded" ? "as needed" : "daily")
     return parts.joined(separator: " · ")
   }
 }

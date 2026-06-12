@@ -683,7 +683,6 @@ struct AdaptiveEditScaffold<FormContent: View>: View {
   var body: some View {
     if isInspector {
       content()
-        .formStyle(.grouped)
         .safeAreaInset(edge: .top, spacing: 0) {
           AdaptiveEditHeader(
             title: title,

@@ -17,11 +17,16 @@ import EventKit
 // Data is passed in — parents collect once and slice per date — so the
 // component is dumb and fast even when 7 stack vertically.
 
+struct DayTimelineExtraEvent: Equatable {
+  let id: String
+  let date: String
+  let time: String
+  let sectionKey: String
+}
+
 struct DayTimelineView: View, Equatable {
   let date: String                    // YYYY-MM-DD
   var oura: OuraNight? = nil
-  var caffeine: [CaffeineEntry] = []
-  var cannabis: [CannabisEntry] = []
   var nutrition: [NutritionEntry] = []
   var gut: [GutEntry] = []
   var mood: [MoodEntry] = []
@@ -30,6 +35,7 @@ struct DayTimelineView: View, Equatable {
   var chores: [ChoreItem] = []
   var training: [ExerciseEntry] = []
   var tasks: [SeptenaTask] = []
+  var extras: [DayTimelineExtraEvent] = []
   var calendar: [EKEvent] = []
   /// Used to source the fasting band color (`macro_colors.fasting`).
   var macroColors: MacroColors? = nil
@@ -56,8 +62,6 @@ struct DayTimelineView: View, Equatable {
       && lhs.fullDay == rhs.fullDay
       && lhs.oura == rhs.oura
       && lhs.macroColors == rhs.macroColors
-      && lhs.caffeine == rhs.caffeine
-      && lhs.cannabis == rhs.cannabis
       && lhs.nutrition == rhs.nutrition
       && lhs.gut == rhs.gut
       && lhs.mood == rhs.mood
@@ -66,6 +70,7 @@ struct DayTimelineView: View, Equatable {
       && lhs.chores == rhs.chores
       && lhs.training == rhs.training
       && lhs.tasks == rhs.tasks
+      && lhs.extras == rhs.extras
       && lhs.calendar == rhs.calendar
   }
 
@@ -435,8 +440,6 @@ struct DayTimelineView: View, Equatable {
 
   private var latestEventHour: Double {
     var values: [Double] = []
-    for e in caffeine    { if let h = parseHHMM(e.time) { values.append(h) } }
-    for e in cannabis    { if let h = parseHHMM(e.time) { values.append(h) } }
     for e in nutrition where e.date == date { if let h = parseHHMM(e.time) { values.append(h) } }
     for e in gut         { if let h = parseHHMM(e.time) { values.append(h) } }
     for e in mood        { if let h = parseHHMM(String(e.time.prefix(5))) { values.append(h) } }
@@ -448,6 +451,9 @@ struct DayTimelineView: View, Equatable {
     }
     for c in chores where c.lastCompleted == date {
       if let t = c.lastCompletedTime, let h = parseHHMM(t) { values.append(h) }
+    }
+    for e in extras where e.date == date {
+      if let h = parseHHMM(e.time) { values.append(h) }
     }
     for s in trainingSessions { values.append(s.endHour) }
     for b in calendarBars { values.append(b.endHour) }
@@ -554,8 +560,6 @@ struct DayTimelineView: View, Equatable {
     }
 
     let cN = theme.color(for: "nutrition")
-    let cC = theme.color(for: "caffeine")
-    let cZ = theme.color(for: "cannabis")
     let cG = theme.color(for: "gut")
     let cH = theme.color(for: "habits")
     let cS = theme.color(for: "supplements")
@@ -563,12 +567,6 @@ struct DayTimelineView: View, Equatable {
 
     for e in nutrition where e.date == date {
       if let h = parseHHMM(e.time) { add(h, color: cN) }
-    }
-    for e in caffeine {
-      if let h = parseHHMM(e.time) { add(h, color: cC) }
-    }
-    for e in cannabis {
-      if let h = parseHHMM(e.time) { add(h, color: cZ) }
     }
     for e in gut {
       if let h = parseHHMM(e.time) { add(h, color: cG) }
@@ -593,6 +591,9 @@ struct DayTimelineView: View, Equatable {
       guard let ts = t.completedAt, ts.hasPrefix(date), ts.count >= 16 else { continue }
       let hhmm = String(ts.dropFirst(11).prefix(5))
       if let h = parseHHMM(hhmm) { add(h, color: cT) }
+    }
+    for e in extras where e.date == date {
+      if let h = parseHHMM(e.time) { add(h, color: theme.color(for: e.sectionKey)) }
     }
     // Chores — dot at last_completed_time for each chore checked off
     // today. Matches web's today-timeline keying on `last_completed_time`.
