@@ -124,8 +124,13 @@ private struct MedicationDoseEditor: View {
   @State private var reason = ""
   @State private var effectNote = ""
   @State private var sideEffectNote = ""
+  @State private var showingDefinitions = false
+  @State private var showingAdvanced = false
 
   private var mutator: MedicationsMutator { SeptenaServices.shared.medicationsMutator }
+  private var selectedDefinition: MedicationDefinitionEntity? {
+    definitions.first { $0.id == medicationID }
+  }
 
   var body: some View {
     NavigationStack {
@@ -134,6 +139,11 @@ private struct MedicationDoseEditor: View {
           ContentUnavailableView("No medications yet",
                                  systemImage: "cross.case",
                                  description: Text("Add medications in Settings first."))
+          Button {
+            showingDefinitions = true
+          } label: {
+            Label("Create medications", systemImage: "plus")
+          }
         } else {
           Section("Dose") {
             Picker("Medication", selection: $medicationID) {
@@ -147,16 +157,20 @@ private struct MedicationDoseEditor: View {
               Text("Skipped").tag("skipped")
               Text("Missed").tag("missed")
             }
+            .pickerStyle(.segmented)
             TextField("Dose value", text: $doseValue)
               #if os(iOS)
               .keyboardType(.decimalPad)
               #endif
             TextField("Dose unit", text: $doseUnit)
           }
-          Section("Notes") {
-            TextField("Reason", text: $reason, axis: .vertical)
-            TextField("Effect", text: $effectNote, axis: .vertical)
-            TextField("Side effect", text: $sideEffectNote, axis: .vertical)
+
+          Section {
+            DisclosureGroup("Notes and effects", isExpanded: $showingAdvanced) {
+              TextField(status == "taken" ? "Context" : "Reason", text: $reason, axis: .vertical)
+              TextField("Effect", text: $effectNote, axis: .vertical)
+              TextField("Side effect", text: $sideEffectNote, axis: .vertical)
+            }
           }
         }
       }
@@ -174,6 +188,14 @@ private struct MedicationDoseEditor: View {
         }
       }
       .task { seed() }
+      .onChange(of: medicationID) { _, _ in
+        guard dose == nil, let def = selectedDefinition else { return }
+        doseValue = def.defaultDoseValue.map { $0.decimalString(2) } ?? ""
+        doseUnit = def.defaultDoseUnit ?? ""
+      }
+      .sheet(isPresented: $showingDefinitions) {
+        MedicationDefinitionsSheet()
+      }
     }
   }
 
@@ -244,22 +266,24 @@ struct MedicationDefinitionsSheet: View {
   @State private var defaultDoseUnit = ""
   @State private var bucket = "anytime"
   @State private var instructions = ""
+  @State private var showingAdvanced = false
 
   private var mutator: MedicationsMutator { SeptenaServices.shared.medicationsMutator }
 
   var body: some View {
     NavigationStack {
       Form {
-        Section("Add Medication") {
+        Section {
+          ForEach(MedicationStarter.all) { starter in
+            starterRow(starter)
+          }
+        } header: {
+          Text("Quick add")
+        } footer: {
+          Text("Use custom medication for exact prescription names and strengths.")
+        }
+        Section("Custom medication") {
           TextField("Name", text: $title)
-          TextField("Generic name", text: $genericName)
-          TextField("Form", text: $form)
-          TextField("Route", text: $route)
-          TextField("Strength value", text: $strengthValue)
-            #if os(iOS)
-            .keyboardType(.decimalPad)
-            #endif
-          TextField("Strength unit", text: $strengthUnit)
           TextField("Default dose value", text: $defaultDoseValue)
             #if os(iOS)
             .keyboardType(.decimalPad)
@@ -272,7 +296,17 @@ struct MedicationDefinitionsSheet: View {
             Text("Evening").tag("evening")
             Text("Bedtime").tag("bedtime")
           }
-          TextField("Instructions", text: $instructions, axis: .vertical)
+          DisclosureGroup("Advanced", isExpanded: $showingAdvanced) {
+            TextField("Generic name", text: $genericName)
+            TextField("Form", text: $form)
+            TextField("Route", text: $route)
+            TextField("Strength value", text: $strengthValue)
+              #if os(iOS)
+              .keyboardType(.decimalPad)
+              #endif
+            TextField("Strength unit", text: $strengthUnit)
+            TextField("Instructions", text: $instructions, axis: .vertical)
+          }
           Button {
             add()
           } label: {
@@ -347,5 +381,51 @@ struct MedicationDefinitionsSheet: View {
     defaultDoseUnit = ""
     bucket = "anytime"
     instructions = ""
+  }
+
+  @ViewBuilder
+  private func starterRow(_ starter: MedicationStarter) -> some View {
+    let exists = definitions.contains { $0.title.localizedCaseInsensitiveCompare(starter.title) == .orderedSame }
+    Button {
+      guard !exists else { return }
+      mutator.addDefinition(title: starter.title,
+                            genericName: starter.genericName,
+                            form: starter.form,
+                            route: starter.route,
+                            defaultDoseValue: starter.doseValue,
+                            defaultDoseUnit: starter.doseUnit,
+                            bucket: starter.bucket)
+      Haptics.success()
+    } label: {
+      HStack(spacing: 12) {
+        Image(systemName: "pills")
+          .font(.title3)
+          .foregroundStyle(exists ? .secondary : Color.accentColor)
+        VStack(alignment: .leading, spacing: 2) {
+          Text(starter.title)
+            .foregroundStyle(exists ? .secondary : .primary)
+            .strikethrough(exists, color: .secondary)
+          Text(starterSummary(starter))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        Spacer()
+        Image(systemName: exists ? "checkmark.circle.fill" : "plus.circle")
+          .foregroundStyle(exists ? Color.secondary : Color.accentColor)
+      }
+    }
+    .buttonStyle(.plain)
+    .disabled(exists)
+  }
+
+  private func starterSummary(_ starter: MedicationStarter) -> String {
+    var parts = [starter.form, starter.route]
+    if let value = starter.doseValue {
+      parts.append("\(value.decimalString(2)) \(starter.doseUnit ?? "")".trimmingCharacters(in: .whitespaces))
+    } else if let unit = starter.doseUnit {
+      parts.append(unit)
+    }
+    if let bucket = starter.bucket { parts.append(bucket) }
+    return parts.joined(separator: " · ")
   }
 }
