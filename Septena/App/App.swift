@@ -149,6 +149,9 @@ struct SeptenaApp: App {
           // waiting on any network round-trip.
           await services.start()
           #if DEBUG
+          // Catch section identity↔behavior drift in dev: every manifest row
+          // must have a plugin and vice versa (the join is a runtime string).
+          SectionRegistry.assertManifestParity()
           // Screenshot / UI-test builds: load curated demo data into the
           // in-memory store. No-op in release (DemoSeedMode.isOn is false).
           if DemoSeedMode.isOn {
