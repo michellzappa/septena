@@ -164,15 +164,9 @@ struct SectionDrawer<Content: View>: View {
   /// the iPad/macOS pane stays `.solid`.
   @Environment(\.drawerSurfaceStyle) private var surfaceStyle
 
-  /// Whether the goals strip is currently revealed. Collapsed by default —
-  /// the goals live behind the `target` toolbar toggle and appear on cue,
-  /// so the daily logging content owns the top of the drawer.
-  @State private var goalsExpanded = false
-
   /// Whether the time-travel date picker sheet is open. The picker lives
-  /// behind a calendar toolbar button (mirroring the goals + log buttons)
-  /// rather than an always-visible strip, so today's logging owns the top
-  /// of the drawer.
+  /// behind a calendar toolbar button rather than an always-visible strip,
+  /// so today's logging owns the top of the drawer.
   @State private var showingTimeTravel = false
 
   /// Whether the deep-linked Settings sheet (this section's pane) is open.
@@ -194,10 +188,9 @@ struct SectionDrawer<Content: View>: View {
   }
 
   /// True when the destination has a date strip pointing at a past day.
-  /// Hides the goals strip and signals to destinations (via the shared
-  /// `SeptenaDate.today` comparison they can do themselves) that
-  /// histograms / heatmaps should also be hidden — past days are a
-  /// read-only log review, not a dashboard.
+  /// Signals to destinations (via the shared `SeptenaDate.today` comparison
+  /// they can do themselves) that histograms / heatmaps should be hidden —
+  /// past days are a read-only log review, not a dashboard.
   private var isTimeTraveling: Bool {
     guard let currentDate else { return false }
     return currentDate.wrappedValue != SeptenaDate.today
@@ -208,8 +201,8 @@ struct SectionDrawer<Content: View>: View {
       // Spacing/margins tuned to match insetGrouped List: ~20pt screen
       // inset and ~28pt between sections so the page breathes the same
       // way the old List did.
-      // The chrome (time-travel pill, goals strip, settings footer, failure
-      // state) stays full-width; only the destination's section cards flow
+      // The chrome (time-travel pill, settings footer, failure state) stays
+      // full-width; only the destination's section cards flow
       // into columns via `DrawerColumns`. A plain VStack here — the lazy,
       // column-aware stacking now lives inside `DrawerColumns`.
       VStack(spacing: Theme.Spacing.xxl) {
@@ -219,10 +212,6 @@ struct SectionDrawer<Content: View>: View {
         // the calendar lives only in the toolbar.
         if isTimeTraveling, let currentDate {
           TimeTravelPill(date: currentDate.wrappedValue) { showingTimeTravel = true }
-        }
-        if !isTimeTraveling && goalsExpanded {
-          SectionGoalsStrip(sectionKey: sectionKey)
-            .transition(.move(edge: .top).combined(with: .opacity))
         }
         if case .failed(let message) = loadState {
           failedView(message)
@@ -294,18 +283,6 @@ struct SectionDrawer<Content: View>: View {
                   systemImage: isTimeTraveling ? "calendar.badge.clock" : "calendar")
           }
           .tint(isTimeTraveling ? resolvedAccent : nil)
-        }
-      }
-      // Goals toggle sits just left of the "+" affordance. Hidden while
-      // time-traveling (the strip itself is suppressed on past days) and
-      // when the section has no tagged goals (the button view self-hides).
-      if !isTimeTraveling {
-        ToolbarItem(placement: .primaryAction) {
-          SectionGoalsToggleButton(
-            sectionKey: sectionKey,
-            isExpanded: $goalsExpanded,
-            accent: resolvedAccent
-          )
         }
       }
       // Log/action button — ONE component (`DrawerActionButton`) so its
