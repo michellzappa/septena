@@ -45,35 +45,39 @@ enum AmbientLight {
 
   // MARK: - The sky model
   //
-  // ONE table describes the whole sky: near-black night, sky-blue day,
-  // dawn warmth and dusk ember at the transitions, with the transition
-  // positions anchored to sunrise/sunset (SolarClock — real, location-based
-  // times when the user enables it; the fixed design day otherwise). The
-  // solar ring strokes it as a conic gradient; the glow and halo *sample*
-  // it at "now", so the light behind the dial is always literally the color
-  // of the sky the ring shows at the current hour.
+  // ONE table describes the whole sky: near-black night, white day, dawn
+  // warmth and dusk ember at the transitions, with the transition
+  // positions anchored to sunrise/sunset (SolarClock — real times from the
+  // device's time zone). The halo wears it as an angular gradient; the
+  // glow *samples* it at "now", so the light behind the dial is always
+  // literally the sky's color at the current hour.
 
-  private typealias RGB = (r: Double, g: Double, b: Double)
-  private static let nightRGB: RGB = (0.07, 0.09, 0.20)
-  private static let dayRGB: RGB   = (0.36, 0.62, 0.98)
-  private static let dawnRGB: RGB  = (1.00, 0.64, 0.42)
-  private static let duskRGB: RGB  = (1.00, 0.48, 0.32)
+  // Day is TRANSPARENT: daylight adds no cast at all — the glass band is
+  // just plain glass through the day. (Sky-blue painted the hero blue;
+  // opaque white read as an HDR burn under the blur.) The sky only ever
+  // ADDS light: night darkens, dawn and dusk warm — the rest is absence,
+  // which is what daylight looks like on glass.
+  private typealias SkyStop = (r: Double, g: Double, b: Double, a: Double)
+  private static let nightStop: SkyStop = (0.07, 0.09, 0.20, 1.0)
+  private static let dayStop: SkyStop   = (1.00, 1.00, 1.00, 0.0)
+  private static let dawnStop: SkyStop  = (1.00, 0.64, 0.42, 1.0)
+  private static let duskStop: SkyStop  = (1.00, 0.48, 0.32, 1.0)
 
   /// The sky's color stops over the day, in HOURS (0..24). Sunrise/sunset
   /// are clamped into a sane visual band so an extreme computed time (or a
   /// polar-adjacent fix) can't fold the gradient onto itself.
-  private static func skyStops(times: SolarClock.Times) -> [(hour: Double, rgb: RGB)] {
+  private static func skyStops(times: SolarClock.Times) -> [(hour: Double, stop: SkyStop)] {
     let sr = min(10, max(4, times.sunriseHour))
     let ss = min(22, max(15, times.sunsetHour))
     return [
-      (0, nightRGB),
-      (sr - 2, nightRGB),
-      (sr, dawnRGB),
-      (sr + 2, dayRGB),
-      (ss - 2.5, dayRGB),
-      (ss, duskRGB),
-      (min(23.9, ss + 2.5), nightRGB),
-      (24, nightRGB),
+      (0, nightStop),
+      (sr - 2, nightStop),
+      (sr, dawnStop),
+      (sr + 2, dayStop),
+      (ss - 2.5, dayStop),
+      (ss, duskStop),
+      (min(23.9, ss + 2.5), nightStop),
+      (24, nightStop),
     ]
   }
 
@@ -81,31 +85,34 @@ enum AmbientLight {
   /// hero dial wears. Stop locations are fractions of the day (0 =
   /// midnight), matching the dial's angle convention (midnight at top,
   /// clockwise) — stroke a circle with this as a conic gradient starting
-  /// at -90°.
+  /// at -90°. The day span is fully transparent, so the band only carries
+  /// night dark and dawn/dusk warmth.
   @MainActor
   static func solarRing(times: SolarClock.Times) -> Gradient {
     Gradient(stops: skyStops(times: times).map {
-      .init(color: Color(red: $0.rgb.r, green: $0.rgb.g, blue: $0.rgb.b),
+      .init(color: Color(red: $0.stop.r, green: $0.stop.g, blue: $0.stop.b)
+              .opacity($0.stop.a),
             location: $0.hour / 24)
     })
   }
 
-  /// The sky's color at a given hour — a linear sample of the same stops
-  /// the ring draws.
+  /// The sky's color at a given hour — a linear sample (color AND alpha) of
+  /// the same stops the ring draws. Fully transparent through midday.
   @MainActor
   static func sky(atHour hour: Double, times: SolarClock.Times) -> Color {
     let stops = skyStops(times: times)
     let h = min(24, max(0, hour))
     guard let upper = stops.firstIndex(where: { $0.hour >= h }), upper > 0 else {
-      let s = stops.first!.rgb
-      return Color(red: s.r, green: s.g, blue: s.b)
+      let s = stops.first!.stop
+      return Color(red: s.r, green: s.g, blue: s.b).opacity(s.a)
     }
     let lo = stops[upper - 1], hi = stops[upper]
     let span = max(0.0001, hi.hour - lo.hour)
     let t = (h - lo.hour) / span
-    return Color(red: lo.rgb.r + (hi.rgb.r - lo.rgb.r) * t,
-                 green: lo.rgb.g + (hi.rgb.g - lo.rgb.g) * t,
-                 blue: lo.rgb.b + (hi.rgb.b - lo.rgb.b) * t)
+    return Color(red: lo.stop.r + (hi.stop.r - lo.stop.r) * t,
+                 green: lo.stop.g + (hi.stop.g - lo.stop.g) * t,
+                 blue: lo.stop.b + (hi.stop.b - lo.stop.b) * t)
+      .opacity(lo.stop.a + (hi.stop.a - lo.stop.a) * t)
   }
 
   /// Convenience: the sky right now — today's solar times sampled at
@@ -151,6 +158,15 @@ struct AmbientHalo: View {
                                   angle: .degrees(-90))
     let dark = colorScheme == .dark
     ZStack {
+      // Under-band wash — the strongest layer, sitting DIRECTLY beneath
+      // the glass donut's band so the glass has real color to refract:
+      // the band reads as stained glass, not frosted white. Sized to the
+      // band's footprint (hole edge → disc edge).
+      Circle()
+        .stroke(shading, lineWidth: 60)
+        .blur(radius: 24)
+        .opacity(dark ? 0.65 : 0.50)
+        .frame(width: diameter * 0.71, height: diameter * 0.71)
       Circle()
         .stroke(shading, lineWidth: 10)
         .blur(radius: 12)

@@ -74,6 +74,11 @@ struct TimeOfDayWheel: View {
   /// comet orbiting the hero dial — lands exactly on the drawn ring.
   static let fullMargin: CGFloat = 20
 
+  /// The hero glass donut's hole, as a fraction of the disc radius. ONE
+  /// definition shared by the `AnnulusShape` glass mask and the Canvas (the
+  /// now-hand starts at this edge; the date floats in the hollow).
+  static let heroHoleFraction: CGFloat = 0.42
+
   /// Radius of the ring the dots and bands sit on, for a full (non-compact)
   /// dial of `diameter`. The Canvas derives the same value from its live
   /// size; this exists so `DayDialHero` can publish the circle the `.arc`
@@ -96,7 +101,9 @@ struct TimeOfDayWheel: View {
   }
 
   private func hourLabel(_ hour: Int) -> String {
-    if uses24Hour { return String(format: "%02d", hour) }
+    // Bare numerals ("0", "6"), not zero-padded clock digits ("00", "06") —
+    // these are axis labels on a dial, not a time readout.
+    if uses24Hour { return String(hour) }
     let h = hour % 12 == 0 ? 12 : hour % 12
     return "\(h)\(hour < 12 ? "a" : "p")"
   }
@@ -135,18 +142,24 @@ struct TimeOfDayWheel: View {
 
   var body: some View {
     ZStack {
-      // White "clock face": a filled disc whose edge lands exactly on the
-      // tick ring, so the hour numbers sit *outside* it on the page (like a
-      // real clock face). The 20pt inset matches the Canvas `ringR` margin.
-      // Skipped in compact — the thumbnail sits directly on its tile card, so a
-      // second filled disc + shadow would read as a double card.
-      if !compact {
+      // The clock face. Non-hero dials get the flat card-surface disc here
+      // at the bottom of the stack (section details sit on drawer cards,
+      // where glass would stack a second translucent layer — spec §5.5).
+      // The HERO's face is the Liquid Glass donut below, SANDWICHED between
+      // the two drawing layers: machinery under the glass, data on top.
+      // Both faces land their edge exactly on the tick ring (20pt inset =
+      // the Canvas `ringR` margin). Compact draws no face at all.
+      if !compact && heroDate == nil {
         Circle()
           .fill(Theme.cardSurface)
           .overlay(Circle().strokeBorder(Theme.inkSecondary.opacity(0.18), lineWidth: 1.5))
           .shadow(color: .black.opacity(0.07), radius: 5, y: 2)
           .padding(20)
       }
+
+      // LAYER 1 — the machinery, UNDER the glass: ticks and duration bands.
+      // On the hero these pick up the donut's frost, so sleep and the day's
+      // schedule read as depth inside the glass rather than marks on it.
       Canvas { ctx, size in
       let side = min(size.width, size.height)
       let center = CGPoint(x: size.width / 2, y: size.height / 2)
@@ -178,6 +191,12 @@ struct TimeOfDayWheel: View {
       // double up on color; the full dial keeps the accent frame.
       let lineColor = compact ? Theme.inkSecondary : accent
 
+      // Everything in this layer sits UNDER the hero's glass donut
+      // (ultraThinMaterial) — it still softens what's beneath; draw the
+      // machinery a touch louder so it lands at the intended strength
+      // through the blur. Flat-disc dials stay at 1×.
+      let underBoost: Double = heroDate != nil ? 1.3 : 1.0
+
       // Full dial: the white disc's edge (above) *is* the outer circle. Compact
       // has no disc, so draw a frame ring here to anchor the angles. Matches the
       // disc border's 1.5pt weight.
@@ -199,7 +218,8 @@ struct TimeOfDayWheel: View {
         tick.move(to: point(f, ringR - length))
         tick.addLine(to: point(f, ringR))
         ctx.stroke(tick,
-                   with: .color(lineColor.opacity(major ? 0.55 : mid ? 0.34 : 0.26)),
+                   with: .color(lineColor.opacity(
+                     min(1, (major ? 0.55 : mid ? 0.34 : 0.26) * underBoost))),
                    lineWidth: major ? 2 : 1)
       }
 
@@ -212,9 +232,45 @@ struct TimeOfDayWheel: View {
       let bandsToDraw = todayOnly ? shownBands + todayBands : shownBands
       for b in bandsToDraw.sorted(by: { $0.daysAgo > $1.daysAgo }) {
         ctx.stroke(arc(b.start, b.end, dotRing),
-                   with: .color((b.color ?? accent).opacity(fade(b.daysAgo) * 0.55)),
+                   with: .color((b.color ?? accent).opacity(
+                     min(1, fade(b.daysAgo) * 0.55 * underBoost))),
                    style: StrokeStyle(lineWidth: b.thin ? 4 : 9, lineCap: .round))
       }
+      }
+
+      // The hero's glass donut — between machinery and data. The base is
+      // `.ultraThinMaterial` for the adaptive translucency + a faint blur
+      // of the machinery beneath; but the GLASS itself is the hand-drawn
+      // `AnnulusGlass` lighting on top — over a flat page the system blur
+      // materials have nothing to refract and read as plain gray, so the
+      // curvature body + crisp lit rims are what sell it. The shape's own
+      // shadow lifts the donut off the page (hole edge included).
+      if !compact && heroDate != nil {
+        AnnulusShape(holeFraction: Self.heroHoleFraction)
+          .fill(.ultraThinMaterial)
+          .overlay {
+            AnnulusGlass(holeFraction: Self.heroHoleFraction)
+          }
+          .shadow(color: .black.opacity(0.12), radius: 11, y: 4)
+          .padding(20)
+      }
+
+      // LAYER 2 — the data, ON TOP of the glass: dots stay crisp on the
+      // surface, the hour labels sit outside the disc, the now-hand rides
+      // the band, and the date/chip floats in the open hole.
+      Canvas { ctx, size in
+      let side = min(size.width, size.height)
+      let center = CGPoint(x: size.width / 2, y: size.height / 2)
+      let ringR = side / 2 - margin
+      guard ringR > 8 else { return }
+
+      func point(_ fraction: Double, _ r: CGFloat) -> CGPoint {
+        let a = fraction * 2 * .pi          // 0 at top, clockwise
+        return CGPoint(x: center.x + r * CGFloat(sin(a)),
+                       y: center.y - r * CGFloat(cos(a)))
+      }
+
+      let dotRing = ringR * 0.82
 
       // Quadrant labels just outside the disc, on the page background — softer
       // (secondary) so they frame the dial without competing with the data.
@@ -226,11 +282,16 @@ struct TimeOfDayWheel: View {
         }
       }
 
-      // "Now" hand — a true hairline, same 1pt weight as the date hub's
-      // outline so the two read as one piece of chrome.
+      // "Now" hand — a true 1pt hairline. On the hero it starts at the
+      // glass donut's inner edge (the hole is open — nothing to cap it),
+      // running only across the glass band; flat-disc dials run it from
+      // center and let the hub disc cap it.
       if let nowFraction {
+        let handStart = heroDate != nil
+          ? point(nowFraction, ringR * Self.heroHoleFraction)
+          : center
         var hand = Path()
-        hand.move(to: center)
+        hand.move(to: handStart)
         hand.addLine(to: point(nowFraction, ringR - 2))
         ctx.stroke(hand, with: .color(accent.opacity(0.6)), lineWidth: 1)
       }
@@ -266,20 +327,20 @@ struct TimeOfDayWheel: View {
         ctx.fill(Path(ellipseIn: rect), with: .color((e.color ?? accent).opacity(fade(e.daysAgo))))
       }
 
-      // Center: a hub disc UNDER the content but OVER the now-hand (drawn
-      // earlier), so the hand reads as truncated at the hub's edge — a
-      // watch's center cap. Inside it: the hero's today view shows the date
-      // (a clock face shows its day — weekday over day number); every other
-      // window shows the scope chip ("Today" ⇄ "7 days"), which names the
-      // view and signals the dial is tappable. Compact thumbnails are
-      // non-interactive, so nothing.
+      // Center. The hero's glass donut leaves the middle genuinely OPEN —
+      // the date (today) or scope chip (week) floats in the hollow with
+      // the ambient glow behind it, no disc; the now-hand already stops at
+      // the glass's inner edge. Flat-disc dials keep a small hub disc that
+      // caps the hand and seats the chip. Compact thumbnails: nothing.
       if !compact {
-        let hubR: CGFloat = 30
-        let hub = CGRect(x: center.x - hubR, y: center.y - hubR,
-                         width: hubR * 2, height: hubR * 2)
-        ctx.fill(Path(ellipseIn: hub), with: .color(Theme.cardSurface))
-        ctx.stroke(Path(ellipseIn: hub),
-                   with: .color(Theme.inkSecondary.opacity(0.18)), lineWidth: 1)
+        if heroDate == nil {
+          let hubR: CGFloat = 30
+          let hub = CGRect(x: center.x - hubR, y: center.y - hubR,
+                           width: hubR * 2, height: hubR * 2)
+          ctx.fill(Path(ellipseIn: hub), with: .color(Theme.cardSurface))
+          ctx.stroke(Path(ellipseIn: hub),
+                     with: .color(Theme.inkSecondary.opacity(0.18)), lineWidth: 1)
+        }
         if let heroDate, todayOnly {
           ctx.draw(
             Text(heroDate.formatted(.dateTime.weekday(.abbreviated)).uppercased())
@@ -314,6 +375,92 @@ struct TimeOfDayWheel: View {
     .accessibilityHint(compact
       ? Text("")
       : Text("Double tap to switch between today and the last \(windowDays) days"))
+  }
+}
+
+/// Annulus (donut) — outer circle wound counterclockwise, inner wound
+/// clockwise, so nonzero filling leaves the hole open. Shapes the hero
+/// dial's glass face: glass band, open center.
+struct AnnulusShape: Shape {
+  /// Inner radius as a fraction of the outer radius.
+  var holeFraction: CGFloat
+
+  func path(in rect: CGRect) -> Path {
+    let center = CGPoint(x: rect.midX, y: rect.midY)
+    let outerR = min(rect.width, rect.height) / 2
+    let innerR = outerR * holeFraction
+    var p = Path()
+    p.addArc(center: center, radius: outerR,
+             startAngle: .zero, endAngle: .degrees(360), clockwise: false)
+    p.closeSubpath()
+    p.addArc(center: center, radius: innerR,
+             startAngle: .zero, endAngle: .degrees(360), clockwise: true)
+    p.closeSubpath()
+    return p
+  }
+}
+
+/// Hand-drawn glass treatment for the hero donut — the cues that read as a
+/// curved glass band over a FLAT page, where the system blur materials have
+/// nothing behind them to refract and collapse to plain gray. Everything
+/// assumes one light source at the top:
+///   • a tonal BODY gradient — lit on top, a faint shadow on the underside
+///     — so the band reads as a rounded (convex) cross-section,
+///   • a crisp OUTER rim: a bright catch-light at the top curving down to a
+///     dark refracted edge at the bottom,
+///   • a crisp INNER rim (the hole's wall): the OPPOSITE — a shadowed lip at
+///     the top, a lit lip at the bottom, because the inner wall faces inward,
+///   • a soft sheen pooling in the upper band.
+/// Pure decoration; hit-testing off. This — not the base material — is what
+/// makes the donut read as glass.
+struct AnnulusGlass: View {
+  var holeFraction: CGFloat
+  @Environment(\.colorScheme) private var scheme
+
+  var body: some View {
+    GeometryReader { geo in
+      let side = min(geo.size.width, geo.size.height)
+      let holeD = side * holeFraction
+      let dark = scheme == .dark
+      ZStack {
+        // Band body — convex cross-section: lighter where it faces the top
+        // light, a faint shadow underneath. This is what gives the band
+        // dimension over a flat page.
+        AnnulusShape(holeFraction: holeFraction)
+          .fill(LinearGradient(
+            colors: [.white.opacity(dark ? 0.12 : 0.32),
+                     .white.opacity(0.0),
+                     .black.opacity(dark ? 0.12 : 0.06)],
+            startPoint: .top, endPoint: .bottom))
+        // Sheen pooling in the upper band.
+        AnnulusShape(holeFraction: holeFraction)
+          .fill(LinearGradient(
+            colors: [.white.opacity(dark ? 0.18 : 0.30), .clear],
+            startPoint: .top, endPoint: .center))
+        // Outer rim — the money cue: a crisp bright catch-light at the top
+        // fading to a dark refracted edge at the bottom.
+        Circle()
+          .strokeBorder(LinearGradient(
+            colors: [.white.opacity(0.95),
+                     .white.opacity(0.22),
+                     .black.opacity(0.20)],
+            startPoint: .top, endPoint: .bottom), lineWidth: 1.5)
+        // Inner wall (hole) — opposite lighting: a shadowed lip at the top,
+        // a lit lip at the bottom. The double-edge is what reads as glass
+        // THICKNESS around the open center.
+        Circle()
+          .stroke(LinearGradient(
+            colors: [.black.opacity(0.18),
+                     .white.opacity(0.10),
+                     .white.opacity(0.72)],
+            startPoint: .top, endPoint: .bottom), lineWidth: 1.5)
+          .frame(width: holeD, height: holeD)
+      }
+      .frame(width: side, height: side)
+      .position(x: geo.size.width / 2, y: geo.size.height / 2)
+    }
+    .allowsHitTesting(false)
+    .accessibilityHidden(true)
   }
 }
 

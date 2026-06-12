@@ -154,6 +154,70 @@ canvas moment per section where one exists.
   restored at 0/6/12/18. Card-surface "pucks" lift the glyphs off the
   band. No night synced → no markers (honest, like the timeline).
 
+### Rounds 10–14 — making the glass actually read as glass
+
+The hard-won lesson, after several screenshots: **system blur materials
+(`glassEffect(.regular/.clear)`, `.ultraThinMaterial`) only look like glass
+when there is contrasty CONTENT behind them to refract.** Over Septena's
+flat pale dashboard they have nothing to bend, so they collapse to matte
+gray / milk / HDR-white. The sequence: `.regular` → matte milk; `.clear` →
+hot HDR burn (it's tuned for media backdrops); `.ultraThinMaterial` +
+faint speculars → flat matte disc ("is the donut still made of glass?" —
+no). Also: the **sky day stop went transparent** (`SkyStop` gained an alpha
+channel) so daylight adds nothing and only night/dawn/dusk tint the band —
+fixing the earlier blue-cast and white-burn.
+
+**The fix (round 14):** the glass is now HAND-DRAWN edge lighting
+(`AnnulusGlass`), not the material. One top light source →
+  • a body curvature gradient (lit top, shadowed underside),
+  • a crisp outer rim: bright catch-light at top → dark refracted edge at
+    bottom,
+  • the inner hole-wall rim lit the OPPOSITE way (shadow lip top, lit lip
+    bottom) → reads as glass thickness around the open center,
+  • a soft upper sheen.
+`.ultraThinMaterial` stays only as a faint translucent base; a shape shadow
+lifts it off the page. On a flat background, **edges and curvature sell
+glass, not blur.**
+
+### Round 9 — glass sandwich + bigger hole (user feedback, same day)
+
+- The hero dial is now a three-layer sandwich: **machinery under the
+  glass** (ticks + sleep/training/calendar bands frost through the donut
+  and read as depth), the **glass donut** in the middle, and the **data on
+  top** (dots crisp on the surface, hour labels, now-hand, the date in the
+  hole). Implemented by splitting the single Canvas into two around the
+  glass layer; non-hero/compact dials render identically to before (their
+  two canvases just stack with no glass between). Moving dots under the
+  glass too = relocating one block from the data canvas to the machinery
+  canvas, if frosted-data is ever worth trying.
+- `heroHoleFraction` 0.23 → **0.34** (hole radius ~26pt → ~39pt) — more
+  donut, hand and glass mask move together via the shared constant.
+
+### Round 8 — tilt parallax (user feedback, same day)
+
+- The light layer (glow + halo) drifts a few points AGAINST device tilt
+  while the glass donut stays fixed — the backdrop-slides-opposite cue
+  that places the light *behind* the glass. `TiltSource` (in
+  DayDialHero.swift, iOS-only): CMMotionManager attitude at 30 Hz — no
+  permission — baseline captured on start so drift is relative to how the
+  phone is held, low-passed, clamped ±8pt, started/stopped with the
+  hero's visibility, disabled under Reduce Motion, static on macOS.
+
+### Round 7 — glass donut face (user feedback, same day)
+
+- The hero's flat white disc became a **Liquid Glass donut**: `AnnulusShape`
+  (nonzero-winding annulus) via `.glassEffect(.regular.interactive(), in:)`.
+  The ambient glow/halo shines through the open center and refracts
+  through the band. The hero's hub disc was then DELETED as redundant —
+  the date (today) / scope chip (week) float bare in the hollow, and the
+  now-hand starts at the glass's inner edge instead of being capped.
+  `TimeOfDayWheel.heroHoleFraction` (0.23) is the one shared constant so
+  the glass mask and the Canvas hand can't drift. Flat-disc dials keep
+  their 30pt hub cap. User explicitly waived the glass-is-chrome rule for
+  the hero — it's the front door's one glass-on-page moment (still a
+  single translucent layer). Section-detail dials keep the flat disc
+  (they sit inside drawer cards). Hour labels also unpadded (0/6).
+
 ### Round 5d — glow A/B on the window tap (user feedback, same day)
 
 - `AmbientHalo` gained `Style`: `.sky` (full solar-band gradient around the
