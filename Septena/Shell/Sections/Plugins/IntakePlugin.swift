@@ -21,7 +21,10 @@ enum IntakePlugin: SectionPlugin {
   // those actions on every kind page (SectionDrawer appends plugin.logActions).
   static var logActions: [LogAction] { [] }
 
-  static var logFlourish: LogFlourish? { LogFlourish(motion: .bloom) }
+  // Crisp snap for every tracker log (see IntakeKindPageView.motion(for:),
+  // which renders it in-page — on iPhone the kind page is a sheet, above
+  // the root overlay). Per-kind stored flourish tokens are dormant.
+  static var logFlourish: LogFlourish? { LogFlourish(motion: .snap) }
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(IntakeOnboardingView(complete: complete))

@@ -17,8 +17,10 @@ enum SymptomsPlugin: SectionPlugin {
     [LogAction(id: "symptom", title: "Log symptom", systemImage: "waveform.path.ecg")]
   }
 
+  // Crisp snap — one sharp confirmation beat for a quick utility log.
+  // (Was `.sink`; the falling dot read as nothing happening.)
   static var logFlourish: LogFlourish? {
-    LogFlourish(motion: .sink)
+    LogFlourish(motion: .snap)
   }
 
   static func detailPaneContent() -> AnyView? {

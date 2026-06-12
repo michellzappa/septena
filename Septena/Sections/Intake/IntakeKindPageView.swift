@@ -25,6 +25,9 @@ struct IntakeKindPageView: View {
   @State private var editing: IntakeEntryDTO? = nil
   @State private var creatingMethod: PresetMethod? = nil
   @State private var managing = false
+  /// Replay counter for the in-page snap flourish (see `handleLogAction` —
+  /// on iPhone this page is a sheet, above the app-root overlay).
+  @State private var flourishTrigger = 0
 
   private struct PresetMethod: Identifiable, Hashable {
     let method: String
@@ -71,6 +74,11 @@ struct IntakeKindPageView: View {
       }
     }
     .tint(accent)
+    // In-page flourish host — see handleLogAction: on iPhone this page is a
+    // sheet, which covers the app-root overlay, so the snap plays here.
+    .overlay {
+      CommitFlourish(motion: .snap, accent: accent, trigger: flourishTrigger)
+    }
     .sectionReload(on: viewingDate, onDataChange: true,
                    forSections: ["intake"]) { await reload() }
     .sheet(isPresented: $managing) {
@@ -124,35 +132,33 @@ struct IntakeKindPageView: View {
     let needsInput = kind.showsAmount || kind.showsCount || kind.hasCatalog
     if count != nil || !needsInput {
       let amount = kind.showsAmount ? method?.defaultAmount : nil
-      // Commit flourish — the tracker's OWN motion (bloom / ripple / …), the
-      // "motion matches the logged data" delight the old consumable
-      // drawers had. Routes through SectionLog so haptic + flourish fire once.
+      // Intake confirms with the crisp `.snap`. IMPORTANT: on iPhone this
+      // page presents as a SHEET, and the app-root LogCommitOverlay renders
+      // *beneath* sheets — so the visual must play in-page. We pass
+      // `logCommit: nil` (haptic + announce still fire via SectionLog) and
+      // bump the local `flourishTrigger` driving the overlay below.
       SectionLog.newLog(section: "intake", accent: accent,
                         motion: Self.motion(for: kind.flourish),
-                        announce: "Logged \(kind.name).", logCommit: logCommit) {
+                        announce: "Logged \(kind.name).", logCommit: nil) {
         mutator.addEntry(kindID: kindID,
                          date: viewingDate,
                          time: EventTimestamp.hhmm(from: nowInstant),
                          method: token, amount: amount, count: count)
       }
+      flourishTrigger += 1
       Task { await reload() }
     } else {
       creatingMethod = .init(method: token)
     }
   }
 
-  /// The kind's stored `flourish` token → commit motion. Same vocabulary the
-  /// plugins declare (each kind's flourish).
+  /// Intake's commit motion: always the crisp `.snap` — one sharp beat for
+  /// a quick tracker log. The per-kind stored `flourish` token is kept on
+  /// the entity (dormant) in case per-kind motions earn their way back, but
+  /// it no longer drives anything.
   static func motion(for flourish: String) -> CommitMotion {
-    switch flourish {
-    case "ripple": return .ripple
-    case "burst":  return .burst
-    case "snap":   return .snap
-    case "sink":   return .sink
-    case "arc":    return .arc
-    case "fill":   return .fill
-    default:       return .bloom
-    }
+    _ = flourish
+    return .snap
   }
 
   private var nowInstant: Date {

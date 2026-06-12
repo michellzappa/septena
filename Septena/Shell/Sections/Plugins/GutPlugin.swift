@@ -32,9 +32,10 @@ enum GutPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(GutDestinationView()) }
 
-  // A bodily-function log gets a quiet sink — acknowledged, never
-  // celebrated. (The .sink motion ignores intensity by design.)
-  static var logFlourish: LogFlourish? { LogFlourish(motion: .sink) }
+  // A quick utility log gets the crisp snap — one sharp confirmation beat,
+  // done. (Was `.sink`; the falling-dot acknowledgment read as nothing
+  // happening.)
+  static var logFlourish: LogFlourish? { LogFlourish(motion: .snap) }
 
   // MARK: - Quick-log actions
 
