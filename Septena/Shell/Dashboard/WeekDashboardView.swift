@@ -181,7 +181,7 @@ struct WeekDashboardView: View {
   @State private var sheetDest: WeekDestination? = nil
   /// Today-scoped collections kept in state so DayTimelineView can read
   /// them. NextItemsModel already covers habits/supplements/chores and
-  /// today's caffeine/cannabis/gut live in their respective `*Today`
+  /// today's intake/gut live in their respective `*Today`
   /// state vars; only nutrition + recent training need fresh stash.
   @State private var todayNutrition: [NutritionEntry] = []
   @State private var recentTraining: [ExerciseEntry] = []
@@ -767,7 +767,7 @@ struct WeekDashboardView: View {
   // touched section so the rest of the dashboard stays put:
   //
   //   1. `repaint(section:)`  — synchronous read from ResponseCache.
-  //      Picks up any optimistic blob the Add page wrote (e.g. cannabis
+  //      Picks up any optimistic blob the Add page wrote (e.g. an intake
   //      bumps `sessionCount` locally before the outbox drains).
   //   2. `refresh(section:)`  — async refetch of just that section's
   //      endpoints. Reconciles with the server once the outbox drains.

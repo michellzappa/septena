@@ -422,7 +422,7 @@ enum CoachContextBuilder {
   }
 
   /// One line per active intake tracker — the generic successor to the old
-  /// per-substance caffeine/cannabis facts. Each kind's name comes from user
+  /// per-substance consumable facts. Each kind's name comes from user
   /// data, so the coach reasons about "Matcha" or "Nicotine" with no edit.
   private static func intake(_ w: CoachWindow, _ r: Range, _ ctx: ModelContext) -> [String] {
     let kinds = ((try? ctx.fetch(FetchDescriptor<IntakeKindEntity>())) ?? [])

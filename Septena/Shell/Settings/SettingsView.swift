@@ -18,7 +18,7 @@ import UIKit
 //   • About           — version / links
 //   ── Sections ────────────────────────────
 //   • Tasks           — badge, today toggle, task sort + identity
-//   • Training, Nutrition, Sleep, Habits, Cannabis, Caffeine, …
+//   • Training, Nutrition, Sleep, Habits, Intake, …
 //                     — identity + (where applicable) catalog data
 //
 // Per-section rows are driven by `SectionManifest.all` filtered against
@@ -2300,7 +2300,7 @@ struct MotionGalleryPane: View {
 // color, description) comes from the local `SectionManifest`; the user's
 // installed `SectionEntity` (label/color) overrides the defaults when
 // present. Per-key content below uses cached catalog data from
-// `SettingsStore` — caffeine beans, cannabis strains, etc. Sections
+// `SettingsStore` — intake catalogs, etc. Sections
 // without catalog data show identity only. Tasks is special-cased to
 // host the local task prefs (badge, today, sort) that used to live in
 // a top-level Tasks pane.

@@ -213,8 +213,7 @@ final class IkigaiViewModel {
     let hints: [String: [String]] = [
       "activity": ["activity", "active", "steps", "walk", "movement", "move"],
       "body": ["body", "weight", "weigh", "composition", "physique"],
-      "caffeine": ["coffee", "caffeine", "energy", "focus"],
-      "cannabis": ["cannabis", "weed", "thc", "cbd"],
+      "intake": ["coffee", "caffeine", "energy", "focus", "drink", "consume"],
       "chores": ["home", "clean", "organize", "chore", "errand"],
       "groceries": ["grocery", "groceries", "shopping", "pantry"],
       "gut": ["gut", "digest", "symptom", "stomach", "bowel"],

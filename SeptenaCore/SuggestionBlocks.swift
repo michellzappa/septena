@@ -36,7 +36,7 @@ public enum SuggestionBlocks {
 
   /// The input a surface gathers before writing the event.
   public enum Input: Sendable, Hashable {
-    /// Pick one option (e.g. caffeine method, cannabis method). The chosen
+    /// Pick one option (e.g. a consumable method). The chosen
     /// `Choice.value` is written to the event's `method` field.
     case choice([Choice])
     /// The two-step mood picker: a 2×2 valence/arousal quadrant grid, then the

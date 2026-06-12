@@ -6,7 +6,7 @@ import SwiftUI
 ///
 ///   * `.bars`     — single-series N-day count. The default. Used by
 ///                   habits, chores, supplements, sleep score, nutrition
-///                   protein, caffeine/cannabis sessions,
+///                   protein, intake sessions,
 ///                   groceries bought-per-day, gut movements, activity
 ///                   steps, tasks completed.
 ///   * `.stackedBars` — two parallel series rendered together. Today

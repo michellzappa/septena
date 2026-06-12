@@ -13,15 +13,13 @@ struct NextView: View {
   @State private var doneModel = NextDoneModel()
 
   /// Section keys whose `.septenaDataChanged` posts the suggestions engine
-  /// actually consumes (`NextSuggestionsModel.computeAll`). Includes both the
-  /// legacy consumable keys and the generalized `intake` key so scoping stays
-  /// correct across the consumables purge.
+  /// actually consumes (`NextSuggestionsModel.computeAll`).
   private static let suggestionKeys: Set<String> =
-    ["caffeine", "cannabis", "intake", "nutrition", "training", "mood"]
+    ["intake", "nutrition", "training", "mood"]
   /// Section keys the Done Today log (`NextDoneModel.collect`) reads. Same
   /// consumables, plus gut; tasks ride the separate `.septenaTasksChanged` path.
   private static let doneLogKeys: Set<String> =
-    ["caffeine", "cannabis", "intake", "nutrition", "training", "mood", "gut"]
+    ["intake", "nutrition", "training", "mood", "gut"]
 
   /// Anything finished today — the trio's live done splits OR a passive log
   /// (caffeine, meals, mood, …). Drives both the empty state and whether the

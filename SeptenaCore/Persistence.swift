@@ -1014,14 +1014,9 @@ final class MedicationDoseEventEntity {
   }
 }
 
-// Legacy CaffeineEventEntity / CaffeineBeanEntity / CannabisEventEntity removed
-// (sections retired into `intake`). The *CloudKitSchema enums below are KEPT so
-// the record-level migrate-on-sight path (IntakeMigrator) still reads legacy
-// CKRecords arriving from old builds.
-
 // MARK: - Intake (consumables generalization)
 //
-// The substance-free successor to the caffeine/cannabis entities: one host
+// The substance-free successor to the per-substance consumable entities: one host
 // section (`intake`) with user-defined `IntakeKindEntity` rows, each its own
 // item catalog (`IntakeItemEntity`) and event stream (`IntakeEventEntity`).
 // CloudKit record types are additive, so these coexist with the legacy types
@@ -1945,39 +1940,6 @@ enum WithingsRowCloudKitSchema {
   }
 }
 
-enum CaffeineEventCloudKitSchema {
-  static let recordType = "CaffeineEvent"
-
-  enum Field {
-    static let date = "date"
-    static let time = "time"
-    static let method = "method"
-    static let beans = "beans"
-    static let grams = "grams"
-    static let note = "note"
-    static let occurredAt = "occurredAt"
-  }
-
-  static func recordName(for id: String) -> String { "caffeine-event:\(id)" }
-  static func entityID(from recordName: String) -> String {
-    String(recordName.dropFirst("caffeine-event:".count))
-  }
-}
-
-enum CaffeineBeanCloudKitSchema {
-  static let recordType = "CaffeineBean"
-
-  enum Field {
-    static let name = "name"
-    static let sortIndex = "sortIndex"
-  }
-
-  static func recordName(for id: String) -> String { "caffeine-bean:\(id)" }
-  static func entityID(from recordName: String) -> String {
-    String(recordName.dropFirst("caffeine-bean:".count))
-  }
-}
-
 enum IntakeKindCloudKitSchema {
   static let recordType = "IntakeKind"
 
@@ -2039,26 +2001,6 @@ enum IntakeEventCloudKitSchema {
   static func recordName(for id: String) -> String { "intake-event:\(id)" }
   static func entityID(from recordName: String) -> String {
     String(recordName.dropFirst("intake-event:".count))
-  }
-}
-
-enum CannabisEventCloudKitSchema {
-  static let recordType = "CannabisEvent"
-
-  enum Field {
-    static let date = "date"
-    static let time = "time"
-    static let method = "method"
-    static let strain = "strain"
-    static let hit = "hit"
-    static let grams = "grams"
-    static let note = "note"
-    static let occurredAt = "occurredAt"
-  }
-
-  static func recordName(for id: String) -> String { "cannabis-event:\(id)" }
-  static func entityID(from recordName: String) -> String {
-    String(recordName.dropFirst("cannabis-event:".count))
   }
 }
 

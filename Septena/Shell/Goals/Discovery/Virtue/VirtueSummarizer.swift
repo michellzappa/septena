@@ -172,7 +172,7 @@ enum VirtueSummarizer {
     // One signal per active tracker. Valence keys off the user's own
     // objective: trackers they've set to limit/reduce/quit read as strain
     // when used most days; plain logs stay neutral (the generic successor
-    // to the old caffeine/cannabis heuristics).
+    // to the old per-substance heuristics).
     let intakeKinds = fetchAll(IntakeKindEntity.self, context).filter { $0.archivedAt == nil }
     if !intakeKinds.isEmpty {
       let byKind = Dictionary(grouping: fetchByDate(IntakeEventEntity.self, fromStr, toStr, context),

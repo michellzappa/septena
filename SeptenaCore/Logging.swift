@@ -18,7 +18,7 @@ extension Notification.Name {
   /// when only navigation structure changed.
   static let septenaStructureChanged = Notification.Name("septena.structureChanged")
   /// Generic mutation broadcast — fires after any non-task mutation (habits,
-  /// supplements, chores, gut, nutrition, caffeine, cannabis, groceries).
+  /// supplements, chores, gut, nutrition, intake, groceries).
   /// Destinations that show those sections subscribe to refresh themselves
   /// without each call site wiring its own reload.
   ///

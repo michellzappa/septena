@@ -2,8 +2,8 @@ import SwiftUI
 import SwiftData
 
 // Time-of-day action suggestions for the Next view. Mirrors the webapp's
-// `hooks/use-next-actions.ts` engine: for each contributing section (caffeine,
-// cannabis, training, nutrition) we read the last ~14 days of history, find
+// `hooks/use-next-actions.ts` engine: for each contributing section (intake,
+// training, nutrition) we read the last ~14 days of history, find
 // the user's median "first time" for that activity, and surface a card when
 // `now >= usual - 45m` AND the activity hasn't happened yet today.
 //
@@ -325,7 +325,7 @@ final class NextSuggestionsModel {
       now: now
     )
     // Per-tracker intake nudges — the generic successor to the old caffeine
-    // first-cup/next-cup + cannabis first-session rules. Reads each active
+    // per-substance first/next rules. Reads each active
     // kind's learned rhythm and carries the container-aware choices so the row
     // logs inline. Lives here (not in pure `compute`) because the kind list is
     // dynamic and needs the live store.

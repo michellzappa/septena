@@ -79,7 +79,7 @@ struct SectionDisabledError: Error, CustomLocalizedStringResourceConvertible {
 /// 17 already appear there and in Spotlight). The only thing curated here is
 /// which 10 ship with a phrase out of the box, chosen purely by how often the
 /// action gets logged — one primary log action per section. No action is held
-/// back for being "sensitive": cannabis is treated exactly like any other log.
+/// back for being "sensitive": every log is treated the same; nothing is singled out as sensitive.
 /// The 7 without a built-in phrase are the 5 catalog "Add" setup actions plus
 /// the two lowest-frequency primaries (Chores, Goals, Gut rotate here).
 /// Rebalance by swapping an `AppShortcut(...)` block in/out — keep total ≤10.

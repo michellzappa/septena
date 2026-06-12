@@ -16,7 +16,7 @@
 // irreducibly bespoke — but each carries a `default` + `assertionFailure`
 // so a row added here without its matching code fails loudly in debug.
 //
-// Suggestions (caffeine / cannabis / training / fast-break) are NOT in this
+// Suggestions (intake / training / fast-break) are NOT in this
 // table. They're read-only nudges that lead the feed, never complete, and
 // don't participate in the saved order — see `NextFeed.flat`. Membership in
 // this table *is* the definition of "completable in Next".

@@ -771,7 +771,7 @@ private struct NextMasonry<Block: View>: View {
 //   • the checklist trio (chores / habits / supplements) from `NextItemsModel`,
 //     so an item the user just ticked off appears here the instant its settle
 //     beat ends (live session state, no refetch);
-//   • passive logs (caffeine, cannabis, gut, mood, meals, training, completed
+//   • passive logs (intake, gut, mood, meals, training, completed
 //     tasks) from `NextDoneModel`, read off the local mirror.
 // Newest at top, so the freshest completion lands right under the open list.
 
@@ -889,7 +889,7 @@ final class NextDoneModel {
 struct NextDoneSection: View {
   /// Live session state for the checklist trio (chores / habits / supplements).
   var model: NextItemsModel
-  /// Today's passive logs (caffeine / cannabis / gut / mood / meals /
+  /// Today's passive logs (intake / gut / mood / meals /
   /// training / completed tasks).
   var passive: [DoneEvent]
   @Environment(SectionTheme.self) private var theme

@@ -3,7 +3,7 @@ import SwiftUI
 // Create-a-kind form. Phrased as plain questions over the §4 aspect axes, not
 // schema. The 15-second path is load-bearing: name + symbol → Create works
 // (one default method, doseStyle "none"); every axis is editable later in the
-// Manage sheet. This is also the cannabis-reconstruction path — two methods,
+// Manage sheet. This is also the container-tracker path — two methods,
 // one with container semantics, under a minute. See docs/CONSUMABLES_PLAN.md.
 
 struct IntakeKindWizard: View {
@@ -190,10 +190,10 @@ struct IntakeKindWizard: View {
   private func addMethod() {
     let label = newMethod.trimmingCharacters(in: .whitespaces)
     guard !label.isEmpty else { return }
-    let token = IntakeMigrationMap.slug(label)
+    let token = IntakeTemplates.slug(label)
     guard !token.isEmpty, !methods.contains(where: { $0.token == token }) else { return }
     // The first container-marked method drives the container quick-add; here a
-    // newly added method inherits the kind's container intent so cannabis-style
+    // newly added method inherits the kind's container intent so container-style
     // reconstruction (vape uses the capsule) is a one-toggle setup.
     methods.append(.init(token: token, label: label, usesContainer: usesContainers && methods.allSatisfy { !$0.usesContainer }))
     newMethod = ""

@@ -3,7 +3,7 @@ import SwiftData
 
 // Per-day browse sheet for gut entries — opens when the user taps a past
 // cell in `GutDestinationView`'s ActivityHeatmap. Same shape as the
-// caffeine/cannabis browse sheets: view + edit only.
+// the consumable browse sheets: view + edit only.
 
 struct BrowseGutDaySheet: View {
   @Environment(\.dismiss) private var dismiss

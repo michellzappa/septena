@@ -305,7 +305,7 @@ public extension SectionManifest {
     ),
     // Intake — the generic consumable tracker (consumables generalization).
     // One host section; user-defined kinds (caffeine, tea, …) are rows, not
-    // sections (Option C). The legacy caffeine/cannabis sections were retired
+    // sections (Option C). The legacy consumable sections were retired
     // into this; their CK records migrate on sight. See docs/CONSUMABLES_PLAN.md.
     .init(
       key: "intake",

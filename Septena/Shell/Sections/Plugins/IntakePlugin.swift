@@ -147,7 +147,7 @@ enum IntakePlugin: SectionPlugin {
   }
 
   /// Per-kind daily correlation signals — the generic successor to the old
-  /// static caffeine/cannabis features. Every active tracker contributes an
+  /// static per-substance features. Every active tracker contributes an
   /// events/day lever; amount-tracking kinds add a dose/day lever. The smart
   /// engine auto-pairs these against outcomes (sleep, readiness, …), so a
   /// user's "matcha" or "nicotine" tracker correlates with no engine edit.

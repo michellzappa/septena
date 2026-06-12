@@ -1896,7 +1896,7 @@ public struct CorrelationPairPoint: Hashable {
 
 // MARK: - Mood
 
-/// One logged check-in. Mirrors the Caffeine/Cannabis event shape so the
+/// One logged check-in. Mirrors the intake event shape so the
 /// dashboard heatmap and section views can share the same patterns.
 public struct MoodEntry: Codable, Identifiable, Hashable {
   public let id: String

@@ -699,15 +699,6 @@ final class SeptenaServices {
             context.insert(WithingsRowEntity(cloudKit: record))
           }
           NotificationCenter.default.post(name: .septenaWithingsChanged, object: nil)
-        case CaffeineEventCloudKitSchema.recordType,
-             CaffeineBeanCloudKitSchema.recordType:
-          batchTouchedData = true
-          // Legacy caffeine sections are retired. A legacy record arriving from
-          // an old build (the watch, a stale device) is migrated on sight into
-          // its generic intake twin by deterministic id — the standing rule that
-          // survives the legacy `@Model` classes' deletion (study §7.2). No local
-          // mirror entity is created any more.
-          IntakeMigrator.migrate(record: record, mutator: self.intakeMutator)
         case IntakeKindCloudKitSchema.recordType:
           batchTouchedData = true
           let id = IntakeKindCloudKitSchema.entityID(from: record.recordID.recordName)
@@ -738,10 +729,6 @@ final class SeptenaServices {
           } else {
             context.insert(IntakeEventEntity(cloudKit: record))
           }
-        case CannabisEventCloudKitSchema.recordType:
-          batchTouchedData = true
-          // Retired section — migrate the legacy CKRecord on sight (see above).
-          IntakeMigrator.migrate(record: record, mutator: self.intakeMutator)
         case GroceryItemCloudKitSchema.recordType:
           batchTouchedData = true
           let id = GroceryItemCloudKitSchema.entityID(from: record.recordID.recordName)
@@ -2435,7 +2422,7 @@ final class MedicationsMutator {
 
 // The single write boundary for the generic `intake` section — kinds, their
 // item catalogs, and events (the generalization that retired the per-substance
-// caffeine/cannabis mutators): optimistic local write, CK enqueue, save, notify.
+// per-substance mutators): optimistic local write, CK enqueue, save, notify.
 // Deletion posture is
 // archive-only for kinds (no hard delete); items and events keep the legacy
 // single-row delete (correction ≠ destruction). See docs/CONSUMABLES_PLAN.md.
@@ -2618,14 +2605,11 @@ final class IntakeMutator {
     postChanged()
   }
 
-  // MARK: - Migration upserts (deterministic ids)
-  //
-  // The record-level migrator writes through these so the write-boundary
-  // invariant holds for migrators too. Ids are deterministic (IntakeMigrationMap),
-  // so every upsert is idempotent and two devices converge (study §7.1).
+  // MARK: - Kind creation (idempotent)
 
-  /// Create the migration kind if absent; if present, leave it untouched — the
-  /// kind is user-owned after creation, so a re-run must not clobber edits.
+  /// Create a kind from a template seed if absent; if present, leave it
+  /// untouched — the kind is user-owned after creation, so re-running must not
+  /// clobber edits. Drives the first-enable template picker.
   @discardableResult
   func upsertKind(seed: IntakeKindSeed) -> IntakeKindEntity {
     if let existing = fetchKind(id: seed.id) { return existing }
@@ -2646,59 +2630,9 @@ final class IntakeMutator {
                                   templateID: seed.templateID)
     entity.methods = seed.methods
     context.insert(entity)
-    commitKind(entity, op: "migrate")
+    commitKind(entity, op: "create")
     return entity
   }
-
-  /// Upsert a catalog item by deterministic id. Name refreshes on re-run.
-  func upsertItem(id: String, kindID: String, name: String, sortIndex: Int) {
-    if let existing = fetchItem(id: id) {
-      existing.name = name
-      existing.updatedAt = .now
-      commitItem(existing, op: "migrate")
-      return
-    }
-    let entity = IntakeItemEntity(id: id, kindID: kindID, name: name, sortIndex: sortIndex)
-    context.insert(entity)
-    commitItem(entity, op: "migrate")
-  }
-
-  /// Upsert an event by deterministic id. On re-run, the legacy source wins only
-  /// when it is newer than the generic twin (else the generic side was edited
-  /// in-app and keeps its value) — study §7.1's migrate-on-sight update rule.
-  func upsertEvent(_ m: MigratedIntakeEvent) {
-    if let existing = fetchEntry(id: m.id) {
-      let legacy = m.updatedAt ?? .distantPast
-      guard legacy > existing.updatedAt else { return }
-      existing.kindID = m.kindID
-      existing.date = m.date
-      existing.method = m.method
-      existing.itemID = m.itemID
-      existing.amount = m.amount
-      existing.count = m.count
-      existing.note = m.note
-      if let occ = m.occurredAt { existing.occurredAt = occ }
-      existing.updatedAt = legacy
-      commitEntry(existing, op: "migrate")
-      return
-    }
-    let entity = IntakeEventEntity(id: m.id,
-                                   kindID: m.kindID,
-                                   date: m.date,
-                                   method: m.method,
-                                   itemID: m.itemID,
-                                   amount: m.amount,
-                                   count: m.count,
-                                   note: m.note,
-                                   updatedAt: m.updatedAt ?? .now)
-    entity.occurredAt = m.occurredAt ?? EventTimestamp.from(date: m.date, time: nil)
-    context.insert(entity)
-    commitEntry(entity, op: "migrate")
-  }
-
-  /// True when the generic twin already exists — lets the migrator skip a kind
-  /// whose events are all present (idempotent fast path).
-  func eventExists(id: String) -> Bool { fetchEntry(id: id) != nil }
 
   // MARK: - Helpers
 

@@ -89,18 +89,10 @@ enum WatchSnapshotPublisher {
           })
       }
     }
-    // Old watch builds still read the two legacy cannabis wire fields. They are
-    // now sourced solely from the migrated `ik-cannabis` intake tracker — the
-    // legacy entities are gone — defaulting to cap 3 / no hit when it's absent.
-    let cannabisKind = intakeKinds.first { $0.id == IntakeMigrationMap.cannabisKindID }
-    let wireCap = cannabisKind?.containerCap ?? 3
-    let wireLastHit = cannabisKind?.lastContainerCount
     let response = NextItemsResponse(date: date, bucket: "", items: items,
                                      lingerHabits: lingerHabits,
                                      lingerSupplements: lingerSupplements,
                                      sectionColors: sectionColors,
-                                     cannabisUsesPerCapsule: wireCap,
-                                     cannabisLastVapeHit: wireLastHit,
                                      intakeKinds: intakeKinds.isEmpty ? nil : intakeKinds)
     guard let payload = try? JSONEncoder().encode(response) else { return }
 

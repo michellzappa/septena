@@ -721,7 +721,7 @@ enum MCPDispatch {
     let rows = arr.compactMap { m -> IntakeMethodRow? in
       guard let label = (m["label"] as? String) ?? (m["token"] as? String) else { return nil }
       let token = (m["token"] as? String).flatMap { $0.isEmpty ? nil : $0.lowercased() }
-        ?? IntakeMigrationMap.slug(label)
+        ?? IntakeTemplates.slug(label)
       return IntakeMethodRow(token: token, label: label,
                              symbol: m["symbol"] as? String,
                              defaultAmount: (m["defaultAmount"] as? NSNumber)?.doubleValue,
@@ -856,7 +856,7 @@ enum MCPDispatch {
     // user's vocabulary. An unknown method errors with the candidate list.
     guard let token = kind.methods.first(where: {
       $0.token == lower || $0.label.lowercased() == lower
-    })?.token ?? (kind.methods.isEmpty ? IntakeMigrationMap.slug(rawMethod) : nil) else {
+    })?.token ?? (kind.methods.isEmpty ? IntakeTemplates.slug(rawMethod) : nil) else {
       throw MCPError.badArgument(
         "unknown method '\(rawMethod)' for \(kind.name) — methods: "
         + kind.methods.map(\.token).joined(separator: ", "))

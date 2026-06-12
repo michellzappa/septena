@@ -245,7 +245,7 @@ struct IntakeManageSheet: View {
   private func addMethod() {
     let label = newMethod.trimmingCharacters(in: .whitespaces)
     guard !label.isEmpty, var methods = kind?.methods else { return }
-    let token = IntakeMigrationMap.slug(label)
+    let token = IntakeTemplates.slug(label)
     guard !token.isEmpty, !methods.contains(where: { $0.token == token }) else { return }
     methods.append(.init(token: token, label: label))
     mutator.updateKind(id: kindID, methods: methods)

@@ -30,7 +30,7 @@ enum CommitMotion: Equatable {
   case sink
   /// A full-screen sonar: huge concentric rings sweeping past the edges.
   /// Bolder, number-free cousin of `.ignition`. Ambient, body-level logs
-  /// (cannabis) and the training-PR session payoff.
+  /// (a ripple-flourish kind) and the training-PR session payoff.
   case ripple
   /// A large glowing comet arcing across the screen — an arc completed.
   /// Tasks' one canvas moment: clearing the last open Today task (at most

@@ -1803,16 +1803,6 @@
         }
       }
     },
-    "Cannabis" : {
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cannabis"
-          }
-        }
-      }
-    },
     "Capabilities that could become offers, services, products, or roles." : {
       "localizations" : {
         "pt-BR" : {
@@ -3919,28 +3909,6 @@
         }
       }
     },
-    "Log Caffeine" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registrar cafeína"
-          }
-        }
-      }
-    },
-    "Log Cannabis" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Registrar cannabis"
-          }
-        }
-      }
-    },
     "Log Gut Entry" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4454,17 +4422,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bom trabalho."
-          }
-        }
-      }
-    },
-    "No bean presets yet — add some in Caffeine settings." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nenhum preset de grãos ainda — adicione alguns nos ajustes de Cafeína."
           }
         }
       }

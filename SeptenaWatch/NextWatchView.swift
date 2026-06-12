@@ -12,7 +12,7 @@ struct NextWatchView: View {
         .navigationTitle(conn.bucket.isEmpty ? "Next" : conn.bucket.capitalized)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-          // Capture a loggable (caffeine / cannabis / mood) on demand, not just
+          // Capture a loggable (intake / mood) on demand, not just
           // when its suggestion happens to lead the feed.
           ToolbarItem(placement: .topBarTrailing) {
             Button { capturing = true } label: {
@@ -110,7 +110,7 @@ struct NextWatchView: View {
 /// suggestions share one band, like the phone's single `NextSuggestionsSection`.
 private enum WatchSectionTint {
   /// Group key — the unit the list draws a rule between. Suggestions collapse
-  /// to one group regardless of their `logKind` (caffeine / cannabis / mood).
+  /// to one group regardless of their `logKind` (intake / mood).
   static func key(for item: NextItem) -> String {
     switch item.kind {
     case "suggestion": return "suggestion"
@@ -130,7 +130,7 @@ private enum WatchSectionTint {
   }
 
   /// Resolve a section's accent straight from its key (e.g. the Capture sheet's
-  /// caffeine / cannabis / mood rows). Neutral when the section has no color.
+  /// intake / mood rows). Neutral when the section has no color.
   static func color(forSectionKey key: String, colors: [String: String]) -> Color {
     guard let token = colors[key], let c = parse(token) else { return .secondary }
     return c
@@ -332,7 +332,7 @@ struct NextItemRow: View {
 
 /// Presented when a quick-loggable suggestion is tapped. Resolves the shared
 /// `SuggestionBlocks` descriptor and shows the right minimal input — a method
-/// list (caffeine / cannabis) or the mood quadrant grid. Picking writes the
+/// list (intake) or the mood quadrant grid. Picking writes the
 /// event and dismisses.
 private struct QuickLogSheet: View {
   let item: NextItem
@@ -460,8 +460,7 @@ private struct CaptureSheet: View {
         .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
 
         // The user's intake trackers, from the snapshot wire — every enabled
-        // tracker is a + item, with container-aware choices. These supersede
-        // the static caffeine/cannabis blocks below (kept for old payloads).
+        // tracker is a + item, with container-aware choices.
         ForEach(conn.intakeKinds, id: \.id) { kind in
           NavigationLink {
             IntakeCaptureInput(kind: kind, conn: conn, onDone: onDone)
@@ -476,9 +475,8 @@ private struct CaptureSheet: View {
           .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
         }
 
-        // On-demand loggables (mood / hydration / gut — plus caffeine/cannabis
-        // only while no trackers ride the wire), from the shared SuggestionBlocks
-        // table.
+        // On-demand loggables (mood / hydration / gut), from the shared
+        // SuggestionBlocks table.
         ForEach(staticBlocks, id: \.kind) { block in
           NavigationLink {
             CaptureInput(block: block, itemID: "adhoc:\(block.kind)", conn: conn, onDone: onDone)
