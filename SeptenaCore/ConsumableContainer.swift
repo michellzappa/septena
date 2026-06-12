@@ -1,21 +1,19 @@
 import Foundation
 
 // ConsumableContainer — the generalized "a container holds N uses; continue the
-// current one or start fresh" math behind the intake quick-add. It is the
-// substance-free successor to `CannabisCapsule`: the same three-choice output
-// (Continue (use N) / New container / non-container methods), but parameterized
-// by a kind's config instead of hardcoding vape/edible/capsule.
+// current one or start fresh" math behind the intake quick-add. Three-choice
+// output (Continue (use N) / New container / non-container methods), parameterized
+// by a kind's config instead of hardcoding any one substance's vape/edible/capsule.
 //
 // A vape capsule, a cigarette pack, and a pill blister are the same shape — a
 // container with a `containerCap` and a per-method "consumes the container"
 // flag. The substance-specific vocabulary (the count noun "Hit", the container
 // noun "capsule", each method's label/symbol) is data the caller supplies, so
-// the migrator can reconstruct cannabis by feeding the matching config and get
-// output that is byte-identical to today's `CannabisCapsule` (proven by
-// `ConsumableContainerTests`).
+// the migrator reconstructs a container tracker by feeding the matching config.
+// `ConsumableContainerTests` pins the exact rows.
 //
 // Dependency-free on purpose (Foundation + `SuggestionBlocks.Choice` only) so it
-// compiles into the watch target exactly like `CannabisCapsule` / `DayBucket`.
+// compiles into the watch target exactly like `SuggestionBlocks` / `DayBucket`.
 public enum ConsumableContainer {
   /// One method as the container model needs to see it. `usesContainer` is the
   /// generalization of "vape vs. edible": a container method routes through the
@@ -33,15 +31,13 @@ public enum ConsumableContainer {
 
   /// True when the current container has room — there's a last count and the
   /// next use still fits under the cap. False with no use yet, or once the last
-  /// use filled it (then we only offer a new container). Mirrors
-  /// `CannabisCapsule.hasActiveCapsule`.
+  /// use filled it (then we only offer a new container).
   public static func hasActiveContainer(lastCount: Int?, containerCap: Int) -> Bool {
     guard let n = lastCount else { return false }
     return n >= 1 && n < containerCap
   }
 
   /// The next use within the current container (only meaningful when active).
-  /// Mirrors `CannabisCapsule.continueHit`.
   public static func continueCount(lastCount: Int?) -> Int { (lastCount ?? 0) + 1 }
 
   /// The quick-add choices in priority order for one kind, given its container
@@ -51,8 +47,7 @@ public enum ConsumableContainer {
   /// drives the Continue/New rows and non-container methods follow.
   ///
   /// The `value` encodes the write — container rows as "<token>:N", plain
-  /// methods as the bare token — and `parse(value:)` is its inverse, so this is
-  /// 1=1 with `CannabisCapsule.choices` for the cannabis config.
+  /// methods as the bare token — and `parse(value:)` is its inverse.
   public static func choices(
     lastCount: Int?,
     containerCap: Int?,
@@ -83,8 +78,7 @@ public enum ConsumableContainer {
 
   /// Decode a `choices` value back into `(token, count)`. Tolerant of a bare
   /// token (no count) so the static `SuggestionBlocks` fallback and older
-  /// payloads still write something sensible. Identical contract to
-  /// `CannabisCapsule.parse`.
+  /// payloads still write something sensible.
   public static func parse(value: String) -> (method: String, count: Int?) {
     let parts = value.split(separator: ":", maxSplits: 1)
     let method = String(parts.first ?? "")
