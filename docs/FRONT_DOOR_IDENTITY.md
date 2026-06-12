@@ -204,17 +204,20 @@ canvas moment per section where one exists.
   23:00 night-indigo, drifting continuously through the transitions. The
   old four-phase tint pairs are gone from the glow path (the `Phase` enum
   survives only for the sun/moon marker tints).
-- **Real sunrise/sunset, opt-in** (`SolarClock` + `SolarLocationFetcher`,
-  `Septena/Shell/UI/SolarClock.swift`): NOAA approximation computed
-  on-device from ONE coarse location fix (kilometer accuracy, rounded to
-  ~0.1° ≈ 11 km before storing — useless for tracking), cached per day,
-  refreshed once per launch/rollover while enabled. Toggle: Settings ▸
-  Home ▸ "Sunrise from location" (`solarFromLocation`; lat/lon under
-  `septena.solar.*`). Off / denied / polar edge → the fixed design day
-  (up 6:30, down 19:00) that matches the pre-location tuning.
-  `NSLocationWhenInUseUsageDescription` added to both app targets +
-  InfoPlist.xcstrings. The ring's dawn/dusk stops and the sampled glow
-  both move with the real times, so the whole sky model shifts together.
+- **Real sunrise/sunset, ZERO permission** (`SolarClock`,
+  `Septena/Shell/UI/SolarClock.swift`): the device TIME ZONE maps to a
+  representative city coordinate via a ~150-zone built-in table
+  (zone1970-style points), then the NOAA approximation runs on-device.
+  Within a zone solar times vary by minutes — invisible inside the
+  2-hour gradient transitions — and the zone follows travel
+  automatically. Always on, nothing asked, nothing stored, no Settings
+  toggle. Unknown zone / polar edge → the fixed design day (up 6:30,
+  down 19:00). [History: round 4 first shipped this as an opt-in
+  CoreLocation one-shot fix + Settings toggle + usage strings; round 6
+  deleted all of it — `SolarLocationFetcher`, `septena.solar.*` keys,
+  `NSLocationWhenInUseUsageDescription` in project.yml/xcstrings — after
+  realizing timezone geography is sufficient for ambient light. "Never
+  asks for location" is itself a feature for this app.]
 
 ## Next steps (in order)
 

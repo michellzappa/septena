@@ -95,7 +95,6 @@ targets:
         NSHealthShareUsageDescription: Septena reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device.
         NSHealthUpdateUsageDescription: Septena saves your mood check-ins and nutrition entries (meals, macros, water) to HealthKit so they appear in the Health app alongside your other data. Data stays on your device.
         NSPhotoLibraryUsageDescription: Septena attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device.
-        NSLocationWhenInUseUsageDescription: Septena uses one approximate location fix, computed on-device, to place sunrise and sunset on the Day dial. Your location never leaves your device.
         WithingsClientID: $(WITHINGS_CLIENT_ID)
         WithingsClientSecret: $(WITHINGS_CLIENT_SECRET)
     configFiles:
@@ -148,7 +147,6 @@ targets:
         NSHealthShareUsageDescription: Septena reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device.
         NSHealthUpdateUsageDescription: Septena saves your mood check-ins and nutrition entries (meals, macros, water) to HealthKit so they appear in the Health app alongside your other data. Data stays on your device.
         NSPhotoLibraryUsageDescription: Septena attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device.
-        NSLocationWhenInUseUsageDescription: Septena uses one approximate location fix, computed on-device, to place sunrise and sunset on the Day dial. Your location never leaves your device.
         WithingsClientID: $(WITHINGS_CLIENT_ID)
         WithingsClientSecret: $(WITHINGS_CLIENT_SECRET)
     configFiles:

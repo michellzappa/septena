@@ -49,13 +49,6 @@ enum SettingsKey {
   /// hidden. Raw value of `DayViewStyle`; default dial. Replaced the old
   /// show-timeline / show-dial boolean pair.
   static let homepageDayView = "septena.homepage.dayView"
-  /// Anchor the Day dial's sky (solar ring + glow) to real sunrise/sunset,
-  /// computed on-device from one coarse location fix (see SolarClock).
-  /// Off (default) → the fixed design day.
-  static let solarFromLocation = "septena.solar.fromLocation"
-  /// The stored coarse coordinate (rounded to ~0.1°) feeding SolarClock.
-  static let solarLatitude = "septena.solar.lat"
-  static let solarLongitude = "septena.solar.lon"
   /// Whether the time-of-day welcome (greeting + subtitle) renders at the
   /// very top of the homepage. Default on; mirrors the webapp's overview
   /// dashboard header.
@@ -821,8 +814,6 @@ struct PrivacySettingsPane: View {
 struct HomeSettingsPane: View {
   @AppStorage(SettingsKey.homepageDayView)
   private var dayViewRaw: String = DayViewStyle.dial.rawValue
-  @AppStorage(SettingsKey.solarFromLocation)
-  private var solarFromLocation: Bool = false
 
   var body: some View {
     Form {
@@ -858,16 +849,10 @@ struct HomeSettingsPane: View {
         }
         .pickerStyle(.inline)
         .labelsHidden()
-        Toggle(isOn: $solarFromLocation) {
-          Label("Sunrise from location", systemImage: "sun.horizon.fill")
-        }
-        .onChange(of: solarFromLocation) { _, on in
-          if on { SolarLocationFetcher.shared.refreshIfEnabled() }
-        }
       } header: {
         Text("Day view")
       } footer: {
-        Text("Today at a glance, between the greeting and the layout. Dial is the 24-hour clock face — every section's logs as dots, sleep as an arc, under the sky's light. Timeline is the same day as a horizontal strip. Sunrise from location places dawn and dusk at your real sunrise and sunset, computed on this device from one approximate location fix — your location never leaves the device.")
+        Text("Today at a glance, between the greeting and the layout. Dial is the 24-hour clock face — every section's logs as dots, sleep as an arc, under the sky's light, with dawn and dusk placed at your region's real sunrise and sunset (from your time zone — no location access). Timeline is the same day as a horizontal strip.")
       }
     }
     .formStyle(.grouped)

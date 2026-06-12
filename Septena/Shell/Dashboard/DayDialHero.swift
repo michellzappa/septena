@@ -137,12 +137,7 @@ struct DayDialHero: View {
     }
     .onDisappear { logCommit?.dayDialAnchor = nil }
     .frame(maxWidth: .infinity)
-    .task(id: clock.today) {
-      reload()
-      // One coarse fix per launch/rollover while "Sunrise from location" is
-      // on — keeps the solar times tracking travel without any monitoring.
-      SolarLocationFetcher.shared.refreshIfEnabled()
-    }
+    .task(id: clock.today) { reload() }
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
       reload()
     }

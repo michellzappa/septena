@@ -6527,7 +6527,7 @@
         }
       }
     },
-    "Today at a glance, between the greeting and the layout. Dial is the 24-hour clock face — every section's logs as dots, sleep as an arc, under the sky's light. Timeline is the same day as a horizontal strip. Sunrise from location places dawn and dusk at your real sunrise and sunset, computed on this device from one approximate location fix — your location never leaves the device." : {
+    "Today at a glance, between the greeting and the layout. Dial is the 24-hour clock face — every section's logs as dots, sleep as an arc, under the sky's light, with dawn and dusk placed at your region's real sunrise and sunset (from your time zone — no location access). Timeline is the same day as a horizontal strip." : {
 
     },
     "Token" : {

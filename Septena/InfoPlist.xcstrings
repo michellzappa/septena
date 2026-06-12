@@ -20,7 +20,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Septena"
+            "value" : "SeptenaMac"
           }
         }
       }
@@ -89,17 +89,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "O Septena salva seus check-ins de humor e entradas de nutrição (refeições, macros, água) no HealthKit para que apareçam no app Saúde junto aos seus outros dados. Os dados ficam no seu dispositivo."
-          }
-        }
-      }
-    },
-    "NSLocationWhenInUseUsageDescription" : {
-      "comment" : "Privacy - Location When In Use Usage Description",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Septena uses one approximate location fix, computed on-device, to place sunrise and sunset on the Day dial. Your location never leaves your device."
           }
         }
       }
