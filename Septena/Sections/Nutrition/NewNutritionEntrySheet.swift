@@ -103,15 +103,12 @@ struct NewNutritionEntrySheet: View {
   }
 
   private func macroField(_ label: String, text: Binding<String>) -> some View {
-    HStack {
-      Text(label)
-      Spacer()
-      TextField("0", text: text)
+    LabeledContent(label) {
+      TextField("", text: text)
         #if os(iOS)
         .keyboardType(.decimalPad)
         #endif
         .multilineTextAlignment(.trailing)
-        .frame(maxWidth: 100)
     }
   }
 
