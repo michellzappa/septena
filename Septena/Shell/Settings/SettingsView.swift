@@ -525,12 +525,14 @@ struct SettingsView: View {
     // the whole window jump. A stable frame lets the Form/List scroll
     // internally instead — matching the fixed-frame QuickFind / AddInfo
     // sheets.
-    .frame(width: 760, height: 560)
-    .toolbar {
-      ToolbarItem(placement: .confirmationAction) {
-        Button("Done") { dismiss() }
-      }
-    }
+    .frame(width: 820, height: 600)
+    // No "Done" button on macOS: the split view fills the whole sheet so
+    // both columns reach the bottom edge, and Escape dismisses it (the
+    // native expectation for a settings window). A `.toolbar`
+    // confirmationAction here would instead render a detached button band
+    // below the split view, rounding the columns off above it and leaving
+    // a dead gap so neither the sidebar nor the detail reached the bottom.
+    .onExitCommand { dismiss() }
     #endif
   }
 
