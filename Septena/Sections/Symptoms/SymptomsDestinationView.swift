@@ -252,6 +252,10 @@ struct SymptomDefinitionsSheet: View {
   @State private var emoji = ""
   @State private var bodySystem = ""
   @State private var region = ""
+  /// The definition being renamed, if any. Editing the title (or glyph/region)
+  /// runs through `updateDefinition`, which keeps the frozen `id` — every logged
+  /// event references that id, so the rename lands everywhere with no re-linking.
+  @State private var editing: SymptomDefinitionEntity?
 
   private var mutator: SymptomsMutator { SeptenaServices.shared.symptomsMutator }
 
@@ -270,25 +274,39 @@ struct SymptomDefinitionsSheet: View {
           }
           .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
-        Section("Symptoms") {
+        Section {
           ForEach(definitions) { def in
             HStack {
-              if let emoji = def.emoji, !emoji.isEmpty {
-                Text(emoji)
-              }
-              VStack(alignment: .leading) {
-                Text(def.title)
-                if let system = def.bodySystem, !system.isEmpty {
-                  Text(system).font(.caption).foregroundStyle(.secondary)
+              // Tap the name to rename — the row's leading content is the edit
+              // affordance; the trailing Archive button stays separate.
+              Button {
+                editing = def
+              } label: {
+                HStack {
+                  if let emoji = def.emoji, !emoji.isEmpty {
+                    Text(emoji)
+                  }
+                  VStack(alignment: .leading) {
+                    Text(def.title).foregroundStyle(.primary)
+                    if let system = def.bodySystem, !system.isEmpty {
+                      Text(system).font(.caption).foregroundStyle(.secondary)
+                    }
+                  }
+                  Spacer(minLength: 0)
                 }
+                .contentShape(Rectangle())
               }
-              Spacer()
+              .buttonStyle(.plain)
               Button(def.archived ? "Unarchive" : "Archive") {
                 mutator.updateDefinition(id: def.id, archived: !def.archived)
               }
               .buttonStyle(.borderless)
             }
           }
+        } header: {
+          Text("Symptoms")
+        } footer: {
+          Text("Tap a symptom to rename it — the new name updates every logged entry automatically.")
         }
       }
       .navigationTitle("Symptoms")
@@ -299,6 +317,9 @@ struct SymptomDefinitionsSheet: View {
         ToolbarItem(placement: .confirmationAction) {
           Button("Done") { dismiss() }
         }
+      }
+      .sheet(item: $editing) { def in
+        SymptomDefinitionEditor(definition: def)
       }
     }
   }
@@ -317,5 +338,78 @@ struct SymptomDefinitionsSheet: View {
     emoji = ""
     bodySystem = ""
     region = ""
+  }
+}
+
+/// Rename / re-tag one symptom definition. Saving routes through
+/// `updateDefinition`, which only changes the title/glyph/system/region and
+/// leaves the definition's frozen `id` intact — so every `SymptomEvent` that
+/// references that id (including the migrated gut rows) inherits the new name
+/// centrally, with no re-linking and no data migration.
+private struct SymptomDefinitionEditor: View {
+  @Environment(\.dismiss) private var dismiss
+  let definition: SymptomDefinitionEntity
+
+  @State private var title: String
+  @State private var emoji: String
+  @State private var bodySystem: String
+  @State private var region: String
+
+  private var mutator: SymptomsMutator { SeptenaServices.shared.symptomsMutator }
+
+  init(definition: SymptomDefinitionEntity) {
+    self.definition = definition
+    _title = State(initialValue: definition.title)
+    _emoji = State(initialValue: definition.emoji ?? "")
+    _bodySystem = State(initialValue: definition.bodySystem ?? "")
+    _region = State(initialValue: definition.defaultBodyRegion ?? "")
+  }
+
+  private var trimmedTitle: String {
+    title.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  var body: some View {
+    NavigationStack {
+      Form {
+        Section("Symptom") {
+          TextField("Name", text: $title)
+          TextField("Glyph", text: $emoji)
+          TextField("Body system", text: $bodySystem)
+          TextField("Default region", text: $region)
+        }
+      }
+      .formStyle(.grouped)
+      .navigationTitle("Edit Symptom")
+      #if os(iOS)
+      .navigationBarTitleDisplayMode(.inline)
+      #endif
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Cancel") { dismiss() }
+            .keyboardShortcut(.cancelAction)
+        }
+        ToolbarItem(placement: .confirmationAction) {
+          Button("Save") { save() }
+            .disabled(trimmedTitle.isEmpty)
+            .keyboardShortcut(.defaultAction)
+        }
+      }
+    }
+  }
+
+  private func nilIfEmpty(_ value: String) -> String? {
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
+  }
+
+  private func save() {
+    guard !trimmedTitle.isEmpty else { return }
+    mutator.updateDefinition(id: definition.id,
+                             title: trimmedTitle,
+                             emoji: .some(nilIfEmpty(emoji)),
+                             bodySystem: .some(nilIfEmpty(bodySystem)),
+                             defaultBodyRegion: .some(nilIfEmpty(region)))
+    dismiss()
   }
 }
