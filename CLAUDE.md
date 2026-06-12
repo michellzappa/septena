@@ -43,6 +43,35 @@ There's no `.env`. The only build-time credential is the optional Withings dev
 pair: copy `Config/Secrets.example.xcconfig` → `Config/Secrets.xcconfig`
 (gitignored). The app builds and runs fine without it.
 
+## Branch & integration discipline
+
+**Default to committing on `main`. Do NOT create branches unless the user
+explicitly asks for one.** The user never asks for branches — every stray
+branch in this repo's history was agent-created, and that is exactly what caused
+the divergence: each session forked a new branch off a frozen `main`, so two big
+features once edited sections, MCP, `Localizable.xcstrings`, and
+`CloudKitSchema.md` independently and the *same* display-name commit landed
+twice. Work on `main`; commit green units directly. Avoid recreating that:
+
+- **Integrate early.** Land green, build-verified work on `main` as you go. If a
+  branch ever does exist (user asked, or mid-consolidation), merge it back the
+  same session — don't let it outlive the task or fork siblings off its base.
+- **Don't leave work uncommitted across sessions.** Commit logically-complete,
+  build-verified units. "BUILT uncommitted" is the anti-pattern that caused the
+  divergence — uncommitted trees are also lost to crashes.
+- **Rebase before you build on top.** If a feature depends on another branch's
+  work, rebase onto it (or onto latest `main`) first, don't develop blind.
+- **Hotspot files conflict constantly** because every feature appends to them:
+  `Localizable.xcstrings` / `InfoPlist.xcstrings` (string catalogs),
+  `CloudKitSchema.md` (the deploy changelog), `project.pbxproj`. Conflicts here
+  are almost always **union merges** (keep both additions; renumber changelog
+  rows). Frequent integration is the real fix — they drift in proportion to how
+  long branches live.
+- **When asked to consolidate branches**, first map each with
+  `git rev-list --count main..<b>` / `<b>..main`, dry-run merges with
+  `git merge-tree`, and confirm a deleted branch's content isn't unique before
+  dropping it (a stale branch's work is often already redone on `main`).
+
 ## Architecture invariants (do not violate)
 
 - **Mutators are the write boundary.** Views and App Intents must not write
