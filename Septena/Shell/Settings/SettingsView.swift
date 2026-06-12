@@ -2514,7 +2514,7 @@ struct SectionDetailPane: View {
       skillAndDataSection
     }
     .formStyle(.grouped)
-    .sheet(isPresented: $pendingOnboarding) { onboardingSheet }
+    .sheet(isPresented: $pendingOnboarding) { onboardingSheet.macSheetFrame() }
   }
 
   /// The section plugin's starter-onboarding view, shown when enabling a

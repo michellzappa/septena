@@ -42,6 +42,7 @@ struct IntakeManageSheet: View {
         if let kind, kind.hasCatalog { varietiesSection(kind) }
         dangerSection
       }
+      .formStyle(.grouped)
       .navigationTitle("Manage")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
@@ -50,6 +51,7 @@ struct IntakeManageSheet: View {
         ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
       }
     }
+    .macSheetFrame()
     .task { await reload() }
   }
 

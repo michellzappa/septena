@@ -48,6 +48,7 @@ struct IntakeKindWizard: View {
         methodsSection
         varietiesSection
       }
+      .formStyle(.grouped)
       .navigationTitle("New tracker")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
@@ -61,6 +62,7 @@ struct IntakeKindWizard: View {
         }
       }
     }
+    .macSheetFrame()
   }
 
   // MARK: Sections

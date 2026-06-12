@@ -341,6 +341,7 @@ struct MedicationDefinitionsSheet: View {
           }
         }
       }
+      .formStyle(.grouped)
       .navigationTitle("Medications")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
@@ -351,6 +352,7 @@ struct MedicationDefinitionsSheet: View {
         }
       }
     }
+    .macSheetFrame()
   }
 
   private func nilIfEmpty(_ value: String) -> String? {

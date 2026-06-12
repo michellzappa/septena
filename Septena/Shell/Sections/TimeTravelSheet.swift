@@ -152,5 +152,6 @@ struct TimeTravelSheet: View {
         }
       }
     }
+    .macSheetFrame(width: 420, height: Self.sheetHeight + 60)
   }
 }

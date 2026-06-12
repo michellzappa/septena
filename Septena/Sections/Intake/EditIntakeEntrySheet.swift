@@ -22,6 +22,7 @@ struct EditIntakeEntrySheet: View {
   @State private var count: Int = 1
   @State private var itemID: String? = nil
   @State private var note = ""
+  @State private var when: Date = Date()
 
   private var mutator: IntakeMutator { SeptenaServices.shared.intakeMutator }
   private var accent: Color { kind.flatMap { AdaptiveColor.adaptive($0.color) } ?? .accentColor }
@@ -36,6 +37,10 @@ struct EditIntakeEntrySheet: View {
                          onSave: save) {
       Form {
         if let kind {
+          Section("When") {
+            DatePicker("Date & time", selection: $when,
+                       displayedComponents: [.date, .hourAndMinute])
+          }
           Section {
             Picker("Method", selection: $method) {
               ForEach(kind.methods, id: \.token) { Text($0.label).tag($0.token) }
@@ -80,14 +85,17 @@ struct EditIntakeEntrySheet: View {
     guard let kind else { return }
     let amt = kind.showsAmount ? amount : nil
     let cnt = kind.showsCount ? count : nil
+    let dayFmt = DateFormatter(); dayFmt.dateFormat = "yyyy-MM-dd"
+    let timeFmt = DateFormatter(); timeFmt.dateFormat = "HH:mm"
+    let newDate = dayFmt.string(from: when)
+    let hhmm = timeFmt.string(from: when)
     if let original {
-      mutator.updateEntry(id: original.id, date: date, time: original.time,
+      mutator.updateEntry(id: original.id, date: newDate, time: hhmm,
                           method: method, itemID: .some(itemID),
                           amount: .some(amt), count: .some(cnt),
                           note: .some(note))
     } else {
-      mutator.addEntry(kindID: kindID, date: date,
-                       time: EventTimestamp.hhmm(from: Date()),
+      mutator.addEntry(kindID: kindID, date: newDate, time: hhmm,
                        method: method, itemID: itemID, amount: amt,
                        count: cnt, note: note)
     }
@@ -116,9 +124,12 @@ struct EditIntakeEntrySheet: View {
       count = original.count ?? 1
       itemID = original.itemID
       note = original.note ?? ""
+      when = original.occurredAt
     } else {
       method = presetMethod ?? kind.methods.first?.token ?? ""
       amount = kind.methods.first { $0.token == method }?.defaultAmount
+      // Land a new entry on the day being viewed, at the current time.
+      when = EventTimestamp.from(date: date, time: EventTimestamp.hhmm(from: Date()))
     }
   }
 }

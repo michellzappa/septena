@@ -1045,6 +1045,7 @@ struct MealRelogSearchView: View {
         }
       }
     }
+    .macSheetFrame()
   }
 
   private func mealRow(_ meal: UsualMeal) -> some View {

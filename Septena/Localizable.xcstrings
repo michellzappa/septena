@@ -777,6 +777,9 @@
         }
       }
     },
+    "24 hours" : {
+
+    },
     "30 days" : {
       "localizations" : {
         "pt-BR" : {
@@ -2561,6 +2564,7 @@
       }
     },
     "Double tap to switch between today and the last %@ days" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -6952,6 +6956,9 @@
           }
         }
       }
+    },
+    "Wheel window" : {
+
     },
     "When on, pending items in the source list import automatically and are removed from Reminders. Runs on app launch and whenever Reminders changes." : {
       "localizations" : {

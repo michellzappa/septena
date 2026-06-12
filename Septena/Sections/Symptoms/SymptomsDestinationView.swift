@@ -326,6 +326,7 @@ struct SymptomDefinitionsSheet: View {
           }
         }
       }
+      .formStyle(.grouped)
       .navigationTitle("Symptoms")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
@@ -336,6 +337,7 @@ struct SymptomDefinitionsSheet: View {
         }
       }
     }
+    .macSheetFrame()
   }
 
   private func nilIfEmpty(_ value: String) -> String? {

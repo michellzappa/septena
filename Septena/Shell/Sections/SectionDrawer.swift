@@ -375,6 +375,21 @@ extension View {
 }
 
 extension View {
+  /// macOS sheets size to their content's *ideal* height, and List/Form/
+  /// NavigationStack-backed content has none — the sheet collapses to zero.
+  /// Apply this to any sheet content compiled for macOS that isn't already
+  /// framed (or wrapped in `sectionDrawerPresentation()`); it's a no-op on iOS,
+  /// where detents own the sheet size.
+  func macSheetFrame(width: CGFloat = 560, height: CGFloat = 600) -> some View {
+    #if os(macOS)
+    return frame(width: width, height: height)
+    #else
+    return self
+    #endif
+  }
+}
+
+extension View {
   /// Standard section data lifecycle in one wire. `perform` runs:
   ///   • on appear,
   ///   • whenever `value` changes (e.g. the viewing date) — `.task(id:)` both
