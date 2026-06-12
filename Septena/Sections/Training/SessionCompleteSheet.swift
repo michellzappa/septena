@@ -127,18 +127,18 @@ struct SessionCompleteSheet: View {
     }
     .background(Theme.groupedBackground)
     .overlay {
-      // The celebration matches the session: a confetti burst when a PR
-      // fell (the moment that earns it), otherwise a calm bloom whose reach
-      // scales with the total volume moved. Same motion vocabulary as every
-      // other section's commit flourish.
+      // Finishing a session is training's ONE celebration — the confetti
+      // burst, every time (sets commit silently along the way). Intensity
+      // still tells the story: louder per PR broken, scaled by volume on an
+      // ordinary day.
       CommitFlourish(motion: completionMotion,
                      accent: accent,
                      intensity: completionIntensity,
                      trigger: celebrate)
     }
     .onAppear {
-      // Motion-matched: the ripple's calm rings or the bloom's soft swell,
-      // at the same intensity the visual plays — not a flat generic buzz.
+      // Motion-matched: the burst's pop at the same intensity the visual
+      // plays — not a flat generic buzz.
       Haptics.play(completionMotion.hapticSpec(intensity: completionIntensity))
       celebrate += 1
     }
@@ -147,9 +147,10 @@ struct SessionCompleteSheet: View {
   /// Did any logged entry break a personal record this session?
   private var hasPR: Bool { stats.prFlags.values.contains { $0.any } }
 
-  /// Full-screen ripple on a PR — a big payoff for a rare milestone;
-  /// otherwise a settling bloom.
-  private var completionMotion: CommitMotion { hasPR ? .ripple : .bloom }
+  /// Session done → burst, always. (Was ripple-on-PR / bloom otherwise;
+  /// the PR's extra payoff now lives in the intensity + the milestone
+  /// layer's own ignition.)
+  private var completionMotion: CommitMotion { .burst }
 
   /// PR sessions get louder with each record broken; non-PR sessions scale
   /// by total volume moved (a hard leg day blooms wider than a light one;

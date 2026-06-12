@@ -2702,9 +2702,9 @@ struct TrainingExerciseCard: View {
              : entry.status == .done ? "Update" : "Done") {
         let wasDone = (entry.status == .done)
         store.markDone(index: index, mutator: trainingMutator)
-        // Celebrate only on first completion, not re-saves of an
-        // already-done entry. Success haptic + confetti + status-icon
-        // bounce — small enough to fit the "you did a set" cadence.
+        // Confirm only on first completion, not re-saves of an already-done
+        // entry. Success haptic + status-icon bounce — a set is a step, not
+        // a moment; the session-complete sheet owns the celebration.
         if !wasDone {
           Haptics.success()
           celebrate += 1
@@ -2719,11 +2719,6 @@ struct TrainingExerciseCard: View {
       .controlSize(.large)
       .tint(accent)
       .disabled(entry.status == .saving)
-      .overlay(alignment: .center) {
-        // Per-set confirm — the shared `.burst`, kept restrained (low
-        // intensity) since it fires on every set.
-        CommitFlourish(motion: .burst, accent: accent, intensity: 0.5, trigger: celebrate)
-      }
     }
     .padding(.top, 12)
   }
