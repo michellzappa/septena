@@ -161,14 +161,32 @@ extension CorrelationEngine {
       for (pKey, pEntry) in eligible where pKey != tKey && pEntry.section != tEntry.section {
         let predictor = spec(pKey, pEntry)
         let h = hint["\(pKey)>\(tKey)"]
+        let lag = h?.lag ?? defaultLagPreference(predictor: pEntry, target: tEntry)
         pairs.append(PairSpec(predictor: predictor,
                               target: target,
-                              lagPreference: h?.lag ?? nil,
+                              lagPreference: lag,
                               expected: h?.expected ?? .unknown,
                               titleOverride: h?.title ?? nil))
       }
     }
     return pairs
+  }
+
+  /// Conservative default lag hints for broad section families. Nil means
+  /// "let the engine compare 0/1/2 days and keep the strongest supported
+  /// relationship"; non-nil means the timing is obvious enough that scanning
+  /// other days would mostly add false-discovery pressure.
+  static func defaultLagPreference(predictor: CatalogEntry, target: CatalogEntry) -> Int? {
+    if target.section == "sleep" {
+      switch predictor.section {
+      case "caffeine", "nutrition", "training", "habits", "supplements", "medications":
+        return 0
+      default:
+        return nil
+      }
+    }
+    if target.section == "gut", predictor.section == "nutrition" { return 1 }
+    return nil
   }
 
   // MARK: - Multiple-comparisons control

@@ -100,8 +100,13 @@ struct CorrelationsHomepageView: View {
       supplementsSection(rows: r.supplementsTable)
     }
 
+    let reports = sectionReports(from: filtered)
+    if !reports.isEmpty {
+      reportsSection(reports)
+    }
+
     if !trusted.isEmpty {
-      sectionHeader("Trusted signals", subtitle: "|r| ≥ \(String(format: "%.2f", CorrelationEngine.strongR)), p < 0.05, monotonic")
+      sectionHeader("Trusted signals", subtitle: "|r| ≥ \(String(format: "%.2f", CorrelationEngine.strongR)), q < 0.05, monotonic")
       grid(trusted)
     }
     if !exploratory.isEmpty {
@@ -180,6 +185,101 @@ struct CorrelationsHomepageView: View {
           .onTapGesture { focused = e }
       }
     }
+  }
+
+  // MARK: - Generalized section reports
+
+  private struct SectionReport: Identifiable {
+    let id: String
+    let title: String
+    let subtitle: String
+    let pairs: [CorrelationEngine.EvaluatedPair]
+  }
+
+  private func sectionReports(from rows: [CorrelationEngine.EvaluatedPair]) -> [SectionReport] {
+    let actionable = rows
+      .filter { $0.n >= CorrelationEngine.minN }
+      .sorted { lhs, rhs in
+        if lhs.tier != rhs.tier { return lhs.tier == .trusted }
+        return lhs.absR > rhs.absR
+      }
+    guard !actionable.isEmpty else { return [] }
+
+    let preferredTargets = ["symptoms", "medications", "sleep", "mood", "gut"]
+    var reports: [SectionReport] = []
+    for section in preferredTargets {
+      let targetRows = actionable
+        .filter { $0.spec.target.section == section }
+        .prefix(3)
+      guard !targetRows.isEmpty else { continue }
+      reports.append(SectionReport(
+        id: "target-\(section)",
+        title: "\(displayName(for: section)) drivers",
+        subtitle: "Top possible drivers of \(displayName(for: section).lowercased()) outcomes.",
+        pairs: Array(targetRows)))
+    }
+
+    let medicationRows = actionable
+      .filter { $0.spec.predictor.section == "medications" || $0.spec.target.section == "medications" }
+      .prefix(3)
+    if !medicationRows.isEmpty && !reports.contains(where: { $0.id == "target-medications" }) {
+      reports.append(SectionReport(
+        id: "medication-signals",
+        title: "Medication signals",
+        subtitle: "Dose, skip, and medication-day patterns worth reviewing.",
+        pairs: Array(medicationRows)))
+    }
+    return Array(reports.prefix(5))
+  }
+
+  private func reportsSection(_ reports: [SectionReport]) -> some View {
+    VStack(alignment: .leading, spacing: 10) {
+      sectionHeader("Reports", subtitle: "Same engine, grouped by the outcome you care about.")
+      ForEach(reports) { report in
+        VStack(alignment: .leading, spacing: 8) {
+          VStack(alignment: .leading, spacing: 2) {
+            Text(report.title)
+              .font(.headline)
+            Text(report.subtitle)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+          ForEach(report.pairs) { pair in
+            Button {
+              focused = pair
+            } label: {
+              HStack(alignment: .top, spacing: 8) {
+                Circle()
+                  .fill(theme.color(for: pair.spec.predictor.section))
+                  .frame(width: 7, height: 7)
+                  .padding(.top, 6)
+                VStack(alignment: .leading, spacing: 2) {
+                  Text(CorrelationEngine.effectSentence(pair))
+                    .font(.subheadline)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                  Text("q=\(pair.qValue.decimalString(3)) · r=\(CorrelationEngine.formatR(pair.r)) · n=\(pair.n) · lag \(pair.lag)d")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                }
+                Spacer()
+                TierBadge(pair: pair)
+              }
+              .padding(.vertical, 4)
+            }
+            .buttonStyle(.plain)
+          }
+        }
+        .padding(12)
+        .background(
+          RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.cardSurface)
+        )
+      }
+    }
+  }
+
+  private func displayName(for section: String) -> String {
+    SectionManifest.byKey[section]?.defaultLabel ?? section.capitalized
   }
 
   // MARK: - Supplements section

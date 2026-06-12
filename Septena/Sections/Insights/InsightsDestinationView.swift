@@ -43,14 +43,14 @@ struct TileView: View {
       MiniChart(pair: pair, color: color)
         .frame(height: 90)
       VStack(alignment: .leading, spacing: 1) {
-        Text(slopeLine)
+        Text(CorrelationEngine.relationshipSentence(pair))
           .font(.caption2)
           .foregroundStyle(.secondary)
           .lineLimit(1)
         HStack {
           Text("lag \(pair.lag)d · n=\(pair.n)")
           Spacer()
-          Text("p=\(pair.p.decimalString(3))")
+          Text("q=\(pair.qValue.decimalString(3))")
         }
         .font(.caption2.monospacedDigit())
         .foregroundStyle(.secondary)
@@ -65,18 +65,6 @@ struct TileView: View {
         .strokeBorder(pair.confound ? Color.orange.opacity(0.35) : Color.primary.opacity(0.06),
                       lineWidth: pair.confound ? 1 : 0.5)
     )
-  }
-
-  private var slopeLine: String {
-    let xUnit = pair.spec.predictor.unit
-    let yUnit = pair.spec.target.unit
-    let sign  = pair.slope >= 0 ? "+" : ""
-    let value = abs(pair.slope) >= 100
-      ? pair.slope.decimalString(0)
-      : pair.slope.decimalString(2)
-    let perUnit = xUnit.isEmpty ? "unit" : xUnit
-    let yLabel  = yUnit.isEmpty ? "pts" : yUnit
-    return "per +1 \(perUnit): \(sign)\(value) \(yLabel)"
   }
 }
 
@@ -171,6 +159,7 @@ struct DetailSheet: View {
           fullChart
           buckets
           stats
+          explainer
         }
         .padding()
       }
@@ -190,7 +179,7 @@ struct DetailSheet: View {
     VStack(alignment: .leading, spacing: 6) {
       HStack(spacing: 8) {
         TierBadge(pair: pair)
-        Text("\(CorrelationEngine.strengthLabel(pair.r)) · lag \(pair.lag)d · n=\(pair.n) · p=\(pair.p.decimalString(3))")
+        Text("\(CorrelationEngine.strengthLabel(pair.r)) · lag \(pair.lag)d · n=\(pair.n) · q=\(pair.qValue.decimalString(3))")
           .font(.caption)
           .foregroundStyle(.secondary)
         Spacer()
@@ -208,9 +197,13 @@ struct DetailSheet: View {
             .font(.caption)
         }
       }
-      Text(slopeLine)
-        .font(.caption)
-        .foregroundStyle(.secondary)
+      VStack(alignment: .leading, spacing: 4) {
+        Text(CorrelationEngine.effectSentence(pair))
+          .font(.subheadline.weight(.medium))
+        Text(CorrelationEngine.relationshipSentence(pair))
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
     }
   }
 
@@ -298,10 +291,24 @@ struct DetailSheet: View {
   }
 
   private var stats: some View {
-    VStack(alignment: .leading, spacing: 4) {
-      Text("Stats")
+    VStack(alignment: .leading, spacing: 8) {
+      Text("Evidence")
         .font(.caption.weight(.medium))
-      Text("r = \(CorrelationEngine.formatR(pair.r))  ·  p = \(pair.p.decimalString(3))  ·  permutations = \(CorrelationEngine.permutations)")
+      VStack(alignment: .leading, spacing: 5) {
+        ForEach(CorrelationEngine.evidenceLines(pair), id: \.self) { line in
+          HStack(alignment: .top, spacing: 6) {
+            Circle()
+              .fill(evidenceColor(for: line))
+              .frame(width: 5, height: 5)
+              .padding(.top, 5)
+            Text(line)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+        }
+      }
+      Divider()
+      Text("r = \(CorrelationEngine.formatR(pair.r))  ·  p = \(pair.p.decimalString(3))  ·  q = \(pair.qValue.decimalString(3))  ·  permutations = \(CorrelationEngine.permutations)")
         .font(.caption.monospacedDigit())
         .foregroundStyle(.secondary)
       Text("x̄ = \(format(pair.meanX))\(unit(pair.spec.predictor.unit))  ·  ȳ = \(format(pair.meanY))\(unit(pair.spec.target.unit))")
@@ -323,11 +330,26 @@ struct DetailSheet: View {
     }
   }
 
-  private var slopeLine: String {
-    let sign = pair.slope >= 0 ? "+" : ""
-    let yUnit = pair.spec.target.unit.isEmpty ? "pts" : pair.spec.target.unit
-    let xUnit = pair.spec.predictor.unit.isEmpty ? "unit" : pair.spec.predictor.unit
-    return "per +1 \(xUnit) of \(pair.spec.predictor.label): \(sign)\(format(pair.slope)) \(yUnit)"
+  private var explainer: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text("How to read this")
+        .font(.caption.weight(.medium))
+      ForEach(CorrelationEngine.methodDefinitions(), id: \.term) { item in
+        VStack(alignment: .leading, spacing: 1) {
+          Text(item.term)
+            .font(.caption.monospacedDigit().weight(.semibold))
+          Text(item.explanation)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+    }
+  }
+
+  private func evidenceColor(for line: String) -> Color {
+    if line.hasPrefix("Tier: trusted") { return .green }
+    if line.hasPrefix("Caution") || line.contains("do not move cleanly") { return .orange }
+    return .secondary
   }
 
   private func chartYDomain(values: [Double]) -> ClosedRange<Double> {

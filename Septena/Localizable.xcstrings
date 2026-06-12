@@ -71,6 +71,7 @@
       }
     },
     "%@ · lag %@d · n=%@ · p=%@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -82,6 +83,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@ · defasagem %2$@d · n=%3$@ · p=%4$@"
+          }
+        }
+      }
+    },
+    "%@ · lag %@d · n=%@ · q=%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · lag %2$@d · n=%3$@ · q=%4$@"
           }
         }
       }
@@ -2810,6 +2821,9 @@
         }
       }
     },
+    "Evidence" : {
+
+    },
     "Exactly" : {
       "localizations" : {
         "pt-BR" : {
@@ -3445,6 +3459,9 @@
           }
         }
       }
+    },
+    "How to read this" : {
+
     },
     "Hydration" : {
       "localizations" : {
@@ -4873,9 +4890,6 @@
         }
       }
     },
-    "p=%@" : {
-      "shouldTranslate" : false
-    },
     "Panicked" : {
       "localizations" : {
         "pt-BR" : {
@@ -5099,6 +5113,19 @@
         }
       }
     },
+    "q=%@" : {
+
+    },
+    "q=%@ · r=%@ · n=%@ · lag %@d" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "q=%1$@ · r=%2$@ · n=%3$@ · lag %4$@d"
+          }
+        }
+      }
+    },
     "Quads" : {
       "localizations" : {
         "pt-BR" : {
@@ -5140,6 +5167,7 @@
       }
     },
     "r = %@  ·  p = %@  ·  permutations = %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5151,6 +5179,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "r = %1$@  ·  p = %2$@  ·  permutações = %3$@"
+          }
+        }
+      }
+    },
+    "r = %@  ·  p = %@  ·  q = %@  ·  permutations = %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "r = %1$@  ·  p = %2$@  ·  q = %3$@  ·  permutations = %4$@"
           }
         }
       }
@@ -5276,6 +5314,7 @@
       }
     },
     "Renders the day-timeline strip above the homepage layout." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -5882,6 +5921,7 @@
       }
     },
     "Stats" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -6262,6 +6302,9 @@
           }
         }
       }
+    },
+    "The Day dial is today on a 24-hour clock face — every section's logs as dots, sleep as an arc, under the day's ambient light. The Today timeline is the horizontal strip version." : {
+
     },
     "The default icon is always free. Color icons are part of Septena+. iOS shows a confirmation prompt each time you switch icons." : {
       "extractionState" : "stale",

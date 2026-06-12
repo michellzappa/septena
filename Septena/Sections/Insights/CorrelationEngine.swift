@@ -730,14 +730,15 @@ struct CorrelationEngine {
     lines.append("## Context")
     lines.append("- User does not drink alcohol — don't suggest it as a confound.")
     lines.append("- User's days are largely identical (low day-of-week variance).")
-    lines.append("- Trusted = n ≥ \(minN), |r| ≥ \(strongR.decimalString(2)), monotonic buckets, sign matches physiology.")
+    lines.append("- Trusted = n ≥ \(minN), |r| ≥ \(strongR.decimalString(2)), monotonic buckets, sign matches physiology, and q < \(strongP.decimalString(2)).")
     lines.append("- Exploratory = n ≥ \(minN) but weak r, non-monotonic, or contradicts physiology.")
     lines.append("")
 
     func chartBlock(_ e: EvaluatedPair) -> String {
       var out: [String] = []
       out.append("### \(e.spec.title)")
-      out.append("- n=\(e.n), lag=\(e.lag)d, r=\(formatR(e.r)) (\(strengthLabel(e.r))), p=\(e.p.decimalString(3))")
+      out.append("- \(effectSentence(e))")
+      out.append("- n=\(e.n), lag=\(e.lag)d, r=\(formatR(e.r)) (\(strengthLabel(e.r))), p=\(e.p.decimalString(3)), q=\(e.qValue.decimalString(3))")
       let xUnit = e.spec.predictor.unit.isEmpty ? "" : " \(e.spec.predictor.unit)"
       let yUnit = e.spec.target.unit.isEmpty ? "" : " \(e.spec.target.unit)"
       out.append("- slope: \(e.slope >= 0 ? "+" : "")\(e.slope.decimalString(3))\(yUnit)/\(xUnit.isEmpty ? "1" : xUnit.trimmingCharacters(in: .whitespaces)); x̄=\(e.meanX.decimalString(2)); ȳ=\(e.meanY.decimalString(2))")
@@ -750,6 +751,7 @@ struct CorrelationEngine {
       if e.confound {
         out.append("- ⚠️ Direction contradicts physiology — likely confound or reverse causation.")
       }
+      out.append("- evidence: \(evidenceLines(e).joined(separator: " "))")
       return out.joined(separator: "\n")
     }
 
@@ -798,6 +800,57 @@ struct CorrelationEngine {
 
   static func formatR(_ r: Double) -> String {
     "\(r >= 0 ? "+" : "")\(r.decimalString(2))"
+  }
+
+  static func effectSentence(_ e: EvaluatedPair) -> String {
+    let sign = e.slope >= 0 ? "+" : ""
+    let delta = abs(e.slope) >= 100 ? e.slope.decimalString(0) : e.slope.decimalString(2)
+    let targetUnit = e.spec.target.unit.isEmpty ? "pts" : e.spec.target.unit
+    if e.binary {
+      return "Days with \(e.spec.predictor.label) tend to go with \(sign)\(delta) \(targetUnit) in \(e.spec.target.label)."
+    }
+    let predictorUnit = e.spec.predictor.unit.isEmpty ? "unit" : e.spec.predictor.unit
+    return "Each +1 \(predictorUnit) of \(e.spec.predictor.label) tends to go with \(sign)\(delta) \(targetUnit) in \(e.spec.target.label)."
+  }
+
+  static func relationshipSentence(_ e: EvaluatedPair) -> String {
+    let direction = e.r >= 0 ? "higher" : "lower"
+    return "Higher \(e.spec.predictor.label) is associated with \(direction) \(e.spec.target.label)."
+  }
+
+  static func evidenceLines(_ e: EvaluatedPair) -> [String] {
+    var lines: [String] = []
+    lines.append("Overlap: \(e.n) days compared after a \(e.lag)-day lag.")
+    lines.append("Strength: r \(formatR(e.r)) (\(strengthLabel(e.r))).")
+    lines.append("False-discovery check: q=\(e.qValue.decimalString(3)) after testing many pairs.")
+    if e.monotonic {
+      lines.append("Dose shape: low, middle, and high buckets move in one direction.")
+    } else {
+      lines.append("Dose shape: buckets do not move cleanly in one direction.")
+    }
+    if e.binary {
+      lines.append("Balance: \(e.stateMinority) days in the smaller state and \(e.stateMajority) in the larger state.")
+    }
+    if e.confound {
+      lines.append("Caution: direction contradicts the prior, so this may be a confound or reverse causation.")
+    }
+    if e.tier == .trusted {
+      lines.append("Tier: trusted because it clears strength, shape, direction, and q-value gates.")
+    } else {
+      lines.append("Tier: exploratory because at least one trust gate is weak or missing.")
+    }
+    return lines
+  }
+
+  static func methodDefinitions() -> [(term: String, explanation: String)] {
+    [
+      ("r", "Relationship strength from -1 to +1. Positive means both move up together; negative means one rises as the other falls."),
+      ("p", "How surprising this result would be if the days were randomly shuffled. Smaller is stronger, but p alone is not enough."),
+      ("q", "The p-value after correcting for all the pairs Septena tested. Trusted insights use q so one lucky false positive is less likely."),
+      ("n", "The number of overlapping days where both signals were available."),
+      ("lag", "How many days earlier the possible driver is compared with the outcome. Lag 1 means yesterday's driver versus today's outcome."),
+      ("buckets", "The same data split into low, middle, and high driver days. A clean trend across buckets is easier to trust than scattered points."),
+    ]
   }
 
   /// Build (predictor at D-lag, target at D) points. Lag 0 = same day.
