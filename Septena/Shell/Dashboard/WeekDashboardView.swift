@@ -1875,9 +1875,24 @@ struct WeekDashboardView: View {
       progress: .init(label: "Steps target",
                       current: Double(min(snap.steps, stepsTarget)),
                       target: Double(stepsTarget)),
-      history: .bars(snap.bars),
+      // The heatmap / dense layouts render the full window, so feed the
+      // 90-day step series from the synced entity — NOT `snap.bars`, which is
+      // only the trailing 7 days the tile histogram needs. (This is why the
+      // drawer showed full history but the heatmap looked near-empty.)
+      history: .bars(activityStepBars(days: Self.historyDays)),
       tap: .openSheet(.activity)
     )
+  }
+
+  /// Steps per day for the trailing `days`, oldest → newest, gap-filled with
+  /// 0, drawn from the persisted `ActivityDayEntity` rows. Feeds the homepage
+  /// heatmap/dense modes (90-day window) the same way other sections do.
+  private func activityStepBars(days: Int) -> [Int] {
+    let keys = lastNDays(days)
+    let rows = fetchActivityDays(from: keys.first ?? "", to: keys.last ?? "")
+    let byDate = Dictionary(rows.map { ($0.date, $0.stepCount ?? 0) },
+                            uniquingKeysWith: { a, _ in a })
+    return keys.map { byDate[$0] ?? 0 }
   }
 
   /// Today's numbers + trailing-7-day step bars for the Activity surfaces.
