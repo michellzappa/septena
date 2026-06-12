@@ -121,8 +121,13 @@ private struct SymptomEventEditor: View {
   @State private var triggerNote = ""
   @State private var reliefNote = ""
   @State private var note = ""
+  @State private var showingDefinitions = false
+  @State private var showingAdvanced = false
 
   private var mutator: SymptomsMutator { SeptenaServices.shared.symptomsMutator }
+  private var selectedDefinition: SymptomDefinitionEntity? {
+    definitions.first { $0.id == symptomID }
+  }
 
   var body: some View {
     NavigationStack {
@@ -131,6 +136,11 @@ private struct SymptomEventEditor: View {
           ContentUnavailableView("No symptoms yet",
                                  systemImage: "waveform.path.ecg",
                                  description: Text("Add symptom definitions in Settings first."))
+          Button {
+            showingDefinitions = true
+          } label: {
+            Label("Create symptoms", systemImage: "plus")
+          }
         } else {
           Section("Symptom") {
             Picker("Symptom", selection: $symptomID) {
@@ -149,25 +159,35 @@ private struct SymptomEventEditor: View {
               }
               Slider(value: $severity, in: 0...10, step: 1)
             }
-          }
-          Section("Detail") {
-            TextField("Duration minutes", text: $duration)
-              #if os(iOS)
-              .keyboardType(.numberPad)
-              #endif
             TextField("Body region", text: $bodyRegion)
-            Picker("Side", selection: $side) {
-              Text("None").tag("none")
-              Text("Left").tag("left")
-              Text("Right").tag("right")
-              Text("Both").tag("both")
-            }
-            TextField("Quality", text: $quality)
-          }
-          Section("Notes") {
-            TextField("Trigger", text: $triggerNote, axis: .vertical)
-            TextField("Relief", text: $reliefNote, axis: .vertical)
             TextField("Note", text: $note, axis: .vertical)
+          }
+
+          Section {
+            DisclosureGroup("More context", isExpanded: $showingAdvanced) {
+              TextField("Duration minutes", text: $duration)
+                #if os(iOS)
+                .keyboardType(.numberPad)
+                #endif
+              Picker("Side", selection: $side) {
+                Text("None").tag("none")
+                Text("Left").tag("left")
+                Text("Right").tag("right")
+                Text("Both").tag("both")
+              }
+              Picker("Quality", selection: $quality) {
+                Text("Unset").tag("")
+                Text("Ache").tag("ache")
+                Text("Sharp").tag("sharp")
+                Text("Burning").tag("burning")
+                Text("Throbbing").tag("throbbing")
+                Text("Pressure").tag("pressure")
+                Text("Cramp").tag("cramp")
+                Text("Tingling").tag("tingling")
+              }
+              TextField("Trigger", text: $triggerNote, axis: .vertical)
+              TextField("Relief", text: $reliefNote, axis: .vertical)
+            }
           }
         }
       }
@@ -185,6 +205,14 @@ private struct SymptomEventEditor: View {
         }
       }
       .task { seed() }
+      .onChange(of: symptomID) { _, _ in
+        if event == nil, bodyRegion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+          bodyRegion = selectedDefinition?.defaultBodyRegion ?? ""
+        }
+      }
+      .sheet(isPresented: $showingDefinitions) {
+        SymptomDefinitionsSheet()
+      }
     }
   }
 
@@ -202,6 +230,7 @@ private struct SymptomEventEditor: View {
       note = event.note ?? ""
     } else if symptomID.isEmpty {
       symptomID = definitions.first?.id ?? ""
+      bodyRegion = definitions.first?.defaultBodyRegion ?? ""
     }
   }
 
@@ -252,17 +281,27 @@ struct SymptomDefinitionsSheet: View {
   @State private var emoji = ""
   @State private var bodySystem = ""
   @State private var region = ""
+  @State private var showingAdvanced = false
 
   private var mutator: SymptomsMutator { SeptenaServices.shared.symptomsMutator }
 
   var body: some View {
     NavigationStack {
       Form {
-        Section("Add Symptom") {
+        Section {
+          ForEach(SymptomStarter.all) { starter in
+            starterRow(starter)
+          }
+        } header: {
+          Text("Quick add")
+        }
+        Section("Custom symptom") {
           TextField("Name", text: $title)
-          TextField("Glyph", text: $emoji)
-          TextField("Body system", text: $bodySystem)
           TextField("Default region", text: $region)
+          DisclosureGroup("Advanced", isExpanded: $showingAdvanced) {
+            TextField("Glyph", text: $emoji)
+            TextField("Body system", text: $bodySystem)
+          }
           Button {
             add()
           } label: {
@@ -317,5 +356,35 @@ struct SymptomDefinitionsSheet: View {
     emoji = ""
     bodySystem = ""
     region = ""
+  }
+
+  @ViewBuilder
+  private func starterRow(_ starter: SymptomStarter) -> some View {
+    let exists = definitions.contains { $0.title.localizedCaseInsensitiveCompare(starter.title) == .orderedSame }
+    Button {
+      guard !exists else { return }
+      mutator.addDefinition(title: starter.title,
+                            emoji: starter.emoji,
+                            bodySystem: starter.bodySystem,
+                            defaultBodyRegion: starter.region)
+      Haptics.success()
+    } label: {
+      HStack(spacing: 12) {
+        Text(starter.emoji).font(.title3).opacity(exists ? 0.4 : 1)
+        VStack(alignment: .leading, spacing: 2) {
+          Text(starter.title)
+            .foregroundStyle(exists ? .secondary : .primary)
+            .strikethrough(exists, color: .secondary)
+          Text(starter.region)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        Spacer()
+        Image(systemName: exists ? "checkmark.circle.fill" : "plus.circle")
+          .foregroundStyle(exists ? Color.secondary : Color.accentColor)
+      }
+    }
+    .buttonStyle(.plain)
+    .disabled(exists)
   }
 }
