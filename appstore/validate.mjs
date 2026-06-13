@@ -46,11 +46,17 @@ const metadataReport = platforms.map((p) => {
 // ----- screenshots + raw -----
 const deviceReport = Object.entries(devices).map(([key, d]) => {
   const outDir = join(ROOT, d.outDir);
-  const files = existsSync(outDir)
-    ? readdirSync(outDir).filter((f) => f.includes(`_${key}_`) && f.endsWith(".png")).sort()
-    : [];
-  const shots = files.map((f) => {
-    const { w, h, colorType } = pngInfo(join(outDir, f));
+  // Validate exactly the CURRENT panels' expected files (so a stale leftover
+  // from a renamed/removed panel can't pollute the set — important where the
+  // filesystem forbids deletes and render.mjs can't clean up).
+  const expected = panelsFor(key).map((p, i) => `${i}_${key}_${p.id}.png`);
+  const shots = expected.map((f) => {
+    const fp = join(outDir, f);
+    if (!existsSync(fp)) {
+      if (d.active) err(`${key}/${f}: missing (run render.mjs)`);
+      return { file: f, path: `${d.outDir}/${f}`, ok: false, problems: ["not rendered"] };
+    }
+    const { w, h, colorType } = pngInfo(fp);
     const sizeOk = w === d.width && h === d.height;
     const probs = [];
     if (!sizeOk) probs.push(`expected ${d.width}×${d.height}, got ${w}×${h}`);
@@ -58,9 +64,14 @@ const deviceReport = Object.entries(devices).map(([key, d]) => {
     if (d.active) for (const m of probs) (m.includes("alpha") ? warn : err)(`${key}/${f}: ${m}`);
     return { file: f, path: `${d.outDir}/${f}`, w, h, ok: sizeOk && colorType !== 6 && colorType !== 4, problems: probs };
   });
-  if (d.active) {
-    if (shots.length < 1) err(`${key}: no rendered screenshots (run render.mjs)`);
-    if (shots.length > 10) err(`${key}: ${shots.length} screenshots > ASC max 10`);
+  if (d.active && shots.length > 10) err(`${key}: ${shots.length} panels > ASC max 10`);
+  // Flag stray files matching this device that aren't current panels (cleanup hint).
+  if (existsSync(outDir)) {
+    for (const f of readdirSync(outDir)) {
+      if (f.includes(`_${key}_`) && f.endsWith(".png") && !expected.includes(f)) {
+        warn(`${key}: stray screenshot ${f} (not a current panel — safe to delete)`);
+      }
+    }
   }
   const raw = {};
   for (const ap of ["light", "dark"]) {
