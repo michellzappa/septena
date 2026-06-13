@@ -32,6 +32,11 @@ enum SeptenaTab: Hashable {
 struct RootTabView: View {
   @Environment(NavigationState.self) private var nav
   @Environment(SectionTheme.self) private var theme
+  // Gates the in-flight training pill below the tab bar. Read here (not
+  // just inside the accessory) so the `.tabViewBottomAccessory` modifier
+  // is attached only mid-workout — an empty accessory content still draws
+  // a blank bar, so the bar has to be absent, not just empty.
+  @Environment(TrainingDraftStore.self) private var draftStore
   #if os(macOS)
   @Environment(\.openWindow) private var openWindow
   #endif
@@ -212,7 +217,19 @@ struct RootTabView: View {
         .tag(SeptenaTab.goals)
     }
     #if os(iOS)
-    tv.tabBarMinimizeBehavior(.onScrollDown)
+    let bar = tv.tabBarMinimizeBehavior(.onScrollDown)
+    // In-flight training session lives here as a Music-style pill above the
+    // tab bar (collapses inline when the bar minimizes) — twin of the Live
+    // Activity. Attach the accessory only while a session is active; an
+    // empty accessory still draws a blank bar, so it must be absent
+    // otherwise. `@Observable` draftStore re-renders this on start/end.
+    if let draft = draftStore.draft, draft.totalCount > 0 {
+      bar.tabViewBottomAccessory {
+        TrainingTabAccessory()
+      }
+    } else {
+      bar
+    }
     #else
     tv
     #endif

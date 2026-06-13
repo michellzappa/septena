@@ -54,7 +54,8 @@ final class TrainingLiveActivityCoordinator {
           sessionID: draft.liveActivitySessionID,
           sessionType: draft.sessionType,
           sessionLabel: draft.label,
-          startedAt: draft.startedAtDate ?? Date()
+          startedAt: draft.startedAtDate ?? Date(),
+          sessionIcon: draft.sessionKind.icon
         ),
         content: ActivityContent(state: Self.contentState(for: draft), staleDate: nil),
         pushType: nil

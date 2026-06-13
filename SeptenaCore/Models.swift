@@ -1887,6 +1887,22 @@ struct DraftSession: Codable, Hashable {
 
   var doneCount: Int { entries.filter { $0.status == .done }.count }
   var totalCount: Int { entries.filter { $0.status != .skipped }.count }
+
+  /// Session-level category, derived from its entries' per-exercise flags
+  /// (set by `backfillDraftFromHistory` from the routine kind + each
+  /// exercise's definition). Drives the glyph the tab-bar accessory and
+  /// the Live Activity both show, so the icon reflects *this* workout —
+  /// run for cardio, yoga for mobility — instead of a generic dumbbell.
+  /// Falls back to the id-based default for an empty/ambiguous draft.
+  var sessionKind: SessionKind {
+    let active = entries.filter { $0.status != .skipped }
+    guard !active.isEmpty else { return .defaulted(for: sessionType) }
+    if active.allSatisfy({ $0.isMobility }) { return .mobility }
+    if active.allSatisfy({ $0.isCardio })   { return .cardio }
+    let anyCardio   = active.contains { $0.isCardio }
+    let anyStrength = active.contains { !$0.isCardio && !$0.isMobility }
+    return (anyCardio && anyStrength) ? .mixed : .strength
+  }
 }
 
 // MARK: - Insights (client-side correlation engine)

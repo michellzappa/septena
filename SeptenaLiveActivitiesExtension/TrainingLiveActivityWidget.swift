@@ -45,14 +45,14 @@ struct TrainingLiveActivityWidget: Widget {
           }
         }
       } compactLeading: {
-        Image(systemName: "figure.strengthtraining.traditional")
+        Image(systemName: context.attributes.sessionIcon)
       } compactTrailing: {
         Text(timerInterval: context.attributes.startedAt...Date.distantFuture,
              countsDown: false)
           .font(.caption2.monospacedDigit())
           .frame(maxWidth: 44)
       } minimal: {
-        Image(systemName: "figure.strengthtraining.traditional")
+        Image(systemName: context.attributes.sessionIcon)
       }
       .widgetURL(URL(string: "septena://training/active"))
     }
@@ -65,7 +65,7 @@ private struct TrainingLockScreenView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       HStack(alignment: .top, spacing: 12) {
-        Image(systemName: "figure.strengthtraining.traditional")
+        Image(systemName: context.attributes.sessionIcon)
           .font(.title3.weight(.semibold))
           .frame(width: 28)
         VStack(alignment: .leading, spacing: 3) {

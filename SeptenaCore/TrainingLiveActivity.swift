@@ -15,5 +15,9 @@ struct TrainingActivityAttributes: ActivityAttributes {
   var sessionType: String
   var sessionLabel: String
   var startedAt: Date
+  /// SF Symbol for the session's category (`SessionKind.icon`), resolved
+  /// at start so the widget shows the same session glyph as the in-app
+  /// tab-bar accessory without needing the routine catalog in-process.
+  var sessionIcon: String
 }
 #endif
