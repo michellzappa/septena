@@ -324,7 +324,8 @@ struct BodyDestinationView: View {
     loading = true
     let loadedRows = try? await WithingsProvider.shared.fetchHistory(days: 21)
     // Settings live in CloudKit — read from the local mirror, not FastAPI.
-    let loadedSettings = SettingsMirror.loadSettings(context: LocalStore.shared.container.mainContext)
+    // Route through the background reader so the fetch never runs on main.
+    let loadedSettings = await MirrorReader.shared.read { SettingsMirror.loadSettings(context: $0) }
     if let loadedRows {
       let sorted = loadedRows.sorted { $0.date > $1.date }
       rows = sorted
