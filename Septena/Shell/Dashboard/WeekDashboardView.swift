@@ -163,6 +163,9 @@ struct WeekDashboardView: View {
   /// GitHub contribution calendar (read-only, per-device token). Drives the
   /// GitHub tile's commit counts; the destination view fetches its own copy.
   @State private var githubContributions: GitHubContributions = .empty
+  /// Guards `loadNetwork` against overlapping runs so concurrent provider
+  /// HTTP stays within the safe parallel ceiling.
+  @State private var networkLoading = false
   @State private var gutToday: GutDayResponse? = nil
   @State private var gutHistory: [GutHistoryPoint] = []
   @State private var moodToday: MoodDayResponse? = nil
@@ -655,8 +658,14 @@ struct WeekDashboardView: View {
       await PerfTrace.span("dash.refreshTasks") { await refreshTasks() }
       await PerfTrace.span("dash.dailies.load") { await dailies.load() }
       loadMenuExtras()
-      await PerfTrace.span("dash.loadNetwork") { await loadNetwork() }
     }
+    // Network-backed tiles load on their own hop so a slow or variable
+    // provider (Oura / Withings / GitHub / HealthKit) never gates the rest
+    // of the dashboard. `paintFromCache()` already showed last-known values;
+    // each tile reconciles when its provider lands. Coalesced via the guard
+    // in `loadNetwork` so a rapid initial-load + day-change can't double the
+    // in-flight HTTP past the safe cap.
+    Task { await loadNetwork() }
   }
 
   /// Assign a reader `Snapshot` to the tile `@State` and mirror each value
@@ -778,23 +787,36 @@ struct WeekDashboardView: View {
   /// mirror path and capped at ≤2 concurrent HTTP calls — past ~4 the shared
   /// URLSession path has heap-corrupted at launch, so GitHub stays sequential.
   private func loadNetwork() async {
-    async let ouraTask = OuraProvider.shared.fetchHistory(days: Self.historyDays)
-    async let withingsTask = WithingsProvider.shared.fetchHistory(days: Self.historyDays)
-    if let o = try? await ouraTask {
+    // Coalesce overlapping runs (initial-load + day-change can both fire)
+    // so concurrent HTTP stays within the safe ≤4-parallel ceiling.
+    if networkLoading { return }
+    networkLoading = true
+    defer { networkLoading = false }
+    // Oura + Withings in parallel (HTTP cap ≤2); each is timed independently
+    // so the Perf log shows the per-provider latency that adds up to the stall.
+    async let ouraTimed = PerfTrace.span("net.oura") {
+      try? await OuraProvider.shared.fetchHistory(days: Self.historyDays)
+    }
+    async let withingsTimed = PerfTrace.span("net.withings") {
+      try? await WithingsProvider.shared.fetchHistory(days: Self.historyDays)
+    }
+    if let o = await ouraTimed {
       ouraNights = o
       ResponseCache.save(o, forKey: CacheKey.ouraNights)
     }
-    if let w = try? await withingsTask {
+    if let w = await withingsTimed {
       let sorted = w.sorted { $0.date > $1.date }
       bodyRows = sorted
       ResponseCache.save(sorted, forKey: CacheKey.bodyRows)
     }
     if GitHubProvider.shared.hasToken,
-       let gh = try? await GitHubProvider.shared.fetchContributions(days: 365) {
+       let gh = await PerfTrace.span("net.github", "", {
+         try? await GitHubProvider.shared.fetchContributions(days: 365)
+       }) {
       githubContributions = gh
       ResponseCache.save(gh, forKey: CacheKey.github)
     }
-    await HealthKitBridge.shared.refresh()
+    await PerfTrace.span("net.healthkit") { await HealthKitBridge.shared.refresh() }
     // Body (Withings) + GitHub inputs just landed — refresh the tile cache.
     recomputeDerived()
   }

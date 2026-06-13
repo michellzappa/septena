@@ -151,23 +151,25 @@ final class SeptenaServices {
       // Order matters: backfill runs BEFORE seeding so newly inserted
       // sections (with manifest-derived hasOnboarded values) aren't
       // accidentally clobbered by the legacy migration.
-      SettingsMirror.backfillHasOnboardedForLegacySections(context: context)
-      // A fresh account has zero SectionEntity rows before this loop. Seed
-      // everything OFF in that case so the first-run welcome starts from a
-      // blank slate (no pre-selected sections behind it); an account that
-      // already has rows seeds any newly-shipped section from its default.
-      let existingSectionCount =
-        (try? context.fetchCount(FetchDescriptor<SectionEntity>())) ?? 0
-      let isFreshAccount = existingSectionCount == 0
-      var seededAny = false
-      for manifest in SectionManifest.all {
-        if SettingsMirror.seedManifestSectionIfMissing(
-          manifest.key, context: context, freshAccount: isFreshAccount) {
-          seededAny = true
+      PerfTrace.spanSync("start.seedSections") {
+        SettingsMirror.backfillHasOnboardedForLegacySections(context: context)
+        // A fresh account has zero SectionEntity rows before this loop. Seed
+        // everything OFF in that case so the first-run welcome starts from a
+        // blank slate (no pre-selected sections behind it); an account that
+        // already has rows seeds any newly-shipped section from its default.
+        let existingSectionCount =
+          (try? context.fetchCount(FetchDescriptor<SectionEntity>())) ?? 0
+        let isFreshAccount = existingSectionCount == 0
+        var seededAny = false
+        for manifest in SectionManifest.all {
+          if SettingsMirror.seedManifestSectionIfMissing(
+            manifest.key, context: context, freshAccount: isFreshAccount) {
+            seededAny = true
+          }
         }
-      }
-      if seededAny {
-        NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+        if seededAny {
+          NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+        }
       }
       var batchTouchedTasks = false
       var batchTouchedStructure = false
@@ -1174,7 +1176,9 @@ final class SeptenaServices {
         // local-first at exactly the moment it matters most. The awaited
         // fetch + post-fetch repairs live in `absorbRemoteChanges()`, which
         // App.swift runs off the critical path after the first frame.
-        ckEngine.start()
+        PerfTrace.spanSync("start.ckEngineStart") {
+          ckEngine.start()
+        }
       }
     }
     startTask = task
