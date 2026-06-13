@@ -45,25 +45,30 @@ function badge(b, tint) {
 }
 
 // ---------------------------------------------------------------- device shot
-// Per-device frame geometry. `screenAspect` (w/h of the raw capture) keeps the
-// frame and placeholder correctly proportioned for each platform.
+// Per-device frame geometry. `pad` is the bezel thickness; `radius` is the
+// OUTER bezel radius. The screen is clipped at `radius − pad` so the corners
+// are concentric (a uniform-width bezel all the way around the curve). Radii
+// are tuned to real device proportions (~14% of width for iPhone). The frame's
+// `overflow:hidden` guarantees the screenshot is actually clipped to the curve.
 const FRAME = {
-  phone: { pad: 22, radius: 120, island: true },
-  pad:   { pad: 30, radius: 72,  island: false },
+  phone: { pad: 24, radius: 158, island: true },
+  pad:   { pad: 30, radius: 92,  island: false },
   mac:   { pad: 0,  radius: 28,  island: false }, // window chrome added separately
-  none:  { pad: 0,  radius: 36,  island: false },
+  none:  { pad: 0,  radius: 40,  island: false },
 };
 
 function shot(s, device, tint) {
   if (!s) return "";
   const dw = device.designWidth;
   const f = FRAME[device.frame] ?? FRAME.phone;
-  const widthFrac = s.width ?? 0.74;
-  const w = Math.round(dw * widthFrac);
+  const w = Math.round(dw * (s.width ?? 0.74));
+  const screenR = Math.max(0, f.radius - f.pad);
   const screen = s.img
-    ? `<img class="screen" src="${s.img}" alt="">`
-    : placeholderScreen(s.src, tint, device.screenAspect ?? 0.46);
-  const island = f.island ? `<div class="island"></div>` : "";
+    ? `<img class="screen" src="${s.img}" alt="" style="border-radius:${screenR}px;">`
+    : placeholderScreen(s.src, tint, device.screenAspect ?? 0.46, screenR);
+  // Real captures already include the device's Dynamic Island/status bar — only
+  // draw a synthetic island on the (content-free) placeholder.
+  const island = f.island && !s.img ? `<div class="island"></div>` : "";
   return `
   <div class="shot-zone" style="transform: translateY(${Math.round((s.offsetY ?? 0) * 100)}%);">
     <div class="frame" style="width:${w}px; padding:${f.pad}px; border-radius:${f.radius}px; transform: rotate(${s.rotate ?? 0}deg);">
@@ -73,8 +78,8 @@ function shot(s, device, tint) {
 }
 
 // Quiet, honest placeholder — neutral screen with the expected capture name.
-function placeholderScreen(src, tint, aspect) {
-  return `<div class="screen ph" style="background:${theme.paper}; aspect-ratio:${aspect};">
+function placeholderScreen(src, tint, aspect, radius = 0) {
+  return `<div class="screen ph" style="background:${theme.paper}; aspect-ratio:${aspect}; border-radius:${radius}px;">
     <div class="ph-center">
       <svg viewBox="0 0 24 24" width="120" height="120" style="color:${tint};opacity:.5">
         <rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="1.4"/>
@@ -160,8 +165,8 @@ h1 { font-family:${theme.fonts.display}; font-weight:600; font-size:${panel.head
 h1 em { font-style:normal; color:${tint}; font-variation-settings:"opsz" 9, "wght" 600, "SOFT" 0, "WONK" 0; }
 .sub { font-size:62px; line-height:1.32; color:color-mix(in oklab, ${theme.ink} 64%, transparent);
   margin-top:44px; max-width:1080px; }
-.frame { position:relative; background:#111; box-shadow:${theme.shadow.device}; }
-.screen { display:block; width:100%; border-radius:inherit; }
+.frame { position:relative; background:#0b0b0c; box-shadow:${theme.shadow.device}; overflow:hidden; }
+.screen { display:block; width:100%; }
 img.screen { height:auto; }
 .island { position:absolute; top:50px; left:50%; transform:translateX(-50%);
   width:268px; height:80px; background:#000; border-radius:999px; }
