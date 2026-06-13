@@ -45,6 +45,13 @@ pair: copy `Config/Secrets.example.xcconfig` → `Config/Secrets.xcconfig`
 
 ## Branch & integration discipline
 
+**A committer-cron handles commits.** A scheduled job commits green work on
+`main` automatically — agents do NOT need to `git commit` (or offer to) as part
+of finishing a task. Just leave the working tree in a green, build-verified
+state; the cron picks it up. Don't worry about "uncommitted across sessions"
+below — that's the cron's job now. (You still must never `git push`, create
+branches, or rewrite history unless explicitly asked.)
+
 **Default to committing on `main`. Do NOT create branches unless the user
 explicitly asks for one.** The user never asks for branches — every stray
 branch in this repo's history was agent-created, and that is exactly what caused
