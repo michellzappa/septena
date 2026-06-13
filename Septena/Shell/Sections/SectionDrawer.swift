@@ -28,26 +28,51 @@ enum DrawerLoadState: Equatable {
 ///
 /// - `.solid` — opaque grouped background + opaque cards (default; the
 ///   iPad/macOS pushed pane and any opaque host).
-/// - `.glass` — clear background + clear cards so content sits directly on a
-///   translucent presentation (the iPhone sheet). Injected by
-///   `sectionDrawerPresentation()`, never set by hand in a destination view.
+/// - `.glass` — clear background + Liquid Glass cards so the cards float on the
+///   translucent presentation (the iPhone sheet) instead of dissolving into it.
+///   Injected by `sectionDrawerPresentation()`, never set by hand in a
+///   destination view. Apply the card surface via `.drawerCardSurface()`.
 enum DrawerSurfaceStyle {
   case solid
   case glass
-
-  /// Fill for a card surface (`DrawerSection`, `StatTile`).
-  var cardFill: Color {
-    switch self {
-    case .solid: return Theme.secondaryGroupedBackground
-    case .glass: return .clear
-    }
-  }
 
   /// Fill behind the drawer's scroll content.
   var scrollFill: Color {
     switch self {
     case .solid: return Theme.groupedBackground
     case .glass: return .clear
+    }
+  }
+}
+
+extension View {
+  /// Paints the rounded card surface shared by `DrawerSection` and `StatTile`,
+  /// picking solid vs. glass from the injected `\.drawerSurfaceStyle` so the two
+  /// card types can't drift. `.solid` lays the opaque secondary-grouped card
+  /// (iPad / macOS pane, any opaque host). `.glass` floats the content on a
+  /// Liquid Glass panel — the same `glassCard()` treatment the dashboard tiles
+  /// use (see `ModuleTile`) — so cards lift off the translucent iPhone sheet
+  /// while staying translucent. Clip follows the glass, matching `ModuleTile`,
+  /// so any full-bleed row highlight stays inside the rounded corners.
+  func drawerCardSurface() -> some View {
+    modifier(DrawerCardSurface())
+  }
+}
+
+private struct DrawerCardSurface: ViewModifier {
+  @Environment(\.drawerSurfaceStyle) private var surfaceStyle
+
+  func body(content: Content) -> some View {
+    let shape = RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+    switch surfaceStyle {
+    case .solid:
+      content
+        .background(shape.fill(Theme.secondaryGroupedBackground))
+        .clipShape(shape)
+    case .glass:
+      content
+        .glassCard()
+        .clipShape(shape)
     }
   }
 }
@@ -340,6 +365,14 @@ struct SectionDrawer<Content: View>: View {
     // hand-passes a `.trackScreen("key")` that always equals `sectionKey`.
     .trackScreen(sectionKey)
     .toolbar {
+      // Time travel sits on the LEADING edge; the quick-add "+" stays trailing.
+      // `.topBarLeading` is the iOS leading slot; macOS uses `.navigation` (the
+      // window-toolbar leading group) — same split the Insights destination uses.
+      #if os(iOS)
+      let leadingPlacement: ToolbarItemPlacement = .topBarLeading
+      #else
+      let leadingPlacement: ToolbarItemPlacement = .navigation
+      #endif
       if loadState == .loading {
         // Subtle inline activity indicator next to the title slot so
         // background fetches surface without blocking the cached
@@ -349,12 +382,12 @@ struct SectionDrawer<Content: View>: View {
             .controlSize(.small)
         }
       }
-      // Calendar / time-travel button — leftmost of the trailing cluster,
-      // present only when the destination is day-scoped. Tints accent and
-      // gains a clock badge while viewing a past day. The system supplies the
-      // glass background for standard toolbar buttons.
+      // Calendar / time-travel button — leading edge, present only when the
+      // destination is day-scoped. Tints accent and gains a clock badge while
+      // viewing a past day. The system supplies the glass background for
+      // standard toolbar buttons.
       if currentDate != nil {
-        ToolbarItem(placement: .primaryAction) {
+        ToolbarItem(placement: leadingPlacement) {
           Button {
             showingTimeTravel = true
           } label: {
@@ -366,11 +399,9 @@ struct SectionDrawer<Content: View>: View {
       }
       // Log/action button — ONE component (`DrawerActionButton`) so its
       // appearance is defined in a single place for both single- and
-      // multi-action sections. A fixed spacer keeps it in its own glass group,
-      // separated from the calendar + goals cluster, on every drawer.
-      // No ToolbarSpacer: it wraps the action in its own glass group, which
-      // renders as a capsule AROUND the button. The system already places the
-      // primaryAction "+" as a standalone prominent control.
+      // multi-action sections. Lives alone in the trailing primaryAction slot
+      // now that time travel moved to the leading edge; the system places the
+      // prominent glass "+" as a standalone control there.
       if let onLog, !actions.isEmpty {
         ToolbarItem(placement: .primaryAction) {
           DrawerActionButton(actions: actions, accent: resolvedAccent, onLog: onLog)
@@ -423,6 +454,14 @@ struct DrawerActionButton: View {
         }
       }
     }
+    // Accent-tinted Liquid Glass capsule with a white glyph — the prominent
+    // "+" the drawer had before it regressed to a plain tinted control.
+    // `.glassProminent` (iOS/macOS 26's GlassProminentButtonStyle) is the
+    // prominent glass style; `.tint` washes the glass with the section accent
+    // and the style auto-contrasts the label to white. Applied to the Group so
+    // both the single-action Button and the multi-action Menu label render as
+    // the same filled glass control.
+    .buttonStyle(.glassProminent)
     .tint(accent)
   }
 }
@@ -952,8 +991,6 @@ struct DrawerSection<Content: View>: View {
   let padding: DrawerPadding
   @ViewBuilder var content: () -> Content
 
-  @Environment(\.drawerSurfaceStyle) private var surfaceStyle
-
   init(_ title: String? = nil,
        spacing: CGFloat = Theme.Spacing.xs,
        padding: DrawerPadding = .standard,
@@ -984,13 +1021,11 @@ struct DrawerSection<Content: View>: View {
         // stacking a second 20pt margin inside the already-inset card.
         .environment(\.rowHInset, Theme.Spacing.xl)
         .frame(maxWidth: .infinity, alignment: .leading)
-        // Surface fill from the injected style — opaque card on a solid host,
-        // clear on the glass (translucent-sheet) host. One decision, one place.
-        .background(
-          RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-            .fill(surfaceStyle.cardFill)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+        // Surface from the injected style — opaque card on a solid host, a
+        // floating Liquid Glass panel on the glass (translucent-sheet) host so
+        // the card lifts off the drawer instead of dissolving into it. One place
+        // owns the decision (`drawerCardSurface`).
+        .drawerCardSurface()
     }
   }
 

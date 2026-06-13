@@ -42,8 +42,6 @@ struct StatTile<Content: View>: View {
   var verticalPadding: CGFloat
   @ViewBuilder var content: () -> Content
 
-  @Environment(\.drawerSurfaceStyle) private var surfaceStyle
-
   init(verticalPadding: CGFloat = Theme.Spacing.md,
        @ViewBuilder content: @escaping () -> Content) {
     self.verticalPadding = verticalPadding
@@ -54,12 +52,10 @@ struct StatTile<Content: View>: View {
     content()
       .frame(maxWidth: .infinity)
       .padding(.vertical, verticalPadding)
-      // Surface fill from the injected style: opaque card on a solid host,
-      // clear on the glass (translucent-sheet) host.
-      .background(
-        surfaceStyle.cardFill,
-        in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-      )
+      // Surface from the injected style: opaque card on a solid host, a floating
+      // Liquid Glass panel on the glass (translucent-sheet) host. One place owns
+      // the decision (`drawerCardSurface`).
+      .drawerCardSurface()
   }
 }
 
