@@ -30,11 +30,13 @@ const onlyPanel = arg("only", null);
 // Brand serif, inlined so panels use the genuine Fraunces regardless of
 // what's installed. Same file serves italic (Fraunces variable has the axes).
 const fontPath = join(ROOT, "..", "Septena", "Resources", "Fraunces-Regular.ttf");
+// Single @font-face: Fraunces is a variable font (axes opsz 9–144, wght
+// 100–900, SOFT, WONK). Components drive opsz/wght per role via
+// font-variation-settings; italic accents are synthesized (Fraunces has no
+// slant axis, and the app itself only ever uses upright SemiBold).
 const fontFace = existsSync(fontPath)
-  ? ["normal", "italic"].map((style) =>
-      `@font-face { font-family:"Fraunces"; font-style:${style}; font-weight:100 900;
+  ? `@font-face { font-family:"Fraunces"; font-weight:100 900; font-style:normal;
        src:url(data:font/ttf;base64,${readFileSync(fontPath).toString("base64")}) format("truetype"); }`
-    ).join("\n")
   : "/* Fraunces not found — falling back to Georgia */";
 
 const shotDataURL = (device, src) => {

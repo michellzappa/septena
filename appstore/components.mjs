@@ -62,13 +62,19 @@ function shot(s, device, tint) {
   </div>`;
 }
 
+// Quiet, honest placeholder — a neutral screen with the expected capture
+// name. No faux UI rows (those read as a real-but-broken design); this clearly
+// says "screenshot goes here".
 function placeholderScreen(src, tint) {
-  const rows = Object.values(theme.sections).slice(0, 7).map(
-    (c) => `<div class="ph-row"><span class="ph-dot" style="background:${c}"></span><span class="ph-bar" style="background: color-mix(in oklab, ${c} 18%, white)"></span></div>`
-  ).join("");
   return `<div class="screen ph" style="background:${theme.paper};">
-    <div class="ph-head" style="background: color-mix(in oklab, ${tint} 12%, white)"></div>${rows}
-    <div class="ph-note">missing capture<br><b>${esc(src ?? "?")}.png</b><br>run scripts/screenshots.sh<br>then appstore/sync-shots.sh</div>
+    <div class="ph-center">
+      <svg viewBox="0 0 24 24" width="120" height="120" style="color:${tint};opacity:.5">
+        <rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <circle cx="9" cy="9.5" r="2" fill="currentColor"/>
+        <path d="M4 18l5-5 4 3 3.5-4L20 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+      </svg>
+      <div class="ph-name">${esc(src ?? "?")}</div>
+    </div>
   </div>`;
 }
 
@@ -133,8 +139,9 @@ html,body { width:${device.width}px; height:${device.height}px; overflow:hidden;
 .badge { display:inline-block; font:600 34px/1 ${theme.fonts.mono}; letter-spacing:.14em;
   padding:18px 34px; border:3px solid; border-radius:${theme.radius.badge}px; margin-bottom:44px; }
 h1 { font-family:${theme.fonts.display}; font-weight:600; font-size:${panel.headlineSize ?? 148}px;
+  font-variation-settings:"opsz" 144, "wght" 600, "SOFT" 0, "WONK" 0;
   line-height:1.04; letter-spacing:-0.015em; text-wrap:balance; }
-h1 em { font-style:italic; color:${tint}; }
+h1 em { font-style:normal; color:${tint}; font-variation-settings:"opsz" 144, "wght" 640, "SOFT" 0, "WONK" 0; }
 .sub { font-size:52px; line-height:1.3; color:color-mix(in oklab, ${theme.ink} 62%, transparent);
   margin-top:40px; max-width:1040px; ${panel.align === "center" ? "margin-left:auto;margin-right:auto;" : ""} }
 .shot-zone { position:absolute; left:0; right:0; bottom:-90px; display:flex; justify-content:center; }
@@ -144,13 +151,10 @@ h1 em { font-style:italic; color:${tint}; }
 img.screen { height:auto; }
 .island { position:absolute; top:50px; left:50%; transform:translateX(-50%);
   width:268px; height:80px; background:#000; border-radius:999px; }
-.ph { aspect-ratio:1320/2868; padding:200px 70px 0; position:relative; }
-.ph-head { height:220px; border-radius:36px; margin-bottom:48px; }
-.ph-row { display:flex; align-items:center; gap:30px; margin-bottom:40px; }
-.ph-dot { width:64px; height:64px; border-radius:50%; flex:none; }
-.ph-bar { height:64px; border-radius:20px; flex:1; }
-.ph-note { position:absolute; left:0; right:0; top:46%; text-align:center;
-  font:400 44px/1.5 ${theme.fonts.mono}; color:${theme.inkSoft}; }
+.ph { aspect-ratio:1320/2868; position:relative; }
+.ph-center { position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:40px; }
+.ph-name { font:400 42px/1 ${theme.fonts.mono}; color:${theme.inkSoft}; }
 .card { position:absolute; display:flex; align-items:center; gap:26px; padding:34px 42px;
   background:${theme.white}; border-radius:${theme.radius.card}px; box-shadow:${theme.shadow.card}; }
 .card-ic { width:84px; height:84px; border-radius:26px; flex:none; display:flex;
@@ -162,8 +166,10 @@ img.screen { height:auto; }
 .founder { position:absolute; left:50%; top:46%; transform:translateX(-50%); width:1020px;
   background:${theme.white}; border-radius:56px; box-shadow:${theme.shadow.card};
   padding:90px 84px; text-align:center; }
-.fq { font-family:${theme.fonts.display}; font-style:italic; font-size:64px; line-height:1.35; }
-.fn { font-family:${theme.fonts.display}; font-size:48px; margin-top:56px; }
+.fq { font-family:${theme.fonts.display}; font-style:normal; font-size:64px; line-height:1.35;
+  font-variation-settings:"opsz" 96, "wght" 480, "SOFT" 0, "WONK" 0; }
+.fn { font-family:${theme.fonts.display}; font-size:48px; margin-top:56px;
+  font-variation-settings:"opsz" 72, "wght" 600; }
 .fr { font:400 36px/1.4 ${theme.fonts.mono}; color:${theme.inkSoft}; margin-top:12px; }
 .footnote { position:absolute; bottom:70px; left:0; right:0; text-align:center;
   font:400 36px/1.4 ${theme.fonts.mono}; color:color-mix(in oklab, ${theme.ink} 55%, transparent); }
