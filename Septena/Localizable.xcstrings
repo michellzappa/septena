@@ -4802,6 +4802,9 @@
         }
       }
     },
+    "One private place for every part of your life. Choose what you'd like to track — you can add, rename, or hide sections anytime in Settings." : {
+
+    },
     "Only a Claude Code running on this Mac can connect." : {
       "localizations" : {
         "pt-BR" : {
@@ -6942,6 +6945,9 @@
           }
         }
       }
+    },
+    "Welcome to Septena" : {
+
     },
     "What are you good at?" : {
       "localizations" : {
