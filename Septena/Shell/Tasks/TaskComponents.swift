@@ -330,17 +330,21 @@ enum TaskCelebration {
 // identical. Carries its own h/v padding so it drops straight into a
 // `DrawerSection(padding: .none)` the same way `LogEntryRow` does.
 
-/// Leading provenance cue for an MCP/Claude-created row the user hasn't
+/// Trailing provenance cue for an MCP/Claude-created row the user hasn't
 /// engaged yet. Calm and peripheral (Things-style): it clears on contact via
 /// `TaskMutator.acknowledge` and auto-decays after `AgentCue.decayWindow`.
-/// Deliberately NOT a sparkle — a small accent dot reads as an unread marker.
-/// To change the glyph, swap the `Circle()` for an `Image(systemName:)` here.
+/// Shares the row's single trailing agent-signal slot with `ConvoBadgeView` —
+/// a live conversation's status badge wins, so the two never show at once.
+/// Deliberately NOT a sparkle — a small accent dot reads as an unread marker,
+/// drawn as a `circle.fill` at `.caption2` so it matches `ConvoBadgeView`'s
+/// size and baseline exactly (they share the slot — all the dots read as one
+/// family, differing only in color). To change the glyph, swap the symbol name.
 struct AgentCueMarker: View {
   var tint: Color
   var body: some View {
-    Circle()
-      .fill(tint)
-      .frame(width: 6, height: 6)
+    Image(systemName: "circle.fill")
+      .font(.caption2)
+      .foregroundStyle(tint)
       .accessibilityLabel(Text("Added by Claude, not yet seen"))
   }
 }
@@ -348,10 +352,10 @@ struct AgentCueMarker: View {
 // MARK: - Checkable row primitive
 //
 // The shared skeleton behind every row with a checkbox — tasks, habits,
-// supplements, chores. Owns the checkbox (+ baseline guide), the leading glyph
-// (an agent-cue dot for tasks, an emoji for the checklist sections), the title
-// with its inactive (done / skipped / deferred / cancelled) treatment, an
-// optional subtitle, and the h/v padding so it drops into a
+// supplements, chores. Owns the checkbox (+ baseline guide), an optional
+// leading emoji (the checklist sections), the title with its inactive
+// (done / skipped / deferred / cancelled) treatment, an optional subtitle,
+// and the h/v padding so it drops into a
 // `DrawerSection(padding: .none)` the same way `LogEntryRow` does. The only
 // genuinely per-type piece — the trailing region (dates, time, badges) — is a
 // `@ViewBuilder` slot the caller fills. Per-type toggle side-effects
@@ -369,9 +373,8 @@ struct CheckableRow<Trailing: View>: View {
   /// Strikethrough + dimmed title. Usually `isDone`, but habits fold in
   /// skipped and chores fold in deferred, so the caller decides.
   var isInactive: Bool
-  /// Leading glyph. `showsAgentCue` wins (tasks); otherwise `leadingEmoji`
-  /// renders (checklist sections). Both off → title sits next to the box.
-  var showsAgentCue: Bool = false
+  /// Optional leading emoji (checklist sections). Off → the title sits next
+  /// to the box. Tasks leave this nil; their agent cue rides the trailing slot.
   var leadingEmoji: String? = nil
   let title: String
   var subtitle: String? = nil
@@ -397,10 +400,7 @@ struct CheckableRow<Trailing: View>: View {
       )
       .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 
-      if showsAgentCue {
-        AgentCueMarker(tint: tint)
-          .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
-      } else if let leadingEmoji {
+      if let leadingEmoji {
         Text(leadingEmoji).font(.body)
       }
 
@@ -443,11 +443,11 @@ struct CheckableRow<Trailing: View>: View {
 
 extension CheckableRow where Trailing == EmptyView {
   init(tint: Color, isDone: Bool, isToday: Bool = false, isSomeday: Bool = false,
-       isInactive: Bool, showsAgentCue: Bool = false, leadingEmoji: String? = nil,
+       isInactive: Bool, leadingEmoji: String? = nil,
        title: String, subtitle: String? = nil, isSelected: Bool = false,
        onToggle: @escaping () -> Void, onTap: (() -> Void)? = nil) {
     self.init(tint: tint, isDone: isDone, isToday: isToday, isSomeday: isSomeday,
-              isInactive: isInactive, showsAgentCue: showsAgentCue,
+              isInactive: isInactive,
               leadingEmoji: leadingEmoji, title: title, subtitle: subtitle,
               isSelected: isSelected,
               trailing: { EmptyView() }, onToggle: onToggle, onTap: onTap)
@@ -520,7 +520,6 @@ struct TaskRow: View {
       isToday: task.isOnToday && showsTodayIndicator,
       isSomeday: task.status == .someday && showsSomedayIndicator,
       isInactive: isInactive,
-      showsAgentCue: task.showsAgentCue(),
       title: task.title,
       subtitle: subtitle,
       isSelected: isSelected,
@@ -531,7 +530,7 @@ struct TaskRow: View {
   }
 
   @ViewBuilder private var trailing: some View {
-    ConvoBadgeView(convo: task.conversation)
+    agentSignal
     if hasNotes {
       Image(systemName: "text.alignleft")
         .scaledFont(size: 12)
@@ -543,6 +542,20 @@ struct TaskRow: View {
         .foregroundStyle(Theme.inkSecondary)
     }
     trailingDate
+  }
+
+  /// The single trailing agent-signal dot. A live conversation's status badge
+  /// wins; absent that, the calm "unseen" cue for a Claude-created row the user
+  /// hasn't engaged yet. Mutually exclusive — the row never shows two dots, and
+  /// the cue now rides the same right edge as every other row glyph (it used to
+  /// sit alone on the leading edge). The `hasStarted && badge != nil` guard
+  /// mirrors `ConvoBadgeView`'s own, so when it wins the badge always renders.
+  @ViewBuilder private var agentSignal: some View {
+    if task.conversation.hasStarted, deriveConvo(task.conversation).badge != nil {
+      ConvoBadgeView(convo: task.conversation)
+    } else if task.showsAgentCue() {
+      AgentCueMarker(tint: accent)
+    }
   }
 
   /// Date treatment, lifted from the old `TaskListView.trailingDate`:
