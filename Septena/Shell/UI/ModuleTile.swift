@@ -70,13 +70,13 @@ struct ModuleTile: View {
       .padding(.vertical, 16)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    // iOS 26: float the tile on liquid glass, faintly washed with the
-    // section accent so each tile carries a touch of its own color and
-    // refracts the canvas gradient beneath. macOS keeps the opaque grouped
-    // card (glass over the mac paper canvas reads muddy) — both paths handled
-    // in `glassCard`. The clip keeps the 3pt leading accent bar inside the
-    // rounded corners.
-    .glassCard(tint: accent)
+    // iOS 26: float the tile on neutral liquid glass — the section color
+    // lives only in the 3pt leading bar and the chart fills, not the card
+    // background, so the histogram grid reads on a clean white-glass surface.
+    // macOS keeps the opaque grouped card (glass over the mac paper canvas
+    // reads muddy) — both paths handled in `glassCard`. The clip keeps the
+    // 3pt leading accent bar inside the rounded corners.
+    .glassCard()
     .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
   }
 
