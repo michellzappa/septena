@@ -9,8 +9,9 @@ import SwiftUI
 /// step the moment the user spins it. macOS has no equivalent on
 /// `NSDatePicker` (its `.hourAndMinute` field is typed / stepped by one), so
 /// there it falls back to a stock `DatePicker`; the :05 stepping is an iOS
-/// affordance. Either way the bound value is snapped to the interval on
-/// appear, so what the field shows is what gets saved.
+/// affordance. An existing odd-minute timestamp is left untouched until you
+/// actually spin the wheel, so opening an entry to edit something else never
+/// quietly shifts its time.
 ///
 /// Drop-in for `DatePicker(_:selection:displayedComponents:)`. Use the
 /// label-less initializer wherever the old call paired with `.labelsHidden()`.
@@ -41,7 +42,7 @@ struct SteppedDatePicker: View {
   }
 
   var body: some View {
-    content.onAppear(perform: snapToInterval)
+    content
   }
 
   @ViewBuilder private var content: some View {
@@ -62,20 +63,6 @@ struct SteppedDatePicker: View {
         .labelsHidden()
     }
     #endif
-  }
-
-  /// Snap the stored value to the nearest `minuteInterval`, dropping seconds,
-  /// so the field and the saved timestamp agree. No-op when already aligned.
-  private func snapToInterval() {
-    let cal = Calendar.current
-    let minute = cal.component(.minute, from: selection)
-    let second = cal.component(.second, from: selection)
-    let target = Int((Double(minute) / Double(minuteInterval)).rounded()) * minuteInterval
-    guard target != minute || second != 0 else { return }
-    var snapped = selection
-    if let m = cal.date(byAdding: .minute, value: target - minute, to: snapped) { snapped = m }
-    if second != 0, let s = cal.date(byAdding: .second, value: -second, to: snapped) { snapped = s }
-    selection = snapped
   }
 
   #if os(iOS)
@@ -103,30 +90,52 @@ private struct MinuteIntervalDatePicker: UIViewRepresentable {
     picker.preferredDatePickerStyle = .compact
     picker.minuteInterval = minuteInterval
     picker.date = date
+    context.coordinator.lastPushed = date
     picker.addTarget(context.coordinator,
                      action: #selector(Coordinator.changed(_:)),
                      for: .valueChanged)
     picker.setContentHuggingPriority(.required, for: .horizontal)
+    picker.setContentHuggingPriority(.required, for: .vertical)
     picker.setContentCompressionResistancePriority(.required, for: .horizontal)
+    picker.setContentCompressionResistancePriority(.required, for: .vertical)
     return picker
+  }
+
+  /// Report the picker's natural chip size so SwiftUI gives the Form row
+  /// enough height. Without this the representable's ideal size is ambiguous,
+  /// the row collapses to the label's line height, and the date/time chips get
+  /// clipped top and bottom.
+  func sizeThatFits(_ proposal: ProposedViewSize, uiView: UIDatePicker, context: Context) -> CGSize? {
+    uiView.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize)
   }
 
   func updateUIView(_ picker: UIDatePicker, context: Context) {
     context.coordinator.date = $date
     if picker.datePickerMode != mode { picker.datePickerMode = mode }
     if picker.minuteInterval != minuteInterval { picker.minuteInterval = minuteInterval }
-    // Only push an external change back into the picker; a user-driven edit
-    // already set the binding to `picker.date`, so the diff is ~0 and we skip
-    // it (re-assigning would fight the wheel mid-spin).
-    if abs(picker.date.timeIntervalSince(date)) > 1 { picker.date = date }
+    // Push the binding in only when it actually changed since we last synced.
+    // Comparing against `picker.date` would be wrong: the picker normalizes
+    // its value (drops seconds, rounds to the interval), so an odd-minute or
+    // non-zero-second binding never equals it — and we'd re-assign on every
+    // layout pass, re-animating the label (the ghosted roll on sheet entry).
+    if context.coordinator.lastPushed != date {
+      picker.setDate(date, animated: false)
+      context.coordinator.lastPushed = date
+    }
   }
 
   func makeCoordinator() -> Coordinator { Coordinator(date: $date) }
 
   final class Coordinator: NSObject {
     var date: Binding<Date>
+    /// The last value we wrote into the picker, so `updateUIView` can tell a
+    /// real binding change from the picker's own normalization.
+    var lastPushed: Date?
     init(date: Binding<Date>) { self.date = date }
-    @objc func changed(_ sender: UIDatePicker) { date.wrappedValue = sender.date }
+    @objc func changed(_ sender: UIDatePicker) {
+      date.wrappedValue = sender.date
+      lastPushed = sender.date
+    }
   }
 }
 #endif
