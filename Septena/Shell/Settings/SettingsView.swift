@@ -351,6 +351,33 @@ final class SettingsStore {
     SettingsMirror.upsert(settings: s, context: context, engine: engine)
   }
 
+  /// Apply a new display order for the *enabled* sections, leaving every other
+  /// section's relative slot in the saved order untouched. Backs the Sections
+  /// pane, where the active group is reorderable but the "Off" group is not —
+  /// so a drag among enabled rows must splice back onto the full
+  /// `sectionOrder` without disturbing disabled (or non–logging-domain)
+  /// sections. `enabledOrder` is the enabled keys in their new order.
+  func applySectionOrder(enabledOrder: [String],
+                         context: ModelContext, engine: CKEngine?) {
+    let enabledSet = Set(enabledOrder)
+    let currentOrder = serverSettings?.sectionOrder ?? sections.map(\.key)
+    var iter = enabledOrder.makeIterator()
+    // Walk the saved order; wherever an enabled key sat, drop in the next key
+    // from the new enabled order. Non-enabled keys keep their positions.
+    var newOrder = currentOrder.map { enabledSet.contains($0) ? (iter.next() ?? $0) : $0 }
+    // Append any keys missing from the saved order (newly seeded sections).
+    let known = Set(newOrder)
+    newOrder += sections.map(\.key).filter { !known.contains($0) }
+    let rank = Dictionary(uniqueKeysWithValues: newOrder.enumerated().map { ($1, $0) })
+    sections.sort { (rank[$0.key] ?? .max) < (rank[$1.key] ?? .max) }
+    var s = serverSettings ?? AppSettings(sectionOrder: nil, targets: nil, units: nil,
+                                          time: nil, theme: nil, eink: nil, nutrition: nil,
+                                          hkSync: nil)
+    s.sectionOrder = sections.map(\.key)
+    serverSettings = s
+    SettingsMirror.upsert(settings: s, context: context, engine: engine)
+  }
+
   /// Update the synced welcome name and push it to CloudKit, mirroring the
   /// `moveSections` write pattern. The local `welcomeName` @AppStorage key
   /// (read by `WelcomeHeader`) is written at the edit site, so both the
@@ -2542,8 +2569,7 @@ struct SectionsSettingsPane: View {
   @Environment(CKEngine.self) private var ckEngine
 
   /// Installed sections in the user's saved order, with newly seeded sections
-  /// (not yet in `sectionOrder`) appended. Includes disabled sections. The
-  /// row offsets line up with what `store.moveSections` expects.
+  /// (not yet in `sectionOrder`) appended. Includes disabled sections.
   private var entries: [SectionEntry] {
     let installedByKey = Dictionary(uniqueKeysWithValues: store.sections.map { ($0.key, $0) })
     let order = store.serverSettings?.sectionOrder ?? store.sections.map(\.key)
@@ -2563,20 +2589,42 @@ struct SectionsSettingsPane: View {
     }
   }
 
+  /// Active sections, in saved order — the reorderable group.
+  private var enabledEntries: [SectionEntry] { entries.filter(\.isEnabled) }
+  /// Disabled sections — listed below, statically (their order doesn't drive
+  /// any surface, and reordering an off section reads as noise).
+  private var disabledEntries: [SectionEntry] { entries.filter { !$0.isEnabled } }
+
   var body: some View {
     Form {
       Section {
-        ForEach(entries) { entry in
+        ForEach(enabledEntries) { entry in
           NavigationLink(value: SettingsView.SettingsDestination.section(entry.key)) {
             row(for: entry)
           }
         }
         .onMove { from, to in
-          store.moveSections(fromOffsets: from, toOffset: to,
-                             context: modelContext, engine: ckEngine)
+          var keys = enabledEntries.map(\.key)
+          keys.move(fromOffsets: from, toOffset: to)
+          store.applySectionOrder(enabledOrder: keys,
+                                  context: modelContext, engine: ckEngine)
         }
       } footer: {
-        Text("Tap a section to set its color, turn it on or off, and tune what it tracks. Drag to reorder how sections appear on the home tab. Disabled sections stay here with your data intact.")
+        Text("Tap a section to set its color, turn it on or off, and tune what it tracks. Drag to reorder how sections appear across the app.")
+      }
+
+      if !disabledEntries.isEmpty {
+        Section {
+          ForEach(disabledEntries) { entry in
+            NavigationLink(value: SettingsView.SettingsDestination.section(entry.key)) {
+              row(for: entry)
+            }
+          }
+        } header: {
+          Text("Off")
+        } footer: {
+          Text("Turned-off sections disappear from the home tab but keep all their data. Turn one back on anytime.")
+        }
       }
     }
     .formStyle(.grouped)
@@ -2600,11 +2648,6 @@ struct SectionsSettingsPane: View {
         }
       }
       Spacer()
-      if !entry.isEnabled {
-        Text("Off")
-          .font(.caption)
-          .foregroundStyle(.secondary)
-      }
     }
   }
 }

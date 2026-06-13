@@ -230,7 +230,7 @@ public extension SectionManifest {
     .init(
       key: "tasks",
       defaultLabel: String(localized: "Tasks", comment: "Section name"),
-      shortDescription: String(localized: "Inbox, projects, areas, today and upcoming", comment: "Section description"),
+      shortDescription: String(localized: "See what's due today and capture the rest", comment: "Section description"),
       // Tasks is .optional like every other section: disabling never
       // deletes data, and the architecture's data-preservation
       // guarantees make a hard lock unnecessary. .always remains in
@@ -243,7 +243,7 @@ public extension SectionManifest {
     .init(
       key: "training",
       defaultLabel: String(localized: "Training", comment: "Section name"),
-      shortDescription: String(localized: "Sessions, exercises, weekly Z2", comment: "Section description"),
+      shortDescription: String(localized: "Log workouts and keep your week on track", comment: "Section description"),
       activation: .optional,
       onboarding: .core,
       supportsDashboard: true,
@@ -252,7 +252,7 @@ public extension SectionManifest {
     .init(
       key: "nutrition",
       defaultLabel: String(localized: "Nutrition", comment: "Section name"),
-      shortDescription: String(localized: "Macros and calorie ranges", comment: "Section description"),
+      shortDescription: String(localized: "Hit your macro and calorie targets", comment: "Section description"),
       activation: .optional,
       onboarding: .core,
       supportsDashboard: true,
@@ -261,7 +261,7 @@ public extension SectionManifest {
     .init(
       key: "sleep",
       defaultLabel: String(localized: "Sleep", comment: "Section name"),
-      shortDescription: String(localized: "Bed and wake times, nightly duration", comment: "Section description"),
+      shortDescription: String(localized: "See how well you slept each night", comment: "Section description"),
       activation: .optional,
       onboarding: .core,
       supportsDashboard: true,
@@ -270,7 +270,7 @@ public extension SectionManifest {
     .init(
       key: "habits",
       defaultLabel: String(localized: "Habits", comment: "Section name"),
-      shortDescription: String(localized: "Daily routines and streaks", comment: "Section description"),
+      shortDescription: String(localized: "Build routines and keep your streaks alive", comment: "Section description"),
       activation: .optional,
       onboarding: .core,
       supportsDashboard: true,
@@ -279,7 +279,7 @@ public extension SectionManifest {
     .init(
       key: "chores",
       defaultLabel: String(localized: "Chores", comment: "Section name"),
-      shortDescription: String(localized: "Recurring household tasks", comment: "Section description"),
+      shortDescription: String(localized: "Keep recurring household tasks from slipping", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
       supportsDashboard: true,
@@ -288,7 +288,7 @@ public extension SectionManifest {
     .init(
       key: "supplements",
       defaultLabel: String(localized: "Supplements", comment: "Section name"),
-      shortDescription: String(localized: "Daily supplements log", comment: "Section description"),
+      shortDescription: String(localized: "Remember what you've taken each day", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
       supportsDashboard: true,
@@ -297,7 +297,7 @@ public extension SectionManifest {
     .init(
       key: "groceries",
       defaultLabel: String(localized: "Groceries", comment: "Section name"),
-      shortDescription: String(localized: "Shopping list and pantry", comment: "Section description"),
+      shortDescription: String(localized: "Keep a running list and a stocked pantry", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
       supportsDashboard: true,
@@ -310,7 +310,7 @@ public extension SectionManifest {
     .init(
       key: "intake",
       defaultLabel: String(localized: "Intake", comment: "Section name"),
-      shortDescription: String(localized: "Track what you consume — and cut back on it", comment: "Section description"),
+      shortDescription: String(localized: "Track what you consume and ease back", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
       supportsDashboard: true,
@@ -319,7 +319,7 @@ public extension SectionManifest {
     .init(
       key: "body",
       defaultLabel: String(localized: "Body", comment: "Section name"),
-      shortDescription: String(localized: "Weight, body fat, measurements", comment: "Section description"),
+      shortDescription: String(localized: "Watch your weight and measurements trend", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
       supportsDashboard: true,
@@ -328,7 +328,7 @@ public extension SectionManifest {
     .init(
       key: "gut",
       defaultLabel: String(localized: "Gut", comment: "Section name"),
-      shortDescription: String(localized: "Digestion log", comment: "Section description"),
+      shortDescription: String(localized: "Spot what upsets your digestion", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
       supportsDashboard: true,
@@ -337,7 +337,7 @@ public extension SectionManifest {
     .init(
       key: "mood",
       defaultLabel: String(localized: "Mood", comment: "Section name"),
-      shortDescription: String(localized: "Three-times-a-day affect check-ins", comment: "Section description"),
+      shortDescription: String(localized: "Notice how your mood shifts through the day", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
       supportsDashboard: true,
@@ -346,7 +346,7 @@ public extension SectionManifest {
     .init(
       key: "symptoms",
       defaultLabel: String(localized: "Symptoms", comment: "Section name"),
-      shortDescription: String(localized: "Pain, symptoms, severity, flares and triggers", comment: "Section description"),
+      shortDescription: String(localized: "Track symptoms and uncover their triggers", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
       supportsDashboard: true,
@@ -355,7 +355,7 @@ public extension SectionManifest {
     .init(
       key: "medications",
       defaultLabel: String(localized: "Medications", comment: "Section name"),
-      shortDescription: String(localized: "Dose logs, skips, effects and side effects", comment: "Section description"),
+      shortDescription: String(localized: "Stay on schedule and track the effects", comment: "Section description"),
       activation: .optional,
       onboarding: .optional,
       supportsDashboard: true,
@@ -364,7 +364,7 @@ public extension SectionManifest {
     .init(
       key: "activity",
       defaultLabel: String(localized: "Activity", comment: "Section name"),
-      shortDescription: String(localized: "Steps and movement (HealthKit)", comment: "Section description"),
+      shortDescription: String(localized: "Bring your steps and movement in from Apple Health", comment: "Section description"),
       activation: .integration,
       onboarding: .optional,
       supportsDashboard: true,
@@ -379,7 +379,7 @@ public extension SectionManifest {
     .init(
       key: "github",
       defaultLabel: String(localized: "GitHub", comment: "Section name"),
-      shortDescription: String(localized: "Commit activity as a contribution heatmap", comment: "Section description"),
+      shortDescription: String(localized: "See your coding streak as a commit heatmap", comment: "Section description"),
       activation: .integration,
       onboarding: .optional,
       supportsDashboard: true,
@@ -404,7 +404,7 @@ public extension SectionManifest {
     .init(
       key: "hydration",
       defaultLabel: String(localized: "Hydration", comment: "Section name"),
-      shortDescription: String(localized: "Water intake against a daily target", comment: "Section description"),
+      shortDescription: String(localized: "Hit your daily water goal", comment: "Section description"),
       activation: .optional,
       onboarding: .core,
       supportsDashboard: true,
@@ -420,7 +420,7 @@ public extension SectionManifest {
     .init(
       key: "goals",
       defaultLabel: String(localized: "Coach", comment: "Section name"),
-      shortDescription: String(localized: "On-device coaches over your goals and logged data", comment: "Section description"),
+      shortDescription: String(localized: "On-device coaching over your goals and data", comment: "Section description"),
       activation: .optional,
       onboarding: .hidden,
       supportsDashboard: false,

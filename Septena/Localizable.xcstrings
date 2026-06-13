@@ -1665,6 +1665,7 @@
       }
     },
     "Bed and wake times, nightly duration" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -2066,6 +2067,7 @@
       }
     },
     "Commit activity as a contribution heatmap" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -2379,6 +2381,7 @@
       }
     },
     "Daily routines and streaks" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -2389,6 +2392,7 @@
       }
     },
     "Daily supplements log" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -2487,6 +2491,7 @@
 
     },
     "Digestion log" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -3633,6 +3638,7 @@
       }
     },
     "Inbox, projects, areas, today and upcoming" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -4111,6 +4117,7 @@
       }
     },
     "Macros and calorie ranges" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -5270,6 +5277,7 @@
       }
     },
     "Recurring household tasks" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -5671,6 +5679,7 @@
       }
     },
     "Sessions, exercises, weekly Z2" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -5749,6 +5758,7 @@
       }
     },
     "Shopping list and pantry" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -5974,6 +5984,7 @@
       }
     },
     "Steps and movement (HealthKit)" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -6178,7 +6189,7 @@
         }
       }
     },
-    "Tap a section to set its color, turn it on or off, and tune what it tracks. Drag to reorder how sections appear on the home tab. Disabled sections stay here with your data intact." : {
+    "Tap a section to set its color, turn it on or off, and tune what it tracks. Drag to reorder how sections appear across the app." : {
 
     },
     "Tap a symptom to rename it — the new name updates every logged entry automatically." : {
@@ -6473,6 +6484,7 @@
       }
     },
     "Three-times-a-day affect check-ins" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -6714,6 +6726,9 @@
         }
       }
     },
+    "Turned-off sections disappear from the home tab but keep all their data. Turn one back on anytime." : {
+
+    },
     "Type %@ · %@" : {
       "localizations" : {
         "en" : {
@@ -6922,6 +6937,7 @@
       }
     },
     "Water intake against a daily target" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -6962,6 +6978,7 @@
       }
     },
     "Weight, body fat, measurements" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
