@@ -96,9 +96,20 @@ struct TimeOfDayWheel: View {
   /// (bedtime) and sun (wake) on the inner/scheduled track, upright and
   /// outside the rotation so the glyphs stay readable as the dial turns.
   var sleepMarks: (bed: Double, wake: Double)? = nil
+  /// Fades the data layers (dots, ticks, now-hand, bands, sleep glyphs) — the
+  /// hero drops this to 0 during a day-swipe so the marks are hidden while the
+  /// dial reorients, then back to 1 to reveal the new day. Avoids trying to
+  /// spin every layer in unison (only the night wedge turns, visibly).
+  var marksOpacity: Double = 1
 
-  /// Degrees to spin the dial content so `northFraction` lands at the top.
+  /// Target degrees to spin the dial content so `northFraction` lands at the
+  /// top. The *applied* rotation is `displayedRotation`, which tracks this by
+  /// the SHORTEST path so a reorientation never spins the long way round.
   private var northRotation: Double { northFraction.map { -$0 * 360 } ?? 0 }
+
+  /// The actually-applied rotation, accumulated so each change to
+  /// `northRotation` moves by the shortest signed delta (±180° max).
+  @State private var displayedRotation: Double = 0
 
   /// Base (un-rotated) position of a clock `fraction` on the ring at
   /// `radiusFactor`. The dial's rotation is applied by the enclosing
@@ -264,8 +275,8 @@ struct TimeOfDayWheel: View {
         AnnulusShape(holeFraction: Self.heroHoleFraction)
           .fill(nightShading(nightArc))
           .padding(20)
-          .rotationEffect(.degrees(northRotation))
-          .animation(.easeInOut(duration: 0.6), value: northRotation)
+          .rotationEffect(.degrees(displayedRotation))
+          .animation(.easeInOut(duration: 0.6), value: displayedRotation)
       }
       // The clear glass donut is a uniform ring, so it must NOT rotate —
       // `rotationEffect` disables `.glassEffect` (the live material can't
@@ -423,11 +434,13 @@ struct TimeOfDayWheel: View {
                  at: center)
       }
     }
-    // The marks (ticks, bands, dots, now-hand) rotate so the clock turns with
-    // "now" at the top; the static glass donut and the upright overlays below
-    // do not. Midnight-at-top when nothing pins it.
-    .rotationEffect(.degrees(northRotation))
-    .animation(.easeInOut(duration: 0.6), value: northRotation)
+    // The marks (ticks, bands, dots, now-hand) sit at the dial's orientation
+    // ("now" at the top). They DON'T animate their rotation — during a
+    // day-swipe they're faded out (marksOpacity → 0), the dial reorients, and
+    // they fade back in at the new angle, so there's no multi-layer spin to
+    // fall out of sync. Only the night wedge turns visibly.
+    .rotationEffect(.degrees(displayedRotation))
+    .opacity(marksOpacity)
 
       // The hero's centre labels live OUTSIDE the rotation — always, so the
       // date stays upright and fixed whether the dial is at rest, drifting, or
@@ -453,6 +466,18 @@ struct TimeOfDayWheel: View {
     .accessibilityHint(compact || lockToday
       ? Text("")
       : Text("Double tap to switch between today and the last \(windowDays) days"))
+    // Seed the applied rotation without animating in from 0 on first appear.
+    .onAppear {
+      var t = Transaction(); t.disablesAnimations = true
+      withTransaction(t) { displayedRotation = northRotation }
+    }
+    // Track the target by the shortest signed delta, so the dial never spins
+    // the long way round (e.g. 5pm → midnight turns 108°, not 252°).
+    .onChange(of: northFraction) { _, _ in
+      var delta = (northRotation - displayedRotation).truncatingRemainder(dividingBy: 360)
+      if delta > 180 { delta -= 360 } else if delta < -180 { delta += 360 }
+      displayedRotation += delta
+    }
   }
 
   /// The centre date stack (weekday · day · month) for the rotating hero,
@@ -481,17 +506,17 @@ struct TimeOfDayWheel: View {
         Image(systemName: "moon.fill")
           .font(.system(size: 10))
           .foregroundStyle(Theme.inkSecondary)
-          .rotationEffect(.degrees(-northRotation))
+          .rotationEffect(.degrees(-displayedRotation))
           .position(ringPoint(s.bed, 0.58, in: diameter))
         Image(systemName: "sun.max.fill")
           .font(.system(size: 11))
           .foregroundStyle(Theme.inkSecondary)
-          .rotationEffect(.degrees(-northRotation))
+          .rotationEffect(.degrees(-displayedRotation))
           .position(ringPoint(s.wake, 0.58, in: diameter))
       }
       .frame(width: diameter, height: diameter)
-      .rotationEffect(.degrees(northRotation))
-      .animation(.easeInOut(duration: 0.6), value: northRotation)
+      .rotationEffect(.degrees(displayedRotation))
+      .opacity(marksOpacity)
       .allowsHitTesting(false)
     }
   }

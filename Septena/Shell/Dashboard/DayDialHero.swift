@@ -72,6 +72,10 @@ struct DayDialHero: View {
   @State private var dayOffset = 0
   /// Live horizontal follow while swiping — the "turn the page" feel.
   @State private var dragX: CGFloat = 0
+  /// Hides the data layers (dots, ticks, now-hand, bands, sleep glyphs) mid
+  /// day-swipe so the dial can reorient without trying to spin everything in
+  /// unison; revealed again at the new day.
+  @State private var marksVisible = true
   #if os(iOS)
   @State private var tilt = TiltSource()
   #endif
@@ -106,6 +110,25 @@ struct DayDialHero: View {
   /// Step the scrubbed day, clamped to [today − maxDaysBack, today].
   private func stepDay(_ delta: Int) {
     dayOffset = max(-Self.maxDaysBack, min(0, dayOffset + delta))
+  }
+
+  /// Day-swipe transition: fade the data out, reorient the dial (the night
+  /// wedge turns; "now"-at-top only differs between today and a past day),
+  /// then fade the new day's data in — rather than spinning every layer at
+  /// once. Holds longer when crossing the today boundary, where the wedge has
+  /// a real turn to make; a past↔past step is just a quick data swap.
+  private func scrub(_ delta: Int) {
+    let target = max(-Self.maxDaysBack, min(0, dayOffset + delta))
+    guard target != dayOffset else { return }
+    let crossesToday = (dayOffset == 0) != (target == 0)
+    let holdMs = crossesToday ? 560 : 190
+    withAnimation(.easeOut(duration: 0.14)) { marksVisible = false }
+    Task { @MainActor in
+      try? await Task.sleep(for: .milliseconds(150))
+      dayOffset = target                 // reorients (wedge animates) + reloads
+      try? await Task.sleep(for: .milliseconds(holdMs))
+      withAnimation(.easeIn(duration: 0.3)) { marksVisible = true }
+    }
   }
 
   /// The displayed day's sleep window (bedtime, wake) as dial fractions —
@@ -161,7 +184,9 @@ struct DayDialHero: View {
       // has no "now", so it rests at the fixed midnight-top orientation.
       northFraction: isToday ? nowFraction : nil,
       // Moon at bedtime, sun at wake, on the inner track.
-      sleepMarks: sleepMarks
+      sleepMarks: sleepMarks,
+      // Hidden while a day-swipe reorients the dial, then revealed.
+      marksOpacity: marksVisible ? 1 : 0
     )
     // A wide soft backwash for depth, drifting a few points against device
     // tilt (iOS) while the glass stays put — the parallax that makes the
@@ -189,11 +214,9 @@ struct DayDialHero: View {
         .onEnded { v in
           let dx = v.translation.width
           let horizontal = abs(dx) > abs(v.translation.height)
-          withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-            if horizontal && dx > 40 { stepDay(-1) }        // swipe right → previous day
-            else if horizontal && dx < -40 { stepDay(1) }   // swipe left → next day
-            dragX = 0
-          }
+          withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { dragX = 0 }
+          if horizontal && dx > 40 { scrub(-1) }        // swipe right → previous day
+          else if horizontal && dx < -40 { scrub(1) }   // swipe left → next day
         }
     )
     .onTapGesture { tabSelection.current = .next }
@@ -202,7 +225,7 @@ struct DayDialHero: View {
     .overlay(alignment: .bottomLeading) {
       if !isToday {
         Button {
-          withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { dayOffset = 0 }
+          scrub(-dayOffset)
         } label: {
           Image(systemName: "arrow.uturn.left")
             .font(.caption.weight(.semibold))
