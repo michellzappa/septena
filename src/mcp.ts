@@ -428,7 +428,7 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
     },
     {
       name: "training_entry_update",
-      description: "Update fields on an existing exercise entry.",
+      description: "Update any subset of fields on an existing exercise entry — only fields you pass change (pass null to clear an optional one). Supports rename/retag (exercise, sessionType, date, time) as well as per-set metrics; returns the list of fields actually written.",
       inputSchema: updateTrainingEntryJsonSchema,
     },
     {
