@@ -3571,6 +3571,7 @@ extension ChoreEventEntity: LoggedEvent { var sectionKey: String { "chores" } }
 extension HabitDayStateEntity: LoggedEvent { var sectionKey: String { "habits" } }
 extension SupplementDayStateEntity: LoggedEvent { var sectionKey: String { "supplements" } }
 extension ExerciseEntryEntity: LoggedEvent { var sectionKey: String { "training" } }
+extension IntakeEventEntity: LoggedEvent { var sectionKey: String { "intake" } }
 
 /// Nutrition (and hydration, which rides on the same entity) stores its instant
 /// as `loggedAt` — always populated, no `.distantPast` sentinel — rather than
@@ -3603,6 +3604,7 @@ enum LoggedEvents {
     add(HabitDayStateEntity.self)
     add(SupplementDayStateEntity.self)
     add(ExerciseEntryEntity.self)
+    add(IntakeEventEntity.self)
     add(NutritionEntryEntity.self)
     return out
   }
@@ -3629,6 +3631,7 @@ enum LoggedEvents {
     add(FetchDescriptor<HabitDayStateEntity>(predicate: #Predicate { $0.occurredAt >= date }))
     add(FetchDescriptor<SupplementDayStateEntity>(predicate: #Predicate { $0.occurredAt >= date }))
     add(FetchDescriptor<ExerciseEntryEntity>(predicate: #Predicate { $0.occurredAt >= date }))
+    add(FetchDescriptor<IntakeEventEntity>(predicate: #Predicate { $0.occurredAt >= date }))
     // Nutrition stores its instant as `loggedAt` (occurredAt is a computed alias).
     add(FetchDescriptor<NutritionEntryEntity>(predicate: #Predicate { $0.loggedAt >= date }))
     return out
@@ -3669,6 +3672,7 @@ enum LoggedEvents {
     grab(FetchDescriptor<HabitDayStateEntity>(predicate: #Predicate { $0.occurredAt >= date }))
     grab(FetchDescriptor<SupplementDayStateEntity>(predicate: #Predicate { $0.occurredAt >= date }))
     grab(FetchDescriptor<ExerciseEntryEntity>(predicate: #Predicate { $0.occurredAt >= date }))
+    grab(FetchDescriptor<IntakeEventEntity>(predicate: #Predicate { $0.occurredAt >= date }))
     // Nutrition stores its instant as `loggedAt` (occurredAt is a computed alias).
     grab(FetchDescriptor<NutritionEntryEntity>(predicate: #Predicate { $0.loggedAt >= date }))
     return out.sorted { $0.occurredAt > $1.occurredAt }
