@@ -310,6 +310,22 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         TEST_TARGET_NAME: Septena
 
+  # Mac marketing-screenshot capture (App Store viz pipeline, appstore/).
+  SeptenaMacUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: SeptenaMacUITests
+        excludes:
+          - "**/.DS_Store"
+    dependencies:
+      - target: SeptenaMac
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.macuitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: SeptenaMac
+
 schemes:
   Septena:
     build:
@@ -347,6 +363,10 @@ schemes:
         SeptenaMac: all
     run:
       config: Debug
+    test:
+      config: Debug
+      targets:
+        - SeptenaMacUITests
 
   # Standalone unit-test scheme. Runs fast (no host app):
   #   xcodebuild test -scheme SeptenaCoreTests -destination 'platform=macOS'

@@ -21,79 +21,140 @@
 import { theme } from "./theme.mjs";
 const S = theme.sections;
 
-export const panels = {
-  iphone69: [
+// iPhone narrative, defined first so iPad can reuse it (same captures, same
+// copy; only the device frame differs). Mac and Watch have their own lists.
+// App Store best practice: first 2 panels carry most conversions, each headline
+// = one benefit the shot proves. Angle: all-in-one life dashboard, for
+// privacy-conscious general users. Must-prove: Week, Correlations, Privacy.
+// Shot `src` names map to SeptenaUITests/ScreenshotTests.swift.
+const iphone = [
     {
+      // 1 · HOOK — the all-in-one promise, on the hero Week screen.
       id: "hook",
       background: { tint: theme.accent, dots: true },
-      badge: "PRIVATE · LOCAL-FIRST",
-      headline: "Your whole life, *one private app*",
-      sub: "Sixteen life sections. One Week. Zero servers.",
-      shot: { src: "01-Week", width: 0.76, rotate: -2.5, offsetY: 0.16 },
+      badge: "ALL IN ONE",
+      headline: "Your whole life, *one calm screen*",
+      sub: "Tasks, sleep, training, mood — every part of your day, together.",
+      shot: { src: "01-Week", width: 0.76, rotate: -2.5, offsetY: 0.17 },
     },
     {
+      // 2 · THE WEEK — glanceable seven days; proves breadth + streaks.
       id: "week",
       background: { tint: S.sleep },
       badge: "THE WEEK",
-      headline: "Start your day with *the Week*",
-      sub: "The trailing seven days — tasks, training, sleep, mood — in one glance.",
-      shot: { src: "06-Week-heatmap", width: 0.74, rotate: 2, offsetY: 0.14 },
+      headline: "Your last *seven days*, at a glance",
+      sub: "Heatmaps and streaks across every section you care about — no tab-digging.",
+      shot: { src: "06-Week-heatmap", width: 0.74, rotate: 2, offsetY: 0.15 },
       overlays: [
-        { icon: "spark", title: "Streaks & heatmaps", sub: "per section, per day", tint: S.habits, x: 0.04, y: 0.56, rotate: -2 },
+        { icon: "spark", title: "Streaks & heatmaps", sub: "per section, per day", tint: S.habits, x: 0.04, y: 0.55, rotate: -2 },
       ],
     },
     {
-      id: "next",
-      background: { tint: S.habits },
-      badge: "NEXT FEED",
-      headline: "Always know *what's next*",
-      sub: "One Next feed, identical on iPhone, Apple Watch, and widgets.",
-      shot: { src: "03-Next", width: 0.74, rotate: -2, offsetY: 0.14 },
-      overlays: [
-        { icon: "watch", title: "Same feed on your wrist", sub: "watch app + complications", tint: S.sleep, x: 0.36, y: 0.6, rotate: 2 },
-      ],
-    },
-    {
+      // 3 · CORRELATIONS — the payoff only an all-in-one app can give.
       id: "correlations",
       background: { tint: S.nutrition },
-      badge: "CORRELATIONS",
+      badge: "PATTERNS",
       headline: "See what *actually moves* your sleep",
-      sub: "Septena correlates across sections — caffeine, training, mood — once the data means something.",
-      shot: { src: "08-Correlations", width: 0.74, rotate: 2, offsetY: 0.14 },
+      sub: "Septena connects the dots — like late coffee turning up in last night's rest.",
+      shot: { src: "08-Correlations", width: 0.74, rotate: 2, offsetY: 0.15 },
     },
     {
+      // 4 · SECTIONS — breadth + control; chips name the domains.
       id: "sections",
       background: { tint: S.goals, dots: true },
       align: "center",
-      badge: "16 SECTIONS",
-      headline: "Sections, *not silos*",
-      sub: "Enable what fits. Hide the rest — your data stays.",
-      chips: { x: 0.5, y: 0.42, w: 1140 },
-      shot: { src: "10-Nutrition", width: 0.66, rotate: 0, offsetY: 0.42 },
+      badge: "SIXTEEN SECTIONS",
+      headline: "Turn on *only what matters*",
+      sub: "Hide a section and it's gone from view. Your data stays exactly where it was.",
+      chips: { x: 0.5, y: 0.43, w: 1140 },
+      shot: { src: "05-Goals", width: 0.66, rotate: 0, offsetY: 0.44 },
     },
     {
+      // 5 · PRIVACY — the trust wedge for a general, privacy-aware audience.
       id: "privacy",
       background: { tint: theme.accent, style: "split" },
       align: "center",
       badge: "PRIVATE BY DESIGN",
       headline: "No servers. No accounts. *No ads.*",
-      sub: "Local-first, synced end-to-end through your own iCloud.",
+      sub: "Your data lives on your device, synced only through your own iCloud.",
+      overlays: [
+        { icon: "lock", title: "End-to-end, even from us", sub: "export it all, any time", tint: theme.accent, x: 0.17, y: 0.46, w: 860, rotate: 0 },
+      ],
+    },
+    {
+      // 6 · CLOSE — quiet, human sign-off.
+      id: "close",
+      background: { tint: S.body, style: "split" },
+      align: "center",
+      badge: "MADE FOR DAILY USE",
+      headline: "A calm place to *run your life*",
+      sub: "Not another feed to check. Try it with demo data before committing your own.",
       founder: {
         quote: "I built Septena for my own daily use. Your data is yours — full stop.",
         name: "MZ",
         role: "maker of Septena",
       },
-      footnote: "Export everything, any time · iOS · macOS · watchOS",
+      footnote: "iPhone · Apple Watch · iPad · Mac",
     },
-  ],
+];
 
-  // Pre-wired slots — fill when the device goes active in devices.mjs.
-  // iPad can usually reuse the iPhone list with wider shots; Mac needs the
-  // landscape layout variant (components.mjs doesn't have one yet); Watch
-  // panels are raw-ish captures with at most a one-line headline.
-  ipad13: [],
-  mac: [],
-  watch: [],
-};
+// iPad reuses the iPhone narrative; the pad frame is shorter (aspect 0.75) so
+// shots sit a little higher and wider. We adjust only the geometry, not copy.
+const ipad = iphone.map((p) =>
+  p.shot
+    ? { ...p, shot: { ...p.shot, width: Math.min(0.86, (p.shot.width ?? 0.74) + 0.06), offsetY: (p.shot.offsetY ?? 0) + 0.10 } }
+    : p,
+);
 
+// Mac is landscape (text column + windowed shot). Fewer panels, all with a
+// shot. Captures come from raw/mac/ (SeptenaMacUITests), same basenames.
+const mac = [
+  {
+    id: "hook",
+    background: { tint: theme.accent, dots: true },
+    badge: "ALL IN ONE",
+    headline: "Your whole life, *one calm screen*",
+    sub: "Every part of your day, together — now on the Mac.",
+    shot: { src: "01-Week", rotate: 0 },
+  },
+  {
+    id: "week",
+    background: { tint: S.sleep },
+    badge: "THE WEEK",
+    headline: "Your last *seven days*, at a glance",
+    sub: "Heatmaps and streaks across every section, in one calm window.",
+    shot: { src: "06-Week-heatmap", rotate: 0 },
+  },
+  {
+    id: "correlations",
+    background: { tint: S.nutrition },
+    badge: "PATTERNS",
+    headline: "See what *actually moves* your sleep",
+    sub: "Septena connects the dots across everything you track.",
+    shot: { src: "08-Correlations", rotate: 0 },
+  },
+  {
+    id: "sections",
+    background: { tint: S.goals, dots: true },
+    badge: "SIXTEEN SECTIONS",
+    headline: "Turn on *only what matters*",
+    sub: "Hide a section and it's gone from view. Your data stays.",
+    shot: { src: "05-Goals", rotate: 0 },
+  },
+];
+
+// Watch: single Next screen (MZ captures it). frame "none", minimal chrome.
+const watch = [
+  {
+    id: "next",
+    background: { tint: theme.accent, dots: true },
+    align: "center",
+    badge: "ON YOUR WRIST",
+    headline: "What's *next*, now",
+    headlineSize: 46,
+    shot: { src: "Next", width: 0.82, rotate: 0, offsetY: 0.04 },
+  },
+];
+
+export const panels = { iphone69: iphone, ipad13: ipad, mac, watch };
 export const panelsFor = (deviceKey) => panels[deviceKey] ?? [];

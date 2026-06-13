@@ -17,6 +17,14 @@ never in the generated `.txt` files.
 - Panel **visuals** (headlines, screenshot choices, overlays) live in code:
   `appstore/panels.config.mjs`. Copy lives here; composition lives there.
 
+**Listing strategy** (keep panels honest to this): angle is *all-in-one life
+dashboard*; audience is *privacy-conscious general*; the screenshots must prove
+**the Week**, **correlations**, and **privacy**. Panel order (highest-converting
+first): hook (all-in-one) → the Week → correlations → sections → privacy →
+close. Shots come from `SeptenaUITests/ScreenshotTests.swift` (names are the
+contract): hook `01-Week`, week `06-Week-heatmap`, correlations
+`08-Correlations`, sections `05-Goals`; privacy/close are statement panels.
+
 **Character limits** (validated by `appstore/validate.mjs`): name 30,
 subtitle 30, promotional_text 170, description 4000, keywords 100 (comma
 separated, no spaces needed after commas).
@@ -31,48 +39,44 @@ Septena
 
 ### subtitle
 
-Your private life dashboard
+All your life, one private app
 
 ### promotional_text
 
-Septena 1.0 — the Week dashboard, 16 life sections, Apple Watch app, widgets, and correlations. Local-first, synced privately through your own iCloud.
+The calmest way to keep your whole life in one place — tasks, sleep, training, mood, and more. Private by design, synced only through your iCloud. No accounts, no ads.
 
 ### description
 
-Septena is a private, local-first operating system for your life. Tasks, training, nutrition, sleep, habits, hydration, mood, body, supplements, chores, groceries, and more — every domain is a section you can enable or hide, and everything meets on one Week dashboard.
+Your life doesn't fit in one app — so you've ended up with a dozen. A tracker here, a journal there, a habit app you keep forgetting to open. Septena brings all of it home.
 
-THE WEEK
-One glance at the trailing seven days. Sparklines, heatmaps, and per-section tiles show what you did, what's pending, and where the streaks are.
+It's a single, private dashboard for the parts of life worth keeping an eye on: tasks, training, sleep, nutrition, habits, mood, hydration, and more. Each one lives in its own section you can turn on or quietly hide — and they all meet on one screen called the Week.
 
-NEXT, EVERYWHERE
-A single Next feed — the few things that matter right now — shared across iPhone, Apple Watch, and widgets, so the same answer follows you to whichever screen is closest.
+ONE GLANCE AT YOUR WEEK
+Open Septena and see your last seven days at once. Heatmaps and gentle sparklines show what you did, what's still open, and where your streaks are — across every section you care about, in one calm view. No digging through tabs.
 
-CORRELATIONS
-Septena looks across sections so you don't have to: caffeine against sleep, training against mood. Patterns surface on the dashboard once there's enough data to mean something.
+PATTERNS YOU'D NEVER SPOT ALONE
+Septena looks across your sections so you don't have to. It quietly connects the dots — like that late afternoon coffee turning up in last night's sleep — and surfaces the pattern only once there's enough to actually trust it.
 
-SECTIONS, NOT SILOS
-Sixteen sections, each optional. Disable one and its surfaces disappear — your data never does. Colors, labels, and visibility are yours to change.
+SIXTEEN SECTIONS, NONE REQUIRED
+Turn on only what matters to you and leave the rest behind. Hide a section and its screens disappear; your data stays exactly where it was, waiting in case you change your mind. Rename it, recolor it, make it yours.
 
-PRIVATE BY ARCHITECTURE
-No accounts. No servers. No ads. No analytics. Your data lives on your device and syncs through your own iCloud private database — end-to-end, invisible to us. Export everything, any time.
+PRIVATE THE WAY IT SHOULD BE
+There's no account to create and no server to trust. No ads, no analytics, no one looking over your shoulder. Your data lives on your device and syncs only through your own iCloud — end to end, invisible even to us. Export all of it whenever you like.
 
-ALSO IN THE BOX
-- Apple Watch app with complications and quick-add
-- Home Screen and Lock Screen widgets, Live Activities
-- App Intents: log anything with Siri or Shortcuts
-- Health, Oura, Withings, and GitHub integrations
-- Time travel: scrub back to any day
-- Demo mode to explore with curated data before committing
+WHEREVER YOU ALREADY ARE
+A Home and Lock Screen widget for the day ahead. An Apple Watch app and complications for the few things that matter right now. Log anything hands-free with Siri and Shortcuts. And step back to any past day to see how it really went.
 
-Built by one person, for daily use first. Septena is opinionated, fast, and quiet — a place to run your life, not another feed to check.
+Septena was built by one person, for daily use first — opinionated, fast, and quiet. It isn't another feed begging for your attention. It's a calm place to run your life.
+
+Try it with a tap of demo data before you commit a single detail of your own.
 
 ### keywords
 
-habit tracker,life,journal,sleep,nutrition,training,mood,private,health log,routine,goals,water
+habit tracker,journal,planner,routine,sleep,mood,nutrition,fitness,diary,offline,goals,water
 
 ### release_notes
 
-First public release: Week dashboard, 16 sections, Next feed, Apple Watch app, widgets, correlations, demo mode.
+Septena's first public release. The Week dashboard, sixteen optional sections, cross-section correlations, an Apple Watch app, Home and Lock Screen widgets, and a demo mode so you can look around before committing any of your own data. Thank you for trying it.
 
 ### support_url
 
@@ -102,13 +106,77 @@ PRODUCTIVITY
 
 ## Platform: macOS (com.septena.cloud.mac)
 
-### status
+> Separate App Store Connect app (own bundle id) → its own `deliver` run:
+> `fastlane deliver --app_identifier com.septena.cloud.mac --platform osx
+> --metadata_path appstore/metadata-mac --screenshots_path appstore/screenshots-mac`.
+> Mac screenshots must be 16:10 (the render pipeline outputs 2880×1800).
 
-planned
+### name
 
-> Separate App Store Connect app (own bundle id) → its own `deliver` run with
-> `screenshots-mac/`. Mac screenshots must be 16:10 — 2880×1800 preferred.
-> Copy will start as the iOS copy minus iPhone-specific lines.
+Septena
+
+### subtitle
+
+All your life, one private app
+
+### promotional_text
+
+Your whole life in one calm Mac window — tasks, sleep, training, mood, and more. Private by design, synced only through your iCloud. No accounts, no ads.
+
+### description
+
+Your life doesn't fit in one app — so you've ended up with a dozen. Septena brings all of it home, now in a calm window on your Mac.
+
+It's a single, private dashboard for the parts of life worth keeping an eye on: tasks, training, sleep, nutrition, habits, mood, hydration, and more. Each lives in its own section you can turn on or quietly hide — and they all meet on one screen called the Week.
+
+ONE GLANCE AT YOUR WEEK
+Open Septena and see your last seven days at once. Heatmaps and gentle sparklines show what you did, what's still open, and where your streaks are — across every section you care about, in one calm view.
+
+PATTERNS YOU'D NEVER SPOT ALONE
+Septena looks across your sections so you don't have to. It quietly connects the dots — like that late afternoon coffee turning up in last night's sleep — and surfaces the pattern only once there's enough to trust it.
+
+SIXTEEN SECTIONS, NONE REQUIRED
+Turn on only what matters to you and leave the rest behind. Hide a section and its screens disappear; your data stays exactly where it was. Rename it, recolor it, make it yours.
+
+PRIVATE THE WAY IT SHOULD BE
+There's no account to create and no server to trust. No ads, no analytics. Your data lives on your devices and syncs only through your own iCloud — end to end, invisible even to us. Export all of it whenever you like.
+
+ONE LIFE, EVERY SCREEN
+Septena syncs the same private dashboard across Mac, iPhone, iPad, and Apple Watch through your iCloud. Start on one, pick up on another.
+
+Built by one person, for daily use first — opinionated, fast, and quiet. Not another feed to check. A calm place to run your life.
+
+### keywords
+
+habit tracker,journal,planner,routine,sleep,mood,nutrition,fitness,diary,goals,water,dashboard
+
+### release_notes
+
+Septena's first release on the Mac. The full Week dashboard, sixteen optional sections, cross-section correlations, and private iCloud sync with your iPhone, iPad, and Apple Watch.
+
+### support_url
+
+https://septena.app/support
+
+### marketing_url
+
+https://septena.app
+
+### privacy_url
+
+https://septena.app/privacy
+
+### copyright
+
+2026 MZ
+
+### primary_category
+
+HEALTH_AND_FITNESS
+
+### secondary_category
+
+PRODUCTIVITY
 
 ---
 
@@ -128,17 +196,28 @@ planned
 ## Workflow (the whole loop)
 
 ```bash
-scripts/screenshots.sh light          # 1. capture raw screens (simulator, demo seed)
+xcodegen generate                     # 0. once, after adding SeptenaMacUITests
 cd appstore && npm install            #    first time only (Playwright)
-npm run shots:sync                    # 2. pull captures into appstore/raw/
-npm run all                           # 3. metadata + render composites + validate
-npm run viz                           # 4. open the App Store viz to verify
-fastlane deliver                      # 5. upload metadata + screenshots (no binary)
+./capture.sh iphone69 light           # 1. capture raw screens straight into raw/
+./capture.sh ipad13 light             #    (per device class)
+./capture.sh mac light
+npm run all                           # 2. metadata + render composites + validate
+npm run viz                           # 3. open the App Store viz to verify
+fastlane deliver                      # 4. upload iOS metadata + screenshots (no binary)
+fastlane deliver --app_identifier com.septena.cloud.mac --platform osx \
+  --metadata_path appstore/metadata-mac --screenshots_path appstore/screenshots-mac
 ```
 
-- Raw captures land in `appstore/raw/iphone69/<light|dark>/`.
-- Composites render to `appstore/screenshots/en-US/` at exact ASC pixel sizes.
-- `fastlane/Deliverfile` points deliver at `appstore/metadata` + `appstore/screenshots`.
-- Screenshot specs encoded in `appstore/devices.mjs`: iPhone 6.9" 1320×2868
-  (ASC scales smaller iPhone shelves from it), iPad 13" 2064×2752, Mac
-  2880×1800, Watch 410×502. PNG/JPEG, RGB, no alpha, max 10 per device class.
+- Raw captures land in `appstore/raw/<device>/<light|dark>/`. Capture targets:
+  iPhone/iPad reuse `SeptenaUITests` (different simulator); Mac uses the new
+  `SeptenaMacUITests` target; Watch is manual
+  (`xcrun simctl io <watch-sim> screenshot`, single Next screen).
+- Composites render to `screenshots/en-US/` (iPhone + iPad, deliver sorts by
+  resolution) and `screenshots-mac/en-US/` (Mac, separate ASC app) at exact ASC
+  pixel sizes.
+- Surfaces + sizes live in `appstore/devices.mjs` (`active: true` to include):
+  iPhone 6.9" 1320×2868, iPad 13" 2064×2752, Mac 2880×1800 (landscape), Watch
+  410×502. Per-device panel layouts in `appstore/panels.config.mjs`. PNG, RGB,
+  no alpha, max 10 per device class.
+- `scripts/screenshots.sh` (Desktop output) + `npm run shots:sync` remain as the
+  legacy iPhone path; `capture.sh` supersedes them by writing straight into raw/.

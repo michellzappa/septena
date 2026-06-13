@@ -1,12 +1,25 @@
 import XCTest
 
-/// Captures App Store / marketing screenshots from the demo-seeded app, in two
-/// homepage layouts (Sparkline + Heatmap). Run via `scripts/screenshots.sh`, or:
+/// Captures App Store / marketing screenshots from the demo-seeded app. Run via
+/// `scripts/screenshots.sh`, or:
 ///   xcodebuild test -scheme Septena \
 ///     -destination 'platform=iOS Simulator,name=iPhone 16 Pro Max,OS=26.0' \
 ///     -resultBundlePath /tmp/septena.xcresult \
 ///     -only-testing:SeptenaUITests/ScreenshotTests
 /// Extract: xcrun xcresulttool export attachments --path /tmp/septena.xcresult --output-path <dir>
+///
+/// These are the raw material for the App Store viz/render pipeline in
+/// `appstore/`. Each capture's name is the contract: `appstore/panels.config.mjs`
+/// references shots by these exact basenames (e.g. `01-Week`, `08-Correlations`).
+/// If you rename a capture here, update the matching `shot.src` there. Current
+/// marketing-panel mapping (appstore/panels.config.mjs → iphone69):
+///   hook         → 01-Week            (all-in-one hero)
+///   week         → 06-Week-heatmap    (glanceable seven days)
+///   correlations → 08-Correlations    (cross-section insight)
+///   sections     → 05-Goals           (breadth + control)
+///   privacy/close → no shot (statement panels)
+/// The remaining captures (02/03/04/07/09 and the section sheets 10–16) are
+/// kept as a bench the viz can swap in without a re-capture.
 final class ScreenshotTests: XCTestCase {
   override func setUpWithError() throws { continueAfterFailure = false }
 
@@ -43,6 +56,8 @@ final class ScreenshotTests: XCTestCase {
     app.swipeUp(); dwell(); capture(app, "09-Correlations-scrolled")
 
     // Pass 4 — section detail sheets (dense layout so the rows are tappable).
+    // These give the viz a colorful bench of section shots to swap into the
+    // breadth panel. Ordered so the most marketing-friendly come first.
     app.terminate()
     launch(app, layout: "dense")
     captureSection(app, "Nutrition", "10-Nutrition")
@@ -50,6 +65,8 @@ final class ScreenshotTests: XCTestCase {
     captureSection(app, "Sleep", "12-Sleep")
     captureSection(app, "Mood", "13-Mood")
     captureSection(app, "Body", "14-Body")
+    captureSection(app, "Habits", "15-Habits")
+    captureSection(app, "Hydration", "16-Hydration")
   }
 
   // MARK: - helpers
@@ -62,9 +79,15 @@ final class ScreenshotTests: XCTestCase {
     dwell()
   }
 
+  /// iPhone shows a tab bar; iPad shows a NavigationSplitView sidebar. Try the
+  /// tab first, then fall back to a sidebar/list item with the same label, so
+  /// the one test drives both idioms.
   @MainActor private func tapTab(_ app: XCUIApplication, _ label: String) {
     let tab = app.tabBars.buttons[label]
-    if tab.waitForExistence(timeout: 8) { tab.tap() }
+    if tab.waitForExistence(timeout: 4), tab.isHittable { tab.tap(); dwell(); return }
+    for el in [app.buttons[label], app.cells[label], app.staticTexts[label]] {
+      if el.waitForExistence(timeout: 2), el.isHittable { el.tap(); dwell(); return }
+    }
     dwell()
   }
 
