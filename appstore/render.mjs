@@ -27,17 +27,25 @@ const appearance = arg("appearance", "light");
 const onlyDevice = arg("device", null);
 const onlyPanel = arg("only", null);
 
-// Brand serif, inlined so panels use the genuine Fraunces regardless of
-// what's installed. Same file serves italic (Fraunces variable has the axes).
-const fontPath = join(ROOT, "..", "Septena", "Resources", "Fraunces-Regular.ttf");
-// Single @font-face: Fraunces is a variable font (axes opsz 9–144, wght
-// 100–900, SOFT, WONK). Components drive opsz/wght per role via
-// font-variation-settings; italic accents are synthesized (Fraunces has no
-// slant axis, and the app itself only ever uses upright SemiBold).
-const fontFace = existsSync(fontPath)
-  ? `@font-face { font-family:"Fraunces"; font-weight:100 900; font-style:normal;
-       src:url(data:font/ttf;base64,${readFileSync(fontPath).toString("base64")}) format("truetype"); }`
-  : "/* Fraunces not found — falling back to Georgia */";
+const firstExisting = (paths) => paths.find((p) => existsSync(p));
+const fontDataUrl = (file) => `url(data:font/otf;base64,${readFileSync(file).toString("base64")}) format("opentype")`;
+const newYorkRegular = firstExisting([
+  "/Library/Fonts/NewYorkLarge-Semibold.otf",
+  "/System/Library/Fonts/NewYork.ttf",
+]);
+const newYorkItalic = firstExisting([
+  "/Library/Fonts/NewYorkLarge-SemiboldItalic.otf",
+  "/Library/Fonts/NewYorkItalic.ttf",
+  "/System/Library/Fonts/NewYorkItalic.ttf",
+]);
+const fontFace = [
+  newYorkRegular
+    ? `@font-face { font-family:"New York Large"; font-weight:600; font-style:normal; src:${fontDataUrl(newYorkRegular)}; }`
+    : "/* New York Semibold not found — falling back to system serif */",
+  newYorkItalic
+    ? `@font-face { font-family:"New York Large"; font-weight:600; font-style:italic; src:${fontDataUrl(newYorkItalic)}; }`
+    : "/* New York Semibold Italic not found — falling back to system serif italic */",
+].join("\n");
 
 const shotDataURL = (device, src) => {
   const p = join(ROOT, device.rawDir, appearance, `${src}.png`);

@@ -71,14 +71,16 @@ Unknown sections fall back to a neutral gray (`SectionTheme.color(for:)`). The u
 Three families, used by role:
 
 - **SF Pro** (system) — all UI body, controls, labels, buttons, and almost every title (section, card, and tile titles included). Stays the system font so nav bars, alerts, and Dynamic Type behave natively.
-- **Fraunces** (serif) — the Dashboard welcome greeting *only* (`septenaWelcomeTitle`). Rare by design: it's the single editorial face in the app, scoped to the front door so arriving at it stays a moment rather than a frame you can't escape. Interior destination headers use SF Pro. Bundled as a variable font and registered via Info.plist (`UIAppFonts` on iOS, `ATSApplicationFontsPath` on Mac); if the file isn't bundled, `Font.custom` falls back to the system font silently, so the app stays buildable either way.
+- **New York / system serif** — restrained editorial display moments: the Dashboard welcome greeting (`septenaWelcomeTitle`), the app wordmark (`septenaWordmark`), and goal names (`septenaGoalTitle`). Implemented with `Font.system(..., design: .serif)` so it maps to Apple's New York on Apple platforms while keeping Dynamic Type native. Interior destination headers use SF Pro.
 - **SF Mono** (system monospaced, `Font.system(design: .monospaced)`) — numerics, units, timestamps, counts, metrics. Tabular figures (`.monospacedDigit()`) so columns of numbers align.
 
-Fraunces-as-accent plus mono-for-numbers is what carries the brand; SF Pro carries the OS feel. Don't replace SF Pro for UI body — it regresses accessibility and breaks consistency with system chrome. Don't reach for Fraunces beyond the Dashboard welcome.
+New York-as-accent plus mono-for-numbers is what carries the brand; SF Pro carries the OS feel. Don't replace SF Pro for UI body — it regresses accessibility and breaks consistency with system chrome.
 
-Use the named styles in [Theme.swift](../Septena/Shell/UI/Theme.swift). No raw `.font(.title)` calls, no fixed point sizes outside these styles. Every style is built on a system text style (or, for Fraunces, `Font.custom(_, size:, relativeTo:)`) so Dynamic Type scales.
+Use the named styles in [Theme.swift](../Septena/Shell/UI/Theme.swift). No raw `.font(.title)` calls, no fixed point sizes outside these styles. Every style is built on a system text style so Dynamic Type scales.
 
-- `.septenaWelcomeTitle` — Dashboard welcome greeting (Fraunces SemiBold, ~`largeTitle`). The only Fraunces user.
+- `.septenaWelcomeTitle` — Dashboard welcome greeting (New York Large Semibold Italic, `largeTitle`)
+- `.septenaWordmark` — app wordmark (New York Semibold, `title`)
+- `.septenaGoalTitle` — goal names (New York Semibold, `title3`)
 - `.septenaScreenTitle` — interior destination header (SF Pro semibold, `largeTitle`)
 - `.septenaSectionTitle` — section header within a screen (SF Pro semibold, `title2`)
 - `.septenaCardTitle` — card header (SF Pro, `headline`)

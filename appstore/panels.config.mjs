@@ -6,7 +6,7 @@
 //   id          stable slug → output filename ordering
 //   background  { tint, style: "wash"|"solid"|"split", pct, dots }
 //   badge       small mono pill above the headline
-//   headline    *stars* = accent-italic Fraunces span
+//   headline    *stars* = accent-italic New York span
 //   sub         supporting line
 //   align       "left" (default) | "center"
 //   shot        { src: raw capture basename (no .png), width 0–1, rotate°, offsetY 0–1 }

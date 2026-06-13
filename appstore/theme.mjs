@@ -2,7 +2,7 @@
 // Mirrors the app's real brand sources:
 //   - section accents → SeptenaCore/SectionTheme.swift `defaultPalette`
 //   - app accent      → Assets AccentColor (rgb 0.20, 0.42, 0.82)
-//   - typography      → docs/DesignSpec.md §5 (Fraunces display, SF Pro UI, mono numerics)
+//   - typography      → docs/DesignSpec.md §5 (New York display, SF Pro UI, mono numerics)
 // Edit freely — everything downstream (components, panels) reads from here.
 
 export const theme = {
@@ -30,11 +30,10 @@ export const theme = {
   },
 
   // ----- typography -----
-  // Fraunces is the app's single editorial face (Dashboard welcome) and is
-  // bundled in the repo; render.mjs inlines it via @font-face so panels use
-  // the genuine brand serif. UI/meta text uses the system stack (SF on Mac).
+  // Display type follows Apple's New York via the system serif stack. App Store
+  // renders inline local New York font files when they are available on macOS.
   fonts: {
-    display: `"Fraunces", Georgia, serif`,
+    display: `"New York Large", "New York", ui-serif, Georgia, serif`,
     ui: `-apple-system, "SF Pro Text", "Helvetica Neue", Inter, sans-serif`,
     mono: `"SF Mono", ui-monospace, Menlo, monospace`,
   },

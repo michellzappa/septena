@@ -98,7 +98,7 @@ Recommend **Settings**: pure chrome, zero user-data-boundary risk, no formatting
 
 ### Task 5 — Pseudolocalization + font check
 - Scheme/launch arg running an **accented, double-length** pseudolanguage; eyeball the pilot for clipping (German ≈ +30%).
-- Verify **Fraunces** carries ß and accented caps (É, Ü, Ñ).
+- Verify the system serif display styles carry ß and accented caps (É, Ü, Ñ).
 
 ### Task 6 — Gate + commit
 Re-run `xcodegen generate`, confirm no regression, commit `project.yml` + regenerated `project.pbxproj` + catalog **together** (one unit).

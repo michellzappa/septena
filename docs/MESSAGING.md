@@ -53,8 +53,13 @@ product trait**, woven through copy — not a standalone pillar.
 
 ## 4. Proof map (pillar → the screenshot that proves it)
 
-Shots live once in `appstore/raw/<device>/` and are reused by the site. Names
-are being unified **(DECIDE: adopt semantic names everywhere?)**:
+Shots live once in `appstore/raw/<device>/` and are reused by the site, under
+shared semantic names. `ScreenshotTests` captures the hero surfaces plus a
+detail shot for **every section the demo enables** (nutrition, exercise, sleep,
+mood, body, habits, hydration, caffeine, chores, supplements, groceries, gut,
+activity) so the site has one image per app area. Not yet covered: cannabis (a
+sub-kind under intake, no standalone row), and github / symptoms / medications
+(not enabled in the demo seed, not marketed on the site).
 
 | Pillar | App Store panel | Capture (proposed canonical name) | Site `AppShot` today |
 |---|---|---|---|
@@ -75,13 +80,13 @@ are being unified **(DECIDE: adopt semantic names everywhere?)**:
 
 ## 6. Brand tokens (one palette, one type system)
 
-The app is the source of truth (`SeptenaCore/SectionTheme.swift`,
-`Septena/Resources/Fraunces-Regular.ttf`). `appstore/theme.mjs` already mirrors
-it. The **site currently diverges** and must be reconciled **(DECIDE)**:
+The app is the source of truth (`SeptenaCore/SectionTheme.swift` and
+`Septena/Shell/UI/Theme.swift`). `appstore/theme.mjs` and the public site mirror
+it:
 
 | Token | App / App Store | Site today | Action |
 |---|---|---|---|
-| Display type | **Fraunces** SemiBold (opsz 9) | Iowan Old Style / Charter / Georgia | unify on Fraunces |
+| Display type | **New York / system serif** Semibold | New York / system serif stack | aligned |
 | Brand accent | **#336bd1** (blue, AccentColor) | `oklch(0.45 0 0)` (neutral gray) | pick one, apply everywhere |
 | Section colors | `SectionTheme.defaultPalette` | own ramp in `globals.css` | confirm values match |
 | Body / numerics | system / mono tabular | system | aligned |
@@ -111,7 +116,7 @@ Goal: a person who sees the site hero and then the App Store hook should see the
 1. Positioning wording differs (site "Everything you track" vs store "All your
    life"). → §1 reconciles to long/short of one idea.
 2. Brand accent: site neutral gray vs app blue `#336bd1`. → **(DECIDE)** §6.
-3. Display font: site Iowan serif vs app Fraunces. → **(DECIDE)** §6.
+3. Display font: site Iowan serif vs app display serif. → resolved in §9.
 4. Pillar count: site 5 vs store 3. → §3 reconciles to 4; store may need a
    BYO-AI panel.
 5. "Bring your own AI" and the "seven days / seven dots" idea are strong on the
@@ -124,9 +129,10 @@ Goal: a person who sees the site hero and then the App Store hook should see the
 
 - **(D1) Brand accent → blue `#336bd1`** (the app's AccentColor), everywhere.
   Site `--brand-accent` switched from neutral gray to blue.
-- **(D2) Fraunces everywhere.** The site already loads Fraunces via `next/font`
-  (`fonts/fraunces-latin.woff2` → `--font-heading`); the stale Iowan `:root`
-  fallback was removed so nothing can shadow it.
+- **(D2) New York / system serif everywhere.** The app uses
+  `Font.system(..., design: .serif)` for editorial display styles; the site uses
+  a CSS system serif stack that resolves to New York on Apple platforms; App
+  Store renders inline local New York font files when available on macOS.
 - **(D3) "Bring your own AI" is a top-four pillar** → gets its own App Store
   panel and stays prominent on the site.
 - **(D4) Positioning** long form = *Everything you track, one private app.*

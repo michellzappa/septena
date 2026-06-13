@@ -30,7 +30,7 @@ sun glyph for Today, the `.arc` comet, `TimeOfDayWheel`).
   1. **A — Day dial as hero** (front door): SHIPPED v1, see below.
   2. **C — Ambient light** (restrained version, front door only): SHIPPED v1
      as the glow behind the dial. No app-wide tinting.
-  3. **B — Literary voice** (NEXT): Fraunces + considered microcopy on
+  3. **B — Literary voice** (NEXT): New York/system serif + considered microcopy on
      *reflective* surfaces only — weekly review masthead, milestone cards,
      Examined Week as a typeset letter, share cards as typeset artifacts.
      Transactional surfaces stay SF/native.
@@ -289,7 +289,7 @@ material, and give it content + motion to work with.**
 
 1. **Device pass on the dial** — glow strength, rim alphas (0.07–0.20 in
    `TimeOfDayWheel`), bloom timing, comet-orbit feel; then commit.
-2. **B — literary voice**: weekly review masthead in Fraunces, Examined Week
+2. **B — literary voice**: weekly review masthead in New York/system serif, Examined Week
    typeset pass, milestone share cards (also the planned viral loop).
 3. **D continued**: `.navigationTransition(.zoom)` tile→destination,
    ghost-state empties (render the section's viz primitive faintly with one

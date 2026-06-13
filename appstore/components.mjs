@@ -8,7 +8,7 @@
 // Component vocabulary (all optional per panel):
 //   background — solid / wash / split, with optional dot grid
 //   badge      — small pill above the headline
-//   headline   — Fraunces display; *stars* mark accent spans
+//   headline   — New York display; *stars* mark accent spans
 //   sub        — supporting line, system font
 //   shot       — real capture in a device frame (placeholder if missing)
 //   overlays   — floating annotation cards, positioned in panel fractions
@@ -160,9 +160,8 @@ html,body { width:${device.width}px; height:${device.height}px; overflow:hidden;
 .badge { display:inline-block; font:600 34px/1 ${theme.fonts.mono}; letter-spacing:.14em;
   padding:18px 34px; border:3px solid; border-radius:${theme.radius.badge}px; margin-bottom:44px; }
 h1 { font-family:${theme.fonts.display}; font-weight:600; font-size:${panel.headlineSize ?? 168}px;
-  font-variation-settings:"opsz" 9, "wght" 600, "SOFT" 0, "WONK" 0;  /* matches app: Fraunces-9ptSemiBold */
   line-height:1.06; letter-spacing:-0.01em; text-wrap:balance; }
-h1 em { font-style:normal; color:${tint}; font-variation-settings:"opsz" 9, "wght" 600, "SOFT" 0, "WONK" 0; }
+h1 em { font-style:italic; color:${tint}; }
 .sub { font-size:62px; line-height:1.32; color:color-mix(in oklab, ${theme.ink} 64%, transparent);
   margin-top:44px; max-width:1080px; }
 .frame { position:relative; background:#0b0b0c; box-shadow:${theme.shadow.device}; overflow:hidden; }
@@ -185,9 +184,9 @@ img.screen { height:auto; }
 .founder { background:${theme.white}; border-radius:56px; box-shadow:${theme.shadow.card};
   padding:90px 84px; text-align:center; }
 .fq { font-family:${theme.fonts.display}; font-style:normal; font-size:64px; line-height:1.35;
-  font-variation-settings:"opsz" 9, "wght" 500, "SOFT" 0, "WONK" 0; }
+  font-weight:600; }
 .fn { font-family:${theme.fonts.display}; font-size:48px; margin-top:56px;
-  font-variation-settings:"opsz" 9, "wght" 600; }
+  font-weight:600; }
 .fr { font:400 36px/1.4 ${theme.fonts.mono}; color:${theme.inkSoft}; margin-top:12px; }
 .footnote { position:absolute; bottom:70px; left:0; right:0; text-align:center;
   font:400 36px/1.4 ${theme.fonts.mono}; color:color-mix(in oklab, ${theme.ink} 55%, transparent); }`;
