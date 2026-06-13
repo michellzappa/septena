@@ -4814,6 +4814,9 @@
         }
       }
     },
+    "Onboarding" : {
+
+    },
     "One app for every corner of your life" : {
       "localizations" : {
         "pt-BR" : {
@@ -4866,6 +4869,9 @@
           }
         }
       }
+    },
+    "Optional — used to personalize your daily greeting. Change it anytime in Settings." : {
+
     },
     "Orange" : {
       "localizations" : {
@@ -7018,6 +7024,9 @@
           }
         }
       }
+    },
+    "What should we call you?" : {
+
     },
     "When on, pending items in the source list import automatically and are removed from Reminders. Runs on app launch and whenever Reminders changes." : {
       "localizations" : {
