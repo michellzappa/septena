@@ -21,16 +21,18 @@ import SwiftData
 
 // MARK: - Gate
 
-/// Decides whether to present `WelcomeView` over the app's root. Gated on the
-/// device-local `welcomeCompleted` flag (instant, offline-safe) AND the
-/// store's `welcomeDecisionReady` (set after the launch sync), so a returning
-/// user's freshly-installed device adopts their synced `onboardedAt` before
-/// the gate ever evaluates — no welcome flash, no re-onboarding.
+/// Decides whether to present `WelcomeView` over the app's root. Gated purely
+/// on the device-local `welcomeCompleted` flag so the welcome appears on the
+/// very first frame of a fresh install — no waiting on the network, nothing
+/// else shown first. Established accounts never reach here: `SettingsStore`
+/// sets the flag synchronously at launch when the local store already has the
+/// user's data (`adoptWelcomeFlagIfEstablished`), and a returning user's brand
+/// new device adopts the synced `onboardedAt` once it syncs in, dismissing the
+/// welcome (the rare pre-sync flash on that path is acceptable).
 private struct WelcomeGate: ViewModifier {
-  @Environment(SettingsStore.self) private var store
   @AppStorage(SettingsKey.welcomeCompleted) private var completed = false
 
-  private var shouldPresent: Bool { store.welcomeDecisionReady && !completed }
+  private var shouldPresent: Bool { !completed }
 
   func body(content: Content) -> some View {
     content

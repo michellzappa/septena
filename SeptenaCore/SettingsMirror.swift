@@ -66,13 +66,20 @@ enum SettingsMirror {
   /// whether onboarding is required.
   @discardableResult
   static func seedManifestSectionIfMissing(_ key: String,
-                                           context: ModelContext) -> Bool {
+                                           context: ModelContext,
+                                           freshAccount: Bool = false) -> Bool {
     let descriptor = FetchDescriptor<SectionEntity>(
       predicate: #Predicate { $0.id == key }
     )
     if (try? context.fetch(descriptor).first) != nil { return false }
     guard let manifest = SectionManifest.byKey[key] else { return false }
-    let seedEnabled = manifest.defaultEnabled
+    // A genuinely fresh account (no SectionEntity rows yet) seeds everything
+    // OFF so nothing is pre-selected behind the first-run welcome — the user
+    // picks there, and `applyWelcomeSelection` enables their choices. An
+    // established account (rows already exist) seeds a newly-shipped section
+    // from its manifest default, so a new core section still lights up on the
+    // update that introduces it.
+    let seedEnabled = freshAccount ? false : manifest.defaultEnabled
     let entity = SectionEntity(id: manifest.key,
                                title: manifest.defaultLabel,
                                color: "",

@@ -223,25 +223,19 @@ struct SeptenaApp: App {
               now: dayClock.now,
               context: localStore.container.mainContext, engine: ckEngine)
             // Same bridge for the first-run onboarding marker: adopt a synced
-            // `onboardedAt` (a returning user's new device) or push a local
-            // completion up. Then release the welcome gate — by now CloudKit
-            // has been pulled, so a fresh account shows the welcome while a
-            // returning device has already adopted the marker and stays quiet.
+            // `onboardedAt` (a returning user's new device, dismissing the
+            // welcome once their data syncs in) or push a local completion up.
             settingsStore.reconcileOnboarding(
               context: localStore.container.mainContext, engine: ckEngine)
-            settingsStore.welcomeDecisionReady = true
             // Seed the Claude gateway token on cold launch (no-op if Claude
             // isn't connected or a recent token is still valid).
             await ClaudeGatewayProvider.shared.refreshIfNeeded()
             BadgeManager.shared.start(context: localStore.container.mainContext)
-            // Behavioral nudge layer. Ask once (no-op if already decided),
-            // then start the scheduler — it reconciles now and re-reconciles
-            // on every section data-change notification, like BadgeManager.
-            // Screenshot / demo-seed builds skip the permission prompt so it
-            // doesn't cover the UI in captures.
-            if !DemoSeedMode.isOn {
-              await LocalNotificationScheduler.shared.requestAuthorizationIfNeeded()
-            }
+            // Behavioral nudge layer. Start the scheduler (reconciles now and
+            // on every section data-change, like BadgeManager) but DON'T prompt
+            // for notification permission at launch — that's asked only when the
+            // user opts in, in Settings ▸ Notifications. Until then the OS status
+            // is `.notDetermined` and `apply` no-ops, so nothing fires.
             LocalNotificationScheduler.shared.start(context: localStore.container.mainContext)
             // One-shot: lift legacy macro targets (MacrosConfig bands) into
             // range goals. After CK fetch above so it won't duplicate bands a
@@ -478,13 +472,20 @@ struct SeptenaApp: App {
 /// flashes a false warning.
 private struct ICloudRequirementModifier: ViewModifier {
   @Environment(CKEngine.self) private var ckEngine
+  // Hold the iCloud warning until the first-run welcome is done, so a fresh
+  // install sees the welcome and nothing else. Once onboarded (or on an
+  // established account, where the flag is already set), it behaves as before.
+  @AppStorage(SettingsKey.welcomeCompleted) private var welcomeCompleted = false
   @State private var showAlert = false
 
   func body(content: Content) -> some View {
     content
-      .onAppear { showAlert = Self.accountMissing(ckEngine.accountStatus) }
+      .onAppear { showAlert = shouldWarn(ckEngine.accountStatus) }
       .onChange(of: ckEngine.accountStatus) { _, status in
-        showAlert = Self.accountMissing(status)
+        showAlert = shouldWarn(status)
+      }
+      .onChange(of: welcomeCompleted) { _, _ in
+        showAlert = shouldWarn(ckEngine.accountStatus)
       }
       .alert("iCloud Required", isPresented: $showAlert) {
         #if os(iOS)
@@ -494,6 +495,12 @@ private struct ICloudRequirementModifier: ViewModifier {
       } message: {
         Text("Septena keeps all your data in your private iCloud, so it needs you signed in. Open Settings and sign in to iCloud to use the app and sync across your devices.")
       }
+  }
+
+  /// Warn only for a definitively-missing account AND only once the welcome
+  /// is behind us — the welcome owns the first-launch screen on its own.
+  private func shouldWarn(_ status: CKAccountStatus) -> Bool {
+    welcomeCompleted && Self.accountMissing(status)
   }
 
   /// Definitive "no usable account" states. `.couldNotDetermine` and

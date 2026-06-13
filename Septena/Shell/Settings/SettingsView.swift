@@ -267,12 +267,6 @@ final class SettingsStore {
   var chores: [ChoreItem] = []
   var serverLoading: Bool = false
 
-  /// Gate for the first-run welcome. Stays `false` until the launch path has
-  /// pulled CloudKit and reconciled the onboarding marker, so the welcome
-  /// gate doesn't flash on a returning user's new device in the window before
-  /// their synced `onboardedAt` arrives. Flipped once in `App`'s launch task.
-  var welcomeDecisionReady: Bool = false
-
   /// Hydrate from the local mirror / disk cache during construction so the
   /// dashboard's first frame uses the user's saved section order and config
   /// instead of an empty array (which falls back to the `SectionManifest`
@@ -321,6 +315,23 @@ final class SettingsStore {
     // welcome gate decides synchronously on the first frame and never waits
     // on (or flashes during) the launch sync.
     reconcileOnboarding(context: context, engine: nil)
+    // Established account with no marker yet (in-place update — their data is
+    // already on disk): set the local flag synchronously so the gate suppresses
+    // the welcome on the first frame. The durable stamp + CloudKit push happens
+    // in the launch task's `grandfatherOnboardingIfEstablished`.
+    adoptWelcomeFlagIfEstablished(context: context)
+  }
+
+  /// Synchronous, local-only welcome suppression for established accounts: if
+  /// the welcome hasn't been completed and there's no marker yet but the local
+  /// store already holds the user's data, set the device-local flag so the gate
+  /// never shows the welcome on the first frame. Pure flag write — no context
+  /// mutation, no network (safe to call from `paintFromCache` during init).
+  func adoptWelcomeFlagIfEstablished(context: ModelContext) {
+    guard !UserDefaults.standard.bool(forKey: SettingsKey.welcomeCompleted),
+          serverSettings?.onboardedAt == nil,
+          accountHasExistingContent(context: context) else { return }
+    UserDefaults.standard.set(true, forKey: SettingsKey.welcomeCompleted)
   }
 
   func moveSections(fromOffsets: IndexSet, toOffset: Int,
@@ -3098,10 +3109,27 @@ struct NotificationsOverviewPane: View {
     }
     .formStyle(.grouped)
     .onAppear(perform: reload)
+    // Opening this pane is the opt-in: request OS notification permission now
+    // (no-op unless the master switch is on and the status is still
+    // `.notDetermined`). We deliberately do NOT ask at launch — only here,
+    // when the user has navigated to Notifications because they want them.
+    .task { await requestPermissionIfWanted() }
+    .onChange(of: notificationsEnabled) { _, on in
+      if on { Task { await LocalNotificationScheduler.shared.requestAuthorizationIfNeeded() } }
+    }
     // Toggling a nudge writes UserDefaults; logging data posts a data-change.
     // Both can change what's scheduled, so re-read on either.
     .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in reload() }
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in reload() }
+  }
+
+  /// Ask for notification permission only when the user has the master switch
+  /// on (the default) — i.e. they want nudges. `requestAuthorizationIfNeeded`
+  /// itself no-ops unless the OS status is `.notDetermined`, so re-visits don't
+  /// re-prompt.
+  private func requestPermissionIfWanted() async {
+    guard notificationsEnabled else { return }
+    await LocalNotificationScheduler.shared.requestAuthorizationIfNeeded()
   }
 
   private func reload() {
