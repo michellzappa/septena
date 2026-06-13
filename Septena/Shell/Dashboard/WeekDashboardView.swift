@@ -303,15 +303,11 @@ struct WeekDashboardView: View {
                                  todayTaskCount: taskCounts?.todayCount ?? 0,
                                  dailies: dailies)
           }
-          // The day view — today at a glance, circular or linear. The dial
-          // is skipped in Wheel mode (whose body is already this dial) so
-          // the dashboard never shows two.
+          // The day view — today at a glance, circular or linear.
           switch DayViewStyle(rawValue: dayViewRaw) ?? .dial {
           case .dial:
-            if currentLayoutMode != .wheel {
-              DayDialHero(visibleSections: Set(visibleDomains.map(\.rawValue)),
-                          sleepNights: ouraNights)
-            }
+            DayDialHero(visibleSections: Set(visibleDomains.map(\.rawValue)),
+                        sleepNights: ouraNights)
           case .linear:
             todayTimeline
           case .hidden:
@@ -1025,13 +1021,6 @@ struct WeekDashboardView: View {
     case .rings:
       RingsHomepageView(
         items: visibleDomainData,
-        onTap: handleDomainTap,
-        menuContent: { item in quickAddMenu(for: item) }
-      )
-    case .wheel:
-      RhythmHomepageView(
-        items: visibleDomainData,
-        sleepNights: ouraNights,
         onTap: handleDomainTap,
         menuContent: { item in quickAddMenu(for: item) }
       )
