@@ -16,9 +16,9 @@ import XCTest
 ///   hook         → 01-Week            (all-in-one hero)
 ///   week         → 06-Week-heatmap    (glanceable seven days)
 ///   correlations → 08-Correlations    (cross-section insight)
-///   sections     → 05-Goals           (breadth + control)
+///   sections     → 17-Sections        (the enable/hide editor)
 ///   privacy/close → no shot (statement panels)
-/// The remaining captures (02/03/04/07/09 and the section sheets 10–16) are
+/// The remaining captures (02/03/04/05/07/09 and the section sheets 10–16) are
 /// kept as a bench the viz can swap in without a re-capture.
 final class ScreenshotTests: XCTestCase {
   override func setUpWithError() throws { continueAfterFailure = false }
@@ -67,6 +67,26 @@ final class ScreenshotTests: XCTestCase {
     captureSection(app, "Body", "14-Body")
     captureSection(app, "Habits", "15-Habits")
     captureSection(app, "Hydration", "16-Hydration")
+
+    // The sections editor (Settings → Sections) — proves the "turn on only what
+    // matters" panel. Best-effort navigation; skips cleanly if labels differ.
+    captureSettingsSections(app, "17-Sections")
+  }
+
+  /// Open Settings → Sections, snapshot the enable/hide list, return to root.
+  @MainActor private func captureSettingsSections(_ app: XCUIApplication, _ shot: String) {
+    for label in ["Settings", "More", "gear"] {
+      let b = app.tabBars.buttons[label].exists ? app.tabBars.buttons[label] : app.buttons[label]
+      if b.waitForExistence(timeout: 3), b.isHittable { b.tap(); dwell(0.6); break }
+    }
+    let row = app.buttons["Sections"].exists ? app.buttons["Sections"]
+            : app.staticTexts["Sections"].exists ? app.staticTexts["Sections"]
+            : app.cells["Sections"]
+    var tries = 0
+    while !(row.exists && row.isHittable) && tries < 6 { app.swipeUp(); dwell(0.4); tries += 1 }
+    guard row.exists, row.isHittable else { return }
+    row.tap(); dwell()
+    capture(app, shot)
   }
 
   // MARK: - helpers
