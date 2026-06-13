@@ -68,7 +68,29 @@ enum TrainingPlugin: SectionPlugin {
   // MARK: - First-enable onboarding
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
-    AnyView(TrainingOnboardingView(complete: complete))
+    AnyView(SectionStarterPicker(
+      sectionKey: "training",
+      intro: "Log your workouts — strength, cardio, or mobility. Pick the kinds of movement you do and Septena sets up a routine for each, ready to fill with exercises as you go.",
+      nounPlural: String(localized: "routines"),
+      header: String(localized: "What kind of training?"),
+      footer: String(localized: "Each becomes a routine you can fill with your own exercises. Rename or add more anytime."),
+      items: SessionStarter.all,
+      glyph: { .symbol($0.kind.icon) },
+      primary: { $0.label },
+      secondary: { $0.blurb },
+      existsKey: { AnyHashable($0.label.lowercased()) },
+      loadExistingKeys: {
+        await MirrorReader.shared.read { ctx in
+          Set(((try? ctx.fetch(FetchDescriptor<SessionTypeEntity>())) ?? [])
+            .map { AnyHashable($0.label.lowercased()) })
+        }
+      },
+      add: { items in
+        let mutator = SeptenaServices.shared.trainingMutator
+        for s in items { _ = mutator.addSessionType(label: s.label, emoji: nil, exercises: []) }
+      },
+      complete: complete
+    ))
   }
 
   // MARK: - MCP / agent contract
@@ -200,126 +222,26 @@ private struct TrainingDetailContent: View {
   }
 }
 
-/// Starter session templates. Picking a session creates a SessionType
-/// row the user can fill with exercises later. Additive only.
+/// Starter routines, framed as the three kinds of movement rather than a
+/// muscle-group split — the simplest mental model for a general exercise
+/// tracker, and a 1:1 match with `SessionKind`. Picking one creates a
+/// SessionType row (its slug maps back to the right `SessionKind`) the user
+/// can fill with exercises later. Additive only. Power users build their own
+/// splits (Upper/Lower/Push/Pull…) from the section once they're in.
 private struct SessionStarter: Identifiable, Hashable {
   let id: String
   let label: String
+  let kind: SessionKind
+  let blurb: String
 
   static let all: [SessionStarter] = [
-    .init(id: "starter-upper",    label: "Upper"),
-    .init(id: "starter-lower",    label: "Lower"),
-    .init(id: "starter-push",     label: "Push"),
-    .init(id: "starter-pull",     label: "Pull"),
-    .init(id: "starter-legs",     label: "Legs"),
-    .init(id: "starter-cardio",   label: "Cardio"),
-    .init(id: "starter-mobility", label: "Mobility"),
-    .init(id: "starter-full",     label: "Full body"),
+    .init(id: "starter-strength", label: "Strength", kind: .strength,
+          blurb: "Lifting and resistance — track sets, reps, and weight."),
+    .init(id: "starter-cardio", label: "Cardio", kind: .cardio,
+          blurb: "Runs, rides, rows — track time and distance."),
+    .init(id: "starter-mobility", label: "Mobility", kind: .mobility,
+          blurb: "Yoga, stretching, recovery — track each session."),
   ]
-}
-
-private struct TrainingOnboardingView: View {
-  let complete: () -> Void
-  @Environment(SectionTheme.self) private var theme
-  @Environment(\.modelContext) private var modelContext
-  @State private var selected: Set<String> = []
-  @State private var existingLabels: Set<String> = []
-
-  private var accent: Color { theme.color(for: "training") }
-  private var mutator: TrainingMutator { SeptenaServices.shared.trainingMutator }
-
-  private func alreadyExists(_ s: SessionStarter) -> Bool {
-    existingLabels.contains(s.label.lowercased())
-  }
-
-  private func loadExisting() {
-    let rows = (try? modelContext.fetch(FetchDescriptor<SessionTypeEntity>())) ?? []
-    existingLabels = Set(rows.map { $0.label.lowercased() })
-  }
-
-  var body: some View {
-    NavigationStack {
-      Form {
-        Section {
-          SectionOnboardingHero(
-            sectionKey: "training",
-            title: "Training",
-            intro: "Groups workouts into session templates like Upper, Lower, or Cardio. Pick the ones you'll use — add exercises to each later, or define your own templates."
-          )
-          .onboardingHeroSection()
-        }
-        Section("Session templates") {
-          ForEach(SessionStarter.all) { starter in
-            starterRow(starter)
-          }
-        }
-      }
-      .formStyle(.grouped)
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .safeAreaInset(edge: .bottom) {
-        bottomBar
-      }
-      .onAppear { loadExisting() }
-    }
-  }
-
-  @ViewBuilder
-  private func starterRow(_ s: SessionStarter) -> some View {
-    let exists = alreadyExists(s)
-    let isSelected = selected.contains(s.id)
-    Button {
-      guard !exists else { return }
-      if isSelected { selected.remove(s.id) } else { selected.insert(s.id) }
-    } label: {
-      HStack(spacing: 12) {
-        Text(s.label)
-          .foregroundStyle(exists ? .secondary : .primary)
-          .strikethrough(exists, color: .secondary)
-        Spacer()
-        if exists {
-          Text("Already added")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        } else {
-          Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-            .foregroundStyle(isSelected ? accent : Color.secondary.opacity(0.6))
-            .font(.title3)
-        }
-      }
-    }
-    .buttonStyle(.plain)
-    .disabled(exists)
-  }
-
-  @ViewBuilder
-  private var bottomBar: some View {
-    HStack(spacing: 12) {
-      Button("Skip") { complete() }
-        .buttonStyle(.bordered)
-      Spacer()
-      Button(actionTitle) { addAndFinish() }
-        .buttonStyle(.borderedProminent)
-        .tint(accent)
-    }
-    .padding()
-    .background(.bar)
-  }
-
-  private var actionTitle: String {
-    selected.isEmpty ? String(localized: "Done") : String(localized: "Add \(selected.count) templates")
-  }
-
-  private func addAndFinish() {
-    let toAdd = SessionStarter.all.filter {
-      selected.contains($0.id) && !alreadyExists($0)
-    }
-    for s in toAdd {
-      _ = mutator.addSessionType(label: s.label, emoji: nil, exercises: [])
-    }
-    complete()
-  }
 }
 
 @MainActor func exerciseEntryExportDict(_ e: ExerciseEntryEntity) -> [String: Any] {
