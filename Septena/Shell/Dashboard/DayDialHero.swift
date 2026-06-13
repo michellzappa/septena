@@ -61,12 +61,9 @@ struct DayDialHero: View {
   // the rows do. nil just means the comet never learns where the dial is.
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  /// Same opt-out the commit flourishes honor — gates the dot blooms only;
-  /// the dial itself (and its data) always renders.
-  @AppStorage(SettingsKey.loggingAnimationsEnabled) private var animationsEnabled = true
-  /// The dial's today ⇄ week window (the wheel owns the tap; same shared
-  /// key) — picks the halo style so the two glow treatments can be compared
-  /// live: today = the full sky band, week = the current hour's light.
+  /// The dial's today ⇄ week window (the wheel owns the tap; same shared key)
+  /// — today lets the donut carry night itself; week adds the current-hour
+  /// glow halo.
   @AppStorage(TimeOfDayWheel.windowDefaultsKey) private var todayOnly = true
 
   @State private var snapshot = RhythmData.Snapshot()
@@ -83,13 +80,6 @@ struct DayDialHero: View {
     .zero
     #endif
   }
-  /// One-shot ring pulses over dots that just landed (see `reload`).
-  @State private var blooms: [DotBloom] = []
-  /// Today-event ids seen by the previous reload — the diff is what blooms.
-  @State private var knownTodayIDs: Set<String> = []
-  /// First reload seeds `knownTodayIDs` silently so opening the dashboard
-  /// never blooms the whole morning at once.
-  @State private var seeded = false
 
   private let windowDays = 7
   private let dialDiameter: CGFloat = 270
@@ -107,6 +97,13 @@ struct DayDialHero: View {
     return (Double(c.hour ?? 0) * 60 + Double(c.minute ?? 0)) / 1440
   }
 
+  /// The night arc (sunset → sunrise) as dial fractions, from the device's
+  /// real solar times — the glass donut tints dark across these hours.
+  private var nightArc: (start: Double, end: Double) {
+    let t = SolarClock.today(now: clock.now)
+    return (start: t.sunsetHour / 24, end: t.sunriseHour / 24)
+  }
+
   var body: some View {
     TimeOfDayWheel(
       events: snapshot.events,
@@ -121,31 +118,28 @@ struct DayDialHero: View {
       // glows with the same light as the halo behind the glass.
       nowColor: AmbientLight.Phase.from(date: clock.now).tint.inner,
       diameter: dialDiameter,
-      heroDate: todayStart
+      heroDate: todayStart,
+      // The glass donut tints dark across the night hours (sunset → sunrise):
+      // a crisp dark wedge sits BEHIND the clear glass (inside the wheel) so
+      // the glass frosts and refracts it into real dark glass — night on the
+      // face itself, not a wash behind it.
+      nightArc: nightArc
     )
-    // Fresh-dot blooms ride on top of the canvas dot at the same angle —
-    // a single expanding ring that says "this one just landed."
-    .overlay {
-      ForEach(blooms) { b in
-        DotBloomRing(color: b.color)
-          .position(dotPosition(b.fraction))
-      }
-      .allowsHitTesting(false)
-    }
     // The light is a background so it bleeds past the dial (toward the
     // greeting above) without claiming layout height: a wide soft backwash
-    // (AmbientGlow) for depth, plus a halo hugging the disc edge
-    // (AmbientHalo) so the face reads as lit, not flat — and survives dark
-    // mode, where the halo carries most of the effect. The whole light
-    // layer drifts a few points against device tilt (iOS) while the glass
-    // stays put — the parallax that makes the donut read as glass with a
-    // light source floating behind it.
+    // for depth. On today the donut carries night itself, so the disc-edge
+    // halo would only re-add the dark shadow we removed — it's kept for the
+    // week view (a uniform current-hour glow). The whole light layer drifts
+    // a few points against device tilt (iOS) while the glass stays put — the
+    // parallax that makes the donut read as glass with light floating behind.
     .background {
       ZStack {
         AmbientGlow()
           .frame(width: 460, height: 460)
-        AmbientHalo(diameter: dialDiameter - 2 * TimeOfDayWheel.fullMargin,
-                    style: todayOnly ? .sky : .now)
+        if !todayOnly {
+          AmbientHalo(diameter: dialDiameter - 2 * TimeOfDayWheel.fullMargin,
+                      style: .now)
+        }
       }
       .offset(glowParallax)
     }
@@ -188,40 +182,7 @@ struct DayDialHero: View {
       calendarFallback: theme.color(for: "calendar"),
       context: modelContext
     )
-
-    // Diff today's dots against the last reload; only the genuinely new
-    // ones bloom (capped so a bulk sync can't ring the whole dial).
-    let today = snapshot.events.filter { $0.daysAgo == 0 }
-    let todayIDs = Set(today.map(\.id))
-    defer { knownTodayIDs = todayIDs; seeded = true }
-    guard seeded, !reduceMotion, animationsEnabled else { return }
-    let fresh = today.filter { !knownTodayIDs.contains($0.id) }.prefix(4)
-    guard !fresh.isEmpty else { return }
-    let newBlooms = fresh.map {
-      DotBloom(id: $0.id, fraction: $0.fraction, color: $0.color ?? Theme.inkSecondary)
-    }
-    blooms.append(contentsOf: newBlooms)
-    let ids = Set(newBlooms.map(\.id))
-    Task { @MainActor in
-      try? await Task.sleep(for: .milliseconds(700))
-      blooms.removeAll { ids.contains($0.id) }
-    }
   }
-
-  /// Where a dot at `fraction` sits on the dial, in the wheel's own
-  /// coordinate space — same angle convention as the Canvas.
-  private func dotPosition(_ fraction: Double) -> CGPoint {
-    let r = TimeOfDayWheel.dotRing(forDiameter: dialDiameter)
-    let a = fraction * 2 * .pi
-    return CGPoint(x: dialDiameter / 2 + r * CGFloat(sin(a)),
-                   y: dialDiameter / 2 - r * CGFloat(cos(a)))
-  }
-}
-
-private struct DotBloom: Identifiable {
-  let id: String
-  let fraction: Double
-  let color: Color
 }
 
 #if os(iOS)
@@ -273,25 +234,3 @@ final class TiltSource {
   }
 }
 #endif
-
-/// One expanding, fading ring — the dial-local cousin of the checkbox
-/// `pulse()`. Plays once on appear; the host removes it after ~0.7s.
-private struct DotBloomRing: View {
-  let color: Color
-  @State private var scale: CGFloat = 0.4
-  @State private var opacity: Double = 0.75
-
-  var body: some View {
-    Circle()
-      .strokeBorder(color.opacity(opacity), lineWidth: 1.5)
-      .frame(width: 26, height: 26)
-      .scaleEffect(scale)
-      .onAppear {
-        withAnimation(.easeOut(duration: 0.6)) {
-          scale = 2.0
-          opacity = 0
-        }
-      }
-      .accessibilityHidden(true)
-  }
-}

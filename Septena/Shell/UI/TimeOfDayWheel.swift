@@ -72,6 +72,11 @@ struct TimeOfDayWheel: View {
   /// halo BEHIND the dial (`AmbientHalo`) — the face stays clean. Ignored
   /// when `compact`.
   var heroDate: Date? = nil
+  /// The night arc as `(start, end)` fractions (sunset → sunrise, wrapping
+  /// midnight). When set on the hero, the glass donut itself tints dark over
+  /// these hours — stained-glass night, drawn on the face — instead of a dark
+  /// wash behind it. `nil` keeps the plain clear-glass donut.
+  var nightArc: (start: Double, end: Double)? = nil
 
   /// Margin between the dial's square and its tick ring (full rendering).
   /// Shared with `dotRing(forDiameter:)` so external geometry — the `.arc`
@@ -82,6 +87,31 @@ struct TimeOfDayWheel: View {
   /// definition shared by the `AnnulusShape` glass mask and the Canvas (the
   /// now-hand starts at this edge; the date floats in the hollow).
   static let heroHoleFraction: CGFloat = 0.42
+
+  /// The dark tone the night arc wears behind the glass — a soft slate-indigo
+  /// (lighter than a true night so the frosted glass stays gentle). Tune this
+  /// for a darker/lighter night.
+  static let nightTone = Color(red: 0.26, green: 0.28, blue: 0.40).opacity(0.72)
+
+  /// Conic shading for the night arc, filled on the whole band behind the
+  /// glass: transparent through the day, ramping to `nightTone` over ~1h at
+  /// sunset (dusk) and back to clear over ~1h before sunrise (dawn), so the
+  /// terminators feather instead of cutting hard. Angle −90° puts midnight
+  /// (location 0) at the top, sweeping clockwise — the dial's convention.
+  private func nightShading(_ arc: (start: Double, end: Double)) -> AngularGradient {
+    let feather = 1.0 / 24          // ~1 hour, as dial fraction
+    let sunset = arc.start, sunrise = arc.end
+    let stops: [Gradient.Stop] = [
+      .init(color: Self.nightTone, location: 0),
+      .init(color: Self.nightTone, location: max(0, sunrise - feather)),
+      .init(color: .clear,         location: sunrise),
+      .init(color: .clear,         location: sunset),
+      .init(color: Self.nightTone, location: min(1, sunset + feather)),
+      .init(color: Self.nightTone, location: 1),
+    ]
+    return AngularGradient(gradient: Gradient(stops: stops),
+                           center: .center, angle: .degrees(-90))
+  }
 
   /// Radius of the ring the dots and bands sit on, for a full (non-compact)
   /// dial of `diameter`. The Canvas derives the same value from its live
@@ -191,6 +221,21 @@ struct TimeOfDayWheel: View {
       // press-lensing; the tilt parallax behind it supplies the motion that
       // makes Liquid Glass actually read as glass.
       if !compact && heroDate != nil {
+        // A dark conic wash over the night arc, on the band BEHIND the glass,
+        // so the glass has real dark content to frost and refract — that's
+        // what makes the night read as dark *glass*, not a flat gray fill
+        // (tinting the glass itself, nothing behind, composites flat). The
+        // dusk/dawn terminators feather over ~1h so night eases in and out.
+        // Day arc stays transparent — the bright page shows through.
+        if let nightArc {
+          AnnulusShape(holeFraction: Self.heroHoleFraction)
+            .fill(nightShading(nightArc))
+            .padding(20)
+        }
+        // One clear glass donut over the whole ring — frosts the dark night
+        // wedge into dark glass and the light page into bright glass, all in
+        // one continuous surface (no seam). `.interactive` gives the press
+        // lensing; the tilt parallax behind supplies the motion.
         Color.clear
           .glassEffect(.regular.interactive(),
                        in: AnnulusShape(holeFraction: Self.heroHoleFraction))
@@ -325,18 +370,26 @@ struct TimeOfDayWheel: View {
                      with: .color(Theme.inkSecondary.opacity(0.18)), lineWidth: 1)
         }
         if let heroDate, todayOnly {
+          // A tight three-line stack: weekday above, the day number centered
+          // and dominant, month below — labels hug the number.
           ctx.draw(
             Text(heroDate.formatted(.dateTime.weekday(.abbreviated)).uppercased())
               .font(.caption2.weight(.semibold))
               .foregroundStyle(.secondary),
-            at: CGPoint(x: center.x, y: center.y - 11)
+            at: CGPoint(x: center.x, y: center.y - 17)
           )
           ctx.draw(
             Text(heroDate.formatted(.dateTime.day()))
               .font(.system(.title3, design: .rounded).weight(.semibold))
               .monospacedDigit()
               .foregroundStyle(.primary),
-            at: CGPoint(x: center.x, y: center.y + 8)
+            at: CGPoint(x: center.x, y: center.y)
+          )
+          ctx.draw(
+            Text(heroDate.formatted(.dateTime.month(.abbreviated)).uppercased())
+              .font(.caption2.weight(.semibold))
+              .foregroundStyle(.secondary),
+            at: CGPoint(x: center.x, y: center.y + 17)
           )
         } else {
           let scope = todayOnly ? "Today" : "\(windowDays) days"
