@@ -3672,7 +3672,10 @@ enum LoggedEvents {
     grab(FetchDescriptor<HabitDayStateEntity>(predicate: #Predicate { $0.occurredAt >= date }))
     grab(FetchDescriptor<SupplementDayStateEntity>(predicate: #Predicate { $0.occurredAt >= date }))
     grab(FetchDescriptor<ExerciseEntryEntity>(predicate: #Predicate { $0.occurredAt >= date }))
-    grab(FetchDescriptor<IntakeEventEntity>(predicate: #Predicate { $0.occurredAt >= date }))
+    // Intake is intentionally omitted here — the rhythm wheel plots it via a
+    // custom path that colors each dot by its *kind* (per-kind color), which
+    // this section-keyed projection can't carry. It stays in `all`/`since`
+    // for the section-level "time since last" queries.
     // Nutrition stores its instant as `loggedAt` (occurredAt is a computed alias).
     grab(FetchDescriptor<NutritionEntryEntity>(predicate: #Predicate { $0.loggedAt >= date }))
     return out.sorted { $0.occurredAt > $1.occurredAt }

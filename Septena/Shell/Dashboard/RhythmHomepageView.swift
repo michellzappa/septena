@@ -224,6 +224,15 @@ enum RhythmData {
                           color: colors["tasks"], context: context)
       if !te.isEmpty { snap.eventsBySection["tasks", default: []].append(contentsOf: te) }
     }
+    // Intake plots per *kind* color (coffee, matcha, … each carry their own),
+    // not the flat section accent — so it gets its own path rather than the
+    // section-keyed `timed` stream.
+    if visible.contains("intake") {
+      let ie = intakeEvents(todayStart: todayStart, windowDays: windowDays,
+                            weekStart: weekStart, sectionColor: colors["intake"],
+                            context: context)
+      if !ie.isEmpty { snap.eventsBySection["intake", default: []].append(contentsOf: ie) }
+    }
 
     let sleep = sleepBands(nights: sleepNights, todayStart: todayStart, windowDays: windowDays,
                            visible: visible, sleepColor: colors["sleep"])
@@ -248,6 +257,26 @@ enum RhythmData {
       guard let cs = t.completedAt, let when = RhythmFmt.isoLocal.date(from: cs) else { return nil }
       return TimeOfDayWheel.Event(id: t.id, occurredAt: when, todayStart: todayStart,
                                   windowDays: windowDays, color: color)
+    }
+  }
+
+  /// Intake events as dots, each tinted by its *kind*'s own color (coffee,
+  /// matcha, cannabis… each define one) rather than the flat section accent.
+  /// Falls back to the section color for a kind with no color set.
+  private static func intakeEvents(todayStart: Date, windowDays: Int, weekStart: Date,
+                                   sectionColor: Color?, context: ModelContext) -> [TimeOfDayWheel.Event] {
+    let rows = (try? context.fetch(
+      FetchDescriptor<IntakeEventEntity>(predicate: #Predicate { $0.occurredAt >= weekStart })
+    )) ?? []
+    guard !rows.isEmpty else { return [] }
+    // One fetch of the kinds, mapped id → color, so the join is in-memory.
+    let kinds = (try? context.fetch(FetchDescriptor<IntakeKindEntity>())) ?? []
+    var kindColor: [String: Color] = [:]
+    for k in kinds { if let c = AdaptiveColor.adaptive(k.color) { kindColor[k.id] = c } }
+    return rows.compactMap { e in
+      TimeOfDayWheel.Event(id: e.id, occurredAt: e.occurredAt, todayStart: todayStart,
+                           windowDays: windowDays,
+                           color: kindColor[e.kindID] ?? sectionColor)
     }
   }
 
