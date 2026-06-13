@@ -40,7 +40,7 @@ const iphone = [
     {
       // 2 · THE WEEK — glanceable seven days; proves breadth + streaks.
       id: "week",
-      background: { tint: S.sleep },
+      background: { tint: theme.accent },
       badge: "THE WEEK",
       headline: "Your last *seven days*, at a glance",
       sub: "Heatmaps and streaks across every section you care about — no tab-digging.",
@@ -50,9 +50,9 @@ const iphone = [
       ],
     },
     {
-      // 3 · CORRELATIONS — the payoff only an all-in-one app can give.
+      // 3 · CORRELATIONS — a sleep-insight story, so it wears sleep indigo.
       id: "correlations",
-      background: { tint: S.nutrition },
+      background: { tint: S.sleep },
       badge: "PATTERNS",
       headline: "See what *actually moves* your sleep",
       sub: "Septena connects the dots — like late coffee turning up in last night's rest.",
@@ -61,13 +61,13 @@ const iphone = [
     {
       // 4 · SECTIONS — breadth + control; chips name the domains.
       id: "sections",
-      background: { tint: S.goals, dots: true },
+      background: { tint: S.goals },        // dots reserved for bookends (hook + close)
       align: "center",
       badge: "SIXTEEN SECTIONS",
       headline: "Turn on *only what matters*",
       sub: "Hide a section and it's gone from view. Your data stays exactly where it was.",
       chips: { x: 0.5, y: 0.43, w: 1140 },
-      shot: { src: "05-Goals", width: 0.66, rotate: 0, offsetY: 0.44 },
+      shot: { src: "17-Sections", width: 0.66, rotate: 0, offsetY: 0.44 },
     },
     {
       // 5 · PRIVACY — the trust wedge for a general, privacy-aware audience.
@@ -84,7 +84,7 @@ const iphone = [
     {
       // 6 · CLOSE — quiet, human sign-off.
       id: "close",
-      background: { tint: S.body, style: "split" },
+      background: { tint: S.body, style: "split", dots: true },
       align: "center",
       badge: "MADE FOR DAILY USE",
       headline: "A calm place to *run your life*",
