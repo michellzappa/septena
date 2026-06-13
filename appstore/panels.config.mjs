@@ -34,6 +34,7 @@ export const panels = {
     {
       id: "week",
       background: { tint: S.sleep },
+      badge: "THE WEEK",
       headline: "Start your day with *the Week*",
       sub: "The trailing seven days — tasks, training, sleep, mood — in one glance.",
       shot: { src: "06-Week-heatmap", width: 0.74, rotate: 2, offsetY: 0.14 },
@@ -44,6 +45,7 @@ export const panels = {
     {
       id: "next",
       background: { tint: S.habits },
+      badge: "NEXT FEED",
       headline: "Always know *what's next*",
       sub: "One Next feed, identical on iPhone, Apple Watch, and widgets.",
       shot: { src: "03-Next", width: 0.74, rotate: -2, offsetY: 0.14 },
@@ -54,6 +56,7 @@ export const panels = {
     {
       id: "correlations",
       background: { tint: S.nutrition },
+      badge: "CORRELATIONS",
       headline: "See what *actually moves* your sleep",
       sub: "Septena correlates across sections — caffeine, training, mood — once the data means something.",
       shot: { src: "08-Correlations", width: 0.74, rotate: 2, offsetY: 0.14 },
@@ -62,6 +65,7 @@ export const panels = {
       id: "sections",
       background: { tint: S.goals, dots: true },
       align: "center",
+      badge: "16 SECTIONS",
       headline: "Sections, *not silos*",
       sub: "Enable what fits. Hide the rest — your data stays.",
       chips: { x: 0.5, y: 0.42, w: 1140 },
@@ -71,6 +75,7 @@ export const panels = {
       id: "privacy",
       background: { tint: theme.accent, style: "split" },
       align: "center",
+      badge: "PRIVATE BY DESIGN",
       headline: "No servers. No accounts. *No ads.*",
       sub: "Local-first, synced end-to-end through your own iCloud.",
       founder: {
