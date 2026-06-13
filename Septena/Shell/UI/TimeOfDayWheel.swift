@@ -296,16 +296,27 @@ struct TimeOfDayWheel: View {
                    lineWidth: major ? 2 : 1)
       }
 
-      // The single ring bands and dots share.
-      let dotRing = ringR * 0.82
+      // Two lanes: things you logged share the OUTER ring with their dots;
+      // scheduled (calendar) blocks pull into an INNER lane — "did" outside,
+      // "planned" inside. Radius now carries that one distinction; angle still
+      // means time, color still means section.
+      let dotRing = ringR * 0.82            // outer: logged dots + durations
+      let scheduledRing = ringR * 0.58      // inner: calendar / scheduled
 
-      // Duration bands (sleep, fasting; calendar pills today) — under the
+      // Logged duration bands (sleep, training) on the outer ring, under the
       // dots, on top of the glass so they stay legible.
-      let bandsToDraw = todayOnly ? shownBands + todayBands : shownBands
-      for b in bandsToDraw.sorted(by: { $0.daysAgo > $1.daysAgo }) {
+      for b in shownBands.sorted(by: { $0.daysAgo > $1.daysAgo }) {
         ctx.stroke(arc(b.start, b.end, dotRing),
                    with: .color((b.color ?? accent).opacity(fade(b.daysAgo) * 0.6)),
                    style: StrokeStyle(lineWidth: b.thin ? 4 : 9, lineCap: .round))
+      }
+      // Scheduled (calendar) blocks on the inner lane — today view only.
+      if todayOnly {
+        for b in todayBands.sorted(by: { $0.daysAgo > $1.daysAgo }) {
+          ctx.stroke(arc(b.start, b.end, scheduledRing),
+                     with: .color((b.color ?? accent).opacity(fade(b.daysAgo) * 0.6)),
+                     style: StrokeStyle(lineWidth: b.thin ? 4 : 9, lineCap: .round))
+        }
       }
 
       // "Now" hand. On the hero it starts at the glass donut's inner edge
@@ -343,16 +354,31 @@ struct TimeOfDayWheel: View {
         }
       }
 
-      // Dots — clean solid section-colored marks. Content that sits ON glass
-      // is solid and crisp (Apple's own rule: glass is chrome, the symbols
-      // and indicators on it are opaque); glass-on-glass is for layered
-      // chrome, not data. Tried tinted-glass beads (went black) and drawn
-      // gloss (read as candy) — solid is right.
+      // Dots. Flat/compact dials keep clean solid marks. The hero paints each
+      // dot as a glass *bead* — NOT material `.glassEffect`, which Apple
+      // reserves for the chrome layer (data is content) and which goes muddy
+      // at dot scale (the "went black" scar) and costs GPU per shape. Painted
+      // glass instead, in three reads: a translucent body so the lit glass
+      // donut shows THROUGH the bead, a brighter core so the data stays
+      // legible, and a thin bright rim that catches light like a glass edge.
+      // No outer bloom (read as a glow), no hard centered gloss (read as
+      // candy) — both were tried and rejected.
       for m in dotMarks(side: side) {
         let r = m.diameter / 2
         let rect = CGRect(x: m.center.x - r, y: m.center.y - r,
                           width: m.diameter, height: m.diameter)
-        ctx.fill(Path(ellipseIn: rect), with: .color(m.color.opacity(m.opacity)))
+        if heroDate != nil {
+          ctx.fill(Path(ellipseIn: rect), with: .color(m.color.opacity(0.50 * m.opacity)))
+          let coreR = r * 0.60
+          ctx.fill(Path(ellipseIn: CGRect(x: m.center.x - coreR, y: m.center.y - coreR,
+                                          width: coreR * 2, height: coreR * 2)),
+                   with: .color(m.color.opacity(0.95 * m.opacity)))
+          ctx.stroke(Path(ellipseIn: rect),
+                     with: .color(.white.opacity(0.35 * m.opacity)),
+                     lineWidth: max(0.5, r * 0.18))
+        } else {
+          ctx.fill(Path(ellipseIn: rect), with: .color(m.color.opacity(m.opacity)))
+        }
       }
 
       // Center. The hero's glass donut leaves the middle genuinely OPEN —
