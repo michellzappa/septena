@@ -86,6 +86,31 @@ struct TimeOfDayWheel: View {
   /// for navigation (tap → Next) and day-scrubbing (swipe → prev/next day);
   /// section-detail dials leave it `false` and keep the week-overlay toggle.
   var lockToday: Bool = false
+  /// When set (0..<1), the whole dial rotates so this fraction sits at the top
+  /// (north) — the hero passes `nowFraction` so "now" is always at 12 o'clock
+  /// and the clock turns slowly through the day. The centre labels are drawn
+  /// in a separate, un-rotated layer so they stay upright. `nil` keeps the
+  /// fixed midnight-at-top orientation (section dials, past days).
+  var northFraction: Double? = nil
+  /// Optional sleep window as `(bedtime, wake)` fractions — drawn as a moon
+  /// (bedtime) and sun (wake) on the inner/scheduled track, upright and
+  /// outside the rotation so the glyphs stay readable as the dial turns.
+  var sleepMarks: (bed: Double, wake: Double)? = nil
+
+  /// Degrees to spin the dial content so `northFraction` lands at the top.
+  private var northRotation: Double { northFraction.map { -$0 * 360 } ?? 0 }
+
+  /// Base (un-rotated) position of a clock `fraction` on the ring at
+  /// `radiusFactor`. The dial's rotation is applied by the enclosing
+  /// `rotationEffect` (so glyphs orbit on the ring's arc, in harmony with the
+  /// rest of the dial), not baked into this coordinate.
+  private func ringPoint(_ fraction: Double, _ radiusFactor: CGFloat, in side: CGFloat) -> CGPoint {
+    let ringR = side / 2 - margin
+    let r = ringR * radiusFactor
+    let a = fraction * 2 * .pi
+    return CGPoint(x: side / 2 + r * CGFloat(sin(a)),
+                   y: side / 2 - r * CGFloat(cos(a)))
+  }
 
   /// Margin between the dial's square and its tick ring (full rendering).
   /// Shared with `dotRing(forDiameter:)` so external geometry — the `.arc`
@@ -230,22 +255,25 @@ struct TimeOfDayWheel: View {
       // renders crisp in the single Canvas ON TOP. `.interactive` gives the
       // press-lensing; the tilt parallax behind it supplies the motion that
       // makes Liquid Glass actually read as glass.
+      // A dark conic wash over the night arc, BEHIND the glass, so the glass
+      // has real dark content to frost and refract. It ROTATES with the clock
+      // so the dark band tracks the (rotated) night hours; the glass refracts
+      // whatever sits behind it, so night still reads as dark *glass*. The
+      // dusk/dawn terminators feather over ~1h.
+      if !compact, heroDate != nil, let nightArc {
+        AnnulusShape(holeFraction: Self.heroHoleFraction)
+          .fill(nightShading(nightArc))
+          .padding(20)
+          .rotationEffect(.degrees(northRotation))
+          .animation(.easeInOut(duration: 0.6), value: northRotation)
+      }
+      // The clear glass donut is a uniform ring, so it must NOT rotate —
+      // `rotationEffect` disables `.glassEffect` (the live material can't
+      // render through a rotation transform). Static glass; the rotated dark
+      // wedge behind it supplies the night, the rotated marks above supply
+      // the data. `.interactive` gives the press lensing; tilt parallax the
+      // motion that makes it read as glass.
       if !compact && heroDate != nil {
-        // A dark conic wash over the night arc, on the band BEHIND the glass,
-        // so the glass has real dark content to frost and refract — that's
-        // what makes the night read as dark *glass*, not a flat gray fill
-        // (tinting the glass itself, nothing behind, composites flat). The
-        // dusk/dawn terminators feather over ~1h so night eases in and out.
-        // Day arc stays transparent — the bright page shows through.
-        if let nightArc {
-          AnnulusShape(holeFraction: Self.heroHoleFraction)
-            .fill(nightShading(nightArc))
-            .padding(20)
-        }
-        // One clear glass donut over the whole ring — frosts the dark night
-        // wedge into dark glass and the light page into bright glass, all in
-        // one continuous surface (no seam). `.interactive` gives the press
-        // lensing; the tilt parallax behind supplies the motion.
         Color.clear
           .glassEffect(.regular.interactive(),
                        in: AnnulusShape(holeFraction: Self.heroHoleFraction))
@@ -361,17 +389,6 @@ struct TimeOfDayWheel: View {
           ctx.stroke(hand, with: .color(Theme.inkSecondary.opacity(0.40)), lineWidth: 2)
           // Phase-colored overlay — the day's light on the hand.
           ctx.stroke(hand, with: .color(nowColor.opacity(0.95)), lineWidth: 1.5)
-          // Luminous tip: a soft radial glow plus a solid core, marking
-          // "now" in the current hour's color where the hand meets the ring.
-          let glowR: CGFloat = 7
-          ctx.fill(Path(ellipseIn: CGRect(x: tip.x - glowR, y: tip.y - glowR,
-                                          width: glowR * 2, height: glowR * 2)),
-                   with: .radialGradient(Gradient(colors: [nowColor.opacity(0.50), .clear]),
-                                         center: tip, startRadius: 0, endRadius: glowR))
-          let coreR: CGFloat = 2.5
-          ctx.fill(Path(ellipseIn: CGRect(x: tip.x - coreR, y: tip.y - coreR,
-                                          width: coreR * 2, height: coreR * 2)),
-                   with: .color(nowColor))
         } else {
           ctx.stroke(hand, with: .color(accent.opacity(0.6)), lineWidth: 1)
         }
@@ -389,49 +406,38 @@ struct TimeOfDayWheel: View {
         ctx.fill(Path(ellipseIn: rect), with: .color(m.color.opacity(m.opacity)))
       }
 
-      // Center. The hero's glass donut leaves the middle genuinely OPEN —
-      // the date (today) or scope chip (week) floats in the hollow with
-      // the ambient glow behind it, no disc; the now-hand already stops at
-      // the glass's inner edge. Flat-disc dials keep a small hub disc that
-      // caps the hand and seats the chip. Compact thumbnails: nothing.
-      if !compact {
-        if heroDate == nil {
-          let hubR: CGFloat = 30
-          let hub = CGRect(x: center.x - hubR, y: center.y - hubR,
-                           width: hubR * 2, height: hubR * 2)
-          ctx.fill(Path(ellipseIn: hub), with: .color(Theme.cardSurface))
-          ctx.stroke(Path(ellipseIn: hub),
-                     with: .color(Theme.inkSecondary.opacity(0.18)), lineWidth: 1)
-        }
-        if let heroDate, focusToday {
-          // A tight three-line stack: weekday above, the day number centered
-          // and dominant, month below — labels hug the number.
-          ctx.draw(
-            Text(heroDate.formatted(.dateTime.weekday(.abbreviated)).uppercased())
-              .font(.caption2.weight(.semibold))
-              .foregroundStyle(.secondary),
-            at: CGPoint(x: center.x, y: center.y - 17)
-          )
-          ctx.draw(
-            Text(heroDate.formatted(.dateTime.day()))
-              .font(.system(.title3, design: .rounded).weight(.semibold))
-              .monospacedDigit()
-              .foregroundStyle(.primary),
-            at: CGPoint(x: center.x, y: center.y)
-          )
-          ctx.draw(
-            Text(heroDate.formatted(.dateTime.month(.abbreviated)).uppercased())
-              .font(.caption2.weight(.semibold))
-              .foregroundStyle(.secondary),
-            at: CGPoint(x: center.x, y: center.y + 17)
-          )
-        } else {
-          let scope = todayOnly ? "Today" : "\(windowDays) days"
-          ctx.draw(Text(scope).font(.caption2.weight(.medium)).foregroundStyle(.secondary),
-                   at: center)
-        }
+      // Center. Section dials (no heroDate) draw a hub disc + scope chip here
+      // in the Canvas. The HERO's centre is the upright overlay (`heroCenter`)
+      // and NEVER the Canvas — so the date stays fixed and level while the
+      // dial spins (drawing it in the rotating Canvas made it whirl). Compact
+      // thumbnails: nothing.
+      if !compact && heroDate == nil {
+        let hubR: CGFloat = 30
+        let hub = CGRect(x: center.x - hubR, y: center.y - hubR,
+                         width: hubR * 2, height: hubR * 2)
+        ctx.fill(Path(ellipseIn: hub), with: .color(Theme.cardSurface))
+        ctx.stroke(Path(ellipseIn: hub),
+                   with: .color(Theme.inkSecondary.opacity(0.18)), lineWidth: 1)
+        let scope = todayOnly ? "Today" : "\(windowDays) days"
+        ctx.draw(Text(scope).font(.caption2.weight(.medium)).foregroundStyle(.secondary),
+                 at: center)
       }
     }
+    // The marks (ticks, bands, dots, now-hand) rotate so the clock turns with
+    // "now" at the top; the static glass donut and the upright overlays below
+    // do not. Midnight-at-top when nothing pins it.
+    .rotationEffect(.degrees(northRotation))
+    .animation(.easeInOut(duration: 0.6), value: northRotation)
+
+      // The hero's centre labels live OUTSIDE the rotation — always, so the
+      // date stays upright and fixed whether the dial is at rest, drifting, or
+      // mid-spin to another day. (Section dials draw their centre in the
+      // Canvas above; they never rotate.)
+      if let heroDate, focusToday {
+        heroCenter(heroDate)
+      }
+      // Sleep moon/sun — on the inner track, but upright (outside rotation).
+      sleepGlyphs
     }
     .frame(width: diameter, height: diameter)
     .contentShape(Circle())
@@ -447,6 +453,47 @@ struct TimeOfDayWheel: View {
     .accessibilityHint(compact || lockToday
       ? Text("")
       : Text("Double tap to switch between today and the last \(windowDays) days"))
+  }
+
+  /// The centre date stack (weekday · day · month) for the rotating hero,
+  /// drawn upright in a layer outside the dial's rotation so it never turns
+  /// with the clock. Mirrors the in-Canvas stack used by non-rotating dials.
+  private func heroCenter(_ date: Date) -> some View {
+    VStack(spacing: -1) {
+      Text(date.formatted(.dateTime.weekday(.abbreviated)).uppercased())
+        .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+      Text(date.formatted(.dateTime.day()))
+        .font(.system(.title3, design: .rounded).weight(.semibold))
+        .monospacedDigit().foregroundStyle(.primary)
+      Text(date.formatted(.dateTime.month(.abbreviated)).uppercased())
+        .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+    }
+    .allowsHitTesting(false)
+  }
+
+  /// Moon at bedtime, sun at wake — on the inner/scheduled track. The whole
+  /// group ORBITS with the dial (same `rotationEffect` + animation as the
+  /// night wedge and marks, so they move in harmony along the ring's arc),
+  /// while each glyph counter-rotates to stay upright and readable.
+  @ViewBuilder private var sleepGlyphs: some View {
+    if let s = sleepMarks {
+      ZStack {
+        Image(systemName: "moon.fill")
+          .font(.system(size: 10))
+          .foregroundStyle(Theme.inkSecondary)
+          .rotationEffect(.degrees(-northRotation))
+          .position(ringPoint(s.bed, 0.58, in: diameter))
+        Image(systemName: "sun.max.fill")
+          .font(.system(size: 11))
+          .foregroundStyle(Theme.inkSecondary)
+          .rotationEffect(.degrees(-northRotation))
+          .position(ringPoint(s.wake, 0.58, in: diameter))
+      }
+      .frame(width: diameter, height: diameter)
+      .rotationEffect(.degrees(northRotation))
+      .animation(.easeInOut(duration: 0.6), value: northRotation)
+      .allowsHitTesting(false)
+    }
   }
 }
 

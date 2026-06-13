@@ -108,6 +108,14 @@ struct DayDialHero: View {
     dayOffset = max(-Self.maxDaysBack, min(0, dayOffset + delta))
   }
 
+  /// The displayed day's sleep window (bedtime, wake) as dial fractions —
+  /// read off the already-computed sleep band so the dial can mark bedtime
+  /// with a moon and wake with a sun. nil when there's no night for the day.
+  private var sleepMarks: (bed: Double, wake: Double)? {
+    guard let b = snapshot.bandsBySection["sleep"]?.first(where: { $0.daysAgo == 0 }) else { return nil }
+    return (b.start, b.end)
+  }
+
   /// Reading `clock.now` here means the 60s tick re-renders only the hero
   /// (the now-hand advances), never the parent dashboard — the same
   /// isolation `WelcomeHeaderSection` uses.
@@ -148,7 +156,12 @@ struct DayDialHero: View {
       nightArc: nightArc,
       // Single-day dial: no week overlay. Tap and swipe drive navigation and
       // day-scrubbing instead (handled below).
-      lockToday: true
+      lockToday: true,
+      // Spin the dial so "now" is always at the top — today only; a past day
+      // has no "now", so it rests at the fixed midnight-top orientation.
+      northFraction: isToday ? nowFraction : nil,
+      // Moon at bedtime, sun at wake, on the inner track.
+      sleepMarks: sleepMarks
     )
     // A wide soft backwash for depth, drifting a few points against device
     // tilt (iOS) while the glass stays put — the parallax that makes the
