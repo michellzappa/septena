@@ -64,6 +64,9 @@ final class ScreenshotTests: XCTestCase {
     // site's section vocabulary (Training → "exercise").
     app.terminate()
     launch(app, layout: "dense")
+    // Full per-section coverage — every section the demo enables, so the site
+    // (one shot per app area, docs/MESSAGING.md §4) and the App Store both draw
+    // from one capture set. Names match the site's vocabulary.
     captureSection(app, "Nutrition", "nutrition")
     captureSection(app, "Training", "exercise")
     captureSection(app, "Sleep", "sleep")
@@ -71,6 +74,12 @@ final class ScreenshotTests: XCTestCase {
     captureSection(app, "Body", "body")
     captureSection(app, "Habits", "habits")
     captureSection(app, "Hydration", "hydration")
+    captureSection(app, "Caffeine", "caffeine")
+    captureSection(app, "Chores", "chores")
+    captureSection(app, "Supplements", "supplements")
+    captureSection(app, "Groceries", "groceries")
+    captureSection(app, "Gut", "gut")
+    captureSection(app, "Activity", "activity")
 
     // Settings editors — best-effort navigation; skip cleanly if labels differ.
     captureSettingsSections(app, "sections")   // proves "turn on only what matters"
