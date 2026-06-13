@@ -291,6 +291,9 @@ struct WeekDashboardView: View {
     ) {
       ZStack {
         VStack(spacing: Theme.sectionSpacing) {
+          #if DEBUG
+          debugTimeTravelBar
+          #endif
           ClaudeReconnectBanner()
           if showWelcome {
             // Self-observes DayClock so the 60s `now` tick re-renders only the
@@ -317,6 +320,23 @@ struct WeekDashboardView: View {
           layoutBody
         }
         .septenaSurface()
+        #if DEBUG
+        // Hidden keyboard shortcuts: ⟨ / ⟩ (the comma/period keys) step the
+        // homepage back/forward a day through the last week, driving
+        // DayClock so the dial + tiles re-render for that day. Zero-size so
+        // they never show; they work whenever the window is key.
+        .background {
+          Group {
+            Button("") { stepDebugDay(-1) }.keyboardShortcut(",", modifiers: [])
+            Button("") { stepDebugDay(+1) }.keyboardShortcut(".", modifiers: [])
+            // Shift variants (the literal ⟨ ⟩ glyphs) too, for muscle memory.
+            Button("") { stepDebugDay(-1) }.keyboardShortcut("<", modifiers: [])
+            Button("") { stepDebugDay(+1) }.keyboardShortcut(">", modifiers: [])
+          }
+          .opacity(0)
+          .accessibilityHidden(true)
+        }
+        #endif
         // While a compact drawer floats over the dashboard the content behind
         // it goes inert. The drawer's backdrop is translucent, not dimmed, and
         // `presentationBackgroundInteraction` keeps it live — so without this a
@@ -929,6 +949,53 @@ struct WeekDashboardView: View {
   private var currentLayoutMode: HomepageLayoutMode {
     HomepageLayoutMode(rawValue: homepageLayoutRaw) ?? .tiles
   }
+
+  #if DEBUG
+  // MARK: - Debug time travel
+
+  /// A compact strip (debug builds only) showing which day the homepage is
+  /// rendering and stepping it through the last week — for inspecting
+  /// SolarClock + past-day data. Tappable ⟨ ⟩ mirror the comma/period
+  /// keyboard shortcuts; everything drives `DayClock.debugDayOffset`, so the
+  /// dial and tiles all follow.
+  @ViewBuilder private var debugTimeTravelBar: some View {
+    let off = clock.debugDayOffset
+    HStack(spacing: 10) {
+      Button { stepDebugDay(-1) } label: { Image(systemName: "chevron.left") }
+        .disabled(off <= -6)
+      Text(debugDayLabel)
+        .font(.septenaMeta)
+        .foregroundStyle(off == 0 ? Theme.inkSecondary : Theme.todayAccent)
+        .frame(minWidth: 150)
+      Button { stepDebugDay(+1) } label: { Image(systemName: "chevron.right") }
+        .disabled(off >= 0)
+      if off != 0 {
+        Button { stepDebugDay(-off) } label: { Text("Today").font(.septenaMeta) }
+      }
+    }
+    .buttonStyle(.plain)
+    .padding(.horizontal, 12)
+    .padding(.vertical, 5)
+    .background(Capsule().fill(Theme.secondaryGroupedBackground))
+    .overlay(Capsule().strokeBorder(Theme.inkSecondary.opacity(0.15)))
+    .frame(maxWidth: .infinity)
+  }
+
+  private var debugDayLabel: String {
+    let date = SeptenaDate.parse(clock.today) ?? Date()
+    let f = DateFormatter()
+    f.dateFormat = "EEE d MMM"
+    let off = clock.debugDayOffset
+    let tail = off == 0 ? " · today  ⟨ ⟩" : "  (\(off)d)"
+    return f.string(from: date) + tail
+  }
+
+  /// Step the homepage's day, clamped to the last 7 days (today … −6).
+  private func stepDebugDay(_ delta: Int) {
+    let next = max(-6, min(0, clock.debugDayOffset + delta))
+    if next != clock.debugDayOffset { clock.debugDayOffset = next }
+  }
+  #endif
 
   /// Renders the homepage body for the currently-selected layout mode.
   /// Three renderers, all reading from `HomepageDomainData`. (Correlations

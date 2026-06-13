@@ -26,6 +26,16 @@ public final class DayClock {
   public private(set) var today: String = SeptenaDate.today
   public private(set) var now: Date = Date()
 
+  #if DEBUG
+  /// Debug time-travel: shifts the whole app's notion of "now" by this many
+  /// days (0 = real today, clamped to the last week by the caller). Because
+  /// every day-scoped view observes `today`/`now`, setting this navigates
+  /// the entire homepage's data at once — used by the dashboard's ⟨ / ⟩
+  /// keyboard shortcuts to inspect SolarClock + past days. Compiled out of
+  /// Release entirely.
+  public var debugDayOffset: Int = 0 { didSet { refreshIfNeeded() } }
+  #endif
+
   @ObservationIgnored private var dayObserver: NSObjectProtocol?
   @ObservationIgnored private var minuteTimer: Timer?
 
@@ -49,10 +59,22 @@ public final class DayClock {
   /// Called from `scenePhase → .active` so the day flips when the app
   /// returns from background across midnight.
   public func refreshIfNeeded() {
-    let nowDate = Date()
+    let nowDate = currentInstant()
     if now != nowDate { now = nowDate }
-    let day = SeptenaDate.today
+    let day = SeptenaDate.format(nowDate) ?? today
     if day != today { today = day }
+  }
+
+  /// The system instant, shifted by `debugDayOffset` in DEBUG builds. In
+  /// Release this is just `Date()` (the offset doesn't exist).
+  private func currentInstant() -> Date {
+    let base = Date()
+    #if DEBUG
+    if debugDayOffset != 0 {
+      return Calendar.current.date(byAdding: .day, value: debugDayOffset, to: base) ?? base
+    }
+    #endif
+    return base
   }
 
   private func scheduleMinuteTimer() {
