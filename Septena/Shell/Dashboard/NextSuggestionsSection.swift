@@ -48,6 +48,11 @@ struct NextSuggestion: Identifiable, Hashable {
   /// navigating. Empty for every other kind.
   var intakeKindID: String? = nil
   var intakeChoices: [SuggestionBlocks.Choice] = []
+  /// For `.intake` nudges: the tracker's own accent (hex/hsl token). The
+  /// `intake` host section has no single palette color, so the row tints
+  /// from the per-kind color and only falls back to the section key when
+  /// this is nil. Without it caffeine/tea/… all render the gray fallback.
+  var kindColor: String? = nil
 }
 
 // MARK: - Math (pure)
@@ -377,7 +382,7 @@ final class NextSuggestionsModel {
           detail: detail,
           score: baseScore + NextScoring.timingScore(usual: due, nowMinutes: nowMinutes, isToday: true),
           proposedMinutes: due,
-          intakeKindID: kind.id, intakeChoices: choices)
+          intakeKindID: kind.id, intakeChoices: choices, kindColor: kind.color)
       }
 
       // First use of the day.
@@ -615,7 +620,8 @@ struct NextSuggestionsSection: View {
               suggestion: suggestion,
               model: model,
               nav: nav,
-              tint: theme.color(for: suggestion.kind.sectionKey)
+              tint: suggestion.kindColor.flatMap(AdaptiveColor.adaptive)
+                ?? theme.color(for: suggestion.kind.sectionKey)
             )
           }
         }
