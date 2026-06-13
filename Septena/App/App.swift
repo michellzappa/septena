@@ -428,6 +428,10 @@ struct SeptenaApp: App {
     } else if url.host == "next" {
       // The Next widget opens straight to the Next tab.
       navigation.pendingTab = .next
+    } else if url.host == "home" {
+      // The time-wheel widget opens the Week dashboard — where the full
+      // homepage dial / Wheel layout lives.
+      navigation.pendingTab = .week
     }
   }
 

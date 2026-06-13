@@ -259,6 +259,14 @@ targets:
       # NextWire + DayBucket. NextWire needs DayBucket.
       - path: SeptenaCore/NextWire.swift
       - path: SeptenaCore/DayBucket.swift
+      # Time-wheel ("Rhythm") widget: the shared wire blob + the dial view it
+      # renders. TimeOfDayWheel needs Theme (token bag) and AdaptiveColor (the
+      # hex→Color resolver, split out of SectionTheme so the widget needn't pull
+      # in the whole theme runtime).
+      - path: SeptenaCore/RhythmWire.swift
+      - path: SeptenaCore/AdaptiveColor.swift
+      - path: Septena/Shell/UI/TimeOfDayWheel.swift
+      - path: Septena/Shell/UI/Theme.swift
     info:
       path: SeptenaWidgets/Info.plist
       properties:

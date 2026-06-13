@@ -85,6 +85,7 @@ struct NextWidget: Widget {
 struct SeptenaWidgetsBundle: WidgetBundle {
   var body: some Widget {
     NextWidget()
+    RhythmWidget()
   }
 }
 
