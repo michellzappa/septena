@@ -35,9 +35,9 @@
   .view { cursor:pointer; font:600 12px/1 -apple-system,sans-serif; padding:8px 14px; border-radius:999px; border:1px solid var(--line); background:var(--card); color:var(--soft); }
   .view.sel { color:#fff; background:var(--accent); border-color:var(--accent); }
 
-  .strip { display:flex; gap:18px; overflow-x:auto; padding:18px 4px 22px; }
-  .shotcard { flex:none; width:248px; }
-  .shotcard img { width:100%; border-radius:22px; border:1px solid var(--line); box-shadow:0 14px 34px -12px rgb(0 0 0 / .25); cursor:zoom-in; display:block; }
+  .strip { display:flex; gap:18px; overflow-x:auto; padding:18px 4px 22px; align-items:flex-start; }
+  .shotcard { flex:none; }
+  .shotcard img { border-radius:22px; border:1px solid var(--line); box-shadow:0 14px 34px -12px rgb(0 0 0 / .25); cursor:zoom-in; display:block; }
   .shotcard .cap { margin-top:8px; font:11px/1.5 ui-monospace,monospace; color:var(--soft); word-break:break-all; }
   .dim { font:600 10px/1 ui-monospace,monospace; padding:4px 8px; border-radius:999px; }
   .dim.ok { color:var(--ok); background:color-mix(in oklab,var(--ok) 12%,white); }
@@ -125,9 +125,13 @@ function renderStrip() {
     $("strip").innerHTML = `<div class="empty">${hint}</div>`;
     return;
   }
+  // Size cards by orientation so iPad reads taller and Mac reads landscape,
+  // instead of every device sharing phone width.
+  const landscape = d.width > d.height;
+  const imgStyle = landscape ? "width:600px;height:auto" : "height:600px;width:auto";
   $("strip").innerHTML = items.map(s => `
     <div class="shotcard">
-      <img src="../${s.path}?t=${Date.now()}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'empty',textContent:'⚠ '+this.getAttribute('src')}))" onclick="$('lbimg').src=this.src;$('lb').style.display='flex'">
+      <img style="${imgStyle}" src="../${s.path}?t=${Date.now()}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'empty',textContent:'⚠ '+this.getAttribute('src')}))" onclick="$('lbimg').src=this.src;$('lb').style.display='flex'">
       <div class="cap">${s.file}${s.w ? ` <span class="dim ${s.ok ? "ok" : "bad"}">${s.w}×${s.h}</span>` : ""}</div>
     </div>`).join("");
 }
