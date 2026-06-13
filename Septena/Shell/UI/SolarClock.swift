@@ -71,6 +71,45 @@ enum SolarClock {
                  sunsetHour: wrap(solarNoon + halfDayHours))
   }
 
+  /// Device-approximate coordinates for `now`: the zone table when the zone
+  /// is known, else a mid-latitude point synthesized from the UTC offset
+  /// (longitude ≈ offset × 15°, latitude 40°N) so the sky still tracks day
+  /// and night anywhere on earth. No permission, no fetch — same posture as
+  /// `today`.
+  static func coordinates(for now: Date) -> (lat: Double, lon: Double) {
+    if let c = zoneCoordinates[TimeZone.current.identifier] { return c }
+    let tzHours = Double(TimeZone.current.secondsFromGMT(for: now)) / 3600
+    return (lat: 40, lon: tzHours * 15)
+  }
+
+  /// The sun's elevation angle at `now` — radians, negative below the
+  /// horizon. The single input the atmosphere model (`SkyAtmosphere`) needs.
+  /// Shares the declination / equation-of-time / solar-noon math with
+  /// `compute`, so the sky wash's day-night always agrees with the dial's
+  /// night arc.
+  static func elevation(now: Date) -> Double {
+    let (lat, lon) = coordinates(for: now)
+    let cal = Calendar.current
+    let n = Double(cal.ordinality(of: .day, in: .year, for: now) ?? 180)
+
+    let declR = (-23.44 * cos((2 * .pi / 365) * (n + 10))) * .pi / 180
+    let b = 2 * .pi * (n - 81) / 364
+    let eotMin = 9.87 * sin(2 * b) - 7.53 * cos(b) - 1.5 * sin(b)
+    let tzHours = Double(TimeZone.current.secondsFromGMT(for: now)) / 3600
+    // Solar noon in local clock hours — hour angle is zero here.
+    let solarNoon = 12 - lon / 15 - eotMin / 60 + tzHours
+
+    let comps = cal.dateComponents([.hour, .minute, .second], from: now)
+    let localHour = Double(comps.hour ?? 0)
+      + Double(comps.minute ?? 0) / 60
+      + Double(comps.second ?? 0) / 3600
+    let hourAngleR = (localHour - solarNoon) * 15 * .pi / 180   // 15°/hour
+
+    let latR = lat * .pi / 180
+    let sinElev = sin(latR) * sin(declR) + cos(latR) * cos(declR) * cos(hourAngleR)
+    return asin(max(-1, min(1, sinElev)))
+  }
+
   /// Representative coordinates per IANA zone (zone1970-style city points,
   /// one decimal — city-level is all sunrise needs). Major zones only;
   /// anything absent falls back to the design day. Includes a few legacy

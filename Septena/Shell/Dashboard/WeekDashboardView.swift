@@ -2971,12 +2971,22 @@ private struct WeekDashboardScreen<CurrentDay: Equatable, MenuExtra: View, Conte
       ScrollView {
         content()
       }
-      // Flat grouped-gray canvas, same as the other tabs (Coach / Next) — so
-      // the transparent nav bar floats over plain content with nothing behind
-      // the toolbar. A top-down accent gradient used to live here (for the
-      // glass tiles to refract), but `.ignoresSafeArea()` bled it up behind
-      // the nav bar and read as a fixed top bar the other tabs don't have.
-      .background(Theme.groupedBackground)
+      // Grouped-gray canvas with the current sky FIXED across the top: tied
+      // to the top of the screen (bleeds behind the status / nav bar via
+      // `.ignoresSafeArea`) and not scrolling — ambient light on the page,
+      // not a scrolling header. Contained to the top ~third so it's a wash
+      // over the greeting that fades to clear into the gray around the top of
+      // the dial. Fixed-behind-content, so the cards scroll over it.
+      .background {
+        GeometryReader { geo in
+          ZStack(alignment: .top) {
+            Theme.groupedBackground
+            SkyTopWash()
+              .frame(height: geo.size.height * 0.33, alignment: .top)
+          }
+        }
+        .ignoresSafeArea()
+      }
       // Tab bar already labels this view. Keep the nav bar present so
       // iOS's default scroll-edge effect kicks in (content fades to bg
       // material as it scrolls under the top — same shape as the
