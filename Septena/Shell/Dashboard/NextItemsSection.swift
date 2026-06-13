@@ -320,57 +320,48 @@ final class NextItemsModel {
   /// / chores snapshot on view appear, so screens that consume this model
   /// (Habits / Supplements / Chores destinations + Next) render real data
   /// on the first frame instead of empty sections while the network
-  /// catches up.
+  /// catches up. Reads only the fast `ResponseCache` blobs (a UserDefaults
+  /// decode) — never the SwiftData mirror — so the synchronous first frame
+  /// can't hitch the push transition. The authoritative mirror read happens
+  /// off-main in `load()`, which also refreshes these blobs.
   func paintFromCache() {
-    let context = LocalStore.shared.container.mainContext
-    if let day = ChecklistMirror.loadHabitsDay(context: context, date: today) {
-      habits = day.buckets.flatMap { day.grouped[$0] ?? [] }
-      habitBuckets = day.buckets
-      ResponseCache.save(habits, forKey: CacheKey.habits)
-      ResponseCache.save(habitBuckets, forKey: CacheKey.habitBuckets)
-    } else {
-      if let v = ResponseCache.load([HabitDayItem].self, forKey: CacheKey.habits) { habits = v }
-      if let v = ResponseCache.load([String].self, forKey: CacheKey.habitBuckets) { habitBuckets = v }
-    }
-    if let day = ChecklistMirror.loadSupplementsDay(context: context, date: today) {
-      supplements = day.items
-      ResponseCache.save(supplements, forKey: CacheKey.supplements)
-    } else if let v = ResponseCache.load([SupplementDayItem].self, forKey: CacheKey.supplements) {
-      supplements = v
-    }
-    let mirroredChores = ChecklistMirror.loadChores(context: context)
-    if !mirroredChores.isEmpty {
-      chores = mirroredChores
-      ResponseCache.save(mirroredChores, forKey: CacheKey.chores)
-    } else if let v = ResponseCache.load([ChoreItem].self, forKey: CacheKey.chores) {
-      chores = v
-    }
+    if let v = ResponseCache.load([HabitDayItem].self, forKey: CacheKey.habits) { habits = v }
+    if let v = ResponseCache.load([String].self, forKey: CacheKey.habitBuckets) { habitBuckets = v }
+    if let v = ResponseCache.load([SupplementDayItem].self, forKey: CacheKey.supplements) { supplements = v }
+    if let v = ResponseCache.load([ChoreItem].self, forKey: CacheKey.chores) { chores = v }
     calendarEvents = CalendarBridge.shared.todayEvents()
     hasLoaded = true
   }
 
   func load() async {
-    let context = LocalStore.shared.container.mainContext
-
     // Habits / Supplements / Chores are CloudKit-authoritative — read
     // directly from the local SwiftData mirror. CKEngine keeps it fresh
     // via fetchChanges() + silent pushes; no FastAPI fallback needed.
-    if let hRes = ChecklistMirror.loadHabitsDay(context: context, date: today) {
+    // Run the (today-scoped) reads off the main actor via MirrorReader so
+    // the fetch + JSON-decode cost never competes with the push transition;
+    // assign the Sendable result back on the main actor below.
+    let day = today
+    let snap = await MirrorReader.shared.read { ctx in
+      (habits: ChecklistMirror.loadHabitsDay(context: ctx, date: day),
+       supplements: ChecklistMirror.loadSupplementsDay(context: ctx, date: day),
+       chores: ChecklistMirror.loadChores(context: ctx))
+    }
+
+    if let hRes = snap.habits {
       habits = hRes.buckets.flatMap { hRes.grouped[$0] ?? [] }
       habitBuckets = hRes.buckets
       ResponseCache.save(habits, forKey: CacheKey.habits)
       ResponseCache.save(habitBuckets, forKey: CacheKey.habitBuckets)
     }
 
-    if let sRes = ChecklistMirror.loadSupplementsDay(context: context, date: today) {
+    if let sRes = snap.supplements {
       supplements = sRes.items
       ResponseCache.save(supplements, forKey: CacheKey.supplements)
     }
 
-    let mirroredChores = ChecklistMirror.loadChores(context: context)
-    chores = mirroredChores
-    if !mirroredChores.isEmpty {
-      ResponseCache.save(mirroredChores, forKey: CacheKey.chores)
+    chores = snap.chores
+    if !snap.chores.isEmpty {
+      ResponseCache.save(snap.chores, forKey: CacheKey.chores)
     }
 
     // Local EventKit fetch — no network. Feeds the homepage today-timeline
