@@ -162,7 +162,7 @@ private struct SymptomEventEditor: View {
             Text(def.title).tag(def.id)
           }
         }
-        DatePicker("Time", selection: $time, displayedComponents: .hourAndMinute)
+        SteppedDatePicker("Time", selection: $time, displayedComponents: .hourAndMinute)
         VStack(alignment: .leading, spacing: 8) {
           HStack {
             Text("Severity")

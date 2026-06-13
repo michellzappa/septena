@@ -219,8 +219,7 @@ struct AddMoodPage: View {
         .font(.caption)
         .foregroundStyle(.secondary)
       if editingTime {
-        DatePicker("", selection: $time, displayedComponents: .hourAndMinute)
-          .labelsHidden()
+        SteppedDatePicker(selection: $time, displayedComponents: .hourAndMinute)
         Button("Done") { editingTime = false }
           .font(.caption.weight(.medium))
       } else {

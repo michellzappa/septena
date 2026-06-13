@@ -38,8 +38,8 @@ struct EditIntakeEntrySheet: View {
       Form {
         if let kind {
           Section("When") {
-            DatePicker("Date & time", selection: $when,
-                       displayedComponents: [.date, .hourAndMinute])
+            SteppedDatePicker("Date & time", selection: $when,
+                              displayedComponents: [.date, .hourAndMinute])
           }
           Section {
             Picker("Method", selection: $method) {

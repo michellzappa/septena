@@ -42,9 +42,9 @@ struct EditGutEntrySheet: View {
   @ViewBuilder private var formBody: some View {
     Form {
         Section("When") {
-          DatePicker("Date & time",
-                     selection: $when,
-                     displayedComponents: [.date, .hourAndMinute])
+          SteppedDatePicker("Date & time",
+                            selection: $when,
+                            displayedComponents: [.date, .hourAndMinute])
         }
         Section("Bristol") {
           // Bristol Stool Scale 1–7. `Stepper` is the standard SwiftUI

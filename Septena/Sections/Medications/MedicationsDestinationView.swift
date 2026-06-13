@@ -165,7 +165,7 @@ private struct MedicationDoseEditor: View {
             Text(def.title).tag(def.id)
           }
         }
-        DatePicker("Time", selection: $time, displayedComponents: .hourAndMinute)
+        SteppedDatePicker("Time", selection: $time, displayedComponents: .hourAndMinute)
         Picker("Status", selection: $status) {
           Text("Taken").tag("taken")
           Text("Skipped").tag("skipped")

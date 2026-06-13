@@ -72,8 +72,8 @@ struct EditMoodEntrySheet: View {
           .padding(.vertical, 4)
         }
         Section("When") {
-          DatePicker("Date & time", selection: $when,
-                     displayedComponents: [.date, .hourAndMinute])
+          SteppedDatePicker("Date & time", selection: $when,
+                            displayedComponents: [.date, .hourAndMinute])
         }
         Section("Note") {
           TextField("Note", text: $note, axis: .vertical)

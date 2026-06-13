@@ -49,9 +49,9 @@ struct NewNutritionEntrySheet: View {
   @ViewBuilder private var formBody: some View {
       Form {
         Section("When") {
-          DatePicker("Time",
-                     selection: $time,
-                     displayedComponents: .hourAndMinute)
+          SteppedDatePicker("Time",
+                            selection: $time,
+                            displayedComponents: .hourAndMinute)
         }
         Section("Meal") {
           TextField("Emoji", text: $emoji)

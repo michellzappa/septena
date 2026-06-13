@@ -458,6 +458,7 @@
 		ADCA538CBFB1E75DCC416215 /* SettingsRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C93BF01E5F69A01E9E9302 /* SettingsRecord.swift */; };
 		AE037FEEBEC164AE695B6329 /* NutritionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3478D00EF04684D27A69EECF /* NutritionPlugin.swift */; };
 		AF247DC389C988F3638A8AE9 /* CoachVoiceRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15B7C1644977DC5B2BBB9339 /* CoachVoiceRecord.swift */; };
+		AF4414AA7A6C5D12A1DECDB2 /* SteppedDatePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EA1FB5C0671C7DC4801C53D /* SteppedDatePicker.swift */; };
 		AF5A77B5B730923A825F7C89 /* Outbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD295FAB7B881CAC43EE8C34 /* Outbox.swift */; };
 		AF64B18251F2EE3C868C7337 /* MoodPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4E90D21C382F9970E4AAF88 /* MoodPlugin.swift */; };
 		AF9AEC8D052F74DF449FE64F /* MacScreenshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B337452F1AC0089640636D00 /* MacScreenshotTests.swift */; };
@@ -537,6 +538,7 @@
 		CB31EA476ED138FEC78FCE6B /* PlatformDelegates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1654FD32744DA1974DA1C1CE /* PlatformDelegates.swift */; };
 		CBA0DEB88E6912CAA657691C /* NutritionIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C1C8DBE27874B430C24F730 /* NutritionIntents.swift */; };
 		CC231BBBE9DAF0BEE2C89058 /* MCPDispatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9944B4E8F1540B42EC6CCC17 /* MCPDispatch.swift */; };
+		CC2A6AB25CDC2D22464E70BA /* SteppedDatePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EA1FB5C0671C7DC4801C53D /* SteppedDatePicker.swift */; };
 		CC39344C28C121004522CAB8 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ACB6256DD75D93215BDFD3C /* RootTabView.swift */; };
 		CC74FC02CD22EC7F0A3AC8AF /* HabitsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D38FA671236F83BEFCB8EBE /* HabitsDestinationView.swift */; };
 		CCDACCBA5F72C3EA3969292D /* MilestoneEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2ABB5641A551478BB6D1FE7 /* MilestoneEngine.swift */; };
@@ -829,6 +831,7 @@
 		3C8645572712693D81587B7C /* TrainingDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingDestinationView.swift; sourceTree = "<group>"; };
 		3D97027452B1A57DBEAF13DE /* TrainingLiveActivityCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingLiveActivityCoordinator.swift; sourceTree = "<group>"; };
 		3E344068B6FEE62E7F0C23E3 /* ConversationCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationCard.swift; sourceTree = "<group>"; };
+		3EA1FB5C0671C7DC4801C53D /* SteppedDatePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteppedDatePicker.swift; sourceTree = "<group>"; };
 		3EDE23D823F6238C9977BF16 /* WatchSnapshotPublisher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchSnapshotPublisher.swift; sourceTree = "<group>"; };
 		40B5D7C95F12FB9F9E53565E /* TasksDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksDestinationView.swift; sourceTree = "<group>"; };
 		40D9EAAB80FD7F9FAC57F20B /* GoalsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalsView.swift; sourceTree = "<group>"; };
@@ -1767,6 +1770,7 @@
 				F79D2478011E9353A0DF90AC /* ModuleTile.swift */,
 				13011C553B04F0ACEFD189CD /* PlatformShims.swift */,
 				2085456E2239FA343DA34D32 /* SolarClock.swift */,
+				3EA1FB5C0671C7DC4801C53D /* SteppedDatePicker.swift */,
 				AF9E152DA345E00295EC4F58 /* SyncIndicator.swift */,
 				7F911216C13CBFC7E330714A /* Theme.swift */,
 				729A9E0B1243570301EBC253 /* TimeOfDayWheel.swift */,
@@ -2533,6 +2537,7 @@
 				55EA2A17835A1384B386E08D /* SolarClock.swift in Sources */,
 				31E3CDE53B537BC61FA86E4B /* StatGrid.swift in Sources */,
 				8359B508D0CAB2AD17E004A9 /* StatStrip.swift in Sources */,
+				CC2A6AB25CDC2D22464E70BA /* SteppedDatePicker.swift in Sources */,
 				4576C2F0D4BCB0983D18B3DE /* SuggestionBlocks.swift in Sources */,
 				FF12744271E9DF61BD2F557F /* SuggestionEngine.swift in Sources */,
 				2395786BEB918CD00236678C /* SupplementIntents.swift in Sources */,
@@ -2879,6 +2884,7 @@
 				EFC89B6F74CF8A5AD952F07D /* SolarClock.swift in Sources */,
 				036EA94AAE4126D6277D46B8 /* StatGrid.swift in Sources */,
 				41FA57763B555A0445F34644 /* StatStrip.swift in Sources */,
+				AF4414AA7A6C5D12A1DECDB2 /* SteppedDatePicker.swift in Sources */,
 				B56035BEC42CF42BCF4E3310 /* SuggestionBlocks.swift in Sources */,
 				F21704F2D348D306CBC132AB /* SuggestionEngine.swift in Sources */,
 				85F24F7A48F82D74D7D0E526 /* SupplementIntents.swift in Sources */,
