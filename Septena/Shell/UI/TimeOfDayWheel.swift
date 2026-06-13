@@ -311,7 +311,7 @@ struct TimeOfDayWheel: View {
       // "planned" inside. Radius now carries that one distinction; angle still
       // means time, color still means section.
       let dotRing = ringR * 0.82            // outer: logged dots + durations
-      let scheduledRing = ringR * 0.58      // inner: calendar / scheduled
+      let scheduledRing = ringR * 0.68      // inner: calendar / scheduled
 
       // Logged duration bands (sleep, training) on the outer ring, under the
       // dots, on top of the glass so they stay legible. Sleep stays a soft
@@ -319,7 +319,10 @@ struct TimeOfDayWheel: View {
       // and get a thin specular highlight riding their outer edge — light on
       // a glass rod, so they read as present *and* glassy.
       for b in shownBands.sorted(by: { $0.daysAgo > $1.daysAgo }) {
-        let lineW: CGFloat = b.thin ? 4 : 9
+        // Sleep (the thin band here) sits a touch thicker than a calendar pill
+        // — about the min dot diameter — so the night reads as a soft lane,
+        // not a hairline. Training (opaque) keeps the heavy 9pt stroke.
+        let lineW: CGFloat = b.thin ? 5 : 9
         let alpha = b.opaque ? min(1.0, fade(b.daysAgo) + 0.2) : fade(b.daysAgo) * 0.6
         ctx.stroke(arc(b.start, b.end, dotRing),
                    with: .color((b.color ?? accent).opacity(alpha)),
@@ -388,14 +391,33 @@ struct TimeOfDayWheel: View {
         let rect = CGRect(x: m.center.x - r, y: m.center.y - r,
                           width: m.diameter, height: m.diameter)
         if heroDate != nil {
-          ctx.fill(Path(ellipseIn: rect), with: .color(m.color.opacity(0.50 * m.opacity)))
-          let coreR = r * 0.60
+          // Lens body — radial, more transparent at the centre (you see the
+          // lit donut through it) and more saturated toward the rim, the way
+          // light bends through a glass bead.
+          ctx.fill(Path(ellipseIn: rect),
+                   with: .radialGradient(
+                     Gradient(colors: [m.color.opacity(0.32 * m.opacity),
+                                       m.color.opacity(0.68 * m.opacity)]),
+                     center: m.center, startRadius: 0, endRadius: r))
+          // Core — keeps the datum legible against the translucent lens.
+          let coreR = r * 0.55
           ctx.fill(Path(ellipseIn: CGRect(x: m.center.x - coreR, y: m.center.y - coreR,
                                           width: coreR * 2, height: coreR * 2)),
                    with: .color(m.color.opacity(0.95 * m.opacity)))
+          // Glass edge.
           ctx.stroke(Path(ellipseIn: rect),
-                     with: .color(.white.opacity(0.35 * m.opacity)),
-                     lineWidth: max(0.5, r * 0.18))
+                     with: .color(.white.opacity(0.30 * m.opacity)),
+                     lineWidth: max(0.5, r * 0.16))
+          // Specular highlight — a soft bright crescent at the upper-left, the
+          // light catching a glass dome. Offset + soft (fades to clear), never
+          // a hard centred gloss (that read as candy).
+          let hl = CGPoint(x: m.center.x - r * 0.30, y: m.center.y - r * 0.32)
+          let hlR = r * 0.55
+          ctx.fill(Path(ellipseIn: CGRect(x: hl.x - hlR, y: hl.y - hlR,
+                                          width: hlR * 2, height: hlR * 2)),
+                   with: .radialGradient(
+                     Gradient(colors: [.white.opacity(0.55 * m.opacity), .clear]),
+                     center: hl, startRadius: 0, endRadius: hlR))
         } else {
           ctx.fill(Path(ellipseIn: rect), with: .color(m.color.opacity(m.opacity)))
         }
