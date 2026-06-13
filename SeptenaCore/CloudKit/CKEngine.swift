@@ -316,7 +316,9 @@ func noteCoachMessageDeletion(id: String) { noteDeletion(recordName: CoachMessag
     guard let engine else { return }
     inflightSyncCount += 1
     defer { inflightSyncCount -= 1 }
-    try await engine.fetchChanges()
+    try await PerfTrace.span("ck.fetchChanges") {
+      try await engine.fetchChanges()
+    }
   }
 
   /// Drop this install's persisted CKSyncEngine state without touching

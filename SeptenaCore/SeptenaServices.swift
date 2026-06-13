@@ -172,6 +172,10 @@ final class SeptenaServices {
       var batchTouchedTasks = false
       var batchTouchedStructure = false
       var batchTouchedData = false
+      // Per-batch apply counter — printed by `applyDidFinishBatch` so the Perf
+      // log shows how many records each CloudKit delta materialized on the main
+      // actor (each is a synchronous fetch-by-id; a large delta is a stall).
+      var batchApplied = 0
 
       // Single-row lookup for the CK closures below: every fetch here
       // resolves a unique id, so cap at one match and stop scanning.
@@ -492,6 +496,7 @@ final class SeptenaServices {
         return nil
       }
       ckEngine.applyFetchedRecord = { record in
+        batchApplied += 1
         switch record.recordType {
         case TaskCloudKitSchema.recordType:
           batchTouchedTasks = true
@@ -1120,7 +1125,10 @@ final class SeptenaServices {
         }
       }
       ckEngine.applyDidFinishBatch = {
-        try? context.save()
+        PerfTrace.spanSync("ck.applyBatch.save", "\(batchApplied) records") {
+          try? context.save()
+        }
+        batchApplied = 0
         if batchTouchedTasks {
           NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
         }

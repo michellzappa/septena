@@ -644,14 +644,18 @@ struct WeekDashboardView: View {
   /// Each applied value is mirrored to `ResponseCache` so the next cold
   /// launch repaints from disk before the reload lands.
   private func loadAll() async {
-    let snap = await reader.read(Self.mirrorSections,
-                                 today: SeptenaDate.today,
-                                 days: Self.historyDays)
-    apply(snap, Self.mirrorSections)
-    await refreshTasks()
-    await dailies.load()
-    loadMenuExtras()
-    await loadNetwork()
+    await PerfTrace.span("dash.loadAll") {
+      let snap = await PerfTrace.span("dash.reader.read") {
+        await reader.read(Self.mirrorSections,
+                          today: SeptenaDate.today,
+                          days: Self.historyDays)
+      }
+      apply(snap, Self.mirrorSections)
+      await PerfTrace.span("dash.refreshTasks") { await refreshTasks() }
+      await PerfTrace.span("dash.dailies.load") { await dailies.load() }
+      loadMenuExtras()
+      await PerfTrace.span("dash.loadNetwork") { await loadNetwork() }
+    }
   }
 
   /// Assign a reader `Snapshot` to the tile `@State` and mirror each value

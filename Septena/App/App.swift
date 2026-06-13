@@ -153,7 +153,7 @@ struct SeptenaApp: App {
           // this `.task` ends right after the delegate stashing below, so
           // the first frame paints from the SwiftData mirror without
           // waiting on any network round-trip.
-          await services.start()
+          await PerfTrace.span("app.servicesStart") { await services.start() }
           #if DEBUG
           // Catch section identity↔behavior drift in dev: every manifest row
           // must have a plugin and vice versa (the join is a runtime string).
@@ -197,11 +197,15 @@ struct SeptenaApp: App {
             // corruption / partial-state situations in the console without
             // an Inspector — but it's three full-table scans, so it has no
             // business ahead of the first frame.
-            LocalCache.logTaskStateSummary(in: localStore.container.mainContext)
+            PerfTrace.spanSync("app.logTaskStateSummary") {
+              LocalCache.logTaskStateSummary(in: localStore.container.mainContext)
+            }
             // Pull CloudKit (+ project-graph heal, occurredAt backfill,
             // timezone publish), then refresh the mirror-backed surfaces
             // to absorb any remote changes.
-            await services.absorbRemoteChanges()
+            await PerfTrace.span("app.absorbRemoteChanges") {
+              await services.absorbRemoteChanges()
+            }
             await theme.refresh()
             await settingsStore.refresh()
             // Bridge the welcome name between the CloudKit-synced settings

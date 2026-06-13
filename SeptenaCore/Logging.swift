@@ -129,6 +129,64 @@ enum SeptenaLog {
   }
 }
 
+// MARK: - Performance tracing
+
+/// Lightweight timing for chasing main-thread stalls. Every span emits an
+/// `os_signpost` interval (visible on the Instruments timeline, and via the
+/// "Septena ▸ Perf" track) AND logs its elapsed milliseconds when they cross
+/// `warnMs` — so a Console filter on category "Perf" surfaces *only* the slow
+/// spans, and the count detail tells you how much work each one did.
+///
+/// `os.Logger`/`OSSignposter` are near-free at call sites, so these can stay
+/// wrapped around hot paths. Tighten/remove once a stall is localized.
+enum PerfTrace {
+  static let signposter = OSSignposter(subsystem: Log.subsystem, category: "Perf")
+  private static let logger = Logger(subsystem: Log.subsystem, category: "Perf")
+
+  /// Spans faster than this don't log (the signpost still fires for Instruments).
+  static let warnMs = 150
+
+  private static func nowNanos() -> UInt64 { DispatchTime.now().uptimeNanoseconds }
+
+  private static func emit(_ name: StaticString, _ startNanos: UInt64, _ detail: String) {
+    let ms = Int((nowNanos() &- startNanos) / 1_000_000)
+    guard ms >= warnMs else { return }
+    if detail.isEmpty {
+      logger.info("\(name, privacy: .public) \(ms, privacy: .public)ms")
+    } else {
+      logger.info("\(name, privacy: .public) \(ms, privacy: .public)ms — \(detail, privacy: .public)")
+    }
+  }
+
+  /// Time an async span. Logs `name <ms>ms — <detail>` when slow.
+  @discardableResult
+  static func span<T>(_ name: StaticString,
+                      _ detail: @autoclosure () -> String = "",
+                      _ body: () async throws -> T) async rethrows -> T {
+    let state = signposter.beginInterval(name)
+    let start = nowNanos()
+    defer {
+      signposter.endInterval(name, state)
+      emit(name, start, detail())
+    }
+    return try await body()
+  }
+
+  /// Time a synchronous span.
+  @discardableResult
+  static func spanSync<T>(_ name: StaticString,
+                          _ detail: @autoclosure () -> String = "",
+                          _ body: () throws -> T) rethrows -> T {
+    let state = signposter.beginInterval(name)
+    let start = nowNanos()
+    defer {
+      signposter.endInterval(name, state)
+      emit(name, start, detail())
+    }
+    return try body()
+  }
+}
+
 // MARK: - Errors
 
 /// Shared error type used by OuraProvider / WithingsProvider for HTTP
