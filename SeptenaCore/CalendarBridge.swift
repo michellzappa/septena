@@ -106,10 +106,14 @@ final class CalendarBridge {
 
   /// Every event on today's date, including ones that have already ended.
   /// Used by the Next screen to surface earlier-today meetings as "Done Today".
-  func todayEvents() -> [EKEvent] {
+  func todayEvents() -> [EKEvent] { events(on: Date()) }
+
+  /// Every event on the given calendar day, including ones that have already
+  /// ended — so a scrubbed past day on the dial can show its real meetings.
+  func events(on day: Date) -> [EKEvent] {
     guard access == .granted else { return [] }
     let cal = Calendar.current
-    let start = cal.startOfDay(for: Date())
+    let start = cal.startOfDay(for: day)
     guard let end = cal.date(byAdding: .day, value: 1, to: start) else { return [] }
     let predicate = store.predicateForEvents(withStart: start, end: end, calendars: visibleCalendars)
     return store.events(matching: predicate)

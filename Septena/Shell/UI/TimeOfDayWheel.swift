@@ -40,6 +40,10 @@ struct TimeOfDayWheel: View {
     /// Half-weight stroke — calendar events render thinner than logged
     /// durations (sleep, fasting), matching the day timeline's thin pills.
     var thin: Bool = false
+    /// Solid (not washed) and given a glass sheen — for activities like
+    /// training that should read as a present thing, not an ambient window.
+    /// Sleep stays translucent (the soft "usual sleep window" pool).
+    var opaque: Bool = false
   }
 
   let events: [Event]
@@ -77,6 +81,11 @@ struct TimeOfDayWheel: View {
   /// these hours — stained-glass night, drawn on the face — instead of a dark
   /// wash behind it. `nil` keeps the plain clear-glass donut.
   var nightArc: (start: Double, end: Double)? = nil
+  /// Locks the dial to a single day — no today⇄week tap toggle, always
+  /// focused on `heroDate`. The hero uses this so its tap and swipe are free
+  /// for navigation (tap → Next) and day-scrubbing (swipe → prev/next day);
+  /// section-detail dials leave it `false` and keep the week-overlay toggle.
+  var lockToday: Bool = false
 
   /// Margin between the dial's square and its tick ring (full rendering).
   /// Shared with `dotRing(forDiameter:)` so external geometry — the `.arc`
@@ -136,9 +145,10 @@ struct TimeOfDayWheel: View {
   /// flips every other dial too (and the choice persists across launches).
   @AppStorage(Self.windowDefaultsKey) private var todayOnly = true
 
-  /// The resolved focus: compact tiles always show the full week (the overlay
-  /// *is* the point of a thumbnail); the full dial honors the tap toggle.
-  private var focusToday: Bool { compact ? false : todayOnly }
+  /// The resolved focus: a locked dial (the hero) is always single-day;
+  /// compact tiles always show the full week (the overlay *is* the point of a
+  /// thumbnail); the full dial honors the tap toggle.
+  private var focusToday: Bool { lockToday ? true : (compact ? false : todayOnly) }
   /// Outer margin for the labels/disc — collapses in compact so the dial fills
   /// its tile.
   private var margin: CGFloat { compact ? 5 : Self.fullMargin }
@@ -304,14 +314,24 @@ struct TimeOfDayWheel: View {
       let scheduledRing = ringR * 0.58      // inner: calendar / scheduled
 
       // Logged duration bands (sleep, training) on the outer ring, under the
-      // dots, on top of the glass so they stay legible.
+      // dots, on top of the glass so they stay legible. Sleep stays a soft
+      // wash (the ambient "usual window"); opaque bands (training) are solid
+      // and get a thin specular highlight riding their outer edge — light on
+      // a glass rod, so they read as present *and* glassy.
       for b in shownBands.sorted(by: { $0.daysAgo > $1.daysAgo }) {
+        let lineW: CGFloat = b.thin ? 4 : 9
+        let alpha = b.opaque ? min(1.0, fade(b.daysAgo) + 0.2) : fade(b.daysAgo) * 0.6
         ctx.stroke(arc(b.start, b.end, dotRing),
-                   with: .color((b.color ?? accent).opacity(fade(b.daysAgo) * 0.6)),
-                   style: StrokeStyle(lineWidth: b.thin ? 4 : 9, lineCap: .round))
+                   with: .color((b.color ?? accent).opacity(alpha)),
+                   style: StrokeStyle(lineWidth: lineW, lineCap: .round))
+        if b.opaque {
+          ctx.stroke(arc(b.start, b.end, dotRing + lineW * 0.28),
+                     with: .color(.white.opacity(0.45 * fade(b.daysAgo))),
+                     style: StrokeStyle(lineWidth: max(1, lineW * 0.18), lineCap: .round))
+        }
       }
-      // Scheduled (calendar) blocks on the inner lane — today view only.
-      if todayOnly {
+      // Scheduled (calendar) blocks on the inner lane — single-day view only.
+      if focusToday {
         for b in todayBands.sorted(by: { $0.daysAgo > $1.daysAgo }) {
           ctx.stroke(arc(b.start, b.end, scheduledRing),
                      with: .color((b.color ?? accent).opacity(fade(b.daysAgo) * 0.6)),
@@ -395,7 +415,7 @@ struct TimeOfDayWheel: View {
           ctx.stroke(Path(ellipseIn: hub),
                      with: .color(Theme.inkSecondary.opacity(0.18)), lineWidth: 1)
         }
-        if let heroDate, todayOnly {
+        if let heroDate, focusToday {
           // A tight three-line stack: weekday above, the day number centered
           // and dominant, month below — labels hug the number.
           ctx.draw(
@@ -427,14 +447,16 @@ struct TimeOfDayWheel: View {
     }
     .frame(width: diameter, height: diameter)
     .contentShape(Circle())
-    .modifier(WheelTapToggle(enabled: !compact) { todayOnly.toggle() })
+    // A locked dial (the hero) handles its own tap/swipe in `DayDialHero`;
+    // only the toggling dials wire the today⇄week tap here.
+    .modifier(WheelTapToggle(enabled: !compact && !lockToday) { todayOnly.toggle() })
     .accessibilityElement()
-    .accessibilityAddTraits(compact ? [] : .isButton)
+    .accessibilityAddTraits(compact || lockToday ? [] : .isButton)
     .accessibilityLabel(Text("Time-of-day wheel"))
     .accessibilityValue(Text(focusToday
-      ? "Today, \(shownEvents.count) events"
+      ? "\(shownEvents.count) events"
       : "\(events.count) events over the last \(windowDays) days"))
-    .accessibilityHint(compact
+    .accessibilityHint(compact || lockToday
       ? Text("")
       : Text("Double tap to switch between today and the last \(windowDays) days"))
   }

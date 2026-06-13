@@ -242,7 +242,9 @@ enum RhythmData {
                                 windowDays: windowDays, color: colors["training"], context: context)
       if !train.isEmpty { snap.bandsBySection["training"] = train }
     }
-    snap.calendarBands = todayCalendarBands(now: now, fallback: calendarFallback)
+    // Calendar for the *displayed* day (today, or a scrubbed past day) — the
+    // `todayStart` the rest of this load is keyed to.
+    snap.calendarBands = calendarBands(on: todayStart, fallback: calendarFallback)
     return snap
   }
 
@@ -316,7 +318,8 @@ enum RhythmData {
           start: m.0 / 24,
           end: min(max(m.1, m.0 + 0.05) / 24, 0.9999),
           daysAgo: daysAgo,
-          color: color
+          color: color,
+          opaque: true
         ))
       }
     }
@@ -327,12 +330,12 @@ enum RhythmData {
   /// end fractions of the local day, each in its own calendar's color. Empty
   /// when calendar access isn't granted (no prompt from here). Clamped to the
   /// day so a multi-day event reads as a single block.
-  private static func todayCalendarBands(now: Date, fallback: Color) -> [TimeOfDayWheel.Band] {
+  private static func calendarBands(on day: Date, fallback: Color) -> [TimeOfDayWheel.Band] {
     guard CalendarBridge.shared.access == .granted else { return [] }
     let cal = Calendar.current
-    let dayStart = cal.startOfDay(for: now)
+    let dayStart = cal.startOfDay(for: day)
     guard let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart) else { return [] }
-    return CalendarBridge.shared.todayEvents().compactMap { e in
+    return CalendarBridge.shared.events(on: day).compactMap { e in
       guard !e.isAllDay else { return nil }
       let s = max(e.startDate, dayStart)
       let f = min(e.endDate, dayEnd)

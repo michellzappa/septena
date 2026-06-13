@@ -61,15 +61,22 @@ struct DayDialHero: View {
   // the rows do. nil just means the comet never learns where the dial is.
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  /// The dial's today ⇄ week window (the wheel owns the tap; same shared key)
-  /// — today lets the donut carry night itself; week adds the current-hour
-  /// glow halo.
-  @AppStorage(TimeOfDayWheel.windowDefaultsKey) private var todayOnly = true
+  /// Switches tabs from inside the dashboard — tapping the dial opens Next.
+  @Environment(TabSelection.self) private var tabSelection
 
   @State private var snapshot = RhythmData.Snapshot()
+  /// Days back from today the dial is scrubbed to (0 = today, negative = past).
+  /// Swiping the dial steps this; capped at today and ~a month back. Local to
+  /// the hero — scrubbing previews a past day's rhythm without moving the rest
+  /// of the dashboard off today.
+  @State private var dayOffset = 0
+  /// Live horizontal follow while swiping — the "turn the page" feel.
+  @State private var dragX: CGFloat = 0
   #if os(iOS)
   @State private var tilt = TiltSource()
   #endif
+
+  private static let maxDaysBack = 30
 
   /// The light layer's parallax offset — device tilt on iOS, static on
   /// macOS (no motion hardware) and under Reduce Motion.
@@ -89,6 +96,18 @@ struct DayDialHero: View {
       ?? Calendar.current.startOfDay(for: clock.now)
   }
 
+  /// Start-of-day of the day the dial currently shows (today, or a scrubbed
+  /// past day).
+  private var displayedStart: Date {
+    Calendar.current.date(byAdding: .day, value: dayOffset, to: todayStart) ?? todayStart
+  }
+  private var isToday: Bool { dayOffset == 0 }
+
+  /// Step the scrubbed day, clamped to [today − maxDaysBack, today].
+  private func stepDay(_ delta: Int) {
+    dayOffset = max(-Self.maxDaysBack, min(0, dayOffset + delta))
+  }
+
   /// Reading `clock.now` here means the 60s tick re-renders only the hero
   /// (the now-hand advances), never the parent dashboard — the same
   /// isolation `WelcomeHeaderSection` uses.
@@ -97,10 +116,10 @@ struct DayDialHero: View {
     return (Double(c.hour ?? 0) * 60 + Double(c.minute ?? 0)) / 1440
   }
 
-  /// The night arc (sunset → sunrise) as dial fractions, from the device's
-  /// real solar times — the glass donut tints dark across these hours.
+  /// The night arc (sunset → sunrise) as dial fractions, from the solar times
+  /// of the *displayed* day — so scrubbing back also shifts the dark glass.
   private var nightArc: (start: Double, end: Double) {
-    let t = SolarClock.today(now: clock.now)
+    let t = SolarClock.today(now: displayedStart.addingTimeInterval(43_200))
     return (start: t.sunsetHour / 24, end: t.sunriseHour / 24)
   }
 
@@ -111,37 +130,75 @@ struct DayDialHero: View {
       // as the Rhythm mode's overlay dial.
       accent: Theme.inkSecondary,
       bands: snapshot.bands,
+      // The scheduled (calendar) lane — loaded for the displayed day, so a
+      // scrubbed past day shows that day's real meetings, not today's.
       todayBands: snapshot.calendarBands,
       windowDays: windowDays,
-      nowFraction: nowFraction,
+      // The now-hand only belongs on today — a past day has no "now".
+      nowFraction: isToday ? nowFraction : nil,
       // The now-hand wears the current hour's ambient phase color, so it
       // glows with the same light as the halo behind the glass.
       nowColor: AmbientLight.Phase.from(date: clock.now).tint.inner,
       diameter: dialDiameter,
-      heroDate: todayStart,
+      heroDate: displayedStart,
       // The glass donut tints dark across the night hours (sunset → sunrise):
       // a crisp dark wedge sits BEHIND the clear glass (inside the wheel) so
       // the glass frosts and refracts it into real dark glass — night on the
       // face itself, not a wash behind it.
-      nightArc: nightArc
+      nightArc: nightArc,
+      // Single-day dial: no week overlay. Tap and swipe drive navigation and
+      // day-scrubbing instead (handled below).
+      lockToday: true
     )
-    // The light is a background so it bleeds past the dial (toward the
-    // greeting above) without claiming layout height: a wide soft backwash
-    // for depth. On today the donut carries night itself, so the disc-edge
-    // halo would only re-add the dark shadow we removed — it's kept for the
-    // week view (a uniform current-hour glow). The whole light layer drifts
-    // a few points against device tilt (iOS) while the glass stays put — the
-    // parallax that makes the donut read as glass with light floating behind.
+    // A wide soft backwash for depth, drifting a few points against device
+    // tilt (iOS) while the glass stays put — the parallax that makes the
+    // donut read as glass with light floating behind it. (Night lives on the
+    // donut now, so no disc-edge halo.)
     .background {
-      ZStack {
-        AmbientGlow()
-          .frame(width: 460, height: 460)
-        if !todayOnly {
-          AmbientHalo(diameter: dialDiameter - 2 * TimeOfDayWheel.fullMargin,
-                      style: .now)
+      AmbientGlow()
+        .frame(width: 460, height: 460)
+        .offset(glowParallax)
+    }
+    // Swipe ← → to scrub days; tap opens the Next feed. The dial follows the
+    // finger a touch (resisted) and springs back on release — the "turning a
+    // page" cue that the day is changing; the centre date is the confirmation.
+    .offset(x: dragX)
+    .contentShape(Circle())
+    // `.gesture` (not high-priority) so the dashboard's vertical scroll still
+    // wins a vertical drag; the dial only claims a horizontal swipe.
+    .gesture(
+      DragGesture(minimumDistance: 12)
+        .onChanged { v in
+          if abs(v.translation.width) > abs(v.translation.height) {
+            dragX = v.translation.width * 0.35
+          }
         }
+        .onEnded { v in
+          let dx = v.translation.width
+          let horizontal = abs(dx) > abs(v.translation.height)
+          withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            if horizontal && dx > 40 { stepDay(-1) }        // swipe right → previous day
+            else if horizontal && dx < -40 { stepDay(1) }   // swipe left → next day
+            dragX = 0
+          }
+        }
+    )
+    .onTapGesture { tabSelection.current = .next }
+    // Off-today: a small "Today" affordance both signals you've scrubbed and
+    // jumps back. Bottom-left so it clears the dial face.
+    .overlay(alignment: .bottomLeading) {
+      if !isToday {
+        Button {
+          withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { dayOffset = 0 }
+        } label: {
+          Image(systemName: "arrow.uturn.left")
+            .font(.caption.weight(.semibold))
+            .padding(7)
+        }
+        .buttonStyle(.glass)
+        .accessibilityLabel("Today")
+        .transition(.opacity.combined(with: .scale))
       }
-      .offset(glowParallax)
     }
     // Publish the dot ring's circle (global coords) so the `.arc` comet can
     // orbit the dial instead of sweeping the screen. Cleared on disappear —
@@ -154,7 +211,7 @@ struct DayDialHero: View {
     }
     .onDisappear { logCommit?.dayDialAnchor = nil }
     .frame(maxWidth: .infinity)
-    .task(id: clock.today) { reload() }
+    .task(id: displayedStart) { reload() }
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
       reload()
     }
@@ -176,7 +233,9 @@ struct DayDialHero: View {
       visible: visibleSections,
       colors: colors,
       sleepNights: sleepNights,
-      todayStart: todayStart,
+      // Load relative to the *displayed* day so scrubbing back shows that
+      // day's dots/bands (the wheel plots its `daysAgo == 0` slice).
+      todayStart: displayedStart,
       now: clock.now,
       windowDays: windowDays,
       calendarFallback: theme.color(for: "calendar"),
