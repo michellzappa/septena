@@ -2446,11 +2446,13 @@ extension GutEventEntity: ChecklistCloudKitBackedEntity {
     )
     record[GutEventCloudKitSchema.Field.date] = date
     record[GutEventCloudKitSchema.Field.bristol] = bristol
-    record[GutEventCloudKitSchema.Field.blood] = blood
     record[GutEventCloudKitSchema.Field.volume] = volume
-    record[GutEventCloudKitSchema.Field.discomfortLevel] = discomfortLevel
-    record[GutEventCloudKitSchema.Field.discomfortStart] = discomfortStart
-    record[GutEventCloudKitSchema.Field.discomfortEnd] = discomfortEnd
+    // Symptom-shaped fields (blood, discomfort*) are NOT written — they moved to
+    // Symptoms. Omitting them keeps the fields out of the CloudKit GutEvent
+    // schema (a field is registered only when a record is saved with it), so a
+    // clean prod deploy never gains those columns. The local SwiftData columns
+    // stay as the migrator's dormant source; `apply(_:)` still *reads* any
+    // legacy values present on historical records (a read can't create schema).
     record[GutEventCloudKitSchema.Field.note] = note
     record[GutEventCloudKitSchema.Field.occurredAt] = occurredAt as NSDate
     return record
