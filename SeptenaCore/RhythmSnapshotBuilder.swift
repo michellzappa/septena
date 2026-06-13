@@ -2,8 +2,10 @@ import Foundation
 import SwiftData
 
 /// Builds the `RhythmWire` snapshot the time-wheel widget renders — the
-/// holistic 24-hour rhythm (every enabled section's timestamped events + the
-/// training-session bands) over the trailing window.
+/// front-door day dial: **today's** timestamped events (every enabled section)
+/// plus the day's training-session bands. (Built with `windowDays: 1` from the
+/// publisher; the wire keeps `windowDays` general in case a multi-day dial ever
+/// wants it.)
 ///
 /// Derives from the same SwiftData primitives the in-app dials use:
 /// `LoggedEvents.timed` (the shared, section-keyed projection), completed
@@ -39,12 +41,10 @@ enum RhythmSnapshotBuilder {
 
     let enabled = sections.filter { $0.isEnabled }
     let colorHex = Dictionary(enabled.map { ($0.key, $0.color) }, uniquingKeysWith: { a, _ in a })
-    let labels = Dictionary(enabled.map { ($0.key, $0.label) }, uniquingKeysWith: { a, _ in a })
     let visible = Set(enabled.map { $0.key })
 
     var events: [RhythmWire.Event] = []
     var bands: [RhythmWire.Band] = []
-    var present = Set<String>()   // sections that contributed → legend rows
 
     // 1) Logged events on the shared section-keyed projection (gut, mood,
     //    chores, habits, supplements, nutrition). Training is a duration, not
@@ -54,7 +54,6 @@ enum RhythmSnapshotBuilder {
       guard let e = event(id: t.id, occurredAt: t.occurredAt, todayStart: todayStart,
                           windowDays: windowDays, colorHex: colorHex[t.sectionKey]) else { continue }
       events.append(e)
-      present.insert(t.sectionKey)
     }
 
     // 2) Completed tasks as dots, placed at their local `completedAt` —
@@ -68,7 +67,6 @@ enum RhythmSnapshotBuilder {
               let e = event(id: t.id, occurredAt: when, todayStart: todayStart,
                             windowDays: windowDays, colorHex: colorHex["tasks"]) else { continue }
         events.append(e)
-        present.insert("tasks")
       }
     }
 
@@ -86,7 +84,6 @@ enum RhythmSnapshotBuilder {
                               windowDays: windowDays,
                               colorHex: kindColor[r.kindID] ?? colorHex["intake"]) else { continue }
           events.append(e)
-          present.insert("intake")
         }
       }
     }
@@ -94,16 +91,11 @@ enum RhythmSnapshotBuilder {
     // 4) Training as session pills (start → start+duration), gaps < 0.75h
     //    merged — mirrors `RhythmData.trainingBands`.
     if visible.contains("training") {
-      let train = trainingBands(todayStart: todayStart, weekStart: weekStart,
-                                windowDays: windowDays, colorHex: colorHex["training"], context: context)
-      if !train.isEmpty { bands.append(contentsOf: train); present.insert("training") }
+      bands = trainingBands(todayStart: todayStart, weekStart: weekStart,
+                            windowDays: windowDays, colorHex: colorHex["training"], context: context)
     }
 
-    let legend = enabled
-      .filter { present.contains($0.key) }
-      .map { RhythmWire.Legend(key: $0.key, label: labels[$0.key] ?? $0.label, colorHex: $0.color) }
-
-    return RhythmWire(windowDays: windowDays, events: events, bands: bands, legend: legend)
+    return RhythmWire(windowDays: windowDays, events: events, bands: bands)
   }
 
   /// `(fraction, daysAgo)` for an instant, bounded to the window. Mirrors

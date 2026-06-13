@@ -15,36 +15,28 @@ struct RhythmEntry: TimelineEntry {
     return (Double(c.hour ?? 0) * 60 + Double(c.minute ?? 0)) / 1440
   }
 
-  /// Placeholder / gallery preview — a plausible day across a few sections.
+  /// Start of the entry's day — the date shown in the dial's hollow.
+  var dayStart: Date { Calendar.current.startOfDay(for: date) }
+
+  /// Placeholder / gallery preview — a plausible single day across sections.
   static var sample: RhythmEntry {
-    func ev(_ id: String, _ frac: Double, _ ago: Int, _ color: Color) -> TimeOfDayWheel.Event {
-      .init(id: id, fraction: frac, daysAgo: ago, color: color)
+    func ev(_ id: String, _ frac: Double, _ color: Color) -> TimeOfDayWheel.Event {
+      .init(id: id, fraction: frac, daysAgo: 0, color: color)
     }
     let coffee = Color.brown, meal = Color.orange, mood = Color.purple, gut = Color.teal
-    var events: [TimeOfDayWheel.Event] = []
-    for day in 0..<7 {
-      events.append(ev("c\(day)", 7.5 / 24 + Double(day) * 0.004, day, coffee))
-      events.append(ev("c2\(day)", 10.0 / 24, day, coffee))
-      events.append(ev("m\(day)", 8.0 / 24, day, meal))
-      events.append(ev("m2\(day)", 13.0 / 24, day, meal))
-      events.append(ev("m3\(day)", 19.5 / 24, day, meal))
-      if day % 2 == 0 { events.append(ev("mo\(day)", 21.0 / 24, day, mood)) }
-      if day % 3 == 0 { events.append(ev("g\(day)", 9.0 / 24, day, gut)) }
-    }
-    let bands = (0..<3).map {
-      TimeOfDayWheel.Band(id: "t\($0)", start: 17.5 / 24, end: 18.5 / 24, daysAgo: $0 * 2,
-                          color: .green, opaque: true)
-    }
-    let legend = [
-      RhythmWidgetSnapshot.LegendItem(key: "intake", label: "Coffee", color: coffee),
-      RhythmWidgetSnapshot.LegendItem(key: "nutrition", label: "Meals", color: meal),
-      RhythmWidgetSnapshot.LegendItem(key: "training", label: "Training", color: .green),
-      RhythmWidgetSnapshot.LegendItem(key: "mood", label: "Mood", color: mood),
-      RhythmWidgetSnapshot.LegendItem(key: "gut", label: "Gut", color: gut),
+    let events: [TimeOfDayWheel.Event] = [
+      ev("c1", 7.5 / 24, coffee), ev("c2", 10.0 / 24, coffee), ev("c3", 14.0 / 24, coffee),
+      ev("m1", 8.0 / 24, meal), ev("m2", 13.0 / 24, meal), ev("m3", 19.5 / 24, meal),
+      ev("mo1", 9.0 / 24, mood), ev("mo2", 21.0 / 24, mood),
+      ev("g1", 11.0 / 24, gut),
+    ]
+    let bands = [
+      TimeOfDayWheel.Band(id: "t1", start: 17.5 / 24, end: 18.5 / 24, daysAgo: 0,
+                          color: .green, opaque: true),
     ]
     return RhythmEntry(
       date: .now,
-      content: .init(events: events, bands: bands, legend: legend, windowDays: 7)
+      content: .init(events: events, bands: bands, windowDays: 1)
     )
   }
 
@@ -95,7 +87,7 @@ struct RhythmWidget: Widget {
       RhythmWidgetView(entry: entry)
     }
     .configurationDisplayName("Rhythm")
-    .description("Your day's shape — every section's events on a 24-hour dial.")
+    .description("Today as a 24-hour dial — your day's shape across every section.")
     .supportedFamilies([.systemSmall, .systemLarge])
   }
 }
@@ -106,7 +98,6 @@ private let homeDeepLink = URL(string: "septena://home")
 
 struct RhythmWidgetView: View {
   let entry: RhythmEntry
-  @Environment(\.widgetFamily) private var family
 
   var body: some View {
     content
@@ -123,98 +114,47 @@ struct RhythmWidgetView: View {
   private var content: some View {
     if entry.content.isEmpty {
       EmptyRhythm()
-    } else if family == .systemLarge {
-      LargeView(entry: entry)
     } else {
-      SmallView(entry: entry)
+      DialFill(entry: entry)
     }
   }
 }
 
-/// The dial itself — sized to fill whatever square it's handed. Compact
-/// rendering (no glass, labels, or hub) so it reads as a clean thumbnail.
-private struct WheelFill: View {
+/// The day dial — a static mirror of the front-door `DayDialHero`: today's
+/// events as section-colored dots, the solar night arc darkening the night
+/// hours (computed on-device from `SolarClock`, no permission), the now-hand,
+/// and the date in the hollow. Sized to fill whatever square it's handed.
+private struct DialFill: View {
   let entry: RhythmEntry
-  /// Whether to draw the live "now" hairline (large only — too busy at small).
-  var showsNow: Bool
 
   var body: some View {
+    // Solar night arc (sunset → sunrise) for the entry's day — the dark glass
+    // wedge the homepage hero wears, recomputed here so the widget needs no
+    // payload field for it.
+    let solar = SolarClock.today(now: entry.date)
+    let night = (start: solar.sunsetHour / 24, end: solar.sunriseHour / 24)
+
     GeometryReader { geo in
       let d = min(geo.size.width, geo.size.height)
       TimeOfDayWheel(
         events: entry.content.events,
+        // Neutral frame — the dots carry the section colors, same as the hero.
         accent: .secondary,
         bands: entry.content.bands,
         windowDays: entry.content.windowDays,
-        nowFraction: showsNow ? entry.nowFraction : nil,
+        nowFraction: entry.nowFraction,
         diameter: d,
-        compact: true
+        heroDate: entry.dayStart,
+        nightArc: night,
+        // Single day, fixed midnight-at-top orientation: a widget snapshot
+        // can't animate, so it doesn't spin "now" to the top (that's the live
+        // hero's motion) — a steady clock reads better at a glance.
+        lockToday: true,
+        // `.glassEffect` can't render in a static widget — stand in a flat face.
+        flatGlass: true
       )
       .frame(width: geo.size.width, height: geo.size.height)
     }
-  }
-}
-
-// MARK: - Small — wheel fills the square
-
-private struct SmallView: View {
-  let entry: RhythmEntry
-  var body: some View {
-    WheelFill(entry: entry, showsNow: false)
-  }
-}
-
-// MARK: - Large — header + dial + legend
-
-private struct LargeView: View {
-  let entry: RhythmEntry
-
-  var body: some View {
-    VStack(spacing: 8) {
-      HStack(spacing: 5) {
-        Image(systemName: "clock")
-          .font(.system(size: 10, weight: .semibold))
-        Text("RHYTHM")
-        Spacer()
-        Text("\(entry.content.windowDays) DAYS")
-      }
-      .font(.system(size: 10, weight: .semibold))
-      .foregroundStyle(.secondary)
-
-      WheelFill(entry: entry, showsNow: true)
-        .frame(maxHeight: .infinity)
-
-      Legend(items: entry.content.legend)
-    }
-  }
-}
-
-/// Section color key — a wrapping run of dot + name chips, capped so it never
-/// crowds the dial. Overflow collapses into a "+N".
-private struct Legend: View {
-  let items: [RhythmWidgetSnapshot.LegendItem]
-  private let cap = 5
-
-  var body: some View {
-    let shown = Array(items.prefix(cap))
-    let overflow = items.count - shown.count
-    HStack(spacing: 10) {
-      ForEach(shown) { item in
-        HStack(spacing: 4) {
-          Circle().fill(item.color).frame(width: 7, height: 7)
-          Text(item.label)
-            .font(.system(size: 10, weight: .medium))
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-        }
-      }
-      if overflow > 0 {
-        Text("+\(overflow)")
-          .font(.system(size: 10, weight: .semibold))
-          .foregroundStyle(.tertiary)
-      }
-    }
-    .frame(maxWidth: .infinity)
   }
 }
 

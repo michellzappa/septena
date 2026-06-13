@@ -262,11 +262,13 @@ targets:
       # Time-wheel ("Rhythm") widget: the shared wire blob + the dial view it
       # renders. TimeOfDayWheel needs Theme (token bag) and AdaptiveColor (the
       # hex→Color resolver, split out of SectionTheme so the widget needn't pull
-      # in the whole theme runtime).
+      # in the whole theme runtime). SolarClock gives the dial its night arc
+      # on-device (no location, no payload field).
       - path: SeptenaCore/RhythmWire.swift
       - path: SeptenaCore/AdaptiveColor.swift
       - path: Septena/Shell/UI/TimeOfDayWheel.swift
       - path: Septena/Shell/UI/Theme.swift
+      - path: Septena/Shell/UI/SolarClock.swift
     info:
       path: SeptenaWidgets/Info.plist
       properties:

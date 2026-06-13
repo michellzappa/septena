@@ -101,6 +101,12 @@ struct TimeOfDayWheel: View {
   /// dial reorients, then back to 1 to reveal the new day. Avoids trying to
   /// spin every layer in unison (only the night wedge turns, visibly).
   var marksOpacity: Double = 1
+  /// Renders the hero face *flat* — a solid disc instead of the live Liquid
+  /// Glass donut. For the widget snapshot, where `.glassEffect` can't render
+  /// (a static archived view); the night wedge still paints on top so the
+  /// solar hours read. No-op unless `heroDate` is set. App surfaces leave this
+  /// `false` and keep the real glass.
+  var flatGlass: Bool = false
 
   /// Target degrees to spin the dial content so `northFraction` lands at the
   /// top. The *applied* rotation is `displayedRotation`, which tracks this by
@@ -271,6 +277,14 @@ struct TimeOfDayWheel: View {
       // so the dark band tracks the (rotated) night hours; the glass refracts
       // whatever sits behind it, so night still reads as dark *glass*. The
       // dusk/dawn terminators feather over ~1h.
+      // Widget snapshot: a flat solid disc stands in for the glass donut
+      // (drawn first, so the night wedge below paints on top of it). The live
+      // glass below is skipped when `flatGlass` is set.
+      if !compact, heroDate != nil, flatGlass {
+        AnnulusShape(holeFraction: Self.heroHoleFraction)
+          .fill(Theme.cardSurface)
+          .padding(20)
+      }
       if !compact, heroDate != nil, let nightArc {
         AnnulusShape(holeFraction: Self.heroHoleFraction)
           .fill(nightShading(nightArc))
@@ -284,7 +298,7 @@ struct TimeOfDayWheel: View {
       // wedge behind it supplies the night, the rotated marks above supply
       // the data. `.interactive` gives the press lensing; tilt parallax the
       // motion that makes it read as glass.
-      if !compact && heroDate != nil {
+      if !compact && heroDate != nil && !flatGlass {
         Color.clear
           .glassEffect(.regular.interactive(),
                        in: AnnulusShape(holeFraction: Self.heroHoleFraction))

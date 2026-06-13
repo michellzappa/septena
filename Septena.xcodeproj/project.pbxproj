@@ -659,6 +659,7 @@
 		F4251470458A2411D47FC255 /* WatchModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D19FFA7AF205D77FD446D409 /* WatchModels.swift */; };
 		F46ED9D5CAC9DA26811E4246 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 784D3E7D8D933961200812D6 /* PrivacyInfo.xcprivacy */; };
 		F46F4FF39CDE14DBD53605C8 /* ActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B5BF16679C5BA62C066871C /* ActivityPlugin.swift */; };
+		F4E3CFE6CE77B57831A98ACB /* SolarClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2085456E2239FA343DA34D32 /* SolarClock.swift */; };
 		F4F3805C73E352D7CAB13041 /* Fasting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5835F104E8DFAA668ACCF9A5 /* Fasting.swift */; };
 		F521521DF4A08E1F5FA21461 /* RhythmHomepageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FBC963243F9C04B7A1E1D3E /* RhythmHomepageView.swift */; };
 		F5B490D2166BAEB13EE3383A /* TasksBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3882D64DF6517B0447F5F65C /* TasksBackend.swift */; };
@@ -2266,6 +2267,7 @@
 				BDB74D08C96CD63AD64F6B0A /* RhythmWidget.swift in Sources */,
 				881C31FAE6D190498F378B6C /* RhythmWidgetSnapshot.swift in Sources */,
 				F0F2E769DBBB44C62E66C4FB /* RhythmWire.swift in Sources */,
+				F4E3CFE6CE77B57831A98ACB /* SolarClock.swift in Sources */,
 				334CC7F3DE035B7A5F4C3CF1 /* Theme.swift in Sources */,
 				56F3CA4E8C3D23B6C2A32AB6 /* TimeOfDayWheel.swift in Sources */,
 			);

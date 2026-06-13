@@ -96,34 +96,35 @@ enum WatchSnapshotPublisher {
                                      intakeKinds: intakeKinds.isEmpty ? nil : intakeKinds)
     guard let payload = try? JSONEncoder().encode(response) else { return }
 
-    // Piggyback the time-wheel widget's data on the same record + same write.
-    // The holistic 24-hour rhythm (every enabled section's events + training
-    // bands over the trailing week) is reduced to a tiny `RhythmWire` blob so
-    // the widget can draw `TimeOfDayWheel` without touching SwiftData. Built
-    // from the user's mirrored sections (same `configs` the Next colors use).
-    let todayStart = SeptenaDate.parse(date).map { Calendar.current.startOfDay(for: $0) }
-      ?? Calendar.current.startOfDay(for: Date())
-    let rhythm = RhythmSnapshotBuilder.build(context: context, sections: configs,
-                                             todayStart: todayStart, windowDays: 7)
-    let rhythmPayload = try? JSONEncoder().encode(rhythm)
+    // The time-wheel/day-dial widget is DISABLED for now (its glass face can't
+    // render in a widget snapshot — see `SeptenaWidgetsBundle`), so we skip
+    // building + publishing its `RhythmWire` blob: no point paying the
+    // per-mutation build cost or registering the `WatchSnapshot.rhythmPayload`
+    // field in Production for a feature nothing reads. The builder
+    // (`RhythmSnapshotBuilder`) is kept; re-enable by restoring the block below
+    // and `record["rhythmPayload"]` in `save`, plus the bundle line.
+    //
+    //   let todayStart = SeptenaDate.parse(date).map { Calendar.current.startOfDay(for: $0) }
+    //     ?? Calendar.current.startOfDay(for: Date())
+    //   let rhythm = RhythmSnapshotBuilder.build(context: context, sections: configs,
+    //                                            todayStart: todayStart, windowDays: 1)
+    //   let rhythmPayload = try? JSONEncoder().encode(rhythm)
 
-    // Nudge the iOS "Next" + time-wheel home/lock-screen widgets to re-read the
-    // snapshot. Same trigger as the watch complication's reload — every
-    // checklist edit and app foreground flows through here. The kind strings
-    // match `NextWidget.kind` / `RhythmWidget.kind` in the SeptenaWidgets
-    // target (separate module, so they can't be referenced directly). No-op on
-    // platforms without the widgets.
+    // Nudge the iOS "Next" home/lock-screen widget to re-read the snapshot. Same
+    // trigger as the watch complication's reload — every checklist edit and app
+    // foreground flows through here. The kind string matches `NextWidget.kind`
+    // in the SeptenaWidgets target (separate module, so it can't be referenced
+    // directly). No-op on platforms without the widget.
     #if os(iOS)
     WidgetCenter.shared.reloadTimelines(ofKind: "NextWidget")
-    WidgetCenter.shared.reloadTimelines(ofKind: "RhythmWidget")
     #endif
 
     Task.detached(priority: .utility) {
-      await save(payload: payload, rhythmPayload: rhythmPayload, date: date)
+      await save(payload: payload, date: date)
     }
   }
 
-  private static func save(payload: Data, rhythmPayload: Data?, date: String) async {
+  private static func save(payload: Data, rhythmPayload: Data? = nil, date: String) async {
     let db = CKContainer(identifier: containerID).privateCloudDatabase
     let id = CKRecord.ID(recordName: recordName)   // default zone
     do {

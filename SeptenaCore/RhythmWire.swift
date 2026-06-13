@@ -1,9 +1,10 @@
 import Foundation
 
-/// Compact, `Codable` snapshot of the homepage **Wheel** — every enabled
-/// section's timestamped events (and duration bands) over the trailing window,
-/// reduced to `(fraction, daysAgo, colorHex)` so the widget extension can draw
-/// `TimeOfDayWheel` without ever touching SwiftData.
+/// Compact, `Codable` snapshot of the front-door day dial (`DayDialHero`) —
+/// **today's** timestamped events (and training bands) across every enabled
+/// section, reduced to `(fraction, daysAgo, colorHex)` so the widget extension
+/// can draw `TimeOfDayWheel` without ever touching SwiftData. The widget pairs
+/// this with the solar night arc (computed on-device via `SolarClock`).
 ///
 /// Published alongside the "Next" payload on the same `WatchSnapshot` record
 /// (default-zone field `rhythmPayload`, see `WatchSnapshotPublisher`) and read
@@ -65,33 +66,18 @@ public struct RhythmWire: Codable, Sendable {
     }
   }
 
-  /// A section that contributed at least one event/band this window — drives
-  /// the widget's color legend (dot + name).
-  public struct Legend: Codable, Sendable {
-    public let key: String
-    public let label: String
-    public let colorHex: String
-
-    public init(key: String, label: String, colorHex: String) {
-      self.key = key
-      self.label = label
-      self.colorHex = colorHex
-    }
-  }
-
-  /// How many trailing days the recency fade spans (today + previous N−1).
+  /// How many trailing days the recency fade spans. Today-only dials pass `1`
+  /// (every event is `daysAgo == 0`, full strength).
   public let windowDays: Int
   public let events: [Event]
   public let bands: [Band]
-  public let legend: [Legend]
 
-  public init(windowDays: Int, events: [Event], bands: [Band], legend: [Legend]) {
+  public init(windowDays: Int, events: [Event], bands: [Band]) {
     self.windowDays = windowDays
     self.events = events
     self.bands = bands
-    self.legend = legend
   }
 
-  /// Empty snapshot — nothing timed logged in the window.
-  public static let empty = RhythmWire(windowDays: 7, events: [], bands: [], legend: [])
+  /// Empty snapshot — nothing timed logged today.
+  public static let empty = RhythmWire(windowDays: 1, events: [], bands: [])
 }

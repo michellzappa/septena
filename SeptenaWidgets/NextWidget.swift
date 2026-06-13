@@ -85,7 +85,14 @@ struct NextWidget: Widget {
 struct SeptenaWidgetsBundle: WidgetBundle {
   var body: some Widget {
     NextWidget()
-    RhythmWidget()
+    // RhythmWidget() — the time-wheel/day-dial widget is DISABLED for now: the
+    // hero's Liquid Glass face can't render in a static widget snapshot, and a
+    // flat-faced fallback doesn't carry the look. All of its code is kept and
+    // still compiles (RhythmWidget / RhythmWidgetSnapshot here; RhythmWire /
+    // RhythmSnapshotBuilder + TimeOfDayWheel.flatGlass in SeptenaCore) so it can
+    // be switched back on if WidgetKit gains glass support. Re-enable by
+    // un-commenting this line AND the `rhythmPayload` publish in
+    // `WatchSnapshotPublisher`.
   }
 }
 

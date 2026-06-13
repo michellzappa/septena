@@ -57,7 +57,7 @@ promoted to Prod unless the Console already shows them):
 | 5 | **New record type** `ActivityDaySum` (read-once HealthKit daily summaries — steps / active kcal / exercise minutes) | `ActivityDaySum` | all | — |
 | 6 | **New record types** for Symptoms | `SymptomDefinition`, `SymptomEvent` | all | — |
 | 7 | **New record types** for Medications | `MedicationDefinition`, `MedicationDoseEvent` | all | — |
-| 8 | **New field** `rhythmPayload` (optional rhythm-wheel widget blob) — default-zone `WatchSnapshot`, additive/ephemeral like `payload` | `WatchSnapshot` | `rhythmPayload` | Bytes(Data) |
+| 8 | ~~**New field** `rhythmPayload` (day-dial widget blob) on `WatchSnapshot`~~ — **DEFERRED**: the day-dial widget is disabled (glass can't render in a widget snapshot), so the field is no longer written. Don't deploy it until the widget ships. | `WatchSnapshot` | `rhythmPayload` | Bytes(Data) |
 
 `MoodEvent` reuses the CloudKit record slot vacated by the retired `AirReading` type
 (Air section removed in the same merge). It is a *new* type from Production's point of
@@ -623,7 +623,7 @@ in Production** for the watch/widget path to write.
 | `payload` | Bytes | `Data` | No | `NextItemsResponse` JSON blob |
 | `date` | String | `String` | No | YYYY-MM-DD |
 | `updatedAt` | Timestamp | `Date` | No | a real Timestamp here (unlike Section/Settings) |
-| `rhythmPayload` | Bytes | `Data` | **Yes** | `RhythmWire` JSON blob for the time-wheel widget — holistic 24h rhythm (all enabled sections' events + training bands, trailing 7 days). Additive; older records simply omit it. |
+| `rhythmPayload` | Bytes | `Data` | **Yes** | `RhythmWire` JSON blob for the day-dial widget — **today's** rhythm (all enabled sections' events + training bands). **Currently NOT written** — the widget is disabled (see `WatchSnapshotPublisher`); the field/code is kept for when WidgetKit gains glass support. |
 
 ---
 

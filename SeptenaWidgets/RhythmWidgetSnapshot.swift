@@ -12,20 +12,12 @@ enum RhythmWidgetSnapshot {
   private static let containerID = "iCloud.com.septena.cloud"
   private static let recordID    = CKRecord.ID(recordName: "watch-next-snapshot")
 
-  /// Render-ready rhythm: wheel marks + a color legend, mapped off the wire.
+  /// Render-ready rhythm: today's wheel marks, mapped off the wire.
   struct Content {
     var events: [TimeOfDayWheel.Event] = []
     var bands: [TimeOfDayWheel.Band] = []
-    var legend: [LegendItem] = []
-    var windowDays: Int = 7
+    var windowDays: Int = 1
     var isEmpty: Bool { events.isEmpty && bands.isEmpty }
-  }
-
-  struct LegendItem: Identifiable {
-    let key: String
-    let label: String
-    let color: Color
-    var id: String { key }
   }
 
   /// Resolved content, or an empty snapshot whenever iCloud is unavailable,
@@ -55,10 +47,6 @@ enum RhythmWidgetSnapshot {
         TimeOfDayWheel.Band(id: $0.id, start: $0.start, end: $0.end, daysAgo: $0.daysAgo,
                             color: $0.colorHex.flatMap(AdaptiveColor.adaptive),
                             thin: $0.thin, opaque: $0.opaque)
-      },
-      legend: wire.legend.map {
-        LegendItem(key: $0.key, label: $0.label,
-                   color: AdaptiveColor.adaptive($0.colorHex) ?? .secondary)
       },
       windowDays: wire.windowDays
     )
