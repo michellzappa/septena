@@ -2712,13 +2712,11 @@ struct SectionDetailPane: View {
                                           context: modelContext, engine: ckEngine)
     SettingsMirror.setSectionEnabled(sectionKey, enabled: true,
                                      context: modelContext, engine: ckEngine)
-    store.sections = store.sections.map { config in
-      config.key == sectionKey
-        ? SectionConfig(key: config.key, label: config.label, color: config.color,
-                        isEnabled: true, showInToday: config.showInToday,
-                        hasOnboarded: true)
-        : config
-    }
+    // Reload from the mirror (not a hand-patched map) so the accent that
+    // `setSectionEnabled` auto-assigned is reflected, then repaint the theme
+    // so the section's tile shows that color instead of gray.
+    store.sections = SettingsMirror.loadSections(context: modelContext)
+    theme.paintFromCache()
     pendingOnboarding = false
   }
 
@@ -2921,16 +2919,10 @@ struct SectionDetailPane: View {
     // Siri + Spotlight in step with its enabled state.
     SeptenaShortcuts.updateAppShortcutParameters()
     #endif
-    store.sections = store.sections.map { config in
-      config.key == sectionKey
-        ? SectionConfig(key: config.key,
-                        label: config.label,
-                        color: config.color,
-                        isEnabled: enabled,
-                        showInToday: config.showInToday,
-                        hasOnboarded: config.hasOnboarded)
-        : config
-    }
+    // Reload from the mirror so an accent auto-assigned on first enable is
+    // reflected, then repaint the theme so the tile isn't gray.
+    store.sections = SettingsMirror.loadSections(context: modelContext)
+    theme.paintFromCache()
   }
 
   private func updateColor(_ hex: String) {

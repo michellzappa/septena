@@ -162,5 +162,8 @@ struct DashboardDiscoveryCard: View {
     // Keep the in-memory store in step so every surface (and this card) sees
     // the enable now, not just after the next launch reload.
     store.sections = SettingsMirror.loadSections(context: modelContext)
+    // The enable auto-assigned an accent; repaint the theme cache so the new
+    // tile shows its color right away rather than the fallback gray.
+    theme.paintFromCache()
   }
 }

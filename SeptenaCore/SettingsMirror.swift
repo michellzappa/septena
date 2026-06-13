@@ -6,6 +6,32 @@ enum SettingsMirror {
   private static let encoder = JSONEncoder()
   private static let decoder = JSONDecoder()
 
+  /// Accent palette for auto-coloring a section the first time it's enabled,
+  /// so a freshly onboarded dashboard isn't a wall of neutral gray. Mirrors the
+  /// bright row of the app's `sectionPalette` (Tailwind-500); kept here as raw
+  /// hex so UI-free SeptenaCore can assign without reaching into the app layer.
+  static let autoAccentPalette: [String] = [
+    "#ef4444", "#f97316", "#f59e0b", "#eab308", "#84cc16", "#22c55e",
+    "#10b981", "#14b8a6", "#06b6d4", "#0ea5e9", "#3b82f6", "#6366f1",
+    "#8b5cf6", "#a855f7", "#ec4899", "#f43f5e",
+  ]
+
+  /// Give a section a palette accent the first time it's enabled. No-op once it
+  /// has any color (a real user pick, or a prior auto-assignment), so it never
+  /// overrides a choice. Prefers a hue not already used by another section so
+  /// enabled tiles stay visually distinct; falls back to a random palette hue
+  /// once every one is taken. Caller saves the context.
+  static func assignAutoColorIfNeeded(_ entity: SectionEntity, context: ModelContext) {
+    guard entity.color.isEmpty else { return }
+    let used = Set(((try? context.fetch(FetchDescriptor<SectionEntity>())) ?? [])
+      .map { $0.color.lowercased() }
+      .filter { !$0.isEmpty })
+    let free = autoAccentPalette.filter { !used.contains($0.lowercased()) }
+    if let pick = (free.isEmpty ? autoAccentPalette : free).randomElement() {
+      entity.color = pick
+    }
+  }
+
   // `nonisolated`: a pure context read, so `DashboardReader` can pull
   // settings on its background context off-main. Uses a local decoder
   // rather than the enum's `@MainActor` shared one (the write methods here
@@ -86,6 +112,10 @@ enum SettingsMirror {
                                isEnabled: seedEnabled,
                                hasOnboarded: seedEnabled)
     context.insert(entity)
+    // A section that seeds enabled (a new core section on an established
+    // account) gets an accent now so it doesn't land gray. Fresh-account seeds
+    // are disabled and stay colorless until the user enables them in the welcome.
+    if seedEnabled { assignAutoColorIfNeeded(entity, context: context) }
     do { try context.save() } catch {
       SeptenaLog.error("SettingsMirror.seedManifestSection", error)
       return false
@@ -165,7 +195,12 @@ enum SettingsMirror {
     let needsWrite = entity.isEnabled != enabled || (enabled && !entity.hasOnboarded)
     guard needsWrite else { return }
     entity.isEnabled = enabled
-    if enabled { entity.hasOnboarded = true }
+    if enabled {
+      entity.hasOnboarded = true
+      // First enable with no color yet → give it a distinct palette accent so
+      // it doesn't land on the dashboard gray.
+      assignAutoColorIfNeeded(entity, context: context)
+    }
     entity.updatedAt = .now
     do {
       try context.save()
@@ -275,6 +310,9 @@ enum SettingsMirror {
     guard let entity = try? context.fetch(descriptor).first else { return }
     guard entity.isEnabled != enabled else { return }
     entity.isEnabled = enabled
+    // First enable with no color yet → auto-assign a distinct accent so the
+    // section doesn't appear gray on the dashboard.
+    if enabled { assignAutoColorIfNeeded(entity, context: context) }
     entity.updatedAt = .now
     do {
       try context.save()

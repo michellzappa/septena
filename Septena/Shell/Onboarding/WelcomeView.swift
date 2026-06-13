@@ -284,6 +284,10 @@ struct WelcomeView: View {
 
     store.applyWelcomeSelection(enabledKeys: selected,
                                 context: modelContext, engine: ckEngine)
+    // applyWelcomeSelection auto-assigned accents to the newly enabled
+    // sections; repaint the theme cache from the mirror so their tiles show
+    // those colors immediately instead of the launch-time gray.
+    theme.paintFromCache()
     #if os(iOS)
     // Selected sections' items should appear in Siri / Spotlight now.
     SeptenaShortcuts.updateAppShortcutParameters()
