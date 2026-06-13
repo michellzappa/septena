@@ -66,6 +66,62 @@ enum IntakePlugin: SectionPlugin {
 
   static func detailPaneContent() -> AnyView? { AnyView(IntakeDetailContent()) }
 
+  // MARK: - Import / Export
+  //
+  // Three tables: the user's trackers (kinds) carry their full config —
+  // including the decoded method rows so a round-trip rebuilds the quick-add
+  // menus — their variety catalog (items), and the event stream. Archived
+  // rows are included (export is a backup, not a view filter).
+
+  static var exportContribution: SectionExportContribution? {
+    SectionExportContribution(
+      tables: [
+        SchemaTable(name: "intakeKind", purpose: "a user-defined consumable tracker", fields: [
+          .req("id", "string", "opaque \"ik-<uuid>\", never the name"),
+          .req("name", "string"), .req("symbol", "string", "SF Symbol"),
+          .opt("color", "string", "hex/hsl token"),
+          .opt("sortIndex", "int"),
+          .opt("unit", "string", "g | mg | ml"),
+          .req("doseStyle", "string", "amount | count | both | none"),
+          .opt("countNoun", "string", "hit | cup | puff"),
+          .opt("containerNoun", "string", "capsule | pack"),
+          .opt("containerCap", "int", "uses per container; omit for no container model"),
+          .opt("catalogNoun", "string", "Beans | Strains"),
+          .opt("flourish", "string", "motion token"),
+          .req("metricMode", "string", "countEvents | sumAmount"),
+          .req("objective", "string", "log | limit | reduce | quit"),
+          .opt("methods", "array", "method rows: { token, label, symbol?, defaultAmount?, usesContainer }"),
+          .opt("templateID", "string"),
+          .opt("archivedAt", "timestamp"),
+        ]),
+        SchemaTable(name: "intakeItem", purpose: "a variety in a tracker's catalog", fields: [
+          .req("id", "string"), .req("kindID", "string", "→ intakeKind.id"),
+          .req("name", "string"), .opt("sortIndex", "int"),
+          .opt("archivedAt", "timestamp"),
+        ]),
+        SchemaTable(name: "intakeEvent", purpose: "a single logged consumption event", fields: [
+          .req("id", "string"), .req("kindID", "string", "→ intakeKind.id"),
+          .req("date", "date"), .opt("occurredAt", "timestamp"),
+          .req("method", "string", "stable token from the kind's method rows"),
+          .opt("itemID", "string", "→ intakeItem.id"),
+          .opt("amount", "double", "in the kind's unit"),
+          .opt("count", "int", "hits/uses; container math reads this"),
+          .opt("note", "string"),
+        ]),
+      ],
+      collect: { ctx in
+        let kinds  = try ctx.fetch(FetchDescriptor<IntakeKindEntity>())
+        let items  = try ctx.fetch(FetchDescriptor<IntakeItemEntity>())
+        let events = try ctx.fetch(FetchDescriptor<IntakeEventEntity>())
+        return [
+          "intakeKind":  kinds.map(intakeKindExportDict),
+          "intakeItem":  items.map(intakeItemExportDict),
+          "intakeEvent": events.map(intakeEventExportDict),
+        ]
+      }
+    )
+  }
+
   // MARK: - MCP / agent contract
   //
   // Deliberately a META-protocol: this text ships in the binary and the
@@ -229,6 +285,53 @@ enum IntakePlugin: SectionPlugin {
       return out
     }
   }
+}
+
+// MARK: - Entity → export dict mappers
+//
+// Mirror NutritionPlugin's helpers: top-level, @MainActor, compaction +
+// isoDate shared from ImportExportService. Keep in sync with the SchemaTable
+// fields above — add a field there, map it here.
+
+@MainActor func intakeKindExportDict(_ k: IntakeKindEntity) -> [String: Any] {
+  compact([
+    "id": k.id, "name": k.name, "symbol": k.symbol, "color": k.color,
+    "sortIndex": k.sortIndex, "unit": k.unit, "doseStyle": k.doseStyle,
+    "countNoun": k.countNoun, "containerNoun": k.containerNoun,
+    "containerCap": k.containerCap, "catalogNoun": k.catalogNoun,
+    "flourish": k.flourish, "metricMode": k.metricMode,
+    "objective": k.objective,
+    "methods": k.methods.map(intakeMethodExportDict),
+    "templateID": k.templateID,
+    "archivedAt": k.archivedAt.map(isoDate),
+    "updatedAt": isoDate(k.updatedAt),
+  ])
+}
+
+@MainActor func intakeMethodExportDict(_ m: IntakeMethodRow) -> [String: Any] {
+  compact([
+    "token": m.token, "label": m.label, "symbol": m.symbol,
+    "defaultAmount": m.defaultAmount, "usesContainer": m.usesContainer,
+  ])
+}
+
+@MainActor func intakeItemExportDict(_ i: IntakeItemEntity) -> [String: Any] {
+  compact([
+    "id": i.id, "kindID": i.kindID, "name": i.name,
+    "sortIndex": i.sortIndex,
+    "archivedAt": i.archivedAt.map(isoDate),
+    "updatedAt": isoDate(i.updatedAt),
+  ])
+}
+
+@MainActor func intakeEventExportDict(_ e: IntakeEventEntity) -> [String: Any] {
+  compact([
+    "id": e.id, "kindID": e.kindID, "date": e.date,
+    "occurredAt": isoDate(e.occurredAt),
+    "method": e.method, "itemID": e.itemID,
+    "amount": e.amount, "count": e.count, "note": e.note,
+    "updatedAt": isoDate(e.updatedAt),
+  ])
 }
 
 // The blank "Custom" onboarding choice: not a multi-select template but an

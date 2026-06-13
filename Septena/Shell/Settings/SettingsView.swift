@@ -4835,7 +4835,7 @@ private let importExportEnvelopeVersion = 1
 /// sidebar.
 private let exportableSectionKeys: [String] = [
   "tasks", "training", "nutrition", "habits", "chores",
-  "supplements", "groceries", "gut",
+  "supplements", "groceries", "gut", "intake",
 ]
 
 struct ImportExportSettingsPane: View {
