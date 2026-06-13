@@ -4,6 +4,9 @@
     "" : {
 
     },
+    "—" : {
+
+    },
     "·" : {
       "shouldTranslate" : false
     },
@@ -288,6 +291,16 @@
     },
     "%@ ml" : {
       "shouldTranslate" : false
+    },
+    "%@ of %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ of %2$@"
+          }
+        }
+      }
     },
     "%@ records · %@ types" : {
       "localizations" : {
@@ -919,6 +932,7 @@
       }
     },
     "Add %lld categories" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -959,6 +973,7 @@
       }
     },
     "Add %lld chores" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -987,6 +1002,7 @@
       }
     },
     "Add %lld habits" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -1044,6 +1060,7 @@
       }
     },
     "Add %lld supplements" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -1072,6 +1089,7 @@
       }
     },
     "Add %lld templates" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -1670,6 +1688,7 @@
       }
     },
     "Bedtime wind-down" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -5922,9 +5941,6 @@
       }
     },
     "Starter medications" : {
-
-    },
-    "Starter symptoms" : {
 
     },
     "Stats" : {

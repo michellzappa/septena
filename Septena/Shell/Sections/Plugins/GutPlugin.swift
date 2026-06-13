@@ -46,16 +46,14 @@ enum GutPlugin: SectionPlugin {
   // MARK: - First-enable onboarding
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
-    AnyView(SectionExplainerView(
+    AnyView(SectionOnboarding(
       sectionKey: "gut",
-      title: "Gut",
       intro: "A private digestive event log. Useful for tracking down a food sensitivity, recovering from antibiotics, or just spotting patterns.",
       bullets: [
         .init("Bristol Stool Scale", "1 = hard pellets, 7 = watery. Required for every entry.", icon: "ruler"),
         .init("Volume", "Small / medium / large. Optional.", icon: "drop"),
         .init("Symptoms live in Symptoms", "Log cramping, discomfort or blood in the Symptoms section, where they get severity and their own timeline.", icon: "waveform.path.ecg"),
       ],
-      primaryActionLabel: "Start logging",
       complete: complete
     ))
   }

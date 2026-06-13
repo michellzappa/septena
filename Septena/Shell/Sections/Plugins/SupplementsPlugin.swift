@@ -44,7 +44,26 @@ enum SupplementsPlugin: SectionPlugin {
   }
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
-    AnyView(SupplementsOnboardingView(complete: complete))
+    AnyView(SectionOnboarding(
+      sectionKey: "supplements",
+      intro: "Logs the things you take daily. Pick a few common ones to start — edit, delete, or add your own anytime.",
+      nounPlural: String(localized: "supplements"),
+      items: SupplementStarter.all,
+      glyph: { .emoji($0.emoji) },
+      primary: { $0.name },
+      existsKey: { AnyHashable($0.name.lowercased()) },
+      loadExistingKeys: {
+        await MirrorReader.shared.read { ctx in
+          Set(((try? ctx.fetch(FetchDescriptor<SupplementDefinitionEntity>())) ?? [])
+            .map { AnyHashable($0.title.lowercased()) })
+        }
+      },
+      add: { items in
+        let mutator = SeptenaServices.shared.checklistMutator
+        for s in items { mutator.createSupplement(name: s.name, emoji: s.emoji) }
+      },
+      complete: complete
+    ))
   }
 
   static var mcpSkill: SectionSkill? {
@@ -218,112 +237,6 @@ private struct SupplementStarter: Identifiable, Hashable {
     .init(id: "starter-iron",          name: "Iron",              emoji: "🩸"),
     .init(id: "starter-zinc",          name: "Zinc",              emoji: "⚙️"),
   ]
-}
-
-private struct SupplementsOnboardingView: View {
-  let complete: () -> Void
-  @Environment(ChecklistMutator.self) private var mutator
-  @Environment(SectionTheme.self) private var theme
-  @Environment(\.modelContext) private var modelContext
-  @State private var selected: Set<String> = []
-  @State private var existingTitles: Set<String> = []
-
-  private var accent: Color { theme.color(for: "supplements") }
-
-  private func alreadyExists(_ s: SupplementStarter) -> Bool {
-    existingTitles.contains(s.name.lowercased())
-  }
-
-  private func loadExisting() {
-    let rows = (try? modelContext.fetch(FetchDescriptor<SupplementDefinitionEntity>())) ?? []
-    existingTitles = Set(rows.map { $0.title.lowercased() })
-  }
-
-  var body: some View {
-    NavigationStack {
-      Form {
-        Section {
-          SectionOnboardingHero(
-            sectionKey: "supplements",
-            title: "Supplements",
-            intro: "Logs the things you take daily. Pick a few common ones to start — edit, delete, or add your own anytime."
-          )
-          .onboardingHeroSection()
-        }
-        Section {
-          ForEach(SupplementStarter.all) { starter in
-            starterRow(starter)
-          }
-        }
-      }
-      .formStyle(.grouped)
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .safeAreaInset(edge: .bottom) {
-        bottomBar
-      }
-      .onAppear { loadExisting() }
-    }
-  }
-
-  @ViewBuilder
-  private func starterRow(_ s: SupplementStarter) -> some View {
-    let exists = alreadyExists(s)
-    let isSelected = selected.contains(s.id)
-    Button {
-      guard !exists else { return }
-      if isSelected { selected.remove(s.id) } else { selected.insert(s.id) }
-    } label: {
-      HStack(spacing: 12) {
-        Text(s.emoji).font(.title3)
-          .opacity(exists ? 0.4 : 1)
-        Text(s.name)
-          .foregroundStyle(exists ? .secondary : .primary)
-          .strikethrough(exists, color: .secondary)
-        Spacer()
-        if exists {
-          Text("Already added")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        } else {
-          Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-            .foregroundStyle(isSelected ? accent : Color.secondary.opacity(0.6))
-            .font(.title3)
-        }
-      }
-    }
-    .buttonStyle(.plain)
-    .disabled(exists)
-  }
-
-  @ViewBuilder
-  private var bottomBar: some View {
-    HStack(spacing: 12) {
-      Button("Skip") { complete() }
-        .buttonStyle(.bordered)
-      Spacer()
-      Button(actionTitle) { addAndFinish() }
-        .buttonStyle(.borderedProminent)
-        .tint(accent)
-    }
-    .padding()
-    .background(.bar)
-  }
-
-  private var actionTitle: String {
-    selected.isEmpty ? String(localized: "Done") : String(localized: "Add \(selected.count) supplements")
-  }
-
-  private func addAndFinish() {
-    let toAdd = SupplementStarter.all.filter {
-      selected.contains($0.id) && !alreadyExists($0)
-    }
-    for s in toAdd {
-      mutator.createSupplement(name: s.name, emoji: s.emoji)
-    }
-    complete()
-  }
 }
 
 @MainActor func supplementDefinitionExportDict(_ e: SupplementDefinitionEntity) -> [String: Any] {

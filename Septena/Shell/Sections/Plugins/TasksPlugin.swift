@@ -64,9 +64,8 @@ enum TasksPlugin: SectionPlugin {
   }
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
-    AnyView(SectionExplainerView(
+    AnyView(SectionOnboarding(
       sectionKey: "tasks",
-      title: "Tasks",
       intro: "Tasks route by intent, not by tags. Three fields decide visibility — today, scheduled, and due.",
       bullets: [
         .init("Inbox", "No today / scheduled / due → lands in Inbox. The parking spot for anything not yet committed.", icon: "tray"),
@@ -74,7 +73,6 @@ enum TasksPlugin: SectionPlugin {
         .init("Scheduled / due", "Scheduled puts it in Upcoming. Due adds a deadline without scheduling — both surface in Anytime.", icon: "calendar"),
         .init("Areas & projects", "Tags for filtering only — not routing. A project task with no view pin still sits in Inbox.", icon: "folder"),
       ],
-      primaryActionLabel: "Add your first task",
       complete: complete
     ))
   }

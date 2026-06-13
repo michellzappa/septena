@@ -69,16 +69,14 @@ enum HydrationPlugin: SectionPlugin {
   // MARK: - First-enable onboarding
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
-    AnyView(SectionExplainerView(
+    AnyView(SectionOnboarding(
       sectionKey: "hydration",
-      title: "Hydration",
       intro: "Tracks water intake against a daily target (default 2,000 ml). Each glass becomes a water-tagged nutrition entry, so meal logs count too.",
       bullets: [
         .init("One-tap presets", "250 / 330 / 500 ml, or enter a custom amount.", icon: "drop.fill"),
         .init("No double-counting", "Water you logged on a meal entry rolls into today's total automatically.", icon: "checkmark.seal"),
         .init("Lives on top of Nutrition", "No separate data store. Disabling Hydration leaves every glass intact in Nutrition.", icon: "square.stack.3d.up"),
       ],
-      primaryActionLabel: "Start logging",
       complete: complete
     ))
   }

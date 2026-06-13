@@ -19,15 +19,13 @@ enum GoalsPlugin: SectionPlugin {
   static func destinationView() -> AnyView? { AnyView(CoachView()) }
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
-    AnyView(SectionExplainerView(
+    AnyView(SectionOnboarding(
       sectionKey: "goals",
-      title: "Goals",
       intro: "Short text intentions tagged with section keys. A training goal shows up inside Training, a nutrition goal inside Nutrition — wherever you're already looking.",
       bullets: [
         .init("Free-form text", "\"Swim twice a week\", \"Read 12 books this year.\" No deadlines, no progress bars — just readable intentions.", icon: "text.alignleft"),
         .init("Tag by section", "One or more section keys per goal; they surface in the relevant destinations automatically.", icon: "tag"),
       ],
-      primaryActionLabel: "Add your first goal",
       complete: complete
     ))
   }

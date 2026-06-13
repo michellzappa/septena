@@ -68,7 +68,7 @@ enum TrainingPlugin: SectionPlugin {
   // MARK: - First-enable onboarding
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
-    AnyView(SectionStarterPicker(
+    AnyView(SectionOnboarding(
       sectionKey: "training",
       intro: "Log your workouts — strength, cardio, or mobility. Pick the kinds of movement you do and Septena sets up a routine for each, ready to fill with exercises as you go.",
       nounPlural: String(localized: "routines"),

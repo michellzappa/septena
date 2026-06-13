@@ -30,16 +30,14 @@ enum MoodPlugin: SectionPlugin {
   }
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
-    AnyView(SectionExplainerView(
+    AnyView(SectionOnboarding(
       sectionKey: "mood",
-      title: "Mood",
       intro: "How you feel, plotted on the affect circumplex: pleasant ↔ unpleasant, calm ↔ energetic. Three check-ins a day is a good cadence — more or fewer is fine.",
       bullets: [
         .init("Tap a quadrant", "Pick the feeling that matches, then a word for it. That's the whole log.", icon: "hand.tap"),
         .init("Morning / afternoon / evening", "Suggested buckets, but timestamps are exact — log whenever it fits.", icon: "clock"),
         .init("Notes when useful", "Add free-text context when something specific is shaping the feeling.", icon: "text.bubble"),
       ],
-      primaryActionLabel: "Start logging",
       complete: complete
     ))
   }

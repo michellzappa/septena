@@ -31,7 +31,35 @@ enum MedicationsPlugin: SectionPlugin {
   }
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
-    AnyView(MedicationsOnboardingView(complete: complete))
+    AnyView(SectionOnboarding(
+      sectionKey: "medications",
+      intro: "Create the medication list first, then daily dose logging is a quick taken / skipped / missed check-in.",
+      nounPlural: String(localized: "medications"),
+      header: String(localized: "Starter medications"),
+      footer: String(localized: "Use generic placeholders when exact prescriptions should be entered manually later."),
+      items: MedicationStarter.all,
+      glyph: { _ in .symbol("pills") },
+      primary: { $0.title },
+      secondary: { $0.summaryLine },
+      existsKey: { AnyHashable($0.title.lowercased()) },
+      loadExistingKeys: {
+        await MirrorReader.shared.read { ctx in
+          Set(((try? ctx.fetch(FetchDescriptor<MedicationDefinitionEntity>())) ?? [])
+            .map { AnyHashable($0.title.lowercased()) })
+        }
+      },
+      add: { items in
+        let mutator = SeptenaServices.shared.medicationsMutator
+        for s in items {
+          mutator.addDefinition(title: s.title, genericName: s.genericName,
+                                form: s.form, route: s.route,
+                                defaultDoseValue: s.doseValue, defaultDoseUnit: s.doseUnit,
+                                bucket: s.bucket, scheduleKind: s.scheduleKind,
+                                targetDosesPerDay: s.scheduleKind == "daily" ? 1 : nil)
+        }
+      },
+      complete: complete
+    ))
   }
 
   static var exportContribution: SectionExportContribution? {
@@ -216,129 +244,18 @@ struct MedicationStarter: Identifiable, Hashable {
     .init(id: "starter-inhaler", title: "Rescue inhaler", genericName: nil, form: "inhaler", route: "inhaled", doseValue: nil, doseUnit: "puffs", bucket: nil, scheduleKind: "asNeeded"),
     .init(id: "starter-birth-control", title: "Birth control", genericName: nil, form: "tablet", route: "oral", doseValue: 1, doseUnit: "pill", bucket: "evening", scheduleKind: "daily"),
   ]
-}
 
-private struct MedicationsOnboardingView: View {
-  let complete: () -> Void
-  @Environment(SectionTheme.self) private var theme
-  @Environment(\.modelContext) private var modelContext
-  @State private var selected: Set<String> = []
-  @State private var existingTitles: Set<String> = []
-
-  private var accent: Color { theme.color(for: "medications") }
-  private var mutator: MedicationsMutator { SeptenaServices.shared.medicationsMutator }
-
-  var body: some View {
-    NavigationStack {
-      Form {
-        Section {
-          SectionOnboardingHero(
-            sectionKey: "medications",
-            title: "Medications",
-            intro: "Create the medication list first, then daily dose logging is a quick taken / skipped / missed check-in."
-          )
-          .onboardingHeroSection()
-        }
-        Section {
-          ForEach(MedicationStarter.all) { starter in
-            starterRow(starter)
-          }
-        } header: {
-          Text("Starter medications")
-        } footer: {
-          Text("Use generic placeholders when exact prescriptions should be entered manually later.")
-        }
-      }
-      .formStyle(.grouped)
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .safeAreaInset(edge: .bottom) { bottomBar }
-      .onAppear { loadExisting() }
-    }
-  }
-
-  @ViewBuilder
-  private func starterRow(_ starter: MedicationStarter) -> some View {
-    let exists = existingTitles.contains(starter.title.lowercased())
-    let isSelected = selected.contains(starter.id)
-    Button {
-      guard !exists else { return }
-      if isSelected { selected.remove(starter.id) } else { selected.insert(starter.id) }
-    } label: {
-      HStack(spacing: 12) {
-        Image(systemName: "pills")
-          .font(.title3)
-          .foregroundStyle(exists ? .secondary : accent)
-        VStack(alignment: .leading, spacing: 2) {
-          Text(starter.title)
-            .foregroundStyle(exists ? .secondary : .primary)
-            .strikethrough(exists, color: .secondary)
-          Text(starterSummary(starter))
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-        Spacer()
-        if exists {
-          Text("Already added").font(.caption).foregroundStyle(.secondary)
-        } else {
-          Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-            .font(.title3)
-            .foregroundStyle(isSelected ? accent : Color.secondary.opacity(0.6))
-        }
-      }
-    }
-    .buttonStyle(.plain)
-    .disabled(exists)
-  }
-
-  private var bottomBar: some View {
-    HStack(spacing: 12) {
-      Button("Skip") { complete() }
-        .buttonStyle(.bordered)
-      Spacer()
-      Button(actionTitle) { addAndFinish() }
-        .buttonStyle(.borderedProminent)
-        .tint(accent)
-    }
-    .padding()
-    .background(.bar)
-  }
-
-  private var actionTitle: String {
-    selected.isEmpty ? String(localized: "Done") : String(localized: "Add \(selected.count) medications")
-  }
-
-  private func loadExisting() {
-    let rows = (try? modelContext.fetch(FetchDescriptor<MedicationDefinitionEntity>())) ?? []
-    existingTitles = Set(rows.map { $0.title.lowercased() })
-  }
-
-  private func starterSummary(_ starter: MedicationStarter) -> String {
-    var parts = [starter.form, starter.route]
-    if let value = starter.doseValue {
-      parts.append("\(value.decimalString(2)) \(starter.doseUnit ?? "")".trimmingCharacters(in: .whitespaces))
-    } else if let unit = starter.doseUnit {
+  /// Secondary row line: form · route · dose · bucket · schedule.
+  var summaryLine: String {
+    var parts = [form, route]
+    if let value = doseValue {
+      parts.append("\(value.decimalString(2)) \(doseUnit ?? "")".trimmingCharacters(in: .whitespaces))
+    } else if let unit = doseUnit {
       parts.append(unit)
     }
-    if let bucket = starter.bucket { parts.append(bucket) }
-    parts.append(starter.scheduleKind == "asNeeded" ? "as needed" : "daily")
+    if let bucket { parts.append(bucket) }
+    parts.append(scheduleKind == "asNeeded" ? "as needed" : "daily")
     return parts.joined(separator: " · ")
-  }
-
-  private func addAndFinish() {
-    for starter in MedicationStarter.all where selected.contains(starter.id) && !existingTitles.contains(starter.title.lowercased()) {
-      mutator.addDefinition(title: starter.title,
-                            genericName: starter.genericName,
-                            form: starter.form,
-                            route: starter.route,
-                            defaultDoseValue: starter.doseValue,
-                            defaultDoseUnit: starter.doseUnit,
-                            bucket: starter.bucket,
-                            scheduleKind: starter.scheduleKind,
-                            targetDosesPerDay: starter.scheduleKind == "daily" ? 1 : nil)
-    }
-    complete()
   }
 }
 

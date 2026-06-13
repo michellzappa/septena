@@ -27,7 +27,40 @@ enum IntakePlugin: SectionPlugin {
   static var logFlourish: LogFlourish? { LogFlourish(motion: .snap) }
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
-    AnyView(IntakeOnboardingView(complete: complete))
+    // Only seed-bearing templates are multi-selectable; the blank "Custom"
+    // choice (seed == nil) is an action that opens the full wizard, handled
+    // by the bespoke row in `extraSections`.
+    let templates = IntakeTemplates.all.filter { $0.seed != nil }
+    let custom = IntakeTemplates.all.filter { $0.seed == nil }
+    return AnyView(SectionOnboarding(
+      sectionKey: "intake",
+      intro: "Track what you consume — and what you want to cut back on. Each tracker keeps its own methods and doses, and a days-since-last streak for the ones you're reducing. Start with a template or build your own.",
+      bullets: [],
+      nounPlural: "",
+      groups: [StarterGroup(header: String(localized: "Templates"), items: templates)],
+      glyph: { .symbol($0.symbol) },
+      primary: { $0.title },
+      secondary: { $0.subtitle },
+      existsKey: { AnyHashable($0.seed?.id ?? $0.id) },
+      loadExistingKeys: {
+        await MirrorReader.shared.read { ctx in
+          Set(((try? ctx.fetch(FetchDescriptor<IntakeKindEntity>())) ?? [])
+            .map { AnyHashable($0.id) })
+        }
+      },
+      add: { items in
+        let mutator = SeptenaServices.shared.intakeMutator
+        for choice in items { if let seed = choice.seed { mutator.upsertKind(seed: seed) } }
+      },
+      complete: complete,
+      extraSections: {
+        Section {
+          ForEach(custom) { choice in
+            IntakeCustomStarterRow(choice: choice, onCreated: complete)
+          }
+        }
+      }
+    ))
   }
 
   static func detailPaneContent() -> AnyView? { AnyView(IntakeDetailContent()) }
@@ -197,59 +230,19 @@ enum IntakePlugin: SectionPlugin {
   }
 }
 
-// MARK: - First-enable onboarding (template picker)
-
-private struct IntakeOnboardingView: View {
-  let complete: () -> Void
+// The blank "Custom" onboarding choice: not a multi-select template but an
+// action that opens the full kind wizard. Lives in its own view so its sheet
+// state survives, and the `.sheet` hangs off the concrete Button (a sheet on
+// a structural Form element mis-anchors — see commit 736b937).
+private struct IntakeCustomStarterRow: View {
+  let choice: IntakeTemplates.Choice
+  let onCreated: () -> Void
   @Environment(SectionTheme.self) private var theme
-  @State private var selected: Set<String> = []
-  @State private var existingIDs: Set<String> = []
   @State private var customizing = false
 
   private var accent: Color { theme.color(for: "intake") }
-  private var mutator: IntakeMutator { SeptenaServices.shared.intakeMutator }
 
   var body: some View {
-    NavigationStack {
-      Form {
-        Section {
-          SectionOnboardingHero(
-            sectionKey: "intake",
-            title: "Intake",
-            intro: "Track what you consume — and what you want to cut back on. Each tracker keeps its own methods and doses, and a days-since-last streak for the ones you're reducing. Start with a template or build your own."
-          )
-          .onboardingHeroSection()
-        }
-        Section("Templates") {
-          ForEach(IntakeTemplates.all) { templateRow($0) }
-        }
-      }
-      .formStyle(.grouped)
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .safeAreaInset(edge: .bottom) { bottomBar }
-      .task { await loadExisting() }
-      .sheet(isPresented: $customizing) {
-        // A blank kind from the full wizard. Creating it finishes onboarding;
-        // cancelling returns to the template picker.
-        IntakeKindWizard(onCreated: { _ in complete() })
-      }
-    }
-  }
-
-  @ViewBuilder
-  private func templateRow(_ choice: IntakeTemplates.Choice) -> some View {
-    // Custom has no seed — it's an action that opens the full wizard, not a
-    // multi-select template. (Selecting it in a checklist did nothing — the bug.)
-    if choice.seed == nil {
-      customRow(choice)
-    } else {
-      selectableRow(choice)
-    }
-  }
-
-  private func customRow(_ choice: IntakeTemplates.Choice) -> some View {
     Button { customizing = true } label: {
       HStack(spacing: 12) {
         Image(systemName: choice.symbol).frame(width: 26).foregroundStyle(accent)
@@ -262,71 +255,9 @@ private struct IntakeOnboardingView: View {
       }
     }
     .buttonStyle(.plain)
-  }
-
-  @ViewBuilder
-  private func selectableRow(_ choice: IntakeTemplates.Choice) -> some View {
-    let exists = choice.seed.map { existingIDs.contains($0.id) } ?? false
-    let isSelected = selected.contains(choice.id)
-    Button {
-      guard !exists else { return }
-      if isSelected { selected.remove(choice.id) } else { selected.insert(choice.id) }
-    } label: {
-      HStack(spacing: 12) {
-        Image(systemName: choice.symbol)
-          .frame(width: 26)
-          .foregroundStyle(exists ? .secondary : accent)
-        VStack(alignment: .leading, spacing: 1) {
-          Text(choice.title).foregroundStyle(exists ? .secondary : .primary)
-          Text(choice.subtitle).font(.caption).foregroundStyle(.secondary)
-        }
-        Spacer()
-        if exists {
-          Text("Already added").font(.caption).foregroundStyle(.secondary)
-        } else {
-          Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-            .foregroundStyle(isSelected ? accent : Color.secondary.opacity(0.6))
-            .font(.title3)
-        }
-      }
-    }
-    .buttonStyle(.plain)
-    .disabled(exists)
-  }
-
-  @ViewBuilder
-  private var bottomBar: some View {
-    HStack(spacing: 12) {
-      Button("Skip") { complete() }
-        .buttonStyle(.bordered)
-      Spacer()
-      Button(actionTitle) { addAndFinish() }
-        .buttonStyle(.borderedProminent)
-        .tint(accent)
-    }
-    .padding()
-    .background(.bar)
-  }
-
-  private var actionTitle: String {
-    let seedCount = selected.filter { id in
-      IntakeTemplates.all.first { $0.id == id }?.seed != nil
-    }.count
-    return seedCount == 0 ? String(localized: "Done") : String(localized: "Add \(seedCount)")
-  }
-
-  private func addAndFinish() {
-    for choice in IntakeTemplates.all where selected.contains(choice.id) {
-      if let seed = choice.seed, !existingIDs.contains(seed.id) {
-        mutator.upsertKind(seed: seed)
-      }
-    }
-    complete()
-  }
-
-  private func loadExisting() async {
-    existingIDs = await MirrorReader.shared.read { ctx in
-      Set(((try? ctx.fetch(FetchDescriptor<IntakeKindEntity>())) ?? []).map(\.id))
+    .sheet(isPresented: $customizing) {
+      // Creating the kind finishes onboarding; cancelling returns to the picker.
+      IntakeKindWizard(onCreated: { _ in onCreated() })
     }
   }
 }

@@ -28,7 +28,30 @@ enum SymptomsPlugin: SectionPlugin {
   }
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
-    AnyView(SymptomsOnboardingView(complete: complete))
+    AnyView(SectionOnboarding(
+      sectionKey: "symptoms",
+      intro: "Pick the symptoms you want ready for one-tap logging. Each log still captures severity, time and optional context.",
+      nounPlural: String(localized: "symptoms"),
+      items: SymptomStarter.all,
+      glyph: { .emoji($0.emoji) },
+      primary: { $0.title },
+      secondary: { $0.region },
+      existsKey: { AnyHashable($0.title.lowercased()) },
+      loadExistingKeys: {
+        await MirrorReader.shared.read { ctx in
+          Set(((try? ctx.fetch(FetchDescriptor<SymptomDefinitionEntity>())) ?? [])
+            .map { AnyHashable($0.title.lowercased()) })
+        }
+      },
+      add: { items in
+        let mutator = SeptenaServices.shared.symptomsMutator
+        for s in items {
+          mutator.addDefinition(title: s.title, emoji: s.emoji,
+                                bodySystem: s.bodySystem, defaultBodyRegion: s.region)
+        }
+      },
+      complete: complete
+    ))
   }
 
   static var exportContribution: SectionExportContribution? {
@@ -185,109 +208,6 @@ struct SymptomStarter: Identifiable, Hashable {
     .init(id: "starter-congestion", title: "Congestion", emoji: "👃", bodySystem: "Respiratory", region: "Nose"),
     .init(id: "starter-anxiety", title: "Anxiety", emoji: "🌫️", bodySystem: "Mental", region: "Chest"),
   ]
-}
-
-private struct SymptomsOnboardingView: View {
-  let complete: () -> Void
-  @Environment(SectionTheme.self) private var theme
-  @Environment(\.modelContext) private var modelContext
-  @State private var selected: Set<String> = []
-  @State private var existingTitles: Set<String> = []
-
-  private var accent: Color { theme.color(for: "symptoms") }
-  private var mutator: SymptomsMutator { SeptenaServices.shared.symptomsMutator }
-
-  var body: some View {
-    NavigationStack {
-      Form {
-        Section {
-          SectionOnboardingHero(
-            sectionKey: "symptoms",
-            title: "Symptoms",
-            intro: "Pick the symptoms you want ready for one-tap logging. Each log still captures severity, time and optional context."
-          )
-          .onboardingHeroSection()
-        }
-        Section {
-          ForEach(SymptomStarter.all) { starter in
-            starterRow(starter)
-          }
-        } header: {
-          Text("Starter symptoms")
-        }
-      }
-      .formStyle(.grouped)
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .safeAreaInset(edge: .bottom) { bottomBar }
-      .onAppear { loadExisting() }
-    }
-  }
-
-  @ViewBuilder
-  private func starterRow(_ starter: SymptomStarter) -> some View {
-    let exists = existingTitles.contains(starter.title.lowercased())
-    let isSelected = selected.contains(starter.id)
-    Button {
-      guard !exists else { return }
-      if isSelected { selected.remove(starter.id) } else { selected.insert(starter.id) }
-    } label: {
-      HStack(spacing: 12) {
-        Text(starter.emoji).font(.title3).opacity(exists ? 0.4 : 1)
-        VStack(alignment: .leading, spacing: 2) {
-          Text(starter.title)
-            .foregroundStyle(exists ? .secondary : .primary)
-            .strikethrough(exists, color: .secondary)
-          Text(starter.region)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-        Spacer()
-        if exists {
-          Text("Already added").font(.caption).foregroundStyle(.secondary)
-        } else {
-          Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-            .font(.title3)
-            .foregroundStyle(isSelected ? accent : Color.secondary.opacity(0.6))
-        }
-      }
-    }
-    .buttonStyle(.plain)
-    .disabled(exists)
-  }
-
-  private var bottomBar: some View {
-    HStack(spacing: 12) {
-      Button("Skip") { complete() }
-        .buttonStyle(.bordered)
-      Spacer()
-      Button(actionTitle) { addAndFinish() }
-        .buttonStyle(.borderedProminent)
-        .tint(accent)
-    }
-    .padding()
-    .background(.bar)
-  }
-
-  private var actionTitle: String {
-    selected.isEmpty ? String(localized: "Done") : String(localized: "Add \(selected.count) symptoms")
-  }
-
-  private func loadExisting() {
-    let rows = (try? modelContext.fetch(FetchDescriptor<SymptomDefinitionEntity>())) ?? []
-    existingTitles = Set(rows.map { $0.title.lowercased() })
-  }
-
-  private func addAndFinish() {
-    for starter in SymptomStarter.all where selected.contains(starter.id) && !existingTitles.contains(starter.title.lowercased()) {
-      mutator.addDefinition(title: starter.title,
-                            emoji: starter.emoji,
-                            bodySystem: starter.bodySystem,
-                            defaultBodyRegion: starter.region)
-    }
-    complete()
-  }
 }
 
 @MainActor func symptomDefinitionExportDict(_ e: SymptomDefinitionEntity) -> [String: Any] {

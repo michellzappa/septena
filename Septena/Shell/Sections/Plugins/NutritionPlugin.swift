@@ -105,9 +105,8 @@ enum NutritionPlugin: SectionPlugin {
   // MARK: - First-enable onboarding
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
-    AnyView(SectionExplainerView(
+    AnyView(SectionOnboarding(
       sectionKey: "nutrition",
-      title: "Nutrition",
       intro: "Meal + macro log with auto-computed daily totals. Name the food, estimate macros, done.",
       bullets: [
         .init("Foods as a list", "One line per item: \"chicken salad\", \"rice\", \"olive oil\". A meal is just a few lines.", icon: "list.bullet"),
@@ -115,7 +114,6 @@ enum NutritionPlugin: SectionPlugin {
         .init("Meal type optional", "Breakfast / lunch / dinner / snack — useful for filtering, not required.", icon: "fork.knife"),
         .init("Daily totals roll up", "Kcal and macros sum automatically across every entry that day.", icon: "sum"),
       ],
-      primaryActionLabel: "Start logging",
       complete: complete
     ))
   }

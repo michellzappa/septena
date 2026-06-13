@@ -14,9 +14,8 @@ enum GitHubPlugin: SectionPlugin {
   static func destinationView() -> AnyView? { AnyView(GitHubDestinationView()) }
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
-    AnyView(SectionExplainerView(
+    AnyView(SectionOnboarding(
       sectionKey: "github",
-      title: "GitHub",
       intro: "Your commit activity as a contribution heatmap. Septena reads your GitHub calendar; it never writes anything back.",
       bullets: [
         .init("Read-only, on this device",
@@ -26,7 +25,6 @@ enum GitHubPlugin: SectionPlugin {
               "The same green contribution grid as your profile, plus a weekly sparkline of commits.",
               icon: "square.grid.3x3"),
       ],
-      primaryActionLabel: "Open GitHub",
       complete: complete
     ))
   }

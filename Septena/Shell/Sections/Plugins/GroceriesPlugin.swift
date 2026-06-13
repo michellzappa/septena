@@ -47,7 +47,26 @@ enum GroceriesPlugin: SectionPlugin {
   }
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
-    AnyView(GroceriesOnboardingView(complete: complete))
+    AnyView(SectionOnboarding(
+      sectionKey: "groceries",
+      intro: "Organizes shopping items by category. Pick a few common categories to start — items themselves get added later as you go.",
+      nounPlural: String(localized: "categories"),
+      header: String(localized: "Categories"),
+      items: GroceryCategoryStarter.all,
+      primary: { $0.name },
+      existsKey: { AnyHashable($0.name.lowercased()) },
+      loadExistingKeys: {
+        await MirrorReader.shared.read { ctx in
+          Set(((try? ctx.fetch(FetchDescriptor<GroceryCategoryEntity>())) ?? [])
+            .map { AnyHashable($0.name.lowercased()) })
+        }
+      },
+      add: { items in
+        let mutator = SeptenaServices.shared.groceryMutator
+        for s in items { _ = mutator.addCategory(name: s.name) }
+      },
+      complete: complete
+    ))
   }
 
   static var mcpSkill: SectionSkill? {
@@ -127,110 +146,6 @@ private struct GroceryCategoryStarter: Identifiable, Hashable {
     .init(id: "starter-drinks",    name: "Drinks"),
     .init(id: "starter-household", name: "Household"),
   ]
-}
-
-private struct GroceriesOnboardingView: View {
-  let complete: () -> Void
-  @Environment(SectionTheme.self) private var theme
-  @Environment(\.modelContext) private var modelContext
-  @State private var selected: Set<String> = []
-  @State private var existingNames: Set<String> = []
-
-  private var accent: Color { theme.color(for: "groceries") }
-  private var mutator: GroceryMutator { SeptenaServices.shared.groceryMutator }
-
-  private func alreadyExists(_ s: GroceryCategoryStarter) -> Bool {
-    existingNames.contains(s.name.lowercased())
-  }
-
-  private func loadExisting() {
-    let rows = (try? modelContext.fetch(FetchDescriptor<GroceryCategoryEntity>())) ?? []
-    existingNames = Set(rows.map { $0.name.lowercased() })
-  }
-
-  var body: some View {
-    NavigationStack {
-      Form {
-        Section {
-          SectionOnboardingHero(
-            sectionKey: "groceries",
-            title: "Groceries",
-            intro: "Organizes shopping items by category. Pick a few common categories to start — items themselves get added later as you go."
-          )
-          .onboardingHeroSection()
-        }
-        Section("Categories") {
-          ForEach(GroceryCategoryStarter.all) { starter in
-            starterRow(starter)
-          }
-        }
-      }
-      .formStyle(.grouped)
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .safeAreaInset(edge: .bottom) {
-        bottomBar
-      }
-      .onAppear { loadExisting() }
-    }
-  }
-
-  @ViewBuilder
-  private func starterRow(_ s: GroceryCategoryStarter) -> some View {
-    let exists = alreadyExists(s)
-    let isSelected = selected.contains(s.id)
-    Button {
-      guard !exists else { return }
-      if isSelected { selected.remove(s.id) } else { selected.insert(s.id) }
-    } label: {
-      HStack(spacing: 12) {
-        Text(s.name)
-          .foregroundStyle(exists ? .secondary : .primary)
-          .strikethrough(exists, color: .secondary)
-        Spacer()
-        if exists {
-          Text("Already added")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        } else {
-          Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-            .foregroundStyle(isSelected ? accent : Color.secondary.opacity(0.6))
-            .font(.title3)
-        }
-      }
-    }
-    .buttonStyle(.plain)
-    .disabled(exists)
-  }
-
-  @ViewBuilder
-  private var bottomBar: some View {
-    HStack(spacing: 12) {
-      Button("Skip") { complete() }
-        .buttonStyle(.bordered)
-      Spacer()
-      Button(actionTitle) { addAndFinish() }
-        .buttonStyle(.borderedProminent)
-        .tint(accent)
-    }
-    .padding()
-    .background(.bar)
-  }
-
-  private var actionTitle: String {
-    selected.isEmpty ? String(localized: "Done") : String(localized: "Add \(selected.count) categories")
-  }
-
-  private func addAndFinish() {
-    let toAdd = GroceryCategoryStarter.all.filter {
-      selected.contains($0.id) && !alreadyExists($0)
-    }
-    for s in toAdd {
-      _ = mutator.addCategory(name: s.name)
-    }
-    complete()
-  }
 }
 
 @MainActor func groceryCategoryExportDict(_ e: GroceryCategoryEntity) -> [String: Any] {
