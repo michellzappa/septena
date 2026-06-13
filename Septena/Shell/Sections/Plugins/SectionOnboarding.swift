@@ -107,17 +107,16 @@ enum StarterGlyph {
 }
 
 /// One titled group of starters. Flat pickers pass a single group with a nil
-/// header; Habits groups its starters by bucket into several.
+/// header; Habits groups its starters by bucket into several. The reassurance
+/// footer is sheet-level (see `SectionOnboarding.footer`), not per-group.
 struct StarterGroup<Item: Identifiable>: Identifiable {
   let id: String
   var header: String?
-  var footer: String?
   var items: [Item]
 
-  init(id: String = "default", header: String? = nil, footer: String? = nil, items: [Item]) {
+  init(id: String = "default", header: String? = nil, items: [Item]) {
     self.id = id
     self.header = header
-    self.footer = footer
     self.items = items
   }
 }
@@ -148,10 +147,16 @@ struct SectionOnboarding<Item: Identifiable, Extra: View>: View {
   /// Plural noun for the confirm button ("habits" → "Add 3 habits"). Empty →
   /// just "Add 3" (Intake, whose templates have no single shared noun).
   let nounPlural: String
+  /// Required reassurance line under the last group ("rename or add anytime").
+  /// Standardized so every onboarding ends the same way; a section may pass
+  /// its own guidance instead (Medications).
+  let footer: String
   let groups: [StarterGroup<Item>]
+  /// Required, meaningful per-row glyph — no bare rows. Emoji or SF Symbol.
   let glyph: (Item) -> StarterGlyph
   let primary: (Item) -> String
-  let secondary: (Item) -> String?
+  /// Required one-line descriptor under each row — every starter explains itself.
+  let secondary: (Item) -> String
   /// How a starter matches an already-existing row, compared against the set
   /// from `loadExistingKeys` (lowercased title/name, or a seed id).
   let existsKey: (Item) -> AnyHashable
@@ -185,13 +190,14 @@ struct SectionOnboarding<Item: Identifiable, Extra: View>: View {
           Section { bulletRow(bullet) }
         }
 
-        ForEach(groups) { group in
+        ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
           Section {
             ForEach(group.items) { row($0) }
           } header: {
             if let header = group.header { Text(header) }
           } footer: {
-            if let footer = group.footer { Text(footer) }
+            // The standardized reassurance line lands once, under the last group.
+            if index == groups.count - 1, !footer.isEmpty { Text(footer) }
           }
         }
 
@@ -259,9 +265,7 @@ struct SectionOnboarding<Item: Identifiable, Extra: View>: View {
           Text(primary(item))
             .foregroundStyle(exists ? .secondary : .primary)
             .strikethrough(exists, color: .secondary)
-          if let sub = secondary(item) {
-            Text(sub).font(.caption).foregroundStyle(.secondary)
-          }
+          Text(secondary(item)).font(.caption).foregroundStyle(.secondary)
         }
         Spacer()
         if exists {
@@ -322,7 +326,7 @@ extension SectionOnboarding where Item == NoStarter, Extra == EmptyView {
   ) {
     self.init(
       sectionKey: sectionKey, intro: intro, bullets: bullets, nounPlural: "",
-      groups: [], glyph: { _ in .none }, primary: { _ in "" }, secondary: { _ in nil },
+      footer: "", groups: [], glyph: { _ in .none }, primary: { _ in "" }, secondary: { _ in "" },
       existsKey: { _ in AnyHashable("") }, loadExistingKeys: { [] },
       add: { _ in }, complete: complete, extraSections: { EmptyView() }
     )
@@ -330,50 +334,51 @@ extension SectionOnboarding where Item == NoStarter, Extra == EmptyView {
 }
 
 extension SectionOnboarding where Extra == EmptyView {
-  /// Flat single-group starter picker (the common case).
+  /// Flat single-group starter picker (the common case). `glyph`, `secondary`,
+  /// `header` and `footer` are required — the standardized row anatomy.
   init(
     sectionKey: String,
     intro: String,
     nounPlural: String,
-    bullets: [OnboardingBullet] = [],
-    header: String? = nil,
-    footer: String? = nil,
+    header: String,
+    footer: String,
     items: [Item],
-    glyph: @escaping (Item) -> StarterGlyph = { _ in .none },
+    glyph: @escaping (Item) -> StarterGlyph,
     primary: @escaping (Item) -> String,
-    secondary: @escaping (Item) -> String? = { _ in nil },
+    secondary: @escaping (Item) -> String,
     existsKey: @escaping (Item) -> AnyHashable,
     loadExistingKeys: @escaping () async -> Set<AnyHashable>,
     add: @escaping ([Item]) -> Void,
     complete: @escaping () -> Void
   ) {
     self.init(
-      sectionKey: sectionKey, intro: intro, bullets: bullets, nounPlural: nounPlural,
-      groups: [StarterGroup(header: header, footer: footer, items: items)],
+      sectionKey: sectionKey, intro: intro, bullets: [], nounPlural: nounPlural,
+      footer: footer, groups: [StarterGroup(header: header, items: items)],
       glyph: glyph, primary: primary, secondary: secondary,
       existsKey: existsKey, loadExistingKeys: loadExistingKeys,
       add: add, complete: complete, extraSections: { EmptyView() }
     )
   }
 
-  /// Multi-group starter picker (Habits, by bucket).
+  /// Multi-group starter picker (Habits, by bucket). Each group carries its own
+  /// header; `footer` is the one reassurance line under the last group.
   init(
     sectionKey: String,
     intro: String,
     nounPlural: String,
-    bullets: [OnboardingBullet] = [],
+    footer: String,
     groups: [StarterGroup<Item>],
-    glyph: @escaping (Item) -> StarterGlyph = { _ in .none },
+    glyph: @escaping (Item) -> StarterGlyph,
     primary: @escaping (Item) -> String,
-    secondary: @escaping (Item) -> String? = { _ in nil },
+    secondary: @escaping (Item) -> String,
     existsKey: @escaping (Item) -> AnyHashable,
     loadExistingKeys: @escaping () async -> Set<AnyHashable>,
     add: @escaping ([Item]) -> Void,
     complete: @escaping () -> Void
   ) {
     self.init(
-      sectionKey: sectionKey, intro: intro, bullets: bullets, nounPlural: nounPlural,
-      groups: groups,
+      sectionKey: sectionKey, intro: intro, bullets: [], nounPlural: nounPlural,
+      footer: footer, groups: groups,
       glyph: glyph, primary: primary, secondary: secondary,
       existsKey: existsKey, loadExistingKeys: loadExistingKeys,
       add: add, complete: complete, extraSections: { EmptyView() }

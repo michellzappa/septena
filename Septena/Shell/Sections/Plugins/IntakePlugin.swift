@@ -37,6 +37,7 @@ enum IntakePlugin: SectionPlugin {
       intro: "Track what you consume — and what you want to cut back on. Each tracker keeps its own methods and doses, and a days-since-last streak for the ones you're reducing. Start with a template or build your own.",
       bullets: [],
       nounPlural: "",
+      footer: String(localized: "Start with a template or build your own — edit anytime."),
       groups: [StarterGroup(header: String(localized: "Templates"), items: templates)],
       glyph: { .symbol($0.symbol) },
       primary: { $0.title },

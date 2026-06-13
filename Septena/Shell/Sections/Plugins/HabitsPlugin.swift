@@ -61,9 +61,11 @@ enum HabitsPlugin: SectionPlugin {
       sectionKey: "habits",
       intro: "Track simple daily routines. Pick a few to get started — edit or delete anytime, or skip and add your own.",
       nounPlural: String(localized: "habits"),
+      footer: String(localized: "Pick a few to start — edit, skip, or add your own anytime."),
       groups: groups,
       glyph: { .emoji($0.emoji) },
       primary: { $0.name },
+      secondary: { $0.blurb },
       existsKey: { AnyHashable($0.name.lowercased()) },
       loadExistingKeys: {
         await MirrorReader.shared.read { ctx in
@@ -263,21 +265,22 @@ private struct HabitStarter: Identifiable, Hashable {
   let name: String
   let emoji: String
   let bucket: String      // "morning" | "anytime" | "evening"
+  let blurb: String       // one-line descriptor shown under the name
 
   static let all: [HabitStarter] = [
     // Morning
-    .init(id: "starter-hydrate",  name: "Hydrate",        emoji: "💧", bucket: "morning"),
-    .init(id: "starter-run",      name: "Run",            emoji: "🏃", bucket: "morning"),
-    .init(id: "starter-meditate", name: "Meditate",       emoji: "🧘", bucket: "morning"),
-    .init(id: "starter-stretch",  name: "Stretch",        emoji: "🤸", bucket: "morning"),
+    .init(id: "starter-hydrate",  name: "Hydrate",        emoji: "💧", bucket: "morning", blurb: "A glass of water to start"),
+    .init(id: "starter-run",      name: "Run",            emoji: "🏃", bucket: "morning", blurb: "A morning run, any distance"),
+    .init(id: "starter-meditate", name: "Meditate",       emoji: "🧘", bucket: "morning", blurb: "A few quiet minutes"),
+    .init(id: "starter-stretch",  name: "Stretch",        emoji: "🤸", bucket: "morning", blurb: "Loosen up for the day"),
     // Anytime
-    .init(id: "starter-read",     name: "Read",           emoji: "📖", bucket: "anytime"),
-    .init(id: "starter-walk",     name: "Walk outside",   emoji: "🚶", bucket: "anytime"),
-    .init(id: "starter-journal",  name: "Journal",        emoji: "✍️", bucket: "anytime"),
-    .init(id: "starter-language", name: "Language study", emoji: "🗣️", bucket: "anytime"),
+    .init(id: "starter-read",     name: "Read",           emoji: "📖", bucket: "anytime", blurb: "Pages before screens"),
+    .init(id: "starter-walk",     name: "Walk outside",   emoji: "🚶", bucket: "anytime", blurb: "Get out and move"),
+    .init(id: "starter-journal",  name: "Journal",        emoji: "✍️", bucket: "anytime", blurb: "Jot down a thought"),
+    .init(id: "starter-language", name: "Language study", emoji: "🗣️", bucket: "anytime", blurb: "Practice a new language"),
     // Evening
-    .init(id: "starter-phone-off", name: "Phone off",     emoji: "📵", bucket: "evening"),
-    .init(id: "starter-reflect",   name: "Reflect on day", emoji: "📝", bucket: "evening"),
+    .init(id: "starter-phone-off", name: "Phone off",     emoji: "📵", bucket: "evening", blurb: "Unplug before bed"),
+    .init(id: "starter-reflect",   name: "Reflect on day", emoji: "📝", bucket: "evening", blurb: "Look back on the day"),
   ]
 }
 

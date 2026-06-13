@@ -32,6 +32,8 @@ enum SymptomsPlugin: SectionPlugin {
       sectionKey: "symptoms",
       intro: "Pick the symptoms you want ready for one-tap logging. Each log still captures severity, time and optional context.",
       nounPlural: String(localized: "symptoms"),
+      header: String(localized: "Starter symptoms"),
+      footer: String(localized: "Pick the ones you want ready — rename or add more anytime."),
       items: SymptomStarter.all,
       glyph: { .emoji($0.emoji) },
       primary: { $0.title },

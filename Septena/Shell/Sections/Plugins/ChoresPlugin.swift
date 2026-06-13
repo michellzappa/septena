@@ -49,6 +49,8 @@ enum ChoresPlugin: SectionPlugin {
       sectionKey: "chores",
       intro: "Recurring household tasks with computed due dates. Pick the ones that apply — cadences are a starting point you can adjust later.",
       nounPlural: String(localized: "chores"),
+      header: String(localized: "Starter chores"),
+      footer: String(localized: "Cadences are a starting point — adjust or add more anytime."),
       items: ChoreStarter.all,
       glyph: { .emoji($0.emoji) },
       primary: { $0.name },

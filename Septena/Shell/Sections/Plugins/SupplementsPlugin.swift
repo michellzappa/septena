@@ -48,9 +48,12 @@ enum SupplementsPlugin: SectionPlugin {
       sectionKey: "supplements",
       intro: "Logs the things you take daily. Pick a few common ones to start — edit, delete, or add your own anytime.",
       nounPlural: String(localized: "supplements"),
+      header: String(localized: "Starter supplements"),
+      footer: String(localized: "Pick a few — rename, remove, or add your own anytime."),
       items: SupplementStarter.all,
       glyph: { .emoji($0.emoji) },
       primary: { $0.name },
+      secondary: { $0.blurb },
       existsKey: { AnyHashable($0.name.lowercased()) },
       loadExistingKeys: {
         await MirrorReader.shared.read { ctx in
@@ -224,18 +227,19 @@ private struct SupplementStarter: Identifiable, Hashable {
   let id: String
   let name: String
   let emoji: String
+  let blurb: String
 
   static let all: [SupplementStarter] = [
-    .init(id: "starter-vitamin-d",     name: "Vitamin D",         emoji: "☀️"),
-    .init(id: "starter-omega-3",       name: "Omega-3",           emoji: "🐟"),
-    .init(id: "starter-magnesium",     name: "Magnesium",         emoji: "🧂"),
-    .init(id: "starter-multivitamin",  name: "Multivitamin",      emoji: "💊"),
-    .init(id: "starter-creatine",      name: "Creatine",          emoji: "💪"),
-    .init(id: "starter-protein",       name: "Protein",           emoji: "🥛"),
-    .init(id: "starter-probiotic",     name: "Probiotic",         emoji: "🦠"),
-    .init(id: "starter-b-complex",     name: "B-complex",         emoji: "🌾"),
-    .init(id: "starter-iron",          name: "Iron",              emoji: "🩸"),
-    .init(id: "starter-zinc",          name: "Zinc",              emoji: "⚙️"),
+    .init(id: "starter-vitamin-d",     name: "Vitamin D",         emoji: "☀️", blurb: "Daily, with a meal"),
+    .init(id: "starter-omega-3",       name: "Omega-3",           emoji: "🐟", blurb: "Fish oil — EPA & DHA"),
+    .init(id: "starter-magnesium",     name: "Magnesium",         emoji: "🧂", blurb: "Often taken in the evening"),
+    .init(id: "starter-multivitamin",  name: "Multivitamin",      emoji: "💊", blurb: "A daily all-rounder"),
+    .init(id: "starter-creatine",      name: "Creatine",          emoji: "💪", blurb: "For training and strength"),
+    .init(id: "starter-protein",       name: "Protein",           emoji: "🥛", blurb: "Shake or powder"),
+    .init(id: "starter-probiotic",     name: "Probiotic",         emoji: "🦠", blurb: "For gut health"),
+    .init(id: "starter-b-complex",     name: "B-complex",         emoji: "🌾", blurb: "The B-vitamin group"),
+    .init(id: "starter-iron",          name: "Iron",              emoji: "🩸", blurb: "Often paired with vitamin C"),
+    .init(id: "starter-zinc",          name: "Zinc",              emoji: "⚙️", blurb: "Immune support"),
   ]
 }
 

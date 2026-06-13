@@ -38,7 +38,7 @@ enum MedicationsPlugin: SectionPlugin {
       header: String(localized: "Starter medications"),
       footer: String(localized: "Use generic placeholders when exact prescriptions should be entered manually later."),
       items: MedicationStarter.all,
-      glyph: { _ in .symbol("pills") },
+      glyph: { .symbol($0.glyphSymbol) },
       primary: { $0.title },
       secondary: { $0.summaryLine },
       existsKey: { AnyHashable($0.title.lowercased()) },
@@ -244,6 +244,15 @@ struct MedicationStarter: Identifiable, Hashable {
     .init(id: "starter-inhaler", title: "Rescue inhaler", genericName: nil, form: "inhaler", route: "inhaled", doseValue: nil, doseUnit: "puffs", bucket: nil, scheduleKind: "asNeeded"),
     .init(id: "starter-birth-control", title: "Birth control", genericName: nil, form: "tablet", route: "oral", doseValue: 1, doseUnit: "pill", bucket: "evening", scheduleKind: "daily"),
   ]
+
+  /// Per-form glyph so rows aren't all the same pill icon.
+  var glyphSymbol: String {
+    switch form {
+    case "inhaler": return "lungs.fill"
+    case "drops":   return "eyedropper"
+    default:        return "pills.fill"
+    }
+  }
 
   /// Secondary row line: form · route · dose · bucket · schedule.
   var summaryLine: String {

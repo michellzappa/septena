@@ -52,8 +52,11 @@ enum GroceriesPlugin: SectionPlugin {
       intro: "Organizes shopping items by category. Pick a few common categories to start — items themselves get added later as you go.",
       nounPlural: String(localized: "categories"),
       header: String(localized: "Categories"),
+      footer: String(localized: "Add items under each category as you shop."),
       items: GroceryCategoryStarter.all,
+      glyph: { .symbol($0.symbol) },
       primary: { $0.name },
+      secondary: { $0.blurb },
       existsKey: { AnyHashable($0.name.lowercased()) },
       loadExistingKeys: {
         await MirrorReader.shared.read { ctx in
@@ -135,16 +138,18 @@ enum GroceriesPlugin: SectionPlugin {
 private struct GroceryCategoryStarter: Identifiable, Hashable {
   let id: String
   let name: String
+  let symbol: String
+  let blurb: String
 
   static let all: [GroceryCategoryStarter] = [
-    .init(id: "starter-produce",   name: "Produce"),
-    .init(id: "starter-dairy",     name: "Dairy"),
-    .init(id: "starter-pantry",    name: "Pantry"),
-    .init(id: "starter-frozen",    name: "Frozen"),
-    .init(id: "starter-meat-fish", name: "Meat & fish"),
-    .init(id: "starter-bakery",    name: "Bakery"),
-    .init(id: "starter-drinks",    name: "Drinks"),
-    .init(id: "starter-household", name: "Household"),
+    .init(id: "starter-produce",   name: "Produce",     symbol: "leaf.fill",            blurb: "Fruit & vegetables"),
+    .init(id: "starter-dairy",     name: "Dairy",       symbol: "cup.and.saucer.fill",  blurb: "Milk, cheese & yogurt"),
+    .init(id: "starter-pantry",    name: "Pantry",      symbol: "cabinet.fill",         blurb: "Dry & canned goods"),
+    .init(id: "starter-frozen",    name: "Frozen",      symbol: "snowflake",            blurb: "Frozen foods"),
+    .init(id: "starter-meat-fish", name: "Meat & fish", symbol: "fish.fill",            blurb: "Meat, poultry & fish"),
+    .init(id: "starter-bakery",    name: "Bakery",      symbol: "birthday.cake.fill",   blurb: "Bread & baked goods"),
+    .init(id: "starter-drinks",    name: "Drinks",      symbol: "cup.and.straw.fill",   blurb: "Beverages"),
+    .init(id: "starter-household", name: "Household",   symbol: "house.fill",           blurb: "Cleaning & supplies"),
   ]
 }
 
