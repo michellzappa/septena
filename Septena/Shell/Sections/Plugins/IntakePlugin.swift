@@ -363,6 +363,14 @@ private struct IntakeDetailContent: View {
         Button { creating = true } label: {
           Label("Add tracker…", systemImage: "plus")
         }
+        // Both management sheets hang off this always-present Button leaf, not
+        // the enclosing Group/Section. A sheet anchored on a structural Form
+        // element mis-anchors and self-presents/dismisses on the appear/layout
+        // pass. See the sibling fix in SupplementsPlugin (commit 736b937).
+        .sheet(item: managingBinding) { id in IntakeManageSheet(kindID: id.value) }
+        .sheet(isPresented: $creating) {
+          IntakeKindWizard(onCreated: { _ in Task { await reload() } })
+        }
       }
       if !archived.isEmpty {
         Section("Archived") {
@@ -381,10 +389,6 @@ private struct IntakeDetailContent: View {
       }
     }
     .task { await reload() }
-    .sheet(item: managingBinding) { id in IntakeManageSheet(kindID: id.value) }
-    .sheet(isPresented: $creating) {
-      IntakeKindWizard(onCreated: { _ in Task { await reload() } })
-    }
   }
 
   private func kindRow(_ kind: IntakeKindDTO) -> some View {

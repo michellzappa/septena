@@ -174,6 +174,11 @@ enum MedicationsPlugin: SectionPlugin {
 private struct MedicationsDetailContent: View {
   @State private var showingSheet = false
 
+  // The `.sheet` hangs off the Button, not the enclosing `Section`. A sheet
+  // anchored on a structural Form element (a lone `Section` here) mis-anchors
+  // and desyncs on the appear/layout pass — it opens then immediately dismisses
+  // on the first tap. Anchoring on the concrete Button leaf is stable. See the
+  // sibling fix in SupplementsPlugin (commit 736b937).
   var body: some View {
     Section {
       Button {
@@ -181,11 +186,11 @@ private struct MedicationsDetailContent: View {
       } label: {
         Label("Manage Medications", systemImage: "cross.case")
       }
+      .sheet(isPresented: $showingSheet) {
+        MedicationDefinitionsSheet()
+      }
     } footer: {
       Text("Archiving hides a medication from new dose logs but keeps its dose history and exports intact.")
-    }
-    .sheet(isPresented: $showingSheet) {
-      MedicationDefinitionsSheet()
     }
   }
 }
