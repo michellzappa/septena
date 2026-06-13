@@ -196,94 +196,13 @@ struct TimeOfDayWheel: View {
           .padding(20)
       }
 
-      // LAYER 1 — the machinery, UNDER the glass: ticks and duration bands.
-      // On the hero these pick up the donut's frost, so sleep and the day's
-      // schedule read as depth inside the glass rather than marks on it.
-      Canvas { ctx, size in
-      let side = min(size.width, size.height)
-      let center = CGPoint(x: size.width / 2, y: size.height / 2)
-      let ringR = side / 2 - margin        // margin for the bolder labels
-      guard ringR > 8 else { return }
-
-      func point(_ fraction: Double, _ r: CGFloat) -> CGPoint {
-        let a = fraction * 2 * .pi          // 0 at top, clockwise
-        return CGPoint(x: center.x + r * CGFloat(sin(a)),
-                       y: center.y - r * CGFloat(cos(a)))
-      }
-
-      // Arc path from `start` to `end` (clockwise, wrapping midnight if end < start).
-      func arc(_ start: Double, _ end: Double, _ r: CGFloat) -> Path {
-        var span = end - start
-        if span <= 0 { span += 1 }          // wrap through midnight
-        let steps = max(2, Int(span * 120))
-        var p = Path()
-        for i in 0...steps {
-          let f = (start + span * Double(i) / Double(steps)).truncatingRemainder(dividingBy: 1)
-          let pt = point(f, r)
-          if i == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
-        }
-        return p
-      }
-
-      // The clock's outline + ticks. On compact tiles these read as neutral
-      // (the section accent is carried by the dots), so the frame doesn't
-      // double up on color; the full dial keeps the accent frame.
-      let lineColor = compact ? Theme.inkSecondary : accent
-
-      // Everything in this layer sits UNDER the hero's glass donut
-      // (ultraThinMaterial) — it still softens what's beneath; draw the
-      // machinery a touch louder so it lands at the intended strength
-      // through the blur. Flat-disc dials stay at 1×.
-      let underBoost: Double = heroDate != nil ? 1.3 : 1.0
-
-      // Full dial: the white disc's edge (above) *is* the outer circle. Compact
-      // has no disc, so draw a frame ring here to anchor the angles. Matches the
-      // disc border's 1.5pt weight.
-      if compact {
-        ctx.stroke(Path(ellipseIn: CGRect(x: center.x - ringR, y: center.y - ringR,
-                                          width: ringR * 2, height: ringR * 2)),
-                   with: .color(lineColor.opacity(0.22)), lineWidth: 1.5)
-      }
-
-      // Hour ticks — quarter-marks longest/darkest, 3-hour marks medium, every
-      // other hour a short minor. Compact uses tiny ticks so the thumbnail reads
-      // the full 24-hour grid without clutter.
-      for h in 0..<24 {
-        let f = Double(h) / 24
-        let major = (h % 6 == 0)
-        let mid = (h % 3 == 0)
-        let length: CGFloat = compact ? (major ? 5 : mid ? 3 : 2) : (major ? 11 : mid ? 7 : 5)
-        var tick = Path()
-        tick.move(to: point(f, ringR - length))
-        tick.addLine(to: point(f, ringR))
-        ctx.stroke(tick,
-                   with: .color(lineColor.opacity(
-                     min(1, (major ? 0.55 : mid ? 0.34 : 0.26) * underBoost))),
-                   lineWidth: major ? 2 : 1)
-      }
-
-      // The single ring everything sits on — bands and dots share it so the
-      // whole dial reads at one consistent distance from center.
-      let dotRing = ringR * 0.82
-
-      // Duration bands (sleep, fasting; calendar pills in today view), under
-      // the dots, as long rounded arcs.
-      let bandsToDraw = todayOnly ? shownBands + todayBands : shownBands
-      for b in bandsToDraw.sorted(by: { $0.daysAgo > $1.daysAgo }) {
-        ctx.stroke(arc(b.start, b.end, dotRing),
-                   with: .color((b.color ?? accent).opacity(
-                     min(1, fade(b.daysAgo) * 0.55 * underBoost))),
-                   style: StrokeStyle(lineWidth: b.thin ? 4 : 9, lineCap: .round))
-      }
-      }
-
-      // The hero's glass donut — between machinery and data — is REAL
-      // Liquid Glass: `.glassEffect` masked to the annulus. It's a
-      // refraction material, so it's calm and subtle over a flat page (by
-      // design) and comes alive on motion — the tilt parallax behind it,
-      // the colored dots and under-glass machinery it bends. No hand-drawn
-      // bevel: faking depth with airbrushed highlights read as forced
-      // skeuomorphism. Trust the material.
+      // The hero's face is the REAL Liquid Glass donut, drawn BELOW the
+      // marks. Real glass frosts whatever sits under it, so nothing
+      // data-bearing goes there (the old "machinery under glass" sandwich
+      // hid the sleep arc + calendar pills). Glass is just glass; every mark
+      // renders crisp in the single Canvas ON TOP. `.interactive` gives the
+      // press-lensing; the tilt parallax behind it supplies the motion that
+      // makes Liquid Glass actually read as glass.
       if !compact && heroDate != nil {
         Color.clear
           .glassEffect(.regular.interactive(),
@@ -291,9 +210,9 @@ struct TimeOfDayWheel: View {
           .padding(20)
       }
 
-      // LAYER 2 — the data, ON TOP of the glass: dots stay crisp on the
-      // surface, the hour labels sit outside the disc, the now-hand rides
-      // the band, and the date/chip floats in the open hole.
+      // All marks, on top of the face: ticks, duration bands, dots, hour
+      // labels, the now-hand, and the centre date/chip — every one crisp
+      // and legible, none fighting the glass.
       Canvas { ctx, size in
       let side = min(size.width, size.height)
       let center = CGPoint(x: size.width / 2, y: size.height / 2)
@@ -305,8 +224,57 @@ struct TimeOfDayWheel: View {
         return CGPoint(x: center.x + r * CGFloat(sin(a)),
                        y: center.y - r * CGFloat(cos(a)))
       }
+      // Arc from `start` to `end` (clockwise, wrapping midnight if end < start).
+      func arc(_ start: Double, _ end: Double, _ r: CGFloat) -> Path {
+        var span = end - start
+        if span <= 0 { span += 1 }
+        let steps = max(2, Int(span * 120))
+        var p = Path()
+        for i in 0...steps {
+          let f = (start + span * Double(i) / Double(steps)).truncatingRemainder(dividingBy: 1)
+          let pt = point(f, r)
+          if i == 0 { p.move(to: pt) } else { p.addLine(to: pt) }
+        }
+        return p
+      }
 
+      // Neutral grid on every dial — the section colors live in the dots and
+      // bands, so the ticks frame the data without competing with it.
+      let lineColor = Theme.inkSecondary
+
+      // Compact tiles have no disc behind them — a faint frame ring anchors
+      // the angles.
+      if compact {
+        ctx.stroke(Path(ellipseIn: CGRect(x: center.x - ringR, y: center.y - ringR,
+                                          width: ringR * 2, height: ringR * 2)),
+                   with: .color(lineColor.opacity(0.22)), lineWidth: 1.5)
+      }
+
+      // Hour ticks — quarter-marks longest/darkest, 3-hour medium, others minor.
+      for h in 0..<24 {
+        let f = Double(h) / 24
+        let major = (h % 6 == 0)
+        let mid = (h % 3 == 0)
+        let length: CGFloat = compact ? (major ? 5 : mid ? 3 : 2) : (major ? 11 : mid ? 7 : 5)
+        var tick = Path()
+        tick.move(to: point(f, ringR - length))
+        tick.addLine(to: point(f, ringR))
+        ctx.stroke(tick,
+                   with: .color(lineColor.opacity(major ? 0.42 : mid ? 0.28 : 0.20)),
+                   lineWidth: major ? 2 : 1)
+      }
+
+      // The single ring bands and dots share.
       let dotRing = ringR * 0.82
+
+      // Duration bands (sleep, fasting; calendar pills today) — under the
+      // dots, on top of the glass so they stay legible.
+      let bandsToDraw = todayOnly ? shownBands + todayBands : shownBands
+      for b in bandsToDraw.sorted(by: { $0.daysAgo > $1.daysAgo }) {
+        ctx.stroke(arc(b.start, b.end, dotRing),
+                   with: .color((b.color ?? accent).opacity(fade(b.daysAgo) * 0.6)),
+                   style: StrokeStyle(lineWidth: b.thin ? 4 : 9, lineCap: .round))
+      }
 
       // Quadrant labels just outside the disc, on the page background — softer
       // (secondary) so they frame the dial without competing with the data.
@@ -332,35 +300,16 @@ struct TimeOfDayWheel: View {
         ctx.stroke(hand, with: .color(accent.opacity(0.6)), lineWidth: 1)
       }
 
-      // Dots. The hero's today view draws them as glossy GLASS DROPLETS —
-      // a bright section-colored marble with a white catch-light top-left,
-      // luminous rather than the dark lens a tinted glassEffect becomes at
-      // bead size over a light page. Every other dial keeps a flat fill.
-      let glossy = heroDate != nil && effectiveWindow == 1
+      // Dots — clean solid section-colored marks. Content that sits ON glass
+      // is solid and crisp (Apple's own rule: glass is chrome, the symbols
+      // and indicators on it are opaque); glass-on-glass is for layered
+      // chrome, not data. Tried tinted-glass beads (went black) and drawn
+      // gloss (read as candy) — solid is right.
       for m in dotMarks(side: side) {
-        // Droplets read better with a little more heft than the flat dots.
-        let r = m.diameter / 2 * (glossy ? 1.4 : 1)
+        let r = m.diameter / 2
         let rect = CGRect(x: m.center.x - r, y: m.center.y - r,
-                          width: r * 2, height: r * 2)
-        if glossy {
-          // Highlight pooled toward the top-left light; the body keeps the
-          // section color so the bead stays recognizable at a glance.
-          let hp = CGPoint(x: m.center.x - r * 0.35, y: m.center.y - r * 0.4)
-          let body = Gradient(stops: [
-            .init(color: .white.opacity(0.85 * m.opacity), location: 0.0),
-            .init(color: m.color.opacity(m.opacity),       location: 0.45),
-            .init(color: m.color.opacity(m.opacity),       location: 1.0),
-          ])
-          ctx.fill(Path(ellipseIn: rect),
-                   with: .radialGradient(body, center: hp,
-                                         startRadius: 0, endRadius: r * 1.5))
-          // A small crisp specular pip.
-          let sr = r * 0.30
-          let srect = CGRect(x: hp.x - sr, y: hp.y - sr, width: sr * 2, height: sr * 2)
-          ctx.fill(Path(ellipseIn: srect), with: .color(.white.opacity(0.75 * m.opacity)))
-        } else {
-          ctx.fill(Path(ellipseIn: rect), with: .color(m.color.opacity(m.opacity)))
-        }
+                          width: m.diameter, height: m.diameter)
+        ctx.fill(Path(ellipseIn: rect), with: .color(m.color.opacity(m.opacity)))
       }
 
       // Center. The hero's glass donut leaves the middle genuinely OPEN —
