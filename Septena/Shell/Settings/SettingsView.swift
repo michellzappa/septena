@@ -36,6 +36,13 @@ enum SettingsKey {
   /// pending nudge on the next reconcile.
   static let notificationsEnabled = "septena.notify.enabled"
   static let todayShowCompleted = "septena.today.showCompleted"
+  /// Device-local mirror of `AppSettings.onboardedAt`: true once the
+  /// first-run welcome has been completed (here or, after sync, on another
+  /// device). The welcome gate reads this for an instant, offline-safe
+  /// "skip the welcome" decision so it never flashes on a returning user's
+  /// device. Written by `SettingsStore.markOnboardingComplete` /
+  /// `reconcileOnboarding`.
+  static let welcomeCompleted = "septena.welcome.completed"
   /// Consent toggle for anonymous aggregate usage analytics (Plausible).
   /// Same key string is referenced by `PlausibleClient.consentKey` so the
   /// guard inside the actor and the @AppStorage binding stay in sync.
@@ -260,6 +267,12 @@ final class SettingsStore {
   var chores: [ChoreItem] = []
   var serverLoading: Bool = false
 
+  /// Gate for the first-run welcome. Stays `false` until the launch path has
+  /// pulled CloudKit and reconciled the onboarding marker, so the welcome
+  /// gate doesn't flash on a returning user's new device in the window before
+  /// their synced `onboardedAt` arrives. Flipped once in `App`'s launch task.
+  var welcomeDecisionReady: Bool = false
+
   /// Hydrate from the local mirror / disk cache during construction so the
   /// dashboard's first frame uses the user's saved section order and config
   /// instead of an empty array (which falls back to the `SectionManifest`
@@ -303,6 +316,11 @@ final class SettingsStore {
     // local→cloud migration leg is deferred to the launch reconcile.
     reconcileWelcomeName(context: context, engine: nil)
     reconcileDayBucketCutoffs(context: context, engine: nil)
+    // Inbound-only at init (no engine): if a synced `onboardedAt` is already
+    // in the local mirror, adopt it into the device-local flag now so the
+    // welcome gate decides synchronously on the first frame and never waits
+    // on (or flashes during) the launch sync.
+    reconcileOnboarding(context: context, engine: nil)
   }
 
   func moveSections(fromOffsets: IndexSet, toOffset: Int,
@@ -349,6 +367,111 @@ final class SettingsStore {
     } else if !local.isEmpty, engine != nil {
       setWelcomeName(local, context: context, engine: engine)
     }
+  }
+
+  /// Mark the first-run welcome complete: stamp the synced `onboardedAt` and
+  /// push it to CloudKit (so other devices skip the welcome), and flip the
+  /// device-local `welcomeCompleted` flag (so the gate dismisses immediately
+  /// and this device never re-shows it). Mirrors the `setWelcomeName` write
+  /// pattern. No-op if already stamped.
+  func markOnboardingComplete(now: Date, context: ModelContext, engine: CKEngine?) {
+    UserDefaults.standard.set(true, forKey: SettingsKey.welcomeCompleted)
+    guard serverSettings?.onboardedAt == nil else { return }
+    var s = serverSettings ?? AppSettings(sectionOrder: nil, targets: nil, units: nil,
+                                          time: nil, theme: nil, eink: nil,
+                                          nutrition: nil, hkSync: nil)
+    s.onboardedAt = now
+    serverSettings = s
+    SettingsMirror.upsert(settings: s, context: context, engine: engine)
+  }
+
+  /// Reconcile the CloudKit-synced `onboardedAt` with the device-local
+  /// `welcomeCompleted` flag the welcome gate reads. Same inbound/outbound
+  /// shape as `reconcileWelcomeName`:
+  /// - A synced stamp wins: set the local flag so a device that onboarded
+  ///   elsewhere never shows the welcome once its data syncs in.
+  /// - No synced stamp but the local flag is already set (upgrade from a
+  ///   build predating this field, or a welcome finished while offline):
+  ///   push a stamp up so siblings learn of it. Outbound leg only with a
+  ///   non-nil `engine` (the launch path); `paintFromCache` passes nil.
+  func reconcileOnboarding(context: ModelContext, engine: CKEngine?) {
+    let key = SettingsKey.welcomeCompleted
+    let localDone = UserDefaults.standard.bool(forKey: key)
+    if serverSettings?.onboardedAt != nil {
+      if !localDone { UserDefaults.standard.set(true, forKey: key) }
+    } else if localDone, engine != nil {
+      markOnboardingComplete(now: .now, context: context, engine: engine)
+    }
+  }
+
+  /// Grandfather existing accounts past the first-run welcome. `onboardedAt`
+  /// is a new field, so every pre-existing user starts with it nil — without
+  /// this they'd be shown the welcome on the update that introduces it. If the
+  /// account carries any real prior content, stamp the marker (which also sets
+  /// the device-local flag and pushes to CloudKit so siblings learn of it).
+  /// Idempotent and cheap: skips entirely once onboarded, and the probe uses
+  /// `fetchCount` with a 1-row limit. Run at launch AFTER the CloudKit pull so
+  /// a returning user's freshly-installed device sees their synced data.
+  func grandfatherOnboardingIfEstablished(now: Date, context: ModelContext,
+                                          engine: CKEngine?) {
+    guard serverSettings?.onboardedAt == nil,
+          !UserDefaults.standard.bool(forKey: SettingsKey.welcomeCompleted) else { return }
+    guard accountHasExistingContent(context: context) else { return }
+    markOnboardingComplete(now: now, context: context, engine: engine)
+  }
+
+  /// Whether the account shows any sign of prior use — used only to decide
+  /// whether to grandfather past the welcome. A truly fresh account has none
+  /// of these; an established one trips on the first probe. Section
+  /// customization (a saved order) counts too, so a setup-but-never-logged
+  /// account isn't re-onboarded.
+  private func accountHasExistingContent(context: ModelContext) -> Bool {
+    if !(serverSettings?.sectionOrder?.isEmpty ?? true) { return true }
+    if !(serverSettings?.welcomeName?.isEmpty ?? true) { return true }
+
+    func any<T: PersistentModel>(_ type: T.Type) -> Bool {
+      var d = FetchDescriptor<T>()
+      d.fetchLimit = 1
+      return ((try? context.fetchCount(d)) ?? 0) > 0
+    }
+    return any(TaskEntity.self)
+      || any(HabitDefinitionEntity.self)
+      || any(SupplementDefinitionEntity.self)
+      || any(GoalEntity.self)
+      || any(NutritionEntryEntity.self)
+      || any(ExerciseEntryEntity.self)
+      || any(ChoreDefinitionEntity.self)
+      || any(GutEventEntity.self)
+      || any(MoodEventEntity.self)
+      || any(SymptomEventEntity.self)
+      || any(MedicationDoseEventEntity.self)
+      || any(IntakeEventEntity.self)
+      || any(GroceryItemEntity.self)
+      || any(ActivityDayEntity.self)
+  }
+
+  /// Apply the welcome screen's section selection to the synced
+  /// `SectionEntity` rows: enable every key the user picked, disable every
+  /// other manage-able (logging-domain) section. Upsert-only — never deletes
+  /// a row or its customizations, honoring the data-preservation guarantee.
+  /// Enabled rows are marked `hasOnboarded` (the chained per-section
+  /// onboarding presents from an explicit queue, so it doesn't depend on the
+  /// bit). Posts one repaint after the batch.
+  func applyWelcomeSelection(enabledKeys: Set<String>,
+                             context: ModelContext, engine: CKEngine?) {
+    for manifest in SectionManifest.all where manifest.kind == .loggingDomain {
+      let shouldEnable = enabledKeys.contains(manifest.key)
+      if shouldEnable {
+        // hasOnboarded-setting overload: enabling implies set-up.
+        SettingsMirror.setSectionEnabled(manifest.key, shouldEnable,
+                                         context: context, engine: engine)
+      } else {
+        SettingsMirror.setSectionEnabled(manifest.key, enabled: false,
+                                         context: context, engine: engine)
+      }
+    }
+    sections = SettingsMirror.loadSections(context: context)
+    NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
   }
 
   /// The user's day-bucket cutoffs as currently configured, falling back to

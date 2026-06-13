@@ -73,6 +73,12 @@ struct SeptenaApp: App {
         // plainly when there's no usable account. Applied here (inside the
         // .environment chain below) so it can read `ckEngine`.
         .iCloudRequirementWarning()
+        // First-run welcome (section picker + chained onboarding). Applied
+        // innermost, like the iCloud warning, so the gate modifier sits
+        // inside the .environment scope below and can read SettingsStore /
+        // SectionTheme / CKEngine / DayClock. Self-gating: a no-op once the
+        // account has been onboarded.
+        .welcomeGate()
         .environment(navigation)
         .environment(theme)
         .environment(trainingDraft)
@@ -208,6 +214,22 @@ struct SeptenaApp: App {
             // from another device, or push a pre-existing local override up.
             settingsStore.reconcileDayBucketCutoffs(
               context: localStore.container.mainContext, engine: ckEngine)
+            // Grandfather established accounts past the first-run welcome:
+            // `onboardedAt` is a new field, so every pre-existing user starts
+            // nil — stamp it when the account already has data so the welcome
+            // only ever shows to genuinely fresh accounts. Runs after the pull
+            // so a returning user's new device sees their synced content.
+            settingsStore.grandfatherOnboardingIfEstablished(
+              now: dayClock.now,
+              context: localStore.container.mainContext, engine: ckEngine)
+            // Same bridge for the first-run onboarding marker: adopt a synced
+            // `onboardedAt` (a returning user's new device) or push a local
+            // completion up. Then release the welcome gate — by now CloudKit
+            // has been pulled, so a fresh account shows the welcome while a
+            // returning device has already adopted the marker and stays quiet.
+            settingsStore.reconcileOnboarding(
+              context: localStore.container.mainContext, engine: ckEngine)
+            settingsStore.welcomeDecisionReady = true
             // Seed the Claude gateway token on cold launch (no-op if Claude
             // isn't connected or a recent token is still valid).
             await ClaudeGatewayProvider.shared.refreshIfNeeded()

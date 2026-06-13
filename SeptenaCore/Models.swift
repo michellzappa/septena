@@ -1360,6 +1360,15 @@ struct AppSettings: Codable {
   var morningCutoffHour: Int? = nil
   var afternoonCutoffHour: Int? = nil
 
+  /// When the first-run welcome (section picker + chained onboarding) was
+  /// completed. The durable, cross-device "this account has been welcomed"
+  /// marker: synced so a returning user's *new* device never re-shows the
+  /// welcome once their data syncs in. Mirrored into the device-local
+  /// `SettingsKey.welcomeCompleted` @AppStorage key that the welcome gate
+  /// reads for an instant, offline-safe decision. Nil → not yet onboarded.
+  /// Defaulted so the existing memberwise-init call sites stay source-stable.
+  var onboardedAt: Date? = nil
+
   enum CodingKeys: String, CodingKey {
     case sectionOrder = "section_order"
     case targets, units, time, theme, eink, nutrition
@@ -1367,6 +1376,7 @@ struct AppSettings: Codable {
     case welcomeName = "welcome_name"
     case morningCutoffHour = "morning_cutoff_hour"
     case afternoonCutoffHour = "afternoon_cutoff_hour"
+    case onboardedAt = "onboarded_at"
   }
 }
 
