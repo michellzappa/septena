@@ -202,6 +202,7 @@
 		497ECF175FD15339CA083270 /* MoodCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33EB22A93C55573C49CFB21B /* MoodCatalog.swift */; };
 		4A14A3B8F875A6E4CC374781 /* BodyDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68B6F4EE0E6882204B5E6088 /* BodyDestinationView.swift */; };
 		4A1D67A9740F57AC7EF673DB /* CoachMiniApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 473849A78E0E577B6653610D /* CoachMiniApp.swift */; };
+		4A555F9C1D0F588DA017C6CC /* DashboardDiscoveryCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12CE112405E07A4FB491C5A /* DashboardDiscoveryCard.swift */; };
 		4A73142797A114C273F16734 /* SymptomsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF048C8F1CAC879C4D330B9D /* SymptomsPlugin.swift */; };
 		4A91BB5DB21D05FE68EBD6A3 /* DemoSeedMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF00EC44C1E78BE7E1417CDF /* DemoSeedMode.swift */; };
 		4A9BF2842C0AC601AF8B7099 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25DC8E705099DB99718A8596 /* Persistence.swift */; };
@@ -476,6 +477,7 @@
 		B5C4876EC67FCD081FB3E0C5 /* WatchConnectivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A09644381782A9A298BDC709 /* WatchConnectivity.swift */; };
 		B60A9AE489FD7502DC0B83B8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0365044C6EA062BBFCCA6B /* SettingsView.swift */; };
 		B649C5BBC42172713718ACEE /* TrainingPRCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE7BD5841409D69626291279 /* TrainingPRCalculator.swift */; };
+		B6DCD2403FD1C55BF64AA2AF /* DashboardDiscoveryCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12CE112405E07A4FB491C5A /* DashboardDiscoveryCard.swift */; };
 		B7A59913ED603636CBA72243 /* GitHubProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7BAA3E1C2D19A55758017FC /* GitHubProvider.swift */; };
 		B90D9E5B4F11E9A5FAABFFAE /* EditIntakeEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 530B8FDCAE87F532F06C9F1F /* EditIntakeEntrySheet.swift */; };
 		B952E848C59122F46C1DF7D3 /* KeyboardShortcutsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5BCD4DA2CB4E9B237526865 /* KeyboardShortcutsView.swift */; };
@@ -966,6 +968,7 @@
 		9F2B50F5BF1098E27A7D4DCA /* SeptenaMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SeptenaMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A08DA8E8E77422BB9583A61C /* TaskCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskCommands.swift; sourceTree = "<group>"; };
 		A09644381782A9A298BDC709 /* WatchConnectivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchConnectivity.swift; sourceTree = "<group>"; };
+		A12CE112405E07A4FB491C5A /* DashboardDiscoveryCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardDiscoveryCard.swift; sourceTree = "<group>"; };
 		A16A2330C66B761049C702ED /* NextComplicationViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextComplicationViews.swift; sourceTree = "<group>"; };
 		A17A6C44F7BE4CCDA2085224 /* TrainingTabAccessory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingTabAccessory.swift; sourceTree = "<group>"; };
 		A2E72A113E9D2B6BD889AEA1 /* DateParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateParserTests.swift; sourceTree = "<group>"; };
@@ -1787,6 +1790,7 @@
 			isa = PBXGroup;
 			children = (
 				7D85EAF7345BE84A44B89936 /* CorrelationsHomepageView.swift */,
+				A12CE112405E07A4FB491C5A /* DashboardDiscoveryCard.swift */,
 				E91427A4EA51692C963F686C /* DashboardReader.swift */,
 				7C3407AF16908C1033DF4DA6 /* DayDialHero.swift */,
 				880B70E1267B3CAAFFBA9D65 /* DayTimelineView.swift */,
@@ -2348,6 +2352,7 @@
 				9056B762F0365C38DEA0F888 /* CorrelationEngine.swift in Sources */,
 				63BDFE20DBBB08795FD135AE /* CorrelationFeatures.swift in Sources */,
 				BFA5390E06045DBE733EE2BA /* CorrelationsHomepageView.swift in Sources */,
+				4A555F9C1D0F588DA017C6CC /* DashboardDiscoveryCard.swift in Sources */,
 				406485770B71FC7B93855865 /* DashboardReader.swift in Sources */,
 				DF016EF192B7891D2DBE3CB6 /* DateParser.swift in Sources */,
 				BF8496432439A9FD8CFAE95E /* DayBucket.swift in Sources */,
@@ -2693,6 +2698,7 @@
 				0578243E033490DBAFABEEE2 /* CorrelationEngine.swift in Sources */,
 				99F32E2446B12071AC929809 /* CorrelationFeatures.swift in Sources */,
 				1EEF01356485CDA24BA9787E /* CorrelationsHomepageView.swift in Sources */,
+				B6DCD2403FD1C55BF64AA2AF /* DashboardDiscoveryCard.swift in Sources */,
 				7B31219E381E3F70CD833622 /* DashboardReader.swift in Sources */,
 				513C8B1D41E5BA85B785129C /* DateParser.swift in Sources */,
 				2781B65014FE7E1D52A10876 /* DayBucket.swift in Sources */,

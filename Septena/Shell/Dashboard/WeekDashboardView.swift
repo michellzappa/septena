@@ -291,9 +291,6 @@ struct WeekDashboardView: View {
     ) {
       ZStack {
         VStack(spacing: Theme.sectionSpacing) {
-          #if DEBUG
-          debugTimeTravelBar
-          #endif
           ClaudeReconnectBanner()
           if showWelcome {
             // Self-observes DayClock so the 60s `now` tick re-renders only the
@@ -317,6 +314,10 @@ struct WeekDashboardView: View {
           case .hidden:
             EmptyView()
           }
+          // Introduces the capabilities the welcome leaves out (Coach,
+          // Insights, Apple Health) once the user is in the app. Self-gating:
+          // renders nothing once everything's discovered or it's dismissed.
+          DashboardDiscoveryCard(onOpen: open)
           layoutBody
         }
         .septenaSurface()
@@ -3359,7 +3360,12 @@ private struct ClaudeReconnectBanner: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
         .frame(maxWidth: .infinity)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
+        // Same white card surface + radius as the tiles and the discovery
+        // card, so the stacked dashboard cards read as one family, not gray.
+        .background(
+          RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+            .fill(Theme.secondaryGroupedBackground)
+        )
       }
       .buttonStyle(.plain)
     }
