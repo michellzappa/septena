@@ -652,6 +652,7 @@ struct SettingsView: View {
     case layout, correlations, timeOfDay, welcome
     case quickActions, appIcon
     case skills, localMcp, motionGallery, dataTools
+    case milestonePreview   // DEBUG bench: fire each milestone celebration
     case siriShortcuts
     case section(String)
   }
@@ -797,6 +798,7 @@ struct SettingsView: View {
     case .advanced:     return "Advanced"
     case .dataTools:    return "Data Tools"
     case .motionGallery: return "Motion Gallery"
+    case .milestonePreview: return "Milestones (preview)"
     case .localMcp:     return "Local MCP Server"
     case .section(let key):
       return SectionManifest.displayLabel(
@@ -830,6 +832,7 @@ struct SettingsView: View {
     case .advanced:     return "wrench.and.screwdriver"
     case .dataTools:    return "stethoscope"
     case .motionGallery: return "wand.and.rays"
+    case .milestonePreview: return "flag.checkered"
     case .localMcp:     return "server.rack"
     case .section:      return "circle.fill"
     }
@@ -878,6 +881,7 @@ struct SettingsView: View {
     case .about:             AboutSettingsPane()
     case .advanced:          AdvancedSettingsPane()
     case .motionGallery:     MotionGalleryPane()
+    case .milestonePreview:  MilestonePreviewPane()
     #if os(macOS)
     case .localMcp:          LocalMCPSettingsPane()
     #else
@@ -4555,6 +4559,11 @@ struct AdvancedSettingsPane: View {
         NavigationLink(value: SettingsView.SettingsDestination.dataTools) {
           Label("Data Tools", systemImage: "stethoscope")
         }
+        #if DEBUG
+        NavigationLink(value: SettingsView.SettingsDestination.milestonePreview) {
+          Label("Milestones (preview)", systemImage: "flag.checkered")
+        }
+        #endif
       } header: {
         Text("Diagnostics")
       } footer: {
@@ -4590,6 +4599,101 @@ struct AdvancedSettingsPane: View {
       #endif
     }
     .formStyle(.grouped)
+  }
+}
+
+// MARK: - Milestone preview bench
+//
+// Fires each milestone celebration on demand through the SAME tiering a real
+// crossing uses (`MilestonePresenter.style(for:)`), rendered in a local
+// overlay so it's visible inside Settings. No store writes, no detection —
+// pure "what does this celebration look like." The synthetic milestones are
+// constructed in-memory and never inserted into a ModelContext.
+struct MilestonePreviewPane: View {
+  @Environment(SectionTheme.self) private var theme
+  @State private var style: LogCommitStyle?
+  @State private var trigger = 0
+
+  /// One row per distinct celebration the presenter can produce. Values
+  /// mirror what the detectors write so the labels read realistically.
+  private struct Sample: Identifiable {
+    let id: String
+    let title: String
+    let subtitle: String
+    let make: () -> GoalMilestoneEntity
+  }
+
+  private static func milestone(scope: String, kind: String, rungKey: String,
+                                label: String, value: Double) -> GoalMilestoneEntity {
+    GoalMilestoneEntity(id: "preview|\(rungKey)", goalID: nil, scope: scope,
+                        kind: kind, rungKey: rungKey, label: label,
+                        value: value, occurredAt: .now, celebrated: true)
+  }
+
+  private let samples: [Sample] = [
+    .init(id: "streak", title: "Streak rung",
+          subtitle: "Habit hits a 30-day streak → Ignition",
+          make: { milestone(scope: "habit:demo", kind: "streak",
+                            rungKey: "streak:30", label: "Meditate: 30-day streak",
+                            value: 30) }),
+    .init(id: "pr", title: "Training PR",
+          subtitle: "Heaviest-ever set → milestone card",
+          make: { milestone(scope: "exercise:bench-press", kind: "pr",
+                            rungKey: "pr:100", label: "Bench Press PR: 100 kg",
+                            value: 100) }),
+    .init(id: "target", title: "Goal target reached",
+          subtitle: "Smoothed value crosses the target → milestone card",
+          make: { milestone(scope: "goal:demo", kind: "rung",
+                            rungKey: "target", label: "Target reached: 74 kg",
+                            value: 74) }),
+    .init(id: "held30", title: "Held 30 days",
+          subtitle: "Maintenance — stayed on target a month → milestone card",
+          make: { milestone(scope: "goal:demo", kind: "rung",
+                            rungKey: "held30", label: "Held 74 kg for 30 days",
+                            value: 74) }),
+    .init(id: "rung", title: "Intermediate rung",
+          subtitle: "Per-kg grid rung → quiet burst",
+          make: { milestone(scope: "goal:demo", kind: "rung",
+                            rungKey: "lvl:78", label: "Trailing average crossed 78 kg",
+                            value: 78) }),
+    .init(id: "xp", title: "Volume XP",
+          subtitle: "Lifetime-tonnage rung → quiet burst",
+          make: { milestone(scope: "training.volume", kind: "xp",
+                            rungKey: "xp:50t", label: "Lifetime volume: 50 tonnes",
+                            value: 50000) }),
+  ]
+
+  var body: some View {
+    Form {
+      Section {
+        ForEach(samples) { sample in
+          Button { fire(sample) } label: {
+            VStack(alignment: .leading, spacing: 2) {
+              Text(sample.title).foregroundStyle(.primary)
+              Text(sample.subtitle).font(.caption).foregroundStyle(.secondary)
+            }
+          }
+          .buttonStyle(.plain)
+        }
+      } header: {
+        Text("Tap to play")
+      } footer: {
+        Text("Each fires the real MilestonePresenter tiering — streaks and goal target/held get the full card, intermediate rungs and XP get the quiet burst. Under Reduce Motion the visual is suppressed by design.")
+      }
+    }
+    .formStyle(.grouped)
+    .overlay {
+      if let style {
+        LogCommitStyleView(style: style, trigger: trigger)
+          .allowsHitTesting(false)
+      }
+    }
+  }
+
+  private func fire(_ sample: Sample) {
+    style = MilestonePresenter.style(for: sample.make(), theme: theme)
+    trigger &+= 1
+    Haptics.success()
   }
 }
 

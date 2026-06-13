@@ -24,26 +24,27 @@ enum MilestonePresenter {
     let pending = milestones.pendingPresentation(now: now)
     guard !pending.isEmpty else { return }
     let top = pending.max { tier($0) < tier($1) } ?? pending[0]
-    let accent = theme.color(for: sectionKey(scope: top.scope))
-
-    switch top.kind {
-    case "streak":
-      logCommit.fire(.ignition(accent: accent, streak: Int(top.value)))
-    case "pr":
-      logCommit.fire(.milestone(accent: accent,
-                                headline: trim(top.value),
-                                caption: caption(for: top)))
-    case "rung" where top.rungKey == "target" || top.rungKey == "held30":
-      logCommit.fire(.milestone(accent: accent,
-                                headline: trim(top.value),
-                                caption: caption(for: top)))
-    default:
-      // Intermediate rungs / XP — acknowledged, not interrupted.
-      logCommit.fire(.flourish(motion: .burst, accent: accent, intensity: 1.2))
-    }
+    logCommit.fire(style(for: top, theme: theme))
     Haptics.success()
     A11y.announce(top.label)
     milestones.markPresented(ids: pending.map(\.id), at: now)
+  }
+
+  /// The real tiering: which celebration a given milestone earns. Pure, so
+  /// the Settings preview bench fires the SAME mapping a real crossing does.
+  static func style(for m: GoalMilestoneEntity, theme: SectionTheme) -> LogCommitStyle {
+    let accent = theme.color(for: sectionKey(scope: m.scope))
+    switch m.kind {
+    case "streak":
+      return .ignition(accent: accent, streak: Int(m.value))
+    case "pr":
+      return .milestone(accent: accent, headline: trim(m.value), caption: caption(for: m))
+    case "rung" where m.rungKey == "target" || m.rungKey == "held30":
+      return .milestone(accent: accent, headline: trim(m.value), caption: caption(for: m))
+    default:
+      // Intermediate rungs / XP — acknowledged, not interrupted.
+      return .flourish(motion: .burst, accent: accent, intensity: 1.2)
+    }
   }
 
   // MARK: - Helpers

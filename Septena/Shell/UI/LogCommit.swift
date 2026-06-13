@@ -88,22 +88,37 @@ struct LogCommitOverlay: View {
   var body: some View {
     ZStack {
       if !reduceMotion, animationsEnabled, let style = center.style {
-        switch style {
-        case .flourish(let motion, let accent, let intensity):
-          CommitFlourish(motion: motion, accent: accent,
-                         intensity: intensity, trigger: center.trigger,
-                         // Only the root overlay knows about the hero dial;
-                         // in-sheet flourishes keep the screen-relative arc.
-                         dialAnchor: motion == .arc ? center.dayDialAnchor : nil)
-        case .ignition(let accent, let streak):
-          IgnitionView(accent: accent, streak: streak, trigger: center.trigger)
-        case .milestone(let accent, let headline, let caption):
-          IgnitionView(accent: accent, headline: headline, caption: caption,
-                       trigger: center.trigger)
-        }
+        LogCommitStyleView(style: style, trigger: center.trigger,
+                           dialAnchor: center.dayDialAnchor)
       }
     }
     .allowsHitTesting(false)
+  }
+}
+
+/// The style → renderer switch, factored out of `LogCommitOverlay` so any
+/// host (the root overlay, the Settings milestone-preview bench) renders a
+/// `LogCommitStyle` identically. Does NOT gate on Reduce Motion / the
+/// animations pref — hosts decide that (the root overlay gates; the gallery
+/// bypasses on purpose).
+struct LogCommitStyleView: View {
+  let style: LogCommitStyle
+  let trigger: Int
+  /// Only the root overlay knows the hero dial position; pass nil elsewhere.
+  var dialAnchor: DayDialAnchor? = nil
+
+  var body: some View {
+    switch style {
+    case .flourish(let motion, let accent, let intensity):
+      CommitFlourish(motion: motion, accent: accent,
+                     intensity: intensity, trigger: trigger,
+                     dialAnchor: motion == .arc ? dialAnchor : nil)
+    case .ignition(let accent, let streak):
+      IgnitionView(accent: accent, streak: streak, trigger: trigger)
+    case .milestone(let accent, let headline, let caption):
+      IgnitionView(accent: accent, headline: headline, caption: caption,
+                   trigger: trigger)
+    }
   }
 }
 
