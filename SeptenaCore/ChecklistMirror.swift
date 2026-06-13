@@ -980,19 +980,25 @@ enum ChecklistMirror {
   }
 
   static func loadTrainingProgression(context: ModelContext, exercise: String) -> [ProgressionPoint] {
+    // Match by `exerciseKey` (lowercased-alphanumeric), not the raw stored
+    // string, so divergent spellings of one movement — "leg press",
+    // "leg-press", "Leg Press" — fold into a single progression series.
+    // SwiftData's #Predicate can't run the key transform, so fetch sorted and
+    // filter in memory (the training log is small).
+    let key = exerciseKey(exercise)
     let entities = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(
-      predicate: #Predicate { $0.exercise == exercise },
       sortBy: [SortDescriptor(\.date), SortDescriptor(\.loggedAt)]
     ))) ?? []
-    return entities.map { e in
-      ProgressionPoint(date: e.date,
-                       weight: e.weight,
-                       sets: e.sets,
-                       reps: e.reps,
-                       difficulty: e.difficulty,
-                       durationMin: e.durationMin,
-                       distanceM: e.distanceM,
-                       level: e.level)
+    return entities.compactMap { e in
+      guard exerciseKey(e.exercise) == key else { return nil }
+      return ProgressionPoint(date: e.date,
+                              weight: e.weight,
+                              sets: e.sets,
+                              reps: e.reps,
+                              difficulty: e.difficulty,
+                              durationMin: e.durationMin,
+                              distanceM: e.distanceM,
+                              level: e.level)
     }
   }
 

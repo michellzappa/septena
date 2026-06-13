@@ -1133,23 +1133,35 @@ struct TrainingDestinationView: View {
   }
 
   private var pillOptions: (strength: [PillItem], cardio: [PillItem]) {
-    var counts: [String: Int] = [:]
-    var hasCardio: [String: Bool] = [:]
+    // Group by `exerciseKey` so divergent spellings of one movement collapse
+    // into a single pill ("leg press" / "leg-press" / "Leg Press" → one).
+    // The pill's identity + label is the canonical display name, so selecting
+    // it filters the chart by the same key (see `metricKind` /
+    // `loadTrainingProgression`).
+    var counts: [String: Int] = [:]            // key -> entry count
+    var hasCardio: [String: Bool] = [:]        // key -> any cardio entry
+    var display: [String: String] = [:]        // key -> canonical display name
     for e in entries {
-      guard let name = e.exercise, !name.isEmpty else { continue }
-      counts[name, default: 0] += 1
-      if isCardioEntry(e) { hasCardio[name] = true }
+      guard let raw = e.exercise, !raw.isEmpty else { continue }
+      let key = exerciseKey(raw)
+      guard !key.isEmpty else { continue }
+      counts[key, default: 0] += 1
+      if display[key] == nil {
+        display[key] = CanonicalExerciseName.display(raw, catalog: draftStore.exerciseNameByKey)
+      }
+      if isCardioEntry(e) { hasCardio[key] = true }
     }
-    let names = counts.keys.sorted { (a, b) in
+    let keys = counts.keys.sorted { (a, b) in
       let ca = counts[a] ?? 0; let cb = counts[b] ?? 0
       if ca != cb { return ca > cb }
-      return a < b
+      return (display[a] ?? a) < (display[b] ?? b)
     }
     var strength: [PillItem] = []
     var cardio: [PillItem] = []
-    for n in names {
-      let item = PillItem(name: n, label: n.capitalized, count: counts[n] ?? 0)
-      if hasCardio[n] == true { cardio.append(item) } else { strength.append(item) }
+    for k in keys {
+      let name = display[k] ?? k
+      let item = PillItem(name: name, label: name, count: counts[k] ?? 0)
+      if hasCardio[k] == true { cardio.append(item) } else { strength.append(item) }
     }
     let metaS = PillItem(name: MetaExercise.strength, label: "All strength", count: strength.count)
     let metaC = PillItem(name: MetaExercise.cardio,   label: "All cardio",   count: cardio.count)
@@ -1165,7 +1177,10 @@ struct TrainingDestinationView: View {
   private func metricKind(for exercise: String) -> MetricKind {
     if exercise == MetaExercise.strength { return .volume }
     if exercise == MetaExercise.cardio { return .cardioTotal }
-    let rel = entries.filter { $0.exercise == exercise }
+    // `exercise` is now a canonical display name; match entries by key so
+    // every spelling variant of the selected movement is considered.
+    let key = exerciseKey(exercise)
+    let rel = entries.filter { exerciseKey($0.exercise ?? "") == key }
     if rel.contains(where: { ($0.distanceM ?? 0) > 0 && ($0.durationMin ?? 0) > 0 }) {
       return .pace
     }
