@@ -69,11 +69,12 @@ struct NextWatchView: View {
     } else {
       List {
         ForEach(Array(conn.items.enumerated()), id: \.element.id) { index, item in
-          // A thin section-accent rule wherever the group changes from the
-          // previous row — the watch echo of iOS's tinted section headers.
-          if index > 0,
+          // A section header — accent rule plus a count label — at the start of
+          // each group: the first row, or wherever the group changes from the
+          // row above. The watch echo of iOS's tinted section headers.
+          if index == 0 ||
              WatchSectionTint.key(for: item) != WatchSectionTint.key(for: conn.items[index - 1]) {
-            sectionRule(for: item)
+            sectionHeader(for: item, at: index)
           }
           NextItemRow(item: item,
                       done: conn.completedIDs.contains(item.id),
@@ -88,15 +89,41 @@ struct NextWatchView: View {
     }
   }
 
-  /// A 2pt rounded rule in the new group's section accent, sitting in its own
-  /// (separator-free) list row between two adjacent groups.
-  private func sectionRule(for item: NextItem) -> some View {
-    Capsule()
-      .fill(WatchSectionTint.color(for: item, colors: conn.sectionColors).opacity(0.7))
-      .frame(height: 2)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .listRowInsets(EdgeInsets(top: 4, leading: 6, bottom: 2, trailing: 6))
-      .listRowBackground(Color.clear)
+  /// A group header in its own (separator-free) list row: a 2pt rule in the
+  /// group's section accent, plus an accent-tinted count caption ("3 tasks").
+  /// Renders before every group, so each section is labelled — not just the
+  /// boundaries between adjacent groups.
+  private func sectionHeader(for item: NextItem, at index: Int) -> some View {
+    let accent = WatchSectionTint.color(for: item, colors: conn.sectionColors)
+    return VStack(alignment: .leading, spacing: 3) {
+      Capsule()
+        .fill(accent.opacity(0.7))
+        .frame(height: 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      Text(sectionLabel(startingAt: index))
+        .font(.caption2)
+        .fontWeight(.semibold)
+        .foregroundStyle(accent)
+        .lineLimit(1)
+    }
+    // The very first header hugs the top; later ones get more breathing room
+    // above to read as a fresh group rather than another row.
+    .listRowInsets(EdgeInsets(top: index == 0 ? 2 : 8, leading: 6, bottom: 2, trailing: 6))
+    .listRowBackground(Color.clear)
+  }
+
+  /// "3 tasks" — the count of contiguous rows in the group that begins at
+  /// `index`, with the section's own noun. Counting the run (rather than every
+  /// matching row) stays correct even if a section key were ever to recur.
+  private func sectionLabel(startingAt index: Int) -> String {
+    let key = WatchSectionTint.key(for: conn.items[index])
+    var count = 0
+    var i = index
+    while i < conn.items.count, WatchSectionTint.key(for: conn.items[i]) == key {
+      count += 1
+      i += 1
+    }
+    return "\(count) \(WatchSectionTint.noun(forKey: key, count: count))"
   }
 }
 
@@ -120,6 +147,20 @@ private enum WatchSectionTint {
     case "chore":      return "chores"
     default:           return item.kind
     }
+  }
+
+  /// The header noun for a group key, singular/plural by count ("task" / "tasks").
+  static func noun(forKey key: String, count: Int) -> String {
+    let singular: String
+    switch key {
+    case "tasks":       singular = "task"
+    case "habits":      singular = "habit"
+    case "supplements": singular = "supplement"
+    case "chores":      singular = "chore"
+    case "suggestion":  singular = "suggestion"
+    default:            singular = key
+    }
+    return count == 1 ? singular : singular + "s"
   }
 
   static func color(for item: NextItem, colors: [String: String]) -> Color {
