@@ -275,8 +275,25 @@ struct SectionDrawer<Content: View>: View {
       .padding(.bottom, 24)
     }
     // Surface fill driven by the injected style: opaque grouped background on
-    // a solid host, clear on the glass (translucent-sheet) host.
-    .background(surfaceStyle.scrollFill)
+    // a solid host, clear on the glass (translucent-sheet) host. Over that base
+    // we bleed a barely-there wash of the section's accent down from the top
+    // edge (~5.5% peak, gone by a third of the way down) so each section's
+    // drawer feels faintly lit by its own color without ever competing with
+    // content. Pinned to the viewport (not the content), so it stays at the top
+    // as you scroll; ignores the safe area so it reaches under the nav bar.
+    .background {
+      surfaceStyle.scrollFill
+      LinearGradient(
+        stops: [
+          .init(color: resolvedAccent.opacity(0.055), location: 0),
+          .init(color: .clear, location: 0.32),
+        ],
+        startPoint: .top,
+        endPoint: .bottom
+      )
+      .ignoresSafeArea()
+      .allowsHitTesting(false)
+    }
     // ←/→ step the viewed day back / forward on the pushed panes (Mac, iPad
     // regular width). Programmatic focus (not a bare `.focusable`) so the keys
     // land with Full Keyboard Access off; we draw no chrome, so suppress the
