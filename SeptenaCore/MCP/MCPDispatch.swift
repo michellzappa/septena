@@ -1228,14 +1228,21 @@ enum MCPDispatch {
   }
 
   private static func trainingUpdate(_ args: MCPArgs) throws -> Any {
-    // The TrainingMutator update path covers the per-set metrics; date/session
-    // re-tagging isn't exposed here (use the app), mirroring its surface.
+    // Full field parity with the hosted gateway's training_entry_update: identity
+    // fields (date/time/sessionType/exercise) and every per-set metric are
+    // patchable. The *Field accessors preserve present-vs-absent, so a call that
+    // only canonicalizes the exercise name can't blank out the set's metrics.
     let id = try args.requireString("id")
-    SeptenaServices.shared.trainingMutator.updateEntry(
-      id: id, weight: args.double("weight"), sets: args.string("sets"), reps: args.string("reps"),
-      difficulty: args.string("difficulty"), durationMin: args.double("durationMin"),
-      distanceM: args.double("distanceM"), level: args.double("level"), note: args.string("note"))
-    return ["id": id]
+    let updated = SeptenaServices.shared.trainingMutator.updateEntry(
+      id: id,
+      date: args.string("date"), time: args.string("time"),
+      sessionType: args.string("sessionType"), exercise: args.string("exercise"),
+      weight: args.doubleField("weight"), sets: args.stringField("sets"),
+      reps: args.stringField("reps"), difficulty: args.stringField("difficulty"),
+      durationMin: args.doubleField("durationMin"), distanceM: args.doubleField("distanceM"),
+      level: args.doubleField("level"), note: args.stringField("note"),
+      concludedAt: args.stringField("concludedAt"))
+    return ["id": id, "updated": updated]
   }
 
   private static func trainingExercises(_ args: MCPArgs) -> Any {

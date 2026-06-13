@@ -3107,7 +3107,24 @@ final class TrainingMutator {
     return saved
   }
 
+  /// Partial update — every parameter defaults to "leave as-is". Identity
+  /// fields (date/time/sessionType/exercise) take a single optional (nil =
+  /// unchanged); nullable per-set metrics take a double optional so `.some(nil)`
+  /// clears them. `exercise` gets the same key-preserving tidy as `addEntry`
+  /// (`CanonicalExerciseName.forStorage`), so a caller can canonicalize a logged
+  /// spelling without fragmenting its history — display, PR baselines and
+  /// prefill all key off `exerciseKey`. A date or time change recomputes the
+  /// canonical `occurredAt`, filling the missing half from the existing row
+  /// (mirrors `IntakeMutator.updateEntry`). Returns the names of the fields
+  /// actually written — mirrors the hosted gateway's `training_entry_update` so
+  /// the MCP layer can report a real write vs a no-op instead of always echoing
+  /// success.
+  @discardableResult
   func updateEntry(id: String,
+                   date: String? = nil,
+                   time: String? = nil,
+                   sessionType: String? = nil,
+                   exercise: String? = nil,
                    weight: Double?? = nil,
                    sets: String?? = nil,
                    reps: String?? = nil,
@@ -3115,18 +3132,31 @@ final class TrainingMutator {
                    durationMin: Double?? = nil,
                    distanceM: Double?? = nil,
                    level: Double?? = nil,
-                   note: String?? = nil) {
-    guard let entity = fetchEntry(id: id) else { return }
-    if let v = weight { entity.weight = v }
-    if let v = sets { entity.sets = v }
-    if let v = reps { entity.reps = v }
-    if let v = difficulty { entity.difficulty = v }
-    if let v = durationMin { entity.durationMin = v }
-    if let v = distanceM { entity.distanceM = v }
-    if let v = level { entity.level = v }
-    if let v = note { entity.note = v }
+                   note: String?? = nil,
+                   concludedAt: String?? = nil) -> [String] {
+    guard let entity = fetchEntry(id: id) else { return [] }
+    var changed: [String] = []
+    if let date { entity.date = date; changed.append("date") }
+    if let sessionType { entity.sessionType = sessionType; changed.append("sessionType") }
+    if let exercise { entity.exercise = CanonicalExerciseName.forStorage(exercise); changed.append("exercise") }
+    if let v = weight { entity.weight = v; changed.append("weight") }
+    if let v = sets { entity.sets = v; changed.append("sets") }
+    if let v = reps { entity.reps = v; changed.append("reps") }
+    if let v = difficulty { entity.difficulty = v; changed.append("difficulty") }
+    if let v = durationMin { entity.durationMin = v; changed.append("durationMin") }
+    if let v = distanceM { entity.distanceM = v; changed.append("distanceM") }
+    if let v = level { entity.level = v; changed.append("level") }
+    if let v = note { entity.note = v; changed.append("note") }
+    if let v = concludedAt { entity.concludedAt = v; changed.append("concludedAt") }
+    if date != nil || time != nil {
+      let t = time ?? EventTimestamp.hhmm(from: entity.occurredAt)
+      entity.occurredAt = EventTimestamp.from(date: entity.date, time: t)
+      changed.append("occurredAt")
+    }
+    guard !changed.isEmpty else { return [] }
     entity.updatedAt = .now
     commitEntry(entity, op: "update")
+    return changed
   }
 
   func deleteEntry(id: String) {

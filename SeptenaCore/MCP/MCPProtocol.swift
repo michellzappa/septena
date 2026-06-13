@@ -90,6 +90,20 @@ struct MCPArgs {
     (raw[key] as? [Any])?.compactMap { $0 as? String }
   }
 
+  /// True when the caller supplied this key at all (including an explicit JSON
+  /// null) — distinct from a present-but-empty string, which `string` maps to
+  /// nil.
+  func has(_ key: String) -> Bool { raw[key] != nil }
+
+  /// Partial-update accessors for NULLABLE fields. Absent key → `nil` (leave the
+  /// field unchanged); present → `.some(value)`, where JSON null / empty /
+  /// unparseable becomes `.some(nil)` (explicit clear). The double optional is
+  /// what lets a patch touch only what the caller sent, instead of bare
+  /// `string`/`double` (which a `T?`→`T??` promotion would turn into a silent
+  /// `.some(nil)`, blanking every omitted field).
+  func doubleField(_ key: String) -> Double?? { has(key) ? .some(double(key)) : nil }
+  func stringField(_ key: String) -> String?? { has(key) ? .some(string(key)) : nil }
+
   func object(_ key: String) -> [String: Any]? { raw[key] as? [String: Any] }
 
   /// True when the caller explicitly sent the key (even as JSON `null`). Lets

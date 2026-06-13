@@ -495,7 +495,7 @@ enum MCPToolCatalog {
               description: "Log a new exercise set / entry. Required: sessionType, exercise (canonical name). Provide weight/sets/reps for strength; durationMin/distanceM for cardio.",
               inputSchema: ["type": "object", "required": ["sessionType", "exercise"], "properties": trainingWriteProps(includeKeys: true)]),
       MCPTool(name: "training_entry_update",
-              description: "Update fields on an existing exercise entry.",
+              description: "Update any subset of fields on an existing exercise entry — only fields you pass change (pass null to clear an optional one). Supports rename/retag (exercise, sessionType, date, time) as well as per-set metrics; returns the list of fields actually written.",
               inputSchema: ["type": "object", "required": ["id"],
                             "properties": (["id": ["type": "string"]] as [String: Any])
                               .merging(trainingWriteProps(includeKeys: true)) { a, _ in a }]),
