@@ -9,17 +9,18 @@ import XCTest
 /// Extract: xcrun xcresulttool export attachments --path /tmp/septena.xcresult --output-path <dir>
 ///
 /// These are the raw material for the App Store viz/render pipeline in
-/// `appstore/`. Each capture's name is the contract: `appstore/panels.config.mjs`
-/// references shots by these exact basenames (e.g. `01-Week`, `08-Correlations`).
-/// If you rename a capture here, update the matching `shot.src` there. Current
-/// marketing-panel mapping (appstore/panels.config.mjs → iphone69):
-///   hook         → 01-Week            (all-in-one hero)
-///   week         → 06-Week-heatmap    (glanceable seven days)
-///   correlations → 08-Correlations    (cross-section insight)
-///   sections     → 17-Sections        (the enable/hide editor)
+/// `appstore/`, and the SAME names the marketing site uses (docs/MESSAGING.md
+/// §4) so one capture serves both. Each name is the contract:
+/// `appstore/panels.config.mjs` references shots by these exact basenames.
+/// Current marketing-panel mapping (→ iphone69):
+///   hook         → overview      (all-in-one hero)
+///   week         → week-heatmap  (glanceable seven days)
+///   correlations → insights      (cross-section insight)
+///   sections     → sections      (the enable/hide editor)
+///   ai           → ai            (bring your own AI)
 ///   privacy/close → no shot (statement panels)
-/// The remaining captures (02/03/04/05/07/09 and the section sheets 10–16) are
-/// kept as a bench the viz can swap in without a re-capture.
+/// The rest (overview-scrolled, next, tasks, goals, …-scrolled, and the section
+/// sheets) are a bench the viz can swap in without a re-capture.
 final class ScreenshotTests: XCTestCase {
   override func setUpWithError() throws { continueAfterFailure = false }
 
@@ -34,59 +35,67 @@ final class ScreenshotTests: XCTestCase {
       return false
     }
 
+    // Semantic capture names (shared with ../septena-site, per docs/MESSAGING.md
+    // §4) — one capture serves both the site and the App Store render.
+
     // Pass 1 — Sparkline layout (the default).
     launch(app, layout: "dense")
-    capture(app, "01-Week")
-    app.swipeUp(); dwell(); capture(app, "02-Week-scrolled")
+    capture(app, "overview")
+    app.swipeUp(); dwell(); capture(app, "overview-scrolled")
     app.swipeDown(); dwell()
-    tapTab(app, "Next");  capture(app, "03-Next")
-    tapTab(app, "Tasks"); capture(app, "04-Tasks")
-    tapTab(app, "Goals"); capture(app, "05-Goals")
+    tapTab(app, "Next");  capture(app, "next")
+    tapTab(app, "Tasks"); capture(app, "tasks")
+    tapTab(app, "Goals"); capture(app, "goals")
 
     // Pass 2 — Heatmap layout. Terminate + relaunch reseeds the in-memory store.
     app.terminate()
     launch(app, layout: "heatmap")
-    capture(app, "06-Week-heatmap")
-    app.swipeUp(); dwell(); capture(app, "07-Week-heatmap-scrolled")
+    capture(app, "week-heatmap")
+    app.swipeUp(); dwell(); capture(app, "week-heatmap-scrolled")
 
-    // Pass 3 — Correlations layout (caffeine→sleep should surface with 90 days).
+    // Pass 3 — Correlations ("insights") layout (caffeine→sleep surfaces at 90 days).
     app.terminate()
     launch(app, layout: "correlations")
-    capture(app, "08-Correlations")
-    app.swipeUp(); dwell(); capture(app, "09-Correlations-scrolled")
+    capture(app, "insights")
+    app.swipeUp(); dwell(); capture(app, "insights-scrolled")
 
     // Pass 4 — section detail sheets (dense layout so the rows are tappable).
-    // These give the viz a colorful bench of section shots to swap into the
-    // breadth panel. Ordered so the most marketing-friendly come first.
+    // A colorful bench the viz can swap into the breadth panel. Names match the
+    // site's section vocabulary (Training → "exercise").
     app.terminate()
     launch(app, layout: "dense")
-    captureSection(app, "Nutrition", "10-Nutrition")
-    captureSection(app, "Training", "11-Training")
-    captureSection(app, "Sleep", "12-Sleep")
-    captureSection(app, "Mood", "13-Mood")
-    captureSection(app, "Body", "14-Body")
-    captureSection(app, "Habits", "15-Habits")
-    captureSection(app, "Hydration", "16-Hydration")
+    captureSection(app, "Nutrition", "nutrition")
+    captureSection(app, "Training", "exercise")
+    captureSection(app, "Sleep", "sleep")
+    captureSection(app, "Mood", "mood")
+    captureSection(app, "Body", "body")
+    captureSection(app, "Habits", "habits")
+    captureSection(app, "Hydration", "hydration")
 
-    // The sections editor (Settings → Sections) — proves the "turn on only what
-    // matters" panel. Best-effort navigation; skips cleanly if labels differ.
-    captureSettingsSections(app, "17-Sections")
+    // Settings editors — best-effort navigation; skip cleanly if labels differ.
+    captureSettingsSections(app, "sections")   // proves "turn on only what matters"
+    captureSettingsRow(app, ["AI", "Intelligence", "MCP"], "ai")  // proves "bring your own AI"
   }
 
-  /// Open Settings → Sections, snapshot the enable/hide list, return to root.
   @MainActor private func captureSettingsSections(_ app: XCUIApplication, _ shot: String) {
+    captureSettingsRow(app, ["Sections"], shot)
+  }
+
+  /// Open Settings, tap the first matching row label, snapshot it. Best-effort:
+  /// returns silently if Settings or the row can't be reached.
+  @MainActor private func captureSettingsRow(_ app: XCUIApplication, _ labels: [String], _ shot: String) {
     for label in ["Settings", "More", "gear"] {
       let b = app.tabBars.buttons[label].exists ? app.tabBars.buttons[label] : app.buttons[label]
       if b.waitForExistence(timeout: 3), b.isHittable { b.tap(); dwell(0.6); break }
     }
-    let row = app.buttons["Sections"].exists ? app.buttons["Sections"]
-            : app.staticTexts["Sections"].exists ? app.staticTexts["Sections"]
-            : app.cells["Sections"]
-    var tries = 0
-    while !(row.exists && row.isHittable) && tries < 6 { app.swipeUp(); dwell(0.4); tries += 1 }
-    guard row.exists, row.isHittable else { return }
-    row.tap(); dwell()
-    capture(app, shot)
+    for name in labels {
+      let row = app.buttons[name].exists ? app.buttons[name]
+              : app.staticTexts[name].exists ? app.staticTexts[name]
+              : app.cells[name]
+      var tries = 0
+      while !(row.exists && row.isHittable) && tries < 4 { app.swipeUp(); dwell(0.4); tries += 1 }
+      if row.exists, row.isHittable { row.tap(); dwell(); capture(app, shot); return }
+    }
   }
 
   // MARK: - helpers
