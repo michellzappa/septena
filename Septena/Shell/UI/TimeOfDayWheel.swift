@@ -377,50 +377,16 @@ struct TimeOfDayWheel: View {
         }
       }
 
-      // Dots. Flat/compact dials keep clean solid marks. The hero paints each
-      // dot as a glass *bead* — NOT material `.glassEffect`, which Apple
-      // reserves for the chrome layer (data is content) and which goes muddy
-      // at dot scale (the "went black" scar) and costs GPU per shape. Painted
-      // glass instead, in three reads: a translucent body so the lit glass
-      // donut shows THROUGH the bead, a brighter core so the data stays
-      // legible, and a thin bright rim that catches light like a glass edge.
-      // No outer bloom (read as a glow), no hard centered gloss (read as
-      // candy) — both were tried and rejected.
+      // Dots — clean solid section-colored marks, on every dial. Real
+      // `.glassEffect` beads were tried at the hero scale: on top of the glass
+      // donut they carried the material's built-in elevation shadow and read
+      // as muddy smudges (glass-on-content, which Apple's HIG warns against).
+      // Glass is the donut (chrome); the data on it stays solid and crisp.
       for m in dotMarks(side: side) {
         let r = m.diameter / 2
         let rect = CGRect(x: m.center.x - r, y: m.center.y - r,
                           width: m.diameter, height: m.diameter)
-        if heroDate != nil {
-          // Lens body — radial, more transparent at the centre (you see the
-          // lit donut through it) and more saturated toward the rim, the way
-          // light bends through a glass bead.
-          ctx.fill(Path(ellipseIn: rect),
-                   with: .radialGradient(
-                     Gradient(colors: [m.color.opacity(0.32 * m.opacity),
-                                       m.color.opacity(0.68 * m.opacity)]),
-                     center: m.center, startRadius: 0, endRadius: r))
-          // Core — keeps the datum legible against the translucent lens.
-          let coreR = r * 0.55
-          ctx.fill(Path(ellipseIn: CGRect(x: m.center.x - coreR, y: m.center.y - coreR,
-                                          width: coreR * 2, height: coreR * 2)),
-                   with: .color(m.color.opacity(0.95 * m.opacity)))
-          // Glass edge.
-          ctx.stroke(Path(ellipseIn: rect),
-                     with: .color(.white.opacity(0.30 * m.opacity)),
-                     lineWidth: max(0.5, r * 0.16))
-          // Specular highlight — a soft bright crescent at the upper-left, the
-          // light catching a glass dome. Offset + soft (fades to clear), never
-          // a hard centred gloss (that read as candy).
-          let hl = CGPoint(x: m.center.x - r * 0.30, y: m.center.y - r * 0.32)
-          let hlR = r * 0.55
-          ctx.fill(Path(ellipseIn: CGRect(x: hl.x - hlR, y: hl.y - hlR,
-                                          width: hlR * 2, height: hlR * 2)),
-                   with: .radialGradient(
-                     Gradient(colors: [.white.opacity(0.55 * m.opacity), .clear]),
-                     center: hl, startRadius: 0, endRadius: hlR))
-        } else {
-          ctx.fill(Path(ellipseIn: rect), with: .color(m.color.opacity(m.opacity)))
-        }
+        ctx.fill(Path(ellipseIn: rect), with: .color(m.color.opacity(m.opacity)))
       }
 
       // Center. The hero's glass donut leaves the middle genuinely OPEN —
