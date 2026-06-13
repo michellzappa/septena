@@ -78,15 +78,28 @@ final class WithingsRowEntity {
     self.cloudKitSystemFields = cloudKitSystemFields
   }
 
-  func update(from row: WithingsRow) {
-    weightKg      = row.weightKg
-    fatPct        = row.fatPct
-    fatMassKg     = row.fatMassKg
-    fatFreeMassKg = row.fatFreeMassKg
-    muscleMassKg  = row.muscleMassKg
-    hydrationKg   = row.hydrationKg
-    boneMassKg    = row.boneMassKg
-    updatedAt = .now
+  /// Apply `row`'s values; returns true iff any field actually changed. See
+  /// `OuraNightEntity.update(from:)` — guarding each assignment turns a
+  /// re-fetch of unchanged body history into a genuine no-op instead of a
+  /// per-row write + CloudKit push + WAL growth on every dashboard refresh.
+  @discardableResult
+  func update(from row: WithingsRow) -> Bool {
+    var changed = false
+    func set<T: Equatable>(_ keyPath: ReferenceWritableKeyPath<WithingsRowEntity, T>, _ value: T) {
+      if self[keyPath: keyPath] != value {
+        self[keyPath: keyPath] = value
+        changed = true
+      }
+    }
+    set(\.weightKg, row.weightKg)
+    set(\.fatPct, row.fatPct)
+    set(\.fatMassKg, row.fatMassKg)
+    set(\.fatFreeMassKg, row.fatFreeMassKg)
+    set(\.muscleMassKg, row.muscleMassKg)
+    set(\.hydrationKg, row.hydrationKg)
+    set(\.boneMassKg, row.boneMassKg)
+    if changed { updatedAt = .now }
+    return changed
   }
 
   func toRow() -> WithingsRow {
@@ -129,14 +142,17 @@ final class WithingsStore {
         predicate: #Predicate { $0.id == id }
       )
       if let entity = try? context.fetch(descriptor).first {
-        entity.update(from: row)
+        if entity.update(from: row) { touched.append(id) }
       } else {
         let entity = WithingsRowEntity(id: id)
         entity.update(from: row)
         context.insert(entity)
+        touched.append(id)
       }
-      touched.append(id)
     }
+    // Unchanged re-fetch ⇒ no save, no CloudKit fan-out, no UI refresh, and
+    // no body-goal re-evaluation (the trailing average can't have moved).
+    guard !touched.isEmpty else { return }
     do { try context.save() }
     catch { SeptenaLog.error("WithingsStore: save failed", error) }
     for id in touched {

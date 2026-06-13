@@ -89,23 +89,38 @@ final class OuraNightEntity {
     self.cloudKitSystemFields = cloudKitSystemFields
   }
 
-  func update(from night: OuraNight) {
-    sleepScore       = night.sleepScore
-    readinessScore   = night.readinessScore
-    totalH           = night.totalH
-    deepH            = night.deepH
-    remH             = night.remH
-    lightH           = night.lightH
-    awakeH           = night.awakeH
-    efficiency       = night.efficiency
-    hrv              = night.hrv
-    restingHr        = night.restingHr
-    bedtime          = night.bedtime
-    wakeTime         = night.wakeTime
-    stressHighMin    = night.stressHighMin
-    recoveryHighMin  = night.recoveryHighMin
-    stressSummary    = night.stressSummary
-    updatedAt = .now
+  /// Apply `night`'s values; returns true iff any field actually changed.
+  /// Re-assigning identical values still marks the SwiftData object dirty,
+  /// and bumping `updatedAt` unconditionally guaranteed a write per night on
+  /// every history fetch — ~250 rows re-saved + pushed to CloudKit + WAL
+  /// growth each time Insights opened. Guarding each assignment makes a
+  /// re-fetch of unchanged data a genuine no-op.
+  @discardableResult
+  func update(from night: OuraNight) -> Bool {
+    var changed = false
+    func set<T: Equatable>(_ keyPath: ReferenceWritableKeyPath<OuraNightEntity, T>, _ value: T) {
+      if self[keyPath: keyPath] != value {
+        self[keyPath: keyPath] = value
+        changed = true
+      }
+    }
+    set(\.sleepScore, night.sleepScore)
+    set(\.readinessScore, night.readinessScore)
+    set(\.totalH, night.totalH)
+    set(\.deepH, night.deepH)
+    set(\.remH, night.remH)
+    set(\.lightH, night.lightH)
+    set(\.awakeH, night.awakeH)
+    set(\.efficiency, night.efficiency)
+    set(\.hrv, night.hrv)
+    set(\.restingHr, night.restingHr)
+    set(\.bedtime, night.bedtime)
+    set(\.wakeTime, night.wakeTime)
+    set(\.stressHighMin, night.stressHighMin)
+    set(\.recoveryHighMin, night.recoveryHighMin)
+    set(\.stressSummary, night.stressSummary)
+    if changed { updatedAt = .now }
+    return changed
   }
 
   func toNight() -> OuraNight {
@@ -159,14 +174,18 @@ final class OuraStore {
         predicate: #Predicate { $0.id == id }
       )
       if let entity = try? context.fetch(descriptor).first {
-        entity.update(from: night)
+        // Only a real value change earns a CloudKit push — a re-fetch of
+        // unchanged history must not re-queue every night.
+        if entity.update(from: night) { touched.append(id) }
       } else {
         let entity = OuraNightEntity(id: id)
         entity.update(from: night)
         context.insert(entity)
+        touched.append(id)
       }
-      touched.append(id)
     }
+    // Nothing changed ⇒ no save, no CloudKit fan-out, no UI refresh.
+    guard !touched.isEmpty else { return }
     do { try context.save() }
     catch { SeptenaLog.error("OuraStore: save failed", error) }
     for id in touched {
