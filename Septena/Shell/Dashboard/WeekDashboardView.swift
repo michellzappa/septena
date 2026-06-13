@@ -2994,7 +2994,19 @@ private struct WeekDashboardScreen<CurrentDay: Equatable, Toolbar: ToolbarConten
       ScrollView {
         content()
       }
-      .background(Theme.groupedBackground)
+      // Canvas is the flat grouped gray plus a barely-there top-down accent
+      // gradient. On its own it's almost invisible; its job is to give the
+      // liquid-glass tiles floating above it something with depth to refract,
+      // so the glass reads as glass rather than a flat translucent panel.
+      .background {
+        Theme.groupedBackground
+        LinearGradient(
+          colors: [Color.accentColor.opacity(0.10), .clear],
+          startPoint: .top,
+          endPoint: .center
+        )
+        .ignoresSafeArea()
+      }
       // Tab bar already labels this view. Keep the nav bar present so
       // iOS's default scroll-edge effect kicks in (content fades to bg
       // material as it scrolls under the top — same shape as the

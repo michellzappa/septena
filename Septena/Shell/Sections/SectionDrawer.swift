@@ -628,7 +628,7 @@ private struct TimeTravelPill: View {
         .foregroundStyle(Theme.inkPrimary)
         .padding(.horizontal, Theme.Spacing.md)
         .padding(.vertical, 6)
-        .background(Theme.secondaryGroupedBackground, in: Capsule())
+        .glassCapsule()
       }
       .buttonStyle(.plain)
       Spacer()

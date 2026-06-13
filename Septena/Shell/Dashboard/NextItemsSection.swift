@@ -1232,7 +1232,7 @@ struct StatusBadge: View {
       .foregroundStyle(Theme.inkSecondary)
       .padding(.horizontal, 8)
       .padding(.vertical, 3)
-      .background(Theme.mutedSurface, in: Capsule())
+      .glassCapsule()
   }
 }
 

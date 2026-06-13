@@ -257,6 +257,44 @@ extension View {
       .presentationBackground(.thinMaterial)
       .presentationCornerRadius(Theme.cornerRadius)
   }
+
+  /// Liquid-glass capsule fill for floating chrome (status badges, pills).
+  /// iOS 26 gets a true `.glassEffect`; macOS falls back to thin material so
+  /// the same call site reads as glass on both — the gating dance lives here
+  /// once instead of at every pill. Pass `tint` to wash the glass with a
+  /// section accent (kept faint; the material carries the look), omit for
+  /// neutral glass. Single choke point so every floating pill glasses in step.
+  @ViewBuilder
+  func glassCapsule(tint: Color? = nil) -> some View {
+    #if os(iOS)
+    if let tint {
+      self.glassEffect(.regular.tint(tint.opacity(0.5)).interactive(), in: .capsule)
+    } else {
+      self.glassEffect(.regular.interactive(), in: .capsule)
+    }
+    #else
+    self.background(.thinMaterial, in: Capsule())
+    #endif
+  }
+
+  /// Liquid-glass fill for a floating *card* surface (dashboard tiles). Same
+  /// iOS-glass / macOS-material split as `glassCapsule`, in a continuous
+  /// rounded rectangle. macOS keeps the opaque grouped card it always had —
+  /// glass over the mac paper canvas reads muddy — so this only glasses iOS
+  /// for now. Tint optionally washes the glass with the tile's section accent.
+  @ViewBuilder
+  func glassCard(cornerRadius: CGFloat = Theme.cornerRadius, tint: Color? = nil) -> some View {
+    let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    #if os(iOS)
+    if let tint {
+      self.glassEffect(.regular.tint(tint.opacity(0.16)), in: shape)
+    } else {
+      self.glassEffect(.regular, in: shape)
+    }
+    #else
+    self.background(shape.fill(Theme.secondaryGroupedBackground))
+    #endif
+  }
 }
 
 /// Zero-effect button style. Suppresses the brief label tint that SwiftUI's

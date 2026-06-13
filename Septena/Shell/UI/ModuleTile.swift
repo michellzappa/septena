@@ -70,13 +70,13 @@ struct ModuleTile: View {
       .padding(.vertical, 16)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    // Match the insetGrouped look: white card on the gray canvas the
-    // Week view supplies. `.secondarySystemGroupedBackground` is the
-    // system token Reminders / Notes use for grouped-list rows.
-    .background(
-      RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-        .fill(Theme.secondaryGroupedBackground)
-    )
+    // iOS 26: float the tile on liquid glass, faintly washed with the
+    // section accent so each tile carries a touch of its own color and
+    // refracts the canvas gradient beneath. macOS keeps the opaque grouped
+    // card (glass over the mac paper canvas reads muddy) — both paths handled
+    // in `glassCard`. The clip keeps the 3pt leading accent bar inside the
+    // rounded corners.
+    .glassCard(tint: accent)
     .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
   }
 
