@@ -70,9 +70,15 @@ private struct DrawerCardSurface: ViewModifier {
         .background(shape.fill(Theme.secondaryGroupedBackground))
         .clipShape(shape)
     case .glass:
+      // Float on neutral Liquid Glass (the dashboard-tile helper) with a faint
+      // neutral hairline rim. The rim is what keeps the card from dissolving
+      // into the translucent sheet — it lifts as a crisp, defined pane — while
+      // accent stays off the chrome (it lives on the controls + tint). Clip
+      // before the rim so the stroke isn't half-cut by the clip.
       content
         .glassCard()
         .clipShape(shape)
+        .overlay(shape.strokeBorder(Theme.border, lineWidth: 0.5))
     }
   }
 }
@@ -1031,14 +1037,57 @@ struct DrawerSection<Content: View>: View {
 
   @ViewBuilder
   private var paddedStack: some View {
-    let stack = VStack(spacing: spacing) { content() }
     switch padding {
-    case .standard: stack.padding(.horizontal, Theme.Spacing.lg)
-                         .padding(.vertical, Theme.Spacing.md)
-    case .tight:    stack.padding(.horizontal, Theme.Spacing.md)
-                         .padding(.vertical, Theme.Spacing.sm)
-    case .none:     stack
+    case .standard:
+      VStack(spacing: spacing) { content() }
+        .padding(.horizontal, Theme.Spacing.lg)
+        .padding(.vertical, Theme.Spacing.md)
+    case .tight:
+      VStack(spacing: spacing) { content() }
+        .padding(.horizontal, Theme.Spacing.md)
+        .padding(.vertical, Theme.Spacing.sm)
+    case .none:
+      // Grouped-list rows: no inter-row gap, an accent hairline between each
+      // adjacent pair. The separators are interleaved through `_VariadicView`
+      // so every `padding: .none` call site keeps its plain `ForEach { row }`
+      // and gains separators here, in one place. A lone child (e.g. an
+      // empty-state label) gets none.
+      VStack(spacing: 0) {
+        _VariadicView.Tree(SeparatedRows()) { content() }
+      }
     }
+  }
+}
+
+/// `_VariadicView` root that drops a `DrawerRowSeparator` between each pair of
+/// adjacent rows in a `DrawerSection(padding: .none)` card — the grouped-list
+/// separator, themed to the section accent. Working at the variadic level is
+/// what lets the ~two-dozen call sites stay a plain `ForEach { row }` while the
+/// separators live in exactly one place (§8 centralization).
+private struct SeparatedRows: _VariadicView.MultiViewRoot {
+  func body(children: _VariadicView.Children) -> some View {
+    let lastID = children.last?.id
+    ForEach(children) { child in
+      child
+      if child.id != lastID {
+        DrawerRowSeparator()
+      }
+    }
+  }
+}
+
+/// Hairline row separator: a true 1px system separator inset to align with the
+/// row title column, full-bleed to the card's trailing edge — the standard
+/// inset-grouped look. Neutral by design; accent stays off the drawer chrome.
+/// Reads `rowHInset` from the environment the enclosing `DrawerSection` set.
+private struct DrawerRowSeparator: View {
+  @Environment(\.rowHInset) private var inset
+  @Environment(\.displayScale) private var scale
+
+  var body: some View {
+    Theme.divider
+      .frame(height: 1 / max(scale, 1))
+      .padding(.leading, inset)
   }
 }
 
