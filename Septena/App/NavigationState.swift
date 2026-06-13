@@ -73,6 +73,13 @@ final class NavigationState {
   /// that page instead of the root list. Cleared on dismiss.
   var addInfoRequestedSection: AddInfoSection? = nil
 
+  /// Set by the first-run welcome as it finishes, consumed by the welcome
+  /// gate's `onDismiss`: once the welcome cover is gone, open the Add Info
+  /// quick-add for this section so the user logs their first thing. Routed
+  /// through the gate (not fired inline) so the sheet presents cleanly after
+  /// the cover dismisses rather than racing it. Nil → no first-log nudge.
+  var pendingFirstLog: AddInfoSection? = nil
+
   /// Drives the Training session sheet (logger). Flipped from Command-K's
   /// "Start training" rows, the Training destination's Start button, and
   /// from any future quick-action; the sheet itself reads the live draft

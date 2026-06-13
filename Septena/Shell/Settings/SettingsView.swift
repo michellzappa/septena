@@ -43,6 +43,12 @@ enum SettingsKey {
   /// device. Written by `SettingsStore.markOnboardingComplete` /
   /// `reconcileOnboarding`.
   static let welcomeCompleted = "septena.welcome.completed"
+  /// Device-local dev override: forces the welcome to present even on an
+  /// established account, surviving relaunch, so the first-run flow can be
+  /// re-tested without wiping the app. Set by Settings ▸ About ▸ Advanced
+  /// ("Reset first-run welcome"); cleared when the welcome is completed.
+  /// Never set in normal use, so the gate behaves exactly as before.
+  static let welcomeForce = "septena.welcome.force"
   /// Consent toggle for anonymous aggregate usage analytics (Plausible).
   /// Same key string is referenced by `PlausibleClient.consentKey` so the
   /// guard inside the actor and the @AppStorage binding stay in sync.
@@ -387,6 +393,8 @@ final class SettingsStore {
   /// pattern. No-op if already stamped.
   func markOnboardingComplete(now: Date, context: ModelContext, engine: CKEngine?) {
     UserDefaults.standard.set(true, forKey: SettingsKey.welcomeCompleted)
+    // Finishing the welcome clears any dev force-override so it stops re-showing.
+    UserDefaults.standard.set(false, forKey: SettingsKey.welcomeForce)
     guard serverSettings?.onboardedAt == nil else { return }
     var s = serverSettings ?? AppSettings(sectionOrder: nil, targets: nil, units: nil,
                                           time: nil, theme: nil, eink: nil,
@@ -394,6 +402,16 @@ final class SettingsStore {
     s.onboardedAt = now
     serverSettings = s
     SettingsMirror.upsert(settings: s, context: context, engine: engine)
+  }
+
+  /// Dev/testing affordance (Settings ▸ About ▸ Advanced): re-show the first-run
+  /// welcome on THIS device without wiping the app. Sets the `welcomeForce`
+  /// override the gate honors over `welcomeCompleted`, so the welcome reappears
+  /// immediately and on relaunch until it's completed again (which clears the
+  /// override). Device-local only — does not touch the synced `onboardedAt`, so
+  /// it never re-triggers the welcome on the user's other devices.
+  func resetWelcomeForTesting() {
+    UserDefaults.standard.set(true, forKey: SettingsKey.welcomeForce)
   }
 
   /// Reconcile the CloudKit-synced `onboardedAt` with the device-local
@@ -4517,9 +4535,11 @@ struct AboutSettingsPane: View {
 /// macOS reasoning-provider override. Keeps the main panes App-Store clean
 /// without deleting tools the developer (and the occasional power user) needs.
 struct AdvancedSettingsPane: View {
+  @Environment(SettingsStore.self) private var store
   #if os(macOS)
   @AppStorage(AIPolicy.devForceProviderKey) private var devForce = ""
   #endif
+  @State private var welcomeReset = false
 
   var body: some View {
     Form {
@@ -4534,6 +4554,21 @@ struct AdvancedSettingsPane: View {
         Text("Diagnostics")
       } footer: {
         Text("Motion Gallery tunes the logging flourishes. Data Tools re-pulls records from CloudKit and generates LLM import prompts.")
+      }
+
+      Section {
+        Button {
+          store.resetWelcomeForTesting()
+          welcomeReset = true
+        } label: {
+          Label("Reset first-run welcome", systemImage: "arrow.counterclockwise")
+        }
+      } header: {
+        Text("Onboarding")
+      } footer: {
+        Text(welcomeReset
+             ? "The welcome will appear over the app now, and on relaunch until you complete it. Only this device is affected."
+             : "Re-shows the first-run welcome (section picker + section intros) on this device, for testing. Doesn't change your data or your other devices.")
       }
 
       #if os(macOS)
