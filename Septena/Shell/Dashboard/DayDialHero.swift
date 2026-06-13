@@ -117,6 +117,9 @@ struct DayDialHero: View {
       todayBands: snapshot.calendarBands,
       windowDays: windowDays,
       nowFraction: nowFraction,
+      // The now-hand wears the current hour's ambient phase color, so it
+      // glows with the same light as the halo behind the glass.
+      nowColor: AmbientLight.Phase.from(date: clock.now).tint.inner,
       diameter: dialDiameter,
       heroDate: todayStart
     )

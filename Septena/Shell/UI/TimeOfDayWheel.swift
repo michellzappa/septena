@@ -14,7 +14,7 @@ import SwiftUI
 ///
 /// The host computes `(fraction, daysAgo)` per event from each row's *local*
 /// time-of-day and calendar-day distance. Read-only, Canvas-drawn for cheap
-/// alpha stacking. Hour labels follow the user's system 24-hour setting.
+/// alpha stacking.
 struct TimeOfDayWheel: View {
   struct Event: Identifiable {
     let id: String
@@ -53,6 +53,10 @@ struct TimeOfDayWheel: View {
   var windowDays: Int = 7
   /// Optional current-time hand (0..<1) — a hairline from center marking "now".
   var nowFraction: Double? = nil
+  /// Tint for the hero's now-hand — the current hour's ambient phase color, so
+  /// the hand glows with the day's light and ends in a luminous tip. `nil`
+  /// keeps the plain neutral hairline (section-detail and compact dials).
+  var nowColor: Color? = nil
   /// Square side of the dial.
   var diameter: CGFloat = 240
   /// Compact tile rendering (the homepage Wheel mode's per-section mini wheels):
@@ -90,23 +94,6 @@ struct TimeOfDayWheel: View {
   // Brightest (today) → faintest (oldest day in the window).
   private let maxOpacity: Double = 0.92
   private let minOpacity: Double = 0.12
-
-  /// Whether to label hours 0–23 (true) or 12-hour a/p (false) — follows the
-  /// device's locale hour cycle, so a 24-hour region never sees "am/pm".
-  private var uses24Hour: Bool {
-    switch Locale.current.hourCycle {
-    case .zeroToTwentyThree, .oneToTwentyFour: return true
-    default: return false
-    }
-  }
-
-  private func hourLabel(_ hour: Int) -> String {
-    // Bare numerals ("0", "6"), not zero-padded clock digits ("00", "06") —
-    // these are axis labels on a dial, not a time readout.
-    if uses24Hour { return String(hour) }
-    let h = hour % 12 == 0 ? 12 : hour % 12
-    return "\(h)\(hour < 12 ? "a" : "p")"
-  }
 
   /// Shared defaults key for the today ⇄ week window, public so co-presenting
   /// views (the hero's `AmbientHalo` style) can key off the same state.
@@ -276,28 +263,39 @@ struct TimeOfDayWheel: View {
                    style: StrokeStyle(lineWidth: b.thin ? 4 : 9, lineCap: .round))
       }
 
-      // Quadrant labels just outside the disc, on the page background — softer
-      // (secondary) so they frame the dial without competing with the data.
-      // Compact thumbnails drop them (no room, and the four ticks suffice).
-      if !compact {
-        for h in [0, 6, 12, 18] {
-          ctx.draw(Text(hourLabel(h)).font(.caption.weight(.semibold)).foregroundStyle(.secondary),
-                   at: point(Double(h) / 24, ringR + 12))
-        }
-      }
-
-      // "Now" hand — a true 1pt hairline. On the hero it starts at the
-      // glass donut's inner edge (the hole is open — nothing to cap it),
-      // running only across the glass band; flat-disc dials run it from
-      // center and let the hub disc cap it.
+      // "Now" hand. On the hero it starts at the glass donut's inner edge
+      // (the hole is open — nothing to cap it) and runs to the ring, tinted
+      // with the current hour's ambient phase color so it glows with the
+      // day's light and ends in a luminous tip; a neutral base keeps it
+      // legible when the tint goes pale at midday. Flat-disc dials keep the
+      // plain accent hairline from center, capped by the hub disc.
       if let nowFraction {
         let handStart = heroDate != nil
           ? point(nowFraction, ringR * Self.heroHoleFraction)
           : center
+        let tip = point(nowFraction, ringR - 2)
         var hand = Path()
         hand.move(to: handStart)
-        hand.addLine(to: point(nowFraction, ringR - 2))
-        ctx.stroke(hand, with: .color(accent.opacity(0.6)), lineWidth: 1)
+        hand.addLine(to: tip)
+        if let nowColor {
+          // Neutral base first — always visible, whatever the tint does.
+          ctx.stroke(hand, with: .color(Theme.inkSecondary.opacity(0.40)), lineWidth: 2)
+          // Phase-colored overlay — the day's light on the hand.
+          ctx.stroke(hand, with: .color(nowColor.opacity(0.95)), lineWidth: 1.5)
+          // Luminous tip: a soft radial glow plus a solid core, marking
+          // "now" in the current hour's color where the hand meets the ring.
+          let glowR: CGFloat = 7
+          ctx.fill(Path(ellipseIn: CGRect(x: tip.x - glowR, y: tip.y - glowR,
+                                          width: glowR * 2, height: glowR * 2)),
+                   with: .radialGradient(Gradient(colors: [nowColor.opacity(0.50), .clear]),
+                                         center: tip, startRadius: 0, endRadius: glowR))
+          let coreR: CGFloat = 2.5
+          ctx.fill(Path(ellipseIn: CGRect(x: tip.x - coreR, y: tip.y - coreR,
+                                          width: coreR * 2, height: coreR * 2)),
+                   with: .color(nowColor))
+        } else {
+          ctx.stroke(hand, with: .color(accent.opacity(0.6)), lineWidth: 1)
+        }
       }
 
       // Dots — clean solid section-colored marks. Content that sits ON glass
