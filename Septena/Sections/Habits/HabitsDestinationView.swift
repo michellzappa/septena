@@ -67,12 +67,12 @@ struct HabitsDestinationView: View {
     .task {
       model.paintFromCache()
       await model.load()
-      loadRates()
+      await loadRates()
     }
     .sectionReload(on: viewingDate, onDataChange: true,
                    forSections: ["habits"]) { await reloadPastDay() }
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
-      if note.affectsSection("habits") { loadRates() }
+      if note.affectsSection("habits") { Task { await loadRates() } }
     }
     // Tapping a habit opens its detail "infobox" (streak + history +
     // consistency); the row's checkbox still checks it off. "Edit" in the
@@ -168,8 +168,11 @@ struct HabitsDestinationView: View {
     )
   }
 
-  private func loadRates() {
-    rates = ChecklistMirror.habitCompletionRates(context: modelContext)
+  /// 30-day completion-rate query runs over the habits' whole state table —
+  /// the largest checklist table — so route it through the background reader
+  /// instead of the view's main context, or it hitches the push transition.
+  private func loadRates() async {
+    rates = await MirrorReader.shared.read { ChecklistMirror.habitCompletionRates(context: $0) }
   }
 
   private func reloadPastDay() async {

@@ -47,12 +47,12 @@ struct SupplementsDestinationView: View {
     .task {
       model.paintFromCache()
       await model.load()
-      loadRates()
+      await loadRates()
     }
     .sectionReload(on: viewingDate, onDataChange: true,
                    forSections: ["supplements"]) { await reloadPastDay() }
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
-      if note.affectsSection("supplements") { loadRates() }
+      if note.affectsSection("supplements") { Task { await loadRates() } }
     }
     // Tapping a supplement opens its detail "infobox" (streak + history +
     // consistency); the row's checkbox still marks it taken. "Edit" swaps to
@@ -248,8 +248,10 @@ struct SupplementsDestinationView: View {
     )
   }
 
-  private func loadRates() {
-    rates = ChecklistMirror.supplementCompletionRates(context: modelContext)
+  /// Route the 30-day rate query through the background reader rather than the
+  /// view's main context, so it can't hitch the push transition. Mirrors Habits.
+  private func loadRates() async {
+    rates = await MirrorReader.shared.read { ChecklistMirror.supplementCompletionRates(context: $0) }
   }
 
   private func reloadPastDay() async {
