@@ -17,7 +17,6 @@ import SwiftData
 struct CoachView: View {
   @Environment(\.modelContext) private var context
   @Environment(SectionTheme.self) private var theme
-  @Environment(NavigationState.self) private var nav
   #if os(iOS)
   @Environment(\.horizontalSizeClass) private var hSize
   #endif
@@ -102,10 +101,10 @@ struct CoachView: View {
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif
-      // Home-page chrome consistent with Week / Next / Tasks: a top-left "…"
-      // menu (Settings today). No top-right "+" — goals are added from the
-      // Goals band's own affordance, the section strips, or the coach.
-      .toolbar { homeToolbar }
+      // Shared home-landing chrome (top-left "…" → Settings), identical to
+      // Week / Next. See HomeChrome.swift. No top-right "+" — goals are added
+      // from the Goals band's own affordance, the section strips, or the coach.
+      .homeChrome()
       // Regular width (iPad / macOS): push the coach as a full pane inside
       // this NavigationStack — a real screen with a back button.
       .navigationDestination(item: coachPushBinding) { domain in
@@ -143,28 +142,6 @@ struct CoachView: View {
       }
       .sectionDrawerPresentation()
     }
-  }
-
-  // MARK: - Home chrome
-
-  @ToolbarContentBuilder
-  private var homeToolbar: some ToolbarContent {
-    #if os(iOS)
-    ToolbarItem(placement: .topBarLeading) { homeMenu }
-    #else
-    ToolbarItem(placement: .primaryAction) { homeMenu }
-    #endif
-  }
-
-  private var homeMenu: some View {
-    Menu {
-      Button { nav.showSettings = true } label: {
-        Label("Settings", systemImage: "gearshape")
-      }
-    } label: {
-      Image(systemName: "ellipsis.circle")
-    }
-    .accessibilityLabel("More")
   }
 
   // MARK: - Bands

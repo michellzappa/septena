@@ -5,8 +5,6 @@ import SwiftUI
 // own ScreenTitle ("Next" + arrow icon), so no extra navigationTitle here.
 
 struct NextDashboardView: View {
-  @Environment(NavigationState.self) private var nav
-
   var body: some View {
     NavigationStack {
       NextView()
@@ -14,32 +12,9 @@ struct NextDashboardView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-        // Consistent home-page chrome across Week / Next / Tasks:
-        //   • top-left "…" menu (Settings today; room to grow)
-        // Search lives in the Tasks sidebar, not the dashboard chrome.
-        .toolbar { homeToolbar }
+        // Shared home-landing chrome: the top-left "…" → Settings menu,
+        // identical to Week / Coach. See HomeChrome.swift.
+        .homeChrome()
     }
-  }
-
-  @ToolbarContentBuilder
-  private var homeToolbar: some ToolbarContent {
-    #if os(iOS)
-    ToolbarItem(placement: .topBarLeading) { homeMenu }
-    #else
-    ToolbarItem(placement: .primaryAction) { homeMenu }
-    #endif
-  }
-
-  private var homeMenu: some View {
-    Menu {
-      Button {
-        nav.showSettings = true
-      } label: {
-        Label("Settings", systemImage: "gearshape")
-      }
-    } label: {
-      Image(systemName: "ellipsis.circle")
-    }
-    .accessibilityLabel("More")
   }
 }

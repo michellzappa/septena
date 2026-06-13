@@ -290,7 +290,7 @@ struct WeekDashboardView: View {
         repaint(section: section)
         Task { await refresh(section: section) }
       },
-      toolbar: { homeToolbar }
+      menuExtra: { weekMenuExtra }
     ) {
       ZStack {
         VStack(spacing: Theme.sectionSpacing) {
@@ -405,59 +405,35 @@ struct WeekDashboardView: View {
     }
   }
 
-  @ToolbarContentBuilder
-  private var homeToolbar: some ToolbarContent {
-    #if os(iOS)
-    ToolbarItem(placement: .topBarLeading) { homeMenu }
-    ToolbarItem(placement: .topBarTrailing) { SyncIndicator() }
-    ToolbarItem(placement: .topBarTrailing) { insightsToolbarButton }
-    #else
-    ToolbarItem(placement: .primaryAction) { homeMenu }
-    ToolbarItem(placement: .primaryAction) { SyncIndicator() }
-    ToolbarItem(placement: .primaryAction) { insightsToolbarButton }
-    #endif
-  }
-
-  /// Insights entry point — toolbar button (not a body tile/card: Insights
-  /// has no per-day series, so it belongs in the dashboard's chrome, not its
-  /// section content). Opens the full explorer. Insights is no longer a
-  /// catalog section, so this is always present — the Septena+ gate lives
-  /// inside the destination.
-  private var insightsToolbarButton: some View {
+  /// Week's tab-specific rows for the shared "…" `HomeMenu` (rendered above
+  /// its Settings item — see HomeChrome.swift). No top-right cluster: with an
+  /// empty nav title, items at both corners read as a separate bar spanning
+  /// the top, which the other tabs don't have. So the dashboard-layout
+  /// switcher and Insights live in the menu, and sync status isn't surfaced in
+  /// the chrome at all.
+  @ViewBuilder
+  private var weekMenuExtra: some View {
+    Picker(selection: Binding(
+      get: { currentLayoutMode },
+      set: { homepageLayoutRaw = $0.rawValue }
+    )) {
+      ForEach(HomepageLayoutMode.allCases) { mode in
+        Label(mode.title, systemImage: mode.icon).tag(mode)
+      }
+    } label: {
+      Text("Dashboard")
+    }
+    .pickerStyle(.inline)
+    Divider()
+    // Insights — folded in from the old top-right toolbar button. Insights has
+    // no per-day series, so the menu is its natural home; the Septena+ gate
+    // still lives inside the destination.
     Button {
-      logInsightsOpen("toolbar tapped")
+      logInsightsOpen("menu tapped")
       open(.insights)
     } label: {
-      Image(systemName: "chart.dots.scatter")
+      Label("Insights", systemImage: "chart.dots.scatter")
     }
-    .accessibilityLabel("Insights")
-  }
-
-  private var homeMenu: some View {
-    Menu {
-      Picker(selection: Binding(
-        get: { currentLayoutMode },
-        set: { homepageLayoutRaw = $0.rawValue }
-      )) {
-        ForEach(HomepageLayoutMode.allCases) { mode in
-          Label(mode.title, systemImage: mode.icon).tag(mode)
-        }
-      } label: {
-        Text("Dashboard")
-      }
-      .pickerStyle(.inline)
-      Divider()
-      Button {
-        nav.showSettings = true
-      } label: {
-        Label("Settings", systemImage: "gearshape")
-      }
-    } label: {
-      // Bare glyph (not `ellipsis.circle`) so it sits on the system's
-      // gray toolbar circle — no double ring.
-      Image(systemName: "ellipsis")
-    }
-    .accessibilityLabel("More")
   }
 
   /// Drives the `.navigationDestination` push. Mirrors `sheetDest` only
@@ -2977,7 +2953,7 @@ private struct ComingSoonLayoutPlaceholder: View {
   }
 }
 
-private struct WeekDashboardScreen<CurrentDay: Equatable, Toolbar: ToolbarContent, Content: View>: View {
+private struct WeekDashboardScreen<CurrentDay: Equatable, MenuExtra: View, Content: View>: View {
   let currentDay: CurrentDay
   let onInitialLoad: () async -> Void
   let onTaskChange: () -> Void
@@ -2986,7 +2962,8 @@ private struct WeekDashboardScreen<CurrentDay: Equatable, Toolbar: ToolbarConten
   /// can scope the reload to `note.changedSections` (nil = refresh all).
   let onDataChange: (Notification) -> Void
   let onTileChange: (AddInfoSection) -> Void
-  @ToolbarContentBuilder let toolbar: () -> Toolbar
+  /// Week's tab-specific rows for the shared "…" home menu.
+  @ViewBuilder let menuExtra: () -> MenuExtra
   @ViewBuilder let content: () -> Content
 
   var body: some View {
@@ -3016,10 +2993,10 @@ private struct WeekDashboardScreen<CurrentDay: Equatable, Toolbar: ToolbarConten
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif
-      // Consistent home-page chrome across Week / Next / Tasks:
-      //   • top-left "…" menu (dashboard layout + Settings)
-      // Search lives in the Tasks sidebar, not the dashboard chrome.
-      .toolbar { toolbar() }
+      // Shared home-landing chrome across Week / Next / Coach: the top-left
+      // "…" menu, with Week's dashboard-layout switcher + Insights injected
+      // above the shared Settings row. See HomeChrome.swift.
+      .homeChrome { menuExtra() }
       // Two-phase load: paint cached blobs synchronously so tiles +
       // histograms appear immediately on cold launch, then kick off the
       // network refresh in the background.

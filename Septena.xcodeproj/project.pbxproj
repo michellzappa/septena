@@ -233,6 +233,7 @@
 		552BD8D05534BBE582041BE4 /* TimeOfDayWheel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 729A9E0B1243570301EBC253 /* TimeOfDayWheel.swift */; };
 		55EA2A17835A1384B386E08D /* SolarClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2085456E2239FA343DA34D32 /* SolarClock.swift */; };
 		560C8807DC6FECD5E6E42A0F /* ConvoDerived.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80DEE8B28CA8C41A6CA85016 /* ConvoDerived.swift */; };
+		56B6B35F3EEAA4ADA71C2195 /* HomeChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 105A64B4FE28BF5907996A17 /* HomeChrome.swift */; };
 		56D71037B585C83AC45D16CC /* PurposeSuggestions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C38A953AE520D739651C6766 /* PurposeSuggestions.swift */; };
 		56E87EA383673A4ACE86F2CD /* BadgeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EC7C9D9CAC52C91AFE79AE7 /* BadgeManager.swift */; };
 		574B0FA4260C0E1EC95380AD /* DefaultExerciseLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC732C2F50FC1EC9308BA218 /* DefaultExerciseLibrary.swift */; };
@@ -528,6 +529,7 @@
 		C6EE3C372089D7A231497306 /* ExerciseLibrarySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A708921A7D5F315781CFCF71 /* ExerciseLibrarySheet.swift */; };
 		C7AC2E4E116DAB445A500573 /* AreasBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E598D0EF28BF638E97F3F22 /* AreasBackend.swift */; };
 		C85119F5342B35E8A92658D3 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 82B033F3BFB3BA4D616AA595 /* Localizable.xcstrings */; };
+		C8EBB237FE5D3159919824BF /* HomeChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 105A64B4FE28BF5907996A17 /* HomeChrome.swift */; };
 		C8F7E91227008E29DA40DB5C /* SectionRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B8CA0380F3FD3679CE4C676 /* SectionRecord.swift */; };
 		C9730A8D5FCB43EAC9A6C304 /* NewNutritionEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C180106D47D0477F75695A /* NewNutritionEntrySheet.swift */; };
 		C9A195F8FF0C63824E0A5BD8 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */; };
@@ -772,6 +774,7 @@
 		0D0365044C6EA062BBFCCA6B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		0D3C4FD96F6113A7975BA394 /* AddInfoRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddInfoRouter.swift; sourceTree = "<group>"; };
 		10378514592526AAE3B3A2CF /* MoodVocabulary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodVocabulary.swift; sourceTree = "<group>"; };
+		105A64B4FE28BF5907996A17 /* HomeChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeChrome.swift; sourceTree = "<group>"; };
 		10B86C3DEC61DA049EAC677E /* CoachView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachView.swift; sourceTree = "<group>"; };
 		10C80A63D8E45192FE97CA9D /* NextWidgetViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextWidgetViews.swift; sourceTree = "<group>"; };
 		112DA7513628EF825585692E /* MilestonePresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MilestonePresenter.swift; sourceTree = "<group>"; };
@@ -1762,6 +1765,7 @@
 				9B6D3C89DD47424084AE32D1 /* CommitMotion.swift */,
 				E0E984505A489247AADAB293 /* ConsistencyHeatmap.swift */,
 				32A70DB5FE3A7F04BE3E7BAC /* DayBucketHeader.swift */,
+				105A64B4FE28BF5907996A17 /* HomeChrome.swift */,
 				CE7DF7DE41AF304A9324BC6E /* IntensityGlyph.swift */,
 				C5BCD4DA2CB4E9B237526865 /* KeyboardShortcutsView.swift */,
 				6B5E07B2C36076D991E0F0C1 /* LogCommit.swift */,
@@ -2415,6 +2419,7 @@
 				5330AF71083A1F3514B862B8 /* Haptics.swift in Sources */,
 				EF6F6DC70A2A20577E2BDCBD /* HealthKitBridge.swift in Sources */,
 				AA637C7BAA42F926C11A1854 /* HeatmapHomepageView.swift in Sources */,
+				56B6B35F3EEAA4ADA71C2195 /* HomeChrome.swift in Sources */,
 				E473CB48403FA0B512BB22AC /* HomepageDomain.swift in Sources */,
 				17ADAC551DA38D31B787D33C /* HomepageDomainData.swift in Sources */,
 				4864ED3E9586783879087215 /* HomepageLayoutMode.swift in Sources */,
@@ -2762,6 +2767,7 @@
 				28777ACD729D9C78846219C4 /* Haptics.swift in Sources */,
 				1DFCCAA759E4B23AC3D03C10 /* HealthKitBridge.swift in Sources */,
 				174606742D6D5BE5AFBFCA50 /* HeatmapHomepageView.swift in Sources */,
+				C8EBB237FE5D3159919824BF /* HomeChrome.swift in Sources */,
 				FC4FF942C172ECE99D6CEFD8 /* HomepageDomain.swift in Sources */,
 				AA7B23BB1EA2FA73771D0069 /* HomepageDomainData.swift in Sources */,
 				BE7C64BB366E2EDDCFE60FF6 /* HomepageLayoutMode.swift in Sources */,
