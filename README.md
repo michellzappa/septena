@@ -223,8 +223,6 @@ From `project.yml` and entitlements:
 
 MIT - see [`LICENSE`](LICENSE). Copyright (c) 2026 Michell Zappa.
 
-Two bundled assets are **not** covered by the MIT grant — see [`NOTICE`](NOTICE):
-the Fraunces typeface (SIL Open Font License 1.1, full text in
-[`Septena/Resources/Fraunces-OFL.txt`](Septena/Resources/Fraunces-OFL.txt)) and
+One bundled asset is **not** covered by the MIT grant — see [`NOTICE`](NOTICE):
 the Claude name/logo (an Anthropic trademark, bundled only to identify the
 Claude integration).

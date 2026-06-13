@@ -57,7 +57,6 @@
 		1215F09AD126AB4364B57041 /* NextFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848DD768C118B7BDF4E27FC4 /* NextFeed.swift */; };
 		12177ED82961204B251988C5 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AF3B8630E404CA38C14B10AC /* InfoPlist.xcstrings */; };
 		1418ABD39D3C3BF52077A9A6 /* CommitMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B6D3C89DD47424084AE32D1 /* CommitMotion.swift */; };
-		1482821460D8B8050C19084C /* Fraunces-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = A46A4C109CF7C73318332FD0 /* Fraunces-OFL.txt */; };
 		14A026D5D1BAFF0B4943D0E0 /* GutBristolRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52B5EEA9B508AB5AAB6152F8 /* GutBristolRecorder.swift */; };
 		14AEC1B28FF545504CFC66C4 /* TrainingLiveActivityCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D97027452B1A57DBEAF13DE /* TrainingLiveActivityCoordinator.swift */; };
 		14E4E2DAB8E916A7F6AFDC57 /* InsightsDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12BBB5200E230B6672B99A6A /* InsightsDestination.swift */; };
@@ -93,7 +92,6 @@
 		1EEF01356485CDA24BA9787E /* CorrelationsHomepageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D85EAF7345BE84A44B89936 /* CorrelationsHomepageView.swift */; };
 		1F42E5CB802628226D0D7E8D /* SectionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18F72C4FF8B470B7B889B00 /* SectionPlugin.swift */; };
 		2062DECFE8C3FA1BD4668E60 /* BackfillSupplementsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BE63017AAC0030D65CA758B /* BackfillSupplementsSheet.swift */; };
-		207AC8DAC92253CDCFE9ADD9 /* Fraunces-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = A46A4C109CF7C73318332FD0 /* Fraunces-OFL.txt */; };
 		2173E7FE6EFC115273513DF4 /* TasksQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0B5F0D2E1B01AAEF2217FA4 /* TasksQuickAddMenu.swift */; };
 		2242B79D13554F2C937E85BD /* NutritionSearchSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 533ABAE12036AA623BE82B59 /* NutritionSearchSheet.swift */; };
 		226BFDEF2964B3BA661ACC67 /* DayTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 880B70E1267B3CAAFFBA9D65 /* DayTimelineView.swift */; };
@@ -295,7 +293,6 @@
 		6DB169E3C4B6BC5BA8855D66 /* ResponseCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D6916E979E5B0D7497CAEF /* ResponseCache.swift */; };
 		6DEF721835395CBA52F670D4 /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB454D5630376DAFA9CBF9E1 /* TaskListView.swift */; };
 		6E125F77C986247F15B6D974 /* IntakeKindPageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F995B787672FC82CA5739FC1 /* IntakeKindPageView.swift */; };
-		6E613152F22C42599AE4AAEC /* Fraunces-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 486E060C50F1CDAEAFCE8E73 /* Fraunces-Regular.ttf */; };
 		6F104C934A5BF6230CC8C1F9 /* MoodQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 089893F59A6C1D2025AD8A2C /* MoodQuickAddMenu.swift */; };
 		6F57829A6E98A79B04CCA884 /* BackfillHabitsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55296A1310EF36E96DC73A4E /* BackfillHabitsSheet.swift */; };
 		6FC29C1570873D66E9B800EA /* TimeOfDayWheel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 729A9E0B1243570301EBC253 /* TimeOfDayWheel.swift */; };
@@ -426,7 +423,6 @@
 		A4B759838A13673DB442A013 /* ScreenshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82027987201417F6117BF8DA /* ScreenshotTests.swift */; };
 		A4CE6F3B52A5191642AB9316 /* SharedComplicationData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F191C9B4CF7C226C46AC330 /* SharedComplicationData.swift */; };
 		A5791B520DB844D57AED6211 /* ConvoDerived.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80DEE8B28CA8C41A6CA85016 /* ConvoDerived.swift */; };
-		A5A083B827BC6B45473A9F3A /* Fraunces-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 486E060C50F1CDAEAFCE8E73 /* Fraunces-Regular.ttf */; };
 		A5DBCDF52DE4E8E077C6451E /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */; };
 		A612EFA9DBD5AF34CEBE35F0 /* SchemaSeedRegistrar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A8ACF72CEC4EEB78A6951E1 /* SchemaSeedRegistrar.swift */; };
 		A64695EB2E96AEA85444D310 /* Fasting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5835F104E8DFAA668ACCF9A5 /* Fasting.swift */; };
@@ -849,7 +845,6 @@
 		47CA5EA5A9284AB449966DCC /* NextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextView.swift; sourceTree = "<group>"; };
 		482D9E9FA333137B98A9DBE1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		4847155874CE3B82AD612728 /* WeekDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekDashboardView.swift; sourceTree = "<group>"; };
-		486E060C50F1CDAEAFCE8E73 /* Fraunces-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fraunces-Regular.ttf"; sourceTree = "<group>"; };
 		4A8ACF72CEC4EEB78A6951E1 /* SchemaSeedRegistrar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchemaSeedRegistrar.swift; sourceTree = "<group>"; };
 		4ACB6256DD75D93215BDFD3C /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
 		4D23858A1A44DB2F156B311E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -977,7 +972,6 @@
 		A17A6C44F7BE4CCDA2085224 /* TrainingTabAccessory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingTabAccessory.swift; sourceTree = "<group>"; };
 		A2E72A113E9D2B6BD889AEA1 /* DateParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateParserTests.swift; sourceTree = "<group>"; };
 		A3319F7A0826C7F360313B88 /* CoachSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachSession.swift; sourceTree = "<group>"; };
-		A46A4C109CF7C73318332FD0 /* Fraunces-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Fraunces-OFL.txt"; sourceTree = "<group>"; };
 		A47ACBC76B98315A93EB462E /* CoachTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachTile.swift; sourceTree = "<group>"; };
 		A4C5E5E15422EB17DB5D3960 /* EditGroceryItemSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditGroceryItemSheet.swift; sourceTree = "<group>"; };
 		A708921A7D5F315781CFCF71 /* ExerciseLibrarySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseLibrarySheet.swift; sourceTree = "<group>"; };
@@ -1907,8 +1901,6 @@
 		E5651035008888FF03C82755 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				A46A4C109CF7C73318332FD0 /* Fraunces-OFL.txt */,
-				486E060C50F1CDAEAFCE8E73 /* Fraunces-Regular.ttf */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -2202,8 +2194,6 @@
 				59D1D3BB3E05AF32C782A9C7 /* AppIcon.icns in Resources */,
 				A5DBCDF52DE4E8E077C6451E /* AppIcon.icon in Resources */,
 				D4B1495C0BDE3AF22A629505 /* Assets.xcassets in Resources */,
-				207AC8DAC92253CDCFE9ADD9 /* Fraunces-OFL.txt in Resources */,
-				6E613152F22C42599AE4AAEC /* Fraunces-Regular.ttf in Resources */,
 				36325B1E6E5A771C01028105 /* Info.plist in Resources */,
 				12177ED82961204B251988C5 /* InfoPlist.xcstrings in Resources */,
 				C1167F10A74CFA8D5CA55A4B /* Localizable.xcstrings in Resources */,
@@ -2227,8 +2217,6 @@
 				A14B8DF03D6FC0799D8AA8C2 /* AppIcon.icns in Resources */,
 				C9A195F8FF0C63824E0A5BD8 /* AppIcon.icon in Resources */,
 				FB79CB77D7DB4D47195A606D /* Assets.xcassets in Resources */,
-				1482821460D8B8050C19084C /* Fraunces-OFL.txt in Resources */,
-				A5A083B827BC6B45473A9F3A /* Fraunces-Regular.ttf in Resources */,
 				3D19536CFB66987D6D5C7642 /* Info-Mac.plist in Resources */,
 				5AB6DCD8964000E8587CA140 /* InfoPlist.xcstrings in Resources */,
 				C85119F5342B35E8A92658D3 /* Localizable.xcstrings in Resources */,

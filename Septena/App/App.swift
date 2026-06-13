@@ -12,17 +12,6 @@ import AppKit
 
 @main
 struct SeptenaApp: App {
-  init() {
-    Self.registerFraunces()
-  }
-
-  private static func registerFraunces() {
-    guard let url = Bundle.main.url(forResource: "Fraunces-Regular", withExtension: "ttf") else { return }
-    var errorRef: Unmanaged<CFError>?
-    _ = CTFontManagerRegisterFontsForURL(url as CFURL, .process, &errorRef)
-    errorRef?.release()
-  }
-
   @State private var navigation = NavigationState()
   @State private var theme = SectionTheme()
   @State private var trainingDraft = TrainingDraftStore()

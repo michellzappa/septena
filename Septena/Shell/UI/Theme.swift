@@ -300,40 +300,25 @@ enum Theme {
 // MARK: - Typography
 //
 // Three-family system (see docs/DesignSpec.md §5):
-//   - SF Pro (system)  → UI body, controls, labels, buttons, most titles
-//   - Fraunces (serif) → Dashboard welcome only (septenaWelcomeTitle); rare by design
-//   - System mono      → numerics / metrics (tabular)
-//
-// Fraunces is registered via Info.plist `UIAppFonts` (iOS) and
-// `ATSApplicationFontsPath` (Mac). If the file isn't bundled, Font.custom
-// silently falls back to system — so the app stays buildable either way.
-//
-// Use `Font.custom(_, size:, relativeTo:)` so Dynamic Type still scales.
+//   - SF Pro (system)         → UI body, controls, labels, buttons, most titles
+//   - New York/system serif   → restrained editorial display moments
+//   - System mono             → numerics / metrics (tabular)
 
 extension Font {
-  // Fraunces PostScript names registered by the bundled variable font.
-  // We address weights by name rather than via `.weight(...)` on a single
-  // base, because SwiftUI's weight modifier can't navigate this font's
-  // multi-axis design (opsz/SOFT/wght/WONK) and silently fails.
-  private static let frauncesRegular  = "Fraunces-9ptRegular"
-  private static let frauncesSemiBold = "Fraunces-9ptSemiBold"
-  private static let frauncesBold     = "Fraunces-9ptBold"
-
   // MARK: Titles
-  // Fraunces is reserved for the Dashboard welcome only (septenaWelcomeTitle) —
-  // the app's front door and the home of the (soon AI-infused) one-liner.
-  // Interior destination headers use SF Pro so arriving at the editorial face
-  // stays a moment, not a frame you can't escape.
+  // The editorial face uses SwiftUI's system serif design, which maps to
+  // Apple's New York on Apple platforms and keeps Dynamic Type native.
+  // Interior destination headers use SF Pro so app chrome remains familiar.
   /// Destination header — SF Pro semibold at largeTitle. Neutral interior H1.
   static let septenaScreenTitle  = Font.system(.largeTitle, weight: .semibold)
-  /// Dashboard welcome greeting — Fraunces SemiBold. The one Fraunces user.
-  static let septenaWelcomeTitle = Font.custom(frauncesSemiBold, size: 34, relativeTo: .largeTitle)
-  /// App wordmark — Fraunces SemiBold, used where the name *is* the brand
+  /// Dashboard welcome greeting — New York Large Semibold Italic.
+  static let septenaWelcomeTitle = Font.system(.largeTitle, design: .serif).weight(.semibold).italic()
+  /// App wordmark — New York Semibold, used where the name *is* the brand
   /// (the About pane). Shares the editorial face of the Dashboard welcome.
-  static let septenaWordmark     = Font.custom(frauncesSemiBold, size: 28, relativeTo: .title)
-  /// Goal card title — Fraunces SemiBold. A goal's first line is its name,
+  static let septenaWordmark     = Font.system(.title, design: .serif).weight(.semibold)
+  /// Goal card title — New York Semibold. A goal's first line is its name,
   /// so it gets the editorial face; the rest of the text reads as body.
-  static let septenaGoalTitle    = Font.custom(frauncesSemiBold, size: 22, relativeTo: .title3)
+  static let septenaGoalTitle    = Font.system(.title3, design: .serif).weight(.semibold)
   /// Section header within a screen — SF Pro semibold at title2.
   static let septenaSectionTitle = Font.system(.title2, weight: .semibold)
   /// Card header — SF Pro at headline (already semibold by default).

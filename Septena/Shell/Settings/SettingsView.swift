@@ -1646,7 +1646,7 @@ enum SeptenaPlus {
   )
 
   /// Champagne-gold foil — the single Plus accent. Warm, to sit with the
-  /// app's Fraunces serif. Used flat for fills/strokes…
+  /// app's New York serif. Used flat for fills/strokes…
   static let foil = parseHexColor("#C9A86A")
   /// …and as a metallic sweep for rims and the avatar ring.
   static let foilGradient = LinearGradient(
