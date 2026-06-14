@@ -1326,6 +1326,33 @@ struct TaskListView: View {
     let newStatus: TaskStatus = task.status == .done ? .open : .done
     if newStatus == .open { Haptics.tap() }
 
+    // Completion never relocates a row. We open the settle window BEFORE the
+    // status flip so the row stays put while it lingers — `settle.isSettling(id)`
+    // keeps it visible (see `visibleItems` and the grouped pool) and `load()`
+    // preserves settling rows, so the `.septenaTasksChanged` this completion
+    // posts can't yank it. After the beat the settle clears and the row fades
+    // out IN PLACE and is gone (it lives on in the dedicated Logbook); the empty
+    // animated transaction lets that removal play `.transition(.opacity)`.
+    // Uncomplete cancels the pending fade.
+    //
+    // Order matters: the pool filter is `status != .done || settle.isSettling`.
+    // The status flip is an @State mutation wrapped in `withAnimation`, while
+    // `settling` lives on the separate @Observable `SettleStore` and commits in
+    // its own (un-animated) transaction. If we flipped first, SwiftUI could
+    // paint one frame where status == .done but settling == false — the pool
+    // would drop the row, the rows below would animate up over the settle beat,
+    // then snap back when `settling` lands a frame later. Marking the row
+    // settling first means there is no `done && !settling` frame: an open row is
+    // always in the pool, and a done-and-settling row is too, so the row never
+    // leaves it across the two transactions.
+    if newStatus == .done {
+      settle.schedule(task.id) {
+        motion.run(Theme.Motion.settle) { }
+      }
+    } else {
+      settle.cancel(task.id)
+    }
+
     motion.run(Theme.Motion.settle) { flipStatus(id: task.id, to: newStatus) }
 
     // Context-scaled completion haptic (see `TaskCelebration`): runs after
@@ -1343,22 +1370,6 @@ struct TaskListView: View {
     }
     if newStatus == .done { sessionDoneIds.insert(task.id) }
     else                  { sessionDoneIds.remove(task.id) }
-
-    // Completion never relocates a row. We open a settle window so the row
-    // stays put while it lingers — `settle.isSettling(id)` keeps it visible
-    // (see `visibleItems` and the grouped pool) and `load()` preserves
-    // settling rows, so the `.septenaTasksChanged` this completion posts can't
-    // yank it. After the beat the settle clears and the row simply fades out
-    // IN PLACE and is gone (it lives on in the dedicated Logbook). The empty
-    // animated transaction lets the settle-clear removal play
-    // `.transition(.opacity)`. Uncomplete cancels the pending fade.
-    if newStatus == .done {
-      settle.schedule(task.id) {
-        motion.run(Theme.Motion.settle) { }
-      }
-    } else {
-      settle.cancel(task.id)
-    }
 
     if newStatus == .done {
       mutator.complete(id: task.id)
