@@ -46,7 +46,7 @@ struct CoachChatView: View {
     #endif
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
-        Menu {
+        OverflowMenu(systemImage: makingGoal ? "hourglass" : "ellipsis") {
           // Time window — tucked into its own submenu.
           Menu {
             Picker("Look back", selection: $window) {
@@ -78,8 +78,6 @@ struct CoachChatView: View {
             }
             .disabled(session.isThinking)
           }
-        } label: {
-          Image(systemName: makingGoal ? "hourglass" : "ellipsis.circle")
         }
       }
     }

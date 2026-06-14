@@ -7,11 +7,37 @@ import SwiftUI
 // own rows above the shared Settings item (Week adds the dashboard-layout
 // switcher + Insights); tabs with nothing extra get just Settings.
 //
-// Tasks is the deliberate exception: it keeps its sidebar (Settings is a row
-// there), so it doesn't adopt this.
+// Tasks is the deliberate exception: it keeps its sidebar, so it doesn't adopt
+// the `homeChrome` modifier — but its phone "…" menu still reuses `HomeMenu`
+// (see SidebarView.phoneMoreMenu) so the glyph stays in the family.
 
-/// The top-left "…" menu. `extra` renders above the shared Settings row, so a
-/// caller stacks its own rows (plus any `Divider`) on top.
+/// The standard toolbar overflow ("…") menu. Owns the glyph and the "More"
+/// accessibility label so every overflow menu across the app reads the same and
+/// the glyph lives in exactly one place. `systemImage` only varies for menus
+/// that show a transient state in the slot (e.g. an hourglass while busy).
+struct OverflowMenu<Content: View>: View {
+  private let systemImage: String
+  private let content: Content
+
+  init(systemImage: String = "ellipsis", @ViewBuilder content: () -> Content) {
+    self.systemImage = systemImage
+    self.content = content()
+  }
+
+  var body: some View {
+    Menu {
+      content
+    } label: {
+      // Bare glyph (not `ellipsis.circle`) so it sits on the system's glass
+      // toolbar circle without doubling the ring on iOS 26.
+      Image(systemName: systemImage)
+    }
+    .accessibilityLabel("More")
+  }
+}
+
+/// The top-left "…" menu for the home tabs. `extra` renders above the shared
+/// Settings row, so a caller stacks its own rows (plus any `Divider`) on top.
 struct HomeMenu<Extra: View>: View {
   @Environment(NavigationState.self) private var nav
   private let extra: Extra
@@ -19,17 +45,12 @@ struct HomeMenu<Extra: View>: View {
   init(@ViewBuilder extra: () -> Extra) { self.extra = extra() }
 
   var body: some View {
-    Menu {
+    OverflowMenu {
       extra
       Button { nav.showSettings = true } label: {
         Label("Settings", systemImage: "gearshape")
       }
-    } label: {
-      // Bare glyph (not `ellipsis.circle`) so it sits on the system's glass
-      // toolbar circle without doubling the ring on iOS 26.
-      Image(systemName: "ellipsis")
     }
-    .accessibilityLabel("More")
   }
 }
 

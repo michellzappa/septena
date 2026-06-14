@@ -322,7 +322,7 @@ struct ProjectDetailView: View {
     .septenaInlineTitle()
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
-        Menu {
+        OverflowMenu {
           Button {
             showingRepoEditor = true
           } label: {
@@ -349,8 +349,6 @@ struct ProjectDetailView: View {
           } label: {
             Label("Delete Project", systemImage: "trash")
           }
-        } label: {
-          Image(systemName: "ellipsis.circle").foregroundStyle(Theme.inkSecondary)
         }
       }
     }
