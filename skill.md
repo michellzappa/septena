@@ -52,7 +52,7 @@ The tool list is **dynamic**: on `tools/list` the gateway reads the user's `Sett
 ### Tasks
 - Views: `today`, `inbox`, `upcoming`, `anytime`, `completed`. `anytime` is the single home for open, dateless tasks (it absorbed the former `someday` bucket). **`anytime` is NOT "all tasks"** — it excludes inbox-only items.
 - `tasks_list` returns `{tasks, total, truncated}` — **`truncated: true` means more rows exist beyond `limit`**, so don't conclude a task is missing/deleted from a capped page; raise `limit` or use `tasks_get`.
-- **`tasks_get(id)`** — one call for "where is this task, what's its state?": title, status, area, project, scheduled, due, today, completedAt, source, plus a compact convo summary. Works regardless of view or status; use this instead of scanning lists to locate a known id.
+- **`tasks_get(id)`** — one call for "where is this task, what's its state?": title, status, area, project, scheduled, deadline, today, completedAt, source, plus a compact convo summary. Works regardless of view or status; use this instead of scanning lists to locate a known id.
 - `tasks_complete` will **error on recurring tasks** — tell the user to complete those in the app so the next occurrence spawns correctly.
 - Resolve `area`/`project` names → ids via `tasks_list_areas` / `tasks_list_projects` before creating/updating.
 
@@ -96,7 +96,7 @@ are stamped `source: "mcp"`, so they land in the user's **triage** pile — the
 user ratifies what enters their day; you can't write straight into `today`. So:
 
 - A task you create shows up immediately in `tasks_list(view: "triage")`.
-- The `today` / `scheduled` / `due` / `project` you set become the *proposed
+- The `today` / `scheduled` / `deadline` / `project` you set become the *proposed
   disposition* the user accepts with one tap. They do **not** make the task
   appear in `today` / `upcoming` / `anytime` yet.
 - Once the user ratifies it (or after ~7 days unacknowledged, when the proposal
@@ -106,7 +106,7 @@ user ratifies what enters their day; you can't write straight into `today`. So:
 |----------------------|--------------------------------|
 | `today: true`        | `today`, `anytime`             |
 | `scheduled: <date>`  | `upcoming`, `anytime`          |
-| `due: <date>` only   | `anytime` (deadline only)      |
+| `deadline: <date>`   | `anytime` (no route)           |
 | None of the above    | loose capture (stays to-sort)  |
 
 `area` and `project` tag a task for filtering but don't route it on their own.

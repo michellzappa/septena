@@ -139,7 +139,7 @@ const GLOBAL_TOOLS: Tool[] = [
   {
     name: "tasks_get",
     description:
-      "Inspect a single task by id: title, status, area, project, scheduled, due, today, completedAt, source, and a compact conversation summary. One call answers 'where is this task and what's its state?' regardless of view or status.",
+      "Inspect a single task by id: title, status, area, project, scheduled, deadline, today, completedAt, source, and a compact conversation summary. One call answers 'where is this task and what's its state?' regardless of view or status.",
     inputSchema: getTaskJsonSchema,
   },
   {
@@ -164,7 +164,7 @@ const GLOBAL_TOOLS: Tool[] = [
   },
   {
     name: "tasks_update",
-    description: "Update fields on an existing task. Any subset of title, today, scheduled, due, area, project, status (cancelled).",
+    description: "Update fields on an existing task. Any subset of title, today, scheduled, deadline, area, project, status (cancelled).",
     inputSchema: updateTaskJsonSchema,
   },
   {

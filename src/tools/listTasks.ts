@@ -62,8 +62,8 @@ export async function listTasks(
   const limit = input.limit ?? 100;
 
   // CKQuery can express EQUALS but not OR-unions or IS-NULL. iOS's
-  // Today view is (today=true OR scheduled<=today OR due<=today) and
-  // Inbox is "no area, project, scheduled, due, today" — neither
+  // Today view is (today=true OR scheduled<=today OR deadline<=today) and
+  // Inbox is "no area, project, scheduled, deadline, today" — neither
   // expressible server-side. So for these views we fetch the full open-
   // task population and filter client-side using iOS's rules (see
   // Persistence.swift LocalCache.tasks(filter:)).

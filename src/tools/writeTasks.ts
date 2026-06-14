@@ -82,7 +82,7 @@ export const createTaskJsonSchema = {
     title: { type: "string", minLength: 1 },
     today: { type: "boolean", default: false },
     scheduled: { type: "string", description: "YYYY-MM-DD" },
-    due: { type: "string", description: "YYYY-MM-DD" },
+    deadline: { type: "string", description: "YYYY-MM-DD (hard deadline)" },
     area: { type: "string", description: "Area id (e.g. 'envisioning')" },
     project: { type: "string", description: "Project id (e.g. 'septena')" },
   },
@@ -102,7 +102,7 @@ export const updateTaskJsonSchema = {
     title: { type: "string" },
     today: { type: "boolean" },
     scheduled: { type: ["string", "null"], description: "YYYY-MM-DD, or null to clear" },
-    due: { type: ["string", "null"], description: "YYYY-MM-DD, or null to clear" },
+    deadline: { type: ["string", "null"], description: "YYYY-MM-DD, or null to clear" },
     area: { type: ["string", "null"] },
     project: { type: ["string", "null"] },
     status: { type: "string", enum: ["open", "cancelled"] },
@@ -125,6 +125,8 @@ export interface CreateTaskInput {
   title: string;
   today?: boolean;
   scheduled?: string;
+  deadline?: string;
+  /** Legacy alias for `deadline` — still accepted on input for back-compat. */
   due?: string;
   area?: string;
   project?: string;
@@ -135,6 +137,8 @@ export interface UpdateTaskInput {
   title?: string;
   today?: boolean;
   scheduled?: string | null;
+  deadline?: string | null;
+  /** Legacy alias for `deadline` — still accepted on input for back-compat. */
   due?: string | null;
   area?: string | null;
   project?: string | null;
@@ -156,7 +160,8 @@ export async function createTask(client: CloudKitClient, input: CreateTaskInput)
     today: { value: input.today ? 1 : 0 },
   };
   if (input.scheduled) fields.scheduled = { value: input.scheduled };
-  if (input.due) fields.deadline = { value: input.due };
+  const createDeadline = input.deadline ?? input.due;
+  if (createDeadline) fields.deadline = { value: createDeadline };
   if (input.area) fields.area = { value: input.area };
   if (input.project) fields.project = { value: input.project };
 
@@ -221,7 +226,8 @@ export async function updateTask(client: CloudKitClient, input: UpdateTaskInput)
     updated.push("today");
   }
   if (input.scheduled !== undefined) { fields.scheduled = { value: input.scheduled ?? "" }; updated.push("scheduled"); }
-  if (input.due !== undefined) { fields.deadline = { value: input.due ?? "" }; updated.push("deadline"); }
+  const updDeadline = input.deadline !== undefined ? input.deadline : input.due;
+  if (updDeadline !== undefined) { fields.deadline = { value: updDeadline ?? "" }; updated.push("deadline"); }
   if (input.area !== undefined) {
     fields.area = { value: input.area ?? "" };
     if (input.area) fields.project = { value: "" };
@@ -417,7 +423,7 @@ export async function getTask(client: CloudKitClient, input: { id: string }) {
     status: (fields.status?.value as string) ?? "open",
     today: ((fields.today?.value as number) ?? 0) !== 0,
     scheduled: optionalString(fields.scheduled?.value),
-    due: optionalString(fields.deadline?.value),
+    deadline: optionalString(fields.deadline?.value),
     area: optionalString(fields.area?.value),
     project: optionalString(fields.project?.value),
     completedAt: optionalString(fields.completedAt?.value),
