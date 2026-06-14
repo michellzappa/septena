@@ -1010,7 +1010,7 @@ struct MovePickerSheet: View {
           // Areas with their projects nested directly underneath, mirroring
           // the sidebar's hierarchy.
           ForEach(filteredAreas) { area in
-            row(.area, title: area.title,
+            row(.area, title: area.title, emoji: area.emoji,
                 selected: currentProjectId == nil && area.id == currentAreaId) {
               onPick(area.id, nil); dismiss()
             }
@@ -1064,11 +1064,11 @@ struct MovePickerSheet: View {
   private enum RowKind { case inbox, area, project }
 
   @ViewBuilder
-  private func row(_ kind: RowKind, title: String, selected: Bool,
+  private func row(_ kind: RowKind, title: String, emoji: String? = nil, selected: Bool,
                    indent: Bool = false, action: @escaping () -> Void) -> some View {
     Button(action: { Haptics.pick(); action() }) {
       HStack(spacing: 12) {
-        icon(for: kind)
+        icon(for: kind, emoji: emoji)
           .frame(width: 24, alignment: .center)
         Text(title)
           .scaledFont(size: 16, weight: kind == .area ? .semibold : .regular)
@@ -1090,14 +1090,14 @@ struct MovePickerSheet: View {
   }
 
   @ViewBuilder
-  private func icon(for kind: RowKind) -> some View {
+  private func icon(for kind: RowKind, emoji: String? = nil) -> some View {
     switch kind {
     case .inbox:
       Image(systemName: "tray.fill")
         .scaledFont(size: 16)
         .foregroundStyle(Theme.iconMuted)
     case .area:
-      AreaIcon(diameter: 14, lineWidth: 1.5)
+      AreaIcon(diameter: 14, lineWidth: 1.5, emoji: emoji)
     case .project:
       // Pie glyph — same component as sidebar / detail page.
       ProjectProgressIcon(progress: 0.25, tint: Theme.iconMuted, diameter: 14)

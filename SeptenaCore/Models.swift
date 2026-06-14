@@ -299,14 +299,17 @@ struct Area: Identifiable, Codable, Hashable {
   let id: String
   var title: String
   var context: String?
+  /// Optional user-assigned glyph; nil ⇒ the area renders its filler dot.
+  var emoji: String?
   var updatedAt: String?
   // Areas are stored on the server as a single wholesale-replace array,
   // so there's no per-row tombstone. Removed areas just stop appearing
   // in /changes — we delete-by-omission for areas, tombstone for tasks
   // and projects. No `deletedAt` field by design.
 
-  init(id: String, title: String, context: String? = nil, updatedAt: String? = nil) {
-    self.id = id; self.title = title; self.context = context
+  init(id: String, title: String, context: String? = nil, emoji: String? = nil,
+       updatedAt: String? = nil) {
+    self.id = id; self.title = title; self.context = context; self.emoji = emoji
     self.updatedAt = updatedAt
   }
 
@@ -315,11 +318,12 @@ struct Area: Identifiable, Codable, Hashable {
     id = try c.decode(String.self, forKey: .id)
     title = try c.decodeIfPresent(String.self, forKey: .title) ?? id
     context = try c.decodeIfPresent(String.self, forKey: .context)
+    emoji = try c.decodeIfPresent(String.self, forKey: .emoji)
     updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
   }
 
   enum CodingKeys: String, CodingKey {
-    case id, title, context
+    case id, title, context, emoji
     case updatedAt = "updated_at"
   }
 }

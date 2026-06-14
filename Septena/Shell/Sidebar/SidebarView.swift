@@ -1095,12 +1095,14 @@ struct SectionGlyph: View {
 
 struct SidebarAreaRow: View {
   let name: String
+  /// Optional user glyph; nil ⇒ the muted dot.
+  var emoji: String? = nil
   /// Open task count rolled up across the area (loose + projects in it).
   var count: Int = 0
 
   var body: some View {
     HStack(spacing: Theme.sidebarRowSpacing) {
-      AreaIcon()
+      AreaIcon(emoji: emoji)
         .frame(width: Theme.sidebarIconSize + 4, alignment: .center)
       Text(name)
         .scaledFont(size: Theme.sidebarAreaTitleSize, weight: .semibold)
@@ -1128,15 +1130,25 @@ struct AreaIcon: View {
   /// Retained for call-site compatibility with the previous two-circle
   /// glyph — ignored by the new rendering.
   var lineWidth: CGFloat? = nil
+  /// User-assigned glyph. When present it takes the dot's place in the same
+  /// icon column, so areas with an emoji read at a glance and areas without
+  /// keep the neutral dot.
+  var emoji: String? = nil
 
   private var resolvedDiameter: CGFloat { diameter ?? Theme.sidebarIconSize * 0.95 }
 
   var body: some View {
-    Circle()
-      .fill(tint)
-      .frame(width: resolvedDiameter * 0.42,
-             height: resolvedDiameter * 0.42)
-      .frame(width: resolvedDiameter, height: resolvedDiameter)
+    if let emoji, !emoji.isEmpty {
+      Text(emoji)
+        .font(.system(size: resolvedDiameter * 0.82))
+        .frame(width: resolvedDiameter, height: resolvedDiameter)
+    } else {
+      Circle()
+        .fill(tint)
+        .frame(width: resolvedDiameter * 0.42,
+               height: resolvedDiameter * 0.42)
+        .frame(width: resolvedDiameter, height: resolvedDiameter)
+    }
   }
 }
 

@@ -262,17 +262,22 @@ final class AreaEntity {
   @Attribute(.unique) var id: String
   var title: String
   var context: String?
+  /// Optional user-assigned glyph. When set, it replaces the area's filler
+  /// dot wherever the area appears (sidebar, headers, pickers) — a Tier-3
+  /// emoji in design-system terms. Nil ⇒ fall back to the dot.
+  var emoji: String?
   var lastSyncedAt: Date
   var updatedAt: String?
   /// CKRecord system-fields blob. See `TaskEntity.cloudKitSystemFields`.
   var cloudKitSystemFields: Data?
 
-  init(id: String, title: String, context: String? = nil,
+  init(id: String, title: String, context: String? = nil, emoji: String? = nil,
        lastSyncedAt: Date = .distantPast, updatedAt: String? = nil,
        cloudKitSystemFields: Data? = nil) {
     self.id = id
     self.title = title
     self.context = context
+    self.emoji = emoji
     self.lastSyncedAt = lastSyncedAt
     self.updatedAt = updatedAt
     self.cloudKitSystemFields = cloudKitSystemFields
@@ -1656,7 +1661,8 @@ extension Project {
 
 extension Area {
   init(_ e: AreaEntity) {
-    self.init(id: e.id, title: e.title, context: e.context, updatedAt: e.updatedAt)
+    self.init(id: e.id, title: e.title, context: e.context, emoji: e.emoji,
+              updatedAt: e.updatedAt)
   }
 }
 

@@ -24,9 +24,11 @@ enum AreaCloudKitSchema {
   enum Field {
     static let title = "title"
     static let context = "context"
+    // Optional user-assigned glyph. Rides the first reserved string slot so
+    // the record type isn't bumped — an additive promotion in Prod.
+    static let emoji = "reservedString1"
 
     // Reserved for foreseeable additions without bumping the record type.
-    static let reservedString1 = "reservedString1"
     static let reservedString2 = "reservedString2"
     static let reservedDate1 = "reservedDate1"
     static let reservedInt1 = "reservedInt1"
@@ -57,6 +59,7 @@ extension AreaEntity {
     )
     record[AreaCloudKitSchema.Field.title] = title
     record[AreaCloudKitSchema.Field.context] = context
+    record[AreaCloudKitSchema.Field.emoji] = emoji
     return record
   }
 }
@@ -67,6 +70,7 @@ extension AreaEntity {
   func apply(_ record: CKRecord) {
     if let v = record[AreaCloudKitSchema.Field.title] as? String { title = v }
     context = optionalAreaString(record[AreaCloudKitSchema.Field.context])
+    emoji = optionalAreaString(record[AreaCloudKitSchema.Field.emoji])
     captureCloudKitSystemFields(from: record)
   }
 

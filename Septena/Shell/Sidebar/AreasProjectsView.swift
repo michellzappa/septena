@@ -82,6 +82,9 @@ struct AreaDetailView: View {
   @State private var draftName: String
   @State private var draftNotes: String
   @State private var originalNotes: String
+  @State private var draftEmoji: String
+  @State private var originalEmoji: String
+  @State private var showingEmojiEditor = false
   @State private var areas: [Area]
   @State private var projects: [Project]
   @State private var projectProgress: [String: Double] = [:]
@@ -95,6 +98,8 @@ struct AreaDetailView: View {
     _draftName = State(initialValue: area.title)
     _draftNotes = State(initialValue: area.context ?? "")
     _originalNotes = State(initialValue: area.context ?? "")
+    _draftEmoji = State(initialValue: area.emoji ?? "")
+    _originalEmoji = State(initialValue: area.emoji ?? "")
     // Seed area + project lists from cache before first render so the
     // project rows are present immediately on navigate-in.
     let ctx = LocalStore.shared.container.mainContext
@@ -114,8 +119,14 @@ struct AreaDetailView: View {
       VStack(alignment: .leading, spacing: 0) {
         VStack(alignment: .leading, spacing: 10) {
           HStack(spacing: Theme.iconTextGap) {
-            AreaIcon(diameter: Theme.checkboxTap)
-              .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
+            Button { showingEmojiEditor = true } label: {
+              AreaIcon(diameter: Theme.checkboxTap,
+                       emoji: draftEmoji.isEmpty ? nil : draftEmoji)
+                .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $showingEmojiEditor) { emojiEditor }
             ClickToEditTitle(placeholder: "Area", text: $draftName) { newName in
               commitName(newName)
             }
@@ -211,6 +222,16 @@ struct AreaDetailView: View {
       }
     }
 
+    // Same for the glyph — keep originalEmoji in lockstep so the editor's
+    // onChange doesn't echo the refreshed value back as a write.
+    if !showingEmojiEditor, let fresh = areas.first(where: { $0.id == area.id }) {
+      let serverEmoji = fresh.emoji ?? ""
+      if serverEmoji != draftEmoji {
+        originalEmoji = serverEmoji
+        draftEmoji = serverEmoji
+      }
+    }
+
     // Group tasks by project to compute progress per project.
     do {
       let items = await allInArea.items
@@ -244,6 +265,44 @@ struct AreaDetailView: View {
       do {
         try await areasMutator.setContext(id: area.id,
                                           context: draftNotes.isEmpty ? nil : draftNotes)
+      } catch {
+        errorMessage = error.localizedDescription
+      }
+    }
+  }
+
+  /// Free-form single-glyph picker. Matches the bare TextField every other
+  /// emoji editor uses today; a richer curated picker is tracked separately.
+  private var emojiEditor: some View {
+    VStack(spacing: 12) {
+      TextField("Emoji", text: $draftEmoji)
+        .multilineTextAlignment(.center)
+        .font(.system(size: 34))
+        .frame(width: 84, height: 56)
+        .onChange(of: draftEmoji) { _, newValue in
+          // Hold one grapheme. Reassigning re-fires onChange, which then
+          // commits the stable value once.
+          let clamped = String(newValue.suffix(1))
+          if clamped != newValue { draftEmoji = clamped; return }
+          commitEmoji(newValue)
+        }
+      Button("Clear") {
+        draftEmoji = ""
+        showingEmojiEditor = false
+      }
+      .disabled(draftEmoji.isEmpty)
+    }
+    .padding()
+    .presentationCompactAdaptation(.popover)
+  }
+
+  private func commitEmoji(_ value: String) {
+    guard value != originalEmoji else { return }
+    originalEmoji = value
+    Task {
+      do {
+        try await areasMutator.setEmoji(id: area.id,
+                                        emoji: value.isEmpty ? nil : value)
       } catch {
         errorMessage = error.localizedDescription
       }
@@ -589,7 +648,7 @@ struct AreaPickerSheet: View {
         ForEach(areas) { area in
           Button { onPick(area.id); dismiss() } label: {
             row(label: area.title, icon: "square.stack.3d.up.fill",
-                selected: currentAreaId == area.id)
+                emoji: area.emoji, selected: currentAreaId == area.id)
           }
           .buttonStyle(.plain)
         }
@@ -606,10 +665,10 @@ struct AreaPickerSheet: View {
   }
 
   @ViewBuilder
-  private func row(label: String, icon: String, selected: Bool) -> some View {
+  private func row(label: String, icon: String, emoji: String? = nil, selected: Bool) -> some View {
     HStack(spacing: 12) {
       if icon == "square.stack.3d.up.fill" {
-        AreaIcon(diameter: 15, lineWidth: 1.1)
+        AreaIcon(diameter: 15, lineWidth: 1.1, emoji: emoji)
           .frame(width: 22)
       } else {
         Image(systemName: icon)

@@ -1051,6 +1051,7 @@ struct TaskListView: View {
         } header: {
           groupHeader(icon: "square.stack.3d.up.fill",
                       title: area.title,
+                      areaEmoji: area.emoji,
                       onTap: { nav.path = [.area(area)] })
         }
       }
@@ -1117,13 +1118,16 @@ struct TaskListView: View {
   @ViewBuilder
   private func groupHeader(icon: String?,
                            title: String,
+                           areaEmoji: String? = nil,
                            onTap: (() -> Void)? = nil) -> some View {
-    groupHeaderBody(icon: icon, title: title, onTap: onTap)
+    groupHeaderBody(icon: icon, title: title, areaEmoji: areaEmoji, onTap: onTap)
       .textCase(nil)
       .selectionDisabled()
   }
 
-  private func groupHeaderBody(icon: String?, title: String, onTap: (() -> Void)? = nil) -> some View {
+  private func groupHeaderBody(icon: String?, title: String,
+                               areaEmoji: String? = nil,
+                               onTap: (() -> Void)? = nil) -> some View {
     // Same icon column width and same icon→text gap as task rows so
     // every icon sits at one X and every text starts at one X.
     #if os(macOS)
@@ -1140,8 +1144,8 @@ struct TaskListView: View {
         if icon == "square.stack.3d.up.fill" {
           // Area dot is intentionally bumped past task-row icon size — it's a
           // section header, not an inline glyph, and the larger circle reads as
-          // a chapter marker.
-          AreaIcon(tint: Theme.inkSecondary, diameter: 21, lineWidth: 1.5)
+          // a chapter marker. A user emoji takes the dot's place.
+          AreaIcon(tint: Theme.inkSecondary, diameter: 21, lineWidth: 1.5, emoji: areaEmoji)
             .frame(width: Theme.checkboxTap, alignment: .center)
         } else if icon != nil {
           Image(systemName: icon!)

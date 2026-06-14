@@ -186,7 +186,8 @@ These six are the task backend, written by `SeptenaCore/CloudKit/*Record.swift`.
 |---|---|---|---|---|
 | `title` | String | `String` | No | |
 | `context` | String | `String?` | Yes | |
-| `reservedString1`, `reservedString2`, `reservedDate1`, `reservedInt1` | — | reserved | — | |
+| `reservedString1` | String | `String?` (`emoji`) | Yes | user-assigned glyph; replaces the area dot in UI |
+| `reservedString2`, `reservedDate1`, `reservedInt1` | — | reserved | — | |
 
 #### Project  — recordName `project:{id}`
 | Field | CK type | Swift | Nullable | Notes |
