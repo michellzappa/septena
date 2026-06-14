@@ -50,7 +50,7 @@ The tool list is **dynamic**: on `tools/list` the gateway reads the user's `Sett
 ## Specific guidance
 
 ### Tasks
-- Views: `today`, `inbox`, `upcoming`, `anytime`, `someday`, `completed`. **`anytime` is NOT "all tasks"** — it excludes inbox-only items.
+- Views: `today`, `inbox`, `upcoming`, `anytime`, `completed`. `anytime` is the single home for open, dateless tasks (it absorbed the former `someday` bucket). **`anytime` is NOT "all tasks"** — it excludes inbox-only items.
 - `tasks_list` returns `{tasks, total, truncated}` — **`truncated: true` means more rows exist beyond `limit`**, so don't conclude a task is missing/deleted from a capped page; raise `limit` or use `tasks_get`.
 - **`tasks_get(id)`** — one call for "where is this task, what's its state?": title, status, area, project, scheduled, due, today, completedAt, source, plus a compact convo summary. Works regardless of view or status; use this instead of scanning lists to locate a known id.
 - `tasks_complete` will **error on recurring tasks** — tell the user to complete those in the app so the next occurrence spawns correctly.

@@ -6,17 +6,17 @@ import { getEffectiveTimezone, todayYMD } from "../tz.js";
 // shared package exists; for now, mirror.
 
 export type TaskView =
-  | "today" | "triage" | "inbox" | "anytime" | "someday" | "upcoming" | "completed";
+  | "today" | "triage" | "inbox" | "anytime" | "upcoming" | "completed";
 
 export const listTasksJsonSchema = {
   type: "object",
   properties: {
     view: {
       type: "string",
-      enum: ["today", "triage", "inbox", "anytime", "someday", "upcoming", "completed"],
+      enum: ["today", "triage", "inbox", "anytime", "upcoming", "completed"],
       default: "today",
       description:
-        "Which task list to read. 'today' = ratified + due. 'triage' = the to-sort pile shown above Today: unratified rows the user hasn't placed (your unacknowledged proposals + their loose captures); 'today' excludes these.",
+        "Which task list to read. 'today' = ratified + due. 'anytime' is the single home for open, dateless tasks (it absorbed the former 'someday' bucket). 'triage' = the to-sort pile shown above Today: unratified rows the user hasn't placed (your unacknowledged proposals + their loose captures); 'today' excludes these.",
     },
     limit: {
       type: "integer",
@@ -56,7 +56,9 @@ export async function listTasks(
   client: CloudKitClient,
   input: ListTasksInput,
 ): Promise<{ tasks: TaskOut[]; total: number; truncated: boolean }> {
-  const view = input.view ?? "today";
+  // "someday" is the retired bucket — accept it as an alias for "anytime" so
+  // existing agent calls keep working.
+  const view = ((input.view as string) === "someday" ? "anytime" : input.view) ?? "today";
   const limit = input.limit ?? 100;
 
   // CKQuery can express EQUALS but not OR-unions or IS-NULL. iOS's
