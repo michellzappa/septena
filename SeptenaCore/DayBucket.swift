@@ -100,6 +100,36 @@ public enum DayBucket: String, CaseIterable, Identifiable, Hashable, Sendable {
   /// *optional* and an unbucketed item should surface all day.
   public static let anytimeKey = "anytime"
 
+  /// Whether an item assigned to `bucketKey` is "due now" on the Next feed.
+  /// The single rule shared by habits and supplements across every surface —
+  /// the phone (`NextOpenSection`), the watch, and the widget
+  /// (`NextItemsResponse.itemsForBucket`) — so they can't disagree about what
+  /// shows when.
+  ///
+  /// - `nil` / the anytime sentinel / any non-`DayBucket` value → always due
+  ///   (an "anytime" item shows all day).
+  /// - a real bucket → due in its own window; with `linger` on it also stays
+  ///   due through later buckets (a missed item carries over instead of
+  ///   vanishing). Never due before its window opens.
+  static func isDueNow(bucketKey: String?, linger: Bool, now: DayBucket = .current) -> Bool {
+    guard let bucketKey, let b = DayBucket(rawValue: bucketKey) else { return true }
+    return linger ? (b.order <= now.order) : (b.order == now.order)
+  }
+
+  /// The one place a stored bucket key becomes a display string. Every
+  /// header, picker, nav title, and complication routes through here so
+  /// labels stay localized and consistent instead of each surface doing its
+  /// own `rawValue.capitalized` (which breaks localization) or hardcoding
+  /// literals. `nil` / empty / the anytime sentinel → "Anytime"; a known
+  /// case → its localized `.title`; anything else → a capitalized fallback,
+  /// defensive against unexpected server-supplied values.
+  public static func label(forKey key: String?) -> String {
+    guard let key, !key.isEmpty, key != anytimeKey else {
+      return String(localized: "Anytime")
+    }
+    return DayBucket(rawValue: key)?.title ?? key.capitalized
+  }
+
   /// Exclusive end-of-window hour (local) for this bucket — the same
   /// cutoffs `from(date:)` uses, exposed so countdown UIs derive the
   /// window boundary here instead of re-hardcoding 12 / 17. Evening runs

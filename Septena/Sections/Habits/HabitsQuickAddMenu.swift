@@ -6,18 +6,15 @@ import SwiftUI
 // evening. Answers "what's next right now" — the full list lives in the sheet.
 
 private func currentBucketSet(_ buckets: [String]) -> Set<String> {
-  let canonical = ["morning", "afternoon", "evening"]
-  let nowIdx: Int = {
-    let h = Calendar.current.component(.hour, from: .now)
-    if h < 12 { return 0 }
-    if h < 17 { return 1 }
-    return 2
-  }()
+  // Read the current bucket through DayBucket so the user's configured
+  // Settings ▸ Time of Day cutoffs apply here too, rather than re-hardcoding
+  // 12 / 17.
+  let now = DayBucket.current.rawValue
   var allowed = Set<String>()
   for name in buckets {
     let lower = name.lowercased()
-    if let i = canonical.firstIndex(of: lower) {
-      if i == nowIdx { allowed.insert(name) }
+    if DayBucket(rawValue: lower) != nil {
+      if lower == now { allowed.insert(name) }
     } else {
       allowed.insert(name) // unknown bucket → fail open
     }

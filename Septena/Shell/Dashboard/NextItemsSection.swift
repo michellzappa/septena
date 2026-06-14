@@ -98,6 +98,12 @@ final class TodayTasksModel {
 
 struct TodayTasksSection: View {
   var model: TodayTasksModel
+  /// Open a task's edit / agent pane (the composer is hosted up at `NextView`
+  /// so its inspector docks to the page on iPad/macOS). nil → the row stays a
+  /// read-through checklist (tap only toggles).
+  var onOpenTask: ((SeptenaTask) -> Void)? = nil
+  /// Id of the task currently open in the composer — drives the row highlight.
+  var selectedTaskId: String? = nil
   @Environment(TaskMutator.self) private var mutator
   @Environment(SectionTheme.self) private var theme
   @Environment(\.modelContext) private var modelContext
@@ -115,7 +121,9 @@ struct TodayTasksSection: View {
           ForEach(tasks) { task in
             TodayTaskRow(task: task, model: model, mutator: mutator,
                          tint: theme.color(for: "tasks"),
-                         areas: areas, projects: projects)
+                         areas: areas, projects: projects,
+                         isSelected: selectedTaskId == task.id,
+                         onOpen: onOpenTask.map { open in { open(task) } })
               .transition(.opacity)
           }
         }
@@ -136,6 +144,10 @@ struct TodayTaskRow: View {
   let tint: Color
   var areas: [Area] = []
   var projects: [Project] = []
+  /// Highlight this row while its edit / agent pane is open.
+  var isSelected: Bool = false
+  /// Open this task's edit / agent pane. nil → tap only toggles (no editor host).
+  var onOpen: (() -> Void)? = nil
   @Environment(\.a11yMotion) private var motion
   /// App-root celebration layer — only used by the day-cleared `.arc`
   /// (see `TaskCelebration`). Optional and nil-safe.
@@ -145,12 +157,15 @@ struct TodayTaskRow: View {
     // On the Next surface every row is already today, so no Today indicator and
     // no scheduled chip; an overdue `due` still surfaces via the canonical
     // trailing. The project / area subtitle renders when the catalog is loaded.
+    // The checkbox owns its own tap region; a tap on the rest of the row opens
+    // the editor (the same split the Tasks drawer uses).
     TaskRow(
       task: task,
       accent: tint,
       areas: areas,
       projects: projects,
       showsTodayIndicator: false,
+      isSelected: isSelected,
       onToggle: {
         let completing = task.status != .done
         model.toggle(task, mutator: mutator, motion: motion)
@@ -162,14 +177,23 @@ struct TodayTaskRow: View {
                                     accent: tint, logCommit: logCommit)
         }
       },
-      onTap: nil
+      onTap: onOpen
     )
-    // Same app-wide pattern as the other rows: long-press → menu. The
-    // richer task menu (When… / Move… / Repeat… / Suggested) lives in
-    // TaskListView because those actions need sheet state that doesn't
-    // exist on the Next surface; here we surface the subset that works
-    // standalone (Today toggle, Cancel, Delete).
+    // Same app-wide pattern as the other rows: long-press → menu. "Edit Task"
+    // mirrors the row tap (open the edit / agent pane); the richer scheduling
+    // menu (When… / Move… / Repeat…) stays in TaskListView, since those need
+    // sheet state the Next surface doesn't host. Here we keep the subset that
+    // works standalone (open, Today toggle, Cancel, Delete).
     .contextMenu {
+      if let onOpen {
+        Button {
+          Haptics.tick()
+          onOpen()
+        } label: {
+          Label("Edit Task", systemImage: "pencil")
+        }
+        Divider()
+      }
       if task.isOnToday {
         Button {
           Haptics.tick()
@@ -502,6 +526,11 @@ final class NextItemsModel {
 struct NextOpenSection: View {
   var model: NextItemsModel
   var tasksModel: TodayTasksModel
+  /// Open a task's edit / agent pane — handed down to the Tasks block's rows.
+  /// nil keeps tasks a read-through checklist.
+  var onOpenTask: ((SeptenaTask) -> Void)? = nil
+  /// Id of the task currently open in the composer, for the row highlight.
+  var selectedTaskId: String? = nil
   @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(SettingsStore.self) private var settingsStore
   @Environment(SectionTheme.self) private var theme
@@ -537,40 +566,18 @@ struct NextOpenSection: View {
       enabledKeys: settingsStore.sections.filter(\.isEnabled).map(\.key))
   }
 
-  /// Habits are bucketed by time-of-day ("morning" / "afternoon" / "evening").
-  /// By default the Next screen shows only the habits for *now* — earlier
-  /// buckets don't linger as catch-up debt, later buckets don't surface
-  /// early. With the section's "carry over missed habits" toggle on, an
-  /// undone habit from an earlier bucket keeps showing until it's done.
-  /// Bucket selection is shared with the watch via `DayBucket`.
-  private var currentHabitBucket: String { DayBucket.current.rawValue }
-
+  /// Habits and supplements are bucketed identically (see `DayBucket.isDueNow`):
+  /// an "anytime" item shows all day; a bucketed one shows in its window, and
+  /// with the section's "carry over missed items" toggle on also lingers through
+  /// later buckets until done. Habits default to strict (exactly now),
+  /// supplements to carry-over — the same single rule the watch/widget snapshot
+  /// uses (`itemsForBucket`), so the surfaces never disagree.
   private var habitsNow: [HabitDayItem] {
-    // Default (strict): exact current-bucket match — unchanged, and keeps
-    // non-DayBucket buckets like "anytime" out of the now-strip as before.
-    guard lingerHabits else {
-      let bucket = currentHabitBucket
-      return model.openHabits.filter { $0.bucket == bucket }
-    }
-    // Carry-over: show every undone habit whose bucket has opened. "anytime"
-    // / non-DayBucket habits aren't part of the now-strip in either mode.
-    let nowOrder = DayBucket.current.order
-    return model.openHabits.filter { h in
-      guard let b = DayBucket(rawValue: h.bucket) else { return false }
-      return b.order <= nowOrder
-    }
+    model.openHabits.filter { DayBucket.isDueNow(bucketKey: $0.bucket, linger: lingerHabits) }
   }
 
-  /// Supplements are *optionally* bucketed (unlike habits). An "anytime"
-  /// supplement (nil bucket) shows all day. A bucketed one shows during its
-  /// window; with "carry over missed doses" on (the default) it also lingers
-  /// through later buckets until taken, so a missed dose doesn't vanish.
   private var supplementsNow: [SupplementDayItem] {
-    let nowOrder = DayBucket.current.order
-    return model.openSupplements.filter { supp in
-      guard let raw = supp.bucket, let b = DayBucket(rawValue: raw) else { return true }
-      return lingerSupplements ? (b.order <= nowOrder) : (b.order == nowOrder)
-    }
+    model.openSupplements.filter { DayBucket.isDueNow(bucketKey: $0.bucket, linger: lingerSupplements) }
   }
 
   private func isEmpty(_ key: String) -> Bool {
@@ -629,7 +636,9 @@ struct NextOpenSection: View {
     switch key {
     case "tasks":
       // TodayTasksSection renders its own "Tasks" header + pill card.
-      TodayTasksSection(model: tasksModel)
+      TodayTasksSection(model: tasksModel,
+                        onOpenTask: onOpenTask,
+                        selectedTaskId: selectedTaskId)
 
     case "chores":
       VStack(alignment: .leading, spacing: 0) {
@@ -646,8 +655,8 @@ struct NextOpenSection: View {
 
     case "habits":
       VStack(alignment: .leading, spacing: 0) {
-        habitBucketHeader(bucket: currentHabitBucket,
-                          tint: theme.color(for: "habits"))
+        bucketSectionHeader("Habits", tint: theme.color(for: "habits"),
+                            showsCountdown: !lingerHabits)
         VStack(spacing: 0) {
           ForEach(habitsNow) { habit in
             HabitRow(habit: habit, model: model, checklistMutator: checklistMutator,
@@ -660,7 +669,8 @@ struct NextOpenSection: View {
 
     case "supplements":
       VStack(alignment: .leading, spacing: 0) {
-        sectionHeader("Supplements", tint: theme.color(for: "supplements"))
+        bucketSectionHeader("Supplements", tint: theme.color(for: "supplements"),
+                            showsCountdown: !lingerSupplements)
         VStack(spacing: 0) {
           ForEach(supplementsNow) { supp in
             SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator,
@@ -1259,19 +1269,24 @@ private func sectionHeader(_ title: String, tint: Color) -> some View {
     .padding(.bottom, 6)
 }
 
-// MARK: - Habit bucket header
+// MARK: - Bucketed section header
 //
-// Same chrome as `sectionHeader`, plus a trailing "time left in this bucket"
-// chip that rounds coarsely when there's plenty of slack and tightens up
-// (minutes, then warm color, then red) as the cutoff approaches.
-
+// Shared by the time-of-day sections (habits + supplements) so both read the
+// same: the current bucket's name prefixing the section noun ("Morning Habits"
+// / "Morning Supplements"), labelled through the canonical `DayBucket.label`.
+// `showsCountdown` adds a trailing "time left in this bucket" chip — shown only
+// when the section is *strict* (not lingering), because a countdown to the
+// window's close is meaningful only when the item actually drops off at the
+// cutoff; a lingering section carries the item over, so no deadline to show.
 @ViewBuilder
-private func habitBucketHeader(bucket: String, tint: Color) -> some View {
+private func bucketSectionHeader(_ sectionTitle: String, tint: Color,
+                                 showsCountdown: Bool) -> some View {
+  let bucket = DayBucket.current.rawValue
   HStack(spacing: 8) {
-    Text("\(bucket.capitalized) Habits")
+    Text("\(DayBucket.label(forKey: bucket)) \(sectionTitle)")
       .font(.septenaSectionTitle).foregroundStyle(tint)
     Spacer()
-    BucketTimeLeft(bucket: bucket)
+    if showsCountdown { BucketTimeLeft(bucket: bucket) }
   }
   // Aligns with the row content inside the card below (rowHInset = Spacing.xl).
   .padding(.horizontal, Theme.Spacing.xl)

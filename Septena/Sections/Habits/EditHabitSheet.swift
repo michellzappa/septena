@@ -13,14 +13,21 @@ struct EditHabitSheet: View {
   @Environment(ChecklistMutator.self) private var checklistMutator
 
   let original: HabitDayItem?
-  /// Allowed buckets for this app/server (e.g. ["morning","afternoon","evening"]).
-  let buckets: [String]
   let onDone: (HabitDayItem?) -> Void
 
   @State private var name: String = ""
   @State private var emoji: String = ""
-  @State private var bucket: String = "morning"
+  /// Selection key. Mirrors Supplements: `DayBucket.anytimeKey` for an
+  /// all-day habit, else a canonical bucket. New habits default to morning
+  /// (the most common routine slot); supplements default to anytime — each
+  /// section keeps the default that fits its nature, but both offer the full
+  /// set.
+  @State private var bucket: String = DayBucket.morning.rawValue
   @FocusState private var nameFocused: Bool
+
+  /// "Anytime" first, then the day's buckets in order — same options as
+  /// `EditSupplementSheet`.
+  private var bucketOptions: [String] { [DayBucket.anytimeKey] + DayBucket.allCases.map(\.rawValue) }
 
   private var navTitle: String { original == nil ? "New Habit" : "Edit Habit" }
 
@@ -45,11 +52,9 @@ struct EditHabitSheet: View {
             .focused($nameFocused)
         }
       }
-      Section("Bucket") {
-        Picker("Bucket", selection: $bucket) {
-          ForEach(buckets, id: \.self) { b in
-            Text(b.capitalized).tag(b)
-          }
+      Section("Time of day") {
+        Picker("Time of day", selection: $bucket) {
+          ForEach(bucketOptions, id: \.self) { Text(DayBucket.label(forKey: $0)).tag($0) }
         }
         .pickerStyle(.segmented)
       }
@@ -59,7 +64,8 @@ struct EditHabitSheet: View {
   private func seed() {
     name = original?.name ?? ""
     emoji = original?.emoji ?? ""
-    bucket = original.flatMap { buckets.contains($0.bucket) ? $0.bucket : nil } ?? buckets.first ?? "morning"
+    let stored = original?.bucket ?? DayBucket.morning.rawValue
+    bucket = bucketOptions.contains(stored) ? stored : DayBucket.morning.rawValue
   }
 
   private func save() {

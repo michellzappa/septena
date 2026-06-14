@@ -1206,6 +1206,8 @@ final class SeptenaServices {
     // Symptoms events. Local-only, idempotent, gated once-per-device; runs
     // after the fetch so synced gut rows are present.
     GutSymptomMigrator.runIfNeeded(context: context, mutator: symptomsMutator)
+    // Fold any retired `bedtime` medication bucket into `evening`.
+    medicationsMutator.migrateBedtimeBuckets()
     SettingsMirror.publishDeviceTimezone(context: context, engine: ckEngine)
   }
 
@@ -2383,6 +2385,22 @@ final class MedicationsMutator {
 
   func bind(ckEngine: CKEngine) {
     self.ckEngine = ckEngine
+  }
+
+  /// One-time fold of the retired `bedtime` bucket into `evening` — buckets
+  /// are now the canonical three (see docs/BUCKET_CONSISTENCY_SPEC.md).
+  /// Idempotent: after the first pass no definitions match, so it's safe to
+  /// run on every launch without a sentinel.
+  func migrateBedtimeBuckets() {
+    let stale = (try? context.fetch(FetchDescriptor<MedicationDefinitionEntity>(
+      predicate: #Predicate { $0.bucket == "bedtime" }
+    ))) ?? []
+    guard !stale.isEmpty else { return }
+    for def in stale {
+      def.bucket = DayBucket.evening.rawValue
+      def.updatedAt = .now
+      commitDefinition(def, op: "migrate")
+    }
   }
 
   @discardableResult

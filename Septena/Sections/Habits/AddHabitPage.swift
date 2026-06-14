@@ -39,7 +39,7 @@ struct AddHabitPage: View {
           Button { create(name: trimmed) } label: {
             AddInfoRow(
               title: "Add: “\(trimmed)”",
-              subtitle: createBucket.capitalized,
+              subtitle: DayBucket.label(forKey: createBucket),
               systemImage: "plus.circle.fill",
               tint: tint
             )
@@ -54,7 +54,7 @@ struct AddHabitPage: View {
             .filter { !$0.done && !$0.skipped }
             .filter { trimmed.isEmpty || $0.name.localizedCaseInsensitiveContains(trimmed) }
           if !items.isEmpty {
-            Section(bucket.capitalized) {
+            Section(DayBucket.label(forKey: bucket)) {
               ForEach(items) { item in
                 Button { toggle(item) } label: {
                   AddInfoRow(

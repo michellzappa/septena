@@ -71,7 +71,7 @@ private struct RectangularView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 2) {
       HStack {
-        Text(data.bucket.capitalized)
+        Text(DayBucket.label(forKey: data.bucket))
           .font(.caption2.weight(.semibold))
           .foregroundStyle(.secondary)
         Spacer()
@@ -102,7 +102,7 @@ private struct InlineView: View {
     if data.remaining == 0 {
       Label("All done", systemImage: "checkmark.circle.fill")
     } else {
-      Text("\(data.remaining) · \(data.bucket.capitalized)")
+      Text("\(data.remaining) · \(DayBucket.label(forKey: data.bucket))")
     }
   }
 }

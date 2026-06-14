@@ -20,7 +20,6 @@ struct EditSupplementSheet: View {
 
   /// "Anytime" first, then the day's buckets in order.
   private var bucketOptions: [String] { [DayBucket.anytimeKey] + DayBucket.allCases.map(\.rawValue) }
-  private func bucketLabel(_ key: String) -> String { DayBucket(rawValue: key)?.title ?? "Anytime" }
 
   var body: some View {
     AdaptiveEditScaffold(
@@ -51,7 +50,7 @@ struct EditSupplementSheet: View {
       }
       Section {
         Picker("Time of day", selection: $bucket) {
-          ForEach(bucketOptions, id: \.self) { Text(bucketLabel($0)).tag($0) }
+          ForEach(bucketOptions, id: \.self) { Text(DayBucket.label(forKey: $0)).tag($0) }
         }
         .pickerStyle(.segmented)
       } header: {

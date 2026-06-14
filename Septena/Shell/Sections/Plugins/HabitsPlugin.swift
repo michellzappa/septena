@@ -91,9 +91,9 @@ enum HabitsPlugin: SectionPlugin {
         SectionSkill.Tool("habits_list",   "Definitions with today's state merged",
               inputs: "optional: date (YYYY-MM-DD, default today)"),
         SectionSkill.Tool("habits_create", "New definition",
-              inputs: "required: title, bucket (morning|evening|anytime) · optional: emoji"),
+              inputs: "required: title, bucket (morning|afternoon|evening|anytime) · optional: emoji"),
         SectionSkill.Tool("habits_update", "Update fields",
-              inputs: "required: id · optional: title, bucket (morning|evening|anytime), emoji"),
+              inputs: "required: id · optional: title, bucket (morning|afternoon|evening|anytime), emoji"),
         SectionSkill.Tool("habits_delete", "Delete definition and all its events",
               inputs: "required: id"),
         SectionSkill.Tool("habits_toggle", "Mark done/skipped/unmarked for a date. Idempotent",
@@ -264,7 +264,7 @@ private struct HabitStarter: Identifiable, Hashable {
   let id: String          // stable key for selection state, not the entity id
   let name: String
   let emoji: String
-  let bucket: String      // "morning" | "anytime" | "evening"
+  let bucket: String      // "morning" | "afternoon" | "evening" | "anytime"
   let blurb: String       // one-line descriptor shown under the name
 
   static let all: [HabitStarter] = [

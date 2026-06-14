@@ -215,6 +215,10 @@ targets:
           - "**/.DS_Store"
           - "**/*.entitlements"
       - path: SeptenaWatch/SharedComplicationData.swift
+      # Canonical bucket labels (DayBucket.label) so the complication renders
+      # the same localized "Morning"/"Afternoon"/"Evening" as every other
+      # surface instead of capitalizing a raw string.
+      - path: SeptenaCore/DayBucket.swift
     info:
       path: SeptenaWatchComplication/Info.plist
       properties:

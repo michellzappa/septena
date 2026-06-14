@@ -48,6 +48,50 @@ struct NextItemsResponse: Codable {
   /// offers every tracker — with container-aware choices — without compiled-in
   /// rows. Optional so older payloads decode.
   var intakeKinds: [IntakeKindWire]? = nil
+  /// The user's most-eaten meals, ranked by frequency then recency and capped to
+  /// a wrist-sized list, so the watch + menu can re-log a real meal (macros and
+  /// all) with one tap. Optional so older payloads decode.
+  var topMeals: [MealWire]? = nil
+}
+
+/// One re-loggable meal on the wire: enough for a remote surface (watch) to
+/// render a quick-select chip — emoji, the meal's foods, a macro summary, an
+/// ×count badge — and to write a full `NutritionEntry` back from a single tap.
+/// Built phone-side from the user's logged meals (the same frequency-then-recency
+/// ranking the phone's "+" meal search uses), so the wrist offers exactly the
+/// meals the phone would. Everything optional-with-defaults so the wire stays
+/// additive.
+struct MealWire: Codable, Hashable, Identifiable {
+  /// Normalized food signature — stable across re-logs, so it dedupes and makes
+  /// a good `Identifiable` id.
+  var id: String
+  var emoji: String? = nil
+  /// The meal's food lines, written back verbatim (newline-joined) on re-log.
+  var foods: [String]
+  /// How many times this meal was logged in the window — the ×N badge and the
+  /// frequency rank (already applied by the publisher).
+  var count: Int = 1
+  var proteinG: Double = 0
+  var fatG: Double = 0
+  var carbsG: Double = 0
+  var kcal: Double = 0
+  var fiberG: Double? = nil
+  var sugarG: Double? = nil
+  var saturatedFatG: Double? = nil
+  var alcoholG: Double? = nil
+  var sodiumMg: Double? = nil
+  var cholesterolMg: Double? = nil
+  var potassiumMg: Double? = nil
+
+  /// The meal's display name — its first food line.
+  var title: String { foods.first ?? "Meal" }
+
+  /// "32P · 14F · 40C · 410kcal" — the quick-select chip's summary line, derived
+  /// here so the wire carries the data once and every surface formats it alike.
+  var macroSummary: String {
+    "\(Int(proteinG.rounded()))P · \(Int(fatG.rounded()))F · "
+      + "\(Int(carbsG.rounded()))C · \(Int(kcal.rounded()))kcal"
+  }
 }
 
 /// One enabled intake tracker on the wire: enough config for a remote surface
@@ -101,44 +145,28 @@ extension NextItemsResponse {
   ///
   /// The snapshot payload is all-day (`bucket == ""`) and tags each bucketed item
   /// with its bucket in `subtitle`. Chores and tasks have no time-of-day and always
-  /// apply. Habits and supplements are bucketed; both have the now-implicit bucket
-  /// stripped from `subtitle` once they pass the filter:
-  ///   • habits — strict by default (exactly the current bucket); with carry-over
-  ///     on, any undone habit whose bucket has already opened. Never shows early.
-  ///   • supplements — "anytime" (nil bucket) shows all day; a bucketed dose shows
-  ///     during its window and, with carry-over on (the default), lingers through
-  ///     later buckets until taken. Never shows early.
+  /// apply. Habits and supplements are bucketed identically (both optional —
+  /// an "anytime" item shows all day); each has the now-implicit bucket stripped
+  /// from `subtitle` once it passes `DayBucket.isDueNow`:
+  ///   • strict by default for habits (exactly the current bucket), carry-over by
+  ///     default for supplements (lingers through later buckets once opened);
+  ///   • the per-section linger pref (carried in the payload) flips that. Neither
+  ///     ever shows before its window opens.
   func itemsForBucket(_ bucket: DayBucket) -> [NextItem] {
-    let key = bucket.rawValue
-    let now = bucket.order
     let lingerHabits = self.lingerHabits ?? NextLinger.habitsDefault
     let lingerSupplements = self.lingerSupplements ?? NextLinger.supplementsDefault
     return items.compactMap { item in
+      let linger: Bool
       switch item.kind {
-      case "habit":
-        if lingerHabits {
-          // Carry-over: any undone habit whose bucket has opened (order ≤ now).
-          // A non-DayBucket value ("anytime") isn't part of the now-strip.
-          guard let b = item.subtitle.flatMap(DayBucket.init(rawValue:)), b.order <= now
-          else { return nil }
-        } else {
-          // Strict: exact current-bucket match — no past, no future.
-          guard item.subtitle == key else { return nil }
-        }
-        var habit = item
-        habit.subtitle = nil
-        return habit
-      case "supplement":
-        // nil / non-DayBucket bucket = "anytime" → always show.
-        guard let b = item.subtitle.flatMap(DayBucket.init(rawValue:)) else { return item }
-        let keep = lingerSupplements ? (b.order <= now) : (b.order == now)
-        guard keep else { return nil }
-        var supp = item
-        supp.subtitle = nil
-        return supp
-      default:
-        return item
+      case "habit":      linger = lingerHabits
+      case "supplement": linger = lingerSupplements
+      default:           return item   // tasks / chores have no time-of-day
       }
+      guard DayBucket.isDueNow(bucketKey: item.subtitle, linger: linger, now: bucket)
+      else { return nil }
+      var due = item
+      due.subtitle = nil
+      return due
     }
   }
 }
