@@ -16,11 +16,15 @@ private enum SidebarSeed {
 
 struct SidebarRootView: View {
   @Environment(NavigationState.self) private var nav
-  @Environment(SectionTheme.self) private var theme
   @Environment(AreasMutator.self) private var areasMutator
   @Environment(ProjectsMutator.self) private var projectsMutator
   @Environment(TaskMutator.self) private var taskMutator
   @Environment(\.modelContext) private var modelContext
+  /// Push-navigation surface (iPad regular / macOS) vs. compact stack (iPhone /
+  /// slide-over) — the single rule, resolved at the app root, that decides
+  /// whether the sidebar drives a persistent detail pane. Selection is native
+  /// (`List(selection:)`) on push surfaces and Button-driven on compact ones.
+  @Environment(\.usesPushNavigation) private var usesPushNavigation
 
   @State private var areas: [Area]
   @State private var projects: [Project]
@@ -227,7 +231,7 @@ struct SidebarRootView: View {
   /// hand-built `sectionCard` / `inCardDivider` / bare-VStack scaffolding this
   /// used to be. insetGrouped on iOS; `.sidebar` on macOS.
   private func sidebarListContent() -> some View {
-    List {
+    List(selection: sidebarSelection) {
       smartListSection
       areaProjectSections
     }
@@ -236,6 +240,10 @@ struct SidebarRootView: View {
     // Hide the system grouped fill so `Theme.sidebarBackground` (applied by
     // `sidebarPhone`) shows through, matching the app's surface rhythm.
     .scrollContentBackground(.hidden)
+    // insetGrouped's default inter-section gap (~35pt) leaves too much air above
+    // the first area and between area cards; tighten it for a denser, more
+    // Reminders-like rhythm.
+    .listSectionSpacing(18)
     #else
     .listStyle(.sidebar)
     #endif
@@ -252,7 +260,7 @@ struct SidebarRootView: View {
     #if os(macOS)
     Section {
       ForEach(smartListSpecs, id: \.title) { spec in
-        sidebarButton(spec.route) {
+        navRow(spec.route) {
           SmartListRow(icon: spec.icon,
                        iconColor: spec.color,
                        title: spec.title,
@@ -267,13 +275,17 @@ struct SidebarRootView: View {
         .listRowInsets(EdgeInsets())
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
+        // The tiles are a custom grid, not selectable List rows — they carry
+        // their own `isSelected` highlight and navigate via their Buttons, so
+        // keep `List(selection:)` from ever trying to select this row.
+        .selectionDisabled()
     }
     #endif
   }
 
   #if os(iOS)
   /// The 2-column grid of large smart-list tiles (Today / Upcoming / Anytime /
-  /// Someday / Completed). Padded to the shared page gutter so it lines up with
+  /// Completed). Padded to the shared page gutter so it lines up with
   /// the grouped section cards below.
   private var smartListGrid: some View {
     LazyVGrid(columns: [GridItem(.flexible(), spacing: Theme.tileGap),
@@ -450,15 +462,60 @@ struct SidebarRootView: View {
     ]
   }
 
+  /// A navigable sidebar row. On push-navigation surfaces (iPad regular /
+  /// macOS, where the sidebar drives a persistent detail pane) the row is a
+  /// plain `List(selection:)`-selectable cell tagged by its route, so selecting
+  /// it (click or arrow keys) highlights it natively *and* drives the detail
+  /// through `sidebarSelection`. On compact surfaces (iPhone / slide-over — a
+  /// push stack with no persistent sidebar to highlight) it's a Button that
+  /// sets `nav.path` directly. InertButtonStyle suppresses the click-tint flash.
   @ViewBuilder
-  private func sidebarButton<Content: View>(_ route: Route,
-                                            @ViewBuilder label: () -> Content) -> some View {
-    // InertButtonStyle (instead of `.plain`) suppresses the brief label-tint
-    // flash that macOS applies on click. The persistent selection pill is
-    // the only feedback we want.
-    Button { selectRoute(route) } label: { label() }
-      .buttonStyle(InertButtonStyle())
-      .background(rowBackground(for: route))
+  private func navRow<Content: View>(_ route: Route,
+                                     @ViewBuilder content: () -> Content) -> some View {
+    if usesPushNavigation {
+      content().tag(Self.token(for: route))
+    } else {
+      Button { selectRoute(route) } label: { content() }
+        .buttonStyle(InertButtonStyle())
+    }
+  }
+
+  /// Stable, id-based selection token for the sidebar `List`. Mirrors `Route`
+  /// but compares projects / areas by id, so a reload that swaps in a
+  /// freshly-fetched struct (same id, changed fields) can't drop the highlight —
+  /// the reason the old manual `isSelected` existed.
+  enum SidebarSelection: Hashable {
+    case filter(TaskFilter)
+    case next
+    case project(String)
+    case area(String)
+  }
+
+  private static func token(for route: Route) -> SidebarSelection {
+    switch route {
+    case .filter(let f):  return .filter(f)
+    case .next:           return .next
+    case .project(let p): return .project(p.id)
+    case .area(let a):    return .area(a.id)
+    }
+  }
+
+  /// Two-way bridge between `List(selection:)` and the app's `nav.path`: reads
+  /// the current route as a token, and writing one (a click / keyboard move)
+  /// routes through `selectRoute`, so selection and navigation stay one action.
+  private var sidebarSelection: Binding<SidebarSelection?> {
+    Binding(
+      get: { nav.path.last.map(Self.token(for:)) },
+      set: { token in
+        guard let token else { return }
+        switch token {
+        case .filter(let f):   selectRoute(.filter(f))
+        case .next:            selectRoute(.next)
+        case .project(let id): if let p = projects.first(where: { $0.id == id }) { selectRoute(.project(p)) }
+        case .area(let id):    if let a = areas.first(where: { $0.id == id }) { selectRoute(.area(a)) }
+        }
+      }
+    )
   }
 
   private func selectRoute(_ route: Route) {
@@ -468,17 +525,21 @@ struct SidebarRootView: View {
     nav.path = [route]
   }
 
-  /// Which route the sidebar should render as "current". On iPhone the
-  /// sidebar IS the home screen, so an empty nav stack means "no row is
-  /// current" — returning a Today fallback there would falsely highlight
-  /// the Today tile while the user is looking at the overview. iPad/macOS
-  /// always have a detail pane showing, so Today is a sensible default.
+  /// Which route the sidebar should render as "current". In a compact-width
+  /// layout the sidebar IS the home screen, so an empty nav stack means "no
+  /// row is current" — returning a Today fallback there would falsely
+  /// highlight the Today tile while the user is looking at the overview. A
+  /// regular-width split (iPad, macOS, or an unfolded foldable) always has a
+  /// detail pane showing, so Today is a sensible default.
+  ///
+  /// Keyed off `usesPushNavigation` — the same push-vs-sheet rule the rest of
+  /// the shell uses — never the device idiom. A foldable iPhone reports the
+  /// `.phone` idiom even when unfolded into a regular-width display, so an
+  /// idiom check would wrongly suppress the default highlight on the big screen.
   private var selectedRoute: Route? {
-    #if os(iOS)
-    if UIDevice.current.userInterfaceIdiom == .phone {
+    if !usesPushNavigation {
       return nav.path.last
     }
-    #endif
     return nav.path.last ?? .filter(.today)
   }
 
@@ -495,30 +556,6 @@ struct SidebarRootView: View {
     case (.area(let a), .area(let b)):       return a.id == b.id
     default:                                 return false
     }
-  }
-
-  /// Single highlight rule: selected → light accent tint pill, otherwise
-  /// transparent. Same shape and color logic as the task-row selection pill.
-  /// iOS / iPadOS sidebar rows sit inside Mimestream-style cards on the
-  /// `Theme.cardSurface` background, so the highlight needs a stronger fill
-  /// to read as "this is the current screen". macOS keeps the lighter
-  /// accent on its bare sidebar column.
-  @ViewBuilder
-  private func rowBackground(for route: Route) -> some View {
-    #if os(iOS)
-    // Highlight sits inside the section card's inner padding — no negative
-    // bleed, and a larger corner so it reads as a nested pill rather than a
-    // separate rectangle clashing with the card's 18pt rounding.
-    let fill: Color = isSelected(route) ? theme.accent.opacity(0.18) : .clear
-    RoundedRectangle(cornerRadius: 10, style: .continuous)
-      .fill(fill)
-      .padding(.horizontal, -6)
-    #else
-    let fill: Color = isSelected(route) ? theme.accent.opacity(0.15) : .clear
-    RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
-      .fill(fill)
-      .padding(.horizontal, -4)
-    #endif
   }
 
   // MARK: - Areas and projects
@@ -568,14 +605,14 @@ struct SidebarRootView: View {
   /// its section's grouped card, projects underneath.
   @ViewBuilder
   private func areaRow(_ area: Area) -> some View {
-    sidebarButton(.area(area)) {
-      SidebarAreaRow(name: area.title, count: areaOpenCount[area.id] ?? 0)
+    navRow(.area(area)) {
+      SidebarAreaRow(name: area.title, emoji: area.emoji, count: areaOpenCount[area.id] ?? 0)
     }
     #if os(iOS)
     .contextMenu {
       areaMenu(area)
     } preview: {
-      SidebarAreaRow(name: area.title, count: areaOpenCount[area.id] ?? 0)
+      SidebarAreaRow(name: area.title, emoji: area.emoji, count: areaOpenCount[area.id] ?? 0)
         .padding(.horizontal, 14).padding(.vertical, 6)
         .background(Theme.cardSurface)
     }
@@ -587,7 +624,7 @@ struct SidebarRootView: View {
 
   @ViewBuilder
   private func projectRow(_ project: Project, parent: String?) -> some View {
-    sidebarButton(.project(project)) {
+    navRow(.project(project)) {
       SidebarProjectRow(name: project.title,
                         progress: projectProgress[project.id] ?? 0,
                         count: projectOpenCount[project.id] ?? 0)
