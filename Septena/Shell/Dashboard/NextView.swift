@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // Dedicated screen for the daily "next" strip: chores, habits, supplements.
 // Pulled out of Today so Today stays focused on tasks (mirrors the web app).
@@ -6,11 +7,22 @@ import SwiftUI
 struct NextView: View {
   @Environment(SectionTheme.self) private var theme
   @Environment(DayClock.self) private var clock
+  @Environment(\.modelContext) private var modelContext
 
   @State private var model = NextItemsModel()
   @State private var tasksModel = TodayTasksModel()
   @State private var suggestionsModel = NextSuggestionsModel()
   @State private var doneModel = NextDoneModel()
+
+  /// Tapping a task row (or its "Edit Task" menu item) opens the composer in
+  /// edit mode — the same card the Tasks tab uses, which embeds the agent
+  /// conversation section. Hosted here at the page root so its docked inspector
+  /// (iPad/macOS) attaches to the whole Next page; iPhone gets a sheet.
+  @State private var editingTask: SeptenaTask?
+  /// Areas / projects backing the composer's List picker + each row's subtitle.
+  /// Loaded once alongside the day's data (small, effectively static).
+  @State private var areas: [Area] = []
+  @State private var projects: [Project] = []
 
   /// Section keys whose `.septenaDataChanged` posts the suggestions engine
   /// actually consumes (`NextSuggestionsModel.computeAll`).
@@ -25,6 +37,12 @@ struct NextView: View {
   /// (caffeine, meals, mood, …). Drives both the empty state and whether the
   /// "Done Today" log renders.
   private var hasAnyDone: Bool { model.hasAnyDone || !doneModel.events.isEmpty }
+
+  /// Drives the composer drawer from the optional `editingTask`; clearing it
+  /// (swipe-away / Cancel / Save) closes the editor.
+  private var composerBinding: Binding<Bool> {
+    Binding(get: { editingTask != nil }, set: { if !$0 { editingTask = nil } })
+  }
 
   var body: some View {
     ScrollView {
@@ -52,7 +70,9 @@ struct NextView: View {
         // Tasks / chores / habits / supplements render in the user's saved
         // section order (one order, shared with the homepage) — see
         // NextOpenSection.orderedKeys.
-        NextOpenSection(model: model, tasksModel: tasksModel)
+        NextOpenSection(model: model, tasksModel: tasksModel,
+                        onOpenTask: { editingTask = $0 },
+                        selectedTaskId: editingTask?.id)
 
         // A chronological log of everything finished today — the trio the
         // user just ticked off (lingers struck-through above, then lands
@@ -78,7 +98,19 @@ struct NextView: View {
     }
     .background(Theme.groupedBackground)
     .septenaInlineTitle()
+    // Host the task composer at the page root so its inspector docks to the
+    // whole Next page (iPad/macOS) and sheets on iPhone — the same adaptive
+    // drawer the Tasks tab uses. Edit mode embeds the agent conversation.
+    .taskComposerDrawer(isPresented: composerBinding) {
+      if let task = editingTask {
+        TaskComposerCard(mode: .edit(task), areas: areas, projects: projects,
+                         accent: theme.color(for: "tasks"),
+                         onDone: { tasksModel.refreshFromCache() })
+      }
+    }
     .task {
+      areas = LocalCache.areas(in: modelContext)
+      projects = LocalCache.projects(in: modelContext)
       model.paintFromCache()
       tasksModel.paintFromCache()
       suggestionsModel.paintFromCache()
