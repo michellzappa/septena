@@ -189,7 +189,7 @@ struct SidebarRootView: View {
   /// top-left "…" overflow menu (and ⌘, on macOS).
   @ViewBuilder
   private var sidebarPhone: some View {
-    sidebarScrollContent()
+    sidebarListContent()
     .background(Theme.sidebarBackground)
     // Empty nav bar so iOS renders its default scroll-edge fade as
     // sidebar rows pass behind the top safe area.
@@ -213,31 +213,89 @@ struct SidebarRootView: View {
   /// Settings is the discreet last item in the toolbar's overflow.
   @ViewBuilder
   private var sidebarMac: some View {
-    sidebarScrollContent()
+    sidebarListContent()
     // No explicit background — NavigationSplitView renders its sidebar
     // column with the system Liquid Glass material on macOS 26 (Tahoe).
     .toolbar { macToolbar }
     .modifier(sidebarBehavior)
   }
 
-  /// Page geometry mirrors the other tabs' `septenaSurface()` rhythm —
-  /// `pageTop` under the nav bar, `sectionSpacing` between the smart-list
-  /// grid and the areas/projects cards, `pageBottom` scroll-past air.
-  /// Horizontal insets stay per-section (`smartLists` / the section cards)
-  /// because each pads itself, but both read `Theme.pageGutter`.
-  private func sidebarScrollContent() -> some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 0) {
-        smartLists
-          .padding(.top, Theme.pageTop)
-          .padding(.bottom, Theme.sectionSpacing)
-        // areasAndProjects renders its own per-section cards
-        // (Mimestream-style), so no outer card wrapping here.
-        areasAndProjects
-        Spacer(minLength: Theme.pageBottom)
+  /// The Tasks home, standardized onto a system `List`: the smart-list tiles as
+  /// a borderless first section, then real grouped sections per area / top-level
+  /// project. `List` supplies the grouped "bubble" cards, the inter-row
+  /// separators, and (on macOS) the native source-list look — replacing the
+  /// hand-built `sectionCard` / `inCardDivider` / bare-VStack scaffolding this
+  /// used to be. insetGrouped on iOS; `.sidebar` on macOS.
+  private func sidebarListContent() -> some View {
+    List {
+      smartListSection
+      areaProjectSections
+    }
+    #if os(iOS)
+    .listStyle(.insetGrouped)
+    // Hide the system grouped fill so `Theme.sidebarBackground` (applied by
+    // `sidebarPhone`) shows through, matching the app's surface rhythm.
+    .scrollContentBackground(.hidden)
+    #else
+    .listStyle(.sidebar)
+    #endif
+  }
+
+  // MARK: - Smart lists section
+  //
+  // iOS: the larger 2-up tile grid, hosted edge-to-edge in a borderless list
+  // row — the Reminders-home pattern (tiles on top, grouped lists below, one
+  // scroll). macOS: each smart list is its own native sidebar row.
+
+  @ViewBuilder
+  private var smartListSection: some View {
+    #if os(macOS)
+    Section {
+      ForEach(smartListSpecs, id: \.title) { spec in
+        sidebarButton(spec.route) {
+          SmartListRow(icon: spec.icon,
+                       iconColor: spec.color,
+                       title: spec.title,
+                       count: spec.count)
+        }
+        .modifier(SmartListTaskDrop(route: spec.route, mutator: taskMutator))
       }
     }
+    #else
+    Section {
+      smartListGrid
+        .listRowInsets(EdgeInsets())
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+    }
+    #endif
   }
+
+  #if os(iOS)
+  /// The 2-column grid of large smart-list tiles (Today / Upcoming / Anytime /
+  /// Someday / Completed). Padded to the shared page gutter so it lines up with
+  /// the grouped section cards below.
+  private var smartListGrid: some View {
+    LazyVGrid(columns: [GridItem(.flexible(), spacing: Theme.tileGap),
+                        GridItem(.flexible(), spacing: Theme.tileGap)],
+              spacing: Theme.tileGap) {
+      ForEach(smartListSpecs, id: \.title) { spec in
+        Button { selectRoute(spec.route) } label: {
+          SmartListTile(icon: spec.icon,
+                        iconColor: spec.color,
+                        title: spec.title,
+                        count: spec.count,
+                        isSelected: isSelected(spec.route))
+        }
+        .buttonStyle(InertButtonStyle())
+      }
+    }
+    // No extra horizontal padding: the borderless row (listRowInsets zeroed)
+    // already spans the grouped section-card width, so the tile pair's outer
+    // edges line up with the area / project cards below (the Reminders home).
+    .padding(.vertical, 4)
+  }
+  #endif
 
   @ToolbarContentBuilder
   private var phoneToolbar: some ToolbarContent {
@@ -397,43 +455,6 @@ struct SidebarRootView: View {
   }
 
   @ViewBuilder
-  private var smartLists: some View {
-    #if os(macOS)
-    VStack(alignment: .leading, spacing: 2) {
-      ForEach(smartListSpecs, id: \.title) { spec in
-        sidebarButton(spec.route) {
-          SmartListRow(icon: spec.icon,
-                       iconColor: spec.color,
-                       title: spec.title,
-                       count: spec.count)
-        }
-        .modifier(SmartListTaskDrop(route: spec.route, mutator: taskMutator))
-      }
-    }
-    .padding(.horizontal, Theme.pageGutter)
-    #else
-    LazyVGrid(columns: [GridItem(.flexible(), spacing: Theme.tileGap),
-                        GridItem(.flexible(), spacing: Theme.tileGap)],
-              spacing: Theme.tileGap) {
-      ForEach(smartListSpecs, id: \.title) { spec in
-        Button { selectRoute(spec.route) } label: {
-          SmartListTile(icon: spec.icon,
-                        iconColor: spec.color,
-                        title: spec.title,
-                        count: spec.count,
-                        isSelected: isSelected(spec.route))
-        }
-        // .plain on iOS animates a brief scale + tint on the whole label,
-        // which read as "the sidebar lifts" on tap. The selected fill is
-        // the only feedback we want — InertButtonStyle strips the rest.
-        .buttonStyle(InertButtonStyle())
-      }
-    }
-    .padding(.horizontal, Theme.pageGutter)
-    #endif
-  }
-
-  @ViewBuilder
   private func sidebarButton<Content: View>(_ route: Route,
                                             @ViewBuilder label: () -> Content) -> some View {
     // InertButtonStyle (instead of `.plain`) suppresses the brief label-tint
@@ -505,95 +526,68 @@ struct SidebarRootView: View {
   }
 
   // MARK: - Areas and projects
+  //
+  // Real grouped `List` sections stand in for the hand-built Mimestream
+  // "bubble" cards: each area is a section (the area row on top, its active
+  // projects beneath), with a separate section for top-level projects. `List`
+  // draws the rounded grouped card and the inter-row separators, so there's no
+  // `sectionCard` / `inCardDivider` scaffolding left. An area with no projects
+  // still renders as a one-row card, so every area reads as the same container.
 
   @ViewBuilder
-  private var areasAndProjects: some View {
-    // Mimestream / iOS Mail pattern: each grouping is a section with a
-    // header above and a card below containing that group's rows.
-    // - Top-level projects (no area) → one card, no header
-    // - Each area → header above (tappable for area detail) + card
-    //   containing that area's projects
-    VStack(alignment: .leading, spacing: 12) {
-      if !topLevelProjects.isEmpty {
-        topLevelProjectsSection
-      }
-      ForEach(areas) { area in
-        areaSection(area)
+  private var areaProjectSections: some View {
+    if !topLevelProjects.isEmpty {
+      Section {
+        ForEach(topLevelProjects) { project in
+          compactRow { projectRow(project, parent: nil) }
+        }
       }
     }
-  }
-
-  // MARK: - Per-section renderers
-
-  @ViewBuilder
-  private var topLevelProjectsSection: some View {
-    sectionCard {
-      ForEach(Array(topLevelProjects.enumerated()), id: \.element.id) { idx, project in
-        projectRow(project, parent: nil)
-        if idx < topLevelProjects.count - 1 { inCardDivider }
-      }
-    }
-  }
-
-  @ViewBuilder
-  private func areaSection(_ area: Area) -> some View {
-    let projectsInArea = projects.filter { $0.area == area.id && $0.status == .active }
-
-    // Each area is its own card (Mimestream-style 'bubble'). The area
-    // row sits at the top of the card, projects underneath. Areas
-    // without projects still get a card so every area visually reads
-    // as the same kind of container.
-    sectionCard {
-      sidebarButton(.area(area)) {
-        SidebarAreaRow(name: area.title, count: areaOpenCount[area.id] ?? 0)
-      }
-      #if os(iOS)
-      .contextMenu {
-        areaMenu(area)
-      } preview: {
-        SidebarAreaRow(name: area.title, count: areaOpenCount[area.id] ?? 0)
-          .padding(.horizontal, 14).padding(.vertical, 6)
-          .background(Theme.cardSurface)
-      }
-      #else
-      .contextMenu { areaMenu(area) }
-      .modifier(SidebarTaskDrop(kind: .area(area.id), mutator: taskMutator))
-      #endif
-
-      if !projectsInArea.isEmpty {
-        inCardDivider
-        ForEach(Array(projectsInArea.enumerated()), id: \.element.id) { idx, project in
-          projectRow(project, parent: area.id)
-          if idx < projectsInArea.count - 1 { inCardDivider }
+    ForEach(areas) { area in
+      Section {
+        compactRow { areaRow(area) }
+        ForEach(projects.filter { $0.area == area.id && $0.status == .active }) { project in
+          compactRow { projectRow(project, parent: area.id) }
         }
       }
     }
   }
 
-  /// Card wrapper for a section's rows — Mimestream-style: rounded
-  /// surface on iOS, bare rows on macOS (matches the platform's native
-  /// sidebar conventions).
+  /// Tightens a sidebar list row to Reminders-like density. The row views carry
+  /// their own height (`Theme.sidebar*RowHeight`, ~44pt), so the List's default
+  /// vertical inset otherwise stacked on top and made rows too tall — we zero it
+  /// and keep a 16pt leading inset for the icon. iOS only; macOS `.sidebar`
+  /// keeps its native row metrics.
   @ViewBuilder
-  private func sectionCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+  private func compactRow<V: View>(@ViewBuilder _ row: () -> V) -> some View {
     #if os(iOS)
-    VStack(alignment: .leading, spacing: 0) { content() }
-      .padding(.horizontal, 14)
-      .padding(.vertical, 6)
-      .background(
-        Theme.cardSurface,
-        in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-      )
-      .padding(.horizontal, sectionCardHPad)
+    row().listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
     #else
-    VStack(alignment: .leading, spacing: 0) { content() }
-      .padding(.horizontal, sectionCardHPad)
+    row()
     #endif
   }
 
-  // Horizontal margin for section cards — the shared page gutter, so the
-  // cards sit the same distance off the edge as the smart-list grid above
-  // and as every other tab's content.
-  private var sectionCardHPad: CGFloat { Theme.pageGutter }
+  /// The area's own row — tappable to its detail, with rename / reorder / delete
+  /// in the context menu (and, on macOS, a task drop target). Sits at the top of
+  /// its section's grouped card, projects underneath.
+  @ViewBuilder
+  private func areaRow(_ area: Area) -> some View {
+    sidebarButton(.area(area)) {
+      SidebarAreaRow(name: area.title, count: areaOpenCount[area.id] ?? 0)
+    }
+    #if os(iOS)
+    .contextMenu {
+      areaMenu(area)
+    } preview: {
+      SidebarAreaRow(name: area.title, count: areaOpenCount[area.id] ?? 0)
+        .padding(.horizontal, 14).padding(.vertical, 6)
+        .background(Theme.cardSurface)
+    }
+    #else
+    .contextMenu { areaMenu(area) }
+    .modifier(SidebarTaskDrop(kind: .area(area.id), mutator: taskMutator))
+    #endif
+  }
 
   @ViewBuilder
   private func projectRow(_ project: Project, parent: String?) -> some View {
@@ -689,24 +683,6 @@ struct SidebarRootView: View {
     } label: {
       Label("Delete Area", systemImage: "trash")
     }
-  }
-
-  /// Thin hairline shown between consecutive rows inside the iPhone
-  /// areas/projects card. Indented to the left edge of the row text
-  /// (past the icon column) so it lines up with the system iOS list
-  /// separator style. macOS sidebar reads cleanly without inter-row
-  /// hairlines (Mimestream macOS doesn't draw them either), so we
-  /// render nothing there.
-  @ViewBuilder
-  private var inCardDivider: some View {
-    #if os(iOS)
-    Rectangle()
-      .fill(Color(uiColor: .opaqueSeparator).opacity(0.6))
-      .frame(height: 0.5)
-      .padding(.leading, Theme.checkboxTap + Theme.iconTextGap)
-    #else
-    EmptyView()
-    #endif
   }
 
   /// Move the area with id `movedId` to the position immediately before
