@@ -81,7 +81,7 @@ struct TaskDraft {
       area: areaId,
       project: projectId,
       scheduled: storedScheduled,
-      due: deadline,
+      deadline: deadline,
       today: pinToday,
       notes: trimmedNotes.isEmpty ? nil : trimmedNotes
     )
@@ -101,7 +101,7 @@ struct TaskDraft {
     mutator.schedule(id: id, date: storedScheduled)
     mutator.moveToToday(id: id, today: pinToday)
     if deadline != SeptenaDate.parse(original.deadline) {
-      mutator.setDue(id: id, date: deadline)
+      mutator.setDeadline(id: id, date: deadline)
     }
 
     if recurrence != original.recurrence {
@@ -109,6 +109,20 @@ struct TaskDraft {
     }
     if projectId != original.project { mutator.moveToProject(id: id, project: projectId) }
     if areaId != original.area { mutator.moveToArea(id: id, area: areaId) }
+  }
+
+  /// Did this edit change a *placement* field — project, area, scheduled, due,
+  /// or Today? These are exactly the fields that take a row out of the triage
+  /// band (`isInTriageBand`), so a change here is a ratification (the editor
+  /// uses it to decide whether saving should clear an agent proposal from the
+  /// Inbox). A pure title / notes edit returns false: editing the text of a
+  /// loose capture isn't filing it.
+  func placementChanged(from original: SeptenaTask) -> Bool {
+    pinToday != original.today
+      || storedScheduled != SeptenaDate.parse(original.scheduled)
+      || deadline != SeptenaDate.parse(original.deadline)
+      || projectId != original.project
+      || areaId != original.area
   }
 
   // MARK: - Pill value labels

@@ -215,8 +215,8 @@ struct TasksDestinationView: View {
 
   /// Complete an Inbox row in place — same beat as a Today check, but the row
   /// lives in `triageTasks`. Completing it (status → done) drops it out of the
-  /// Inbox and into Done. To triage instead of finish, tap the row to edit (the
-  /// composer acknowledges the agent cue and lets you place it).
+  /// Inbox and into Done. To triage instead of finish, tap the row to edit and
+  /// place it (filing/scheduling/saving ratifies it; a bare peek does not).
   private func toggleInbox(_ task: SeptenaTask) {
     guard task.status != .done else { return }
     mutator.complete(id: task.id)

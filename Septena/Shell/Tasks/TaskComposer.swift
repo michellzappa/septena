@@ -284,8 +284,12 @@ struct TaskComposerCard: View {
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { titleFocused = true }
     case .edit(let task):
       draft = TaskDraft(task: task)
-      // Opening the editor counts as engagement — clear any agent cue.
-      mutator.acknowledge(id: task.id)
+      // Note: opening the editor must NOT acknowledge. The agent cue == triage-
+      // band membership for agent rows, so acknowledging here would silently
+      // ratify an unclassified proposal the moment you peek at it — it would
+      // vanish from the Inbox on dismiss with no decision made. Ratification
+      // happens on Save, and only when the edit actually (re)places it (see
+      // `persist`).
     }
   }
 
@@ -301,7 +305,15 @@ struct TaskComposerCard: View {
       draft.create(via: mutator)
       AddInfoSection.tasks.notifyTilesChanged()
     case .edit(let task):
+      // Ratify (acknowledge → leave the Inbox) only when this save actually
+      // (re)placed the task — gave it a project/area, a date, or a Today pin
+      // (the same fields that take a row out of the triage band). A bare title /
+      // notes edit, or just opening to peek, is not a placement decision and
+      // must keep an agent proposal in the Inbox. No-op for non-agent /
+      // already-seen rows.
+      let placed = draft.placementChanged(from: task)
       draft.update(task, via: mutator)
+      if placed { mutator.acknowledge(id: task.id) }
     }
   }
 

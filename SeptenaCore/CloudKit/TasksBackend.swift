@@ -20,9 +20,10 @@ protocol TasksBackend: AnyObject {
               area: String?,
               project: String?,
               scheduled: Date?,
-              due: Date?,
+              deadline: Date?,
               today: Bool,
               notes: String?,
+              source: String,
               deferPush: Bool) -> SeptenaTask
 
   func update(id: String, title: String?, notes: String?)
@@ -35,7 +36,7 @@ protocol TasksBackend: AnyObject {
   func moveToToday(id: String, today: Bool)
   func removeFromToday(id: String)
   func schedule(id: String, date: Date?)
-  func setDue(id: String, date: Date?)
+  func setDeadline(id: String, date: Date?)
   func setRecurrence(id: String, recurrence: Recurrence?)
   func moveToArea(id: String, area: String?)
   func moveToProject(id: String, project: String?)
@@ -205,8 +206,9 @@ final class CloudKitTasksBackend: TasksBackend {
 
   @discardableResult
   func create(title: String, area: String?, project: String?,
-              scheduled: Date?, due: Date?, today: Bool,
-              notes: String?, deferPush: Bool = false) -> SeptenaTask {
+              scheduled: Date?, deadline: Date?, today: Bool,
+              notes: String?, source: String = TaskSource.app,
+              deferPush: Bool = false) -> SeptenaTask {
     let id = uniqueTaskID()
     let todayIso = SeptenaDate.today
     let effectiveArea = project != nil ? nil : area
@@ -219,7 +221,7 @@ final class CloudKitTasksBackend: TasksBackend {
       statusRaw: TaskStatus.open.rawValue,
       created: todayIso,
       scheduled: SeptenaDate.format(scheduled),
-      due: SeptenaDate.format(due),
+      deadline: SeptenaDate.format(deadline),
       today: today,
       todaySetOn: today ? todayIso : nil,
       area: effectiveArea,
@@ -227,8 +229,10 @@ final class CloudKitTasksBackend: TasksBackend {
       notes: (notes?.isEmpty == false) ? notes : nil,
       position: TaskOrder.topPosition(in: context),
       pendingSync: true,
-      source: TaskSource.app,            // positive provenance for app-authored rows
-      sourceClient: currentAppClientLabel,
+      source: source,                    // "app" (native) or "mcp" (agent proposal)
+      // Mirror the gateway's label for agent rows so MCP-authored tasks read as
+      // "Claude" regardless of which surface (gateway / local server) wrote them.
+      sourceClient: source == TaskSource.mcp ? "Claude" : currentAppClientLabel,
       createdAt: Date()
     )
     context.insert(entity)
@@ -332,7 +336,7 @@ final class CloudKitTasksBackend: TasksBackend {
   ///
   /// A live deadline (`due ≤ today`) is intentionally left intact: it's a real
   /// commitment, so such a task stays in Today until the deadline itself is
-  /// changed (same principle as `setDue`'s clear-pin behavior). Callers should
+  /// changed (same principle as `setDeadline`'s clear-pin behavior). Callers should
   /// label the affordance off `isOnToday`, not the raw `today` flag.
   func removeFromToday(id: String) {
     guard let entity = fetch(id: id) else { return }
@@ -352,7 +356,7 @@ final class CloudKitTasksBackend: TasksBackend {
     commitAndPush(entity, op: "schedule")
   }
 
-  func setDue(id: String, date: Date?) {
+  func setDeadline(id: String, date: Date?) {
     guard let entity = fetch(id: id) else { return }
     // Deadline is rendering-only (Things-style): the Today filter unions
     // `due <= today` rows at view time, so a deadline-today task already shows
@@ -371,9 +375,9 @@ final class CloudKitTasksBackend: TasksBackend {
       entity.today = true
       entity.todaySetOn = SeptenaDate.today
     }
-    entity.due = SeptenaDate.format(date)
+    entity.deadline = SeptenaDate.format(date)
     entity.pendingSync = true
-    commitAndPush(entity, op: "setDue")
+    commitAndPush(entity, op: "setDeadline")
   }
 
   func setRecurrence(id: String, recurrence: Recurrence?) {

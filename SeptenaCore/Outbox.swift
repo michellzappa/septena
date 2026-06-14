@@ -59,17 +59,18 @@ final class TaskMutator {
               area: String? = nil,
               project: String? = nil,
               scheduled: Date? = nil,
-              due: Date? = nil,
+              deadline: Date? = nil,
               today: Bool = false,
               notes: String? = nil,
+              source: String = TaskSource.app,
               deferPush: Bool = false) -> SeptenaTask {
     guard let cloudBackend else {
       preconditionFailure("TaskMutator.create called before SeptenaServices.shared.start()")
     }
-    SeptenaLog.info("[TaskMutator] route=cloudKit op=create title=\"\(title)\" deferPush=\(deferPush)")
+    SeptenaLog.info("[TaskMutator] route=cloudKit op=create title=\"\(title)\" source=\(source) deferPush=\(deferPush)")
     return cloudBackend.create(title: title, area: area, project: project,
-                               scheduled: scheduled, due: due, today: today,
-                               notes: notes, deferPush: deferPush)
+                               scheduled: scheduled, deadline: deadline, today: today,
+                               notes: notes, source: source, deferPush: deferPush)
   }
 
   func complete(id: String) {
@@ -167,12 +168,12 @@ final class TaskMutator {
     cloudBackend.schedule(id: id, date: date)
   }
 
-  func setDue(id: String, date: Date?) {
+  func setDeadline(id: String, date: Date?) {
     guard let cloudBackend else {
-      SeptenaLog.error("[TaskMutator] setDue called before CK bound — dropping", nil)
+      SeptenaLog.error("[TaskMutator] setDeadline called before CK bound — dropping", nil)
       return
     }
-    cloudBackend.setDue(id: id, date: date)
+    cloudBackend.setDeadline(id: id, date: date)
   }
 
   func setRecurrence(id: String, recurrence: Recurrence?) {

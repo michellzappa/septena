@@ -285,7 +285,7 @@ enum MCPDispatch {
     }
     var out: [String: Any] = ["id": e.id, "title": e.title, "status": e.status.rawValue, "today": e.today]
     if let v = e.scheduled { out["scheduled"] = v }
-    if let v = e.due { out["due"] = v }
+    if let v = e.deadline { out["deadline"] = v }
     if let v = e.area { out["area"] = v }
     if let v = e.project { out["project"] = v }
     if let v = e.completedAt { out["completedAt"] = v }
@@ -308,11 +308,17 @@ enum MCPDispatch {
   private static func tasksCreate(_ args: MCPArgs) throws -> Any {
     try validateContainer("area", args.string("area"))
     try validateContainer("project", args.string("project"))
+    // Stamp provenance "mcp" so a Claude-authored task lands as an agent
+    // proposal in the triage band (freshness cue + acknowledge-on-ratify),
+    // matching the hosted gateway. Without this it would read as the user's own
+    // app capture. See SeptenaTask.isInTriageBand / TaskSource.
     let t = SeptenaServices.shared.taskMutator.create(
       title: try args.requireString("title"),
       area: args.string("area"), project: args.string("project"),
-      scheduled: try args.date("scheduled"), due: try args.date("due"),
-      today: args.bool("today") ?? false)
+      scheduled: try args.date("scheduled"),
+      deadline: try args.date("deadline") ?? args.date("due"),
+      today: args.bool("today") ?? false,
+      source: TaskSource.mcp)
     return ["id": t.id, "title": t.title]
   }
 
@@ -347,7 +353,10 @@ enum MCPDispatch {
       today ? m.moveToToday(id: id) : m.removeFromToday(id: id); updated.append("today")
     }
     if args.present("scheduled") { m.schedule(id: id, date: try args.date("scheduled")); updated.append("scheduled") }
-    if args.present("due") { m.setDue(id: id, date: try args.date("due")); updated.append("due") }
+    if args.present("deadline") || args.present("due") {
+      m.setDeadline(id: id, date: try args.date(args.present("deadline") ? "deadline" : "due"))
+      updated.append("deadline")
+    }
     if args.present("area") {
       try validateContainer("area", args.string("area"))
       m.moveToArea(id: id, area: args.string("area")); updated.append("area")
