@@ -95,6 +95,7 @@ targets:
         NSHealthShareUsageDescription: Septena reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device.
         NSHealthUpdateUsageDescription: Septena saves your mood check-ins and nutrition entries (meals, macros, water) to HealthKit so they appear in the Health app alongside your other data. Data stays on your device.
         NSPhotoLibraryUsageDescription: Septena attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device.
+        NSFaceIDUsageDescription: Septena uses Face ID to unlock the app when App Lock is turned on, so your private logs stay covered on an unlocked phone.
         WithingsClientID: $(WITHINGS_CLIENT_ID)
         WithingsClientSecret: $(WITHINGS_CLIENT_SECRET)
     configFiles:
@@ -147,6 +148,7 @@ targets:
         NSHealthShareUsageDescription: Septena reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device.
         NSHealthUpdateUsageDescription: Septena saves your mood check-ins and nutrition entries (meals, macros, water) to HealthKit so they appear in the Health app alongside your other data. Data stays on your device.
         NSPhotoLibraryUsageDescription: Septena attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device.
+        NSFaceIDUsageDescription: Septena uses Face ID to unlock the app when App Lock is turned on, so your private logs stay covered on an unlocked phone.
         WithingsClientID: $(WITHINGS_CLIENT_ID)
         WithingsClientSecret: $(WITHINGS_CLIENT_SECRET)
     configFiles:
@@ -266,6 +268,9 @@ targets:
       # on-device (no location, no payload field).
       - path: SeptenaCore/RhythmWire.swift
       - path: SeptenaCore/AdaptiveColor.swift
+      # TimeOfDayWheel's occurredAt→Event init references WakingDay (the dial's
+      # waking-day boundary). Foundation-only, no model deps, so it slots in.
+      - path: SeptenaCore/WakingDay.swift
       - path: Septena/Shell/UI/TimeOfDayWheel.swift
       - path: Septena/Shell/UI/Theme.swift
       - path: Septena/Shell/UI/SolarClock.swift
@@ -300,6 +305,7 @@ targets:
       - path: SeptenaCore/SuggestionBlocks.swift
       - path: SeptenaCore/IntakeModel.swift
       - path: SeptenaCore/GutSymptomMigrationMap.swift
+      - path: SeptenaCore/WakingDay.swift
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES

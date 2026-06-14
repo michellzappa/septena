@@ -577,18 +577,19 @@ private struct WheelTapToggle: ViewModifier {
 extension TimeOfDayWheel.Event {
   /// Build a wheel point from an absolute instant (an entity's `occurredAt`).
   /// Returns `nil` for undated sentinel rows (`.distantPast`) or events outside
-  /// the trailing `windowDays`. `todayStart` is the start of *today* in the
-  /// local calendar; the angle comes from the event's local hour/minute, the
-  /// ring from its calendar-day distance.
+  /// the trailing `windowDays`. `todayStart` is the `dayKey` of *today's* waking
+  /// day; the angle comes from the event's local hour/minute, the ring from its
+  /// waking-day distance (`WakingDay`). With `WakingDay(enabled: false)` this is
+  /// exactly the legacy midnight-to-midnight bucketing.
   init?(id: String,
         occurredAt: Date,
         todayStart: Date,
         windowDays: Int = 7,
         color: Color? = nil,
+        wakingDay: WakingDay = WakingDay(enabled: false),
         calendar: Calendar = .current) {
     guard occurredAt > .distantPast else { return nil }
-    let dayStart = calendar.startOfDay(for: occurredAt)
-    let daysAgo = calendar.dateComponents([.day], from: dayStart, to: todayStart).day ?? 0
+    let daysAgo = wakingDay.daysAgo(occurredAt, todayKey: todayStart, calendar: calendar)
     guard daysAgo >= 0, daysAgo < windowDays else { return nil }
     let c = calendar.dateComponents([.hour, .minute], from: occurredAt)
     self.init(id: id,

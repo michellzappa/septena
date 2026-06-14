@@ -2432,6 +2432,9 @@
         }
       }
     },
+    "Day dial" : {
+
+    },
     "DAY STREAK" : {
       "localizations" : {
         "pt-BR" : {
@@ -5951,6 +5954,9 @@
           }
         }
       }
+    },
+    "Start day at wake rolls the dial over when you wake — from your sleep, or 4 AM if it hasn't synced yet — instead of at midnight, so a late night stays on the same day. Open on the full week starts the wheels on the trailing 7 days rather than today; you can also tap any wheel to switch." : {
+
     },
     "Start training" : {
       "localizations" : {

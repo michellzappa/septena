@@ -32,10 +32,16 @@ enum RhythmSnapshotBuilder {
   /// Build the snapshot for `todayStart` (start-of-day) over `windowDays`.
   /// `sections` is the user's mirrored section list (`SettingsMirror.loadSections`)
   /// — only enabled sections plot, each in its own authored color.
+  /// `wakingDay` rolls the wheel over at wake instead of midnight (the same
+  /// lens the in-app dials use; see `WakingDay`). The background builder has no
+  /// Oura sleep data, so it degrades to the documented 4am cutoff — `todayStart`
+  /// must be a `dayKey` from the same resolver. Pass `WakingDay(enabled: false)`
+  /// for the legacy midnight buckets.
   static func build(context: ModelContext,
                     sections: [SectionConfig],
                     todayStart: Date,
-                    windowDays: Int = 7) -> RhythmWire {
+                    windowDays: Int = 7,
+                    wakingDay: WakingDay = WakingDay(enabled: true, cutoffHour: 4)) -> RhythmWire {
     let cal = Calendar.current
     let weekStart = cal.date(byAdding: .day, value: -(windowDays - 1), to: todayStart) ?? todayStart
 
@@ -52,7 +58,8 @@ enum RhythmSnapshotBuilder {
     for t in LoggedEvents.timed(since: weekStart, in: context)
     where visible.contains(t.sectionKey) && t.sectionKey != "training" {
       guard let e = event(id: t.id, occurredAt: t.occurredAt, todayStart: todayStart,
-                          windowDays: windowDays, colorHex: colorHex[t.sectionKey]) else { continue }
+                          windowDays: windowDays, colorHex: colorHex[t.sectionKey],
+                          wakingDay: wakingDay) else { continue }
       events.append(e)
     }
 
@@ -65,7 +72,8 @@ enum RhythmSnapshotBuilder {
       for t in rows {
         guard let cs = t.completedAt, let when = isoLocal.date(from: cs),
               let e = event(id: t.id, occurredAt: when, todayStart: todayStart,
-                            windowDays: windowDays, colorHex: colorHex["tasks"]) else { continue }
+                            windowDays: windowDays, colorHex: colorHex["tasks"],
+                            wakingDay: wakingDay) else { continue }
         events.append(e)
       }
     }
@@ -82,7 +90,8 @@ enum RhythmSnapshotBuilder {
         for r in rows {
           guard let e = event(id: r.id, occurredAt: r.occurredAt, todayStart: todayStart,
                               windowDays: windowDays,
-                              colorHex: kindColor[r.kindID] ?? colorHex["intake"]) else { continue }
+                              colorHex: kindColor[r.kindID] ?? colorHex["intake"],
+                              wakingDay: wakingDay) else { continue }
           events.append(e)
         }
       }
@@ -92,7 +101,8 @@ enum RhythmSnapshotBuilder {
     //    merged — mirrors `RhythmData.trainingBands`.
     if visible.contains("training") {
       bands = trainingBands(todayStart: todayStart, weekStart: weekStart,
-                            windowDays: windowDays, colorHex: colorHex["training"], context: context)
+                            windowDays: windowDays, colorHex: colorHex["training"],
+                            wakingDay: wakingDay, context: context)
     }
 
     return RhythmWire(windowDays: windowDays, events: events, bands: bands)
@@ -101,11 +111,11 @@ enum RhythmSnapshotBuilder {
   /// `(fraction, daysAgo)` for an instant, bounded to the window. Mirrors
   /// `TimeOfDayWheel.Event.init?(occurredAt:todayStart:windowDays:)`.
   private static func event(id: String, occurredAt: Date, todayStart: Date,
-                            windowDays: Int, colorHex: String?) -> RhythmWire.Event? {
+                            windowDays: Int, colorHex: String?,
+                            wakingDay: WakingDay) -> RhythmWire.Event? {
     guard occurredAt > .distantPast else { return nil }
     let cal = Calendar.current
-    let dayStart = cal.startOfDay(for: occurredAt)
-    let daysAgo = cal.dateComponents([.day], from: dayStart, to: todayStart).day ?? 0
+    let daysAgo = wakingDay.daysAgo(occurredAt, todayKey: todayStart, calendar: cal)
     guard daysAgo >= 0, daysAgo < windowDays else { return nil }
     let c = cal.dateComponents([.hour, .minute], from: occurredAt)
     let fraction = (Double(c.hour ?? 0) * 60 + Double(c.minute ?? 0)) / 1440
@@ -113,7 +123,8 @@ enum RhythmSnapshotBuilder {
   }
 
   private static func trainingBands(todayStart: Date, weekStart: Date, windowDays: Int,
-                                    colorHex: String?, context: ModelContext) -> [RhythmWire.Band] {
+                                    colorHex: String?, wakingDay: WakingDay,
+                                    context: ModelContext) -> [RhythmWire.Band] {
     let rows = (try? context.fetch(
       FetchDescriptor<ExerciseEntryEntity>(predicate: #Predicate { $0.occurredAt >= weekStart })
     )) ?? []
@@ -121,7 +132,7 @@ enum RhythmSnapshotBuilder {
     var out: [RhythmWire.Band] = []
     for (dateStr, dayRows) in Dictionary(grouping: rows, by: \.date) {
       guard let d = ymd.date(from: dateStr) else { continue }
-      let daysAgo = cal.dateComponents([.day], from: cal.startOfDay(for: d), to: todayStart).day ?? 0
+      let daysAgo = wakingDay.daysAgo(d.addingTimeInterval(43_200), todayKey: todayStart, calendar: cal)
       guard daysAgo >= 0, daysAgo < windowDays else { continue }
       let spans = dayRows.compactMap { e -> (Double, Double)? in
         guard e.occurredAt > .distantPast else { return nil }

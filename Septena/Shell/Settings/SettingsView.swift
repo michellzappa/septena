@@ -62,6 +62,16 @@ enum SettingsKey {
   /// hidden. Raw value of `DayViewStyle`; default dial. Replaced the old
   /// show-timeline / show-dial boolean pair.
   static let homepageDayView = "septena.homepage.dayView"
+  /// The dashboard dial's day boundary. On → the wheel rolls over at wake
+  /// (sleep → 4am cutoff → midnight; see `WakingDay`) instead of calendar
+  /// midnight, so a late night stays on one dial. Default on. This is the
+  /// literal key `DayDialHero` / `RhythmHomepageView` / `TimeOfDayWheel`
+  /// already read — kept verbatim so the constant binds to the same storage.
+  static let wheelWakingDay = "wheel.wakingDay"
+  /// Whether the time-of-day wheels open focused on today (default) or on the
+  /// trailing 7-day overlay. Same literal as `TimeOfDayWheel.windowDefaultsKey`
+  /// — tapping a wheel writes this same key, so the setting stays in sync.
+  static let wheelTodayOnly = "timeOfDayWheel.todayOnly"
   /// Whether the time-of-day welcome (greeting + subtitle) renders at the
   /// very top of the homepage. Default on; mirrors the webapp's overview
   /// dashboard header.
@@ -997,6 +1007,10 @@ struct PrivacySettingsPane: View {
 struct HomeSettingsPane: View {
   @AppStorage(SettingsKey.homepageDayView)
   private var dayViewRaw: String = DayViewStyle.dial.rawValue
+  @AppStorage(SettingsKey.wheelWakingDay)
+  private var wakingDay: Bool = true
+  @AppStorage(SettingsKey.wheelTodayOnly)
+  private var wheelTodayOnly: Bool = true
 
   var body: some View {
     Form {
@@ -1036,6 +1050,20 @@ struct HomeSettingsPane: View {
         Text("Day view")
       } footer: {
         Text("Today at a glance, between the greeting and the layout. Dial is the 24-hour clock face — every section's logs as dots, sleep as an arc, under the sky's light, with dawn and dusk placed at your region's real sunrise and sunset (from your time zone — no location access). Timeline is the same day as a horizontal strip.")
+      }
+
+      Section {
+        Toggle(isOn: $wakingDay) {
+          Label("Start day at wake", systemImage: "sunrise")
+        }
+        Toggle(isOn: Binding(get: { !wheelTodayOnly },
+                             set: { wheelTodayOnly = !$0 })) {
+          Label("Open on the full week", systemImage: "calendar")
+        }
+      } header: {
+        Text("Day dial")
+      } footer: {
+        Text("Start day at wake rolls the dial over when you wake — from your sleep, or 4 AM if it hasn't synced yet — instead of at midnight, so a late night stays on the same day. Open on the full week starts the wheels on the trailing 7 days rather than today; you can also tap any wheel to switch.")
       }
     }
     .formStyle(.grouped)

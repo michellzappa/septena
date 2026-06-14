@@ -862,21 +862,24 @@ struct SupplementHistoryResponse: Codable {
 
 struct OuraNight: Codable, Identifiable, Hashable {
   let date: String           // YYYY-MM-DD
-  var sleepScore: Int?
-  var readinessScore: Int?
-  var totalH: Double?
-  var deepH: Double?
-  var remH: Double?
-  var lightH: Double?
-  var awakeH: Double?
-  var efficiency: Int?
-  var hrv: Int?
-  var restingHr: Int?
-  var bedtime: String?
-  var wakeTime: String?
-  var stressHighMin: Int?
-  var recoveryHighMin: Int?
-  var stressSummary: String?   // "stressful" | "normal" | "restored" | "restorative"
+  // Optionals default to nil so the memberwise init can be called with just the
+  // fields a caller cares about (e.g. date + wakeTime). Decoding is unaffected —
+  // synthesized Decodable already treats a missing key for an optional as nil.
+  var sleepScore: Int? = nil
+  var readinessScore: Int? = nil
+  var totalH: Double? = nil
+  var deepH: Double? = nil
+  var remH: Double? = nil
+  var lightH: Double? = nil
+  var awakeH: Double? = nil
+  var efficiency: Int? = nil
+  var hrv: Int? = nil
+  var restingHr: Int? = nil
+  var bedtime: String? = nil
+  var wakeTime: String? = nil
+  var stressHighMin: Int? = nil
+  var recoveryHighMin: Int? = nil
+  var stressSummary: String? = nil   // "stressful" | "normal" | "restored" | "restorative"
 
   var id: String { date }
 

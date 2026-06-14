@@ -55,15 +55,26 @@ struct RhythmHomepageView<MenuContent: View>: View {
 
   private let windowDays = 7
 
+  /// Roll the dial over at wake (sleep → 4am cutoff → midnight) rather than
+  /// calendar midnight, so a late night stays on the same dial. Shared default
+  /// with `DayDialHero`; off → plain midnight buckets. See `WakingDay`.
+  @AppStorage(SettingsKey.wheelWakingDay) private var wakingDayEnabled = true
+
   /// Section accent + title + tap, keyed for fast lookup while mapping the
   /// flat event list and building the legend.
   private var byKey: [String: HomepageDomainData] {
     Dictionary(items.map { ($0.domain.rawValue, $0) }, uniquingKeysWith: { a, _ in a })
   }
 
+  /// The dial's day boundary, built from the loaded Oura nights.
+  private var wakingDay: WakingDay {
+    WakingDay.from(nights: sleepNights, enabled: wakingDayEnabled)
+  }
+
+  /// `dayKey` of the current waking day — the wheel's "today". In the small
+  /// hours this is still yesterday's civil date until you wake.
   private var todayStart: Date {
-    SeptenaDate.parse(clock.today).map { Calendar.current.startOfDay(for: $0) }
-      ?? Calendar.current.startOfDay(for: clock.now)
+    wakingDay.dayKey(containing: clock.now)
   }
 
   private var nowFraction: Double {
@@ -98,8 +109,9 @@ struct RhythmHomepageView<MenuContent: View>: View {
     }
     .frame(maxWidth: .infinity)
     .padding(.vertical, 8)
-    // Reload on appear, day-rollover (clock.today), and any logged write.
-    .task(id: clock.today) { await reload() }
+    // Reload on appear, waking-day rollover (todayStart flips at wake/cutoff,
+    // not just midnight — clock.now ticks it within 60s), and any logged write.
+    .task(id: todayStart) { await reload() }
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
       Task { await reload() }
     }
@@ -167,6 +179,7 @@ struct RhythmHomepageView<MenuContent: View>: View {
       now: clock.now,
       windowDays: windowDays,
       calendarFallback: theme.color(for: "calendar"),
+      wakingDay: wakingDay,
       context: modelContext
     )
     eventsBySection = snap.eventsBySection
@@ -199,6 +212,7 @@ enum RhythmData {
                    now: Date,
                    windowDays: Int,
                    calendarFallback: Color,
+                   wakingDay: WakingDay = WakingDay(enabled: false),
                    context: ModelContext) -> Snapshot {
     let weekStart = Calendar.current.date(byAdding: .day, value: -(windowDays - 1), to: todayStart) ?? todayStart
 
@@ -213,7 +227,7 @@ enum RhythmData {
     for t in timed {
       guard let e = TimeOfDayWheel.Event(
         id: t.id, occurredAt: t.occurredAt, todayStart: todayStart,
-        windowDays: windowDays, color: colors[t.sectionKey]
+        windowDays: windowDays, color: colors[t.sectionKey], wakingDay: wakingDay
       ) else { continue }
       snap.eventsBySection[t.sectionKey, default: []].append(e)
     }
@@ -221,7 +235,7 @@ enum RhythmData {
     // matches the timeline (which plots done tasks at their completedAt time).
     if visible.contains("tasks") {
       let te = taskEvents(todayStart: todayStart, windowDays: windowDays,
-                          color: colors["tasks"], context: context)
+                          color: colors["tasks"], wakingDay: wakingDay, context: context)
       if !te.isEmpty { snap.eventsBySection["tasks", default: []].append(contentsOf: te) }
     }
     // Intake plots per *kind* color (coffee, matcha, … each carry their own),
@@ -230,16 +244,17 @@ enum RhythmData {
     if visible.contains("intake") {
       let ie = intakeEvents(todayStart: todayStart, windowDays: windowDays,
                             weekStart: weekStart, sectionColor: colors["intake"],
-                            context: context)
+                            wakingDay: wakingDay, context: context)
       if !ie.isEmpty { snap.eventsBySection["intake", default: []].append(contentsOf: ie) }
     }
 
     let sleep = sleepBands(nights: sleepNights, todayStart: todayStart, windowDays: windowDays,
-                           visible: visible, sleepColor: colors["sleep"])
+                           visible: visible, sleepColor: colors["sleep"], wakingDay: wakingDay)
     if !sleep.isEmpty { snap.bandsBySection["sleep"] = sleep }
     if visible.contains("training") {
       let train = trainingBands(todayStart: todayStart, weekStart: weekStart,
-                                windowDays: windowDays, color: colors["training"], context: context)
+                                windowDays: windowDays, color: colors["training"],
+                                wakingDay: wakingDay, context: context)
       if !train.isEmpty { snap.bandsBySection["training"] = train }
     }
     // Calendar for the *displayed* day (today, or a scrubbed past day) — the
@@ -252,13 +267,14 @@ enum RhythmData {
   /// mirrors `DayTimelineView`'s task handling. The `Event` init bounds them to
   /// the window.
   private static func taskEvents(todayStart: Date, windowDays: Int,
-                                 color: Color?, context: ModelContext) -> [TimeOfDayWheel.Event] {
+                                 color: Color?, wakingDay: WakingDay,
+                                 context: ModelContext) -> [TimeOfDayWheel.Event] {
     let desc = FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.statusRaw == "done" })
     let rows = (try? context.fetch(desc)) ?? []
     return rows.compactMap { t in
       guard let cs = t.completedAt, let when = RhythmFmt.isoLocal.date(from: cs) else { return nil }
       return TimeOfDayWheel.Event(id: t.id, occurredAt: when, todayStart: todayStart,
-                                  windowDays: windowDays, color: color)
+                                  windowDays: windowDays, color: color, wakingDay: wakingDay)
     }
   }
 
@@ -266,7 +282,8 @@ enum RhythmData {
   /// matcha, cannabis… each define one) rather than the flat section accent.
   /// Falls back to the section color for a kind with no color set.
   private static func intakeEvents(todayStart: Date, windowDays: Int, weekStart: Date,
-                                   sectionColor: Color?, context: ModelContext) -> [TimeOfDayWheel.Event] {
+                                   sectionColor: Color?, wakingDay: WakingDay,
+                                   context: ModelContext) -> [TimeOfDayWheel.Event] {
     let rows = (try? context.fetch(
       FetchDescriptor<IntakeEventEntity>(predicate: #Predicate { $0.occurredAt >= weekStart })
     )) ?? []
@@ -278,7 +295,7 @@ enum RhythmData {
     return rows.compactMap { e in
       TimeOfDayWheel.Event(id: e.id, occurredAt: e.occurredAt, todayStart: todayStart,
                            windowDays: windowDays,
-                           color: kindColor[e.kindID] ?? sectionColor)
+                           color: kindColor[e.kindID] ?? sectionColor, wakingDay: wakingDay)
     }
   }
 
@@ -286,7 +303,8 @@ enum RhythmData {
   /// day's exercise rows and merging gaps under 0.75h — the same session idea
   /// `DayTimelineView` draws as a bar. Faded by recency like the other bands.
   private static func trainingBands(todayStart: Date, weekStart: Date, windowDays: Int,
-                                    color: Color?, context: ModelContext) -> [TimeOfDayWheel.Band] {
+                                    color: Color?, wakingDay: WakingDay,
+                                    context: ModelContext) -> [TimeOfDayWheel.Band] {
     guard let color else { return [] }
     let rows = (try? context.fetch(
       FetchDescriptor<ExerciseEntryEntity>(predicate: #Predicate { $0.occurredAt >= weekStart })
@@ -295,7 +313,10 @@ enum RhythmData {
     var out: [TimeOfDayWheel.Band] = []
     for (dateStr, dayRows) in Dictionary(grouping: rows, by: \.date) {
       guard let d = RhythmFmt.ymd.date(from: dateStr) else { continue }
-      let daysAgo = cal.dateComponents([.day], from: cal.startOfDay(for: d), to: todayStart).day ?? 0
+      // Noon of the civil date resolves to that date's own waking day (always
+      // after wake, before the next midnight) — same integer as the old
+      // calendar-day distance, but measured against the waking "today" key.
+      let daysAgo = wakingDay.daysAgo(d.addingTimeInterval(43_200), todayKey: todayStart, calendar: cal)
       guard daysAgo >= 0, daysAgo < windowDays else { continue }
       // Per-entry spans (start hour → start + duration), then merge near ones.
       let spans = dayRows.compactMap { e -> (Double, Double)? in
@@ -355,14 +376,17 @@ enum RhythmData {
   /// Each recent night's sleep as a bedtime→wake arc, faded by recency. Only
   /// when the sleep section is enabled and we have a color for it.
   private static func sleepBands(nights: [OuraNight], todayStart: Date, windowDays: Int,
-                                 visible: Set<String>, sleepColor: Color?) -> [TimeOfDayWheel.Band] {
+                                 visible: Set<String>, sleepColor: Color?,
+                                 wakingDay: WakingDay) -> [TimeOfDayWheel.Band] {
     guard visible.contains("sleep"), let sleepColor else { return [] }
     let cal = Calendar.current
     return nights.compactMap { n in
       guard let b = frac(fromHHmm: n.bedtime),
             let w = frac(fromHHmm: n.wakeTime),
             let d = RhythmFmt.ymd.date(from: n.date) else { return nil }
-      let daysAgo = cal.dateComponents([.day], from: cal.startOfDay(for: d), to: todayStart).day ?? 0
+      // The night ending the morning of `n.date` belongs to that date's waking
+      // day (it's how the day began). Noon resolves to that same waking day.
+      let daysAgo = wakingDay.daysAgo(d.addingTimeInterval(43_200), todayKey: todayStart, calendar: cal)
       guard daysAgo >= 0, daysAgo < windowDays else { return nil }
       // Thin like the calendar pills — a night is context, not a headline;
       // the heavy stroke made sleep dominate the dial.

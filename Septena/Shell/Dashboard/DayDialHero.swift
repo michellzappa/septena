@@ -95,9 +95,20 @@ struct DayDialHero: View {
   private let windowDays = 7
   private let dialDiameter: CGFloat = 270
 
+  /// Roll the dial over at wake (sleep → 4am cutoff → midnight) rather than
+  /// calendar midnight, so a night that runs past midnight stays on one dial.
+  /// Shared default with the Rhythm layout mode; off → plain midnight buckets.
+  @AppStorage(SettingsKey.wheelWakingDay) private var wakingDayEnabled = true
+
+  /// The dial's day boundary, built from the loaded Oura nights.
+  private var wakingDay: WakingDay {
+    WakingDay.from(nights: sleepNights, enabled: wakingDayEnabled)
+  }
+
+  /// `dayKey` of the current waking day — the dial's "today". In the small
+  /// hours this is still yesterday's civil date until you wake.
   private var todayStart: Date {
-    SeptenaDate.parse(clock.today).map { Calendar.current.startOfDay(for: $0) }
-      ?? Calendar.current.startOfDay(for: clock.now)
+    wakingDay.dayKey(containing: clock.now)
   }
 
   /// Start-of-day of the day the dial currently shows (today, or a scrubbed
@@ -275,6 +286,7 @@ struct DayDialHero: View {
       now: clock.now,
       windowDays: windowDays,
       calendarFallback: theme.color(for: "calendar"),
+      wakingDay: wakingDay,
       context: modelContext
     )
   }
