@@ -42,7 +42,7 @@ export const createHabitJsonSchema = {
   required: ["title", "bucket"],
   properties: {
     title: { type: "string", minLength: 1 },
-    bucket: { type: "string", enum: ["morning", "evening", "anytime"] },
+    bucket: { type: "string", enum: ["morning", "afternoon", "evening", "anytime"] },
     emoji: { type: "string" },
   },
 } as const;

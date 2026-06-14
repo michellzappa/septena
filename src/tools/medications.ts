@@ -101,7 +101,7 @@ export const createMedicationJsonSchema = {
     strengthUnit:      { type: "string",  description: "e.g. mg, ml." },
     defaultDoseValue:  { type: "number" },
     defaultDoseUnit:   { type: "string" },
-    bucket:            { type: "string",  description: "morning/midday/evening/bedtime/anytime." },
+    bucket:            { type: "string",  description: "morning/afternoon/evening/anytime." },
     scheduleKind:      { type: "string",  enum: ["daily", "asNeeded"], description: "Defaults to daily." },
     targetDosesPerDay: { type: "integer", minimum: 0, description: "Defaults to 1 for daily meds." },
     instructions:      { type: "string" },
