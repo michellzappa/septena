@@ -3353,10 +3353,11 @@ enum GroceryStockHistory {
 // (the app never auto-pops the Apple sign-in). Tapping it is an explicit user
 // action, so presenting the sign-in here is expected. Two presentations, same
 // state + tap-to-re-mint logic:
-//   • `.pill` — an icon-only Claude-tinted glass disc in the top bar's trailing
-//     corner (iOS), mirroring the system "…" glass circle opposite it. `.plain`
-//     button + self-contained `glassCircle`, so it floats on its own glass
-//     instead of folding into a shared toolbar glass bar.
+//   • `.pill` — an icon-only control in the top bar's trailing corner (iOS):
+//     a plain Button the SYSTEM draws as a regular Liquid Glass circle, the
+//     same treatment as the "…" menu opposite it. No custom glass (that nests
+//     glass-in-glass — the idiom this codebase already follows for the drawer
+//     and Tasks "+"); the Claude accent rides in only via `.tint`.
 //   • `.card` — the full-width inline glass card stacked above the dashboard,
 //     used on macOS where the menu lives top-right, not in a leading bar.
 private struct ClaudeReconnectCue: View {
@@ -3375,14 +3376,10 @@ private struct ClaudeReconnectCue: View {
 
   var body: some View {
     if provider.isEnabled && (provider.needsReauth || justReconnected) {
-      Button(action: tap) {
-        switch presentation {
-        case .pill: pillLabel
-        case .card: cardLabel
-        }
+      switch presentation {
+      case .pill: pillButton
+      case .card: cardButton
       }
-      .buttonStyle(.plain)
-      .disabled(justReconnected)
     }
   }
 
@@ -3398,15 +3395,18 @@ private struct ClaudeReconnectCue: View {
     }
   }
 
-  // Compact top-bar control: an icon-only Claude-tinted glass disc, mirroring
-  // the system "…" glass circle on the opposite corner. Warning triangle by
-  // default, a green check on the post-reconnect flash, a spinner mid-refresh.
-  private var pillLabel: some View {
-    pillGlyph
-      .font(.system(size: 15, weight: .semibold))
-      .frame(width: 22, height: 22)
-      .padding(10)
-      .glassCircle(tint: Color.claudeAccent)
+  // Top-bar control: a plain Button the SYSTEM draws as a regular Liquid Glass
+  // circle — matching the "…" menu opposite it, no custom glass. `.tint` only
+  // carries the Claude accent into the glyph. The glyph swaps per state:
+  // warning triangle by default, a green check on the post-reconnect flash,
+  // a spinner mid-refresh.
+  private var pillButton: some View {
+    Button(action: tap) {
+      pillGlyph
+        .accessibilityLabel(justReconnected ? "Reconnected" : "Reconnect Claude")
+    }
+    .tint(Color.claudeAccent)
+    .disabled(justReconnected)
   }
 
   @ViewBuilder private var pillGlyph: some View {
@@ -3414,10 +3414,20 @@ private struct ClaudeReconnectCue: View {
       Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
     } else if provider.isRefreshing {
       ProgressView().controlSize(.mini)
+    } else if failed {
+      Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
     } else {
+      // Tinted Claude by the button's `.tint`.
       Image(systemName: "exclamationmark.triangle.fill")
-        .foregroundStyle(failed ? Color.orange : Color.claudeAccent)
     }
+  }
+
+  // Inline card (macOS): a custom full-width glass card, so it keeps `.plain`
+  // and carries its own `glassCard` background.
+  private var cardButton: some View {
+    Button(action: tap) { cardLabel }
+      .buttonStyle(.plain)
+      .disabled(justReconnected)
   }
 
   // Full-width inline card (macOS): glyph + word + muted context line.

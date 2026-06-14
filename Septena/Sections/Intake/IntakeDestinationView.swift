@@ -34,7 +34,14 @@ struct IntakeDestinationView: View {
     #endif
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
-        Button { creating = true } label: { Image(systemName: "plus") }
+        // Route through the shared drawer control so the host "+" reads as the
+        // same prominent accent-glass circle every section drawer renders —
+        // not a bespoke flat toolbar glyph. (Per-kind pages use the same
+        // component via SectionDrawer's `leadingLogActions`.)
+        DrawerActionButton(
+          actions: [LogAction(id: "new", title: "Add tracker", systemImage: "plus")],
+          accent: .accentColor,
+          onLog: { _ in creating = true })
       }
     }
     .sheet(isPresented: $creating) {

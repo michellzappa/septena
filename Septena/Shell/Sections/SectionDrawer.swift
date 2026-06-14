@@ -570,10 +570,10 @@ struct SectionDrawer<Content: View>: View {
 /// every drawer's action button is identical. A single action fires on one tap
 /// (a plain `Button` the system draws as the prominent accent circle); multiple
 /// actions open an inline dropdown `Menu` — the consolidated quick-add list,
-/// each row carrying its section icon, the first row bound to ⌘N. We let the
-/// system render the toolbar control (no `.glassProminent`, which nests a circle
-/// inside the toolbar's own capsule and renders the Menu as a pill) and only
-/// carry the section tint.
+/// each row carrying its section icon, the first row bound to ⌘N. Both branches
+/// get the same `.glassProminent` + section `.tint`; the Menu branch hides its
+/// disclosure indicator so it renders as the identical circular "+" rather than
+/// a wider pill.
 struct DrawerActionButton: View {
   let actions: [LogAction]
   let accent: Color
@@ -607,6 +607,11 @@ struct DrawerActionButton: View {
           Image(systemName: "plus")
             .accessibilityLabel("Log")
         }
+        // Suppress the menu disclosure chevron so the glass control collapses to
+        // the same circular "+" the single-action Button renders — without this,
+        // `.glassProminent` draws the Menu as a wider pill (glyph + chevron),
+        // which is why multi-action sections (e.g. Intake) looked different.
+        .menuIndicator(.hidden)
       }
     }
     // Accent-tinted Liquid Glass capsule with a white glyph — the prominent
