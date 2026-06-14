@@ -133,7 +133,7 @@ const GLOBAL_TOOLS: Tool[] = [
   {
     name: "tasks_list",
     description:
-      "List Septena tasks for a given view (today, inbox, upcoming, anytime, someday, completed). Returns {tasks, total, truncated}; truncated=true means more rows exist beyond limit.",
+      "List Septena tasks for a given view (today, triage, inbox, upcoming, anytime, someday, completed). 'triage' is the to-sort pile shown above Today — unratified rows the user hasn't placed (your unacknowledged proposals + their loose captures); 'today' excludes those. Returns {tasks, total, truncated}; truncated=true means more rows exist beyond limit.",
     inputSchema: listTasksJsonSchema,
   },
   {

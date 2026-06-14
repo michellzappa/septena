@@ -90,32 +90,46 @@ possible choice. The loop is `confirm → ground → (scope if epic) → decide 
   identical so the two surfaces never disagree.
 
 #### View routing (critical)
-A task's visibility depends on these three fields:
+**Everything you create is a *proposal*.** Tasks you author via `tasks_create`
+are stamped `source: "mcp"`, so they land in the user's **triage** pile — the
+"to sort" band shown on top of Today — not directly in any committed list. The
+user ratifies what enters their day; you can't write straight into `today`. So:
 
-| Set on create        | Appears in view(s)            |
-|----------------------|-------------------------------|
-| `today: true`        | `today`, `anytime`            |
-| `scheduled: <date>`  | `upcoming`, `anytime`         |
-| `due: <date>` only   | `anytime` (deadline only)     |
-| None of the above    | **`inbox` only**              |
+- A task you create shows up immediately in `tasks_list(view: "triage")`.
+- The `today` / `scheduled` / `due` / `project` you set become the *proposed
+  disposition* the user accepts with one tap. They do **not** make the task
+  appear in `today` / `upcoming` / `anytime` yet.
+- Once the user ratifies it (or after ~7 days unacknowledged, when the proposal
+  ages in), it flows into its natural view per the fields you set:
 
-`area` and `project` are NOT routing fields. They tag a task for filtering inside views but don't make it appear anywhere on their own.
+| Fields you set       | View *after the user ratifies* |
+|----------------------|--------------------------------|
+| `today: true`        | `today`, `anytime`             |
+| `scheduled: <date>`  | `upcoming`, `anytime`          |
+| `due: <date>` only   | `anytime` (deadline only)      |
+| None of the above    | loose capture (stays to-sort)  |
 
-**Footgun**: a bare `tasks_create(title: "X")` lands in inbox and is invisible from `today`/`anytime`/`upcoming`. `tasks_create` returns success — it doesn't tell you which view the task ended up in. Models have lost track of created tasks because of this.
+`area` and `project` tag a task for filtering but don't route it on their own.
 
-**Default behavior**: when the user doesn't specify "today" or a date, either ask which list they want it on, or proceed with no flags AND tell them "I put it in your inbox." Never claim a task is "added" without saying where it lives.
+**Footgun**: a task you create is NOT in `today` even when you set `today: true`
+— it's in `triage`, awaiting the user's tap. Never claim "added to today"; say
+you've **proposed** it (e.g. "Proposed for today — accept it in your To sort
+band"). `tasks_list(view: "triage")` shows your pending proposals.
 
-**Verification habit**: when routing matters, list the destination view after creating to confirm the task is actually visible there.
+**Verification habit**: after creating, `tasks_list(view: "triage")` confirms the
+proposal is queued for the user.
 
 ```
-# "Add X to today"
+# "Add X to today" — proposes X for today; user taps to accept
 tasks_create(title: "X", today: true)
+  → "Proposed for today — accept it in your To sort band."
 
 # "Schedule X for tomorrow"
 tasks_create(title: "X", scheduled: "<tomorrow>")
+  → "Queued to sort, proposed for tomorrow."
 
-# "Just add X to my list"
-tasks_create(title: "X")   → reply: "Added to your inbox."
+# "What haven't I sorted yet?"
+tasks_list(view: "triage")
 
 # "Show me unscheduled tasks"
 tasks_list(view: "inbox")

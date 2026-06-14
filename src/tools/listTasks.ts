@@ -6,16 +6,17 @@ import { getEffectiveTimezone, todayYMD } from "../tz.js";
 // shared package exists; for now, mirror.
 
 export type TaskView =
-  | "today" | "inbox" | "anytime" | "someday" | "upcoming" | "completed";
+  | "today" | "triage" | "inbox" | "anytime" | "someday" | "upcoming" | "completed";
 
 export const listTasksJsonSchema = {
   type: "object",
   properties: {
     view: {
       type: "string",
-      enum: ["today", "inbox", "anytime", "someday", "upcoming", "completed"],
+      enum: ["today", "triage", "inbox", "anytime", "someday", "upcoming", "completed"],
       default: "today",
-      description: "Which task list to read, matching the iOS app's sidebar.",
+      description:
+        "Which task list to read. 'today' = ratified + due. 'triage' = the to-sort pile shown above Today: unratified rows the user hasn't placed (your unacknowledged proposals + their loose captures); 'today' excludes these.",
     },
     limit: {
       type: "integer",
@@ -41,7 +42,15 @@ interface TaskOut {
   area?: string;
   project?: string;
   completedAt?: string;
+  // Provenance + freshness cue — needed to compute the triage band (and to
+  // keep "today" excluding unratified rows). See iOS SeptenaTask.isInTriageBand.
+  source?: string;
+  acknowledgedAt?: number; // ms epoch; present once the user has engaged the row
+  createdAt?: number;      // ms epoch
 }
+
+// Agent-cue decay window — keep in lockstep with iOS AgentCue.decayWindow (7d).
+const CUE_DECAY_MS = 7 * 24 * 60 * 60 * 1000;
 
 export async function listTasks(
   client: CloudKitClient,
@@ -56,7 +65,8 @@ export async function listTasks(
   // expressible server-side. So for these views we fetch the full open-
   // task population and filter client-side using iOS's rules (see
   // Persistence.swift LocalCache.tasks(filter:)).
-  const needsClientFilter = view === "today" || view === "inbox" || view === "upcoming";
+  const needsClientFilter =
+    view === "today" || view === "triage" || view === "inbox" || view === "upcoming";
   // These views are filtered client-side (today/inbox/upcoming aren't
   // expressible as one CK query), and the matching tasks often have NO
   // `scheduled` value (inbox items, today-flagged) so they sort unpredictably.
@@ -82,6 +92,9 @@ export async function listTasks(
     area: optionalString(r.fields.area?.value),
     project: optionalString(r.fields.project?.value),
     completedAt: optionalString(r.fields.completedAt?.value),
+    source: optionalString(r.fields.source?.value),
+    acknowledgedAt: optionalNumber(r.fields.acknowledgedAt?.value),
+    createdAt: optionalNumber(r.fields.createdAt?.value),
   }));
 
   // Truncation signal so a caller knows there's more beyond `limit` (the
@@ -95,7 +108,8 @@ export async function listTasks(
   if (needsClientFilter) {
     const tz = await getEffectiveTimezone(client);
     const todayStr = todayYMD(tz);
-    const matched = tasks.filter((t) => matchesView(t, view, todayStr));
+    const nowMs = Date.now();
+    const matched = tasks.filter((t) => matchesView(t, view, todayStr, nowMs));
     total = matched.length;
     truncated = matched.length > limit;
     tasks = matched.slice(0, limit);
@@ -110,13 +124,35 @@ function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
+function optionalNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+/// Mirrors iOS TaskEntity.isInTriageBand — the unratified layer above Today.
+/// Agent arm: an unacknowledged MCP-authored row still inside the freshness
+/// window (reuses the agent-cue, so cue-decay = ratification-by-timeout).
+/// Human arm: a loose capture with no disposition at all (the classic Inbox).
+function inTriageBand(t: TaskOut, nowMs: number): boolean {
+  if (t.status !== "open") return false;
+  if (t.source === "mcp") {
+    if (t.acknowledgedAt) return false;
+    if (!t.createdAt) return false;
+    return nowMs - t.createdAt < CUE_DECAY_MS;
+  }
+  return !t.today && !t.area && !t.project && !t.scheduled && !t.deadline;
+}
+
 /// Mirrors Persistence.swift LocalCache.tasks(filter:). Keep in lockstep
 /// with iOS so the two surfaces never disagree on what "Today" means.
-function matchesView(t: TaskOut, view: TaskView, today: string): boolean {
+function matchesView(t: TaskOut, view: TaskView, today: string, nowMs: number): boolean {
   if (t.status !== "open") return false;
   switch (view) {
     case "today":
+      // Ratified + due — the triage band (unratified) is excluded.
+      if (inTriageBand(t, nowMs)) return false;
       return t.today || (!!t.scheduled && t.scheduled <= today) || (!!t.deadline && t.deadline <= today);
+    case "triage":
+      return inTriageBand(t, nowMs);
     case "inbox":
       return !t.today && !t.area && !t.project && !t.scheduled && !t.deadline;
     case "upcoming":
