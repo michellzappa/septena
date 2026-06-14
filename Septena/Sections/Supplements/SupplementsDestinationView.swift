@@ -28,6 +28,11 @@ struct SupplementsDestinationView: View {
   /// tuck behind their headers. "Anytime" never folds (handled separately).
   /// The first manual tap freezes it to an explicit collapsed set.
   @State private var collapsedBuckets: Set<String>? = nil
+  // Supplements is an editable dual section: Log = the actionable stack
+  // (time-travelable); Patterns = whole-stack adherence heatmap. Default Log;
+  // the checklist is the surface you act on, so no empty-state nudge.
+  @State private var mode: DrawerMode = .remembered(for: "supplements", default: .log)
+  @State private var history: [CompletionDay] = []
 
   private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
 
@@ -36,11 +41,18 @@ struct SupplementsDestinationView: View {
   var body: some View {
     SectionDrawer(sectionKey: "supplements",
                   onLog: { _ in creating = true },
-                  currentDate: $viewingDate) {
-      if isViewingToday {
-        todaySections
-      } else {
-        pastDaySection
+                  currentDate: $viewingDate,
+                  mode: $mode) {
+      switch mode {
+      case .log:
+        if isViewingToday {
+          todaySections
+        } else {
+          pastDaySection
+        }
+      case .patterns:
+        CompletionPatternsSection(title: "Adherence", accent: accent,
+                                  days: history, loading: !model.hasLoaded)
       }
     }
     .tint(accent)
@@ -48,11 +60,12 @@ struct SupplementsDestinationView: View {
       model.paintFromCache()
       await model.load()
       await loadRates()
+      await loadHistory()
     }
     .sectionReload(on: viewingDate, onDataChange: true,
                    forSections: ["supplements"]) { await reloadPastDay() }
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
-      if note.affectsSection("supplements") { Task { await loadRates() } }
+      if note.affectsSection("supplements") { Task { await loadRates(); await loadHistory() } }
     }
     // Tapping a supplement opens its detail "infobox" (streak + history +
     // consistency); the row's checkbox still marks it taken. "Edit" swaps to
@@ -252,6 +265,14 @@ struct SupplementsDestinationView: View {
   /// view's main context, so it can't hitch the push transition. Mirrors Habits.
   private func loadRates() async {
     rates = await MirrorReader.shared.read { ChecklistMirror.supplementCompletionRates(context: $0) }
+  }
+
+  /// Whole-stack daily adherence for the Patterns heatmap (trailing ~17 weeks).
+  private func loadHistory() async {
+    let resp = await MirrorReader.shared.read {
+      ChecklistMirror.loadSupplementsHistory(context: $0, days: 119)
+    }
+    history = resp.daily.map { CompletionDay(date: $0.date, done: $0.done, total: $0.total) }
   }
 
   private func reloadPastDay() async {

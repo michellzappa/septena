@@ -74,7 +74,6 @@ struct SleepDestinationView: View {
       }
     }
     .tint(accent)
-    .onChange(of: mode) { _, newMode in newMode.remember(for: "sleep") }
     .task {
       paintFromCache()
       await load()

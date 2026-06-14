@@ -12,12 +12,38 @@ struct MedicationsDestinationView: View {
   @State private var viewingDate = SeptenaDate.today
   @State private var editing: MedicationDoseEventEntity?
   @State private var creating = false
+  // Medications is an editable dual section: Log = the day's dose list
+  // (time-travelable); Patterns = adherence heatmap (taken vs daily target).
+  // Default Log — the dose list is what you act on.
+  @State private var mode: DrawerMode = .remembered(for: "medications", default: .log)
 
   private var accent: Color { theme.color(for: "medications") }
   private var mutator: MedicationsMutator { SeptenaServices.shared.medicationsMutator }
 
   private var activeDefinitions: [MedicationDefinitionEntity] {
     definitions.filter { !$0.archived }
+  }
+
+  /// Sum of daily-schedule dose targets across active meds — the adherence
+  /// denominator. As-needed meds carry no target, so they don't inflate it.
+  private var dailyDoseTarget: Int {
+    activeDefinitions
+      .filter { $0.scheduleKind == "daily" }
+      .reduce(0) { $0 + ($1.targetDosesPerDay ?? 1) }
+  }
+
+  /// Daily taken-vs-target series for the adherence heatmap (trailing ~17
+  /// weeks). When no daily target exists (only as-needed meds), each logged day
+  /// reads as "full" so the heatmap still shows when meds were taken.
+  private var adherenceDays: [CompletionDay] {
+    var takenByDate: [String: Int] = [:]
+    for d in doses where d.status == "taken" { takenByDate[d.date, default: 0] += 1 }
+    let target = dailyDoseTarget
+    return CompletionDateRange.lastNDates(119).map { iso in
+      let done = takenByDate[iso] ?? 0
+      let total = target > 0 ? target : done
+      return CompletionDay(date: iso, done: min(done, max(total, 0)), total: total)
+    }
   }
 
   private var dayDoses: [MedicationDoseEventEntity] {
@@ -35,34 +61,40 @@ struct MedicationsDestinationView: View {
   var body: some View {
     SectionDrawer(sectionKey: "medications",
                   onLog: { _ in creating = true },
-                  currentDate: $viewingDate) {
-      DrawerSection("Doses", padding: .none) {
-        if dayDoses.isEmpty {
-          Text("Nothing logged yet.")
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-        } else {
-          ForEach(dayDoses) { dose in
-            LogEntryRow(
-              title: title(for: dose),
-              detail: detail(for: dose),
-              trailing: EventTimestamp.hhmm(from: dose.occurredAt),
-              tint: accent,
-              isSelected: editing?.id == dose.id,
-              onEdit: { editing = dose },
-              onDelete: { delete(dose) }
-            )
+                  currentDate: $viewingDate,
+                  mode: $mode) {
+      switch mode {
+      case .log:
+        DrawerSection("Doses", padding: .none) {
+          if dayDoses.isEmpty {
+            Text("Nothing logged yet.")
+              .foregroundStyle(.secondary)
+              .padding(.horizontal, 14)
+              .padding(.vertical, 12)
+          } else {
+            ForEach(dayDoses) { dose in
+              LogEntryRow(
+                title: title(for: dose),
+                detail: detail(for: dose),
+                trailing: EventTimestamp.hhmm(from: dose.occurredAt),
+                tint: accent,
+                isSelected: editing?.id == dose.id,
+                onEdit: { editing = dose },
+                onDelete: { delete(dose) }
+              )
+            }
           }
         }
-      }
 
-      DrawerSection("Summary") {
-        StatStrip(stats: [
-          Stat(value: "\(takenCount)", label: "taken", tint: accent),
-          Stat(value: "\(skippedCount)", label: "skipped", tint: accent),
-          Stat(value: "\(activeDefinitions.count)", label: "active meds", tint: accent),
-        ])
+        DrawerSection("Summary") {
+          StatStrip(stats: [
+            Stat(value: "\(takenCount)", label: "taken", tint: accent),
+            Stat(value: "\(skippedCount)", label: "skipped", tint: accent),
+            Stat(value: "\(activeDefinitions.count)", label: "active meds", tint: accent),
+          ])
+        }
+      case .patterns:
+        CompletionPatternsSection(title: "Adherence", accent: accent, days: adherenceDays)
       }
     }
     .tint(accent)
@@ -299,11 +331,10 @@ struct MedicationDefinitionsSheet: View {
               #endif
           }
           Picker("Bucket", selection: $bucket) {
-            Text("Anytime").tag("anytime")
-            Text("Morning").tag("morning")
-            Text("Afternoon").tag("afternoon")
-            Text("Evening").tag("evening")
-            Text("Bedtime").tag("bedtime")
+            Text(DayBucket.label(forKey: DayBucket.anytimeKey)).tag(DayBucket.anytimeKey)
+            ForEach(DayBucket.allCases) { b in
+              Text(b.title).tag(b.rawValue)
+            }
           }
           DisclosureGroup("Advanced", isExpanded: $showingAdvanced) {
             TextField("Generic name", text: $genericName)
@@ -368,7 +399,7 @@ struct MedicationDefinitionsSheet: View {
       parts.append("\(value.decimalString(2))\(unit)")
     }
     parts.append(def.scheduleKind == "asNeeded" ? "as needed" : "daily")
-    if let bucket = def.bucket, !bucket.isEmpty { parts.append(bucket) }
+    if let bucket = def.bucket, !bucket.isEmpty { parts.append(DayBucket.label(forKey: bucket)) }
     return parts.isEmpty ? "No default dose" : parts.joined(separator: " · ")
   }
 

@@ -176,12 +176,18 @@ enum DrawerMode: String, Hashable {
 /// the trailing "+"), matching the calendar button's resting look.
 struct DrawerModeToggle: View {
   @Binding var mode: DrawerMode
+  /// Key the toggled choice is remembered under. Usually the section key, but
+  /// can be a finer key (e.g. per Intake kind) so sibling pages remember apart.
+  let storageKey: String
 
   var body: some View {
     Button {
-      withAnimation(.snappy) {
-        mode = (mode == .log) ? .patterns : .log
-      }
+      let next: DrawerMode = (mode == .log) ? .patterns : .log
+      withAnimation(.snappy) { mode = next }
+      // Persist ONLY on an explicit user toggle. Programmatic mode changes
+      // (the empty-state nudge, day-step-forces-Log) deliberately route around
+      // this so they never overwrite the remembered choice.
+      next.remember(for: storageKey)
     } label: {
       Label(mode == .log ? "Show patterns" : "Show log",
             systemImage: mode == .log ? "chart.xyaxis.line" : "list.bullet")
@@ -239,6 +245,10 @@ struct SectionDrawer<Content: View>: View {
   /// `content` on the value; the drawer just hosts the toggle. nil for
   /// single-mode sections.
   var mode: Binding<DrawerMode>? = nil
+  /// Storage key for the remembered mode when it must differ from `sectionKey`
+  /// — e.g. Intake's per-kind pages all share `sectionKey` "intake" but each
+  /// kind remembers its own mode. Defaults to `sectionKey`.
+  var modeStorageKey: String? = nil
   /// Whether to render the subtle "Customize <Section>" footer that
   /// deep-links into this section's Settings pane. Default on; the footer
   /// also self-hides for utility drawers (empty `title` or a `sectionKey`
@@ -313,7 +323,10 @@ struct SectionDrawer<Content: View>: View {
 
   /// Step the viewed day by `delta` days, clamping the forward edge at today —
   /// time travel reviews the past, never the future. ← goes back, → forward.
+  /// Stepping the day is a Log action, so it pulls a dual section out of
+  /// Patterns first (Patterns is cross-day and never date-stepped).
   private func stepDay(_ delta: Int) {
+    if let mode, mode.wrappedValue == .patterns { mode.wrappedValue = .log }
     guard let currentDate,
           let day = SeptenaDate.parse(currentDate.wrappedValue),
           let moved = Calendar.current.date(byAdding: .day, value: delta, to: day)
@@ -339,7 +352,7 @@ struct SectionDrawer<Content: View>: View {
         // the time-travel context is never invisible — tap it to reopen the
         // picker or jump back to today. On today the drawer stays clean and
         // the calendar lives only in the toolbar.
-        if isTimeTraveling, let currentDate {
+        if isTimeTraveling, !inPatterns, let currentDate {
           TimeTravelPill(date: currentDate.wrappedValue) { showingTimeTravel = true }
         }
         if case .failed(let message) = loadState {
@@ -456,7 +469,7 @@ struct SectionDrawer<Content: View>: View {
       // left-to-right as "which view · which day".
       if let mode {
         ToolbarItem(placement: leadingPlacement) {
-          DrawerModeToggle(mode: mode)
+          DrawerModeToggle(mode: mode, storageKey: modeStorageKey ?? sectionKey)
         }
       }
       // Calendar / time-travel button — leading edge, present only when the

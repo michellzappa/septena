@@ -260,6 +260,7 @@
       }
     },
     "%@ Habits" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -731,6 +732,9 @@
     "•" : {
       "shouldTranslate" : false
     },
+    "→ %@" : {
+
+    },
     "→ %@ %@ in 7d" : {
       "localizations" : {
         "en" : {
@@ -753,6 +757,9 @@
       }
     },
     "+%@" : {
+
+    },
+    "+%@ more" : {
 
     },
     "×%@" : {
@@ -1683,9 +1690,6 @@
           }
         }
       }
-    },
-    "Bedtime" : {
-
     },
     "BEDTIME" : {
       "localizations" : {
@@ -3854,6 +3858,9 @@
         }
       }
     },
+    "Keep logging — a completion pattern appears here once there's a few days of history." : {
+
+    },
     "Keep logging — pairs need n ≥ %@ overlapping days." : {
       "localizations" : {
         "pt-BR" : {
@@ -4688,6 +4695,9 @@
         }
       }
     },
+    "Not enough check-ins yet to chart your week — keep logging and your rhythm and quadrant mix appear here." : {
+
+    },
     "Not enough data yet (%@)" : {
       "localizations" : {
         "pt-BR" : {
@@ -4697,6 +4707,9 @@
           }
         }
       }
+    },
+    "Not enough logged yet to read a rhythm — keep at it and a 7-day pattern shows here." : {
+
     },
     "Not supported on this device." : {
 
@@ -6553,6 +6566,9 @@
       }
     },
     "Tingling" : {
+
+    },
+    "To sort" : {
 
     },
     "today" : {

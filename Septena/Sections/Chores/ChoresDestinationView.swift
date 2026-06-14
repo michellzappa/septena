@@ -14,6 +14,11 @@ struct ChoresDestinationView: View {
   @State private var viewing: ChoreItem? = nil
   @State private var editing: ChoreItem? = nil
   @State private var creating = false
+  // Chores is a dual section: Log = today/later task list; Patterns = daily
+  // completion heatmap. No time travel (the list is forward-looking). Default
+  // Log — the task list is the surface you act on.
+  @State private var mode: DrawerMode = .remembered(for: "chores", default: .log)
+  @State private var history: [CompletionDay] = []
 
   private var accent: Color { theme.color(for: "chores") }
 
@@ -41,18 +46,29 @@ struct ChoresDestinationView: View {
 
   var body: some View {
     SectionDrawer(sectionKey: "chores",
-                  onLog: { _ in creating = true }) {
-      if !today.isEmpty {
-        DrawerSection("Today", padding: .none) { ForEach(today) { row(for: $0) } }
-      }
-      if !later.isEmpty {
-        DrawerSection("Later", padding: .none) { ForEach(later) { row(for: $0) } }
+                  onLog: { _ in creating = true },
+                  mode: $mode) {
+      switch mode {
+      case .log:
+        if !today.isEmpty {
+          DrawerSection("Today", padding: .none) { ForEach(today) { row(for: $0) } }
+        }
+        if !later.isEmpty {
+          DrawerSection("Later", padding: .none) { ForEach(later) { row(for: $0) } }
+        }
+      case .patterns:
+        CompletionPatternsSection(title: "Completion", accent: accent,
+                                  days: history, loading: !model.hasLoaded)
       }
     }
     .tint(accent)
     .task {
       model.paintFromCache()
       await model.load()
+      await loadHistory()
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
+      if note.affectsSection("chores") { Task { await loadHistory() } }
     }
     // Tapping a chore opens its detail "infobox" (history + learned cadence);
     // the row's own checkbox still completes it. From the detail, "Edit" swaps
@@ -98,6 +114,14 @@ struct ChoresDestinationView: View {
     checklistMutator.deleteChore(id: chore.id)
     model.chores.removeAll { $0.id == chore.id }
     Haptics.warning()
+  }
+
+  /// Daily completed/total for the Patterns heatmap (trailing ~17 weeks).
+  private func loadHistory() async {
+    let resp = await MirrorReader.shared.read {
+      ChecklistMirror.loadChoresHistory(context: $0, days: 119)
+    }
+    history = resp.daily.map { CompletionDay(date: $0.date, done: $0.completed, total: $0.total) }
   }
 
 }

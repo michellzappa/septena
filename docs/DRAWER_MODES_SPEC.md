@@ -6,17 +6,32 @@ three different concepts share one surface and behave differently depending on
 the date. This unifies them under one capability-driven scaffold and (where a
 section warrants it) one toggle.
 
-Status: **scaffold + Sleep pilot built (iOS + macOS green, uncommitted);
-remaining sections pending.** Code is the source of truth; when this spec and the
-code disagree, fix one of them deliberately. Supersedes the earlier
-"Journal/Patterns" draft (renamed Log/Patterns; now covers all 16 drawers).
+Status: **Phases 1 & 2 complete — built green on iOS + macOS, uncommitted.**
+Code is the source of truth; when this spec and the code disagree, fix one of
+them deliberately. Supersedes the earlier "Journal/Patterns" draft (renamed
+Log/Patterns; now covers all 16 drawers).
 
-Built so far: `DrawerMode` enum + per-section persistence + `DrawerModeToggle`
-in `SectionDrawer.swift`; the `mode:` binding on `SectionDrawer` (renders the
-top-left toggle, hides the calendar while in Patterns); Sleep converted to
-Log (readouts + nights) / Patterns (4 charts), default Log. The arrow-key /
-time-travel-forces-Log interaction is deferred to the first dual section that
-*has* time travel (Mood/Gut/Training/Nutrition) — Sleep exercises neither.
+Phase 2 (aggregate Patterns for the formerly single-mode loggables) is built:
+shared `CompletionPatternsSection` (a `ConsistencyHeatmap`-backed aggregate
+completion/adherence heatmap) drives Habits, Supplements, Chores, Medications;
+Symptoms gets a bespoke severity-trend + rhythm-wheel pair. Groceries stays
+single-mode (a stateless stock list, no time-series). GitHub/Activity remain
+Patterns-only. Phase 2 sections default to Log with NO empty-state nudge — their
+Logs are actionable checklists or "good when empty" event logs, not blank slates.
+
+Built: `DrawerMode` enum + per-section persistence + `DrawerModeToggle` in
+`SectionDrawer.swift`; the `mode:` binding (+ optional `modeStorageKey` for
+per-instance memory like Intake kinds) renders the top-left toggle, hides the
+calendar while in Patterns, forces Log on day-step, and hides the time-travel
+pill in Patterns. Persistence lives in the toggle (explicit tap only), so the
+empty-state nudge never sticks. Converted: **Sleep, Body** (read-only dual, no
+nudge), **Gut, Mood, Training, Nutrition, Intake-kind** (editable dual, with the
+one-shot empty-state nudge).
+
+The 6 pure-data loggables (Habits, Supplements, Chores, Medications, Symptoms,
+Groceries) and GitHub/Activity are single-mode — they pass no `mode` binding, so
+they show no toggle and keep their current behavior unchanged. Phase 2 (aggregate
+graphs that flip the 6 loggables to dual) remains future work.
 
 ## The model
 

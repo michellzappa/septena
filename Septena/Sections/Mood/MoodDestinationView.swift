@@ -26,21 +26,35 @@ struct MoodDestinationView: View {
   @State private var addingNew = false
   @State private var editing: MoodEntry? = nil
   @State private var loading = true
-  /// Day the drawer's date strip is pointing at. Slot cards and the
-  /// quadrant breakdown are "today" affordances and hide when browsing
-  /// the past — past view is just the day's check-in list.
+  /// Day the drawer's date strip is pointing at. In Log mode the list
+  /// follows this date; Patterns is cross-day and ignores it.
   @State private var viewingDate: String = SeptenaDate.today
+  // Mood is an editable dual section: Log = the day's check-ins; Patterns =
+  // 30-day quadrant breakdown + 7-day rhythm wheel. Default Log; remembered.
+  @State private var mode: DrawerMode = .remembered(for: "mood", default: .log)
+  /// Whether the one-shot empty-state nudge has run for this appearance.
+  @State private var didNudge = false
 
   private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
 
   var body: some View {
     SectionDrawer(sectionKey: "mood",
                   onLog: { _ in addingNew = true },
-                  currentDate: $viewingDate) {
-      todaySection
-      if isViewingToday {
+                  currentDate: $viewingDate,
+                  mode: $mode) {
+      switch mode {
+      case .log:
+        todaySection
+      case .patterns:
         breakdownSection
         rhythmSection
+        if monthEntries.isEmpty, wheelEvents.count < 3, !loading {
+          DrawerSection("Patterns") {
+            Text("Not enough check-ins yet to chart your week — keep logging and your rhythm and quadrant mix appear here.")
+              .font(.subheadline)
+              .foregroundStyle(.secondary)
+          }
+        }
       }
     }
     .sectionReload(on: viewingDate, onDataChange: true,
@@ -177,6 +191,19 @@ struct MoodDestinationView: View {
     }
     if isViewingToday { await reloadWeek() }
     loading = false
+    applyEmptyStateNudgeIfNeeded()
+  }
+
+  /// Editable dual sections open in Patterns when today's Log is empty: an empty
+  /// log first thing reads as a dead end, so the rhythm/quadrant view greets you
+  /// instead (the global "+" stays one tap away). One-shot per appearance, never
+  /// persisted — a deliberate user toggle is the only thing that sticks.
+  private func applyEmptyStateNudgeIfNeeded() {
+    guard !didNudge else { return }
+    didNudge = true
+    if mode == .log, isViewingToday, today?.entries.isEmpty ?? true {
+      withAnimation(.snappy) { mode = .patterns }
+    }
   }
 
   private static func loadMonthEntries(context: ModelContext) -> [MoodEntry] {

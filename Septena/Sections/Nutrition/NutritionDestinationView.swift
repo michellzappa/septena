@@ -51,6 +51,11 @@ struct NutritionDestinationView: View {
   /// browsing back through history is for reviewing logged meals, not
   /// for retro-targeting macros.
   @State private var viewingDate: String = SeptenaDate.today
+  // Nutrition is an editable dual section: Log = the meal log (time-travelable);
+  // Patterns = macro trend tiles + the meal rhythm wheel. Default Log; remembered.
+  @State private var mode: DrawerMode = .remembered(for: "nutrition", default: .log)
+  /// Whether the one-shot empty-state nudge has run for this appearance.
+  @State private var didNudge = false
 
   /// Live "now" for the fasting row + relative time labels. Sourced from
   /// the shared DayClock (single 60s tick app-wide) instead of a per-view
@@ -193,17 +198,20 @@ struct NutritionDestinationView: View {
   var body: some View {
     SectionDrawer(sectionKey: "nutrition",
                   onLog: { _ in searchingMeals = true },
-                  currentDate: $viewingDate) {
-      // Time-travel mode: when the date strip is on a past day we drop
-      // the macro tiles + heatmap and show just the day's logs. The
-      // macros tiles read "today" status (in range / over / left) so
-      // they're meaningless retro; the heatmap is a "where do I want
-      // to go" picker which the user already used to get here.
-      if isViewingToday {
+                  currentDate: $viewingDate,
+                  mode: $mode) {
+      switch mode {
+      case .log:
+        // The meal log, time-travelable. Macro tiles read "today" status, so
+        // they live in Patterns, not retro on a browsed past day.
+        entriesList
+      case .patterns:
+        // Today-anchored macro trend tiles + the trailing-7-day meal rhythm
+        // wheel. Both ignore the viewing date by design. Tiles always render,
+        // so Patterns is never blank.
         macroTilesGrid
         mealRhythmSection
       }
-      entriesList
     }
     // Day rollover: reload so the fasting row, today's totals, and the
     // "earlier days" grouping all reflect the new day's data. The
@@ -264,6 +272,19 @@ struct NutritionDestinationView: View {
         ?? legacyPrefs(from: settingsRes?.nutrition?.macroColors)
         ?? MacroCatalog.defaultTilePrefs())
     loading = false
+    applyEmptyStateNudgeIfNeeded()
+  }
+
+  /// Editable dual sections open in Patterns when today's Log is empty: an empty
+  /// meal log first thing reads as a dead end, so the macro/rhythm view greets
+  /// you instead (the global "+" stays one tap away). One-shot per appearance,
+  /// never persisted — a deliberate user toggle is the only thing that sticks.
+  private func applyEmptyStateNudgeIfNeeded() {
+    guard !didNudge else { return }
+    didNudge = true
+    if mode == .log, isViewingToday, todayEntries.isEmpty {
+      withAnimation(.snappy) { mode = .patterns }
+    }
   }
 
   /// Bridges the legacy `MacroColors` shape (color-only, no order or

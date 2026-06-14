@@ -241,7 +241,7 @@ struct TimeOfDayWheel: View {
     return shownEvents.sorted { $0.daysAgo > $1.daysAgo }.map { e in
       let count = Double(density[Int(e.fraction * Double(slots)) % slots] ?? 1)
       let norm = maxCount > 1 ? (count - 1) / (maxCount - 1) : 0
-      let dotR: CGFloat = effectiveWindow == 1 ? min(8, 4 + count) / 2 : (2.2 + norm * 3.75)
+      let dotR: CGFloat = effectiveWindow == 1 ? min(8, 4 + count) / 2 : (2.2 + norm * 1.8)
       return DotMark(id: e.id, center: point(e.fraction, dotRing),
                      diameter: dotR * 2, color: e.color ?? accent,
                      opacity: fade(e.daysAgo))
@@ -387,11 +387,27 @@ struct TimeOfDayWheel: View {
         }
       }
       // Scheduled (calendar) blocks on the inner lane — single-day view only.
+      // Back-to-back events (one ends exactly when the next begins) would share
+      // an endpoint angle and, with the round caps spilling half a line-width
+      // past each end, merge into one continuous band. Inset each end by the
+      // cap radius plus a hair so adjacent events pull apart into a `)(` — the
+      // caps taper away from the boundary instead of overlapping across it.
       if focusToday {
         for b in todayBands.sorted(by: { $0.daysAgo > $1.daysAgo }) {
-          ctx.stroke(arc(b.start, b.end, scheduledRing),
+          let lineW: CGFloat = b.thin ? 4 : 9
+          // Round-cap overhang (lineW/2) + a 1pt breathing gap, as a fraction
+          // of the day at this ring's circumference.
+          let insetPx = lineW / 2 + 1
+          let insetFrac = Double(insetPx) / (2 * .pi * Double(scheduledRing))
+          var span = b.end - b.start
+          if span <= 0 { span += 1 }
+          // Never eat more than 40% per side — short events keep a visible core.
+          let inset = min(insetFrac, span * 0.4)
+          let s = (b.start + inset).truncatingRemainder(dividingBy: 1)
+          let e = (b.end - inset + 1).truncatingRemainder(dividingBy: 1)
+          ctx.stroke(arc(s, e, scheduledRing),
                      with: .color((b.color ?? accent).opacity(fade(b.daysAgo) * 0.6)),
-                     style: StrokeStyle(lineWidth: b.thin ? 4 : 9, lineCap: .round))
+                     style: StrokeStyle(lineWidth: lineW, lineCap: .round))
         }
       }
 

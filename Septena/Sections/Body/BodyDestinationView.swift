@@ -13,6 +13,9 @@ struct BodyDestinationView: View {
   @State private var rows: [WithingsRow] = []
   @State private var targets: AppTargets?
   @State private var loading = true
+  // Body is a read-only dual section (Withings-synced, no manual entry): Log =
+  // stat readouts + weigh-ins list; Patterns = the trend charts. Default Log.
+  @State private var mode: DrawerMode = .remembered(for: "body", default: .log)
 
   private var accent: Color { theme.color(for: "body") }
 
@@ -44,17 +47,21 @@ struct BodyDestinationView: View {
   }
 
   var body: some View {
-    SectionDrawer(sectionKey: "body") {
-      statsSection
-      chartsSection
-      DrawerSection("Recent weigh-ins", padding: .none) {
-        ForEach(rows) { row in
-          LogRow(
-            title: friendlyDate(row.date),
-            detail: detailLine(row),
-            trailing: row.weightKg.map { "\($0.decimalString()) kg" }
-          )
+    SectionDrawer(sectionKey: "body", mode: $mode) {
+      switch mode {
+      case .log:
+        statsSection
+        DrawerSection("Recent weigh-ins", padding: .none) {
+          ForEach(rows) { row in
+            LogRow(
+              title: friendlyDate(row.date),
+              detail: detailLine(row),
+              trailing: row.weightKg.map { "\($0.decimalString()) kg" }
+            )
+          }
         }
+      case .patterns:
+        chartsSection
       }
       if !loading && rows.isEmpty {
         ContentUnavailableView("No Withings data",

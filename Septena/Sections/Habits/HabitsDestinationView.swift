@@ -38,6 +38,11 @@ struct HabitsDestinationView: View {
   /// headers, and the open one advances as time passes. The first manual tap
   /// freezes it to an explicit collapsed set so nothing jumps afterwards.
   @State private var collapsedBuckets: Set<String>? = nil
+  // Habits is an editable dual section: Log = the actionable checklist
+  // (time-travelable); Patterns = whole-stack completion heatmap. Default Log —
+  // the checklist is the morning surface, so no empty-state nudge here.
+  @State private var mode: DrawerMode = .remembered(for: "habits", default: .log)
+  @State private var history: [CompletionDay] = []
 
   private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
 
@@ -48,19 +53,26 @@ struct HabitsDestinationView: View {
   var body: some View {
     SectionDrawer(sectionKey: "habits",
                   onLog: { _ in creating = true },
-                  currentDate: $viewingDate) {
-      if isViewingToday {
-        // Today folds into an accordion: the current time bucket is open with
-        // a "time left" countdown, the others tuck behind their headers. The
-        // minute tick lets the open bucket follow the clock until the user
-        // taps a header (which freezes the fold state).
-        TimelineView(.periodic(from: .now, by: 60)) { _ in
-          ForEach(model.habitBuckets, id: \.self) { bucket in
-            bucketSection(bucket)
+                  currentDate: $viewingDate,
+                  mode: $mode) {
+      switch mode {
+      case .log:
+        if isViewingToday {
+          // Today folds into an accordion: the current time bucket is open with
+          // a "time left" countdown, the others tuck behind their headers. The
+          // minute tick lets the open bucket follow the clock until the user
+          // taps a header (which freezes the fold state).
+          TimelineView(.periodic(from: .now, by: 60)) { _ in
+            ForEach(model.habitBuckets, id: \.self) { bucket in
+              bucketSection(bucket)
+            }
           }
+        } else {
+          pastDaySection
         }
-      } else {
-        pastDaySection
+      case .patterns:
+        CompletionPatternsSection(title: "Completion", accent: accent,
+                                  days: history, loading: !model.hasLoaded)
       }
     }
     .tint(accent)
@@ -68,11 +80,12 @@ struct HabitsDestinationView: View {
       model.paintFromCache()
       await model.load()
       await loadRates()
+      await loadHistory()
     }
     .sectionReload(on: viewingDate, onDataChange: true,
                    forSections: ["habits"]) { await reloadPastDay() }
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
-      if note.affectsSection("habits") { Task { await loadRates() } }
+      if note.affectsSection("habits") { Task { await loadRates(); await loadHistory() } }
     }
     // Tapping a habit opens its detail "infobox" (streak + history +
     // consistency); the row's checkbox still checks it off. "Edit" in the
@@ -91,7 +104,6 @@ struct HabitsDestinationView: View {
     .adaptiveDetail(item: $editing) { habit in
       EditHabitSheet(
         original: habit,
-        buckets: model.habitBuckets,
         onDone: { updated in
           if let updated, let idx = model.habits.firstIndex(where: { $0.id == updated.id }) {
             model.habits[idx] = updated
@@ -102,7 +114,6 @@ struct HabitsDestinationView: View {
     .adaptiveDetail(isPresented: $creating) {
       EditHabitSheet(
         original: nil,
-        buckets: model.habitBuckets,
         onDone: { _ in Task { await model.load() } }
       )
     }
@@ -173,6 +184,14 @@ struct HabitsDestinationView: View {
   /// instead of the view's main context, or it hitches the push transition.
   private func loadRates() async {
     rates = await MirrorReader.shared.read { ChecklistMirror.habitCompletionRates(context: $0) }
+  }
+
+  /// Whole-stack daily completion for the Patterns heatmap (trailing ~17 weeks).
+  private func loadHistory() async {
+    let resp = await MirrorReader.shared.read {
+      ChecklistMirror.loadHabitsHistory(context: $0, days: 119)
+    }
+    history = resp.daily.map { CompletionDay(date: $0.date, done: $0.done, total: $0.total) }
   }
 
   private func reloadPastDay() async {

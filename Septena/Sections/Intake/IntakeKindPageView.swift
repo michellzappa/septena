@@ -28,6 +28,17 @@ struct IntakeKindPageView: View {
   /// Replay counter for the in-page snap flourish (see `handleLogAction` —
   /// on iPhone this page is a sheet, above the app-root overlay).
   @State private var flourishTrigger = 0
+  // Intake is an editable dual section: Log = stat strip + the day's entries
+  // (time-travelable); Patterns = the rhythm wheel. Remembered PER KIND — every
+  // tracker page shares sectionKey "intake" but keeps its own mode. Default Log.
+  @State private var mode: DrawerMode
+  /// Whether the one-shot empty-state nudge has run for this appearance.
+  @State private var didNudge = false
+
+  init(kindID: String) {
+    self.kindID = kindID
+    _mode = State(initialValue: .remembered(for: "intake.\(kindID)", default: .log))
+  }
 
   private struct PresetMethod: Identifiable, Hashable {
     let method: String
@@ -44,33 +55,39 @@ struct IntakeKindPageView: View {
                   onLog: handleLogAction,
                   leadingLogActions: quickAddActions,
                   currentDate: $viewingDate,
+                  mode: $mode,
+                  modeStorageKey: "intake.\(kindID)",
                   showsSettingsLink: false) {
-      if let kind {
-        DrawerSection(padding: .standard) {
-          StatStrip(stats: statTiles(kind))
-        }
-      }
-      rhythmSection
-      DrawerSection("Log", padding: .none) {
-        if !entries.isEmpty {
-          ForEach(entries.reversed()) { entry in
-            LogEntryRow(
-              title: methodLabel(entry.method),
-              detail: detailLine(entry),
-              trailing: entry.time,
-              accessory: capsuleAccessory(entry),
-              tint: accent,
-              isSelected: editing?.id == entry.id,
-              onEdit: { editing = entry },
-              onDelete: { delete(entry) }
-            )
+      switch mode {
+      case .log:
+        if let kind {
+          DrawerSection(padding: .standard) {
+            StatStrip(stats: statTiles(kind))
           }
-        } else if !loading {
-          Text("Nothing logged yet.")
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
         }
+        DrawerSection("Log", padding: .none) {
+          if !entries.isEmpty {
+            ForEach(entries.reversed()) { entry in
+              LogEntryRow(
+                title: methodLabel(entry.method),
+                detail: detailLine(entry),
+                trailing: entry.time,
+                accessory: capsuleAccessory(entry),
+                tint: accent,
+                isSelected: editing?.id == entry.id,
+                onEdit: { editing = entry },
+                onDelete: { delete(entry) }
+              )
+            }
+          } else if !loading {
+            Text("Nothing logged yet.")
+              .foregroundStyle(.secondary)
+              .padding(.horizontal, 14)
+              .padding(.vertical, 12)
+          }
+        }
+      case .patterns:
+        rhythmSection
       }
     }
     .tint(accent)
@@ -227,10 +244,16 @@ struct IntakeKindPageView: View {
   @ViewBuilder
   private var rhythmSection: some View {
     let events = wheelEvents
-    if isViewingToday, events.count >= 3, let kind {
+    if events.count >= 3, let kind {
       DrawerSection("When you reach for \(kind.name)", padding: .tight) {
         TimeOfDayWheel(events: events, accent: accent, windowDays: 7, nowFraction: nowFraction)
           .frame(maxWidth: .infinity)
+      }
+    } else if !loading {
+      DrawerSection("Rhythm") {
+        Text("Not enough logged yet to read a rhythm — keep at it and a 7-day pattern shows here.")
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
       }
     }
   }
@@ -308,6 +331,19 @@ struct IntakeKindPageView: View {
     lastEventAt = bundle.lastEventAt
     weekPoints = bundle.weekPoints
     loading = false
+    applyEmptyStateNudgeIfNeeded()
+  }
+
+  /// Editable dual sections open in Patterns when today's Log is empty: an empty
+  /// log first thing reads as a dead end, so the rhythm view greets you instead
+  /// (the global "+" stays one tap away). One-shot per appearance, never
+  /// persisted — a deliberate user toggle is the only thing that sticks.
+  private func applyEmptyStateNudgeIfNeeded() {
+    guard !didNudge else { return }
+    didNudge = true
+    if mode == .log, isViewingToday, entries.isEmpty {
+      withAnimation(.snappy) { mode = .patterns }
+    }
   }
 
   private struct PageBundle: Sendable {

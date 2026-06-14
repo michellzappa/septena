@@ -1,3 +1,4 @@
+import Charts
 import SwiftData
 import SwiftUI
 
@@ -13,6 +14,11 @@ struct SymptomsDestinationView: View {
   @State private var viewingDate = SeptenaDate.today
   @State private var editing: SymptomEventEntity?
   @State private var creating = false
+  // Symptoms is an editable dual section, but an event log (not a checklist):
+  // Log = the day's events (time-travelable); Patterns = 30-day severity trend +
+  // a timing rhythm wheel. Default Log — an empty symptom day is good news, so
+  // no empty-state nudge to Patterns.
+  @State private var mode: DrawerMode = .remembered(for: "symptoms", default: .log)
 
   private var accent: Color { theme.color(for: "symptoms") }
   private var mutator: SymptomsMutator { SeptenaServices.shared.symptomsMutator }
@@ -28,34 +34,49 @@ struct SymptomsDestinationView: View {
   var body: some View {
     SectionDrawer(sectionKey: "symptoms",
                   onLog: { _ in creating = true },
-                  currentDate: $viewingDate) {
-      DrawerSection("Log", padding: .none) {
-        if dayEvents.isEmpty {
-          Text("Nothing logged yet.")
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-        } else {
-          ForEach(dayEvents) { event in
-            LogEntryRow(
-              title: title(for: event),
-              detail: detail(for: event),
-              trailing: EventTimestamp.hhmm(from: event.occurredAt),
-              tint: accent,
-              isSelected: editing?.id == event.id,
-              onEdit: { editing = event },
-              onDelete: { delete(event) }
-            )
+                  currentDate: $viewingDate,
+                  mode: $mode) {
+      switch mode {
+      case .log:
+        DrawerSection("Log", padding: .none) {
+          if dayEvents.isEmpty {
+            Text("Nothing logged yet.")
+              .foregroundStyle(.secondary)
+              .padding(.horizontal, 14)
+              .padding(.vertical, 12)
+          } else {
+            ForEach(dayEvents) { event in
+              LogEntryRow(
+                title: title(for: event),
+                detail: detail(for: event),
+                trailing: EventTimestamp.hhmm(from: event.occurredAt),
+                tint: accent,
+                isSelected: editing?.id == event.id,
+                onEdit: { editing = event },
+                onDelete: { delete(event) }
+              )
+            }
           }
         }
-      }
 
-      DrawerSection("Summary") {
-        StatStrip(stats: [
-          Stat(value: "\(dayEvents.count)", label: "events", tint: accent),
-          Stat(value: "\(dayEvents.map(\.severity).max() ?? 0)", label: "peak", tint: accent),
-          Stat(value: averageSeverityText, label: "average", tint: accent),
-        ])
+        DrawerSection("Summary") {
+          StatStrip(stats: [
+            Stat(value: "\(dayEvents.count)", label: "events", tint: accent),
+            Stat(value: "\(dayEvents.map(\.severity).max() ?? 0)", label: "peak", tint: accent),
+            Stat(value: averageSeverityText, label: "average", tint: accent),
+          ])
+        }
+      case .patterns:
+        if events.isEmpty {
+          DrawerSection("Patterns") {
+            Text("Log a few symptoms and your severity trend and timing pattern appear here.")
+              .font(.subheadline)
+              .foregroundStyle(.secondary)
+          }
+        } else {
+          severityTrendSection
+          rhythmSection
+        }
       }
     }
     .tint(accent)
@@ -97,6 +118,70 @@ struct SymptomsDestinationView: View {
   private func delete(_ event: SymptomEventEntity) {
     mutator.deleteEvent(id: event.id)
     Haptics.warning()
+  }
+
+  // MARK: - Patterns
+
+  private struct SeverityDay: Identifiable {
+    let date: String
+    let peak: Int
+    var id: String { date }
+  }
+
+  /// Daily peak severity (0–10) over the trailing 30 days, gap-filled so empty
+  /// days read as zero rather than vanishing.
+  private var severityDays: [SeverityDay] {
+    var peakByDate: [String: Int] = [:]
+    for e in events { peakByDate[e.date] = max(peakByDate[e.date] ?? 0, e.severity) }
+    return CompletionDateRange.lastNDates(30).map {
+      SeverityDay(date: $0, peak: peakByDate[$0] ?? 0)
+    }
+  }
+
+  @ViewBuilder
+  private var severityTrendSection: some View {
+    let days = severityDays
+    DrawerSection("Severity") {
+      Chart(days) { d in
+        BarMark(x: .value("Day", d.date),
+                y: .value("Peak", d.peak),
+                width: .ratio(0.6))
+          .foregroundStyle(d.peak == 0 ? Color.secondary.opacity(0.2) : accent.opacity(0.85))
+          .cornerRadius(2)
+          .accessibilityLabel(d.date)
+          .accessibilityValue(d.peak == 0 ? "no symptoms" : "peak severity \(d.peak) of 10")
+      }
+      .chartYScale(domain: 0...10)
+      .chartXScale(domain: days.map(\.date))
+      .chartXAxis(.hidden)
+      .frame(height: 120)
+    }
+  }
+
+  /// Trailing-7-day timing wheel — when symptoms tend to strike. The shared
+  /// `TimeOfDayWheel` filters to its window, so passing every event is fine.
+  private var wheelEvents: [TimeOfDayWheel.Event] {
+    let todayStart = Calendar.current.startOfDay(for: Date())
+    return events.compactMap {
+      TimeOfDayWheel.Event(id: $0.id, occurredAt: $0.occurredAt,
+                           todayStart: todayStart, windowDays: 7)
+    }
+  }
+
+  private var nowFraction: Double {
+    let c = Calendar.current.dateComponents([.hour, .minute], from: Date())
+    return (Double(c.hour ?? 0) * 60 + Double(c.minute ?? 0)) / 1440
+  }
+
+  @ViewBuilder
+  private var rhythmSection: some View {
+    let wheel = wheelEvents
+    if wheel.count >= 3 {
+      DrawerSection("When symptoms occur", padding: .tight) {
+        TimeOfDayWheel(events: wheel, accent: accent, windowDays: 7, nowFraction: nowFraction)
+          .frame(maxWidth: .infinity)
+      }
+    }
   }
 }
 

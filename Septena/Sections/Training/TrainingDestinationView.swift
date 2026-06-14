@@ -37,6 +37,12 @@ struct TrainingDestinationView: View {
   /// day it drops the dashboard and shows just that day's session log.
   /// Mirrors `NutritionDestinationView.viewingDate`.
   @State private var viewingDate: String = SeptenaDate.today
+  // Training is an editable dual section: Log = active draft + session list
+  // (time-travelable); Patterns = the cardio / strength / muscle / progression
+  // dashboard. Default Log; remembered per section.
+  @State private var mode: DrawerMode = .remembered(for: "training", default: .log)
+  /// Whether the one-shot empty-state nudge has run for this appearance.
+  @State private var didNudge = false
 
   private var accent: Color { theme.color(for: "training") }
 
@@ -112,41 +118,44 @@ struct TrainingDestinationView: View {
   var body: some View {
     SectionDrawer(sectionKey: "training",
                   onLog: { _ in nav.showTrainingSession = true },
-                  currentDate: $viewingDate) {
-      if isViewingToday {
-        // Default view: active draft + the dashboard charts (the overview
-        // for any deeper history) + just this week's session log. Older
-        // sessions live behind the time-travel control, not dumped inline.
-        if let d = draftStore.draft {
-          activeSessionSection(d)
+                  currentDate: $viewingDate,
+                  mode: $mode) {
+      switch mode {
+      case .log:
+        if isViewingToday {
+          // Active draft + the rolling session list. Older sessions live
+          // behind the time-travel control, not dumped inline; the trend
+          // charts moved to Patterns.
+          if let d = draftStore.draft {
+            activeSessionSection(d)
+          }
+          ForEach(defaultSessions, id: \.key) { block in
+            sessionBlockView(block)
+          }
+          if !loading && entries.isEmpty {
+            ContentUnavailableView("No entries yet",
+                                   systemImage: theme.icon(for: "training"),
+                                   description: Text("Tap + to log a session."))
+          }
+        } else {
+          // Time-travel view: just the picked day's sessions.
+          if viewingSessions.isEmpty {
+            Text("No sessions logged on this day")
+              .font(.caption).foregroundStyle(.secondary)
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .padding(.horizontal, 16)
+              .padding(.vertical, 12)
+          } else {
+            ForEach(viewingSessions, id: \.key) { block in
+              sessionBlockView(block)
+            }
+          }
         }
+      case .patterns:
         z2CardioSection
         strengthVolumeSection   // merged headline + 8-week trend in one card
         muscleLoadSection       // per-muscle sets, trailing 7 days
-        progressionSection
-        ForEach(defaultSessions, id: \.key) { block in
-          sessionBlockView(block)
-        }
-        if !loading && entries.isEmpty {
-          ContentUnavailableView("No entries yet",
-                                 systemImage: theme.icon(for: "training"),
-                                 description: Text("Tap + to log a session."))
-        }
-      } else {
-        // Time-travel view: just the picked day's sessions, no dashboard —
-        // a past day is a read-only log review, the charts already covered
-        // the trend.
-        if viewingSessions.isEmpty {
-          Text("No sessions logged on this day")
-            .font(.caption).foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-        } else {
-          ForEach(viewingSessions, id: \.key) { block in
-            sessionBlockView(block)
-          }
-        }
+        progressionSection      // always renders its card (pills + chart/empty)
       }
     }
     .tint(accent)
@@ -346,6 +355,21 @@ struct TrainingDestinationView: View {
     cardio = r.cardio
     ResponseCache.save(r.cardio, forKey: CacheKey.cardio)
     loading = false
+    applyEmptyStateNudgeIfNeeded()
+  }
+
+  /// Editable dual sections open in Patterns when nothing's logged today — for
+  /// a chart-forward section like Training the dashboard is the natural greeting
+  /// on a rest morning, with the session list and "+" one tap away. One-shot per
+  /// appearance, never persisted; a deliberate toggle is the only thing that
+  /// sticks.
+  private func applyEmptyStateNudgeIfNeeded() {
+    guard !didNudge else { return }
+    didNudge = true
+    let loggedToday = entries.contains { $0.date == today }
+    if mode == .log, isViewingToday, !loggedToday {
+      withAnimation(.snappy) { mode = .patterns }
+    }
   }
 
   // MARK: - Charts

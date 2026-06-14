@@ -19,6 +19,11 @@ struct GutDestinationView: View {
   /// `currentDate` slot so the user can step prev/next from the date
   /// strip and `reload()` re-fetches for that day. Defaults to today.
   @State private var viewingDate: String = SeptenaDate.today
+  // Gut is an editable dual section: Log = the day's movements; Patterns = the
+  // 7-day rhythm wheel. Default Log; remembered per section.
+  @State private var mode: DrawerMode = .remembered(for: "gut", default: .log)
+  /// Whether the one-shot empty-state nudge has run for this appearance.
+  @State private var didNudge = false
 
   private var gut: GutMutator { SeptenaServices.shared.gutMutator }
 
@@ -30,28 +35,33 @@ struct GutDestinationView: View {
   var body: some View {
     SectionDrawer(sectionKey: "gut",
                   onLog: { _ in creating = true },
-                  currentDate: $viewingDate) {
-      DrawerSection("Today", padding: .none) {
-        if let today, !today.entries.isEmpty {
-          ForEach(Array(today.entries.reversed())) { entry in
-            LogEntryRow(
-              title: bristolLabel(entry.bristol),
-              detail: detailLine(entry),
-              trailing: entry.time,
-              tint: accent,
-              isSelected: editing?.id == entry.id,
-              onEdit: { editing = entry },
-              onDelete: { delete(entry) }
-            )
+                  currentDate: $viewingDate,
+                  mode: $mode) {
+      switch mode {
+      case .log:
+        DrawerSection("Today", padding: .none) {
+          if let today, !today.entries.isEmpty {
+            ForEach(Array(today.entries.reversed())) { entry in
+              LogEntryRow(
+                title: bristolLabel(entry.bristol),
+                detail: detailLine(entry),
+                trailing: entry.time,
+                tint: accent,
+                isSelected: editing?.id == entry.id,
+                onEdit: { editing = entry },
+                onDelete: { delete(entry) }
+              )
+            }
+          } else if !loading {
+            Text("Nothing logged yet.")
+              .foregroundStyle(.secondary)
+              .padding(.horizontal, 14)
+              .padding(.vertical, 12)
           }
-        } else if !loading {
-          Text("Nothing logged yet.")
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
         }
+      case .patterns:
+        rhythmSection
       }
-      rhythmSection
     }
     .tint(accent)
     .sectionReload(on: viewingDate, onDataChange: true,
@@ -101,13 +111,27 @@ struct GutDestinationView: View {
     }
     await reloadWeek()
     loading = false
+    applyEmptyStateNudgeIfNeeded()
   }
 
-  // MARK: - Rhythm wheel
+  /// Editable dual sections open in Patterns when today's Log is empty: an empty
+  /// log first thing reads as a dead end, so the rhythm view greets you instead
+  /// (the global "+" stays one tap away). One-shot per appearance, and never
+  /// persisted — a deliberate user toggle is the only thing that sticks.
+  private func applyEmptyStateNudgeIfNeeded() {
+    guard !didNudge else { return }
+    didNudge = true
+    if mode == .log, isViewingToday, today?.entries.isEmpty ?? true {
+      withAnimation(.snappy) { mode = .patterns }
+    }
+  }
+
+  // MARK: - Rhythm wheel (Patterns mode)
   //
   // A 24-hour dial of *when* movements land over the trailing 7 days, faded by
   // recency — gut regularity is a time-of-day signal. See `TimeOfDayWheel`.
-  // Today only, and only with enough events to read a pattern.
+  // Cross-day by nature, so it's the section's Patterns view; needs enough
+  // events to read a pattern, otherwise a gentle keep-logging placeholder.
 
   private struct WheelPoint: Identifiable, Sendable {
     let id: String
@@ -147,10 +171,16 @@ struct GutDestinationView: View {
   @ViewBuilder
   private var rhythmSection: some View {
     let events = wheelEvents
-    if isViewingToday, events.count >= 3 {
+    if events.count >= 3 {
       DrawerSection("When movements happen", padding: .tight) {
         TimeOfDayWheel(events: events, accent: accent, windowDays: 7, nowFraction: nowFraction)
           .frame(maxWidth: .infinity)
+      }
+    } else if !loading {
+      DrawerSection("When movements happen") {
+        Text("Not enough logged yet to read a rhythm — keep at it and a 7-day pattern shows here.")
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
       }
     }
   }
