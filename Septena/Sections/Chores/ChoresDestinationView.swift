@@ -46,7 +46,7 @@ struct ChoresDestinationView: View {
 
   var body: some View {
     SectionDrawer(sectionKey: "chores",
-                  onLog: { _ in creating = true },
+                  quickAdd: DrawerQuickAdd("New chore") { creating = true },
                   mode: $mode) {
       switch mode {
       case .log:

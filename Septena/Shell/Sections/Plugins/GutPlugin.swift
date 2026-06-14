@@ -37,12 +37,6 @@ enum GutPlugin: SectionPlugin {
   // happening.)
   static var logFlourish: LogFlourish? { LogFlourish(motion: .snap) }
 
-  // MARK: - Quick-log actions
-
-  static var logActions: [LogAction] {
-    [LogAction(id: "movement", title: "Log movement", systemImage: "plus")]
-  }
-
   // MARK: - First-enable onboarding
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {

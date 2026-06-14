@@ -52,7 +52,7 @@ struct HabitsDestinationView: View {
 
   var body: some View {
     SectionDrawer(sectionKey: "habits",
-                  onLog: { _ in creating = true },
+                  quickAdd: DrawerQuickAdd("New habit") { creating = true },
                   currentDate: $viewingDate,
                   mode: $mode) {
       switch mode {

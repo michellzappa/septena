@@ -60,7 +60,7 @@ struct GoalsView: View {
   var body: some View {
     NavigationStack {
       SectionDrawer(sectionKey: "goals",
-                    onLog: { _ in addGoal() }) {
+                    quickAdd: DrawerQuickAdd("New goal") { addGoal() }) {
         content
       }
       .task { await load() }

@@ -11,10 +11,6 @@ enum ChoresPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(ChoresDestinationView()) }
 
-  static var logActions: [LogAction] {
-    [LogAction(id: "new", title: "New chore", systemImage: "plus")]
-  }
-
   static func detailPaneContent() -> AnyView? { AnyView(ChoresDetailContent()) }
 
   static var exportContribution: SectionExportContribution? {

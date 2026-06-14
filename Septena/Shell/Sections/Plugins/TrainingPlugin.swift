@@ -17,10 +17,6 @@ enum TrainingPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(TrainingDestinationView()) }
 
-  static var logActions: [LogAction] {
-    [LogAction(id: "start", title: "Start session", systemImage: "play.fill")]
-  }
-
   static func detailPaneContent() -> AnyView? { AnyView(TrainingDetailContent()) }
 
   static var exportContribution: SectionExportContribution? {

@@ -89,13 +89,6 @@ protocol SectionPlugin {
   /// the metric's key string.
   static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double?
 
-  /// Quick-log entries surfaced by the SectionDrawer's "+" toolbar
-  /// button. Single action → tapping + fires it directly. Multiple →
-  /// + opens a menu. Empty → no + button rendered. The destination
-  /// view receives the tapped action's `id` via its drawer `onLog`
-  /// handler and decides what to present (sheet, navigation, etc.).
-  static var logActions: [LogAction] { get }
-
   /// How a *new* log in this section celebrates — the affect axis,
   /// declared here so the commit feel is manifest-driven (one place per
   /// section). `SectionLog.newLog` reads this. `nil` = no flourish
@@ -361,11 +354,6 @@ extension SectionPlugin {
 
   /// Default: no evaluator. Pairs with the empty default `aimMetrics`.
   static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? { nil }
-
-  /// Default: no quick-log actions. Sections opt in to surface a "+"
-  /// affordance in the drawer by overriding this with at least one
-  /// `LogAction` and wiring the destination view's `onLog` handler.
-  static var logActions: [LogAction] { [] }
 
   /// Default: no commit flourish. Sections opt in by declaring a
   /// `LogFlourish` and routing their writes through `SectionLog`.

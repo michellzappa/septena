@@ -76,7 +76,7 @@ struct GroceriesDestinationView: View {
 
   var body: some View {
     SectionDrawer(sectionKey: "groceries",
-                  onLog: { _ in creating = true }) {
+                  quickAdd: DrawerQuickAdd("New item") { creating = true }) {
       if !low.isEmpty {
         VStack(alignment: .leading, spacing: 8) {
           HStack {

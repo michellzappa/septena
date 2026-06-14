@@ -13,10 +13,6 @@ enum HabitsPlugin: SectionPlugin {
 
   static func detailPaneContent() -> AnyView? { AnyView(HabitsDetailContent()) }
 
-  static var logActions: [LogAction] {
-    [LogAction(id: "new", title: "New habit", systemImage: "plus")]
-  }
-
   static var exportContribution: SectionExportContribution? {
     SectionExportContribution(
       tables: [

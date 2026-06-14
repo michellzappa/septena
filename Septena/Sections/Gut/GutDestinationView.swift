@@ -34,7 +34,7 @@ struct GutDestinationView: View {
 
   var body: some View {
     SectionDrawer(sectionKey: "gut",
-                  onLog: { _ in creating = true },
+                  quickAdd: DrawerQuickAdd("Log movement") { creating = true },
                   currentDate: $viewingDate,
                   mode: $mode) {
       switch mode {

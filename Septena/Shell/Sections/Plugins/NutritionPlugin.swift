@@ -67,10 +67,6 @@ enum NutritionPlugin: SectionPlugin {
       && e.proteinG == 0 && e.fatG == 0 && e.carbsG == 0
   }
 
-  static var logActions: [LogAction] {
-    [LogAction(id: "log", title: "Log meal", systemImage: "plus")]
-  }
-
   static func detailPaneContent() -> AnyView? { AnyView(NutritionDetailContent()) }
 
   static var exportContribution: SectionExportContribution? {

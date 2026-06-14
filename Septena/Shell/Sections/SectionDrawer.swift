@@ -260,15 +260,11 @@ struct SectionDrawer<Content: View>: View {
   /// presented from this drawer). Defaults to the section's theme color
   /// if the destination doesn't override.
   var accent: Color? = nil
-  /// Invoked with the tapped `LogAction.id` when the drawer's "+"
-  /// affordance fires. Required for + to appear — if `nil`, no button
-  /// is rendered even if the plugin declares `logActions`.
-  var onLog: ((String) -> Void)? = nil
-  /// Dynamic, destination-supplied quick-log actions rendered *above* the
-  /// plugin's static `logActions` in the "+" menu — e.g. a smart
-  /// "Repeat: <bean>" or "Continue · Hit N" row that depends on the current
-  /// day's entries. Dispatched through the same `onLog(id)`. Empty by default.
-  var leadingLogActions: [LogAction] = []
+  /// The drawer's single quick-add affordance — the prominent accent "+" in the
+  /// trailing toolbar slot. Required for the "+" to appear; `nil` renders none.
+  /// One spec (title + icon + action) declared at the call site — the single
+  /// source of truth per section.
+  var quickAdd: DrawerQuickAdd? = nil
   /// Drawer-level load lifecycle. `.idle` is the no-op default. When
   /// the destination knows about its own fetch state, surface it here
   /// so the toolbar spinner / failure-state UI stays consistent.
@@ -346,10 +342,6 @@ struct SectionDrawer<Content: View>: View {
   /// call sites can omit `title:` for any catalogued section.
   private var resolvedTitle: String {
     title ?? SectionManifest.byKey[sectionKey]?.defaultLabel ?? ""
-  }
-
-  private var actions: [LogAction] {
-    leadingLogActions + (SectionRegistry.plugin(forKey: sectionKey)?.logActions ?? [])
   }
 
   /// True when the destination has a date strip pointing at a past day.
@@ -552,75 +544,52 @@ struct SectionDrawer<Content: View>: View {
           .glassCircle(tint: isTimeTraveling ? resolvedAccent : nil)
         }
       }
-      // Log/action button — ONE component (`DrawerActionButton`) so its
-      // appearance is defined in a single place for both single- and
-      // multi-action sections. Lives alone in the trailing primaryAction slot
+      // Quick-add "+" — ONE component (`DrawerActionButton`), one style, one
+      // shape, for every section. Lives alone in the trailing primaryAction slot
       // now that time travel moved to the leading edge; the system places the
       // prominent glass "+" as a standalone control there.
-      if let onLog, !actions.isEmpty {
+      if let quickAdd {
         ToolbarItem(placement: .primaryAction) {
-          DrawerActionButton(actions: actions, accent: resolvedAccent, onLog: onLog)
+          DrawerActionButton(quickAdd: quickAdd, accent: resolvedAccent)
         }
       }
     }
   }
 }
 
-/// The drawer's log/action toolbar control, centralized in ONE component so
-/// every drawer's action button is identical. A single action fires on one tap
-/// (a plain `Button` the system draws as the prominent accent circle); multiple
-/// actions open an inline dropdown `Menu` — the consolidated quick-add list,
-/// each row carrying its section icon, the first row bound to ⌘N. Both branches
-/// get the same `.glassProminent` + section `.tint`; the Menu branch hides its
-/// disclosure indicator so it renders as the identical circular "+" rather than
-/// a wider pill.
+/// A drawer's single quick-add affordance — title (for the accessibility label),
+/// icon, and the action to run on tap. Declared once at the `SectionDrawer` call
+/// site, so each section has exactly one source of truth for its "+". Sections
+/// with several quick options point `action` at a chooser SHEET rather than a
+/// menu (see NutritionDestinationView / IntakeQuickLogSheet) — `.glassProminent`
+/// only *fills* a `Button`, so the single-button form is the only one that reads
+/// as the prominent accent circle.
+struct DrawerQuickAdd {
+  let title: String
+  let systemImage: String
+  let action: () -> Void
+
+  init(_ title: String, systemImage: String = "plus", action: @escaping () -> Void) {
+    self.title = title
+    self.systemImage = systemImage
+    self.action = action
+  }
+}
+
+/// The drawer's quick-add toolbar control, centralized in ONE component so every
+/// "+" is identical: a plain `Button` the system draws as the prominent
+/// accent-filled circle via `.glassProminent` (`.tint` washes the glass with the
+/// section accent; the style auto-contrasts the glyph to white). Bound to ⌘N.
 struct DrawerActionButton: View {
-  let actions: [LogAction]
+  let quickAdd: DrawerQuickAdd
   let accent: Color
-  let onLog: (String) -> Void
 
   var body: some View {
-    Group {
-      if actions.count == 1, let only = actions.first {
-        Button { onLog(only.id) } label: {
-          Image(systemName: only.systemImage ?? "plus")
-            .accessibilityLabel(only.title)
-        }
-        .keyboardShortcut("n", modifiers: .command)
-      } else {
-        // Multi-action: an inline dropdown listing every quick-add option with
-        // its icon — the quick-menu style. First row carries ⌘N.
-        Menu {
-          ForEach(Array(actions.enumerated()), id: \.element.id) { idx, action in
-            Button {
-              onLog(action.id)
-            } label: {
-              if let img = action.systemImage {
-                Label(action.title, systemImage: img)
-              } else {
-                Text(action.title)
-              }
-            }
-            .keyboardShortcut(idx == 0 ? KeyboardShortcut("n", modifiers: .command) : nil)
-          }
-        } label: {
-          Image(systemName: "plus")
-            .accessibilityLabel("Log")
-        }
-        // Suppress the menu disclosure chevron so the glass control collapses to
-        // the same circular "+" the single-action Button renders — without this,
-        // `.glassProminent` draws the Menu as a wider pill (glyph + chevron),
-        // which is why multi-action sections (e.g. Intake) looked different.
-        .menuIndicator(.hidden)
-      }
+    Button { quickAdd.action() } label: {
+      Image(systemName: quickAdd.systemImage)
+        .accessibilityLabel(quickAdd.title)
     }
-    // Accent-tinted Liquid Glass capsule with a white glyph — the prominent
-    // "+" the drawer had before it regressed to a plain tinted control.
-    // `.glassProminent` (iOS/macOS 26's GlassProminentButtonStyle) is the
-    // prominent glass style; `.tint` washes the glass with the section accent
-    // and the style auto-contrasts the label to white. Applied to the Group so
-    // both the single-action Button and the multi-action Menu label render as
-    // the same filled glass control.
+    .keyboardShortcut("n", modifiers: .command)
     .buttonStyle(.glassProminent)
     .tint(accent)
   }

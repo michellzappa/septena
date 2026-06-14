@@ -11,10 +11,6 @@ enum SupplementsPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(SupplementsDestinationView()) }
 
-  static var logActions: [LogAction] {
-    [LogAction(id: "new", title: "New supplement", systemImage: "plus")]
-  }
-
   static func detailPaneContent() -> AnyView? { AnyView(SupplementsDetailContent()) }
 
   static var exportContribution: SectionExportContribution? {

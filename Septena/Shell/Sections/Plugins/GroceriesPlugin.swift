@@ -17,10 +17,6 @@ enum GroceriesPlugin: SectionPlugin {
   // list-keeping and stays silent.
   static var logFlourish: LogFlourish? { LogFlourish(motion: .burst) }
 
-  static var logActions: [LogAction] {
-    [LogAction(id: "new", title: "New item", systemImage: "plus")]
-  }
-
   static var exportContribution: SectionExportContribution? {
     SectionExportContribution(
       tables: [

@@ -25,6 +25,14 @@ struct IntakeKindPageView: View {
   @State private var editing: IntakeEntryDTO? = nil
   @State private var creatingMethod: PresetMethod? = nil
   @State private var managing = false
+  /// The quick-log chooser sheet (nutrition pattern): the drawer's single big
+  /// "+" opens it; the container-aware choices live inside, so the toolbar
+  /// control stays the prominent accent circle instead of a multi-action Menu.
+  @State private var quickLogging = false
+  /// The choice picked in the quick-log sheet, dispatched in its `onDismiss` so
+  /// any follow-on sheet (method detail / Manage) presents cleanly after the
+  /// chooser has dismissed rather than racing it.
+  @State private var pendingChoice: String? = nil
   /// Replay counter for the in-page snap flourish (see `handleLogAction` —
   /// on iPhone this page is a sheet, above the app-root overlay).
   @State private var flourishTrigger = 0
@@ -52,8 +60,7 @@ struct IntakeKindPageView: View {
     SectionDrawer(sectionKey: "intake",
                   title: kind?.name ?? "Tracker",
                   accent: accent,
-                  onLog: handleLogAction,
-                  leadingLogActions: quickAddActions,
+                  quickAdd: DrawerQuickAdd("Log \(kind?.name ?? "")") { quickLogging = true },
                   currentDate: $viewingDate,
                   mode: $mode,
                   modeStorageKey: "intake.\(kindID)",
@@ -110,13 +117,24 @@ struct IntakeKindPageView: View {
                            presetMethod: preset.method,
                            onSave: { Task { await reload() } })
     }
+    // The quick-log chooser. A pick is recorded and the sheet dismissed; the
+    // actual log / Manage runs in onDismiss so any follow-on sheet presents
+    // after this one is gone (no sheet-over-sheet race on iPhone).
+    .sheet(isPresented: $quickLogging, onDismiss: {
+      if let id = pendingChoice { pendingChoice = nil; handleLogAction(id) }
+    }) {
+      IntakeQuickLogSheet(kindName: kind?.name ?? "Tracker",
+                          accent: accent,
+                          choices: quickChoices,
+                          onPick: { id in pendingChoice = id; quickLogging = false })
+    }
   }
 
   // MARK: Quick-add
 
-  /// Container-aware choices for the "+" menu, built from the kind's methods
-  /// exactly as the watch will from the wire. Plus a Manage row.
-  private var quickAddActions: [LogAction] {
+  /// Container-aware choices shown inside the quick-log sheet, built from the
+  /// kind's methods exactly as the watch will from the wire. Plus a Manage row.
+  private var quickChoices: [LogAction] {
     guard let kind else { return [] }
     let methods = kind.methods.map {
       ConsumableContainer.Method(token: $0.token, label: $0.label,
@@ -353,5 +371,51 @@ struct IntakeKindPageView: View {
     let lastContainerCount: Int?
     let lastEventAt: Date?
     let weekPoints: [IntakeReader.IntakeInstant]
+  }
+}
+
+/// The intake quick-log chooser — the sheet the per-kind drawer's single "+"
+/// circle opens (the Nutrition pattern). Lists the container-aware log choices,
+/// with the Manage row split into its own footer section. Picking a row hands
+/// its id back to the page, which logs it (or opens the method-detail sheet).
+private struct IntakeQuickLogSheet: View {
+  let kindName: String
+  let accent: Color
+  let choices: [LogAction]
+  let onPick: (String) -> Void
+  @Environment(\.dismiss) private var dismiss
+
+  private var logChoices: [LogAction] { choices.filter { $0.id != "manage" } }
+  private var manage: LogAction? { choices.first { $0.id == "manage" } }
+
+  var body: some View {
+    NavigationStack {
+      List {
+        Section {
+          ForEach(logChoices) { choice in
+            Button { onPick(choice.id) } label: {
+              Label(choice.title, systemImage: choice.systemImage ?? "plus")
+            }
+          }
+        }
+        if let manage {
+          Section {
+            Button { onPick(manage.id) } label: {
+              Label(manage.title, systemImage: manage.systemImage ?? "slider.horizontal.3")
+                .foregroundStyle(.secondary)
+            }
+          }
+        }
+      }
+      .tint(accent)
+      .navigationTitle("Log \(kindName)")
+      #if os(iOS)
+      .navigationBarTitleDisplayMode(.inline)
+      #endif
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+      }
+    }
+    .presentationDetents([.medium, .large])
   }
 }

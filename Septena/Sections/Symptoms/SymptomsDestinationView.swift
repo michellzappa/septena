@@ -33,7 +33,7 @@ struct SymptomsDestinationView: View {
 
   var body: some View {
     SectionDrawer(sectionKey: "symptoms",
-                  onLog: { _ in creating = true },
+                  quickAdd: DrawerQuickAdd("Log symptom", systemImage: "waveform.path.ecg") { creating = true },
                   currentDate: $viewingDate,
                   mode: $mode) {
       switch mode {

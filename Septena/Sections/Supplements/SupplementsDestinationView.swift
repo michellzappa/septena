@@ -40,7 +40,7 @@ struct SupplementsDestinationView: View {
 
   var body: some View {
     SectionDrawer(sectionKey: "supplements",
-                  onLog: { _ in creating = true },
+                  quickAdd: DrawerQuickAdd("New supplement") { creating = true },
                   currentDate: $viewingDate,
                   mode: $mode) {
       switch mode {

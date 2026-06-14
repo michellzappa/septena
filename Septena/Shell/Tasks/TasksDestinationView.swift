@@ -64,7 +64,7 @@ struct TasksDestinationView: View {
   var body: some View {
     SectionDrawer(sectionKey: "tasks",
                   title: "Tasks",
-                  onLog: { _ in openCreate() },
+                  quickAdd: DrawerQuickAdd("New task") { openCreate() },
                   mode: $mode) {
       switch mode {
       case .log:

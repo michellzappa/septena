@@ -9,10 +9,6 @@ enum GoalsPlugin: SectionPlugin {
     SectionManifest.byKey["goals"]!
   }
 
-  static var logActions: [LogAction] {
-    [LogAction(id: "new", title: "New goal", systemImage: "plus")]
-  }
-
   // The section surfaces as "Coach": the top-level destination is the coach
   // grid (goals live under each coach). The key stays "goals" — only the
   // surface/label changed.

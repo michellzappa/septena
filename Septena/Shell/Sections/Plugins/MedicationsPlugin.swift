@@ -13,13 +13,6 @@ enum MedicationsPlugin: SectionPlugin {
     AnyView(MedicationsDestinationView())
   }
 
-  static var logActions: [LogAction] {
-    [
-      LogAction(id: "dose", title: "Log dose", systemImage: "cross.case"),
-      LogAction(id: "new", title: "New medication", systemImage: "plus"),
-    ]
-  }
-
   // Crisp snap — one sharp confirmation beat for a quick utility log.
   // (Was `.sink`; the falling dot read as nothing happening.)
   static var logFlourish: LogFlourish? {

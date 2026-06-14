@@ -25,10 +25,6 @@ enum MoodPlugin: SectionPlugin {
 
   static func detailPaneContent() -> AnyView? { AnyView(MoodDetailContent()) }
 
-  static var logActions: [LogAction] {
-    [LogAction(id: "log", title: "Log mood", systemImage: "plus")]
-  }
-
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(SectionOnboarding(
       sectionKey: "mood",

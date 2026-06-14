@@ -197,7 +197,7 @@ struct NutritionDestinationView: View {
 
   var body: some View {
     SectionDrawer(sectionKey: "nutrition",
-                  onLog: { _ in searchingMeals = true },
+                  quickAdd: DrawerQuickAdd("Log meal") { searchingMeals = true },
                   currentDate: $viewingDate,
                   mode: $mode) {
       switch mode {

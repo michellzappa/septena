@@ -39,7 +39,7 @@ struct MoodDestinationView: View {
 
   var body: some View {
     SectionDrawer(sectionKey: "mood",
-                  onLog: { _ in addingNew = true },
+                  quickAdd: DrawerQuickAdd("Log mood") { addingNew = true },
                   currentDate: $viewingDate,
                   mode: $mode) {
       switch mode {

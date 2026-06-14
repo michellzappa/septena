@@ -16,10 +16,6 @@ enum TasksPlugin: SectionPlugin {
   // user route the tile straight there instead.
   static func destinationView() -> AnyView? { AnyView(TasksDestinationView()) }
 
-  static var logActions: [LogAction] {
-    [LogAction(id: "new", title: "New task", systemImage: "plus")]
-  }
-
   static func detailPaneContent() -> AnyView? { AnyView(TasksDetailContent()) }
 
   static var exportContribution: SectionExportContribution? {

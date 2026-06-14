@@ -117,7 +117,7 @@ struct TrainingDestinationView: View {
 
   var body: some View {
     SectionDrawer(sectionKey: "training",
-                  onLog: { _ in nav.showTrainingSession = true },
+                  quickAdd: DrawerQuickAdd("Start session", systemImage: "play.fill") { nav.showTrainingSession = true },
                   currentDate: $viewingDate,
                   mode: $mode) {
       switch mode {
