@@ -45,6 +45,12 @@ struct TasksDestinationView: View {
   @State private var editingTask: SeptenaTask?
   /// Row currently open in the composer — drives the selection highlight.
   @State private var selectedId: String?
+  // Tasks is a dual section: Log = today's actionable list; Patterns = a
+  // throughput heatmap of completed tasks over time. Default Log — the list is
+  // the everyday surface.
+  @State private var mode: DrawerMode = .remembered(for: "tasks", default: .log)
+  /// Daily completed-task counts backing the Patterns heatmap.
+  @State private var history: [TaskCompletionDay] = []
 
   private var accent: Color { theme.color(for: "tasks") }
 
@@ -58,7 +64,24 @@ struct TasksDestinationView: View {
   var body: some View {
     SectionDrawer(sectionKey: "tasks",
                   title: "Tasks",
-                  onLog: { _ in openCreate() }) {
+                  onLog: { _ in openCreate() },
+                  mode: $mode) {
+      switch mode {
+      case .log:
+        logContent
+      case .patterns:
+        TaskPatternsSection(accent: accent, days: history)
+      }
+    }
+    .tint(accent)
+    .task { reload() }
+    // Host the composer here so it stacks on top of the drawer sheet and
+    // dismisses back to it.
+    .taskComposerDrawer(isPresented: composerBinding) { composerCard }
+  }
+
+  @ViewBuilder
+  private var logContent: some View {
       // The Inbox (unratified layer) sits on top of Today as a normal section —
       // same row style as Today below (see docs/TRIAGE_BAND_SPEC.md).
       if !triageTasks.isEmpty {
@@ -112,12 +135,6 @@ struct TasksDestinationView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
       }
-    }
-    .tint(accent)
-    .task { reload() }
-    // Host the composer here so it stacks on top of the drawer sheet and
-    // dismisses back to it.
-    .taskComposerDrawer(isPresented: composerBinding) { composerCard }
   }
 
   @ViewBuilder
@@ -152,11 +169,39 @@ struct TasksDestinationView: View {
     // satisfies both predicates lands only in the band — Today stays clean.
     triageTasks = LocalCache.tasks(in: modelContext, filter: .triage)
     openTasks = LocalCache.tasks(in: modelContext, filter: .today)
-    guard showCompleted else { doneTasks = []; return }
     let today = SeptenaDate.today
-    doneTasks = LocalCache.tasks(in: modelContext, filter: .logbook)
+    let completed = LocalCache.tasks(in: modelContext, filter: .logbook)
+    history = Self.dailyCounts(completed)
+    guard showCompleted else { doneTasks = []; return }
+    doneTasks = completed
       .filter { ($0.completedAt ?? "").hasPrefix(today) }
       .sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
+  }
+
+  /// Collapse the logbook into a contiguous daily series of completed-task
+  /// counts, oldest → today, for the Patterns heatmap. Days with no completions
+  /// are filled with zero so streak math reads gaps correctly.
+  private static func dailyCounts(_ completed: [SeptenaTask]) -> [TaskCompletionDay] {
+    var counts: [String: Int] = [:]
+    for task in completed {
+      guard let day = task.completedAt?.prefix(10), day.count == 10 else { continue }
+      counts[String(day), default: 0] += 1
+    }
+    guard let earliest = counts.keys.min(), let start = SeptenaDate.parse(earliest) else {
+      return []
+    }
+    let cal = Calendar.current
+    var series: [TaskCompletionDay] = []
+    var cursor = cal.startOfDay(for: start)
+    let end = cal.startOfDay(for: Date())
+    while cursor <= end {
+      if let iso = SeptenaDate.format(cursor) {
+        series.append(TaskCompletionDay(date: iso, count: counts[iso] ?? 0))
+      }
+      guard let next = cal.date(byAdding: .day, value: 1, to: cursor) else { break }
+      cursor = next
+    }
+    return series
   }
 
   /// Optimistic toggle — routes through the mutator (outbox + CloudKit) and

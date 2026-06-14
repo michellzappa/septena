@@ -1941,6 +1941,9 @@
     "Changing the unit doesn't rewrite past entries — history reads in the new unit." : {
 
     },
+    "Check a few things off and your completion pattern shows up here." : {
+
+    },
     "Checkable rows celebrate at the box — four feels separated by rhythm: one beat, two spaced beats, fall-then-thud, thud-then-close — each with a CoreHaptics pattern timed to its visual. The canvas is reserved for at-most-once-a-day moments: clearing your last Today task (Arc), habit streak milestones (Ignition), and finishing a training session (Ripple on a PR, Bloom otherwise)." : {
 
     },

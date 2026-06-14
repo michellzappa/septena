@@ -59,6 +59,7 @@
 		1205F7E14E321EB6B9CB6F13 /* LocaleFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05BCC1A109F5CA85CA8D3477 /* LocaleFormatting.swift */; };
 		1215F09AD126AB4364B57041 /* NextFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848DD768C118B7BDF4E27FC4 /* NextFeed.swift */; };
 		12177ED82961204B251988C5 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = AF3B8630E404CA38C14B10AC /* InfoPlist.xcstrings */; };
+		121CB23C20E242AC2BEE6EF7 /* TaskPatternsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7704DE3A742E53715F1667F4 /* TaskPatternsSection.swift */; };
 		1418ABD39D3C3BF52077A9A6 /* CommitMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B6D3C89DD47424084AE32D1 /* CommitMotion.swift */; };
 		14A026D5D1BAFF0B4943D0E0 /* GutBristolRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52B5EEA9B508AB5AAB6152F8 /* GutBristolRecorder.swift */; };
 		14AEC1B28FF545504CFC66C4 /* TrainingLiveActivityCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D97027452B1A57DBEAF13DE /* TrainingLiveActivityCoordinator.swift */; };
@@ -417,6 +418,7 @@
 		970B36891277CD49027B391E /* MealLogEntity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C198F08A4BCFDFC1B254BA8 /* MealLogEntity.swift */; };
 		97D8C948119E61E0DEE371AF /* LogDetailScaffold.swift in Sources */ = {isa = PBXBuildFile; fileRef = 703257F32821B161F51B5CC1 /* LogDetailScaffold.swift */; };
 		99277F861EF959F986D7589B /* ChartCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6677D4008D68908591E4937 /* ChartCard.swift */; };
+		99367B9D4DB682358C218857 /* TaskPatternsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7704DE3A742E53715F1667F4 /* TaskPatternsSection.swift */; };
 		99C5E0B4C1F96A710C71DFFC /* DayTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 880B70E1267B3CAAFFBA9D65 /* DayTimelineView.swift */; };
 		99F32E2446B12071AC929809 /* CorrelationFeatures.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAD69A204D1E2CF4993DE291 /* CorrelationFeatures.swift */; };
 		9A309102A56D669A431C6703 /* EditGroceryItemSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4C5E5E15422EB17DB5D3960 /* EditGroceryItemSheet.swift */; };
@@ -951,6 +953,7 @@
 		75A7338B84E54DF44893A020 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		75AAC894569974BDF43B3B15 /* CoachChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachChatView.swift; sourceTree = "<group>"; };
 		7665B2DC0D88761C66A7600D /* MCPToolCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPToolCatalog.swift; sourceTree = "<group>"; };
+		7704DE3A742E53715F1667F4 /* TaskPatternsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskPatternsSection.swift; sourceTree = "<group>"; };
 		77BD26CAAAC746043C2B1D6D /* VirtueFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VirtueFlowView.swift; sourceTree = "<group>"; };
 		77BEB26345A68838167042D8 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		784D3E7D8D933961200812D6 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -1788,6 +1791,7 @@
 				1F13269D0CDB1EB49B2351D6 /* TaskDetailView.swift */,
 				58104223B8DF0EFE5EA8D46F /* TaskDraft.swift */,
 				BB454D5630376DAFA9CBF9E1 /* TaskListView.swift */,
+				7704DE3A742E53715F1667F4 /* TaskPatternsSection.swift */,
 				40B5D7C95F12FB9F9E53565E /* TasksDestinationView.swift */,
 				E0B5F0D2E1B01AAEF2217FA4 /* TasksQuickAddMenu.swift */,
 			);
@@ -2643,6 +2647,7 @@
 				77A510BB428BFD5266C208AE /* TaskDraft.swift in Sources */,
 				6452BCC76A57E3D56A450486 /* TaskIntents.swift in Sources */,
 				6DEF721835395CBA52F670D4 /* TaskListView.swift in Sources */,
+				121CB23C20E242AC2BEE6EF7 /* TaskPatternsSection.swift in Sources */,
 				E9D604A78C243E8ED46607A4 /* TaskReads.swift in Sources */,
 				241E03A545CC2025FA858C82 /* TaskRecord.swift in Sources */,
 				F5B490D2166BAEB13EE3383A /* TasksBackend.swift in Sources */,
@@ -3004,6 +3009,7 @@
 				40DE0B3EE352E4459E9C4DF6 /* TaskDraft.swift in Sources */,
 				DFEE3A236B4EFB7A94EE7CC6 /* TaskIntents.swift in Sources */,
 				3239E48846BD07983E8A8FCF /* TaskListView.swift in Sources */,
+				99367B9D4DB682358C218857 /* TaskPatternsSection.swift in Sources */,
 				C54E2FFB072378F72D591866 /* TaskReads.swift in Sources */,
 				4C7EE421B5249E3E301C3211 /* TaskRecord.swift in Sources */,
 				DBD1584A15E7BCA54B072F50 /* TasksBackend.swift in Sources */,
