@@ -142,9 +142,16 @@ that reads as inconsistent and is the cheapest, highest-value fix.
 2. **One cutoff path.** No surface compares `hour < 12`. Current-bucket
    resolution always goes through `DayBucket.from(date:)` /
    `bucket(forHour:)` so custom cutoffs propagate everywhere.
-3. **One icon rule.** Bucketed → `.icon`; anytime → `circle.dashed` (already
-   used by `DayBucketHeader`). Apply the same on watch nav + complication
-   (currently icon-less).
+3. **One icon rule — ✅ RESOLVED (2026-06-14): icons only where glanceable or
+   functional, never beside a bucket *word*.** A time-of-day glyph next to the
+   literal "Morning" is decoration (and `circle.dashed` for anytime is
+   meaningless), so text headers stay title-only — matching the existing
+   "section headers are title-only" convention. Bucket icons are kept only on
+   the **Next widget** (glanceable, space-constrained) and the **Settings
+   cutoff rows** (the glyph pairs with the value it configures). Removed the
+   leading glyph from `DayBucketHeader` (the habits/supplements drawer
+   accordions); the iOS Next header was already title-only. Watch nav +
+   complication stay icon-less by the same rule.
 4. **One picker shape.** Every bucket picker is
    `[anytimeKey] + DayBucket.allCases` (anytime first), labels via rule 1 —
    matching the supplement form. Sections that don't support anytime drop the

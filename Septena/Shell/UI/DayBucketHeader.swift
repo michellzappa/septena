@@ -5,10 +5,15 @@ import SwiftUI
 // list) and Mood (today's check-in slots), and meant for any future
 // section that wants the same time-of-day rhythm.
 //
-// Renders: icon · "Morning" · trailing count · "Now" pill on the
-// current bucket. The "Now" pill is the cheap unification cue the user
-// asked for after first shipping Mood. With `showTimeLeft` / `disclosed`
-// it also drives the accordion drawer headers (see `BucketDisclosure`).
+// Renders: "Morning" · trailing count · "Now" pill on the current
+// bucket. The "Now" pill is the cheap unification cue the user asked for
+// after first shipping Mood. With `showTimeLeft` / `disclosed` it also
+// drives the accordion drawer headers (see `BucketDisclosure`).
+//
+// Title-only by design — no leading time-of-day glyph. Next to the literal
+// word ("Morning") the sunrise/sun/moon symbol is pure decoration, and the
+// "anytime" sentinel has no meaningful glyph. Bucket icons live only where
+// they're glanceable (the Next widget) or functional (the Settings cutoffs).
 
 struct DayBucketHeader: View {
   /// Bucket as the canonical lowercase string ("morning" / "afternoon" /
@@ -31,20 +36,10 @@ struct DayBucketHeader: View {
   private var isCurrent: Bool {
     parsed.map { $0 == DayBucket.current } ?? false
   }
-  /// "anytime" (the optional-bucket sentinel) gets a dashed-circle glyph —
-  /// reads as "no particular slot" — rather than the unknown-bucket fallback.
-  private var iconName: String {
-    if bucket == DayBucket.anytimeKey { return "circle.dashed" }
-    return parsed?.icon ?? "circle"
-  }
 
   var body: some View {
     HStack(spacing: 10) {
-      Image(systemName: iconName)
-        .font(.title3)
-        .foregroundStyle(.secondary)
-        .frame(width: 26, alignment: .center)
-      Text(parsed?.title ?? bucket.capitalized)
+      Text(DayBucket.label(forKey: bucket))
         .font(.septenaSectionTitle)
       if isCurrent {
         Text("Now")
