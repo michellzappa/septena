@@ -42,8 +42,13 @@ public final class ClaudeGatewayProvider {
   private static let callbackPath = "/auth/apple/callback"
 
   /// CloudKit Web Services API token — MUST match the gateway's CK_API_TOKEN,
-  /// whose sign-in callback URL must be the one above.
-  private static let webServicesAPIToken = "REDACTED-CLOUDKIT-API-TOKEN"
+  /// whose sign-in callback URL must be the one above. Injected at build time
+  /// from `Config/Secrets.xcconfig` (gitignored) via the `CloudKitWebAPIToken`
+  /// Info.plist key wired in `project.yml`; empty on a clone without secrets,
+  /// which degrades the in-app reconnect to "not configured" instead of failing
+  /// the build. See `Config/Secrets.example.xcconfig`.
+  private static let webServicesAPIToken: String =
+    (Bundle.main.object(forInfoDictionaryKey: "CloudKitWebAPIToken") as? String) ?? ""
 
   /// CloudKit env for the REST path. Must match the gateway's CK_ENVIRONMENT.
   /// Flip to "production" (with the gateway) for TestFlight/App Store builds.

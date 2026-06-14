@@ -435,20 +435,16 @@ struct TimeOfDayWheel: View {
         }
       }
 
-      // Dots. Compact tiles, section-detail dials, and the flat widget snapshot
-      // draw them as solid Canvas fills (crisp at small size, and where
-      // `.glassEffect` can't render). The live HERO instead draws them as real
-      // Liquid Glass beads in a separate, un-rotated overlay (`glassDots`,
-      // below) — so we skip the fill here whenever that overlay is active, to
-      // never draw a dot twice.
-      let glassDots = !compact && heroDate != nil && !flatGlass
-      if !glassDots {
-        for m in dotMarks(side: side) {
-          let r = m.diameter / 2
-          let rect = CGRect(x: m.center.x - r, y: m.center.y - r,
-                            width: m.diameter, height: m.diameter)
-          ctx.fill(Path(ellipseIn: rect), with: .color(m.color.opacity(m.opacity)))
-        }
+      // Dots — clean solid section-colored marks, on every dial. Real
+      // `.glassEffect` beads were tried at the hero scale: on top of the glass
+      // donut they carried the material's built-in elevation shadow and read
+      // as muddy smudges (glass-on-content, which Apple's HIG warns against).
+      // Glass is the donut (chrome); the data on it stays solid and crisp.
+      for m in dotMarks(side: side) {
+        let r = m.diameter / 2
+        let rect = CGRect(x: m.center.x - r, y: m.center.y - r,
+                          width: m.diameter, height: m.diameter)
+        ctx.fill(Path(ellipseIn: rect), with: .color(m.color.opacity(m.opacity)))
       }
 
       // Center. Section dials (no heroDate) draw a hub disc + scope chip here
@@ -475,20 +471,6 @@ struct TimeOfDayWheel: View {
     // fall out of sync. Only the night wedge turns visibly.
     .rotationEffect(.degrees(displayedRotation))
     .opacity(marksOpacity)
-
-      // The hero's data dots as REAL Liquid Glass beads, in a layer that is
-      // NOT rotated — the live material can't render through a `rotationEffect`
-      // (the same constraint that holds the glass donut static). The dial's
-      // rotation is baked into each bead's position (trig in code, not a view
-      // transform), and the whole layer fades with `marksOpacity`: on a
-      // day-swipe the beads fade out, the angle jumps, and they fade back in at
-      // the new orientation — matching the Canvas marks. Beads hide/show across
-      // reorientations rather than spinning; the accepted tradeoff for glass.
-      // Live hero only; compact/section/widget keep the Canvas fill above.
-      if !compact, heroDate != nil, !flatGlass {
-        glassDots(side: diameter)
-          .opacity(marksOpacity)
-      }
 
       // The hero's centre labels live OUTSIDE the rotation — always, so the
       // date stays upright and fixed whether the dial is at rest, drifting, or
@@ -526,61 +508,6 @@ struct TimeOfDayWheel: View {
       if delta > 180 { delta -= 360 } else if delta < -180 { delta += 360 }
       displayedRotation += delta
     }
-  }
-
-  /// The hero's data dots rendered as real Liquid Glass beads. Consumes the
-  /// SAME `dotMarks(side:)` geometry as the Canvas fill — one source for sizing
-  /// and density — then rotates each center about the dial center by
-  /// `displayedRotation` in code (no view transform, so `.glassEffect` stays
-  /// live). Wrapped in a `GlassEffectContainer` so beads sharing a 30-min slot
-  /// blend into one bead instead of N overlapping ones reading as a smudge.
-  /// Flavor is `.clear` + a hand-painted specular sheen (see the overlay).
-  /// `.regular` was tried and reproduced the old "muddy" failure exactly — its
-  /// elevation shadow read as dark halos on the near-black night donut, pooling
-  /// into smudges where the container merged clusters. `.clear` carries no such
-  /// shadow (clean), but over a dark donut it has nothing to refract and reads
-  /// flat — so the overlay paints the highlight a glass bead would catch, which
-  /// gives the marble dimension without the shadow. `.interactive()` adds the
-  /// press/tilt lensing. The glass-only size floor lifts the
-  /// native 5–8pt dots (too small for glass) to ~7–10pt — the Canvas/widget
-  /// sizing is untouched.
-  @ViewBuilder private func glassDots(side: CGFloat) -> some View {
-    let c = CGPoint(x: side / 2, y: side / 2)
-    let theta = displayedRotation * .pi / 180   // +clockwise = SwiftUI's rotationEffect
-    GlassEffectContainer(spacing: 2) {
-      ForEach(dotMarks(side: side)) { m in
-        let d = min(10, max(7, m.diameter * 1.25))
-        // Rotate m.center about the dial center, in screen coords (y down), so
-        // the bead lands where the rotated Canvas would have drawn its fill.
-        let dx = m.center.x - c.x, dy = m.center.y - c.y
-        let rc = CGPoint(x: c.x + dx * cos(theta) - dy * sin(theta),
-                         y: c.y + dx * sin(theta) + dy * cos(theta))
-        Color.clear
-          .frame(width: d, height: d)
-          .glassEffect(.clear.tint(m.color).interactive(), in: .circle)
-          // A fixed top-left specular sheen + a faint bottom-right counter-glow
-          // — the highlights a glass bead catches. `.clear` glass over the
-          // near-black donut has nothing to refract, so it reads flat; this
-          // paints the dimension by hand, giving the marble look WITHOUT the
-          // elevation shadow that made `.regular` muddy. `.plusLighter` adds
-          // light over the tint instead of replacing it, so the section color
-          // survives. Inset a hair so the sheen doesn't bleed past the rim.
-          .overlay {
-            Circle()
-              .fill(LinearGradient(
-                colors: [.white.opacity(0.75), .white.opacity(0.05),
-                         .clear, .white.opacity(0.12)],
-                startPoint: .topLeading, endPoint: .bottomTrailing))
-              .blendMode(.plusLighter)
-              .padding(max(0.5, d * 0.07))
-              .allowsHitTesting(false)
-          }
-          .opacity(m.opacity)
-          .position(rc)
-      }
-    }
-    .frame(width: side, height: side)
-    .allowsHitTesting(false)
   }
 
   /// The centre date stack (weekday · day · month) for the rotating hero,

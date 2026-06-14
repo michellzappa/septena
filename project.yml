@@ -98,6 +98,7 @@ targets:
         NSFaceIDUsageDescription: Septena uses Face ID to unlock the app when App Lock is turned on, so your private logs stay covered on an unlocked phone.
         WithingsClientID: $(WITHINGS_CLIENT_ID)
         WithingsClientSecret: $(WITHINGS_CLIENT_SECRET)
+        CloudKitWebAPIToken: $(CLOUDKIT_WEB_API_TOKEN)
     configFiles:
       Debug: Config/Base.xcconfig
       Release: Config/Base.xcconfig
@@ -151,6 +152,7 @@ targets:
         NSFaceIDUsageDescription: Septena uses Face ID to unlock the app when App Lock is turned on, so your private logs stay covered on an unlocked phone.
         WithingsClientID: $(WITHINGS_CLIENT_ID)
         WithingsClientSecret: $(WITHINGS_CLIENT_SECRET)
+        CloudKitWebAPIToken: $(CLOUDKIT_WEB_API_TOKEN)
     configFiles:
       Debug: Config/Base.xcconfig
       Release: Config/Base.xcconfig
