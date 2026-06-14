@@ -9,7 +9,7 @@ struct NextWatchView: View {
   var body: some View {
     NavigationStack {
       content
-        .navigationTitle(conn.bucket.isEmpty ? "Next" : conn.bucket.capitalized)
+        .navigationTitle(conn.bucket.isEmpty ? "Next" : DayBucket.label(forKey: conn.bucket))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
           // Capture a loggable (intake / mood) on demand, not just
@@ -471,6 +471,57 @@ private struct IntakeCaptureInput: View {
   }
 }
 
+// MARK: - Meal picker (nutrition quick-add)
+
+/// The wrist nutrition quick-add: the user's most-eaten meals as one-tap
+/// quick-selects, each an emoji + the meal's name + a macro summary line (and an
+/// ×N badge for repeats). Built entirely from the snapshot wire (`MealWire`), so
+/// the watch carries no nutrition model — tapping writes a full `NutritionEntry`
+/// for the chosen meal and dismisses. Ranking (frequency then recency) and the
+/// 25-meal cap are applied phone-side, so the list is render-ready.
+private struct MealPickerView: View {
+  let meals: [MealWire]
+  let conn: WatchConnectivity
+  let onDone: () -> Void
+
+  var body: some View {
+    List(meals) { meal in
+      Button {
+        conn.logMeal(meal)
+        onDone()
+      } label: {
+        HStack(spacing: 9) {
+          Text(meal.emoji?.isEmpty == false ? meal.emoji! : "🍽")
+            .font(.body)
+            .frame(width: 22)
+          VStack(alignment: .leading, spacing: 1) {
+            Text(meal.title)
+              .font(.body)
+              .lineLimit(1)
+            Text(meal.macroSummary)
+              .font(.caption2)
+              .foregroundStyle(.secondary)
+              .lineLimit(1)
+              .minimumScaleFactor(0.8)
+          }
+          if meal.count > 1 {
+            Spacer(minLength: 0)
+            Text("×\(meal.count)")
+              .font(.caption2.monospacedDigit())
+              .foregroundStyle(.secondary)
+          }
+        }
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
+    }
+    .listStyle(.plain)
+    .navigationTitle("Log a meal")
+    .navigationBarTitleDisplayMode(.inline)
+  }
+}
+
 // MARK: - Capture sheet (on-demand log)
 
 /// The toolbar **+** target: pick a capturable, then collect its minimal input.
@@ -499,6 +550,23 @@ private struct CaptureSheet: View {
           }
         }
         .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
+
+        // Nutrition — re-log one of the user's most-eaten meals (foods +
+        // macros) in one tap. Hidden until the phone has published some meals.
+        if !conn.topMeals.isEmpty {
+          NavigationLink {
+            MealPickerView(meals: conn.topMeals, conn: conn, onDone: onDone)
+          } label: {
+            Label {
+              Text("Log a meal")
+            } icon: {
+              Image(systemName: "fork.knife")
+                .foregroundStyle(WatchSectionTint.color(forSectionKey: "nutrition",
+                                                        colors: conn.sectionColors))
+            }
+          }
+          .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
+        }
 
         // The user's intake trackers, from the snapshot wire — every enabled
         // tracker is a + item, with container-aware choices.

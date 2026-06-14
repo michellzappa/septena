@@ -28,6 +28,9 @@ final class WatchConnectivity {
   /// The user's enabled intake trackers from the snapshot — the + menu offers
   /// one quick-log row per tracker, with container-aware choices.
   var intakeKinds: [IntakeKindWire] = []
+  /// The user's most-eaten meals from the snapshot — the + menu offers them as
+  /// one-tap re-log quick-selects (emoji + macro summary).
+  var topMeals: [MealWire] = []
   var bucket: String = ""
   var isLoading = false
   var errorMessage: String?
@@ -129,6 +132,7 @@ final class WatchConnectivity {
       self.items         = filtered
       self.sectionColors = response.sectionColors ?? [:]
       self.intakeKinds   = response.intakeKinds ?? []
+      self.topMeals      = response.topMeals ?? []
       self.bucket        = bkt
       updateComplication()
       scheduleNextRefresh()
@@ -275,6 +279,18 @@ final class WatchConnectivity {
         try await saveMoodEvent(quadrant: quadrant, emotion: emotion,
                                 arousal: arousal, valence: valence, date: date)
       } catch { }
+    }
+  }
+
+  /// Re-log one of the user's meals from the wrist — writes a full
+  /// `NutritionEntry` (foods + macros), mirroring the phone's `logAgainNow`.
+  /// A plain quick-log, not a suggestion: the confirming haptic fires here and
+  /// the picker dismisses itself, so there's no Next row to optimistically hide.
+  func logMeal(_ meal: MealWire) {
+    WKInterfaceDevice.current().play(.success)
+    Task {
+      do { try await saveMealEntry(meal) }
+      catch { }   // Fire-and-forget: the iOS CKSyncEngine reconciles on next open.
     }
   }
 
@@ -439,6 +455,35 @@ final class WatchConnectivity {
     record["fatG"]     = 0
     record["carbsG"]   = 0
     record["waterMl"]  = ml
+    try await db.save(record)
+  }
+
+  /// A full meal log — a `NutritionEntry` carrying the re-logged meal's foods
+  /// and macros. Mirrors the phone's `NutritionMutator.addEntry`: foods are
+  /// newline-joined, optional nutrients ride along only when present, and
+  /// time-of-day lives in `loggedAt`. A fresh UUID id so each re-log is its own
+  /// event. Field names match `NutritionEntryCloudKitSchema` so the phone
+  /// mirrors it like its own writes.
+  private func saveMealEntry(_ meal: MealWire) async throws {
+    let eventID  = String(UUID().uuidString.lowercased().prefix(8))
+    let recordID = CKRecord.ID(recordName: "nutrition-entry:\(eventID)", zoneID: ckZoneID)
+    let record   = CKRecord(recordType: "NutritionEntry", recordID: recordID)
+    record["loggedAt"] = Date()
+    if let emoji = meal.emoji, !emoji.isEmpty { record["emoji"] = emoji }
+    record["foods"]    = meal.foods.joined(separator: "\n")
+    record["note"]     = ""
+    record["source"]   = "manual"
+    record["proteinG"] = meal.proteinG
+    record["fatG"]     = meal.fatG
+    record["carbsG"]   = meal.carbsG
+    if meal.kcal > 0 { record["kcal"] = meal.kcal }
+    if let v = meal.fiberG { record["fiberG"] = v }
+    if let v = meal.sugarG { record["sugarG"] = v }
+    if let v = meal.saturatedFatG { record["saturatedFatG"] = v }
+    if let v = meal.alcoholG { record["alcoholG"] = v }
+    if let v = meal.sodiumMg { record["sodiumMg"] = v }
+    if let v = meal.cholesterolMg { record["cholesterolMg"] = v }
+    if let v = meal.potassiumMg { record["potassiumMg"] = v }
     try await db.save(record)
   }
 

@@ -89,11 +89,16 @@ enum WatchSnapshotPublisher {
           })
       }
     }
+    // The user's most-eaten meals, so the wrist + menu can re-log a real meal
+    // (foods + macros) with one tap — frequency-then-recency ranked, capped to
+    // a wrist-sized list.
+    let topMeals = buildTopMeals(context: context)
     let response = NextItemsResponse(date: date, bucket: "", items: items,
                                      lingerHabits: lingerHabits,
                                      lingerSupplements: lingerSupplements,
                                      sectionColors: sectionColors,
-                                     intakeKinds: intakeKinds.isEmpty ? nil : intakeKinds)
+                                     intakeKinds: intakeKinds.isEmpty ? nil : intakeKinds,
+                                     topMeals: topMeals.isEmpty ? nil : topMeals)
     guard let payload = try? JSONEncoder().encode(response) else { return }
 
     // The time-wheel/day-dial widget is DISABLED for now (its glass face can't
@@ -122,6 +127,61 @@ enum WatchSnapshotPublisher {
     Task.detached(priority: .utility) {
       await save(payload: payload, date: date)
     }
+  }
+
+  // MARK: - Top meals (wrist quick-add)
+
+  /// Wrist quick-add list cap and lookback window. Bounded so the debounced
+  /// per-mutation snapshot build stays cheap.
+  private static let topMealsCap = 50
+  private static let topMealsWindowDays = 120
+
+  /// The user's most-eaten meals for the wrist quick-add, frequency- then
+  /// recency-ranked, capped to `topMealsCap`. Mirrors the phone's
+  /// `allDistinctMeals` (the Nutrition "+" meal search): group by a normalized
+  /// food signature, keep the most-recent instance as the template, exclude the
+  /// macro-free water marker (hydration has its own quick-log).
+  @MainActor
+  private static func buildTopMeals(context: ModelContext) -> [MealWire] {
+    let since = SeptenaDate.format(
+      Calendar.current.date(byAdding: .day, value: -topMealsWindowDays, to: Date()))
+    let entries = ChecklistMirror.loadNutritionEntries(context: context, since: since)
+
+    func signature(_ e: NutritionEntry) -> String {
+      e.foods
+        .map { $0.lowercased().trimmingCharacters(in: .whitespaces) }
+        .filter { !$0.isEmpty }
+        .joined(separator: "|")
+    }
+
+    var groups: [String: [NutritionEntry]] = [:]
+    for e in entries {
+      guard let first = e.foods.first, !first.isEmpty else { continue }
+      // The macro-free water marker is hydration, not a meal — it has its own
+      // wrist quick-log (`SuggestionBlocks` hydration).
+      if e.foods == ["Water"] { continue }
+      groups[signature(e), default: []].append(e)
+    }
+
+    // (wire, date, time) so the rank can break frequency ties by recency
+    // without recomputing the template's timestamp.
+    let ranked = groups.compactMap { sig, items -> (MealWire, String, String)? in
+      guard let t = items.max(by: { ($0.date, $0.time) < ($1.date, $1.time) })
+      else { return nil }
+      let wire = MealWire(
+        id: sig, emoji: t.emoji, foods: t.foods, count: items.count,
+        proteinG: t.proteinG, fatG: t.fatG, carbsG: t.carbsG, kcal: t.kcal,
+        fiberG: t.fiberG, sugarG: t.sugarG, saturatedFatG: t.saturatedFatG,
+        alcoholG: t.alcoholG, sodiumMg: t.sodiumMg, cholesterolMg: t.cholesterolMg,
+        potassiumMg: t.potassiumMg)
+      return (wire, t.date, t.time)
+    }
+    .sorted { a, b in
+      if a.0.count != b.0.count { return a.0.count > b.0.count }
+      return (a.1, a.2) > (b.1, b.2)
+    }
+
+    return ranked.prefix(topMealsCap).map(\.0)
   }
 
   private static func save(payload: Data, rhythmPayload: Data? = nil, date: String) async {
