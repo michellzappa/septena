@@ -230,25 +230,43 @@ struct SkyTopWash: View {
       if stops.isEmpty {
         Color.clear
       } else {
-        LinearGradient(
-          gradient: Gradient(stops: stops.map {
-            .init(color: Color(.sRGB, red: $0.r, green: $0.g, blue: $0.b, opacity: 1),
-                  location: $0.location)
-          }),
-          startPoint: .top, endPoint: .bottom
-        )
-        // Melt into the page: opaque from the top edge (behind the
-        // status/nav bar) and held full through the dial, then fading to
-        // clear by the band's foot — no hard bottom line, and real color
-        // behind the glass donut so it has sky to refract.
-        .mask(
-          LinearGradient(stops: [
-            .init(color: .white, location: 0),
-            .init(color: .white, location: 0.55),
-            .init(color: .white.opacity(0.55), location: 0.82),
-            .init(color: .clear, location: 1),
-          ], startPoint: .top, endPoint: .bottom)
-        )
+        GeometryReader { geo in
+          let h = geo.size.height
+          // How far *below* the wash the fade's arcs are centred. A radial
+          // mask's iso-opacity contours are circles around this point, so a
+          // centre below the frame bows the fade baseline into a gentle upward
+          // arch (∩): highest in the middle, dropping at the sides — the wash
+          // "curves up in the middle" instead of melting along a flat line.
+          // Deeper centre → flatter arch; this is the curviness knob.
+          let depth = h * 1.1
+          LinearGradient(
+            gradient: Gradient(stops: stops.map {
+              .init(color: Color(.sRGB, red: $0.r, green: $0.g, blue: $0.b, opacity: 1),
+                    location: $0.location)
+            }),
+            startPoint: .top, endPoint: .bottom
+          )
+          // Melt into the page along that CURVED baseline: opaque from the top
+          // edge (behind the status / nav bar) and held full through the dial,
+          // then fading to clear by the band's foot — no hard bottom line, and
+          // real color behind the glass donut so it has sky to refract. Same
+          // fade stops as before, now wrapped onto arcs: location 0 sits at the
+          // centre (frame-bottom, clear) and location 1 at the rim (frame-top,
+          // opaque), so the wash reaches lower at the sides than in the middle.
+          .mask(
+            RadialGradient(
+              stops: [
+                .init(color: .clear, location: 0),
+                .init(color: .white.opacity(0.55), location: 0.25),
+                .init(color: .white, location: 0.45),
+                .init(color: .white, location: 1),
+              ],
+              center: UnitPoint(x: 0.5, y: (h + depth) / max(h, 1)),
+              startRadius: depth,
+              endRadius: depth + h
+            )
+          )
+        }
         // Dark appearance: ADD the sky as light (`plusLighter`) rather than
         // paint it over the dark UI — the daytime blue then reads as a soft
         // glow instead of a strong slab, and a near-black night adds nothing
