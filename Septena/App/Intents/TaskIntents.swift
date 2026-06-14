@@ -1,6 +1,8 @@
 import AppIntents
+import CoreSpotlight
 import Foundation
 import SwiftData
+import UniformTypeIdentifiers
 
 // Tasks — action intents for EXISTING tasks (complete / move-to-today / defer),
 // the counterpart to `AddTaskIntent` (which creates). Together they bring the
@@ -20,9 +22,14 @@ import SwiftData
 /// One of the user's tasks, surfaced to Siri / Shortcuts / Spotlight as a
 /// pickable value. Backed by `TaskEntity`; `id` is the stable task id passed
 /// straight to the mutators.
-struct TaskChoice: AppEntity {
+struct TaskChoice: AppEntity, IndexedEntity {
   let id: String
   let title: String
+  /// Notes ride along only to enrich the Spotlight `attributeSet`
+  /// (`contentDescription`) — the picker shows just the title. Defaulted so the
+  /// resolution/suggestion path (`TaskChoice(id:title:)`) is unaffected; only
+  /// the indexer populates it.
+  var notes: String? = nil
 
   static var typeDisplayRepresentation: TypeDisplayRepresentation { "Task" }
 
@@ -31,6 +38,20 @@ struct TaskChoice: AppEntity {
   }
 
   static var defaultQuery = TaskChoiceQuery()
+
+  /// What lands in Spotlight's semantic index for this task — the surface
+  /// Apple Intelligence reads (per Apple, `IndexedEntity` items are
+  /// "discoverable by Apple Intelligence"). Title is the headline, notes the
+  /// searchable body, keywords broaden recall. Donated by `SpotlightIndexer`;
+  /// see docs/SPOTLIGHT_READABILITY_PLAN.md.
+  var attributeSet: CSSearchableItemAttributeSet {
+    let attrs = CSSearchableItemAttributeSet(contentType: .text)
+    attrs.title = title
+    attrs.displayName = title
+    if let notes, !notes.isEmpty { attrs.contentDescription = notes }
+    attrs.keywords = ["task", "to-do", "todo", "Septena"]
+    return attrs
+  }
 }
 
 /// Resolves task parameters and supplies the picker list. Suggestions are the

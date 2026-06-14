@@ -1,6 +1,8 @@
 import AppIntents
+import CoreSpotlight
 import Foundation
 import SwiftData
+import UniformTypeIdentifiers
 
 // Chores — section intents mirroring the Supplements template
 // (SupplementIntents.swift). Chores are checklist-shaped like
@@ -15,7 +17,7 @@ import SwiftData
 /// One of the user's recurring chores, surfaced to Siri / Shortcuts /
 /// Spotlight as a pickable value. Backed by `ChoreDefinitionEntity`; `id` is
 /// the stable definition id so a resolved value survives renames.
-struct ChoreEntity: AppEntity {
+struct ChoreEntity: AppEntity, IndexedEntity {
   let id: String
   let title: String
   let emoji: String?
@@ -28,6 +30,16 @@ struct ChoreEntity: AppEntity {
   }
 
   static var defaultQuery = ChoreEntityQuery()
+
+  /// Spotlight index entry — the surface Apple Intelligence reads. Donated by
+  /// `SpotlightIndexer`; see docs/SPOTLIGHT_READABILITY_PLAN.md.
+  var attributeSet: CSSearchableItemAttributeSet {
+    let attrs = CSSearchableItemAttributeSet(contentType: .text)
+    attrs.title = title
+    attrs.displayName = [emoji, title].compactMap { $0 }.joined(separator: " ")
+    attrs.keywords = ["chore", "Septena"]
+    return attrs
+  }
 }
 
 /// Resolves chore parameters and supplies the picker list. Reads the live

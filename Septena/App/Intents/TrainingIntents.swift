@@ -1,6 +1,8 @@
 import AppIntents
+import CoreSpotlight
 import Foundation
 import SwiftData
+import UniformTypeIdentifiers
 
 // Training — section-intent surface modeled on SupplementIntents (the
 // canonical template). Exposes the exercise catalog to the picker via an
@@ -19,7 +21,7 @@ import SwiftData
 /// Spotlight as a pickable value. Backed by `ExerciseDefinitionEntity`. `id`
 /// is the canonical NAME (the value the mutator wants), so the picked value
 /// maps directly onto `addEntry(exercise:)` with no slug→name lookup.
-struct ExerciseChoice: AppEntity {
+struct ExerciseChoice: AppEntity, IndexedEntity {
   let id: String   // canonical exercise name, e.g. "Chest press"
 
   static var typeDisplayRepresentation: TypeDisplayRepresentation { "Exercise" }
@@ -29,6 +31,17 @@ struct ExerciseChoice: AppEntity {
   }
 
   static var defaultQuery = ExerciseEntityQuery()
+
+  /// Spotlight index entry — the surface Apple Intelligence reads. `id` is the
+  /// canonical name, so it's also the title. See
+  /// docs/SPOTLIGHT_READABILITY_PLAN.md.
+  var attributeSet: CSSearchableItemAttributeSet {
+    let attrs = CSSearchableItemAttributeSet(contentType: .text)
+    attrs.title = id
+    attrs.displayName = id
+    attrs.keywords = ["exercise", "workout", "training", "Septena"]
+    return attrs
+  }
 }
 
 /// Resolves exercise parameters and supplies the picker list. Reads the live
@@ -64,7 +77,7 @@ struct ExerciseEntityQuery: EntityQuery {
 /// One of the user's configured training session types (upper, cardio, yoga,
 /// etc.), surfaced as an optional picker so Siri / Shortcuts logs can land in
 /// the correct routine bucket instead of always defaulting to "upper".
-struct TrainingSessionTypeChoice: AppEntity {
+struct TrainingSessionTypeChoice: AppEntity, IndexedEntity {
   let id: String
   let title: String
 
@@ -75,6 +88,16 @@ struct TrainingSessionTypeChoice: AppEntity {
   }
 
   static var defaultQuery = TrainingSessionTypeQuery()
+
+  /// Spotlight index entry — the surface Apple Intelligence reads. See
+  /// docs/SPOTLIGHT_READABILITY_PLAN.md.
+  var attributeSet: CSSearchableItemAttributeSet {
+    let attrs = CSSearchableItemAttributeSet(contentType: .text)
+    attrs.title = title
+    attrs.displayName = title
+    attrs.keywords = ["training", "workout", "session", "Septena"]
+    return attrs
+  }
 }
 
 struct TrainingSessionTypeQuery: EntityQuery {

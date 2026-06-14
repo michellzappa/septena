@@ -1,6 +1,8 @@
 import AppIntents
+import CoreSpotlight
 import Foundation
 import SwiftData
+import UniformTypeIdentifiers
 
 // Habits — modeled on the Supplements template (SupplementIntents.swift): a
 // definition + a per-day toggle. Two thin intents lean on SectionLogIntent
@@ -12,22 +14,25 @@ import SwiftData
 
 // MARK: - Daypart bucket
 
-/// The daypart a new habit belongs to. Cases mirror the free-form bucket
-/// keys used across the Habits section (HabitsPlugin starter list,
-/// `ChecklistMutator.createHabit(bucket:)`): "morning" | "anytime" |
-/// "evening". As an AppEnum, Siri can capture it inline from a phrase.
+/// The daypart a new habit belongs to. Cases mirror the canonical bucket keys
+/// used across the Habits section (HabitsPlugin starters,
+/// `ChecklistMutator.createHabit(bucket:)`) — the full set Supplements offers:
+/// "morning" | "afternoon" | "evening" | "anytime". As an AppEnum, Siri can
+/// capture it inline from a phrase.
 enum HabitBucket: String, AppEnum {
   case morning
-  case anytime
+  case afternoon
   case evening
+  case anytime
 
   static var typeDisplayRepresentation: TypeDisplayRepresentation { "Time of Day" }
 
   static var caseDisplayRepresentations: [HabitBucket: DisplayRepresentation] {
     [
       .morning: "Morning",
-      .anytime: "Anytime",
+      .afternoon: "Afternoon",
       .evening: "Evening",
+      .anytime: "Anytime",
     ]
   }
 }
@@ -37,7 +42,7 @@ enum HabitBucket: String, AppEnum {
 /// One of the user's habits, surfaced to Siri / Shortcuts / Spotlight as a
 /// pickable value. Backed by `HabitDefinitionEntity`; `id` is the stable
 /// definition id so a resolved value survives renames.
-struct HabitEntity: AppEntity {
+struct HabitEntity: AppEntity, IndexedEntity {
   let id: String
   let title: String
   let emoji: String?
@@ -50,6 +55,17 @@ struct HabitEntity: AppEntity {
   }
 
   static var defaultQuery = HabitEntityQuery()
+
+  /// Spotlight index entry — the surface Apple Intelligence reads (per Apple,
+  /// `IndexedEntity` items are "discoverable by Apple Intelligence"). Donated
+  /// by `SpotlightIndexer`; see docs/SPOTLIGHT_READABILITY_PLAN.md.
+  var attributeSet: CSSearchableItemAttributeSet {
+    let attrs = CSSearchableItemAttributeSet(contentType: .text)
+    attrs.title = title
+    attrs.displayName = [emoji, title].compactMap { $0 }.joined(separator: " ")
+    attrs.keywords = ["habit", "Septena"]
+    return attrs
+  }
 }
 
 /// Resolves habit parameters and supplies the picker list. Reads the live

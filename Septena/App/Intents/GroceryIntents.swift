@@ -1,6 +1,8 @@
 import AppIntents
+import CoreSpotlight
 import Foundation
 import SwiftData
+import UniformTypeIdentifiers
 
 // Groceries — section intents. Copied from the Supplements template: a pair
 // of catalog AppEntities exposing the user's live grocery list / categories
@@ -18,7 +20,7 @@ import SwiftData
 /// One of the user's grocery items, surfaced to Siri / Shortcuts / Spotlight
 /// as a pickable value. Backed by `GroceryItemEntity`; `id` is the stable
 /// item id so a resolved value survives renames.
-struct GroceryItemChoice: AppEntity {
+struct GroceryItemChoice: AppEntity, IndexedEntity {
   let id: String
   let title: String
   let emoji: String?
@@ -31,6 +33,16 @@ struct GroceryItemChoice: AppEntity {
   }
 
   static var defaultQuery = GroceryItemChoiceQuery()
+
+  /// Spotlight index entry — the surface Apple Intelligence reads. See
+  /// docs/SPOTLIGHT_READABILITY_PLAN.md.
+  var attributeSet: CSSearchableItemAttributeSet {
+    let attrs = CSSearchableItemAttributeSet(contentType: .text)
+    attrs.title = title
+    attrs.displayName = [emoji, title].compactMap { $0 }.joined(separator: " ")
+    attrs.keywords = ["grocery", "shopping", "Septena"]
+    return attrs
+  }
 }
 
 /// Resolves grocery-item parameters and supplies the picker list. Reads the
@@ -66,7 +78,7 @@ struct GroceryItemChoiceQuery: EntityQuery {
 /// One of the user's grocery categories (shopping aisle / pantry group),
 /// surfaced as a pickable value. Backed by `GroceryCategoryEntity`; `id` is
 /// the stable category id passed straight to the mutator.
-struct GroceryCategoryChoice: AppEntity {
+struct GroceryCategoryChoice: AppEntity, IndexedEntity {
   let id: String
   let title: String
 
@@ -77,6 +89,16 @@ struct GroceryCategoryChoice: AppEntity {
   }
 
   static var defaultQuery = GroceryCategoryChoiceQuery()
+
+  /// Spotlight index entry — the surface Apple Intelligence reads. See
+  /// docs/SPOTLIGHT_READABILITY_PLAN.md.
+  var attributeSet: CSSearchableItemAttributeSet {
+    let attrs = CSSearchableItemAttributeSet(contentType: .text)
+    attrs.title = title
+    attrs.displayName = title
+    attrs.keywords = ["grocery", "category", "Septena"]
+    return attrs
+  }
 }
 
 /// Resolves category parameters and supplies the picker list from the live

@@ -317,6 +317,11 @@ enum SettingsMirror {
     do {
       try context.save()
       engine?.noteSectionChange(id: key)
+      // Tell the app a section's enabled-state changed so data-driven surfaces
+      // refresh — including the Spotlight index, where `SpotlightIndexer` purges
+      // a disabled section's entities and re-indexes them on enable. Matches the
+      // positional overload above; this labeled one previously notified no one.
+      NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
     } catch {
       SeptenaLog.error("SettingsMirror.setSectionEnabled", error)
     }

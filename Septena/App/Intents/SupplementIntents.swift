@@ -1,6 +1,8 @@
 import AppIntents
+import CoreSpotlight
 import Foundation
 import SwiftData
+import UniformTypeIdentifiers
 
 // Supplements — the canonical section-intent template. To add a section,
 // copy this file and rename: (1) an AppEntity + EntityQuery exposing the
@@ -15,7 +17,7 @@ import SwiftData
 /// One of the user's supplements, surfaced to Siri / Shortcuts / Spotlight as
 /// a pickable value. Backed by `SupplementDefinitionEntity`; `id` is the
 /// stable definition id so a resolved value survives renames.
-struct SupplementEntity: AppEntity {
+struct SupplementEntity: AppEntity, IndexedEntity {
   let id: String
   let title: String
   let emoji: String?
@@ -28,6 +30,16 @@ struct SupplementEntity: AppEntity {
   }
 
   static var defaultQuery = SupplementEntityQuery()
+
+  /// Spotlight index entry — the surface Apple Intelligence reads. Donated by
+  /// `SpotlightIndexer`; see docs/SPOTLIGHT_READABILITY_PLAN.md.
+  var attributeSet: CSSearchableItemAttributeSet {
+    let attrs = CSSearchableItemAttributeSet(contentType: .text)
+    attrs.title = title
+    attrs.displayName = [emoji, title].compactMap { $0 }.joined(separator: " ")
+    attrs.keywords = ["supplement", "Septena"]
+    return attrs
+  }
 }
 
 /// Resolves supplement parameters and supplies the picker list. Reads the

@@ -212,6 +212,16 @@ struct SeptenaApp: App {
             await PerfTrace.span("app.absorbRemoteChanges") {
               await services.absorbRemoteChanges()
             }
+            // Spotlight "readability" backfill — donate tasks + the catalog
+            // entities (habits, supplements, chores, exercises, session types,
+            // grocery items/categories) to the on-device index after the pull
+            // (not the pre-sync mirror) so system search and, per Apple, Apple
+            // Intelligence / personal-context Siri can find them. `start()` then
+            // keeps the index live off `.septenaTasksChanged` /
+            // `.septenaDataChanged` (incl. section enable/disable purge). See
+            // docs/SPOTLIGHT_READABILITY_PLAN.md.
+            SpotlightIndexer.shared.start()
+            await SpotlightIndexer.shared.backfill()
             await theme.refresh()
             await settingsStore.refresh()
             // Bridge the welcome name between the CloudKit-synced settings
