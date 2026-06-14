@@ -69,7 +69,7 @@ struct EditNutritionEntrySheet: View {
                             displayedComponents: [.date, .hourAndMinute])
         }
         Section("Meal") {
-          TextField("Emoji", text: $emoji)
+          LabeledContent("Emoji") { EmojiSlotPicker(emoji: $emoji) }
           // `axis: .vertical` is the documented SwiftUI affordance for a
           // growing multi-line `TextField` (iOS 16+). One food per line —
           // mirrors what the server already parses on POST/PUT.

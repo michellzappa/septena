@@ -384,7 +384,7 @@ struct SymptomDefinitionsSheet: View {
           TextField("Name", text: $title)
           TextField("Default region", text: $region)
           DisclosureGroup("Advanced", isExpanded: $showingAdvanced) {
-            TextField("Glyph", text: $emoji)
+            LabeledContent("Glyph") { EmojiSlotPicker(emoji: $emoji) }
             TextField("Body system", text: $bodySystem)
           }
           Button {
@@ -526,7 +526,7 @@ private struct SymptomDefinitionEditor: View {
       Form {
         Section("Symptom") {
           TextField("Name", text: $title)
-          TextField("Glyph", text: $emoji)
+          LabeledContent("Glyph") { EmojiSlotPicker(emoji: $emoji) }
           TextField("Body system", text: $bodySystem)
           TextField("Default region", text: $region)
         }

@@ -54,7 +54,7 @@ struct NewNutritionEntrySheet: View {
                             displayedComponents: .hourAndMinute)
         }
         Section("Meal") {
-          TextField("Emoji", text: $emoji)
+          LabeledContent("Emoji") { EmojiSlotPicker(emoji: $emoji) }
           TextField("Foods (one per line)", text: $foodsText, axis: .vertical)
             .lineLimit(2...8)
           TextField("Ingredients (one per line)",

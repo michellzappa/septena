@@ -35,7 +35,7 @@ The long tail of things users add over time and scan in a list — their specifi
 - and the user picked it themselves.
 
 Constraints on Tier 3 emoji:
-- **From a curated set**, not free-form input. Starter sets in plugin files are the current source of truth.
+- **From a curated set**, not free-form input. Every Tier-3 glyph editor uses `EmojiSlotPicker` / `EmojiPickerContent` ([EmojiPicker.swift](../Septena/Shell/UI/EmojiPicker.swift)) — a curated grid (`CuratedEmoji`, seeded from the section starter sets in the plugin files) with a free-form fallback and a clear option, rendered into the row's leading glyph slot. The plugin starter sets stay the source of truth for onboarding suggestions and seed the catalog.
 - **Optional** — rows must render correctly with no emoji. Don't fall back to a placeholder bullet `•` or a "default" emoji.
 - **Separate slot, never concatenated** into a title or label string. Use the row's leading glyph slot.
 

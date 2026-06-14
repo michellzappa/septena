@@ -126,7 +126,9 @@ struct AreaDetailView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .popover(isPresented: $showingEmojiEditor) { emojiEditor }
+            .popover(isPresented: $showingEmojiEditor) {
+              EmojiPickerContent(emoji: $draftEmoji) { commitEmoji($0) }
+            }
             ClickToEditTitle(placeholder: "Area", text: $draftName) { newName in
               commitName(newName)
             }
@@ -269,31 +271,6 @@ struct AreaDetailView: View {
         errorMessage = error.localizedDescription
       }
     }
-  }
-
-  /// Free-form single-glyph picker. Matches the bare TextField every other
-  /// emoji editor uses today; a richer curated picker is tracked separately.
-  private var emojiEditor: some View {
-    VStack(spacing: 12) {
-      TextField("Emoji", text: $draftEmoji)
-        .multilineTextAlignment(.center)
-        .font(.system(size: 34))
-        .frame(width: 84, height: 56)
-        .onChange(of: draftEmoji) { _, newValue in
-          // Hold one grapheme. Reassigning re-fires onChange, which then
-          // commits the stable value once.
-          let clamped = String(newValue.suffix(1))
-          if clamped != newValue { draftEmoji = clamped; return }
-          commitEmoji(newValue)
-        }
-      Button("Clear") {
-        draftEmoji = ""
-        showingEmojiEditor = false
-      }
-      .disabled(draftEmoji.isEmpty)
-    }
-    .padding()
-    .presentationCompactAdaptation(.popover)
   }
 
   private func commitEmoji(_ value: String) {

@@ -23,9 +23,7 @@ struct SupplementTypeSheet: View {
       List {
         Section {
           HStack {
-            TextField("Emoji", text: $newEmoji)
-              .frame(width: 44)
-              .multilineTextAlignment(.center)
+            EmojiSlotPicker(emoji: $newEmoji)
             TextField("Name", text: $newName)
               .focused($addFieldFocused)
               .submitLabel(.done)

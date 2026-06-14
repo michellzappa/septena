@@ -43,9 +43,7 @@ struct EditChoreSheet: View {
       Form {
         Section("Chore") {
           HStack(spacing: 12) {
-            TextField("Emoji", text: $emoji)
-              .frame(width: 44)
-              .multilineTextAlignment(.center)
+            EmojiSlotPicker(emoji: $emoji)
             TextField("Name", text: $name)
               .focused($nameFocused)
           }
