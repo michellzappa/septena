@@ -2696,6 +2696,9 @@
         }
       }
     },
+    "Each fires the real MilestonePresenter tiering — streaks and goal target/held get the full card, intermediate rungs and XP get the quiet burst. Under Reduce Motion the visual is suppressed by design." : {
+
+    },
     "Each row fires the same renderer and haptic a real log uses. Under Reduce Motion the visual is suppressed (by design) — you'll still feel the haptic." : {
       "localizations" : {
         "pt-BR" : {
