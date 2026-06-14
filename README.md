@@ -19,8 +19,8 @@ The product principle is simple: every life domain is a section, every section c
 ## Quick Start
 
 ```bash
-git clone <repo> septena-cloud
-cd septena-cloud
+git clone https://github.com/septena/septena.git
+cd septena
 brew install xcodegen   # if needed
 xcodegen generate
 open Septena.xcodeproj
