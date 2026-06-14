@@ -1,6 +1,6 @@
 # Septena
 
-Septena is a private life operating system for Apple platforms. It brings tasks, goals, training, nutrition, hydration, sleep, mood, symptoms, medications, supplements, habits, chores, groceries, gut, intake trackers, activity, and body metrics into one CloudKit-backed app.
+Septena is a private life operating system for Apple platforms. It brings tasks, goals, training, nutrition, hydration, sleep, mood, symptoms, medications, supplements, habits, chores, groceries, gut, intake trackers, activity, body metrics, and GitHub commit history into one CloudKit-backed app.
 
 The product principle is simple: every life domain is a section, every section can be enabled or hidden without deleting data, and every write should land in the local SwiftData mirror first, then sync through CloudKit.
 
@@ -110,7 +110,7 @@ Current sections:
 
 | Section | What it covers |
 | --- | --- |
-| **Tasks** | Inbox, Today, Upcoming, Someday, areas, projects, recurrence. |
+| **Tasks** | Inbox, Today, Upcoming, Anytime, areas, projects, recurrence. |
 | **Goals** | Intentions tagged to sections, with optional measurable metrics. |
 | **Training** | Exercise library, session types, strength/cardio entries, routines, PRs. |
 | **Nutrition** | Meals, macros, water on meals, fasting preferences, daily summaries. |
@@ -121,14 +121,13 @@ Current sections:
 | **Supplements** | Supplement definitions and daily state. |
 | **Groceries** | Shopping items and categories. |
 | **Intake** | User-defined consumable trackers with methods, catalogs, and event logs. |
-| **Caffeine** | Drink entries, beans/config, half-life style tracking. |
-| **Cannabis** | Strains, methods, dose/use entries. |
 | **Gut** | Digestive events and Bristol-style logging. |
 | **Mood** | Mood/energy check-ins and history. |
 | **Symptoms** | Symptom definitions, severity logs, duration, location, triggers, and relief notes. |
 | **Medications** | Medication definitions, daily/as-needed schedules, dose logs, skips, effects, and side effects. |
 | **Body** | Weight/body-composition rows, Withings integration. |
 | **Activity** | HealthKit movement/recovery metrics. |
+| **GitHub** | Read-only commit-activity heatmap via a per-device personal access token. |
 
 Important section rules:
 
@@ -149,7 +148,7 @@ The app is local-first:
 - `SeptenaCore/Outbox.swift` - task mutator and legacy schema compatibility surface.
 - `SeptenaCore/ChecklistMirror.swift` - local reconstruction helpers for habit/supplement/chore/next-style data.
 
-Current CloudKit record coverage includes tasks, areas, projects, settings, sections, goals, habits, supplements, chores, gut, mood, Oura, Withings, caffeine, cannabis, groceries, training, and nutrition. Hydration writes through nutrition records.
+Current CloudKit record coverage includes tasks, areas, projects, settings, sections, goals, habits, supplements, chores, gut, mood, symptoms, medications, intake, Oura, Withings, groceries, training, activity, and nutrition. Hydration writes through nutrition records. (GitHub is read-only and token-based, with no CloudKit records.)
 
 Mutators are the write boundary. Views and intents should not write SwiftData entities directly when a mutator exists, because the mutator performs the optimistic local update, queues the CloudKit change, saves context, and posts the right app notifications.
 
