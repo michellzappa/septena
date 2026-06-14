@@ -36,7 +36,7 @@ struct BackfillHabitsSheet: View {
           }
           if (resp.grouped.values.flatMap { $0 }).isEmpty {
             ContentUnavailableView(
-              "No habits defined",
+              "No habits yet",
               systemImage: theme.icon(for: "habits"),
               description: Text("Add a habit first, then come back to backfill.")
             )

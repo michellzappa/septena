@@ -62,7 +62,7 @@ struct IntakeDestinationView: View {
     ContentUnavailableView {
       Label("No trackers yet", systemImage: "cup.and.saucer")
     } description: {
-      Text("Track what you consume — and cut back on it. Each tracker keeps its own methods, doses, and a days-since-last streak.")
+      Text("Add a tracker for anything you consume — each keeps its own doses and a streak counting the days since you last logged.")
     } actions: {
       Button("Create a tracker") { creating = true }
         .buttonStyle(.borderedProminent)

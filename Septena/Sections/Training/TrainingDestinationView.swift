@@ -133,7 +133,7 @@ struct TrainingDestinationView: View {
             sessionBlockView(block)
           }
           if !loading && entries.isEmpty {
-            ContentUnavailableView("No entries yet",
+            ContentUnavailableView("No sessions yet",
                                    systemImage: theme.icon(for: "training"),
                                    description: Text("Tap + to log a session."))
           }

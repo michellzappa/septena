@@ -132,7 +132,7 @@ struct HabitsDestinationView: View {
       let allItems = resp.buckets.flatMap { resp.grouped[$0] ?? [] }
       if allItems.isEmpty {
         DrawerSection {
-          Text("No habits defined.")
+          Text("Nothing logged on this day.")
             .foregroundStyle(.secondary)
         }
       } else {

@@ -110,7 +110,7 @@ struct SupplementsDestinationView: View {
   private var todaySections: some View {
     let sections = Self.groupedSections(model.supplements)
     if model.hasLoaded && model.supplements.isEmpty {
-      ContentUnavailableView("No supplements configured",
+      ContentUnavailableView("No supplements yet",
                              systemImage: theme.icon(for: "supplements"),
                              description: Text("Tap + to add a supplement."))
     } else if Self.isFlat(sections) {
@@ -223,7 +223,7 @@ struct SupplementsDestinationView: View {
     if let resp = pastDay {
       if resp.items.isEmpty {
         DrawerSection {
-          Text("No supplements configured.")
+          Text("Nothing logged on this day.")
             .foregroundStyle(.secondary)
         }
       } else {

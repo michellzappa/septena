@@ -1077,7 +1077,7 @@ struct HomeSettingsPane: View {
       } header: {
         Text("Day view")
       } footer: {
-        Text("Today at a glance, between the greeting and the layout. Dial is the 24-hour clock face — every section's logs as dots, sleep as an arc, under the sky's light, with dawn and dusk placed at your region's real sunrise and sunset (from your time zone — no location access). Timeline is the same day as a horizontal strip.")
+        Text("Shows today at a glance, above the layout. Dial is a 24-hour clock with your logs as dots and sleep as an arc, lit by the real sunrise and sunset for your time zone — no location needed. Timeline shows the same day as a horizontal strip.")
       }
 
       Section {
@@ -1091,7 +1091,7 @@ struct HomeSettingsPane: View {
       } header: {
         Text("Day dial")
       } footer: {
-        Text("Start day at wake rolls the dial over when you wake — from your sleep, or 4 AM if it hasn't synced yet — instead of at midnight, so a late night stays on the same day. Open on the full week starts the wheels on the trailing 7 days rather than today; you can also tap any wheel to switch.")
+        Text("Start day at wake rolls the dial over when you wake rather than at midnight, so a late night stays on the same day. Open on the full week starts on the last 7 days instead of today — tap any wheel to switch.")
       }
     }
     .formStyle(.grouped)
@@ -1407,14 +1407,14 @@ struct CorrelationsSettingsPane: View {
           ForEach(sectionOptions, id: \.key) { Text($0.label).tag($0.key) }
         }
       } footer: {
-        Text("Window controls how far back CorrelationEngine pulls data. Section filter limits which predictor → target pairs render — pairs are kept if either side matches.")
+        Text("Window sets how far back to look for patterns. Section filter narrows which relationships appear — a pairing shows if either section matches.")
       }
 
       Section {
         Toggle("Show Supplements → Sleep table", isOn: $showSupplements)
         Toggle("Show insufficient-data section", isOn: $showInsufficient)
       } footer: {
-        Text("Insufficient pairs (1 ≤ n < \(CorrelationEngine.minN) overlapping days) are too noisy to chart but listed here so you can see what's almost ready.")
+        Text("Relationships with fewer than \(CorrelationEngine.minN) overlapping days are too sparse to chart, but listed here so you can see what's almost ready.")
       }
     }
     .formStyle(.grouped)
@@ -2813,7 +2813,7 @@ struct SectionDetailPane: View {
     } header: {
       Text("Skill & Data")
     } footer: {
-      Text("Section Skill briefs an AI assistant on how to use this section via the Septena MCP. Export downloads every record in this section as JSON.")
+      Text("Section Skill tells Claude how to use this section when you connect it. Export downloads every record in this section as JSON.")
     }
   }
 
@@ -3212,7 +3212,7 @@ struct NotificationsOverviewPane: View {
           } header: {
             Label("Quiet Right Now", systemImage: "moon.zzz")
           } footer: {
-            Text("On, but nothing to nudge yet — already done today, nothing pending, or waiting out quiet hours.")
+            Text("On, but nothing to nudge about right now — today's done, nothing's pending, or it's quiet hours.")
           }
         }
 
@@ -3226,7 +3226,7 @@ struct NotificationsOverviewPane: View {
 
         if items.isEmpty {
           Section {
-            Text("No sections declare notifications yet.")
+            Text("No sections offer reminders yet.")
               .foregroundStyle(.secondary)
           }
         }

@@ -675,7 +675,7 @@ struct NutritionDestinationView: View {
     } else if entries.isEmpty {
       VStack(spacing: 8) {
         Image(systemName: "fork.knife").font(.title2).foregroundStyle(.secondary)
-        Text("No entries yet").foregroundStyle(.secondary)
+        Text("No meals logged yet").foregroundStyle(.secondary)
       }
       .frame(maxWidth: .infinity).padding(.vertical, 24)
     } else if isViewingToday {

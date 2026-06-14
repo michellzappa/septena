@@ -24,7 +24,7 @@ struct BackfillSupplementsSheet: View {
         if let resp = response {
           if resp.items.isEmpty {
             ContentUnavailableView(
-              "No supplements defined",
+              "No supplements yet",
               systemImage: theme.icon(for: "supplements"),
               description: Text("Add a supplement first, then come back to backfill.")
             )

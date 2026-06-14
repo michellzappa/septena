@@ -1148,6 +1148,9 @@
         }
       }
     },
+    "Add a tracker for anything you consume — each keeps its own doses and a streak counting the days since you last logged." : {
+
+    },
     "Add Chore" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1799,6 +1802,17 @@
         }
       }
     },
+    "Bring your steps and movement in from Apple Health" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traga seus passos e movimento do Apple Saúde"
+          }
+        }
+      }
+    },
     "Bristol Type" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1826,6 +1840,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "As faixas não são monotônicas — a relação pode ter formato de limiar ou de U."
+          }
+        }
+      }
+    },
+    "Build routines and keep your streaks alive" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crie rotinas e mantenha suas sequências vivas"
           }
         }
       }
@@ -2033,6 +2058,7 @@
 
     },
     "Claude session expired" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -3483,6 +3509,28 @@
         }
       }
     },
+    "Hit your daily water goal" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atinja sua meta diária de água"
+          }
+        }
+      }
+    },
+    "Hit your macro and calorie targets" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atinja suas metas de macros e calorias"
+          }
+        }
+      }
+    },
     "Hold the week up to the light" : {
       "localizations" : {
         "pt-BR" : {
@@ -3705,6 +3753,7 @@
       }
     },
     "Insufficient pairs (1 ≤ n < %@ overlapping days) are too noisy to chart but listed here so you can see what's almost ready." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -3832,6 +3881,17 @@
         }
       }
     },
+    "Keep a running list and a stocked pantry" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantenha uma lista sempre à mão e a despensa abastecida"
+          }
+        }
+      }
+    },
     "Keep a supplement on the Next list after its time of day, until you take it. Off shows it only during its slot." : {
       "localizations" : {
         "pt-BR" : {
@@ -3861,6 +3921,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Continue registrando — os pares precisam de n ≥ %@ dias sobrepostos."
+          }
+        }
+      }
+    },
+    "Keep recurring household tasks from slipping" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não deixe as tarefas domésticas recorrentes escaparem"
           }
         }
       }
@@ -3941,6 +4012,9 @@
           }
         }
       }
+    },
+    "Let Siri and Apple Intelligence find this section's entries in search." : {
+
     },
     "Light mode uses a %@ background with white discs. Dark mode uses transparent artwork so the system background shows through behind %@ discs." : {
       "localizations" : {
@@ -4053,6 +4127,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Registrar treino"
+          }
+        }
+      }
+    },
+    "Log workouts and keep your week on track" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registre treinos e mantenha sua semana em dia"
           }
         }
       }
@@ -4582,6 +4667,7 @@
       }
     },
     "No entries yet" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -4592,11 +4678,34 @@
       }
     },
     "No habits defined." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nenhum hábito definido."
+          }
+        }
+      }
+    },
+    "No habits yet" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum hábito ainda"
+          }
+        }
+      }
+    },
+    "No meals logged yet" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma refeição registrada ainda"
           }
         }
       }
@@ -4643,11 +4752,23 @@
       }
     },
     "No sections declare notifications yet." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nenhuma seção declara notificações ainda."
+          }
+        }
+      }
+    },
+    "No sections offer reminders yet." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma seção oferece lembretes ainda."
           }
         }
       }
@@ -4672,12 +4793,35 @@
         }
       }
     },
+    "No sessions yet" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhuma sessão ainda"
+          }
+        }
+      }
+    },
     "No supplements configured." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nenhum suplemento configurado."
+          }
+        }
+      }
+    },
+    "No supplements yet" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum suplemento ainda"
           }
         }
       }
@@ -4754,6 +4898,17 @@
         }
       }
     },
+    "Nothing logged on this day." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada registrado neste dia."
+          }
+        }
+      }
+    },
     "Nothing logged yet." : {
       "localizations" : {
         "pt-BR" : {
@@ -4770,6 +4925,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nada em Hoje"
+          }
+        }
+      }
+    },
+    "Notice how your mood shifts through the day" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perceba como o seu humor muda ao longo do dia"
           }
         }
       }
@@ -4839,7 +5005,19 @@
     "On-device intelligence" : {
 
     },
+    "On, but nothing to nudge about right now — today's done, nothing's pending, or it's quiet hours." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ativo, mas nada para avisar agora — já concluído hoje, nada pendente, ou em horas de silêncio."
+          }
+        }
+      }
+    },
     "On, but nothing to nudge yet — already done today, nothing pending, or waiting out quiet hours." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -5345,12 +5523,34 @@
         }
       }
     },
+    "Relationships with fewer than %@ overlapping days are too sparse to chart, but listed here so you can see what's almost ready." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relações com menos de %@ dias sobrepostos são esparsas demais para gerar um gráfico, mas ficam listadas aqui para você ver o que está quase pronto."
+          }
+        }
+      }
+    },
     "Relaxed" : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Relaxado"
+          }
+        }
+      }
+    },
+    "Remember what you've taken each day" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lembre-se do que tomou a cada dia"
           }
         }
       }
@@ -5510,11 +5710,23 @@
       }
     },
     "Section Skill briefs an AI assistant on how to use this section via the Septena MCP. Export downloads every record in this section as JSON." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "O Skill da seção orienta um assistente de IA sobre como usar esta seção pelo MCP do Septena. Exportar baixa cada registro desta seção em JSON."
+          }
+        }
+      }
+    },
+    "Section Skill tells Claude how to use this section when you connect it. Export downloads every record in this section as JSON." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Skill da seção ensina o Claude a usar esta seção quando você a conecta. Exportar baixa cada registro desta seção em JSON."
           }
         }
       }
@@ -5545,6 +5757,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Seções"
+          }
+        }
+      }
+    },
+    "See how well you slept each night" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Veja como você dormiu a cada noite"
+          }
+        }
+      }
+    },
+    "See what's due today and capture the rest" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Veja o que vence hoje e registre o resto"
+          }
+        }
+      }
+    },
+    "See your coding streak as a commit heatmap" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Veja sua sequência de código como um mapa de commits"
           }
         }
       }
@@ -5830,6 +6075,20 @@
         }
       }
     },
+    "Show in Spotlight & Siri" : {
+
+    },
+    "Shows today at a glance, above the layout. Dial is a 24-hour clock with your logs as dots and sleep as an arc, lit by the real sunrise and sunset for your time zone — no location needed. Timeline shows the same day as a horizontal strip." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra o dia de hoje num relance, acima do layout. O Mostrador é um relógio de 24 horas com seus registros como pontos e o sono como um arco, iluminado pelo nascer e pôr do sol reais do seu fuso horário — sem precisar de localização. A Linha do tempo mostra o mesmo dia como uma faixa horizontal."
+          }
+        }
+      }
+    },
     "Since %@ · target %@–%@h" : {
       "localizations" : {
         "en" : {
@@ -5961,6 +6220,7 @@
 
     },
     "Someday" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -5980,8 +6240,27 @@
         }
       }
     },
-    "Start day at wake rolls the dial over when you wake — from your sleep, or 4 AM if it hasn't synced yet — instead of at midnight, so a late night stays on the same day. Open on the full week starts the wheels on the trailing 7 days rather than today; you can also tap any wheel to switch." : {
-
+    "Spot what upsets your digestion" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descubra o que afeta a sua digestão"
+          }
+        }
+      }
+    },
+    "Start day at wake rolls the dial over when you wake rather than at midnight, so a late night stays on the same day. Open on the full week starts on the last 7 days instead of today — tap any wheel to switch." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Iniciar o dia ao acordar gira o mostrador quando você acorda, em vez de à meia-noite, para que uma noite longa permaneça no mesmo dia. Abrir na semana completa começa nos últimos 7 dias em vez de hoje — toque em qualquer roda para alternar."
+          }
+        }
+      }
     },
     "Start training" : {
       "localizations" : {
@@ -6604,9 +6883,6 @@
         }
       }
     },
-    "Today at a glance, between the greeting and the layout. Dial is the 24-hour clock face — every section's logs as dots, sleep as an arc, under the sky's light, with dawn and dusk placed at your region's real sunrise and sunset (from your time zone — no location access). Timeline is the same day as a horizontal strip." : {
-
-    },
     "Token" : {
       "localizations" : {
         "pt-BR" : {
@@ -6636,9 +6912,6 @@
           }
         }
       }
-    },
-    "Track what you consume — and cut back on it. Each tracker keeps its own methods, doses, and a days-since-last streak." : {
-
     },
     "Training" : {
       "localizations" : {
@@ -6960,6 +7233,17 @@
         }
       }
     },
+    "Watch your weight and measurements trend" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acompanhe a tendência do seu peso e das suas medidas"
+          }
+        }
+      }
+    },
     "Water" : {
       "localizations" : {
         "pt-BR" : {
@@ -7113,11 +7397,23 @@
       }
     },
     "Window controls how far back CorrelationEngine pulls data. Section filter limits which predictor → target pairs render — pairs are kept if either side matches." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "A janela controla até quando o CorrelationEngine puxa dados. O filtro de seção limita quais pares preditor → alvo são exibidos — os pares são mantidos se qualquer um dos lados corresponder."
+          }
+        }
+      }
+    },
+    "Window sets how far back to look for patterns. Section filter narrows which relationships appear — a pairing shows if either section matches." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A janela define até quando buscar padrões. O filtro de seção restringe quais relações aparecem — um par é mostrado se qualquer um dos lados corresponder."
           }
         }
       }
