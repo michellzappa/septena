@@ -140,6 +140,56 @@ private struct ResolveAdaptiveNavigation: ViewModifier {
   }
 }
 
+// MARK: - Drawer mode (Log / Patterns)
+//
+// A section drawer presents one of two modes, switched by the top-left glass
+// toggle the scaffold renders when a `mode` binding is supplied:
+//   • .log      — the records list + point-in-time readouts (a single day;
+//                 editable + time-travel for user-authored sections).
+//   • .patterns — charts / heatmaps / rhythm wheels / trends (range-windowed,
+//                 read-only).
+// Only sections that have BOTH modes pass a binding; single-mode drawers leave
+// it nil and no toggle appears. The destination owns the `@State` and switches
+// its own `content`; the choice is remembered per section. See
+// docs/DRAWER_MODES_SPEC.md.
+enum DrawerMode: String, Hashable {
+  case log, patterns
+
+  /// The per-section remembered mode, or `fallback` if the user never toggled.
+  static func remembered(for sectionKey: String, default fallback: DrawerMode) -> DrawerMode {
+    guard let raw = UserDefaults.standard.string(forKey: storageKey(sectionKey)),
+          let mode = DrawerMode(rawValue: raw) else { return fallback }
+    return mode
+  }
+
+  /// Persist this mode as the section's remembered choice.
+  func remember(for sectionKey: String) {
+    UserDefaults.standard.set(rawValue, forKey: Self.storageKey(sectionKey))
+  }
+
+  private static func storageKey(_ sectionKey: String) -> String { "drawerMode.\(sectionKey)" }
+}
+
+/// The top-left glass control that flips a drawer between Log and Patterns.
+/// One button switching to the *other* mode on tap — rendered by `SectionDrawer`
+/// only when a `mode` binding is present. Neutral glass at rest (accent stays on
+/// the trailing "+"), matching the calendar button's resting look.
+struct DrawerModeToggle: View {
+  @Binding var mode: DrawerMode
+
+  var body: some View {
+    Button {
+      withAnimation(.snappy) {
+        mode = (mode == .log) ? .patterns : .log
+      }
+    } label: {
+      Label(mode == .log ? "Show patterns" : "Show log",
+            systemImage: mode == .log ? "chart.xyaxis.line" : "list.bullet")
+    }
+    .buttonStyle(.glass)
+  }
+}
+
 struct SectionDrawer<Content: View>: View {
   let sectionKey: String
   /// Section name shown as the inline nav-bar title. Optional — when omitted,
@@ -182,6 +232,13 @@ struct SectionDrawer<Content: View>: View {
   /// destination reads the same binding to fetch its day-scoped data,
   /// replacing per-section `BrowseXDaySheet` detours.
   var currentDate: Binding<String>? = nil
+  /// Binding to the section's current Log/Patterns mode. Non-nil renders the
+  /// top-left glass mode toggle and hides the calendar/time-travel control while
+  /// viewing Patterns (Patterns is range-windowed, never date-stepped). The
+  /// destination owns the mode `@State` + persistence and switches its own
+  /// `content` on the value; the drawer just hosts the toggle. nil for
+  /// single-mode sections.
+  var mode: Binding<DrawerMode>? = nil
   /// Whether to render the subtle "Customize <Section>" footer that
   /// deep-links into this section's Settings pane. Default on; the footer
   /// also self-hides for utility drawers (empty `title` or a `sectionKey`
@@ -240,6 +297,12 @@ struct SectionDrawer<Content: View>: View {
     guard let currentDate else { return false }
     return currentDate.wrappedValue != SeptenaDate.today
   }
+
+  /// True while the drawer is showing its Patterns (visualization) mode, when a
+  /// mode binding is present. Single-mode drawers are never in Patterns. The
+  /// calendar/time-travel control hides here — Patterns is range-windowed, never
+  /// stepped to a single past day.
+  private var inPatterns: Bool { mode?.wrappedValue == .patterns }
 
   /// Whether ←/→ day-stepping is live: a day-scoped drawer on a pushed pane
   /// (Mac / iPad regular width). Compact iPhone sheets keep the tap-only
@@ -388,11 +451,22 @@ struct SectionDrawer<Content: View>: View {
             .controlSize(.small)
         }
       }
+      // Mode toggle — leading edge, leftmost, present only for dual-mode
+      // (Log + Patterns) sections. Sits before the calendar so the two read
+      // left-to-right as "which view · which day".
+      if let mode {
+        ToolbarItem(placement: leadingPlacement) {
+          DrawerModeToggle(mode: mode)
+        }
+      }
       // Calendar / time-travel button — leading edge, present only when the
-      // destination is day-scoped. Tints accent and gains a clock badge while
-      // viewing a past day. The system supplies the glass background for
-      // standard toolbar buttons.
-      if currentDate != nil {
+      // destination is day-scoped AND not viewing Patterns (Patterns is
+      // cross-day, so a day picker is meaningless there). Tints accent and gains
+      // a clock badge while viewing a past day. `.glass` (the non-prominent
+      // GlassButtonStyle) pins it to a clear Liquid Glass capsule at all times
+      // instead of relying on the system's automatic toolbar-glass, which it can
+      // drop at rest; prominent stays reserved for the trailing "+".
+      if currentDate != nil, !inPatterns {
         ToolbarItem(placement: leadingPlacement) {
           Button {
             showingTimeTravel = true
@@ -401,6 +475,7 @@ struct SectionDrawer<Content: View>: View {
                   systemImage: isTimeTraveling ? "calendar.badge.clock" : "calendar")
           }
           .tint(isTimeTraveling ? resolvedAccent : nil)
+          .buttonStyle(.glass)
         }
       }
       // Log/action button — ONE component (`DrawerActionButton`) so its

@@ -29,6 +29,10 @@ struct SleepDestinationView: View {
 
   @State private var nights: [OuraNight] = []
   @State private var loading = true
+  // Sleep is a read-only dual section: Log = score/duration readouts + the
+  // nights list; Patterns = the four trend charts. Default Log (the "standard"
+  // glanceable readout); no empty-state nudge since Sleep isn't user-authored.
+  @State private var mode: DrawerMode = .remembered(for: "sleep", default: .log)
 
   private var accent: Color { theme.color(for: "sleep") }
 
@@ -46,18 +50,22 @@ struct SleepDestinationView: View {
   }
 
   var body: some View {
-    SectionDrawer(sectionKey: "sleep") {
-      scoresSection
-      durationSection
-      chartsSection
-      DrawerSection("Recent nights", padding: .none) {
-        ForEach(nights.prefix(14)) { night in
-          LogRow(
-            title: friendlyDate(night.date),
-            detail: detailLine(night),
-            trailing: night.totalH.map(formatHours)
-          )
+    SectionDrawer(sectionKey: "sleep", mode: $mode) {
+      switch mode {
+      case .log:
+        scoresSection
+        durationSection
+        DrawerSection("Recent nights", padding: .none) {
+          ForEach(nights.prefix(14)) { night in
+            LogRow(
+              title: friendlyDate(night.date),
+              detail: detailLine(night),
+              trailing: night.totalH.map(formatHours)
+            )
+          }
         }
+      case .patterns:
+        chartsSection
       }
       if !loading && nights.isEmpty {
         ContentUnavailableView("No Oura data",
@@ -66,6 +74,7 @@ struct SleepDestinationView: View {
       }
     }
     .tint(accent)
+    .onChange(of: mode) { _, newMode in newMode.remember(for: "sleep") }
     .task {
       paintFromCache()
       await load()
