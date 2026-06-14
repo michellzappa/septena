@@ -251,8 +251,11 @@ struct SidebarRootView: View {
     ToolbarItem(placement: .primaryAction) { searchButton(help: "Quick Find (⌘K)") }
   }
 
+  // Tasks keeps its sidebar, so it doesn't adopt the full `homeChrome`, but it
+  // reuses `HomeMenu` for the phone "…" menu so the glyph, Settings row, and
+  // accessibility label can't drift from the Week / Next / Coach peers.
   private var phoneMoreMenu: some View {
-    Menu {
+    HomeMenu {
       Button {
         showingNewArea = true
         newAreaName = ""
@@ -265,15 +268,7 @@ struct SidebarRootView: View {
         Label("New Project", systemImage: "number")
       }
       Divider()
-      Button {
-        nav.showSettings = true
-      } label: {
-        Label("Settings", systemImage: "gearshape")
-      }
-    } label: {
-      Image(systemName: "ellipsis.circle")
     }
-    .accessibilityLabel("More")
   }
 
   private var macCreateMenu: some View {
@@ -314,7 +309,9 @@ struct SidebarRootView: View {
       newProjectInArea: $newProjectInArea,
       areas: areas,
       onNewTodo: {
-        nav.path = [.filter(.inbox)]
+        // Land on Today (where the triage band lives) instead of a separate
+        // Inbox page (retired). The composer seeds from the Today filter.
+        nav.path = [.filter(.today)]
         nav.shouldStartCreating = true
       },
       onCreateProject: { title, areaId in createProject(title: title, areaId: areaId) },
@@ -369,10 +366,9 @@ struct SidebarRootView: View {
 
   private var smartListSpecs: [SmartListSpec] {
     [
-      SmartListSpec(route: .filter(.inbox),
-                    icon: "tray.fill", color: .gray,
-                    title: "Inbox",
-                    count: counts?.inboxCount),
+      // No separate Inbox row — loose captures now live in the triage band on
+      // top of Today (docs/TRIAGE_BAND_SPEC.md). The Today row's badge counts
+      // committed-today; the "to sort" pile shows on the Today screen itself.
       SmartListSpec(route: .filter(.today),
                     icon: "sun.max.fill", color: Theme.todayAccent,
                     title: "Today",
@@ -826,7 +822,7 @@ struct SidebarRootView: View {
     // Area count = direct-in-area tasks ONLY. Nested projects render as
     // their own rows, so rolling them up would double-count.
     var areaDirectOpen: [String: Int] = [:]
-    var inbox = 0, todayN = 0, upcoming = 0, unscheduled = 0, open = 0, someday = 0
+    var inbox = 0, triage = 0, todayN = 0, upcoming = 0, unscheduled = 0, open = 0, someday = 0
     let today = SeptenaDate.today
     for t in tasks {
       if t.status == .open { open += 1 }
@@ -846,9 +842,13 @@ struct SidebarRootView: View {
          t.scheduled == nil, t.due == nil, !t.today {
         inbox += 1
       }
-      if t.today { todayN += 1 }
-      else if let s = t.scheduled, s <= today { todayN += 1 }
-      else if let d = t.due, d <= today { todayN += 1 }
+      // The triage band (unratified) sits above Today and is excluded from it.
+      if t.isInTriageBand { triage += 1 }
+      if !t.isInTriageBand {
+        if t.today { todayN += 1 }
+        else if let s = t.scheduled, s <= today { todayN += 1 }
+        else if let d = t.due, d <= today { todayN += 1 }
+      }
       if !t.today {
         if let s = t.scheduled, s > today { upcoming += 1 }
         else if let d = t.due, d > today { upcoming += 1 }
@@ -864,7 +864,8 @@ struct SidebarRootView: View {
     return Aggregate(
       counts: TasksCounts(today: today,
                           todayCount: todayN, reviewCount: 0,
-                          inboxCount: inbox, upcomingCount: upcoming,
+                          inboxCount: inbox, triageCount: triage,
+                          upcomingCount: upcoming,
                           unscheduledCount: unscheduled,
                           somedayCount: someday, openCount: open),
       projectProgress: progress,

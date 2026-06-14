@@ -5,12 +5,12 @@ import SwiftUI
 //
 // Spec'd as:
 //
-//   • Create in Inbox…   → switches to Tasks tab, routes to Inbox filter,
-//                           and trips `nav.shouldStartCreating` so the
-//                           list opens its inline create row (Things-style
-//                           — same flow as the sidebar's New To-Do button).
-//   • Go to Inbox         → switches to Tasks tab + .filter(.inbox).
-//   • Go to Today         → switches to Tasks tab + .filter(.today).
+//   • Quick capture…     → pops the composer in place to capture a loose task;
+//                           it lands in the triage band on Today
+//                           (docs/TRIAGE_BAND_SPEC.md).
+//   • Go to Today         → switches to Tasks tab + .filter(.today), where the
+//                           triage band (the retired Inbox page's contents) now
+//                           sits on top of the day.
 //   • Section "Today"     → up to 3 open today's tasks, tap to mark done.
 //   • Tasks…              → opens the AddInfo sheet (existing palette).
 //
@@ -20,7 +20,6 @@ import SwiftUI
 struct TasksQuickAddMenu: View {
   let todayTasks: [SeptenaTask]
   let onCreateInInbox: () -> Void
-  let onGoToInbox: () -> Void
   let onGoToToday: () -> Void
   let onCheckOff: (SeptenaTask) -> Void
 
@@ -32,10 +31,7 @@ struct TasksQuickAddMenu: View {
 
   var body: some View {
     Button { onCreateInInbox() } label: {
-      Label("Create in Inbox…", systemImage: "plus.circle")
-    }
-    Button { onGoToInbox() } label: {
-      Label("Go to Inbox", systemImage: "tray")
+      Label("Quick capture…", systemImage: "plus.circle")
     }
     Button { onGoToToday() } label: {
       Label("Go to Today", systemImage: "star")

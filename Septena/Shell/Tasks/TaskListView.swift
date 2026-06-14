@@ -113,6 +113,42 @@ struct TaskListView: View {
     nonmutating set { reviewStorage = newValue; storageFilter = filter }
   }
 
+  /// The triage band — the unratified layer rendered above the Today list (only
+  /// on the Today view). Read straight from the mirror; the table is
+  /// personal-scale and the band only renders on `.today`. See `TriageBandView`,
+  /// docs/TRIAGE_BAND_SPEC.md.
+  private var triageItems: [SeptenaTask] {
+    filter == .today ? LocalCache.tasks(in: modelContext, filter: .triage) : []
+  }
+
+  /// Apply a disposition to a band row, then reload so it moves into Today (or
+  /// off the surface). Any disposition but Drop also acknowledges an agent row,
+  /// so the cue clears in the same gesture. See docs/TRIAGE_BAND_SPEC.md §4.
+  private func disposeTriage(_ task: SeptenaTask, _ d: TriageDisposition) {
+    Haptics.tap()
+    let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date())
+    switch d {
+    case .today:            mutator.moveToToday(id: task.id)
+    case .tomorrow:         mutator.schedule(id: task.id, date: tomorrow)
+    case .someday:          mutator.moveToSomeday(id: task.id)
+    case .drop:             mutator.cancel(id: task.id)
+    case .acceptAgent:      break  // acknowledge below is the whole action
+    case .project(let pid): mutator.moveToProject(id: task.id, project: pid)
+    }
+    if task.source == TaskSource.mcp, d != .drop { mutator.acknowledge(id: task.id) }
+    Task { await load() }
+  }
+
+  /// Accept every agent proposal in the band in one gesture (keeping each one's
+  /// placement); the ones placed today flow into the list below on reload.
+  private func acceptAllTriage() {
+    let proposals = triageItems.filter { $0.source == TaskSource.mcp }
+    guard !proposals.isEmpty else { return }
+    Haptics.success()
+    for p in proposals { mutator.acknowledge(id: p.id) }
+    Task { await load() }
+  }
+
   /// Review tasks that genuinely rolled in overnight — i.e. were scheduled
   /// for a date strictly before today. Items the user scheduled *for* today
   /// (scheduled == today) or that are merely due today don't count as "new"
@@ -173,6 +209,10 @@ struct TaskListView: View {
   // the app-wide capture / quick-find sheet — so creating from a list lands
   // the task in that list's context with no search surface in the way.
   @State private var creating = false
+
+  /// Triage band collapse state (Today only). Expanded by default so proposals
+  /// are one tap from accepted; the user can fold it without emptying it.
+  @State private var triageCollapsed = false
 
   // When picker. Use a single Identifiable item so the sheet's kind
   // is intrinsic to the presentation — avoids stale-state races where
@@ -410,7 +450,25 @@ struct TaskListView: View {
     titleRow
     newTodosBannerRow
     remindersRow
+    triageBandRow
     emptyStateRow
+  }
+
+  /// The triage band sits directly above the Today rows (and just below any
+  /// pending Reminders import, which is itself an unratified-capture source).
+  @ViewBuilder
+  private var triageBandRow: some View {
+    if filter == .today && !triageItems.isEmpty {
+      TriageBandView(tasks: triageItems,
+                     accent: theme.color(for: "tasks"),
+                     projects: projects,
+                     areas: areas,
+                     collapsed: $triageCollapsed,
+                     onOpen: { editingDetail = $0 },
+                     onDispose: { disposeTriage($0, $1) },
+                     onAcceptAll: { acceptAllTriage() })
+        .plainListChrome()
+    }
   }
 
   @ViewBuilder
@@ -466,12 +524,18 @@ struct TaskListView: View {
     if filter == .inbox {
       RemindersInboxSection(onImported: { Task { await load() } })
         .plainListChrome()
+    } else if filter == .today {
+      // Pending Apple Reminders are unratified captures too — surface them in
+      // the triage zone on Today, but only when something's actually pending
+      // (no setup CTAs here, so an unconfigured user sees nothing).
+      RemindersInboxSection(onImported: { Task { await load() } }, showsSetupCTAs: false)
+        .plainListChrome()
     }
   }
 
   @ViewBuilder
   private var emptyStateRow: some View {
-    if loadedFilters.contains(filter) && visibleItems.isEmpty && review.isEmpty && doneToday.isEmpty && !isLoading {
+    if loadedFilters.contains(filter) && visibleItems.isEmpty && review.isEmpty && doneToday.isEmpty && triageItems.isEmpty && !isLoading {
       ContentUnavailableView(
         "Nothing here yet",
         systemImage: titleIcon,
@@ -1059,7 +1123,7 @@ struct TaskListView: View {
     // Every open-work list hides done tasks (a just-completed one lingers via
     // the settle exception in `visibleItems`, then fades). Only the Logbook —
     // whose whole job is showing completed tasks — keeps them.
-    case .project, .area, .unscheduled, .upcoming, .inbox, .someday: return true
+    case .project, .area, .unscheduled, .upcoming, .inbox, .triage, .someday: return true
     case .today:
       return !todayShowCompleted
     case .logbook: return false
@@ -1441,6 +1505,7 @@ struct TaskListView: View {
     switch filter {
     case .today: return "sun.max.fill"
     case .inbox: return "tray"
+    case .triage: return "tray.full"
     case .upcoming: return "calendar"
     case .unscheduled: return "rectangle.stack"
     case .someday: return "moon.stars.fill"

@@ -1289,7 +1289,7 @@ struct WeekDashboardView: View {
 
   private func tasksDomainData() -> HomepageDomainData {
     let openToday = taskCounts.map { $0.todayCount + $0.reviewCount } ?? 0
-    let inbox = taskCounts?.inboxCount ?? 0
+    let toSort = taskCounts?.triageCount ?? 0
     let upcoming = taskCounts?.upcomingCount ?? 0
     let doneToday = tasksHistory?.daily.last?.done ?? 0
     let totalToday = doneToday + openToday
@@ -1301,7 +1301,7 @@ struct WeekDashboardView: View {
       headline: "\(openToday) open · \(doneToday)/\(totalToday) done",
       headlineStats: [
         .init(label: "Today", value: "\(openToday)"),
-        .init(label: "Inbox", value: "\(inbox)"),
+        .init(label: "To sort", value: "\(toSort)"),
         .init(label: "Upcoming", value: "\(upcoming)"),
       ],
       progress: .init(label: "Done today",
@@ -2034,7 +2034,7 @@ struct WeekDashboardView: View {
   // or the Tasks tab.
   private var tasksTile: some View {
     let openToday = taskCounts.map { $0.todayCount + $0.reviewCount } ?? 0
-    let inbox = taskCounts?.inboxCount ?? 0
+    let toSort = taskCounts?.triageCount ?? 0
     let upcoming = taskCounts?.upcomingCount ?? 0
     let doneToday = tasksHistory?.daily.last?.done ?? 0
     let totalToday = doneToday + openToday
@@ -2047,7 +2047,7 @@ struct WeekDashboardView: View {
     return WeekTasksTile(
       accent: theme.color(for: "tasks"),
       openToday: openToday,
-      inbox: inbox,
+      toSort: toSort,
       upcoming: upcoming,
       doneToday: doneToday,
       totalToday: totalToday,
@@ -2076,10 +2076,6 @@ struct WeekDashboardView: View {
         // Pop the composer right here over the homepage — no tab switch /
         // navigation into the Tasks list first.
         creatingTask = true
-      },
-      onGoToInbox: {
-        tabSelection.current = .tasks
-        nav.path = [.filter(.inbox)]
       },
       onGoToToday: {
         tabSelection.current = .tasks
@@ -3078,7 +3074,7 @@ private struct WeekDashboardTimelineCard: View {
 private struct WeekTasksTile: View {
   let accent: Color
   let openToday: Int
-  let inbox: Int
+  let toSort: Int
   let upcoming: Int
   let doneToday: Int
   let totalToday: Int
@@ -3090,7 +3086,7 @@ private struct WeekTasksTile: View {
       accent: accent,
       stats: [
         .init(label: "Today", value: "\(openToday)"),
-        .init(label: "Inbox", value: "\(inbox)"),
+        .init(label: "To sort", value: "\(toSort)"),
         .init(label: "Upcoming", value: "\(upcoming)")
       ],
       progress: .init(

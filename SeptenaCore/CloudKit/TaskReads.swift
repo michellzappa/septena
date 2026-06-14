@@ -17,6 +17,7 @@ enum TaskReads {
   /// CloudKit-mode return values for `client.list(...)`. View-string
   /// semantics:
   ///   "today"      — open + (today flag or scheduled≤today or due≤today)
+  ///   "triage"     — unratified: agent proposals + loose captures (⊇ inbox)
   ///   "inbox"      — open, no area/project/scheduled/due/today
   ///   "upcoming"   — open, !today, scheduled>today or due>today
   ///   "unscheduled"— open, !today, no scheduled, no due
@@ -70,6 +71,13 @@ enum TaskReads {
       // the data is computable later if we need it.
       return TasksListResponse(view: view, today: todayIso, items: items,
                                review: [], done: [])
+
+    case "triage":
+      // Unratified layer above Today (agent proposals + loose human captures).
+      // Superset of "inbox"; see `docs/TRIAGE_BAND_SPEC.md`.
+      let items = LocalCache.tasks(in: context, filter: .triage)
+      return TasksListResponse(view: view, today: todayIso, items: items,
+                               review: nil, done: nil)
 
     case "inbox":
       let items = LocalCache.tasks(in: context, filter: .inbox)
@@ -138,14 +146,17 @@ enum TaskReads {
     // rules mirror `LocalCache.convert`'s filter semantics — keep in sync.
     let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
     let today = SeptenaDate.today
-    var todayN = 0, inbox = 0, upcoming = 0, unscheduled = 0, someday = 0
+    var todayN = 0, inbox = 0, triage = 0, upcoming = 0, unscheduled = 0, someday = 0
     var allOpen = 0
     for e in rows {
       // Matches the historical openCount (an `allTasks` reduce), which
       // did not exclude pendingDeletion rows.
       if e.status == .open { allOpen += 1 }
       guard !e.pendingDeletion else { continue }
-      if e.isOnToday { todayN += 1 }
+      // Today excludes the triage band — unratified rows live above Today,
+      // not in it (docs/TRIAGE_BAND_SPEC.md). `triage` counts the band.
+      if e.isInTriageBand { triage += 1 }
+      if e.isOnToday && !e.isInTriageBand { todayN += 1 }
       switch e.status {
       case .someday:
         someday += 1
@@ -165,6 +176,7 @@ enum TaskReads {
                        todayCount: todayN,
                        reviewCount: 0,
                        inboxCount: inbox,
+                       triageCount: triage,
                        upcomingCount: upcoming,
                        unscheduledCount: unscheduled,
                        somedayCount: someday,

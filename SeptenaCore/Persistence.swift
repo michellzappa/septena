@@ -170,6 +170,25 @@ final class TaskEntity {
     return false
   }
 
+  /// Single definition of "is this open task in the triage band" — the
+  /// *unratified* layer rendered above Today (see `docs/TRIAGE_BAND_SPEC.md`).
+  /// The divider is ratification, not date: an unacknowledged agent proposal
+  /// still inside its freshness window (regardless of any date/project it
+  /// carries), or a loose human capture with no disposition at all (the
+  /// classic Inbox). A row leaves the band on any ratification — a disposition,
+  /// an `acknowledge`, or (agent rows only) cue decay. Mirror of
+  /// `SeptenaTask.isInTriageBand`; keep the two in lockstep. The agent arm
+  /// reuses the same predicate as `showsAgentCue` so band == cue for agent rows.
+  var isInTriageBand: Bool {
+    guard status == .open else { return false }
+    if source == TaskSource.mcp {
+      guard acknowledgedAt == nil, createdAt != .distantPast else { return false }
+      return Date().timeIntervalSince(createdAt) < AgentCue.decayWindow
+    }
+    return scheduled == nil && due == nil
+        && project == nil && area == nil && !today
+  }
+
   var recurrence: Recurrence? {
     get {
       guard let unit = recurrenceUnit.flatMap(Recurrence.Unit.init(rawValue:)) else { return nil }
@@ -3379,8 +3398,14 @@ enum LocalCache {
     if e.pendingDeletion { return nil }
     switch filter {
     case .today:
-      // Single source of truth — see `TaskEntity.isOnToday`.
-      return e.isOnToday ? SeptenaTask(e) : nil
+      // Today = ratified-and-due. An unratified row that happens to be due
+      // today belongs in the triage band above Today, not in it — keep the
+      // trusted list clean (see `TaskEntity.isInTriageBand`,
+      // docs/TRIAGE_BAND_SPEC.md). The band is rendered from `.triage`.
+      return (e.isOnToday && !e.isInTriageBand) ? SeptenaTask(e) : nil
+    case .triage:
+      // Unratified layer above Today — see `TaskEntity.isInTriageBand`.
+      return e.isInTriageBand ? SeptenaTask(e) : nil
     case .inbox:
       guard e.status == .open,
             e.project == nil, e.area == nil,

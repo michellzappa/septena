@@ -66,12 +66,12 @@ enum MCPToolCatalog {
   static var tasks: [MCPTool] {
     [
       MCPTool(name: "tasks_list",
-              description: "List Septena tasks for a given view (today, inbox, upcoming, anytime, someday, completed). Returns {tasks, total, truncated}; truncated=true means more rows exist beyond limit.",
+              description: "List Septena tasks for a given view (today, triage, inbox, upcoming, anytime, someday, completed). 'triage' is the to-sort pile shown above Today — unratified rows the user hasn't placed yet (your unacknowledged proposals + the user's loose captures); 'today' excludes those. Returns {tasks, total, truncated}; truncated=true means more rows exist beyond limit.",
               inputSchema: ["type": "object", "properties": [
                 "view": ["type": "string",
-                         "enum": ["today", "inbox", "anytime", "someday", "upcoming", "completed"],
+                         "enum": ["today", "triage", "inbox", "anytime", "someday", "upcoming", "completed"],
                          "default": "today",
-                         "description": "Which task list to read, matching the iOS app's sidebar."],
+                         "description": "Which task list to read. 'today' = ratified + due; 'triage' = the unratified to-sort pile above Today."],
                 "limit": ["type": "integer", "minimum": 1, "maximum": 500, "default": 100],
               ]]),
       MCPTool(name: "tasks_get",
@@ -248,7 +248,7 @@ enum MCPToolCatalog {
               description: "Create a new habit definition.",
               inputSchema: ["type": "object", "required": ["title", "bucket"], "properties": [
                 "title": ["type": "string", "minLength": 1],
-                "bucket": ["type": "string", "enum": ["morning", "evening", "anytime"]],
+                "bucket": ["type": "string", "enum": ["morning", "afternoon", "evening", "anytime"]],
                 "emoji": ["type": "string"],
               ]]),
       MCPTool(name: "habits_toggle",
@@ -446,7 +446,7 @@ enum MCPToolCatalog {
                 "strengthUnit": ["type": "string"],
                 "defaultDoseValue": ["type": "number"],
                 "defaultDoseUnit": ["type": "string"],
-                "bucket": ["type": "string", "enum": ["morning", "midday", "evening", "bedtime", "anytime"]],
+                "bucket": ["type": "string", "enum": ["morning", "afternoon", "evening", "anytime"]],
                 "scheduleKind": ["type": "string", "enum": ["daily", "asNeeded"], "default": "daily"],
                 "targetDosesPerDay": ["type": "integer", "minimum": 1],
                 "instructions": ["type": "string"],

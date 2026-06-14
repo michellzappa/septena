@@ -131,6 +131,25 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     return false
   }
 
+  /// Whether this open task sits in the **triage band** — the *unratified*
+  /// layer that renders above Today (see `docs/TRIAGE_BAND_SPEC.md`). The
+  /// divider is ratification, not date: two captured-but-not-committed
+  /// populations belong here —
+  ///   • an unacknowledged agent proposal still inside its freshness window
+  ///     (`showsAgentCue`), regardless of any date/project it carries; and
+  ///   • a loose human capture with no disposition at all (the classic Inbox).
+  /// A row leaves the band the instant it is ratified (any disposition, or
+  /// `acknowledge` for agent rows) — and for agent rows also when the cue
+  /// decays (ratification-by-timeout, so a long-ignored proposal ages into
+  /// its natural bucket rather than living in limbo). DTO mirror of
+  /// `TaskEntity.isInTriageBand` — keep the two in lockstep.
+  var isInTriageBand: Bool {
+    guard status == .open else { return false }
+    if source == TaskSource.mcp { return showsAgentCue() }
+    return scheduled == nil && deadline == nil
+        && project == nil && area == nil && !today
+  }
+
   enum CodingKeys: String, CodingKey {
     case id, title, status, created, scheduled, deadline, today
     case todaySetOn = "today_set_on"
@@ -342,6 +361,9 @@ struct TasksCounts: Codable {
   var todayCount: Int
   var reviewCount: Int
   var inboxCount: Int
+  /// Unratified "to sort" pile — the triage band's size (agent proposals +
+  /// loose captures). Superset of `inboxCount`; see `docs/TRIAGE_BAND_SPEC.md`.
+  var triageCount: Int
   var upcomingCount: Int
   var unscheduledCount: Int
   var somedayCount: Int
@@ -352,6 +374,7 @@ struct TasksCounts: Codable {
     case todayCount = "today_count"
     case reviewCount = "review_count"
     case inboxCount = "inbox_count"
+    case triageCount = "triage_count"
     case upcomingCount = "upcoming_count"
     case unscheduledCount = "unscheduled_count"
     case somedayCount = "someday_count"
@@ -364,6 +387,7 @@ struct TasksCounts: Codable {
     todayCount = (try? c.decode(Int.self, forKey: .todayCount)) ?? 0
     reviewCount = (try? c.decode(Int.self, forKey: .reviewCount)) ?? 0
     inboxCount = (try? c.decode(Int.self, forKey: .inboxCount)) ?? 0
+    triageCount = (try? c.decode(Int.self, forKey: .triageCount)) ?? 0
     upcomingCount = (try? c.decode(Int.self, forKey: .upcomingCount)) ?? 0
     unscheduledCount = (try? c.decode(Int.self, forKey: .unscheduledCount)) ?? 0
     somedayCount = (try? c.decode(Int.self, forKey: .somedayCount)) ?? 0
@@ -371,12 +395,13 @@ struct TasksCounts: Codable {
   }
 
   init(today: String, todayCount: Int, reviewCount: Int,
-       inboxCount: Int, upcomingCount: Int, unscheduledCount: Int,
-       somedayCount: Int = 0, openCount: Int) {
+       inboxCount: Int, triageCount: Int = 0, upcomingCount: Int,
+       unscheduledCount: Int, somedayCount: Int = 0, openCount: Int) {
     self.today = today
     self.todayCount = todayCount
     self.reviewCount = reviewCount
     self.inboxCount = inboxCount
+    self.triageCount = triageCount
     self.upcomingCount = upcomingCount
     self.unscheduledCount = unscheduledCount
     self.somedayCount = somedayCount
@@ -388,6 +413,10 @@ struct TasksCounts: Codable {
 
 enum TaskFilter: Equatable, Hashable {
   case today
+  /// Unratified layer rendered above Today — agent proposals + loose human
+  /// captures (see `SeptenaTask.isInTriageBand`, `docs/TRIAGE_BAND_SPEC.md`).
+  /// Superset of `.inbox` (which is only the loose-human arm).
+  case triage
   case inbox
   case upcoming
   case unscheduled
@@ -399,6 +428,7 @@ enum TaskFilter: Equatable, Hashable {
   var serverView: String {
     switch self {
     case .today: return "today"
+    case .triage: return "triage"
     case .inbox: return "inbox"
     case .upcoming: return "upcoming"
     case .unscheduled: return "unscheduled"
@@ -414,6 +444,7 @@ enum TaskFilter: Equatable, Hashable {
   var title: String {
     switch self {
     case .today: return String(localized: "Today", comment: "Task filter")
+    case .triage: return String(localized: "To sort", comment: "Task filter")
     case .inbox: return String(localized: "Inbox", comment: "Task filter")
     case .upcoming: return String(localized: "Upcoming", comment: "Task filter")
     case .unscheduled: return String(localized: "Anytime", comment: "Task filter")

@@ -253,6 +253,7 @@ enum MCPDispatch {
     let limit = args.int("limit") ?? 100
     let filter: TaskFilter
     switch view {
+    case "triage": filter = .triage
     case "inbox": filter = .inbox
     case "upcoming": filter = .upcoming
     case "anytime": filter = .unscheduled

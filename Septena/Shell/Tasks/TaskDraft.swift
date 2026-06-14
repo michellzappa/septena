@@ -37,7 +37,7 @@ struct TaskDraft {
     case .someday:         someday = true
     case .project(let id): projectId = id
     case .area(let id):    areaId = id
-    case .inbox, .unscheduled, .logbook: break
+    case .triage, .inbox, .unscheduled, .logbook: break
     }
   }
 

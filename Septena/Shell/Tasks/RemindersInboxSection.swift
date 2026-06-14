@@ -12,6 +12,11 @@ struct RemindersInboxSection: View {
   @Environment(NavigationState.self) private var nav
   /// Parent calls this after a successful import so the inbox below refreshes.
   let onImported: () -> Void
+  /// Whether to surface the setup CTAs (grant access / pick a list / denied
+  /// note). On the Today screen we pass `false` so only *actual pending
+  /// imports* appear in the triage zone — an unconfigured user sees nothing,
+  /// not a permanent setup prompt. Defaults to `true` for the dedicated inbox.
+  var showsSetupCTAs: Bool = true
 
   /// Plain `let` — RemindersBridge is a shared @Observable singleton, and
   /// SwiftUI's observation macros track property accesses on the instance
@@ -35,7 +40,7 @@ struct RemindersInboxSection: View {
       switch bridge.access {
       case .granted:
         if sourceList == nil {
-          pickListCTA
+          if showsSetupCTAs { pickListCTA }
         } else if !pairs.isEmpty {
           VStack(alignment: .leading, spacing: 8) {
             header
@@ -50,9 +55,9 @@ struct RemindersInboxSection: View {
         // If sourceList is set but pairs is empty, render nothing — list
         // is nominated and just has no pending reminders. Don't clutter.
       case .notDetermined:
-        grantAccessCTA
+        if showsSetupCTAs { grantAccessCTA }
       case .denied, .writeOnly:
-        deniedNote
+        if showsSetupCTAs { deniedNote }
       }
     }
     // `.task(id:)` fires on first appear AND whenever the source list ID
