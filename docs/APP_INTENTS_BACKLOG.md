@@ -72,7 +72,7 @@ Remaining items (AI-4, AI-8, P2) are still open.
 **Why:** Tasks is the app's core, but only `AddTaskIntent` exists. Acting on an
 *existing* task by voice/Shortcut needs the system to resolve *which* task — an
 `AppEntity` + `EntityQuery`. Foundation for AI-2/AI-3/AI-9.
-**What:** A `TaskAppEntity` (id, title, status, today/scheduled/due, area,
+**What:** A `TaskAppEntity` (id, title, status, today/scheduled/deadline, area,
 project) backed by an `EntityQuery` reading the live store via
 `SeptenaServices`. Query reflects enablement implicitly (no rows → empty).
 **Acceptance:** Siri/Shortcuts can pick a task; query returns current Today /
@@ -149,10 +149,28 @@ likely yes → add a log intent + MCP tools (lockstep). `activity`
 
 ## P2 — enhancements / optional
 
-### AI-9 · Read-intents
+### AI-9 · Read-intents  *(= Phase 3 of docs/SPOTLIGHT_READABILITY_PLAN.md)*
 "How much water today" (`hydration_today`), "what did I eat" / day macros
 (`nutrition_day_summary`), "what's on today" (tasks). Return `IntentResult` with
 dialog + snippet; good widget/Control Center fodder. Not "completeness."
+
+**Why it matters now (Spotlight readability):** Phases 0–2 of the readability
+work index individual *rows* into Spotlight (`IndexedEntity`), so Siri/Apple
+Intelligence can find "the meal with salmon" or "my squat from Tuesday." But a
+per-row index can't answer **aggregates** — "how much water *today*", "did I hit
+my protein", "what's left on today". Read-intents are that complement: Swift
+computes the aggregate, the intent returns dialog + snippet. This is the natural
+finish of the readability surface once Phases 0–2 are device-verified.
+
+- **Scope:** App-Intents-only. Reuse existing aggregate logic (e.g. the
+  `nutrition_day_summary` MCP tool's computation) — do NOT fork a third tool
+  surface; MCP stays untouched (no lockstep change).
+- **Candidates (start small):** `hydration_today`, `nutrition_day_summary`,
+  "what's on today" (tasks). Each is also widget / Control Center fodder.
+- **Depends on:** AI-1 (Task entity, done). Independent of the indexing phases —
+  can land before or after the device test.
+- **Status:** ⬜ backlogged (not started) — deferred 2026-06-14 by owner; build
+  Phases 0–2 device-verification first.
 
 ### AI-10 · Re-curate the 10 zero-config phrases
 After AI-2/AI-3 land, the top-10 phrase slots may want Complete Task /

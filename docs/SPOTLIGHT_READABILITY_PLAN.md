@@ -1,7 +1,7 @@
 # Spotlight Readability Plan — making Septena legible to Apple Intelligence
 
-Status: **Phases 0–1 built, iOS + macOS green, pending on-device verification**
-(2026-06-14). Companion to
+Status: **Phases 0–2 + opt-out built, iOS + macOS green, pending on-device
+verification** (2026-06-14). Phase 3 (read-intents) not started. Companion to
 `docs/CORE_AI_iOS27_PREP.md` (Track C0) and `docs/APP_INTENTS_BACKLOG.md`. This
 doc owns the *readability* surface specifically: getting Septena's data into the
 on-device Spotlight semantic index so Siri / Apple Intelligence can answer
@@ -113,7 +113,10 @@ sentinel/incremental is a Phase 1 optimization).
 **Acceptance (device):** disabling a section purges exactly its items in seconds;
 re-enabling restores them; renames/adds reflect within a beat.
 
-## Phase 2 — high-value historical LOG events (blocked on the (A)/(B) decision)
+## Phase 2 — high-value historical LOG events (BUILT — pending device test)
+
+Built: `MealLogEntity`, `MoodLogEntity`, `WorkoutLogEntity` (full history indexed,
+gated by section enabled + Spotlight opt-out). iOS + macOS green 2026-06-14.
 
 Prioritized subset (richest text, highest "Siri knows what I did" value):
 1. **Meals** — `NutritionEntryEntity` → `MealLogEntity` (foods, mealType, kcal,
@@ -132,13 +135,18 @@ attribute's `startDate` so recency ranks. Consider a trailing-window cap (e.g.
 **Acceptance:** "what did I eat yesterday" surfaces meal rows; disabling
 Nutrition purges them.
 
-## Phase 3 — read-intents (AI-9) + privacy toggle
+## Phase 3 — read-intents → BACKLOGGED (not started)
 
-- **Read-intents:** `hydration_today`, `nutrition_day_summary`, "what's on
-  today" as `AppIntent`s returning dialog + snippet. These answer **aggregates**
-  no per-row index can. Reuse existing summary logic; App-Intents-only (do not
-  fork a third MCP surface).
-- **Privacy toggle:** implement (B) only if product chose it.
+Deferred 2026-06-14 by owner. Tracked as **AI-9** in
+`docs/APP_INTENTS_BACKLOG.md` (the canonical home — see it for full scope).
+
+Gist: `hydration_today`, `nutrition_day_summary`, "what's on today" as
+`AppIntent`s returning dialog + snippet — the **aggregate** queries no per-row
+index can answer. Reuse existing summary logic; App-Intents-only (no third MCP
+surface). Independent of Phases 0–2; can land before or after the device test.
+
+(The privacy toggle that earlier drafts parked here is already shipped — see the
+"expose-by-default + per-section opt-out" decision above.)
 
 ---
 
