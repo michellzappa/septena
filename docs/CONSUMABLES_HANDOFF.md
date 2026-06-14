@@ -8,8 +8,8 @@ list for the next agent, written from the end of a long build thread.
 
 The `intake` section is **live and in daily use**. Caffeine and cannabis have
 both been **imported** into intake trackers (real data, via the Settings import
-buttons); the user's "Cannabis" tracker holds the full imported history
-strains. The old caffeine/cannabis sections still exist but are now redundant.
+buttons); the user's "Cannabis" tracker holds the full imported history.
+The old caffeine/cannabis sections still exist but are now redundant.
 
 **Shipped this thread (all builds green unless noted):**
 
