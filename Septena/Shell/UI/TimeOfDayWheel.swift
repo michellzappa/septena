@@ -101,6 +101,13 @@ struct TimeOfDayWheel: View {
   /// (bedtime) and sun (wake) on the inner/scheduled track, upright and
   /// outside the rotation so the glyphs stay readable as the dial turns.
   var sleepMarks: (bed: Double, wake: Double)? = nil
+  /// Per-glyph fade for the bedtime `moon` and wake `sun`, on top of
+  /// `marksOpacity`. The hero crossfades them through the day — the sun (the
+  /// day's origin) stays lit while the moon fades in as bedtime turns from
+  /// "last night" into "tonight's expected end" (see `DayDialHero`). Section
+  /// dials leave both at 1.
+  var moonOpacity: Double = 1
+  var sunOpacity: Double = 1
   /// Fades the data layers (dots, ticks, now-hand, bands, sleep glyphs) — the
   /// hero drops this to 0 during a day-swipe so the marks are hidden while the
   /// dial reorients, then back to 1 to reveal the new day. Avoids trying to
@@ -275,7 +282,10 @@ struct TimeOfDayWheel: View {
     return shownEvents.sorted { $0.daysAgo > $1.daysAgo }.map { e in
       let count = Double(density[Int(e.fraction * Double(slots)) % slots] ?? 1)
       let norm = maxCount > 1 ? (count - 1) / (maxCount - 1) : 0
-      let dotR: CGFloat = effectiveWindow == 1 ? min(8, 4 + count) / 2 : (2.2 + norm * 1.8)
+      // Aggregated dots (many events sharing a slot) cap ~25% smaller than the
+      // old 8pt ceiling — a single dot stays its size; a busy slot just doesn't
+      // bloom as large. today: 5pt single → 6pt cap; week: scales to a 6pt max.
+      let dotR: CGFloat = effectiveWindow == 1 ? min(6, 4 + count) / 2 : (2.2 + norm * 0.8)
       return DotMark(id: e.id, center: point(e.fraction, dotRing),
                      diameter: dotR * 2, color: e.color ?? accent,
                      opacity: min(fade(e.daysAgo), dotMaxOpacity))
@@ -565,11 +575,13 @@ struct TimeOfDayWheel: View {
         Image(systemName: "moon.fill")
           .font(.system(size: 10))
           .foregroundStyle(Theme.inkSecondary)
+          .opacity(moonOpacity)
           .rotationEffect(.degrees(-displayedRotation))
           .position(ringPoint(s.bed, 0.58, in: diameter))
         Image(systemName: "sun.max.fill")
           .font(.system(size: 11))
           .foregroundStyle(Theme.inkSecondary)
+          .opacity(sunOpacity)
           .rotationEffect(.degrees(-displayedRotation))
           .position(ringPoint(s.wake, 0.58, in: diameter))
       }

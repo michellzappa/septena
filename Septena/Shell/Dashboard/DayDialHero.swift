@@ -150,6 +150,43 @@ struct DayDialHero: View {
     return (b.start, b.end)
   }
 
+  /// Sleep is recovery info — most useful the moment you wake, and less so as
+  /// the day fills with its own dots. On *today* the sleep arc fades out over
+  /// the ~5 hours after wake (full at wake → gone by late morning), so the
+  /// dial turns from looking back to living forward. Scrubbed past days keep
+  /// the full arc — you're reviewing them, not living them. Smoothstepped so
+  /// the thinning reads as a fade, not a wipe.
+  private var sleepArcOpacity: Double {
+    guard isToday, let wake = sleepMarks?.wake else { return 1 }
+    var delta = nowFraction - wake
+    if delta < 0 { delta += 1 }            // before wake on the dial: treat as 0
+    let t = max(0, min(1, (delta * 24) / 5))   // 0 at wake → 1 five hours on
+    return 1 - (t * t * (3 - 2 * t))
+  }
+
+  /// The bedtime moon is the arc's mirror image: hidden in the morning (the
+  /// arc's own rounded cap already marks where you went to bed), it fades in
+  /// as the arc clears so the lone glyph reads as *tonight's* expected bedtime
+  /// rather than last night's. Position stays at last night's bedtime — a fair
+  /// proxy for "about when you'll turn in" (could become a trailing usual
+  /// bedtime later). Full on past days, where the moon bookends the night.
+  private var moonOpacity: Double { isToday ? 1 - sleepArcOpacity : 1 }
+
+  /// Today's sleep band, dimmed by `sleepArcOpacity`; every other band passes
+  /// through untouched. The wake `sun` is unaffected — it stays as the day's
+  /// origin all day.
+  private var displayBands: [TimeOfDayWheel.Band] {
+    guard sleepArcOpacity < 1,
+          let sleepID = snapshot.bandsBySection["sleep"]?.first(where: { $0.daysAgo == 0 })?.id
+    else { return snapshot.bands }
+    return snapshot.bands.map { band in
+      guard band.id == sleepID else { return band }
+      var faded = band
+      faded.color = (band.color ?? Theme.inkSecondary).opacity(sleepArcOpacity)
+      return faded
+    }
+  }
+
   /// Reading `clock.now` here means the 60s tick re-renders only the hero
   /// (the now-hand advances), never the parent dashboard — the same
   /// isolation `WelcomeHeaderSection` uses.
@@ -171,7 +208,7 @@ struct DayDialHero: View {
       // Neutral frame — the dots and bands carry the section colors, same
       // as the Rhythm mode's overlay dial.
       accent: Theme.inkSecondary,
-      bands: snapshot.bands,
+      bands: displayBands,
       // The scheduled (calendar) lane — loaded for the displayed day, so a
       // scrubbed past day shows that day's real meetings, not today's.
       todayBands: snapshot.calendarBands,
@@ -198,8 +235,12 @@ struct DayDialHero: View {
       // Spin the dial so "now" is always at the top — today only; a past day
       // has no "now", so it rests at the fixed midnight-top orientation.
       northFraction: isToday ? nowFraction : nil,
-      // Moon at bedtime, sun at wake, on the inner track.
+      // Moon at bedtime, sun at wake, on the inner track. The sun stays lit all
+      // day (the day's origin); the moon crossfades in as the sleep arc fades,
+      // turning bedtime from "last night" into "tonight's expected".
       sleepMarks: sleepMarks,
+      moonOpacity: moonOpacity,
+      sunOpacity: 1,
       // Hidden while a day-swipe reorients the dial, then revealed.
       marksOpacity: marksVisible ? 1 : 0
     )
