@@ -948,6 +948,10 @@ struct AdaptiveEditScaffold<FormContent: View>: View {
   /// Confirmation label. Defaults to "Save"; pass "Add", "Done", etc.
   var saveTitle: String = "Save"
   var cancelTitle: String = "Cancel"
+  /// Hides the confirmation control entirely. Use when the close control already
+  /// persists (autosave-on-close) so a separate Save would be redundant — the
+  /// left control alone ("Done") both saves and closes.
+  var showsSave: Bool = true
   /// Tints just the Cancel/Save controls. The form content stays neutral; pass
   /// a section color when you want the confirm/cancel affordances accented
   /// without coloring the whole form.
@@ -976,6 +980,7 @@ struct AdaptiveEditScaffold<FormContent: View>: View {
             title: title,
             cancelTitle: cancelTitle,
             saveTitle: saveTitle,
+            showsSave: showsSave,
             canSave: canSave,
             accent: accent,
             onCancel: close,
@@ -1000,11 +1005,13 @@ struct AdaptiveEditScaffold<FormContent: View>: View {
                 .tint(accent)
                 .keyboardShortcut(.cancelAction) // Esc
             }
-            ToolbarItem(placement: .confirmationAction) {
-              Button(saveTitle, action: confirm)
-                .tint(accent)
-                .disabled(!canSave)
-                .keyboardShortcut(.defaultAction) // Return / ⌘Return
+            if showsSave {
+              ToolbarItem(placement: .confirmationAction) {
+                Button(saveTitle, action: confirm)
+                  .tint(accent)
+                  .disabled(!canSave)
+                  .keyboardShortcut(.defaultAction) // Return / ⌘Return
+              }
             }
           }
       }
@@ -1019,6 +1026,7 @@ private struct AdaptiveEditHeader: View {
   let title: String
   let cancelTitle: String
   let saveTitle: String
+  var showsSave: Bool = true
   let canSave: Bool
   var accent: Color? = nil
   let onCancel: () -> Void
@@ -1031,10 +1039,12 @@ private struct AdaptiveEditHeader: View {
       Spacer()
       Text(title).font(.headline)
       Spacer()
-      Button(saveTitle, action: onSave)
-        .fontWeight(.semibold)
-        .disabled(!canSave)
-        .keyboardShortcut(.defaultAction) // Return / ⌘Return
+      if showsSave {
+        Button(saveTitle, action: onSave)
+          .fontWeight(.semibold)
+          .disabled(!canSave)
+          .keyboardShortcut(.defaultAction) // Return / ⌘Return
+      }
     }
     .tint(accent)
     .padding(.horizontal, 16)

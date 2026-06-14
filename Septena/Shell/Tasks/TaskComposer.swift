@@ -12,6 +12,15 @@ import SwiftUI
 
 // MARK: - Composer card
 
+/// The keyboard focus targets inside the composer, in no particular order —
+/// `TaskComposerCard.focusOrder` defines the Tab sequence. Driven entirely
+/// programmatically (Tab is intercepted), so it works with macOS keyboard
+/// navigation OFF — see `moveFocus` / `activateFocused`.
+enum TaskEditFocus: Hashable {
+  case title
+  case pill(TaskAttributeBar.Attribute)
+}
+
 struct TaskComposerCard: View {
   enum Mode {
     case create(TaskFilter)
@@ -32,7 +41,17 @@ struct TaskComposerCard: View {
   @Environment(\.adaptiveDetailClose) private var adaptiveClose
   @State private var draft = TaskDraft()
   @State private var seeded = false
-  @FocusState private var titleFocused: Bool
+  /// Single keyboard cursor across the whole form (title, pills, terminal
+  /// actions). Replaces the old title-only `titleFocused` bool.
+  @FocusState private var focus: TaskEditFocus?
+  /// One-shot trigger: set to a pill to make `TaskAttributeBar` run its
+  /// `select` for that pill (keyboard Space/Return on a focused pill). The bar
+  /// resets it to nil after acting.
+  @State private var pendingPillActivate: TaskAttributeBar.Attribute?
+  /// Autosave guard. Every persistence path (explicit Save, Return-to-save,
+  /// or a terminal action that already decided the outcome) flips this so the
+  /// `.onDisappear` autosave doesn't double-write or resurrect a deleted task.
+  @State private var savedOrSkipped = false
   /// SuggestionEngine's learned area/project pick for the current title (the
   /// "Suggested" chip). Recomputed as the title changes; create-mode only.
   @State private var suggestedList: SuggestionEngine.Suggestion?
@@ -56,10 +75,17 @@ struct TaskComposerCard: View {
     // other edit form. Save persists + reloads; the scaffold then closes.
     AdaptiveEditScaffold(
       title: headerTitle,
+      // Autosave-on-close: the left control just closes (the `.onDisappear`
+      // below persists), so it reads "Done", not "Cancel" — Esc, swipe, and
+      // click-away all keep your edits.
       saveTitle: saveTitle,
+      cancelTitle: "Done",
+      // Edit mode autosaves on close, so a separate Save would be redundant —
+      // "Done" both saves and closes. Create mode keeps its "Add" primary action.
+      showsSave: !isEditing,
       accent: accent,
       canSave: draft.canSave,
-      onSave: { persist(); onDone() }
+      onSave: { persistOnce() }
     ) {
       ScrollView {
         VStack(alignment: .leading, spacing: 14) {
@@ -72,21 +98,36 @@ struct TaskComposerCard: View {
             areas: areas,
             projects: projects,
             accent: accent,
-            onInteractStart: { titleFocused = false }
+            focus: $focus,
+            activate: $pendingPillActivate
           )
 
           // Edit mode only — a not-yet-created task has no id/conversation.
           // docs/TASK_CONVERSATIONS_PHASE1.md.
           if case .edit(let task) = mode {
             ConversationSection(task: task, accent: accent)
-            terminalActions(task)
           }
         }
         .padding(16)
       }
       .scrollDismissesKeyboard(.interactively)
+      // Tab / Shift-Tab cycle the whole form; Space / Return open a focused
+      // pill or fire a focused action. Attached here so it catches the keypress
+      // whenever any pill / action (a focusable descendant) holds the cursor;
+      // the title field carries its own copy (a TextField would otherwise eat
+      // Tab). Works with macOS keyboard navigation off — we move focus
+      // ourselves rather than relying on the system ring.
+      .onKeyPress(keys: [.tab]) { press in
+        moveFocus(forward: !press.modifiers.contains(.shift)); return .handled
+      }
+      .onKeyPress(.space) { activateFocused() }
+      .onKeyPress(.return) { activateFocused() }
     }
     .onAppear(perform: seed)
+    // Autosave on any close (Esc / swipe / click-away / Done). Idempotent via
+    // `savedOrSkipped`, so the explicit Save and terminal-action paths that
+    // already ran don't write twice.
+    .onDisappear { persistOnce() }
     .onChange(of: draft.title) { _, newValue in
       // The title wraps (axis: .vertical) so long titles show in full instead
       // of truncating — but it stays single-line in spirit: a Return inserts a
@@ -110,47 +151,32 @@ struct TaskComposerCard: View {
     TextField("What needs doing?", text: $draft.title, axis: .vertical)
       .textFieldStyle(.plain)
       .font(.septenaTaskTitle)
-      .focused($titleFocused)
+      .focused($focus, equals: .title)
       .lineLimit(1...4)
       // macOS: a vertical-axis field fires onSubmit on plain Return (the iOS
       // newline-as-save trick never triggers there) — commit here instead.
       .onSubmit { if draft.canSave { commit() } }
+      // The field would otherwise swallow Tab, so carry the same focus-cycling
+      // handler here too.
+      .onKeyPress(keys: [.tab]) { press in
+        moveFocus(forward: !press.modifiers.contains(.shift)); return .handled
+      }
       .padding(.horizontal, 14)
       .padding(.vertical, 12)
       .background(Theme.secondaryGroupedBackground,
                   in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+      .overlay(focusRing(visible: focus == .title, cornerRadius: 18))
   }
 
-  // MARK: - Terminal actions (edit mode)
-
-  /// Complete / Cancel / Delete, at the bottom of the scroll (the scaffold owns
-  /// the toolbar, so these standard destructive rows replace the old … menu).
+  /// The shared keyboard focus ring drawn on whatever holds the cursor — a
+  /// 2pt accent stroke, so Tab traversal is visible with macOS keyboard
+  /// navigation off (the system ring never appears).
   @ViewBuilder
-  private func terminalActions(_ task: SeptenaTask) -> some View {
-    VStack(spacing: 0) {
-      actionRow("Complete", "checkmark.circle") { mutator.complete(id: task.id) }
-      Divider().padding(.leading, 14)
-      actionRow("Cancel Task", "xmark.circle") { mutator.cancel(id: task.id) }
-      Divider().padding(.leading, 14)
-      actionRow("Delete To-Do", "trash", destructive: true) { mutator.delete(id: task.id) }
-    }
-    .background(Theme.secondaryGroupedBackground,
-                in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-  }
-
-  private func actionRow(_ title: String, _ icon: String, destructive: Bool = false,
-                         _ action: @escaping () -> Void) -> some View {
-    Button(role: destructive ? .destructive : nil) {
-      action(); onDone(); close()
-    } label: {
-      Label(title, systemImage: icon)
-        .font(.septenaSidebarRow)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 14).padding(.vertical, 12)
-        .contentShape(Rectangle())
-    }
-    .buttonStyle(.plain)
-    .foregroundStyle(destructive ? Theme.overdueRed : Theme.inkPrimary)
+  private func focusRing(visible: Bool, cornerRadius: CGFloat) -> some View {
+    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+      .strokeBorder(accent, lineWidth: 2)
+      .opacity(visible ? 1 : 0)
+      .allowsHitTesting(false)
   }
 
   private func updateSuggestion() {
@@ -281,7 +307,7 @@ struct TaskComposerCard: View {
       )
       // Focus after the sheet settles — an immediate focus is dropped before the
       // field joins the responder chain, so the keyboard wouldn't come up.
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { titleFocused = true }
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focus = .title }
     case .edit(let task):
       draft = TaskDraft(task: task)
       // Note: opening the editor must NOT acknowledge. The agent cue == triage-
@@ -290,6 +316,12 @@ struct TaskComposerCard: View {
       // vanish from the Inbox on dismiss with no decision made. Ratification
       // happens on Save, and only when the edit actually (re)places it (see
       // `persist`).
+      //
+      // Open with the cursor already in the title (keyboard-driven open: a row
+      // is opened with Return, so you can edit immediately). Same settle delay
+      // as create — an immediate focus is dropped before the field joins the
+      // responder chain.
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focus = .title }
     }
   }
 
@@ -317,14 +349,58 @@ struct TaskComposerCard: View {
     }
   }
 
-  /// Persist + reload + close (the Return-to-save path; the scaffold's Save
-  /// button does the same via its own close).
+  /// Persist exactly once. The single funnel for every save path (explicit
+  /// Save button, Return-to-save, autosave-on-close), so they can't double
+  /// write. Skips the write when there's nothing worth saving (an empty new
+  /// task that's just being dismissed).
+  private func persistOnce() {
+    guard !savedOrSkipped else { return }
+    savedOrSkipped = true
+    guard draft.canSave else { return }
+    persist()
+    onDone()
+  }
+
+  /// Persist + close (Return-to-save / newline-save). Closing then fires
+  /// `.onDisappear`, but `persistOnce` is idempotent so it won't write twice.
   private func commit() {
     guard draft.canSave else { return }
     Haptics.tick()
-    persist()
-    onDone()
+    persistOnce()
     close()
+  }
+
+  // MARK: - Keyboard focus traversal
+
+  /// Tab order: title → every pill.
+  private var focusOrder: [TaskEditFocus] {
+    var order: [TaskEditFocus] = [.title]
+    order += TaskAttributeBar.Attribute.allCases.map { .pill($0) }
+    return order
+  }
+
+  /// Advance / retreat the keyboard cursor, wrapping at the ends.
+  private func moveFocus(forward: Bool) {
+    let order = focusOrder
+    guard let current = focus, let i = order.firstIndex(of: current) else {
+      focus = order.first
+      return
+    }
+    let n = order.count
+    focus = order[forward ? (i + 1) % n : (i - 1 + n) % n]
+  }
+
+  /// Space / Return on the cursor: open a focused pill. On the title field (or
+  /// no focus) it does nothing here so the field's own Return-to-save /
+  /// space-typing wins.
+  private func activateFocused() -> KeyPress.Result {
+    switch focus {
+    case .pill(let attr):
+      pendingPillActivate = attr   // TaskAttributeBar runs `select` and resets.
+      return .handled
+    default:
+      return .ignored
+    }
   }
 }
 
@@ -337,9 +413,13 @@ struct TaskAttributeBar: View {
   let areas: [Area]
   let projects: [Project]
   let accent: Color
-  /// Called when a pill expands / a sheet opens, so the card can drop the
-  /// title-field keyboard before showing a calendar.
-  let onInteractStart: () -> Void
+  /// The composer's shared keyboard cursor — pills bind to `.pill(attr)` so Tab
+  /// can land on them and they can draw the focus ring.
+  @FocusState.Binding var focus: TaskEditFocus?
+  /// One-shot keyboard-activation channel: when the composer sets this to a
+  /// pill (Space / Return on a focused pill), the bar runs `select` and clears
+  /// it. Pointer taps call `select` directly.
+  @Binding var activate: Attribute?
 
   /// The electives, in rail order. Each is fully described by the enum (icon /
   /// label / how it presents); per-attribute *values* are derived from the draft
@@ -391,8 +471,10 @@ struct TaskAttributeBar: View {
           ForEach(Attribute.allCases) { attr in
             AttributePill(icon: attr.icon, label: attr.label,
                           value: value(for: attr), isSet: isSet(attr),
-                          isActive: expanded == attr, accent: accent,
+                          isActive: expanded == attr, isFocused: focus == .pill(attr),
+                          accent: accent,
                           glassID: String(describing: attr), glassNS: glassNS) { select(attr) }
+              .focused($focus, equals: .pill(attr))
           }
         }
       }
@@ -407,6 +489,12 @@ struct TaskAttributeBar: View {
       #if os(iOS)
       .presentationDetents([.large, .medium])
       #endif
+    }
+    // Keyboard Space / Return on a focused pill arrives here.
+    .onChange(of: activate) { _, attr in
+      guard let attr else { return }
+      activate = nil
+      select(attr)
     }
   }
 
@@ -465,7 +553,9 @@ struct TaskAttributeBar: View {
   /// a default, Notes autofocusing) lives in each panel's `onAppear`, so this
   /// stays uniform.
   private func select(_ attr: Attribute) {
-    onInteractStart()
+    // Move the keyboard cursor onto the pill (also drops the title field's
+    // keyboard before a calendar opens — what `onInteractStart` used to do).
+    focus = .pill(attr)
     withAnimation(.snappy(duration: 0.22)) {
       if attr.presentsSheet {
         expanded = nil
@@ -495,6 +585,9 @@ private struct AttributePill: View {
   let value: String?
   let isSet: Bool
   let isActive: Bool
+  /// The keyboard cursor is on this pill — draw the focus ring (the system ring
+  /// never shows with macOS keyboard navigation off).
+  var isFocused: Bool = false
   let accent: Color
   /// Stable identity inside the bar's `GlassEffectContainer`, so the pill's
   /// glass morphs in place (and merges with neighbours) as its value changes
@@ -525,6 +618,12 @@ private struct AttributePill: View {
       in: .capsule
     )
     .glassEffectID(glassID, in: glassNS)
+    .overlay {
+      Capsule()
+        .strokeBorder(accent, lineWidth: 2)
+        .opacity(isFocused ? 1 : 0)
+        .allowsHitTesting(false)
+    }
   }
 }
 

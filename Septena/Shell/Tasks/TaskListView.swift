@@ -296,6 +296,7 @@ struct TaskListView: View {
     .modifier(KeyboardNavigationModifier(
       isInputMode: false,
       hasSelection: !selection.isEmpty,
+      editorOpen: composerIsOpen,
       onReturn: openSelectedForEdit,
       onEscape: { clearSelection() },
       onSpace: toggleSelected,
@@ -1014,17 +1015,18 @@ struct TaskListView: View {
   /// edit mode, so the detail-open ghost is the sole indicator there.
   @ViewBuilder
   private func rowBackground(for task: SeptenaTask) -> some View {
-    let isOpen = editingDetail?.id == task.id
-    #if os(macOS)
-    // macOS: the bubble IS the selection (native highlight is killed via
-    // `.tint(.clear)`). Selected → full strength; open-but-not-cursor → ghost.
+    // The on-theme bubble IS the selection on both platforms — the native
+    // full-bleed highlight is suppressed on macOS via the table's
+    // `selectionHighlightStyle` (see `PlainListSelectionHighlightDisabler`), and
+    // on iOS the clear `.listRowBackground` keeps the system fill from showing.
+    // A selected row reads at full strength; a row whose inspector is open but
+    // isn't the keyboard cursor keeps a lighter ghost so it stays anchored.
+    // (On iPhone `selection` is empty outside edit mode, so the ghost is the
+    // only indicator there; on iPad keyboard nav now shows the same bubble as
+    // macOS. Edit-mode multi-select circles are unaffected.)
     let isSelected = selection.contains(task.id)
+    let isOpen = editingDetail?.id == task.id
     let opacity: Double = isSelected ? 0.18 : (isOpen ? 0.10 : 0)
-    #else
-    // iOS: native edit-mode circles already show multi-selection, so the only
-    // custom backplate is the open-row anchor.
-    let opacity: Double = isOpen ? 0.18 : 0
-    #endif
     RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
       .fill(theme.color(for: "tasks").opacity(opacity))
       .padding(.horizontal, Theme.hPadding - 6)
@@ -1863,6 +1865,10 @@ private struct KeyboardNavigationModifier: ViewModifier {
   /// input mode, all row-navigation keys forward to the active TextField.
   let isInputMode: Bool
   let hasSelection: Bool
+  /// True while the task editor (inspector / sheet) is open. When it closes we
+  /// pull keyboard focus back to the list so ↑↓ row traversal keeps working —
+  /// the editor steals focus on open and nothing returns it otherwise.
+  let editorOpen: Bool
   let onReturn: () -> Void
   let onEscape: () -> Void
   let onSpace: () -> Void
@@ -1898,6 +1904,13 @@ private struct KeyboardNavigationModifier: ViewModifier {
       // selection pill on the focused row is indicator enough.
       .focusEffectDisabled()
       .onAppear { listFocused = true }
+      // When the editor closes, the title field that stole focus is torn down
+      // and the list is left with none — ↑↓ would stop selecting. Pull focus
+      // back on the next runloop (after the inspector relinquishes it).
+      .onChange(of: editorOpen) { _, open in
+        guard !open else { return }
+        DispatchQueue.main.async { listFocused = true }
+      }
       .onKeyPress(.return) {
         guard !isInputMode, hasSelection else { return .ignored }
         onReturn()
