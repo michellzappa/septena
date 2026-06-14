@@ -261,62 +261,146 @@ struct SkyTopWash: View {
                  opacity: 1)
   }
 
+  /// 0 while the sun is up, ramping to 1 by the end of (≈nautical) twilight at
+  /// −12° elevation. Drives the star field's fade-in through dusk so they don't
+  /// pop on at sunset.
+  private var nightness: Double {
+    let elevationDegrees = SolarClock.elevation(now: clock.now) * 180 / .pi
+    return min(1, max(0, -elevationDegrees / 12))
+  }
+
+  /// The sky-colour wash itself (no stars): the vertical sky gradient melted
+  /// into the page along the curved, never-cut baseline, tinted per appearance.
+  private var washLayer: some View {
+    LinearGradient(
+      gradient: Gradient(stops: stops.map {
+        // `* skySpan` lifts the ramp into the top of the band; the last stop
+        // then holds the horizon colour down to the foot (see `skySpan`).
+        // `washColor` desaturates the sky in dark mode (see it).
+        .init(color: washColor($0), location: $0.location * skySpan)
+      }),
+      startPoint: .top, endPoint: .bottom
+    )
+    // Melt into the page along a CURVED baseline that bows up in the middle.
+    // Two stacked masks (their alphas multiply):
+    //   1. An ELLIPTICAL fade whose centre sits below the frame, so its
+    //      iso-opacity arcs read as a gentle upward arch (∩) — highest in
+    //      the middle, lower at the sides. *Elliptical*, not radial: the
+    //      arcs scale with the frame, so the arch spans the full width at
+    //      any aspect. (A circular radial left the far corners of a wide
+    //      macOS window fully opaque, cutting a hard horizontal line.)
+    //   2. A plain vertical fade as a SAFETY FLOOR — guarantees the wash is
+    //      fully clear by the band's foot across the WHOLE width, so it can
+    //      never end in a hard edge regardless of window proportions.
+    // Opaque from the top edge (behind the status / nav bar), held full
+    // through the dial (real colour for the glass donut to refract), gone
+    // by the foot. `archDepth` controls how curvy.
+    .mask(
+      EllipticalGradient(
+        stops: [
+          .init(color: .clear, location: 0),
+          .init(color: .white.opacity(0.5), location: 0.5),
+          .init(color: .white, location: 1),
+        ],
+        center: UnitPoint(x: 0.5, y: 1 + archDepth),
+        startRadiusFraction: 0.71,
+        endRadiusFraction: 1.15
+      )
+    )
+    .mask(
+      LinearGradient(stops: [
+        .init(color: .white, location: 0),
+        .init(color: .white, location: 0.80),
+        .init(color: .white.opacity(0.5), location: 0.92),
+        .init(color: .clear, location: 1),
+      ], startPoint: .top, endPoint: .bottom)
+    )
+    // Dark appearance: ADD the sky as light (`plusLighter`) rather than
+    // paint it over the dark UI — the daytime blue then reads as a soft
+    // glow instead of a strong slab, and a near-black night adds nothing
+    // and disappears. Light appearance: ordinary source-over tint. Dark
+    // sky is desaturated (see `washColor`) so it no longer needs to be
+    // dimmed into near-nothing — 0.32 keeps a soft cool presence.
+    .opacity(colorScheme == .dark ? 0.32 : 0.6)
+    .blendMode(colorScheme == .dark ? .plusLighter : .normal)
+  }
+
+  // MARK: Starfield
+
+  private struct Star {
+    let x, y: Double        // unit position (y biased toward the top)
+    let radius: Double      // points
+    let brightness: Double  // 0…1 base alpha
+    let phase: Double       // twinkle phase offset
+  }
+
+  /// A fixed, deterministically-generated star field — stable across redraws
+  /// and launches (no per-frame `Date`/random). Biased denser and brighter
+  /// toward the top, where the night sky is darkest. Unit positions, scaled to
+  /// the Canvas at draw time.
+  private static let stars: [Star] = {
+    var seed: UInt64 = 0x5EED_1EAF              // any fixed seed
+    func rnd() -> Double {                       // small LCG in [0, 1)
+      seed = seed &* 6364136223846793005 &+ 1442695040888963407
+      return Double(seed >> 11) / Double(1 << 53)
+    }
+    return (0..<72).map { _ in
+      Star(x: rnd(),
+           y: rnd() * rnd(),                      // squared → biased toward top
+           radius: 0.4 + rnd() * 1.2,             // 0.4…1.6 pt
+           brightness: 0.3 + rnd() * 0.7,         // 0.3…1.0
+           phase: rnd() * 2 * .pi)
+    }
+  }()
+
+  /// The star layer: cheap `Canvas` dots on a slow `TimelineView` tick so they
+  /// twinkle gently. The whole field fades in with `nightness` and melts out
+  /// toward the foot (its own vertical mask). Additive white over the near-black
+  /// night sky. The caller gates it to night + dark, so this animates ONLY then.
+  private var starfield: some View {
+    TimelineView(.animation(minimumInterval: 0.7)) { tl in
+      Canvas { ctx, size in
+        let t = tl.date.timeIntervalSinceReferenceDate
+        let n = nightness
+        for star in Self.stars {
+          let twinkle = 0.8 + 0.2 * sin(t * 0.9 + star.phase)
+          let alpha = star.brightness * twinkle * n
+          if alpha <= 0.01 { continue }
+          let cx = star.x * size.width, cy = star.y * size.height
+          let r = star.radius
+          ctx.fill(
+            Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+            with: .color(.white.opacity(min(1, alpha)))
+          )
+        }
+      }
+    }
+    // Stars only in the upper sky, gone well before the wash's foot.
+    .mask(
+      LinearGradient(stops: [
+        .init(color: .white, location: 0),
+        .init(color: .white, location: 0.40),
+        .init(color: .clear, location: 0.72),
+      ], startPoint: .top, endPoint: .bottom)
+    )
+    .blendMode(.plusLighter)
+    .allowsHitTesting(false)
+  }
+
   var body: some View {
     Group {
       if stops.isEmpty {
         Color.clear
       } else {
-        LinearGradient(
-          gradient: Gradient(stops: stops.map {
-            // `* skySpan` lifts the ramp into the top of the band; the last stop
-            // then holds the horizon colour down to the foot (see `skySpan`).
-            // `washColor` desaturates the sky in dark mode (see it).
-            .init(color: washColor($0), location: $0.location * skySpan)
-          }),
-          startPoint: .top, endPoint: .bottom
-        )
-        // Melt into the page along a CURVED baseline that bows up in the middle.
-        // Two stacked masks (their alphas multiply):
-        //   1. An ELLIPTICAL fade whose centre sits below the frame, so its
-        //      iso-opacity arcs read as a gentle upward arch (∩) — highest in
-        //      the middle, lower at the sides. *Elliptical*, not radial: the
-        //      arcs scale with the frame, so the arch spans the full width at
-        //      any aspect. (A circular radial left the far corners of a wide
-        //      macOS window fully opaque, cutting a hard horizontal line.)
-        //   2. A plain vertical fade as a SAFETY FLOOR — guarantees the wash is
-        //      fully clear by the band's foot across the WHOLE width, so it can
-        //      never end in a hard edge regardless of window proportions.
-        // Opaque from the top edge (behind the status / nav bar), held full
-        // through the dial (real colour for the glass donut to refract), gone
-        // by the foot. `archDepth` controls how curvy.
-        .mask(
-          EllipticalGradient(
-            stops: [
-              .init(color: .clear, location: 0),
-              .init(color: .white.opacity(0.5), location: 0.5),
-              .init(color: .white, location: 1),
-            ],
-            center: UnitPoint(x: 0.5, y: 1 + archDepth),
-            startRadiusFraction: 0.71,
-            endRadiusFraction: 1.15
-          )
-        )
-        .mask(
-          LinearGradient(stops: [
-            .init(color: .white, location: 0),
-            .init(color: .white, location: 0.80),
-            .init(color: .white.opacity(0.5), location: 0.92),
-            .init(color: .clear, location: 1),
-          ], startPoint: .top, endPoint: .bottom)
-        )
-        // Dark appearance: ADD the sky as light (`plusLighter`) rather than
-        // paint it over the dark UI — the daytime blue then reads as a soft
-        // glow instead of a strong slab, and a near-black night adds nothing
-        // and disappears. Light appearance: ordinary source-over tint. Dark
-        // sky is desaturated (see `washColor`) so it no longer needs to be
-        // dimmed into near-nothing — 0.32 keeps a soft cool presence.
-        .opacity(colorScheme == .dark ? 0.32 : 0.6)
-        .blendMode(colorScheme == .dark ? .plusLighter : .normal)
+        ZStack {
+          washLayer
+          // A light star field over the wash — ONLY at night (faded in by
+          // `nightness` through dusk) and ONLY in dark mode. By day or in light
+          // mode it isn't in the tree at all, so there's no animation cost.
+          if colorScheme == .dark, nightness > 0.01 {
+            starfield
+          }
+        }
       }
     }
     .allowsHitTesting(false)
