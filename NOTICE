@@ -1,13 +1,20 @@
 NOTICE
 ======
 
-Septena is licensed under the MIT License (see LICENSE), with the following
-exception. This item ships in the repository so the app builds and functions,
-but it is NOT covered by the MIT grant:
+Septena is licensed under the MIT License (see LICENSE). The MIT grant covers
+the source code in this repository. It does NOT grant any rights to the
+trademarks and brand identity described below.
 
-1. Claude name and logo — Septena/Assets.xcassets/ClaudeMark.imageset/
-   "Claude" and the Claude logo are trademarks of Anthropic, PBC. They appear
-   here only to identify Septena's optional integration with Claude. Anthropic
-   retains all rights to its marks; the MIT License does not grant any right to
-   use them. If you fork or redistribute Septena under a different name, remove
-   or replace this asset.
+1. The Septena name and brand. "Septena," the Septena wordmark, and the app
+   icon are trademarks of Michell Zappa. The MIT License covers the code, not
+   the brand: you may build, modify, and redistribute the source freely, but
+   you may not use the "Septena" name, wordmark, or icon to identify a fork or
+   a derivative app, or in any way that implies endorsement. If you ship a
+   derivative — for example to the App Store — give it your own name and icon.
+
+2. Claude name and logo — Septena/Assets.xcassets/ClaudeMark.imageset/.
+   "Claude" and the Claude logo are trademarks of Anthropic, PBC. They ship in
+   the repository so the app builds and functions, but they are NOT covered by
+   the MIT grant; they appear only to identify Septena's optional integration
+   with Claude. Anthropic retains all rights to its marks. If you fork or
+   redistribute Septena under a different name, remove or replace this asset.

@@ -223,6 +223,8 @@ From `project.yml` and entitlements:
 
 MIT - see [`LICENSE`](LICENSE). Copyright (c) 2026 Michell Zappa.
 
-One bundled asset is **not** covered by the MIT grant — see [`NOTICE`](NOTICE):
-the Claude name/logo (an Anthropic trademark, bundled only to identify the
-Claude integration).
+The MIT grant covers the **code**, not the **brand** — see [`NOTICE`](NOTICE).
+"Septena," the wordmark, and the app icon are reserved trademarks: fork and
+build all you like, but ship derivatives under your own name and icon. One
+bundled asset is also excluded — the Claude name/logo (an Anthropic trademark,
+bundled only to identify the Claude integration).
