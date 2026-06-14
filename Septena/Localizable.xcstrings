@@ -1270,6 +1270,12 @@
         }
       }
     },
+    "After 1 minute" : {
+
+    },
+    "After 5 minutes" : {
+
+    },
     "After completion" : {
       "localizations" : {
         "pt-BR" : {
@@ -1432,6 +1438,9 @@
           }
         }
       }
+    },
+    "App Lock" : {
+
     },
     "Appended to how this coach talks." : {
       "localizations" : {
@@ -3574,6 +3583,9 @@
         }
       }
     },
+    "Immediately" : {
+
+    },
     "Import" : {
       "localizations" : {
         "pt-BR" : {
@@ -5556,6 +5568,9 @@
           }
         }
       }
+    },
+    "Septena is locked" : {
+
     },
     "Septena keeps all your data in your private iCloud, so it needs you signed in. Open Settings and sign in to iCloud to use the app and sync across your devices." : {
       "localizations" : {

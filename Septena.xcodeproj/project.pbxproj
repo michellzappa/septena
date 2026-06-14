@@ -362,6 +362,7 @@
 		881C31FAE6D190498F378B6C /* RhythmWidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75738AAA1F8AD9EA26EF0D3B /* RhythmWidgetSnapshot.swift */; };
 		882529A4B2900274FC268325 /* AddMoodPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A1880819394CCA40FDB923 /* AddMoodPage.swift */; };
 		8877DE54B1CFE5A7B64F2C2E /* GoalMetricProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21A8FE1B8B5D5A1B17969276 /* GoalMetricProgressView.swift */; };
+		887BECF5F9C96F017814AA60 /* AppLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 808A135DB47F304105813AE4 /* AppLock.swift */; };
 		88D354F6ACC5B87602A1B731 /* ShortcutAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB6A01D91E7B3ED63B6BFDE /* ShortcutAction.swift */; };
 		88D6592312AB55D1A314C247 /* EditNutritionEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C79C561E59D69B3653B65047 /* EditNutritionEntrySheet.swift */; };
 		88DB9A3D589E04E5E452A15C /* MedicationsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05717A5AFCE742FF68367E5F /* MedicationsPlugin.swift */; };
@@ -604,6 +605,7 @@
 		DE17E0E10A5D900BF45E5888 /* IntakeModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FDD99A14104B857C0AD4661 /* IntakeModel.swift */; };
 		DE2DC97811EBF7E4B01C3261 /* HabitsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136C8433FB649CD81132B054 /* HabitsPlugin.swift */; };
 		DE6D750657BA618C33B271DD /* GoalGridSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84FDF565EF256B9FFDFFC782 /* GoalGridSupport.swift */; };
+		DEA2045EF8AC5881F6EA6403 /* AppLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 808A135DB47F304105813AE4 /* AppLock.swift */; };
 		DEF6485917B66FBC2949A92D /* AppleIntelligenceUnavailableCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 587415415EEBAE5FFCF79DE4 /* AppleIntelligenceUnavailableCard.swift */; };
 		DF016EF192B7891D2DBE3CB6 /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E25F81FE5AA4B6BBC056275 /* DateParser.swift */; };
 		DF18562CFD663359486C92FF /* InsightsDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12BBB5200E230B6672B99A6A /* InsightsDestination.swift */; };
@@ -953,6 +955,7 @@
 		7F911216C13CBFC7E330714A /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		7FD1B7B2BAE523F2E4D3F99C /* ProjectsBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectsBackend.swift; sourceTree = "<group>"; };
 		804ACCAA2E1FE43802EA25AB /* AddGutPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGutPage.swift; sourceTree = "<group>"; };
+		808A135DB47F304105813AE4 /* AppLock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLock.swift; sourceTree = "<group>"; };
 		80D7DFAC856BBE635EBBC6E4 /* ActivityDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityDestinationView.swift; sourceTree = "<group>"; };
 		80DEE8B28CA8C41A6CA85016 /* ConvoDerived.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvoDerived.swift; sourceTree = "<group>"; };
 		81E6CCEAE6C25B88290F0666 /* DenseHomepageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DenseHomepageView.swift; sourceTree = "<group>"; };
@@ -1335,6 +1338,14 @@
 			path = Virtue;
 			sourceTree = "<group>";
 		};
+		58E88D7A812F74DFC3213689 /* Security */ = {
+			isa = PBXGroup;
+			children = (
+				808A135DB47F304105813AE4 /* AppLock.swift */,
+			);
+			path = Security;
+			sourceTree = "<group>";
+		};
 		59B08D4759930317F4B0B9CB /* Sections */ = {
 			isa = PBXGroup;
 			children = (
@@ -1536,6 +1547,7 @@
 				0D96A0BCB876F3BD917A9A7C /* Intelligence */,
 				86446509AEE92C03A74BCF48 /* Onboarding */,
 				9DCBFF2C71121CA320866A3F /* Sections */,
+				58E88D7A812F74DFC3213689 /* Security */,
 				6D68A1F0A14D187F52B0AB8E /* Settings */,
 				87100EA2A5455E2B0A07163C /* Sidebar */,
 				AC3601086E54088A26CF492F /* Tasks */,
@@ -2349,6 +2361,7 @@
 				91693AEE32D3825C811733E8 /* AddTrainingPage.swift in Sources */,
 				262BCA840BF28F47B44CE247 /* AmbientLight.swift in Sources */,
 				2933A423AA89C0FC06C738DD /* App.swift in Sources */,
+				DEA2045EF8AC5881F6EA6403 /* AppLock.swift in Sources */,
 				E666EB185C74070004ACD166 /* AppleIntelligenceUnavailableCard.swift in Sources */,
 				1044DAF00212F1890D0BBCC3 /* AreaRecord.swift in Sources */,
 				E8CE6D6CCE3418CBE815E85A /* AreasBackend.swift in Sources */,
@@ -2702,6 +2715,7 @@
 				6600263164A28E6F185190DA /* AddTrainingPage.swift in Sources */,
 				04D117D5F2EB083A9423E808 /* AmbientLight.swift in Sources */,
 				1872D480184BC0A84068D022 /* App.swift in Sources */,
+				887BECF5F9C96F017814AA60 /* AppLock.swift in Sources */,
 				DEF6485917B66FBC2949A92D /* AppleIntelligenceUnavailableCard.swift in Sources */,
 				74E631E4D6B41796BBE7B3FA /* AreaRecord.swift in Sources */,
 				C7AC2E4E116DAB445A500573 /* AreasBackend.swift in Sources */,

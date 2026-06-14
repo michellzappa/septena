@@ -59,6 +59,18 @@
         }
       }
     },
+    "NSFaceIDUsageDescription" : {
+      "comment" : "Privacy - Face ID Usage Description",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Septena uses Face ID to unlock the app when App Lock is turned on, so your private logs stay covered on an unlocked phone."
+          }
+        }
+      }
+    },
     "NSHealthShareUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {

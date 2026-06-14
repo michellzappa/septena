@@ -23,6 +23,9 @@ struct SeptenaApp: App {
   /// from this instead of calling `SeptenaDate.today` or `Date()` so they
   /// re-render on midnight rollover and on each minute tick uniformly.
   @State private var dayClock = DayClock()
+  /// Whole-app privacy gate (Face ID / Touch ID / passcode). No-op unless the
+  /// user turns it on in Settings ▸ Privacy. Driven below from `scenePhase`.
+  @State private var appLock = AppLock()
   private let localStore = LocalStore.shared
   /// Process-wide accessor for the CloudKit-backed mutation stack.
   /// Owns `ckEngine`, `taskMutator`, `areasMutator`, `projectsMutator`
@@ -58,6 +61,10 @@ struct SeptenaApp: App {
         // OUTSIDE that scope and crash on the first frame.) Presented sheets
         // still render above it, so sheet-based logs fire after dismissal.
         .overlay { LogCommitOverlay() }
+        // Privacy lock cover. Applied AFTER LogCommitOverlay so it layers
+        // above it, and (like the overlays here) before the .environment
+        // chain, so it can read `appLock` from the environment below.
+        .overlay { AppLockCover() }
         // Septena keeps everything in the user's private iCloud, so warn
         // plainly when there's no usable account. Applied here (inside the
         // .environment chain below) so it can read `ckEngine`.
@@ -79,8 +86,12 @@ struct SeptenaApp: App {
         .environment(dayClock)
         .environment(ckEngine)
         .environment(logCommit)
+        .environment(appLock)
         .modelContainer(localStore.container)
         .onChange(of: scenePhase) { _, phase in
+          // Drive the privacy lock first: re-arm / re-cover on background,
+          // prompt for auth on return. No-op unless the user enabled it.
+          appLock.handle(scenePhase: phase)
           // Foreground transitions are the best moment to flush any
           // mutations that were queued while offline / suspended, and
           // to re-check the clock so a backgrounded-across-midnight
@@ -115,6 +126,12 @@ struct SeptenaApp: App {
         }
         .onOpenURL { url in
           handleDeepLink(url)
+        }
+        .task {
+          // Cold-launch arm: `onChange(of:)` doesn't fire for the initial
+          // scene phase, so kick the first biometric prompt here when the app
+          // came up locked. No-op when the lock is off.
+          appLock.handle(scenePhase: scenePhase)
         }
         .task {
           #if os(iOS)

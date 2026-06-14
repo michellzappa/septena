@@ -137,6 +137,14 @@ enum SettingsKey {
   static let localMcpEnabled  = MCPDefaultsKey.enabled
   /// macOS-only: bearer token Claude Code sends to the local MCP server.
   static let localMcpToken    = MCPDefaultsKey.token
+  /// Whole-app privacy lock: require Face ID / Touch ID / device passcode to
+  /// reopen Septena after it's been backgrounded past the grace window.
+  /// Local-only @AppStorage — the lock is a per-device privacy gate, not
+  /// synced account data (each device opts in on its own). Read by `AppLock`.
+  static let appLockEnabled      = "septena.security.appLock"
+  /// Seconds the app may sit backgrounded before the lock re-arms. 0 =
+  /// immediately. Absent → 60. Read by `AppLock`.
+  static let appLockGraceSeconds = "septena.security.appLockGrace"
 }
 
 /// Where a homepage tap on the Tasks tile lands. `drawer` shows today's
@@ -957,9 +965,29 @@ private struct SettingsTopGradient: View {
 
 struct PrivacySettingsPane: View {
   @AppStorage(SettingsKey.shareUsageData) private var share: Bool = true
+  @AppStorage(SettingsKey.appLockEnabled) private var appLockEnabled: Bool = false
+  @AppStorage(SettingsKey.appLockGraceSeconds) private var appLockGrace: Int = 60
 
   var body: some View {
     Form {
+      Section {
+        Toggle(AppLock.requireActionLabel, isOn: $appLockEnabled)
+          .disabled(!AppLock.isAvailable)
+        if appLockEnabled {
+          Picker("Lock after", selection: $appLockGrace) {
+            Text("Immediately").tag(0)
+            Text("After 1 minute").tag(60)
+            Text("After 5 minutes").tag(300)
+          }
+        }
+      } header: {
+        Text("App Lock")
+      } footer: {
+        Text(AppLock.isAvailable
+             ? "Asks for \(AppLock.biometryLabel) or your passcode when you reopen Septena. Your data is already protected by your device passcode — this adds a gate in front of the app itself, for when the phone is unlocked and handed over."
+             : "Set up \(AppLock.biometryLabel) or a device passcode in Settings to use App Lock.")
+      }
+
       Section {
         Toggle("Share anonymous usage data", isOn: $share)
       } footer: {
