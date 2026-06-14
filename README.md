@@ -4,8 +4,6 @@ Septena is a private life operating system for Apple platforms. It brings tasks,
 
 The product principle is simple: every life domain is a section, every section can be enabled or hidden without deleting data, and every write should land in the local SwiftData mirror first, then sync through CloudKit.
 
-> Status (2026-05-30): Septena is CloudKit-first. The general FastAPI client path has been removed from this repo; remaining FastAPI references are migration history, export DTO compatibility, or comments that still need cleanup. `docs/TRAINING_MIGRATION_HANDOFF.md` and `docs/NUTRITION_MIGRATION_HANDOFF.md` are historical migration notes — verify them against code before treating them as live truth.
-
 ## Stack
 
 - **SwiftUI** - shared app code for iOS and macOS, plus a watchOS companion
