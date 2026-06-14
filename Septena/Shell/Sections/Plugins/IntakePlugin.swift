@@ -14,12 +14,11 @@ enum IntakePlugin: SectionPlugin {
 
   static var manifest: SectionManifest { SectionManifest.byKey["intake"]! }
 
-  static func destinationView() -> AnyView? { AnyView(IntakeDestinationView()) }
-
-  // The host has no quick-log of its own — quick-add is per kind (each kind page
-  // builds its own container-aware menu). Keeping this empty avoids duplicating
-  // those actions on every kind page (SectionDrawer appends plugin.logActions).
-  static var logActions: [LogAction] { [] }
+  // Intake has no single "whole section" screen: each kind is surfaced as its
+  // own dashboard tile that opens straight into IntakeKindPageView, and the
+  // empty state opens the create-tracker wizard. So there's no host destination
+  // (no redundant kind-switcher list) — management lives in detailPaneContent().
+  static func destinationView() -> AnyView? { nil }
 
   // Crisp snap for every tracker log (see IntakeKindPageView.motion(for:),
   // which renders it in-page — on iPhone the kind page is a sheet, above

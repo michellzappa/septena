@@ -159,6 +159,10 @@ struct WeekDashboardView: View {
   @State private var intakeTiles: [IntakeTileDTO] = []
   /// Tracker page presented from a tile tap (push on regular, sheet on compact).
   @State private var intakeKindDest: IntakeKindRef? = nil
+  /// Create-a-tracker wizard, presented from the empty-state tile. Intake has no
+  /// monolithic section screen (each kind is its own tile → drawer), so the empty
+  /// state goes straight to creation rather than a redundant kind-switcher list.
+  @State private var creatingIntakeKind = false
   @State private var bodyRows: [WithingsRow] = []
   /// GitHub contribution calendar (read-only, per-device token). Drives the
   /// GitHub tile's commit counts; the destination view fetches its own copy.
@@ -383,6 +387,9 @@ struct WeekDashboardView: View {
     .sheet(item: intakeKindSheetBinding) { ref in
       NavigationStack { IntakeKindPageView(kindID: ref.value) }
         .sectionDrawerPresentation()
+    }
+    .sheet(isPresented: $creatingIntakeKind) {
+      IntakeKindWizard(onCreated: { _ in Task { await reloadIntake() } })
     }
     .sheet(item: $nutritionSheet) { sheet in
       switch sheet {
@@ -2422,14 +2429,14 @@ struct WeekDashboardView: View {
                               to: cal.startOfDay(for: clock.now)).day
   }
 
-  /// Shown when the section is enabled but has no kinds yet — keeps the
-  /// destination reachable so the user can create their first tracker.
+  /// Shown when the section is enabled but has no kinds yet — taps straight into
+  /// the create-a-tracker wizard (there's no host kind-switcher screen anymore).
   private var intakeEmptyTile: some View {
     ModuleTile(title: SectionManifest.byKey["intake"]?.defaultLabel ?? "Intake",
                accent: theme.color(for: "intake"),
                stats: [.init(label: "Trackers", value: "0")])
       .contentShape(Rectangle())
-      .onTapGesture { open(.intake) }
+      .onTapGesture { creatingIntakeKind = true }
   }
 
   /// Aggregate row for the non-Tiles layout modes (Dense / Heatmap / Rings /

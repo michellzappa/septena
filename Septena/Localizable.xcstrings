@@ -1148,9 +1148,6 @@
         }
       }
     },
-    "Add a tracker for anything you consume — each keeps its own doses and a streak counting the days since you last logged." : {
-
-    },
     "Add Chore" : {
       "extractionState" : "manual",
       "localizations" : {
