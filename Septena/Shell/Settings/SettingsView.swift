@@ -2857,6 +2857,7 @@ struct SectionDetailPane: View {
       }
       enabledRow
       showInTodayRow
+      showInSpotlightRow
     } footer: {
       if let m = manifest, !m.shortDescription.isEmpty {
         Text(m.shortDescription)
@@ -2936,6 +2937,46 @@ struct SectionDetailPane: View {
                         color: config.color,
                         isEnabled: config.isEnabled,
                         showInToday: value,
+                        showInSpotlight: config.showInSpotlight,
+                        hasOnboarded: config.hasOnboarded)
+        : config
+    }
+  }
+
+  /// Per-section opt-out for Spotlight / Siri / Apple Intelligence. Shown only
+  /// for sections that actually contribute entities to the index, so a
+  /// read-only section (Sleep, GitHub, Insights) doesn't show a dead toggle.
+  /// Default on — Septena exposes everything unless the user opts out here.
+  @ViewBuilder
+  private var showInSpotlightRow: some View {
+    if SpotlightIndexer.indexableSectionKeys.contains(sectionKey) {
+      Toggle(isOn: Binding(
+        get: { server?.showInSpotlight ?? true },
+        set: { setShowInSpotlight($0) }
+      )) {
+        VStack(alignment: .leading, spacing: 1) {
+          Text("Show in Spotlight & Siri")
+          Text("Let Siri and Apple Intelligence find this section's entries in search.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+    }
+  }
+
+  private func setShowInSpotlight(_ value: Bool) {
+    SettingsMirror.setSectionShowInSpotlight(sectionKey,
+                                             showInSpotlight: value,
+                                             context: modelContext,
+                                             engine: ckEngine)
+    store.sections = store.sections.map { config in
+      config.key == sectionKey
+        ? SectionConfig(key: config.key,
+                        label: config.label,
+                        color: config.color,
+                        isEnabled: config.isEnabled,
+                        showInToday: config.showInToday,
+                        showInSpotlight: value,
                         hasOnboarded: config.hasOnboarded)
         : config
     }
@@ -3014,6 +3055,7 @@ struct SectionDetailPane: View {
                         color: hex,
                         isEnabled: config.isEnabled,
                         showInToday: config.showInToday,
+                        showInSpotlight: config.showInSpotlight,
                         hasOnboarded: config.hasOnboarded)
         : config
     }

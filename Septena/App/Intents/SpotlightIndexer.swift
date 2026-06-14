@@ -26,6 +26,15 @@ import SwiftData
 final class SpotlightIndexer {
   static let shared = SpotlightIndexer()
 
+  /// Sections that currently contribute entities to the index. Drives which
+  /// Settings pages show the "Show in Spotlight & Siri" opt-out (a read-only
+  /// section has nothing to gate). Keep in step with the builders below; grows
+  /// as later phases index more (e.g. nutrition / mood logs).
+  static let indexableSectionKeys: Set<String> = [
+    "tasks", "habits", "supplements", "chores", "training", "groceries",
+    "nutrition", "mood",
+  ]
+
   private enum Scope { case tasks, catalogs }
 
   /// Last-indexed id set per snapshot key, persisted so a delete made while the
@@ -86,9 +95,15 @@ final class SpotlightIndexer {
 
   private func reconcileTasks() async {
     let context = LocalStore.shared.container.mainContext
-    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
-    let entities = rows.map { TaskChoice(id: $0.id, title: $0.title, notes: $0.notes) }
-    // Tasks is a core, always-on section — index unconditionally.
+    // Tasks is a core, always-on section, but still honors the Spotlight
+    // opt-out. Opted out → empty list → reconcile prunes whatever was indexed.
+    let entities: [TaskChoice]
+    if SettingsMirror.showInSpotlight("tasks", context: context) {
+      let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
+      entities = rows.map { TaskChoice(id: $0.id, title: $0.title, notes: $0.notes) }
+    } else {
+      entities = []
+    }
     await reconcile(entities, type: TaskChoice.self,
                     snapshotKey: "spotlight.snapshot.tasks")
   }
@@ -109,6 +124,15 @@ final class SpotlightIndexer {
                     snapshotKey: "spotlight.snapshot.groceryItems")
     await reconcile(groceryCats(ctx),  type: GroceryCategoryChoice.self,
                     snapshotKey: "spotlight.snapshot.groceryCategories")
+    // Phase 2 — historical log events (full history; CoreSpotlight handles
+    // large indexes). A trailing-window cap can be added if device backfill
+    // proves slow. See docs/SPOTLIGHT_READABILITY_PLAN.md.
+    await reconcile(meals(ctx),        type: MealLogEntity.self,
+                    snapshotKey: "spotlight.snapshot.meals")
+    await reconcile(moods(ctx),        type: MoodLogEntity.self,
+                    snapshotKey: "spotlight.snapshot.moods")
+    await reconcile(workouts(ctx),     type: WorkoutLogEntity.self,
+                    snapshotKey: "spotlight.snapshot.workouts")
   }
 
   /// Index everything present, prune the diff against the last-indexed set. An
@@ -142,49 +166,58 @@ final class SpotlightIndexer {
     return stored
   }
 
+  /// A section is indexed only when it's enabled AND the user hasn't opted it
+  /// out of Spotlight / Siri. Either being false makes the builder return [],
+  /// so reconcile prunes the section's entries.
+  private func indexable(_ key: String, _ ctx: ModelContext) -> Bool {
+    SeptenaServices.shared.isSectionEnabled(key)
+      && SettingsMirror.showInSpotlight(key, context: ctx)
+  }
+
   // MARK: Catalog builders
   //
   // Each mirrors its section's `EntityQuery` catalog and returns [] when the
-  // section is disabled, so reconcile prunes it. (Replicated rather than shared
-  // because the queries' catalog helpers are private; the shapes are trivial.)
+  // section is disabled or opted out, so reconcile prunes it. (Replicated
+  // rather than shared because the queries' catalog helpers are private; the
+  // shapes are trivial.)
 
   private func habits(_ ctx: ModelContext) -> [HabitEntity] {
-    guard SeptenaServices.shared.isSectionEnabled("habits") else { return [] }
+    guard indexable("habits", ctx) else { return [] }
     let defs = (try? ctx.fetch(FetchDescriptor<HabitDefinitionEntity>(
       sortBy: [SortDescriptor(\.sortIndex)]))) ?? []
     return defs.map { HabitEntity(id: $0.id, title: $0.title, emoji: $0.emoji) }
   }
 
   private func supplements(_ ctx: ModelContext) -> [SupplementEntity] {
-    guard SeptenaServices.shared.isSectionEnabled("supplements") else { return [] }
+    guard indexable("supplements", ctx) else { return [] }
     let defs = (try? ctx.fetch(FetchDescriptor<SupplementDefinitionEntity>(
       sortBy: [SortDescriptor(\.sortIndex)]))) ?? []
     return defs.map { SupplementEntity(id: $0.id, title: $0.title, emoji: $0.emoji) }
   }
 
   private func chores(_ ctx: ModelContext) -> [ChoreEntity] {
-    guard SeptenaServices.shared.isSectionEnabled("chores") else { return [] }
+    guard indexable("chores", ctx) else { return [] }
     let defs = (try? ctx.fetch(FetchDescriptor<ChoreDefinitionEntity>(
       sortBy: [SortDescriptor(\.sortIndex)]))) ?? []
     return defs.map { ChoreEntity(id: $0.id, title: $0.title, emoji: $0.emoji) }
   }
 
   private func exercises(_ ctx: ModelContext) -> [ExerciseChoice] {
-    guard SeptenaServices.shared.isSectionEnabled("training") else { return [] }
+    guard indexable("training", ctx) else { return [] }
     let defs = (try? ctx.fetch(FetchDescriptor<ExerciseDefinitionEntity>(
       sortBy: [SortDescriptor(\.sortIndex)]))) ?? []
     return defs.filter { !$0.archived }.map { ExerciseChoice(id: $0.name) }
   }
 
   private func sessionTypes(_ ctx: ModelContext) -> [TrainingSessionTypeChoice] {
-    guard SeptenaServices.shared.isSectionEnabled("training") else { return [] }
+    guard indexable("training", ctx) else { return [] }
     return ChecklistMirror.loadSessionTypes(context: ctx)
       .filter { !$0.archived }
       .map { TrainingSessionTypeChoice(id: $0.id, title: $0.label) }
   }
 
   private func groceryItems(_ ctx: ModelContext) -> [GroceryItemChoice] {
-    guard SeptenaServices.shared.isSectionEnabled("groceries") else { return [] }
+    guard indexable("groceries", ctx) else { return [] }
     let items = (try? ctx.fetch(FetchDescriptor<GroceryItemEntity>(
       sortBy: [SortDescriptor(\.sortIndex)]))) ?? []
     return items.map {
@@ -194,9 +227,29 @@ final class SpotlightIndexer {
   }
 
   private func groceryCats(_ ctx: ModelContext) -> [GroceryCategoryChoice] {
-    guard SeptenaServices.shared.isSectionEnabled("groceries") else { return [] }
+    guard indexable("groceries", ctx) else { return [] }
     let cats = (try? ctx.fetch(FetchDescriptor<GroceryCategoryEntity>(
       sortBy: [SortDescriptor(\.sortIndex)]))) ?? []
     return cats.map { GroceryCategoryChoice(id: $0.id, title: $0.name) }
+  }
+
+  // MARK: Historical log builders (Phase 2)
+
+  private func meals(_ ctx: ModelContext) -> [MealLogEntity] {
+    guard indexable("nutrition", ctx) else { return [] }
+    let rows = (try? ctx.fetch(FetchDescriptor<NutritionEntryEntity>())) ?? []
+    return rows.map { MealLogEntity.from($0) }
+  }
+
+  private func moods(_ ctx: ModelContext) -> [MoodLogEntity] {
+    guard indexable("mood", ctx) else { return [] }
+    let rows = (try? ctx.fetch(FetchDescriptor<MoodEventEntity>())) ?? []
+    return rows.map { MoodLogEntity.from($0) }
+  }
+
+  private func workouts(_ ctx: ModelContext) -> [WorkoutLogEntity] {
+    guard indexable("training", ctx) else { return [] }
+    let rows = (try? ctx.fetch(FetchDescriptor<ExerciseEntryEntity>())) ?? []
+    return rows.map { WorkoutLogEntity.from($0) }
   }
 }

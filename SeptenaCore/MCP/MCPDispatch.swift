@@ -611,6 +611,9 @@ enum MCPDispatch {
       color: args.string("color") ?? existing?.color ?? "#888888",
       isEnabled: args.bool("enabled") ?? existing?.isEnabled ?? true,
       showInToday: existing?.showInToday ?? true,
+      // Preserve the Spotlight opt-out — MCP doesn't manage it, but
+      // replaceSections writes it, so carry the existing value through.
+      showInSpotlight: existing?.showInSpotlight ?? true,
       hasOnboarded: existing?.hasOnboarded ?? false)
     SettingsMirror.replaceSections([config], context: ctx, engine: engine)
 

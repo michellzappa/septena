@@ -58,6 +58,8 @@ promoted to Prod unless the Console already shows them):
 | 6 | **New record types** for Symptoms | `SymptomDefinition`, `SymptomEvent` | all | — |
 | 7 | **New record types** for Medications | `MedicationDefinition`, `MedicationDoseEvent` | all | — |
 | 8 | ~~**New field** `rhythmPayload` (day-dial widget blob) on `WatchSnapshot`~~ — **DEFERRED**: the day-dial widget is disabled (glass can't render in a widget snapshot), so the field is no longer written. Don't deploy it until the widget ships. | `WatchSnapshot` | `rhythmPayload` | Bytes(Data) |
+| 9 | **New field** `showInSpotlight` (per-section Spotlight/Siri opt-out; absent ⇒ true ⇒ discoverable) | `Section` | `showInSpotlight` | Int(64) (`Bool`) |
+| 10 | **New field** `reservedString1` (carries an area's optional user emoji — first actual write of this reserved slot) | `Area` | `reservedString1` | String |
 
 `MoodEvent` reuses the CloudKit record slot vacated by the retired `AirReading` type
 (Air section removed in the same merge). It is a *new* type from Production's point of
@@ -210,6 +212,7 @@ These six are the task backend, written by `SeptenaCore/CloudKit/*Record.swift`.
 | `color` | String | `String` | No | |
 | `isEnabled` | Int(64) | `Bool` | No | |
 | `showInToday` | Int(64) | `Bool` | No | |
+| `showInSpotlight` | Int(64) | `Bool` | No | Spotlight/Siri opt-out; **NEW — pending Prod deploy**. Absent ⇒ true (discoverable) |
 | `hasOnboarded` | Int(64) | `Bool` | No | |
 | `updatedAt` | **String** | `Date` | No | ISO8601 **string**, not a Timestamp |
 | `reservedString1`, `reservedInt1` | — | reserved | — | |

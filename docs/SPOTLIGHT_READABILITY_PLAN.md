@@ -47,23 +47,24 @@ can log for you but cannot recall anything you logged.
   `services.absorbRemoteChanges()` in the launch path, never inside `start()`
   (which deliberately doesn't await a server round-trip).
 
-## The one product decision (gates Phase 2 only)
+## The product decision — DECIDED 2026-06-14: expose-by-default + per-section opt-out
 
-`IndexedEntity` makes data "discoverable by Apple Intelligence." Two postures:
+`IndexedEntity` makes data "discoverable by Apple Intelligence." The owner chose:
+**index everything by default, with a per-section opt-out** — the user can hide
+any section from Spotlight / Siri without disabling the section itself.
 
-- **(A) Index-by-default, gated by section enablement** *(recommended for
-  catalog entities)* — if a section is on, its items index; disabling purges.
-  This matches today's model (enabling a section already exposes it to
-  Siri/pickers/MCP). No new UI, one mental model.
-- **(B) Opt-in per-section "Discoverable in Spotlight" toggle** — a new
-  CloudKit-synced `SectionEntity` flag, default off, for the sensitive
-  historical-log surface. More privacy-forward; costs a synced field + settings
-  UI + onboarding copy + a second gate.
+Implemented as a **synced** `SectionEntity.showInSpotlight: Bool = true` flag
+(mirrors `showInToday`: model + CloudKit `Section.showInSpotlight` field +
+`SectionConfig` DTO + a `setSectionShowInSpotlight` toggle that posts
+`.septenaDataChanged`). Chosen synced (not per-device) so "don't expose this to
+Siri" set on the phone also applies on iPad/Mac. Absence in a CKRecord decodes as
+`true`, so existing rows are discoverable with no migration. CloudKit schema:
+additive field, **pending Prod deploy** (docs/CloudKitSchema.md changelog #9).
 
-**Recommendation:** ship Phase 0/1 (catalog entities) under (A) — those are
-already Spotlight-suggested via `AppEntity`, so indexing them changes nothing
-privacy-wise. **Hold the (A)/(B) call for Phase 2** (meals, moods, workouts are
-the sensitive surface). This decision blocks Phase 2 and is the product owner's.
+`SpotlightIndexer` gates every section on `isSectionEnabled(key) &&
+showInSpotlight(key)`; opting out yields an empty build → the existing prune step
+removes the section's entries. The Settings toggle ("Show in Spotlight & Siri")
+shows only for sections in `SpotlightIndexer.indexableSectionKeys`.
 
 ---
 

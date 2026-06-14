@@ -20,6 +20,7 @@
 		02C0FDC8E22EF595A294A4ED /* SeptenaSceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6962898B56CBFB87E5417A5 /* SeptenaSceneDelegate.swift */; };
 		036EA94AAE4126D6277D46B8 /* StatGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 905952CC4800DE8D2B5A5659 /* StatGrid.swift */; };
 		03F4D6C2B204D072D7147C89 /* AISettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CD583880ED63C58AF877EFD /* AISettingsPane.swift */; };
+		03FFAAF8A852B4469ACD03FD /* MoodLogEntity.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E574983CE59DCE0D6CB32E /* MoodLogEntity.swift */; };
 		04112426A92819E814A6F66A /* QuickFindView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAB04CA79A9C3207CCE972F9 /* QuickFindView.swift */; };
 		0448F507E1F1600F9933AEED /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5ECFDA9128B73993023CB6 /* Models.swift */; };
 		04D117D5F2EB083A9423E808 /* AmbientLight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B3E103B23A9C78BF9C29516 /* AmbientLight.swift */; };
@@ -83,6 +84,7 @@
 		1BBBC5F2298045DC6FD22C2F /* TrainingTabAccessory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17A6C44F7BE4CCDA2085224 /* TrainingTabAccessory.swift */; };
 		1C507D0995C20ECA4DA6479F /* ChoresQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = F531676F7BCEFA46F3A7D827 /* ChoresQuickAddMenu.swift */; };
 		1C66407AC9157A11987CE3DB /* WelcomeHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD1B703F4A00C0E46140FEC1 /* WelcomeHeader.swift */; };
+		1CBC30CB0EAE9F3FF70A7CE9 /* EmojiPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F6A1305E991C15F64C716D9 /* EmojiPicker.swift */; };
 		1CBF0222F73BAE3CDDB0E342 /* ProjectRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A7C4DF4E90BB39F4A0D23DE /* ProjectRecord.swift */; };
 		1D075925DFF88985F673FD7F /* SiriShortcutsSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15B234E4AED39B8EF15DD9A6 /* SiriShortcutsSettingsPane.swift */; };
 		1D9688F8151A47D8555D18FB /* CanonicalExerciseName.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6458F5784F01C48C06CAE489 /* CanonicalExerciseName.swift */; };
@@ -197,6 +199,7 @@
 		43BBD8657E058CAD84ECE541 /* TrainingIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 185686A2A4BF9FA8CE915F91 /* TrainingIntents.swift */; };
 		43C9357C3238780EE8C04378 /* SupplementTypeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F326D9758674AD8EA4DBB211 /* SupplementTypeSheet.swift */; };
 		450496F40630174648D27F2F /* NextFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848DD768C118B7BDF4E27FC4 /* NextFeed.swift */; };
+		450C9309FB8EC6AA3F778341 /* WorkoutLogEntity.swift in Sources */ = {isa = PBXBuildFile; fileRef = F19A6EE7622D933F115B075D /* WorkoutLogEntity.swift */; };
 		450F6EE8AD17A6935567940D /* DayClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFD8EA98B891BB43A0CE4640 /* DayClock.swift */; };
 		454D024E707CE7FF7C823FEA /* NutritionRecommendations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CEAA5532CD1C1A47DB1BBAC /* NutritionRecommendations.swift */; };
 		4576C2F0D4BCB0983D18B3DE /* SuggestionBlocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = B57B46F99E041E6147DBFCE6 /* SuggestionBlocks.swift */; };
@@ -223,6 +226,7 @@
 		4FBE329D7003929D4E3A98BF /* ReasoningProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C641220AFE9A17115F46A97C /* ReasoningProvider.swift */; };
 		4FBF503917E03E829BA50234 /* ChoreDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B51BC53BD88D706639E85DB /* ChoreDetailView.swift */; };
 		500ED8305AD78B70EF40D352 /* NotificationKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A1CF28130DC18463097263 /* NotificationKit.swift */; };
+		5095EC10FFE8E70AFC17560A /* EmojiPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F6A1305E991C15F64C716D9 /* EmojiPicker.swift */; };
 		50CF4B051F95F41ABD93209E /* TrainingLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2A2AA1777B672AFC02F29BF /* TrainingLiveActivity.swift */; };
 		50ECC944A3D81BCEB7923CED /* WatchSnapshotPublisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EDE23D823F6238C9977BF16 /* WatchSnapshotPublisher.swift */; };
 		513C8B1D41E5BA85B785129C /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E25F81FE5AA4B6BBC056275 /* DateParser.swift */; };
@@ -320,6 +324,7 @@
 		72DE86EBB0B6CEE689289481 /* GutSymptomMigrationMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = A752F956A678D4C282D192DE /* GutSymptomMigrationMap.swift */; };
 		7397EB4533BA4D026F9F7662 /* CalendarBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7027B881D1D8B1B09B105034 /* CalendarBridge.swift */; };
 		741596AFFC77B4E147C388F4 /* WakingDay+Oura.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6292E14A6AFBDD8FFC8E7E6E /* WakingDay+Oura.swift */; };
+		741C8DEC093734FCECDE01C3 /* MealLogEntity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C198F08A4BCFDFC1B254BA8 /* MealLogEntity.swift */; };
 		7435B6913FC111EAE946DBBB /* ValuesMiniApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABBBBE8B556E5C9946CFB630 /* ValuesMiniApp.swift */; };
 		74E631E4D6B41796BBE7B3FA /* AreaRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = C729259A5867D99CC64AA9C3 /* AreaRecord.swift */; };
 		752EC30B8D5BBB93EBA9FBBE /* CoachVoiceRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15B7C1644977DC5B2BBB9339 /* CoachVoiceRecord.swift */; };
@@ -409,6 +414,7 @@
 		95FF3A61C542C9B1633050C3 /* SectionManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27161C741F9EC6CFC1F83CE0 /* SectionManifest.swift */; };
 		963652437C3079BD46CC1E83 /* NutritionDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42EB061D69FA656547DC171F /* NutritionDestinationView.swift */; };
 		96BC93CC430B1522E41BFE43 /* TimeTravelSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F64F5C726E0098D4000EFCE8 /* TimeTravelSheet.swift */; };
+		970B36891277CD49027B391E /* MealLogEntity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C198F08A4BCFDFC1B254BA8 /* MealLogEntity.swift */; };
 		97D8C948119E61E0DEE371AF /* LogDetailScaffold.swift in Sources */ = {isa = PBXBuildFile; fileRef = 703257F32821B161F51B5CC1 /* LogDetailScaffold.swift */; };
 		99277F861EF959F986D7589B /* ChartCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6677D4008D68908591E4937 /* ChartCard.swift */; };
 		99C5E0B4C1F96A710C71DFFC /* DayTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 880B70E1267B3CAAFFBA9D65 /* DayTimelineView.swift */; };
@@ -576,6 +582,7 @@
 		D2221698053775DF028EFE9B /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C416C1BB08DEB2D6277BAB1 /* FlowLayout.swift */; };
 		D2943E437F80E794F2D7797B /* HabitIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C277868C4AE1C5E33D07F566 /* HabitIntents.swift */; };
 		D2ED87D701557BCC94446AC6 /* AddInfoRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD5AAD8DD0E25AF940E3237C /* AddInfoRow.swift */; };
+		D2F3891ACF304E8652895F92 /* WorkoutLogEntity.swift in Sources */ = {isa = PBXBuildFile; fileRef = F19A6EE7622D933F115B075D /* WorkoutLogEntity.swift */; };
 		D334F61695EED971DC3B3146 /* GroceryIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87FAF7FBE617575AF2437A61 /* GroceryIntents.swift */; };
 		D3852E3A3953E48A78381A8B /* LocalMCPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E077E7EB9C0315CB7E97CF1D /* LocalMCPServer.swift */; };
 		D3D1CABDF4A3D738542C4712 /* LogEntryRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C0951A6C8EB5FC40A37EE51 /* LogEntryRow.swift */; };
@@ -648,6 +655,7 @@
 		E91ADC2BF5CC85574807D529 /* ValuesMiniApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABBBBE8B556E5C9946CFB630 /* ValuesMiniApp.swift */; };
 		E952E27D2FD074C1473A4292 /* LogCommit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B5E07B2C36076D991E0F0C1 /* LogCommit.swift */; };
 		E9970D5068FD243A6FF27686 /* GoalsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40D9EAAB80FD7F9FAC57F20B /* GoalsView.swift */; };
+		E9CA3C5EAD1B3DBAC3BDA24D /* MoodLogEntity.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E574983CE59DCE0D6CB32E /* MoodLogEntity.swift */; };
 		E9D604A78C243E8ED46607A4 /* TaskReads.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CBF0DAD74F9392D507229CE /* TaskReads.swift */; };
 		E9F99B7A66CD24B118A9E8E1 /* GutSymptomMigrationMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = A752F956A678D4C282D192DE /* GutSymptomMigrationMap.swift */; };
 		E9FE8C1F55C7F682DDC5E73B /* MoodCommitAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1AB58A3A36A898E92890EBA /* MoodCommitAnimation.swift */; };
@@ -907,11 +915,13 @@
 		5961822BB83BCF87B27E11AD /* AddTaskIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTaskIntent.swift; sourceTree = "<group>"; };
 		59A88F76E4A01B4157081C37 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		5B49A0D20B2ECD672137900F /* Info-Mac.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Info-Mac.plist"; sourceTree = "<group>"; };
+		5C198F08A4BCFDFC1B254BA8 /* MealLogEntity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealLogEntity.swift; sourceTree = "<group>"; };
 		5C480659283E01C4B16C910C /* DiscoveryMiniApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveryMiniApp.swift; sourceTree = "<group>"; };
 		5CB6A01D91E7B3ED63B6BFDE /* ShortcutAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutAction.swift; sourceTree = "<group>"; };
 		5D227602C1039FA2206A539A /* SeptenaServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptenaServices.swift; sourceTree = "<group>"; };
 		5DB73B809A74BC9ACB0122A5 /* SectionOnboarding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionOnboarding.swift; sourceTree = "<group>"; };
 		5DDBCEACF8957679BD5E02F2 /* LogRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogRow.swift; sourceTree = "<group>"; };
+		5F6A1305E991C15F64C716D9 /* EmojiPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmojiPicker.swift; sourceTree = "<group>"; };
 		5FB10CCDDEAC20D7E90832D7 /* LocalMCPSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMCPSettingsPane.swift; sourceTree = "<group>"; };
 		5FBFFB14069FB717EF02173A /* NextComplicationBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextComplicationBundle.swift; sourceTree = "<group>"; };
 		624F4DB126AEF0811BFBF590 /* BrowseGutDaySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseGutDaySheet.swift; sourceTree = "<group>"; };
@@ -1094,6 +1104,7 @@
 		E17D3542734AB0B32527C12C /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
 		E18F72C4FF8B470B7B889B00 /* SectionPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionPlugin.swift; sourceTree = "<group>"; };
 		E1AB58A3A36A898E92890EBA /* MoodCommitAnimation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodCommitAnimation.swift; sourceTree = "<group>"; };
+		E2E574983CE59DCE0D6CB32E /* MoodLogEntity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodLogEntity.swift; sourceTree = "<group>"; };
 		E31867A580D7D96DFB20391B /* ChoresDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoresDestinationView.swift; sourceTree = "<group>"; };
 		E31DA79ECD8884E07F3A15A5 /* IntakeReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntakeReader.swift; sourceTree = "<group>"; };
 		E368966622BF4B1309F74C1E /* SeptenaWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = SeptenaWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1113,6 +1124,7 @@
 		F05E01AB86D25931CD682001 /* WatchAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchAppDelegate.swift; sourceTree = "<group>"; };
 		F0B811772EC1DF4C9130BECD /* HomepageLayoutMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomepageLayoutMode.swift; sourceTree = "<group>"; };
 		F0BEBB91083B3194167B548E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		F19A6EE7622D933F115B075D /* WorkoutLogEntity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutLogEntity.swift; sourceTree = "<group>"; };
 		F24E908729637004C14E5310 /* AddHabitPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddHabitPage.swift; sourceTree = "<group>"; };
 		F2DDEBCD24A7394AE224AD93 /* NextBlocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextBlocks.swift; sourceTree = "<group>"; };
 		F326D9758674AD8EA4DBB211 /* SupplementTypeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementTypeSheet.swift; sourceTree = "<group>"; };
@@ -1256,7 +1268,9 @@
 				F44D5D94AD1AD13F2D0AC6F7 /* GutIntents.swift */,
 				C277868C4AE1C5E33D07F566 /* HabitIntents.swift */,
 				D78BBADF69CAD2C6D2605053 /* HydrationIntents.swift */,
+				5C198F08A4BCFDFC1B254BA8 /* MealLogEntity.swift */,
 				675F31A4511CBADB2FB97B81 /* MoodIntents.swift */,
+				E2E574983CE59DCE0D6CB32E /* MoodLogEntity.swift */,
 				1C1C8DBE27874B430C24F730 /* NutritionIntents.swift */,
 				9A3030188F50F856913FBC4E /* SectionLogIntent.swift */,
 				15B234E4AED39B8EF15DD9A6 /* SiriShortcutsSettingsPane.swift */,
@@ -1264,6 +1278,7 @@
 				78C110FEAA290C71AE8A57A4 /* SupplementIntents.swift */,
 				24B8A11A356D1DC98670738C /* TaskIntents.swift */,
 				185686A2A4BF9FA8CE915F91 /* TrainingIntents.swift */,
+				F19A6EE7622D933F115B075D /* WorkoutLogEntity.swift */,
 			);
 			path = Intents;
 			sourceTree = "<group>";
@@ -1811,6 +1826,7 @@
 				9B6D3C89DD47424084AE32D1 /* CommitMotion.swift */,
 				E0E984505A489247AADAB293 /* ConsistencyHeatmap.swift */,
 				32A70DB5FE3A7F04BE3E7BAC /* DayBucketHeader.swift */,
+				5F6A1305E991C15F64C716D9 /* EmojiPicker.swift */,
 				105A64B4FE28BF5907996A17 /* HomeChrome.swift */,
 				CE7DF7DE41AF304A9324BC6E /* IntensityGlyph.swift */,
 				C5BCD4DA2CB4E9B237526865 /* KeyboardShortcutsView.swift */,
@@ -2443,6 +2459,7 @@
 				FF82CEDA629B023E377F342A /* EditMoodEntrySheet.swift in Sources */,
 				92F25DBCB85C19C91F51ADB7 /* EditNutritionEntrySheet.swift in Sources */,
 				AB68497A7AF5F88ED33EAB79 /* EditSupplementSheet.swift in Sources */,
+				5095EC10FFE8E70AFC17560A /* EmojiPicker.swift in Sources */,
 				38D2BDDEB7410B6AC61B2A85 /* ExerciseCatalogView.swift in Sources */,
 				ED82759C6079C919DD635ED6 /* ExerciseDetailView.swift in Sources */,
 				C6EE3C372089D7A231497306 /* ExerciseLibrarySheet.swift in Sources */,
@@ -2516,6 +2533,7 @@
 				3075501D55DCA66B3B08C831 /* MCPToolCatalog.swift in Sources */,
 				77B186F9015710E0B19204AB /* MacroCatalog.swift in Sources */,
 				7A17945534ABEF825F7910CA /* MacroTargetMigration.swift in Sources */,
+				741C8DEC093734FCECDE01C3 /* MealLogEntity.swift in Sources */,
 				FAA313C1459654D04096B9AC /* MedicationsDestinationView.swift in Sources */,
 				88DB9A3D589E04E5E452A15C /* MedicationsPlugin.swift in Sources */,
 				7BF180B58D52C2BD10BBC5AB /* MenuBarMenu.swift in Sources */,
@@ -2529,6 +2547,7 @@
 				E9FE8C1F55C7F682DDC5E73B /* MoodCommitAnimation.swift in Sources */,
 				D68C4DF01907E23021C0EB16 /* MoodDestinationView.swift in Sources */,
 				72CC45D5A8CEC1C0A3B6EA39 /* MoodIntents.swift in Sources */,
+				03FFAAF8A852B4469ACD03FD /* MoodLogEntity.swift in Sources */,
 				AF64B18251F2EE3C868C7337 /* MoodPlugin.swift in Sources */,
 				5A6DFBAB575054F0FBA4B916 /* MoodQuickAddMenu.swift in Sources */,
 				09D5D1C810DA4F7024ED8DA9 /* MoodVocabulary.swift in Sources */,
@@ -2658,6 +2677,7 @@
 				E772D842933CA1E01A9D9D3D /* WelcomeHeader.swift in Sources */,
 				8F3BA0D41062825458681FF5 /* WelcomeView.swift in Sources */,
 				BEF2D6CEC537A8A230DCD142 /* WithingsProvider.swift in Sources */,
+				D2F3891ACF304E8652895F92 /* WorkoutLogEntity.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2800,6 +2820,7 @@
 				D057C45AB5852CC5800058D8 /* EditMoodEntrySheet.swift in Sources */,
 				88D6592312AB55D1A314C247 /* EditNutritionEntrySheet.swift in Sources */,
 				11091A62DB6744BDE8673415 /* EditSupplementSheet.swift in Sources */,
+				1CBC30CB0EAE9F3FF70A7CE9 /* EmojiPicker.swift in Sources */,
 				262EF303D006D36A39042280 /* ExerciseCatalogView.swift in Sources */,
 				BF21A6B5BEFFC4F242D109B8 /* ExerciseDetailView.swift in Sources */,
 				3292128871BF0E9AAEE59677 /* ExerciseLibrarySheet.swift in Sources */,
@@ -2873,6 +2894,7 @@
 				85FD87CB9D116DB97063525A /* MCPToolCatalog.swift in Sources */,
 				59333A2540ABE31E381C30C7 /* MacroCatalog.swift in Sources */,
 				195223E915278AF4DC4D965C /* MacroTargetMigration.swift in Sources */,
+				970B36891277CD49027B391E /* MealLogEntity.swift in Sources */,
 				D520448E97327EB6F37A8559 /* MedicationsDestinationView.swift in Sources */,
 				3AB0DEE9A556294D0CF82B56 /* MedicationsPlugin.swift in Sources */,
 				D8337D72DCD514F36A6094B4 /* MenuBarMenu.swift in Sources */,
@@ -2886,6 +2908,7 @@
 				5B33966B1FD021C5BE96C2B9 /* MoodCommitAnimation.swift in Sources */,
 				40A0EE423552A4504E87DCC4 /* MoodDestinationView.swift in Sources */,
 				C14E1B79E07BD242BD1C9810 /* MoodIntents.swift in Sources */,
+				E9CA3C5EAD1B3DBAC3BDA24D /* MoodLogEntity.swift in Sources */,
 				E1CBA01ED10A916CD8BC355F /* MoodPlugin.swift in Sources */,
 				6F104C934A5BF6230CC8C1F9 /* MoodQuickAddMenu.swift in Sources */,
 				91D7DEF6095D3B1E3692B3DE /* MoodVocabulary.swift in Sources */,
@@ -3015,6 +3038,7 @@
 				1C66407AC9157A11987CE3DB /* WelcomeHeader.swift in Sources */,
 				259CE0E0350FAB702F2AC5E8 /* WelcomeView.swift in Sources */,
 				A22130AF134CD3219A94BEBD /* WithingsProvider.swift in Sources */,
+				450C9309FB8EC6AA3F778341 /* WorkoutLogEntity.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -270,11 +270,13 @@ enum SettingsMirror {
           || entity.color != section.color
           || entity.isEnabled != section.isEnabled
           || entity.showInToday != section.showInToday
+          || entity.showInSpotlight != section.showInSpotlight
           || entity.hasOnboarded != section.hasOnboarded
         entity.title = section.label
         entity.color = section.color
         entity.isEnabled = section.isEnabled
         entity.showInToday = section.showInToday
+        entity.showInSpotlight = section.showInSpotlight
         entity.hasOnboarded = section.hasOnboarded
         entity.updatedAt = .now
         if changed { changedIDs.append(section.key) }
@@ -284,6 +286,7 @@ enum SettingsMirror {
                                    color: section.color,
                                    isEnabled: section.isEnabled,
                                    showInToday: section.showInToday,
+                                   showInSpotlight: section.showInSpotlight,
                                    hasOnboarded: section.hasOnboarded)
         context.insert(entity)
         changedIDs.append(section.key)
@@ -346,5 +349,41 @@ enum SettingsMirror {
     } catch {
       SeptenaLog.error("SettingsMirror.setSectionShowInToday", error)
     }
+  }
+
+  /// Toggle `showInSpotlight` on a single section — the user's opt-out from
+  /// Spotlight / Siri / Apple Intelligence discoverability. Same shape as
+  /// `setSectionShowInToday`, but also posts `.septenaDataChanged` so
+  /// `SpotlightIndexer` reconciles immediately (purge on opt-out, re-index on
+  /// opt-in). See docs/SPOTLIGHT_READABILITY_PLAN.md.
+  static func setSectionShowInSpotlight(_ key: String,
+                                        showInSpotlight: Bool,
+                                        context: ModelContext,
+                                        engine: CKEngine? = nil) {
+    let descriptor = FetchDescriptor<SectionEntity>(
+      predicate: #Predicate { $0.id == key }
+    )
+    guard let entity = try? context.fetch(descriptor).first else { return }
+    guard entity.showInSpotlight != showInSpotlight else { return }
+    entity.showInSpotlight = showInSpotlight
+    entity.updatedAt = .now
+    do {
+      try context.save()
+      engine?.noteSectionChange(id: key)
+      NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+    } catch {
+      SeptenaLog.error("SettingsMirror.setSectionShowInSpotlight", error)
+    }
+  }
+
+  /// Whether a section is currently exposed to Spotlight / Siri. Defaults to
+  /// true for a section with no row yet (e.g. the always-on Tasks section), so
+  /// the absence of an explicit opt-out means discoverable. Read by
+  /// `SpotlightIndexer` to gate indexing.
+  static func showInSpotlight(_ key: String, context: ModelContext) -> Bool {
+    let descriptor = FetchDescriptor<SectionEntity>(
+      predicate: #Predicate { $0.id == key }
+    )
+    return (try? context.fetch(descriptor).first)?.showInSpotlight ?? true
   }
 }

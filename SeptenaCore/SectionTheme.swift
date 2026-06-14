@@ -17,6 +17,9 @@ public struct SectionConfig: Codable, Hashable {
   /// Whether this section contributes to the Today log. Only meaningful
   /// for sections the manifest flags as `appearsInToday`.
   public let showInToday: Bool
+  /// Whether this section's entries are exposed to Spotlight / Siri / Apple
+  /// Intelligence. Default true; the user opts a section out in Settings.
+  public let showInSpotlight: Bool
   /// True once the section's first-time onboarding has completed (or
   /// been skipped). Distinguishes "first ever enable" from a later
   /// toggle off → on. Stays true forever once set.
@@ -27,20 +30,22 @@ public struct SectionConfig: Codable, Hashable {
               color: String,
               isEnabled: Bool = true,
               showInToday: Bool = true,
+              showInSpotlight: Bool = true,
               hasOnboarded: Bool = false) {
     self.key = key
     self.label = label
     self.color = color
     self.isEnabled = isEnabled
     self.showInToday = showInToday
+    self.showInSpotlight = showInSpotlight
     self.hasOnboarded = hasOnboarded
   }
 
   // Custom decode so older ResponseCache blobs (pre-isEnabled /
-  // pre-showInToday / pre-hasOnboarded) decode cleanly with sensible
-  // defaults.
+  // pre-showInToday / pre-showInSpotlight / pre-hasOnboarded) decode cleanly
+  // with sensible defaults.
   private enum CodingKeys: String, CodingKey {
-    case key, label, color, isEnabled, showInToday, hasOnboarded
+    case key, label, color, isEnabled, showInToday, showInSpotlight, hasOnboarded
   }
   public init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -49,6 +54,7 @@ public struct SectionConfig: Codable, Hashable {
     self.color = try c.decode(String.self, forKey: .color)
     self.isEnabled = (try? c.decode(Bool.self, forKey: .isEnabled)) ?? true
     self.showInToday = (try? c.decode(Bool.self, forKey: .showInToday)) ?? true
+    self.showInSpotlight = (try? c.decode(Bool.self, forKey: .showInSpotlight)) ?? true
     self.hasOnboarded = (try? c.decode(Bool.self, forKey: .hasOnboarded)) ?? false
   }
 }

@@ -19,6 +19,7 @@ enum SectionCloudKitSchema {
     static let color = "color"
     static let isEnabled = "isEnabled"
     static let showInToday = "showInToday"
+    static let showInSpotlight = "showInSpotlight"
     static let hasOnboarded = "hasOnboarded"
     static let updatedAt = "updatedAt"
     static let reservedString1 = "reservedString1"
@@ -51,6 +52,7 @@ extension SectionEntity {
     record[SectionCloudKitSchema.Field.color] = color
     record[SectionCloudKitSchema.Field.isEnabled] = (isEnabled ? 1 : 0) as NSNumber
     record[SectionCloudKitSchema.Field.showInToday] = (showInToday ? 1 : 0) as NSNumber
+    record[SectionCloudKitSchema.Field.showInSpotlight] = (showInSpotlight ? 1 : 0) as NSNumber
     record[SectionCloudKitSchema.Field.hasOnboarded] = (hasOnboarded ? 1 : 0) as NSNumber
     record[SectionCloudKitSchema.Field.updatedAt] = updatedAt.ISO8601Format()
     return record
@@ -64,6 +66,11 @@ extension SectionEntity {
     }
     if let v = record[SectionCloudKitSchema.Field.showInToday] as? NSNumber {
       showInToday = v.intValue != 0
+    }
+    // Absent on existing records → leaves the model default (true), so a
+    // section the user never touched stays discoverable.
+    if let v = record[SectionCloudKitSchema.Field.showInSpotlight] as? NSNumber {
+      showInSpotlight = v.intValue != 0
     }
     if let v = record[SectionCloudKitSchema.Field.hasOnboarded] as? NSNumber {
       hasOnboarded = v.intValue != 0
