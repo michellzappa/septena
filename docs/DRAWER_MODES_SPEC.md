@@ -198,6 +198,7 @@ Lands in the shared scaffold, not per section.
 ## Out of scope / open
 
 - Toggle as icon-swap button vs. 2-segment glass control (visual detail).
-- Whether the Patterns range picker is a unified component (30/60/90/365, section
-  declares allowed windows) or stays per-section. Lean: shared component.
+- ~~Patterns range picker unified vs per-section~~ — DONE: shared
+  `DrawerRangePicker` + `DrawerRange` enum (section declares allowed windows);
+  adopted by Training (30/60/90) and Activity (30/90/1y).
 - watchOS unchanged — hand-wired per section, does not use this scaffold.

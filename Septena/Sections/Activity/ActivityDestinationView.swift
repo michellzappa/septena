@@ -11,25 +11,13 @@ struct ActivityDestinationView: View {
   @Environment(SectionTheme.self) private var theme
 
   @State private var bridge = HealthKitBridge.shared
-  @State private var range: HistoryRange = .ninety
+  @State private var rangeDays = DrawerRange.ninety.rawValue
 
   // The persisted, synced history. Present on every platform once a phone has
   // ingested at least once — this is what gives macOS a non-empty view.
   @Query(sort: \ActivityDayEntity.date) private var days: [ActivityDayEntity]
 
   private var accent: Color { theme.color(for: "activity") }
-
-  enum HistoryRange: Int, CaseIterable, Identifiable {
-    case thirty = 30, ninety = 90, year = 365
-    var id: Int { rawValue }
-    var label: String {
-      switch self {
-      case .thirty: return "30d"
-      case .ninety: return "90d"
-      case .year:   return "1y"
-      }
-    }
-  }
 
   var body: some View {
     SectionDrawer(sectionKey: "activity") {
@@ -55,7 +43,7 @@ struct ActivityDestinationView: View {
 
   /// Rows within the selected window that actually have a step count.
   private var windowed: [ActivityDayEntity] {
-    let start = Calendar.current.date(byAdding: .day, value: -(range.rawValue - 1), to: Date())
+    let start = Calendar.current.date(byAdding: .day, value: -(rangeDays - 1), to: Date())
     let cutoff = SeptenaDate.format(start) ?? ""
     return days.filter { $0.date >= cutoff }
   }
@@ -74,10 +62,7 @@ struct ActivityDestinationView: View {
   private var history: some View {
     DrawerSection {
       VStack(alignment: .leading, spacing: 12) {
-        Picker("Range", selection: $range) {
-          ForEach(HistoryRange.allCases) { Text($0.label).tag($0) }
-        }
-        .pickerStyle(.segmented)
+        DrawerRangePicker(days: $rangeDays, options: [.month, .ninety, .year])
 
         Text("\(averageSteps) avg steps · \(steppedDays.count) active days")
           .font(.caption)

@@ -884,13 +884,8 @@ struct TrainingDestinationView: View {
             .font(.subheadline.weight(.semibold))
             .lineLimit(1)
           Spacer()
-          Picker("Window", selection: $windowDays) {
-            Text("30d").tag(30)
-            Text("60d").tag(60)
-            Text("90d").tag(90)
-          }
-          .pickerStyle(.segmented)
-          .frame(width: 170)
+          DrawerRangePicker(days: $windowDays, options: [.month, .sixty, .ninety])
+            .frame(width: 170)
         }
         Text(chartSubtitle)
           .font(.caption)

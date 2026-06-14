@@ -207,6 +207,48 @@ struct DrawerModeToggle: View {
   }
 }
 
+// MARK: - Patterns range picker
+//
+// One segmented window control for every Patterns chart that's range-windowed
+// (Training progression, Activity history, …). The section declares which
+// windows it supports and binds the chosen trailing-day count; the labels and
+// segmented styling live here so they can't drift between sections.
+
+/// A standard trailing-day window for a Patterns chart. Raw value = days.
+enum DrawerRange: Int, CaseIterable, Identifiable {
+  case week = 7
+  case month = 30
+  case sixty = 60
+  case ninety = 90
+  case year = 365
+
+  var id: Int { rawValue }
+
+  var label: String {
+    switch self {
+    case .week:   return "7d"
+    case .month:  return "30d"
+    case .sixty:  return "60d"
+    case .ninety: return "90d"
+    case .year:   return "1y"
+    }
+  }
+}
+
+/// Shared segmented range control. The section passes the windows it supports;
+/// the picker binds the chosen day count (so call sites keep a plain `Int`).
+struct DrawerRangePicker: View {
+  @Binding var days: Int
+  var options: [DrawerRange]
+
+  var body: some View {
+    Picker("Range", selection: $days) {
+      ForEach(options) { Text($0.label).tag($0.rawValue) }
+    }
+    .pickerStyle(.segmented)
+  }
+}
+
 struct SectionDrawer<Content: View>: View {
   let sectionKey: String
   /// Section name shown as the inline nav-bar title. Optional — when omitted,
