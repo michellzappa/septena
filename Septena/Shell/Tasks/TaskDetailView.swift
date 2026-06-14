@@ -15,7 +15,7 @@ struct TaskDetailView: View {
       }
       Section("Meta") {
         if let s = task.scheduled { LabeledContent("Scheduled", value: s) }
-        if let d = task.due { LabeledContent("Due", value: d) }
+        if let d = task.deadline { LabeledContent("Deadline", value: d) }
         if let a = task.area { LabeledContent("Area", value: a) }
         if let p = task.project { LabeledContent("Project", value: p) }
         LabeledContent("Status", value: task.status.rawValue)
