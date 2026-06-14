@@ -2973,6 +2973,9 @@ private struct WeekDashboardScreen<CurrentDay: Equatable, MenuExtra: View, Conte
             SkyTopWash()
               .frame(height: geo.size.height * 0.33, alignment: .top)
           }
+          // Contain SkyTopWash's dark-mode `plusLighter` blend to the canvas
+          // below it (not whatever sits behind the whole background).
+          .compositingGroup()
         }
         .ignoresSafeArea()
       }

@@ -219,11 +219,6 @@ struct SkyTopWash: View {
 
   @State private var stops: [SkyAtmosphere.Stop] = []
 
-  /// Degrees the sun is lifted before rendering, to stand in for the multiple
-  /// scattering the single-scattering model omits (see `.task` below). 0 =
-  /// physically faithful; ~5 keeps civil twilight blue like the real sky.
-  static let twilightLiftDegrees: Double = 5
-
   /// ~0.5° elevation buckets — the `.task` id, so a 60s tick that doesn't
   /// move the sun a visible amount doesn't re-render the gradient.
   private var elevationBucket: Int {
@@ -254,26 +249,22 @@ struct SkyTopWash: View {
             .init(color: .clear, location: 1),
           ], startPoint: .top, endPoint: .bottom)
         )
-        // A tint, not a poster. Slightly stronger in dark mode, where a
-        // faint wash would vanish against near-black.
-        .opacity(colorScheme == .dark ? 0.7 : 0.6)
+        // Dark appearance: ADD the sky as light (`plusLighter`) rather than
+        // paint it over the dark UI — the daytime blue then reads as a soft
+        // glow instead of a strong slab, and a near-black night adds nothing
+        // and disappears. Light appearance: ordinary source-over tint.
+        .opacity(colorScheme == .dark ? 0.4 : 0.6)
+        .blendMode(colorScheme == .dark ? .plusLighter : .normal)
       }
     }
     .allowsHitTesting(false)
     .accessibilityHidden(true)
     .task(id: elevationBucket) {
-      // The model is single-scattering only — no multiple scattering, which
-      // in the real atmosphere is exactly what keeps the twilight sky blue
-      // after the sun touches the horizon. Without it the bare model muddies
-      // to brown right at sunrise/sunset. Lift the sun a few degrees as a
-      // cheap stand-in for that missing skylight: twilight stays blue, the
-      // warm glow slides to true dusk, and deep night still goes dark. (The
-      // web original looks bluer for an unrelated reason — its coarse IP
-      // geolocation often renders a brighter, far-off longitude, not your
-      // real sun.) `0` = physically faithful (brown at the horizon); larger
-      // = bluer, longer-lasting twilight.
-      let twilightLift = SkyTopWash.twilightLiftDegrees * Double.pi / 180
-      let elevation = SolarClock.elevation(now: clock.now) + twilightLift
+      // Pure physics — the sky is rendered straight from the sun's true
+      // elevation, no fudge. Single scattering only, so it genuinely darkens
+      // to near-black through deep night and warms at the real horizon;
+      // that's the atmosphere, not a stylization.
+      let elevation = SolarClock.elevation(now: clock.now)
       let computed = await Task.detached(priority: .utility) {
         SkyAtmosphere.render(elevation: elevation)
       }.value
