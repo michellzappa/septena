@@ -5847,7 +5847,11 @@
         }
       }
     },
+    "Septena keeps the everyday things you track in one place: tasks, habits, what you eat, how you sleep. It syncs across your devices over iCloud and stays yours alone — and it's open source, so you can read exactly how it handles your data." : {
+
+    },
     "Septena keeps the everyday things you track in one place: tasks, habits, what you eat, how you sleep. It syncs across your devices over iCloud and stays yours alone." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {

@@ -4576,7 +4576,7 @@ struct AboutSettingsPane: View {
       }
 
       Section {
-        Text("Septena keeps the everyday things you track in one place: tasks, habits, what you eat, how you sleep. It syncs across your devices over iCloud and stays yours alone.")
+        Text("Septena keeps the everyday things you track in one place: tasks, habits, what you eat, how you sleep. It syncs across your devices over iCloud and stays yours alone — and it's open source, so you can read exactly how it handles your data.")
           .font(.callout)
           .foregroundStyle(.secondary)
       }
@@ -4585,6 +4585,7 @@ struct AboutSettingsPane: View {
         outboundLink("Website", destination: "https://septena.app", icon: "globe")
         outboundLink("Telegram", destination: "https://t.me/septena_app", icon: "paperplane")
         outboundLink("Feedback", destination: "mailto:mz@envisioning.com", icon: "envelope")
+        outboundLink("Source code", destination: "https://github.com/septena/septena-cloud", icon: "chevron.left.forwardslash.chevron.right")
         outboundLink("License", destination: "https://opensource.org/licenses/MIT", icon: "doc.text")
       }
 
