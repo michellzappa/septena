@@ -170,15 +170,18 @@ enum DrawerMode: String, Hashable {
   private static func storageKey(_ sectionKey: String) -> String { "drawerMode.\(sectionKey)" }
 }
 
-/// The top-left glass control that flips a drawer between Log and Patterns.
-/// One button switching to the *other* mode on tap — rendered by `SectionDrawer`
-/// only when a `mode` binding is present. Neutral glass at rest (accent stays on
-/// the trailing "+"), matching the calendar button's resting look.
+/// The top-left glass control that flips a drawer between Log and Patterns —
+/// the neutral-glass twin of the trailing "+": same round glass capsule, but a
+/// tinted glyph on a neutral fill rather than the prominent accent fill. Rendered
+/// by `SectionDrawer` only when a `mode` binding is present; the calendar (when
+/// the section has time travel) sits beside it as its own separate button.
 struct DrawerModeToggle: View {
   @Binding var mode: DrawerMode
   /// Key the toggled choice is remembered under. Usually the section key, but
   /// can be a finer key (e.g. per Intake kind) so sibling pages remember apart.
   let storageKey: String
+  /// Accent for the glyph — the only color on an otherwise neutral glass capsule.
+  let accent: Color
 
   var body: some View {
     Button {
@@ -189,10 +192,18 @@ struct DrawerModeToggle: View {
       // this so they never overwrite the remembered choice.
       next.remember(for: storageKey)
     } label: {
-      Label(mode == .log ? "Show patterns" : "Show log",
-            systemImage: mode == .log ? "chart.xyaxis.line" : "list.bullet")
+      // Self-contained round glass (not `.buttonStyle(.glass)`, which the
+      // toolbar folds into a shared leading group → bubble-in-a-bubble): a
+      // neutral glass circle with an accent glyph, the twin of the trailing "+".
+      Image(systemName: mode == .log ? "chart.xyaxis.line" : "list.bullet")
+        .font(.body.weight(.semibold))
+        .foregroundStyle(accent)
+        .frame(width: 38, height: 38)
+        .contentShape(Circle())
+        .accessibilityLabel(mode == .log ? "Show patterns" : "Show log")
     }
-    .buttonStyle(.glass)
+    .buttonStyle(.plain)
+    .glassCircle()
   }
 }
 
@@ -469,7 +480,8 @@ struct SectionDrawer<Content: View>: View {
       // left-to-right as "which view · which day".
       if let mode {
         ToolbarItem(placement: leadingPlacement) {
-          DrawerModeToggle(mode: mode, storageKey: modeStorageKey ?? sectionKey)
+          DrawerModeToggle(mode: mode, storageKey: modeStorageKey ?? sectionKey,
+                           accent: resolvedAccent)
         }
       }
       // Calendar / time-travel button — leading edge, present only when the
@@ -484,11 +496,18 @@ struct SectionDrawer<Content: View>: View {
           Button {
             showingTimeTravel = true
           } label: {
-            Label("Time Travel",
-                  systemImage: isTimeTraveling ? "calendar.badge.clock" : "calendar")
+            // Same self-contained glass circle as the mode toggle, so the two
+            // read as separate floating siblings — not nested in one pill. Glyph
+            // is neutral at rest, accent (with a clock badge) while traveling.
+            Image(systemName: isTimeTraveling ? "calendar.badge.clock" : "calendar")
+              .font(.body.weight(.semibold))
+              .foregroundStyle(isTimeTraveling ? resolvedAccent : Color.primary)
+              .frame(width: 38, height: 38)
+              .contentShape(Circle())
+              .accessibilityLabel("Time Travel")
           }
-          .tint(isTimeTraveling ? resolvedAccent : nil)
-          .buttonStyle(.glass)
+          .buttonStyle(.plain)
+          .glassCircle(tint: isTimeTraveling ? resolvedAccent : nil)
         }
       }
       // Log/action button — ONE component (`DrawerActionButton`) so its

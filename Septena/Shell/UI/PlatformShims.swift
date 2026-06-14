@@ -277,6 +277,25 @@ extension View {
     #endif
   }
 
+  /// Liquid-glass fill for a floating *circular* control (toolbar glyph
+  /// buttons). A self-contained glass circle — using this instead of
+  /// `.buttonStyle(.glass)` keeps the control from being folded into the
+  /// system's shared leading-toolbar glass group (the "bubble in a bubble"),
+  /// so each button floats on its own like the prominent "+". macOS falls back
+  /// to thin material. Tint optionally washes the glass; omit for neutral.
+  @ViewBuilder
+  func glassCircle(tint: Color? = nil) -> some View {
+    #if os(iOS)
+    if let tint {
+      self.glassEffect(.regular.tint(tint.opacity(0.5)).interactive(), in: .circle)
+    } else {
+      self.glassEffect(.regular.interactive(), in: .circle)
+    }
+    #else
+    self.background(.thinMaterial, in: Circle())
+    #endif
+  }
+
   /// Liquid-glass fill for a floating *card* surface (dashboard tiles). Same
   /// iOS-glass / macOS-material split as `glassCapsule`, in a continuous
   /// rounded rectangle. macOS keeps the opaque grouped card it always had —
