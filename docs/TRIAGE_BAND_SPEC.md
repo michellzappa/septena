@@ -67,6 +67,16 @@ retired — one Today, no parallel inbox. iOS + macOS + 39 core tests green.
   `.today` change). The gateway skill now teaches that **everything the agent
   creates is a proposal** that lands in `triage` (since gateway creates carry
   `source: "mcp"`), not directly in `today`. Gateway typecheck clean.
+- **Auto-triage — Tier 1 (suggested filing).** Inbox rows show a one-tap
+  **"→ ‹project/area›" chip** when the on-device classifier (`SuggestionEngine`)
+  is confident, drawn only for genuinely loose captures (no project/area).
+  Tap files there + acknowledges (`applySuggestion` → `inboxSuggestion(for:)`,
+  `row(quickMenu:)`). Fixed the unification gap: the classifier now `refresh`es
+  over the Inbox-in-Today rows (was keyed to the retired `.inbox` view),
+  restoring the ranked suggestions **and** the implicit "not this" learning.
+  Tier 2 (natural-language date / `#project` / `@area` / `!today` at capture)
+  already exists via `TaskTitleParser` + the composer chips. Tiers 3 ("Sort
+  all" batch) and 4 (auto-file) declined for now.
 > **Design note (revised 2026-06-14):** the first cut was a bespoke
 > `TriageBandView` card (chips, Accept-all, cap, collapse). User feedback: make
 > it look native — say "Inbox", header like the area headers, normal task rows

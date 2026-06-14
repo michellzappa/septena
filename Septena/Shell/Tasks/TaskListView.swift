@@ -237,6 +237,10 @@ struct TaskListView: View {
 
   // Local semantic sorter — populates a "→ Suggested" chip on Inbox rows.
   @State private var suggestionEngine = SuggestionEngine.shared
+  /// Per-row Inbox "file here" suggestions, snapshotted in `load()` (keyed by
+  /// task id). Held in @State — not read live off the engine — so the row chip
+  /// reliably renders on load (see `load()`).
+  @State private var inboxSuggestions: [String: SuggestionEngine.Suggestion] = [:]
 
   // "You have N new to-dos" banner — compact start-of-day welcome that
   // surfaces tasks rolling in from scheduled-past or due-today. Dismissed
@@ -781,6 +785,30 @@ struct TaskListView: View {
     // long-press — used on Inbox rows so triage is one tap, not a hidden press.
     HStack(spacing: 0) {
       rowContent(task)
+      // One-tap "file here" — the learned destination, shown only when the
+      // classifier is confident (Tier 1 auto-triage). Tap files + acknowledges.
+      if quickMenu, let suggestion = inboxSuggestion(for: task) {
+        Button {
+          applySuggestion(task: task, suggestion: suggestion)
+        } label: {
+          HStack(spacing: 3) {
+            Image(systemName: suggestion.kind == .project ? "number" : "folder")
+              .scaledFont(size: 10, weight: .semibold)
+            Text(suggestion.title)
+              .scaledFont(size: 12, weight: .medium)
+              .lineLimit(1)
+          }
+          .padding(.horizontal, 8)
+          .padding(.vertical, 3)
+          .background(Capsule().fill(theme.color(for: "tasks").opacity(0.14)))
+          .foregroundStyle(theme.color(for: "tasks"))
+          .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .padding(.trailing, 2)
+        .accessibilityLabel("File in \(suggestion.title)")
+      }
       if quickMenu {
         Menu {
           rowActionsMenu(target: .single(task))
@@ -985,7 +1013,17 @@ struct TaskListView: View {
     case .project:
       mutator.moveToProject(id: task.id, project: suggestion.id)
     }
+    // Filing is engagement — clears the agent cue so the row leaves the Inbox.
+    mutator.acknowledge(id: task.id)
     Task { await load() }
+  }
+
+  /// The one-tap "file here" suggestion for an Inbox row — only for genuinely
+  /// loose captures (no project/area yet) and only when the classifier is
+  /// confident (`topSuggestion` is already evidence + margin gated). Agent rows
+  /// that already carry a placement are ratified via the checkbox / ⋯, not this.
+  private func inboxSuggestion(for task: SeptenaTask) -> SuggestionEngine.Suggestion? {
+    inboxSuggestions[task.id]
   }
 
   /// Implicit "Not this" — fires when the user moves the task somewhere
@@ -1424,11 +1462,35 @@ struct TaskListView: View {
                                allTasks: allTasks,
                                projects: projects,
                                areas: areas)
+    } else if filter == .today {
+      // The Inbox lives on the Today view now (the triage rows), so classify
+      // *those* — that's what powers the one-tap "file here" suggestion chip and
+      // the implicit "not this" learning. refresh also primes the model for the
+      // composer's on-keystroke suggest().
+      let allTasks = LocalCache.allTasks(in: modelContext)
+      suggestionEngine.refresh(inbox: triageItems,
+                               allTasks: allTasks,
+                               projects: projects,
+                               areas: areas)
     } else if filter != .logbook {
       suggestionEngine.prepare(allTasks: LocalCache.allTasks(in: modelContext),
                                projects: projects,
                                areas: areas)
     }
+    // Snapshot the per-row Inbox suggestions into @State so the chip renders
+    // (and re-renders) with each load. Reading the @Observable engine live
+    // inside the row's body proved unreliable for this list; the composer's
+    // own suggestion chip works precisely because it caches into @State too.
+    let suggestSource: [SeptenaTask] = filter == .today ? triageItems
+                                     : filter == .inbox ? local : []
+    var freshSuggestions: [String: SuggestionEngine.Suggestion] = [:]
+    for t in suggestSource where t.project == nil && t.area == nil {
+      // Use the SAME call the composer's working chip uses, so the row and the
+      // edit box never disagree on confidence (the model was just trained by the
+      // refresh/prepare above).
+      if let s = suggestionEngine.suggest(forText: t.title) { freshSuggestions[t.id] = s }
+    }
+    inboxSuggestions = freshSuggestions
     // Refresh dismissed state — banner reappears next day automatically.
     if filter == .today {
       let last = UserDefaults.standard.string(forKey: "septena.newTodos.dismissedDate")
