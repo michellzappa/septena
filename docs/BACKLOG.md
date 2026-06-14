@@ -15,6 +15,15 @@ Tracked work, not urgent. Ordered loosely by appeal, not priority.
 
 - **Checklists / subtasks** — nested checkable items on a task. Not yet, but likely needed.
 
+## Tasks — today logic (tech debt)
+
+Found during the `due`→`deadline` vocab cleanup (2026-06-14); not vocabulary, so left untouched. Retiring the `today` flag (already seamed in `TaskEntity.isOnToday`, "Step 4 of the due/when simplification") dissolves the first two outright.
+
+- **Sticky `today` pins never expire** — `isOnToday` short-circuits on `if today { return true }`, so a task pinned Monday stays in Today indefinitely until completed or explicitly removed. Either intended (Things-style) → then the next item is pure dead weight; or pins should age out → then rollover logic is missing.
+- **`todaySetOn` is write-only dead weight** — stamped on every pin and carried through SwiftData + CloudKit + the wire + MCP output + migration, but read by nothing. Someone planned pin-expiry via this date and never wired it. Delete it (or wire it).
+- **Today-membership union is copy-pasted in 3+ places** — the `today || scheduled≤today || deadline≤today` rule is re-implemented in `SidebarView` counts, `TaskReads`, and `LocalCache.convert`, despite the "everyone reads `isOnToday`" intent. They agree today; they'll drift when the rule changes (e.g. the flag retirement). Collapse onto the single `isOnToday`.
+- **`SeptenaDate.today` ignores time-travel** — it calls naked `Date()`, so `isOnToday`/`isOverdue` don't follow `DayClock.debugDayOffset` while views (reading `clock.today`) do. Tasks' today/overdue state diverges in time-travel and across a midnight while the app's open. Fix = consumers read `DayClock`, not change `SeptenaDate` (which seeds the clock).
+
 ## Multi-platform
 
 - **iPad** — the open platform gap. `NavigationSplitView` 3-column when `horizontalSizeClass == .regular`, pointer hover, cross-list drag-and-drop, iPad keyboard shortcuts. Today iPad rides incidental size-class branches only — no top-level split view. macOS is already native (`.commands`, menu-bar extra, ⌘ shortcuts, context menus — shipped).

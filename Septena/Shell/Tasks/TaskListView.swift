@@ -190,7 +190,7 @@ struct TaskListView: View {
   // is intrinsic to the presentation — avoids stale-state races where
   // tapping "When" could open the prior "Deadline" pane.
   @State private var whenSheet: WhenSheet?
-  enum WhenKind { case due, scheduled }
+  enum WhenKind { case deadline, scheduled }
   struct WhenSheet: Identifiable {
     let id: String   // composite of taskId + kind so reopening a kind re-presents cleanly
     let taskId: String
@@ -198,7 +198,7 @@ struct TaskListView: View {
     init(taskId: String, kind: WhenKind) {
       self.taskId = taskId
       self.kind = kind
-      self.id = "\(taskId)|\(kind == .due ? "due" : "sched")"
+      self.id = "\(taskId)|\(kind == .deadline ? "due" : "sched")"
     }
   }
 
@@ -588,7 +588,7 @@ struct TaskListView: View {
   private func currentDeadline(for id: String?) -> Date? {
     guard let id else { return nil }
     let pool = items + review + doneToday
-    return pool.first(where: { $0.id == id })?.due.flatMap(SeptenaDate.parse)
+    return pool.first(where: { $0.id == id })?.deadline.flatMap(SeptenaDate.parse)
   }
 
   /// Existing scheduled date for a target task, so the picker sheet can
@@ -693,7 +693,7 @@ struct TaskListView: View {
   /// ⌘⇧D — open the Deadline picker for the focused row.
   private func openDeadlineForSelected() {
     guard let id = effectiveSelectionId() else { return }
-    whenSheet = WhenSheet(taskId: id, kind: .due)
+    whenSheet = WhenSheet(taskId: id, kind: .deadline)
   }
 
   /// ⌘⌫ — delete every selected row (or the effective single row).
@@ -927,7 +927,7 @@ struct TaskListView: View {
         if case .single(let t) = target { whenSheet = WhenSheet(taskId: t.id, kind: .scheduled) }
       },
       onOpenDeadline: { target in
-        if case .single(let t) = target { whenSheet = WhenSheet(taskId: t.id, kind: .due) }
+        if case .single(let t) = target { whenSheet = WhenSheet(taskId: t.id, kind: .deadline) }
       },
       onOpenMove: { target in
         if case .single(let t) = target { moveTargetId = t.id; showingMoveSheet = true }
@@ -1256,7 +1256,7 @@ struct TaskListView: View {
       // upcoming task lingers for the beat then fades (matches every other
       // open-work list).
       if task.status == .done && !settle.isSettling(task.id) { continue }
-      let key = task.scheduled ?? task.due ?? ""
+      let key = task.scheduled ?? task.deadline ?? ""
       guard !key.isEmpty else { continue }
       if grouped[key] == nil { order.append(key) }
       grouped[key, default: []].append(task)
@@ -1287,8 +1287,8 @@ struct TaskListView: View {
   private func applyWhen(id: String, kind: WhenKind, date: Date?) {
     Haptics.tick()
     switch kind {
-    case .due:
-      mutator.setDue(id: id, date: date)
+    case .deadline:
+      mutator.setDeadline(id: id, date: date)
     case .scheduled:
       // Things-style mapping:
       //   • "Today" → pin to today (today=true), clear any scheduled date.
@@ -1672,7 +1672,7 @@ private struct TaskListModalPresenter: ViewModifier {
           .presentationDetents([.height(DatePickerSheet.sheetHeight), .large])
           .presentationBackground(.thinMaterial)
           .presentationCornerRadius(Theme.cornerRadius)
-        case .due:
+        case .deadline:
           DatePickerSheet(
             title: "Deadline",
             initialDate: currentDeadline(sheet.taskId),
@@ -1680,7 +1680,7 @@ private struct TaskListModalPresenter: ViewModifier {
             updateLabel: "Update Deadline",
             clearLabel: "Remove Deadline"
           ) { date in
-            applyWhen(sheet.taskId, .due, date)
+            applyWhen(sheet.taskId, .deadline, date)
           }
           .presentationDetents([.height(DatePickerSheet.sheetHeight), .large])
           .presentationBackground(.thinMaterial)

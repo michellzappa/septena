@@ -168,14 +168,14 @@ empty-state placeholder (no guilt surface).
 
 ## 3. The division is *ratification*, not date
 
-Current model defines Inbox by *absence* (`no scheduled && no due && no project &&
+Current model defines Inbox by *absence* (`no scheduled && no deadline && no project &&
 !today`). That breaks the moment an agent proposes a task *with* a suggested date —
 it would have a date but still not be blessed. So the band's membership is defined
 by **ratification state**:
 
 An open task is **in the triage band** iff it is *unratified*, i.e. **either**:
 
-1. **Loose human capture** — `source != mcp`, and `scheduled == nil && due == nil
+1. **Loose human capture** — `source != mcp`, and `scheduled == nil && deadline == nil
    && project == nil && area == nil && !today && status == open`. (Today's Inbox
    definition, unchanged.)
 2. **Unacknowledged agent proposal** — `source == mcp && acknowledgedAt == nil &&

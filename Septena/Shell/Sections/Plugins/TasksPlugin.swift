@@ -29,7 +29,7 @@ enum TasksPlugin: SectionPlugin {
           .req("id", "string"), .req("title", "string"),
           .opt("status", "string", "open | done | cancelled"),
           .opt("created", "date"), .opt("scheduled", "date"),
-          .opt("due", "date"), .opt("today", "bool"),
+          .opt("deadline", "date"), .opt("today", "bool"),
           .opt("todaySetOn", "date"), .opt("completedAt", "timestamp"),
           .opt("area", "string", "area id"),
           .opt("project", "string", "project id"),
@@ -66,11 +66,11 @@ enum TasksPlugin: SectionPlugin {
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(SectionOnboarding(
       sectionKey: "tasks",
-      intro: "Tasks route by intent, not by tags. Three fields decide visibility — today, scheduled, and due.",
+      intro: "Tasks route by intent, not by tags. Three fields decide visibility — today, scheduled, and deadline.",
       bullets: [
-        .init("Inbox", "No today / scheduled / due → lands in Inbox. The parking spot for anything not yet committed.", icon: "tray"),
+        .init("Inbox", "No today / scheduled / deadline → lands in Inbox. The parking spot for anything not yet committed.", icon: "tray"),
         .init("Today", "Pin to Today to commit. Use it for what you'll actually do today.", icon: "sun.max"),
-        .init("Scheduled / due", "Scheduled puts it in Upcoming. Due adds a deadline without scheduling — both surface in Anytime.", icon: "calendar"),
+        .init("Scheduled / deadline", "Scheduled puts it in Upcoming. A deadline adds a hard date without scheduling — both surface in Anytime.", icon: "calendar"),
         .init("Areas & projects", "Tags for filtering only — not routing. A project task with no view pin still sits in Inbox.", icon: "folder"),
       ],
       complete: complete
@@ -84,10 +84,10 @@ enum TasksPlugin: SectionPlugin {
       tools: [
         SectionSkill.Tool("tasks_list",          "List by view. Inbox = unscheduled, untoday; today = pinned; upcoming = future-scheduled; anytime EXCLUDES inbox-only tasks",
               inputs: "optional: view (today|inbox|upcoming|anytime|completed), limit"),
-        SectionSkill.Tool("tasks_create",        "New task. Without today/scheduled/due it lands in INBOX ONLY — invisible in today/anytime/upcoming. Set a routing field if the user expects to see it",
-              inputs: "required: title · optional: today (boolean — pins to Today), scheduled (YYYY-MM-DD — puts in upcoming), due (YYYY-MM-DD — deadline only, does NOT route into views), area (id, not a routing field), project (id, not a routing field)"),
-        SectionSkill.Tool("tasks_update",        "Patch any subset. Pass null to clear scheduled/due/area/project",
-              inputs: "required: id · optional: title, today, scheduled (YYYY-MM-DD or null), due (YYYY-MM-DD or null), area (id or null), project (id or null), status (open|cancelled)"),
+        SectionSkill.Tool("tasks_create",        "New task. Without today/scheduled/deadline it lands in INBOX ONLY — invisible in today/anytime/upcoming. Set a routing field if the user expects to see it",
+              inputs: "required: title · optional: today (boolean — pins to Today), scheduled (YYYY-MM-DD — puts in upcoming), deadline (YYYY-MM-DD — hard date only, does NOT route into views), area (id, not a routing field), project (id, not a routing field)"),
+        SectionSkill.Tool("tasks_update",        "Patch any subset. Pass null to clear scheduled/deadline/area/project",
+              inputs: "required: id · optional: title, today, scheduled (YYYY-MM-DD or null), deadline (YYYY-MM-DD or null), area (id or null), project (id or null), status (open|cancelled)"),
         SectionSkill.Tool("tasks_complete",      "Mark done. ERRORS on recurring — those must be done in-app so the next occurrence spawns",
               inputs: "required: id"),
         SectionSkill.Tool("tasks_defer",         "Set scheduled date, clear today",
@@ -117,13 +117,13 @@ enum TasksPlugin: SectionPlugin {
       ],
       body: """
       ### View routing — important
-      A task's visibility depends entirely on three fields: `today`, `scheduled`, `due`.
+      A task's visibility depends entirely on three fields: `today`, `scheduled`, `deadline`.
 
       | Set on create        | Appears in view(s)            |
       |----------------------|-------------------------------|
       | `today: true`        | `today`, `anytime`            |
       | `scheduled: <date>`  | `upcoming`, `anytime`         |
-      | `due: <date>` only   | `anytime` (deadline; no route)|
+      | `deadline: <date>`   | `anytime` (no route)          |
       | None of the above    | **`inbox` only**              |
 
       Notes:
@@ -213,7 +213,7 @@ private struct TasksDetailContent: View {
 @MainActor func taskExportDict(_ e: TaskEntity) -> [String: Any] {
   compact([
     "id": e.id, "title": e.title, "status": e.statusRaw,
-    "created": e.created, "scheduled": e.scheduled, "due": e.due,
+    "created": e.created, "scheduled": e.scheduled, "deadline": e.deadline,
     "today": e.today, "todaySetOn": e.todaySetOn, "completedAt": e.completedAt,
     "area": e.area, "project": e.project, "notes": e.notes,
     "recurrenceUnit": e.recurrenceUnit,

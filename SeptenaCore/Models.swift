@@ -98,14 +98,6 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     return now.timeIntervalSince(createdAt) < AgentCue.decayWindow
   }
 
-  /// Transitional read-only alias so older call sites compile during the
-  /// rename. Prefer `deadline` for new code; remove the alias once nothing
-  /// else references it.
-  var due: String? {
-    get { deadline }
-    set { deadline = newValue }
-  }
-
   /// Canonical "overdue" test — Things-style: ONLY a hard `deadline` can make
   /// a task overdue. A scheduled ("When") date in the past is just a plan that
   /// rolled into Today; it never turns red. A deadline of *today or earlier*

@@ -231,7 +231,7 @@ struct RemindersInboxSection: View {
     defer { importingID = nil }
     mutator.create(
       title: pair.view.title,
-      due: pair.view.dueDate,
+      deadline: pair.view.dueDate,
       notes: pair.view.notes
     )
     try? bridge.delete([pair.reminder])
@@ -247,7 +247,7 @@ struct RemindersInboxSection: View {
     for pair in pairs {
       mutator.create(
         title: pair.view.title,
-        due: pair.view.dueDate,
+        deadline: pair.view.dueDate,
         notes: pair.view.notes
       )
       succeeded.append(pair.reminder)

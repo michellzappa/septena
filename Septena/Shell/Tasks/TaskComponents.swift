@@ -564,7 +564,7 @@ struct TaskRow: View {
         Text(Self.shortDate(done)).font(.septenaMeta)
       }
       .foregroundStyle(Theme.inkSecondary)
-    } else if let due = task.due.flatMap(SeptenaDate.parse) {
+    } else if let due = task.deadline.flatMap(SeptenaDate.parse) {
       let dueDay = cal.startOfDay(for: due)
       if dueDay <= today {
         Text(cal.isDateInToday(due) ? "Today" : Self.shortDate(due))

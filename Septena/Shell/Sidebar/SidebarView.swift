@@ -847,7 +847,7 @@ struct SidebarRootView: View {
       guard t.status == .open else { continue }
       // Smart-list buckets — mirror LocalCache.tasks(in:filter:) semantics.
       if t.project == nil, t.area == nil,
-         t.scheduled == nil, t.due == nil, !t.today {
+         t.scheduled == nil, t.deadline == nil, !t.today {
         inbox += 1
       }
       // The triage band (unratified) sits above Today and is excluded from it.
@@ -855,13 +855,13 @@ struct SidebarRootView: View {
       if !t.isInTriageBand {
         if t.today { todayN += 1 }
         else if let s = t.scheduled, s <= today { todayN += 1 }
-        else if let d = t.due, d <= today { todayN += 1 }
+        else if let d = t.deadline, d <= today { todayN += 1 }
       }
       if !t.today {
         if let s = t.scheduled, s > today { upcoming += 1 }
-        else if let d = t.due, d > today { upcoming += 1 }
+        else if let d = t.deadline, d > today { upcoming += 1 }
       }
-      if !t.today, t.scheduled == nil, t.due == nil { unscheduled += 1 }
+      if !t.today, t.scheduled == nil, t.deadline == nil { unscheduled += 1 }
     }
     // Lump the today-screen sum into `todayCount` and leave `reviewCount`
     // at 0 — the sidebar shows the sum, so the tile looks identical
@@ -1494,11 +1494,11 @@ private struct SidebarTaskDrop: ViewModifier {
     case .inbox:
       // Inbox = no routing at all: clear schedule, deadline, area, project, and
       // the Today pin. A leftover deadline would keep the task out of Inbox
-      // (the filter requires due == nil) and stuck in Today, so we clear it too.
-      // Drop the pin LAST: `setDue(nil)` re-pins a still-Today row, so ending on
+      // (the filter requires deadline == nil) and stuck in Today, so we clear it too.
+      // Drop the pin LAST: `setDeadline(nil)` re-pins a still-Today row, so ending on
       // `moveToToday(false)` guarantees the task actually lands in Inbox.
       mutator.schedule(id: id, date: nil)
-      mutator.setDue(id: id, date: nil)
+      mutator.setDeadline(id: id, date: nil)
       mutator.moveToArea(id: id, area: nil)
       mutator.moveToProject(id: id, project: nil)
       mutator.moveToToday(id: id, today: false)

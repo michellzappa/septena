@@ -110,7 +110,7 @@ extension TaskEntity {
     record[TaskCloudKitSchema.Field.status] = statusRaw
     record[TaskCloudKitSchema.Field.created] = created
     record[TaskCloudKitSchema.Field.scheduled] = scheduled
-    record[TaskCloudKitSchema.Field.deadline] = due
+    record[TaskCloudKitSchema.Field.deadline] = deadline
     record[TaskCloudKitSchema.Field.today] = today ? 1 : 0
     record[TaskCloudKitSchema.Field.todaySetOn] = todaySetOn
     record[TaskCloudKitSchema.Field.completedAt] = completedAt
@@ -161,7 +161,7 @@ func apply(_ record: CKRecord) {
     if let v = record[TaskCloudKitSchema.Field.status] as? String { statusRaw = v }
     created = optionalTaskString(record[TaskCloudKitSchema.Field.created])
     scheduled = optionalTaskString(record[TaskCloudKitSchema.Field.scheduled])
-    due = optionalTaskString(record[TaskCloudKitSchema.Field.deadline])
+    deadline = optionalTaskString(record[TaskCloudKitSchema.Field.deadline])
     if let v = record[TaskCloudKitSchema.Field.today] as? Int { today = v != 0 }
     todaySetOn = optionalTaskString(record[TaskCloudKitSchema.Field.todaySetOn])
     completedAt = optionalTaskString(record[TaskCloudKitSchema.Field.completedAt])

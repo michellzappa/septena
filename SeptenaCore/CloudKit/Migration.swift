@@ -26,7 +26,7 @@ struct TaskSnapshot: Codable {
   var statusRaw: String
   var created: String?
   var scheduled: String?
-  var due: String?
+  var deadline: String?
   var today: Bool
   var todaySetOn: String?
   var completedAt: String?
@@ -45,7 +45,7 @@ struct TaskSnapshot: Codable {
     self.statusRaw = e.statusRaw
     self.created = e.created
     self.scheduled = e.scheduled
-    self.due = e.due
+    self.deadline = e.deadline
     self.today = e.today
     self.todaySetOn = e.todaySetOn
     self.completedAt = e.completedAt
@@ -255,7 +255,7 @@ final class TasksMigrator {
       entity.statusRaw = s.statusRaw
       entity.created = s.created
       entity.scheduled = s.scheduled
-      entity.due = s.due
+      entity.deadline = s.deadline
       entity.today = s.today
       entity.todaySetOn = s.todaySetOn
       entity.completedAt = s.completedAt

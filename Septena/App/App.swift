@@ -476,7 +476,7 @@ struct SeptenaApp: App {
     // ready, and the guarantee that `taskMutator` routes to CloudKit.
     await services.start()
     await bridge.runAutoImport { title, due, notes in
-      _ = taskMutator.create(title: title, due: due, notes: notes)
+      _ = taskMutator.create(title: title, deadline: due, notes: notes)
     }
     if bridge.recentImports.count != before {
       NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)

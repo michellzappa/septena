@@ -165,7 +165,7 @@ These six are the task backend, written by `SeptenaCore/CloudKit/*Record.swift`.
 | `status` | String | `String` (`statusRaw`) | No | |
 | `created` | String | `String?` | Yes | YYYY-MM-DD |
 | `scheduled` | String | `String?` | Yes | |
-| `deadline` | String | `String?` (`due`) | Yes | key `deadline` ↔ Swift `due` |
+| `deadline` | String | `String?` | Yes | hard deadline; the only field that makes a task overdue. CK field and Swift `TaskEntity.deadline` now match (legacy `due` JSON key still decoded for old payloads) |
 | `today` | Int(64) | `Bool` | No | |
 | `todaySetOn` | String | `String?` | Yes | |
 | `completedAt` | String | `String?` | Yes | string, not Timestamp |

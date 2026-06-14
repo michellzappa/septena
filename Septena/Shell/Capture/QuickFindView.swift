@@ -180,7 +180,7 @@ struct QuickFindView: View {
       return .area(Area(a))
     }
     if t.isOnToday { return .filter(.today) }
-    if t.scheduled != nil || t.due != nil { return .filter(.upcoming) }
+    if t.scheduled != nil || t.deadline != nil { return .filter(.upcoming) }
     if t.status == .done { return .filter(.logbook) }
     return .filter(.inbox)
   }

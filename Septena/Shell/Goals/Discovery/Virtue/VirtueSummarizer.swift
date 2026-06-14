@@ -260,7 +260,7 @@ enum VirtueSummarizer {
     if !completed.isEmpty {
       let otherDirected = completed.filter(isOtherDirected).count
       let financial = completed.filter { isFinancial($0.title) }.count
-      let obligations = completed.filter { $0.due != nil || isFinancial($0.title) }.count
+      let obligations = completed.filter { $0.deadline != nil || isFinancial($0.title) }.count
       add(.wisdom, "Completed \(completed.count) real tasks this week (test entries excluded)", .good, section: "tasks")
       if otherDirected > 0 {
         add(.justice, "\(otherDirected) other-directed commitments done (replies, follow-ups, messages)", .good, section: "tasks")

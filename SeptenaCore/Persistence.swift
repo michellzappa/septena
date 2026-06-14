@@ -22,7 +22,7 @@ final class TaskEntity {
   var statusRaw: String
   var created: String?
   var scheduled: String?
-  var due: String?
+  @Attribute(originalName: "due") var deadline: String?
   var today: Bool
   var todaySetOn: String?
   var completedAt: String?
@@ -96,7 +96,7 @@ final class TaskEntity {
        statusRaw: String = TaskStatus.open.rawValue,
        created: String? = nil,
        scheduled: String? = nil,
-       due: String? = nil,
+       deadline: String? = nil,
        today: Bool = false,
        todaySetOn: String? = nil,
        completedAt: String? = nil,
@@ -124,7 +124,7 @@ final class TaskEntity {
     self.statusRaw = statusRaw
     self.created = created
     self.scheduled = scheduled
-    self.due = due
+    self.deadline = deadline
     self.today = today
     self.todaySetOn = todaySetOn
     self.completedAt = completedAt
@@ -166,7 +166,7 @@ final class TaskEntity {
     guard status == .open else { return false }
     if today { return true }
     if let s = scheduled, s <= SeptenaDate.today { return true }
-    if let d = due, d <= SeptenaDate.today { return true }
+    if let d = deadline, d <= SeptenaDate.today { return true }
     return false
   }
 
@@ -185,7 +185,7 @@ final class TaskEntity {
       guard acknowledgedAt == nil, createdAt != .distantPast else { return false }
       return Date().timeIntervalSince(createdAt) < AgentCue.decayWindow
     }
-    return scheduled == nil && due == nil
+    return scheduled == nil && deadline == nil
         && project == nil && area == nil && !today
   }
 
@@ -1586,7 +1586,7 @@ extension SeptenaTask {
       "status": e.statusRaw,
       "created": e.created,
       "scheduled": e.scheduled,
-      "due": e.due,
+      "deadline": e.deadline,
       "today": e.today,
       "today_set_on": e.todaySetOn,
       "completed_at": e.completedAt,
@@ -3425,16 +3425,16 @@ enum LocalCache {
     case .inbox:
       guard e.status == .open,
             e.project == nil, e.area == nil,
-            e.scheduled == nil, e.due == nil, !e.today else { return nil }
+            e.scheduled == nil, e.deadline == nil, !e.today else { return nil }
       return SeptenaTask(e)
     case .upcoming:
       guard e.status == .open, !e.today else { return nil }
       if let s = e.scheduled, s > today { return SeptenaTask(e) }
-      if let d = e.due, d > today { return SeptenaTask(e) }
+      if let d = e.deadline, d > today { return SeptenaTask(e) }
       return nil
     case .unscheduled:
       guard e.status == .open, !e.today,
-            e.scheduled == nil, e.due == nil else { return nil }
+            e.scheduled == nil, e.deadline == nil else { return nil }
       return SeptenaTask(e)
     case .logbook:
       guard e.status == .done else { return nil }
@@ -3474,7 +3474,7 @@ enum LocalCache {
       }
       if e.today { todayFlag += 1 }
       if let s = e.scheduled, s <= today { scheduledLE += 1 }
-      if let d = e.due, d <= today { dueLE += 1 }
+      if let d = e.deadline, d <= today { dueLE += 1 }
       if e.area != nil { withArea += 1 }
       if e.project != nil { withProject += 1 }
       if e.pendingDeletion { pendingDel += 1 }
@@ -3525,7 +3525,7 @@ enum LocalCache {
     let today = SeptenaDate.today
     let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
     return rows.reduce(0) { acc, e in
-      guard e.status == .open, let d = e.due, d <= today else { return acc }
+      guard e.status == .open, let d = e.deadline, d <= today else { return acc }
       return acc + 1
     }
   }
