@@ -2967,7 +2967,10 @@ private struct WeekDashboardScreen<CurrentDay: Equatable, MenuExtra: View, Conte
           ZStack(alignment: .top) {
             Theme.groupedBackground
             SkyTopWash()
-              .frame(height: geo.size.height * 0.33, alignment: .top)
+              // Taller band than the dial needs: SkyTopWash's curved fade
+              // completes ~15% above its own foot, so the extra height is the
+              // room the horizon needs to melt out softly instead of clipping.
+              .frame(height: geo.size.height * 0.44, alignment: .top)
           }
           // Contain SkyTopWash's dark-mode `plusLighter` blend to the canvas
           // below it (not whatever sits behind the whole background).

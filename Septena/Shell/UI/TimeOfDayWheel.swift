@@ -40,9 +40,9 @@ struct TimeOfDayWheel: View {
     /// Half-weight stroke — calendar events render thinner than logged
     /// durations (sleep, fasting), matching the day timeline's thin pills.
     var thin: Bool = false
-    /// Solid (not washed) and given a glass sheen — for activities like
-    /// training that should read as a present thing, not an ambient window.
-    /// Sleep stays translucent (the soft "usual sleep window" pool).
+    /// Solid (not washed) — for activities like training that should read as
+    /// a present thing, not an ambient window. Sleep stays translucent (the
+    /// soft "usual sleep window" pool).
     var opaque: Bool = false
   }
 
@@ -176,6 +176,13 @@ struct TimeOfDayWheel: View {
   private let maxOpacity: Double = 0.92
   private let minOpacity: Double = 0.12
 
+  /// Ceiling on a dot's alpha — the brightest (today) dots render translucent
+  /// so the glass donut reads through them. Over the near-white donut a high
+  /// value barely reads (and dense slots stack toward opaque anyway), so this
+  /// sits low. The recency fade for older days is unchanged (only the top of
+  /// the range, which today occupies, is clamped); size/density math is intact.
+  private let dotMaxOpacity: Double = 0.5
+
   /// Shared defaults key for the today ⇄ week window, public so co-presenting
   /// views (the hero's `AmbientHalo` style) can key off the same state.
   static let windowDefaultsKey = "timeOfDayWheel.todayOnly"
@@ -244,7 +251,7 @@ struct TimeOfDayWheel: View {
       let dotR: CGFloat = effectiveWindow == 1 ? min(8, 4 + count) / 2 : (2.2 + norm * 1.8)
       return DotMark(id: e.id, center: point(e.fraction, dotRing),
                      diameter: dotR * 2, color: e.color ?? accent,
-                     opacity: fade(e.daysAgo))
+                     opacity: min(fade(e.daysAgo), dotMaxOpacity))
     }
   }
 
@@ -369,8 +376,7 @@ struct TimeOfDayWheel: View {
       // Logged duration bands (sleep, training) on the outer ring, under the
       // dots, on top of the glass so they stay legible. Sleep stays a soft
       // wash (the ambient "usual window"); opaque bands (training) are solid
-      // and get a thin specular highlight riding their outer edge — light on
-      // a glass rod, so they read as present *and* glassy.
+      // so they read as a present thing, not an ambient window.
       for b in shownBands.sorted(by: { $0.daysAgo > $1.daysAgo }) {
         // Sleep (the thin band here) sits a touch thicker than a calendar pill
         // — about the min dot diameter — so the night reads as a soft lane,
@@ -380,11 +386,6 @@ struct TimeOfDayWheel: View {
         ctx.stroke(arc(b.start, b.end, dotRing),
                    with: .color((b.color ?? accent).opacity(alpha)),
                    style: StrokeStyle(lineWidth: lineW, lineCap: .round))
-        if b.opaque {
-          ctx.stroke(arc(b.start, b.end, dotRing + lineW * 0.28),
-                     with: .color(.white.opacity(0.45 * fade(b.daysAgo))),
-                     style: StrokeStyle(lineWidth: max(1, lineW * 0.18), lineCap: .round))
-        }
       }
       // Scheduled (calendar) blocks on the inner lane — single-day view only.
       // Back-to-back events (one ends exactly when the next begins) would share

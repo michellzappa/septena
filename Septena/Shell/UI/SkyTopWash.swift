@@ -219,10 +219,46 @@ struct SkyTopWash: View {
 
   @State private var stops: [SkyAtmosphere.Stop] = []
 
+  /// How far below the band the fade's elliptical centre sits, in frame
+  /// heights. The fade's iso-opacity arcs are ellipses around that point, so a
+  /// centre below the frame bows the baseline into a gentle upward arch (∩) —
+  /// highest in the middle, dropping at the sides. Smaller → more pronounced
+  /// arch. This is the curviness knob (see `body`).
+  private let archDepth: CGFloat = 0.35
+
+  /// Squeeze the sky's zenith→horizon ramp into the upper `skySpan` of the
+  /// band, holding the horizon colour below it. The warmest stop ("the daylight
+  /// below the blue") is the *last* in the ramp, so at full span it lands at the
+  /// very foot — right where the curved fade goes transparent — and never
+  /// shows. Pulling the ramp up reaches that warmth before the fade clears it,
+  /// so the daylight band reads, then melts away. Lower → warm shows higher.
+  private let skySpan: Double = 0.6
+
   /// ~0.5° elevation buckets — the `.task` id, so a 60s tick that doesn't
   /// move the sun a visible amount doesn't re-render the gradient.
   private var elevationBucket: Int {
     Int((SolarClock.elevation(now: clock.now) / (0.5 * Double.pi / 180)).rounded())
+  }
+
+  /// The sky colour for a stop, adjusted for the current appearance. In dark
+  /// mode the sky is desaturated (pulled toward grey of the SAME brightness)
+  /// before it's added with `.plusLighter`: a saturated blue added onto black
+  /// reads as a vivid blue slab, whereas a desaturated cool grey reads as soft
+  /// ambient light — which is the brief. Pulling toward *luminance* (not white)
+  /// keeps each stop's brightness, so a near-black night stays near-black and
+  /// still adds nothing — the property that makes night vanish. `desaturation`
+  /// is the knob: 0 = full sky colour, 1 = pure grey.
+  private func washColor(_ s: SkyAtmosphere.Stop) -> Color {
+    guard colorScheme == .dark else {
+      return Color(.sRGB, red: s.r, green: s.g, blue: s.b, opacity: 1)
+    }
+    let desaturation = 0.6
+    let l = 0.2126 * s.r + 0.7152 * s.g + 0.0722 * s.b
+    return Color(.sRGB,
+                 red: s.r + (l - s.r) * desaturation,
+                 green: s.g + (l - s.g) * desaturation,
+                 blue: s.b + (l - s.b) * desaturation,
+                 opacity: 1)
   }
 
   var body: some View {
@@ -230,48 +266,56 @@ struct SkyTopWash: View {
       if stops.isEmpty {
         Color.clear
       } else {
-        GeometryReader { geo in
-          let h = geo.size.height
-          // How far *below* the wash the fade's arcs are centred. A radial
-          // mask's iso-opacity contours are circles around this point, so a
-          // centre below the frame bows the fade baseline into a gentle upward
-          // arch (∩): highest in the middle, dropping at the sides — the wash
-          // "curves up in the middle" instead of melting along a flat line.
-          // Deeper centre → flatter arch; this is the curviness knob.
-          let depth = h * 1.1
-          LinearGradient(
-            gradient: Gradient(stops: stops.map {
-              .init(color: Color(.sRGB, red: $0.r, green: $0.g, blue: $0.b, opacity: 1),
-                    location: $0.location)
-            }),
-            startPoint: .top, endPoint: .bottom
+        LinearGradient(
+          gradient: Gradient(stops: stops.map {
+            // `* skySpan` lifts the ramp into the top of the band; the last stop
+            // then holds the horizon colour down to the foot (see `skySpan`).
+            // `washColor` desaturates the sky in dark mode (see it).
+            .init(color: washColor($0), location: $0.location * skySpan)
+          }),
+          startPoint: .top, endPoint: .bottom
+        )
+        // Melt into the page along a CURVED baseline that bows up in the middle.
+        // Two stacked masks (their alphas multiply):
+        //   1. An ELLIPTICAL fade whose centre sits below the frame, so its
+        //      iso-opacity arcs read as a gentle upward arch (∩) — highest in
+        //      the middle, lower at the sides. *Elliptical*, not radial: the
+        //      arcs scale with the frame, so the arch spans the full width at
+        //      any aspect. (A circular radial left the far corners of a wide
+        //      macOS window fully opaque, cutting a hard horizontal line.)
+        //   2. A plain vertical fade as a SAFETY FLOOR — guarantees the wash is
+        //      fully clear by the band's foot across the WHOLE width, so it can
+        //      never end in a hard edge regardless of window proportions.
+        // Opaque from the top edge (behind the status / nav bar), held full
+        // through the dial (real colour for the glass donut to refract), gone
+        // by the foot. `archDepth` controls how curvy.
+        .mask(
+          EllipticalGradient(
+            stops: [
+              .init(color: .clear, location: 0),
+              .init(color: .white.opacity(0.5), location: 0.5),
+              .init(color: .white, location: 1),
+            ],
+            center: UnitPoint(x: 0.5, y: 1 + archDepth),
+            startRadiusFraction: 0.71,
+            endRadiusFraction: 1.15
           )
-          // Melt into the page along that CURVED baseline: opaque from the top
-          // edge (behind the status / nav bar) and held full through the dial,
-          // then fading to clear by the band's foot — no hard bottom line, and
-          // real color behind the glass donut so it has sky to refract. Same
-          // fade stops as before, now wrapped onto arcs: location 0 sits at the
-          // centre (frame-bottom, clear) and location 1 at the rim (frame-top,
-          // opaque), so the wash reaches lower at the sides than in the middle.
-          .mask(
-            RadialGradient(
-              stops: [
-                .init(color: .clear, location: 0),
-                .init(color: .white.opacity(0.55), location: 0.25),
-                .init(color: .white, location: 0.45),
-                .init(color: .white, location: 1),
-              ],
-              center: UnitPoint(x: 0.5, y: (h + depth) / max(h, 1)),
-              startRadius: depth,
-              endRadius: depth + h
-            )
-          )
-        }
+        )
+        .mask(
+          LinearGradient(stops: [
+            .init(color: .white, location: 0),
+            .init(color: .white, location: 0.80),
+            .init(color: .white.opacity(0.5), location: 0.92),
+            .init(color: .clear, location: 1),
+          ], startPoint: .top, endPoint: .bottom)
+        )
         // Dark appearance: ADD the sky as light (`plusLighter`) rather than
         // paint it over the dark UI — the daytime blue then reads as a soft
         // glow instead of a strong slab, and a near-black night adds nothing
-        // and disappears. Light appearance: ordinary source-over tint.
-        .opacity(colorScheme == .dark ? 0.4 : 0.6)
+        // and disappears. Light appearance: ordinary source-over tint. Dark
+        // sky is desaturated (see `washColor`) so it no longer needs to be
+        // dimmed into near-nothing — 0.32 keeps a soft cool presence.
+        .opacity(colorScheme == .dark ? 0.32 : 0.6)
         .blendMode(colorScheme == .dark ? .plusLighter : .normal)
       }
     }

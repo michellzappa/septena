@@ -49,7 +49,7 @@ public struct RhythmWire: Codable, Sendable {
     public let end: Double
     public let daysAgo: Int
     public let colorHex: String?
-    /// Solid + sheen (training) vs. soft wash; mirrors `TimeOfDayWheel.Band`.
+    /// Solid (training) vs. soft wash; mirrors `TimeOfDayWheel.Band`.
     public let opaque: Bool
     /// Half-weight stroke (calendar-style thin pill).
     public let thin: Bool
