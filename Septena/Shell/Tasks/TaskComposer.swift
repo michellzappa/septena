@@ -859,6 +859,15 @@ extension View {
     isPresented: Binding<Bool>,
     @ViewBuilder card: @escaping () -> Card
   ) -> some View {
-    adaptiveDetail(isPresented: isPresented) { card() }
+    adaptiveDetail(isPresented: isPresented) {
+      card()
+      #if os(iOS)
+        // On iPhone the drawer is a bottom sheet: open at half height when the
+        // content fits, with a drag-up to full. (No-op on iPad/macOS, where
+        // `adaptiveDetail` docks an inspector that ignores presentation detents.)
+        .presentationDetents([.medium, .large])
+        .presentationContentInteraction(.scrolls)
+      #endif
+    }
   }
 }
