@@ -188,6 +188,10 @@ struct DayDialHero: View {
       // the glass frosts and refracts it into real dark glass — night on the
       // face itself, not a wash behind it.
       nightArc: nightArc,
+      // The night wedge wears the user's Sleep color in dark mode (where a
+      // dark tone would read as muddy dark-on-dark); light mode keeps the
+      // built-in slate-indigo.
+      nightColor: theme.color(for: "sleep"),
       // Single-day dial: no week overlay. Tap and swipe drive navigation and
       // day-scrubbing instead (handled below).
       lockToday: true,

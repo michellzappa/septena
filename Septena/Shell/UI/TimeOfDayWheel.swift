@@ -81,6 +81,11 @@ struct TimeOfDayWheel: View {
   /// these hours — stained-glass night, drawn on the face — instead of a dark
   /// wash behind it. `nil` keeps the plain clear-glass donut.
   var nightArc: (start: Double, end: Double)? = nil
+  /// The hue the night arc wears instead of the fixed slate-indigo. The hero
+  /// passes the user's Sleep section color so that in dark mode the night reads
+  /// as a tint against the dark glass rather than muddy dark-on-dark. `nil`
+  /// keeps the static `nightTone` (the widget, section dials).
+  var nightColor: Color? = nil
   /// Locks the dial to a single day — no today⇄week tap toggle, always
   /// focused on `heroDate`. The hero uses this so its tap and swipe are free
   /// for navigation (tap → Next) and day-scrubbing (swipe → prev/next day);
@@ -117,6 +122,10 @@ struct TimeOfDayWheel: View {
   /// `northRotation` moves by the shortest signed delta (±180° max).
   @State private var displayedRotation: Double = 0
 
+  /// Drives the night arc's tone: dark mode swaps the muddy slate-indigo for
+  /// the Sleep-colored tint (see `resolvedNightTone`).
+  @Environment(\.colorScheme) private var colorScheme
+
   /// Base (un-rotated) position of a clock `fraction` on the ring at
   /// `radiusFactor`. The dial's rotation is applied by the enclosing
   /// `rotationEffect` (so glyphs orbit on the ring's arc, in harmony with the
@@ -144,21 +153,33 @@ struct TimeOfDayWheel: View {
   /// for a darker/lighter night.
   static let nightTone = Color(red: 0.26, green: 0.28, blue: 0.40).opacity(0.72)
 
+  /// The night arc's tone, resolved against the color scheme. In dark mode the
+  /// fixed slate-indigo reads as muddy dark-on-dark, so the night is tinted
+  /// with the user's Sleep color instead (`nightColor`) — a hue against the
+  /// dark glass, not more darkness. Light mode keeps the slate-indigo, which
+  /// reads fine on the bright donut. Falls back to the static tone when no
+  /// Sleep color is supplied (widget, section dials).
+  private var resolvedNightTone: Color {
+    guard colorScheme == .dark, let nightColor else { return Self.nightTone }
+    return nightColor.opacity(0.55)
+  }
+
   /// Conic shading for the night arc, filled on the whole band behind the
-  /// glass: transparent through the day, ramping to `nightTone` over ~1h at
+  /// glass: transparent through the day, ramping to the night tone over ~1h at
   /// sunset (dusk) and back to clear over ~1h before sunrise (dawn), so the
   /// terminators feather instead of cutting hard. Angle −90° puts midnight
   /// (location 0) at the top, sweeping clockwise — the dial's convention.
   private func nightShading(_ arc: (start: Double, end: Double)) -> AngularGradient {
     let feather = 1.0 / 24          // ~1 hour, as dial fraction
     let sunset = arc.start, sunrise = arc.end
+    let tone = resolvedNightTone
     let stops: [Gradient.Stop] = [
-      .init(color: Self.nightTone, location: 0),
-      .init(color: Self.nightTone, location: max(0, sunrise - feather)),
-      .init(color: .clear,         location: sunrise),
-      .init(color: .clear,         location: sunset),
-      .init(color: Self.nightTone, location: min(1, sunset + feather)),
-      .init(color: Self.nightTone, location: 1),
+      .init(color: tone,   location: 0),
+      .init(color: tone,   location: max(0, sunrise - feather)),
+      .init(color: .clear, location: sunrise),
+      .init(color: .clear, location: sunset),
+      .init(color: tone,   location: min(1, sunset + feather)),
+      .init(color: tone,   location: 1),
     ]
     return AngularGradient(gradient: Gradient(stops: stops),
                            center: .center, angle: .degrees(-90))
@@ -182,6 +203,12 @@ struct TimeOfDayWheel: View {
   /// sits low. The recency fade for older days is unchanged (only the top of
   /// the range, which today occupies, is clamped); size/density math is intact.
   private let dotMaxOpacity: Double = 0.5
+
+  /// Ceiling on an opaque duration band's alpha (training). Like the dots, it
+  /// stays semitransparent so the whole donut reads as glass — but sits a touch
+  /// above the soft sleep wash (~0.55) so training still reads as the more
+  /// "present" activity rather than an ambient window.
+  private let bandMaxOpacity: Double = 0.6
 
   /// Shared defaults key for the today ⇄ week window, public so co-presenting
   /// views (the hero's `AmbientHalo` style) can key off the same state.
@@ -374,15 +401,16 @@ struct TimeOfDayWheel: View {
       let scheduledRing = ringR * 0.68      // inner: calendar / scheduled
 
       // Logged duration bands (sleep, training) on the outer ring, under the
-      // dots, on top of the glass so they stay legible. Sleep stays a soft
-      // wash (the ambient "usual window"); opaque bands (training) are solid
-      // so they read as a present thing, not an ambient window.
+      // dots, on top of the glass so they stay legible. Everything on the donut
+      // is semitransparent so the glass reads through: sleep is a soft wash
+      // (the ambient "usual window"); opaque bands (training) sit a touch more
+      // present (capped at `bandMaxOpacity`) but still translucent.
       for b in shownBands.sorted(by: { $0.daysAgo > $1.daysAgo }) {
         // Sleep (the thin band here) sits a touch thicker than a calendar pill
         // — about the min dot diameter — so the night reads as a soft lane,
         // not a hairline. Training (opaque) keeps the heavy 9pt stroke.
         let lineW: CGFloat = b.thin ? 5 : 9
-        let alpha = b.opaque ? min(1.0, fade(b.daysAgo) + 0.2) : fade(b.daysAgo) * 0.6
+        let alpha = b.opaque ? min(bandMaxOpacity, fade(b.daysAgo) + 0.2) : fade(b.daysAgo) * 0.6
         ctx.stroke(arc(b.start, b.end, dotRing),
                    with: .color((b.color ?? accent).opacity(alpha)),
                    style: StrokeStyle(lineWidth: lineW, lineCap: .round))
