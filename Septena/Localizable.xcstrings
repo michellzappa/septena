@@ -732,9 +732,6 @@
     "•" : {
       "shouldTranslate" : false
     },
-    "→ %@" : {
-
-    },
     "→ %@ %@ in 7d" : {
       "localizations" : {
         "en" : {
@@ -757,9 +754,6 @@
       }
     },
     "+%@" : {
-
-    },
-    "+%@ more" : {
 
     },
     "×%@" : {
@@ -3985,6 +3979,9 @@
         }
       }
     },
+    "Log a few symptoms and your severity trend and timing pattern appear here." : {
+
+    },
     "Log a Meal" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6566,9 +6563,6 @@
       }
     },
     "Tingling" : {
-
-    },
-    "To sort" : {
 
     },
     "today" : {

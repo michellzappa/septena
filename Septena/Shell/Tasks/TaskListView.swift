@@ -113,40 +113,12 @@ struct TaskListView: View {
     nonmutating set { reviewStorage = newValue; storageFilter = filter }
   }
 
-  /// The triage band — the unratified layer rendered above the Today list (only
-  /// on the Today view). Read straight from the mirror; the table is
-  /// personal-scale and the band only renders on `.today`. See `TriageBandView`,
-  /// docs/TRIAGE_BAND_SPEC.md.
+  /// The Inbox — the unratified layer rendered as a section above Today (only on
+  /// the Today view; see `triageSection`). Read straight from the mirror; the
+  /// table is personal-scale and this only renders on `.today`.
+  /// See docs/TRIAGE_BAND_SPEC.md.
   private var triageItems: [SeptenaTask] {
     filter == .today ? LocalCache.tasks(in: modelContext, filter: .triage) : []
-  }
-
-  /// Apply a disposition to a band row, then reload so it moves into Today (or
-  /// off the surface). Any disposition but Drop also acknowledges an agent row,
-  /// so the cue clears in the same gesture. See docs/TRIAGE_BAND_SPEC.md §4.
-  private func disposeTriage(_ task: SeptenaTask, _ d: TriageDisposition) {
-    Haptics.tap()
-    let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date())
-    switch d {
-    case .today:            mutator.moveToToday(id: task.id)
-    case .tomorrow:         mutator.schedule(id: task.id, date: tomorrow)
-    case .someday:          mutator.moveToSomeday(id: task.id)
-    case .drop:             mutator.cancel(id: task.id)
-    case .acceptAgent:      break  // acknowledge below is the whole action
-    case .project(let pid): mutator.moveToProject(id: task.id, project: pid)
-    }
-    if task.source == TaskSource.mcp, d != .drop { mutator.acknowledge(id: task.id) }
-    Task { await load() }
-  }
-
-  /// Accept every agent proposal in the band in one gesture (keeping each one's
-  /// placement); the ones placed today flow into the list below on reload.
-  private func acceptAllTriage() {
-    let proposals = triageItems.filter { $0.source == TaskSource.mcp }
-    guard !proposals.isEmpty else { return }
-    Haptics.success()
-    for p in proposals { mutator.acknowledge(id: p.id) }
-    Task { await load() }
   }
 
   /// Review tasks that genuinely rolled in overnight — i.e. were scheduled
@@ -210,9 +182,9 @@ struct TaskListView: View {
   // the task in that list's context with no search surface in the way.
   @State private var creating = false
 
-  /// Triage band collapse state (Today only). Expanded by default so proposals
-  /// are one tap from accepted; the user can fold it without emptying it.
-  @State private var triageCollapsed = false
+  /// Whether the Inbox section (on the Today view) is folded. Expanded by
+  /// default; the header shows the count either way.
+  @State private var inboxCollapsed = false
 
   // When picker. Use a single Identifiable item so the sheet's kind
   // is intrinsic to the presentation — avoids stale-state races where
@@ -450,31 +422,81 @@ struct TaskListView: View {
     titleRow
     newTodosBannerRow
     remindersRow
-    triageBandRow
     emptyStateRow
   }
 
-  /// The triage band sits directly above the Today rows (and just below any
-  /// pending Reminders import, which is itself an unratified-capture source).
+  /// The Inbox — the unratified layer (agent proposals + loose captures) —
+  /// rendered as a normal section on top of Today, styled exactly like the area
+  /// sections below: a `groupHeader` title and standard task rows (checkbox,
+  /// swipe, context menu). Triage *is* the normal task interaction — complete,
+  /// open to edit, or move/schedule via swipe/menu (each acknowledges an agent
+  /// row, clearing it from the Inbox). See docs/TRIAGE_BAND_SPEC.md.
   @ViewBuilder
-  private var triageBandRow: some View {
+  private var triageSection: some View {
     if filter == .today && !triageItems.isEmpty {
-      TriageBandView(tasks: triageItems,
-                     accent: theme.color(for: "tasks"),
-                     projects: projects,
-                     areas: areas,
-                     collapsed: $triageCollapsed,
-                     onOpen: { editingDetail = $0 },
-                     onDispose: { disposeTriage($0, $1) },
-                     onAcceptAll: { acceptAllTriage() })
-        .plainListChrome()
+      Section {
+        if !inboxCollapsed {
+          ForEach(triageItems) { task in row(task, quickMenu: true).asTaskRow(id: task.id) }
+        }
+      } header: {
+        inboxHeader(count: triageItems.count)
+      }
     }
+  }
+
+  /// Foldable Inbox header — same anatomy as the area `groupHeader` (icon
+  /// column, title, hairline) plus a live count and a fold chevron. Tapping
+  /// anywhere on it toggles the section.
+  @ViewBuilder
+  private func inboxHeader(count: Int) -> some View {
+    #if os(macOS)
+    let headerTopPadding: CGFloat = 32
+    let headerHorizontalCorrection: CGFloat = 0
+    #else
+    let headerTopPadding: CGFloat = 18
+    let headerHorizontalCorrection: CGFloat = -16
+    #endif
+    Button {
+      Haptics.tick()
+      withAnimation(.easeInOut(duration: 0.2)) { inboxCollapsed.toggle() }
+    } label: {
+      VStack(alignment: .leading, spacing: 0) {
+        HStack(spacing: Theme.iconTextGap) {
+          Image(systemName: "tray.full")
+            .scaledFont(size: 16)
+            .foregroundStyle(Theme.iconMuted)
+            .frame(width: Theme.checkboxTap, alignment: .center)
+          Text("Inbox")
+            .scaledFont(size: Theme.groupHeaderFontSize, weight: .semibold)
+            .foregroundStyle(Theme.inkPrimary)
+          Text("\(count)")
+            .scaledFont(size: Theme.groupHeaderFontSize, weight: .regular)
+            .monospacedDigit()
+            .foregroundStyle(Theme.inkSecondary)
+          Spacer()
+          Image(systemName: "chevron.down")
+            .scaledFont(size: 12, weight: .semibold)
+            .foregroundStyle(Theme.iconMuted)
+            .rotationEffect(.degrees(inboxCollapsed ? -90 : 0))
+        }
+        .padding(.horizontal, Theme.hPadding)
+        .padding(.horizontal, headerHorizontalCorrection)
+        .padding(.top, headerTopPadding)
+        .padding(.bottom, 6)
+        Hairline().padding(.bottom, 4)
+      }
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .textCase(nil)
+    .selectionDisabled()
   }
 
   @ViewBuilder
   private var taskListRows: some View {
     switch filter {
     case .today:
+      triageSection
       groupedOpenItems
     case .unscheduled:
       reviewRows
@@ -755,79 +777,52 @@ struct TaskListView: View {
       mutator.moveToArea(id: id, area: areaId)
       mutator.moveToProject(id: id, project: nil)
     }
+    // Filing is engagement — clear the agent cue so a moved proposal leaves the
+    // Inbox. No-op for non-agent / already-seen rows.
+    mutator.acknowledge(id: id)
     Task { await load() }
   }
 
   // MARK: - Row
 
   @ViewBuilder
-  private func row(_ task: SeptenaTask) -> some View {
-    rowContent(task)
-      .background(rowBackground(for: task))
-      // Drag a row (or the whole selection) to a sidebar area/project to
-      // re-home it. `.draggable` pairs with the sidebar's
-      // `.dropDestination(for: String.self)`; the explicit preview is a
-      // compact title pill (the default snapshots the full-width row and
-      // scales it into a ragged thumbnail).
-      #if os(macOS)
-      .draggable(task.id) {
-        Text(task.title)
-          .scaledFont(size: 13)
-          .lineLimit(1)
-          .padding(.horizontal, 10)
-          .padding(.vertical, 6)
-          .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
-      }
-      #endif
-      // Standard Reminders/Things swipe set. Must live on the outer row view
-      // (the direct child of List) — List only walks one level deep to find
-      // swipe actions.
-      // Leading, full-swipe: in the Today list this completes the task
-      // (swipe-right-to-done); in every other list it promotes the task into
-      // Today instead — "complete" is ambiguous for a row that isn't yet a
-      // today commitment.
-      .swipeActions(edge: .leading, allowsFullSwipe: true) {
-        if filter == .today {
-          Button {
-            toggle(task)
-          } label: {
-            Label(task.status == .done ? "Uncomplete" : "Complete",
-                  systemImage: task.status == .done ? "arrow.uturn.left" : "checkmark")
-          }
-          .tint(.green)
-        } else {
-          Button {
-            Haptics.tick()
-            mutator.moveToToday(id: task.id, today: true)
-            Task { await load() }
-          } label: {
-            Label("Today", systemImage: "sun.max")
-          }
-          .tint(Theme.todayAccent)
-        }
-      }
-      // Trailing: Delete (also in the context menu). Not full-swipe, so a
-      // stray swipe can't destroy a task — you have to tap the revealed button.
-      .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-        Button(role: .destructive) {
-          Haptics.warning()
-          applyDelete(task.id)
+  private func row(_ task: SeptenaTask, quickMenu: Bool = false) -> some View {
+    // No swipe actions on task rows (removed by request — completion is the
+    // checkbox; everything else is the menu). `quickMenu` adds a visible
+    // trailing "⋯" that opens the same shared `rowActionsMenu` as right-click /
+    // long-press — used on Inbox rows so triage is one tap, not a hidden press.
+    HStack(spacing: 0) {
+      rowContent(task)
+      if quickMenu {
+        Menu {
+          rowActionsMenu(target: .single(task))
         } label: {
-          Label("Delete", systemImage: "trash")
+          Image(systemName: "ellipsis")
+            .scaledFont(size: 16, weight: .semibold)
+            .foregroundStyle(Theme.iconMuted)
+            .frame(width: 44, height: 32)
+            .contentShape(Rectangle())
         }
-        // Explicit acknowledge for agent-created rows — dismiss the cue
-        // without otherwise touching the task. Only offered while it glows.
-        if task.showsAgentCue() {
-          Button {
-            Haptics.tick()
-            mutator.acknowledge(id: task.id)
-            Task { await load() }
-          } label: {
-            Label("Mark seen", systemImage: "eye")
-          }
-          .tint(Theme.inkSecondary)
-        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .fixedSize()
+        .accessibilityLabel("Organize")
       }
+    }
+    .background(rowBackground(for: task))
+    // Drag a row (or the whole selection) to a sidebar area/project to re-home
+    // it. `.draggable` pairs with the sidebar's `.dropDestination(for:)`; the
+    // explicit preview is a compact title pill.
+    #if os(macOS)
+    .draggable(task.id) {
+      Text(task.title)
+        .scaledFont(size: 13)
+        .lineLimit(1)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+    }
+    #endif
   }
 
   private func rowContent(_ task: SeptenaTask) -> some View {
@@ -907,6 +902,9 @@ struct TaskListView: View {
         for id in ids {
           if today { mutator.moveToToday(id: id, today: true) }
           else { mutator.removeFromToday(id: id) }
+          // Engagement — clear the agent cue so a ratified proposal leaves the
+          // Inbox. No-op for non-agent / already-seen rows.
+          mutator.acknowledge(id: id)
         }
         Task { await load() }
       },
@@ -1286,6 +1284,9 @@ struct TaskListView: View {
         mutator.moveToToday(id: id, today: false)
       }
     }
+    // Scheduling is engagement — clear the agent cue so a dated proposal leaves
+    // the Inbox. No-op for non-agent / already-seen rows.
+    mutator.acknowledge(id: id)
     Task { await load() }
   }
 

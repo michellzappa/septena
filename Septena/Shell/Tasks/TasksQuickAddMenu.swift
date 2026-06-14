@@ -5,8 +5,8 @@ import SwiftUI
 //
 // Spec'd as:
 //
-//   • Quick capture…     → pops the composer in place to capture a loose task;
-//                           it lands in the triage band on Today
+//   • Create in Inbox…   → pops the composer in place to capture a loose task;
+//                           it lands in the Inbox section on top of Today
 //                           (docs/TRIAGE_BAND_SPEC.md).
 //   • Go to Today         → switches to Tasks tab + .filter(.today), where the
 //                           triage band (the retired Inbox page's contents) now
@@ -31,7 +31,7 @@ struct TasksQuickAddMenu: View {
 
   var body: some View {
     Button { onCreateInInbox() } label: {
-      Label("Quick capture…", systemImage: "plus.circle")
+      Label("Create in Inbox…", systemImage: "plus.circle")
     }
     Button { onGoToToday() } label: {
       Label("Go to Today", systemImage: "star")

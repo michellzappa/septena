@@ -1301,7 +1301,7 @@ struct WeekDashboardView: View {
       headline: "\(openToday) open · \(doneToday)/\(totalToday) done",
       headlineStats: [
         .init(label: "Today", value: "\(openToday)"),
-        .init(label: "To sort", value: "\(toSort)"),
+        .init(label: "Inbox", value: "\(toSort)"),
         .init(label: "Upcoming", value: "\(upcoming)"),
       ],
       progress: .init(label: "Done today",
@@ -3086,7 +3086,7 @@ private struct WeekTasksTile: View {
       accent: accent,
       stats: [
         .init(label: "Today", value: "\(openToday)"),
-        .init(label: "To sort", value: "\(toSort)"),
+        .init(label: "Inbox", value: "\(toSort)"),
         .init(label: "Upcoming", value: "\(upcoming)")
       ],
       progress: .init(

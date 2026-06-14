@@ -324,7 +324,6 @@
 		74E631E4D6B41796BBE7B3FA /* AreaRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = C729259A5867D99CC64AA9C3 /* AreaRecord.swift */; };
 		752EC30B8D5BBB93EBA9FBBE /* CoachVoiceRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15B7C1644977DC5B2BBB9339 /* CoachVoiceRecord.swift */; };
 		75F953C419493CAE4EC29A6E /* GoalsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 207D112EFCEB89F2F0D1DBE5 /* GoalsPlugin.swift */; };
-		7647743D25B2D5C1421A50DB /* TriageBand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48002AB8BA47AF89EE7A6BAE /* TriageBand.swift */; };
 		76C049B6FAEBDE6471287104 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0365044C6EA062BBFCCA6B /* SettingsView.swift */; };
 		77A510BB428BFD5266C208AE /* TaskDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58104223B8DF0EFE5EA8D46F /* TaskDraft.swift */; };
 		77B186F9015710E0B19204AB /* MacroCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5B53F1EA33DC5B17A751664 /* MacroCatalog.swift */; };
@@ -618,7 +617,6 @@
 		DFEE3A236B4EFB7A94EE7CC6 /* TaskIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24B8A11A356D1DC98670738C /* TaskIntents.swift */; };
 		E0001C3C4A47E0774F8C0156 /* CoachChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75AAC894569974BDF43B3B15 /* CoachChatView.swift */; };
 		E13166B735F6109781FB1178 /* GutPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E4B85E65CB1D53481420C4C /* GutPlugin.swift */; };
-		E16771C9BF6B57A29439E8AE /* TriageBand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48002AB8BA47AF89EE7A6BAE /* TriageBand.swift */; };
 		E18A84E4ED0B805920276DF6 /* EditExerciseEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5B59047A762635E5A4D89D0 /* EditExerciseEntrySheet.swift */; };
 		E1CBA01ED10A916CD8BC355F /* MoodPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4E90D21C382F9970E4AAF88 /* MoodPlugin.swift */; };
 		E277850005E097545CB80530 /* GoalMilestoneRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 545368C5D91673E810519444 /* GoalMilestoneRecord.swift */; };
@@ -877,7 +875,6 @@
 		460C571ECD796E1777AD12C1 /* QuickActionsApplier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickActionsApplier.swift; sourceTree = "<group>"; };
 		473849A78E0E577B6653610D /* CoachMiniApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachMiniApp.swift; sourceTree = "<group>"; };
 		47CA5EA5A9284AB449966DCC /* NextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextView.swift; sourceTree = "<group>"; };
-		48002AB8BA47AF89EE7A6BAE /* TriageBand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriageBand.swift; sourceTree = "<group>"; };
 		482D9E9FA333137B98A9DBE1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		4847155874CE3B82AD612728 /* WeekDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekDashboardView.swift; sourceTree = "<group>"; };
 		4A8ACF72CEC4EEB78A6951E1 /* SchemaSeedRegistrar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchemaSeedRegistrar.swift; sourceTree = "<group>"; };
@@ -1778,7 +1775,6 @@
 				BB454D5630376DAFA9CBF9E1 /* TaskListView.swift */,
 				40B5D7C95F12FB9F9E53565E /* TasksDestinationView.swift */,
 				E0B5F0D2E1B01AAEF2217FA4 /* TasksQuickAddMenu.swift */,
-				48002AB8BA47AF89EE7A6BAE /* TriageBand.swift */,
 			);
 			path = Tasks;
 			sourceTree = "<group>";
@@ -2646,7 +2642,6 @@
 				F0C1672EFEBA715B2830BC62 /* TrainingPlugin.swift in Sources */,
 				9E8994F78DFE201A05147CE2 /* TrainingQuickAddMenu.swift in Sources */,
 				32946FB8F8ED833AE1EEA490 /* TrainingTabAccessory.swift in Sources */,
-				7647743D25B2D5C1421A50DB /* TriageBand.swift in Sources */,
 				40A48B907339E705C7B4F2ED /* ValuesFlowView.swift in Sources */,
 				7435B6913FC111EAE946DBBB /* ValuesMiniApp.swift in Sources */,
 				15EE3B56B18381CC683C9E5F /* ValuesPromptService.swift in Sources */,
@@ -3004,7 +2999,6 @@
 				E7A21358615235C62A3149B5 /* TrainingPlugin.swift in Sources */,
 				533D26E5CB13EAC2F2B088B2 /* TrainingQuickAddMenu.swift in Sources */,
 				1BBBC5F2298045DC6FD22C2F /* TrainingTabAccessory.swift in Sources */,
-				E16771C9BF6B57A29439E8AE /* TriageBand.swift in Sources */,
 				FA7DB874B35156F613E9DDAE /* ValuesFlowView.swift in Sources */,
 				E91ADC2BF5CC85574807D529 /* ValuesMiniApp.swift in Sources */,
 				18FF97ECE670F663D30AB04A /* ValuesPromptService.swift in Sources */,

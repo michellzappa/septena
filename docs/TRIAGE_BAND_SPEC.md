@@ -1,9 +1,11 @@
 # Triage Band — Inbox *over* Today
 
-**Status:** **Built + fully unified** — band is the Today experience on both the
-drawer and the full Tasks tab; the separate Inbox page is retired. iOS + macOS +
-core tests green, uncommitted · **Date:** 2026-06-14. Code is the source of
-truth; when this spec and the code disagree, fix one of them deliberately.
+**Status:** **Built + fully unified, rendered as a native "Inbox" section** —
+Inbox is a normal section (area-style header, standard checkbox rows, all items)
+on top of Today, on both the drawer and the full Tasks tab; the separate Inbox
+page is retired. iOS + macOS + core tests green, uncommitted · **Date:**
+2026-06-14. Code is the source of truth; when this spec and the code disagree,
+fix one of them deliberately.
 
 ## Built (Phase 1 + full unify)
 
@@ -20,19 +22,34 @@ retired — one Today, no parallel inbox. iOS + macOS + 39 core tests green.
   in any Today surface — the invariant (§1) holds app-wide. This deliberately
   also keeps unratified agent proposals **out of the Next feed** until ratified
   (Next reads `.today`), which is the correct "Next = committed" behavior.
-- **Both surfaces host the band.**
-  - **Drawer** (`TasksDestinationView`): band on top of Today, optimistic move
-    across the divider (`dispose`/`applyLocally`/`acceptAllProposals`).
-  - **Full Tasks tab** (`TaskListView`, Mac/iPad): `triageBandRow` banner above
-    the Today rows on the `.today` view; `disposeTriage`/`acceptAllTriage`
-    reload-driven. So the band shows where Mac/iPad users actually live.
-- **Separate Inbox retired.** Removed the Inbox sidebar smart-list row; "New
-  To-Do" now lands on Today (`SidebarView`). Dashboard Tasks tile + headline
-  stat changed **"Inbox" → "To sort"** (`triageCount`), and the quick-add menu
-  dropped "Go to Inbox", reworded "Create in Inbox…" → "Quick capture…"
-  (`WeekTasksTile`, `tasksTile`, `tasksDomainData`, `TasksQuickAddMenu`). The
-  `.inbox` `TaskFilter` case survives only as a loose-capture *create seed*, not
-  a navigable page.
+- **Inbox is a native section, not a bespoke widget** (revised per user
+  feedback). It's rendered like any other group — labelled **"Inbox"**, header
+  styled exactly like the area headers, with **standard task rows (checkbox,
+  swipe, context menu)**, and **all items shown** (no cap / fold / collapse).
+  - **Full Tasks tab** (`TaskListView`): `triageSection` = a `Section` with a
+    **foldable** `inboxHeader` (same anatomy as the area `groupHeader` — tray
+    icon, title, hairline — plus a live **count** and a fold chevron; tap to
+    collapse/expand) over the canonical `row()`, on top of the Today groups.
+  - **Drawer** (`TasksDestinationView`): a `DrawerSection("Inbox")` of `TaskRow`s
+    above the "Today" section. (Fold/count not yet wired here — `DrawerSection`
+    chrome change; follow-up.)
+  - **No swipe actions on task rows** (removed by request — completion is the
+    checkbox, everything else the menu). Inbox rows carry a visible trailing
+    **`⋯` menu** (`row(quickMenu:)`) that opens the shared `rowActionsMenu`
+    (Today / When / Move / Someday / Drop…) — one tap, not a hidden long-press.
+  - **Triage *is* the normal task interaction** — no chips, no "Accept all".
+    Complete (checkbox), open-to-edit, or the `⋯` menu. Each acknowledges an
+    agent row so a dispositioned proposal leaves the Inbox: `flipStatus`/complete
+    + the composer already acknowledged; added `acknowledge` to `applyMove`,
+    `applyWhen`, and the context-menu `onMoveToToday`. The bespoke
+    `TriageBandView` was **deleted**.
+- **Separate Inbox *page* retired.** Removed the Inbox sidebar smart-list row;
+  "New To-Do" now lands on Today (`SidebarView`). Dashboard Tasks tile + headline
+  stat changed to **"Inbox"** backed by `triageCount` (so it counts the to-sort
+  pile, not the old loose-only inbox), and the quick-add menu dropped "Go to
+  Inbox" (`WeekTasksTile`, `tasksTile`, `tasksDomainData`, `TasksQuickAddMenu`).
+  The `.inbox` `TaskFilter` case survives only as a loose-capture *create seed*
+  and the (now unlisted) Reminders-setup route, not a navigable list.
 - **Reminders import relocated.** Pending Apple Reminders are unratified
   captures too, so `RemindersInboxSection` now also renders on Today
   (`showsSetupCTAs: false` — only actual pending imports show; no setup prompt
@@ -50,12 +67,12 @@ retired — one Today, no parallel inbox. iOS + macOS + 39 core tests green.
   `.today` change). The gateway skill now teaches that **everything the agent
   creates is a proposal** that lands in `triage` (since gateway creates carry
   `source: "mcp"`), not directly in `today`. Gateway typecheck clean.
-- **UI component** (`Septena/Shell/Tasks/TriageBand.swift`): collapsible
-  `TriageBandView` — "To sort · N" header, **Accept all / Accept N**, per-row
-  **primary chip** (one tap = accept; agent rows `acknowledge` keeping
-  placement, loose → Today) + **override menu** (Today / Tomorrow / Move to
-  project / Someday / Drop), soft **cap of 5** with tap-to-reveal "+N more",
-  default **expanded**, absent when empty.
+> **Design note (revised 2026-06-14):** the first cut was a bespoke
+> `TriageBandView` card (chips, Accept-all, cap, collapse). User feedback: make
+> it look native — say "Inbox", header like the area headers, normal task rows
+> with checkboxes, show everything. So the card was replaced by a plain section
+> reusing the existing `groupHeader` + canonical row, and `TriageBandView` was
+> deleted. Triage actions are now just the standard task affordances.
 
 **Pending (needs the user):** **deploy the gateway** (`wrangler deploy`) so
 `view:"triage"` goes live for consumer chat — an outward/production action, not

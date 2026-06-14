@@ -444,7 +444,7 @@ enum TaskFilter: Equatable, Hashable {
   var title: String {
     switch self {
     case .today: return String(localized: "Today", comment: "Task filter")
-    case .triage: return String(localized: "To sort", comment: "Task filter")
+    case .triage: return String(localized: "Inbox", comment: "Task filter")
     case .inbox: return String(localized: "Inbox", comment: "Task filter")
     case .upcoming: return String(localized: "Upcoming", comment: "Task filter")
     case .unscheduled: return String(localized: "Anytime", comment: "Task filter")
