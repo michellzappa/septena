@@ -3335,25 +3335,38 @@ enum GroceryStockHistory {
 // it is an explicit user action, so presenting the sign-in here is expected.
 private struct ClaudeReconnectBanner: View {
   @State private var provider = ClaudeGatewayProvider.shared
+  // Briefly held true after a successful re-mint so the tap closes the loop
+  // with a "Reconnected" flash instead of the banner silently vanishing.
+  @State private var justReconnected = false
+
+  // A real refresh failure (network etc.) — distinct from a user-cancel,
+  // which leaves `lastError` nil so the banner stays in its calm default copy.
+  private var failed: Bool { provider.lastError != nil && provider.needsReauth }
 
   var body: some View {
-    if provider.isEnabled && provider.needsReauth {
+    if provider.isEnabled && (provider.needsReauth || justReconnected) {
       Button {
-        Task { await provider.refreshNow() }
+        guard !justReconnected, !provider.isRefreshing else { return }
+        Task {
+          if await provider.refreshNow() {
+            Haptics.success()
+            withAnimation(.snappy) { justReconnected = true }
+            try? await Task.sleep(for: .seconds(1.6))
+            withAnimation(.snappy) { justReconnected = false }
+          }
+        }
       } label: {
         HStack(spacing: 8) {
-          Circle()
-            .fill(Color.claudeAccent)
-            .frame(width: 7, height: 7)
-          Text("Reconnect")
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(Color.claudeAccent)
-          Text("Claude session expired")
-            .font(.subheadline)
-            .foregroundStyle(.tertiary)
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .layoutPriority(-1)
+          leadingGlyph
+          title
+          if let subtitle {
+            Text(subtitle)
+              .font(.subheadline)
+              .foregroundStyle(.tertiary)
+              .lineLimit(1)
+              .truncationMode(.tail)
+              .layoutPriority(-1)
+          }
           Spacer(minLength: 8)
           if provider.isRefreshing {
             ProgressView().controlSize(.small)
@@ -3370,6 +3383,33 @@ private struct ClaudeReconnectBanner: View {
         )
       }
       .buttonStyle(.plain)
+      .disabled(justReconnected)
     }
+  }
+
+  @ViewBuilder private var leadingGlyph: some View {
+    if justReconnected {
+      Image(systemName: "checkmark.circle.fill")
+        .font(.subheadline)
+        .foregroundStyle(.green)
+    } else {
+      Circle()
+        .fill(failed ? Color.orange : Color.claudeAccent)
+        .frame(width: 7, height: 7)
+    }
+  }
+
+  @ViewBuilder private var title: some View {
+    Text(justReconnected ? "Reconnected" : "Reconnect")
+      .font(.subheadline.weight(.semibold))
+      .foregroundStyle(justReconnected ? Color.green : Color.claudeAccent)
+  }
+
+  // Muted context line. Default framing is proactive ("keep connected"), since
+  // the cue fires while the session is still live and quick to re-mint.
+  private var subtitle: String? {
+    if justReconnected { return nil }
+    if failed { return "Couldn’t reconnect — tap to retry" }
+    return "Keep Claude connected"
   }
 }

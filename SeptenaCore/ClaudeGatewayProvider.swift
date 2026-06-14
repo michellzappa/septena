@@ -127,9 +127,13 @@ public final class ClaudeGatewayProvider {
   }
 
   /// Mint a token and push it now. Updates observable status either way.
-  public func refreshNow() async {
-    guard isEnabled else { return }
-    guard !isRefreshing else { return }
+  /// Returns `true` only on a successful re-mint, so callers (the homepage
+  /// banner) can confirm the reconnect; a user-cancel returns `false` without
+  /// recording an error.
+  @discardableResult
+  public func refreshNow() async -> Bool {
+    guard isEnabled else { return false }
+    guard !isRefreshing else { return false }
     isRefreshing = true
     defer { isRefreshing = false }
     do {
@@ -142,9 +146,16 @@ public final class ClaudeGatewayProvider {
       // Re-arm the pre-expiry reconnect nudge off the fresh timestamp.
       NotificationCenter.default.post(name: .septenaClaudeGatewayChanged, object: nil)
       logger.info("Claude gateway token refreshed")
+      return true
+    } catch GatewayError.cancelled {
+      // Not a failure — keep `needsReauth` so the cue stays, leave `lastError`
+      // untouched so Settings doesn't show a stale "cancelled" error.
+      logger.info("Claude gateway sign-in cancelled by user")
+      return false
     } catch {
       lastError = error.localizedDescription
       logger.error("Claude gateway refresh failed: \(error.localizedDescription, privacy: .public)")
+      return false
     }
   }
 
@@ -207,6 +218,11 @@ public final class ClaudeGatewayProvider {
         self?.anchorProvider = nil
         if let callbackURL {
           cont.resume(returning: callbackURL)
+        } else if let asError = error as? ASWebAuthenticationSessionError,
+                  asError.code == .canceledLogin {
+          // User tapped Cancel / swiped the sheet away — leave the reconnect
+          // cue up, don't record it as an error.
+          cont.resume(throwing: GatewayError.cancelled)
         } else {
           cont.resume(throwing: error ?? GatewayError.server(0, "sign-in cancelled"))
         }
@@ -248,10 +264,13 @@ public final class ClaudeGatewayProvider {
 
   enum GatewayError: LocalizedError {
     case badURL
+    /// The user dismissed the Apple sign-in sheet — not a failure.
+    case cancelled
     case server(Int, String)
     var errorDescription: String? {
       switch self {
       case .badURL: return "Invalid gateway URL"
+      case .cancelled: return "Sign-in cancelled"
       case let .server(code, detail): return "Gateway error \(code): \(detail)"
       }
     }
