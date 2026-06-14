@@ -419,6 +419,14 @@ struct TaskListView: View {
       taskListRows
       taskListFooter
     }
+    // macOS: kill the system-blue full-bleed selection fill so our on-theme
+    // rounded bubble (`rowBackground`) is the only selection indicator. The Set
+    // binding still drives keyboard nav / Esc / multi-select — we just don't
+    // want its native highlight painted on top of ours. (Scoped to macOS: on
+    // iOS `.tint(.clear)` would blank the edit-mode multi-select circles.)
+    #if os(macOS)
+    .tint(.clear)
+    #endif
   }
 
   @ViewBuilder
@@ -988,15 +996,30 @@ struct TaskListView: View {
     #endif
   }
 
-  /// Backplate for the row whose detail drawer is open — a soft accent fill so
-  /// it reads as "active". Selection itself is the List's native highlight
-  /// (macOS) — we don't draw our own, which would double up.
+  /// The one selection / active indicator: an on-theme rounded "bubble" in the
+  /// tasks accent. This is the modern macOS list-selection look (Things,
+  /// Reminders, Notes) and stays on-brand — the system-blue full-bleed native
+  /// highlight is neutralized with `.tint(.clear)` on the List, so this is the
+  /// only thing the user sees. A *selected* row reads at full strength (and Esc
+  /// / clicking away clears it via `selection`); a row whose inspector is open
+  /// but isn't the keyboard cursor keeps a lighter ghost so it stays anchored
+  /// while the cursor moves elsewhere. On iOS/iPad `selection` is empty outside
+  /// edit mode, so the detail-open ghost is the sole indicator there.
   @ViewBuilder
   private func rowBackground(for task: SeptenaTask) -> some View {
-    let isActive = editingDetail?.id == task.id
-    let fill: Color = isActive ? theme.color(for: "tasks").opacity(0.18) : .clear
+    let isOpen = editingDetail?.id == task.id
+    #if os(macOS)
+    // macOS: the bubble IS the selection (native highlight is killed via
+    // `.tint(.clear)`). Selected → full strength; open-but-not-cursor → ghost.
+    let isSelected = selection.contains(task.id)
+    let opacity: Double = isSelected ? 0.18 : (isOpen ? 0.10 : 0)
+    #else
+    // iOS: native edit-mode circles already show multi-selection, so the only
+    // custom backplate is the open-row anchor.
+    let opacity: Double = isOpen ? 0.18 : 0
+    #endif
     RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
-      .fill(fill)
+      .fill(theme.color(for: "tasks").opacity(opacity))
       .padding(.horizontal, Theme.hPadding - 6)
   }
 
