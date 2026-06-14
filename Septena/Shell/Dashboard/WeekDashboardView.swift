@@ -3378,11 +3378,11 @@ private struct ClaudeReconnectBanner: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
         .frame(maxWidth: .infinity)
-        // Float on the same neutral Liquid Glass as the tiles and discovery
-        // card (iOS) — translucent so it reads as a transient cue, not a solid
-        // card — so the stacked dashboard cards still read as one family.
-        // macOS keeps the opaque grouped card via `glassCard`.
-        .glassCard()
+        // Float on translucent Liquid Glass like the tiles and discovery card
+        // (iOS) — a transient cue you can see through, not a solid card — washed
+        // with a faint Claude tint so it reads as Claude's own without losing
+        // the transparency. macOS keeps the opaque grouped card via `glassCard`.
+        .glassCard(tint: Color.claudeAccent)
       }
       .buttonStyle(.plain)
       .disabled(justReconnected)
