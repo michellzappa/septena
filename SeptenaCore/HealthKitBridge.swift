@@ -126,30 +126,48 @@ final class HealthKitBridge {
 
   private func liveShareStatus(_ kind: WritableKind) -> ShareStatus {
     #if canImport(HealthKit)
-    guard isAvailable, let type = Self.sampleType(for: kind) else { return .unavailable }
-    switch store.authorizationStatus(for: type) {
-    case .sharingAuthorized: return .authorized
-    case .sharingDenied:     return .denied
-    case .notDetermined:     return .notDetermined
-    @unknown default:        return .notDetermined
+    guard isAvailable else { return .unavailable }
+    let types = Self.probeTypes(for: kind)
+    guard !types.isEmpty else { return .unavailable }
+    // Aggregate across every type the section writes: authorized if *any* is
+    // (nutrition spans 9 quantity types — a single denied/notDetermined probe
+    // type must not hide a section whose other types are granted and writing).
+    var sawDenied = false
+    for type in types {
+      switch store.authorizationStatus(for: type) {
+      case .sharingAuthorized: return .authorized
+      case .sharingDenied:     sawDenied = true
+      case .notDetermined:     break
+      @unknown default:        break
+      }
     }
+    return sawDenied ? .denied : .notDetermined
     #else
     return .unavailable
     #endif
   }
 
   #if canImport(HealthKit)
-  /// Representative HK type per section — the one we probe for write status.
-  /// Nutrition uses dietary energy as a stand-in for the whole correlation set
-  /// (they're requested together, so status is uniform).
-  private static func sampleType(for kind: WritableKind) -> HKSampleType? {
+  /// Every HK type a section writes, used to probe its aggregate write status.
+  /// Nutrition spans the whole dietary set, so status reflects all of them
+  /// rather than a single stand-in type that may be decided independently.
+  private static func probeTypes(for kind: WritableKind) -> [HKSampleType] {
     switch kind {
     case .mood:
-      if #available(iOS 18, *) { return HKObjectType.stateOfMindType() }
-      return nil
-    case .nutrition: return HKQuantityType.quantityType(forIdentifier: .dietaryEnergyConsumed)
+      if #available(iOS 18, *) { return [HKObjectType.stateOfMindType()] }
+      return []
+    case .nutrition:
+      return nutritionWriteIDs.compactMap { HKQuantityType.quantityType(forIdentifier: $0) }
     }
   }
+
+  /// Dietary quantity types Septena writes. `HKCorrelationType.food` is
+  /// Apple-only, so we write the individual nutrients.
+  static let nutritionWriteIDs: [HKQuantityTypeIdentifier] = [
+    .dietaryEnergyConsumed, .dietaryProtein, .dietaryFatTotal,
+    .dietaryCarbohydrates, .dietaryFiber, .dietarySugar,
+    .dietarySodium, .dietaryCholesterol, .dietaryWater,
+  ]
   #endif
 
   #if canImport(HealthKit)
@@ -179,12 +197,7 @@ final class HealthKitBridge {
 
     // Nutrition — individual quantity types only. HKCorrelationType.food
     // is restricted to Apple and cannot be requested by third-party apps.
-    let nutritionIDs: [HKQuantityTypeIdentifier] = [
-      .dietaryEnergyConsumed, .dietaryProtein, .dietaryFatTotal,
-      .dietaryCarbohydrates, .dietaryFiber, .dietarySugar,
-      .dietarySodium, .dietaryCholesterol, .dietaryWater,
-    ]
-    for id in nutritionIDs {
+    for id in Self.nutritionWriteIDs {
       if let t = HKQuantityType.quantityType(forIdentifier: id) { s.insert(t) }
     }
 

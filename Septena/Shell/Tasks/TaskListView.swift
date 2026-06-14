@@ -419,18 +419,25 @@ struct TaskListView: View {
       taskListRows
       taskListFooter
     }
-    // macOS: kill the system-blue full-bleed selection fill so our on-theme
-    // rounded bubble (`rowBackground`) is the only selection indicator. The Set
-    // binding still drives keyboard nav / Esc / multi-select — we just don't
-    // want its native highlight painted on top of ours. (Scoped to macOS: on
-    // iOS `.tint(.clear)` would blank the edit-mode multi-select circles.)
-    #if os(macOS)
-    .tint(.clear)
-    #endif
   }
 
   @ViewBuilder
   private var taskListHeader: some View {
+    #if os(macOS)
+    // Reach this list's backing NSTableView and disable its native selection
+    // highlight, so the only selection indicator is our on-theme bubble
+    // (`rowBackground`) — not the system-blue full-bleed bar. Selection itself
+    // (click / ⌘ / ⇧ / ↑↓ keyboard nav) is untouched; we just stop AppKit from
+    // painting the highlight. Lives in a hairline row so the introspector sits
+    // *inside* the table and resolves to the right one (never the sidebar's).
+    Color.clear
+      .frame(height: 1)
+      .background(PlainListSelectionHighlightDisabler())
+      .listRowSeparator(.hidden)
+      .listRowBackground(Color.clear)
+      .listRowInsets(EdgeInsets())
+      .selectionDisabled()
+    #endif
     titleRow
     newTodosBannerRow
     remindersRow

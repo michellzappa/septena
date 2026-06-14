@@ -294,7 +294,12 @@ struct WeekDashboardView: View {
     ) {
       ZStack {
         VStack(spacing: Theme.sectionSpacing) {
-          ClaudeReconnectBanner()
+          // iOS floats the reconnect cue as a glass pill beside the "…" in the
+          // top bar (added in the screen's toolbar); macOS keeps it inline here
+          // since its "…" menu lives top-right, not in a leading bar.
+          #if os(macOS)
+          ClaudeReconnectCue(.card)
+          #endif
           if showWelcome {
             // Self-observes DayClock so the 60s `now` tick re-renders only the
             // header, not the whole tile grid. (Reading `clock.now` here in the
@@ -2991,6 +2996,17 @@ private struct WeekDashboardScreen<CurrentDay: Equatable, MenuExtra: View, Conte
       // "…" menu, with Week's dashboard-layout switcher + Insights injected
       // above the shared Settings row. See HomeChrome.swift.
       .homeChrome { menuExtra() }
+      // iOS: float the "keep Claude connected" cue as a glass pill in the top
+      // bar's TRAILING corner — opposite the leading "…" menu, so the system
+      // doesn't fold the two into one shared glass bar. Renders nothing unless
+      // the token is stale (see ClaudeReconnectCue). macOS shows it inline.
+      #if os(iOS)
+      .toolbar {
+        ToolbarItem(placement: .topBarTrailing) {
+          ClaudeReconnectCue(.pill)
+        }
+      }
+      #endif
       // Two-phase load: paint cached blobs synchronously so tiles +
       // histograms appear immediately on cold launch, then kick off the
       // network refresh in the background.
@@ -3331,62 +3347,101 @@ enum GroceryStockHistory {
   }
 }
 
-// MARK: - Claude reconnect banner
+// MARK: - Claude reconnect cue
 //
-// Subtle, non-modal cue on the homepage shown only when the Claude gateway
-// token has gone stale (the app never auto-pops the Apple sign-in). Tapping
-// it is an explicit user action, so presenting the sign-in here is expected.
-private struct ClaudeReconnectBanner: View {
+// Subtle, non-modal cue shown only when the Claude gateway token has gone stale
+// (the app never auto-pops the Apple sign-in). Tapping it is an explicit user
+// action, so presenting the sign-in here is expected. Two presentations, same
+// state + tap-to-re-mint logic:
+//   • `.pill` — an icon-only Claude-tinted glass disc in the top bar's trailing
+//     corner (iOS), mirroring the system "…" glass circle opposite it. `.plain`
+//     button + self-contained `glassCircle`, so it floats on its own glass
+//     instead of folding into a shared toolbar glass bar.
+//   • `.card` — the full-width inline glass card stacked above the dashboard,
+//     used on macOS where the menu lives top-right, not in a leading bar.
+private struct ClaudeReconnectCue: View {
+  enum Presentation { case pill, card }
+  let presentation: Presentation
+  init(_ presentation: Presentation) { self.presentation = presentation }
+
   @State private var provider = ClaudeGatewayProvider.shared
   // Briefly held true after a successful re-mint so the tap closes the loop
-  // with a "Reconnected" flash instead of the banner silently vanishing.
+  // with a "Reconnected" flash instead of the cue silently vanishing.
   @State private var justReconnected = false
 
   // A real refresh failure (network etc.) — distinct from a user-cancel,
-  // which leaves `lastError` nil so the banner stays in its calm default copy.
+  // which leaves `lastError` nil so the cue stays in its calm default copy.
   private var failed: Bool { provider.lastError != nil && provider.needsReauth }
 
   var body: some View {
     if provider.isEnabled && (provider.needsReauth || justReconnected) {
-      Button {
-        guard !justReconnected, !provider.isRefreshing else { return }
-        Task {
-          if await provider.refreshNow() {
-            Haptics.success()
-            withAnimation(.snappy) { justReconnected = true }
-            try? await Task.sleep(for: .seconds(1.6))
-            withAnimation(.snappy) { justReconnected = false }
-          }
+      Button(action: tap) {
+        switch presentation {
+        case .pill: pillLabel
+        case .card: cardLabel
         }
-      } label: {
-        HStack(spacing: 8) {
-          leadingGlyph
-          title
-          if let subtitle {
-            Text(subtitle)
-              .font(.subheadline)
-              .foregroundStyle(.tertiary)
-              .lineLimit(1)
-              .truncationMode(.tail)
-              .layoutPriority(-1)
-          }
-          Spacer(minLength: 8)
-          if provider.isRefreshing {
-            ProgressView().controlSize(.small)
-          }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .frame(maxWidth: .infinity)
-        // Float on translucent Liquid Glass like the tiles and discovery card
-        // (iOS) — a transient cue you can see through, not a solid card — washed
-        // with a faint Claude tint so it reads as Claude's own without losing
-        // the transparency. macOS keeps the opaque grouped card via `glassCard`.
-        .glassCard(tint: Color.claudeAccent)
       }
       .buttonStyle(.plain)
       .disabled(justReconnected)
     }
+  }
+
+  private func tap() {
+    guard !justReconnected, !provider.isRefreshing else { return }
+    Task {
+      if await provider.refreshNow() {
+        Haptics.success()
+        withAnimation(.snappy) { justReconnected = true }
+        try? await Task.sleep(for: .seconds(1.6))
+        withAnimation(.snappy) { justReconnected = false }
+      }
+    }
+  }
+
+  // Compact top-bar control: an icon-only Claude-tinted glass disc, mirroring
+  // the system "…" glass circle on the opposite corner. Warning triangle by
+  // default, a green check on the post-reconnect flash, a spinner mid-refresh.
+  private var pillLabel: some View {
+    pillGlyph
+      .font(.system(size: 15, weight: .semibold))
+      .frame(width: 22, height: 22)
+      .padding(10)
+      .glassCircle(tint: Color.claudeAccent)
+  }
+
+  @ViewBuilder private var pillGlyph: some View {
+    if justReconnected {
+      Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+    } else if provider.isRefreshing {
+      ProgressView().controlSize(.mini)
+    } else {
+      Image(systemName: "exclamationmark.triangle.fill")
+        .foregroundStyle(failed ? Color.orange : Color.claudeAccent)
+    }
+  }
+
+  // Full-width inline card (macOS): glyph + word + muted context line.
+  private var cardLabel: some View {
+    HStack(spacing: 8) {
+      leadingGlyph
+      title
+      if let subtitle {
+        Text(subtitle)
+          .font(.subheadline)
+          .foregroundStyle(.tertiary)
+          .lineLimit(1)
+          .truncationMode(.tail)
+          .layoutPriority(-1)
+      }
+      Spacer(minLength: 8)
+      if provider.isRefreshing {
+        ProgressView().controlSize(.small)
+      }
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 9)
+    .frame(maxWidth: .infinity)
+    .glassCard(tint: Color.claudeAccent)
   }
 
   @ViewBuilder private var leadingGlyph: some View {
@@ -3407,8 +3462,8 @@ private struct ClaudeReconnectBanner: View {
       .foregroundStyle(justReconnected ? Color.green : Color.claudeAccent)
   }
 
-  // Muted context line. Default framing is proactive ("keep connected"), since
-  // the cue fires while the session is still live and quick to re-mint.
+  // Muted context line (card only). Default framing is proactive ("keep
+  // connected"), since the cue fires while the session is still live.
   private var subtitle: String? {
     if justReconnected { return nil }
     if failed { return "Couldn’t reconnect — tap to retry" }

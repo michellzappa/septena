@@ -167,6 +167,52 @@ struct DoubleClickCatcher: NSViewRepresentable {
     }
   }
 }
+
+/// Reaches the `NSTableView` backing a SwiftUI `List` and turns OFF its native
+/// selection highlight (`selectionHighlightStyle = .none`). Selection stays
+/// fully live — click, ⌘/⇧-click, and ↑↓ keyboard nav all still update the
+/// `List(selection:)` set — we just stop AppKit from painting the system-blue
+/// full-bleed bar, so a view can draw its own on-theme selection background
+/// instead. `.tint(.clear)` does NOT achieve this on a `.plain` macOS list;
+/// the highlight style does.
+///
+/// Self-scoping: place it inside a list row (its host view is then a descendant
+/// of the table), and it walks UP the superview chain to the first enclosing
+/// `NSTableView` — guaranteed to be *that* list's table, never a sibling
+/// list/sidebar in another split-view pane. Re-applies on every SwiftUI update
+/// so it survives the list rebuilding its table (e.g. on a filter swap).
+struct PlainListSelectionHighlightDisabler: NSViewRepresentable {
+  func makeNSView(context: Context) -> NSView { Host() }
+  func updateNSView(_ nsView: NSView, context: Context) {
+    (nsView as? Host)?.disableHighlight()
+  }
+
+  final class Host: NSView {
+    private weak var table: NSTableView?
+
+    override func viewDidMoveToWindow() {
+      super.viewDidMoveToWindow()
+      // Defer one runloop hop so the List's NSTableView is in the tree.
+      DispatchQueue.main.async { [weak self] in self?.disableHighlight() }
+    }
+
+    func disableHighlight() {
+      if let table {
+        table.selectionHighlightStyle = .none
+        return
+      }
+      var ancestor = superview
+      while let current = ancestor {
+        if let found = current as? NSTableView {
+          found.selectionHighlightStyle = .none
+          table = found
+          return
+        }
+        ancestor = current.superview
+      }
+    }
+  }
+}
 #endif
 
 /// Click-to-edit title: renders as `Text` until tapped, then becomes a

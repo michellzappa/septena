@@ -255,6 +255,11 @@ final class LocalNotificationScheduler {
       content.body = plan.body
       content.threadIdentifier = plan.threadID
       content.sound = .default
+      // "Nudge to mark, don't nag to do": these land quietly in Notification
+      // Center rather than firing a prominent alert. On a silenced watch this
+      // is the difference between a loud substitute Taptic and (effectively) no
+      // wrist buzz at all.
+      content.interruptionLevel = .passive
       // Only attach a category when the descriptor has actions — otherwise the
       // OS renders an empty action area.
       if !nudge.descriptor.actions.isEmpty {
@@ -329,6 +334,9 @@ final class LocalNotificationScheduler {
     content.body = "Your Claude session is about to expire. Tap to refresh while it's still live."
     content.threadIdentifier = "septena.claude"
     content.sound = .default
+    // Time-sensitive (the session is about to expire), so it stays an alert —
+    // unlike the passive daily nudges — and can break through on the wrist.
+    content.interruptionLevel = .timeSensitive
     content.categoryIdentifier = Self.claudeNudgeID
     content.userInfo = ["claudeReconnect": true]
 
