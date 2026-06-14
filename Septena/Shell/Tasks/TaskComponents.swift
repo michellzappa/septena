@@ -82,9 +82,6 @@ struct TaskCheckbox: View {
   /// today indicator into the checkbox itself, so it no longer sits as a
   /// separate glyph inline with the title.
   var isToday: Bool = false
-  /// When true (and not done and not today), the checkbox stroke switches to
-  /// `Theme.somedayAccent` (muted indigo) to signal a parked/deferred task.
-  var isSomeday: Bool = false
   /// Which celebration plays on check — the row's type picks it (tasks
   /// `.stamp`, habits `.echo`, supplements `.drop`, chores `.tuck`).
   var feel: CheckFeel = .stamp
@@ -109,15 +106,13 @@ struct TaskCheckbox: View {
   #endif
 
   /// Checkbox chrome is neutral gray by default; Today rows swap stroke
-  /// and fill to `Theme.todayAccent`; Someday rows use `Theme.somedayAccent`.
+  /// and fill to `Theme.todayAccent`.
   private var boxStrokeColor: Color {
-    if isToday   { return Theme.todayAccent }
-    if isSomeday { return Theme.somedayAccent }
+    if isToday { return Theme.todayAccent }
     return Theme.inkSecondary.opacity(0.55)
   }
   private var boxFillColor: Color {
-    if isToday   { return Theme.todayAccent }
-    if isSomeday { return Theme.somedayAccent }
+    if isToday { return Theme.todayAccent }
     return Theme.inkSecondary.opacity(0.85)
   }
 
@@ -365,7 +360,6 @@ struct CheckableRow<Trailing: View>: View {
   var tint: Color
   var isDone: Bool
   var isToday: Bool = false
-  var isSomeday: Bool = false
   /// The checkbox celebration this row's type plays on check (see
   /// `CheckFeel`). Tasks keep the default `.stamp`; habits pass `.echo`,
   /// supplements `.drop`, chores `.tuck`.
@@ -394,7 +388,6 @@ struct CheckableRow<Trailing: View>: View {
         tint: tint,
         isDone: isDone,
         isToday: isToday,
-        isSomeday: isSomeday,
         feel: feel,
         onToggle: onToggle
       )
@@ -442,11 +435,11 @@ struct CheckableRow<Trailing: View>: View {
 }
 
 extension CheckableRow where Trailing == EmptyView {
-  init(tint: Color, isDone: Bool, isToday: Bool = false, isSomeday: Bool = false,
+  init(tint: Color, isDone: Bool, isToday: Bool = false,
        isInactive: Bool, leadingEmoji: String? = nil,
        title: String, subtitle: String? = nil, isSelected: Bool = false,
        onToggle: @escaping () -> Void, onTap: (() -> Void)? = nil) {
-    self.init(tint: tint, isDone: isDone, isToday: isToday, isSomeday: isSomeday,
+    self.init(tint: tint, isDone: isDone, isToday: isToday,
               isInactive: isInactive,
               leadingEmoji: leadingEmoji, title: title, subtitle: subtitle,
               isSelected: isSelected,
@@ -490,7 +483,6 @@ struct TaskRow: View {
   /// date in the trailing. Pass `false` on Today / Next surfaces (where every
   /// row is already today, so both are noise).
   var showsTodayIndicator: Bool = true
-  var showsSomedayIndicator: Bool = true
   /// Highlight this row while its edit modal is open (see `CheckableRow`).
   var isSelected: Bool = false
   let onToggle: () -> Void
@@ -518,7 +510,6 @@ struct TaskRow: View {
       tint: accent,
       isDone: task.status == .done,
       isToday: task.isOnToday && showsTodayIndicator,
-      isSomeday: task.status == .someday && showsSomedayIndicator,
       isInactive: isInactive,
       title: task.title,
       subtitle: subtitle,

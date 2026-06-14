@@ -256,8 +256,9 @@ enum MCPDispatch {
     case "triage": filter = .triage
     case "inbox": filter = .inbox
     case "upcoming": filter = .upcoming
-    case "anytime": filter = .unscheduled
-    case "someday": filter = .someday
+    // "someday" is the retired bucket — accept it as an alias for "anytime"
+    // so existing agent calls keep working.
+    case "anytime", "someday": filter = .unscheduled
     case "completed": filter = .logbook
     default: filter = .today
     }

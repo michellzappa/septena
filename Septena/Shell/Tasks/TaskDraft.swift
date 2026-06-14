@@ -16,10 +16,6 @@ struct TaskDraft {
   var recurrence: Recurrence? = nil
   var areaId: String? = nil
   var projectId: String? = nil
-  /// Someday bucket — "I'll get to it eventually," not a calendared commitment.
-  /// Stored as `status == .someday`; mutually exclusive with Today / a
-  /// scheduled date. Lives in the When control, not a separate menu action.
-  var someday: Bool = false
 
   var trimmedTitle: String { title.trimmingCharacters(in: .whitespacesAndNewlines) }
   var trimmedNotes: String { notes.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -28,13 +24,12 @@ struct TaskDraft {
   init() {}
 
   /// Seed defaults from the list you're composing in: Today pins today,
-  /// Upcoming schedules tomorrow, Someday demotes, a Project / Area files it
-  /// there, everything else lands in the Inbox.
+  /// Upcoming schedules tomorrow, a Project / Area files it there, everything
+  /// else lands in the Inbox.
   init(filter: TaskFilter) {
     switch filter {
     case .today:           onToday = true
     case .upcoming:        scheduled = Calendar.current.date(byAdding: .day, value: 1, to: .now)
-    case .someday:         someday = true
     case .project(let id): projectId = id
     case .area(let id):    areaId = id
     case .triage, .inbox, .unscheduled, .logbook: break
@@ -51,21 +46,17 @@ struct TaskDraft {
     recurrence = task.recurrence
     areaId = task.area
     projectId = task.project
-    someday = task.status == .someday
   }
 
   // MARK: - When mutations (mutually exclusive)
 
-  mutating func setToday() { onToday = true; scheduled = nil; someday = false }
+  mutating func setToday() { onToday = true; scheduled = nil }
   mutating func setScheduled(_ date: Date) {
     let day = Calendar.current.startOfDay(for: date)
     if Calendar.current.isDateInToday(day) { setToday() }
-    else { onToday = false; scheduled = day; someday = false }
+    else { onToday = false; scheduled = day }
   }
-  /// Demote to Someday — clears Today, any planning date, and the deadline
-  /// (Someday isn't a commitment), mirroring `TaskMutator.moveToSomeday`.
-  mutating func setSomeday() { someday = true; onToday = false; scheduled = nil; deadline = nil }
-  mutating func clearWhen() { onToday = false; scheduled = nil; someday = false }
+  mutating func clearWhen() { onToday = false; scheduled = nil }
 
   // MARK: - Things-style scheduled mapping
 
@@ -75,8 +66,8 @@ struct TaskDraft {
   private var schedIsToday: Bool {
     scheduled.map { Calendar.current.isDateInToday($0) } ?? false
   }
-  var pinToday: Bool { !someday && (onToday || schedIsToday) }
-  private var storedScheduled: Date? { someday ? nil : (schedIsToday ? nil : scheduled) }
+  var pinToday: Bool { onToday || schedIsToday }
+  private var storedScheduled: Date? { schedIsToday ? nil : scheduled }
 
   // MARK: - Commit
 
@@ -90,10 +81,9 @@ struct TaskDraft {
       area: areaId,
       project: projectId,
       scheduled: storedScheduled,
-      due: someday ? nil : deadline,
+      due: deadline,
       today: pinToday,
-      notes: trimmedNotes.isEmpty ? nil : trimmedNotes,
-      status: someday ? "someday" : nil
+      notes: trimmedNotes.isEmpty ? nil : trimmedNotes
     )
     if let recurrence { mutator.setRecurrence(id: task.id, recurrence: recurrence) }
     return task
@@ -108,19 +98,10 @@ struct TaskDraft {
       mutator.update(id: id, title: trimmedTitle, notes: notes)
     }
 
-    let wasSomeday = original.status == .someday
-    if someday {
-      // Demote — moveToSomeday clears today/scheduled/due, so skip the
-      // scheduling calls that would resurrect it.
-      if !wasSomeday { mutator.moveToSomeday(id: id) }
-    } else {
-      // Leaving Someday: re-open (status someday → open) before re-scheduling.
-      if wasSomeday { mutator.uncomplete(id: id) }
-      mutator.schedule(id: id, date: storedScheduled)
-      mutator.moveToToday(id: id, today: pinToday)
-      if deadline != SeptenaDate.parse(original.deadline) {
-        mutator.setDue(id: id, date: deadline)
-      }
+    mutator.schedule(id: id, date: storedScheduled)
+    mutator.moveToToday(id: id, today: pinToday)
+    if deadline != SeptenaDate.parse(original.deadline) {
+      mutator.setDue(id: id, date: deadline)
     }
 
     if recurrence != original.recurrence {

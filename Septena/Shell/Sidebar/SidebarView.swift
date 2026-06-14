@@ -443,10 +443,6 @@ struct SidebarRootView: View {
                     icon: "rectangle.stack.fill", color: .orange,
                     title: "Anytime",
                     count: counts?.unscheduledCount),
-      SmartListSpec(route: .filter(.someday),
-                    icon: "moon.stars.fill", color: .purple,
-                    title: "Someday",
-                    count: counts?.somedayCount),
       SmartListSpec(route: .filter(.logbook),
                     icon: "checkmark", color: .gray,
                     title: "Completed",
@@ -798,16 +794,15 @@ struct SidebarRootView: View {
     // Area count = direct-in-area tasks ONLY. Nested projects render as
     // their own rows, so rolling them up would double-count.
     var areaDirectOpen: [String: Int] = [:]
-    var inbox = 0, triage = 0, todayN = 0, upcoming = 0, unscheduled = 0, open = 0, someday = 0
+    var inbox = 0, triage = 0, todayN = 0, upcoming = 0, unscheduled = 0, open = 0
     let today = SeptenaDate.today
     for t in tasks {
       if t.status == .open { open += 1 }
-      if t.status == .someday { someday += 1 }
       if let pid = t.project {
         switch t.status {
         case .done:                 done[pid, default: 0] += 1; total[pid, default: 0] += 1
         case .open:                 total[pid, default: 0] += 1; projOpen[pid, default: 0] += 1
-        case .cancelled, .someday:  break
+        case .cancelled:            break
         }
       } else if let aid = t.area, t.status == .open {
         areaDirectOpen[aid, default: 0] += 1
@@ -843,7 +838,7 @@ struct SidebarRootView: View {
                           inboxCount: inbox, triageCount: triage,
                           upcomingCount: upcoming,
                           unscheduledCount: unscheduled,
-                          somedayCount: someday, openCount: open),
+                          openCount: open),
       projectProgress: progress,
       projectOpenCount: projOpen,
       areaOpenCount: areaDirectOpen)
@@ -1407,7 +1402,6 @@ private struct SidebarTaskDrop: ViewModifier {
     case project(String)
     case today
     case inbox
-    case someday
 
     /// Maps a smart-list route to a drop action, or nil for routes with no
     /// single unambiguous "move here" meaning (Upcoming, Anytime, Logbook).
@@ -1415,7 +1409,6 @@ private struct SidebarTaskDrop: ViewModifier {
       switch route {
       case .filter(.today):   self = .today
       case .filter(.inbox):   self = .inbox
-      case .filter(.someday): self = .someday
       default:                return nil
       }
     }
@@ -1449,8 +1442,6 @@ private struct SidebarTaskDrop: ViewModifier {
       mutator.moveToProject(id: id, project: projectId)
     case .today:
       mutator.moveToToday(id: id, today: true)
-    case .someday:
-      mutator.moveToSomeday(id: id)
     case .inbox:
       // Inbox = no routing at all: clear schedule, deadline, area, project, and
       // the Today pin. A leftover deadline would keep the task out of Inbox
@@ -1467,7 +1458,7 @@ private struct SidebarTaskDrop: ViewModifier {
 }
 
 /// Installs `SidebarTaskDrop` on a smart-list row only when the route has a
-/// meaningful drop action (Today / Inbox / Someday); other routes pass
+/// meaningful drop action (Today / Inbox); other routes pass
 /// through so they don't show a misleading drop highlight.
 private struct SmartListTaskDrop: ViewModifier {
   let route: Route

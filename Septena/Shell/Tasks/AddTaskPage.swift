@@ -9,7 +9,6 @@ private enum TaskBucket {
   case inbox
   case today
   case upcoming
-  case someday
   case area(Area)
   case project(Project)
 
@@ -18,7 +17,6 @@ private enum TaskBucket {
     case .inbox:               return "Inbox"
     case .today:               return "Today"
     case .upcoming:            return "Upcoming"
-    case .someday:             return "Someday"
     case .area(let a):         return a.title
     case .project(let p):      return p.title
     }
@@ -116,7 +114,6 @@ struct AddTaskPage: View {
       return nil
     }()
     let today: Bool = { if case .today = bucket { return true }; return false }()
-    let status: String? = { if case .someday = bucket { return "someday" }; return nil }()
     let area: String? = { if case .area(let a) = bucket { return a.id }; return nil }()
     let project: String? = { if case .project(let p) = bucket { return p.id }; return nil }()
     mutator.create(
@@ -124,8 +121,7 @@ struct AddTaskPage: View {
       area: area,
       project: project,
       scheduled: scheduled,
-      today: today,
-      status: status
+      today: today
     )
     AddInfoSection.tasks.notifyTilesChanged()
     Haptics.tick()

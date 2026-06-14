@@ -221,7 +221,7 @@ struct AreaDetailView: View {
         switch t.status {
         case .done:                 done[pid, default: 0] += 1; total[pid, default: 0] += 1
         case .open:                 total[pid, default: 0] += 1
-        case .cancelled, .someday:  break
+        case .cancelled:            break
         }
       }
       projectProgress = total.reduce(into: [:]) { acc, kv in
@@ -448,7 +448,7 @@ struct ProjectDetailView: View {
         switch x.status {
         case .done:                 d += 1; t += 1
         case .open:                 t += 1
-        case .cancelled, .someday:  break
+        case .cancelled:            break
         }
       }
       progress = t > 0 ? Double(d) / Double(t) : 0
@@ -461,7 +461,7 @@ struct ProjectDetailView: View {
         switch t.status {
         case .done:                 done += 1; total += 1
         case .open:                 total += 1
-        case .cancelled, .someday:  break
+        case .cancelled:            break
         }
       }
       progress = total > 0 ? Double(done) / Double(total) : 0

@@ -62,7 +62,6 @@ final class TaskMutator {
               due: Date? = nil,
               today: Bool = false,
               notes: String? = nil,
-              status: String? = nil,
               deferPush: Bool = false) -> SeptenaTask {
     guard let cloudBackend else {
       preconditionFailure("TaskMutator.create called before SeptenaServices.shared.start()")
@@ -70,8 +69,7 @@ final class TaskMutator {
     SeptenaLog.info("[TaskMutator] route=cloudKit op=create title=\"\(title)\" deferPush=\(deferPush)")
     return cloudBackend.create(title: title, area: area, project: project,
                                scheduled: scheduled, due: due, today: today,
-                               notes: notes, status: status,
-                               deferPush: deferPush)
+                               notes: notes, deferPush: deferPush)
   }
 
   func complete(id: String) {
@@ -159,14 +157,6 @@ final class TaskMutator {
       return
     }
     cloudBackend.removeFromToday(id: id)
-  }
-
-  func moveToSomeday(id: String) {
-    guard let cloudBackend else {
-      SeptenaLog.error("[TaskMutator] moveToSomeday called before CK bound — dropping", nil)
-      return
-    }
-    cloudBackend.moveToSomeday(id: id)
   }
 
   func schedule(id: String, date: Date?) {

@@ -8,7 +8,6 @@ enum TaskStatus: String, Codable, Hashable {
   case open
   case done
   case cancelled
-  case someday
 }
 
 /// Provenance values stamped on a row's `source` field — what authored it.
@@ -366,7 +365,6 @@ struct TasksCounts: Codable {
   var triageCount: Int
   var upcomingCount: Int
   var unscheduledCount: Int
-  var somedayCount: Int
   var openCount: Int
 
   enum CodingKeys: String, CodingKey {
@@ -377,7 +375,6 @@ struct TasksCounts: Codable {
     case triageCount = "triage_count"
     case upcomingCount = "upcoming_count"
     case unscheduledCount = "unscheduled_count"
-    case somedayCount = "someday_count"
     case openCount = "open_count"
   }
 
@@ -390,13 +387,12 @@ struct TasksCounts: Codable {
     triageCount = (try? c.decode(Int.self, forKey: .triageCount)) ?? 0
     upcomingCount = (try? c.decode(Int.self, forKey: .upcomingCount)) ?? 0
     unscheduledCount = (try? c.decode(Int.self, forKey: .unscheduledCount)) ?? 0
-    somedayCount = (try? c.decode(Int.self, forKey: .somedayCount)) ?? 0
     openCount = (try? c.decode(Int.self, forKey: .openCount)) ?? 0
   }
 
   init(today: String, todayCount: Int, reviewCount: Int,
        inboxCount: Int, triageCount: Int = 0, upcomingCount: Int,
-       unscheduledCount: Int, somedayCount: Int = 0, openCount: Int) {
+       unscheduledCount: Int, openCount: Int) {
     self.today = today
     self.todayCount = todayCount
     self.reviewCount = reviewCount
@@ -404,7 +400,6 @@ struct TasksCounts: Codable {
     self.triageCount = triageCount
     self.upcomingCount = upcomingCount
     self.unscheduledCount = unscheduledCount
-    self.somedayCount = somedayCount
     self.openCount = openCount
   }
 }
@@ -420,7 +415,6 @@ enum TaskFilter: Equatable, Hashable {
   case inbox
   case upcoming
   case unscheduled
-  case someday
   case logbook
   case project(String)
   case area(String)
@@ -432,15 +426,14 @@ enum TaskFilter: Equatable, Hashable {
     case .inbox: return "inbox"
     case .upcoming: return "upcoming"
     case .unscheduled: return "unscheduled"
-    case .someday: return "someday"
     case .logbook: return "logbook"
     case .project, .area: return "all"
     }
   }
 
-  // User-facing label. We follow Things 3 vocabulary: "Anytime" for the
-  // unscheduled-open pile and "Someday" for the deliberately-deferred one.
-  // The serverView key stays `unscheduled` so the API contract is unchanged.
+  // User-facing label. "Anytime" is the single home for open, dateless tasks
+  // (it absorbed the former "Someday" bucket). The serverView key stays
+  // `unscheduled` so the API contract is unchanged.
   var title: String {
     switch self {
     case .today: return String(localized: "Today", comment: "Task filter")
@@ -448,7 +441,6 @@ enum TaskFilter: Equatable, Hashable {
     case .inbox: return String(localized: "Inbox", comment: "Task filter")
     case .upcoming: return String(localized: "Upcoming", comment: "Task filter")
     case .unscheduled: return String(localized: "Anytime", comment: "Task filter")
-    case .someday: return String(localized: "Someday", comment: "Task filter")
     case .logbook: return String(localized: "Logbook", comment: "Task filter")
     case .project: return String(localized: "Project", comment: "Task filter")
     case .area: return String(localized: "Area", comment: "Task filter")

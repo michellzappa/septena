@@ -21,7 +21,7 @@ enum TaskReads {
   ///   "inbox"      — open, no area/project/scheduled/due/today
   ///   "upcoming"   — open, !today, scheduled>today or due>today
   ///   "unscheduled"— open, !today, no scheduled, no due
-  ///   "someday"    — status==someday
+  ///                  ("anytime"/"someday" are accepted aliases)
   ///   "logbook"    — status==done
   ///   "all"        — every live task (filter out tombstones)
   ///   "next"       — alias of "today" (used by NextItemsSection)
@@ -89,13 +89,11 @@ enum TaskReads {
       return TasksListResponse(view: view, today: todayIso, items: items,
                                review: nil, done: nil)
 
-    case "unscheduled":
+    // "anytime" is the user-facing name; "unscheduled" is the legacy server
+    // key; "someday" is the retired bucket — all resolve to the single
+    // open-and-dateless pile.
+    case "unscheduled", "anytime", "someday":
       let items = LocalCache.tasks(in: context, filter: .unscheduled)
-      return TasksListResponse(view: view, today: todayIso, items: items,
-                               review: nil, done: nil)
-
-    case "someday":
-      let items = LocalCache.tasks(in: context, filter: .someday)
       return TasksListResponse(view: view, today: todayIso, items: items,
                                review: nil, done: nil)
 
@@ -146,7 +144,7 @@ enum TaskReads {
     // rules mirror `LocalCache.convert`'s filter semantics — keep in sync.
     let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
     let today = SeptenaDate.today
-    var todayN = 0, inbox = 0, triage = 0, upcoming = 0, unscheduled = 0, someday = 0
+    var todayN = 0, inbox = 0, triage = 0, upcoming = 0, unscheduled = 0
     var allOpen = 0
     for e in rows {
       // Matches the historical openCount (an `allTasks` reduce), which
@@ -158,8 +156,6 @@ enum TaskReads {
       if e.isInTriageBand { triage += 1 }
       if e.isOnToday && !e.isInTriageBand { todayN += 1 }
       switch e.status {
-      case .someday:
-        someday += 1
       case .open:
         let undated = e.scheduled == nil && e.due == nil
         if undated, e.project == nil, e.area == nil, !e.today { inbox += 1 }
@@ -179,7 +175,6 @@ enum TaskReads {
                        triageCount: triage,
                        upcomingCount: upcoming,
                        unscheduledCount: unscheduled,
-                       somedayCount: someday,
                        openCount: allOpen)
   }
 

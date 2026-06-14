@@ -23,7 +23,6 @@ protocol TasksBackend: AnyObject {
               due: Date?,
               today: Bool,
               notes: String?,
-              status: String?,
               deferPush: Bool) -> SeptenaTask
 
   func update(id: String, title: String?, notes: String?)
@@ -35,7 +34,6 @@ protocol TasksBackend: AnyObject {
   func delete(id: String)
   func moveToToday(id: String, today: Bool)
   func removeFromToday(id: String)
-  func moveToSomeday(id: String)
   func schedule(id: String, date: Date?)
   func setDue(id: String, date: Date?)
   func setRecurrence(id: String, recurrence: Recurrence?)
@@ -208,8 +206,7 @@ final class CloudKitTasksBackend: TasksBackend {
   @discardableResult
   func create(title: String, area: String?, project: String?,
               scheduled: Date?, due: Date?, today: Bool,
-              notes: String?, status: String?,
-              deferPush: Bool = false) -> SeptenaTask {
+              notes: String?, deferPush: Bool = false) -> SeptenaTask {
     let id = uniqueTaskID()
     let todayIso = SeptenaDate.today
     let effectiveArea = project != nil ? nil : area
@@ -219,7 +216,7 @@ final class CloudKitTasksBackend: TasksBackend {
     let entity = TaskEntity(
       id: id,
       title: title,
-      statusRaw: status ?? TaskStatus.open.rawValue,
+      statusRaw: TaskStatus.open.rawValue,
       created: todayIso,
       scheduled: SeptenaDate.format(scheduled),
       due: SeptenaDate.format(due),
@@ -346,22 +343,6 @@ final class CloudKitTasksBackend: TasksBackend {
     }
     entity.pendingSync = true
     commitAndPush(entity, op: "removeFromToday")
-  }
-
-  /// Demote a task to the Someday bucket. Clears today, scheduled, and due
-  /// — Someday is "I'll get to it eventually," not a calendared commitment.
-  /// Recurrence stays intact so the user can pull a recurring task into the
-  /// Someday holding bay without losing the rule.
-  func moveToSomeday(id: String) {
-    guard let entity = fetch(id: id) else { return }
-    entity.statusRaw = TaskStatus.someday.rawValue
-    entity.today = false
-    entity.todaySetOn = nil
-    entity.scheduled = nil
-    entity.due = nil
-    entity.completedAt = nil
-    entity.pendingSync = true
-    commitAndPush(entity, op: "moveToSomeday")
   }
 
   func schedule(id: String, date: Date?) {

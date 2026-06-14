@@ -1206,6 +1206,10 @@ final class SeptenaServices {
     // Symptoms events. Local-only, idempotent, gated once-per-device; runs
     // after the fetch so synced gut rows are present.
     GutSymptomMigrator.runIfNeeded(context: context, mutator: symptomsMutator)
+    // Retire the legacy `someday` task status — the "Someday" bucket merged
+    // into "Anytime". Rewrites stored statusRaw → "open" and pushes the fix;
+    // gated once-per-device, after the fetch so synced someday rows are present.
+    SomedayStatusMigrator.runIfNeeded(context: context, engine: ckEngine)
     // Fold any retired `bedtime` medication bucket into `evening`.
     medicationsMutator.migrateBedtimeBuckets()
     SettingsMirror.publishDeviceTimezone(context: context, engine: ckEngine)

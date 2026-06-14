@@ -907,3 +907,49 @@ enum GutSymptomMigrator {
     return Int((e.timeIntervalSince(s) / 60).rounded())
   }
 }
+
+// MARK: - Someday → Anytime status migration
+
+/// One-shot migration that retires the legacy `someday` task status. The
+/// "Someday" bucket merged into "Anytime" — a parked task is now just an open,
+/// dateless task. `TaskStatus(rawValue:)` already coerces an unknown
+/// `"someday"` string to `.open` on read, so display and filtering are already
+/// correct without this; but the *stored* value (locally and in CloudKit)
+/// would stay stale until the row was next edited. This rewrites `statusRaw`
+/// to `"open"` and pushes the fix so the data model stays honest. Idempotent
+/// (re-running finds nothing); gated once-per-device; runs after the initial
+/// CloudKit fetch so synced someday rows are present.
+@MainActor
+enum SomedayStatusMigrator {
+  private static let versionKey = "tasks.somedayMerge.v1"
+
+  @discardableResult
+  static func runIfNeeded(context: ModelContext, engine: CKEngine,
+                          defaults: UserDefaults = .standard) -> Int {
+    guard !defaults.bool(forKey: versionKey) else { return 0 }
+    guard let rows = try? context.fetch(FetchDescriptor<TaskEntity>()) else { return 0 }
+
+    var changedIDs: [String] = []
+    for row in rows where row.statusRaw == "someday" {
+      row.statusRaw = TaskStatus.open.rawValue
+      row.pendingSync = true
+      changedIDs.append(row.id)
+    }
+    guard !changedIDs.isEmpty else {
+      defaults.set(true, forKey: versionKey)
+      return 0
+    }
+    do {
+      try context.save()
+    } catch {
+      // Leave the gate unset so a later launch retries the rewrite.
+      SeptenaLog.error("SomedayStatusMigrator.save", error)
+      return 0
+    }
+    for id in changedIDs { engine.noteTaskChange(id: id) }
+    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    SeptenaLog.info("SomedayStatusMigrator: rewrote \(changedIDs.count) someday tasks → open")
+    defaults.set(true, forKey: versionKey)
+    return changedIDs.count
+  }
+}

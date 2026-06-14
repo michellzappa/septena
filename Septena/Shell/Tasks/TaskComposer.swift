@@ -175,7 +175,7 @@ struct TaskComposerCard: View {
 
   private func isUnset(_ token: DetectedToken) -> Bool {
     switch token.kind {
-    case .today, .date: return !draft.onToday && draft.scheduled == nil && !draft.someday
+    case .today, .date: return !draft.onToday && draft.scheduled == nil
     case .project:      return draft.projectId == nil
     case .area:         return draft.areaId == nil && draft.projectId == nil
     }
@@ -402,10 +402,9 @@ struct TaskAttributeBar: View {
   /// values are derived from the draft — the single read-side of the rail.
   private func value(for attr: Attribute) -> String? {
     switch attr {
-    // "When" folds in Today and Someday: a task pinned to today (no date) reads
-    // "Today", a future planning date reads its date, Someday reads "Someday".
+    // "When" folds in Today: a task pinned to today (no date) reads "Today", a
+    // future planning date reads its date, nothing set reads as Anytime (nil).
     case .when:
-      if draft.someday { return "Someday" }
       if let s = draft.scheduled { return Self.dateLabel(s) }
       return draft.onToday ? "Today" : nil
     case .deadline:
@@ -426,7 +425,7 @@ struct TaskAttributeBar: View {
   /// Whether a pill counts as "filled" — drives the accent tint.
   private func isSet(_ attr: Attribute) -> Bool {
     switch attr {
-    case .when:       draft.someday || draft.scheduled != nil || draft.onToday
+    case .when:       draft.scheduled != nil || draft.onToday
     case .deadline:   draft.deadline != nil
     case .repeatRule: draft.recurrence != nil
     case .list:       draft.areaId != nil || draft.projectId != nil
@@ -519,11 +518,11 @@ private struct AttributePill: View {
 
 // MARK: - Inline "When" editor
 
-/// The scheduling control — the single home for Today, a planning date, and
-/// the Someday bucket, so none of them needs its own pill. Quick chips (Today /
-/// Tomorrow / Weekend / Someday) sit above a graphical calendar; picking today
-/// normalizes back to the pinned-Today state, and Someday dims the calendar
-/// since it's an explicitly date-free bucket. Expanded under the When pill.
+/// The scheduling control — the single home for Today and a planning date, so
+/// neither needs its own pill. Quick chips (Today / Tomorrow / Weekend) sit
+/// above a graphical calendar; picking today normalizes back to the
+/// pinned-Today state. Leaving it unset keeps the task in Anytime. Expanded
+/// under the When pill.
 private struct InlineWhenPanel: View {
   @Binding var draft: TaskDraft
   let accent: Color
@@ -538,7 +537,7 @@ private struct InlineWhenPanel: View {
     return cal.startOfDay(for: next)
   }
 
-  private var isSet: Bool { draft.someday || draft.scheduled != nil || draft.onToday }
+  private var isSet: Bool { draft.scheduled != nil || draft.onToday }
 
   private var calendarBinding: Binding<Date> {
     Binding(get: { draft.scheduled ?? today },
@@ -548,21 +547,16 @@ private struct InlineWhenPanel: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
       HStack(spacing: 8) {
-        chip("Today", active: draft.onToday && draft.scheduled == nil && !draft.someday) {
+        chip("Today", active: draft.onToday && draft.scheduled == nil) {
           draft.setToday()
         }
         chip("Tomorrow", active: isSameDay(draft.scheduled, tomorrow)) { draft.setScheduled(tomorrow) }
         chip("Weekend", active: isSameDay(draft.scheduled, weekend)) { draft.setScheduled(weekend) }
-        chip("Someday", active: draft.someday) { draft.setSomeday() }
       }
 
       DatePicker("", selection: calendarBinding, displayedComponents: [.date])
         .datePickerStyle(.graphical)
         .tint(accent)
-        // Someday is intentionally date-free — dim + disable the calendar so it
-        // reads as "no date" rather than today's date.
-        .opacity(draft.someday ? 0.4 : 1)
-        .disabled(draft.someday)
 
       if isSet {
         Button(role: .destructive) {

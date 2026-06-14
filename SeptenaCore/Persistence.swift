@@ -3420,9 +3420,6 @@ enum LocalCache {
       guard e.status == .open, !e.today,
             e.scheduled == nil, e.due == nil else { return nil }
       return SeptenaTask(e)
-    case .someday:
-      guard e.status == .someday else { return nil }
-      return SeptenaTask(e)
     case .logbook:
       guard e.status == .done else { return nil }
       return SeptenaTask(e)
@@ -3449,7 +3446,7 @@ enum LocalCache {
   static func logTaskStateSummary(in context: ModelContext) {
     let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
     let today = SeptenaDate.today
-    var open = 0, done = 0, cancelled = 0, someday = 0
+    var open = 0, done = 0, cancelled = 0
     var todayFlag = 0, scheduledLE = 0, dueLE = 0
     var withArea = 0, withProject = 0, pendingDel = 0
     var withSystemFields = 0
@@ -3458,7 +3455,6 @@ enum LocalCache {
       case .open: open += 1
       case .done: done += 1
       case .cancelled: cancelled += 1
-      case .someday: someday += 1
       }
       if e.today { todayFlag += 1 }
       if let s = e.scheduled, s <= today { scheduledLE += 1 }

@@ -36,7 +36,7 @@ retired — one Today, no parallel inbox. iOS + macOS + 39 core tests green.
   - **No swipe actions on task rows** (removed by request — completion is the
     checkbox, everything else the menu). Inbox rows carry a visible trailing
     **`⋯` menu** (`row(quickMenu:)`) that opens the shared `rowActionsMenu`
-    (Today / When / Move / Someday / Drop…) — one tap, not a hidden long-press.
+    (Today / When / Move / Drop…) — one tap, not a hidden long-press.
   - **Triage *is* the normal task interaction** — no chips, no "Accept all".
     Complete (checkbox), open-to-edit, or the `⋯` menu. Each acknowledges an
     agent row so a dispositioned proposal leaves the Inbox: `flipStatus`/complete
@@ -176,7 +176,7 @@ An open task is **in the triage band** iff it is *unratified*, i.e. **either**:
 An item **leaves the band** the instant it is ratified:
 
 - tap a disposition (§4) → fields applied **+** `acknowledgedAt = now` (for agent
-  rows) → it either drops into Today below, or leaves this surface (later/someday),
+  rows) → it either drops into Today below, or leaves this surface (later),
   or is gone (drop).
 - For agent rows, "ratify" reuses the **existing** `acknowledgedAt` clear — the
   same field that today decays the agent-cue glow. The band is the agent cue's
@@ -198,7 +198,6 @@ From a band row, the disposition actions — and nothing else — are:
 | **Today** | `scheduled = today` (today-flag during transition; see §7) | Today list, below |
 | **Schedule…** | `scheduled = <date>` | Upcoming (off this surface) |
 | **Project / Area…** | assign container, no date | Anytime (off this surface) |
-| **Someday** | `status = someday` | Someday (off this surface) |
 | **Drop** | `status = cancelled` | gone |
 
 For agent rows, the agent's proposal **pre-selects** one verb (the inline chip);
@@ -220,7 +219,7 @@ every input:
 - **Tap** — tapping the proposed chip *is* the accept (no second confirm step).
   The expand (`⌄`) is only for overriding, which is the rare path.
 - **Swipe** — Things-style row swipes: swipe one way = accept the proposal (or
-  → Today if none), the other = Someday/Drop. Triage a band without ever expanding
+  → Today if none), the other = Drop. Triage a band without ever expanding
   a row.
 - **Accept all** — the header one-tap when every row carries a confident proposal;
   the steady-state morning gesture.
@@ -288,7 +287,7 @@ Full agent-era task topology:
 ```
    CAPTURE          TRIAGE BAND        COMMITTED            WAITING            DONE
  (0-friction)  →   (unratified)   →  Today / Upcoming  →  (on agent)    →   done
-                    human + agent      Anytime/Someday      delegated
+                    human + agent      Anytime              delegated
 ```
 
 ---

@@ -124,7 +124,7 @@ Every create/edit form goes through `AdaptiveEditScaffold` ([SectionDrawer.swift
 2. **Body** — a `Form` (or a custom content view) supplied by the form; sectioned layout — dates (`DatePicker` / `WeekStrip`), relations (`Picker`), free-form notes (`TextField(axis: .vertical)`).
 3. **Save** — the form passes an `onSave` closure and a `canSave` flag; the scaffold runs the action then closes. Forms must **not** call `dismiss`/close themselves.
 4. **Cancel** — handled by the scaffold (inline header button on inspector, toolbar button on sheet).
-5. **Destructive / status actions** — may live **in-sheet** when the editor is the primary surface for them (e.g. `EditTaskSheet` carries Delete, Cancel, and Move-to-Someday so it stays at parity with the row's context menu); they act immediately and close via `\.adaptiveDetailClose` with a `dismiss` fallback. Lighter editors leave delete on the row's context menu. Either is fine — the scaffold supports both.
+5. **Destructive / status actions** — may live **in-sheet** when the editor is the primary surface for them (e.g. `EditTaskSheet` carries Delete and Cancel so it stays at parity with the row's context menu); they act immediately and close via `\.adaptiveDetailClose` with a `dismiss` fallback. Lighter editors leave delete on the row's context menu. Either is fine — the scaffold supports both.
 6. **Detents** — compact-width sheets open at `[.medium, .large]` with a drag indicator; the inspector ignores detents.
 
 ## 8. Centralization rule

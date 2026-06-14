@@ -27,7 +27,7 @@ enum TasksPlugin: SectionPlugin {
       tables: [
         SchemaTable(name: "task", purpose: "one row per task / to-do", fields: [
           .req("id", "string"), .req("title", "string"),
-          .opt("status", "string", "open | done | cancelled | someday"),
+          .opt("status", "string", "open | done | cancelled"),
           .opt("created", "date"), .opt("scheduled", "date"),
           .opt("due", "date"), .opt("today", "bool"),
           .opt("todaySetOn", "date"), .opt("completedAt", "timestamp"),
@@ -83,7 +83,7 @@ enum TasksPlugin: SectionPlugin {
       summary: "Manage tasks, projects, and areas. Always available.",
       tools: [
         SectionSkill.Tool("tasks_list",          "List by view. Inbox = unscheduled, untoday; today = pinned; upcoming = future-scheduled; anytime EXCLUDES inbox-only tasks",
-              inputs: "optional: view (today|inbox|upcoming|anytime|someday|completed), limit"),
+              inputs: "optional: view (today|inbox|upcoming|anytime|completed), limit"),
         SectionSkill.Tool("tasks_create",        "New task. Without today/scheduled/due it lands in INBOX ONLY — invisible in today/anytime/upcoming. Set a routing field if the user expects to see it",
               inputs: "required: title · optional: today (boolean — pins to Today), scheduled (YYYY-MM-DD — puts in upcoming), due (YYYY-MM-DD — deadline only, does NOT route into views), area (id, not a routing field), project (id, not a routing field)"),
         SectionSkill.Tool("tasks_update",        "Patch any subset. Pass null to clear scheduled/due/area/project",

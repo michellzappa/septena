@@ -724,18 +724,6 @@ struct TaskListView: View {
     mutator.cancel(id: id)
   }
 
-  /// Demote to Someday. Optimistically removes the row from the current
-  /// list (it no longer matches any filter except `.someday`) and routes
-  /// the mutation through the mutator. The CK backend persists status +
-  /// clears today/scheduled/due in one round-trip.
-  private func applySomeday(_ id: String) {
-    Haptics.tap()
-    flipStatus(id: id, to: .someday)
-    removeLocally(id: id)
-    mutator.moveToSomeday(id: id)
-    Task { await load() }
-  }
-
   private func applyDelete(_ id: String) {
     Haptics.warning()
     // Remove from the visible buckets immediately — the row is filtered
@@ -850,7 +838,6 @@ struct TaskListView: View {
       suppressProject: suppressProject,
       suppressArea: suppressArea,
       showsTodayIndicator: filter != .today,
-      showsSomedayIndicator: filter != .someday,
       onToggle: { toggle(task) },
       onTap: nil
     )
@@ -920,9 +907,6 @@ struct TaskListView: View {
       onOpenRepeat: { task in
         repeatTargetId = task.id
         showingRepeatSheet = true
-      },
-      onMoveToSomeday: { ids in
-        for id in ids { applySomeday(id) }
       },
       onCancel: { ids in
         for id in ids { applyCancel(id) }
@@ -1121,7 +1105,7 @@ struct TaskListView: View {
     // Every open-work list hides done tasks (a just-completed one lingers via
     // the settle exception in `visibleItems`, then fades). Only the Logbook —
     // whose whole job is showing completed tasks — keeps them.
-    case .project, .area, .unscheduled, .upcoming, .inbox, .triage, .someday: return true
+    case .project, .area, .unscheduled, .upcoming, .inbox, .triage: return true
     case .today:
       return !todayShowCompleted
     case .logbook: return false
@@ -1509,7 +1493,6 @@ struct TaskListView: View {
     case .triage: return "tray.full"
     case .upcoming: return "calendar"
     case .unscheduled: return "rectangle.stack"
-    case .someday: return "moon.stars.fill"
     case .logbook: return "checkmark.circle"
     case .project: return "number"
     case .area: return "folder"
@@ -1669,7 +1652,6 @@ private struct TaskListRowContextMenu: View {
   let onOpenDeadline: (TaskListView.ActionTarget) -> Void
   let onOpenMove: (TaskListView.ActionTarget) -> Void
   let onOpenRepeat: (SeptenaTask) -> Void
-  let onMoveToSomeday: ([String]) -> Void
   let onCancel: ([String]) -> Void
   let onDelete: (TaskListView.ActionTarget) -> Void
 
@@ -1740,14 +1722,6 @@ private struct TaskListRowContextMenu: View {
 
     Divider()
 
-    if !allSomeday {
-      Button {
-        onMoveToSomeday(target.ids)
-      } label: {
-        Label("Move to Someday", systemImage: "moon.stars.fill")
-      }
-    }
-
     Button {
       onCancel(target.ids)
     } label: {
@@ -1770,11 +1744,6 @@ private struct TaskListRowContextMenu: View {
   private var singleTodayFlag: Bool? {
     if case let .single(task) = target { return task.isOnToday }
     return nil
-  }
-
-  private var allSomeday: Bool {
-    if case let .single(task) = target { return task.status == TaskStatus.someday }
-    return false
   }
 }
 

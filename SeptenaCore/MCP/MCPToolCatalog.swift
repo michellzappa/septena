@@ -66,10 +66,10 @@ enum MCPToolCatalog {
   static var tasks: [MCPTool] {
     [
       MCPTool(name: "tasks_list",
-              description: "List Septena tasks for a given view (today, triage, inbox, upcoming, anytime, someday, completed). 'triage' is the to-sort pile shown above Today — unratified rows the user hasn't placed yet (your unacknowledged proposals + the user's loose captures); 'today' excludes those. Returns {tasks, total, truncated}; truncated=true means more rows exist beyond limit.",
+              description: "List Septena tasks for a given view (today, triage, inbox, upcoming, anytime, completed). 'anytime' is the single home for open, dateless tasks (it absorbed the former 'someday' bucket). 'triage' is the to-sort pile shown above Today — unratified rows the user hasn't placed yet (your unacknowledged proposals + the user's loose captures); 'today' excludes those. Returns {tasks, total, truncated}; truncated=true means more rows exist beyond limit.",
               inputSchema: ["type": "object", "properties": [
                 "view": ["type": "string",
-                         "enum": ["today", "triage", "inbox", "anytime", "someday", "upcoming", "completed"],
+                         "enum": ["today", "triage", "inbox", "anytime", "upcoming", "completed"],
                          "default": "today",
                          "description": "Which task list to read. 'today' = ratified + due; 'triage' = the unratified to-sort pile above Today."],
                 "limit": ["type": "integer", "minimum": 1, "maximum": 500, "default": 100],
