@@ -44,12 +44,17 @@ final class ScreenshotTests: XCTestCase {
     app.swipeUp(); dwell(); capture(app, "overview-scrolled")
     app.swipeDown(); dwell()
     tapTab(app, "Next");  capture(app, "next")
-    // Tasks: scroll past the smart-list cards to reveal the seeded Areas /
-    // Projects below, then capture there.
-    tapTab(app, "Tasks"); app.swipeUp(); dwell(); capture(app, "tasks")
-    // "Goals" is not a tab — goals live in the Coach tab's Goals band. Capture
-    // that, so the shot isn't a duplicate of Tasks.
-    tapTab(app, "Coach"); capture(app, "goals")
+    // Tasks — two shots:
+    //  • "tasks": the sidebar home (smart-list grid + the seeded Areas /
+    //    Projects sections below it).
+    //  • "tasks-today": the Today view, which renders the Inbox / triage band
+    //    of loose captures above today's ratified list.
+    tapTab(app, "Tasks"); dwell(); capture(app, "tasks")
+    tapFirst(app, ["Today"]); dwell(); capture(app, "tasks-today")
+    // "Goals" is not a tab — goals live in the Coach tab. Capture the coaches
+    // landing as "coach", then scroll to the Goals band for "goals".
+    tapTab(app, "Coach"); capture(app, "coach")
+    app.swipeUp(); dwell(0.4); app.swipeUp(); dwell(); capture(app, "goals")
 
     // Pass 2 — Heatmap layout. Terminate + relaunch reseeds the in-memory store.
     app.terminate()
@@ -71,18 +76,18 @@ final class ScreenshotTests: XCTestCase {
     // Full per-section coverage — every section the demo enables, so the site
     // (one shot per app area, docs/MESSAGING.md §4) and the App Store both draw
     // from one capture set. Names match the site's vocabulary.
-    captureSection(app, "Nutrition", "nutrition")
+    captureSection(app, "Nutrition", "nutrition", short: true)
     captureSection(app, "Training", "training")
     captureSection(app, "Sleep", "sleep")
-    captureSection(app, "Mood", "mood")
+    captureSection(app, "Mood", "mood", short: true)
     captureSection(app, "Body", "body")
-    captureSection(app, "Habits", "habits")
+    captureSection(app, "Habits", "habits", short: true)
     captureSection(app, "Hydration", "hydration")
-    captureSection(app, "Caffeine", "caffeine")
+    captureSection(app, "Caffeine", "caffeine", short: true)
     captureSection(app, "Chores", "chores")
-    captureSection(app, "Supplements", "supplements")
+    captureSection(app, "Supplements", "supplements", short: true)
     captureSection(app, "Groceries", "groceries")
-    captureSection(app, "Gut", "gut")
+    captureSection(app, "Gut", "gut", short: true)
     captureSection(app, "Activity", "activity")
 
     // Settings editors — best-effort navigation; skip cleanly if labels differ.
@@ -133,6 +138,17 @@ final class ScreenshotTests: XCTestCase {
     dwell()
   }
 
+  /// Tap the first hittable element matching any of `labels` (button, cell, or
+  /// static text). Best-effort: returns silently if none is reachable, so a
+  /// renamed control degrades to capturing wherever we are rather than failing.
+  @MainActor private func tapFirst(_ app: XCUIApplication, _ labels: [String]) {
+    for label in labels {
+      for el in [app.buttons[label], app.cells[label], app.staticTexts[label]] {
+        if el.waitForExistence(timeout: 2), el.isHittable { el.tap(); return }
+      }
+    }
+  }
+
   @MainActor private func capture(_ app: XCUIApplication, _ name: String) {
     let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
     attachment.name = name
@@ -141,8 +157,11 @@ final class ScreenshotTests: XCTestCase {
   }
 
   /// Open a section's detail sheet from the Week list, snapshot it, dismiss.
-  /// Rows carry a compound a11y label that starts with the section name.
-  @MainActor private func captureSection(_ app: XCUIApplication, _ name: String, _ shot: String) {
+  /// Rows carry a compound a11y label that starts with the section name. Pass
+  /// `short: true` for content-light sections (gut, caffeine, nutrition) that
+  /// the app keeps at the medium detent in demo builds — the dismissal differs.
+  @MainActor private func captureSection(_ app: XCUIApplication, _ name: String, _ shot: String,
+                                         short: Bool = false) {
     for _ in 0..<6 { app.swipeDown() }                 // reset to the top
     dwell(0.5)
     let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", name)).firstMatch
@@ -152,19 +171,24 @@ final class ScreenshotTests: XCTestCase {
     row.tap()
     dwell()
     capture(app, shot)
-    dismissDrawer(app)
+    dismissDrawer(app, short: short)
   }
 
-  /// Dismiss the section drawer. Screenshot builds open it full-height (`.large`
-  /// only), so the backdrop is just a top sliver that overlaps the
-  /// non-interactive status bar — a tap there often misses and leaves the drawer
-  /// open over the next section's row, cascading into skipped captures. Instead
-  /// drag the grabber (top edge of the sheet) straight down: the canonical
-  /// dismissal gesture, reliable regardless of detent.
-  @MainActor private func dismissDrawer(_ app: XCUIApplication) {
-    let grabber = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.07))
-    let bottom = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95))
-    grabber.press(forDuration: 0.1, thenDragTo: bottom)
+  /// Dismiss the section drawer. The two demo detents need different gestures:
+  /// a full-height `.large` drawer's grabber sits at the top of the screen, so
+  /// drag it straight down (the canonical dismissal). A `.medium` drawer covers
+  /// only the bottom half, so its top is mid-screen and a top-edge drag would
+  /// miss — tap the dashboard backdrop above it instead, which fires the
+  /// drawer's tap-away dismissal. Getting this wrong leaves the sheet open over
+  /// the next section's row and cascades into skipped captures.
+  @MainActor private func dismissDrawer(_ app: XCUIApplication, short: Bool) {
+    if short {
+      app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.28)).tap()
+    } else {
+      let grabber = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.07))
+      let bottom = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95))
+      grabber.press(forDuration: 0.1, thenDragTo: bottom)
+    }
     dwell(0.8)
   }
 

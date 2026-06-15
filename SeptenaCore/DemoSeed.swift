@@ -97,9 +97,14 @@ public enum DemoSeed {
     // (title, onToday, area, project) — a couple loose (inbox), a few on Today,
     // the rest organized under projects/areas.
     let open: [(String, Bool, String?, String?)] = [
+      // Loose captures (no area/project, not on Today) — these surface in the
+      // Inbox / triage band above Today, so the Today view isn't just the
+      // ratified list. See `TaskEntity.isInTriageBand`.
       ("Reply to the landlord", false, nil, nil),
-      ("Call the dentist", true, nil, nil),
       ("Renew the parking permit", false, nil, nil),
+      ("Text Mom back", false, nil, nil),
+      ("Cancel the unused subscription", false, nil, nil),
+      ("Call the dentist", true, nil, nil),
       ("Draft the Q3 plan", true, "area-work", "proj-q3"),
       ("Finalize the launch checklist", false, "area-work", "proj-q3"),
       ("Review the design doc", true, "area-work", "proj-website"),
@@ -141,15 +146,30 @@ public enum DemoSeed {
     let habits: [(String, String, String, Int, Double)] = [
       ("Morning walk", "🚶", "morning", 12, 0.85),
       ("Meditate", "🧘", "morning", 5, 0.80),
+      ("Cold shower", "🚿", "morning", 9, 0.74),
       ("Stretch", "🤸", "afternoon", 6, 0.78),
+      ("Desk break", "🧍", "afternoon", 4, 0.70),
       ("Read", "📖", "evening", 8, 0.88),
       ("Journal", "✍️", "evening", 3, 0.72),
+      ("No screens after 10", "📵", "evening", 7, 0.68),
     ]
     for (i, h) in habits.enumerated() {
       let id = "demo-habit-\(i)"
       ctx.insert(HabitDefinitionEntity(id: id, title: h.0, emoji: h.1, bucket: h.2, sortIndex: i))
       for d in 0..<days {
-        let done = d < h.3 ? true : rng.chance(h.4)   // force the current streak, then realistic
+        let done: Bool
+        if d == 0 {
+          // Today is in progress: morning done, afternoon half, evening still
+          // open — so the drawer's current bucket has real, undone items to show
+          // rather than a finished "all done" list.
+          switch h.2 {
+          case "morning":   done = true
+          case "afternoon": done = rng.chance(0.5)
+          default:          done = false
+          }
+        } else {
+          done = d < h.3 ? true : rng.chance(h.4)   // force the streak, then realistic
+        }
         let date = day(-d)
         ctx.insert(HabitDayStateEntity(id: "habit:\(date):\(id)", date: date, habitID: id,
                                        done: done, skipped: false))

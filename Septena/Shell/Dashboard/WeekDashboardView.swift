@@ -380,6 +380,18 @@ struct WeekDashboardView: View {
     .sheet(isPresented: $creatingIntakeKind) {
       IntakeKindWizard(onCreated: { _ in Task { await reloadIntake() } })
     }
+    // Tasks-tile "Create in Inbox…" — the composer, as the standard edit drawer.
+    // Anchored on the top-level screen (not the Tasks/Mood tile) so it presents
+    // regardless of which tiles are enabled or materialized in the lazy grid.
+    .taskComposerDrawer(isPresented: $creatingTask) {
+      TaskComposerCard(
+        mode: .create(.inbox),
+        areas: LocalCache.areas(in: modelContext),
+        projects: LocalCache.projects(in: modelContext),
+        accent: theme.color(for: "tasks"),
+        onDone: { Task { await refreshTasks() } }
+      )
+    }
     .sheet(item: $nutritionSheet) { sheet in
       switch sheet {
       case .search:
@@ -549,7 +561,9 @@ struct WeekDashboardView: View {
 
   /// Sections whose drawer content is short enough that a full-height demo
   /// capture would be mostly empty — keep them at the medium detent.
-  private static let shortDrawerSections: Set<String> = ["gut", "nutrition"]
+  private static let shortDrawerSections: Set<String> = [
+    "gut", "nutrition", "mood", "supplements", "habits",
+  ]
 
   // MARK: - Cache keys
   //
@@ -2755,16 +2769,6 @@ struct WeekDashboardView: View {
       .presentationDetents([.medium, .large])
       .presentationDragIndicator(.visible)
       #endif
-    }
-    // Tasks-tile "Create in Inbox…" — the composer, as the standard edit drawer.
-    .taskComposerDrawer(isPresented: $creatingTask) {
-      TaskComposerCard(
-        mode: .create(.inbox),
-        areas: LocalCache.areas(in: modelContext),
-        projects: LocalCache.projects(in: modelContext),
-        accent: theme.color(for: "tasks"),
-        onDone: { Task { await refreshTasks() } }
-      )
     }
   }
 

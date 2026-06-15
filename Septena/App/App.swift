@@ -177,6 +177,10 @@ struct SeptenaApp: App {
             // derived caches — without it those rows show 0 despite seeded data.
             NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
             NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+            // Invalidate the process-wide areas/projects memo (cached empty at
+            // launch, before the seed inserted them) so the Tasks sidebar shows
+            // the seeded structure instead of a bare smart-list grid.
+            NotificationCenter.default.post(name: .septenaStructureChanged, object: nil)
           }
           #endif
           // Stash the engine on the platform's app delegate so silent
