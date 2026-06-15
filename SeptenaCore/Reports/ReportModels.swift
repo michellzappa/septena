@@ -118,14 +118,14 @@ public struct ReportPreset: Identifiable, Sendable, Hashable {
   /// section; ones without aggregates yet render a "not yet aggregated" note.
   public static let all: [ReportPreset] = [
     .init(id: "doctor", title: "Doctor", symbol: "stethoscope",
-          blurb: "Symptoms, intake and digestion trends for a clinic visit.",
-          defaultSections: ["nutrition", "gut", "supplements", "activity"]),
+          blurb: "Symptoms, medications, intake and digestion for a clinic visit.",
+          defaultSections: ["symptoms", "medications", "nutrition", "gut", "sleep"]),
     .init(id: "therapist", title: "Therapist", symbol: "brain.head.profile",
-          blurb: "Mood rhythm and daily-routine adherence over time.",
-          defaultSections: ["mood", "habits", "gut"]),
+          blurb: "Mood rhythm, sleep and symptoms over time.",
+          defaultSections: ["mood", "sleep", "symptoms"]),
     .init(id: "pt", title: "Physical therapist", symbol: "figure.run",
           blurb: "Training load, movement and recovery for rehab check-ins.",
-          defaultSections: ["training", "activity", "habits"]),
+          defaultSections: ["training", "activity", "sleep"]),
     .init(id: "coach", title: "Coach", symbol: "trophy",
           blurb: "Habits, supplements, training and nutrition consistency.",
           defaultSections: ["habits", "supplements", "training", "nutrition"]),
@@ -270,11 +270,15 @@ public struct ReportChart: Codable, Sendable {
   public var kind: Kind
   public var unit: String
   public var points: [ReportPoint]
-  public init(title: String, kind: Kind, unit: String = "", points: [ReportPoint]) {
+  /// Optional goal/target — drawn as a dashed reference line so a coach reads
+  /// "vs. target" at a glance. nil = no line.
+  public var target: Double?
+  public init(title: String, kind: Kind, unit: String = "", points: [ReportPoint], target: Double? = nil) {
     self.title = title
     self.kind = kind
     self.unit = unit
     self.points = points
+    self.target = target
   }
 }
 

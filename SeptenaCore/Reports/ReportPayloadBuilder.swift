@@ -20,6 +20,7 @@ public enum ReportPayloadBuilder {
     "habits", "supplements", "chores", "gut",
     "training", "nutrition", "mood", "activity",
     "sleep", "body", "hydration",
+    "symptoms", "medications", "intake",
   ]
 
   public static func build(bundle: ReportBundle,
@@ -62,6 +63,9 @@ public enum ReportPayloadBuilder {
     case "sleep":       return sleep(label, colorHex, days, context)
     case "body":        return body(label, colorHex, days, weightUnit, context)
     case "hydration":   return hydration(label, colorHex, days, context)
+    case "symptoms":    return symptoms(label, colorHex, days, context)
+    case "medications": return medications(label, colorHex, days, context)
+    case "intake":      return intake(label, colorHex, days, context)
     default:
       return ReportSection(key: key, label: label, colorHex: colorHex, unavailable: true)
     }
@@ -173,7 +177,8 @@ public enum ReportPayloadBuilder {
     let cardioActive = cardio.daily.filter { $0.minutes > 0 }
     if !cardioActive.isEmpty {
       charts.append(ReportChart(title: "Cardio minutes per day", kind: .bar, unit: "min",
-                                points: cardio.daily.map { ReportPoint(label: $0.date, value: Double($0.minutes)) }))
+                                points: cardio.daily.map { ReportPoint(label: $0.date, value: Double($0.minutes)) },
+                                target: cardio.targetWeeklyMin > 0 ? Double(cardio.targetWeeklyMin) / 7.0 : nil))
     }
 
     // Per-exercise progression — working weight over time for the most-trained
@@ -249,22 +254,37 @@ public enum ReportPayloadBuilder {
   private static func nutrition(_ label: String, _ color: String, _ days: Int, _ ctx: ModelContext) -> ReportSection {
     let resp = ChecklistMirror.buildNutritionStatsResponse(context: ctx, days: days)
     let withData = resp.daily.filter { $0.kcal > 0 }
-    let avgKcal = withData.isEmpty ? 0 : withData.map { $0.kcal }.reduce(0, +) / Double(withData.count)
-    let avgProtein = withData.isEmpty ? 0 : withData.map { $0.proteinG }.reduce(0, +) / Double(withData.count)
-    var stats = [
-      ReportStat(label: "Avg energy", value: "\(Int(avgKcal.rounded())) kcal", detail: "per logged day"),
-      ReportStat(label: "Avg protein", value: "\(Int(avgProtein.rounded())) g"),
-      ReportStat(label: "Days logged", value: "\(withData.count)"),
-    ]
-    if let fast = resp.avgFastH {
-      stats.append(ReportStat(label: "Avg fast", value: String(format: "%.1f h", fast)))
+    func avg(_ f: (NutritionDailyPoint) -> Double?) -> Double {
+      let v = withData.compactMap(f); return v.isEmpty ? 0 : v.reduce(0, +) / Double(v.count)
     }
+    let cfg = NutritionPrefs.loadMacrosConfig()
+    func mid(_ r: MacroRange?) -> Double? { r.map { ($0.min + $0.max) / 2 } }
+
+    var stats = [
+      ReportStat(label: "Avg energy", value: "\(Int(avg { $0.kcal }.rounded())) kcal", detail: "per logged day"),
+      ReportStat(label: "Avg protein", value: "\(Int(avg { $0.proteinG }.rounded())) g"),
+      ReportStat(label: "Avg carbs", value: "\(Int(avg { $0.carbsG }.rounded())) g"),
+      ReportStat(label: "Avg fat", value: "\(Int(avg { $0.fatG }.rounded())) g"),
+    ]
+    let avgFiber = avg { $0.fiberG }
+    if avgFiber > 0 { stats.append(ReportStat(label: "Avg fiber", value: "\(Int(avgFiber.rounded())) g")) }
+    stats.append(ReportStat(label: "Days logged", value: "\(withData.count)"))
+    if let fast = resp.avgFastH { stats.append(ReportStat(label: "Avg fast", value: String(format: "%.1f h", fast))) }
+
     var charts: [ReportChart] = []
     if !withData.isEmpty {
       charts.append(ReportChart(title: "Energy per day", kind: .line, unit: "kcal",
-                                points: resp.daily.map { ReportPoint(label: $0.date, value: $0.kcal) }))
+                                points: resp.daily.map { ReportPoint(label: $0.date, value: $0.kcal) }, target: mid(cfg?.kcal)))
       charts.append(ReportChart(title: "Protein per day", kind: .line, unit: "g",
-                                points: resp.daily.map { ReportPoint(label: $0.date, value: $0.proteinG) }))
+                                points: resp.daily.map { ReportPoint(label: $0.date, value: $0.proteinG) }, target: mid(cfg?.protein)))
+      charts.append(ReportChart(title: "Carbs per day", kind: .line, unit: "g",
+                                points: resp.daily.map { ReportPoint(label: $0.date, value: $0.carbsG) }, target: mid(cfg?.carbs)))
+      charts.append(ReportChart(title: "Fat per day", kind: .line, unit: "g",
+                                points: resp.daily.map { ReportPoint(label: $0.date, value: $0.fatG) }, target: mid(cfg?.fat)))
+      if resp.daily.contains(where: { ($0.fiberG ?? 0) > 0 }) {
+        charts.append(ReportChart(title: "Fiber per day", kind: .line, unit: "g",
+                                  points: resp.daily.map { ReportPoint(label: $0.date, value: $0.fiberG ?? 0) }, target: mid(cfg?.fiber)))
+      }
     }
     return ReportSection(key: "nutrition", label: label, colorHex: color, stats: stats, charts: charts,
                          unavailable: withData.isEmpty)
@@ -278,16 +298,32 @@ public enum ReportPayloadBuilder {
       ReportStat(label: "Check-ins", value: "\(totalLogs)", detail: "last \(days)d"),
       ReportStat(label: "Days logged", value: "\(logged.count)"),
     ]
-    // Dominant-quadrant distribution as a small breakdown chip.
+    // Dominant-quadrant distribution — the actual mood content.
     let quadrants = Dictionary(grouping: logged.compactMap { $0.dominantQuadrant }, by: { $0 })
       .mapValues { $0.count }
-    if let top = quadrants.max(by: { $0.value < $1.value }) {
-      stats.append(ReportStat(label: "Most common", value: quadrantLabel(top.key)))
+    let totalQ = quadrants.values.reduce(0, +)
+    if totalQ > 0 {
+      let pleasant = (quadrants["hap"] ?? 0) + (quadrants["lap"] ?? 0)
+      stats.append(ReportStat(label: "Pleasant", value: "\(Int((Double(pleasant) / Double(totalQ) * 100).rounded()))%",
+                              detail: "of logged days"))
+      if let top = quadrants.max(by: { $0.value < $1.value }) {
+        stats.append(ReportStat(label: "Most common", value: quadrantLabel(top.key)))
+      }
+    }
+    var tables: [ReportTable] = []
+    if totalQ > 0 {
+      let order = ["hap", "lap", "lan", "han"]
+      let rows = order.compactMap { q -> [String]? in
+        let c = quadrants[q] ?? 0
+        guard c > 0 else { return nil }
+        return [quadrantLabel(q), "\(c)", "\(Int((Double(c) / Double(totalQ) * 100).rounded()))%"]
+      }
+      tables.append(ReportTable(title: "Mood balance", columns: ["State", "Days", "Share"], rows: rows))
     }
     let charts = logged.isEmpty ? [] : [ReportChart(title: "Check-ins per day", kind: .bar,
                                                     points: resp.daily.map { ReportPoint(label: $0.date, value: Double($0.logs)) })]
     return ReportSection(key: "mood", label: label, colorHex: color, stats: stats, charts: charts,
-                         unavailable: logged.isEmpty)
+                         tables: tables, unavailable: logged.isEmpty)
   }
 
   private static func activity(_ label: String, _ color: String, _ days: Int, _ ctx: ModelContext) -> ReportSection {
@@ -308,10 +344,21 @@ public enum ReportPayloadBuilder {
     if totalEx > 0 {
       stats.append(ReportStat(label: "Exercise", value: "\(totalEx) min", detail: "last \(days)d"))
     }
-    let charts = steps.isEmpty ? [] : [ReportChart(title: "Steps per day", kind: .line, unit: "steps",
-                                                  points: rows.compactMap { r in r.stepCount.map { ReportPoint(label: r.date, value: Double($0)) } })]
+    let kcal = rows.compactMap { $0.activeKcal }.filter { $0 > 0 }
+    if !kcal.isEmpty {
+      stats.append(ReportStat(label: "Avg active energy", value: "\(Int((kcal.reduce(0,+) / Double(kcal.count)).rounded())) kcal"))
+    }
+    var charts: [ReportChart] = []
+    if !steps.isEmpty {
+      charts.append(ReportChart(title: "Steps per day", kind: .line, unit: "steps",
+                                points: rows.compactMap { r in r.stepCount.map { ReportPoint(label: r.date, value: Double($0)) } }))
+    }
+    if !exMin.isEmpty {
+      charts.append(ReportChart(title: "Exercise minutes per day", kind: .bar, unit: "min",
+                                points: rows.compactMap { r in r.exerciseMinutes.map { ReportPoint(label: r.date, value: Double($0)) } }))
+    }
     return ReportSection(key: "activity", label: label, colorHex: color, stats: stats, charts: charts,
-                         unavailable: steps.isEmpty)
+                         unavailable: steps.isEmpty && exMin.isEmpty)
   }
 
   private static func sleep(_ label: String, _ color: String, _ days: Int, _ ctx: ModelContext) -> ReportSection {
@@ -335,7 +382,17 @@ public enum ReportPayloadBuilder {
     if !readiness.isEmpty {
       stats.append(ReportStat(label: "Avg readiness", value: "\(readiness.reduce(0,+) / readiness.count)"))
     }
+    func avgD(_ xs: [Double]) -> Double { xs.isEmpty ? 0 : xs.reduce(0,+) / Double(xs.count) }
+    func avgI(_ xs: [Int]) -> Int { xs.isEmpty ? 0 : xs.reduce(0,+) / xs.count }
+    let deep = rows.compactMap { $0.deepH }, rem = rows.compactMap { $0.remH }
+    if !deep.isEmpty { stats.append(ReportStat(label: "Avg deep", value: String(format: "%.1f h", avgD(deep)))) }
+    if !rem.isEmpty { stats.append(ReportStat(label: "Avg REM", value: String(format: "%.1f h", avgD(rem)))) }
+    let hrv = rows.compactMap { $0.hrv }, rhr = rows.compactMap { $0.restingHr }, eff = rows.compactMap { $0.efficiency }
+    if !hrv.isEmpty { stats.append(ReportStat(label: "Avg HRV", value: "\(avgI(hrv)) ms")) }
+    if !rhr.isEmpty { stats.append(ReportStat(label: "Avg resting HR", value: "\(avgI(rhr)) bpm")) }
+    if !eff.isEmpty { stats.append(ReportStat(label: "Avg efficiency", value: "\(avgI(eff))%")) }
     stats.append(ReportStat(label: "Nights", value: "\(max(scores.count, durations.count))"))
+
     var charts: [ReportChart] = []
     if !scores.isEmpty {
       charts.append(ReportChart(title: "Sleep score", kind: .line,
@@ -344,6 +401,14 @@ public enum ReportPayloadBuilder {
     if !durations.isEmpty {
       charts.append(ReportChart(title: "Total sleep", kind: .line, unit: "h",
                                 points: rows.compactMap { r in r.totalH.map { ReportPoint(label: r.id, value: $0) } }))
+    }
+    if !hrv.isEmpty {
+      charts.append(ReportChart(title: "HRV", kind: .line, unit: "ms",
+                                points: rows.compactMap { r in r.hrv.map { ReportPoint(label: r.id, value: Double($0)) } }))
+    }
+    if !rhr.isEmpty {
+      charts.append(ReportChart(title: "Resting heart rate", kind: .line, unit: "bpm",
+                                points: rows.compactMap { r in r.restingHr.map { ReportPoint(label: r.id, value: Double($0)) } }))
     }
     return ReportSection(key: "sleep", label: label, colorHex: color, stats: stats, charts: charts,
                          unavailable: scores.isEmpty && durations.isEmpty)
@@ -359,6 +424,7 @@ public enum ReportPayloadBuilder {
     let toUnit = weightUnit == "lb" ? 2.20462 : 1.0
     let weights = rows.compactMap { r in r.weightKg.map { (r.id, $0 * toUnit) } }
     let fats = rows.compactMap { r in r.fatPct.map { (r.id, $0) } }
+    let muscle = rows.compactMap { r in r.muscleMassKg.map { (r.id, $0 * toUnit) } }
     var stats: [ReportStat] = []
     if let last = weights.last {
       let delta = weights.first.map { last.1 - $0.1 } ?? 0
@@ -369,6 +435,9 @@ public enum ReportPayloadBuilder {
     if let last = fats.last {
       stats.append(ReportStat(label: "Body fat", value: String(format: "%.1f%%", last.1)))
     }
+    if let last = muscle.last {
+      stats.append(ReportStat(label: "Muscle mass", value: "\(trimNum(last.1)) \(weightUnit)"))
+    }
     stats.append(ReportStat(label: "Weigh-ins", value: "\(weights.count)"))
     var charts: [ReportChart] = []
     if !weights.isEmpty {
@@ -378,6 +447,10 @@ public enum ReportPayloadBuilder {
     if !fats.isEmpty {
       charts.append(ReportChart(title: "Body fat", kind: .line, unit: "%",
                                 points: fats.map { ReportPoint(label: $0.0, value: $0.1) }))
+    }
+    if !muscle.isEmpty {
+      charts.append(ReportChart(title: "Muscle mass", kind: .line, unit: weightUnit,
+                                points: muscle.map { ReportPoint(label: $0.0, value: $0.1) }))
     }
     return ReportSection(key: "body", label: label, colorHex: color, stats: stats, charts: charts,
                          unavailable: weights.isEmpty && fats.isEmpty)
@@ -403,6 +476,85 @@ public enum ReportPayloadBuilder {
     }
     return ReportSection(key: "hydration", label: label, colorHex: color, stats: stats, charts: charts,
                          unavailable: active.isEmpty)
+  }
+
+  private static func symptoms(_ label: String, _ color: String, _ days: Int, _ ctx: ModelContext) -> ReportSection {
+    let since = isoDaysAgo(days)
+    let events = (try? ctx.fetch(FetchDescriptor<SymptomEventEntity>(
+      predicate: #Predicate { $0.date >= since }, sortBy: [SortDescriptor(\.date)]))) ?? []
+    guard !events.isEmpty else {
+      return ReportSection(key: "symptoms", label: label, colorHex: color, unavailable: true)
+    }
+    let defs = (try? ctx.fetch(FetchDescriptor<SymptomDefinitionEntity>())) ?? []
+    let titles = Dictionary(defs.map { ($0.id, $0.title) }, uniquingKeysWith: { a, _ in a })
+    let byId = Dictionary(grouping: events, by: { $0.symptomID })
+    let stats = [
+      ReportStat(label: "Episodes", value: "\(events.count)", detail: "last \(days)d"),
+      ReportStat(label: "Distinct symptoms", value: "\(byId.count)"),
+      ReportStat(label: "Days affected", value: "\(Set(events.map { $0.date }).count)"),
+    ]
+    let rows = byId.sorted { $0.value.count > $1.value.count }.map { (id, evs) -> [String] in
+      let avg = Double(evs.map { $0.severity }.reduce(0, +)) / Double(evs.count)
+      let last = evs.map { $0.date }.max() ?? ""
+      return [titles[id] ?? id, "\(evs.count)", String(format: "%.1f", avg), SeptenaDate.friendlyLabel(last)]
+    }
+    let table = ReportTable(title: "Symptoms", columns: ["Symptom", "Episodes", "Avg severity", "Last"], rows: rows)
+    let perDay = Dictionary(grouping: events, by: { $0.date }).mapValues { $0.count }
+    let chart = ReportChart(title: "Episodes per day", kind: .bar,
+                            points: perDay.keys.sorted().map { ReportPoint(label: $0, value: Double(perDay[$0]!)) })
+    return ReportSection(key: "symptoms", label: label, colorHex: color, stats: stats, charts: [chart], tables: [table])
+  }
+
+  private static func medications(_ label: String, _ color: String, _ days: Int, _ ctx: ModelContext) -> ReportSection {
+    let since = isoDaysAgo(days)
+    let events = (try? ctx.fetch(FetchDescriptor<MedicationDoseEventEntity>(
+      predicate: #Predicate { $0.date >= since }, sortBy: [SortDescriptor(\.date)]))) ?? []
+    guard !events.isEmpty else {
+      return ReportSection(key: "medications", label: label, colorHex: color, unavailable: true)
+    }
+    let defs = (try? ctx.fetch(FetchDescriptor<MedicationDefinitionEntity>())) ?? []
+    let titles = Dictionary(defs.map { ($0.id, $0.title) }, uniquingKeysWith: { a, _ in a })
+    let byId = Dictionary(grouping: events, by: { $0.medicationID })
+    let stats = [
+      ReportStat(label: "Doses logged", value: "\(events.count)", detail: "last \(days)d"),
+      ReportStat(label: "Medications", value: "\(byId.count)"),
+    ]
+    let rows = byId.sorted { $0.value.count > $1.value.count }.map { (id, evs) -> [String] in
+      let last = evs.map { $0.date }.max() ?? ""
+      return [titles[id] ?? id, "\(evs.count)", SeptenaDate.friendlyLabel(last)]
+    }
+    let table = ReportTable(title: "Medications", columns: ["Medication", "Doses", "Last"], rows: rows)
+    return ReportSection(key: "medications", label: label, colorHex: color, stats: stats, tables: [table])
+  }
+
+  private static func intake(_ label: String, _ color: String, _ days: Int, _ ctx: ModelContext) -> ReportSection {
+    let since = isoDaysAgo(days)
+    let events = (try? ctx.fetch(FetchDescriptor<IntakeEventEntity>(
+      predicate: #Predicate { $0.date >= since }, sortBy: [SortDescriptor(\.date)]))) ?? []
+    guard !events.isEmpty else {
+      return ReportSection(key: "intake", label: label, colorHex: color, unavailable: true)
+    }
+    let kinds = (try? ctx.fetch(FetchDescriptor<IntakeKindEntity>())) ?? []
+    let kindByID = Dictionary(kinds.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+    let byKind = Dictionary(grouping: events, by: { $0.kindID })
+    let stats = [
+      ReportStat(label: "Entries", value: "\(events.count)", detail: "last \(days)d"),
+      ReportStat(label: "Trackers", value: "\(byKind.count)"),
+    ]
+    let rows = byKind.sorted { $0.value.count > $1.value.count }.map { (id, evs) -> [String] in
+      let k = kindByID[id]
+      let name = k?.name ?? id
+      let total: String
+      if k?.metricMode == "sumAmount" {
+        let sum = evs.compactMap { $0.amount }.reduce(0, +)
+        total = "\(trimNum(sum)) \(k?.unit ?? "")".trimmingCharacters(in: .whitespaces)
+      } else {
+        total = "\(evs.count)×"
+      }
+      return [name, total, "\(evs.count)"]
+    }
+    let table = ReportTable(title: "Intake", columns: ["Tracker", "Total", "Entries"], rows: rows)
+    return ReportSection(key: "intake", label: label, colorHex: color, stats: stats, tables: [table])
   }
 
   // MARK: - Helpers

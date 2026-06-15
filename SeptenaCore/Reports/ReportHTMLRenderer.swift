@@ -168,8 +168,8 @@ public enum ReportHTMLRenderer {
     guard !c.points.isEmpty else { return "" }
     let svg: String
     switch c.kind {
-    case .line:    svg = lineSVG(c.points, accent: accent)
-    case .bar:     svg = barSVG(c.points, accent: accent)
+    case .line:    svg = lineSVG(c.points, accent: accent, target: c.target)
+    case .bar:     svg = barSVG(c.points, accent: accent, target: c.target)
     case .heatmap: svg = heatmapSVG(c.points, accent: accent)
     }
     let unit = c.unit.isEmpty ? "" : " <span class=\"unit\">(\(esc(c.unit)))</span>"
@@ -187,10 +187,11 @@ public enum ReportHTMLRenderer {
   private static let H = 150.0
   private static let padL = 10.0, padR = 10.0, padT = 14.0, padB = 26.0
 
-  private static func lineSVG(_ points: [ReportPoint], accent: String) -> String {
+  private static func lineSVG(_ points: [ReportPoint], accent: String, target: Double? = nil) -> String {
     let vals = points.map { $0.value }
     let n = vals.count
-    let (lo, hi) = bounds(vals)
+    var (lo, hi) = bounds(vals)
+    if let t = target { lo = Swift.min(lo, t); hi = Swift.max(hi, t); if lo == hi { hi = lo + 1 } }
     let innerW = W - padL - padR, innerH = H - padT - padB
     let baseline = padT + innerH
     func x(_ i: Int) -> Double { n <= 1 ? padL + innerW / 2 : padL + innerW * Double(i) / Double(n - 1) }
@@ -206,15 +207,17 @@ public enum ReportHTMLRenderer {
       <path d="\(area)" fill="\(accent)" fill-opacity="0.10"/>
       <polyline points="\(poly)" fill="none" stroke="\(accent)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
       <circle cx="\(fmt(lastX))" cy="\(fmt(lastY))" r="3.4" fill="\(accent)"/>
+      \(targetSVG(target, y: target.map(y), accent: accent))
       \(axisLabels(points, lo: lo, hi: hi))
     </svg>
     """
   }
 
-  private static func barSVG(_ points: [ReportPoint], accent: String) -> String {
+  private static func barSVG(_ points: [ReportPoint], accent: String, target: Double? = nil) -> String {
     let vals = points.map { $0.value }
     let n = vals.count
-    let hi = max(vals.max() ?? 1, 1)
+    var hi = max(vals.max() ?? 1, 1)
+    if let t = target { hi = Swift.max(hi, t) }
     let innerW = W - padL - padR, innerH = H - padT - padB
     let baseline = padT + innerH
     let slot = innerW / Double(n)
@@ -226,11 +229,22 @@ public enum ReportHTMLRenderer {
       let yy = baseline - h
       return "<rect x=\"\(fmt(xx))\" y=\"\(fmt(yy))\" width=\"\(fmt(bw))\" height=\"\(fmt(max(h, 0.5)))\" rx=\"1.5\" fill=\"\(accent)\" fill-opacity=\"0.85\"/>"
     }.joined()
+    let ty = target.map { baseline - innerH * ($0 / hi) }
     return """
     <svg viewBox="0 0 \(fmt(W)) \(fmt(H))" preserveAspectRatio="none" class="g">
       \(bars)
+      \(targetSVG(target, y: ty, accent: accent))
       \(axisLabels(points, lo: 0, hi: hi))
     </svg>
+    """
+  }
+
+  /// Dashed horizontal reference line + label at the target value.
+  private static func targetSVG(_ target: Double?, y: Double?, accent: String) -> String {
+    guard let t = target, let ty = y else { return "" }
+    return """
+    <line x1="\(fmt(padL))" y1="\(fmt(ty))" x2="\(fmt(W - padR))" y2="\(fmt(ty))" stroke="\(accent)" stroke-width="1" stroke-dasharray="4 3" opacity="0.55"/>
+    <text x="\(fmt(W - padR))" y="\(fmt(ty - 3))" class="axn" text-anchor="end">target \(fmt(t))</text>
     """
   }
 

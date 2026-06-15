@@ -44,6 +44,17 @@ struct CorrelationsHomepageView: View {
     #endif
   }
 
+  /// Card-sized columns for text-heavy sections (Reports, the supplements
+  /// table) so a wide pane flows them two-up instead of stretching one card
+  /// edge-to-edge. Wider minimum than the tile grid since these hold a title
+  /// plus several rows of sentences. Single column on compact iPhone.
+  private var cardColumns: [GridItem] {
+    #if os(iOS)
+    if hSize != .regular { return [GridItem(.flexible())] }
+    #endif
+    return [GridItem(.adaptive(minimum: 380), spacing: 12)]
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
       if loading {
@@ -258,6 +269,7 @@ struct CorrelationsHomepageView: View {
   private func reportsSection(_ reports: [SectionReport]) -> some View {
     VStack(alignment: .leading, spacing: 10) {
       sectionHeader("Reports", subtitle: "Same engine, grouped by the outcome you care about.")
+      LazyVGrid(columns: cardColumns, alignment: .leading, spacing: 12) {
       ForEach(reports) { report in
         VStack(alignment: .leading, spacing: 8) {
           VStack(alignment: .leading, spacing: 2) {
@@ -293,10 +305,12 @@ struct CorrelationsHomepageView: View {
             .buttonStyle(.plain)
           }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .background(
           RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.cardSurface)
         )
+      }
       }
     }
   }
