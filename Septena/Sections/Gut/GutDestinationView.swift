@@ -41,6 +41,7 @@ struct GutDestinationView: View {
                   mode: $mode) {
       switch mode {
       case .log:
+        gutSummary
         DrawerSection("Today", padding: .none) {
           if let today, !today.entries.isEmpty {
             ForEach(Array(today.entries.reversed())) { entry in
@@ -79,6 +80,18 @@ struct GutDestinationView: View {
         original: entry,
         onSave: { _ in Task { await reload() } }
       )
+    }
+  }
+
+  /// Top-of-Log day readout — count + average Bristol type for the viewed day.
+  @ViewBuilder
+  private var gutSummary: some View {
+    if let entries = today?.entries, !entries.isEmpty {
+      let avg = Double(entries.map(\.bristol).reduce(0, +)) / Double(entries.count)
+      DrawerSummary(stats: [
+        Stat(value: "\(entries.count)", label: "movements", tint: accent),
+        Stat(value: avg.decimalString(1), label: "avg type", tint: accent),
+      ])
     }
   }
 
@@ -132,16 +145,10 @@ struct GutDestinationView: View {
     }
   }
 
-  /// Editable dual sections open in Patterns when today's Log is empty: an empty
-  /// log first thing reads as a dead end, so the rhythm view greets you instead
-  /// (the global "+" stays one tap away). One-shot per appearance, and never
-  /// persisted — a deliberate user toggle is the only thing that sticks.
   private func applyEmptyStateNudgeIfNeeded() {
-    guard !didNudge else { return }
-    didNudge = true
-    if mode == .log, isViewingToday, today?.entries.isEmpty ?? true {
-      withAnimation(.snappy) { mode = .patterns }
-    }
+    DrawerMode.nudgeEmptyDayToPatterns(mode: $mode, didNudge: $didNudge,
+                                       isViewingToday: isViewingToday,
+                                       isEmpty: today?.entries.isEmpty ?? true)
   }
 
   // MARK: - Rhythm wheel (Patterns mode)

@@ -122,6 +122,7 @@ struct TrainingDestinationView: View {
                   mode: $mode) {
       switch mode {
       case .log:
+        trainingSummary
         if isViewingToday {
           // Active draft + the rolling session list. Older sessions live
           // behind the time-travel control, not dumped inline; the trend
@@ -366,18 +367,25 @@ struct TrainingDestinationView: View {
     applyEmptyStateNudgeIfNeeded()
   }
 
-  /// Editable dual sections open in Patterns when nothing's logged today — for
-  /// a chart-forward section like Training the dashboard is the natural greeting
-  /// on a rest morning, with the session list and "+" one tap away. One-shot per
-  /// appearance, never persisted; a deliberate toggle is the only thing that
-  /// sticks.
-  private func applyEmptyStateNudgeIfNeeded() {
-    guard !didNudge else { return }
-    didNudge = true
-    let loggedToday = entries.contains { $0.date == today }
-    if mode == .log, isViewingToday, !loggedToday {
-      withAnimation(.snappy) { mode = .patterns }
+  /// Top-of-Log day readout — exercises + total sets for the viewed day.
+  @ViewBuilder
+  private var trainingSummary: some View {
+    let blocks = viewingSessions
+    if !blocks.isEmpty {
+      let sets = blocks.reduce(0) { $0 + $1.entries.count }
+      DrawerSummary(stats: [
+        Stat(value: "\(blocks.count)", label: "exercises", tint: accent),
+        Stat(value: "\(sets)", label: "sets", tint: accent),
+      ])
     }
+  }
+
+  /// Training's "empty" is "no session logged today" — for a chart-forward
+  /// section the dashboard is the natural greeting on a rest morning.
+  private func applyEmptyStateNudgeIfNeeded() {
+    DrawerMode.nudgeEmptyDayToPatterns(mode: $mode, didNudge: $didNudge,
+                                       isViewingToday: isViewingToday,
+                                       isEmpty: !entries.contains { $0.date == today })
   }
 
   // MARK: - Charts

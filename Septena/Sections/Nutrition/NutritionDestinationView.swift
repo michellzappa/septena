@@ -202,8 +202,10 @@ struct NutritionDestinationView: View {
                   mode: $mode) {
       switch mode {
       case .log:
-        // The meal log, time-travelable. Macro tiles read "today" status, so
-        // they live in Patterns, not retro on a browsed past day.
+        // The meal log, time-travelable. Full macro tiles live in Patterns;
+        // a compact day-total readout leads the Log for consistency with the
+        // other editable sections.
+        nutritionSummary
         entriesList
       case .patterns:
         // Today-anchored macro trend tiles + the trailing-7-day meal rhythm
@@ -275,16 +277,10 @@ struct NutritionDestinationView: View {
     applyEmptyStateNudgeIfNeeded()
   }
 
-  /// Editable dual sections open in Patterns when today's Log is empty: an empty
-  /// meal log first thing reads as a dead end, so the macro/rhythm view greets
-  /// you instead (the global "+" stays one tap away). One-shot per appearance,
-  /// never persisted — a deliberate user toggle is the only thing that sticks.
   private func applyEmptyStateNudgeIfNeeded() {
-    guard !didNudge else { return }
-    didNudge = true
-    if mode == .log, isViewingToday, todayEntries.isEmpty {
-      withAnimation(.snappy) { mode = .patterns }
-    }
+    DrawerMode.nudgeEmptyDayToPatterns(mode: $mode, didNudge: $didNudge,
+                                       isViewingToday: isViewingToday,
+                                       isEmpty: todayEntries.isEmpty)
   }
 
   /// Bridges the legacy `MacroColors` shape (color-only, no order or
@@ -667,6 +663,24 @@ struct NutritionDestinationView: View {
   }
 
   // MARK: - Entries list
+
+  /// Compact day-total readout atop the Log — kcal + macros for the viewed day.
+  @ViewBuilder
+  private var nutritionSummary: some View {
+    let day = viewingEntries
+    if !day.isEmpty {
+      let t = day.reduce(into: DayTotals()) { acc, e in
+        acc.protein += e.proteinG; acc.fat += e.fatG; acc.carbs += e.carbsG
+        acc.fiber += e.fiberG ?? 0; acc.kcal += e.kcal
+      }
+      DrawerSummary(stats: [
+        Stat(value: "\(Int(t.kcal.rounded()))", label: "kcal", tint: kcalColor),
+        Stat(value: "\(Int(t.protein.rounded()))", label: "protein", tint: proteinColor, unit: "g"),
+        Stat(value: "\(Int(t.carbs.rounded()))", label: "carbs", tint: carbsColor, unit: "g"),
+        Stat(value: "\(Int(t.fat.rounded()))", label: "fat", tint: fatColor, unit: "g"),
+      ])
+    }
+  }
 
   @ViewBuilder
   private var entriesList: some View {

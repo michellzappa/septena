@@ -44,6 +44,7 @@ struct MoodDestinationView: View {
                   mode: $mode) {
       switch mode {
       case .log:
+        moodSummary
         todaySection
       case .patterns:
         breakdownSection
@@ -70,6 +71,18 @@ struct MoodDestinationView: View {
   }
 
   // MARK: - Today list
+
+  /// Top-of-Log day readout — check-in count + the latest emotion logged.
+  @ViewBuilder
+  private var moodSummary: some View {
+    if let entries = today?.entries, !entries.isEmpty {
+      let latest = entries.max(by: { $0.time < $1.time })?.emotion
+      DrawerSummary(stats: [
+        Stat(value: "\(entries.count)", label: "check-ins", tint: accent),
+        Stat(value: latest ?? "—", label: "latest", tint: accent),
+      ])
+    }
+  }
 
   @ViewBuilder
   private var todaySection: some View {
@@ -194,16 +207,10 @@ struct MoodDestinationView: View {
     applyEmptyStateNudgeIfNeeded()
   }
 
-  /// Editable dual sections open in Patterns when today's Log is empty: an empty
-  /// log first thing reads as a dead end, so the rhythm/quadrant view greets you
-  /// instead (the global "+" stays one tap away). One-shot per appearance, never
-  /// persisted — a deliberate user toggle is the only thing that sticks.
   private func applyEmptyStateNudgeIfNeeded() {
-    guard !didNudge else { return }
-    didNudge = true
-    if mode == .log, isViewingToday, today?.entries.isEmpty ?? true {
-      withAnimation(.snappy) { mode = .patterns }
-    }
+    DrawerMode.nudgeEmptyDayToPatterns(mode: $mode, didNudge: $didNudge,
+                                       isViewingToday: isViewingToday,
+                                       isEmpty: today?.entries.isEmpty ?? true)
   }
 
   private static func loadMonthEntries(context: ModelContext) -> [MoodEntry] {

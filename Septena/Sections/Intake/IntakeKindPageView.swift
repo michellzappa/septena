@@ -70,9 +70,7 @@ struct IntakeKindPageView: View {
       switch mode {
       case .log:
         if let kind {
-          DrawerSection(padding: .standard) {
-            StatStrip(stats: statTiles(kind))
-          }
+          DrawerSummary(stats: statTiles(kind))
         }
         DrawerSection("Log", padding: .none) {
           if !entries.isEmpty {
@@ -364,16 +362,10 @@ struct IntakeKindPageView: View {
     applyEmptyStateNudgeIfNeeded()
   }
 
-  /// Editable dual sections open in Patterns when today's Log is empty: an empty
-  /// log first thing reads as a dead end, so the rhythm view greets you instead
-  /// (the global "+" stays one tap away). One-shot per appearance, never
-  /// persisted — a deliberate user toggle is the only thing that sticks.
   private func applyEmptyStateNudgeIfNeeded() {
-    guard !didNudge else { return }
-    didNudge = true
-    if mode == .log, isViewingToday, entries.isEmpty {
-      withAnimation(.snappy) { mode = .patterns }
-    }
+    DrawerMode.nudgeEmptyDayToPatterns(mode: $mode, didNudge: $didNudge,
+                                       isViewingToday: isViewingToday,
+                                       isEmpty: entries.isEmpty)
   }
 
   private struct PageBundle: Sendable {

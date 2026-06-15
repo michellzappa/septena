@@ -58,6 +58,7 @@ struct HabitsDestinationView: View {
       switch mode {
       case .log:
         if isViewingToday {
+          if !model.habits.isEmpty { habitsSummary }
           // Today folds into an accordion: the current time bucket is open with
           // a "time left" countdown, the others tuck behind their headers. The
           // minute tick lets the open bucket follow the clock until the user
@@ -207,6 +208,18 @@ struct HabitsDestinationView: View {
     checklistMutator.deleteHabit(id: habit.id)
     model.habits.removeAll { $0.id == habit.id }
     Haptics.warning()
+  }
+
+  /// Top-of-Log day readout — today's completion at a glance. Mirrors the
+  /// shared summary band on the event-log sections.
+  private var habitsSummary: some View {
+    let done = model.habits.filter(\.done).count
+    let total = model.habits.count
+    let pct = total > 0 ? Int((Double(done) * 100 / Double(total)).rounded()) : 0
+    return DrawerSummary(stats: [
+      Stat(value: "\(done)/\(total)", label: "done today", tint: accent),
+      Stat(value: "\(pct)%", label: "complete", tint: accent),
+    ])
   }
 
   // MARK: - Patterns breakdown

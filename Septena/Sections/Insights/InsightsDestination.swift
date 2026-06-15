@@ -35,7 +35,8 @@ struct InsightsDestinationView: View {
 
   var body: some View {
     SectionDrawer(sectionKey: "insights", title: "Insights",
-                  accent: Self.accent, showsSettingsLink: false) {
+                  accent: Self.accent, showsSettingsLink: false,
+                  usesColumns: false) {
       CorrelationsHomepageView()
     }
     .onAppear {

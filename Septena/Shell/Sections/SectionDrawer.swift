@@ -168,6 +168,24 @@ enum DrawerMode: String, Hashable {
   }
 
   private static func storageKey(_ sectionKey: String) -> String { "drawerMode.\(sectionKey)" }
+
+  /// One-shot empty-day nudge for editable dual sections: if still in `.log` and
+  /// the day you're viewing is today with nothing logged, swing to `.patterns`
+  /// so an empty log greets you with the pattern view instead of a dead end (the
+  /// global "+" stays one tap away). Never persisted — only a deliberate toggle
+  /// sticks. Call from a section's reload once data has loaded; `didNudge` guards
+  /// it to a single fire per appearance. Centralized here so every section that
+  /// wants it shares the exact same rule.
+  static func nudgeEmptyDayToPatterns(mode: Binding<DrawerMode>,
+                                      didNudge: Binding<Bool>,
+                                      isViewingToday: Bool,
+                                      isEmpty: Bool) {
+    guard !didNudge.wrappedValue else { return }
+    didNudge.wrappedValue = true
+    if mode.wrappedValue == .log, isViewingToday, isEmpty {
+      withAnimation(.snappy) { mode.wrappedValue = .patterns }
+    }
+  }
 }
 
 /// The top-left glass control that flips a drawer between Log and Patterns —
@@ -303,6 +321,13 @@ struct SectionDrawer<Content: View>: View {
   /// also self-hides for utility drawers (empty `title` or a `sectionKey`
   /// with no `SectionManifest`) and while time-traveling.
   var showsSettingsLink: Bool = true
+  /// Whether to flow `content()` through `DrawerColumns` (the 1-vs-2 column
+  /// masonry). Default on. Set `false` for destinations that are a *single*
+  /// monolithic view doing their own internal width-responsive layout (e.g.
+  /// Insights) — the masonry would otherwise place that one subview into one
+  /// half-width column and leave the other empty, collapsing a wide pane into
+  /// a thin column. Full-width hands the destination the entire content width.
+  var usesColumns: Bool = true
   @ViewBuilder var content: () -> Content
 
   @Environment(SectionTheme.self) private var theme
@@ -405,9 +430,16 @@ struct SectionDrawer<Content: View>: View {
         } else {
           // On a regular-width pane (iPad / Mac) the section cards spread
           // across up to two columns; on iPhone (and any narrow pane) they
-          // stay a single lazy column, exactly as before.
-          DrawerColumns(spacing: Theme.Spacing.xxl) {
+          // stay a single lazy column, exactly as before. Destinations that
+          // own their internal responsive layout opt out (`usesColumns:
+          // false`) and get the full content width.
+          if usesColumns {
+            DrawerColumns(spacing: Theme.Spacing.xxl) {
+              content()
+            }
+          } else {
             content()
+              .frame(maxWidth: .infinity, alignment: .leading)
           }
           if showsSettingsLink, !isTimeTraveling,
              !resolvedTitle.isEmpty, SectionManifest.byKey[sectionKey] != nil {

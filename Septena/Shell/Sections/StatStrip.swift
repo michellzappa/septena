@@ -61,6 +61,22 @@ struct StatStrip: View {
   }
 }
 
+/// The standard top-of-Log readout: a titled card wrapping the shared
+/// `StatStrip`. Editable event-log sections (Symptoms, Medications, Intake)
+/// put one of these at the top of their Log so the day's headline stats read
+/// identically everywhere — same title, placement, and tile shape. Sections
+/// with a genuinely richer readout (Sleep score rings, Body trend tiles,
+/// Hydration progress bar) keep their bespoke top block; this is only for the
+/// stat-strip family.
+struct DrawerSummary: View {
+  let stats: [Stat]
+  var title: String = "Summary"
+
+  var body: some View {
+    DrawerSection(title) { StatStrip(stats: stats) }
+  }
+}
+
 #Preview("StatStrip — two stats") {
   StatStrip(stats: [
     Stat(value: "12", label: "today", tint: .blue),
