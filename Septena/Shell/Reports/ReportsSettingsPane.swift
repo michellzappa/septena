@@ -66,7 +66,7 @@ struct ReportsSettingsPane: View {
       }
     }
     .sheet(item: $preview) { p in
-      ReportPreviewSheet(preview: p)
+      ReportPreviewSheet(preview: p) { bundles = ReportStore.load() }
     }
   }
 
@@ -103,7 +103,8 @@ struct ReportsSettingsPane: View {
     let sects = "\(n) section\(n == 1 ? "" : "s")"
     let win = b.windowDays == 365 ? "12 months" : "\(b.windowDays)d"
     let mcp = b.mcpEnabled ? " · MCP on" : ""
-    return "\(sects) · \(win)\(mcp)"
+    let link = (b.linkURL?.isEmpty == false) ? " · 🔗 shared" : ""
+    return "\(sects) · \(win)\(mcp)\(link)"
   }
 
   // MARK: Actions
@@ -126,12 +127,12 @@ struct ReportsSettingsPane: View {
     let meta = metaMap(for: bundle.sectionKeys)
     let owner = store.serverSettings?.welcomeName ?? ""
     Task {
-      let html = await MirrorReader.shared.read { ctx in
-        ReportHTMLRenderer.html(for: ReportPayloadBuilder.build(
-          bundle: bundle, meta: meta, owner: owner, context: ctx))
+      let payload = await MirrorReader.shared.read { ctx in
+        ReportPayloadBuilder.build(bundle: bundle, meta: meta, owner: owner, context: ctx)
       }
+      let html = ReportHTMLRenderer.html(for: payload)
       await MainActor.run {
-        preview = ReportPreview(bundle: bundle, html: html)
+        preview = ReportPreview(bundle: bundle, payload: payload, html: html)
         renderingID = nil
       }
     }
@@ -160,6 +161,7 @@ struct ReportsSettingsPane: View {
 
 struct ReportPreview: Identifiable {
   let bundle: ReportBundle
+  let payload: ReportPayload
   let html: String
   var id: String { bundle.id }
 }
@@ -200,6 +202,16 @@ struct ReportBuilderSheet: View {
           Text("Checked sections appear as aggregate trends. Sections marked “no trends yet” are listed but won't chart until their pattern view ships.")
         }
 
+        SwiftUI.Section("Link expiry") {
+          Picker("Link expires", selection: expiryBinding) {
+            Text("30 days").tag(30)
+            Text("90 days").tag(90)
+            Text("12 months").tag(365)
+            Text("Never").tag(0)
+          }
+          .pickerStyle(.segmented)
+        }
+
         SwiftUI.Section {
           Toggle(isOn: $draft.mcpEnabled) {
             VStack(alignment: .leading, spacing: 2) {
@@ -225,6 +237,12 @@ struct ReportBuilderSheet: View {
     #if os(macOS)
     .frame(width: 520, height: 560)
     #endif
+  }
+
+  // Maps the optional linkExpiryDays to the picker (0 = never).
+  private var expiryBinding: Binding<Int> {
+    Binding(get: { draft.linkExpiryDays ?? 0 },
+            set: { draft.linkExpiryDays = $0 == 0 ? nil : $0 })
   }
 
   @ViewBuilder
@@ -253,28 +271,143 @@ struct ReportBuilderSheet: View {
 struct ReportPreviewSheet: View {
   @Environment(\.dismiss) private var dismiss
   let preview: ReportPreview
+  /// Called after the link is created/refreshed so the hub list can refresh.
+  var onUpdate: () -> Void = {}
+
+  @State private var linkURL: String?
+  @State private var creating = false
+  @State private var errorMessage: String?
+
+  init(preview: ReportPreview, onUpdate: @escaping () -> Void = {}) {
+    self.preview = preview
+    self.onUpdate = onUpdate
+    _linkURL = State(initialValue: preview.bundle.linkURL)
+  }
 
   var body: some View {
     NavigationStack {
-      ReportWebView(html: preview.html)
-        .navigationTitle(preview.bundle.title.isEmpty ? "Report" : preview.bundle.title)
-        .toolbar {
-          #if os(macOS)
-          ToolbarItemGroup {
-            Button { openInBrowser() } label: { Label("Open in Browser", systemImage: "safari") }
-            Button { saveHTML() } label: { Label("Save HTML…", systemImage: "square.and.arrow.down") }
-            Button("Done") { dismiss() }
-          }
-          #else
-          ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
-          ToolbarItem(placement: .primaryAction) {
-            ShareLink(item: exportURL()) { Image(systemName: "square.and.arrow.up") }
-          }
-          #endif
+      VStack(spacing: 0) {
+        if let url = linkURL, !url.isEmpty {
+          linkBanner(url)
         }
+        ReportWebView(html: preview.html)
+      }
+      .navigationTitle(preview.bundle.title.isEmpty ? "Report" : preview.bundle.title)
+      .toolbar {
+        #if os(macOS)
+        ToolbarItemGroup {
+          linkButton
+          Button { openInBrowser() } label: { Label("Open in Browser", systemImage: "safari") }
+          Button { saveHTML() } label: { Label("Save HTML…", systemImage: "square.and.arrow.down") }
+          Button("Done") { dismiss() }
+        }
+        #else
+        ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+        ToolbarItem(placement: .primaryAction) {
+          ShareLink(item: exportURL()) { Image(systemName: "square.and.arrow.up") }
+        }
+        #endif
+      }
+      .alert("Couldn't create link", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+        Button("OK", role: .cancel) {}
+      } message: { Text(errorMessage ?? "") }
     }
     #if os(macOS)
     .frame(minWidth: 760, minHeight: 640)
+    #endif
+  }
+
+  // MARK: Link UI
+
+  @ViewBuilder
+  private var linkButton: some View {
+    if creating {
+      ProgressView().controlSize(.small)
+    } else if linkURL?.isEmpty == false {
+      Button { copyLink() } label: { Label("Copy Link", systemImage: "link") }
+      Button(role: .destructive) { revokeLink() } label: { Label("Revoke", systemImage: "trash") }
+    } else {
+      Button { createLink() } label: { Label("Create Link", systemImage: "link.badge.plus") }
+    }
+  }
+
+  @ViewBuilder
+  private func linkBanner(_ url: String) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
+      HStack(spacing: 10) {
+        Image(systemName: "link").foregroundStyle(.secondary)
+        Text(url).font(.callout.monospaced()).lineLimit(1).truncationMode(.middle)
+        Spacer()
+        Button("Copy") { copyLink() }.buttonStyle(.borderless)
+      }
+      Text(expiryCaption).font(.caption).foregroundStyle(.secondary)
+    }
+    .padding(.horizontal, 16).padding(.vertical, 10)
+    .background(.thinMaterial)
+  }
+
+  private var expiryCaption: String {
+    if let d = preview.bundle.linkExpiryDays {
+      return "Expires \(d == 365 ? "in 12 months" : "in \(d) days") · anyone with the link can view · Revoke to kill it now"
+    }
+    return "Never expires · anyone with the link can view · Revoke to kill it now"
+  }
+
+  // MARK: Link actions — pushes live aggregates to the Worker (user-initiated)
+
+  private func createLink() {
+    creating = true
+    var bundle = preview.bundle
+    let token = bundle.token ?? ReportEndpoint.newToken()
+    let payload = preview.payload
+    let html = preview.html
+    let expiresAt = ReportPublisher.expiry(daysFromNow: bundle.linkExpiryDays)
+    Task {
+      do {
+        let url = try await ReportPublisher.push(payload: payload, html: html, token: token,
+                                                 expiresAt: expiresAt, baseURL: ReportEndpoint.baseURL)
+        bundle.token = token
+        bundle.linkURL = url.absoluteString
+        ReportStore.upsert(bundle)
+        await MainActor.run {
+          linkURL = url.absoluteString
+          creating = false
+          copyLink()
+          onUpdate()
+        }
+      } catch {
+        await MainActor.run {
+          creating = false
+          errorMessage = "\(error)"
+        }
+      }
+    }
+  }
+
+  private func revokeLink() {
+    guard let token = preview.bundle.token else { linkURL = nil; return }
+    creating = true
+    var bundle = preview.bundle
+    Task {
+      try? await ReportPublisher.revoke(token: token, baseURL: ReportEndpoint.baseURL)
+      bundle.linkURL = nil
+      bundle.token = nil
+      ReportStore.upsert(bundle)
+      await MainActor.run {
+        linkURL = nil
+        creating = false
+        onUpdate()
+      }
+    }
+  }
+
+  private func copyLink() {
+    guard let url = linkURL, !url.isEmpty else { return }
+    #if os(macOS)
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(url, forType: .string)
+    #else
+    UIPasteboard.general.string = url
     #endif
   }
 

@@ -19,14 +19,16 @@ public enum ReportPublisher {
   /// `/r/<token>` URL on success.
   @discardableResult
   public static func push(payload: ReportPayload,
+                          html: String,
                           token: String,
+                          expiresAt: String? = nil,
                           baseURL: URL,
                           session: URLSession = .shared) async throws -> URL {
     var req = URLRequest(url: baseURL.appendingPathComponent("api/reports/\(token)"))
     req.httpMethod = "PUT"
     req.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-    let body = PushBody(token: token, payload: payload)
+    let body = PushBody(token: token, payload: payload, html: html, expiresAt: expiresAt)
     guard let data = try? JSONEncoder().encode(body) else { throw PublishError.encoding }
     req.httpBody = data
 
@@ -36,8 +38,28 @@ public enum ReportPublisher {
     return baseURL.appendingPathComponent("r/\(token)")
   }
 
+  /// Revoke a link — deletes the blob so `/r/<token>` 404s immediately.
+  public static func revoke(token: String,
+                            baseURL: URL,
+                            session: URLSession = .shared) async throws {
+    var req = URLRequest(url: baseURL.appendingPathComponent("api/reports/\(token)"))
+    req.httpMethod = "DELETE"
+    let (_, response) = try await session.data(for: req)
+    let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+    guard (200..<300).contains(code) else { throw PublishError.badResponse(code) }
+  }
+
+  /// ISO8601 instant `days` from now, or nil for "never".
+  public static func expiry(daysFromNow days: Int?) -> String? {
+    guard let days else { return nil }
+    let date = Calendar.current.date(byAdding: .day, value: days, to: Date()) ?? Date()
+    return ISO8601DateFormatter().string(from: date)
+  }
+
   private struct PushBody: Encodable {
     let token: String
     let payload: ReportPayload
+    let html: String
+    let expiresAt: String?
   }
 }

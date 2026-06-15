@@ -43,20 +43,30 @@ Patterns view from `docs/DRAWER_MODES_SPEC.md` first).
 The HTML renderer lives in `SeptenaCore` and is the single source the future
 Worker will mirror — one renderer, both surfaces.
 
-## Turning on the real link (later, ~10 min once `wrangler` is authed)
+## The real link — LIVE (deployed 2026-06-15)
 
-```bash
-cd reports-worker
-npm install
-wrangler kv namespace create REPORTS      # paste the printed id into wrangler.toml
-wrangler deploy                            # prints https://septena-reports.<you>.workers.dev
-```
+The Worker is deployed and the app is wired:
 
-Then wire `ReportPublisher.push(payload:token:baseURL:)` into the report row
-("Create link") and present `<baseURL>/r/<token>`. The Worker stores the payload
-the app PUTs and serves it at `/r/:token`. This prototype Worker has **no App
-Attest, no expiry enforcement, no rate limiting** — those are the spec's Phase 1
-hardening, not the throwaway link.
+- **Endpoint:** `https://septena-reports.mz-508.workers.dev` (KV namespace
+  `REPORTS`, deployed from `reports-worker/` via `npx wrangler deploy`).
+- **In-app:** open a report's preview → **Create Link**. This pushes the live
+  aggregate payload via `ReportPublisher.push(...)`, mints a 40-hex-char token,
+  stores `token` + `linkURL` on the bundle, copies the URL, and shows it in a
+  banner. Re-creating refreshes the same token's payload. The row shows
+  "🔗 shared".
+- The base URL is `ReportEndpoint.baseURL` (override via the
+  `septena.reports.baseURL` UserDefaults key).
+
+Verified end-to-end with a **synthetic** payload: PUT → `{ok,url}`, GET
+`/r/<token>` → HTTP 200 with the rendered report, unknown token → 404. The first
+push of *real* data happens only when the user taps Create Link.
+
+> ⚠️ This prototype Worker has **no App Attest gate, no token expiry, no revoke,
+> no rate limiting** — anyone with the URL can read it until the KV entry is
+> deleted. Those are the spec's Phase-1 hardening (track #3). Treat current
+> links as disposable; don't share real health data widely yet.
+
+Redeploy after Worker edits: `cd reports-worker && npx wrangler deploy`.
 
 ## Not built (deferred to the spec phases)
 - Secure token auth / App Attest gate / expiry + revoke enforcement.

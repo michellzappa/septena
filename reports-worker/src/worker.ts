@@ -27,6 +27,12 @@ export interface Env {
 interface StoredReport {
   token: string;
   payload: ReportPayload;
+  /** Full HTML rendered by the Swift ReportHTMLRenderer (the rich, charted
+   *  view). Served verbatim so there's ONE renderer. `payload` is kept for the
+   *  future scoped MCP endpoint. */
+  html?: string;
+  /** ISO8601 instant after which the link 404s. Omitted = never expires. */
+  expiresAt?: string;
   updatedAt: string;
 }
 
@@ -55,14 +61,24 @@ export default {
     // PUT /api/reports/:id  → upsert payload, keyed by its view token.
     if (req.method === "PUT" && path.startsWith("/api/reports/")) {
       try {
-        const body = (await req.json()) as { token?: string; payload?: ReportPayload };
+        const body = (await req.json()) as { token?: string; payload?: ReportPayload; html?: string; expiresAt?: string };
         if (!body.token || !body.payload) return json({ error: "token and payload required" }, 400);
-        const stored: StoredReport = { token: body.token, payload: body.payload, updatedAt: new Date().toISOString() };
+        const stored: StoredReport = {
+          token: body.token, payload: body.payload, html: body.html,
+          expiresAt: body.expiresAt, updatedAt: new Date().toISOString(),
+        };
         await env.REPORTS.put(body.token, JSON.stringify(stored));
         return json({ ok: true, url: `${url.origin}/r/${body.token}` });
       } catch {
         return json({ error: "bad request" }, 400);
       }
+    }
+
+    // DELETE /api/reports/:token  → revoke (remove the blob; link 404s).
+    if (req.method === "DELETE" && path.startsWith("/api/reports/")) {
+      const token = path.slice("/api/reports/".length);
+      if (token) await env.REPORTS.delete(token);
+      return json({ ok: true });
     }
 
     // GET /r/:token  → render the report HTML.
@@ -71,7 +87,14 @@ export default {
       const raw = await env.REPORTS.get(token);
       if (!raw) return new Response("Report not found, expired, or revoked.", { status: 404 });
       const stored = JSON.parse(raw) as StoredReport;
-      return new Response(renderHTML(stored.payload), {
+      if (stored.expiresAt && Date.parse(stored.expiresAt) < Date.now()) {
+        await env.REPORTS.delete(token); // tidy the expired blob
+        return new Response("This report link has expired.", { status: 404 });
+      }
+      // Serve the Swift-rendered HTML (the charted view); fall back to the
+      // minimal in-Worker render only for blobs pushed without html.
+      const out = stored.html && stored.html.length > 0 ? stored.html : renderHTML(stored.payload);
+      return new Response(out, {
         headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
       });
     }

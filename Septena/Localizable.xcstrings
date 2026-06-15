@@ -823,6 +823,9 @@
         }
       }
     },
+    "12 months" : {
+
+    },
     "30 days" : {
       "localizations" : {
         "pt-BR" : {
@@ -1947,6 +1950,9 @@
     "Checkbox feels" : {
 
     },
+    "Checked sections appear as aggregate trends. Sections marked “no trends yet” are listed but won't chart until their pattern view ships." : {
+
+    },
     "Chest" : {
       "localizations" : {
         "pt-BR" : {
@@ -2835,6 +2841,9 @@
           }
         }
       }
+    },
+    "Enable MCP endpoint" : {
+
     },
     "Enabled" : {
       "localizations" : {
@@ -4016,6 +4025,9 @@
     "Let Siri and Apple Intelligence find this section's entries in search." : {
 
     },
+    "Let the recipient's own AI query this report (scoped, read-only). Design flag in this prototype — not yet served." : {
+
+    },
     "Light mode uses a %@ background with white discs. Dark mode uses transparent artwork so the system background shows through behind %@ discs." : {
       "localizations" : {
         "en" : {
@@ -4546,6 +4558,9 @@
         }
       }
     },
+    "New report" : {
+
+    },
     "New Task" : {
       "localizations" : {
         "pt-BR" : {
@@ -4825,6 +4840,9 @@
           }
         }
       }
+    },
+    "no trends yet" : {
+
     },
     "None" : {
       "localizations" : {
@@ -5204,6 +5222,9 @@
           }
         }
       }
+    },
+    "Pick an audience to start — each pre-selects sensible sections you can edit. Reports share aggregate trends only, never individual entries." : {
+
     },
     "Pick up to %@ sections. Each one becomes a shortcut in the Home Screen long-press menu, opening directly into that section." : {
       "localizations" : {

@@ -6,7 +6,7 @@ compatibility_date = "2024-11-01"
 # then paste the printed id below.
 [[kv_namespaces]]
 binding = "REPORTS"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "893586324c144d1fb6402b8a4427d49d"
 
 # To serve on septena.app/r/* later, add a route here and remove workers.dev:
 # [[routes]]

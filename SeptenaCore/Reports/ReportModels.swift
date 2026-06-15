@@ -33,6 +33,14 @@ public struct ReportBundle: Codable, Identifiable, Hashable, Sendable {
   /// Whether this report would also expose a scoped read-only MCP endpoint
   /// (design flag only in the prototype — surfaced in the UI, not yet wired).
   public var mcpEnabled: Bool
+  /// Unguessable token for the shareable link, minted on first "Create link".
+  /// Stays stable so re-pushing refreshes the same URL. nil until shared.
+  public var token: String?
+  /// The public /r/<token> URL, cached for display once created.
+  public var linkURL: String?
+  /// How many days the shared link stays live, from each push. nil = never
+  /// expires. Default 90.
+  public var linkExpiryDays: Int?
 
   public init(id: String,
               title: String,
@@ -40,7 +48,10 @@ public struct ReportBundle: Codable, Identifiable, Hashable, Sendable {
               sectionKeys: [String],
               windowDays: Int = 90,
               createdAt: String,
-              mcpEnabled: Bool = false) {
+              mcpEnabled: Bool = false,
+              token: String? = nil,
+              linkURL: String? = nil,
+              linkExpiryDays: Int? = 90) {
     self.id = id
     self.title = title
     self.note = note
@@ -48,6 +59,31 @@ public struct ReportBundle: Codable, Identifiable, Hashable, Sendable {
     self.windowDays = windowDays
     self.createdAt = createdAt
     self.mcpEnabled = mcpEnabled
+    self.token = token
+    self.linkURL = linkURL
+    self.linkExpiryDays = linkExpiryDays
+  }
+}
+
+// MARK: - Worker endpoint
+
+/// Where report payloads are pushed / served from. Defaults to the deployed
+/// prototype Worker; overridable via UserDefaults for testing.
+public enum ReportEndpoint {
+  public static let defaultBaseURL = URL(string: "https://septena-reports.mz-508.workers.dev")!
+
+  public static var baseURL: URL {
+    if let s = UserDefaults.standard.string(forKey: "septena.reports.baseURL"),
+       let u = URL(string: s) { return u }
+    return defaultBaseURL
+  }
+
+  /// 128-bit unguessable token (32 hex chars) for a new shareable link.
+  public static func newToken() -> String {
+    (UUID().uuidString + UUID().uuidString)
+      .replacingOccurrences(of: "-", with: "")
+      .lowercased()
+      .prefix(40).description
   }
 }
 
